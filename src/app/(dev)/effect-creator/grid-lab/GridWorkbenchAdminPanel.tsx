@@ -1,38 +1,13 @@
 type GridDensity = 'standard' | 'light'
 type GridPattern = 'standard' | 'quincunx' | 'diamond'
 type MagnetPlan = 'auto' | 'all6' | 'all8' | 'corners8'
-type Src = 'std' | 'preset' | 'gen' | 'magic'
-type StdGeo = 'square' | 'diamondShape' | 'rect' | 'circle' | 'triangle'
-type GridMode = 'auto' | 'standard' | 'quincunx' | 'diamond'
-
-interface SemanticRungView {
-  label: string
-  points: number
-  sizeMM: number
-  visible: boolean
-}
-
-interface RectangleRungsView {
-  longOptions: SemanticRungView[]
-  shortOptions: SemanticRungView[]
-}
 
 interface GridWorkbenchAdminPanelModel {
   pitch: number
   patternUsed: string
-  rung: SemanticRungView | null
-  rungH: SemanticRungView | null
 }
 
 export interface GridWorkbenchAdminPanelProps {
-  src: Src
-  geo: StdGeo
-  setLongMM: (value: number) => void
-  setShortMM: (value: number) => void
-  setSizeMM: (value: number) => void
-  gridMode: GridMode
-  stdRungs: SemanticRungView[]
-  rectRungs: RectangleRungsView | null
   pitch: number
   setPitch: (value: number) => void
   pitchAuto: boolean
@@ -55,60 +30,29 @@ export interface GridWorkbenchAdminPanelProps {
   setCenterMode: (value: 'centroid' | 'bbox') => void
   maxGrowMM: number
   setMaxGrowMM: (value: number) => void
+  testSizeMM: number
+  setTestSizeMM: (value: number) => void
+  testSizeMin: number
+  testSizeMax: number
+  snapToGrid: boolean
+  setSnapToGrid: (value: boolean) => void
+  snapSizesMM: number[]
   model: GridWorkbenchAdminPanelModel | null
   onSliderInteractionChange: (transient: boolean) => void
 }
 
 export function GridWorkbenchAdminPanel({
-  src, geo, setLongMM, setShortMM, setSizeMM, gridMode, stdRungs, rectRungs,
   pitch, setPitch, pitchAuto, setPitchAuto,
   density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
-  maxGrowMM, setMaxGrowMM, model, onSliderInteractionChange,
+  maxGrowMM, setMaxGrowMM,
+  testSizeMM, setTestSizeMM, testSizeMin, testSizeMax,
+  snapToGrid, setSnapToGrid, snapSizesMM,
+  model, onSliderInteractionChange,
 }: GridWorkbenchAdminPanelProps) {
-  const hiddenStdRungs = stdRungs.filter(r => !r.visible)
-  const hiddenLongRungs = (rectRungs?.longOptions ?? []).filter(r => !r.visible)
-  const hiddenShortRungs = (rectRungs?.shortOptions ?? []).filter(r => !r.visible)
-
+  const snapIndex = Math.max(0, snapSizesMM.indexOf(testSizeMM))
   return <>
     <div className="gl-card gl-pad">
-      {!(src === 'std' && geo === 'rect') && (!stdRungs.length || hiddenStdRungs.length > 0) && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
-        <div className="gl-seg gl-wrap">
-          {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
-          {hiddenStdRungs.map(r =>
-            <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
-              className={r.visible ? undefined : 'gl-hidden-rung'}
-              onClick={() => setSizeMM(r.sizeMM)}
-              title={`${r.points} anchor point${r.points > 1 ? 's' : ''}${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-              {r.label}{r.visible ? '' : '†'}
-            </button>)}
-        </div>
-      </div>}
-      {src === 'std' && geo === 'rect' && <>
-        {(!rectRungs || hiddenLongRungs.length > 0) && <div className="gl-field"><span>Long side · size</span>
-          <div className="gl-seg gl-wrap">
-            {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {hiddenLongRungs.map(r =>
-              <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
-                className={r.visible ? undefined : 'gl-hidden-rung'}
-                onClick={() => setLongMM(r.sizeMM)}
-                title={`${r.points} anchor points${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                {r.label}{r.visible ? '' : '†'}
-              </button>)}
-          </div>
-        </div>}
-        {(!rectRungs || hiddenShortRungs.length > 0) && <div className="gl-field"><span>Short side · size</span>
-          <div className="gl-seg gl-wrap">
-            {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {hiddenShortRungs.map(r =>
-              <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
-                className={r.visible ? undefined : 'gl-hidden-rung'}
-                onClick={() => setShortMM(r.sizeMM)}>
-                {r.label}{r.visible ? '' : '†'}
-              </button>)}
-          </div>
-        </div>}
-      </>}
       <div className="gl-field"><span>Density</span>
         <div className="gl-seg">
           <button aria-pressed={density === 'standard'} onClick={() => setDensity('standard')} title="dense — fine grid, full coverage, firmer hold">Standard</button>
@@ -125,6 +69,24 @@ export function GridWorkbenchAdminPanel({
       <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} onInteractionChange={onSliderInteractionChange} />
       <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} onInteractionChange={onSliderInteractionChange} />
       <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} onInteractionChange={onSliderInteractionChange} />
+      <label className="gl-toggle"><span>Snap test size to grid</span>
+        <input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} />
+      </label>
+      <div data-grid-size-snap={snapToGrid ? 'on' : 'off'}>
+        <Slider
+          label="Test size · longest side"
+          unit="mm"
+          v={snapToGrid ? snapIndex : testSizeMM}
+          displayV={testSizeMM}
+          set={value => {
+            const sizeMM = snapToGrid ? snapSizesMM[Math.round(value)] : value
+            if (sizeMM != null) setTestSizeMM(sizeMM)
+          }}
+          min={snapToGrid ? 0 : testSizeMin}
+          max={snapToGrid ? Math.max(0, snapSizesMM.length - 1) : testSizeMax}
+          onInteractionChange={onSliderInteractionChange}
+        />
+      </div>
 
       <div className="gl-field"><span>Grid pattern · {patternAuto && model ? `auto → ${model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed}` : 'manual'}</span>
         <div className="gl-seg">
@@ -154,9 +116,10 @@ export function GridWorkbenchAdminPanel({
 
 const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'])
 
-function Slider({ label, v, set, min, max, unit, onInteractionChange }: {
+function Slider({ label, v, displayV = v, set, min, max, unit, onInteractionChange }: {
   label: string
   v: number
+  displayV?: number
   set: (n: number) => void
   min: number
   max: number
@@ -165,7 +128,7 @@ function Slider({ label, v, set, min, max, unit, onInteractionChange }: {
 }) {
   return (
     <label className="gl-slider">
-      <div className="gl-slider-row"><span>{label}</span><b>{v}{unit ? ' ' + unit : ''}</b></div>
+      <div className="gl-slider-row"><span>{label}</span><b>{displayV}{unit ? ' ' + unit : ''}</b></div>
       <input
         type="range"
         min={min}

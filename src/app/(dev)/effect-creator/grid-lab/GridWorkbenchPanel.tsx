@@ -146,30 +146,28 @@ export function GridWorkbenchPanel({
             <button key={a} aria-pressed={attachment === a} onClick={() => setAttachment(a)}>{l}</button>)}
         </div>
       </div>
-      {/* SEMANTIC SIZES — the shape's own T-shirt ladder (anchor-count tiers), mode + recipe driven */}
-      {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
+      {/* SEMANTIC SIZES — the shape's own T-shirt ladder (grid-extent tiers), mode + recipe driven */}
+      {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : src === 'preset' ? 'this preset' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
         <div className="gl-seg gl-wrap">
           {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
           {stdRungs.filter(r => r.visible).map(r =>
             <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
-              className={r.visible ? undefined : 'gl-hidden-rung'}
               onClick={() => setSizeMM(r.sizeMM)}
-              title={`${r.points} anchor point${r.points > 1 ? 's' : ''}${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-              {r.label}{r.visible ? '' : '†'}
+              title={`${r.points} anchor point${r.points > 1 ? 's' : ''}`}>
+              {r.label}
             </button>)}
         </div>
       </div>}
       {src === 'std' && geo === 'rect' && <>
-        {/* system A: long side → short side (< long) → orientation */}
+        {/* system A: two legal axis extents (equal = square) → orientation */}
         <div className="gl-field"><span>Long side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
             {(rectRungs?.longOptions ?? []).filter(r => r.visible).map(r =>
               <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
-                className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setLongMM(r.sizeMM)}
-                title={`${r.points} anchor points${r.visible ? '' : ' · hidden at launch (untested)'}`}>
-                {r.label}{r.visible ? '' : '†'}
+                title={`${r.points} anchor points`}>
+                {r.label}
               </button>)}
           </div>
         </div>
@@ -178,9 +176,8 @@ export function GridWorkbenchPanel({
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
             {(rectRungs?.shortOptions ?? []).filter(r => r.visible).map(r =>
               <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
-                className={r.visible ? undefined : 'gl-hidden-rung'}
                 onClick={() => setShortMM(r.sizeMM)}>
-                {r.label}{r.visible ? '' : '†'}
+                {r.label}
               </button>)}
           </div>
         </div>
@@ -191,7 +188,8 @@ export function GridWorkbenchPanel({
           </div>
         </div>
       </>}
-      <Slider label={`Design size · longest side${sizeMax < maxRungMM ? ` · max ${sizeMax}` : ''}`} unit="mm" v={resolvedSizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} onInteractionChange={onSliderInteractionChange} />
+      {(src === 'gen' || src === 'magic') &&
+        <Slider label={`Design size · longest side${sizeMax < maxRungMM ? ` · max ${sizeMax}` : ''}`} unit="mm" v={resolvedSizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} onInteractionChange={onSliderInteractionChange} />}
       {model && <div className="gl-total">
         <span className="gl-total-k">Total effect size</span>
         <b className="gl-total-v">{model.effSize}<small> mm</small></b>
@@ -201,7 +199,7 @@ export function GridWorkbenchPanel({
           ? model.rung && model.rungH
             ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}`
             : `seated ${model.grid.anchors.length}`
-          : `${model.rung ? `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.rung.points}pt · ` : ''}seated ${model.grid.anchors.length}`}
+          : `${model.rung ? `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.grid.anchors.length}pt · ` : ''}seated ${model.grid.anchors.length}`}
         {model.rung && model.rungH && (!model.rung.visible || !model.rungH.visible) ? ' · HIDDEN (untested)' : ''}</span>
       </div>}
     </div>

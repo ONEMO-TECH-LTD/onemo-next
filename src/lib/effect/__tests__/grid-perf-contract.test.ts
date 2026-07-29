@@ -141,6 +141,36 @@ describe('exact grid recipe handlers', () => {
     expect(handled.operation).toBe('plan')
     expectByteIdentical(handled.value, direct)
   })
+
+  it('derives a fixed-96 square ladder only from registered 96mm grid extents', () => {
+    const recipe: LadderRecipe = { kind: 'standard', shape: 'square' }
+    const options: GridPlanOptions = {
+      mode: 'standard',
+      density: 'light',
+      paddingMM: 10,
+      pitchMM: 96,
+      maxGrowMM: 0,
+    }
+    const handled = handleGridJob({
+      operation: 'ladder',
+      recipe,
+      law: DEFAULT_LAW,
+      mode: 'standard',
+      options,
+    })
+
+    expect(handled.operation).toBe('ladder')
+    if (handled.operation !== 'ladder') throw new Error('Expected a ladder result.')
+    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([22, 118, 214, 310])
+    expect(handled.value.map((rung) => rung.points)).toEqual([1, 4, 8, 12])
+    expect(handled.key).toBe(gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', options))
+    expect(handled.key).not.toBe(gridLadderCacheKey(
+      recipe,
+      DEFAULT_LAW,
+      'standard',
+      { ...options, pitchMM: 48 },
+    ))
+  })
 })
 
 describe('exact grid cache identity', () => {
@@ -220,7 +250,7 @@ describe('exact grid cache identity', () => {
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(1)
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(3)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(gridLadderCacheKey(squareLadder)).toContain(`"cacheVersion":${GRID_ENGINE_CACHE_VERSION}`)

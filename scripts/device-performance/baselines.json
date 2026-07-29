@@ -3,23 +3,20 @@
   "executor": "Node.js current engine",
   "fixtures": {
     "canonical-ladder": {
-      "sha256": "c88186a8c2008dabad7929d510464498bf0c8b91dd2be83b9f4ff6d30743dbae",
+      "sha256": "348cd15175e13cd296d50aa5bc51a6888bdde26f30138ea3eaeb0c17875f6437",
       "t2": {
         "rungs": [
           { "label": "ONE", "points": 1, "sizeMM": 23, "visible": true },
           { "label": "S", "points": 2, "sizeMM": 71, "visible": true },
-          { "label": "M", "points": 4, "sizeMM": 90, "visible": true },
-          { "label": "L", "points": 6, "sizeMM": 130, "visible": true },
-          { "label": "XL", "points": 8, "sizeMM": 158, "visible": true },
-          { "label": "2XL", "points": 9, "sizeMM": 215, "visible": false },
-          { "label": "3XL", "points": 10, "sizeMM": 221, "visible": false },
-          { "label": "4XL", "points": 12, "sizeMM": 226, "visible": false },
-          { "label": "5XL", "points": 16, "sizeMM": 303, "visible": false }
+          { "label": "M", "points": 4, "sizeMM": 119, "visible": true },
+          { "label": "L", "points": 8, "sizeMM": 174, "visible": true },
+          { "label": "XL", "points": 9, "sizeMM": 215, "visible": true },
+          { "label": "2XL", "points": 14, "sizeMM": 263, "visible": false }
         ]
       }
     },
     "dense-live-plan": {
-      "sha256": "f291088e720cde9d196e30b9f817b9fb1d829d6990f7e1ac4ce8c23e22f76382",
+      "sha256": "a3f1a99f38049ff9bd3076151e676715a2e9105cadc70345e8f773dba42191dd",
       "t2": {
         "anchorCount": 2,
         "flapCount": 0,
@@ -34,7 +31,7 @@
       }
     },
     "small-contour-plan": {
-      "sha256": "455ae16fc3d707aedfaa0f7ef117e41369e9cd9b2c10c175b7894822ac3420be",
+      "sha256": "09cad563d2ee9556835489505316cd1269e1f9136d15f4b58167780c02049e33",
       "t2": {
         "anchorCount": 4,
         "flapCount": 0,

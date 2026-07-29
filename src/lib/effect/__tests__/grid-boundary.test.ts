@@ -42,6 +42,9 @@ describe('Creator magnetic-grid module boundary', () => {
       pageSource.indexOf('<GridWorkbenchPanel'),
     )
     expect(pageSource).toContain('requestGridJob')
+    expect(pageSource).toContain('const [snapToGrid, setSnapToGrid] = useState(true)')
+    expect(pageSource)
+      .toContain('resolvedSizeMM: snapToGrid ? effectiveTestSizeMM : resolvedSizeMM')
     expect(pageSource).not.toMatch(/\b(?:Admin|User)Grid/)
     expect(pageSource).not.toContain('panel' + 'Entry')
     expect(pageSource).not.toContain('data-grid-door')
@@ -75,6 +78,8 @@ describe('Creator magnetic-grid module boundary', () => {
       '<div className="gl-field"><span>Grid pattern ·',
       '<div className="gl-field"><span>Grid centering · A/B</span>',
       '<div className="gl-field"><span>Magnet plan</span>',
+      '<span>Snap test size to grid</span>',
+      'label="Test size · longest side"',
       '<label className="gl-toggle"><span>Front face · magnet overlay</span>',
     ]
 
@@ -90,11 +95,13 @@ describe('Creator magnetic-grid module boundary', () => {
     }
 
     expect(panelSource.match(/\.filter\(r => r\.visible\)/g)).toHaveLength(3)
-    expect(adminPanelSource.match(/\.filter\(r => !r\.visible\)/g)).toHaveLength(3)
+    expect(adminPanelSource).not.toContain('Size ·')
+    expect(adminPanelSource).not.toContain('Long side · size')
+    expect(adminPanelSource).not.toContain('Short side · size')
     expect(`${pageSource}\n${panelSource}\n${adminPanelSource}`).not.toContain('showUntestedRungs')
   })
 
-  it('keeps visible rungs product-only and untested rungs admin-only across every tier group', () => {
+  it('keeps only calibrated size tiers in the product panel and none in the admin panel', () => {
     const noop = () => {}
     const stdRungs = [
       { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
@@ -149,14 +156,6 @@ describe('Creator magnetic-grid module boundary', () => {
       onSliderInteractionChange: noop,
     }
     const baseAdminProps: ComponentProps<typeof GridWorkbenchAdminPanel> = {
-      src: 'std',
-      geo: 'square',
-      setLongMM: noop,
-      setShortMM: noop,
-      setSizeMM: noop,
-      gridMode: 'auto',
-      stdRungs,
-      rectRungs,
       pitch: 48,
       setPitch: noop,
       pitchAuto: true,
@@ -179,6 +178,13 @@ describe('Creator magnetic-grid module boundary', () => {
       setCenterMode: noop,
       maxGrowMM: 12,
       setMaxGrowMM: noop,
+      testSizeMM: 143,
+      setTestSizeMM: noop,
+      testSizeMin: 22,
+      testSizeMax: 310,
+      snapToGrid: false,
+      setSnapToGrid: noop,
+      snapSizesMM: [39, 143, 231],
       model: null,
       onSliderInteractionChange: noop,
     }
@@ -192,43 +198,39 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(productStandard).toContain('VISIBLE_STD')
     expect(productStandard).not.toContain('HIDDEN_STD')
     expect(adminStandard).not.toContain('VISIBLE_STD')
-    expect(adminStandard).toContain('HIDDEN_STD')
+    expect(adminStandard).not.toContain('HIDDEN_STD')
 
     const productRectangle = renderProduct({ geo: 'rect' })
-    const adminRectangle = renderAdmin({ geo: 'rect' })
+    const adminRectangle = renderAdmin({})
     expect(productRectangle).toContain('VISIBLE_LONG')
     expect(productRectangle).toContain('VISIBLE_SHORT')
     expect(productRectangle).not.toContain('HIDDEN_LONG')
     expect(productRectangle).not.toContain('HIDDEN_SHORT')
     expect(adminRectangle).not.toContain('VISIBLE_LONG')
     expect(adminRectangle).not.toContain('VISIBLE_SHORT')
-    expect(adminRectangle).toContain('HIDDEN_LONG')
-    expect(adminRectangle).toContain('HIDDEN_SHORT')
+    expect(adminRectangle).not.toContain('HIDDEN_LONG')
+    expect(adminRectangle).not.toContain('HIDDEN_SHORT')
 
-    const adminWithoutHiddenStandard = renderAdmin({
-      stdRungs: stdRungs.filter(r => r.visible),
-    })
-    expect(adminWithoutHiddenStandard).not.toContain('Size · this shape')
+    expect(productStandard).not.toContain('Design size · longest side')
+    expect(renderProduct({ src: 'preset' })).not.toContain('Design size · longest side')
+    expect(renderProduct({ src: 'gen' })).toContain('Design size · longest side')
+    expect(renderProduct({ src: 'magic' })).toContain('Design size · longest side')
 
-    const adminWithoutHiddenLong = renderAdmin({
-      geo: 'rect',
-      rectRungs: {
-        longOptions: rectRungs.longOptions.filter(r => r.visible),
-        shortOptions: rectRungs.shortOptions,
-      },
-    })
-    expect(adminWithoutHiddenLong).not.toContain('Long side · size')
-    expect(adminWithoutHiddenLong).toContain('Short side · size')
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
+    expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' ? maxGrowMM : 0")
+    expect(pageSource).toContain("{ kind: 'uniform-contour', unitContour: presetUnitContour }")
 
-    const adminWithoutHiddenShort = renderAdmin({
-      geo: 'rect',
-      rectRungs: {
-        longOptions: rectRungs.longOptions,
-        shortOptions: rectRungs.shortOptions.filter(r => r.visible),
-      },
-    })
-    expect(adminWithoutHiddenShort).toContain('Long side · size')
-    expect(adminWithoutHiddenShort).not.toContain('Short side · size')
+    const continuousAdmin = renderAdmin({})
+    expect(continuousAdmin).toContain('data-grid-size-snap="off"')
+    expect(continuousAdmin).toContain('min="22"')
+    expect(continuousAdmin).toContain('max="310"')
+    expect(continuousAdmin).toContain('value="143"')
+
+    const snappedAdmin = renderAdmin({ snapToGrid: true })
+    expect(snappedAdmin).toContain('data-grid-size-snap="on"')
+    expect(snappedAdmin).toContain('min="0"')
+    expect(snappedAdmin).toContain('max="2"')
+    expect(snappedAdmin).toContain('value="1"')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {
@@ -307,12 +309,24 @@ describe('Creator magnetic-grid module boundary', () => {
       .toContain('if (!stdRungs.length) return { ...planDesign, rung: null, rungH: null }')
     expect(preparedDesignSource).toContain("if (src === 'std' && geo === 'rect')")
     expect(preparedDesignSource).toContain('if (!rectRungs) return null')
+    expect(preparedDesignSource).toContain('const targetMM = snapToGrid')
+    expect(preparedDesignSource).toContain('? effectiveTestSizeMM')
     expect(pageSource).toContain('renderedPlanKey')
     expect(pageSource).toContain('planKey: activePlanResult.key')
     expect(rendererSource).toContain('useLayoutEffect')
     expect(rendererSource).toContain('onRenderedPlanCommit(model?.planKey ?? null)')
     expect(panelSource).toContain('model?.rung?.sizeMM')
     expect(panelSource).toContain('seated ${model.grid.anchors.length}')
+  })
+
+  it('keeps calibration verdicts off the product surface and labels the delivered population', () => {
+    const panelSource = readFileSync(PANEL_PATH, 'utf8')
+    const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
+
+    expect(rendererSource).not.toContain('"Won\'t hold reliably"')
+    expect(rendererSource).not.toContain('<Verdict grid={model.grid} />')
+    expect(panelSource).not.toContain('tier ${model.rung.points}pt')
+    expect(panelSource).toContain('tier ${model.grid.anchors.length}pt')
   })
 
   it('retains generic lane cancellation after removing profile switching', () => {

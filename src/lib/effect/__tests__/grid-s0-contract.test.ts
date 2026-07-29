@@ -23,8 +23,8 @@ function directGridJob(job: GridJob) {
   return job.operation === 'ladder'
     ? {
         operation: 'ladder' as const,
-        key: gridLadderCacheKey(job.recipe, job.law, job.mode),
-        value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode),
+        key: gridLadderCacheKey(job.recipe, job.law, job.mode, job.options),
+        value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode, job.options),
       }
     : {
         operation: 'plan' as const,
