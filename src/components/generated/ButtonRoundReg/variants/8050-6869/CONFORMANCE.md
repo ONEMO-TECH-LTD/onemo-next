@@ -10,7 +10,7 @@
 | APPROXIMATIONS | 0 (lossy-but-deliberate, listed below) |
 | RAW SOURCE EVIDENCE | **PASS** ✅ |
 | PAINT PROJECTION EVIDENCE | **PASS** ✅ |
-| TOKEN VALUE PARITY | **2** ⚠️ DS drift (below) |
+| TOKEN VALUE PARITY | **0** ✅ |
 | PAINT PARITY (fills/strokes/gradients) | **0** ✅ |
 | EFFECT PARITY (drop/inner shadows) | **0** ✅ |
 | CASCADE (prim→alias→sem · both modes) | **0** ✅ |
@@ -33,9 +33,8 @@ _none — every converted value is exact_
 ## FONTS USED — must exist in the app build (fallback = silent visual drift)
 _none_
 
-## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved at frame width)
-- .stateSelected · `width` = `--sem-dim-fluid-big-m` → resolves **47.37px** but Figma shows **48px** (css:5) — fix the token build or the Figma variable, not the converter
-- .stateSelected · `height` = `--sem-dim-fluid-big-m` → resolves **47.37px** but Figma shows **48px** (css:6) — fix the token build or the Figma variable, not the converter
+## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved in authored context)
+_none — every bound token resolves to Figma's own value_
 
 ## PAINT PARITY — dropped/flattened fills, strokes & gradients (the non-numeric blind spot)
 _none — every visible Figma paint reaches the CSS_

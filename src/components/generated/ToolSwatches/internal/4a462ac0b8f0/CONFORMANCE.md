@@ -10,7 +10,7 @@
 | APPROXIMATIONS | 0 (lossy-but-deliberate, listed below) |
 | RAW SOURCE EVIDENCE | **PASS** ✅ |
 | PAINT PROJECTION EVIDENCE | **PASS** ✅ |
-| TOKEN VALUE PARITY | **20** ⚠️ DS drift (below) |
+| TOKEN VALUE PARITY | **0** ✅ |
 | PAINT PARITY (fills/strokes/gradients) | **0** ✅ |
 | EFFECT PARITY (drop/inner shadows) | **0** ✅ |
 | CASCADE (prim→alias→sem · both modes) | **0** ✅ |
@@ -34,27 +34,8 @@ _none — every converted value is exact_
 ## FONTS USED — must exist in the app build (fallback = silent visual drift)
 _none_
 
-## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved at frame width)
-- .alpha · `height` = `--sem-dim-fluid-big-xs` → resolves **34.09px** but Figma shows **32px** (css:24) — fix the token build or the Figma variable, not the converter
-- .swatchRow · `gap` = `--sem-dim-fluid-standard-m` → resolves **17.05px** but Figma shows **16px** (css:35) — fix the token build or the Figma variable, not the converter
-- .dial · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:42) — fix the token build or the Figma variable, not the converter
-- .dial · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:43) — fix the token build or the Figma variable, not the converter
-- .dial2 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:48) — fix the token build or the Figma variable, not the converter
-- .dial2 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:49) — fix the token build or the Figma variable, not the converter
-- .dial3 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:54) — fix the token build or the Figma variable, not the converter
-- .dial3 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:55) — fix the token build or the Figma variable, not the converter
-- .dial4 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:60) — fix the token build or the Figma variable, not the converter
-- .dial4 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:61) — fix the token build or the Figma variable, not the converter
-- .dial5 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:66) — fix the token build or the Figma variable, not the converter
-- .dial5 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:67) — fix the token build or the Figma variable, not the converter
-- .dial6 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:72) — fix the token build or the Figma variable, not the converter
-- .dial6 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:73) — fix the token build or the Figma variable, not the converter
-- .dial7 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:78) — fix the token build or the Figma variable, not the converter
-- .dial7 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:79) — fix the token build or the Figma variable, not the converter
-- .dial8 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:84) — fix the token build or the Figma variable, not the converter
-- .dial8 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:85) — fix the token build or the Figma variable, not the converter
-- .dial9 · `width` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:90) — fix the token build or the Figma variable, not the converter
-- .dial9 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:91) — fix the token build or the Figma variable, not the converter
+## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved in authored context)
+_none — every bound token resolves to Figma's own value_
 
 ## PAINT PARITY — dropped/flattened fills, strokes & gradients (the non-numeric blind spot)
 _none — every visible Figma paint reaches the CSS_

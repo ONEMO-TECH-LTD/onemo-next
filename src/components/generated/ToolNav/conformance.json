@@ -18,16 +18,7 @@
   "raws": [],
   "refusals": [],
   "approximations": [],
-  "valueParity": [
-    {
-      "className": "toolNav",
-      "prop": "padding[2]",
-      "token": "--sem-dim-fluid-nano-xl",
-      "figma": 8,
-      "resolved": 9.05,
-      "line": 5
-    }
-  ],
+  "valueParity": [],
   "fonts": [],
   "missingAssets": [],
   "paintParity": [],
@@ -41,8 +32,8 @@
       "status": "pass"
     },
     "numeric": {
-      "drift": 1,
-      "status": "warn"
+      "drift": 0,
+      "status": "pass"
     },
     "paint": {
       "mismatches": 0,

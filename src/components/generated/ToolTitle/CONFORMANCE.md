@@ -10,7 +10,7 @@
 | APPROXIMATIONS | 0 (lossy-but-deliberate, listed below) |
 | RAW SOURCE EVIDENCE | **PASS** ✅ |
 | PAINT PROJECTION EVIDENCE | **PASS** ✅ |
-| TOKEN VALUE PARITY | **2** ⚠️ DS drift (below) |
+| TOKEN VALUE PARITY | **0** ✅ |
 | PAINT PARITY (fills/strokes/gradients) | **0** ✅ |
 | EFFECT PARITY (drop/inner shadows) | **0** ✅ |
 | CASCADE (prim→alias→sem · both modes) | **0** ✅ |
@@ -35,9 +35,8 @@ _none — every converted value is exact_
 ## FONTS USED — must exist in the app build (fallback = silent visual drift)
 - Chillax
 
-## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved at frame width)
-- .toolTitle · `padding[2]` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:5) — fix the token build or the Figma variable, not the converter
-- .small · `font-size` = `--sem-type-fluid-label-m-size` → resolves **15.05px** but Figma shows **14px** (css:22) — fix the token build or the Figma variable, not the converter
+## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved in authored context)
+_none — every bound token resolves to Figma's own value_
 
 ## PAINT PARITY — dropped/flattened fills, strokes & gradients (the non-numeric blind spot)
 _none — every visible Figma paint reaches the CSS_

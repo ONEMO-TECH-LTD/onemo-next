@@ -52,24 +52,7 @@
   ],
   "refusals": [],
   "approximations": [],
-  "valueParity": [
-    {
-      "className": "toolTitle",
-      "prop": "padding[2]",
-      "token": "--sem-dim-fluid-standard-xl",
-      "figma": 24,
-      "resolved": 26.09,
-      "line": 5
-    },
-    {
-      "className": "small",
-      "prop": "font-size",
-      "token": "--sem-type-fluid-label-m-size",
-      "figma": 14,
-      "resolved": 15.05,
-      "line": 22
-    }
-  ],
+  "valueParity": [],
   "fonts": [
     "Chillax"
   ],
@@ -85,8 +68,8 @@
       "status": "pass"
     },
     "numeric": {
-      "drift": 2,
-      "status": "warn"
+      "drift": 0,
+      "status": "pass"
     },
     "paint": {
       "mismatches": 0,

@@ -89,48 +89,7 @@
   ],
   "refusals": [],
   "approximations": [],
-  "valueParity": [
-    {
-      "className": "toolBarModesel",
-      "prop": "padding[2]",
-      "token": "--sem-dim-fluid-standard-xl",
-      "figma": 24,
-      "resolved": 26.09,
-      "line": 5
-    },
-    {
-      "className": "frame9",
-      "prop": "height",
-      "token": "--sem-dim-fluid-standard-xl",
-      "figma": 24,
-      "resolved": 26.09,
-      "line": 37
-    },
-    {
-      "className": "segment",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-xl",
-      "figma": 64,
-      "resolved": 68.19,
-      "line": 62
-    },
-    {
-      "className": "segment2",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-xl",
-      "figma": 64,
-      "resolved": 68.19,
-      "line": 88
-    },
-    {
-      "className": "segment3",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-xl",
-      "figma": 64,
-      "resolved": 68.19,
-      "line": 114
-    }
-  ],
+  "valueParity": [],
   "fonts": [
     "Chillax"
   ],
@@ -146,8 +105,8 @@
       "status": "pass"
     },
     "numeric": {
-      "drift": 5,
-      "status": "warn"
+      "drift": 0,
+      "status": "pass"
     },
     "paint": {
       "mismatches": 0,

@@ -10,7 +10,7 @@
 | APPROXIMATIONS | 0 (lossy-but-deliberate, listed below) |
 | RAW SOURCE EVIDENCE | **PASS** ✅ |
 | PAINT PROJECTION EVIDENCE | **PASS** ✅ |
-| TOKEN VALUE PARITY | **5** ⚠️ DS drift (below) |
+| TOKEN VALUE PARITY | **0** ✅ |
 | PAINT PARITY (fills/strokes/gradients) | **0** ✅ |
 | EFFECT PARITY (drop/inner shadows) | **0** ✅ |
 | CASCADE (prim→alias→sem · both modes) | **0** ✅ |
@@ -41,12 +41,8 @@ _none — every converted value is exact_
 ## FONTS USED — must exist in the app build (fallback = silent visual drift)
 - Chillax
 
-## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved at frame width)
-- .toolBarModesel · `padding[2]` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:5) — fix the token build or the Figma variable, not the converter
-- .frame9 · `height` = `--sem-dim-fluid-standard-xl` → resolves **26.09px** but Figma shows **24px** (css:37) — fix the token build or the Figma variable, not the converter
-- .segment · `width` = `--sem-dim-fluid-big-xl` → resolves **68.19px** but Figma shows **64px** (css:62) — fix the token build or the Figma variable, not the converter
-- .segment2 · `width` = `--sem-dim-fluid-big-xl` → resolves **68.19px** but Figma shows **64px** (css:88) — fix the token build or the Figma variable, not the converter
-- .segment3 · `width` = `--sem-dim-fluid-big-xl` → resolves **68.19px** but Figma shows **64px** (css:114) — fix the token build or the Figma variable, not the converter
+## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved in authored context)
+_none — every bound token resolves to Figma's own value_
 
 ## PAINT PARITY — dropped/flattened fills, strokes & gradients (the non-numeric blind spot)
 _none — every visible Figma paint reaches the CSS_

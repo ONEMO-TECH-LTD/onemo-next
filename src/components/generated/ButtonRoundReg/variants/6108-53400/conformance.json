@@ -33,24 +33,7 @@
   ],
   "refusals": [],
   "approximations": [],
-  "valueParity": [
-    {
-      "className": "stateDefault",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-m",
-      "figma": 48,
-      "resolved": 47.37,
-      "line": 5
-    },
-    {
-      "className": "stateDefault",
-      "prop": "height",
-      "token": "--sem-dim-fluid-big-m",
-      "figma": 48,
-      "resolved": 47.37,
-      "line": 6
-    }
-  ],
+  "valueParity": [],
   "fonts": [],
   "missingAssets": [],
   "paintParity": [],
@@ -64,8 +47,8 @@
       "status": "pass"
     },
     "numeric": {
-      "drift": 2,
-      "status": "warn"
+      "drift": 0,
+      "status": "pass"
     },
     "paint": {
       "mismatches": 0,

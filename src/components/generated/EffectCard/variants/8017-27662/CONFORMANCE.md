@@ -34,7 +34,7 @@
 ## FONTS USED — must exist in the app build (fallback = silent visual drift)
 _none_
 
-## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved at frame width)
+## TOKEN VALUE PARITY — DS drift (Figma raw vs token resolved in authored context)
 _none — every bound token resolves to Figma's own value_
 
 ## PAINT PARITY — dropped/flattened fills, strokes & gradients (the non-numeric blind spot)

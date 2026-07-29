@@ -18,32 +18,7 @@
   "raws": [],
   "refusals": [],
   "approximations": [],
-  "valueParity": [
-    {
-      "className": "badge",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-l",
-      "figma": 56,
-      "resolved": 55.37,
-      "line": 11
-    },
-    {
-      "className": "badge2",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-l",
-      "figma": 56,
-      "resolved": 55.37,
-      "line": 18
-    },
-    {
-      "className": "badge3",
-      "prop": "width",
-      "token": "--sem-dim-fluid-big-l",
-      "figma": 56,
-      "resolved": 55.37,
-      "line": 24
-    }
-  ],
+  "valueParity": [],
   "fonts": [],
   "missingAssets": [],
   "paintParity": [],
@@ -57,8 +32,8 @@
       "status": "pass"
     },
     "numeric": {
-      "drift": 3,
-      "status": "warn"
+      "drift": 0,
+      "status": "pass"
     },
     "paint": {
       "mismatches": 0,
