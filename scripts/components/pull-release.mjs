@@ -61,7 +61,11 @@ function consumersFor(component, wrapperFiles) {
     `/generated/${component.codeName}/${component.codeName}`,
   ];
   return Object.entries(wrapperFiles)
-    .filter(([, source]) => needles.some((needle) => source.includes(needle)))
+    .filter(([, source]) => (
+      [...source.matchAll(/(?:from\s+|import\s*)['"]([^'"]+)['"]/g)]
+        .some(([, specifier]) => /(?:^|\/)generated$/.test(specifier))
+      || needles.some((needle) => source.includes(needle))
+    ))
     .map(([file]) => file)
     .sort();
 }

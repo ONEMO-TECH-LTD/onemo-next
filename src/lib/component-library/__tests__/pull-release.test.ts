@@ -244,6 +244,18 @@ describe('component release pull transaction', () => {
     })).status).toBe('pass');
   });
 
+  it('accepts the app-owned proof route as a non-vacuous generated-barrel consumer', async () => {
+    const { root, app, wrapper, tokens } = await fixture();
+    await fs.writeFile(
+      wrapper,
+      "import { Thing } from '@/components/generated';\nexport default function Proof() { return <Thing label=\"Proof\" />; }\n",
+    );
+    await expect(pullComponentRelease({
+      releaseDir: await release(root, tokens),
+      appRoot: app,
+    })).resolves.toBeDefined();
+  });
+
   it('refuses an incompatible token closure before writes but ignores unrelated token additions', async () => {
     const { root, app, tokens } = await fixture();
     const releaseDir = await release(root, tokens);
