@@ -456,9 +456,16 @@ describe('semantic ladder stays inside its product contract', () => {
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
           })
-          const nearestBoundaryMM = Math.min(...plan.grid.anchors.map(
-            (anchor) => distanceToPreparedContour(anchor.p, prepared),
-          ))
+          const nearestBoundaryMM = Math.min(...plan.grid.anchors.map((anchor) => {
+            if (shape !== 'circle') return distanceToPreparedContour(anchor.p, prepared)
+            // Law 9.2(a): the true circle is the measurement authority. Its bounded
+            // polygon proxy may shave microns from an analytically exact tangency.
+            const radiusMM = rung.sizeMM / 2
+            return radiusMM - Math.hypot(
+              anchor.p[0] - radiusMM,
+              anchor.p[1] - radiusMM,
+            )
+          }))
           expect(
             nearestBoundaryMM,
             `${shape}/${mode}/${pitchMM ?? 'auto'} ${rung.label} ${rung.sizeMM}mm seats below the hard padding floor`,
@@ -634,10 +641,10 @@ describe('semantic ladder stays inside its product contract', () => {
     const auto = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'auto')
     const standard = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'standard')
 
-    expect(auto.map((rung) => rung.label)).toEqual(['ONE', 'S', 'M', 'L', 'XL', '2XL'])
-    expect(standard.map((rung) => rung.label)).toEqual(['ONE', 'S', 'M', 'L', 'XL', '2XL'])
-    expect(auto.map((rung) => rung.gridExtentMM)).toEqual([22, 70, 118, 166, 214, 262])
-    expect(standard.map((rung) => rung.gridExtentMM)).toEqual([22, 70, 118, 166, 214, 262])
+    expect(auto.map((rung) => rung.label)).toEqual(['ONE', 'S', 'M', 'L', 'XL', '2XL', '3XL'])
+    expect(standard.map((rung) => rung.label)).toEqual(['ONE', 'S', 'M', 'L', 'XL', '2XL', '3XL'])
+    expect(auto.map((rung) => rung.gridExtentMM)).toEqual([22, 70, 118, 166, 214, 262, 310])
+    expect(standard.map((rung) => rung.gridExtentMM)).toEqual([22, 70, 118, 166, 214, 262, 310])
   })
 
   it('uses the configured size ceiling, not label exhaustion, as the terminal gate', () => {
