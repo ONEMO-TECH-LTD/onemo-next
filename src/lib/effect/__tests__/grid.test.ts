@@ -491,6 +491,7 @@ describe('semantic ladder stays inside its product contract', () => {
       pattern: 'standard',
       paddingMM: DEFAULT_LAW.paddingMM,
       perimeterOnly: true,
+      sparseThin: true,
     })
     const diamondFull = computeGrid(diamond, {
       pitchMM: 48,
@@ -504,6 +505,16 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(diamondFull.anchors.map(({ p }) => p)).toContainEqual(centre)
     expect(diamondLight.anchors.map(({ p }) => p)).not.toContainEqual(centre)
     expect(diamondLight.anchors).toHaveLength(4)
+    const fullPopulation = diamondFull.anchors.map(({ p }) => p)
+    let comparedRimAnchors = 0
+    for (const { p } of diamondLight.anchors) {
+      comparedRimAnchors++
+      expect(
+        fullPopulation,
+        `light density shifted rim anchor ${p.join(',')} onto the cancelled 24mm phase`,
+      ).toContainEqual(p)
+    }
+    expect(comparedRimAnchors).toBe(4)
 
     const triangle = stdShapeContour('triangle', 290)
     const triangleLight = computeGrid(triangle, {
@@ -519,6 +530,42 @@ describe('semantic ladder stays inside its product contract', () => {
         `light mode dropped population-rim anchor ${edgeHolder.join(',')}`,
       ).toBe(true)
     }
+
+    let comparedDensityCases = 0
+    let comparedDensityAnchors = 0
+    for (const [shape, sizeMM] of [
+      ['square', 214],
+      ['circle', 224],
+      ['triangle', 290],
+      ['diamondShape', 224],
+    ] as const) {
+      const contour = stdShapeContour(shape, sizeMM)
+      const light = computeGrid(contour, {
+        pitchMM: 48,
+        pattern: 'standard',
+        paddingMM: DEFAULT_LAW.paddingMM,
+        perimeterOnly: true,
+        sparseThin: true,
+      })
+      const standard = computeGrid(contour, {
+        pitchMM: 48,
+        pattern: 'standard',
+        paddingMM: DEFAULT_LAW.paddingMM,
+        perimeterOnly: false,
+        sparseThin: false,
+      })
+      const standardPopulation = standard.anchors.map(({ p }) => p)
+      comparedDensityCases++
+      for (const { p } of light.anchors) {
+        comparedDensityAnchors++
+        expect(
+          standardPopulation,
+          `${shape} ${sizeMM}mm Light shifted ${p.join(',')} onto a different grid phase`,
+        ).toContainEqual(p)
+      }
+    }
+    expect(comparedDensityCases).toBe(4)
+    expect(comparedDensityAnchors).toBeGreaterThan(0)
   })
 
   it('publishes no uncovered multi-anchor geometric rung on the product Auto path', () => {

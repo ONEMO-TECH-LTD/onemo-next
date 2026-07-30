@@ -554,9 +554,9 @@ function computePreparedGridForExtent(
   // FINALIZE a candidate seed into the delivered layout: population-boundary rim + light 1·3·4·6
   // thinning. Rim membership is lattice topology, never the physical hold-reach distance: a node is
   // interior only when its exact construction population surrounds it on both basis axes.
-  // Placement parities are judged on THIS final layout (not the raw seed) —
-  // the old raw-seat-count scoring let a 5-node cross beat a 4-node box, and after the belt dropped the
-  // cross's centre the result read as a diamond arrangement under the STANDARD pattern.
+  // Pattern conformance belongs to this construction before its interior is removed: thinning a
+  // standard population must not relabel it as diamond or authorize a cancelled half-pitch phase.
+  // Phase selection judges the construction; the final layout is delivery only.
   const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[] } => {
     let seated = seed
     let interior: Pt[] = []
@@ -604,11 +604,12 @@ function computePreparedGridForExtent(
 
   // CENTER the fixed grid on the shape — balanced by construction (the grid translates as a rigid bulk).
   // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
-  // Each parity's FINAL layout is scored by: PATTERN CONFORMANCE (nearest-neighbour spacing must match
-  // the pattern's own geometry: standard = pitch, quincunx = pitch/√2, diamond = pitch·√2) →
-  // EDGE REGISTRATION → COVERAGE → most seated → best centred. Coverage ranks only inside equally
-  // registered legal topology: it cannot resurrect dead-border phases, turn standard into dice, or
-  // let interior magnets mask a corner/edge gap.
+  // Each parity's CONSTRUCTION population is scored by: PATTERN CONFORMANCE (nearest-neighbour spacing
+  // must match the pattern's own geometry: standard = pitch, quincunx = pitch/√2,
+  // diamond = pitch·√2) → EDGE REGISTRATION → COVERAGE → population → best centred. Light then thins
+  // the chosen construction without re-solving its phase: density never creates a cancelled 24mm
+  // shift. Coverage ranks only inside equally registered legal topology; it cannot resurrect
+  // dead-border phases or turn standard into dice.
   let seated: Pt[] = []
   let interior: Pt[] = []
   if (cfg.construction) {
@@ -684,6 +685,7 @@ function computePreparedGridForExtent(
     }
     type Cand = {
       fin: { seated: Pt[]; interior: Pt[] }
+      population: Pt[]
       conform: number
       uncoveredPerimeterMM: number
       registered: number
@@ -695,17 +697,17 @@ function computePreparedGridForExtent(
       const seat = thinBySpacing(nodes.filter(valid), minSpacing, prepared, c)
       const fin = finalize(seat)
       let mp = Infinity
-      for (let i = 0; i < fin.seated.length; i++) for (let j = i + 1; j < fin.seated.length; j++) {
-        const d = dist(fin.seated[i], fin.seated[j]); if (d < mp) mp = d
+      for (let i = 0; i < seat.length; i++) for (let j = i + 1; j < seat.length; j++) {
+        const d = dist(seat[i], seat[j]); if (d < mp) mp = d
       }
-      const conform = fin.seated.length < 2 ? 1 : Math.abs(mp - expectedMp) < 2 ? 1 : 0
-      const uncoveredPerimeterMM = fin.seated.length
-        ? exactPerimeterCoverage(contourMM, fin.seated, HOLD_REACH_MM).uncoveredMM
+      const conform = seat.length < 2 ? 1 : Math.abs(mp - expectedMp) < 2 ? 1 : 0
+      const uncoveredPerimeterMM = seat.length
+        ? exactPerimeterCoverage(contourMM, seat, HOLD_REACH_MM).uncoveredMM
         : Infinity
-      const registered = fullyRegistered(fin.seated) ? 1 : 0
-      let sx = 0, sy = 0; for (const p of fin.seated) { sx += p[0]; sy += p[1] }
-      const bal = fin.seated.length ? Math.hypot(sx / fin.seated.length - c[0], sy / fin.seated.length - c[1]) : 1e9
-      cands.push({ fin, conform, uncoveredPerimeterMM, registered, bal })
+      const registered = fullyRegistered(seat) ? 1 : 0
+      let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
+      const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9
+      cands.push({ fin, population: seat, conform, uncoveredPerimeterMM, registered, bal })
     }
     // STANDARD and DIAMOND are HARD conformance laws (Dan): standard shows straight pitch-spaced rows
     // or nothing; diamond shows 68-atom (pitch·√2) links or nothing — neither may quietly resolve into
@@ -715,11 +717,11 @@ function computePreparedGridForExtent(
       ? cands
       : cands.filter((candidate) =>
         anchorGridExtentMM(
-          candidate.fin.seated.map((p) => ({ p, dia: 6 })),
+          candidate.population.map((p) => ({ p, dia: 6 })),
           pad,
         ) === requiredGridExtentMM)
     const pool = (pattern === 'standard' || pattern === 'diamond')
-      && extentPool.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
+      && extentPool.some((k) => k.conform === 1 && k.population.length >= MIN_ANCHORS)
       ? extentPool.filter((k) => k.conform === 1)
       : extentPool
     let bestKey: number[] | null = null
@@ -728,7 +730,7 @@ function computePreparedGridForExtent(
         -k.conform,
         -k.registered,
         gridConstructionUnit(k.uncoveredPerimeterMM),
-        -k.fin.seated.length,
+        -k.population.length,
         gridConstructionUnit(k.bal),
       ]
       let better = !bestKey

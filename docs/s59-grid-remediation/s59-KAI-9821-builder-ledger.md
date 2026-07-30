@@ -63,7 +63,7 @@ role is removed while coverage, seating and wrap sources remain untouched by thi
 - Live laws 2.1, 3.4 and the verbatim 13:02 ruling: each magnet owns a 10mm-radius safe spot;
   optimal geometric fabric wraps those spots edge-to-edge.
 - Law 3.5/F5 at probe time: the canonical outer zero-point was padding + the 1mm frame = 11mm;
-  subsequently superseded by Dan for the separate KAI-9844 sizing change.
+  subsequently superseded by Dan for the separate KAI-9845 sizing change.
 - Live law 3.23: upward publication remainder is margin, never flap.
 - Live law 4.5 defines Light as a perimeter belt, but supplies no numeric contour-depth threshold.
 - Historical L82 says the support oracle measures outward protrusion from the seated safe-spot
@@ -152,9 +152,96 @@ interior.
     `output/playwright/kai-9821-population-rim-f527031.png` and
     `output/playwright/kai-9821-full-grid-f527031.png`.
 
+## QA rework — density may thin one construction, never select a 24mm-shifted phase
+
+Designer falsified the first handoff at Diamond-shape 128mm:
+
+- base Light and Standard were the same five-node cross;
+- first implementation removed the centre but re-solved Light onto the four-node box at
+  `[40,40] [40,88] [88,40] [88,88]`;
+- the resulting Light phase was shifted 24mm from Standard.
+
+The builder's first 12-case attribution claimed this case was unchanged. That claim was false and
+was withdrawn immediately. The corrected isolated probe imports the immutable pre-rework module
+graph directly and prints an unconditional comparison count.
+
+Dan ruled the ambiguity: 24mm is the cancelled old atom and must not re-enter through a density
+phase shift.
+
+RED:
+
+- strengthened the existing regression so every Light rim anchor must be a point in the Standard
+  population;
+- focused run failed at `[40,40]`;
+- four rim-anchor comparisons were executed.
+
+Rejected attempt:
+
+- deleting the half-pitch candidate globally was too broad;
+- it removed four lawful product rungs: visible Auto rungs `18 → 15`, rounded-square 70mm
+  `4 → 2`, the lawful Circle two-anchor gravity tier disappeared, and the Circle ladder lost 3XL;
+- this proved the candidate itself is used to reach legal registered phases. The defect was density
+  re-solving after thinning, not the existence of the candidate.
+
+Final minimal correction:
+
+- score conformance, registration, coverage, extent, population count and balance on the legal
+  construction population;
+- deliver the population-boundary/thinned subset only after that phase is selected;
+- no shape branch, new constant, alternate solver or UI path.
+
+GREEN:
+
+- Diamond-shape 128 Light is Standard's same cross minus centre:
+  `[16,64] [64,16] [64,112] [112,64]`;
+- Circle 224 and Diamond-shape 224 Light also inherit Standard's phase instead of their former
+  24mm-shifted phases;
+- direct attribution: 6/6 comparisons executed;
+- regression sweep: four shapes and every delivered Light anchor compared against its Standard
+  population; four cases and a non-zero anchor count execute.
+
+Final staging-to-current movement, all under Light; every Standard-density configuration is
+unchanged:
+
+| Configuration | Staging | Final |
+|---|---|---|
+| square / standard 48 | XL `214/10`, 3XL origin `[11,35]` | XL `214/8`, 3XL origin `[11,11]` |
+| square / diamond 48 | `ONE:22/1 S:192/5 M:288/13` | `ONE:22/1 S:118/4 M:214/8 L:310/12` |
+| square / diamond 96 | `ONE:22/1 S:288/5` | `ONE:22/1 S:214/4` |
+| circle / auto | XL `224/4` | XL `216/4` |
+| circle / standard 48 | M `130/6` | M `120/4` |
+| circle / standard 96 | M `224/4` | M `216/4` |
+| triangle / auto | M `260/4` | M `260/5` |
+| triangle / standard 96 | S `260/4` | S `260/5` |
+| triangle / diamond 48 | M `260/6` | M `260/7` |
+| diamond-shape / auto | M `128/5`, L `176/8` | M `128/4`, L `176/6` |
+| diamond-shape / standard 48 | M `128/5`, L `176/8` | M `128/4`, L `176/6` |
+
+The derived circle and admin-diamond size movements are not silent re-baselines: they are the first
+covered constructions when density cannot buy a different phase. The square Standard 48 physical
+sizes remain unchanged in this task. KAI-9845 separately supersedes those sizes with the frameless
+padding-to-padding law.
+
+Final rework gates:
+
+- focused phase/topology regression: 1 passed / 33 skipped;
+- complete grid law file: 34/34;
+- edge-registration + device baseline + grid: 47/47;
+- full suite: 458 passed / 10 intentionally skipped, 47 files passed / 1 intentionally skipped;
+- typecheck: exit 0;
+- lint: exit 0, 214 pre-existing warnings;
+- device performance: exit 0, WebKit 26.0 — canonical circle 263ms cold / 1ms warm,
+  dense real-AI plan 79ms / 17ms, small square 39ms / 1ms; T1/T2 PASS on all three;
+- rectangle registration improved from two ONE-axis exceptions to zero across the 84-plan matrix;
+- canonical circle performance fixture intentionally re-baselined:
+  XL `224 → 216`, hash `f3135936… → 881dc1be…`;
+- `git diff --check`: clean;
+- full post-edit reads completed for all five changed files; no stale final-layout ranking claim
+  remains in the changed engine block.
+
 ## Subsequent Dan ruling — sizing work remains separate
 
 Dan subsequently ruled that frameless base size is padding edge-to-padding edge and the frame becomes
 a separate additive admin-set buffer. This supersedes the earlier 11mm-as-base reading and is owned
-by KAI-9844 after its SSOT text lands. KAI-9821 remains belt-only and contains no new 10/11 sizing
+by KAI-9845 after its SSOT text landed. KAI-9821 contains no new 10/11 sizing
 logic: coverage stays HOLD 48 and rim membership stays population topology.
