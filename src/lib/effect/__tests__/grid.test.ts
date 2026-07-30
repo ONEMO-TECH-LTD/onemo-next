@@ -483,35 +483,41 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(sharpRung).toMatchObject({ label: 'S', sizeMM: 70, points: 4 })
   })
 
-  it('keeps every light-grid node that physically faces a sloped contour', () => {
-    const contour = stdShapeContour('triangle', 290)
-    const prepared = prepareExactContour(contour)
-    const full = computeGrid(contour, {
-      pitchMM: 48,
-      pattern: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      perimeterOnly: false,
-    })
-    const light = computeGrid(contour, {
+  it('derives the light rim from the lattice-population boundary, never hold reach', () => {
+    const diamond = stdShapeContour('diamondShape', 128)
+    const diamondPrepared = prepareExactContour(diamond)
+    const diamondLight = computeGrid(diamond, {
       pitchMM: 48,
       pattern: 'standard',
       paddingMM: DEFAULT_LAW.paddingMM,
       perimeterOnly: true,
     })
+    const diamondFull = computeGrid(diamond, {
+      pitchMM: 48,
+      pattern: 'standard',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      perimeterOnly: false,
+    })
+    const centre: Pt = [64, 64]
 
-    const contourFacing = full.anchors.filter(
-      (anchor) => distanceToPreparedContour(anchor.p, prepared) < HOLD_REACH_MM,
-    )
-    expect(contourFacing.length).toBeGreaterThan(0)
-    for (const anchor of contourFacing) {
+    expect(distanceToPreparedContour(centre, diamondPrepared)).toBeLessThan(HOLD_REACH_MM)
+    expect(diamondFull.anchors.map(({ p }) => p)).toContainEqual(centre)
+    expect(diamondLight.anchors.map(({ p }) => p)).not.toContainEqual(centre)
+    expect(diamondLight.anchors).toHaveLength(4)
+
+    const triangle = stdShapeContour('triangle', 290)
+    const triangleLight = computeGrid(triangle, {
+      pitchMM: 48,
+      pattern: 'standard',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      perimeterOnly: true,
+    })
+    for (const edgeHolder of [[97, 132], [145, 228], [193, 132]] as Pt[]) {
       expect(
-        light.anchors.some(({ p }) =>
-          Math.hypot(p[0] - anchor.p[0], p[1] - anchor.p[1]) < 1e-6),
-        `light mode dropped contour-facing anchor ${anchor.p.join(',')}`,
+        triangleLight.anchors.some(({ p }) =>
+          Math.hypot(p[0] - edgeHolder[0], p[1] - edgeHolder[1]) < 0.5),
+        `light mode dropped population-rim anchor ${edgeHolder.join(',')}`,
       ).toBe(true)
-    }
-    for (const point of light.candidates) {
-      expect(distanceToPreparedContour(point, prepared)).toBeGreaterThanOrEqual(HOLD_REACH_MM)
     }
   })
 
@@ -645,11 +651,11 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(auto).toMatchObject([
       { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
       { label: 'S', points: 4, sizeMM: 136, gridExtentMM: 118 },
-      { label: 'M', points: 4, sizeMM: 260, gridExtentMM: 214 },
+      { label: 'M', points: 5, sizeMM: 260, gridExtentMM: 214 },
     ])
     expect(standard96).toMatchObject([
       { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
-      { label: 'S', points: 4, sizeMM: 260, gridExtentMM: 214 },
+      { label: 'S', points: 5, sizeMM: 260, gridExtentMM: 214 },
     ])
     expect(standard96.some((rung) => rung.points === 2)).toBe(false)
 

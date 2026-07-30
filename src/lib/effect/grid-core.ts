@@ -416,6 +416,33 @@ function constructionBasis(pattern: GridPattern, pitchMM: number): [Pt, Pt] {
   return [[pitchMM, 0], [0, pitchMM]]
 }
 
+/** Population topology owns the light rim. A node is interior only when the exact lattice
+ * population contains its immediate neighbour in both directions on both basis axes. */
+function splitPopulationBoundary(
+  points: ReadonlyArray<Pt>,
+  pattern: GridPattern,
+  pitchMM: number,
+): { rim: Pt[]; interior: Pt[] } {
+  const basis = constructionBasis(pattern, pitchMM)
+  const directions: Pt[] = [
+    basis[0],
+    [-basis[0][0], -basis[0][1]],
+    basis[1],
+    [-basis[1][0], -basis[1][1]],
+  ]
+  const key = ([x, y]: Pt) => `${gridConstructionUnit(x)},${gridConstructionUnit(y)}`
+  const population = new Set(points.map(key))
+  const rim: Pt[] = []
+  const interior: Pt[] = []
+  for (const point of points) {
+    const surrounded = directions.every(([dx, dy]) =>
+      population.has(key([point[0] + dx, point[1] + dy])))
+    const group = surrounded ? interior : rim
+    group.push(point)
+  }
+  return { rim, interior }
+}
+
 function constructionFromAnchors(
   pattern: GridPattern,
   pitchMM: number,
@@ -524,25 +551,20 @@ function computePreparedGridForExtent(
     return distanceToPreparedContour(p, prepared) + GRID_ARITHMETIC_EPSILON_MM >= pad
   }
 
-  // FINALIZE a candidate seed into the delivered layout: contour-facing belt + light 1·3·4·6
-  // thinning. A Cartesian neighbour enclosure is not a perimeter test on sloped/curved contours:
-  // triangle edge holders can be surrounded in x/y while still sitting within physical hold reach.
-  // Keep every contour-facing node and drop only nodes deeper than HOLD_REACH_MM. Placement parities
-  // are judged on THIS final layout (not the raw seed) —
+  // FINALIZE a candidate seed into the delivered layout: population-boundary rim + light 1·3·4·6
+  // thinning. Rim membership is lattice topology, never the physical hold-reach distance: a node is
+  // interior only when its exact construction population surrounds it on both basis axes.
+  // Placement parities are judged on THIS final layout (not the raw seed) —
   // the old raw-seat-count scoring let a 5-node cross beat a 4-node box, and after the belt dropped the
   // cross's centre the result read as a diamond arrangement under the STANDARD pattern.
   const finalize = (seed: Pt[]): { seated: Pt[]; interior: Pt[] } => {
     let seated = seed
     let interior: Pt[] = []
     if (perimeterOnly && seated.length > 4) {
-      const contourFacing = seated.filter(
-        (point) => distanceToPreparedContour(point, prepared) < HOLD_REACH_MM,
-      )
-      if (contourFacing.length >= MIN_ANCHORS) {
-        interior = seated.filter(
-          (point) => distanceToPreparedContour(point, prepared) >= HOLD_REACH_MM,
-        )
-        seated = contourFacing
+      const split = splitPopulationBoundary(seated, pattern, pitch)
+      if (split.rim.length >= MIN_ANCHORS) {
+        seated = split.rim
+        interior = split.interior
       }
     }
     // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — along the belt edges only;
@@ -1443,7 +1465,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 6
+export const GRID_ENGINE_CACHE_VERSION = 7
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
