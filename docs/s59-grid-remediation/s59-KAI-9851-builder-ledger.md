@@ -99,6 +99,7 @@ Independent post-fix executable:
 - Focused coverage RED: 36 tests, 2 intentional failures.
 - Focused coverage green: 36/36.
 - Cache/performance/worker contracts: 175/175.
+- Affected edge-registration/report contracts: 12/12.
 - Typecheck: exit 0.
 - Changed-file lint: exit 0.
 - Full suite after explicit downstream updates: 459 passed / 10 intentionally
@@ -117,5 +118,25 @@ Independent post-fix executable:
 - DEFER: frameless sizing/admin buffer and truthful label work remain their
   separately ordered tasks.
 
-Current-runtime visual evidence is appended after the exact product commit is
-served on `:3970`.
+## Current-runtime visual gate
+
+- Product commit `737190c5ed93a7663cff6a98b63c8c57a28c33cc` served on
+  `http://localhost:3970/effect-creator/grid-lab`.
+- Provenance: listener PID 19834, `next-server v16.2.6`, cwd
+  `.claude/worktrees/grid-lab`, HTTP 200, worktree HEAD exactly `737190c`.
+- Playwright fallback exercised the real bench:
+  - Circle product Auto exposes only `ONE 24`, `S 72`, `M 120`, `L 168`;
+    selected L renders Standard/48, tier 6, seated 6, with no red flap edge.
+    Artefact: `output/playwright/kai-9851/circle-l-737190c.png`.
+  - Diamond product Auto exposes only `ONE 32`, `S 80`, `M 128`, `L 176`;
+    selected L renders Standard/48, tier 6, seated 6, with no red flap edge.
+    Artefact: `output/playwright/kai-9851/diamond-l-737190c.png`.
+  - With the admin snap toggle disabled, the two original falsification
+    witnesses remain reachable only as raw diagnostics: Circle 216 and Diamond
+    224 both render their unsupported perimeter in red. They are absent from
+    the published product ladder rather than hidden.
+    Artefacts: `output/playwright/kai-9851/circle-raw-216-737190c.png` and
+    `output/playwright/kai-9851/diamond-raw-224-737190c.png`.
+- Browser console: 2 informational development messages, 0 warnings, 0 errors.
+- The bench was returned to the safe snapped Circle L 168 state after the raw
+  witness checks.
