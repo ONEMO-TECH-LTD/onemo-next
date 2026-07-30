@@ -257,7 +257,9 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2' ? maxGrowMM : 0")
     expect(pageSource).toContain("{ kind: 'uniform-contour', unitContour: presetUnitContour }")
     expect(pageSource).toContain("src === 'magic2' ? 'magic' : src")
-    expect(pageSource).toContain("src === 'magic2' && magicUnitContour")
+    expect(pageSource).toMatch(
+      /src === 'magic2' && magicUnitContour\s*\?\s*\{ kind: 'uniform-contour', unitContour: magicUnitContour \}/,
+    )
     expect(pageSource).toContain('const ladderJob = useMemo<GridJob | null>')
     expect(pageSource).toContain("kind: 'rounded-square'")
     expect(pageSource).toContain('radiusMM: roundedSquareRadiusMM')
