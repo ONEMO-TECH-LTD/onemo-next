@@ -381,3 +381,19 @@ construction, derives its density delivery, or invalidates the resulting cache i
 
 Sufficiency: delivers the complete KAI-9821 rework and KAI-9788 consequence—visible, hidden,
 rectangular, geometric, explicit freeform and every legal pattern/pitch family are executable.
+
+### Current-runtime visual gate
+
+- Product commit: `0331ffb22b5d7ba0ee43eb2d95afede285900592`.
+- Real bench: `http://localhost:3970/effect-creator/grid-lab`; PID 19834; process cwd
+  `grid-lab`; HTTP 200; serving tree HEAD matched the product commit.
+- Declared Playwright fallback, after the already-recorded profiled-Chrome control failure:
+  - Diamond-shape M 128mm: Light rendered four rim magnets; Standard rendered the same four plus
+    centre; both stayed Standard/48 and the readout changed truthfully from `4pt/4` to `5pt/5`.
+  - Rectangle 214×118: Standard rendered 15 magnets; Light rendered 8 on the same Standard/48
+    construction and preserved the same physical size.
+- Console: 2 development messages, 0 errors, 0 warnings.
+- Captures:
+  - `output/playwright/kai-9821-light-parent-0331ffb.png`;
+  - `output/playwright/kai-9821-standard-parent-0331ffb.png`;
+  - `output/playwright/kai-9821-rectangle-light-0331ffb.png`.
