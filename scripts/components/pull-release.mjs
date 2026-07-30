@@ -149,6 +149,10 @@ export async function pullComponentRelease({
       source: manifest.authority,
       appBase: await gitSha(appRoot),
       components: manifest.components,
+      capabilityClosure: {
+        relativePath: manifest.capabilityClosure.relativePath,
+        ...release.capabilityClosure,
+      },
       artifacts,
       valueDrift,
     };

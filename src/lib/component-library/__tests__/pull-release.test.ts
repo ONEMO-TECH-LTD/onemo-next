@@ -64,6 +64,7 @@ async function fixture() {
 async function release(root: string, tokens: string, {
   labelType = 'string',
   marker = 'one',
+  unacknowledgedRefusals = 0,
 } = {}) {
   const stage = path.join(root, `.release-${marker}`);
   const dir = stage;
@@ -71,6 +72,41 @@ async function release(root: string, tokens: string, {
   const evidence = path.join(component, 'evidence');
   await fs.mkdir(evidence, { recursive: true });
   await fs.mkdir(path.join(dir, 'authority'), { recursive: true });
+  await fs.mkdir(path.join(dir, 'evidence'), { recursive: true });
+  const capabilitySummary = {
+    nodes: 3,
+    fields: 10 + unacknowledgedRefusals,
+    consumed: 10,
+    ignoredByLaw: 0,
+    refused: unacknowledgedRefusals,
+    acknowledgedRefusals: 0,
+    unacknowledgedRefusals,
+    unclassified: unacknowledgedRefusals,
+  };
+  const capabilityEvidence = {
+    schemaVersion: 1,
+    source: {
+      fileKey: 'file',
+      fileVersion: 'version',
+      boardId: 'board',
+      boardContentHash: 'board-hash',
+    },
+    summary: capabilitySummary,
+    recordsHash: 'a'.repeat(64),
+    dispositions: [],
+    refusals: unacknowledgedRefusals ? [{
+      recordId: 'b'.repeat(64),
+      scopeId: 'thing:1',
+      nodeId: 'thing:1',
+      nodeType: 'COMPONENT',
+      path: 'futureCapability',
+      classification: 'REFUSED',
+      lawId: 'UNCLASSIFIED_DEFAULT',
+      reason: 'no source-field law classifies COMPONENT thing:1 path futureCapability.',
+      consumer: 'none; publication requires an exact named disposition',
+      dispositionId: null,
+    }] : [],
+  };
   await Promise.all([
     fs.writeFile(path.join(component, 'Thing.tsx'), `import styles from './thing.module.css';
 export type ThingProps = {
@@ -86,6 +122,10 @@ export default function Thing({ label = 'Default' }: ThingProps) {
     fs.writeFile(path.join(evidence, 'light.png'), png),
     fs.writeFile(path.join(evidence, 'dark.png'), png),
     fs.writeFile(path.join(dir, 'authority', 'tokens.css'), tokens),
+    fs.writeFile(
+      path.join(dir, 'evidence', 'capability-closure.json'),
+      `${JSON.stringify(capabilityEvidence, null, 2)}\n`,
+    ),
   ]);
   const files = (await filesOf(dir)).filter((file) => file !== 'manifest.json');
   const artifacts = Object.fromEntries(await Promise.all(files.map(async (file) => {
@@ -137,6 +177,11 @@ export default function Thing({ label = 'Default' }: ThingProps) {
       tokensHash: sha256(tokens),
     },
     counts: { artifacts: 1, masters: 1 },
+    capabilityClosure: {
+      relativePath: 'evidence/capability-closure.json',
+      summary: capabilitySummary,
+      recordsHash: capabilityEvidence.recordsHash,
+    },
     components: [componentRecord],
     artifacts,
   };
@@ -251,6 +296,43 @@ describe('component release pull transaction', () => {
       path.join(app, 'src', 'components', 'generated', 'Thing', 'Thing.tsx'),
       'utf8',
     )).toContain('data-marker="two"');
+  });
+
+  it('KAI-9867 refuses unacknowledged source capability before writes and in pulled provenance', async () => {
+    // Claim: source-closure refusal is terminal at the app boundary, before and after the swap.
+    // Break: this passes while false when artifacts hash correctly but the pull ignores the
+    // manifest alarm, or provenance drops it after a successful pull.
+    // Mutation: publish one unacknowledged futureCapability, then mutate valid provenance likewise.
+    // Terminal: pre-pull leaves no generated tree; post-pull verification names futureCapability.
+    const { root, app, tokens } = await fixture();
+    const refused = await release(root, tokens, {
+      marker: 'refused',
+      unacknowledgedRefusals: 1,
+    });
+    await expect(pullComponentRelease({ releaseDir: refused, appRoot: app }))
+      .rejects.toThrow(/source capability refusal.*thing:1.*futureCapability/s);
+    await expect(fs.access(path.join(app, 'src', 'components', 'generated'))).rejects.toThrow();
+
+    const valid = await release(root, tokens, { marker: 'valid' });
+    await pullComponentRelease({ releaseDir: valid, appRoot: app });
+    const generatedDir = path.join(app, 'src', 'components', 'generated');
+    const provenancePath = path.join(generatedDir, 'provenance.json');
+    const provenance = JSON.parse(await fs.readFile(provenancePath, 'utf8'));
+    provenance.capabilityClosure.summary.refused = 1;
+    provenance.capabilityClosure.summary.unacknowledgedRefusals = 1;
+    provenance.capabilityClosure.refusals = [{
+      nodeId: 'thing:1',
+      path: 'futureCapability',
+      dispositionId: null,
+    }];
+    await fs.writeFile(provenancePath, `${JSON.stringify(provenance, null, 2)}\n`);
+    const verdict = await verifyPulledGenerated({
+      generatedDir,
+      appTokensPath: path.join(app, 'src', 'app', 'tokens', 'tokens.css'),
+      appRoot: app,
+    });
+    expect(verdict.status).toBe('fail');
+    expect(verdict.reason).toMatch(/source capability refusal.*thing:1.*futureCapability/s);
   });
 
   it('accepts the app-owned proof route as a non-vacuous generated-barrel consumer', async () => {

@@ -77,6 +77,59 @@ function expectedReleaseId(manifest) {
   return sha256(canonical(payload));
 }
 
+function verifyCapabilityClosure(pointer, evidence, source) {
+  if (
+    !pointer
+    || typeof pointer.relativePath !== 'string'
+    || !pointer.relativePath
+    || !pointer.summary
+    || typeof pointer.recordsHash !== 'string'
+  ) {
+    return 'source capability closure absent';
+  }
+  if (
+    evidence?.schemaVersion !== 1
+    || canonical(evidence.source) !== canonical({
+      fileKey: source?.fileKey,
+      fileVersion: source?.fileVersion,
+      boardId: source?.boardId,
+      boardContentHash: source?.boardContentHash,
+    })
+    || canonical(evidence.summary) !== canonical(pointer.summary)
+    || evidence.recordsHash !== pointer.recordsHash
+    || !Array.isArray(evidence.dispositions)
+    || !Array.isArray(evidence.refusals)
+  ) {
+    return 'source capability closure differs from sealed manifest authority';
+  }
+  const summary = evidence.summary;
+  if (
+    !Number.isInteger(summary.refused)
+    || !Number.isInteger(summary.acknowledgedRefusals)
+    || !Number.isInteger(summary.unacknowledgedRefusals)
+    || summary.refused !== evidence.refusals.length
+    || summary.refused !== summary.acknowledgedRefusals + summary.unacknowledgedRefusals
+  ) {
+    return 'source capability refusal census differs from sealed evidence';
+  }
+  const dispositionIds = new Set(evidence.dispositions.map(({ id }) => id));
+  const unacknowledged = evidence.refusals.filter(({ dispositionId }) => !dispositionId);
+  if (
+    unacknowledged.length !== summary.unacknowledgedRefusals
+    || evidence.refusals.some(({ dispositionId }) =>
+      dispositionId && !dispositionIds.has(dispositionId))
+  ) {
+    return 'source capability disposition census differs from sealed evidence';
+  }
+  if (unacknowledged.length) {
+    return [
+      `source capability refusal: ${unacknowledged.length} unacknowledged`,
+      ...unacknowledged.map(({ nodeId, path: fieldPath }) => `${nodeId} ${fieldPath}`),
+    ].join('; ');
+  }
+  return null;
+}
+
 function syntaxClass(value) {
   const text = String(value).trim();
   if (/^var\(/.test(text)) return 'alias';
@@ -107,6 +160,30 @@ export async function verifyPublishedRelease(releaseDir) {
     if (got.bytes !== want?.bytes || got.sha256 !== want?.sha256)
       return { status: 'fail', reason: `release artifact mismatch: ${relative}`, manifest };
   }
+  const capabilityPointer = manifest.capabilityClosure;
+  if (!capabilityPointer?.relativePath || !manifest.artifacts[capabilityPointer.relativePath]) {
+    return { status: 'unverified', reason: 'source capability closure absent', manifest };
+  }
+  let capabilityClosure;
+  try {
+    capabilityClosure = JSON.parse(
+      await fs.readFile(path.join(releaseDir, capabilityPointer.relativePath), 'utf8'),
+    );
+  } catch {
+    return {
+      status: 'unverified',
+      reason: `source capability evidence unavailable at ${path.join(releaseDir, capabilityPointer.relativePath)}`,
+      manifest,
+    };
+  }
+  const capabilityFailure = verifyCapabilityClosure(
+    capabilityPointer,
+    capabilityClosure,
+    manifest.authority,
+  );
+  if (capabilityFailure) {
+    return { status: 'fail', reason: capabilityFailure, manifest, capabilityClosure };
+  }
   const tokenBytes = await fs.readFile(path.join(releaseDir, 'authority', 'tokens.css'));
   if (sha256(tokenBytes) !== manifest.authority?.tokensHash)
     return { status: 'fail', reason: 'release token authority mismatch', manifest };
@@ -116,7 +193,7 @@ export async function verifyPublishedRelease(releaseDir) {
       return { status: 'unverified', reason: `release component incomplete: ${component.figmaId ?? 'unknown'}`, manifest };
     }
   }
-  return { status: 'pass', manifest };
+  return { status: 'pass', manifest, capabilityClosure };
 }
 
 export function compareApi(previous, next) {
@@ -217,9 +294,22 @@ export async function verifyPulledGenerated({ generatedDir, appTokensPath, appRo
     || !provenance.source?.converterSha
     || !provenance.appBase
     || !Array.isArray(provenance.components)
+    || !provenance.capabilityClosure
     || !provenance.artifacts
     || Array.isArray(provenance.artifacts)) {
     return { status: 'unverified', reason: 'generated provenance incomplete', provenance };
+  }
+  const capabilityFailure = verifyCapabilityClosure(
+    {
+      relativePath: provenance.capabilityClosure.relativePath,
+      summary: provenance.capabilityClosure.summary,
+      recordsHash: provenance.capabilityClosure.recordsHash,
+    },
+    provenance.capabilityClosure,
+    provenance.source,
+  );
+  if (capabilityFailure) {
+    return { status: 'fail', reason: capabilityFailure, provenance };
   }
   const files = (await filesOf(generatedDir)).filter((file) => file !== 'provenance.json');
   const expected = Object.keys(provenance.artifacts ?? {}).sort();
