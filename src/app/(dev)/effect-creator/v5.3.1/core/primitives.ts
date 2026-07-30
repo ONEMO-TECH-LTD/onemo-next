@@ -59,7 +59,7 @@ export async function runCutout(url: string, onProgress?: (s: SegmentProgress) =
  *  (Phase-2 Option A, expert source-verified): when supplied (the cache-hit path) the AI is not re-run;
  *  when absent, prepareEffect segments internally AT THE CAP and keeps the G4 flood-fill fallback
  *  (prepare-effect.ts:191/:194-199 — both already capped, no crash bypass). Behaviour-IDENTICAL to the
- *  macro, same cfg (Detail 100 floor, paddingMM 0). inv-28's literal required-preseg (one segmentation
+ *  macro, same cfg (Detail 100 floor and the engine's default outward padding). inv-28's literal required-preseg (one segmentation
  *  entry) is DEFERRED to a flagged hardening that MUST relocate the flood-fill + 'fallback' notify, not
  *  drop it (G4 "a degraded cut is never silent"). */
 export async function prepareShaped(
@@ -68,7 +68,7 @@ export async function prepareShaped(
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
 ): Promise<PreparedEffect> {
   const { prepareEffect, EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
-  return prepareEffect(url, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, onProgress, preseg)
+  return prepareEffect(url, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100) }, onProgress, preseg)
 }
 
 export type ExportResult =

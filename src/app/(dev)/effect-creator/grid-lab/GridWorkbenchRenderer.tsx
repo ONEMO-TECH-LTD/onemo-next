@@ -119,10 +119,9 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
-  const dDall = pathFrom(dPts)
   return (
     <svg width={vbW * S} height={vbH * S} viewBox={`${minX - pad} ${minY - pad} ${vbW} ${vbH}`}>
-      <defs><clipPath id="frontclip"><path d={dDall} /></clipPath></defs>
+      <defs><clipPath id="frontclip"><path d={eD} /></clipPath></defs>
       {/* faint edge-to-edge frame at the ultimate extent + the real W×H (total effect size) */}
       <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink-3)" strokeOpacity={0.5} strokeWidth={0.6} strokeDasharray="3 2.2" />
       <text x={minX + w / 2} y={minY - pad * 0.28} fontSize={fontMM} fill="var(--ink-3)" textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(w)} mm</text>
@@ -132,10 +131,9 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
             the grid can be sanity-checked over the art. Positions are engine anchors, not re-derived. */}
         {frontArtwork
           ? <g clipPath="url(#frontclip)">
-              {/* The v5.3.1 engine returns its blended composite and vector in one mask-pixel/y-down
-                  frame. Grid contours are mm/y-up and Stage negates them to screen y-down, so this
-                  translation+scale preserves that shared origin without any local image fitting. */}
-              <g transform={`translate(0 ${-frontArtwork.imgH * frontArtwork.pixelsToMM}) scale(${frontArtwork.pixelsToMM})`}>
+              {/* The v5.3.1 engine composite is Y-up (canvas row 0 is the design bottom). Negating Y
+                  maps it into the same SVG frame as the contour without re-fitting either result. */}
+              <g transform={`scale(${frontArtwork.pixelsToMM} -${frontArtwork.pixelsToMM})`}>
                 <image
                   data-v531-engine-artwork="composite"
                   href={frontArtwork.imageUrl}
@@ -147,8 +145,7 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
                 />
               </g>
             </g>
-          : <path d={dDall} fill="var(--suede)" />}
-        <path d={dDall} fill="none" stroke="var(--suede-edge)" strokeWidth={1} strokeLinejoin="round" />
+          : <path d={eD} fill="var(--suede)" />}
         {grid.anchors.map((a, i) => {
           const p = fy(a.p)
           return <g key={'fm' + i}>
@@ -161,9 +158,8 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
           margin band shows as the ring between the dashed design outline and the effect edge. */}
       <path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />
       {hasMargin && <path d={dD} fill="var(--suede)" />}
-      {/* frame: fixed 1mm suede edge (engine law, always drawn) — turns red when edges would lift (flap risk).
-          Always rendered: it is the manufactured border AND the flap-risk signal — never user-toggleable. */}
-      <path d={eD} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'} strokeOpacity={hasFlap ? 0.85 : 1} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" />
+      {/* Flap risk remains diagnostic; passing shapes have no cosmetic outline over their material. */}
+      {hasFlap && <path d={eD} fill="none" stroke="var(--fail)" strokeOpacity={0.85} strokeWidth={1.5} strokeLinejoin="round" />}
       {hasMargin && <path d={dD} fill="none" stroke="var(--accent)" strokeOpacity={0.6} strokeWidth={0.8} strokeDasharray="3 2" />}
       {grid.candidates.filter(c => !seat.has(c[0].toFixed(2) + ',' + c[1].toFixed(2))).map((c, i) => {
         const p = fy(c); return <circle key={'c' + i} cx={p[0]} cy={p[1]} r={1.6} fill="var(--grid)" fillOpacity={0.5} />

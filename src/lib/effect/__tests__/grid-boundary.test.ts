@@ -17,6 +17,7 @@ const WORKER_PATH = 'src/lib/effect/grid.worker.ts'
 const CLIENT_PATH = 'src/lib/effect/grid-client.ts'
 const WORKER_HOOK_PATH = 'src/app/(dev)/effect-creator/grid-lab/useGridWorkerJob.ts'
 const SHAPED_MODEL_PATH = 'src/app/(dev)/effect-creator/v5.3.1/core/shaped/ShapedModel.tsx'
+const PRIMITIVES_PATH = 'src/app/(dev)/effect-creator/v5.3.1/core/primitives.ts'
 
 describe('Creator magnetic-grid module boundary', () => {
   it('removes the A4 Create route and sends the root to the original Grid Lab', () => {
@@ -97,14 +98,14 @@ describe('Creator magnetic-grid module boundary', () => {
       expect(combined.split(control)).toHaveLength(2)
     }
 
-    expect(panelSource.match(/\.filter\(r => r\.visible\)/g)).toHaveLength(3)
+    expect(panelSource).not.toContain('.filter(r => r.visible)')
     expect(adminPanelSource).not.toContain('Size ·')
     expect(adminPanelSource).not.toContain('Long side · size')
     expect(adminPanelSource).not.toContain('Short side · size')
     expect(`${pageSource}\n${panelSource}\n${adminPanelSource}`).not.toContain('showUntestedRungs')
   })
 
-  it('keeps only calibrated size tiers in the product panel and none in the admin panel', () => {
+  it('keeps every engine-derived size tier in the product panel and none in the admin panel', () => {
     const noop = () => {}
     const stdRungs = [
       { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
@@ -203,7 +204,7 @@ describe('Creator magnetic-grid module boundary', () => {
     const productStandard = renderProduct({})
     const adminStandard = renderAdmin({})
     expect(productStandard).toContain('VISIBLE_STD')
-    expect(productStandard).not.toContain('HIDDEN_STD')
+    expect(productStandard).toContain('HIDDEN_STD')
     expect(adminStandard).not.toContain('VISIBLE_STD')
     expect(adminStandard).not.toContain('HIDDEN_STD')
 
@@ -226,12 +227,30 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(productDiagonalSurvivors).toContain('nearest delivered spacing 68mm')
     expect(productDiagonalSurvivors).not.toContain('grid diagonal')
 
+    const productHybridRung = renderProduct({
+      model: {
+        effSize: 150,
+        marginMM: 6,
+        designSize: 138,
+        grew: 0,
+        pitch: 48,
+        magDist: 48,
+        patternUsed: 'standard',
+        format: null,
+        rung: { label: 'M', points: 5, sizeMM: 150, visible: true },
+        rungH: { label: 'M', points: 5, sizeMM: 150, visible: true },
+        grid: { anchors: [{}, {}, {}, {}, {}] },
+      },
+    })
+    expect(productHybridRung).toContain('size M · tier 5pt · seated 5')
+    expect(productHybridRung).not.toContain('nearest M')
+
     const productRectangle = renderProduct({ geo: 'rect' })
     const adminRectangle = renderAdmin({})
     expect(productRectangle).toContain('VISIBLE_LONG')
     expect(productRectangle).toContain('VISIBLE_SHORT')
-    expect(productRectangle).not.toContain('HIDDEN_LONG')
-    expect(productRectangle).not.toContain('HIDDEN_SHORT')
+    expect(productRectangle).toContain('HIDDEN_LONG')
+    expect(productRectangle).toContain('HIDDEN_SHORT')
     expect(adminRectangle).not.toContain('VISIBLE_LONG')
     expect(adminRectangle).not.toContain('VISIBLE_SHORT')
     expect(adminRectangle).not.toContain('HIDDEN_LONG')
@@ -257,9 +276,12 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2' ? maxGrowMM : 0")
     expect(pageSource).toContain("{ kind: 'uniform-contour', unitContour: presetUnitContour }")
     expect(pageSource).toContain("src === 'magic2' ? 'magic' : src")
-    expect(pageSource).toMatch(
-      /src === 'magic2' && magicUnitContour\s*\?\s*\{ kind: 'uniform-contour', unitContour: magicUnitContour \}/,
+    expect(pageSource).toContain(
+      "{ kind: 'uniform-contour', unitContour: magicUnitContour, maxMarginMM: maxGrowMM }",
     )
+    expect(pageSource).toContain('activeSnapRung.designSizeMM')
+    expect(pageSource).toContain('? activeSnapRung.marginMM')
+    expect(pageSource).toContain('baseMarginMM: snappedMarginMM')
     expect(pageSource).toContain('const ladderJob = useMemo<GridJob | null>')
     expect(pageSource).toContain("kind: 'rounded-square'")
     expect(pageSource).toContain('radiusMM: roundedSquareRadiusMM')
@@ -354,7 +376,7 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).not.toContain('semanticLadder(')
   })
 
-  it('renders an accepted non-rectangle plan before ladder metadata while rectangles still wait', () => {
+  it('waits for exact snapped ladder metadata instead of flashing a provisional adaptive plan', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
     const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
@@ -364,7 +386,7 @@ describe('Creator magnetic-grid module boundary', () => {
     )
 
     expect(preparedDesignSource).toContain('if (!planDesign) return null')
-    expect(preparedDesignSource).not.toContain('if (!planDesign || !stdRungs.length) return null')
+    expect(preparedDesignSource).toContain('if (snapToGrid && !stdRungs.length) return null')
     expect(preparedDesignSource)
       .toContain('if (!stdRungs.length) return { ...planDesign, rung: null, rungH: null }')
     expect(preparedDesignSource).toContain("if (src === 'std' && geo === 'rect')")
@@ -396,15 +418,38 @@ describe('Creator magnetic-grid module boundary', () => {
 
   it('draws the front-face artwork the right way up — no vertical mirror on the raster', () => {
     const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
-    const imageTag = rendererSource.match(
-      /<image\b[^>]*data-v531-engine-artwork="composite"[^>]*\/>/,
+    const artworkGroup = rendererSource.match(
+      /<g transform=\{`[^`]+`\}>\s*<image\b[^>]*data-v531-engine-artwork="composite"[^>]*\/>\s*<\/g>/,
     )?.[0]
 
-    // The engine composite is y-down already. A negative Y scale mirrors wearer artwork while the
-    // outline stays unchanged — DAN, 2026-07-30: "the image preview is upside down".
-    expect(imageTag, 'v5.3.1 engine composite not rendered').toBeDefined()
-    expect(imageTag).not.toMatch(/scale\(\s*[-\d.]+[\s,]+-/)
-    expect(imageTag).not.toMatch(/scaleY\(\s*-/)
+    // The engine composite is Y-up: canvas row 0 is the design's bottom. SVG is Y-down, so the
+    // raster must negate Y exactly once to coincide with the already-correct contour.
+    expect(artworkGroup, 'v5.3.1 engine composite transform not rendered').toBeDefined()
+    expect(artworkGroup).toContain(
+      'scale(${frontArtwork.pixelsToMM} -${frontArtwork.pixelsToMM})',
+    )
+    expect(artworkGroup).not.toContain('translate(')
+  })
+
+  it('keeps the cosmetic dark outline off both shape faces', () => {
+    const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
+
+    expect(rendererSource).not.toContain('var(--suede-edge)')
+    expect(rendererSource).toContain("hasFlap && <path d={eD}")
+    expect(rendererSource).toContain('stroke="var(--fail)"')
+  })
+
+  it('fills the real outward offset with the v5.3.1 blended composite, never a grey proxy', () => {
+    const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
+    const frontFace = rendererSource.slice(
+      rendererSource.indexOf('{front ? <>'),
+      rendererSource.indexOf('{grid.anchors.map((a, i) => {'),
+    )
+    const marginLayer = "<path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />"
+
+    expect(rendererSource).toContain('<clipPath id="frontclip"><path d={eD} /></clipPath>')
+    expect(frontFace).not.toContain(marginLayer)
+    expect(frontFace).toContain('data-v531-engine-artwork="composite"')
   })
 
   it('wires AI Magic through the full v5.3.1 engine result without its obsolete UI', () => {
@@ -428,6 +473,14 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).toContain('data-v531-engine-artwork="composite"')
     expect(rendererSource).not.toContain('preserveAspectRatio="none"')
     expect(rendererSource).not.toContain('dmnx')
+  })
+
+  it('uses the v5.3.1 shaped-engine outline padding and fidelity defaults', () => {
+    const primitivesSource = readFileSync(PRIMITIVES_PATH, 'utf8')
+
+    expect(primitivesSource).toContain('minFeatureMM: detailToFloorMm(100)')
+    expect(primitivesSource).not.toContain('paddingMM: 0')
+    expect(primitivesSource).toContain('{ ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100) }')
   })
 
   it('retains generic lane cancellation after removing profile switching', () => {

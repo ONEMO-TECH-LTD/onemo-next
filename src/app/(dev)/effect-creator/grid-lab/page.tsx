@@ -222,7 +222,7 @@ export default function GridLab() {
       : presetUnitContour
       ? { kind: 'uniform-contour', unitContour: presetUnitContour }
       : src === 'magic2' && magicUnitContour
-        ? { kind: 'uniform-contour', unitContour: magicUnitContour }
+        ? { kind: 'uniform-contour', unitContour: magicUnitContour, maxMarginMM: maxGrowMM }
       : src === 'magic2'
         ? null
       : snapToGrid && sourceUnitContour
@@ -232,6 +232,7 @@ export default function GridLab() {
       isRoundedSquarePreset,
       ladderShape,
       magicUnitContour,
+      maxGrowMM,
       presetUnitContour,
       roundedSquareRadiusMM,
       snapToGrid,
@@ -292,13 +293,19 @@ export default function GridLab() {
   )
   const rawTestSizeMM = src === 'std' && geo === 'rect' ? longMM : resolvedSizeMM
   const activeSnapRungs = src === 'std' && geo === 'rect' ? rectangleSnapRungs : snapRungs
-  const effectiveTestSizeMM = snapToGrid && activeSnapRungs.length
-    ? nextSemanticRung(activeSnapRungs, rawTestSizeMM).sizeMM
+  const activeSnapRung = snapToGrid && activeSnapRungs.length
+    ? nextSemanticRung(activeSnapRungs, rawTestSizeMM)
+    : null
+  const effectiveTestSizeMM = activeSnapRung
+    ? activeSnapRung.sizeMM
     : rawTestSizeMM
-  const gridDerivedSizeMM = snapToGrid ? effectiveTestSizeMM : resolvedSizeMM
+  const gridDerivedDesignSizeMM = activeSnapRung
+    ? activeSnapRung.designSizeMM
+    : resolvedSizeMM
 
   const planDesign = useMemo<PlanDesign | null>(() => {
     try {
+      if (snapToGrid && !activeSnapRung) return null
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm; grid snap is explicit and shared ──
       if (src === 'std') {
         // Product buttons remain catalogue sizes; the admin test slider can explicitly inspect a
@@ -317,28 +324,37 @@ export default function GridLab() {
             format: rectFormat(widthMM, heightMM),
           }
         }
-        const design = stdShapeContour(geo, gridDerivedSizeMM, gridDerivedSizeMM)
+        const design = stdShapeContour(
+          geo,
+          gridDerivedDesignSizeMM,
+          gridDerivedDesignSizeMM,
+        )
         return {
           design,
-          recipe: { kind: 'standard', shape: geo, widthMM: gridDerivedSizeMM, heightMM: gridDerivedSizeMM },
-          designSize: gridDerivedSizeMM,
+          recipe: {
+            kind: 'standard',
+            shape: geo,
+            widthMM: gridDerivedDesignSizeMM,
+            heightMM: gridDerivedDesignSizeMM,
+          },
+          designSize: gridDerivedDesignSizeMM,
           format: null,
         }
       }
       if (isRoundedSquarePreset) {
         const design = roundedSquareContourMM(
-          gridDerivedSizeMM,
-          gridDerivedSizeMM,
+          gridDerivedDesignSizeMM,
+          gridDerivedDesignSizeMM,
           roundedSquareRadiusMM,
         )
         return {
           design,
           recipe: {
             kind: 'rounded-square',
-            sizeMM: gridDerivedSizeMM,
+            sizeMM: gridDerivedDesignSizeMM,
             radiusMM: roundedSquareRadiusMM,
           },
-          designSize: gridDerivedSizeMM,
+          designSize: gridDerivedDesignSizeMM,
           format: null,
         }
       }
@@ -348,7 +364,7 @@ export default function GridLab() {
       const b = base
       // Every contour uses the effective test size. Grid snap is on by default; disabling it is an
       // explicit continuous calibration mode. Only generators/AI may add adaptive outer margin.
-      const dSize = gridDerivedSizeMM
+      const dSize = gridDerivedDesignSizeMM
       const design = scaleContour(b, dSize)
       return {
         design,
@@ -358,13 +374,14 @@ export default function GridLab() {
       }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [
-    src, geo, sourceUnitContour, rectRungs, gridDerivedSizeMM,
+    src, geo, sourceUnitContour, rectRungs, gridDerivedDesignSizeMM,
     isRoundedSquarePreset, roundedSquareRadiusMM,
-    snapToGrid, effectiveTestSizeMM, longMM, shortMM, orient,
+    snapToGrid, activeSnapRung, effectiveTestSizeMM, longMM, shortMM, orient,
   ])
 
   const preparedDesign = useMemo<PreparedDesign | null>(() => {
     if (!planDesign) return null
+    if (snapToGrid && !stdRungs.length) return null
     if (src === 'std' && geo === 'rect') {
       if (!rectRungs) return null
       return {
@@ -398,12 +415,19 @@ export default function GridLab() {
   }, [preparedDesign, snapToGrid, src, geo, activeLaw, gridMode, planOptions])
   const planJob = useMemo<GridJob | null>(() => {
     if (!planDesign) return null
+    const snappedMarginMM = src === 'magic2' && activeSnapRung
+      ? activeSnapRung.marginMM
+      : planOptions.baseMarginMM
     return {
       operation: 'plan',
       recipe: planDesign.recipe,
-      options: { ...planOptions, construction: selectedConstruction },
+      options: {
+        ...planOptions,
+        baseMarginMM: snappedMarginMM,
+        construction: selectedConstruction,
+      },
     }
-  }, [planDesign, planOptions, selectedConstruction])
+  }, [planDesign, planOptions, selectedConstruction, src, activeSnapRung])
   const planKey = planJob ? gridJobKey(planJob) : null
   const planState = useGridWorkerJob<GridJob, GridJobResult>(
     planJob,

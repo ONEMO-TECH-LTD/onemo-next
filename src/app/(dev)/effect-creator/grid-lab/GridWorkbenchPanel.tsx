@@ -151,7 +151,7 @@ export function GridWorkbenchPanel({
       {!(src === 'std' && geo === 'rect') && !(src === 'magic2' && !magic) && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : src === 'preset' ? 'this preset' : src === 'magic2' ? 'this outline' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
         <div className="gl-seg gl-wrap">
           {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
-          {stdRungs.filter(r => r.visible).map(r =>
+          {stdRungs.map(r =>
             <button key={r.sizeMM} aria-pressed={model?.rung?.sizeMM === r.sizeMM}
               onClick={() => setSizeMM(r.sizeMM)}
               title={`${r.points} anchor point${r.points > 1 ? 's' : ''}`}>
@@ -164,7 +164,7 @@ export function GridWorkbenchPanel({
         <div className="gl-field"><span>Long side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {(rectRungs?.longOptions ?? []).filter(r => r.visible).map(r =>
+            {(rectRungs?.longOptions ?? []).map(r =>
               <button key={'L' + r.sizeMM} aria-pressed={Math.max(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 onClick={() => setLongMM(r.sizeMM)}
                 title={`${r.points} anchor points`}>
@@ -175,7 +175,7 @@ export function GridWorkbenchPanel({
         <div className="gl-field"><span>Short side · size</span>
           <div className="gl-seg gl-wrap">
             {!rectRungs && <span className="gl-inline-resolving">Resolving…</span>}
-            {(rectRungs?.shortOptions ?? []).filter(r => r.visible).map(r =>
+            {(rectRungs?.shortOptions ?? []).map(r =>
               <button key={'S' + r.sizeMM} aria-pressed={Math.min(model?.rung?.sizeMM ?? 0, model?.rungH?.sizeMM ?? 0) === r.sizeMM}
                 onClick={() => setShortMM(r.sizeMM)}>
                 {r.label}
@@ -200,7 +200,7 @@ export function GridWorkbenchPanel({
           ? model.rung && model.rungH
             ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}`
             : `seated ${model.grid.anchors.length}`
-          : `${model.rung ? `${model.designSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.grid.anchors.length}pt · ` : ''}seated ${model.grid.anchors.length}`}
+          : `${model.rung ? `${model.effSize === model.rung.sizeMM ? 'size' : 'nearest'} ${model.rung.label} · tier ${model.grid.anchors.length}pt · ` : ''}seated ${model.grid.anchors.length}`}
         {model.rung && model.rungH && (!model.rung.visible || !model.rungH.visible) ? ' · HIDDEN (untested)' : ''}</span>
       </div>}
     </div>
