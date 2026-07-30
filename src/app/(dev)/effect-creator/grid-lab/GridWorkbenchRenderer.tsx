@@ -127,7 +127,10 @@ function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx,
         {/* FRONT FACE — the design/artwork the wearer sees, with magnets as translucent overlay rings so
             the grid can be sanity-checked over the art. Positions are engine anchors, not re-derived. */}
         {frontImg
-          ? <image href={frontImg} x={dmnx} y={dmny} width={dmxx - dmnx} height={dmxy - dmny} clipPath="url(#frontclip)" preserveAspectRatio="none" transform={`translate(0 ${dmny + dmxy}) scale(1 -1)`} />
+          // dPts are ALREADY screen space (y negated at the top of this function), so the design bbox
+          // below is screen space too and the raster drops straight into it. No axis flip here: adding
+          // one mirrors the artwork about the bbox centre and the wearer sees the design upside down.
+          ? <image href={frontImg} x={dmnx} y={dmny} width={dmxx - dmnx} height={dmxy - dmny} clipPath="url(#frontclip)" preserveAspectRatio="none" />
           : <path d={dDall} fill="var(--suede)" />}
         <path d={dDall} fill="none" stroke="var(--suede-edge)" strokeWidth={1} strokeLinejoin="round" />
         {grid.anchors.map((a, i) => {
