@@ -1,4 +1,6 @@
+'use client';
 // Generated component-library proof inventory. Do not hand-edit.
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import RatioLock from './RatioLock/RatioLock';
 import S from './S/S';
 import ButtonPillSpec from './ButtonPillSpec/ButtonPillSpec';
@@ -840,453 +842,521 @@ export const componentProofInventory = [
   }
 ] as const;
 
+type ProofScenarioProps = {
+  label: string;
+  width: number;
+  height: number;
+  hostLeft: number;
+  hostTop: number;
+  hostWidth: number;
+  hostHeight: number;
+  children: ReactNode;
+};
+
+function ProofScenario({
+  label,
+  width,
+  height,
+  hostLeft,
+  hostTop,
+  hostWidth,
+  hostHeight,
+  children,
+}: ProofScenarioProps) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const host = hostRef.current;
+    if (!stage || !host) return undefined;
+    let stopped = false;
+    const measure = () => {
+      if (stopped) return;
+      stage.style.width = `${width}px`;
+      stage.style.height = `${height}px`;
+      host.style.left = `${hostLeft}px`;
+      host.style.top = `${hostTop}px`;
+      const hostRect = host.getBoundingClientRect();
+      const nodes = [host, ...host.querySelectorAll('*')];
+      let minX = 0;
+      let minY = 0;
+      let maxX = hostRect.width;
+      let maxY = hostRect.height;
+      for (const node of nodes) {
+        const rect = node.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        minX = Math.min(minX, rect.left - hostRect.left);
+        minY = Math.min(minY, rect.top - hostRect.top);
+        maxX = Math.max(maxX, rect.right - hostRect.left);
+        maxY = Math.max(maxY, rect.bottom - hostRect.top);
+      }
+      const originX = Math.min(0, hostLeft + minX);
+      const originY = Math.min(0, hostTop + minY);
+      host.style.left = `${hostLeft - originX}px`;
+      host.style.top = `${hostTop - originY}px`;
+      stage.style.width = `${Math.ceil(Math.max(width, hostLeft + maxX) - originX)}px`;
+      stage.style.height = `${Math.ceil(Math.max(height, hostTop + maxY) - originY)}px`;
+    };
+    measure();
+    void document.fonts.ready.then(() => requestAnimationFrame(measure));
+    return () => {
+      stopped = true;
+    };
+  }, [width, height, hostLeft, hostTop, hostWidth, hostHeight]);
+  return (
+    <div ref={stageRef} data-scenario={label} style={{ width: `${width}px`, height: `${height}px`, position: 'relative' }}>
+      <div ref={hostRef} data-component-host="true" style={{ position: 'absolute', left: `${hostLeft}px`, top: `${hostTop}px`, width: `${hostWidth}px`, height: `${hostHeight}px` }}>{children}</div>
+    </div>
+  );
+}
+
 export default function ComponentLibraryProof() {
   return (
     <main data-component-library-proof="true" style={{ backgroundColor: "rgb(214 214 214)" }}>
-      <section data-component-id={"12002:17702"} data-code-name={"RatioLock"} data-icon-root={false}>
+      <section data-component-id={"12002:17702"} data-code-name={"RatioLock"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Ratio-Lock"}</h2>
-        <div data-scenario={"variant-1"}><RatioLock state={"Locked"} /></div>
-        <div data-scenario={"variant-2"}><RatioLock state={"Open"} /></div>
-        <div data-scenario={"variant-3"}><RatioLock state={"disabled"} /></div>
+        <ProofScenario label={"variant-1"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><RatioLock state={"Locked"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><RatioLock state={"Open"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><RatioLock state={"disabled"} /></ProofScenario>
       </section>
-      <section data-component-id={"8053:2721"} data-code-name={"S"} data-icon-root={false}>
+      <section data-component-id={"8053:2721"} data-code-name={"S"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"S"}</h2>
-        <div data-scenario={"variant-1"}><S size={"SMALL"} /></div>
-        <div data-scenario={"variant-2"}><S size={"Medium"} /></div>
-        <div data-scenario={"variant-3"}><S size={"LARGE"} /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><S size={"SMALL"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><S size={"Medium"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><S size={"LARGE"} /></ProofScenario>
       </section>
-      <section data-component-id={"8018:28068"} data-code-name={"ButtonPillSpec"} data-icon-root={false}>
+      <section data-component-id={"8018:28068"} data-code-name={"ButtonPillSpec"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-Pill-Spec"}</h2>
-        <div data-scenario={"variant-1"}><ButtonPillSpec state={"Default"} /></div>
-        <div data-scenario={"variant-2"}><ButtonPillSpec state={"Pressed"} /></div>
-        <div data-scenario={"swap-icon-6105:18342-6105:687"}><ButtonPillSpec state={"Default"} icon={Menu} /></div>
-        <div data-scenario={"swap-icon-8018:28069-6105:687"}><ButtonPillSpec state={"Pressed"} icon={Menu} /></div>
+        <ProofScenario label={"variant-1"} width={60} height={36} hostLeft={4} hostTop={2} hostWidth={52} hostHeight={28}><ButtonPillSpec state={"Default"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={52} height={252} hostLeft={0} hostTop={224} hostWidth={52} hostHeight={28}><ButtonPillSpec state={"Pressed"} /></ProofScenario>
+        <ProofScenario label={"swap-icon-6105:18342-6105:687"} width={60} height={36} hostLeft={4} hostTop={2} hostWidth={52} hostHeight={28}><ButtonPillSpec state={"Default"} icon={Menu} /></ProofScenario>
+        <ProofScenario label={"swap-icon-8018:28069-6105:687"} width={52} height={252} hostLeft={0} hostTop={224} hostWidth={52} hostHeight={28}><ButtonPillSpec state={"Pressed"} icon={Menu} /></ProofScenario>
       </section>
-      <section data-component-id={"8050:6868"} data-code-name={"ButtonRoundReg"} data-icon-root={false}>
+      <section data-component-id={"8050:6868"} data-code-name={"ButtonRoundReg"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-Round-Reg"}</h2>
-        <div data-scenario={"variant-1"}><ButtonRoundReg state={"Default"} /></div>
-        <div data-scenario={"variant-2"}><ButtonRoundReg state={"Selected"} /></div>
-        <div data-scenario={"swap-icons-6108:53400-6108:52031"}><ButtonRoundReg state={"Default"} icons={Circle} /></div>
-        <div data-scenario={"swap-icons-8050:6869-6108:52031"}><ButtonRoundReg state={"Selected"} icons={Circle} /></div>
+        <ProofScenario label={"variant-1"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><ButtonRoundReg state={"Default"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><ButtonRoundReg state={"Selected"} /></ProofScenario>
+        <ProofScenario label={"swap-icons-6108:53400-6108:52031"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><ButtonRoundReg state={"Default"} icons={Circle} /></ProofScenario>
+        <ProofScenario label={"swap-icons-8050:6869-6108:52031"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><ButtonRoundReg state={"Selected"} icons={Circle} /></ProofScenario>
       </section>
-      <section data-component-id={"6110:56193"} data-code-name={"Dial_6110_56193"} data-icon-root={false}>
+      <section data-component-id={"6110:56193"} data-code-name={"Dial_6110_56193"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Dial"}</h2>
-        <div data-scenario={"variant-1"}><Dial_6110_56193 state={"Active"} /></div>
-        <div data-scenario={"variant-2"}><Dial_6110_56193 state={"New value"} /></div>
-        <div data-scenario={"text-value-6110:56192"}><Dial_6110_56193 state={"Active"} value={"Proof Dial"} /></div>
-        <div data-scenario={"swap-icons-6110:56191-6110:54836"}><Dial_6110_56193 state={"New value"} icons={Hexagon} /></div>
+        <ProofScenario label={"variant-1"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><Dial_6110_56193 state={"Active"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><Dial_6110_56193 state={"New value"} /></ProofScenario>
+        <ProofScenario label={"text-value-6110:56192"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><Dial_6110_56193 state={"Active"} value={"Proof Dial"} /></ProofScenario>
+        <ProofScenario label={"swap-icons-6110:56191-6110:54836"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><Dial_6110_56193 state={"New value"} icons={Hexagon} /></ProofScenario>
       </section>
-      <section data-component-id={"8014:3389"} data-code-name={"TickMark"} data-icon-root={false}>
+      <section data-component-id={"8014:3389"} data-code-name={"TickMark"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tick-mark"}</h2>
-        <div data-scenario={"variant-1"}><TickMark size={"Small"} /></div>
-        <div data-scenario={"variant-2"}><TickMark size={"Center"} /></div>
+        <ProofScenario label={"variant-1"} width={2} height={12} hostLeft={0} hostTop={0} hostWidth={2} hostHeight={12}><TickMark size={"Small"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={2} height={24} hostLeft={0} hostTop={0} hostWidth={2} hostHeight={24}><TickMark size={"Center"} /></ProofScenario>
       </section>
-      <section data-component-id={"8050:6894"} data-code-name={"Dial_8050_6894"} data-icon-root={false}>
+      <section data-component-id={"8050:6894"} data-code-name={"Dial_8050_6894"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Dial"}</h2>
-        <div data-scenario={"variant-1"}><Dial_8050_6894 state={"Selected"} /></div>
-        <div data-scenario={"variant-2"}><Dial_8050_6894 state={"Default"} /></div>
+        <ProofScenario label={"variant-1"} width={28} height={28} hostLeft={2} hostTop={2} hostWidth={24} hostHeight={24}><Dial_8050_6894 state={"Selected"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={24} height={24} hostLeft={0} hostTop={0} hostWidth={24} hostHeight={24}><Dial_8050_6894 state={"Default"} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:20931"} data-code-name={"ToggleCombo"} data-icon-root={false}>
+      <section data-component-id={"8017:20931"} data-code-name={"ToggleCombo"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Toggle-Combo"}</h2>
-        <div data-scenario={"variant-1"}><ToggleCombo mode={"Magnetic"} /></div>
-        <div data-scenario={"variant-2"}><ToggleCombo mode={"Sticky"} /></div>
+        <ProofScenario label={"variant-1"} width={110} height={44.90380859375} hostLeft={2} hostTop={0} hostWidth={108} hostHeight={44}><ToggleCombo mode={"Magnetic"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={110} height={44.90380859375} hostLeft={0} hostTop={0} hostWidth={108} hostHeight={44}><ToggleCombo mode={"Sticky"} /></ProofScenario>
       </section>
-      <section data-component-id={"12002:3885"} data-code-name={"Badge"} data-icon-root={false}>
+      <section data-component-id={"12002:3885"} data-code-name={"Badge"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Badge"}</h2>
-        <div data-scenario={"variant-1"}><Badge state={"Active"} /></div>
-        <div data-scenario={"variant-2"}><Badge state={"Passive"} /></div>
+        <ProofScenario label={"variant-1"} width={64} height={28} hostLeft={4} hostTop={3} hostWidth={56} hostHeight={20}><Badge state={"Active"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={56} height={20} hostLeft={0} hostTop={0} hostWidth={56} hostHeight={20}><Badge state={"Passive"} /></ProofScenario>
       </section>
-      <section data-component-id={"12002:4329"} data-code-name={"ModeSelector"} data-icon-root={false}>
+      <section data-component-id={"12002:4329"} data-code-name={"ModeSelector"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Mode-selector"}</h2>
-        <div data-scenario={"variant-1"}><ModeSelector mode={"2"} /></div>
-        <div data-scenario={"variant-2"}><ModeSelector mode={"1"} /></div>
-        <div data-scenario={"variant-3"}><ModeSelector mode={"3"} /></div>
+        <ProofScenario label={"variant-1"} width={176} height={28} hostLeft={0} hostTop={1} hostWidth={176} hostHeight={24}><ModeSelector mode={"2"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={178} height={28} hostLeft={2} hostTop={1} hostWidth={176} hostHeight={24}><ModeSelector mode={"1"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={178} height={28} hostLeft={0} hostTop={1} hostWidth={176} hostHeight={24}><ModeSelector mode={"3"} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:20997"} data-code-name={"ButtonFBFlip"} data-icon-root={false}>
+      <section data-component-id={"8017:20997"} data-code-name={"ButtonFBFlip"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-F-B-flip"}</h2>
-        <div data-scenario={"variant-1"}><ButtonFBFlip state={"Frontside"} /></div>
-        <div data-scenario={"variant-2"}><ButtonFBFlip state={"Backside"} /></div>
+        <ProofScenario label={"variant-1"} width={52} height={40} hostLeft={0} hostTop={0} hostWidth={52} hostHeight={40}><ButtonFBFlip state={"Frontside"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={52} height={40} hostLeft={0} hostTop={0} hostWidth={52} hostHeight={40}><ButtonFBFlip state={"Backside"} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21219"} data-code-name={"MicroSectionCardMode"} data-icon-root={false}>
+      <section data-component-id={"8017:21219"} data-code-name={"MicroSectionCardMode"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Micro-section-card-mode"}</h2>
-        <div data-scenario={"variant-1"}><MicroSectionCardMode state={"Frontside"} /></div>
-        <div data-scenario={"variant-2"}><MicroSectionCardMode state={"Backside"} /></div>
+        <ProofScenario label={"variant-1"} width={402} height={20} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={20}><MicroSectionCardMode state={"Frontside"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={402} height={20} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={20}><MicroSectionCardMode state={"Backside"} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:25623"} data-code-name={"Tab"} data-icon-root={false}>
+      <section data-component-id={"8017:25623"} data-code-name={"Tab"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tab"}</h2>
-        <div data-scenario={"variant-1"}><Tab state={"Active"} /></div>
-        <div data-scenario={"variant-2"}><Tab state={"Passive"} /></div>
-        <div data-scenario={"text-label-8017:21679"}><Tab state={"Active"} label={"Proof Tab"} /></div>
-        <div data-scenario={"text-label-8017:25624"}><Tab state={"Passive"} label={"Proof Tab"} /></div>
-        <div data-scenario={"swap-instance-8017:21679-8017:21672"}><Tab state={"Active"} instance={IconBasket} /></div>
-        <div data-scenario={"swap-instance-8017:25624-8017:21672"}><Tab state={"Passive"} instance={IconBasket} /></div>
+        <ProofScenario label={"variant-1"} width={71.60009765625} height={38} hostLeft={0} hostTop={0} hostWidth={71.5999984741211} hostHeight={38}><Tab state={"Active"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={71.60009765625} height={38} hostLeft={0} hostTop={0} hostWidth={71.5999984741211} hostHeight={38}><Tab state={"Passive"} /></ProofScenario>
+        <ProofScenario label={"text-label-8017:21679"} width={71.60009765625} height={38} hostLeft={0} hostTop={0} hostWidth={71.5999984741211} hostHeight={38}><Tab state={"Active"} label={"Proof Tab"} /></ProofScenario>
+        <ProofScenario label={"text-label-8017:25624"} width={71.60009765625} height={38} hostLeft={0} hostTop={0} hostWidth={71.5999984741211} hostHeight={38}><Tab state={"Passive"} label={"Proof Tab"} /></ProofScenario>
+        <ProofScenario label={"swap-instance-8017:21679-8017:21672"} width={71.60009765625} height={38} hostLeft={0} hostTop={0} hostWidth={71.5999984741211} hostHeight={38}><Tab state={"Active"} instance={IconBasket} /></ProofScenario>
+        <ProofScenario label={"swap-instance-8017:25624-8017:21672"} width={71.60009765625} height={38} hostLeft={0} hostTop={0} hostWidth={71.5999984741211} hostHeight={38}><Tab state={"Passive"} instance={IconBasket} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:26135"} data-code-name={"Dock"} data-icon-root={false}>
+      <section data-component-id={"8017:26135"} data-code-name={"Dock"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Dock"}</h2>
-        <div data-scenario={"variant-1"}><Dock selected={"Default"} /></div>
-        <div data-scenario={"variant-2"}><Dock selected={"Shape"} /></div>
-        <div data-scenario={"variant-3"}><Dock selected={"Add"} /></div>
-        <div data-scenario={"variant-4"}><Dock selected={"Style"} /></div>
-        <div data-scenario={"variant-5"}><Dock selected={"Tune"} /></div>
-        <div data-scenario={"variant-6"}><Dock selected={"Edit"} /></div>
+        <ProofScenario label={"variant-1"} width={402} height={54} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={54}><Dock selected={"Default"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={402} height={54} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={54}><Dock selected={"Shape"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={402} height={54} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={54}><Dock selected={"Add"} /></ProofScenario>
+        <ProofScenario label={"variant-4"} width={402} height={54} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={54}><Dock selected={"Style"} /></ProofScenario>
+        <ProofScenario label={"variant-5"} width={402} height={54} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={54}><Dock selected={"Tune"} /></ProofScenario>
+        <ProofScenario label={"variant-6"} width={402} height={54} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={54}><Dock selected={"Edit"} /></ProofScenario>
       </section>
-      <section data-component-id={"8054:4016"} data-code-name={"EffectCard"} data-icon-root={false}>
+      <section data-component-id={"8054:4016"} data-code-name={"EffectCard"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Effect Card"}</h2>
-        <div data-scenario={"variant-1"}><EffectCard side={"Face"} /></div>
-        <div data-scenario={"variant-2"}><EffectCard side={"Back"} /></div>
-        <div data-scenario={"variant-3"}><EffectCard side={"Face-Modify-frame1"} /></div>
+        <ProofScenario label={"variant-1"} width={312} height={312} hostLeft={10} hostTop={6} hostWidth={292} hostHeight={292}><EffectCard side={"Face"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={312} height={312} hostLeft={12} hostTop={8} hostWidth={288} hostHeight={288}><EffectCard side={"Back"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={312} height={314} hostLeft={4} hostTop={2} hostWidth={304} hostHeight={304}><EffectCard side={"Face-Modify-frame1"} /></ProofScenario>
       </section>
-      <section data-component-id={"12016:8557"} data-code-name={"Swatch_12016_8557"} data-icon-root={false}>
+      <section data-component-id={"12016:8557"} data-code-name={"Swatch_12016_8557"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Swatch"}</h2>
-        <div data-scenario={"variant-1"}><Swatch_12016_8557 state={"Default"} /></div>
-        <div data-scenario={"variant-2"}><Swatch_12016_8557 state={"Selected"} /></div>
+        <ProofScenario label={"variant-1"} width={49} height={52.5} hostLeft={0.5} hostTop={0} hostWidth={48} hostHeight={48}><Swatch_12016_8557 state={"Default"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={52} height={54.5} hostLeft={4} hostTop={4} hostWidth={44} hostHeight={44}><Swatch_12016_8557 state={"Selected"} /></ProofScenario>
       </section>
-      <section data-component-id={"12016:11253"} data-code-name={"SizeIndicator"} data-icon-root={false}>
+      <section data-component-id={"12016:11253"} data-code-name={"SizeIndicator"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Size-Indicator"}</h2>
-        <div data-scenario={"variant-1"}><SizeIndicator size={"Large"} /></div>
-        <div data-scenario={"variant-2"}><SizeIndicator size={"Small"} /></div>
-        <div data-scenario={"variant-3"}><SizeIndicator size={"Medium"} /></div>
-        <div data-scenario={"variant-4"}><SizeIndicator size={"Custom"} /></div>
+        <ProofScenario label={"variant-1"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><SizeIndicator size={"Large"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><SizeIndicator size={"Small"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><SizeIndicator size={"Medium"} /></ProofScenario>
+        <ProofScenario label={"variant-4"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><SizeIndicator size={"Custom"} /></ProofScenario>
       </section>
-      <section data-component-id={"12016:10932"} data-code-name={"MagnetBump"} data-icon-root={true}>
+      <section data-component-id={"12016:10932"} data-code-name={"MagnetBump"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Magnet Bump"}</h2>
-        <div data-scenario={"variant-1"}><MagnetBump size={"Small"} /></div>
-        <div data-scenario={"variant-2"}><MagnetBump size={"Medium"} /></div>
-        <div data-scenario={"variant-3"}><MagnetBump size={"SIze3"} /></div>
+        <ProofScenario label={"variant-1"} width={36} height={36} hostLeft={2} hostTop={1} hostWidth={32} hostHeight={32}><MagnetBump size={"Small"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={32} height={32} hostLeft={2} hostTop={1} hostWidth={28} hostHeight={28}><MagnetBump size={"Medium"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={28} height={28} hostLeft={2} hostTop={1} hostWidth={24} hostHeight={24}><MagnetBump size={"SIze3"} /></ProofScenario>
       </section>
-      <section data-component-id={"12016:11148"} data-code-name={"Component1"} data-icon-root={false}>
+      <section data-component-id={"12016:11148"} data-code-name={"Component1"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Component 1"}</h2>
-        <div data-scenario={"variant-1"}><Component1 property1={"LARGE"} /></div>
-        <div data-scenario={"variant-2"}><Component1 property1={"MEDIUM"} /></div>
-        <div data-scenario={"variant-3"}><Component1 property1={"SMALL"} /></div>
-        <div data-scenario={"variant-4"}><Component1 property1={"Variant4"} /></div>
+        <ProofScenario label={"variant-1"} width={312} height={312} hostLeft={12} hostTop={8} hostWidth={288} hostHeight={288}><Component1 property1={"LARGE"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={312} height={312} hostLeft={12} hostTop={8} hostWidth={288} hostHeight={288}><Component1 property1={"MEDIUM"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={312} height={312} hostLeft={12} hostTop={8} hostWidth={288} hostHeight={288}><Component1 property1={"SMALL"} /></ProofScenario>
+        <ProofScenario label={"variant-4"} width={312} height={312} hostLeft={12} hostTop={8} hostWidth={288} hostHeight={288}><Component1 property1={"Variant4"} /></ProofScenario>
       </section>
-      <section data-component-id={"12016:8545"} data-code-name={"SizeSwatches"} data-icon-root={false}>
+      <section data-component-id={"12016:8545"} data-code-name={"SizeSwatches"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Size-swatches"}</h2>
-        <div data-scenario={"variant-1"}><SizeSwatches size={"Freeform"} /></div>
-        <div data-scenario={"variant-2"}><SizeSwatches size={"Medium"} /></div>
-        <div data-scenario={"variant-3"}><SizeSwatches size={"Small"} /></div>
-        <div data-scenario={"variant-4"}><SizeSwatches size={"Large"} /></div>
-        <div data-scenario={"variant-5"}><SizeSwatches size={"None"} /></div>
+        <ProofScenario label={"variant-1"} width={49} height={49} hostLeft={4.5} hostTop={0.5} hostWidth={40} hostHeight={40}><SizeSwatches size={"Freeform"} /></ProofScenario>
+        <ProofScenario label={"variant-2"} width={49} height={49} hostLeft={4.5} hostTop={0.5} hostWidth={40} hostHeight={40}><SizeSwatches size={"Medium"} /></ProofScenario>
+        <ProofScenario label={"variant-3"} width={49} height={49} hostLeft={4.5} hostTop={0.5} hostWidth={40} hostHeight={40}><SizeSwatches size={"Small"} /></ProofScenario>
+        <ProofScenario label={"variant-4"} width={49} height={49} hostLeft={4.5} hostTop={0.5} hostWidth={40} hostHeight={40}><SizeSwatches size={"Large"} /></ProofScenario>
+        <ProofScenario label={"variant-5"} width={49} height={49} hostLeft={4.5} hostTop={0.5} hostWidth={40} hostHeight={40}><SizeSwatches size={"None"} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21672"} data-code-name={"IconBasket"} data-icon-root={true}>
+      <section data-component-id={"8017:21672"} data-code-name={"IconBasket"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Basket"}</h2>
-        <div data-scenario={"variant-1"}><IconBasket /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconBasket /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21674"} data-code-name={"IconShop"} data-icon-root={true}>
+      <section data-component-id={"8017:21674"} data-code-name={"IconShop"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Shop"}</h2>
-        <div data-scenario={"variant-1"}><IconShop /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconShop /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21671"} data-code-name={"IconCreate"} data-icon-root={true}>
+      <section data-component-id={"8017:21671"} data-code-name={"IconCreate"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Create"}</h2>
-        <div data-scenario={"variant-1"}><IconCreate /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconCreate /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21673"} data-code-name={"IconLibrary"} data-icon-root={true}>
+      <section data-component-id={"8017:21673"} data-code-name={"IconLibrary"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Library"}</h2>
-        <div data-scenario={"variant-1"}><IconLibrary /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconLibrary /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21675"} data-code-name={"IconProfile"} data-icon-root={true}>
+      <section data-component-id={"8017:21675"} data-code-name={"IconProfile"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-profile"}</h2>
-        <div data-scenario={"variant-1"}><IconProfile /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconProfile /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21534"} data-code-name={"IconAdd"} data-icon-root={true}>
+      <section data-component-id={"8017:21534"} data-code-name={"IconAdd"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Add"}</h2>
-        <div data-scenario={"variant-1"}><IconAdd /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconAdd /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21535"} data-code-name={"IconShape"} data-icon-root={true}>
+      <section data-component-id={"8017:21535"} data-code-name={"IconShape"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Shape"}</h2>
-        <div data-scenario={"variant-1"}><IconShape /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconShape /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21536"} data-code-name={"IconStyle"} data-icon-root={true}>
+      <section data-component-id={"8017:21536"} data-code-name={"IconStyle"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Style"}</h2>
-        <div data-scenario={"variant-1"}><IconStyle /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconStyle /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21537"} data-code-name={"IconTune"} data-icon-root={true}>
+      <section data-component-id={"8017:21537"} data-code-name={"IconTune"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Tune"}</h2>
-        <div data-scenario={"variant-1"}><IconTune /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconTune /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21538"} data-code-name={"IconEdit"} data-icon-root={true}>
+      <section data-component-id={"8017:21538"} data-code-name={"IconEdit"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Icon-Edit"}</h2>
-        <div data-scenario={"variant-1"}><IconEdit /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><IconEdit /></ProofScenario>
       </section>
-      <section data-component-id={"8068:4571"} data-code-name={"Frame_8068_4571"} data-icon-root={true}>
+      <section data-component-id={"8068:4571"} data-code-name={"Frame_8068_4571"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Frame"}</h2>
-        <div data-scenario={"variant-1"}><Frame_8068_4571 /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><Frame_8068_4571 /></ProofScenario>
       </section>
-      <section data-component-id={"8068:4670"} data-code-name={"Grid_8068_4670"} data-icon-root={true}>
+      <section data-component-id={"8068:4670"} data-code-name={"Grid_8068_4670"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Grid"}</h2>
-        <div data-scenario={"variant-1"}><Grid_8068_4670 /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><Grid_8068_4670 /></ProofScenario>
       </section>
-      <section data-component-id={"8069:4107"} data-code-name={"Size_8069_4107"} data-icon-root={true}>
+      <section data-component-id={"8069:4107"} data-code-name={"Size_8069_4107"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Size"}</h2>
-        <div data-scenario={"variant-1"}><Size_8069_4107 /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><Size_8069_4107 /></ProofScenario>
       </section>
-      <section data-component-id={"10006:4085"} data-code-name={"Frame_10006_4085"} data-icon-root={true}>
+      <section data-component-id={"10006:4085"} data-code-name={"Frame_10006_4085"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Frame"}</h2>
-        <div data-scenario={"variant-1"}><Frame_10006_4085 /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><Frame_10006_4085 /></ProofScenario>
       </section>
-      <section data-component-id={"10007:4146"} data-code-name={"Frame_10007_4146"} data-icon-root={true}>
+      <section data-component-id={"10007:4146"} data-code-name={"Frame_10007_4146"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Frame"}</h2>
-        <div data-scenario={"variant-1"}><Frame_10007_4146 /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><Frame_10007_4146 /></ProofScenario>
       </section>
-      <section data-component-id={"10007:4176"} data-code-name={"Grid2"} data-icon-root={true}>
+      <section data-component-id={"10007:4176"} data-code-name={"Grid2"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Grid2"}</h2>
-        <div data-scenario={"variant-1"}><Grid2 /></div>
+        <ProofScenario label={"variant-1"} width={22} height={22} hostLeft={0} hostTop={0} hostWidth={22} hostHeight={22}><Grid2 /></ProofScenario>
       </section>
-      <section data-component-id={"12002:17690"} data-code-name={"LockClosed"} data-icon-root={true}>
+      <section data-component-id={"12002:17690"} data-code-name={"LockClosed"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"lock-closed"}</h2>
-        <div data-scenario={"variant-1"}><LockClosed /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><LockClosed /></ProofScenario>
       </section>
-      <section data-component-id={"12002:17696"} data-code-name={"LockOpen"} data-icon-root={true}>
+      <section data-component-id={"12002:17696"} data-code-name={"LockOpen"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Lock-open"}</h2>
-        <div data-scenario={"variant-1"}><LockOpen /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><LockOpen /></ProofScenario>
       </section>
-      <section data-component-id={"8063:3191"} data-code-name={"Images"} data-icon-root={true}>
+      <section data-component-id={"8063:3191"} data-code-name={"Images"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Images"}</h2>
-        <div data-scenario={"variant-1"}><Images /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Images /></ProofScenario>
       </section>
-      <section data-component-id={"6108:54771"} data-code-name={"Blob"} data-icon-root={true}>
+      <section data-component-id={"6108:54771"} data-code-name={"Blob"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Blob"}</h2>
-        <div data-scenario={"variant-1"}><Blob /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Blob /></ProofScenario>
       </section>
-      <section data-component-id={"6110:54836"} data-code-name={"Hexagon"} data-icon-root={true}>
+      <section data-component-id={"6110:54836"} data-code-name={"Hexagon"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Hexagon"}</h2>
-        <div data-scenario={"variant-1"}><Hexagon /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Hexagon /></ProofScenario>
       </section>
-      <section data-component-id={"6110:54839"} data-code-name={"Diamond"} data-icon-root={true}>
+      <section data-component-id={"6110:54839"} data-code-name={"Diamond"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Diamond"}</h2>
-        <div data-scenario={"variant-1"}><Diamond /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Diamond /></ProofScenario>
       </section>
-      <section data-component-id={"6110:54842"} data-code-name={"Sparkle"} data-icon-root={true}>
+      <section data-component-id={"6110:54842"} data-code-name={"Sparkle"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Sparkle"}</h2>
-        <div data-scenario={"variant-1"}><Sparkle /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Sparkle /></ProofScenario>
       </section>
-      <section data-component-id={"12002:17774"} data-code-name={"Shuffle"} data-icon-root={true}>
+      <section data-component-id={"12002:17774"} data-code-name={"Shuffle"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Shuffle"}</h2>
-        <div data-scenario={"variant-1"}><Shuffle /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Shuffle /></ProofScenario>
       </section>
-      <section data-component-id={"6108:52031"} data-code-name={"Circle"} data-icon-root={true}>
+      <section data-component-id={"6108:52031"} data-code-name={"Circle"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Circle"}</h2>
-        <div data-scenario={"variant-1"}><Circle /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Circle /></ProofScenario>
       </section>
-      <section data-component-id={"6108:52032"} data-code-name={"Triangle"} data-icon-root={true}>
+      <section data-component-id={"6108:52032"} data-code-name={"Triangle"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Triangle"}</h2>
-        <div data-scenario={"variant-1"}><Triangle /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Triangle /></ProofScenario>
       </section>
-      <section data-component-id={"6108:52033"} data-code-name={"Star"} data-icon-root={true}>
+      <section data-component-id={"6108:52033"} data-code-name={"Star"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Star"}</h2>
-        <div data-scenario={"variant-1"}><Star /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Star /></ProofScenario>
       </section>
-      <section data-component-id={"6108:52034"} data-code-name={"Heart"} data-icon-root={true}>
+      <section data-component-id={"6108:52034"} data-code-name={"Heart"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Heart"}</h2>
-        <div data-scenario={"variant-1"}><Heart /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Heart /></ProofScenario>
       </section>
-      <section data-component-id={"6108:52035"} data-code-name={"Upload"} data-icon-root={true}>
+      <section data-component-id={"6108:52035"} data-code-name={"Upload"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Upload"}</h2>
-        <div data-scenario={"variant-1"}><Upload /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Upload /></ProofScenario>
       </section>
-      <section data-component-id={"6137:652"} data-code-name={"Square"} data-icon-root={true}>
+      <section data-component-id={"6137:652"} data-code-name={"Square"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Square"}</h2>
-        <div data-scenario={"variant-1"}><Square /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Square /></ProofScenario>
       </section>
-      <section data-component-id={"14027:8364"} data-code-name={"RectangleLandscape"} data-icon-root={true}>
+      <section data-component-id={"14027:8364"} data-code-name={"RectangleLandscape"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Rectangle-Landscape"}</h2>
-        <div data-scenario={"variant-1"}><RectangleLandscape /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><RectangleLandscape /></ProofScenario>
       </section>
-      <section data-component-id={"14027:8371"} data-code-name={"RectanglePortrait"} data-icon-root={true}>
+      <section data-component-id={"14027:8371"} data-code-name={"RectanglePortrait"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Rectangle-Portrait"}</h2>
-        <div data-scenario={"variant-1"}><RectanglePortrait /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><RectanglePortrait /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1144"} data-code-name={"Blend"} data-icon-root={true}>
+      <section data-component-id={"8001:1144"} data-code-name={"Blend"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Blend"}</h2>
-        <div data-scenario={"variant-1"}><Blend /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Blend /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1142"} data-code-name={"Exposure"} data-icon-root={true}>
+      <section data-component-id={"8001:1142"} data-code-name={"Exposure"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Exposure"}</h2>
-        <div data-scenario={"variant-1"}><Exposure /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Exposure /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1141"} data-code-name={"Brightness"} data-icon-root={true}>
+      <section data-component-id={"8001:1141"} data-code-name={"Brightness"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Brightness"}</h2>
-        <div data-scenario={"variant-1"}><Brightness /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Brightness /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1140"} data-code-name={"Contrast"} data-icon-root={true}>
+      <section data-component-id={"8001:1140"} data-code-name={"Contrast"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Contrast"}</h2>
-        <div data-scenario={"variant-1"}><Contrast /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Contrast /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1143"} data-code-name={"Saturation"} data-icon-root={true}>
+      <section data-component-id={"8001:1143"} data-code-name={"Saturation"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Saturation"}</h2>
-        <div data-scenario={"variant-1"}><Saturation /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Saturation /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1138"} data-code-name={"Temp"} data-icon-root={true}>
+      <section data-component-id={"8001:1138"} data-code-name={"Temp"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Temp"}</h2>
-        <div data-scenario={"variant-1"}><Temp /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Temp /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1139"} data-code-name={"Vignette"} data-icon-root={true}>
+      <section data-component-id={"8001:1139"} data-code-name={"Vignette"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Vignette"}</h2>
-        <div data-scenario={"variant-1"}><Vignette /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Vignette /></ProofScenario>
       </section>
-      <section data-component-id={"12015:7443"} data-code-name={"Tile"} data-icon-root={true}>
+      <section data-component-id={"12015:7443"} data-code-name={"Tile"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Tile"}</h2>
-        <div data-scenario={"variant-1"}><Tile /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Tile /></ProofScenario>
       </section>
-      <section data-component-id={"12015:7447"} data-code-name={"Fix"} data-icon-root={true}>
+      <section data-component-id={"12015:7447"} data-code-name={"Fix"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Fix"}</h2>
-        <div data-scenario={"variant-1"}><Fix /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Fix /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1151"} data-code-name={"Offset"} data-icon-root={true}>
+      <section data-component-id={"8001:1151"} data-code-name={"Offset"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Offset"}</h2>
-        <div data-scenario={"variant-1"}><Offset /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Offset /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1150"} data-code-name={"Definition"} data-icon-root={true}>
+      <section data-component-id={"8001:1150"} data-code-name={"Definition"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Definition"}</h2>
-        <div data-scenario={"variant-1"}><Definition /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Definition /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1148"} data-code-name={"Radius"} data-icon-root={true}>
+      <section data-component-id={"8001:1148"} data-code-name={"Radius"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Radius"}</h2>
-        <div data-scenario={"variant-1"}><Radius /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Radius /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1147"} data-code-name={"Bend"} data-icon-root={true}>
+      <section data-component-id={"8001:1147"} data-code-name={"Bend"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Bend"}</h2>
-        <div data-scenario={"variant-1"}><Bend /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Bend /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1146"} data-code-name={"Smooth"} data-icon-root={true}>
+      <section data-component-id={"8001:1146"} data-code-name={"Smooth"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Smooth"}</h2>
-        <div data-scenario={"variant-1"}><Smooth /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Smooth /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1145"} data-code-name={"Snap"} data-icon-root={true}>
+      <section data-component-id={"8001:1145"} data-code-name={"Snap"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Snap"}</h2>
-        <div data-scenario={"variant-1"}><Snap /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Snap /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1149"} data-code-name={"Sharpen"} data-icon-root={true}>
+      <section data-component-id={"8001:1149"} data-code-name={"Sharpen"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Sharpen"}</h2>
-        <div data-scenario={"variant-1"}><Sharpen /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Sharpen /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1158"} data-code-name={"Sticky_8001_1158"} data-icon-root={true}>
+      <section data-component-id={"8001:1158"} data-code-name={"Sticky_8001_1158"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Sticky"}</h2>
-        <div data-scenario={"variant-1"}><Sticky_8001_1158 /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Sticky_8001_1158 /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1157"} data-code-name={"Swatch_8001_1157"} data-icon-root={true}>
+      <section data-component-id={"8001:1157"} data-code-name={"Swatch_8001_1157"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Swatch"}</h2>
-        <div data-scenario={"variant-1"}><Swatch_8001_1157 /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Swatch_8001_1157 /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1156"} data-code-name={"Material"} data-icon-root={true}>
+      <section data-component-id={"8001:1156"} data-code-name={"Material"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Material"}</h2>
-        <div data-scenario={"variant-1"}><Material /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Material /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1154"} data-code-name={"Size_8001_1154"} data-icon-root={true}>
+      <section data-component-id={"8001:1154"} data-code-name={"Size_8001_1154"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Size"}</h2>
-        <div data-scenario={"variant-1"}><Size_8001_1154 /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Size_8001_1154 /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1155"} data-code-name={"Grid_8001_1155"} data-icon-root={true}>
+      <section data-component-id={"8001:1155"} data-code-name={"Grid_8001_1155"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Grid"}</h2>
-        <div data-scenario={"variant-1"}><Grid_8001_1155 /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Grid_8001_1155 /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1153"} data-code-name={"Magnetic"} data-icon-root={true}>
+      <section data-component-id={"8001:1153"} data-code-name={"Magnetic"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Magnetic"}</h2>
-        <div data-scenario={"variant-1"}><Magnetic /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Magnetic /></ProofScenario>
       </section>
-      <section data-component-id={"8001:1347"} data-code-name={"Sticky_8001_1347"} data-icon-root={true}>
+      <section data-component-id={"8001:1347"} data-code-name={"Sticky_8001_1347"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Sticky"}</h2>
-        <div data-scenario={"variant-1"}><Sticky_8001_1347 /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Sticky_8001_1347 /></ProofScenario>
       </section>
-      <section data-component-id={"6105:687"} data-code-name={"Menu"} data-icon-root={true}>
+      <section data-component-id={"6105:687"} data-code-name={"Menu"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Menu"}</h2>
-        <div data-scenario={"variant-1"}><Menu /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Menu /></ProofScenario>
       </section>
-      <section data-component-id={"6105:18352"} data-code-name={"Rotate"} data-icon-root={true}>
+      <section data-component-id={"6105:18352"} data-code-name={"Rotate"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Rotate"}</h2>
-        <div data-scenario={"variant-1"}><Rotate /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Rotate /></ProofScenario>
       </section>
-      <section data-component-id={"6108:48035"} data-code-name={"Magic"} data-icon-root={true}>
+      <section data-component-id={"6108:48035"} data-code-name={"Magic"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Magic"}</h2>
-        <div data-scenario={"variant-1"}><Magic /></div>
+        <ProofScenario label={"variant-1"} width={20} height={20} hostLeft={0} hostTop={0} hostWidth={20} hostHeight={20}><Magic /></ProofScenario>
       </section>
-      <section data-component-id={"8018:27923"} data-code-name={"UndoMini"} data-icon-root={true}>
+      <section data-component-id={"8018:27923"} data-code-name={"UndoMini"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Undo-mini"}</h2>
-        <div data-scenario={"variant-1"}><UndoMini /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><UndoMini /></ProofScenario>
       </section>
-      <section data-component-id={"8018:27921"} data-code-name={"RedoMini"} data-icon-root={true}>
+      <section data-component-id={"8018:27921"} data-code-name={"RedoMini"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Redo-mini"}</h2>
-        <div data-scenario={"variant-1"}><RedoMini /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><RedoMini /></ProofScenario>
       </section>
-      <section data-component-id={"8018:27922"} data-code-name={"FlipVMini"} data-icon-root={true}>
+      <section data-component-id={"8018:27922"} data-code-name={"FlipVMini"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Flip-V-mini"}</h2>
-        <div data-scenario={"variant-1"}><FlipVMini /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><FlipVMini /></ProofScenario>
       </section>
-      <section data-component-id={"8018:27920"} data-code-name={"FlipHMini"} data-icon-root={true}>
+      <section data-component-id={"8018:27920"} data-code-name={"FlipHMini"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Flip-H-mini"}</h2>
-        <div data-scenario={"variant-1"}><FlipHMini /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><FlipHMini /></ProofScenario>
       </section>
-      <section data-component-id={"8018:27919"} data-code-name={"ResetMini"} data-icon-root={true}>
+      <section data-component-id={"8018:27919"} data-code-name={"ResetMini"} data-icon-root={true} style={{ width: 'max-content' }}>
         <h2>{"Reset-Mini"}</h2>
-        <div data-scenario={"variant-1"}><ResetMini /></div>
+        <ProofScenario label={"variant-1"} width={16} height={16} hostLeft={0} hostTop={0} hostWidth={16} hostHeight={16}><ResetMini /></ProofScenario>
       </section>
-      <section data-component-id={"12010:22538"} data-code-name={"ToolTitle"} data-icon-root={false}>
+      <section data-component-id={"12010:22538"} data-code-name={"ToolTitle"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-title"}</h2>
-        <div data-scenario={"variant-1"}><ToolTitle /></div>
+        <ProofScenario label={"variant-1"} width={945} height={38} hostLeft={0} hostTop={0} hostWidth={945} hostHeight={38}><ToolTitle /></ProofScenario>
       </section>
-      <section data-component-id={"6103:702"} data-code-name={"MenuToolFrostSingleTemplate"} data-icon-root={false}>
+      <section data-component-id={"6103:702"} data-code-name={"MenuToolFrostSingleTemplate"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Menu-Tool-Frost-single template"}</h2>
-        <div data-scenario={"variant-1"}><MenuToolFrostSingleTemplate /></div>
-        <div data-scenario={"boolean-button2-6103:702"}><MenuToolFrostSingleTemplate button2={true} /></div>
-        <div data-scenario={"boolean-button3-6103:702"}><MenuToolFrostSingleTemplate button3={true} /></div>
-        <div data-scenario={"boolean-button4-6103:702"}><MenuToolFrostSingleTemplate button4={true} /></div>
-        <div data-scenario={"boolean-button5-6103:702"}><MenuToolFrostSingleTemplate button5={true} /></div>
+        <ProofScenario label={"variant-1"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><MenuToolFrostSingleTemplate /></ProofScenario>
+        <ProofScenario label={"boolean-button2-6103:702"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><MenuToolFrostSingleTemplate button2={true} /></ProofScenario>
+        <ProofScenario label={"boolean-button3-6103:702"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><MenuToolFrostSingleTemplate button3={true} /></ProofScenario>
+        <ProofScenario label={"boolean-button4-6103:702"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><MenuToolFrostSingleTemplate button4={true} /></ProofScenario>
+        <ProofScenario label={"boolean-button5-6103:702"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><MenuToolFrostSingleTemplate button5={true} /></ProofScenario>
       </section>
-      <section data-component-id={"6104:641"} data-code-name={"ButtonRoundFrostMini"} data-icon-root={false}>
+      <section data-component-id={"6104:641"} data-code-name={"ButtonRoundFrostMini"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-Round-Frost-mini"}</h2>
-        <div data-scenario={"variant-1"}><ButtonRoundFrostMini /></div>
-        <div data-scenario={"swap-icons-6104:641-8018:27923"}><ButtonRoundFrostMini icons={UndoMini} /></div>
+        <ProofScenario label={"variant-1"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><ButtonRoundFrostMini /></ProofScenario>
+        <ProofScenario label={"swap-icons-6104:641-8018:27923"} width={32} height={32} hostLeft={0} hostTop={0} hostWidth={32} hostHeight={32}><ButtonRoundFrostMini icons={UndoMini} /></ProofScenario>
       </section>
-      <section data-component-id={"6103:707"} data-code-name={"ButtonPillReg"} data-icon-root={false}>
+      <section data-component-id={"6103:707"} data-code-name={"ButtonPillReg"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-pill-reg"}</h2>
-        <div data-scenario={"variant-1"}><ButtonPillReg /></div>
+        <ProofScenario label={"variant-1"} width={65} height={24} hostLeft={0} hostTop={0} hostWidth={65} hostHeight={24}><ButtonPillReg /></ProofScenario>
       </section>
-      <section data-component-id={"6108:48040"} data-code-name={"ButtonRoundSpec"} data-icon-root={false}>
+      <section data-component-id={"6108:48040"} data-code-name={"ButtonRoundSpec"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-Round-Spec"}</h2>
-        <div data-scenario={"variant-1"}><ButtonRoundSpec /></div>
-        <div data-scenario={"swap-icons-6108:48040-6108:48035"}><ButtonRoundSpec icons={Magic} /></div>
+        <ProofScenario label={"variant-1"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><ButtonRoundSpec /></ProofScenario>
+        <ProofScenario label={"swap-icons-6108:48040-6108:48035"} width={48} height={48} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={48}><ButtonRoundSpec icons={Magic} /></ProofScenario>
       </section>
-      <section data-component-id={"8017:21076"} data-code-name={"ButtonPillSpecLabeled"} data-icon-root={false}>
+      <section data-component-id={"8017:21076"} data-code-name={"ButtonPillSpecLabeled"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Button-Pill-Spec-Labeled"}</h2>
-        <div data-scenario={"variant-1"}><ButtonPillSpecLabeled /></div>
+        <ProofScenario label={"variant-1"} width={60} height={42} hostLeft={4} hostTop={2} hostWidth={52} hostHeight={40}><ButtonPillSpecLabeled /></ProofScenario>
       </section>
-      <section data-component-id={"8018:28072"} data-code-name={"MenuToolFrostAssembled"} data-icon-root={false}>
+      <section data-component-id={"8018:28072"} data-code-name={"MenuToolFrostAssembled"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Menu-Tool-Frost-assembled"}</h2>
-        <div data-scenario={"variant-1"}><MenuToolFrostAssembled /></div>
+        <ProofScenario label={"variant-1"} width={48} height={208} hostLeft={0} hostTop={0} hostWidth={48} hostHeight={208}><MenuToolFrostAssembled /></ProofScenario>
       </section>
-      <section data-component-id={"8019:1146"} data-code-name={"ToolSwatches"} data-icon-root={false}>
+      <section data-component-id={"8019:1146"} data-code-name={"ToolSwatches"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-Swatches"}</h2>
-        <div data-scenario={"variant-1"}><ToolSwatches /></div>
+        <ProofScenario label={"variant-1"} width={402} height={32} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={32}><ToolSwatches /></ProofScenario>
       </section>
-      <section data-component-id={"8019:1593"} data-code-name={"ToolSwatch"} data-icon-root={false}>
+      <section data-component-id={"8019:1593"} data-code-name={"ToolSwatch"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-Swatch"}</h2>
-        <div data-scenario={"variant-1"}><ToolSwatch /></div>
+        <ProofScenario label={"variant-1"} width={945} height={76} hostLeft={0} hostTop={0} hostWidth={945} hostHeight={76}><ToolSwatch /></ProofScenario>
       </section>
-      <section data-component-id={"8001:998"} data-code-name={"ToolRuller"} data-icon-root={false}>
+      <section data-component-id={"8001:998"} data-code-name={"ToolRuller"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-Ruller"}</h2>
-        <div data-scenario={"variant-1"}><ToolRuller /></div>
+        <ProofScenario label={"variant-1"} width={945} height={56} hostLeft={0} hostTop={0} hostWidth={945} hostHeight={56}><ToolRuller /></ProofScenario>
       </section>
-      <section data-component-id={"6138:953"} data-code-name={"ToolBarModesel"} data-icon-root={false}>
+      <section data-component-id={"6138:953"} data-code-name={"ToolBarModesel"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-Bar-ModeSel"}</h2>
-        <div data-scenario={"variant-1"}><ToolBarModesel /></div>
+        <ProofScenario label={"variant-1"} width={945} height={52} hostLeft={0} hostTop={0} hostWidth={945} hostHeight={52}><ToolBarModesel /></ProofScenario>
       </section>
-      <section data-component-id={"8018:27668"} data-code-name={"TopSection"} data-icon-root={false}>
+      <section data-component-id={"8018:27668"} data-code-name={"TopSection"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Top Section"}</h2>
-        <div data-scenario={"variant-1"}><TopSection /></div>
-        <div data-scenario={"text-title-8018:27668"}><TopSection title={"Proof Top Section"} /></div>
+        <ProofScenario label={"variant-1"} width={402} height={40} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={40}><TopSection /></ProofScenario>
+        <ProofScenario label={"text-title-8018:27668"} width={402} height={40} hostLeft={0} hostTop={0} hostWidth={402} hostHeight={40}><TopSection title={"Proof Top Section"} /></ProofScenario>
       </section>
-      <section data-component-id={"8019:1640"} data-code-name={"ToolNav"} data-icon-root={false}>
+      <section data-component-id={"8019:1640"} data-code-name={"ToolNav"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-Nav"}</h2>
-        <div data-scenario={"variant-1"}><ToolNav /></div>
+        <ProofScenario label={"variant-1"} width={945} height={54} hostLeft={0} hostTop={2} hostWidth={945} hostHeight={52}><ToolNav /></ProofScenario>
       </section>
-      <section data-component-id={"12007:18284"} data-code-name={"FrameEffectSelection"} data-icon-root={false}>
+      <section data-component-id={"12007:18284"} data-code-name={"FrameEffectSelection"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Frame-Effect selection"}</h2>
-        <div data-scenario={"variant-1"}><FrameEffectSelection /></div>
+        <ProofScenario label={"variant-1"} width={303} height={306} hostLeft={8} hostTop={4} hostWidth={287} hostHeight={290}><FrameEffectSelection /></ProofScenario>
       </section>
-      <section data-component-id={"12007:18281"} data-code-name={"VectorMode"} data-icon-root={false}>
+      <section data-component-id={"12007:18281"} data-code-name={"VectorMode"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Vector mode"}</h2>
-        <div data-scenario={"variant-1"}><VectorMode /></div>
+        <ProofScenario label={"variant-1"} width={296} height={296} hostLeft={0} hostTop={0} hostWidth={296} hostHeight={296}><VectorMode /></ProofScenario>
       </section>
     </main>
   );
