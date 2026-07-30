@@ -85,8 +85,8 @@ export interface GridConfig {
    *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
    *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
   sparseThin?: boolean
-  /** Exact catalogue construction. When present, delivery validates and uses these lattice nodes
-   * instead of independently solving another phase/population. */
+  /** Exact parent catalogue construction. Delivery validates it, then Standard keeps the population
+   * while Light derives its rim/thinned subset instead of independently solving another phase. */
   construction?: GridConstruction
 }
 
@@ -536,10 +536,9 @@ function computePreparedGridForExtent(
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const pattern = cfg.construction?.pattern ?? cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'auto'
-  // GLOBAL LAW (amended, Dan 2026-07-21): the perimeter belt applies to STANDARD and DIAMOND — a
-  // diamond's outer 68-ring stands alone, its inner anchors are removable. Only DICE is forced full:
-  // its centre magnets ARE the pattern (stripping them leaves plain corners). Every consumer inherits.
-  const perimeterOnly = pattern === 'quincunx' ? false : (cfg.perimeterOnly ?? true)
+  // GLOBAL LAW (Dan 2026-07-28): Light is the perimeter belt whatever the pattern. Density chooses
+  // which nodes of one construction ship; it never authorizes a pattern-specific interior exemption.
+  const perimeterOnly = cfg.perimeterOnly ?? true
   const centerMode = cfg.center ?? 'centroid'
   const bb = prepared.bbox
   const issues: string[] = []
@@ -569,8 +568,8 @@ function computePreparedGridForExtent(
     }
     // LIGHT thinning — 1·3·4·6 (Dan: "keep central 3-4, remove 2 and 5") — along the belt edges only;
     // corners always stay; interior nodes (full-grid mode) thin on the axis cross.
-    // LIGHT 1·3·4·6 thinning is a STANDARD-rows law only — a diamond ring's midpoints are structural
-    // 68-links, not crowd (thinning them broke the 224 diamond); dice never reaches here (full).
+    // LIGHT 1·3·4·6 thinning is a STANDARD-rows law only — a diamond or dice rim's diagonal/midpoint
+    // links are structural, not crowd. Those patterns use the population-boundary step above only.
     if (cfg.sparseThin && pattern === 'standard' && pitch === 48 && seated.length >= 5) {
       const r1 = (v: number) => Math.round(v * 10) / 10
       const mains = (vals: number[]): number[] => {
@@ -628,6 +627,9 @@ function computePreparedGridForExtent(
         throw new RangeError('Grid construction overlaps magnet application spots.')
       }
     }
+    const delivered = finalize(seated)
+    seated = delivered.seated
+    interior = delivered.interior
   } else {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
@@ -789,11 +791,10 @@ function computePreparedGridForExtent(
  *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
 export type GridDensity = 'standard' | 'light'
 function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
-/** MERGED COVERAGE LAW (Dan 2026-07-21 — simplify controls): density IS the coverage — 'standard' =
- *  dense/full grid (all interior kept), 'light' = sparse/perimeter belt (interior dropped) + thinning.
- *  Dice always full (its centres ARE the pattern). One control; the old separate Coverage toggle retired. */
-export function perimeterForDensity(density: GridDensity, pattern: GridPattern): boolean {
-  if (pattern === 'quincunx') return false
+/** MERGED COVERAGE LAW (Dan 2026-07-21, amended 2026-07-28): density IS the coverage — 'standard' =
+ *  dense/full grid (all interior kept), 'light' = sparse/perimeter belt (interior dropped) + thinning,
+ *  whatever the pattern. One control; the old separate Coverage toggle retired. */
+export function perimeterForDensity(density: GridDensity): boolean {
   return density === 'light'
 }
 /** Legal patterns per pitch under the 48/68 system: dice centres live at half-pitch, so quincunx is
@@ -915,7 +916,7 @@ export interface SemanticRung {
   /** Shape-independent rectangular extent of the seated lattice, including pad + frame on both sides. */
   gridExtentMM: number
   visible: boolean
-  /** Complete lattice identity consumed verbatim by the delivered plan. */
+  /** Complete parent lattice identity consumed by both density deliveries. */
   construction: GridConstruction
 }
 export type SemanticRungTieBreak = 'higher' | 'first'
@@ -979,11 +980,10 @@ export function deriveRectangleConstruction(
   heightRung: SemanticRung,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'center'> = {},
 ): GridConstruction | null {
   const padEff = law.paddingMM + law.frameMM
-  const density = options.density ?? 'light'
-  const pitchOrder = allowedPitches(density)
+  const pitchOrder = allowedPitches('standard')
   const combos = modeCombos(mode, options.pitchMM, options.source).sort((a, b) =>
     pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM))
   const prepared = prepareExactContour(stdShapeContour(
@@ -992,25 +992,40 @@ export function deriveRectangleConstruction(
     heightRung.sizeMM,
   ))
   for (const combo of combos) {
-    const grid = computePreparedGridForExtent(
+    const full = computePreparedGridForExtent(
       prepared,
       {
         pitchMM: combo.pitchMM,
         pattern: combo.pattern,
         paddingMM: padEff,
         center: options.center,
-        perimeterOnly: perimeterForDensity(density, combo.pattern),
-        sparseThin: density === 'light',
+        perimeterOnly: false,
+        sparseThin: false,
       },
       Math.max(widthRung.gridExtentMM, heightRung.gridExtentMM),
     )
-    const dimensions = anchorGridDimensionsMM(grid.anchors, padEff)
+    if (!full.anchors.length) continue
+    const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, full.anchors)
+    const light = computePreparedGridForExtent(
+      prepared,
+      {
+        pitchMM: combo.pitchMM,
+        pattern: combo.pattern,
+        paddingMM: padEff,
+        center: options.center,
+        perimeterOnly: true,
+        sparseThin: true,
+        construction,
+      },
+      Math.max(widthRung.gridExtentMM, heightRung.gridExtentMM),
+    )
+    const dimensions = anchorGridDimensionsMM(light.anchors, padEff)
     if (
-      grid.flaps.length === 0
+      light.flaps.length === 0
       && dimensions[0] === widthRung.gridExtentMM
       && dimensions[1] === heightRung.gridExtentMM
     ) {
-      return constructionFromAnchors(combo.pattern, combo.pitchMM, grid.anchors)
+      return construction
     }
   }
   return null
@@ -1035,7 +1050,10 @@ function semanticSteps(
 ): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
   const density = options.density ?? 'light'
-  const pitchOrder = allowedPitches(density)
+  // Density is a delivery choice over one parent construction. Catalogue phase/pitch selection is
+  // therefore density-neutral and uses the full 48-first family; Light derives its rim from that
+  // construction instead of running a second coarse-first solver.
+  const pitchOrder = allowedPitches('standard')
   const orderedCombos = [...combos].sort((a, b) => {
     const pitchDifference = pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM)
     return pitchDifference || legalPatterns(a.pitchMM).indexOf(a.pattern)
@@ -1056,23 +1074,42 @@ function semanticSteps(
   ) {
     const minSizeMM = previousSizeMM + 1
     const maxSizeMM = law.maxRungMM
-    let solved: { sizeMM: number; grid: GridResult; combo: typeof orderedCombos[number] } | null = null
+    let solved: {
+      sizeMM: number
+      grid: GridResult
+      construction: GridConstruction
+      combo: typeof orderedCombos[number]
+    } | null = null
     const extentCombos = gridExtentMM === firstExtentMM
       ? [...orderedCombos].sort((a, b) => a.pitchMM - b.pitchMM)
       : orderedCombos
     for (const combo of extentCombos) {
-      const gridAt = (sizeMM: number): GridResult => computePreparedGridForExtent(
-        prepareExactContour(makeShape(sizeMM)),
-        {
+      const gridAt = (sizeMM: number): {
+        grid: GridResult
+        construction: GridConstruction
+      } | null => {
+        const prepared = prepareExactContour(makeShape(sizeMM))
+        const full = computePreparedGridForExtent(prepared, {
           pitchMM: combo.pitchMM,
           pattern: combo.pattern,
           paddingMM: padEff,
           center: options.center,
-          perimeterOnly: perimeterForDensity(density, combo.pattern),
-          sparseThin: density === 'light',
-        },
-        gridExtentMM,
-      )
+          perimeterOnly: false,
+          sparseThin: false,
+        }, gridExtentMM)
+        if (!full.anchors.length) return null
+        const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, full.anchors)
+        const grid = computePreparedGridForExtent(prepared, {
+          pitchMM: combo.pitchMM,
+          pattern: combo.pattern,
+          paddingMM: padEff,
+          center: options.center,
+          perimeterOnly: true,
+          sparseThin: true,
+          construction,
+        }, gridExtentMM)
+        return { grid, construction }
+      }
       const accepts = (grid: GridResult): boolean =>
         grid.anchors.length >= minimumAnchors
         && grid.flaps.length === 0
@@ -1086,29 +1123,37 @@ function semanticSteps(
       // internal; every seat/coverage predicate is re-evaluated at this published even size.
       const firstCandidateMM = 2 * Math.ceil(minimumCandidateMM / 2)
       for (let sizeMM = firstCandidateMM; sizeMM <= maxSizeMM; sizeMM += 2) {
-        const grid = gridAt(sizeMM)
+        const candidate = gridAt(sizeMM)
+        if (!candidate) continue
+        const grid = candidate.grid
         const accepted = gridExtentMM === firstExtentMM
           ? grid.anchors.length >= minimumAnchors
             && anchorGridExtentMM(grid.anchors, padEff) === gridExtentMM
           : accepts(grid)
         if (accepted) {
-          solved = { sizeMM, grid, combo }
+          solved = { sizeMM, grid, construction: candidate.construction, combo }
           break
         }
       }
       if (solved) break
     }
     if (!solved) continue
-    const construction = constructionFromAnchors(
-      solved.combo.pattern,
-      solved.combo.pitchMM,
-      solved.grid.anchors,
-    )
+    const publishedGrid = density === 'light'
+      ? solved.grid
+      : computePreparedGridForExtent(prepareExactContour(makeShape(solved.sizeMM)), {
+          pitchMM: solved.combo.pitchMM,
+          pattern: solved.combo.pattern,
+          paddingMM: padEff,
+          center: options.center,
+          perimeterOnly: false,
+          sparseThin: false,
+          construction: solved.construction,
+        }, gridExtentMM)
     steps.push({
-      points: solved.grid.anchors.length,
+      points: publishedGrid.anchors.length,
       sizeMM: solved.sizeMM,
       gridExtentMM,
-      construction,
+      construction: solved.construction,
     })
     previousSizeMM = solved.sizeMM
   }
@@ -1326,7 +1371,7 @@ export interface GridPlanOptions {
   targetAnchors?: number
   signedBaseMargin?: boolean
   diagnosticVelcro?: boolean
-  /** Catalogue rung construction. Delivery validates and uses it verbatim. */
+  /** Parent catalogue construction. Delivery validates it and applies the requested density. */
   construction?: GridConstruction
 }
 
@@ -1396,13 +1441,12 @@ export function resolveGridPlan(
     (marginMM) => contourWithOuterMargin(contourMM, marginMM),
   )
   const manualPattern = mode === 'auto' ? undefined : mode
-  const patternForCoverage = manualPattern ?? 'standard'
   const cfg: GridConfig = {
     attachment,
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
-    perimeterOnly: perimeterForDensity(density, patternForCoverage),
+    perimeterOnly: perimeterForDensity(density),
     sparseThin: density === 'light',
   }
 
@@ -1467,7 +1511,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 7
+export const GRID_ENGINE_CACHE_VERSION = 8
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 

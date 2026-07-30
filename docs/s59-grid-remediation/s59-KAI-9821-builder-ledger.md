@@ -274,3 +274,110 @@ which already-legal population is scored and then thinned.
 Sufficiency: Light and Standard now inherit one construction phase, Light is population-boundary
 only for every pattern, the cancelled 24mm atom cannot re-enter through density selection, and all
 named code, regression, performance, production-build and visual gates executed.
+
+## Meta rework — hidden rungs and every-pattern Light
+
+Meta falsified the preceding final claim on hidden Diamond-shape 272mm. The visible-rung sweep had
+executed 18 comparisons, but the hidden rung still let Light independently choose Standard/96 at
+phase 40 while Standard chose Standard/48 at phase 16. Light was not a subset of Standard.
+
+The rework probe printed its launcher witness before any result and then executed:
+
+- 23 matched Auto extents: 15 density-dependent constructions before the fix, 0 after;
+- 97 all-shape/all-mode/all-pitch rung comparisons: every Light and Standard rung now carries the
+  same label, size, extent, visibility and parent construction;
+- 97 Standard-delivery counts and 97 Light-delivery counts: every advertised `points` value equals
+  its own delivered anchor count;
+- 49 ordered rectangle pairs: 0 density-dependent constructions; Standard equals
+  each full parent population and Light is its rim/thinned subset;
+- 3 explicit freeform pattern comparisons: Standard, Diamond and Dice Light are all subsets of their
+  full population and retain no enclosed interior node.
+
+The original construction-delivery seam bypassed `finalize`, so storing one full construction could
+not produce two densities. The minimal correction:
+
+1. catalogue construction selection is density-neutral and 48-first;
+2. each rung stores that full parent construction;
+3. rectangle construction composes the same density-neutral parent from its two axis rungs;
+4. exact-construction delivery validates the parent, then the existing finalizer keeps all nodes for
+   Standard or derives the population rim/thinning for Light;
+5. the Dice/quincunx full-grid exemptions are deleted both at density policy and engine delivery.
+
+No second solver, mode branch, shape branch, state, policy constant or UI path was added.
+
+### Auto before/after, exact head comparison
+
+Authority: detached `qa-9817` at `59028ad` versus the working tree. Eight ladders and 46 rungs
+executed on each side. Format is `label:size/advertised@extent,pitch`.
+
+| Shape / density | Before | After |
+|---|---|---|
+| Square / Standard | `ONE:22/1@22,p48 S:70/4@70,p48 M:118/9@118,p48 L:166/16@166,p48 XL:214/25@214,p48 2XL:262/36@262,p48 3XL:310/49@310,p48` | unchanged |
+| Square / Light | `ONE:22/1@22,p48 S:70/4@70,p48 M:118/4@118,p96 L:166/12@166,p48 XL:214/8@214,p96 2XL:262/12@262,p48 3XL:310/12@310,p96` | `ONE:22/1@22,p48 S:70/4@70,p48 M:118/8@118,p48 L:166/12@166,p48 XL:214/8@214,p48 2XL:262/12@262,p48 3XL:310/12@310,p48` |
+| Circle / Standard | `ONE:24/1@22,p48 S:72/2@70,p48 M:120/5@118,p48 L:168/8@166,p48 XL:216/13@214,p48 2XL:262/18@262,p48 3XL:310/29@310,p48` | unchanged |
+| Circle / Light | `ONE:24/1@22,p48 S:72/2@70,p48 M:158/4@118,p96 L:168/6@166,p48 XL:216/4@214,p96 2XL:262/6@262,p48 3XL:310/16@310,p48` | `ONE:24/1@22,p48 S:72/2@70,p48 M:120/4@118,p48 L:168/6@166,p48 XL:216/4@214,p48 2XL:262/6@262,p48 3XL:310/16@310,p48` |
+| Triangle / Standard | `ONE:40/1@22,p48 S:136/4@118,p48 M:232/10@214,p48` | unchanged |
+| Triangle / Light | `ONE:40/1@22,p48 S:136/4@118,p48 M:260/5@214,p96` | `ONE:40/1@22,p48 S:136/4@118,p48 M:232/5@214,p48` |
+| Diamond-shape / Standard | `ONE:32/1@22,p48 S:80/2@70,p48 M:128/5@118,p48 L:176/8@166,p48 XL:224/13@214,p48 2XL:272/18@262,p48` | unchanged |
+| Diamond-shape / Light | `ONE:32/1@22,p48 S:80/2@70,p48 M:128/4@118,p48 L:176/6@166,p48 XL:224/4@214,p96 2XL:272/6@262,p48` | `ONE:32/1@22,p48 S:80/2@70,p48 M:128/4@118,p48 L:176/6@166,p48 XL:224/4@214,p48 2XL:272/6@262,p48` |
+
+### KAI-9788 consequence measurement
+
+At 310mm, explicit freeform Light delivery yields:
+
+- Standard/48: 12 rim anchors;
+- Diamond/48: 12 rim anchors;
+- Dice/96: 18 rim anchors.
+
+Dice without its enclosed centres is still distinguishable from the plain Standard rim, so law 4.5
+strips the Dice interior rather than removing explicit Dice from Light. All three sets are subsets of
+their Standard-density parent population.
+
+### Rework verification checkpoint
+
+- RED: 36 focused tests, 2 failed — density-dependent Auto construction and Dice interior retention.
+- GREEN: grid law 35/35.
+- Cache identity: 7 → 8; performance/cache contract 136/136.
+- Typecheck: exit 0.
+- Full-suite first run: 458 passed / 10 skipped / 1 intentional baseline RED.
+  `canonical-ladder` changed only at Circle M (`158 → 120`) and its fixture hash
+  (`881dc1be… → f6b02654…`), matching the enumerated Auto table above; baseline updated explicitly.
+- Device performance after the explicit baseline update: exit 0, WebKit 26.0;
+  canonical circle 70ms cold / 0ms warm, dense real-AI 77ms / 1ms, small square
+  37ms / 1ms; T1/T2 PASS on all three.
+- Full suite after the baseline update: 459 passed / 10 intentionally skipped;
+  47 files passed / 1 intentionally skipped.
+- Lint: full repo exit 0; the first run exposed one new unused-parameter warning,
+  removed before handoff; changed-file lint then exited 0 with zero warnings.
+
+Necessity: no unnecessary element; the change reuses the existing construction, population-boundary
+and finalization seams.
+
+Sufficiency: the shared parent construction closes hidden and visible phase drift; density-specific
+advertised counts remain truthful; every pattern/source inherits rim-only Light; the measured Dice
+consequence is decided rather than assumed.
+
+### Final sufficiency and deslop audit
+
+- Rectangle construction no longer accepts a density input; its API structurally prevents a second
+  density-specific solve. All 49 ordered rung pairs execute through one construction.
+- Deleted: both Dice-full exemptions, the construction-delivery bypass around `finalize`, the
+  density-specific rectangle pitch order and the duplicate construction-identity regression.
+- Retained deliberately: `allowedPitches(light)` in the adaptive freeform/off-rung solver (law 4.7);
+  the outer hull coverage implementation for the separately ordered KAI-9851 slice; existing
+  padding/frame arithmetic owned by KAI-9845. None is part of this density-construction change.
+- Search found zero remaining pattern-specific Light/full-grid exemption and zero unused
+  density parameter on the rectangle constructor.
+- Post-subtraction gates: grid law 35/35; cache/performance contract 136/136; full suite
+  459 passed / 10 intentionally skipped; typecheck exit 0; changed-file lint exit 0; full-repo lint
+  exit 0 with 214 pre-existing warnings; `git diff --check` clean.
+- Final device run: WebKit 26.0, canonical 117ms/1ms, dense 82ms/1ms, small 37ms/0ms;
+  T1/T2 PASS on all three.
+- Full post-edit read completed for all five changed files after the rectangle correction and
+  subtraction pass.
+
+Necessity: no unnecessary element remains; every changed engine line either selects one parent
+construction, derives its density delivery, or invalidates the resulting cache identity.
+
+Sufficiency: delivers the complete KAI-9821 rework and KAI-9788 consequence—visible, hidden,
+rectangular, geometric, explicit freeform and every legal pattern/pitch family are executable.
