@@ -394,6 +394,19 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).toContain('nearest delivered spacing')
   })
 
+  it('draws the front-face artwork the right way up — no vertical mirror on the raster', () => {
+    const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
+    const imageTag = rendererSource.match(/<image\b[^>]*\/>/)?.[0]
+
+    // The contour is converted to screen space before the design bbox is measured, so the raster
+    // drops into that bbox upright. A negative Y scale mirrors the artwork about the bbox centre
+    // and the wearer sees the design upside down — DAN, 2026-07-30: "the image preview is upside
+    // down". The silhouette is unaffected, which is why this survived every geometry-only gate.
+    expect(imageTag, 'front-face <image> element not found in the renderer').toBeDefined()
+    expect(imageTag).not.toMatch(/scale\(\s*[-\d.]+[\s,]+-/)
+    expect(imageTag).not.toMatch(/scaleY\(\s*-/)
+  })
+
   it('retains generic lane cancellation after removing profile switching', () => {
     const clientSource = readFileSync(CLIENT_PATH, 'utf8')
     const hookSource = readFileSync(WORKER_HOOK_PATH, 'utf8')
