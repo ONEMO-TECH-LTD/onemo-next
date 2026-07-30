@@ -614,7 +614,9 @@ function computePreparedGridForExtent(
       for (let i = 0; i < seat.length; i++) for (let j = i + 1; j < seat.length; j++) {
         const d = dist(seat[i], seat[j]); if (d < mp) mp = d
       }
-      const conform = seat.length < 2 ? 1 : Math.abs(mp - expectedMp) < 2 ? 1 : 0
+      const conform = seat.length < 2
+        ? 1
+        : Math.abs(mp - expectedMp) <= MANUFACTURING_TOLERANCE_MM ? 1 : 0
       const uncoveredPerimeterMM = seat.length
         ? exactPerimeterCoverage(contourMM, seat, HOLD_REACH_MM).uncoveredMM
         : Infinity
@@ -634,8 +636,7 @@ function computePreparedGridForExtent(
           candidate.population.map((p) => ({ p, dia: 6 })),
           pad,
         ) === requiredGridExtentMM)
-    const pool = (pattern === 'standard' || pattern === 'diamond')
-      && extentPool.some((k) => k.conform === 1 && k.population.length >= MIN_ANCHORS)
+    const pool = pattern === 'standard' || pattern === 'diamond'
       ? extentPool.filter((k) => k.conform === 1)
       : extentPool
     let bestKey: number[] | null = null
@@ -1423,7 +1424,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 9
+export const GRID_ENGINE_CACHE_VERSION = 10
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 

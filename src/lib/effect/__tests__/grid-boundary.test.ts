@@ -207,6 +207,25 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(adminStandard).not.toContain('VISIBLE_STD')
     expect(adminStandard).not.toContain('HIDDEN_STD')
 
+    const productDiagonalSurvivors = renderProduct({
+      model: {
+        effSize: 128,
+        marginMM: 0,
+        designSize: 128,
+        grew: 0,
+        pitch: 48,
+        magDist: 48 * Math.SQRT2,
+        patternUsed: 'standard',
+        format: null,
+        rung: stdRungs[0],
+        rungH: stdRungs[0],
+        grid: { anchors: [{}, {}, {}, {}] },
+      },
+    })
+    expect(productDiagonalSurvivors).toContain('standard construction')
+    expect(productDiagonalSurvivors).toContain('nearest delivered spacing 68mm')
+    expect(productDiagonalSurvivors).not.toContain('grid diagonal')
+
     const productRectangle = renderProduct({ geo: 'rect' })
     const adminRectangle = renderAdmin({})
     expect(productRectangle).toContain('VISIBLE_LONG')
@@ -352,6 +371,11 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).not.toContain('<Verdict grid={model.grid} />')
     expect(panelSource).not.toContain('tier ${model.rung.points}pt')
     expect(panelSource).toContain('tier ${model.grid.anchors.length}pt')
+    expect(panelSource).not.toContain('grid diagonal')
+    expect(panelSource).not.toContain('dice half-diagonal')
+    expect(rendererSource).not.toContain('grid.pitchCentreMM * Math.SQRT2')
+    expect(rendererSource).not.toContain('dice ½')
+    expect(rendererSource).toContain('nearest delivered spacing')
   })
 
   it('retains generic lane cancellation after removing profile switching', () => {

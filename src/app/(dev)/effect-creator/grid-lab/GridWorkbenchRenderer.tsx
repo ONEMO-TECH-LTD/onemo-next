@@ -169,7 +169,7 @@ function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx,
           {/* dark underlay + white overlay → legible on the dark suede AND the light margin band */}
           <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#000" strokeOpacity={0.5} strokeWidth={1.6} />
           <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#fff" strokeOpacity={0.95} strokeWidth={0.7} strokeDasharray="1.8 1.4" />
-          <text x={mx} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm{Math.abs(bd - grid.pitchCentreMM * Math.SQRT2) < 1.5 ? ` · ${grid.pitchCentreMM}×√2` : Math.abs(bd - grid.pitchCentreMM / Math.SQRT2) < 1.5 ? ` · dice ½·${grid.pitchCentreMM}√2` : ''}</text>
+          <text x={mx} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm · nearest delivered spacing</text>
         </g>
       })()}
     </svg>

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { getShape } from '@/lib/shape-library'
 import { pointInPolygon } from '../polygon'
-import { contourFromShape } from '../geometry-truth'
+import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 import {
   distanceToPreparedContour,
   prepareExactContour,
@@ -477,6 +477,59 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
+  it('fails closed instead of publishing a rotated population as Standard', () => {
+    const angle = Math.PI / 4
+    const ux = Math.cos(angle), uy = Math.sin(angle)
+    const vx = -uy, vy = ux
+    const halfLong = 0.5, halfShort = 0.15
+    const unit: Contour = {
+      outer: {
+        pts: [
+          [0.5 - halfLong * ux - halfShort * vx, 0.5 - halfLong * uy - halfShort * vy],
+          [0.5 + halfLong * ux - halfShort * vx, 0.5 + halfLong * uy - halfShort * vy],
+          [0.5 + halfLong * ux + halfShort * vx, 0.5 + halfLong * uy + halfShort * vy],
+          [0.5 - halfLong * ux + halfShort * vx, 0.5 - halfLong * uy + halfShort * vy],
+        ],
+      },
+      holes: [],
+    }
+    const shapeAt = (sizeMM: number) => scaleContour(unit, sizeMM)
+    const ladder = semanticLadder(shapeAt, DEFAULT_LAW, 'standard', { pitchMM: 48 })
+    const firstMultiAnchor = ladder.find(({ points }) => points >= 2)
+    expect(firstMultiAnchor).toBeDefined()
+    const constructionPair = nearestAnchorPair(
+      constructionPoints(firstMultiAnchor!.construction)
+        .map((p) => ({ p, dia: 6 as const })),
+    )
+    expect(constructionPair).not.toBeNull()
+    expect(
+      Math.abs(constructionPair!.distanceMM - firstMultiAnchor!.construction.pitchMM),
+      `Standard published ${constructionPair!.distanceMM.toFixed(6)}mm diagonal spacing`,
+    ).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
+
+    const rejected = resolveGridPlan(shapeAt(102), {
+      source: 'gen',
+      mode: 'standard',
+      pitchMM: 48,
+      density: 'standard',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      maxGrowMM: 0,
+    })
+    const grown = resolveGridPlan(shapeAt(102), {
+      source: 'gen',
+      mode: 'standard',
+      pitchMM: 48,
+      density: 'standard',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      maxGrowMM: 12,
+    })
+    expect(rejected.grid.ok).toBe(false)
+    expect(rejected.grid.anchors).toHaveLength(1)
+    expect(grown.grewMM).toBe(12)
+    expect(grown.grid.ok).toBe(true)
+    expect(grown.nearestAnchorMM).toBeCloseTo(48, 9)
+  })
+
   it('keeps every visible geometric product rung on the standard pattern in Auto', () => {
     const nonStandardRungs = new Set<string>()
     let visibleRungs = 0
@@ -860,6 +913,8 @@ describe('semantic ladder stays inside its product contract', () => {
       { mode: 'quincunx', pitchMM: 96 },
     ] as const
     let compared = 0
+    let conformingConstructionsCompared = 0
+    let deliveriesCompared = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       for (const { mode, pitchMM } of cases) {
         const standardRungs = semanticLadderFromRecipe(
@@ -897,6 +952,25 @@ describe('semantic ladder stays inside its product contract', () => {
           })
 
           const contour = stdShapeContour(shape, standardRung.sizeMM)
+          const population = constructionPoints(standardRung.construction)
+          if (population.length >= 2) {
+            const nearest = nearestAnchorPair(
+              population.map((p) => ({ p, dia: 6 as const })),
+            )
+            const basis = patternBasis(
+              standardRung.construction.pattern,
+              standardRung.construction.pitchMM,
+            )
+            const expectedSpacingMM = Math.min(
+              Math.hypot(...basis[0]),
+              Math.hypot(...basis[1]),
+            )
+            conformingConstructionsCompared++
+            expect(
+              Math.abs(nearest!.distanceMM - expectedSpacingMM),
+              `${shape}/${mode}/${pitchMM ?? 'auto'}/${standardRung.label} construction did not conform`,
+            ).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
+          }
           const standard = resolveGridPlan(contour, {
             mode,
             pitchMM,
@@ -913,7 +987,6 @@ describe('semantic ladder stays inside its product contract', () => {
             maxGrowMM: 0,
             construction: standardRung.construction,
           })
-          const population = constructionPoints(standardRung.construction)
           const populationKeys = new Set(population.map(pointKey))
           const rimKeys = boundaryPointKeys(population, standardRung.construction.basisMM)
           expect(standard.grid.anchors.map(({ p }) => p)).toEqual(population)
@@ -923,6 +996,7 @@ describe('semantic ladder stays inside its product contract', () => {
             ['standard', standardRung, standard],
             ['light', lightRung, light],
           ] as const) {
+            deliveriesCompared++
             expect(plan.pattern).toBe(rung.construction.pattern)
             expect(plan.pitchMM).toBe(rung.construction.pitchMM)
             if (rung.points >= 2) {
@@ -951,6 +1025,8 @@ describe('semantic ladder stays inside its product contract', () => {
       }
     }
     expect(compared).toBe(50)
+    expect(conformingConstructionsCompared).toBeGreaterThan(0)
+    expect(deliveriesCompared).toBe(100)
   })
 
   it('law 4.5 — explicit freeform standard, diamond and dice all thin to their population rim', () => {
