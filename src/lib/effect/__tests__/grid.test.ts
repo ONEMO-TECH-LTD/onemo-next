@@ -5,6 +5,7 @@ import { computeAttachmentGrid } from '@/app/(dev)/effect-creator/v5.3.1/core/pr
 import { getShape } from '@/lib/shape-library'
 import { pointInPolygon } from '../polygon'
 import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
+import { REAL_AI_GRID_CORPUS } from '../grid-s0-corpus'
 import {
   distanceToPreparedContour,
   prepareExactContour,
@@ -477,6 +478,61 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
+  it('derives AI Magic 2 sizes from the real outline instead of a square reference', () => {
+    const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
+    const xs = realContour.outer.pts.map(([x]) => x)
+    const ys = realContour.outer.pts.map(([, y]) => y)
+    const longestMM = Math.max(
+      Math.max(...xs) - Math.min(...xs),
+      Math.max(...ys) - Math.min(...ys),
+    )
+    const unitContour = scaleContour(realContour, 1 / longestMM)
+    const options = { source: 'magic' as const, density: 'light' as const }
+    const actualOutline = semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour },
+      DEFAULT_LAW,
+      'auto',
+      options,
+    )
+    const squareReference = semanticLadderFromRecipe(
+      { kind: 'standard', shape: 'square' },
+      DEFAULT_LAW,
+      'auto',
+      options,
+    )
+
+    expect(actualOutline.map(({ label, sizeMM, points, gridExtentMM }) => ({
+      label,
+      sizeMM,
+      points,
+      gridExtentMM,
+    }))).toEqual([
+      { label: 'ONE', sizeMM: 46, points: 1, gridExtentMM: 22 },
+      { label: 'S', sizeMM: 72, points: 2, gridExtentMM: 70 },
+      { label: 'M', sizeMM: 120, points: 3, gridExtentMM: 118 },
+      { label: 'L', sizeMM: 184, points: 8, gridExtentMM: 166 },
+    ])
+    expect(actualOutline.map(({ sizeMM }) => sizeMM))
+      .not.toEqual(squareReference.map(({ sizeMM }) => sizeMM))
+    expect(actualOutline.some(({ sizeMM }) => sizeMM > 180)).toBe(true)
+
+    let compared = 0
+    for (const rung of actualOutline) {
+      const plan = resolveGridPlan(scaleContour(unitContour, rung.sizeMM), {
+        source: 'magic',
+        mode: 'auto',
+        density: 'light',
+        paddingMM: DEFAULT_LAW.paddingMM,
+        maxGrowMM: 0,
+        construction: rung.construction,
+      })
+      compared++
+      expect(plan.grid.anchors).toHaveLength(rung.points)
+      if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
+    }
+    expect(compared).toBe(4)
+  })
+
   it('fails closed instead of publishing a rotated population as Standard', () => {
     const angle = Math.PI / 4
     const ux = Math.cos(angle), uy = Math.sin(angle)

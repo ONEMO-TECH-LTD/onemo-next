@@ -240,11 +240,25 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(productStandard).not.toContain('Design size · longest side')
     expect(renderProduct({ src: 'preset' })).not.toContain('Design size · longest side')
     expect(renderProduct({ src: 'gen' })).toContain('Design size · longest side')
-    expect(renderProduct({ src: 'magic' })).toContain('Design size · longest side')
+    const productMagicV1 = renderProduct({ src: 'magic' })
+    const productMagicV2 = renderProduct({
+      src: 'magic2',
+      magic: { adapter: 'test-cut' },
+    })
+    expect(productMagicV1).toContain('Size · square ref')
+    expect(productMagicV1).toContain('Design size · longest side')
+    expect(productMagicV2).toContain('AI Magic 2')
+    expect(productMagicV2).toContain('Size · this outline')
+    expect(productMagicV2).not.toContain('square ref')
+    expect(productMagicV2).not.toContain('Design size · longest side')
+    expect(productMagicV2).toContain('Replace image')
 
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
-    expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' ? maxGrowMM : 0")
+    expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2' ? maxGrowMM : 0")
     expect(pageSource).toContain("{ kind: 'uniform-contour', unitContour: presetUnitContour }")
+    expect(pageSource).toContain("src === 'magic2' ? 'magic' : src")
+    expect(pageSource).toContain("src === 'magic2' && magicUnitContour")
+    expect(pageSource).toContain('const ladderJob = useMemo<GridJob | null>')
     expect(pageSource).toContain("kind: 'rounded-square'")
     expect(pageSource).toContain('radiusMM: roundedSquareRadiusMM')
     expect(pageSource).toContain('minimumAnchors: DEFAULT_ROUNDED_SQUARE_CALIBRATION.minimumAnchors')
@@ -291,7 +305,7 @@ describe('Creator magnetic-grid module boundary', () => {
 
     expect(pageSource).toContain('resolveRectangleRungs(')
     expect(pageSource).toContain('nearestAnchorPair(')
-    expect(pageSource).toContain('source: src')
+    expect(pageSource).toContain('source: engineSource')
     expect(panelSource).toContain('rectRungs?.shortOptions')
     expect(rendererSource).toContain('anchorPair.distanceMM')
     expect(combined).not.toMatch(/\b(?:autoGrid|balancedFit|perimeterForDensity|insetRingMM)\s*\(/)

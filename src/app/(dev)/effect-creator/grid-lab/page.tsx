@@ -32,7 +32,7 @@ const IMG = 1000
 const VP = 440
 const FIT = 0.86
 
-type Src = 'std' | 'preset' | 'gen' | 'magic'
+type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
 type StdGeo = StdShape
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
 interface PlanDesign {
@@ -135,7 +135,7 @@ export default function GridLab() {
     const f = e.target.files?.[0]; if (!f) return
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
-    setSrc('magic'); setMagStatus('cutting')
+    setSrc((current) => current === 'magic2' ? 'magic2' : 'magic'); setMagStatus('cutting')
     prepareShaped(loaded.url, undefined, (s) => setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s))
       .then((p) => {
         setMagic({ vshape: p.spec.vectorShape, maskH: p.spec.maskHeightPx, adapter: p.spec.generator?.adapter ?? 'cut', imgUrl: loaded.url })
@@ -144,12 +144,17 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
-  const sizeMax = maxDesignMM(src === 'std' ? 'std' : src, DEFAULT_LAW) // engine law: per-source max
+  const isMagicSource = src === 'magic' || src === 'magic2'
+  const engineSource = src === 'magic2' ? 'magic' : src
+  // V1 keeps its provisional random-shape cap. V2 deliberately uses the shared full system range;
+  // both still enter the one engine as the same freeform `magic` source.
+  const sizeBoundsSource = src === 'magic2' ? 'std' : engineSource
+  const sizeMax = maxDesignMM(sizeBoundsSource, DEFAULT_LAW) // engine law: per-source max
   const activeLaw = useMemo(() => ({ ...DEFAULT_LAW, paddingMM: pad }), [pad])
   const sizeMin = minEffectMM(activeLaw)
   const resolvedSizeMM = resolveDesignSizeMM(
     sizeMM,
-    src === 'std' ? 'std' : src,
+    sizeBoundsSource,
     activeLaw,
   )
 
@@ -178,12 +183,12 @@ export default function GridLab() {
     )
   }, [src, gen, p1, p2])
   const magicUnitContour = useMemo(
-    () => src === 'magic' && magic ? normBase(magic.vshape, magic.maskH) : null,
-    [src, magic],
+    () => isMagicSource && magic ? normBase(magic.vshape, magic.maskH) : null,
+    [isMagicSource, magic],
   )
   const sourceUnitContour = presetUnitContour ?? generatedUnitContour ?? magicUnitContour
   const isRoundedSquarePreset = src === 'preset' && preset === 'squircle'
-  const ladderRecipe = useMemo<LadderRecipe>(
+  const ladderRecipe = useMemo<LadderRecipe | null>(
     () => isRoundedSquarePreset
       ? {
           kind: 'rounded-square',
@@ -192,21 +197,27 @@ export default function GridLab() {
         }
       : presetUnitContour
       ? { kind: 'uniform-contour', unitContour: presetUnitContour }
+      : src === 'magic2' && magicUnitContour
+        ? { kind: 'uniform-contour', unitContour: magicUnitContour }
+      : src === 'magic2'
+        ? null
       : snapToGrid && sourceUnitContour
         ? { kind: 'uniform-contour', unitContour: sourceUnitContour }
       : { kind: 'standard', shape: ladderShape },
     [
       isRoundedSquarePreset,
       ladderShape,
+      magicUnitContour,
       presetUnitContour,
       roundedSquareRadiusMM,
       snapToGrid,
       sourceUnitContour,
+      src,
     ],
   )
   const planOptions = useMemo<GridPlanOptions>(() => ({
     attachment,
-    source: src,
+    source: engineSource,
     mode: gridMode,
     density,
     paddingMM: pad,
@@ -215,20 +226,20 @@ export default function GridLab() {
     baseMarginMM: offsetMM,
     // Catalogue rungs already are exact zero-margin grid extents. Adaptive growth is an explicit
     // freeform-only tool; applying it to a rung would silently invent a second product size.
-    maxGrowMM: src === 'gen' || src === 'magic' ? maxGrowMM : 0,
+    maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2' ? maxGrowMM : 0,
     pitchMM: pitchAuto ? undefined : pitch,
     signedBaseMargin: true,
     diagnosticVelcro: true,
-  }), [attachment, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch, src])
+  }), [attachment, engineSource, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch, src])
 
-  const ladderJob = useMemo<GridJob>(() => ({
+  const ladderJob = useMemo<GridJob | null>(() => ladderRecipe ? ({
     operation: 'ladder',
     recipe: ladderRecipe,
     law: activeLaw,
     mode: gridMode,
     options: planOptions,
-  }), [ladderRecipe, activeLaw, gridMode, planOptions])
-  const ladderKey = gridJobKey(ladderJob)
+  }) : null, [ladderRecipe, activeLaw, gridMode, planOptions])
+  const ladderKey = ladderJob ? gridJobKey(ladderJob) : null
   const ladderState = useGridWorkerJob<GridJob, GridJobResult>(
     ladderJob,
     ladderKey,
@@ -488,14 +499,14 @@ export default function GridLab() {
           viewportPx={VP}
           fit={FIT}
           front={front}
-          frontImg={src === 'magic' && magic ? magic.imgUrl : null}
+          frontImg={isMagicSource && magic ? magic.imgUrl : null}
           emptyText={runtimeError
             ? `Grid error · ${runtimeError}`
             : runtimeStatus === 'resolving-sizes'
               ? 'Resolving sizes…'
               : runtimeStatus === 'resolving-grid'
                 ? 'Resolving grid…'
-                : src === 'magic'
+                : isMagicSource
                   ? magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'
                   : 'shape unavailable'}
           emptySpin={runtimeStatus === 'resolving-sizes' || runtimeStatus === 'resolving-grid' || magStatus === 'downloading-model' || magStatus.startsWith('cutting')}
@@ -555,6 +566,7 @@ const CSS = `
 .gl-resolving{padding:11px 13px;display:flex;align-items:center;gap:9px;color:var(--ink-2);font:11.5px var(--mono)}.gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
 .gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap}
+.gl-source-seg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}.gl-source-seg button:nth-child(-n+3){grid-column:span 2}.gl-source-seg button:nth-child(n+4){grid-column:span 3}
 .gl-seg.gl-wrap{flex-wrap:wrap}.gl-seg.gl-wrap button{min-width:64px}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
