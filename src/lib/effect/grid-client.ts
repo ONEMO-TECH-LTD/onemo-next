@@ -22,8 +22,8 @@ import {
 let sharedClient: GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> | null = null
 
 export function gridJobKey(job: GridJob): string {
-  // Pinned pitch and source class change ladder semantics; every other plan option is seed-only and
-  // must not fragment the ladder cache.
+  // Ladder identity includes every option that selects its serialized construction. Remaining plan
+  // options are seed-only and do not fragment the ladder cache.
   return job.operation === 'ladder'
     ? gridLadderCacheKey(job.recipe, job.law, job.mode, job.options)
     : gridPlanCacheKey(job.recipe, job.options)

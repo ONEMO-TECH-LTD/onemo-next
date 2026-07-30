@@ -216,6 +216,8 @@ describe('exact grid cache identity', () => {
     for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { source: 'gen' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'standard' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { center: 'bbox' })).not.toBe(base)
   })
 
   it('changes the plan key for every consumed option and normalizes effective defaults', () => {
@@ -247,12 +249,21 @@ describe('exact grid cache identity', () => {
       { targetAnchors: 5 },
       { signedBaseMargin: true },
       { diagnosticVelcro: true },
+      {
+        construction: {
+          pattern: 'standard',
+          pitchMM: 48,
+          originMM: [11, 11],
+          basisMM: [[48, 0], [0, 48]],
+          population: [[0, 0], [1, 0]],
+        },
+      },
     ]
     for (const options of mutations) expect(gridPlanCacheKey(squarePlan, options)).not.toBe(defaults)
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(5)
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(6)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')

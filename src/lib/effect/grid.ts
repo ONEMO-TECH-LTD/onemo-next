@@ -81,7 +81,7 @@ export function handleGridWorkerJob(job: GridJob): GridWorkerEnvelope {
     const seedJob: GridPlanJob = {
       operation: 'plan',
       recipe: rungPlanRecipe(job.recipe, rung.sizeMM),
-      options: job.options,
+      options: { ...job.options, construction: rung.construction },
     }
     const seed: GridCacheSeed = {
       job: seedJob,

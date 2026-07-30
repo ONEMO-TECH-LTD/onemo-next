@@ -35,7 +35,7 @@ describe('KAI-9837 rounded-square product geometry', () => {
 
   it.each([
     { radiusMM: 10, expectedSizeMM: 70 },
-    { radiusMM: 12, expectedSizeMM: 71 },
+    { radiusMM: 12, expectedSizeMM: 72 },
     { radiusMM: 14, expectedSizeMM: 72 },
   ])(
     'derives the first four-corner S construction for radius $radiusMM at $expectedSizeMM',
@@ -86,7 +86,7 @@ describe('KAI-9837 rounded-square product geometry', () => {
       options: { pitchMM: 48 },
     })
     if (result.operation !== 'ladder') throw new Error('expected ladder result')
-    expect(result.value.find(({ label }) => label === 'S')?.sizeMM).toBe(71)
+    expect(result.value.find(({ label }) => label === 'S')?.sizeMM).toBe(72)
   })
 
   it('keeps the released four-corner minimum in serialized recipe semantics', () => {

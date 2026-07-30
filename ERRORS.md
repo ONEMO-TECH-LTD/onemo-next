@@ -146,3 +146,23 @@
   bounded tangency calls.
 - Remember: never put a proof-density contour inside a 22–310mm scanner; isolate
   the exact geometry assertion from catalogue enumeration.
+
+## 2026-07-29 — standalone grid profile script lacks repo aliases
+
+- Failed: `npm run grid:profile -- <scenario>` for all three scenarios, then a
+  direct `vite-node --config vitest.config.ts` retry.
+- Symptom: Vite could not resolve `@/lib/outline-core/math` or
+  `@/lib/vector-core` from `geometry-truth.ts`; the profile never executed.
+- Worked: the tracked device-performance runner and Vitest gates use their own
+  alias-aware runtime and remain the performance authorities for KAI-9843.
+- Remember: do not report `grid:profile` numbers unless its runtime actually
+  loads the repo aliases; a zero-duration launcher failure is not a benchmark.
+
+## 2026-07-30 — tsx eval silently skipped when `--tsconfig` precedes `-e`
+
+- Failed: `npx tsx --tsconfig tsconfig.json -e "<probe>"` returned exit 0 with
+  no stdout, making a zero-row comparison look like a clean result.
+- Worked: use `npx --no-install tsx -e "<probe>" --tsconfig tsconfig.json`, or
+  run a tracked script file with `npx tsx --tsconfig tsconfig.json <file>`.
+- Remember: an empty diagnostic is not a pass. Print an unconditional executed
+  comparison count, and verify the probe launcher with one literal output first.

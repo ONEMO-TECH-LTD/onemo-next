@@ -3,15 +3,15 @@
   "executor": "Node.js current engine",
   "fixtures": {
     "canonical-ladder": {
-      "sha256": "9a54d89319c63fa7dd40ce5f164bcf46da4c5a521ade16d37d2279901555f161",
+      "sha256": "f3135936d08b27c1b74ca3685e59792fe035331fd5c2983079b29b1f93d5a51f",
       "t2": {
         "rungs": [
-          { "label": "ONE", "points": 1, "sizeMM": 23, "visible": true },
-          { "label": "S", "points": 2, "sizeMM": 71, "visible": true },
-          { "label": "M", "points": 6, "sizeMM": 130, "visible": true },
-          { "label": "L", "points": 8, "sizeMM": 174, "visible": true },
-          { "label": "XL", "points": 10, "sizeMM": 220, "visible": true },
-          { "label": "2XL", "points": 14, "sizeMM": 263, "visible": false },
+          { "label": "ONE", "points": 1, "sizeMM": 24, "visible": true },
+          { "label": "S", "points": 2, "sizeMM": 72, "visible": true },
+          { "label": "M", "points": 4, "sizeMM": 158, "visible": true },
+          { "label": "L", "points": 6, "sizeMM": 168, "visible": true },
+          { "label": "XL", "points": 4, "sizeMM": 224, "visible": true },
+          { "label": "2XL", "points": 6, "sizeMM": 262, "visible": false },
           { "label": "3XL", "points": 16, "sizeMM": 310, "visible": false }
         ]
       }

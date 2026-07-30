@@ -10,9 +10,9 @@
 //     interior magnets never compensate for an uncovered corner/edge. Inside one conforming topology,
 //     covered phase beats uncovered phase; a geometric catalogue publishes covered constructions only.
 //   • MARGIN model: the design never resizes; an outward margin band grows (capped) until covered.
-//   • Procedural sizes: scan the selected legal lattice and publish exact grid extents. Use the first
-//     legal size, except a two-anchor tier may grow within that same extent so gravity gets the largest
-//     top-to-bottom support span.
+//   • Procedural sizes: enumerate legal lattice extents, then solve the earliest upward even-whole-mm
+//     contour size that accepts each extent. The grid extent is the catalogue authority; shape mm is
+//     derived output.
 
 import type { Contour, Pt } from './types'
 import { DEFAULT_CIRCLE_TESSELLATION_CALIBRATION } from './effect-calibration'
@@ -54,6 +54,17 @@ export const TARGET_ANCHORS = 4
  * manufacturing flatten produces 0.00333mm chord sagitta on the R=11 corner; one tenth of the source
  * tolerance bounds it. This is an internal representation epsilon, never a product padding tolerance. */
 const GRID_ARITHMETIC_EPSILON_MM = MANUFACTURING_TOLERANCE_MM / 10
+/** Cross-engine trigonometry can differ below meaningful manufacturing precision. Rank physically
+ * equal phases and serialize their construction on one derived quantum so Node/WebKit publish the
+ * same lattice identity. One thousandth of the source tolerance is representation-only. */
+const GRID_CONSTRUCTION_QUANTUM_MM = MANUFACTURING_TOLERANCE_MM / 1000
+function gridConstructionUnit(value: number): number {
+  return Math.round(value / GRID_CONSTRUCTION_QUANTUM_MM)
+}
+function canonicalGridCoordinate(value: number): number {
+  const canonical = gridConstructionUnit(value) * GRID_CONSTRUCTION_QUANTUM_MM
+  return Object.is(canonical, -0) ? 0 : canonical
+}
 /** How far a magnet holds material down before an edge would lift — a PHYSICAL distance, independent of
  *  the chosen grid pitch. Tunable after coupon testing. */
 export const HOLD_REACH_MM = 48
@@ -74,9 +85,20 @@ export interface GridConfig {
    *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
    *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
   sparseThin?: boolean
+  /** Exact catalogue construction. When present, delivery validates and uses these lattice nodes
+   * instead of independently solving another phase/population. */
+  construction?: GridConstruction
 }
 
 export interface Anchor { p: Pt; dia: MagnetDia }
+
+export interface GridConstruction {
+  pattern: GridPattern
+  pitchMM: number
+  originMM: Pt
+  basisMM: [Pt, Pt]
+  population: Array<[number, number]>
+}
 
 export interface GridResult {
   attachment: Attachment
@@ -362,6 +384,91 @@ function assignSizes(seated: Pt[], plan: MagnetPlan, effectSizeMM: number): Anch
   return seated.map((p, i) => ({ p, dia: (maxR > 1 && radii[i] >= cut ? 8 : 6) as MagnetDia }))
 }
 
+function anchorGridExtentMM(anchors: ReadonlyArray<Anchor>, padEff: number): number {
+  if (!anchors.length) return 0
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const anchor of anchors) {
+    const [x, y] = anchor.p
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  return Math.round(Math.max(maxX - minX, maxY - minY) + 2 * padEff)
+}
+
+function anchorGridDimensionsMM(
+  anchors: ReadonlyArray<Anchor>,
+  padEff: number,
+): [number, number] {
+  if (!anchors.length) return [0, 0]
+  const xs = anchors.map(({ p }) => p[0])
+  const ys = anchors.map(({ p }) => p[1])
+  return [
+    Math.round(Math.max(...xs) - Math.min(...xs) + 2 * padEff),
+    Math.round(Math.max(...ys) - Math.min(...ys) + 2 * padEff),
+  ]
+}
+
+function constructionBasis(pattern: GridPattern, pitchMM: number): [Pt, Pt] {
+  if (pattern === 'diamond') return [[pitchMM, pitchMM], [pitchMM, -pitchMM]]
+  if (pattern === 'quincunx') return [[pitchMM, 0], [pitchMM / 2, pitchMM / 2]]
+  return [[pitchMM, 0], [0, pitchMM]]
+}
+
+function constructionFromAnchors(
+  pattern: GridPattern,
+  pitchMM: number,
+  anchors: ReadonlyArray<Anchor>,
+): GridConstruction {
+  if (!anchors.length) throw new RangeError('A grid construction requires at least one anchor.')
+  const points = anchors.map(({ p: [x, y] }) =>
+    [canonicalGridCoordinate(x), canonicalGridCoordinate(y)] as Pt)
+    .sort(([leftX, leftY], [rightX, rightY]) => leftX - rightX || leftY - rightY)
+  const originMM = points[0]
+  const basisMM = constructionBasis(pattern, pitchMM)
+  const [[ax, ay], [bx, by]] = basisMM
+  const determinant = ax * by - ay * bx
+  const population = points.map((p, anchorIndex) => {
+    const dx = p[0] - originMM[0]
+    const dy = p[1] - originMM[1]
+    const first = Math.round((dx * by - dy * bx) / determinant)
+    const second = Math.round((ax * dy - ay * dx) / determinant)
+    const roundTrip: Pt = [
+      originMM[0] + first * ax + second * bx,
+      originMM[1] + first * ay + second * by,
+    ]
+    if (dist(roundTrip, p) > MANUFACTURING_TOLERANCE_MM) {
+      throw new Error(`${pattern} anchor ${anchorIndex} is not on its declared lattice.`)
+    }
+    return [first, second] as [number, number]
+  }).sort(([leftFirst, leftSecond], [rightFirst, rightSecond]) =>
+    leftFirst - rightFirst || leftSecond - rightSecond)
+  return { pattern, pitchMM, originMM: [...originMM] as Pt, basisMM, population }
+}
+
+function constructionPoints(construction: GridConstruction): Pt[] {
+  const expectedBasis = constructionBasis(construction.pattern, construction.pitchMM)
+  if (
+    construction.originMM.some((value) => !Number.isFinite(value))
+    || construction.basisMM.flat().some((value) => !Number.isFinite(value))
+    || construction.population.some(([first, second]) =>
+      !Number.isInteger(first) || !Number.isInteger(second))
+  ) {
+    throw new RangeError('Grid construction requires finite geometry and whole-number indices.')
+  }
+  for (let axis = 0; axis < 2; axis++) for (let component = 0; component < 2; component++) {
+    if (Math.abs(construction.basisMM[axis][component] - expectedBasis[axis][component]) > 1e-9) {
+      throw new RangeError('Grid construction basis does not match its pattern and pitch.')
+    }
+  }
+  const [[ax, ay], [bx, by]] = construction.basisMM
+  return construction.population.map(([first, second]) => [
+    construction.originMM[0] + first * ax + second * bx,
+    construction.originMM[1] + first * ay + second * by,
+  ])
+}
+
 /**
  * Magnet grid for a silhouette contour (mm). Phase-optimizes the fixed-pitch lattice for conformance,
  * boundary registration, exact ring coverage, population, then balance; in perimeter mode
@@ -373,6 +480,14 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 }
 
 export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig = {}): GridResult {
+  return computePreparedGridForExtent(prepared, cfg)
+}
+
+function computePreparedGridForExtent(
+  prepared: PreparedContour,
+  cfg: GridConfig,
+  requiredGridExtentMM?: number,
+): GridResult {
   const contourMM = prepared.contour
   const attachment: Attachment = cfg.attachment ?? 'magnetic'
   // VELCRO LAW: no grid exists — the back is a full velcro hook in the silhouette. Any shape, any
@@ -386,13 +501,13 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // GLOBAL LAW (48/68 system): dice centres live at half-pitch — quincunx below 96 would put anchors
   // on 24-offsets (34mm links), which do not exist in the system. Enforced HERE so every caller
   // (manual pins, auto search, ladder solver, app) inherits it; pitchCentreMM reports the truth.
-  const reqPitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const reqPitch = cfg.construction?.pitchMM ?? cfg.pitchMM ?? DEFAULT_PITCH_MM
   if (!(LAUNCH_PITCHES_MM as readonly number[]).includes(reqPitch)) {
     throw new RangeError(`Unsupported magnetic-grid pitch ${reqPitch}mm; launch pitches are 48mm and 96mm.`)
   }
   const pitch = (cfg.pattern === 'quincunx' && reqPitch < 96) ? 96 : reqPitch
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-  const pattern = cfg.pattern ?? 'standard'
+  const pattern = cfg.construction?.pattern ?? cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'auto'
   // GLOBAL LAW (amended, Dan 2026-07-21): the perimeter belt applies to STANDARD and DIAMOND — a
   // diamond's outer 68-ring stands alone, its inner anchors are removable. Only DICE is forced full:
@@ -474,7 +589,23 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   // let interior magnets mask a corner/edge gap.
   let seated: Pt[] = []
   let interior: Pt[] = []
-  {
+  if (cfg.construction) {
+    if (cfg.pitchMM != null && cfg.pitchMM !== cfg.construction.pitchMM) {
+      throw new RangeError('Grid construction pitch does not match the requested pitch.')
+    }
+    if (cfg.pattern != null && cfg.pattern !== cfg.construction.pattern) {
+      throw new RangeError('Grid construction pattern does not match the requested pattern.')
+    }
+    seated = constructionPoints(cfg.construction)
+    if (seated.some((point) => !valid(point))) {
+      throw new RangeError('Grid construction places an anchor outside the legal padding floor.')
+    }
+    for (let i = 0; i < seated.length; i++) for (let j = i + 1; j < seated.length; j++) {
+      if (dist(seated[i], seated[j]) < 2 * pad - 1e-6) {
+        throw new RangeError('Grid construction overlaps magnet application spots.')
+      }
+    }
+  } else {
     const c: Pt = centerMode === 'bbox'
       ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
       : prepared.centroid
@@ -558,12 +689,26 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
     // or nothing; diamond shows 68-atom (pitch·√2) links or nothing — neither may quietly resolve into
     // the other's arrangement (the honest outcome is flaps + margin growth, or switching mode). Dice
     // keeps coverage-first (its geometry is inherently the mix).
-    const pool = (pattern === 'standard' || pattern === 'diamond') && cands.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
-      ? cands.filter((k) => k.conform === 1)
-      : cands
+    const extentPool = requiredGridExtentMM == null
+      ? cands
+      : cands.filter((candidate) =>
+        anchorGridExtentMM(
+          candidate.fin.seated.map((p) => ({ p, dia: 6 })),
+          pad,
+        ) === requiredGridExtentMM)
+    const pool = (pattern === 'standard' || pattern === 'diamond')
+      && extentPool.some((k) => k.conform === 1 && k.fin.seated.length >= MIN_ANCHORS)
+      ? extentPool.filter((k) => k.conform === 1)
+      : extentPool
     let bestKey: number[] | null = null
     for (const k of pool) {
-      const key = [-k.conform, -k.registered, k.uncoveredPerimeterMM, -k.fin.seated.length, k.bal]
+      const key = [
+        -k.conform,
+        -k.registered,
+        gridConstructionUnit(k.uncoveredPerimeterMM),
+        -k.fin.seated.length,
+        gridConstructionUnit(k.bal),
+      ]
       let better = !bestKey
       if (bestKey) {
         for (let i = 0; i < key.length; i++) {
@@ -578,7 +723,13 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
 
   // GUARANTEE ≥1: if the sparse grid seated nothing but the shape can still hold a magnet, drop one at the
   // deepest interior point (a single magnet has no spacing to honour, so grid phase is moot here).
-  if (seated.length === 0) {
+  if (
+    seated.length === 0
+    && (
+      requiredGridExtentMM == null
+      || requiredGridExtentMM === Math.round(2 * pad)
+    )
+  ) {
     const dp = deepestPoint(prepared, bb)
     if (dp && dp.d >= pad) { seated = [dp.p]; interior = [] }
   }
@@ -729,8 +880,8 @@ function modeCombos(
 }
 
 /** SEMANTIC SIZES: every shape carries the same sequential grid-extent ladder. The physical mm under
- *  each label is the exact fit for that contour, solved from the live padding/pitch/pattern; a
- *  two-anchor tier may grow within its unchanged extent to improve gravity support.
+ *  each label is the earliest upward even-whole-mm fit for that contour, solved from the live
+ *  padding/pitch/pattern.
  *  Anchor-count changes inside one rectangular extent never manufacture extra product sizes. */
 export interface SemanticRung {
   label: string
@@ -740,6 +891,8 @@ export interface SemanticRung {
   /** Shape-independent rectangular extent of the seated lattice, including pad + frame on both sides. */
   gridExtentMM: number
   visible: boolean
+  /** Complete lattice identity consumed verbatim by the delivered plan. */
+  construction: GridConstruction
 }
 export type SemanticRungTieBreak = 'higher' | 'first'
 
@@ -795,6 +948,49 @@ export function resolveRectangleRungs(
     shortOptions,
   }
 }
+
+/** Compose two axis rungs into the one exact rectangular lattice that delivery consumes. */
+export function deriveRectangleConstruction(
+  widthRung: SemanticRung,
+  heightRung: SemanticRung,
+  law: SizeLaw = DEFAULT_LAW,
+  mode: GridMode = 'auto',
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
+): GridConstruction | null {
+  const padEff = law.paddingMM + law.frameMM
+  const density = options.density ?? 'light'
+  const pitchOrder = allowedPitches(density)
+  const combos = modeCombos(mode, options.pitchMM, options.source).sort((a, b) =>
+    pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM))
+  const prepared = prepareExactContour(stdShapeContour(
+    'rect',
+    widthRung.sizeMM,
+    heightRung.sizeMM,
+  ))
+  for (const combo of combos) {
+    const grid = computePreparedGridForExtent(
+      prepared,
+      {
+        pitchMM: combo.pitchMM,
+        pattern: combo.pattern,
+        paddingMM: padEff,
+        center: options.center,
+        perimeterOnly: perimeterForDensity(density, combo.pattern),
+        sparseThin: density === 'light',
+      },
+      Math.max(widthRung.gridExtentMM, heightRung.gridExtentMM),
+    )
+    const dimensions = anchorGridDimensionsMM(grid.anchors, padEff)
+    if (
+      grid.flaps.length === 0
+      && dimensions[0] === widthRung.gridExtentMM
+      && dimensions[1] === heightRung.gridExtentMM
+    ) {
+      return constructionFromAnchors(combo.pattern, combo.pitchMM, grid.anchors)
+    }
+  }
+  return null
+}
 const BASE_BAND_LABELS = ['2XS', 'XS', 'S', 'M', 'L', 'XL']
 function bandLabel(idx: number): string {
   return idx < BASE_BAND_LABELS.length ? BASE_BAND_LABELS[idx] : `${idx - BASE_BAND_LABELS.length + 2}XL`
@@ -803,25 +999,7 @@ interface SemanticStep {
   points: number
   sizeMM: number
   gridExtentMM: number
-  patterns: GridPattern[]
-  gravitySpanMM: number
-}
-
-function anchorGridExtentMM(anchors: ReadonlyArray<Anchor>, padEff: number): number {
-  if (!anchors.length) return 0
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-  for (const anchor of anchors) {
-    const [x, y] = anchor.p
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-  }
-  return Math.round(Math.max(maxX - minX, maxY - minY) + 2 * padEff)
-}
-
-function twoAnchorGravitySpanMM(anchors: ReadonlyArray<Anchor>): number {
-  return anchors.length === 2 ? Math.abs(anchors[1].p[1] - anchors[0].p[1]) : 0
+  construction: GridConstruction
 }
 
 function semanticSteps(
@@ -829,90 +1007,87 @@ function semanticSteps(
   law: SizeLaw,
   combos: ReadonlyArray<{ pitchMM: number; pattern: GridPattern }>,
   minimumAnchors: number,
+  options: Pick<GridPlanOptions, 'density' | 'center'> = {},
 ): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
-  // A published size is an exact grid extent: at that size, with zero added margin and strict padding,
-  // a legal fixed lattice delivers the topology. A two-anchor extent keeps the earliest size with the
-  // largest vertical span, because gravity makes top-to-bottom support beat an unsupported horizontal
-  // pair. Hold coverage gates publication but never invents a size. Margin growth may adapt a one-off
-  // freeform plan, but it must never manufacture a catalogue rung and then relabel the grown total as
-  // a new design size.
+  const density = options.density ?? 'light'
+  const pitchOrder = allowedPitches(density)
+  const orderedCombos = [...combos].sort((a, b) => {
+    const pitchDifference = pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM)
+    return pitchDifference || legalPatterns(a.pitchMM).indexOf(a.pattern)
+      - legalPatterns(b.pitchMM).indexOf(b.pattern)
+  })
+
+  // GRID-FIRST: enumerate canonical lattice extents, then exhaust the bounded integer-mm domain for
+  // each legal combo and take its first covered construction. The acceptance predicate can contain
+  // disjoint islands as a curved contour crosses lattice phases, so bisection is unsound. Extent
+  // remains the catalogue authority and physical mm is derived within the configured production bound.
   const steps: SemanticStep[] = []
-  let lastGridExtentMM = 0
-  let pendingTwoAnchor: SemanticStep | null = null
-  const emit = (step: SemanticStep) => {
-    steps.push(step)
-    lastGridExtentMM = step.gridExtentMM
-  }
-  for (let sizeMM = Math.ceil(2 * padEff); sizeMM <= law.maxRungMM; sizeMM++) {
-    let bestPoints = 0
-    let bestGridExtentMM = 0
-    let bestGravitySpanMM = 0
-    const bestPatterns = new Set<GridPattern>()
-    const prepared = prepareExactContour(makeShape(sizeMM))
-    for (const combo of combos) {
-      const grid = computePreparedGrid(prepared, {
-        pitchMM: combo.pitchMM,
-        pattern: combo.pattern,
-        paddingMM: padEff,
-        perimeterOnly: combo.pattern === 'standard',
-      })
-      // Law 3.19: an uncovered construction is calibration evidence, never a published rung.
-      // Continue the scan until this lattice extent has a fully covered construction.
-      if (grid.flaps.length > 0 || grid.anchors.length < minimumAnchors) continue
-      const gridExtentMM = anchorGridExtentMM(grid.anchors, padEff)
-      const gravitySpanMM = twoAnchorGravitySpanMM(grid.anchors)
-      if (
-        gridExtentMM > bestGridExtentMM
-        || (gridExtentMM === bestGridExtentMM && grid.anchors.length > bestPoints)
-      ) {
-        bestPoints = grid.anchors.length
-        bestGridExtentMM = gridExtentMM
-        bestGravitySpanMM = gravitySpanMM
-        bestPatterns.clear()
-        bestPatterns.add(combo.pattern)
-      } else if (
-        gridExtentMM === bestGridExtentMM
-        && grid.anchors.length === bestPoints
-        && bestPoints > 0
-      ) {
-        if (gravitySpanMM > bestGravitySpanMM) bestGravitySpanMM = gravitySpanMM
-        bestPatterns.add(combo.pattern)
-      }
-    }
-    if (pendingTwoAnchor) {
-      if (bestGridExtentMM === pendingTwoAnchor.gridExtentMM) {
-        if (bestPoints === 2 && bestGravitySpanMM > pendingTwoAnchor.gravitySpanMM) {
-          pendingTwoAnchor = {
-            points: bestPoints,
-            sizeMM,
-            gridExtentMM: bestGridExtentMM,
-            patterns: [...bestPatterns],
-            gravitySpanMM: bestGravitySpanMM,
-          }
+  let previousSizeMM = Math.ceil(2 * padEff) - 1
+  const firstExtentMM = Math.round(2 * padEff)
+  for (
+    let gridExtentMM = firstExtentMM;
+    gridExtentMM <= law.maxRungMM;
+    gridExtentMM += DEFAULT_PITCH_MM
+  ) {
+    const minSizeMM = previousSizeMM + 1
+    const maxSizeMM = law.maxRungMM
+    let solved: { sizeMM: number; grid: GridResult; combo: typeof orderedCombos[number] } | null = null
+    const extentCombos = gridExtentMM === firstExtentMM
+      ? [...orderedCombos].sort((a, b) => a.pitchMM - b.pitchMM)
+      : orderedCombos
+    for (const combo of extentCombos) {
+      const gridAt = (sizeMM: number): GridResult => computePreparedGridForExtent(
+        prepareExactContour(makeShape(sizeMM)),
+        {
+          pitchMM: combo.pitchMM,
+          pattern: combo.pattern,
+          paddingMM: padEff,
+          center: options.center,
+          perimeterOnly: perimeterForDensity(density, combo.pattern),
+          sparseThin: density === 'light',
+        },
+        gridExtentMM,
+      )
+      const accepts = (grid: GridResult): boolean =>
+        grid.anchors.length >= minimumAnchors
+        && grid.flaps.length === 0
+        && anchorGridExtentMM(grid.anchors, padEff) === gridExtentMM
+
+      const minimumCandidateMM = gridExtentMM === firstExtentMM
+        ? minSizeMM
+        : Math.max(minSizeMM, gridExtentMM)
+      // Product sizes publish upward on even whole millimetres: an odd size puts the grid centre
+      // on a half-millimetre, which cannot be placed repeatably on fabric. The exact geometry remains
+      // internal; every seat/coverage predicate is re-evaluated at this published even size.
+      const firstCandidateMM = 2 * Math.ceil(minimumCandidateMM / 2)
+      for (let sizeMM = firstCandidateMM; sizeMM <= maxSizeMM; sizeMM += 2) {
+        const grid = gridAt(sizeMM)
+        const accepted = gridExtentMM === firstExtentMM
+          ? grid.anchors.length >= minimumAnchors
+            && anchorGridExtentMM(grid.anchors, padEff) === gridExtentMM
+          : accepts(grid)
+        if (accepted) {
+          solved = { sizeMM, grid, combo }
+          break
         }
-        continue
       }
-      if (bestGridExtentMM > pendingTwoAnchor.gridExtentMM) {
-        emit(pendingTwoAnchor)
-        pendingTwoAnchor = null
-      } else {
-        continue
-      }
+      if (solved) break
     }
-    if (bestGridExtentMM > lastGridExtentMM) {
-      const step: SemanticStep = {
-        points: bestPoints,
-        sizeMM,
-        gridExtentMM: bestGridExtentMM,
-        patterns: [...bestPatterns],
-        gravitySpanMM: bestGravitySpanMM,
-      }
-      if (bestPoints === 2) pendingTwoAnchor = step
-      else emit(step)
-    }
+    if (!solved) continue
+    const construction = constructionFromAnchors(
+      solved.combo.pattern,
+      solved.combo.pitchMM,
+      solved.grid.anchors,
+    )
+    steps.push({
+      points: solved.grid.anchors.length,
+      sizeMM: solved.sizeMM,
+      gridExtentMM,
+      construction,
+    })
+    previousSizeMM = solved.sizeMM
   }
-  if (pendingTwoAnchor) emit(pendingTwoAnchor)
   return steps
 }
 
@@ -929,6 +1104,7 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
         sizeMM: st.sizeMM,
         gridExtentMM: st.gridExtentMM,
         visible: st.gridExtentMM <= law.maxTestedMM,
+        construction: st.construction,
       })
       continue
     }
@@ -938,6 +1114,7 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
       sizeMM: st.sizeMM,
       gridExtentMM: st.gridExtentMM,
       visible: st.gridExtentMM <= law.maxTestedMM,
+      construction: st.construction,
     })
   }
   return rungs
@@ -945,10 +1122,10 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
 
 export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
 ): SemanticRung[] {
   return labelSemanticSteps(
-    semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM, options.source), 1),
+    semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM, options.source), 1, options),
     law,
   )
 }
@@ -1125,6 +1302,8 @@ export interface GridPlanOptions {
   targetAnchors?: number
   signedBaseMargin?: boolean
   diagnosticVelcro?: boolean
+  /** Catalogue rung construction. Delivery validates and uses it verbatim. */
+  construction?: GridConstruction
 }
 
 /** Complete engine verdict. A caller renders these facts; it does not reimplement their laws. */
@@ -1219,6 +1398,27 @@ export function resolveGridPlan(
     }
   }
 
+  if (opts.construction && attachment !== 'velcro') {
+    const effectContour = marginVariants.get(baseMarginMM)
+    const grid = computePreparedGrid(effectContour, {
+      ...cfg,
+      pitchMM: opts.construction.pitchMM,
+      pattern: opts.construction.pattern,
+      construction: opts.construction,
+    })
+    return {
+      designContourMM: contourMM,
+      effectContourMM: effectContour.contour,
+      grid,
+      pitchMM: opts.construction.pitchMM,
+      pattern: opts.construction.pattern,
+      baseMarginMM,
+      resolvedMarginMM: baseMarginMM,
+      grewMM: 0,
+      nearestAnchorMM: nearestAnchorPair(grid.anchors)?.distanceMM ?? null,
+    }
+  }
+
   const selected = autoPreparedGrid(marginVariants, cfg, baseMarginMM, maxGrowMM, {
     minN: opts.targetAnchors,
     density,
@@ -1243,7 +1443,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 5
+export const GRID_ENGINE_CACHE_VERSION = 6
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
@@ -1297,7 +1497,7 @@ export function semanticLadderFromRecipe(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
 ): SemanticRung[] {
   const minimumAnchors = recipe.kind === 'rounded-square' ? recipe.minimumAnchors : 1
   return labelSemanticSteps(
@@ -1306,6 +1506,7 @@ export function semanticLadderFromRecipe(
       law,
       modeCombos(mode, options.pitchMM, options.source),
       minimumAnchors,
+      options,
     ),
     law,
   )
@@ -1354,6 +1555,7 @@ const GRID_ENGINE_POLICY_CONTRACT = {
   minAnchors: MIN_ANCHORS,
   targetAnchors: TARGET_ANCHORS,
   preparedContourEpsilonMM: GRID_ARITHMETIC_EPSILON_MM,
+  constructionQuantumMM: GRID_CONSTRUCTION_QUANTUM_MM,
   circleTessellation: DEFAULT_CIRCLE_TESSELLATION_CALIBRATION,
   manufacturingOffsetArcToleranceMM: MANUFACTURING_OFFSET_ARC_TOLERANCE_MM,
   holdReachMM: HOLD_REACH_MM,
@@ -1398,7 +1600,7 @@ export function gridLadderCacheKey(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
 ): string {
   ladderShapeFromRecipe(recipe)
   return gridCacheKey('ladder', {
@@ -1407,6 +1609,8 @@ export function gridLadderCacheKey(
     options: {
       pitchMM: options.pitchMM ?? null,
       source: options.source ?? 'std',
+      density: options.density ?? 'light',
+      center: options.center ?? 'centroid',
     },
     recipe,
   })
@@ -1427,6 +1631,7 @@ function effectiveGridPlanOptions(opts: GridPlanOptions = {}) {
     targetAnchors: opts.targetAnchors ?? TARGET_ANCHORS,
     signedBaseMargin: opts.signedBaseMargin ?? false,
     diagnosticVelcro: opts.diagnosticVelcro ?? false,
+    construction: opts.construction ?? null,
   }
 }
 

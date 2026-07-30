@@ -14,6 +14,7 @@ import {
   computeGrid,
   contourWithOuterMargin,
   DEFAULT_LAW,
+  deriveRectangleConstruction,
   exactPerimeterCoverage,
   HOLD_REACH_MM,
   nearestAnchorPair,
@@ -24,7 +25,9 @@ import {
   resolveRectangleRungs,
   scaleContour,
   semanticLadder,
+  semanticLadderFromRecipe,
   stdShapeContour,
+  type SemanticRung,
 } from '../grid'
 import type { Contour, Pt } from '../types'
 
@@ -172,11 +175,20 @@ describe('resolveGridPlan — production engine seam', () => {
 })
 
 describe('engine-owned workbench selections', () => {
-  const rungs = [
+  const rungs: SemanticRung[] = [
     { label: 'ONE', points: 1, sizeMM: 22, gridExtentMM: 22, visible: true },
     { label: 'S', points: 2, sizeMM: 70, gridExtentMM: 70, visible: true },
     { label: 'M', points: 4, sizeMM: 118, gridExtentMM: 118, visible: true },
-  ]
+  ].map((rung) => ({
+    ...rung,
+    construction: {
+      pattern: 'standard',
+      pitchMM: 48,
+      originMM: [11, 11],
+      basisMM: [[48, 0], [0, 48]],
+      population: [[0, 0]],
+    },
+  }))
 
   it('uses the canonical higher-rung exact-tie policy', () => {
     expect(nearestSemanticRung(rungs, 94).sizeMM).toBe(118)
@@ -220,7 +232,14 @@ describe('engine-owned workbench selections', () => {
   it('allows the short axis to use the same legal grid extent as the long axis', () => {
     const axisRungs = [
       ...rungs,
-      { label: 'L', points: 12, sizeMM: 214, gridExtentMM: 214, visible: true },
+      {
+        label: 'L',
+        points: 12,
+        sizeMM: 214,
+        gridExtentMM: 214,
+        visible: true,
+        construction: rungs[2].construction,
+      },
     ]
     const square = resolveRectangleRungs(axisRungs, {
       longMM: 214,
@@ -230,6 +249,28 @@ describe('engine-owned workbench selections', () => {
 
     expect(square.shortOptions.map((rung) => rung.sizeMM)).toContain(214)
     expect([square.widthRung.sizeMM, square.heightRung.sizeMM]).toEqual([214, 214])
+  })
+
+  it('composes every reachable rectangle from the exact two axis constructions', () => {
+    const axisRungs = semanticLadderFromRecipe({ kind: 'standard', shape: 'square' })
+    for (const widthRung of axisRungs) for (const heightRung of axisRungs) {
+      const construction = deriveRectangleConstruction(widthRung, heightRung)
+      expect(
+        construction,
+        `${widthRung.gridExtentMM}×${heightRung.gridExtentMM} has no construction`,
+      ).not.toBeNull()
+      const plan = resolveGridPlan(
+        stdShapeContour('rect', widthRung.sizeMM, heightRung.sizeMM),
+        {
+          mode: 'auto',
+          density: 'light',
+          paddingMM: DEFAULT_LAW.paddingMM,
+          maxGrowMM: 0,
+          construction: construction!,
+        },
+      )
+      expect(plan.grid.anchors).toHaveLength(construction!.population.length)
+    }
   })
 
   it('returns one deterministic nearest-anchor pair and feeds the plan distance from it', () => {
@@ -461,7 +502,7 @@ describe('semantic ladder stays inside its product contract', () => {
     }
   })
 
-  it('publishes no uncovered multi-anchor geometric rung', () => {
+  it('publishes no uncovered multi-anchor geometric rung on the product Auto path', () => {
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       const rungs = semanticLadder(contourAt)
@@ -566,7 +607,7 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(twoAnchor).toMatchObject({
       label: 'S',
       points: 2,
-      sizeMM: 71,
+      sizeMM: 72,
       gridExtentMM: 70,
     })
 
@@ -589,12 +630,12 @@ describe('semantic ladder stays inside its product contract', () => {
     const standard96 = semanticLadder(makeTriangle, DEFAULT_LAW, 'standard', { pitchMM: 96 })
 
     expect(auto).toMatchObject([
-      { label: 'ONE', sizeMM: 39, gridExtentMM: 22 },
-      { label: 'S', points: 4, sizeMM: 135, gridExtentMM: 118 },
-      { label: 'M', points: 9, sizeMM: 231, gridExtentMM: 214 },
+      { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
+      { label: 'S', points: 4, sizeMM: 136, gridExtentMM: 118 },
+      { label: 'M', points: 4, sizeMM: 260, gridExtentMM: 214 },
     ])
     expect(standard96).toMatchObject([
-      { label: 'ONE', sizeMM: 39, gridExtentMM: 22 },
+      { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
       { label: 'S', points: 4, sizeMM: 260, gridExtentMM: 214 },
     ])
     expect(standard96.some((rung) => rung.points === 2)).toBe(false)
@@ -610,7 +651,7 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(auto.every((rung) => rung.sizeMM <= DEFAULT_LAW.maxRungMM)).toBe(true)
   })
 
-  it('CHARACTERIZATION — the interim scanner emits first-covered extents and delays lawful gravity pairs', () => {
+  it('law 3.1 — construction extents are monotonic and never collapse as the catalogue advances', () => {
     const combos = [
       { mode: 'standard', pitchMM: 48 },
       { mode: 'standard', pitchMM: 96 },
@@ -627,67 +668,87 @@ describe('semantic ladder stays inside its product contract', () => {
           mode,
           { pitchMM },
         )
-        for (const rung of rungs.filter((candidate) => candidate.points >= 2)) {
-          const contour = stdShapeContour(shape, rung.sizeMM)
-          const prepared = prepareExactContour(contour)
-          const cfg = {
-            pitchMM,
-            pattern: mode,
-            paddingMM: DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM,
-            perimeterOnly: mode === 'standard',
-          } as const
-          const exact = computeGrid(contour, cfg)
-          const oneMillimetreSmaller = computeGrid(
-            stdShapeContour(shape, rung.sizeMM - 1),
-            cfg,
-          )
-          const nearestBoundaryMM = Math.min(...exact.anchors.map(
-            (anchor) => distanceToPreparedContour(anchor.p, prepared),
-          ))
-
-          expect(exact.anchors.length, `${shape}/${mode}/${pitchMM}/${rung.sizeMM} count`)
-            .toBe(rung.points)
-          const extentMM = (anchors: typeof exact.anchors) => {
-            const xs = anchors.map((anchor) => anchor.p[0])
-            const ys = anchors.map((anchor) => anchor.p[1])
-            return anchors.length
-              ? Math.round(Math.max(
-                Math.max(...xs) - Math.min(...xs),
-                Math.max(...ys) - Math.min(...ys),
-              ) + 2 * (DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM))
-              : 0
-          }
-          expect(extentMM(exact.anchors), `${shape}/${mode}/${pitchMM}/${rung.sizeMM} extent`)
-            .toBe(rung.gridExtentMM)
-          const firstFit = extentMM(oneMillimetreSmaller.anchors) < rung.gridExtentMM
-          if (firstFit) {
-            expect(firstFit).toBe(true)
-          } else if (oneMillimetreSmaller.flaps.length > 0) {
-            expect(exact.flaps, `${shape}/${mode}/${pitchMM}/${rung.sizeMM} remained uncovered`)
-              .toHaveLength(0)
-          } else {
-            expect(rung.points, `${shape}/${mode}/${pitchMM}/${rung.sizeMM} delayed without two anchors`)
-              .toBe(2)
-            const gravitySpan = (anchors: typeof exact.anchors) => anchors.length === 2
-              ? Math.abs(anchors[1].p[1] - anchors[0].p[1])
-              : 0
-            expect(
-              gravitySpan(exact.anchors),
-              `${shape}/${mode}/${pitchMM}/${rung.sizeMM} did not improve top-to-bottom support`,
-            ).toBeGreaterThan(gravitySpan(oneMillimetreSmaller.anchors))
-          }
+        for (let index = 1; index < rungs.length; index++) {
           expect(
-            nearestBoundaryMM,
-            `${shape}/${mode}/${pitchMM}/${rung.sizeMM} carries invented boundary slack`,
-          ).toBeLessThan(DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM + 1)
+            rungs[index].gridExtentMM,
+            `${shape}/${mode}/${pitchMM} collapsed ${rungs[index - 1].gridExtentMM} -> ${rungs[index].gridExtentMM}`,
+          ).toBeGreaterThan(rungs[index - 1].gridExtentMM)
+          expect(rungs[index].sizeMM).toBeGreaterThan(rungs[index - 1].sizeMM)
         }
       }
     }
   })
 
-  it.todo(
-    'law 3.1 — derive every geometric rung from a lattice population; never scan arbitrary shape millimetres',
-  )
+  it('law 3.1 — derives every geometric rung from one serialized lattice construction', () => {
+    const cases = [
+      { mode: 'auto', pitchMM: undefined },
+      { mode: 'standard', pitchMM: 48 },
+      { mode: 'standard', pitchMM: 96 },
+      { mode: 'diamond', pitchMM: 48 },
+      { mode: 'diamond', pitchMM: 96 },
+      { mode: 'quincunx', pitchMM: 96 },
+    ] as const
+    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
+      for (const { mode, pitchMM } of cases) for (const density of ['light', 'standard'] as const) {
+        const rungs = semanticLadderFromRecipe(
+          { kind: 'standard', shape },
+          DEFAULT_LAW,
+          mode,
+          { pitchMM, density },
+        )
+        for (const rung of rungs) {
+          const construction = rung.construction
+          expect(
+            construction,
+            `${shape}/${mode}/${pitchMM ?? 'auto'}/${density}/${rung.label} has no construction`,
+          ).toBeDefined()
+          expect(construction.population).toHaveLength(rung.points)
+
+          const plan = resolveGridPlan(stdShapeContour(shape, rung.sizeMM), {
+            mode,
+            pitchMM,
+            density,
+            paddingMM: DEFAULT_LAW.paddingMM,
+            maxGrowMM: 0,
+            construction,
+          })
+          expect(plan.pattern).toBe(construction.pattern)
+          expect(plan.pitchMM).toBe(construction.pitchMM)
+          if (rung.points >= 2) {
+            expect(
+              plan.grid.ok,
+              `${shape}/${mode}/${pitchMM ?? 'auto'}/${density}/${rung.label} was published uncovered`,
+            ).toBe(true)
+          }
+          const [[ax, ay], [bx, by]] = construction.basisMM
+          expect(plan.grid.anchors.map(({ p }) => p))
+            .toEqual(construction.population.map(([i, j]) => [
+              construction.originMM[0] + i * ax + j * bx,
+              construction.originMM[1] + i * ay + j * by,
+            ]))
+          if (plan.grid.anchors.length === 2) {
+            const [first, second] = plan.grid.anchors
+            expect(
+              Math.abs(second.p[1] - first.p[1]),
+              `${shape}/${mode}/${pitchMM ?? 'auto'}/${density}/${rung.label} lost gravity orientation`,
+            ).toBeGreaterThanOrEqual(Math.abs(second.p[0] - first.p[0]))
+          }
+        }
+      }
+    }
+  })
+
+  it('publishes every physical catalogue size on the next even whole millimetre', () => {
+    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
+      const rungs = semanticLadder((sizeMM) => stdShapeContour(shape, sizeMM))
+      for (const rung of rungs) {
+        expect(
+          rung.sizeMM % 2,
+          `${shape}/${rung.label} published an odd ${rung.sizeMM}mm size`,
+        ).toBe(0)
+      }
+    }
+  })
 
   it('deduplicates circle count changes inside one extent and never skips labels', () => {
     const auto = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'auto')
