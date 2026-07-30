@@ -6,9 +6,9 @@
 //     law while restricting the pitch/pattern family.
 //   • PER-SPOT padding (interp A): a node is valid = inside the silhouette AND ≥ pad (10mm radius from
 //     the magnet centre) from the REAL outline — per-node, no erosion (pinched shapes keep all regions).
-//   • Grid geometry chooses the legal topology. HOLD COVERAGE is measured radially from each actual
-//     seated magnet to every manufactured ring. Inside one conforming topology, covered phase beats
-//     uncovered phase; a geometric catalogue publishes covered constructions only.
+//   • Grid geometry chooses the legal topology. HOLD COVERAGE is radial at each actual magnet and
+//     includes only the finite outer span of lawful population-rim pairs no farther than 96mm; holes
+//     stay radial. Inside one topology, covered phase beats uncovered phase.
 //   • MARGIN model: the design never resizes; an outward margin band grows (capped) until covered.
 //   • Procedural sizes: enumerate legal lattice extents, then solve the earliest upward even-whole-mm
 //     contour size that accepts each extent. The grid extent is the catalogue authority; shape mm is
@@ -81,12 +81,11 @@ export interface GridConfig {
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — magnetic belt (drop redundant interior)
   center?: 'centroid' | 'bbox' // where the fixed grid is anchored (A/B). default 'centroid'
-  /** LIGHT-mode thinning of 48-composed grids (Dan 2026-07-21: "keep central 3-4, remove 2 and 5"):
+  /** Freeform LIGHT thinning of 48-composed grids (Dan 2026-07-21: "keep central 3-4, remove 2 and 5"):
    *  per axis keep the ends + alternate inward, always keeping the central pair → 96/48/96 gaps.
    *  A 262 (48×6) light row becomes 1·3·4·6. Applied only at pitch 48 with ≥5 lines. */
   sparseThin?: boolean
-  /** Exact parent catalogue construction. Delivery validates it, then Standard keeps the population
-   * while Light derives its rim/thinned subset instead of independently solving another phase. */
+  /** Exact catalogue construction. Delivery validates and uses this population without re-solving. */
   construction?: GridConstruction
 }
 
@@ -198,6 +197,25 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
   return merged
 }
 
+function clipRange(
+  interval: Interval,
+  start: number,
+  end: number,
+  min: number,
+  max: number,
+): Interval | null {
+  const delta = end - start
+  let [lo, hi] = interval
+  if (Math.abs(delta) < 1e-12) {
+    return start >= min - 1e-9 && start <= max + 1e-9 ? interval : null
+  }
+  const t0 = (min - start) / delta
+  const t1 = (max - start) / delta
+  lo = Math.max(lo, Math.min(t0, t1))
+  hi = Math.min(hi, Math.max(t0, t1))
+  return lo <= hi + 1e-9 ? [lo, hi] : null
+}
+
 function discInterval(a: Pt, b: Pt, centre: Pt, radius: number): Interval | null {
   const dx = b[0] - a[0], dy = b[1] - a[1]
   const ox = a[0] - centre[0], oy = a[1] - centre[1]
@@ -213,26 +231,83 @@ function discInterval(a: Pt, b: Pt, centre: Pt, radius: number): Interval | null
   return lo <= hi + 1e-9 ? [lo, hi] : null
 }
 
-/** Exact unsupported intervals per manufactured ring. Every outline point must sit within the
- *  physical hold radius of an actual seated magnet; no hull or between-magnet bridge invents support. */
+function pairSpanIntervals(
+  a: Pt,
+  b: Pt,
+  first: Pt,
+  second: Pt,
+  radius: number,
+): Interval[] {
+  const intervals: Interval[] = []
+  const firstDisc = discInterval(a, b, first, radius)
+  const secondDisc = discInterval(a, b, second, radius)
+  if (firstDisc) intervals.push(firstDisc)
+  if (secondDisc) intervals.push(secondDisc)
+  const axisX = second[0] - first[0]
+  const axisY = second[1] - first[1]
+  const length = Math.hypot(axisX, axisY)
+  if (length > 1e-9) {
+    const ux = axisX / length
+    const uy = axisY / length
+    const along = (point: Pt) => (point[0] - first[0]) * ux + (point[1] - first[1]) * uy
+    const across = (point: Pt) => -(point[0] - first[0]) * uy + (point[1] - first[1]) * ux
+    let strip: Interval | null = clipRange([0, 1], along(a), along(b), 0, length)
+    if (strip) strip = clipRange(strip, across(a), across(b), -radius, radius)
+    if (strip) intervals.push(strip)
+  }
+  return mergeIntervals(intervals)
+}
+
+function boundedRimPairs(
+  seated: ReadonlyArray<Pt>,
+  pattern: GridPattern,
+  pitchMM: number,
+): Array<[Pt, Pt]> {
+  const rim = splitPopulationBoundary(seated, pattern, pitchMM).rim
+  const maximumSpanMM = Math.max(...LAUNCH_PITCHES_MM)
+  const pairs: Array<[Pt, Pt]> = []
+  for (let leftIndex = 0; leftIndex < rim.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < rim.length; rightIndex += 1) {
+      const spanMM = dist(rim[leftIndex], rim[rightIndex])
+      if (spanMM <= maximumSpanMM + MANUFACTURING_TOLERANCE_MM) {
+        pairs.push([rim[leftIndex], rim[rightIndex]])
+      }
+    }
+  }
+  return pairs
+}
+
+/** Exact unsupported intervals per manufactured ring. The outer ring is supported radially by
+ *  actual magnets plus the bounded fabric span between lawful population-rim magnets no farther
+ *  apart than the launch 96mm maximum. Hole rims remain per-magnet radial. No hull, miter, or
+ *  non-local bridge exists, so tips/lobes beyond a lawful pair's finite span remain uncovered. */
 export function exactPerimeterCoverage(
   contour: Contour,
   seated: ReadonlyArray<Pt>,
   safeRadius: number,
+  pattern: GridPattern,
+  pitchMM: number,
 ): PerimeterCoverage {
+  const rimPairs = boundedRimPairs(seated, pattern, pitchMM)
   const gaps: Pt[] = []
   let uncoveredMM = 0
-  for (const ring of [contour.outer, ...contour.holes]) {
+  for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
     const pts = ring.pts
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 1) % pts.length]
       const segLen = dist(a, b)
       if (segLen < 1e-9) continue
       const ux = (b[0] - a[0]) / segLen, uy = (b[1] - a[1]) / segLen
-      const intervals = mergeIntervals(seated.flatMap((anchor) => {
-        const interval = discInterval(a, b, anchor, safeRadius)
-        return interval ? [interval] : []
-      }))
+      const intervals = mergeIntervals([
+        ...seated.flatMap((anchor) => {
+          const interval = discInterval(a, b, anchor, safeRadius)
+          return interval ? [interval] : []
+        }),
+        ...(ringIndex === 0
+          ? rimPairs.flatMap(([first, second]) =>
+              pairSpanIntervals(a, b, first, second, safeRadius))
+          : []),
+      ])
       let coveredTo = 0
       const gapPoint = (lo: number, hi: number): Pt => {
         const t = (lo + hi) / 2
@@ -448,8 +523,8 @@ function computePreparedGridForExtent(
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const pattern = cfg.construction?.pattern ?? cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'auto'
-  // GLOBAL LAW (Dan 2026-07-28): Light is the perimeter belt whatever the pattern. Density chooses
-  // which nodes of one construction ship; it never authorizes a pattern-specific interior exemption.
+  // The caller selects the source-aware density policy. Standard shapes pass perimeter-only for both
+  // densities; freeform Standard may retain its interior while freeform Light keeps the rim.
   const perimeterOnly = cfg.perimeterOnly ?? true
   const centerMode = cfg.center ?? 'centroid'
   const bb = prepared.bbox
@@ -517,9 +592,9 @@ function computePreparedGridForExtent(
   // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
   // Each parity's CONSTRUCTION population is scored by: PATTERN CONFORMANCE (nearest-neighbour spacing
   // must match the pattern's own geometry: standard = pitch, quincunx = pitch/√2,
-  // diamond = pitch·√2) → EDGE REGISTRATION → COVERAGE → population → best centred. Light then thins
-  // the chosen construction without re-solving its phase: density never creates a cancelled 24mm
-  // shift. Coverage ranks only inside equally registered legal topology; it cannot resurrect
+  // diamond = pitch·√2) → EDGE REGISTRATION → COVERAGE → population → best centred. Any requested
+  // freeform thinning happens inside finalize without re-solving the phase. Coverage ranks only
+  // inside equally registered legal topology; it cannot resurrect
   // dead-border phases or turn standard into dice.
   let seated: Pt[] = []
   let interior: Pt[] = []
@@ -618,7 +693,7 @@ function computePreparedGridForExtent(
         ? 1
         : Math.abs(mp - expectedMp) <= MANUFACTURING_TOLERANCE_MM ? 1 : 0
       const uncoveredPerimeterMM = seat.length
-        ? exactPerimeterCoverage(contourMM, seat, HOLD_REACH_MM).uncoveredMM
+        ? exactPerimeterCoverage(contourMM, fin.seated, HOLD_REACH_MM, pattern, pitch).uncoveredMM
         : Infinity
       const registered = fullyRegistered(seat) ? 1 : 0
       let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
@@ -677,10 +752,10 @@ function computePreparedGridForExtent(
   if (!seated.length) issues.push(`No room for a magnet — too small/thin to keep a magnet ${pad}mm from every edge.`)
   else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
   const coverage = seated.length
-    ? exactPerimeterCoverage(contourMM, seated, HOLD_REACH_MM)
+    ? exactPerimeterCoverage(contourMM, seated, HOLD_REACH_MM, pattern, pitch)
     : { gaps: [], uncoveredMM: 0 }
   const flaps = coverage.gaps
-  if (flaps.length > 0) issues.push(`Some edge areas sit outside every seated magnet's hold radius (red edge) and could lift. Raise the size / max auto-grow.`)
+  if (flaps.length > 0) issues.push(`Some edge areas sit outside the supported magnet spans (red edge) and could lift. Raise the size / max auto-grow.`)
 
   let minD = 8, maxD = 6
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
@@ -700,15 +775,20 @@ function computePreparedGridForExtent(
 
 // ─── LAUNCH LAW (§13, locked 2026-07-21) — 48-family only, procedural zero-point ladder ──────────────
 // Launch pitches = 48/96 exclusively. Retired 24/72 pitches have no exception.
-/** Grid density preference: 'light' tries the coarse 96 first (sparse, uncrowded — the garment
- *  aesthetic); 'standard' tries 48 first (denser, firmer hold). Same family either way. */
+/** Freeform density preference: Light tries coarse 96 first; Standard tries 48 first. Standard
+ *  shapes use the density's pitch directly through semanticSteps. */
 export type GridDensity = 'standard' | 'light'
 function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
-/** MERGED COVERAGE LAW (Dan 2026-07-21, amended 2026-07-28): density IS the coverage — 'standard' =
- *  dense/full grid (all interior kept), 'light' = sparse/perimeter belt (interior dropped) + thinning,
- *  whatever the pattern. One control; the old separate Coverage toggle retired. */
-export function perimeterForDensity(density: GridDensity): boolean {
-  return density === 'light'
+function isFreeformSource(source: GridSource): boolean {
+  return source === 'gen' || source === 'magic'
+}
+/** Standard shapes are perimeter-only in both densities. Freeform retains the earlier adaptive
+ *  Standard-full / Light-rim policy until Dan re-rules it. */
+export function perimeterForDensity(density: GridDensity, source: GridSource = 'std'): boolean {
+  return isFreeformSource(source) ? density === 'light' : true
+}
+function sparseThinForDensity(density: GridDensity, source: GridSource): boolean {
+  return isFreeformSource(source) && density === 'light'
 }
 /** Legal patterns per pitch under the 48/68 system: dice centres live at half-pitch, so quincunx is
  *  legal ONLY at 96 (centres at 48-offsets = the shirt's own dice). Nothing ever sits at 24-offsets. */
@@ -829,7 +909,7 @@ export interface SemanticRung {
   /** Shape-independent rectangular extent of the seated lattice, including pad + frame on both sides. */
   gridExtentMM: number
   visible: boolean
-  /** Complete parent lattice identity consumed by both density deliveries. */
+  /** Complete lattice identity consumed by this rung's delivery. */
   construction: GridConstruction
 }
 export type SemanticRungTieBreak = 'higher' | 'first'
@@ -893,11 +973,20 @@ export function deriveRectangleConstruction(
   heightRung: SemanticRung,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
 ): GridConstruction | null {
   const padEff = law.paddingMM + law.frameMM
-  const pitchOrder = allowedPitches('standard')
-  const combos = modeCombos(mode, options.pitchMM, options.source).sort((a, b) =>
+  const source = options.source ?? 'std'
+  const density = options.density ?? 'light'
+  const requestedCombos = modeCombos(mode, options.pitchMM, source)
+  const directPerimeter = !isFreeformSource(source)
+  const densityPitchMM = density === 'standard' ? 48 : 96
+  const densityCombos = directPerimeter
+    ? requestedCombos.filter(({ pitchMM }) => pitchMM === densityPitchMM)
+    : requestedCombos
+  const activeCombos = densityCombos.length ? densityCombos : requestedCombos
+  const pitchOrder = allowedPitches(directPerimeter ? density : 'standard')
+  const combos = activeCombos.sort((a, b) =>
     pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM))
   const prepared = prepareExactContour(stdShapeContour(
     'rect',
@@ -905,6 +994,29 @@ export function deriveRectangleConstruction(
     heightRung.sizeMM,
   ))
   for (const combo of combos) {
+    if (directPerimeter) {
+      const grid = computePreparedGridForExtent(
+        prepared,
+        {
+          pitchMM: combo.pitchMM,
+          pattern: combo.pattern,
+          paddingMM: padEff,
+          center: options.center,
+          perimeterOnly: true,
+          sparseThin: false,
+        },
+        Math.max(widthRung.gridExtentMM, heightRung.gridExtentMM),
+      )
+      if (!grid.anchors.length || grid.flaps.length > 0) continue
+      const dimensions = anchorGridDimensionsMM(grid.anchors, padEff)
+      if (
+        dimensions[0] === widthRung.gridExtentMM
+        && dimensions[1] === heightRung.gridExtentMM
+      ) {
+        return constructionFromAnchors(combo.pattern, combo.pitchMM, grid.anchors)
+      }
+      continue
+    }
     const full = computePreparedGridForExtent(
       prepared,
       {
@@ -959,15 +1071,19 @@ function semanticSteps(
   law: SizeLaw,
   combos: ReadonlyArray<{ pitchMM: number; pattern: GridPattern }>,
   minimumAnchors: number,
-  options: Pick<GridPlanOptions, 'density' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'source' | 'density' | 'center'> = {},
 ): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
+  const source = options.source ?? 'std'
   const density = options.density ?? 'light'
-  // Density is a delivery choice over one parent construction. Catalogue phase/pitch selection is
-  // therefore density-neutral and uses the full 48-first family; Light derives its rim from that
-  // construction instead of running a second coarse-first solver.
-  const pitchOrder = allowedPitches('standard')
-  const orderedCombos = [...combos].sort((a, b) => {
+  const directPerimeter = !isFreeformSource(source)
+  const densityPitchMM = density === 'standard' ? 48 : 96
+  const densityCombos = directPerimeter
+    ? combos.filter(({ pitchMM }) => pitchMM === densityPitchMM)
+    : combos
+  const activeCombos = densityCombos.length ? densityCombos : combos
+  const pitchOrder = allowedPitches(directPerimeter ? density : 'standard')
+  const orderedCombos = [...activeCombos].sort((a, b) => {
     const pitchDifference = pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM)
     return pitchDifference || legalPatterns(a.pitchMM).indexOf(a.pattern)
       - legalPatterns(b.pitchMM).indexOf(b.pattern)
@@ -1002,6 +1118,30 @@ function semanticSteps(
         construction: GridConstruction
       } | null => {
         const prepared = prepareExactContour(makeShape(sizeMM))
+        if (directPerimeter) {
+          const grid = computePreparedGridForExtent(prepared, {
+            pitchMM: combo.pitchMM,
+            pattern: combo.pattern,
+            paddingMM: padEff,
+            center: options.center,
+            perimeterOnly: true,
+            sparseThin: false,
+          }, gridExtentMM)
+          if (!grid.anchors.length) return null
+          const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, grid.anchors)
+          return {
+            grid: computePreparedGridForExtent(prepared, {
+              pitchMM: combo.pitchMM,
+              pattern: combo.pattern,
+              paddingMM: padEff,
+              center: options.center,
+              perimeterOnly: true,
+              sparseThin: false,
+              construction,
+            }, gridExtentMM),
+            construction,
+          }
+        }
         const full = computePreparedGridForExtent(prepared, {
           pitchMM: combo.pitchMM,
           pattern: combo.pattern,
@@ -1051,7 +1191,7 @@ function semanticSteps(
       if (solved) break
     }
     if (!solved) continue
-    const publishedGrid = density === 'light'
+    const publishedGrid = directPerimeter || density === 'light'
       ? solved.grid
       : computePreparedGridForExtent(prepareExactContour(makeShape(solved.sizeMM)), {
           pitchMM: solved.combo.pitchMM,
@@ -1222,8 +1362,8 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
 
 /**
  * Sizing ADAPTS (always-on, capped): from the selected size, nudge UP in small steps up to `maxGrowMM`
- * and keep the first size that is BALANCED — full hold coverage (zero flaps: no outline point beyond
- * HOLD_REACH of a magnet) and ≥ target magnets. Coverage-by-hold is the shape-agnostic criterion (the
+ * and keep the first size that is BALANCED — full hold coverage (zero flaps under the shared radial
+ * plus bounded-pair oracle) and ≥ target magnets. Coverage is the shape-agnostic criterion (the
  * old `gaps` bbox heuristic mis-ranked curved shapes — a disc's rim always has padding-blocked nodes).
  * If nothing within the cap fully covers, keep the size with the least uncovered perimeter length (then
  * most magnets). `sized(mm)` produces the real-mm contour. `maxGrowMM = 0` disables growth.
@@ -1284,7 +1424,7 @@ export interface GridPlanOptions {
   targetAnchors?: number
   signedBaseMargin?: boolean
   diagnosticVelcro?: boolean
-  /** Parent catalogue construction. Delivery validates it and applies the requested density. */
+  /** Exact catalogue construction. Delivery validates it and does not independently re-solve. */
   construction?: GridConstruction
 }
 
@@ -1359,8 +1499,8 @@ export function resolveGridPlan(
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
-    perimeterOnly: perimeterForDensity(density),
-    sparseThin: density === 'light',
+    perimeterOnly: perimeterForDensity(density, source),
+    sparseThin: sparseThinForDensity(density, source),
   }
 
   if (attachment === 'velcro' && !opts.diagnosticVelcro) {
@@ -1403,7 +1543,8 @@ export function resolveGridPlan(
   const selected = autoPreparedGrid(marginVariants, cfg, baseMarginMM, maxGrowMM, {
     minN: opts.targetAnchors,
     density,
-    pitchMM: opts.pitchMM,
+    pitchMM: opts.pitchMM
+      ?? (isFreeformSource(source) ? undefined : density === 'standard' ? 48 : 96),
     pattern: manualPattern,
     patterns: mode === 'auto' ? automaticPatternsForSource(source) : undefined,
   })
@@ -1424,7 +1565,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 10
+export const GRID_ENGINE_CACHE_VERSION = 11
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 

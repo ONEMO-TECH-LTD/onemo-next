@@ -39,7 +39,9 @@
           "heightMM": 70
         },
         "options": {
-          "attachment": "magnetic"
+          "attachment": "magnetic",
+          "source": "std",
+          "density": "standard"
         }
       }
     }

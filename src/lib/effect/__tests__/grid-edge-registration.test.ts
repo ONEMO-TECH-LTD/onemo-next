@@ -11,8 +11,9 @@
 // the rung matrix and nothing else. Engine behaviour off-ladder is deliberately unpinned here and
 // recorded in KAI-9793: 88 integer bands move. Every delivered anchor still obeys the hard floor.
 //
-// The grid box is NOT always square: it is whatever set of 48-lattice nodes the shape hosts, chosen
-// per axis. A square is the case where both axes agree. A rectangle's long edge must therefore
+// The grid box is NOT always square: it is whatever set of the density's 48/96 lattice nodes the
+// shape hosts, chosen per axis. A square is the case where both axes agree. A rectangle's long edge
+// must therefore
 // register on its own zero-point exactly as the same-length square edge does.
 //
 // The engine already GENERATES the correct layout; before this law it lost the candidate ranking to
@@ -53,12 +54,18 @@ function registrationSlackMM(plan: ResolvedGridPlan): number {
   )
 }
 
-const LIGHT = { mode: 'auto', density: 'light', baseMarginMM: 0, maxGrowMM: 0 } as const
+const BASE_OPTIONS = { mode: 'auto', baseMarginMM: 0, maxGrowMM: 0 } as const
 
 describe('edge-registration law — every edge registers on its own zero-point', () => {
   it('registers a rectangle long edge exactly as the same-length square edge (166x70)', () => {
-    const rect = resolveGridPlan(stdShapeContour('rect', 166, 70), LIGHT)
-    const square = resolveGridPlan(stdShapeContour('square', 166, 166), LIGHT)
+    const rect = resolveGridPlan(stdShapeContour('rect', 166, 70), {
+      ...BASE_OPTIONS,
+      density: 'standard',
+    })
+    const square = resolveGridPlan(stdShapeContour('square', 166, 166), {
+      ...BASE_OPTIONS,
+      density: 'standard',
+    })
 
     // The square is the reference: 166 is a zero-point, so its edge anchors sit at the floor.
     const sq = axes(square)
@@ -78,14 +85,17 @@ describe('edge-registration law — every edge registers on its own zero-point',
   })
 
   it('leaves no dead border on any rung-by-rung rectangle', () => {
-    // Every pairing traced in the design probe. Mixed 48/96-family pairs are the interesting ones.
+    // Standard/48 rung pairs traced in the design probe.
     const pairs: Array<[number, number]> = [
       [118, 70],
       [166, 70],
       [166, 118],
     ]
     for (const [longMM, shortMM] of pairs) {
-      const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
+      const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), {
+        ...BASE_OPTIONS,
+        density: 'standard',
+      })
       expect(
         registrationSlackMM(plan),
         `${longMM}x${shortMM} leaves dead border: ${JSON.stringify(axes(plan))}`,
@@ -93,16 +103,17 @@ describe('edge-registration law — every edge registers on its own zero-point',
     }
   })
 
-  it('keeps every canon square registered and byte-identical in layout', () => {
-    // The guard that proves the law changed nothing it should not: squares already register, so
-    // their anchor sets must be untouched by the new ranking term.
-    const canon = semanticLadder(
-      (sizeMM: number) => stdShapeContour('square', sizeMM),
-    ).filter(({ points }) => points >= 2).map(({ sizeMM }) => sizeMM)
-    for (const sizeMM of canon) {
-      for (const density of ['light', 'standard'] as const) {
+  it('keeps every density-specific square rung registered', () => {
+    for (const density of ['standard', 'light'] as const) {
+      const canon = semanticLadder(
+        (sizeMM: number) => stdShapeContour('square', sizeMM),
+        DEFAULT_LAW,
+        'auto',
+        { source: 'std', density },
+      ).filter(({ points }) => points >= 2).map(({ sizeMM }) => sizeMM)
+      for (const sizeMM of canon) {
         const plan = resolveGridPlan(stdShapeContour('square', sizeMM, sizeMM), {
-          ...LIGHT,
+          ...BASE_OPTIONS,
           density,
         })
         expect(
@@ -113,10 +124,11 @@ describe('edge-registration law — every edge registers on its own zero-point',
     }
   })
 
-  it('still reduces every multi-anchor layout to one 48-lattice population', () => {
-    // Dan: "the grid box must always be 48 lattice — that is the law." Registration must never buy
-    // edge contact by moving a node off the lattice.
-    const plan = resolveGridPlan(stdShapeContour('rect', 166, 70), LIGHT)
+  it('still keeps Standard on one 48mm lattice population', () => {
+    const plan = resolveGridPlan(stdShapeContour('rect', 166, 70), {
+      ...BASE_OPTIONS,
+      density: 'standard',
+    })
     const { xs, ys } = axes(plan)
     expect(plan.grid.anchors.length).toBeGreaterThanOrEqual(2)
     for (const axis of [xs, ys]) {
@@ -131,7 +143,10 @@ describe('edge-registration law — every edge registers on its own zero-point',
     // Registration leads only inside the conforming pool; an accepted registered layout must still
     // be covered, so zero-point selection cannot bring back a flap-bearing construction.
     for (const [longMM, shortMM] of [[166, 70], [166, 118]] as Array<[number, number]>) {
-      const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
+      const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), {
+        ...BASE_OPTIONS,
+        density: 'standard',
+      })
       expect(plan.grid.flaps.length, `${longMM}x${shortMM} flaps`).toBe(0)
       expect(plan.grid.ok).toBe(true)
     }
@@ -143,15 +158,24 @@ describe('edge-registration law — every edge registers on its own zero-point',
     // asserted. Enumerates the live ladder (never a hardcoded rung list — if the ladder moves, this
     // moves with it), takes every ORDERED pair so both orientations are covered, and crosses it with
     // both densities. The executed denominator derives from the live catalogue.
-    const rungs = semanticLadder((sizeMM: number) => stdShapeContour('rect', sizeMM, sizeMM))
-    const sizes = rungs.map((r) => r.sizeMM)
     const unregistered: string[] = []
     let checked = 0
-    for (const density of ['light', 'standard'] as const) {
+    let expected = 0
+    for (const density of ['standard', 'light'] as const) {
+      const sizes = semanticLadder(
+        (sizeMM: number) => stdShapeContour('rect', sizeMM, sizeMM),
+        DEFAULT_LAW,
+        'auto',
+        { source: 'std', density },
+      ).map((rung) => rung.sizeMM)
+      expected += sizes.length * (sizes.length - 1)
       for (const wMM of sizes) {
         for (const hMM of sizes) {
           if (wMM === hMM) continue // a square, not a rectangle — covered by the canon test above
-          const plan = resolveGridPlan(stdShapeContour('rect', wMM, hMM), { ...LIGHT, density })
+          const plan = resolveGridPlan(stdShapeContour('rect', wMM, hMM), {
+            ...BASE_OPTIONS,
+            density,
+          })
           const a = axes(plan)
           checked++
           const registered = [a.left, a.right, a.top, a.bottom].every((i) => i <= FLOOR_MM + 1e-6)
@@ -159,7 +183,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
         }
       }
     }
-    expect(checked).toBe(sizes.length * (sizes.length - 1) * 2)
+    expect(checked).toBe(expected)
     expect(unregistered).toEqual([])
   })
 
@@ -170,7 +194,10 @@ describe('edge-registration law — every edge registers on its own zero-point',
     // All-or-nothing keeps the axes tied, so symmetry survives. Exact outer-wrap coverage may select
     // a different symmetric pitch on this off-ladder diagnostic size; population is not the law here.
     // This fails loudly if the term is ever loosened back to a partial-credit, asymmetric score.
-    const plan = resolveGridPlan(stdShapeContour('circle', 166, 166), LIGHT)
+    const plan = resolveGridPlan(stdShapeContour('circle', 166, 166), {
+      ...BASE_OPTIONS,
+      density: 'light',
+    })
     const { xs, ys } = axes(plan)
     expect(plan.grid.anchors.length).toBeGreaterThanOrEqual(4)
     expect(xs).toEqual(ys) // a disc has no preferred axis; asymmetry is the tell

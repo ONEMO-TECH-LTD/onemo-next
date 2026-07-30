@@ -23,7 +23,7 @@ function fixtureJob(scenario: { job?: GridJob; fixture?: string }): GridJob {
     return {
       operation: 'plan',
       recipe: { kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR },
-      options: { attachment: 'magnetic' },
+      options: { attachment: 'magnetic', source: 'magic' },
     }
   }
   throw new Error(`Scenario has no executable input: ${JSON.stringify(scenario)}`)

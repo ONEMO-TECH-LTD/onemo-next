@@ -69,7 +69,7 @@ function jobForScenario(scenario: ScenarioConfig): GridJob {
     return {
       operation: 'plan',
       recipe: { kind: 'final-contour', contourMM: DENSE_REAL_AI_GRID_CONTOUR },
-      options: { attachment: 'magnetic' },
+      options: { attachment: 'magnetic', source: 'magic' },
     }
   }
   throw new Error(`Scenario ${scenario.id} has no executable input.`)
