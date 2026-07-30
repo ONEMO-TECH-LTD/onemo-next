@@ -397,7 +397,12 @@ describe('semantic ladder stays inside its product contract', () => {
       }
     }
 
-    expect(visibleRungs).toBe(18)
+    // The law under test is 4.1 — every product rung resolves standard. The COUNT is not the law:
+    // it was 18 only because 5 rungs above the 214 tested ceiling were hidden, and that hiding was
+    // unsanctioned (Dan, 07-30 — "I never said to hide them now, we are not at the launch, are we?").
+    // Pinning a count re-pins whatever the ladder happens to emit, so assert the property and a
+    // non-empty denominator instead.
+    expect(visibleRungs).toBeGreaterThan(0)
     expect([...nonStandardRungs]).toEqual([])
   })
 

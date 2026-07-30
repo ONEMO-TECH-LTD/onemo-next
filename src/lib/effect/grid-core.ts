@@ -783,7 +783,13 @@ export function legalPatterns(pitchMM: number): GridPattern[] {
 export interface SizeLaw {
   paddingMM: number   // mag-safe radius from magnet centre (default 10)
   frameMM: number     // frame stroke per side (default 1; 0 = frameless… padding then absorbs it)
-  maxTestedMM: number // largest physically tested size → rungs above ship hidden (default 214)
+  /** The largest physically tested size — a RECORD, not a filter.
+   *  LAW 3.12 with its qualifiers intact: Dan, 07-21 — "we can add larger sizes than 200 but we MAY hide
+   *  them FOR LAUNCH and test them first." Conditional, and scoped to launch. It was applied now and
+   *  unconditionally, which hid untested sizes during the exact phase they exist to be tested in.
+   *  Ruled unsanctioned by Dan 07-30. Hiding is a launch-time admin decision under 8.7 — "only fixed are
+   *  admin input settings when we decide to lock them" — and no such setting exists yet. */
+  maxTestedMM: number
   maxRungMM: number   // generator stop (default 310 — the 4-column shirt max)
 }
 export const DEFAULT_LAW: SizeLaw = {
@@ -1103,7 +1109,7 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
         points: 1,
         sizeMM: st.sizeMM,
         gridExtentMM: st.gridExtentMM,
-        visible: st.gridExtentMM <= law.maxTestedMM,
+        visible: true,
         construction: st.construction,
       })
       continue
@@ -1113,7 +1119,7 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
       points: st.points,
       sizeMM: st.sizeMM,
       gridExtentMM: st.gridExtentMM,
-      visible: st.gridExtentMM <= law.maxTestedMM,
+      visible: true,
       construction: st.construction,
     })
   }
