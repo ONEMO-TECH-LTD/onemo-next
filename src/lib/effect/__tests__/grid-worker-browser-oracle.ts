@@ -127,7 +127,11 @@ async function run(): Promise<string[]> {
           widthMM: sizeMM,
           heightMM: sizeMM,
         }
-        const planJob = { operation: 'plan' as const, recipe: planRecipe, options }
+        const planJob = {
+          operation: 'plan' as const,
+          recipe: planRecipe,
+          options: { ...options, construction: ladder.value[0].construction },
+        }
         const cached = seededClient.peek(planJob)
         const expected = handleGridJob(planJob)
         assertBytes(`Neutral ${attachment} seeded cache hit`, cached, expected)

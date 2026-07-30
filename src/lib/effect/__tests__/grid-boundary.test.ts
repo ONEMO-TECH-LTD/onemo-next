@@ -44,6 +44,7 @@ describe('Creator magnetic-grid module boundary', () => {
     )
     expect(pageSource).toContain('requestGridJob')
     expect(pageSource).toContain('const [snapToGrid, setSnapToGrid] = useState(true)')
+    expect(pageSource).toContain('if (!snapToGrid || !preparedDesign?.rung) return undefined')
     expect(pageSource)
       .toContain('resolvedSizeMM: snapToGrid ? effectiveTestSizeMM : resolvedSizeMM')
     expect(pageSource).not.toMatch(/\b(?:Admin|User)Grid/)

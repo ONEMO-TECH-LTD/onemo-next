@@ -16,7 +16,7 @@ import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
 import { roundedSquareContourMM } from '@/lib/effect/rounded-square'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { nearestAnchorPair, nearestSemanticRung, nextSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridJob, type GridJobResult, type GridPattern, type GridPlanOptions, type LadderRecipe, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StandardLadderShape, type StdShape, type Attachment } from '@/lib/effect/grid'
+import { deriveRectangleConstruction, nearestAnchorPair, nearestSemanticRung, nextSemanticRung, resolveDesignSizeMM, resolveRectangleRungs, scaleContour, stdShapeContour, rectFormat, minEffectMM, maxDesignMM, DEFAULT_MARGIN_MM, DEFAULT_LAW, type GridJob, type GridJobResult, type GridPattern, type GridPlanOptions, type LadderRecipe, type MagnetPlan, type GridDensity, type GridMode, type PlanRecipe, type ResolvedGridPlan, type SemanticRung, type StandardLadderShape, type StdShape, type Attachment } from '@/lib/effect/grid'
 import { requestGridWorkerJobInBackground } from '@/lib/effect/grid-worker-client'
 import {
   cachedGridJob,
@@ -349,9 +349,26 @@ export default function GridLab() {
     snapToGrid, effectiveTestSizeMM,
   ])
 
-  const planJob = useMemo<GridJob | null>(() => planDesign
-    ? { operation: 'plan', recipe: planDesign.recipe, options: planOptions }
-    : null, [planDesign, planOptions])
+  const selectedConstruction = useMemo(() => {
+    if (!snapToGrid || !preparedDesign?.rung) return undefined
+    if (src !== 'std' || geo !== 'rect') return preparedDesign.rung.construction
+    if (!preparedDesign.rungH) return undefined
+    return deriveRectangleConstruction(
+      preparedDesign.rung,
+      preparedDesign.rungH,
+      activeLaw,
+      gridMode,
+      planOptions,
+    ) ?? undefined
+  }, [preparedDesign, snapToGrid, src, geo, activeLaw, gridMode, planOptions])
+  const planJob = useMemo<GridJob | null>(() => {
+    if (!planDesign) return null
+    return {
+      operation: 'plan',
+      recipe: planDesign.recipe,
+      options: { ...planOptions, construction: selectedConstruction },
+    }
+  }, [planDesign, planOptions, selectedConstruction])
   const planKey = planJob ? gridJobKey(planJob) : null
   const planState = useGridWorkerJob<GridJob, GridJobResult>(
     planJob,
