@@ -140,6 +140,17 @@ interior.
 - Production build: exit 0; Next 16.2.6 webpack build compiled, typed and generated all routes.
 - Device performance: exit 0, WebKit 26.0 — canonical circle ladder 245ms cold / 1ms warm,
   dense real-AI plan 73ms / 0ms, small square 35ms / 1ms; T1/T2 PASS on all three.
+- Visual gate on exact product commit `f527031c19e74271bca0f5764649f7ac267b55eb`:
+  - server PID 19834, cwd `grid-lab`, HTTP 200 on
+    `http://localhost:3970/effect-creator/grid-lab`;
+  - profiled Chrome was attempted first; Chrome, extension and native host all validated, but the
+    control connection returned zero browsers after its required retry;
+  - declared Playwright fallback observed Diamond-shape M 128mm on the real bench:
+    Light = four rim magnets / no centre; Standard = five magnets / centre retained;
+  - console: 2 messages total, 0 errors, 0 warnings;
+  - captures:
+    `output/playwright/kai-9821-population-rim-f527031.png` and
+    `output/playwright/kai-9821-full-grid-f527031.png`.
 
 ## Subsequent Dan ruling — sizing work remains separate
 
