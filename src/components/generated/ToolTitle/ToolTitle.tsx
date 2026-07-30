@@ -5,7 +5,7 @@ export default function Tooltitle() {
   return (
     <div className={styles.toolTitle}>
       <div className={styles.frame12}>
-        <span className={styles.chairProof}>Chair proof</span>
+        <span className={styles.small}>Small</span>
       </div>
     </div>
   );

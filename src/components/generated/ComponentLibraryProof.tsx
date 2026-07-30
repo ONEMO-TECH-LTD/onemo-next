@@ -1293,7 +1293,7 @@ export default function ComponentLibraryProof() {
       </section>
       <section data-component-id={"12010:22538"} data-code-name={"ToolTitle"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Tool-title"}</h2>
-        <ProofScenario label={"variant-1"} width={945} height={52} hostLeft={0} hostTop={0} hostWidth={945} hostHeight={52}><ToolTitle /></ProofScenario>
+        <ProofScenario label={"variant-1"} width={945} height={38} hostLeft={0} hostTop={0} hostWidth={945} hostHeight={38}><ToolTitle /></ProofScenario>
       </section>
       <section data-component-id={"6103:702"} data-code-name={"MenuToolFrostSingleTemplate"} data-icon-root={false} style={{ width: 'max-content' }}>
         <h2>{"Menu-Tool-Frost-single template"}</h2>

@@ -1,7 +1,7 @@
 {
   "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
   "nodeId": "12010:22538",
-  "fileVersion": "2382071047635827559",
+  "fileVersion": "2382085534573304220",
   "elements": 3,
   "evidence": {
     "raw": {
@@ -36,14 +36,14 @@
       "candidates": []
     },
     {
-      "className": "chairProof",
+      "className": "small",
       "prop": "width",
       "value": "50px",
       "line": 18,
       "candidates": []
     },
     {
-      "className": "chairProof",
+      "className": "small",
       "prop": "font-weight",
       "value": "500",
       "line": 23,

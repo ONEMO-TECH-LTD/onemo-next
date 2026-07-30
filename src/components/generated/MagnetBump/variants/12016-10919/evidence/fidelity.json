@@ -1,9 +1,9 @@
 {
   "masterId": "12016:10919",
   "status": "measured",
-  "mismatch": 88,
+  "mismatch": 90,
   "pixels": 5184,
-  "mismatchPct": 1.6975308641975309,
+  "mismatchPct": 1.7361111111111112,
   "deltaThreshold": 32,
   "diagnosticBudgetPct": 10,
   "viewportWidth": 402,
@@ -24,17 +24,17 @@
   "referenceReason": "visible non-NORMAL blend has no opaque backing inside the component subtree",
   "cropBounds": {
     "left": 56,
-    "top": 10346,
+    "top": 10318,
     "width": 72,
     "height": 72,
     "scaleX": 2,
     "scaleY": 2,
     "boardSpace": {
       "x": 4462,
-      "y": 10549,
+      "y": 10535,
       "width": 36,
       "height": 36
     }
   },
-  "referenceSha256": "1366717634ac386ded56427689bb36b8807a75090c2ea564a9e15b80cb224457"
+  "referenceSha256": "e6d193190a22fefb216440dd3e9d1a72b90d66692fda706e95b89e93674df355"
 }
