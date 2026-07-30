@@ -5,7 +5,7 @@ import type { ShapeKind } from '../v5.3.1/user/shapes'
 const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
 const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, { k: 'form', label: 'Clover' }, { k: 'daisy', label: 'Daisy' }, { k: 'pinwheel', label: 'Pinwheel' }]
 
-type Src = 'std' | 'preset' | 'gen' | 'magic'
+type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
 type StdGeo = 'square' | 'diamondShape' | 'rect' | 'circle' | 'triangle'
 type Attachment = 'magnetic' | 'twinfix' | 'velcro'
 type GridMode = 'auto' | 'standard' | 'quincunx' | 'diamond'
@@ -92,11 +92,12 @@ export function GridWorkbenchPanel({
   return <>
     <div className="gl-card gl-pad">
       <div className="gl-glabel">Shape source</div>
-      <div className="gl-seg gl-seg3">
+      <div className="gl-seg gl-source-seg">
         <button aria-pressed={src === 'std'} onClick={() => setSrc('std')}>Standard</button>
         <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
         <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
         <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
+        <button aria-pressed={src === 'magic2'} onClick={() => setSrc('magic2')}>AI Magic 2</button>
       </div>
 
       {src === 'std' && <div className="gl-field"><span>Geometry</span>
@@ -124,7 +125,7 @@ export function GridWorkbenchPanel({
         <Slider label={genParams[gen][1][0]} v={p2} set={setP2} min={p2min} max={p2max} onInteractionChange={onSliderInteractionChange} />
       </>}
 
-      {src === 'magic' && <>
+      {(src === 'magic' || src === 'magic2') && <>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
         <button className="gl-upload" onClick={() => fileRef.current?.click()}>
           {magic ? 'Replace image' : 'Upload an image'}
@@ -147,7 +148,7 @@ export function GridWorkbenchPanel({
         </div>
       </div>
       {/* SEMANTIC SIZES — the shape's own T-shirt ladder (grid-extent tiers), mode + recipe driven */}
-      {!(src === 'std' && geo === 'rect') && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : src === 'preset' ? 'this preset' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
+      {!(src === 'std' && geo === 'rect') && !(src === 'magic2' && !magic) && <div className="gl-field"><span>Size · {src === 'std' ? 'this shape' : src === 'preset' ? 'this preset' : src === 'magic2' ? 'this outline' : 'square ref'} · {gridMode === 'quincunx' ? 'dice' : gridMode}</span>
         <div className="gl-seg gl-wrap">
           {!stdRungs.length && <span className="gl-inline-resolving">Resolving…</span>}
           {stdRungs.filter(r => r.visible).map(r =>
