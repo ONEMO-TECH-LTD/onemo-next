@@ -18,6 +18,7 @@ import {
   deriveRectangleConstruction,
   exactPerimeterCoverage,
   HOLD_REACH_MM,
+  LAUNCH_PITCHES_MM,
   nearestAnchorPair,
   nearestSemanticRung,
   nextSemanticRung,
@@ -99,42 +100,57 @@ function patternBasis(pattern: GridPattern, pitchMM: number): [Pt, Pt] {
   return [[pitchMM, 0], [0, pitchMM]]
 }
 
-function independentRadialUncoveredMM(
+function distanceToSegment(point: Pt, first: Pt, second: Pt): number {
+  const dx = second[0] - first[0]
+  const dy = second[1] - first[1]
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared < 1e-12) return Math.hypot(point[0] - first[0], point[1] - first[1])
+  const t = Math.max(0, Math.min(1, (
+    (point[0] - first[0]) * dx + (point[1] - first[1]) * dy
+  ) / lengthSquared))
+  return Math.hypot(
+    point[0] - (first[0] + t * dx),
+    point[1] - (first[1] + t * dy),
+  )
+}
+
+function independentBoundedSpanFailures(
   contour: Contour,
   anchors: ReadonlyArray<Pt>,
+  pattern: GridPattern,
+  pitchMM: number,
   reachMM: number,
 ): number {
-  let uncoveredMM = 0
-  for (const ring of [contour.outer, ...contour.holes]) {
+  const rimKeys = boundaryPointKeys(anchors, patternBasis(pattern, pitchMM))
+  const rim = anchors.filter((point) => rimKeys.has(pointKey(point)))
+  const maximumSpanMM = Math.max(...LAUNCH_PITCHES_MM)
+  const pairs = rim.flatMap((first, firstIndex) => rim.slice(firstIndex + 1).flatMap((second) =>
+    Math.hypot(first[0] - second[0], first[1] - second[1])
+      <= maximumSpanMM + MANUFACTURING_TOLERANCE_MM
+      ? [[first, second] as [Pt, Pt]]
+      : []))
+  let failures = 0
+  for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
     for (let index = 0; index < ring.pts.length; index++) {
-      const a = ring.pts[index]
-      const b = ring.pts[(index + 1) % ring.pts.length]
-      const dx = b[0] - a[0]
-      const dy = b[1] - a[1]
-      const segmentMM = Math.hypot(dx, dy)
-      if (segmentMM < 1e-9) continue
-      const intervals = anchors.flatMap(([cx, cy]) => {
-        const ox = a[0] - cx
-        const oy = a[1] - cy
-        const qa = dx * dx + dy * dy
-        const qb = 2 * (ox * dx + oy * dy)
-        const qc = ox * ox + oy * oy - reachMM * reachMM
-        const discriminant = qb * qb - 4 * qa * qc
-        if (discriminant < -1e-9) return []
-        const root = Math.sqrt(Math.max(0, discriminant))
-        const lo = Math.max(0, (-qb - root) / (2 * qa))
-        const hi = Math.min(1, (-qb + root) / (2 * qa))
-        return lo <= hi + 1e-9 ? [[lo, hi] as [number, number]] : []
-      }).sort((left, right) => left[0] - right[0] || left[1] - right[1])
-      let coveredTo = 0
-      for (const [lo, hi] of intervals) {
-        if (lo > coveredTo) uncoveredMM += (lo - coveredTo) * segmentMM
-        if (hi > coveredTo) coveredTo = hi
+      const first = ring.pts[index]
+      const second = ring.pts[(index + 1) % ring.pts.length]
+      const segmentMM = Math.hypot(second[0] - first[0], second[1] - first[1])
+      const samples = Math.max(1, Math.ceil(segmentMM / 0.25))
+      for (let sample = 0; sample <= samples; sample++) {
+        const t = sample / samples
+        const point: Pt = [
+          first[0] + (second[0] - first[0]) * t,
+          first[1] + (second[1] - first[1]) * t,
+        ]
+        const radial = anchors.some((anchor) =>
+          Math.hypot(point[0] - anchor[0], point[1] - anchor[1]) <= reachMM + 1e-7)
+        const spanned = ringIndex === 0 && pairs.some(([left, right]) =>
+          distanceToSegment(point, left, right) <= reachMM + 1e-7)
+        if (!radial && !spanned) failures++
       }
-      if (coveredTo < 1) uncoveredMM += (1 - coveredTo) * segmentMM
     }
   }
-  return uncoveredMM
+  return failures
 }
 
 describe('resolveGridPlan — production engine seam', () => {
@@ -179,22 +195,21 @@ describe('resolveGridPlan — production engine seam', () => {
       contour,
       grid.anchors.map((anchor) => anchor.p),
       HOLD_REACH_MM,
+      'standard',
+      96,
     )
 
     expect(coverage.gaps.length).toBeGreaterThan(0)
     expect(coverage.uncoveredMM).toBeGreaterThan(0)
   })
 
-  it('does not invent support between magnets on the outer ring', () => {
+  it('holds only the bounded outer span between 96mm-neighbouring magnets', () => {
     const contour = stdShapeContour('square', 118)
     const anchors: Pt[] = [[11, 11], [107, 11], [107, 107], [11, 107]]
-    const coverage = exactPerimeterCoverage(contour, anchors, HOLD_REACH_MM)
-    const expectedGapMM = 4 * (
-      96 - 2 * Math.sqrt(HOLD_REACH_MM ** 2 - 11 ** 2)
-    )
+    const coverage = exactPerimeterCoverage(contour, anchors, HOLD_REACH_MM, 'standard', 96)
 
-    expect(coverage.uncoveredMM).toBeCloseTo(expectedGapMM, 6)
-    expect(coverage.gaps).toHaveLength(4)
+    expect(coverage.uncoveredMM).toBe(0)
+    expect(coverage.gaps).toHaveLength(0)
   })
 
   it('prefers less uncovered perimeter even when it has more gap intervals', () => {
@@ -225,11 +240,15 @@ describe('resolveGridPlan — production engine seam', () => {
       star(selected.fit.sizeMM),
       selected.fit.grid.anchors.map((anchor) => anchor.p),
       HOLD_REACH_MM,
+      selected.pattern,
+      selected.pitchMM,
     )
     const diceCoverage = exactPerimeterCoverage(
       star(184),
       dice.anchors.map((anchor) => anchor.p),
       HOLD_REACH_MM,
+      'quincunx',
+      96,
     )
 
     expect(selectedCoverage.uncoveredMM).toBeLessThan(diceCoverage.uncoveredMM)
@@ -348,45 +367,45 @@ describe('engine-owned workbench selections', () => {
     expect([rectangle.widthRung.sizeMM, rectangle.heightRung.sizeMM]).toEqual([166, 118])
   })
 
-  it('composes every reachable rectangle once, then derives both density deliveries from it', () => {
-    const axisRungs = semanticLadderFromRecipe({ kind: 'standard', shape: 'square' })
+  it('composes every reachable rectangle from the active density construction', () => {
     let compared = 0
-    for (const widthRung of axisRungs) for (const heightRung of axisRungs) {
-      const construction = deriveRectangleConstruction(
-        widthRung,
-        heightRung,
+    for (const density of ['standard', 'light'] as const) {
+      const axisRungs = semanticLadderFromRecipe(
+        { kind: 'standard', shape: 'square' },
         DEFAULT_LAW,
         'auto',
+        { source: 'std', density },
       )
-      compared++
-      expect(
-        construction,
-        `${widthRung.gridExtentMM}×${heightRung.gridExtentMM} has no construction`,
-      ).not.toBeNull()
-      const contour = stdShapeContour('rect', widthRung.sizeMM, heightRung.sizeMM)
-      const standard = resolveGridPlan(contour, {
-        mode: 'auto',
-        density: 'standard',
-        paddingMM: DEFAULT_LAW.paddingMM,
-        maxGrowMM: 0,
-        construction: construction!,
-      })
-      const light = resolveGridPlan(contour, {
-        mode: 'auto',
-        density: 'light',
-        paddingMM: DEFAULT_LAW.paddingMM,
-        maxGrowMM: 0,
-        construction: construction!,
-      })
-      const population = constructionPoints(construction!)
-      const populationKeys = new Set(population.map(pointKey))
-      const rimKeys = boundaryPointKeys(population, construction!.basisMM)
-      expect(standard.grid.anchors.map(({ p }) => p)).toEqual(population)
-      expect(light.grid.anchors.every(({ p }) => populationKeys.has(pointKey(p)))).toBe(true)
-      expect(light.grid.anchors.every(({ p }) => rimKeys.has(pointKey(p)))).toBe(true)
+      for (const widthRung of axisRungs) for (const heightRung of axisRungs) {
+        const construction = deriveRectangleConstruction(
+          widthRung,
+          heightRung,
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        )
+        compared++
+        expect(
+          construction,
+          `${density}/${widthRung.gridExtentMM}×${heightRung.gridExtentMM} has no construction`,
+        ).not.toBeNull()
+        const contour = stdShapeContour('rect', widthRung.sizeMM, heightRung.sizeMM)
+        const plan = resolveGridPlan(contour, {
+          source: 'std',
+          mode: 'auto',
+          density,
+          paddingMM: DEFAULT_LAW.paddingMM,
+          maxGrowMM: 0,
+          construction: construction!,
+        })
+        const population = constructionPoints(construction!)
+        const rimKeys = boundaryPointKeys(population, construction!.basisMM)
+        expect(construction!.pitchMM).toBe(density === 'standard' ? 48 : 96)
+        expect(rimKeys.size).toBe(population.length)
+        expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
+      }
     }
-    expect(axisRungs).toHaveLength(4)
-    expect(compared).toBe(16)
+    expect(compared).toBe(65)
   })
 
   it('returns one deterministic nearest-anchor pair and feeds the plan distance from it', () => {
@@ -432,7 +451,7 @@ describe('engine-owned workbench selections', () => {
       pattern: signed.pattern,
       margin: signed.resolvedMarginMM,
       anchors: signed.grid.anchors.length,
-    }).toEqual({ pitch: 48, pattern: 'standard', margin: -15, anchors: 1 })
+    }).toEqual({ pitch: 96, pattern: 'standard', margin: -15, anchors: 1 })
 
     const diagnosticVelcro = resolveGridPlan(contour, {
       attachment: 'velcro',
@@ -446,7 +465,7 @@ describe('engine-owned workbench selections', () => {
       pattern: diagnosticVelcro.pattern,
       gridPitch: diagnosticVelcro.grid.pitchCentreMM,
       anchors: diagnosticVelcro.grid.anchors.length,
-    }).toEqual({ pitch: 48, pattern: 'standard', gridPitch: 0, anchors: 0 })
+    }).toEqual({ pitch: 96, pattern: 'standard', gridPitch: 0, anchors: 0 })
 
     const productVelcro = resolveGridPlan(contour, {
       attachment: 'velcro',
@@ -478,6 +497,87 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
+  it('builds standard shapes as direct 48/96 perimeter constructions by density', () => {
+    const square = stdShapeContour('square', 214)
+    const standard = resolveGridPlan(square, {
+      source: 'std',
+      mode: 'auto',
+      density: 'standard',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      maxGrowMM: 0,
+    })
+    const light = resolveGridPlan(square, {
+      source: 'std',
+      mode: 'auto',
+      density: 'light',
+      paddingMM: DEFAULT_LAW.paddingMM,
+      maxGrowMM: 0,
+    })
+    const standardPoints = standard.grid.anchors.map(({ p }) => p)
+    const lightPoints = light.grid.anchors.map(({ p }) => p)
+
+    expect({
+      pitchMM: standard.pitchMM,
+      anchors: standard.grid.anchors.length,
+      deliveredInterior: standard.grid.anchors.length
+        - boundaryPointKeys(standardPoints, patternBasis('standard', 48)).size,
+      ok: standard.grid.ok,
+    }).toEqual({ pitchMM: 48, anchors: 16, deliveredInterior: 0, ok: true })
+    expect({
+      pitchMM: light.pitchMM,
+      anchors: light.grid.anchors.length,
+      deliveredInterior: light.grid.anchors.length
+        - boundaryPointKeys(lightPoints, patternBasis('standard', 96)).size,
+      ok: light.grid.ok,
+    }).toEqual({ pitchMM: 96, anchors: 8, deliveredInterior: 0, ok: true })
+  })
+
+  it('keeps bounded spans honest on the named standard-shape witnesses', () => {
+    let compared = 0
+    for (const [shape, sizeMM, density, pitchMM, expectedOk] of [
+      ['square', 214, 'light', 96, true],
+      ['circle', 216, 'light', 96, false],
+      ['diamondShape', 224, 'light', 96, false],
+      ['triangle', 260, 'standard', 48, true],
+      ['triangle', 260, 'light', 96, false],
+    ] as const) {
+      const plan = resolveGridPlan(stdShapeContour(shape, sizeMM), {
+        source: 'std',
+        mode: 'standard',
+        density,
+        pitchMM,
+        paddingMM: DEFAULT_LAW.paddingMM,
+        maxGrowMM: 0,
+      })
+      compared++
+      expect(
+        plan.grid.ok,
+        `${shape}/${sizeMM}/${density}/${pitchMM} contradicted bounded pair-span`,
+      ).toBe(expectedOk)
+    }
+    expect(compared).toBe(5)
+  })
+
+  it('expands AI Magic 2 on the lawful 96mm family without bypassing its real outline', () => {
+    const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
+    const xs = realContour.outer.pts.map(([x]) => x)
+    const ys = realContour.outer.pts.map(([, y]) => y)
+    const longestMM = Math.max(
+      Math.max(...xs) - Math.min(...xs),
+      Math.max(...ys) - Math.min(...ys),
+    )
+    const unitContour = scaleContour(realContour, 1 / longestMM)
+    const rungs = semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour },
+      DEFAULT_LAW,
+      'standard',
+      { source: 'magic', density: 'light', pitchMM: 96 },
+    )
+
+    expect(rungs.length).toBeGreaterThan(1)
+    expect(rungs.every((rung) => rung.construction.pitchMM === 96)).toBe(true)
+  })
+
   it('derives AI Magic 2 sizes from the real outline instead of a square reference', () => {
     const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
     const xs = realContour.outer.pts.map(([x]) => x)
@@ -510,7 +610,9 @@ describe('semantic ladder stays inside its product contract', () => {
       { label: 'ONE', sizeMM: 46, points: 1, gridExtentMM: 22 },
       { label: 'S', sizeMM: 72, points: 2, gridExtentMM: 70 },
       { label: 'M', sizeMM: 120, points: 3, gridExtentMM: 118 },
-      { label: 'L', sizeMM: 184, points: 8, gridExtentMM: 166 },
+      { label: 'L', sizeMM: 168, points: 4, gridExtentMM: 166 },
+      { label: 'XL', sizeMM: 228, points: 6, gridExtentMM: 214 },
+      { label: '2XL', sizeMM: 304, points: 10, gridExtentMM: 262 },
     ])
     expect(actualOutline.map(({ sizeMM }) => sizeMM))
       .not.toEqual(squareReference.map(({ sizeMM }) => sizeMM))
@@ -530,7 +632,7 @@ describe('semantic ladder stays inside its product contract', () => {
       expect(plan.grid.anchors).toHaveLength(rung.points)
       if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
     }
-    expect(compared).toBe(4)
+    expect(compared).toBe(6)
   })
 
   it('fails closed instead of publishing a rotated population as Standard', () => {
@@ -588,27 +690,34 @@ describe('semantic ladder stays inside its product contract', () => {
 
   it('keeps every visible geometric product rung on the standard pattern in Auto', () => {
     const nonStandardRungs = new Set<string>()
-    let visibleRungs = 0
+    const visibleRungs = { standard: 0, light: 0 }
 
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
-      for (const rung of semanticLadder(contourAt).filter(({ visible }) => visible)) {
-        visibleRungs++
-        for (const density of ['light', 'standard'] as const) {
+      for (const density of ['standard', 'light'] as const) {
+        for (const rung of semanticLadder(
+          contourAt,
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        ).filter(({ visible }) => visible)) {
+          visibleRungs[density]++
           const plan = resolveGridPlan(contourAt(rung.sizeMM), {
+            source: 'std',
             mode: 'auto',
             density,
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
+            construction: rung.construction,
           })
           if (plan.pattern !== 'standard') {
-            nonStandardRungs.add(`${shape}/${rung.label}/${rung.sizeMM}`)
+            nonStandardRungs.add(`${shape}/${density}/${rung.label}/${rung.sizeMM}`)
           }
         }
       }
     }
 
-    expect(visibleRungs).toBe(14)
+    expect(visibleRungs).toEqual({ standard: 18, light: 7 })
     expect([...nonStandardRungs]).toEqual([])
   })
 
@@ -676,16 +785,28 @@ describe('semantic ladder stays inside its product contract', () => {
 
   it('keeps the real rounded-square preset on the same 70mm four-corner default as sharp square', () => {
     const roundedAt = (sizeMM: number) => scaleContour(normalizedPresetContour('squircle'), sizeMM)
-    const roundedRung = nextSemanticRung(semanticLadder(roundedAt), 70)
+    const roundedRung = nextSemanticRung(semanticLadder(
+      roundedAt,
+      DEFAULT_LAW,
+      'auto',
+      { source: 'preset', density: 'standard' },
+    ), 70)
     const roundedPlan = resolveGridPlan(roundedAt(roundedRung.sizeMM), {
+      source: 'preset',
       mode: 'standard',
       pitchMM: 48,
-      density: 'light',
+      density: 'standard',
       paddingMM: DEFAULT_LAW.paddingMM,
       maxGrowMM: 0,
+      construction: roundedRung.construction,
     })
     const sharpRung = nextSemanticRung(
-      semanticLadder((sizeMM) => stdShapeContour('square', sizeMM)),
+      semanticLadder(
+        (sizeMM) => stdShapeContour('square', sizeMM),
+        DEFAULT_LAW,
+        'auto',
+        { source: 'std', density: 'standard' },
+      ),
       70,
     )
 
@@ -694,102 +815,75 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(sharpRung).toMatchObject({ label: 'S', sizeMM: 70, points: 4 })
   })
 
-  it('derives the light rim from the lattice-population boundary, never hold reach', () => {
-    const diamond = stdShapeContour('diamondShape', 128)
-    const diamondPrepared = prepareExactContour(diamond)
-    const diamondLight = computeGrid(diamond, {
-      pitchMM: 48,
-      pattern: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      perimeterOnly: true,
-      sparseThin: true,
-    })
-    const diamondFull = computeGrid(diamond, {
-      pitchMM: 48,
-      pattern: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      perimeterOnly: false,
-    })
-    const centre: Pt = [64, 64]
-
-    expect(distanceToPreparedContour(centre, diamondPrepared)).toBeLessThan(HOLD_REACH_MM)
-    expect(diamondFull.anchors.map(({ p }) => p)).toContainEqual(centre)
-    expect(diamondLight.anchors.map(({ p }) => p)).not.toContainEqual(centre)
-    expect(diamondLight.anchors).toHaveLength(4)
-    const fullPopulation = diamondFull.anchors.map(({ p }) => p)
-    let comparedRimAnchors = 0
-    for (const { p } of diamondLight.anchors) {
-      comparedRimAnchors++
-      expect(
-        fullPopulation,
-        `light density shifted rim anchor ${p.join(',')} onto the cancelled 24mm phase`,
-      ).toContainEqual(p)
-    }
-    expect(comparedRimAnchors).toBe(4)
-
-    let comparedDensityCases = 0
-    let comparedDensityAnchors = 0
-    for (const [shape, sizeMM] of [
-      ['square', 214],
-      ['circle', 224],
-      ['triangle', 290],
-      ['diamondShape', 224],
-    ] as const) {
-      const contour = stdShapeContour(shape, sizeMM)
-      const light = computeGrid(contour, {
-        pitchMM: 48,
-        pattern: 'standard',
-        paddingMM: DEFAULT_LAW.paddingMM,
-        perimeterOnly: true,
-        sparseThin: true,
-      })
-      const standard = computeGrid(contour, {
-        pitchMM: 48,
-        pattern: 'standard',
-        paddingMM: DEFAULT_LAW.paddingMM,
-        perimeterOnly: false,
-        sparseThin: false,
-      })
-      const standardPopulation = standard.anchors.map(({ p }) => p)
-      comparedDensityCases++
-      for (const { p } of light.anchors) {
-        comparedDensityAnchors++
-        expect(
-          standardPopulation,
-          `${shape} ${sizeMM}mm Light shifted ${p.join(',')} onto a different grid phase`,
-        ).toContainEqual(p)
-      }
-    }
-    expect(comparedDensityCases).toBe(4)
-    expect(comparedDensityAnchors).toBeGreaterThan(0)
-  })
-
-  it('publishes only radially held geometric constructions on the product Auto path', () => {
-    const radialFailures: string[] = []
+  it('builds every standard-shape density as its own perimeter-only 48/96 construction', () => {
     let compared = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
-      const rungs = semanticLadder(contourAt)
-      for (const rung of rungs.filter((candidate) => candidate.points >= 2)) {
-        const contour = contourAt(rung.sizeMM)
-        for (const density of ['light', 'standard'] as const) {
-          const plan = resolveGridPlan(contour, {
+      for (const density of ['standard', 'light'] as const) {
+        const expectedPitchMM = density === 'standard' ? 48 : 96
+        const rungs = semanticLadder(
+          contourAt,
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        )
+        for (const rung of rungs) {
+          const population = constructionPoints(rung.construction)
+          const rimKeys = boundaryPointKeys(population, rung.construction.basisMM)
+          const plan = resolveGridPlan(contourAt(rung.sizeMM), {
+            source: 'std',
             mode: 'auto',
             density,
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
             construction: rung.construction,
           })
-          const radialUncoveredMM = independentRadialUncoveredMM(
+          compared++
+          expect(rung.construction.pitchMM).toBe(expectedPitchMM)
+          expect(rung.construction.pattern).toBe('standard')
+          expect(rimKeys.size).toBe(population.length)
+          expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
+          expect(plan.grid.anchors).toHaveLength(rung.points)
+          if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
+        }
+      }
+    }
+    expect(compared).toBe(31)
+  })
+
+  it('publishes only independently covered bounded-span constructions on the product Auto path', () => {
+    const coverageFailures: string[] = []
+    let compared = 0
+    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
+      const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
+      for (const density of ['standard', 'light'] as const) {
+        const rungs = semanticLadder(
+          contourAt,
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        )
+        for (const rung of rungs.filter((candidate) => candidate.points >= 2)) {
+          const contour = contourAt(rung.sizeMM)
+          const plan = resolveGridPlan(contour, {
+            source: 'std',
+            mode: 'auto',
+            density,
+            paddingMM: DEFAULT_LAW.paddingMM,
+            maxGrowMM: 0,
+            construction: rung.construction,
+          })
+          const failedSamples = independentBoundedSpanFailures(
             contour,
             plan.grid.anchors.map(({ p }) => p),
+            rung.construction.pattern,
+            rung.construction.pitchMM,
             HOLD_REACH_MM,
           )
           compared++
-          if (radialUncoveredMM > 1e-6) {
-            radialFailures.push(
-              `${shape}/${density}/${rung.label}/${rung.sizeMM}`
-              + ` uncovered=${radialUncoveredMM.toFixed(3)}`,
+          if (failedSamples > 0) {
+            coverageFailures.push(
+              `${shape}/${density}/${rung.label}/${rung.sizeMM} failed=${failedSamples}`,
             )
           }
           expect(
@@ -799,8 +893,8 @@ describe('semantic ladder stays inside its product contract', () => {
         }
       }
     }
-    expect(compared).toBeGreaterThan(0)
-    expect(radialFailures, `${compared} constructions compared`).toEqual([])
+    expect(compared).toBe(23)
+    expect(coverageFailures, `${compared} constructions compared`).toEqual([])
   })
 
   it('seats every published anchor at or above the hard padding floor', () => {
@@ -819,17 +913,19 @@ describe('semantic ladder stays inside its product contract', () => {
           contourAt,
           DEFAULT_LAW,
           mode,
-          pitchMM === undefined ? {} : { pitchMM },
+          { source: 'std', density: 'standard', pitchMM },
         )
         for (const rung of rungs.filter((candidate) => candidate.points >= 2)) {
           const contour = contourAt(rung.sizeMM)
           const prepared = prepareExactContour(contour)
           const plan = resolveGridPlan(contour, {
+            source: 'std',
             mode,
             pitchMM,
-            density: 'light',
+            density: 'standard',
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
+            construction: rung.construction,
           })
           const nearestBoundaryMM = Math.min(...plan.grid.anchors.map((anchor) => {
             if (shape !== 'circle') return distanceToPreparedContour(anchor.p, prepared)
@@ -896,7 +992,7 @@ describe('semantic ladder stays inside its product contract', () => {
     const plan = resolveGridPlan(stdShapeContour('circle', twoAnchor!.sizeMM), {
       mode: 'standard',
       pitchMM: 48,
-      density: 'light',
+      density: 'standard',
       paddingMM: DEFAULT_LAW.paddingMM,
       maxGrowMM: 0,
     })
@@ -906,29 +1002,42 @@ describe('semantic ladder stays inside its product contract', () => {
       .toBeGreaterThan(Math.abs(second.p[0] - first.p[0]))
   })
 
-  it('keeps small triangles on covered Auto constructions and drops the uncovered Standard/96 pair', () => {
+  it('keeps covered Standard/48 triangles and rejects the unsupported Light/96 T population', () => {
     const makeTriangle = (sizeMM: number) => stdShapeContour('triangle', sizeMM)
-    const auto = semanticLadder(makeTriangle, DEFAULT_LAW, 'auto')
-    const standard96 = semanticLadder(makeTriangle, DEFAULT_LAW, 'standard', { pitchMM: 96 })
+    const standard = semanticLadder(
+      makeTriangle,
+      DEFAULT_LAW,
+      'auto',
+      { source: 'std', density: 'standard' },
+    )
+    const light = semanticLadder(
+      makeTriangle,
+      DEFAULT_LAW,
+      'auto',
+      { source: 'std', density: 'light' },
+    )
 
-    expect(auto).toMatchObject([
+    expect(standard).toMatchObject([
       { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
       { label: 'S', points: 5, sizeMM: 150, gridExtentMM: 118 },
+      { label: 'M', points: 9, sizeMM: 232, gridExtentMM: 214 },
     ])
-    expect(standard96).toMatchObject([
+    expect(light).toMatchObject([
       { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
     ])
-    expect(standard96.some((rung) => rung.points === 2)).toBe(false)
+    expect(light.some((rung) => rung.points >= 2)).toBe(false)
 
-    const delivered = resolveGridPlan(makeTriangle(auto[1].sizeMM), {
+    const delivered = resolveGridPlan(makeTriangle(standard[1].sizeMM), {
+      source: 'std',
       mode: 'auto',
-      density: 'light',
+      density: 'standard',
       paddingMM: DEFAULT_LAW.paddingMM,
       maxGrowMM: 0,
+      construction: standard[1].construction,
     })
-    expect(delivered.grid.anchors).toHaveLength(auto[1].points)
+    expect(delivered.grid.anchors).toHaveLength(standard[1].points)
     expect(delivered.grid.ok).toBe(true)
-    expect(auto.every((rung) => rung.sizeMM <= DEFAULT_LAW.maxRungMM)).toBe(true)
+    expect(standard.every((rung) => rung.sizeMM <= DEFAULT_LAW.maxRungMM)).toBe(true)
   })
 
   it('law 3.1 — construction extents are monotonic and never collapse as the catalogue advances', () => {
@@ -957,132 +1066,6 @@ describe('semantic ladder stays inside its product contract', () => {
         }
       }
     }
-  })
-
-  it('laws 1.3/4.5/4.6 — one construction serves both densities and Light is its rim subset', () => {
-    const cases = [
-      { mode: 'auto', pitchMM: undefined },
-      { mode: 'standard', pitchMM: 48 },
-      { mode: 'standard', pitchMM: 96 },
-      { mode: 'diamond', pitchMM: 48 },
-      { mode: 'diamond', pitchMM: 96 },
-      { mode: 'quincunx', pitchMM: 96 },
-    ] as const
-    let compared = 0
-    let conformingConstructionsCompared = 0
-    let deliveriesCompared = 0
-    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      for (const { mode, pitchMM } of cases) {
-        const standardRungs = semanticLadderFromRecipe(
-          { kind: 'standard', shape },
-          DEFAULT_LAW,
-          mode,
-          { pitchMM, density: 'standard' },
-        )
-        const lightRungs = semanticLadderFromRecipe(
-          { kind: 'standard', shape },
-          DEFAULT_LAW,
-          mode,
-          { pitchMM, density: 'light' },
-        )
-        expect(lightRungs).toHaveLength(standardRungs.length)
-        for (let index = 0; index < standardRungs.length; index++) {
-          const standardRung = standardRungs[index]
-          const lightRung = lightRungs[index]
-          compared++
-          expect(
-            {
-              label: lightRung.label,
-              sizeMM: lightRung.sizeMM,
-              gridExtentMM: lightRung.gridExtentMM,
-              visible: lightRung.visible,
-              construction: lightRung.construction,
-            },
-            `${shape}/${mode}/${pitchMM ?? 'auto'}/${standardRung.label} changed construction by density`,
-          ).toEqual({
-            label: standardRung.label,
-            sizeMM: standardRung.sizeMM,
-            gridExtentMM: standardRung.gridExtentMM,
-            visible: standardRung.visible,
-            construction: standardRung.construction,
-          })
-
-          const contour = stdShapeContour(shape, standardRung.sizeMM)
-          const population = constructionPoints(standardRung.construction)
-          if (population.length >= 2) {
-            const nearest = nearestAnchorPair(
-              population.map((p) => ({ p, dia: 6 as const })),
-            )
-            const basis = patternBasis(
-              standardRung.construction.pattern,
-              standardRung.construction.pitchMM,
-            )
-            const expectedSpacingMM = Math.min(
-              Math.hypot(...basis[0]),
-              Math.hypot(...basis[1]),
-            )
-            conformingConstructionsCompared++
-            expect(
-              Math.abs(nearest!.distanceMM - expectedSpacingMM),
-              `${shape}/${mode}/${pitchMM ?? 'auto'}/${standardRung.label} construction did not conform`,
-            ).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
-          }
-          const standard = resolveGridPlan(contour, {
-            mode,
-            pitchMM,
-            density: 'standard',
-            paddingMM: DEFAULT_LAW.paddingMM,
-            maxGrowMM: 0,
-            construction: standardRung.construction,
-          })
-          const light = resolveGridPlan(contour, {
-            mode,
-            pitchMM,
-            density: 'light',
-            paddingMM: DEFAULT_LAW.paddingMM,
-            maxGrowMM: 0,
-            construction: standardRung.construction,
-          })
-          const populationKeys = new Set(population.map(pointKey))
-          const rimKeys = boundaryPointKeys(population, standardRung.construction.basisMM)
-          expect(standard.grid.anchors.map(({ p }) => p)).toEqual(population)
-          expect(standardRung.points).toBe(standard.grid.anchors.length)
-          expect(lightRung.points).toBe(light.grid.anchors.length)
-          for (const [density, rung, plan] of [
-            ['standard', standardRung, standard],
-            ['light', lightRung, light],
-          ] as const) {
-            deliveriesCompared++
-            expect(plan.pattern).toBe(rung.construction.pattern)
-            expect(plan.pitchMM).toBe(rung.construction.pitchMM)
-            if (rung.points >= 2) {
-              expect(
-                plan.grid.ok,
-                `${shape}/${mode}/${pitchMM ?? 'auto'}/${density}/${rung.label} was published uncovered`,
-              ).toBe(true)
-            }
-            if (plan.grid.anchors.length === 2) {
-              const [first, second] = plan.grid.anchors
-              expect(
-                Math.abs(second.p[1] - first.p[1]),
-                `${shape}/${mode}/${pitchMM ?? 'auto'}/${density}/${rung.label} lost gravity orientation`,
-              ).toBeGreaterThanOrEqual(Math.abs(second.p[0] - first.p[0]))
-            }
-          }
-          expect(
-            light.grid.anchors.every(({ p }) => populationKeys.has(pointKey(p))),
-            `${shape}/${mode}/${pitchMM ?? 'auto'}/${standardRung.label} Light left its construction`,
-          ).toBe(true)
-          expect(
-            light.grid.anchors.every(({ p }) => rimKeys.has(pointKey(p))),
-            `${shape}/${mode}/${pitchMM ?? 'auto'}/${standardRung.label} Light retained an interior node`,
-          ).toBe(true)
-        }
-      }
-    }
-    expect(compared).toBe(50)
-    expect(conformingConstructionsCompared).toBeGreaterThan(0)
-    expect(deliveriesCompared).toBe(100)
   })
 
   it('law 4.5 — explicit freeform standard, diamond and dice all thin to their population rim', () => {
@@ -1134,13 +1117,26 @@ describe('semantic ladder stays inside its product contract', () => {
   })
 
   it('deduplicates circle count changes inside one extent and never skips labels', () => {
-    const auto = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'auto')
-    const standard = semanticLadder((sizeMM) => stdShapeContour('circle', sizeMM), DEFAULT_LAW, 'standard')
+    const contourAt = (sizeMM: number) => stdShapeContour('circle', sizeMM)
+    const standard = semanticLadder(
+      contourAt,
+      DEFAULT_LAW,
+      'auto',
+      { source: 'std', density: 'standard' },
+    )
+    const light = semanticLadder(
+      contourAt,
+      DEFAULT_LAW,
+      'auto',
+      { source: 'std', density: 'light' },
+    )
 
-    expect(auto.map((rung) => rung.label)).toEqual(['ONE', 'S', 'M', 'L'])
-    expect(standard.map((rung) => rung.label)).toEqual(['ONE', 'S', 'M', 'L'])
-    expect(auto.map((rung) => rung.gridExtentMM)).toEqual([22, 70, 118, 166])
-    expect(standard.map((rung) => rung.gridExtentMM)).toEqual([22, 70, 118, 166])
+    expect(standard.map((rung) => rung.label))
+      .toEqual(['ONE', 'S', 'M', 'L', 'XL', '2XL', '3XL'])
+    expect(standard.map((rung) => rung.gridExtentMM))
+      .toEqual([22, 70, 118, 166, 214, 262, 310])
+    expect(light.map((rung) => rung.label)).toEqual(['ONE', 'S'])
+    expect(light.map((rung) => rung.gridExtentMM)).toEqual([22, 118])
   })
 
   it('uses the configured size ceiling, not label exhaustion, as the terminal gate', () => {

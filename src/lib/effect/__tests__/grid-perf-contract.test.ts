@@ -134,7 +134,7 @@ describe('exact grid recipe handlers', () => {
     }
     const recipe: PlanRecipe = { kind: 'final-contour', contourMM }
     const attachment: Attachment = 'magnetic'
-    const options = { attachment }
+    const options = { attachment, source: 'magic' as const }
     const direct = resolveGridPlan(contourMM, options)
     const handled = handleGridJob({ operation: 'plan', recipe, options })
 
@@ -142,7 +142,7 @@ describe('exact grid recipe handlers', () => {
     expectByteIdentical(handled.value, direct)
   })
 
-  it('rejects fixed-96 square extents whose edges exceed radial hold reach', () => {
+  it('publishes fixed-96 square extents through bounded perimeter support', () => {
     const recipe: LadderRecipe = { kind: 'standard', shape: 'square' }
     const options: GridPlanOptions = {
       mode: 'standard',
@@ -161,8 +161,8 @@ describe('exact grid recipe handlers', () => {
 
     expect(handled.operation).toBe('ladder')
     if (handled.operation !== 'ladder') throw new Error('Expected a ladder result.')
-    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([22])
-    expect(handled.value.map((rung) => rung.points)).toEqual([1])
+    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([22, 118, 214, 310])
+    expect(handled.value.map((rung) => rung.points)).toEqual([1, 4, 8, 12])
     expect(handled.key).toBe(gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', options))
     expect(handled.key).not.toBe(gridLadderCacheKey(
       recipe,
@@ -216,7 +216,7 @@ describe('exact grid cache identity', () => {
     for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { source: 'gen' })).not.toBe(base)
-    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'standard' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'light' })).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { center: 'bbox' })).not.toBe(base)
   })
 
@@ -263,7 +263,7 @@ describe('exact grid cache identity', () => {
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(10)
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(11)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')
