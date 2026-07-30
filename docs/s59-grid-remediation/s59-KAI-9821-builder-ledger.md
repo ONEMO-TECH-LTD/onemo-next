@@ -245,3 +245,32 @@ Dan subsequently ruled that frameless base size is padding edge-to-padding edge 
 a separate additive admin-set buffer. This supersedes the earlier 11mm-as-base reading and is owned
 by KAI-9845 after its SSOT text landed. KAI-9821 contains no new 10/11 sizing
 logic: coverage stays HOLD 48 and rim membership stays population topology.
+
+## Final runtime proof — phase inheritance rework
+
+Product commit: `1af1f839ab63ac314057a214746598f764a477fd`.
+
+- A clean detached worktree at that exact commit completed
+  `npm run build -- --webpack`: compilation, type checking and all 20 static routes passed.
+- The real bench ran on `http://localhost:3970/effect-creator/grid-lab` from PID 19834,
+  whose cwd was this `grid-lab` worktree at the exact product commit.
+- Chrome control had already failed its required retry, so the declared Playwright fallback
+  exercised the live page.
+- Diamond-shape M 128mm:
+  - Light rendered exactly four outer cross nodes:
+    `[16,64] [64,16] [64,112] [112,64]`;
+  - Standard rendered those same four nodes plus centre `[64,64]`;
+  - therefore density changed only delivery membership and did not select another phase.
+- Circle XL rendered 216mm, tier 4pt / seated 4, confirming the disclosed `224 → 216`
+  derived catalogue consequence on the user-visible surface.
+- Browser console: 2 total messages, 0 errors, 0 warnings.
+- Captures:
+  - `output/playwright/kai-9821-population-phase-final-1af1f83.png`;
+  - `output/playwright/kai-9821-standard-phase-final-1af1f83.png`.
+
+Necessity: no new numeric policy, shape branch, solver, or UI path. The final rework changes only
+which already-legal population is scored and then thinned.
+
+Sufficiency: Light and Standard now inherit one construction phase, Light is population-boundary
+only for every pattern, the cancelled 24mm atom cannot re-enter through density selection, and all
+named code, regression, performance, production-build and visual gates executed.
