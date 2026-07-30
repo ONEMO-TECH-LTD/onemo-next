@@ -933,10 +933,10 @@ export function resolveRectangleRungs(
   rungs: ReadonlyArray<SemanticRung>,
   opts: { longMM: number; shortMM: number; orientation: 'landscape' | 'portrait' },
 ): RectangleRungResolution {
-  const longRung = nearestSemanticRung(rungs, opts.longMM)
+  const longRung = nextSemanticRung(rungs, opts.longMM)
   const shortOptions = rungs.filter((rung) => rung.sizeMM <= longRung.sizeMM)
   const shortRung = shortOptions.length
-    ? nearestSemanticRung(shortOptions, opts.shortMM)
+    ? nextSemanticRung(shortOptions, opts.shortMM)
     : longRung
   const landscape = opts.orientation === 'landscape'
   return {
