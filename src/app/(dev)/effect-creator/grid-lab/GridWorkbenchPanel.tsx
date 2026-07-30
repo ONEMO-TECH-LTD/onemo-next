@@ -194,7 +194,7 @@ export function GridWorkbenchPanel({
         <span className="gl-total-k">Total effect size</span>
         <b className="gl-total-v">{model.effSize}<small> mm</small></b>
         <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
-        <span className="gl-total-note gl-total-grid">grid {model.pitch}mm{model.magDist != null ? ` · magnets ${Math.round(model.magDist)}mm apart${Math.abs(model.magDist - model.pitch * Math.SQRT2) < 1.5 ? ` · grid diagonal (${model.pitch}×√2)` : Math.abs(model.magDist - model.pitch * Math.SQRT2 / 2) < 1.5 ? ` · dice half-diagonal` : ''}` : ''}</span>
+        <span className="gl-total-note gl-total-grid">{model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed} construction · grid pitch {model.pitch}mm{model.magDist != null ? ` · nearest delivered spacing ${Math.round(model.magDist)}mm` : ''}</span>
         <span className="gl-total-note">{model.format
           ? model.rung && model.rungH
             ? `${model.rung.sizeMM}×${model.rungH.sizeMM} · ${model.format}`
