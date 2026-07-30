@@ -6,9 +6,9 @@
 //     law while restricting the pitch/pattern family.
 //   • PER-SPOT padding (interp A): a node is valid = inside the silhouette AND ≥ pad (10mm radius from
 //     the magnet centre) from the REAL outline — per-node, no erosion (pinched shapes keep all regions).
-//   • Grid geometry chooses the legal topology. HOLD COVERAGE is measured from the PERIMETER BELT:
-//     interior magnets never compensate for an uncovered corner/edge. Inside one conforming topology,
-//     covered phase beats uncovered phase; a geometric catalogue publishes covered constructions only.
+//   • Grid geometry chooses the legal topology. HOLD COVERAGE is measured radially from each actual
+//     seated magnet to every manufactured ring. Inside one conforming topology, covered phase beats
+//     uncovered phase; a geometric catalogue publishes covered constructions only.
 //   • MARGIN model: the design never resizes; an outward margin band grows (capped) until covered.
 //   • Procedural sizes: enumerate legal lattice extents, then solve the earliest upward even-whole-mm
 //     contour size that accepts each extent. The grid extent is the catalogue authority; shape mm is
@@ -185,37 +185,6 @@ export interface PerimeterCoverage {
   uncoveredMM: number
 }
 
-function cross(a: Pt, b: Pt, c: Pt): number {
-  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
-}
-
-function convexHull(points: ReadonlyArray<Pt>): Pt[] {
-  const sorted = [...points]
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
-    .filter((point, index, all) =>
-      index === 0 || Math.abs(point[0] - all[index - 1][0]) > 1e-7
-        || Math.abs(point[1] - all[index - 1][1]) > 1e-7)
-  if (sorted.length <= 2) return sorted
-  const lower: Pt[] = []
-  for (const point of sorted) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 1e-9) {
-      lower.pop()
-    }
-    lower.push(point)
-  }
-  const upper: Pt[] = []
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const point = sorted[i]
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 1e-9) {
-      upper.pop()
-    }
-    upper.push(point)
-  }
-  lower.pop()
-  upper.pop()
-  return [...lower, ...upper]
-}
-
 type Interval = [number, number]
 
 function mergeIntervals(intervals: Interval[]): Interval[] {
@@ -227,22 +196,6 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
     else if (interval[1] > last[1]) last[1] = interval[1]
   }
   return merged
-}
-
-function clipRange(
-  interval: Interval,
-  start: number,
-  end: number,
-  min: number,
-  max: number,
-): Interval | null {
-  const delta = end - start
-  let [lo, hi] = interval
-  if (Math.abs(delta) < 1e-12) return start >= min - 1e-9 && start <= max + 1e-9 ? interval : null
-  const t0 = (min - start) / delta, t1 = (max - start) / delta
-  lo = Math.max(lo, Math.min(t0, t1))
-  hi = Math.min(hi, Math.max(t0, t1))
-  return lo <= hi + 1e-9 ? [lo, hi] : null
 }
 
 function discInterval(a: Pt, b: Pt, centre: Pt, radius: number): Interval | null {
@@ -260,67 +213,26 @@ function discInterval(a: Pt, b: Pt, centre: Pt, radius: number): Interval | null
   return lo <= hi + 1e-9 ? [lo, hi] : null
 }
 
-function capsuleIntervals(a: Pt, b: Pt, first: Pt, second: Pt, radius: number): Interval[] {
-  const intervals: Interval[] = []
-  const firstDisc = discInterval(a, b, first, radius)
-  const secondDisc = discInterval(a, b, second, radius)
-  if (firstDisc) intervals.push(firstDisc)
-  if (secondDisc) intervals.push(secondDisc)
-  const axisX = second[0] - first[0], axisY = second[1] - first[1]
-  const length = Math.hypot(axisX, axisY)
-  if (length > 1e-9) {
-    const ux = axisX / length, uy = axisY / length
-    const along = (point: Pt) => (point[0] - first[0]) * ux + (point[1] - first[1]) * uy
-    const across = (point: Pt) => -(point[0] - first[0]) * uy + (point[1] - first[1]) * ux
-    let strip: Interval | null = clipRange([0, 1], along(a), along(b), 0, length)
-    if (strip) strip = clipRange(strip, across(a), across(b), -radius, radius)
-    if (strip) intervals.push(strip)
-  }
-  return mergeIntervals(intervals)
-}
-
-function miterHullInterval(a: Pt, b: Pt, hull: ReadonlyArray<Pt>, radius: number): Interval[] {
-  let interval: Interval | null = [0, 1]
-  for (let i = 0; i < hull.length && interval; i++) {
-    const first = hull[i], second = hull[(i + 1) % hull.length]
-    const ex = second[0] - first[0], ey = second[1] - first[1]
-    const edgeLength = Math.hypot(ex, ey)
-    const side = (point: Pt) => ex * (point[1] - first[1]) - ey * (point[0] - first[0])
-    interval = clipRange(interval, side(a), side(b), -radius * edgeLength, Infinity)
-  }
-  return interval ? [interval] : []
-}
-
-/** Exact unsupported intervals per manufactured ring. The outer ring uses the seated anchors' wrap:
- *  fabric BETWEEN perimeter magnets is pinned by those endpoints, and interior nodes cannot enlarge
- *  the convex hull to mask a tip or lobe. Each hole rim instead requires its own radial support from
- *  a seated anchor; being inside the outer hull does not cover a cut-out. */
+/** Exact unsupported intervals per manufactured ring. Every outline point must sit within the
+ *  physical hold radius of an actual seated magnet; no hull or between-magnet bridge invents support. */
 export function exactPerimeterCoverage(
   contour: Contour,
   seated: ReadonlyArray<Pt>,
   safeRadius: number,
 ): PerimeterCoverage {
-  const hull = convexHull(seated)
   const gaps: Pt[] = []
   let uncoveredMM = 0
-  for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
+  for (const ring of [contour.outer, ...contour.holes]) {
     const pts = ring.pts
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 1) % pts.length]
       const segLen = dist(a, b)
       if (segLen < 1e-9) continue
       const ux = (b[0] - a[0]) / segLen, uy = (b[1] - a[1]) / segLen
-      const intervals = ringIndex > 0
-        ? mergeIntervals(seated.flatMap((anchor) => {
-            const interval = discInterval(a, b, anchor, safeRadius)
-            return interval ? [interval] : []
-          }))
-        : hull.length === 0 ? []
-          : hull.length === 1
-            ? [discInterval(a, b, hull[0], safeRadius)].filter((value): value is Interval => !!value)
-            : hull.length === 2
-              ? capsuleIntervals(a, b, hull[0], hull[1], safeRadius)
-              : miterHullInterval(a, b, hull, safeRadius)
+      const intervals = mergeIntervals(seated.flatMap((anchor) => {
+        const interval = discInterval(a, b, anchor, safeRadius)
+        return interval ? [interval] : []
+      }))
       let coveredTo = 0
       const gapPoint = (lo: number, hi: number): Pt => {
         const t = (lo + hi) / 2
@@ -665,7 +577,7 @@ function computePreparedGridForExtent(
     // EDGE REGISTRATION (Dan, 2026-07-28): "the size is optimal when we follow square logic pretty
     // much everywhere — magnets side to side along the edges, with margins encoded between magnet and
     // edge of the effect." Within the LADDER DOMAIN the same edge length registers the same way: a
-    // rectangle's 214 side takes the layout a 214 square's side takes. The claim is bounded on
+    // rectangle rung takes the layout the same-length square rung takes. The claim is bounded on
     // purpose — a rung is the size whose surface exactly wraps its magnet array plus both encoded
     // margins (Dan), so a NON-rung size has no zero-point to register on and nothing is claimed for
     // it; off-ladder behaviour is recorded in KAI-9793, not pinned. The term itself is shape- and
@@ -767,7 +679,7 @@ function computePreparedGridForExtent(
     ? exactPerimeterCoverage(contourMM, seated, HOLD_REACH_MM)
     : { gaps: [], uncoveredMM: 0 }
   const flaps = coverage.gaps
-  if (flaps.length > 0) issues.push(`Some edge areas sit outside the seated support envelope (red edge) and could lift. Raise the size / max auto-grow.`)
+  if (flaps.length > 0) issues.push(`Some edge areas sit outside every seated magnet's hold radius (red edge) and could lift. Raise the size / max auto-grow.`)
 
   let minD = 8, maxD = 6
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
@@ -1511,7 +1423,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 8
+export const GRID_ENGINE_CACHE_VERSION = 9
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
