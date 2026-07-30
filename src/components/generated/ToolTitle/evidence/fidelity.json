@@ -1,9 +1,9 @@
 {
   "masterId": "12010:22538",
   "status": "measured",
-  "mismatch": 379,
-  "pixels": 143640,
-  "mismatchPct": 0.26385407964355334,
+  "mismatch": 767,
+  "pixels": 196560,
+  "mismatchPct": 0.3902116402116402,
   "deltaThreshold": 32,
   "diagnosticBudgetPct": 10,
   "viewportWidth": 402,
@@ -20,5 +20,5 @@
   "qualifyingSourcePath": null,
   "referenceReason": "no visible non-NORMAL blend without internal opaque backing",
   "cropBounds": null,
-  "referenceSha256": "bfad990ec5250addab000221d53c35e19a15f87d56a2a05b2c7bafedc12649d6"
+  "referenceSha256": "b02556916dc2ac09f04df449843dcd1bcf59396c2a5113087dec8f674b237523"
 }

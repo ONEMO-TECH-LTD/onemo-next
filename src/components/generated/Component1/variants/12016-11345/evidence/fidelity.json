@@ -27,17 +27,17 @@
   "referenceReason": "visible non-NORMAL blend has no opaque backing inside the component subtree",
   "cropBounds": {
     "left": 36,
-    "top": 12640,
+    "top": 12668,
     "width": 624,
     "height": 624,
     "scaleX": 2,
     "scaleY": 2,
     "boardSpace": {
       "x": 4452,
-      "y": 11696,
+      "y": 11710,
       "width": 312,
       "height": 312
     }
   },
-  "referenceSha256": "56e208aa5ca7dabc2e0ac3984a208032b5ba420758019e4b55c4dc30a9834fcf"
+  "referenceSha256": "7803777aa3d90abb5a7bd078055cca3e0afe456ab594c5a58243f2c9eb86a57b"
 }

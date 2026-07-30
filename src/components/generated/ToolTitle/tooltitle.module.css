@@ -14,7 +14,7 @@
   flex-shrink: 0;
 }
 
-.small {
+.chairProof {
   width: 50px;
   flex-shrink: 0;
   color: var(--sem-col-text-primary-default);

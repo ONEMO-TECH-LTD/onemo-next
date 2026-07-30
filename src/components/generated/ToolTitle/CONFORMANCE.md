@@ -1,4 +1,4 @@
-# Conformance — 12010:22538 @ file v2381318852839647833
+# Conformance — 12010:22538 @ file v2382071047635827559
 
 | Check | Result |
 |---|---|
@@ -23,8 +23,8 @@
 ## RAW values — bind-token worklist
 - .frame12 · `gap: 10px` (css:12) → candidates: `--prim-track-pos-10`
 - .frame12 · `width: 50px` (css:13)
-- .small · `width: 50px` (css:18)
-- .small · `font-weight: 500` (css:23)
+- .chairProof · `width: 50px` (css:18)
+- .chairProof · `font-weight: 500` (css:23)
 
 ## REFUSED — design cleanup worklist
 
