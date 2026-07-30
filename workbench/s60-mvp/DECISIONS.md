@@ -58,6 +58,12 @@ Under-the-hood grid → shape calculation: magnetic point layout and sizing. Not
 The engine originally built 3D-first and pivoted to the 2D editor carries forward.
 *Source: Brief 60.2*
 
+### D12 — The outlined shape must sit on the grid
+An AI-outlined silhouette is only a product if its magnetic points land on the standardised grid. Magic outline must not be able to produce a shape grid-lab cannot lay out. This is what keeps the offering honest: everything shown is manufacturable (see R2), and a shape that cannot be gridded is not manufacturable.
+
+**In flight elsewhere:** Dan is working with `@s59-pixel-designer` in Session 59 to streamline the shaper tool in grid-lab. Session 60 does not duplicate or dispatch into that work — it consumes the result.
+*Source: Dan, 2026-07-30*
+
 ---
 
 ## OPEN

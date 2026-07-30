@@ -62,7 +62,11 @@ Everything else in the editor programme is subject to the cut.
 
 **Fit is unaddressed.** "Will this work on what I already own?" is the first real buyer question — across fabric weights, knits, hoodies. There is no answer anywhere in the flow. Cheap to solve now, expensive after the first hundred orders.
 
-**Nothing shown may be unmanufacturable.** The credibility of the whole offering rests on this. Magic outline in particular must not be able to produce a shape grid-lab cannot lay out — which is precisely why grid-lab is not optional.
+**Nothing shown may be unmanufacturable.** The credibility of the whole offering rests on this. Magic outline in particular must not be able to produce a shape grid-lab cannot lay out — which is precisely why grid-lab is not optional. Confirmed by Dan and now locked as D12: the outlined shape must sit on the grid.
+
+## In flight outside this session
+
+**Shaper tool in grid-lab** — Dan is working with `@s59-pixel-designer` in Session 59 to streamline it. Session 60 consumes the result; it does not duplicate the work, dispatch into it, or propose an alternative. The MVP audit treats the shaper as an input with a known owner.
 
 ## Ideas parked, not dead
 
