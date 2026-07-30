@@ -142,7 +142,7 @@ describe('exact grid recipe handlers', () => {
     expectByteIdentical(handled.value, direct)
   })
 
-  it('derives a fixed-96 square ladder only from registered 96mm grid extents', () => {
+  it('rejects fixed-96 square extents whose edges exceed radial hold reach', () => {
     const recipe: LadderRecipe = { kind: 'standard', shape: 'square' }
     const options: GridPlanOptions = {
       mode: 'standard',
@@ -161,8 +161,8 @@ describe('exact grid recipe handlers', () => {
 
     expect(handled.operation).toBe('ladder')
     if (handled.operation !== 'ladder') throw new Error('Expected a ladder result.')
-    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([22, 118, 214, 310])
-    expect(handled.value.map((rung) => rung.points)).toEqual([1, 4, 8, 12])
+    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([22])
+    expect(handled.value.map((rung) => rung.points)).toEqual([1])
     expect(handled.key).toBe(gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', options))
     expect(handled.key).not.toBe(gridLadderCacheKey(
       recipe,
@@ -263,7 +263,7 @@ describe('exact grid cache identity', () => {
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(8)
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(9)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')

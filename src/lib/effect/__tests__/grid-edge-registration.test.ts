@@ -7,7 +7,7 @@
 // magnet outer margin and surface margin encoded by the system." A rung is therefore the size whose
 // surface exactly wraps its magnet array plus both encoded margins. A NON-rung size has no
 // zero-point, so asking whether it registers on one is a category error, not a failure. Rectangle
-// snaps both axes to rungs (resolveRectangleRungs -> nearestSemanticRung), so the product domain is
+// snaps both axes to rungs (resolveRectangleRungs -> nextSemanticRung), so the product domain is
 // the rung matrix and nothing else. Engine behaviour off-ladder is deliberately unpinned here and
 // recorded in KAI-9793: 88 integer bands move. Every delivered anchor still obeys the hard floor.
 //
@@ -56,16 +56,16 @@ function registrationSlackMM(plan: ResolvedGridPlan): number {
 const LIGHT = { mode: 'auto', density: 'light', baseMarginMM: 0, maxGrowMM: 0 } as const
 
 describe('edge-registration law — every edge registers on its own zero-point', () => {
-  it('registers a rectangle long edge exactly as the same-length square edge (214x70)', () => {
-    const rect = resolveGridPlan(stdShapeContour('rect', 214, 70), LIGHT)
-    const square = resolveGridPlan(stdShapeContour('square', 214, 214), LIGHT)
+  it('registers a rectangle long edge exactly as the same-length square edge (166x70)', () => {
+    const rect = resolveGridPlan(stdShapeContour('rect', 166, 70), LIGHT)
+    const square = resolveGridPlan(stdShapeContour('square', 166, 166), LIGHT)
 
-    // The square is the reference: 214 is a zero-point, so its edge anchors sit at the floor.
+    // The square is the reference: 166 is a zero-point, so its edge anchors sit at the floor.
     const sq = axes(square)
     expect(sq.left).toBeCloseTo(FLOOR_MM, 3)
     expect(sq.right).toBeCloseTo(FLOOR_MM, 3)
 
-    // The rectangle's 214 edge must do the same. Before the law it sat 35mm inboard.
+    // The rectangle's 166 edge must do the same.
     const r = axes(rect)
     expect(r.left).toBeCloseTo(FLOOR_MM, 3)
     expect(r.right).toBeCloseTo(FLOOR_MM, 3)
@@ -80,11 +80,9 @@ describe('edge-registration law — every edge registers on its own zero-point',
   it('leaves no dead border on any rung-by-rung rectangle', () => {
     // Every pairing traced in the design probe. Mixed 48/96-family pairs are the interesting ones.
     const pairs: Array<[number, number]> = [
-      [214, 70],
-      [214, 118],
-      [310, 70],
-      [310, 118],
-      [214, 166],
+      [118, 70],
+      [166, 70],
+      [166, 118],
     ]
     for (const [longMM, shortMM] of pairs) {
       const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
@@ -98,7 +96,9 @@ describe('edge-registration law — every edge registers on its own zero-point',
   it('keeps every canon square registered and byte-identical in layout', () => {
     // The guard that proves the law changed nothing it should not: squares already register, so
     // their anchor sets must be untouched by the new ranking term.
-    const canon = [70, 118, 166, 214, 262, 310]
+    const canon = semanticLadder(
+      (sizeMM: number) => stdShapeContour('square', sizeMM),
+    ).filter(({ points }) => points >= 2).map(({ sizeMM }) => sizeMM)
     for (const sizeMM of canon) {
       for (const density of ['light', 'standard'] as const) {
         const plan = resolveGridPlan(stdShapeContour('square', sizeMM, sizeMM), {
@@ -116,7 +116,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
   it('still reduces every multi-anchor layout to one 48-lattice population', () => {
     // Dan: "the grid box must always be 48 lattice — that is the law." Registration must never buy
     // edge contact by moving a node off the lattice.
-    const plan = resolveGridPlan(stdShapeContour('rect', 214, 70), LIGHT)
+    const plan = resolveGridPlan(stdShapeContour('rect', 166, 70), LIGHT)
     const { xs, ys } = axes(plan)
     expect(plan.grid.anchors.length).toBeGreaterThanOrEqual(2)
     for (const axis of [xs, ys]) {
@@ -130,38 +130,10 @@ describe('edge-registration law — every edge registers on its own zero-point',
   it('does not trade coverage for registration', () => {
     // Registration leads only inside the conforming pool; an accepted registered layout must still
     // be covered, so zero-point selection cannot bring back a flap-bearing construction.
-    for (const [longMM, shortMM] of [[214, 70], [310, 118]] as Array<[number, number]>) {
+    for (const [longMM, shortMM] of [[166, 70], [166, 118]] as Array<[number, number]>) {
       const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
       expect(plan.grid.flaps.length, `${longMM}x${shortMM} flaps`).toBe(0)
       expect(plan.grid.ok).toBe(true)
-    }
-  })
-
-  it('pins every layout this law moves in the REACHABLE rectangle space — exactly two', () => {
-    // SCOPE, and it is load-bearing: a rectangle's two axes are each snapped to a ladder rung
-    // (resolveRectangleRungs -> nearestSemanticRung), so the product can only ever ask for a
-    // rung x rung pair — 42 of them. Off-ladder dimensions (209x70, 214x143) are NOT product
-    // inputs; a rung is by definition the size whose surface exactly wraps its magnet array plus
-    // the encoded margins, so a non-rung size has no zero-point to register on and asking whether
-    // it registers is a category error. Measured across the full reachable matrix, both densities,
-    // against pre-law staging by SWAPPING the engine file — never by stashing (a stash after commit
-    // is a silent no-op, and is how the blast radius was first undercounted as one case).
-    // Both movers are light density and both are the same 35mm -> 11mm correction.
-    const moved: Array<[number, number, number, number[]]> = [
-      [214, 70, 6, [11, 107, 203]],
-      [214, 166, 10, [11, 107, 203]],
-    ]
-    for (const [longMM, shortMM, anchors, cols] of moved) {
-      const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
-      expect(plan.grid.anchors.length, `${longMM}x${shortMM} anchor count`).toBe(anchors)
-      expect(axes(plan).xs, `${longMM}x${shortMM} columns`).toEqual(cols)
-    }
-    // Unmoved neighbours, pinned so the set cannot silently widen.
-    for (const [longMM, shortMM, anchors] of [[310, 70, 8], [310, 118, 8], [214, 118, 6]] as Array<
-      [number, number, number]
-    >) {
-      const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), LIGHT)
-      expect(plan.grid.anchors.length, `${longMM}x${shortMM} must be unchanged`).toBe(anchors)
     }
   })
 
@@ -170,7 +142,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
     // law itself over the entire product domain, so the surrounding prose is checked rather than
     // asserted. Enumerates the live ladder (never a hardcoded rung list — if the ladder moves, this
     // moves with it), takes every ORDERED pair so both orientations are covered, and crosses it with
-    // both densities. 7 rungs -> 42 oriented pairs -> 84 plans.
+    // both densities. The executed denominator derives from the live catalogue.
     const rungs = semanticLadder((sizeMM: number) => stdShapeContour('rect', sizeMM, sizeMM))
     const sizes = rungs.map((r) => r.sizeMM)
     const unregistered: string[] = []
