@@ -64,6 +64,16 @@ An AI-outlined silhouette is only a product if its magnetic points land on the s
 **In flight elsewhere:** Dan is working with `@s59-pixel-designer` in Session 59 to streamline the shaper tool in grid-lab. Session 60 does not duplicate or dispatch into that work — it consumes the result.
 *Source: Dan, 2026-07-30*
 
+### D13 — No 3D at launch
+The product pivoted away from 3D. React Three Fiber, three.js, drei and Theatre are out of MVP scope.
+
+Measured containment (2026-07-30) — the 3D surface is six files and none are on the MVP path:
+- `src/lib/effect/mesh.ts` and `src/lib/effect/build-mesh.ts` — consumed only by `ShapedModel.tsx` in the dev editor and one test.
+- Four files under `src/app/(dev)/effect-creator/v5.3.1/` (`core/`, `core/shaped/`, `core/scene-format/`).
+
+Consequence: three/R3F/drei/Theatre never enter a shipped customisation bundle. The engine's remaining runtime dependencies are clipper2, paper.js, and the ML worker.
+*Source: Dan, 2026-07-30 — "react 3 fiber is for 3D we do not have 3d now (pivotted from it)"*
+
 ---
 
 ## OPEN
