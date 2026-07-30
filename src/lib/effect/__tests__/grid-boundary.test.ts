@@ -396,15 +396,38 @@ describe('Creator magnetic-grid module boundary', () => {
 
   it('draws the front-face artwork the right way up — no vertical mirror on the raster', () => {
     const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
-    const imageTag = rendererSource.match(/<image\b[^>]*\/>/)?.[0]
+    const imageTag = rendererSource.match(
+      /<image\b[^>]*data-v531-engine-artwork="composite"[^>]*\/>/,
+    )?.[0]
 
-    // The contour is converted to screen space before the design bbox is measured, so the raster
-    // drops into that bbox upright. A negative Y scale mirrors the artwork about the bbox centre
-    // and the wearer sees the design upside down — DAN, 2026-07-30: "the image preview is upside
-    // down". The silhouette is unaffected, which is why this survived every geometry-only gate.
-    expect(imageTag, 'front-face <image> element not found in the renderer').toBeDefined()
+    // The engine composite is y-down already. A negative Y scale mirrors wearer artwork while the
+    // outline stays unchanged — DAN, 2026-07-30: "the image preview is upside down".
+    expect(imageTag, 'v5.3.1 engine composite not rendered').toBeDefined()
     expect(imageTag).not.toMatch(/scale\(\s*[-\d.]+[\s,]+-/)
     expect(imageTag).not.toMatch(/scaleY\(\s*-/)
+  })
+
+  it('wires AI Magic through the full v5.3.1 engine result without its obsolete UI', () => {
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
+    const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
+
+    // `prepareShaped` owns segmentation, vectorisation, subject matte, and magic-blend composition.
+    // Grid-lab consumes its vector and matching composite as one result. Falling back to the raw
+    // upload or importing the obsolete editor/store recreates two truth paths.
+    expect(pageSource).toContain('prepared: p')
+    expect(pageSource).toContain('compositeUrl: p.composite.toDataURL()')
+    expect(pageSource).toContain('magic.prepared.spec.vectorShape')
+    expect(pageSource).toContain('imageUrl: magic.compositeUrl')
+    expect(pageSource).toContain('frontArtwork={')
+    expect(pageSource).not.toContain('frontImg={isMagicSource && magic ? magic.imgUrl : null}')
+    expect(pageSource).not.toContain('OutlineEditor')
+    expect(pageSource).not.toContain('useOutlineStore')
+    expect(pageSource).not.toContain('publishToViewer')
+    expect(pageSource).not.toContain('buildMeshFromSpec')
+    expect(pageSource).not.toMatch(/from ['"]three['"]/)
+    expect(rendererSource).toContain('data-v531-engine-artwork="composite"')
+    expect(rendererSource).not.toContain('preserveAspectRatio="none"')
+    expect(rendererSource).not.toContain('dmnx')
   })
 
   it('retains generic lane cancellation after removing profile switching', () => {

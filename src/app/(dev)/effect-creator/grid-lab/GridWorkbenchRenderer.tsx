@@ -30,6 +30,13 @@ interface GridWorkbenchModel {
   anchorPair: GridWorkbenchNearestAnchorPair | null
 }
 
+interface GridWorkbenchFrontArtwork {
+  imageUrl: string
+  imgW: number
+  imgH: number
+  pixelsToMM: number
+}
+
 export function contourDimension(c: Contour, axis: 0 | 1): number {
   let lo = Infinity, hi = -Infinity
   for (const p of c.outer.pts) { if (p[axis] < lo) lo = p[axis]; if (p[axis] > hi) hi = p[axis] }
@@ -42,7 +49,7 @@ export function GridWorkbenchStage({
   viewportPx,
   fit,
   front,
-  frontImg,
+  frontArtwork,
   emptyText,
   emptySpin,
   onRenderedPlanCommit,
@@ -52,7 +59,7 @@ export function GridWorkbenchStage({
   viewportPx: number
   fit: number
   front: boolean
-  frontImg: string | null
+  frontArtwork: GridWorkbenchFrontArtwork | null
   emptyText: string
   emptySpin?: boolean
   onRenderedPlanCommit: (planKey: string | null) => void
@@ -68,7 +75,7 @@ export function GridWorkbenchStage({
         <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
       </div>
       <div className="gl-vp">
-        {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} anchorPair={model.anchorPair} front={front} frontImg={frontImg} viewportPx={viewportPx} fit={fit} />
+        {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} anchorPair={model.anchorPair} front={front} frontArtwork={frontArtwork} viewportPx={viewportPx} fit={fit} />
           : <Empty text={emptyText} spin={emptySpin} />}
       </div>
       <div className="gl-legend">
@@ -96,7 +103,7 @@ export function GridWorkbenchReadouts({ model, scale }: { model: GridWorkbenchMo
 }
 
 const pathFrom = (pp: Pt[]) => 'M ' + pp.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
-function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx, fit }: { contour: Contour; design: Contour; grid: GridWorkbenchGrid; anchorPair: GridWorkbenchNearestAnchorPair | null; front: boolean; frontImg: string | null; viewportPx: number; fit: number }) {
+function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewportPx, fit }: { contour: Contour; design: Contour; grid: GridWorkbenchGrid; anchorPair: GridWorkbenchNearestAnchorPair | null; front: boolean; frontArtwork: GridWorkbenchFrontArtwork | null; viewportPx: number; fit: number }) {
   const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -112,9 +119,6 @@ function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx,
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
-  // design bbox (flipped screen space) for placing the front image
-  let dmnx = Infinity, dmny = Infinity, dmxx = -Infinity, dmxy = -Infinity
-  for (const [x, y] of dPts) { if (x < dmnx) dmnx = x; if (x > dmxx) dmxx = x; if (y < dmny) dmny = y; if (y > dmxy) dmxy = y }
   const dDall = pathFrom(dPts)
   return (
     <svg width={vbW * S} height={vbH * S} viewBox={`${minX - pad} ${minY - pad} ${vbW} ${vbH}`}>
@@ -126,11 +130,23 @@ function Stage({ contour, design, grid, anchorPair, front, frontImg, viewportPx,
       {front ? <>
         {/* FRONT FACE — the design/artwork the wearer sees, with magnets as translucent overlay rings so
             the grid can be sanity-checked over the art. Positions are engine anchors, not re-derived. */}
-        {frontImg
-          // dPts are ALREADY screen space (y negated at the top of this function), so the design bbox
-          // below is screen space too and the raster drops straight into it. No axis flip here: adding
-          // one mirrors the artwork about the bbox centre and the wearer sees the design upside down.
-          ? <image href={frontImg} x={dmnx} y={dmny} width={dmxx - dmnx} height={dmxy - dmny} clipPath="url(#frontclip)" preserveAspectRatio="none" />
+        {frontArtwork
+          ? <g clipPath="url(#frontclip)">
+              {/* The v5.3.1 engine returns its blended composite and vector in one mask-pixel/y-down
+                  frame. Grid contours are mm/y-up and Stage negates them to screen y-down, so this
+                  translation+scale preserves that shared origin without any local image fitting. */}
+              <g transform={`translate(0 ${-frontArtwork.imgH * frontArtwork.pixelsToMM}) scale(${frontArtwork.pixelsToMM})`}>
+                <image
+                  data-v531-engine-artwork="composite"
+                  href={frontArtwork.imageUrl}
+                  x={0}
+                  y={0}
+                  width={frontArtwork.imgW}
+                  height={frontArtwork.imgH}
+                  preserveAspectRatio="xMidYMid slice"
+                />
+              </g>
+            </g>
           : <path d={dDall} fill="var(--suede)" />}
         <path d={dDall} fill="none" stroke="var(--suede-edge)" strokeWidth={1} strokeLinejoin="round" />
         {grid.anchors.map((a, i) => {

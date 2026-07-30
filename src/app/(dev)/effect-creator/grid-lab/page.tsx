@@ -4,7 +4,7 @@
 // ALL engine shape sources through contourFromShape → computeGrid, rendered true-to-scale:
 //   • Presets    — shape-library getShape() (baked vector data)
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
-//   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
+//   • AI Magic   — image upload → prepareShaped() → cut-out + vector outline + blend composite
 // Every source yields a VShape → final mm contour consumed by the neutral grid engine.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -13,6 +13,7 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
+import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
 import { roundedSquareContourMM } from '@/lib/effect/rounded-square'
 import type { Contour, Pt } from '@/lib/effect/types'
@@ -34,7 +35,16 @@ const FIT = 0.86
 
 type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
 type StdGeo = StdShape
-type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
+type MagicState = {
+  prepared: PreparedEffect
+  compositeUrl: string
+  adapter: string
+  imgUrl: string
+} | null
+interface NormalizedContour {
+  contour: Contour
+  longestPx: number
+}
 interface PlanDesign {
   design: Contour
   recipe: PlanRecipe
@@ -71,13 +81,16 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
 /** VShape → mm contour normalized so its longest side = 1mm. Flatten FINELY first (mmPerPx=1 → 0.05px
  *  tolerance = smooth curves), THEN normalize the points — otherwise the tiny mmPerPx blows up the
  *  flatten tolerance and circles/squircles come out faceted. */
-function normBase(vs: VShape, maskH: number): Contour | null {
+function normBase(vs: VShape, maskH: number): NormalizedContour | null {
   const c = contourFromShape(vs, { mmPerPx: 1, maskHeightPx: maskH })
   if (!c || c.outer.pts.length < 3) return null
   let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity
   for (const [x, y] of c.outer.pts) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y }
   const L = Math.max(mxx - mnx, mxy - mny, 1)
-  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / L, y / L] as Pt) }, holes: [] }
+  return {
+    contour: { outer: { pts: c.outer.pts.map(([x, y]) => [x / L, y / L] as Pt) }, holes: [] },
+    longestPx: L,
+  }
 }
 
 function normGeneratedRing(ring: ReadonlyArray<Pt>): Contour | null {
@@ -138,7 +151,12 @@ export default function GridLab() {
     setSrc((current) => current === 'magic2' ? 'magic2' : 'magic'); setMagStatus('cutting')
     prepareShaped(loaded.url, undefined, (s) => setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s))
       .then((p) => {
-        setMagic({ vshape: p.spec.vectorShape, maskH: p.spec.maskHeightPx, adapter: p.spec.generator?.adapter ?? 'cut', imgUrl: loaded.url })
+        setMagic({
+          prepared: p,
+          compositeUrl: p.composite.toDataURL(),
+          adapter: p.spec.generator?.adapter ?? 'cut',
+          imgUrl: loaded.url,
+        })
         setMagStatus('')
       })
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
@@ -168,7 +186,7 @@ export default function GridLab() {
     : 'square'
   const presetUnitContour = useMemo(
     () => src === 'preset' && hasVectorDef(preset)
-      ? normBase(getShape(preset, IMG, IMG, { sides, points }), IMG)
+      ? normBase(getShape(preset, IMG, IMG, { sides, points }), IMG)?.contour ?? null
       : null,
     [src, preset, sides, points],
   )
@@ -182,10 +200,16 @@ export default function GridLab() {
       generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG),
     )
   }, [src, gen, p1, p2])
-  const magicUnitContour = useMemo(
-    () => isMagicSource && magic ? normBase(magic.vshape, magic.maskH) : null,
+  const magicBase = useMemo(
+    () => isMagicSource && magic
+      ? normBase(
+          magic.prepared.spec.vectorShape,
+          magic.prepared.spec.maskHeightPx,
+        )
+      : null,
     [isMagicSource, magic],
   )
+  const magicUnitContour = magicBase?.contour ?? null
   const sourceUnitContour = presetUnitContour ?? generatedUnitContour ?? magicUnitContour
   const isRoundedSquarePreset = src === 'preset' && preset === 'squircle'
   const ladderRecipe = useMemo<LadderRecipe | null>(
@@ -442,6 +466,14 @@ export default function GridLab() {
   }, [runtimeStatus, ladderKey, planKey, renderedPlanKey, resolvedPlan, model])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
+  const frontArtwork = isMagicSource && magic && model && magicBase
+    ? {
+        imageUrl: magic.compositeUrl,
+        imgW: magic.prepared.spec.maskWidthPx,
+        imgH: magic.prepared.spec.maskHeightPx,
+        pixelsToMM: model.designSize / magicBase.longestPx,
+      }
+    : null
   const panelProps: GridWorkbenchPanelProps = {
     src, setSrc, geo, setGeo, setLongMM, setShortMM, orient, setOrient,
     preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
@@ -499,7 +531,7 @@ export default function GridLab() {
           viewportPx={VP}
           fit={FIT}
           front={front}
-          frontImg={isMagicSource && magic ? magic.imgUrl : null}
+          frontArtwork={frontArtwork}
           emptyText={runtimeError
             ? `Grid error · ${runtimeError}`
             : runtimeStatus === 'resolving-sizes'
