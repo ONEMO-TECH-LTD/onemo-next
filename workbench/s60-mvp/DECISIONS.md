@@ -74,6 +74,30 @@ Measured containment (2026-07-30) — the 3D surface is six files and none are o
 Consequence: three/R3F/drei/Theatre never enter a shipped customisation bundle. The engine's remaining runtime dependencies are clipper2, paper.js, and the ML worker.
 *Source: Dan, 2026-07-30 — "react 3 fiber is for 3D we do not have 3d now (pivotted from it)"*
 
+### D14 — The MVP creation surface is two paths off one product page
+Both end in the basket:
+1. Pick artwork from the carousel (5–6 ONEMO pieces), or upload your own image → add to basket / buy.
+2. Upload → press **Magic Shape** → select size → add to basket / buy.
+
+Nothing else. No studio, no editor destination, no second page.
+*Source: Brief 60.6*
+
+### D15 — Replicate SKYLRK's shop/carousel logic, styled as ONEMO
+Take the interaction and layout structure — not the styling. Confirmed live on skylrk.com 2026-07-30 and mapped element by element in `SPEC-mvp-product-page.md`.
+
+Load-bearing pieces: vertical drag-and-snap main-stage carousel (Embla, column axis) with adjacent slides bleeding off the edges; bottom-left horizontal glass thumbnail strip of six; bottom-right frosted glass info card; one full-width action button with a state-dependent label; mono uppercase bracket labels.
+
+Corroborating fact: SKYLRK runs a **custom classic Shopify Liquid theme** — same family as `onemo-theme` — achieving the whole look in ~70 KB CSS + ~643 KB JS on stock Shopify. Direct evidence for Option A in `AUDIT-mvp-surfaces.md`.
+*Source: Brief 60.6; live inspection; s58 teardown @ 354e790*
+
+### D16 — The main-stage carousel swaps vertically between mini and maxi
+Not a variant selector — a vertical swap between the size products, consistent with D7 (sizes as self-sufficient products). Subject to O2: if a single size ships, the main stage swaps preset effects instead.
+*Source: Brief 60.6*
+
+### D17 — T-shirt pre-order rides the same carousel
+Different preset effects carrying ONEMO art, on the same pattern as the effects themselves.
+*Source: Brief 60.6*
+
 ---
 
 ## OPEN
@@ -83,8 +107,10 @@ No price is settled. Figures raised in the transcript were exploratory only: ~£
 *Source: transcript*
 
 ### O2 — Which sizes ship at launch
-Twin Fix works at ~70 mm and ~115 mm. Dan noted large sizes do not make sense for Twin Fix (clamping a garment with two large pieces would be unwieldy). Whether launch is one size or two is not settled.
-*Source: transcript*
+Twin Fix works at ~70 mm and ~115 mm. Dan noted large sizes do not make sense for Twin Fix (clamping a garment with two large pieces would be unwieldy). Whether launch is one size or two is not settled — Brief 60.6 explicitly floats "or we actually keep 1 size".
+
+**This one now has a build consequence.** Per D16 the main-stage carousel swaps vertically between mini and maxi. With a single size there is nothing to swap, and the main stage has to do something else (swap preset effects). It changes what the central surface of the product page is *for*, so it is worth settling before that page is built.
+*Source: transcript; Brief 60.6*
 
 ### O3 — Naming
 "Mini" and "Classic" were landed on warmly in the transcript as a direction — product language rather than tier language or measurements. Not confirmed by Dan as final. Tier words (Basic, Premium, Core, Essential) were all considered and cooled on.
@@ -95,8 +121,10 @@ The transcript files it as a later premium upgrade. Its value as a launch market
 *Source: transcript; raised in WIP*
 
 ### O5 — Pre-order / reserve-slot mechanic at launch
-"Reserve your slot" with a refundable deposit was adopted in the transcript over voting, which Dan rejected outright. Whether any reserve mechanic ships in the MVP flow — versus being deferred as out of scope for browse → customise → buy — is not settled.
-*Source: transcript*
+"Reserve your slot" with a refundable deposit was adopted in the transcript over voting, which Dan rejected outright. Whether any reserve mechanic ships in the MVP flow was previously leaning out.
+
+**Now leaning in.** Brief 60.6 names t-shirt pre-order riding the same carousel as the effects (D17), which puts it on the product-page surface rather than beside it. Still unconfirmed as launch scope, but it is no longer a separate mechanic to defer — it is a state of the button that already exists.
+*Source: transcript; Brief 60.6*
 
 ### O6 — Launch garment
 A limited launch edition (order of 50 t-shirts, integrated grid) was discussed, possibly with a pocket-sized dense grid. Not confirmed as in scope for launch.

@@ -94,3 +94,26 @@ Verbatim:
 > we spent 7 months on that overbuilding now is time to cut the bullshiot and stop dreaming and actually build the webshop for onemo MVP v.1
 
 This is the governing statement for Session 60. The deliverable is **the ONEMO webshop, MVP v1** — a working shop, not a capability programme, not a further round of architecture. Seven months of building capability ahead of product is the failure mode being corrected. Every proposal in this session is measured against: does this get the webshop live?
+
+---
+
+## Brief 60.6 — The MVP in full, and the SKYLRK carousel pattern (2026-07-30)
+
+Verbatim:
+
+> and it even stronger than that because my idea of the MVP in the context of the studio and editor - only swap image on the product page >save to basket/buy and /or press MAgic shape on the uploaded image and select size (or we actually keep 1 size) > save to basket /buy
+>
+> Artwork library to select from or up[load yours - 5-6 items in carousel to select from - we can replicate unstylised logic of shop with carousel from skylrk.com here - stylise it for one and that is it - the carousel vertically swaps between options mini/maxi - t-shirt preorder different preset effects with onemo art on the carousel - check the skylrk.com
+
+Read back as directives:
+
+1. The MVP creation surface is **swap image on the product page → save to basket / buy**.
+2. And / or **press Magic Shape on the uploaded image → select size → save to basket / buy**.
+3. Possibly **keep a single size** — open.
+4. **Artwork library**: select from **5–6 items in a carousel**, or upload your own.
+5. **Replicate the unstylised shop/carousel logic from skylrk.com** — take the interaction and layout structure, apply ONEMO's own styling.
+6. The carousel **swaps vertically** between options — mini / maxi.
+7. **T-shirt pre-order** rides the same carousel, with different preset effects carrying ONEMO art.
+8. Check skylrk.com.
+
+Actioned: skylrk.com and its PDP inspected live 2026-07-30; cross-read against the s58 teardown. Findings and the element-by-element mapping in `../SPEC-mvp-product-page.md`.
