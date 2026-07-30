@@ -251,6 +251,19 @@ describe('engine-owned workbench selections', () => {
     expect([square.widthRung.sizeMM, square.heightRung.sizeMM]).toEqual([214, 214])
   })
 
+  it('snaps both rectangle axes upward so the grid never undersizes the requested surface', () => {
+    const axisRungs = semanticLadderFromRecipe({ kind: 'standard', shape: 'square' })
+    const rectangle = resolveRectangleRungs(axisRungs, {
+      longMM: 180,
+      shortMM: 80,
+      orientation: 'landscape',
+    })
+
+    expect(rectangle.longRung.sizeMM).toBe(214)
+    expect(rectangle.shortRung.sizeMM).toBe(118)
+    expect([rectangle.widthRung.sizeMM, rectangle.heightRung.sizeMM]).toEqual([214, 118])
+  })
+
   it('composes every reachable rectangle from the exact two axis constructions', () => {
     const axisRungs = semanticLadderFromRecipe({ kind: 'standard', shape: 'square' })
     for (const widthRung of axisRungs) for (const heightRung of axisRungs) {
