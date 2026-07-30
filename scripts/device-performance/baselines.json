@@ -3,14 +3,14 @@
   "executor": "Node.js current engine",
   "fixtures": {
     "canonical-ladder": {
-      "sha256": "f3135936d08b27c1b74ca3685e59792fe035331fd5c2983079b29b1f93d5a51f",
+      "sha256": "f6b0265489155d6b1b2961f425d27adcf7e165aeb00d0144d6c3f095728cf8fb",
       "t2": {
         "rungs": [
           { "label": "ONE", "points": 1, "sizeMM": 24, "visible": true },
           { "label": "S", "points": 2, "sizeMM": 72, "visible": true },
-          { "label": "M", "points": 4, "sizeMM": 158, "visible": true },
+          { "label": "M", "points": 4, "sizeMM": 120, "visible": true },
           { "label": "L", "points": 6, "sizeMM": 168, "visible": true },
-          { "label": "XL", "points": 4, "sizeMM": 224, "visible": true },
+          { "label": "XL", "points": 4, "sizeMM": 216, "visible": true },
           { "label": "2XL", "points": 6, "sizeMM": 262, "visible": false },
           { "label": "3XL", "points": 16, "sizeMM": 310, "visible": false }
         ]

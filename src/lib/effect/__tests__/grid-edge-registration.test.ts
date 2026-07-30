@@ -173,11 +173,6 @@ describe('edge-registration law — every edge registers on its own zero-point',
     // both densities. 7 rungs -> 42 oriented pairs -> 84 plans.
     const rungs = semanticLadder((sizeMM: number) => stdShapeContour('rect', sizeMM, sizeMM))
     const sizes = rungs.map((r) => r.sizeMM)
-    // The single-anchor ONE rung cannot register: at 22mm the shape is exactly 2x(pad+frame) wide,
-    // so its one column sits at the floor on one axis while the long axis has no second node to
-    // reach the far edge. Dan's minimum-anchor ruling deletes this rung entirely (KAI-9784) — when
-    // it lands, these two entries disappear and this exception list must go with them.
-    const ONE_RUNG_MM = Math.min(...sizes)
     const unregistered: string[] = []
     let checked = 0
     for (const density of ['light', 'standard'] as const) {
@@ -193,10 +188,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
       }
     }
     expect(checked).toBe(sizes.length * (sizes.length - 1) * 2)
-    expect(unregistered.sort()).toEqual([
-      `light 214x${ONE_RUNG_MM} [35.0,35.0,11.0,11.0]`,
-      `light ${ONE_RUNG_MM}x214 [11.0,11.0,35.0,35.0]`,
-    ])
+    expect(unregistered).toEqual([])
   })
 
   it('keeps a disc symmetric — the exact failure of the rejected summed-slack variant', () => {
