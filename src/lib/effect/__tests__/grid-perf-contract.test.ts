@@ -216,7 +216,7 @@ describe('exact grid cache identity', () => {
     for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { source: 'gen' })).not.toBe(base)
-    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'light' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'standard' })).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { center: 'bbox' })).not.toBe(base)
   })
 

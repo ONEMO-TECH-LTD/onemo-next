@@ -977,7 +977,7 @@ export function deriveRectangleConstruction(
 ): GridConstruction | null {
   const padEff = law.paddingMM + law.frameMM
   const source = options.source ?? 'std'
-  const density = options.density ?? 'standard'
+  const density = options.density ?? 'light'
   const requestedCombos = modeCombos(mode, options.pitchMM, source)
   const directPerimeter = !isFreeformSource(source)
   const densityPitchMM = density === 'standard' ? 48 : 96
@@ -1075,7 +1075,7 @@ function semanticSteps(
 ): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
   const source = options.source ?? 'std'
-  const density = options.density ?? 'standard'
+  const density = options.density ?? 'light'
   const directPerimeter = !isFreeformSource(source)
   const densityPitchMM = density === 'standard' ? 48 : 96
   const densityCombos = directPerimeter
@@ -1731,7 +1731,7 @@ export function gridLadderCacheKey(
     options: {
       pitchMM: options.pitchMM ?? null,
       source: options.source ?? 'std',
-      density: options.density ?? 'standard',
+      density: options.density ?? 'light',
       center: options.center ?? 'centroid',
     },
     recipe,

@@ -17,6 +17,7 @@ import {
   DEFAULT_LAW,
   deriveRectangleConstruction,
   exactPerimeterCoverage,
+  gridLadderCacheKey,
   HOLD_REACH_MM,
   LAUNCH_PITCHES_MM,
   nearestAnchorPair,
@@ -355,7 +356,12 @@ describe('engine-owned workbench selections', () => {
   })
 
   it('snaps both rectangle axes upward within the published catalogue', () => {
-    const axisRungs = semanticLadderFromRecipe({ kind: 'standard', shape: 'square' })
+    const axisRungs = semanticLadderFromRecipe(
+      { kind: 'standard', shape: 'square' },
+      DEFAULT_LAW,
+      'auto',
+      { density: 'standard' },
+    )
     const rectangle = resolveRectangleRungs(axisRungs, {
       longMM: 140,
       shortMM: 80,
@@ -406,6 +412,35 @@ describe('engine-owned workbench selections', () => {
       }
     }
     expect(compared).toBe(65)
+  })
+
+  it('uses Light as the one omitted-density default across ladder and delivery seams', () => {
+    const recipe = { kind: 'standard', shape: 'square' } as const
+    const explicitLight = semanticLadderFromRecipe(
+      recipe,
+      DEFAULT_LAW,
+      'auto',
+      { density: 'light' },
+    )
+    const omitted = semanticLadderFromRecipe(recipe)
+    const firstMultiAnchor = omitted.find((rung) => rung.points >= 2)!
+
+    expect(omitted).toEqual(explicitLight)
+    expect(firstMultiAnchor.construction.pitchMM).toBe(96)
+    expect(
+      deriveRectangleConstruction(firstMultiAnchor, firstMultiAnchor)?.pitchMM,
+    ).toBe(96)
+    expect(gridLadderCacheKey(recipe)).toBe(
+      gridLadderCacheKey(recipe, DEFAULT_LAW, 'auto', { density: 'light' }),
+    )
+
+    const delivered = resolveGridPlan(
+      stdShapeContour('square', firstMultiAnchor.sizeMM),
+      { construction: firstMultiAnchor.construction, maxGrowMM: 0 },
+    )
+    expect(delivered.pitchMM).toBe(96)
+    expect(delivered.grid.anchors.map(({ p }) => p))
+      .toEqual(constructionPoints(firstMultiAnchor.construction))
   })
 
   it('returns one deterministic nearest-anchor pair and feeds the plan distance from it', () => {
