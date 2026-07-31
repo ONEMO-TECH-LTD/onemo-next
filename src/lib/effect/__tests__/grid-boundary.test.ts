@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { GridWorkbenchAdminPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchAdminPanel'
 import { GridWorkbenchOutlinePanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchOutlinePanel'
 import { GridWorkbenchPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchPanel'
+import { GridWorkbenchStage } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchRenderer'
 
 const CREATE_PAGE_PATH = 'src/app/(store)/create/page.tsx'
 const HOME_PAGE_PATH = 'src/app/page.tsx'
@@ -533,6 +534,59 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).not.toContain('grid.pitchCentreMM * Math.SQRT2')
     expect(rendererSource).not.toContain('dice ½')
     expect(rendererSource).toContain('nearest delivered spacing')
+  })
+
+  it('keeps the nearest-spacing annotation inside both horizontal viewport edges', () => {
+    const contour = {
+      outer: { pts: [[0, 0], [310, 0], [310, 80], [0, 80]] as [number, number][] },
+      holes: [],
+    }
+    const renderPair = (x1: number, x2: number) => renderToStaticMarkup(createElement(
+      GridWorkbenchStage,
+      {
+        model: {
+          planKey: 'wide-oblong',
+          contour,
+          design: contour,
+          patternUsed: 'standard',
+          anchorPair: {
+            first: { p: [x1, 40] },
+            second: { p: [x2, 40] },
+            distanceMM: 48,
+          },
+          grid: {
+            anchors: [{ p: [x1, 40], dia: 6 }, { p: [x2, 40], dia: 6 }],
+            candidates: [],
+            flaps: [],
+            pitchCentreMM: 48,
+            edgeRangeMM: [48, 48],
+            applicationPadMM: 10,
+          },
+        },
+        scale: 1,
+        viewportPx: 760,
+        fit: 0.88,
+        front: false,
+        frontArtwork: null,
+        emptyText: '',
+        onRenderedPlanCommit: () => {},
+      },
+    ))
+
+    for (const markup of [renderPair(0, 48), renderPair(262, 310)]) {
+      const viewBox = markup.match(/viewBox="([^"]+)"/)?.[1].split(' ').map(Number)
+      const label = markup.match(
+        /<text\b([^>]*)>48 mm · nearest delivered spacing<\/text>/,
+      )?.[1]
+      const readNumber = (name: string) => Number(label?.match(new RegExp(`${name}="([^"]+)"`))?.[1])
+      const x = readNumber('x')
+      const width = readNumber('textLength')
+
+      expect(viewBox).toHaveLength(4)
+      expect(label).toContain('lengthAdjust="spacingAndGlyphs"')
+      expect(x - width / 2).toBeGreaterThanOrEqual(viewBox![0])
+      expect(x + width / 2).toBeLessThanOrEqual(viewBox![0] + viewBox![2])
+    }
   })
 
   it('draws the front-face artwork the right way up — no vertical mirror on the raster', () => {

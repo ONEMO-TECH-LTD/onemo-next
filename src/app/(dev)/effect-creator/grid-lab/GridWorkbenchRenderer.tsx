@@ -182,11 +182,15 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
         const bd = anchorPair.distanceMM
         const p1 = fy(anchorPair.first.p), p2 = fy(anchorPair.second.p)
         const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2
+        const label = `${Math.round(bd)} mm · nearest delivered spacing`
+        const labelInset = fontMM * 0.35
+        const labelWidth = Math.min(vbW - 2 * labelInset, label.length * fontMM * 0.62)
+        const labelX = Math.min(maxX + pad - labelInset - labelWidth / 2, Math.max(minX - pad + labelInset + labelWidth / 2, mx))
         return <g>
           {/* dark underlay + white overlay → legible on the dark suede AND the light margin band */}
           <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#000" strokeOpacity={0.5} strokeWidth={1.6} />
           <line x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} stroke="#fff" strokeOpacity={0.95} strokeWidth={0.7} strokeDasharray="1.8 1.4" />
-          <text x={mx} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" fontFamily="ui-monospace,monospace">{Math.round(bd)} mm · nearest delivered spacing</text>
+          <text x={labelX} y={my - 2.4} fontSize={fontMM * 1.05} fontWeight={700} fill="#fff" stroke="#000" strokeWidth={fontMM * 0.22} strokeOpacity={0.65} style={{ paintOrder: 'stroke' }} textAnchor="middle" textLength={labelWidth} lengthAdjust="spacingAndGlyphs" fontFamily="ui-monospace,monospace">{label}</text>
         </g>
       })()}
     </svg>
