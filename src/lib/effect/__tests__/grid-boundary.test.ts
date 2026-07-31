@@ -417,6 +417,10 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).toContain('frontArtwork.originY')
     expect(primitivesSource).toContain("export { composeEffectArtwork")
     expect(prepareSource).toContain('composeEffectArtwork({')
+    expect(compositeSource).toContain(
+      'drawImage(subjectCanvas, subjectDraw.dx, subjectDraw.dy, subjectDraw.dw, subjectDraw.dh)',
+    )
+    expect(compositeSource).not.toContain('drawImage(subjectCanvas, 0, 0')
     expect(compositeSource).not.toMatch(/from ['"].*(outlineStore|ShapedModel|EditorCanvas|three)/)
   })
 
