@@ -3,7 +3,7 @@
   "executor": "Node.js current engine",
   "fixtures": {
     "canonical-ladder": {
-      "sha256": "7ea810f458be423e4760f6d083f516cb046d9aa393a1e11b1d224b1f7ed81f40",
+      "sha256": "b0afd8bf8646034cb32315bd085524ce5de08ab4e5da469994b71c13f3aca74f",
       "t2": {
         "rungs": [
           { "label": "ONE", "points": 1, "sizeMM": 24, "visible": true },
