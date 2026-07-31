@@ -1,14 +1,15 @@
 @import "tailwindcss";
+/* DS v2.3 tokens (single source, auto-synced from SSOT tools/ds-pipeline).
+   tokens.tailwind.css = @theme → Tailwind v4 utilities + :root + [data-theme="dark"].
+   tokens.css adds the [data-fluid="container"] cqi container variant + full :root cascade.
+   NOTE: all @import lines MUST stay contiguous at the top — any rule between them (CSS spec)
+   makes the loader silently DROP the later imports (live-hit: every token var computed empty). */
+@import "./tokens/tokens.tailwind.css";
+@import "./tokens/tokens.css";
 
 /* Align TW4 dark: variant with our [data-theme="dark"] switching.
    Without this, dark:bg-* uses prefers-color-scheme instead of data attribute. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-/* DS v2.3 tokens (single source, auto-synced from SSOT tools/ds-pipeline).
-   tokens.tailwind.css = @theme → Tailwind v4 utilities + :root + [data-theme="dark"].
-   tokens.css adds the [data-fluid="container"] cqi container variant + full :root cascade. */
-@import "./tokens/tokens.tailwind.css";
-@import "./tokens/tokens.css";
 
 body {
   background: var(--sem-col-bg-primary);

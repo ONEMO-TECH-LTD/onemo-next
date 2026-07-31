@@ -2167,8 +2167,6 @@
   --sem-dim-fluid-none: 0px;
   --sem-container-paragraph-max-width: var(--al-container-maxi-xs);
   --sem-container-editor-content-max-widthh: var(--al-container-maxi-xs);
-  --sem-container-menu-standard: var(--al-container-standard-xs);
-  --sem-container-menu-screen-witdth: var(--al-container-standard-xl);
   --sem-container-effect-frame-micro: var(--al-container-compact-xs);
   --sem-container-effect-frame-mini: var(--al-container-compact-s);
   --sem-container-effect-frame-standard: var(--al-container-compact-m);
@@ -3277,10 +3275,6 @@
   --sem-border-standard-m: var(--al-dim-nano-m);
   --sem-border-standard-l: var(--al-dim-nano-l);
   --sem-border-standard-xl: var(--al-dim-nano-xl);
-  --sem-border-maxi-s: var(--al-dim-nano-2xl);
-  --sem-border-maxi-m: var(--al-dim-standard-xs);
-  --sem-border-maxi-l: var(--al-dim-standard-s);
-  --sem-border-maxi-xl: var(--al-dim-standard-m);
   --sem-breakpoints-xs: var(--al-breakpoints-xs);
   --sem-breakpoints-sm: var(--al-breakpoints-sm);
   --sem-breakpoints-md: var(--al-breakpoints-md);
