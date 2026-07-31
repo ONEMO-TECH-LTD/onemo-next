@@ -285,6 +285,8 @@ describe('engine-owned workbench selections', () => {
     { label: 'M', points: 4, sizeMM: 118, gridExtentMM: 118, visible: true },
   ].map((rung) => ({
     ...rung,
+    designSizeMM: rung.sizeMM,
+    marginMM: 0,
     construction: {
       pattern: 'standard',
       pitchMM: 48,
@@ -340,6 +342,8 @@ describe('engine-owned workbench selections', () => {
         label: 'L',
         points: 12,
         sizeMM: 214,
+        designSizeMM: 214,
+        marginMM: 0,
         gridExtentMM: 214,
         visible: true,
         construction: rungs[2].construction,
@@ -668,6 +672,130 @@ describe('semantic ladder stays inside its product contract', () => {
       if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
     }
     expect(compared).toBe(6)
+  })
+
+  it('derives freeform rungs from scale plus bounded outward margin and delivers that exact split', () => {
+    const unitContour: Contour = {
+      outer: {
+        pts: [
+          [0.08, 0], [0.12, 0.24], [0.25, 0.38], [0.32, 0.58],
+          [0.28, 0.78], [0.35, 1], [0.46, 0.78], [0.57, 0.78],
+          [0.68, 1], [0.72, 0.78], [0.68, 0.58], [0.76, 0.38],
+          [0.9, 0.24], [0.94, 0],
+        ],
+      },
+      holes: [],
+    }
+    const hybridRecipe = {
+      kind: 'uniform-contour',
+      unitContour,
+      maxMarginMM: 12,
+    } as const
+    const testLaw = { ...DEFAULT_LAW, maxTestedMM: 166, maxRungMM: 166 }
+    const rungs = semanticLadderFromRecipe(
+      hybridRecipe,
+      testLaw,
+      'auto',
+      { source: 'magic', density: 'standard' },
+    )
+
+    expect(gridLadderCacheKey(
+      hybridRecipe,
+      testLaw,
+      'auto',
+      { source: 'magic', density: 'standard' },
+    )).not.toBe(gridLadderCacheKey(
+      { ...hybridRecipe, maxMarginMM: 0 },
+      testLaw,
+      'auto',
+      { source: 'magic', density: 'standard' },
+    ))
+    expect(rungs.some(({ marginMM }) => marginMM > 0)).toBe(true)
+    expect(rungs.every(({ sizeMM, designSizeMM, marginMM }) =>
+      sizeMM === designSizeMM + 2 * marginMM)).toBe(true)
+
+    let compared = 0
+    for (const rung of rungs) {
+      const plan = resolveGridPlan(scaleContour(unitContour, rung.designSizeMM), {
+        source: 'magic',
+        mode: 'auto',
+        density: 'standard',
+        paddingMM: DEFAULT_LAW.paddingMM,
+        baseMarginMM: rung.marginMM,
+        maxGrowMM: 0,
+        construction: rung.construction,
+      })
+      compared++
+      expect(plan.grid.anchors).toHaveLength(rung.points)
+      if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
+    }
+    expect(compared).toBe(rungs.length)
+    expect(compared).toBeGreaterThan(1)
+  })
+
+  it('honours automatic margin bounds and an exact manual margin in serialized outline ladders', () => {
+    const unitContour: Contour = {
+      outer: { pts: [[0, 0], [1, 0], [1, 0.72], [0.54, 1], [0, 0.72]] },
+      holes: [],
+    }
+    const law = { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 }
+    const options = { source: 'magic' as const, density: 'standard' as const }
+    const automatic = semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
+      law,
+      'auto',
+      options,
+    )
+    const manual = semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
+      law,
+      'auto',
+      options,
+    )
+
+    expect(automatic.length).toBeGreaterThan(1)
+    expect(automatic.every(({ marginMM }) => marginMM >= 3 && marginMM <= 9)).toBe(true)
+    expect(manual.length).toBeGreaterThan(1)
+    expect(manual.every(({ marginMM }) => marginMM === 6)).toBe(true)
+    expect(manual.every(({ sizeMM, designSizeMM }) => sizeMM === designSizeMM + 12)).toBe(true)
+    expect(gridLadderCacheKey(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
+      law,
+      'auto',
+      options,
+    )).not.toBe(gridLadderCacheKey(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
+      law,
+      'auto',
+      options,
+    ))
+    expect(() => semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 10, maxMarginMM: 9 },
+      law,
+      'auto',
+      options,
+    )).toThrow(/minimum margin/i)
+  })
+
+  it('prepares each physical size once even when multiple extents and pattern combos reject it', () => {
+    const calls: number[] = []
+    const impossible: Contour = {
+      outer: { pts: [[0, 0], [1, 0], [0, 1]] },
+      holes: [],
+    }
+    semanticLadder(
+      (sizeMM) => {
+        calls.push(sizeMM)
+        return impossible
+      },
+      { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 },
+      'auto',
+      { source: 'magic', density: 'standard' },
+    )
+
+    expect(calls.length, 'probe must execute candidate preparation').toBeGreaterThan(0)
+    expect(calls.length, 'the same physical candidate was prepared more than once')
+      .toBe(new Set(calls).size)
   })
 
   it('fails closed instead of publishing a rotated population as Standard', () => {

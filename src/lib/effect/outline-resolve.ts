@@ -22,7 +22,7 @@
 //   • Curve is the one in-house op (native bézier tangent-handle math — no library "bend-by-amount").
 
 import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
-import { flattenPath, scaleAnchorTension, type VShape, type VPath } from '@/lib/vector-core'
+import { flattenPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
 import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
@@ -84,6 +84,16 @@ export const smoothFactor = (pct: number) => Math.max(0, Math.min(1, pct / 100))
 /** Simplify: Paper SIMPLIFY tolerance = pct × MAX_FRAC × shape short side (px). 0% = OFF; higher =
  *  fewer anchors + rounder curve-fit. Applied directly to the anchors; never a dense chain. */
 export const simplifyTolPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(100, pct)) / 100) * SIMPLIFY_MAX_FRAC * scalePx
+/** Whole-outline Radius slider geometry: 100% = half the resolved shape's short side. */
+export function outlineRadiusMaxPx(shape: VShape): number {
+  const bb = shapeBBox(shape, 1)
+  return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
+}
+export const outlineRadiusPx = (pct: number, shape: VShape) =>
+  (Math.max(0, Math.min(100, pct)) / 100) * outlineRadiusMaxPx(shape)
+/** Whole-outline Curve slider geometry: 0..100% maps to the engine's 0..2 bend factor. */
+export const outlineCurveFactor = (pct: number) =>
+  (Math.max(0, Math.min(100, pct)) / 100) * 2
 
 // ── id minting + lookup ─────────────────────────────────────────────────────────────────────
 let _idSeq = 0

@@ -231,50 +231,65 @@ function discInterval(a: Pt, b: Pt, centre: Pt, radius: number): Interval | null
   return lo <= hi + 1e-9 ? [lo, hi] : null
 }
 
-function pairSpanIntervals(
-  a: Pt,
-  b: Pt,
-  first: Pt,
-  second: Pt,
-  radius: number,
-): Interval[] {
-  const intervals: Interval[] = []
-  const firstDisc = discInterval(a, b, first, radius)
-  const secondDisc = discInterval(a, b, second, radius)
-  if (firstDisc) intervals.push(firstDisc)
-  if (secondDisc) intervals.push(secondDisc)
-  const axisX = second[0] - first[0]
-  const axisY = second[1] - first[1]
-  const length = Math.hypot(axisX, axisY)
-  if (length > 1e-9) {
-    const ux = axisX / length
-    const uy = axisY / length
-    const along = (point: Pt) => (point[0] - first[0]) * ux + (point[1] - first[1]) * uy
-    const across = (point: Pt) => -(point[0] - first[0]) * uy + (point[1] - first[1]) * ux
-    let strip: Interval | null = clipRange([0, 1], along(a), along(b), 0, length)
-    if (strip) strip = clipRange(strip, across(a), across(b), -radius, radius)
-    if (strip) intervals.push(strip)
-  }
-  return mergeIntervals(intervals)
+interface BoundedRimSpan {
+  first: Pt
+  ux: number
+  uy: number
+  length: number
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
 }
 
-function boundedRimPairs(
+function pairSpanInterval(
+  a: Pt,
+  b: Pt,
+  span: BoundedRimSpan,
+  radius: number,
+): Interval | null {
+  if (
+    Math.max(a[0], b[0]) < span.minX - radius
+    || Math.min(a[0], b[0]) > span.maxX + radius
+    || Math.max(a[1], b[1]) < span.minY - radius
+    || Math.min(a[1], b[1]) > span.maxY + radius
+  ) return null
+  const along = (point: Pt) =>
+    (point[0] - span.first[0]) * span.ux + (point[1] - span.first[1]) * span.uy
+  const across = (point: Pt) =>
+    -(point[0] - span.first[0]) * span.uy + (point[1] - span.first[1]) * span.ux
+  let strip: Interval | null = clipRange([0, 1], along(a), along(b), 0, span.length)
+  if (strip) strip = clipRange(strip, across(a), across(b), -radius, radius)
+  return strip
+}
+
+function boundedRimSpans(
   seated: ReadonlyArray<Pt>,
   pattern: GridPattern,
   pitchMM: number,
-): Array<[Pt, Pt]> {
+): BoundedRimSpan[] {
   const rim = splitPopulationBoundary(seated, pattern, pitchMM).rim
   const maximumSpanMM = Math.max(...LAUNCH_PITCHES_MM)
-  const pairs: Array<[Pt, Pt]> = []
+  const spans: BoundedRimSpan[] = []
   for (let leftIndex = 0; leftIndex < rim.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < rim.length; rightIndex += 1) {
-      const spanMM = dist(rim[leftIndex], rim[rightIndex])
-      if (spanMM <= maximumSpanMM + MANUFACTURING_TOLERANCE_MM) {
-        pairs.push([rim[leftIndex], rim[rightIndex]])
-      }
+      const first = rim[leftIndex], second = rim[rightIndex]
+      const axisX = second[0] - first[0], axisY = second[1] - first[1]
+      const length = Math.hypot(axisX, axisY)
+      if (length <= 1e-9 || length > maximumSpanMM + MANUFACTURING_TOLERANCE_MM) continue
+      spans.push({
+        first,
+        ux: axisX / length,
+        uy: axisY / length,
+        length,
+        minX: Math.min(first[0], second[0]),
+        maxX: Math.max(first[0], second[0]),
+        minY: Math.min(first[1], second[1]),
+        maxY: Math.max(first[1], second[1]),
+      })
     }
   }
-  return pairs
+  return spans
 }
 
 /** Exact unsupported intervals per manufactured ring. The outer ring is supported radially by
@@ -288,7 +303,7 @@ export function exactPerimeterCoverage(
   pattern: GridPattern,
   pitchMM: number,
 ): PerimeterCoverage {
-  const rimPairs = boundedRimPairs(seated, pattern, pitchMM)
+  const rimSpans = boundedRimSpans(seated, pattern, pitchMM)
   const gaps: Pt[] = []
   let uncoveredMM = 0
   for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
@@ -298,16 +313,18 @@ export function exactPerimeterCoverage(
       const segLen = dist(a, b)
       if (segLen < 1e-9) continue
       const ux = (b[0] - a[0]) / segLen, uy = (b[1] - a[1]) / segLen
-      const intervals = mergeIntervals([
-        ...seated.flatMap((anchor) => {
-          const interval = discInterval(a, b, anchor, safeRadius)
-          return interval ? [interval] : []
-        }),
-        ...(ringIndex === 0
-          ? rimPairs.flatMap(([first, second]) =>
-              pairSpanIntervals(a, b, first, second, safeRadius))
-          : []),
-      ])
+      const coveredIntervals: Interval[] = []
+      for (const anchor of seated) {
+        const interval = discInterval(a, b, anchor, safeRadius)
+        if (interval) coveredIntervals.push(interval)
+      }
+      // The anchor discs above already cover both endpoints of every span. Add only the bounded
+      // connecting strip; recomputing endpoint discs per pair is duplicate geometry.
+      if (ringIndex === 0) for (const span of rimSpans) {
+        const interval = pairSpanInterval(a, b, span, safeRadius)
+        if (interval) coveredIntervals.push(interval)
+      }
+      const intervals = mergeIntervals(coveredIntervals)
       let coveredTo = 0
       const gapPoint = (lo: number, hi: number): Pt => {
         const t = (lo + hi) / 2
@@ -904,8 +921,12 @@ function modeCombos(
 export interface SemanticRung {
   label: string
   points: number
-  /** Physical longest-side size of this shape at its selected exact fit. */
+  /** Published total effect longest side: design plus both outward margin sides. */
   sizeMM: number
+  /** Longest side of the artwork/shape before its selected outward margin. */
+  designSizeMM: number
+  /** Selected outward margin per side. */
+  marginMM: number
   /** Shape-independent rectangular extent of the seated lattice, including pad + frame on both sides. */
   gridExtentMM: number
   visible: boolean
@@ -1062,6 +1083,8 @@ function bandLabel(idx: number): string {
 interface SemanticStep {
   points: number
   sizeMM: number
+  designSizeMM: number
+  marginMM: number
   gridExtentMM: number
   construction: GridConstruction
 }
@@ -1072,6 +1095,8 @@ function semanticSteps(
   combos: ReadonlyArray<{ pitchMM: number; pattern: GridPattern }>,
   minimumAnchors: number,
   options: Pick<GridPlanOptions, 'source' | 'density' | 'center'> = {},
+  minMarginMM = 0,
+  maxMarginMM = 0,
 ): SemanticStep[] {
   const padEff = law.paddingMM + law.frameMM
   const source = options.source ?? 'std'
@@ -1088,6 +1113,38 @@ function semanticSteps(
     return pitchDifference || legalPatterns(a.pitchMM).indexOf(a.pattern)
       - legalPatterns(b.pitchMM).indexOf(b.pattern)
   })
+  const marginFloorMM = Math.max(0, Math.floor(minMarginMM))
+  const marginCeilingMM = Math.max(marginFloorMM, Math.floor(maxMarginMM))
+  const marginCandidatesMM: number[] = []
+  if (marginFloorMM === marginCeilingMM) marginCandidatesMM.push(marginFloorMM)
+  else {
+    for (let marginMM = marginFloorMM; marginMM <= marginCeilingMM; marginMM += 3) {
+      marginCandidatesMM.push(marginMM)
+    }
+  }
+  const preparedCandidates = new Map<string, {
+    designSizeMM: number
+    prepared: PreparedContour
+  } | null>()
+  const preparedAt = (sizeMM: number, marginMM: number) => {
+    const key = `${sizeMM}:${marginMM}`
+    if (preparedCandidates.has(key)) return preparedCandidates.get(key) ?? null
+    const designSizeMM = sizeMM - 2 * marginMM
+    if (designSizeMM <= 0) {
+      preparedCandidates.set(key, null)
+      return null
+    }
+    const designContour = makeShape(designSizeMM)
+    const effectContour = marginMM > 0
+      ? contourWithOuterMargin(designContour, marginMM)
+      : designContour
+    const candidate = {
+      designSizeMM,
+      prepared: prepareExactContour(effectContour),
+    }
+    preparedCandidates.set(key, candidate)
+    return candidate
+  }
 
   // GRID-FIRST: enumerate canonical lattice extents, then exhaust the bounded integer-mm domain for
   // each legal combo and take its first covered construction. The acceptance predicate can contain
@@ -1105,19 +1162,26 @@ function semanticSteps(
     const maxSizeMM = law.maxRungMM
     let solved: {
       sizeMM: number
+      designSizeMM: number
+      marginMM: number
       grid: GridResult
       construction: GridConstruction
+      prepared: PreparedContour
       combo: typeof orderedCombos[number]
     } | null = null
     const extentCombos = gridExtentMM === firstExtentMM
       ? [...orderedCombos].sort((a, b) => a.pitchMM - b.pitchMM)
       : orderedCombos
     for (const combo of extentCombos) {
-      const gridAt = (sizeMM: number): {
+      const gridAt = (sizeMM: number, marginMM: number): {
+        designSizeMM: number
         grid: GridResult
         construction: GridConstruction
+        prepared: PreparedContour
       } | null => {
-        const prepared = prepareExactContour(makeShape(sizeMM))
+        const candidate = preparedAt(sizeMM, marginMM)
+        if (!candidate) return null
+        const { designSizeMM, prepared } = candidate
         if (directPerimeter) {
           const grid = computePreparedGridForExtent(prepared, {
             pitchMM: combo.pitchMM,
@@ -1130,6 +1194,7 @@ function semanticSteps(
           if (!grid.anchors.length) return null
           const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, grid.anchors)
           return {
+            designSizeMM,
             grid: computePreparedGridForExtent(prepared, {
               pitchMM: combo.pitchMM,
               pattern: combo.pattern,
@@ -1140,6 +1205,7 @@ function semanticSteps(
               construction,
             }, gridExtentMM),
             construction,
+            prepared,
           }
         }
         const full = computePreparedGridForExtent(prepared, {
@@ -1161,7 +1227,7 @@ function semanticSteps(
           sparseThin: true,
           construction,
         }, gridExtentMM)
-        return { grid, construction }
+        return { designSizeMM, grid, construction, prepared }
       }
       const accepts = (grid: GridResult): boolean =>
         grid.anchors.length >= minimumAnchors
@@ -1175,25 +1241,39 @@ function semanticSteps(
       // on a half-millimetre, which cannot be placed repeatably on fabric. The exact geometry remains
       // internal; every seat/coverage predicate is re-evaluated at this published even size.
       const firstCandidateMM = 2 * Math.ceil(minimumCandidateMM / 2)
-      for (let sizeMM = firstCandidateMM; sizeMM <= maxSizeMM; sizeMM += 2) {
-        const candidate = gridAt(sizeMM)
-        if (!candidate) continue
-        const grid = candidate.grid
-        const accepted = gridExtentMM === firstExtentMM
-          ? grid.anchors.length >= minimumAnchors
-            && anchorGridExtentMM(grid.anchors, padEff) === gridExtentMM
-          : accepts(grid)
-        if (accepted) {
-          solved = { sizeMM, grid, construction: candidate.construction, combo }
-          break
+      // Margin is compensation, never a way to shrink the artwork to manufacture a smaller rung:
+      // preserve the adaptive engine's existing smallest-margin-first law, then take the smallest
+      // even total size at that margin. Its existing 3mm quantum remains the one offset system.
+      for (const marginMM of marginCandidatesMM) {
+        for (let sizeMM = firstCandidateMM; sizeMM <= maxSizeMM; sizeMM += 2) {
+          const candidate = gridAt(sizeMM, marginMM)
+          if (!candidate) continue
+          const grid = candidate.grid
+          const accepted = gridExtentMM === firstExtentMM
+            ? grid.anchors.length >= minimumAnchors
+              && anchorGridExtentMM(grid.anchors, padEff) === gridExtentMM
+            : accepts(grid)
+          if (accepted) {
+            solved = {
+              sizeMM,
+              designSizeMM: candidate.designSizeMM,
+              marginMM,
+              grid,
+              construction: candidate.construction,
+              prepared: candidate.prepared,
+              combo,
+            }
+            break
+          }
         }
+        if (solved) break
       }
       if (solved) break
     }
     if (!solved) continue
     const publishedGrid = directPerimeter || density === 'light'
       ? solved.grid
-      : computePreparedGridForExtent(prepareExactContour(makeShape(solved.sizeMM)), {
+      : computePreparedGridForExtent(solved.prepared, {
           pitchMM: solved.combo.pitchMM,
           pattern: solved.combo.pattern,
           paddingMM: padEff,
@@ -1205,6 +1285,8 @@ function semanticSteps(
     steps.push({
       points: publishedGrid.anchors.length,
       sizeMM: solved.sizeMM,
+      designSizeMM: solved.designSizeMM,
+      marginMM: solved.marginMM,
       gridExtentMM,
       construction: solved.construction,
     })
@@ -1224,6 +1306,8 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
         label: 'ONE',
         points: 1,
         sizeMM: st.sizeMM,
+        designSizeMM: st.designSizeMM,
+        marginMM: st.marginMM,
         gridExtentMM: st.gridExtentMM,
         visible: st.gridExtentMM <= law.maxTestedMM,
         construction: st.construction,
@@ -1234,6 +1318,8 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
       label: bandLabel(nextIdx++),
       points: st.points,
       sizeMM: st.sizeMM,
+      designSizeMM: st.designSizeMM,
+      marginMM: st.marginMM,
       gridExtentMM: st.gridExtentMM,
       visible: st.gridExtentMM <= law.maxTestedMM,
       construction: st.construction,
@@ -1565,7 +1651,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 11
+export const GRID_ENGINE_CACHE_VERSION = 14
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
@@ -1573,7 +1659,12 @@ export type StandardLadderShape = Exclude<StdShape, 'rect'>
 export type LadderRecipe =
   | { kind: 'standard'; shape: StandardLadderShape }
   | { kind: 'rounded-square'; radiusMM: number; minimumAnchors: number }
-  | { kind: 'uniform-contour'; unitContour: Contour }
+  | {
+      kind: 'uniform-contour'
+      unitContour: Contour
+      minMarginMM?: number
+      maxMarginMM?: number
+    }
 
 /** Serializable identity of one exact contour to resolve. */
 export type PlanRecipe =
@@ -1610,6 +1701,21 @@ export function ladderShapeFromRecipe(recipe: LadderRecipe): (sizeMM: number) =>
     }
     return (sizeMM) => roundedSquareContourMM(sizeMM, sizeMM, recipe.radiusMM)
   }
+  if (
+    (recipe.minMarginMM != null
+      && (!Number.isFinite(recipe.minMarginMM) || recipe.minMarginMM < 0))
+    || (recipe.maxMarginMM != null
+      && (!Number.isFinite(recipe.maxMarginMM) || recipe.maxMarginMM < 0))
+  ) {
+    throw new RangeError('Uniform-contour ladder margin must be a non-negative finite number.')
+  }
+  if (
+    recipe.minMarginMM != null
+    && recipe.maxMarginMM != null
+    && recipe.minMarginMM > recipe.maxMarginMM
+  ) {
+    throw new RangeError('Uniform-contour ladder minimum margin must not exceed its maximum margin.')
+  }
   const unitContour = exactContourCopy(recipe.unitContour, 'Ladder recipe')
   return (sizeMM) => scaleContour(unitContour, sizeMM)
 }
@@ -1629,6 +1735,8 @@ export function semanticLadderFromRecipe(
       modeCombos(mode, options.pitchMM, options.source),
       minimumAnchors,
       options,
+      recipe.kind === 'uniform-contour' ? recipe.minMarginMM ?? 0 : 0,
+      recipe.kind === 'uniform-contour' ? recipe.maxMarginMM ?? 0 : 0,
     ),
     law,
   )

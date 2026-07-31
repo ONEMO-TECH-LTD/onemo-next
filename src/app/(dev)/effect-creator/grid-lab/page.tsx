@@ -4,15 +4,21 @@
 // ALL engine shape sources through contourFromShape → computeGrid, rendered true-to-scale:
 //   • Presets    — shape-library getShape() (baked vector data)
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
-//   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
+//   • AI Magic   — image upload → prepareShaped() → cut-out + vector outline + blend composite
 // Every source yields a VShape → final mm contour consumed by the neutral grid engine.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
-import { type VShape } from '@/lib/vector-core'
+import { shapeBBox, type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
+import {
+  resolveTraceOutline,
+  TRACE_OUTLINE_DEFAULTS,
+  type TraceOutlineSettings,
+} from '../v5.3.1/user/editor/producers'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
-import { contourFromShape } from '@/lib/effect/geometry-truth'
+import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '@/lib/effect/geometry-truth'
+import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
 import { roundedSquareContourMM } from '@/lib/effect/rounded-square'
 import type { Contour, Pt } from '@/lib/effect/types'
@@ -22,8 +28,13 @@ import {
   cachedGridJob,
   gridJobKey,
   requestGridJob,
+  suspendGridWork,
 } from '@/lib/effect/grid-client'
 import { GridWorkbenchAdminPanel, type GridWorkbenchAdminPanelProps } from './GridWorkbenchAdminPanel'
+import {
+  GridWorkbenchOutlinePanel,
+  type GridWorkbenchOutlinePanelProps,
+} from './GridWorkbenchOutlinePanel'
 import { GridWorkbenchPanel, type GridWorkbenchPanelProps } from './GridWorkbenchPanel'
 import { contourDimension as dim, GridWorkbenchReadouts, GridWorkbenchStage } from './GridWorkbenchRenderer'
 import { useGridWorkerJob } from './useGridWorkerJob'
@@ -34,7 +45,16 @@ const FIT = 0.86
 
 type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
 type StdGeo = StdShape
-type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
+type MagicState = {
+  prepared: PreparedEffect
+  compositeUrl: string
+  adapter: string
+  imgUrl: string
+} | null
+interface NormalizedContour {
+  contour: Contour
+  longestPx: number
+}
 interface PlanDesign {
   design: Contour
   recipe: PlanRecipe
@@ -68,16 +88,29 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   for (const p of pts) { if (p.x < a) a = p.x; if (p.x > c) c = p.x; if (p.y < b) b = p.y; if (p.y > d) d = p.y }
   return { w: c - a, h: d - b }
 }
-/** VShape → mm contour normalized so its longest side = 1mm. Flatten FINELY first (mmPerPx=1 → 0.05px
- *  tolerance = smooth curves), THEN normalize the points — otherwise the tiny mmPerPx blows up the
- *  flatten tolerance and circles/squircles come out faceted. */
-function normBase(vs: VShape, maskH: number): Contour | null {
-  const c = contourFromShape(vs, { mmPerPx: 1, maskHeightPx: maskH })
+/** VShape → contour normalized so its longest side = 1mm. The source is flattened at the
+ * manufacturing tolerance of the largest physical rung, not at an arbitrary source-pixel scale:
+ * at 310mm this remains ≤0.05mm, while smaller rungs are necessarily finer. */
+function normBase(vs: VShape, maskH: number): NormalizedContour | null {
+  const sourceBounds = shapeBBox(vs, MANUFACTURING_TOLERANCE_MM)
+  const sourceLongestPx = Math.max(
+    sourceBounds.maxX - sourceBounds.minX,
+    sourceBounds.maxY - sourceBounds.minY,
+    1,
+  )
+  const maxRungMMPerPx = DEFAULT_LAW.maxRungMM / sourceLongestPx
+  const c = contourFromShape(vs, {
+    mmPerPx: maxRungMMPerPx,
+    maskHeightPx: maskH,
+  })
   if (!c || c.outer.pts.length < 3) return null
   let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity
   for (const [x, y] of c.outer.pts) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y }
   const L = Math.max(mxx - mnx, mxy - mny, 1)
-  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / L, y / L] as Pt) }, holes: [] }
+  return {
+    contour: { outer: { pts: c.outer.pts.map(([x, y]) => [x / L, y / L] as Pt) }, holes: [] },
+    longestPx: sourceLongestPx,
+  }
 }
 
 function normGeneratedRing(ring: ReadonlyArray<Pt>): Contour | null {
@@ -114,7 +147,10 @@ export default function GridLab() {
   const [attachment, setAttachment] = useState<Attachment>('magnetic')
   const [density, setDensity] = useState<GridDensity>('light') // cell count: standard = more cells (48-first), light = fewer (96-first)
   const [pad, setPad] = useState(10)
-  const [offsetMM, setOffsetMM] = useState(0)
+  const [marginMode, setMarginMode] = useState<'auto' | 'manual'>('auto')
+  const [manualMarginMM, setManualMarginMM] = useState(0)
+  const [minMarginMM, setMinMarginMM] = useState(0)
+  const [maxMarginMM, setMaxMarginMM] = useState(DEFAULT_MARGIN_MM)
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
   const [plan, setPlan] = useState<MagnetPlan>('auto') // engine law default: size-driven focal ramp
@@ -124,8 +160,14 @@ export default function GridLab() {
   // size keeps the frame — a lying control. Frame thickness, if ever tunable, belongs in the engine law inputs.
   const [front, setFront] = useState(false) // front-face overlay: magnets shown over the design/art
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
-  const [maxGrowMM, setMaxGrowMM] = useState(DEFAULT_MARGIN_MM) // engine law default
   const [snapToGrid, setSnapToGrid] = useState(true)
+  const [outlineSettings, setOutlineSettings] = useState<TraceOutlineSettings>(
+    () => ({ ...TRACE_OUTLINE_DEFAULTS }),
+  )
+  const handleSliderInteractionChange = useCallback((transient: boolean) => {
+    if (transient) suspendGridWork()
+    setSliderTransient(transient)
+  }, [])
 
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
@@ -135,10 +177,16 @@ export default function GridLab() {
     const f = e.target.files?.[0]; if (!f) return
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
+    setOutlineSettings({ ...TRACE_OUTLINE_DEFAULTS })
     setSrc((current) => current === 'magic2' ? 'magic2' : 'magic'); setMagStatus('cutting')
     prepareShaped(loaded.url, undefined, (s) => setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s))
       .then((p) => {
-        setMagic({ vshape: p.spec.vectorShape, maskH: p.spec.maskHeightPx, adapter: p.spec.generator?.adapter ?? 'cut', imgUrl: loaded.url })
+        setMagic({
+          prepared: p,
+          compositeUrl: p.composite.toDataURL(),
+          adapter: p.spec.generator?.adapter ?? 'cut',
+          imgUrl: loaded.url,
+        })
         setMagStatus('')
       })
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
@@ -157,6 +205,8 @@ export default function GridLab() {
     sizeBoundsSource,
     activeLaw,
   )
+  const fitMarginMinMM = marginMode === 'auto' ? minMarginMM : manualMarginMM
+  const fitMarginMaxMM = marginMode === 'auto' ? maxMarginMM : manualMarginMM
 
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
   // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
@@ -168,7 +218,7 @@ export default function GridLab() {
     : 'square'
   const presetUnitContour = useMemo(
     () => src === 'preset' && hasVectorDef(preset)
-      ? normBase(getShape(preset, IMG, IMG, { sides, points }), IMG)
+      ? normBase(getShape(preset, IMG, IMG, { sides, points }), IMG)?.contour ?? null
       : null,
     [src, preset, sides, points],
   )
@@ -182,10 +232,24 @@ export default function GridLab() {
       generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG),
     )
   }, [src, gen, p1, p2])
-  const magicUnitContour = useMemo(
-    () => isMagicSource && magic ? normBase(magic.vshape, magic.maskH) : null,
-    [isMagicSource, magic],
+  const magicOutline = useMemo(() => {
+    if (!isMagicSource || !magic) return null
+    const spec = magic.prepared.spec
+    return resolveTraceOutline({
+      vectorShape: spec.vectorShape,
+      rawTracePx: spec.rawTracePx,
+      maskWidthPx: spec.maskWidthPx,
+      maskHeightPx: spec.maskHeightPx,
+      mmPerPx: spec.mmPerPx,
+    }, outlineSettings)
+  }, [isMagicSource, magic, outlineSettings])
+  const magicBase = useMemo(
+    () => magicOutline && magic
+      ? normBase(magicOutline, magic.prepared.spec.maskHeightPx)
+      : null,
+    [magicOutline, magic],
   )
+  const magicUnitContour = magicBase?.contour ?? null
   const sourceUnitContour = presetUnitContour ?? generatedUnitContour ?? magicUnitContour
   const isRoundedSquarePreset = src === 'preset' && preset === 'squircle'
   const ladderRecipe = useMemo<LadderRecipe | null>(
@@ -198,7 +262,12 @@ export default function GridLab() {
       : presetUnitContour
       ? { kind: 'uniform-contour', unitContour: presetUnitContour }
       : src === 'magic2' && magicUnitContour
-        ? { kind: 'uniform-contour', unitContour: magicUnitContour }
+        ? {
+            kind: 'uniform-contour',
+            unitContour: magicUnitContour,
+            minMarginMM: fitMarginMinMM,
+            maxMarginMM: fitMarginMaxMM,
+          }
       : src === 'magic2'
         ? null
       : snapToGrid && sourceUnitContour
@@ -206,6 +275,8 @@ export default function GridLab() {
       : { kind: 'standard', shape: ladderShape },
     [
       isRoundedSquarePreset,
+      fitMarginMaxMM,
+      fitMarginMinMM,
       ladderShape,
       magicUnitContour,
       presetUnitContour,
@@ -223,14 +294,19 @@ export default function GridLab() {
     paddingMM: pad,
     plan,
     center: centerMode,
-    baseMarginMM: offsetMM,
+    baseMarginMM: fitMarginMinMM,
     // Catalogue rungs already are exact zero-margin grid extents. Adaptive growth is an explicit
     // freeform-only tool; applying it to a rung would silently invent a second product size.
-    maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2' ? maxGrowMM : 0,
+    maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2'
+      ? Math.max(0, fitMarginMaxMM - fitMarginMinMM)
+      : 0,
     pitchMM: pitchAuto ? undefined : pitch,
     signedBaseMargin: true,
     diagnosticVelcro: true,
-  }), [attachment, engineSource, gridMode, density, pad, plan, centerMode, offsetMM, maxGrowMM, pitchAuto, pitch, src])
+  }), [
+    attachment, engineSource, gridMode, density, pad, plan, centerMode,
+    fitMarginMinMM, fitMarginMaxMM, pitchAuto, pitch, src,
+  ])
 
   const ladderJob = useMemo<GridJob | null>(() => ladderRecipe ? ({
     operation: 'ladder',
@@ -268,13 +344,19 @@ export default function GridLab() {
   )
   const rawTestSizeMM = src === 'std' && geo === 'rect' ? longMM : resolvedSizeMM
   const activeSnapRungs = src === 'std' && geo === 'rect' ? rectangleSnapRungs : snapRungs
-  const effectiveTestSizeMM = snapToGrid && activeSnapRungs.length
-    ? nextSemanticRung(activeSnapRungs, rawTestSizeMM).sizeMM
+  const activeSnapRung = snapToGrid && activeSnapRungs.length
+    ? nextSemanticRung(activeSnapRungs, rawTestSizeMM)
+    : null
+  const effectiveTestSizeMM = activeSnapRung
+    ? activeSnapRung.sizeMM
     : rawTestSizeMM
-  const gridDerivedSizeMM = snapToGrid ? effectiveTestSizeMM : resolvedSizeMM
+  const gridDerivedDesignSizeMM = activeSnapRung
+    ? activeSnapRung.designSizeMM
+    : resolvedSizeMM
 
   const planDesign = useMemo<PlanDesign | null>(() => {
     try {
+      if (snapToGrid && !activeSnapRung) return null
       // ── STANDARD GEOMETRIES (D12–D15): drawn directly in mm; grid snap is explicit and shared ──
       if (src === 'std') {
         // Product buttons remain catalogue sizes; the admin test slider can explicitly inspect a
@@ -293,28 +375,37 @@ export default function GridLab() {
             format: rectFormat(widthMM, heightMM),
           }
         }
-        const design = stdShapeContour(geo, gridDerivedSizeMM, gridDerivedSizeMM)
+        const design = stdShapeContour(
+          geo,
+          gridDerivedDesignSizeMM,
+          gridDerivedDesignSizeMM,
+        )
         return {
           design,
-          recipe: { kind: 'standard', shape: geo, widthMM: gridDerivedSizeMM, heightMM: gridDerivedSizeMM },
-          designSize: gridDerivedSizeMM,
+          recipe: {
+            kind: 'standard',
+            shape: geo,
+            widthMM: gridDerivedDesignSizeMM,
+            heightMM: gridDerivedDesignSizeMM,
+          },
+          designSize: gridDerivedDesignSizeMM,
           format: null,
         }
       }
       if (isRoundedSquarePreset) {
         const design = roundedSquareContourMM(
-          gridDerivedSizeMM,
-          gridDerivedSizeMM,
+          gridDerivedDesignSizeMM,
+          gridDerivedDesignSizeMM,
           roundedSquareRadiusMM,
         )
         return {
           design,
           recipe: {
             kind: 'rounded-square',
-            sizeMM: gridDerivedSizeMM,
+            sizeMM: gridDerivedDesignSizeMM,
             radiusMM: roundedSquareRadiusMM,
           },
-          designSize: gridDerivedSizeMM,
+          designSize: gridDerivedDesignSizeMM,
           format: null,
         }
       }
@@ -324,7 +415,7 @@ export default function GridLab() {
       const b = base
       // Every contour uses the effective test size. Grid snap is on by default; disabling it is an
       // explicit continuous calibration mode. Only generators/AI may add adaptive outer margin.
-      const dSize = gridDerivedSizeMM
+      const dSize = gridDerivedDesignSizeMM
       const design = scaleContour(b, dSize)
       return {
         design,
@@ -334,13 +425,14 @@ export default function GridLab() {
       }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [
-    src, geo, sourceUnitContour, rectRungs, gridDerivedSizeMM,
+    src, geo, sourceUnitContour, rectRungs, gridDerivedDesignSizeMM,
     isRoundedSquarePreset, roundedSquareRadiusMM,
-    snapToGrid, effectiveTestSizeMM, longMM, shortMM, orient,
+    snapToGrid, activeSnapRung, effectiveTestSizeMM, longMM, shortMM, orient,
   ])
 
   const preparedDesign = useMemo<PreparedDesign | null>(() => {
     if (!planDesign) return null
+    if (snapToGrid && !stdRungs.length) return null
     if (src === 'std' && geo === 'rect') {
       if (!rectRungs) return null
       return {
@@ -374,12 +466,19 @@ export default function GridLab() {
   }, [preparedDesign, snapToGrid, src, geo, activeLaw, gridMode, planOptions])
   const planJob = useMemo<GridJob | null>(() => {
     if (!planDesign) return null
+    const snappedMarginMM = src === 'magic2' && activeSnapRung
+      ? activeSnapRung.marginMM
+      : planOptions.baseMarginMM
     return {
       operation: 'plan',
       recipe: planDesign.recipe,
-      options: { ...planOptions, construction: selectedConstruction },
+      options: {
+        ...planOptions,
+        baseMarginMM: snappedMarginMM,
+        construction: selectedConstruction,
+      },
     }
-  }, [planDesign, planOptions, selectedConstruction])
+  }, [planDesign, planOptions, selectedConstruction, src, activeSnapRung])
   const planKey = planJob ? gridJobKey(planJob) : null
   const planState = useGridWorkerJob<GridJob, GridJobResult>(
     planJob,
@@ -442,6 +541,14 @@ export default function GridLab() {
   }, [runtimeStatus, ladderKey, planKey, renderedPlanKey, resolvedPlan, model])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
+  const frontArtwork = isMagicSource && magic && model && magicBase
+    ? {
+        imageUrl: magic.compositeUrl,
+        imgW: magic.prepared.spec.maskWidthPx,
+        imgH: magic.prepared.spec.maskHeightPx,
+        pixelsToMM: model.designSize / magicBase.longestPx,
+      }
+    : null
   const panelProps: GridWorkbenchPanelProps = {
     src, setSrc, geo, setGeo, setLongMM, setShortMM, orient, setOrient,
     preset, setPreset, gen, setGen, p1, setP1, p2, setP2, sides, setSides, points, setPoints,
@@ -449,12 +556,39 @@ export default function GridLab() {
     magic, magStatus, fileRef, onFile, sizeMax, sizeMin,
     resolvedSizeMM: snapToGrid ? effectiveTestSizeMM : resolvedSizeMM,
     maxRungMM: DEFAULT_LAW.maxRungMM, gridMode, stdRungs, rectRungs, model,
-    onSliderInteractionChange: setSliderTransient,
+    onSliderInteractionChange: handleSliderInteractionChange,
+  }
+  const outlinePanelProps: GridWorkbenchOutlinePanelProps = {
+    values: outlineSettings,
+    offsetJoin: outlineSettings.offsetJoin,
+    setValue: (key, value) => setOutlineSettings((current) => ({
+      ...current,
+      [key]: Math.max(0, Math.min(100, value)),
+    })),
+    setOffsetJoin: offsetJoin => setOutlineSettings((current) => ({
+      ...current,
+      offsetJoin,
+    })),
+    onSliderInteractionChange: handleSliderInteractionChange,
   }
   const adminPanelProps: GridWorkbenchAdminPanelProps = {
     pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
-    offsetMM, setOffsetMM, pattern, setPattern, patternAuto, setPatternAuto,
-    plan, setPlan, front, setFront, centerMode, setCenterMode, maxGrowMM, setMaxGrowMM,
+    marginMode, setMarginMode,
+    appliedMarginMM: model?.marginMM ?? fitMarginMinMM,
+    manualMarginMM,
+    setManualMarginMM: value => setManualMarginMM(
+      Math.max(0, Math.min(80, Math.round(value))),
+    ),
+    minMarginMM,
+    setMinMarginMM: value => setMinMarginMM(
+      Math.max(0, Math.min(maxMarginMM, Math.round(value))),
+    ),
+    maxMarginMM,
+    setMaxMarginMM: value => setMaxMarginMM(
+      Math.max(minMarginMM, Math.min(80, Math.round(value))),
+    ),
+    pattern, setPattern, patternAuto, setPatternAuto,
+    plan, setPlan, front, setFront, centerMode, setCenterMode,
     roundedSquareRadiusMM,
     setRoundedSquareRadiusMM,
     roundedSquareRadiusMaxMM: DEFAULT_ROUNDED_SQUARE_CALIBRATION.sideMM / 2,
@@ -469,12 +603,13 @@ export default function GridLab() {
     snapToGrid, setSnapToGrid,
     snapSizesMM: activeSnapRungs.map((rung) => rung.sizeMM),
     model,
-    onSliderInteractionChange: setSliderTransient,
+    onSliderInteractionChange: handleSliderInteractionChange,
   }
 
   return (
     <div
       className="gl"
+      data-theme="dark"
       data-grid-runtime-status={runtimeStatus}
       data-grid-slider-transient={sliderTransient}
       data-grid-ladder-key={ladderKey}
@@ -493,25 +628,28 @@ export default function GridLab() {
           <div className="gl-panel-stack"><GridWorkbenchAdminPanel {...adminPanelProps} /></div>
         </aside>
 
-        <GridWorkbenchStage
-          model={model}
-          scale={scale}
-          viewportPx={VP}
-          fit={FIT}
-          front={front}
-          frontImg={isMagicSource && magic ? magic.imgUrl : null}
-          emptyText={runtimeError
-            ? `Grid error · ${runtimeError}`
-            : runtimeStatus === 'resolving-sizes'
-              ? 'Resolving sizes…'
-              : runtimeStatus === 'resolving-grid'
-                ? 'Resolving grid…'
-                : isMagicSource
-                  ? magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'
-                  : 'shape unavailable'}
-          emptySpin={runtimeStatus === 'resolving-sizes' || runtimeStatus === 'resolving-grid' || magStatus === 'downloading-model' || magStatus.startsWith('cutting')}
-          onRenderedPlanCommit={setRenderedPlanKey}
-        />
+        <div className="gl-center">
+          <GridWorkbenchStage
+            model={model}
+            scale={scale}
+            viewportPx={VP}
+            fit={FIT}
+            front={front}
+            frontArtwork={frontArtwork}
+            emptyText={runtimeError
+              ? `Grid error · ${runtimeError}`
+              : runtimeStatus === 'resolving-sizes'
+                ? 'Resolving sizes…'
+                : runtimeStatus === 'resolving-grid'
+                  ? 'Resolving grid…'
+                  : isMagicSource
+                    ? magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'
+                    : 'shape unavailable'}
+            emptySpin={runtimeStatus === 'resolving-sizes' || runtimeStatus === 'resolving-grid' || magStatus === 'downloading-model' || magStatus.startsWith('cutting')}
+            onRenderedPlanCommit={setRenderedPlanKey}
+          />
+          {isMagicSource && magic && <GridWorkbenchOutlinePanel {...outlinePanelProps} />}
+        </div>
 
         <aside className="gl-controls">
           {runtimeStatus !== 'ready' && (
@@ -540,7 +678,7 @@ const CSS = `
   --magnet-hi:#6b7280;--mag8:#c98a12;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
-@media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
+.gl[data-theme=dark]{--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}
 .gl *{box-sizing:border-box}
 .gl-head{max-width:1060px;margin:0 auto 20px}
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
@@ -548,6 +686,7 @@ const CSS = `
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
 .gl-body{max-width:1436px;margin:0 auto;display:grid;grid-template-columns:336px minmax(0,1fr) 336px;gap:20px;align-items:start}
 @media (max-width:840px){.gl-body{grid-template-columns:1fr}}
+.gl-center{min-width:0;display:flex;flex-direction:column;gap:16px}
 .gl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .gl-pad{padding:18px;display:flex;flex-direction:column;gap:15px}
 .gl-stage{padding:20px;display:flex;flex-direction:column;gap:14px}
@@ -573,6 +712,8 @@ const CSS = `
 .gl-inline-resolving{width:100%;padding:6px 8px;color:var(--ink-3);font:11px var(--mono);text-align:center;text-transform:none;letter-spacing:0}
 .gl-field{display:flex;flex-direction:column;gap:8px;font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .gl-field select{font:500 13px var(--sans);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px;cursor:pointer}
+.gl-outline-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+@media (max-width:1100px){.gl-outline-grid{grid-template-columns:1fr}}
 .gl-upload{font:600 13px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer;width:100%}
 .gl-upload:hover{filter:brightness(1.05)}
 .gl-magic-note{font:11.5px var(--mono);color:var(--ink-2);line-height:1.5}
@@ -584,6 +725,11 @@ const CSS = `
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.gl-number-field{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--ink-2)}
+.gl-number-input{display:flex;align-items:center;gap:6px}
+.gl-number-input input{width:74px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;text-align:right}
+.gl-number-input input:read-only,.gl-number-input input:disabled{color:var(--ink-2);opacity:.72}
+.gl-number-input b{font:600 11px var(--mono);color:var(--ink-3)}
 .gl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;background:var(--line);outline:none}
 .gl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px #0003;cursor:pointer}
 .gl input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);cursor:pointer}

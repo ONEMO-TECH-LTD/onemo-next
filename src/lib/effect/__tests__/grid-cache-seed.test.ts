@@ -5,6 +5,7 @@ import { jsonByteLength } from '../grid-cache'
 import {
   GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
   GRID_CACHE_SEED_MAX_BYTES,
+  DEFAULT_LAW,
   handleGridJob,
   handleGridWorkerJob,
   gridPlanCacheKey,
@@ -122,6 +123,43 @@ describe('S1d exact neutral ladder cache seeds', () => {
     await expect(scheduler.request(firstSeed.job)).resolves.toEqual(firstSeed.result)
     expect(workers[0].requests).toHaveLength(1)
     scheduler.dispose()
+  }, 20_000)
+
+  it('seeds a margin-derived uniform rung with the exact design scale and outward margin', () => {
+    const recipe: LadderRecipe = {
+      kind: 'uniform-contour',
+      unitContour: {
+        outer: {
+          pts: [
+            [0.08, 0], [0.12, 0.24], [0.25, 0.38], [0.32, 0.58],
+            [0.28, 0.78], [0.35, 1], [0.46, 0.78], [0.57, 0.78],
+            [0.68, 1], [0.72, 0.78], [0.68, 0.58], [0.76, 0.38],
+            [0.9, 0.24], [0.94, 0],
+          ],
+        },
+        holes: [],
+      },
+      maxMarginMM: 12,
+    }
+    const transport = handleGridWorkerJob({
+      operation: 'ladder',
+      recipe,
+      law: { ...DEFAULT_LAW, maxTestedMM: 166, maxRungMM: 166 },
+      options: { source: 'magic', density: 'standard' },
+    })
+    if (transport.result.operation !== 'ladder') throw new Error('Expected ladder result')
+    const rungIndex = transport.result.value.findIndex(({ marginMM }) => marginMM > 0)
+    const rung = transport.result.value[rungIndex]
+    const seed = transport.cacheSeeds[rungIndex]
+
+    expect(rungIndex).toBeGreaterThanOrEqual(0)
+    expect(seed.job.recipe).toMatchObject({
+      kind: 'uniform-contour',
+      longestMM: rung.designSizeMM,
+    })
+    expect(seed.job.options?.baseMarginMM).toBe(rung.marginMM)
+    expect(seed.result.value.grid.anchors).toHaveLength(rung.points)
+    expect(gridJsonBytes(seed.result)).toBe(gridJsonBytes(handleGridJob(seed.job)))
   }, 20_000)
 
   it('fails a late malformed seed without partially mutating the LRU', async () => {

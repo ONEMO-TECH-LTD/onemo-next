@@ -4,7 +4,7 @@
 // bezier factor (pct/100)·2. 0 = straight (off), reversible. Remove = delete this file + its registry line.
 
 import type { ToolDescriptor, EditorCtx } from '../types'
-import type { OutlineAdjustments } from '@/lib/effect/outline-resolve'
+import { outlineCurveFactor, type OutlineAdjustments } from '@/lib/effect/outline-resolve'
 import { representativeLocal } from '../../seed-defaults'
 
 /** Curve targets: the selected source id, else EVERY source anchor id (whole-shape bend). */
@@ -17,7 +17,7 @@ function curveTargets(ctx: EditorCtx): string[] {
 
 function nextAdj(ctx: EditorCtx, pct: number): OutlineAdjustments {
   const adj = ctx.getAdjustments()
-  const curve = (pct / 100) * 2
+  const curve = outlineCurveFactor(pct)
   const local = { ...adj.local }
   for (const id of curveTargets(ctx)) local[id] = { ...local[id], curve }
   return { global: adj.global, local }
