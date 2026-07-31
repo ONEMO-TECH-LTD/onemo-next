@@ -1309,7 +1309,7 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
         designSizeMM: st.designSizeMM,
         marginMM: st.marginMM,
         gridExtentMM: st.gridExtentMM,
-        visible: st.gridExtentMM <= law.maxTestedMM,
+        visible: true,
         construction: st.construction,
       })
       continue
@@ -1321,7 +1321,7 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
       designSizeMM: st.designSizeMM,
       marginMM: st.marginMM,
       gridExtentMM: st.gridExtentMM,
-      visible: st.gridExtentMM <= law.maxTestedMM,
+      visible: true,
       construction: st.construction,
     })
   }
