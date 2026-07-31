@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-07-26T13:35:48.232Z",
+  "statement": "Local WebKit is correctness coverage; Chromium throttling is calibrated emulation, not real hardware.",
+  "profiles": [
+    {
+      "id": "webkit-iphone-13",
+      "engine": "webkit",
+      "engineVersion": "26.0",
+      "device": "iPhone 13",
+      "cpuRate": 1,
+      "truth": "local-webkit-correctness-and-timing",
+      "surface": "http://127.0.0.1:5173/scripts/device-performance/fixture.html",
+      "throttle": null,
+      "scenarios": [
+        {
+          "id": "canonical-ladder",
+          "label": "Canonical circle ladder",
+          "cold": {
+            "scenarioId": "canonical-ladder",
+            "temperature": "cold",
+            "elapsedMs": 1527,
+            "sha256": "de539e0aa9ad09b622470950d4cd376fe42d7195e6b92671a45430ad549e3dc6",
+            "t2": {
+              "rungs": [
+                {
+                  "label": "ONE",
+                  "points": 1,
+                  "sizeMM": 23,
+                  "visible": true
+                },
+                {
+                  "label": "S",
+                  "points": 4,
+                  "sizeMM": 71,
+                  "visible": true
+                },
+                {
+                  "label": "M",
+                  "points": 4,
+                  "sizeMM": 90,
+                  "visible": true
+                },
+                {
+                  "label": "L",
+                  "points": 4,
+                  "sizeMM": 130,
+                  "visible": true
+                },
+                {
+                  "label": "XL",
+                  "points": 8,
+                  "sizeMM": 158,
+                  "visible": true
+                },
+                {
+                  "label": "2XL",
+                  "points": 8,
+                  "sizeMM": 221,
+                  "visible": false
+                },
+                {
+                  "label": "3XL",
+                  "points": 16,
+                  "sizeMM": 303,
+                  "visible": false
+                }
+              ]
+            },
+            "directWorkerByteEqual": true
+          },
+          "warm": {
+            "scenarioId": "canonical-ladder",
+            "temperature": "warm",
+            "elapsedMs": 1,
+            "sha256": "de539e0aa9ad09b622470950d4cd376fe42d7195e6b92671a45430ad549e3dc6",
+            "t2": {
+              "rungs": [
+                {
+                  "label": "ONE",
+                  "points": 1,
+                  "sizeMM": 23,
+                  "visible": true
+                },
+                {
+                  "label": "S",
+                  "points": 4,
+                  "sizeMM": 71,
+                  "visible": true
+                },
+                {
+                  "label": "M",
+                  "points": 4,
+                  "sizeMM": 90,
+                  "visible": true
+                },
+                {
+                  "label": "L",
+                  "points": 4,
+                  "sizeMM": 130,
+                  "visible": true
+                },
+                {
+                  "label": "XL",
+                  "points": 8,
+                  "sizeMM": 158,
+                  "visible": true
+                },
+                {
+                  "label": "2XL",
+                  "points": 8,
+                  "sizeMM": 221,
+                  "visible": false
+                },
+                {
+                  "label": "3XL",
+                  "points": 16,
+                  "sizeMM": 303,
+                  "visible": false
+                }
+              ]
+            },
+            "directWorkerByteEqual": true
+          },
+          "directWorkerByteEqual": true,
+          "baselineT1Pass": true,
+          "expectedSha256": "de539e0aa9ad09b622470950d4cd376fe42d7195e6b92671a45430ad549e3dc6",
+          "t2Pass": true
+        },
+        {
+          "id": "dense-live-plan",
+          "label": "Dense real-AI contour plan",
+          "cold": {
+            "scenarioId": "dense-live-plan",
+            "temperature": "cold",
+            "elapsedMs": 81.00000000000091,
+            "sha256": "de307b637e3272176a7128a5fd04a0fd3b4f185069ea38edca89b11e403f8981",
+            "t2": {
+              "anchorCount": 2,
+              "rescueCount": 0,
+              "flapCount": 0,
+              "ok": true,
+              "pitchMM": 48,
+              "pattern": "standard",
+              "nodes": [
+                {
+                  "x": "34.80",
+                  "y": "70.35",
+                  "dia": 6,
+                  "rescue": false
+                },
+                {
+                  "x": "34.80",
+                  "y": "22.35",
+                  "dia": 6,
+                  "rescue": false
+                }
+              ],
+              "edges": [
+                "0-1"
+              ]
+            },
+            "directWorkerByteEqual": true
+          },
+          "warm": {
+            "scenarioId": "dense-live-plan",
+            "temperature": "warm",
+            "elapsedMs": 1,
+            "sha256": "de307b637e3272176a7128a5fd04a0fd3b4f185069ea38edca89b11e403f8981",
+            "t2": {
+              "anchorCount": 2,
+              "rescueCount": 0,
+              "flapCount": 0,
+              "ok": true,
+              "pitchMM": 48,
+              "pattern": "standard",
+              "nodes": [
+                {
+                  "x": "34.80",
+                  "y": "70.35",
+                  "dia": 6,
+                  "rescue": false
+                },
+                {
+                  "x": "34.80",
+                  "y": "22.35",
+                  "dia": 6,
+                  "rescue": false
+                }
+              ],
+              "edges": [
+                "0-1"
+              ]
+            },
+            "directWorkerByteEqual": true
+          },
+          "directWorkerByteEqual": true,
+          "baselineT1Pass": true,
+          "expectedSha256": "de307b637e3272176a7128a5fd04a0fd3b4f185069ea38edca89b11e403f8981",
+          "t2Pass": true
+        },
+        {
+          "id": "small-contour-plan",
+          "label": "Small square plan",
+          "cold": {
+            "scenarioId": "small-contour-plan",
+            "temperature": "cold",
+            "elapsedMs": 21,
+            "sha256": "6c3b36820b04c05f19c2a11b7bb25c380af2a0005ed246046ac261a100157ea2",
+            "t2": {
+              "anchorCount": 5,
+              "rescueCount": 4,
+              "flapCount": 0,
+              "ok": true,
+              "pitchMM": 96,
+              "pattern": "standard",
+              "nodes": [
+                {
+                  "x": "35.00",
+                  "y": "35.00",
+                  "dia": 6,
+                  "rescue": false
+                },
+                {
+                  "x": "10.00",
+                  "y": "10.00",
+                  "dia": 6,
+                  "rescue": true
+                },
+                {
+                  "x": "60.00",
+                  "y": "10.00",
+                  "dia": 6,
+                  "rescue": true
+                },
+                {
+                  "x": "60.00",
+                  "y": "60.00",
+                  "dia": 6,
+                  "rescue": true
+                },
+                {
+                  "x": "10.00",
+                  "y": "60.00",
+                  "dia": 6,
+                  "rescue": true
+                }
+              ],
+              "edges": [
+                "0-1",
+                "0-2",
+                "0-3",
+                "0-4",
+                "1-2",
+                "1-3",
+                "1-4",
+                "2-3",
+                "2-4",
+                "3-4"
+              ]
+            },
+            "directWorkerByteEqual": true
+          },
+          "warm": {
+            "scenarioId": "small-contour-plan",
+            "temperature": "warm",
+            "elapsedMs": 0,
+            "sha256": "6c3b36820b04c05f19c2a11b7bb25c380af2a0005ed246046ac261a100157ea2",
+            "t2": {
+              "anchorCount": 5,
+              "rescueCount": 4,
+              "flapCount": 0,
+              "ok": true,
+              "pitchMM": 96,
+              "pattern": "standard",
+              "nodes": [
+                {
+                  "x": "35.00",
+                  "y": "35.00",
+                  "dia": 6,
+                  "rescue": false
+                },
+                {
+                  "x": "10.00",
+                  "y": "10.00",
+                  "dia": 6,
+                  "rescue": true
+                },
+                {
+                  "x": "60.00",
+                  "y": "10.00",
+                  "dia": 6,
+                  "rescue": true
+                },
+                {
+                  "x": "60.00",
+                  "y": "60.00",
+                  "dia": 6,
+                  "rescue": true
+                },
+                {
+                  "x": "10.00",
+                  "y": "60.00",
+                  "dia": 6,
+                  "rescue": true
+                }
+              ],
+              "edges": [
+                "0-1",
+                "0-2",
+                "0-3",
+                "0-4",
+                "1-2",
+                "1-3",
+                "1-4",
+                "2-3",
+                "2-4",
+                "3-4"
+              ]
+            },
+            "directWorkerByteEqual": true
+          },
+          "directWorkerByteEqual": true,
+          "baselineT1Pass": true,
+          "expectedSha256": "6c3b36820b04c05f19c2a11b7bb25c380af2a0005ed246046ac261a100157ea2",
+          "t2Pass": true
+        }
+      ]
+    }
+  ],
+  "workerThrottle": {
+    "pass": false,
+    "error": "Worker throttle profiles or validation scenario missing."
+  },
+  "cloudAdapter": {
+    "status": "designed-not-built",
+    "transport": "playwright-websocket",
+    "endpointEnv": "DEVICE_PERF_CLOUD_WS_ENDPOINT",
+    "credentialsEnv": "DEVICE_PERF_CLOUD_CREDENTIALS",
+    "decision": "Dan approval required before provider signup or paid implementation"
+  }
+}
