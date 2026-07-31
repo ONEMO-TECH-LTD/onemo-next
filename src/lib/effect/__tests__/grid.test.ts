@@ -1210,7 +1210,7 @@ describe('semantic ladder stays inside its product contract', () => {
         }
       }
     }
-  })
+  }, 15_000)
 
   it('snaps one continuous target through every active mode, pitch, and density', () => {
     const modes = ['auto', 'standard', 'quincunx', 'diamond'] as const

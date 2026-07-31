@@ -226,6 +226,33 @@ describe('preemptive exact grid worker scheduler', () => {
     scheduler.dispose()
   })
 
+  it('serves loaded static results without a worker and lazily computes a missing key', async () => {
+    const { scheduler, workers } = fixture()
+    scheduler.loadStaticResults('law-a', [{
+      key: 'static',
+      value: { key: 'static', value: 1 },
+    }])
+
+    await expect(scheduler.request({ key: 'static', value: 99 }))
+      .resolves.toEqual({ key: 'static', value: 1 })
+    expect(workers).toHaveLength(0)
+
+    const dynamic = scheduler.request({ key: 'dynamic', value: 2 })
+    expect(workers).toHaveLength(1)
+    workers[0].succeed()
+    await expect(dynamic).resolves.toEqual({ key: 'dynamic', value: 2 })
+    scheduler.dispose()
+  })
+
+  it('rejects a static result whose declared and intrinsic keys disagree', () => {
+    const { scheduler } = fixture()
+    expect(() => scheduler.loadStaticResults('law-a', [{
+      key: 'declared',
+      value: { key: 'actual', value: 1 },
+    }])).toThrow('Grid static result has the wrong cache key.')
+    scheduler.dispose()
+  })
+
   it('clears pinned static results on law generation change and rejects stale-generation writes', async () => {
     const { scheduler, workers } = fixture()
     scheduler.activateStaticGeneration('law-a')

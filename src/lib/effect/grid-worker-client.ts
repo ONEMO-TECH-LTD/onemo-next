@@ -37,6 +37,11 @@ export interface GridWorkerDecodedResult<Result> {
   cacheSeeds?: ReadonlyArray<GridWorkerCacheSeed<Result>>
 }
 
+export interface GridWorkerStaticResult<Result> {
+  key: string
+  value: Result
+}
+
 export class GridWorkerSupersededError extends Error {
   constructor(readonly staleKey: string, readonly latestKey: string) {
     super(`Grid worker request ${staleKey} was superseded by ${latestKey}.`)
@@ -178,6 +183,19 @@ export class GridWorkerScheduler<Job, Result, Transport = Result> {
 
   activateStaticGeneration(generation: string): boolean {
     return this.staticResults.activate(generation)
+  }
+
+  loadStaticResults(
+    generation: string,
+    results: ReadonlyArray<GridWorkerStaticResult<Result>>,
+  ): void {
+    this.staticResults.activate(generation)
+    for (const result of results) {
+      if (this.keyOfResult(result.value) !== result.key) {
+        throw new Error('Grid static result has the wrong cache key.')
+      }
+      this.staticResults.set(generation, result.key, result.value)
+    }
   }
 
   peek(job: Job): Result | undefined {

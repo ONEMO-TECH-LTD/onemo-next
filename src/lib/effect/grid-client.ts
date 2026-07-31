@@ -1,6 +1,8 @@
 import {
   GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
   GRID_CACHE_SEED_MAX_BYTES,
+  GRID_ENGINE_CACHE_VERSION,
+  GRID_ENGINE_POLICY_SIGNATURE,
   gridLadderCacheKey,
   gridPlanCacheKey,
   type GridJob,
@@ -18,6 +20,11 @@ import {
   type GridWorkerDecodedResult,
   type GridWorkerPriority,
 } from './grid-worker-client'
+import {
+  GRID_STATIC_CATALOGUE_CACHE_VERSION,
+  GRID_STATIC_CATALOGUE_ENTRIES,
+  GRID_STATIC_CATALOGUE_POLICY_SIGNATURE,
+} from './grid-static-catalogue.generated'
 
 let sharedClient: GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> | null = null
 
@@ -30,12 +37,22 @@ export function gridJobKey(job: GridJob): string {
 }
 
 export function createGridWorkerClient(): GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> {
-  return new GridWorkerScheduler({
+  const scheduler = new GridWorkerScheduler({
     createWorker: () => new Worker(new URL('./grid.worker.ts', import.meta.url), { type: 'module' }),
     keyOfJob: gridJobKey,
     keyOfResult: (result) => result.key,
     decodeWorkerResult: decodeGridWorkerResult,
   })
+  if (
+    GRID_STATIC_CATALOGUE_CACHE_VERSION === GRID_ENGINE_CACHE_VERSION
+    && GRID_STATIC_CATALOGUE_POLICY_SIGNATURE === GRID_ENGINE_POLICY_SIGNATURE
+  ) {
+    scheduler.loadStaticResults(
+      `${GRID_STATIC_CATALOGUE_CACHE_VERSION}:${GRID_STATIC_CATALOGUE_POLICY_SIGNATURE}`,
+      GRID_STATIC_CATALOGUE_ENTRIES.map(({ result }) => ({ key: result.key, value: result })),
+    )
+  }
+  return scheduler
 }
 
 function client(): GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> {
