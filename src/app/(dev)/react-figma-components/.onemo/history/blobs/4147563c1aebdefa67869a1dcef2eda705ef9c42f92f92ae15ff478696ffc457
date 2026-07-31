@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "storeId": "project-main",
+  "revision": 0,
+  "root": {
+    "kind": "project"
+  },
+  "sourceHashes": {
+    "src/app/(dev)/react-figma-components/MetaProbeCard.tsx": "544c509e2bcc300412b4473ba6e76727741e9ad76bba13f2e4c087de9f0c86d1"
+  },
+  "components": {
+    "component_02743620e9dcd6c2": {
+      "id": "component_02743620e9dcd6c2",
+      "displayName": "MetaProbeCard",
+      "source": {
+        "storeId": "project-main",
+        "file": "src/app/(dev)/react-figma-components/MetaProbeCard.tsx",
+        "exportName": "MetaProbeCard"
+      },
+      "primaryVariantId": "variant_37b38dd67910d55b",
+      "folderId": null,
+      "compatibility": "native-v1"
+    }
+  },
+  "variants": {
+    "variant_37b38dd67910d55b": {
+      "id": "variant_37b38dd67910d55b",
+      "componentId": "component_02743620e9dcd6c2",
+      "displayName": "Primary",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 180
+      },
+      "inheritance": {
+        "kind": "primary"
+      },
+      "kind": "primary",
+      "transition": {
+        "kind": "instant",
+        "delayMs": 0
+      }
+    }
+  },
+  "sourceProperties": {},
+  "interactions": {},
+  "interactionOverrides": {},
+  "instances": {},
+  "folders": {}
+}

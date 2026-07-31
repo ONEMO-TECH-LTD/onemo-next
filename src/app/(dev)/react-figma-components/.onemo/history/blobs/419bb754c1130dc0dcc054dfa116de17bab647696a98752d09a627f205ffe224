@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "storeId": "project-main",
+  "revision": 1,
+  "root": {
+    "kind": "project"
+  },
+  "sourceHashes": {
+    "src/app/(dev)/react-figma-components/MetaProbeCard.tsx": "5097c5616a1ebec7832c339976c05fddaf09a292aa12e197756ebc6637595bca"
+  },
+  "components": {
+    "component_02743620e9dcd6c2": {
+      "id": "component_02743620e9dcd6c2",
+      "displayName": "MetaProbeCard",
+      "source": {
+        "storeId": "project-main",
+        "file": "src/app/(dev)/react-figma-components/MetaProbeCard.tsx",
+        "exportName": "MetaProbeCard"
+      },
+      "primaryVariantId": "variant_6cb487a9ca0a281c",
+      "folderId": null,
+      "compatibility": "legacy-single-axis"
+    }
+  },
+  "variants": {
+    "variant_6cb487a9ca0a281c": {
+      "id": "variant_6cb487a9ca0a281c",
+      "componentId": "component_02743620e9dcd6c2",
+      "displayName": "Primary",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 180
+      },
+      "inheritance": {
+        "kind": "primary"
+      },
+      "kind": "primary",
+      "transition": {
+        "kind": "instant",
+        "delayMs": 0
+      }
+    },
+    "variant_49717bfe524da63b": {
+      "id": "variant_49717bfe524da63b",
+      "componentId": "component_02743620e9dcd6c2",
+      "displayName": "Variant 2",
+      "frame": {
+        "x": 360,
+        "y": 0,
+        "width": 320,
+        "height": 180
+      },
+      "inheritance": {
+        "kind": "linked",
+        "primaryVariantId": "variant_6cb487a9ca0a281c",
+        "overridePropertyIds": []
+      },
+      "kind": "custom",
+      "transition": {
+        "kind": "instant",
+        "delayMs": 0
+      }
+    }
+  },
+  "sourceProperties": {},
+  "interactions": {},
+  "interactionOverrides": {},
+  "instances": {},
+  "folders": {}
+}

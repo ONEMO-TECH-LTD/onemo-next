@@ -1,0 +1,16 @@
+{
+  "transactionId": "authoring-1783795534459",
+  "storeId": "project-main",
+  "coordinator": {
+    "storeId": "project-main",
+    "relativeTransactionPath": "src/app/(dev)/react-figma-components/.onemo/transactions/authoring-1783795534459/participant.json"
+  },
+  "participants": [
+    "project-main"
+  ],
+  "status": "committed",
+  "beforeRevision": 2,
+  "afterRevision": 3,
+  "beforeSidecarHash": "844cea9ff3702b26855ec4daf8d0c1b55386adcc6d15b1ba77950f3bffd43cf8",
+  "afterSidecarHash": "d72f74a644f9fba80f09b1333a432f0377e271bbb231ef207a25f69c0d59c2c6"
+}
