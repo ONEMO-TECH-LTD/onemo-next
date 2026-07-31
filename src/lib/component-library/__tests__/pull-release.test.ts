@@ -310,7 +310,7 @@ describe('component release pull transaction', () => {
       unacknowledgedRefusals: 1,
     });
     await expect(pullComponentRelease({ releaseDir: refused, appRoot: app }))
-      .rejects.toThrow(/source capability refusal.*thing:1.*futureCapability/s);
+      .rejects.toThrow(/source capability refusal[\s\S]*thing:1[\s\S]*futureCapability/);
     await expect(fs.access(path.join(app, 'src', 'components', 'generated'))).rejects.toThrow();
 
     const valid = await release(root, tokens, { marker: 'valid' });
@@ -332,7 +332,7 @@ describe('component release pull transaction', () => {
       appRoot: app,
     });
     expect(verdict.status).toBe('fail');
-    expect(verdict.reason).toMatch(/source capability refusal.*thing:1.*futureCapability/s);
+    expect(verdict.reason).toMatch(/source capability refusal[\s\S]*thing:1[\s\S]*futureCapability/);
   });
 
   it('accepts the app-owned proof route as a non-vacuous generated-barrel consumer', async () => {
