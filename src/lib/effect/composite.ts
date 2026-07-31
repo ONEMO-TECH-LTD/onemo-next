@@ -37,6 +37,149 @@ const PRESET_FILTER: Record<PresetKey, string> = {
 }
 export const presetFilter = (key: PresetKey | undefined): string => PRESET_FILTER[key ?? 'none'] ?? ''
 
+export type ArtworkFillMode = 'clamp' | 'tile'
+
+export interface ArtworkBounds {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+export interface ArtworkFrame {
+  /** Output-canvas origin in the source artwork's pixel coordinate system. */
+  originX: number
+  originY: number
+  width: number
+  height: number
+}
+
+export interface ArtworkFillDraw {
+  sx: number
+  sy: number
+  sw: number
+  sh: number
+  dx: number
+  dy: number
+  dw: number
+  dh: number
+}
+
+export interface ComposeEffectArtworkInput {
+  originalCanvas: HTMLCanvasElement
+  subjectCanvas: HTMLCanvasElement
+  outputBoundsPx?: ArtworkBounds
+  blendPercent: number
+  fillMode: ArtworkFillMode
+  fxFilter?: string
+  vignette?: number
+  tint?: string | null
+}
+
+export interface ComposedEffectArtwork {
+  canvas: HTMLCanvasElement
+  frame: ArtworkFrame
+}
+
+/** v5.3.1 Blend is a physical percentage control; pixels scale with source width. */
+export function blendPercentToPixels(percent: number, sourceWidth: number): number {
+  return Math.max(0, Math.min(100, percent)) * Math.max(0, sourceWidth) / 2500
+}
+
+export function blendPixelsToPercent(pixels: number, sourceWidth: number): number {
+  return sourceWidth > 0 ? Math.max(0, Math.min(100, pixels * 2500 / sourceWidth)) : 0
+}
+
+/** Integer raster frame covering the exact requested source-space bounds. */
+export function resolveArtworkFrame(
+  sourceWidth: number,
+  sourceHeight: number,
+  bounds?: ArtworkBounds,
+): ArtworkFrame {
+  const originX = bounds ? Math.floor(bounds.minX) : 0
+  const originY = bounds ? Math.floor(bounds.minY) : 0
+  const maxX = bounds ? Math.ceil(bounds.maxX) : Math.ceil(sourceWidth)
+  const maxY = bounds ? Math.ceil(bounds.maxY) : Math.ceil(sourceHeight)
+  return {
+    originX,
+    originY,
+    width: Math.max(1, maxX - originX),
+    height: Math.max(1, maxY - originY),
+  }
+}
+
+/** Destination rect that preserves the subject's source coordinates inside an expanded frame. */
+export function resolveArtworkSubjectDraw(
+  sourceWidth: number,
+  sourceHeight: number,
+  frame: ArtworkFrame,
+): Pick<ArtworkFillDraw, 'dx' | 'dy' | 'dw' | 'dh'> {
+  return {
+    dx: -frame.originX,
+    dy: -frame.originY,
+    dw: sourceWidth,
+    dh: sourceHeight,
+  }
+}
+
+interface AxisDraw {
+  source: number
+  sourceLength: number
+  destination: number
+  destinationLength: number
+}
+
+function clampAxisDraws(origin: number, length: number, sourceLength: number): AxisDraw[] {
+  const end = origin + length
+  const draws: AxisDraw[] = []
+  const belowEnd = Math.min(end, 0)
+  if (belowEnd > origin) draws.push({ source: 0, sourceLength: 1, destination: 0, destinationLength: belowEnd - origin })
+  const middleStart = Math.max(origin, 0)
+  const middleEnd = Math.min(end, sourceLength)
+  if (middleEnd > middleStart) draws.push({ source: middleStart, sourceLength: middleEnd - middleStart, destination: middleStart - origin, destinationLength: middleEnd - middleStart })
+  const aboveStart = Math.max(origin, sourceLength)
+  if (end > aboveStart) draws.push({ source: Math.max(0, sourceLength - 1), sourceLength: 1, destination: aboveStart - origin, destinationLength: end - aboveStart })
+  return draws
+}
+
+/**
+ * Pure draw plan used by the compositor and its pixel oracle. Clamp stretches the source's outermost
+ * pixel rows/columns; Tile repeats the source on its original coordinate phase.
+ */
+export function buildArtworkFillDraws(
+  sourceWidth: number,
+  sourceHeight: number,
+  frame: ArtworkFrame,
+  fillMode: ArtworkFillMode,
+): ArtworkFillDraw[] {
+  if (sourceWidth <= 0 || sourceHeight <= 0) return []
+  if (fillMode === 'tile') {
+    const draws: ArtworkFillDraw[] = []
+    const firstX = Math.floor(frame.originX / sourceWidth) * sourceWidth
+    const firstY = Math.floor(frame.originY / sourceHeight) * sourceHeight
+    const endX = frame.originX + frame.width
+    const endY = frame.originY + frame.height
+    for (let y = firstY; y < endY; y += sourceHeight) {
+      for (let x = firstX; x < endX; x += sourceWidth) {
+        draws.push({ sx: 0, sy: 0, sw: sourceWidth, sh: sourceHeight, dx: x - frame.originX, dy: y - frame.originY, dw: sourceWidth, dh: sourceHeight })
+      }
+    }
+    return draws
+  }
+  const xs = clampAxisDraws(frame.originX, frame.width, sourceWidth)
+  const ys = clampAxisDraws(frame.originY, frame.height, sourceHeight)
+  return ys.flatMap(y => xs.map(x => ({
+    sx: x.source,
+    sy: y.source,
+    sw: x.sourceLength,
+    sh: y.sourceLength,
+    dx: x.destination,
+    dy: y.destination,
+    dw: x.destinationLength,
+    dh: y.destinationLength,
+  })))
+}
+
 // ── CSS filter shorthand → SVG filter primitives (W3C Filter Effects §filter functions) ───────────
 // The CSS shorthands are DEFINED as these exact SVG primitives, so a faithful translation is identical
 // to the CSS filter on any engine. Blur is handled separately (bgBlurPx) — any blur() here is ignored.
@@ -133,15 +276,50 @@ export async function composeFront(
   vignette = 0,
   tint: string | null = null,
 ): Promise<HTMLCanvasElement> {
-  const fw = origCanvas.width, fh = origCanvas.height
+  return (await composeEffectArtwork({
+    originalCanvas: origCanvas,
+    subjectCanvas: subjCanvas,
+    blendPercent: blendPixelsToPercent(bgBlurPx, origCanvas.width),
+    fillMode: 'clamp',
+    fxFilter,
+    vignette,
+    tint,
+  })).canvas
+}
+
+/**
+ * The one reusable v5.3.1 2D image operation: fill the requested artwork frame, blur that complete
+ * background, then place the sharp subject once at its original source coordinates. It owns no UI,
+ * store, history, segmentation, or Three.js state.
+ */
+export async function composeEffectArtwork({
+  originalCanvas,
+  subjectCanvas,
+  outputBoundsPx,
+  blendPercent,
+  fillMode,
+  fxFilter,
+  vignette = 0,
+  tint = null,
+}: ComposeEffectArtworkInput): Promise<ComposedEffectArtwork> {
+  const frame = resolveArtworkFrame(originalCanvas.width, originalCanvas.height, outputBoundsPx)
+  const fw = frame.width, fh = frame.height
+  const filled = document.createElement('canvas')
+  filled.width = fw; filled.height = fh
+  const filledCtx = filled.getContext('2d')!
+  for (const draw of buildArtworkFillDraws(originalCanvas.width, originalCanvas.height, frame, fillMode)) {
+    filledCtx.drawImage(originalCanvas, draw.sx, draw.sy, draw.sw, draw.sh, draw.dx, draw.dy, draw.dw, draw.dh)
+  }
   // BACKGROUND: the blur is the CORE effect (magic-blend + offset-fill). Bake it with the SVG engine
   // (feGaussianBlur, linearRGB — matches the editor preview), cross-browser incl. Safari.
-  const bg = bgBlurPx > 0 ? await svgFilterBake(origCanvas, `<feGaussianBlur stdDeviation="${bgBlurPx}" />`, 'linearRGB') : origCanvas
+  const bgBlurPx = blendPercentToPixels(blendPercent, originalCanvas.width)
+  const bg = bgBlurPx > 0 ? await svgFilterBake(filled, `<feGaussianBlur stdDeviation="${bgBlurPx}" />`, 'linearRGB') : filled
   // composite: blurred bg + the sharp subject on top
   let composed = document.createElement('canvas')
   composed.width = fw; composed.height = fh
   composed.getContext('2d')!.drawImage(bg, 0, 0)
-  composed.getContext('2d')!.drawImage(subjCanvas, 0, 0, fw, fh)
+  const subjectDraw = resolveArtworkSubjectDraw(originalCanvas.width, originalCanvas.height, frame)
+  composed.getContext('2d')!.drawImage(subjectCanvas, subjectDraw.dx, subjectDraw.dy, subjectDraw.dw, subjectDraw.dh)
   // COLOUR fx over the finished composite — spec-exact SVG primitives (sRGB → matches CSS filter).
   const colourBody = cssColorFilterToSvg(fxFilter)
   if (colourBody) composed = await svgFilterBake(composed, colourBody, 'sRGB')
@@ -153,7 +331,7 @@ export async function composeFront(
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${Math.max(0, Math.min(1, vignette)) * 0.72})`)
     ctx.save(); ctx.fillStyle = g; ctx.fillRect(0, 0, fw, fh); ctx.restore()
   }
-  return composed
+  return { canvas: composed, frame }
 }
 
 /** A strongly-blurred copy of a canvas — the edge-lip texture source (smooth rim colour, no banding).

@@ -24,6 +24,9 @@ import type { GridPlanOptions, ResolvedGridPlan } from '@/lib/effect/grid'
 import type { VShape } from '@/lib/vector-core'
 import { detailToFloorMm } from '../user/editor/producers'
 
+export { composeEffectArtwork } from '@/lib/effect/composite'
+export type { ArtworkBounds, ArtworkFillMode, ComposedEffectArtwork } from '@/lib/effect/composite'
+
 /** loadImage(file) → { url } — decode + the new-image blob lifecycle ONLY (validate type, revoke the
  *  prior blob, mint a fresh object URL). Flow-BLIND: NO store/state reset, NO downstream prepare/cut-out
  *  (blueprint §4 "no downstream side-effects, no auto-anything"). The app-state reset is the flow's job.

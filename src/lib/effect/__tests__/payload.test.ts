@@ -48,7 +48,7 @@ function prepared(v: VShape, geometryMM?: Contour): PreparedEffect {
     spec,
     composite: null as unknown as HTMLCanvasElement,
     edgeComposite: null as unknown as HTMLCanvasElement,
-    frontSrc: { origCanvas: null as unknown as HTMLCanvasElement, subjCanvas: null as unknown as HTMLCanvasElement, defaultBlurPx: 0 },
+    frontSrc: { origCanvas: null as unknown as HTMLCanvasElement, subjCanvas: null as unknown as HTMLCanvasElement, defaultBlurPx: 0, defaultBlendPercent: 0 },
     widthMM: 70,
     heightMM: 70,
   }

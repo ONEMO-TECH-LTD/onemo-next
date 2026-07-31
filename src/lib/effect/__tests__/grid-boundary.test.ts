@@ -20,6 +20,8 @@ const CLIENT_PATH = 'src/lib/effect/grid-client.ts'
 const WORKER_HOOK_PATH = 'src/app/(dev)/effect-creator/grid-lab/useGridWorkerJob.ts'
 const SHAPED_MODEL_PATH = 'src/app/(dev)/effect-creator/v5.3.1/core/shaped/ShapedModel.tsx'
 const PRIMITIVES_PATH = 'src/app/(dev)/effect-creator/v5.3.1/core/primitives.ts'
+const COMPOSITE_PATH = 'src/lib/effect/composite.ts'
+const PREPARE_EFFECT_PATH = 'src/lib/effect/prepare-effect.ts'
 
 describe('Creator magnetic-grid module boundary', () => {
   it('removes the A4 Create route and sends the root to the original Grid Lab', () => {
@@ -358,8 +360,12 @@ describe('Creator magnetic-grid module boundary', () => {
         straighten: 60,
       },
       offsetJoin: 'round',
+      blendPercent: 50,
+      fillMode: 'clamp',
       setValue: noop,
       setOffsetJoin: noop,
+      setBlendPercent: noop,
+      setFillMode: noop,
       onSliderInteractionChange: noop,
     }))
 
@@ -376,6 +382,46 @@ describe('Creator magnetic-grid module boundary', () => {
       expect(markup).toContain(`<b>${value}%</b>`)
     }
     expect(markup).toContain('aria-pressed="true">Round</button>')
+    expect(markup).toContain('<span>Blend</span><b>50%</b>')
+    expect(markup).toContain('aria-pressed="true">Clamp</button>')
+  })
+
+  it('keeps blend and fill as live v5.3.1 engine controls with their applied values', () => {
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
+    const panelSource = readFileSync(OUTLINE_PANEL_PATH, 'utf8')
+    const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
+    const primitivesSource = readFileSync(PRIMITIVES_PATH, 'utf8')
+    const compositeSource = readFileSync(COMPOSITE_PATH, 'utf8')
+    const prepareSource = readFileSync(PREPARE_EFFECT_PATH, 'utf8')
+
+    expect(panelSource).toContain('Blend')
+    expect(panelSource).toContain('Fill outside image')
+    expect(panelSource).toContain("['clamp', 'Clamp']")
+    expect(panelSource).toContain("['tile', 'Tile']")
+    expect(pageSource).toContain('composeEffectArtwork')
+    expect(pageSource).toContain('magic.prepared.frontSrc')
+    expect(pageSource).toContain("fillMode")
+    expect(pageSource).toContain('blendPercent')
+    expect(pageSource).toContain('data-v531-initial-composite-sha256')
+    expect(pageSource.match(/prepareShaped\(loaded\.url/g)).toHaveLength(1)
+    const recomposeEffect = pageSource.slice(
+      pageSource.indexOf("useEffect(() => {\n    if (!artworkRequest)"),
+      pageSource.indexOf("useEffect(() => {\n    const committedModel"),
+    )
+    expect(recomposeEffect).toContain('composeEffectArtwork({')
+    expect(recomposeEffect).toContain('outputBoundsPx: bounds')
+    expect(recomposeEffect).toContain('if (!current) return')
+    expect(recomposeEffect).toContain('imageUrl: canvas.toDataURL()')
+    expect(recomposeEffect).not.toContain('prepareShaped')
+    expect(rendererSource).toContain('frontArtwork.originX')
+    expect(rendererSource).toContain('frontArtwork.originY')
+    expect(primitivesSource).toContain("export { composeEffectArtwork")
+    expect(prepareSource).toContain('composeEffectArtwork({')
+    expect(compositeSource).toContain(
+      'drawImage(subjectCanvas, subjectDraw.dx, subjectDraw.dy, subjectDraw.dw, subjectDraw.dh)',
+    )
+    expect(compositeSource).not.toContain('drawImage(subjectCanvas, 0, 0')
+    expect(compositeSource).not.toMatch(/from ['"].*(outlineStore|ShapedModel|EditorCanvas|three)/)
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {
@@ -533,9 +579,9 @@ describe('Creator magnetic-grid module boundary', () => {
     // Grid-lab consumes its vector and matching composite as one result. Falling back to the raw
     // upload or importing the obsolete editor/store recreates two truth paths.
     expect(pageSource).toContain('prepared: p')
-    expect(pageSource).toContain('compositeUrl: p.composite.toDataURL()')
+    expect(pageSource).not.toContain('compositeUrl: p.composite.toDataURL()')
     expect(pageSource).toContain('vectorShape: spec.vectorShape')
-    expect(pageSource).toContain('imageUrl: magic.compositeUrl')
+    expect(pageSource).toContain('imageUrl: liveArtwork.imageUrl')
     expect(pageSource).toContain('frontArtwork={')
     expect(pageSource).toContain('data-theme="dark"')
     expect(pageSource).not.toContain('frontImg={isMagicSource && magic ? magic.imgUrl : null}')

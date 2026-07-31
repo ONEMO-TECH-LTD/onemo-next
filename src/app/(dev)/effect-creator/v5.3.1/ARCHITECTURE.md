@@ -61,7 +61,8 @@ upload (File) → v53Flow.upload:
       → publishCutoutResult(seq,…) [the seq-guard at PUBLICATION; matte written iff still the active image]
   → 3D: EffectViewer(prepared-for-3D) → ShapedModelBridge → ShapedModel   (engine, unchanged)
         mesh = buildShapedGeometry( vectorTrueContour(committedContour ?? spec.geometryMM) )
-        texture = composeFront(frontSrc.origCanvas, frontSrc.subjCanvas, blur, fx, vignette, tint)
+        artwork = composeEffectArtwork({ originalCanvas, subjectCanvas, outputBoundsPx, blendPercent, fillMode, fx })
+        texture = artwork.canvas; placement = artwork.frame
 
 Magic → v53Flow.magic: prepareShaped(url, preseg from cache) [reuses the bg cut — no AI re-run]
   → if isCurrent(runId): setPrepared + publishToViewer; shaped spec REPLACES standard; setSubjMatteUrl;
@@ -153,7 +154,7 @@ its matte feeds the editor's Blend preview on any shape.
 | File | Role | Key contract |
 |---|---|---|
 | `prepare-effect.ts` (292) | The ONE 2D engine. `standardBirthShape` (full rect + calibrated radius input). `prepareEffect(url, type, cfg, onProgress, preseg)`. | `EFFECT_BUILD_CONFIG`: 70mm base, 1mm body, edgeRadius 0.2mm, padding 1.5mm, texDim 2400. Shaped = raw marching-squares + RDP at `minFeatureMM` (5mm floor), NO fairing/fit. `frontSrc` = re-bake source. |
-| `composite.ts` (172) | The image bake (P2 cross-browser SVG engine). `composeFront(orig, subj, blurPx, fxFilter?, vignette, tint)` async. `svgFilterBake` via `URL.createObjectURL(Blob)` (Safari-safe; data-URL renders empty on WebKit). `cssColorFilterToSvg`. `PRESET_FILTER`/`presetFilter`/`PRESET_LABELS`. | One bake feeds 3D + print. Zero `ctx.filter`. |
+| `composite.ts` | The UI-independent image bake (P2 cross-browser SVG engine). `composeEffectArtwork` owns source-frame expansion, Blend 0–100 conversion, Clamp/Tile fill, blurred background, sharp subject, colour/tint/vignette, and returns canvas plus source-space frame. `composeFront` is the compatibility signature over that same operation. | One bake feeds initial Magic, live Grid Lab recomposition, 3D, and print. Zero `ctx.filter`; zero store/Three imports. |
 | `outline-resolve.ts` (263) | The shape engine. `resolve(source, adjustments)→VShape`: all-off=exact source; globalPass (straighten→simplify→smooth→radius) + localPass (curve+per-corner radius), fold-guarded. | Kernels: Paper (smooth/simplify/per-corner radius) + Clipper2 (straighten/whole radius) + in-house curve. |
 | `geometry-truth.ts` (106) | The single geometry pipeline. `contourFromShape(v)` @ `MANUFACTURING_TOLERANCE_MM` (0.05). `assertContourCuttable`. `vectorShapeHash`. | Tolerances: mfg 0.05, display 0.004, min-feature 5mm, anchor-sep 1.5mm. |
 | `grid-core.ts` · `grid.ts` · `grid-client.ts` · `grid.worker.ts` | Session 59 pure-mm magnetic-grid engine plus one neutral serializable job and browser-worker lane. | Any caller supplies a contour/recipe and explicit options; caller identity never changes engine policy, cache identity, or output. |
@@ -220,8 +221,8 @@ Other state: `bgBlur` (magic-blend), `subjMatteUrl` (Blend preview matte), `edit
 ### 5.1 Shape — `resolve(source, adjustments)`
 The editor writes a recipe; `resolve` owns the shape. Born sharp (Magic = raw marching-squares polygon RDP'd to the 5mm min-feature floor; pre-Magic = square + 8mm-radius adjustment). Tools are reversible: dialing every axis to 0 returns the exact source. Math bottoms out in Paper.js (round/smooth/simplify), Clipper2 (straighten/whole-radius), Schneider fit (`ringToVPath`), and the outline-core ring-math (RDP/self-intersection/fairing).
 
-### 5.2 Image-fx — `composeFront` (P2)
-Cross-browser SVG-filter bake. `composeFront(orig, subj, blurPx, fxFilter, vignette, tint)`: blurred bg + sharp subject (magic-blend) → CSS-shorthand colour fx → tint + vignette. Rasterized via **Blob-URL** SVG `<filter>` (Safari-safe; data-URL is empty on WebKit). The **same** composite is the 3D front texture and the print master.
+### 5.2 Image-fx — `composeEffectArtwork` (P2)
+Cross-browser SVG-filter bake. One operation receives original + subject canvases, the requested source-space output bounds, Blend 0–100, Fill Clamp/Tile, and the existing image effects. It fills the complete output frame first, blurs that background, places the sharp subject once at its original coordinates, then applies colour/tint/vignette. It returns the canvas and its source-space frame so consumers cannot guess origin or scale. Rasterization remains the Safari-safe **Blob-URL** SVG path. `composeFront` delegates to the same operation for compatibility; there is no second compositor.
 
 Two preview paths, by design:
 - **Editor** (EditorCanvas): live preview via Safari-safe DOM filters (CSS `fxFilter` + SVG `feGaussianBlur`), 3D bake **deferred** to Done (version-bridge).
