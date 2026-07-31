@@ -854,16 +854,16 @@ describe('semantic ladder stays inside its product contract', () => {
   it('keeps every visible geometric product rung on the standard pattern in Auto', () => {
     const nonStandardRungs = new Set<string>()
     const visibleRungs = { standard: 0, light: 0 }
+    const hiddenRungs = new Set<string>()
 
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       for (const density of ['standard', 'light'] as const) {
-        for (const rung of semanticLadder(
-          contourAt,
-          DEFAULT_LAW,
-          'auto',
-          { source: 'std', density },
-        ).filter(({ visible }) => visible)) {
+        const ladder = semanticLadder(contourAt, DEFAULT_LAW, 'auto', { source: 'std', density })
+        for (const rung of ladder) {
+          if (!rung.visible) hiddenRungs.add(`${shape}/${density}/${rung.label}/${rung.sizeMM}`)
+        }
+        for (const rung of ladder.filter(({ visible }) => visible)) {
           visibleRungs[density]++
           const plan = resolveGridPlan(contourAt(rung.sizeMM), {
             source: 'std',
@@ -889,6 +889,17 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(visibleRungs.standard).toBeGreaterThan(0)
     expect(visibleRungs.light).toBeGreaterThan(0)
     expect([...nonStandardRungs]).toEqual([])
+
+    // …and the visibility law itself, which the pattern property CANNOT carry: a re-introduced
+    // filter simply removes rungs from the sweep above, so every survivor is still standard and
+    // the whole file stays green while sizes vanish from the product. That is exactly how the
+    // hiding survived — restoring the filter verbatim passed 44/44 until this line existed.
+    //
+    // PINS DAN'S CURRENT RULING (07-30): "I never said to hide them, now we are not at the
+    // launch, are we?" — EVERY computed rung is visible. This assertion is MEANT to change, but
+    // only deliberately: when hiding returns it returns as an 8.7 admin input with a released
+    // value, and whoever builds that updates this line as part of the change.
+    expect([...hiddenRungs]).toEqual([])
   })
 
   it('retains adaptive patterns for freeform and explicit admin modes', () => {
