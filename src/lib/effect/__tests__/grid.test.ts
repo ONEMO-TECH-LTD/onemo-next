@@ -880,7 +880,14 @@ describe('semantic ladder stays inside its product contract', () => {
       }
     }
 
-    expect(visibleRungs).toEqual({ standard: 18, light: 7 })
+    // The law under test is "every VISIBLE product rung is standard-pattern in Auto" — the rung
+    // COUNT is not the law. The old pin (18/7) was arithmetic of the unsanctioned visibility
+    // filter, not of 4.1: it only held while sizes above the tested ceiling were hidden, so it
+    // failed the moment that filter was removed on Dan's ruling ("I never said to hide them").
+    // Pinning a count here re-creates the filter by the back door. Assert the property, plus a
+    // non-empty denominator so the sweep cannot pass by examining nothing.
+    expect(visibleRungs.standard).toBeGreaterThan(0)
+    expect(visibleRungs.light).toBeGreaterThan(0)
     expect([...nonStandardRungs]).toEqual([])
   })
 
