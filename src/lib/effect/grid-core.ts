@@ -7,8 +7,8 @@
 //   • PER-SPOT padding (interp A): a node is valid = inside the silhouette AND ≥ pad (10mm radius from
 //     the magnet centre) from the REAL outline — per-node, no erosion (pinched shapes keep all regions).
 //   • Grid geometry chooses the legal topology. HOLD COVERAGE is radial at each actual magnet and
-//     includes only the finite outer span of lawful population-rim pairs no farther than 96mm; holes
-//     stay radial. Inside one topology, covered phase beats uncovered phase.
+//     includes only the finite outer span of outline-adjacent lawful population-rim pairs no farther
+//     than 96mm; holes stay radial. Inside one topology, covered phase beats uncovered phase.
 //   • MARGIN model: the design never resizes; an outward margin band grows (capped) until covered.
 //   • Procedural sizes: enumerate legal lattice extents, then solve the earliest upward even-whole-mm
 //     contour size that accepts each extent. The grid extent is the catalogue authority; shape mm is
@@ -263,39 +263,66 @@ function pairSpanInterval(
   return strip
 }
 
+function ringPositionMM(point: Pt, ring: ReadonlyArray<Pt>): number {
+  let travelledMM = 0
+  let closest = { distanceMM: Infinity, positionMM: 0 }
+  for (let index = 0; index < ring.length; index++) {
+    const first = ring[index], second = ring[(index + 1) % ring.length]
+    const dx = second[0] - first[0], dy = second[1] - first[1]
+    const lengthSquared = dx * dx + dy * dy
+    const lengthMM = Math.sqrt(lengthSquared)
+    const t = lengthSquared <= 1e-12 ? 0 : Math.max(0, Math.min(1,
+      ((point[0] - first[0]) * dx + (point[1] - first[1]) * dy) / lengthSquared,
+    ))
+    const projected: Pt = [first[0] + t * dx, first[1] + t * dy]
+    const distanceMM = dist(point, projected)
+    if (distanceMM < closest.distanceMM) {
+      closest = { distanceMM, positionMM: travelledMM + t * lengthMM }
+    }
+    travelledMM += lengthMM
+  }
+  return closest.positionMM
+}
+
 function boundedRimSpans(
+  outerRing: ReadonlyArray<Pt>,
   seated: ReadonlyArray<Pt>,
   pattern: GridPattern,
   pitchMM: number,
 ): BoundedRimSpan[] {
+  // A pair spans fabric only when its magnets are consecutive around the real outer outline.
+  // Any other short pair is an interior chord — the hull is not a magnet.
   const rim = splitPopulationBoundary(seated, pattern, pitchMM).rim
+    .map((point) => ({ point, positionMM: ringPositionMM(point, outerRing) }))
+    .sort((left, right) => left.positionMM - right.positionMM
+      || left.point[0] - right.point[0] || left.point[1] - right.point[1])
   const maximumSpanMM = Math.max(...LAUNCH_PITCHES_MM)
   const spans: BoundedRimSpan[] = []
-  for (let leftIndex = 0; leftIndex < rim.length; leftIndex += 1) {
-    for (let rightIndex = leftIndex + 1; rightIndex < rim.length; rightIndex += 1) {
-      const first = rim[leftIndex], second = rim[rightIndex]
-      const axisX = second[0] - first[0], axisY = second[1] - first[1]
-      const length = Math.hypot(axisX, axisY)
-      if (length <= 1e-9 || length > maximumSpanMM + MANUFACTURING_TOLERANCE_MM) continue
-      spans.push({
-        first,
-        ux: axisX / length,
-        uy: axisY / length,
-        length,
-        minX: Math.min(first[0], second[0]),
-        maxX: Math.max(first[0], second[0]),
-        minY: Math.min(first[1], second[1]),
-        maxY: Math.max(first[1], second[1]),
-      })
-    }
+  const pairCount = rim.length === 2 ? 1 : rim.length
+  for (let index = 0; index < pairCount; index += 1) {
+    const first = rim[index].point
+    const second = rim[(index + 1) % rim.length].point
+    const axisX = second[0] - first[0], axisY = second[1] - first[1]
+    const length = Math.hypot(axisX, axisY)
+    if (length <= 1e-9 || length > maximumSpanMM + MANUFACTURING_TOLERANCE_MM) continue
+    spans.push({
+      first,
+      ux: axisX / length,
+      uy: axisY / length,
+      length,
+      minX: Math.min(first[0], second[0]),
+      maxX: Math.max(first[0], second[0]),
+      minY: Math.min(first[1], second[1]),
+      maxY: Math.max(first[1], second[1]),
+    })
   }
   return spans
 }
 
 /** Exact unsupported intervals per manufactured ring. The outer ring is supported radially by
- *  actual magnets plus the bounded fabric span between lawful population-rim magnets no farther
- *  apart than the launch 96mm maximum. Hole rims remain per-magnet radial. No hull, miter, or
- *  non-local bridge exists, so tips/lobes beyond a lawful pair's finite span remain uncovered. */
+ *  actual magnets plus the bounded fabric span between outline-adjacent lawful population-rim
+ *  magnets no farther apart than the launch 96mm maximum. Hole rims remain per-magnet radial.
+ *  No hull, miter, interior chord, or non-local bridge exists. */
 export function exactPerimeterCoverage(
   contour: Contour,
   seated: ReadonlyArray<Pt>,
@@ -303,7 +330,7 @@ export function exactPerimeterCoverage(
   pattern: GridPattern,
   pitchMM: number,
 ): PerimeterCoverage {
-  const rimSpans = boundedRimSpans(seated, pattern, pitchMM)
+  const rimSpans = boundedRimSpans(contour.outer.pts, seated, pattern, pitchMM)
   const gaps: Pt[] = []
   let uncoveredMM = 0
   for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
