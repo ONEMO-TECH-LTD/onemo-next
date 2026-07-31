@@ -1,0 +1,247 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:25624",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "008e2b52999efec805a4e51ef31a8c7358769d026fc3848d8c10003fca8f834a",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8017:25624",
+      "class": "statePassive",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:25625",
+      "class": "iconBox",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:25762",
+      "class": "iconBasket",
+      "kind": "element",
+      "propertyRefs": {
+        "mainComponent": "Instance#8017:22"
+      }
+    },
+    {
+      "figmaId": "8017:25638",
+      "class": "label",
+      "kind": "text",
+      "propertyRefs": {
+        "characters": "Label#8017:23"
+      }
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8017:25762",
+      "targetId": "8017:21672",
+      "props": {},
+      "layout": {
+        "height": 22,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 22
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Instance#8017:22",
+      "propName": "instance",
+      "type": "INSTANCE_SWAP",
+      "defaultValue": "8017:21672",
+      "preferredValues": [
+        {
+          "type": "COMPONENT",
+          "key": "7dd60ed139415036b96c69e1a3d7259f59f157ec"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "42e470d622db783228d9890800176990079320a9"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "2ac58201a3d2db9a19f70024cc576a6da3390f5b"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "6b106ab187519214fb10facfd3a430afaa4cdc1d"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "de2b89ece695c0645e38a6140d3ceab79f37feb4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "b578f9677c175d9ff2e3797658426d0b0ee81b2a"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a40458170987e25f3ab888ecdcef4c6dd384850b"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "0fa8350fa4193eaa56f198eaa927e9f1b630879c"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "0b294553d831062cd525287fbf3ec3057a5d430c"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "586e57b6b2ffba6a2de8aa250376edf646317023"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "eb50fdb21f1da227ede7ff5285bc8f0965c0c748"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f2871f80e826fff25fd6ef3ff5c79ccff0ec0407"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "b819d781abde83c26dd4a8083845e3ba6a78479b"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "4ce98c31d936827937cf1bf4a07c11c6baa4de44"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "9d9fc9f95016e8039bdff3673b041c76f0a511e4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "27ccaee168255ba6b7721603647f3d146322f351"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "e0ce747db2dab539f9c27f3202bb45ef43192b31"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a14aee0db9069ce781e918bd54687f5cc775f871"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "5e2c596a17267dddf2dc4ebad21ecdbfe7e33ecc"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "9010231444dc296aa62750d636bc87ffb9b8cda7"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "036d8082952af025ce46fc7d756bdbd93c16198d"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "537a4f3eb609bca4969f5fe7ff0f567c8fdc4f22"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "c9871ea9cebb4e124f05079218b7a046f36eefa5"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "204c8ba310fb468127722cce01ab4e887087c700"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "c8a71b41e03e0b0f23ca18a46a5bf76d176ad6ea"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "523fd440138b0223a23096eefccf7dea610f0221"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "d464639a38e5d4252c6f553926c51272a03cea83"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "e2ead190da3b57c161b0a921d41ec314f254aebe"
+        }
+      ],
+      "bindingScope": [
+        {
+          "masterId": "8017:21679",
+          "sites": [
+            {
+              "nodeId": "8017:25750",
+              "field": "mainComponent"
+            }
+          ]
+        },
+        {
+          "masterId": "8017:25624",
+          "sites": [
+            {
+              "nodeId": "8017:25762",
+              "field": "mainComponent"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "Label#8017:23",
+      "propName": "label",
+      "type": "TEXT",
+      "defaultValue": "Add",
+      "bindingScope": [
+        {
+          "masterId": "8017:21679",
+          "sites": [
+            {
+              "nodeId": "8017:21334",
+              "field": "characters"
+            }
+          ]
+        },
+        {
+          "masterId": "8017:25624",
+          "sites": [
+            {
+              "nodeId": "8017:25638",
+              "field": "characters"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Active",
+      "variantOptions": [
+        "Active",
+        "Passive"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8017:25762",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    }
+  ]
+}

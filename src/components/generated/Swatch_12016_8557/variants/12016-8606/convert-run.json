@@ -1,0 +1,60 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:8606",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "6dd1f699bfb74a687979e6a67160712c9871fa7ad68e7c0c57d4c6906f6615af",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12016:8606",
+      "class": "stateSelected",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:8607",
+      "class": "sizeSwatches",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "12016:8607",
+      "targetId": "12016:8539",
+      "props": {
+        "Size": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Freeform"
+        }
+      },
+      "layout": {
+        "height": 40,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 40
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Default",
+      "variantOptions": [
+        "Default",
+        "Selected"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

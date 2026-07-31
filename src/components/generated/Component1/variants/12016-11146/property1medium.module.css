@@ -1,0 +1,68 @@
+.property1Medium {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px;
+  width: 288px;
+  height: 288px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.effectCard {
+  width: var(--sem-container-effect-frame-big);
+  height: var(--sem-container-effect-frame-big);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+}
+
+.magneticGridSM {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  width: 252px;
+  height: 252px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.magnetBump {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.magnetBump2 {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.magnetBump3 {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.magnetBump4 {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}

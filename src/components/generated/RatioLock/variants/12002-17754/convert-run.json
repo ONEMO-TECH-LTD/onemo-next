@@ -1,0 +1,71 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12002:17754",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "1a7eee2f10c81119c9cfeb22f75a81f7bb5c4ed06f8af714e3efa0a6079f133e",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12002:17754",
+      "class": "stateDisabled",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:17755",
+      "class": "buttonRoundSmall",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:17756",
+      "class": "lockClosed",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "12002:17756",
+      "targetId": "12002:17690",
+      "props": {},
+      "layout": {
+        "height": 16,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 16
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Locked",
+      "variantOptions": [
+        "Locked",
+        "Open",
+        "disabled"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "12002:17756",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    }
+  ]
+}

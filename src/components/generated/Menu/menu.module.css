@@ -1,0 +1,5 @@
+.menu {
+  width: var(--fc-icon-w, var(--com-controls-icon));
+  height: var(--fc-icon-h, var(--com-controls-icon));
+  color: var(--sem-col-fg-primary-default-contrast-perma);
+}

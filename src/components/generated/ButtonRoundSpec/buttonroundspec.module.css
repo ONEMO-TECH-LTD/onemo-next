@@ -1,0 +1,18 @@
+.buttonRoundSpec {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  background-image: linear-gradient(-0.53deg, var(--sem-col-bg-spec-pill-primary) 72.97%, var(--sem-col-bg-spec-gradient-secondary-mono) 111.94%);
+  background-origin: border-box;
+  border: 1px solid var(--sem-col-border-spec-pill-primary-mono);
+  border-radius: 9999px;
+}
+
+.magic {
+  width: var(--sem-dim-fluid-standard-l);
+  height: var(--sem-dim-fluid-standard-l);
+  flex-shrink: 0;
+}

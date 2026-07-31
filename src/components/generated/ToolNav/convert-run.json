@@ -1,0 +1,95 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8019:1640",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "6ca2174dfc554ecc6bdf7bc4c0c72269107197911d1fdaee880e4ad1f7749d7c",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8019:1640",
+      "class": "toolNav",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:21091",
+      "class": "toggleCombo",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20957",
+      "class": "controlCombo",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:21021",
+      "class": "buttonFBFlip",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:21084",
+      "class": "buttonPillSpecLabeled",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8017:21091",
+      "targetId": "8017:20929",
+      "props": {
+        "Mode": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Magnetic"
+        }
+      },
+      "layout": {
+        "height": 44,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 108
+      }
+    },
+    {
+      "instanceId": "8017:21021",
+      "targetId": "8017:20996",
+      "props": {
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Backside"
+        }
+      },
+      "layout": {
+        "height": 40,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 52
+      }
+    },
+    {
+      "instanceId": "8017:21084",
+      "targetId": "8017:21076",
+      "props": {},
+      "layout": {
+        "height": 40,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 52
+      }
+    }
+  ],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

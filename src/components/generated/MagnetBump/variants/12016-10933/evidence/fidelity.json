@@ -1,0 +1,40 @@
+{
+  "masterId": "12016:10933",
+  "status": "measured",
+  "mismatch": 76,
+  "pixels": 4096,
+  "mismatchPct": 1.85546875,
+  "deltaThreshold": 32,
+  "diagnosticBudgetPct": 10,
+  "viewportWidth": 402,
+  "layoutWidth": 28,
+  "renderWidth": 32,
+  "backdrop": {
+    "sourceNodeId": "6103:679",
+    "r": 214,
+    "g": 214,
+    "b": 214,
+    "alpha": 1
+  },
+  "referenceRoute": "board-crop",
+  "qualifyingSourcePath": [
+    "12016:10933",
+    "12016:10934"
+  ],
+  "referenceReason": "visible non-NORMAL blend has no opaque backing inside the component subtree",
+  "cropBounds": {
+    "left": 56,
+    "top": 10430,
+    "width": 64,
+    "height": 64,
+    "scaleX": 2,
+    "scaleY": 2,
+    "boardSpace": {
+      "x": 4462,
+      "y": 10591,
+      "width": 32,
+      "height": 32
+    }
+  },
+  "referenceSha256": "907aede9e038c8b719be5c25bdf5bc031d3361538a623cd93f8f2ff6b9ea6475"
+}

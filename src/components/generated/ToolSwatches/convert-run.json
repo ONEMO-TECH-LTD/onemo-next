@@ -1,0 +1,336 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8019:1146",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "2456d41b1e30d3baa603bd7c4ea2bd4673829987d94e6c842e0f419bc21b12f8",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 2,
+  "figmaAbsoluteCount": 2,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8019:1146",
+      "class": "toolSwatches",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:4429",
+      "class": "swatchMasked",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:4430",
+      "class": "alpha",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:4431",
+      "class": "swatchRow",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28195",
+      "class": "dial",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28197",
+      "class": "dial2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28199",
+      "class": "dial3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28201",
+      "class": "dial4",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28205",
+      "class": "dial5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28203",
+      "class": "dial6",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28207",
+      "class": "dial7",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28209",
+      "class": "dial8",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28211",
+      "class": "dial9",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8018:28195",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28197",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28199",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28201",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28205",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28203",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28207",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28209",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "8018:28211",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    }
+  ],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

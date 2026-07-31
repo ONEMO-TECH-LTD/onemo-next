@@ -1,0 +1,497 @@
+.toolRuller {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 56px;
+}
+
+.rulerMasked {
+  width: 402px;
+  height: 24px;
+  flex-shrink: 0;
+  position: relative;
+  -webkit-mask-image: linear-gradient(88.3deg, rgba(0, 0, 0, 0) 15.3%, rgba(0, 0, 0, 0.9) 32.81%, #000000 50.11%, rgba(0, 0, 0, 0.9) 67.82%, rgba(0, 0, 0, 0) 85.32%);
+  mask-image: linear-gradient(88.3deg, rgba(0, 0, 0, 0) 15.3%, rgba(0, 0, 0, 0.9) 32.81%, #000000 50.11%, rgba(0, 0, 0, 0.9) 67.82%, rgba(0, 0, 0, 0) 85.32%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 0px 0px;
+  mask-position: 0px 0px;
+  -webkit-mask-size: 402px var(--sem-dim-fluid-standard-xl);
+  mask-size: 402px var(--sem-dim-fluid-standard-xl);
+}
+
+.frame9 {
+  width: 402px;
+  height: var(--sem-dim-fluid-standard-xl);
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  background-image: linear-gradient(88.3deg, rgba(0, 0, 0, 0) 15.3%, rgba(0, 0, 0, 0.9) 32.81%, #000000 50.11%, rgba(0, 0, 0, 0.9) 67.82%, rgba(0, 0, 0, 0) 85.32%);
+}
+
+.ruller {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--sem-dim-fluid-nano-l);
+  height: 24px;
+  position: absolute;
+  left: -56px;
+  top: 0;
+}
+
+.tickMark {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark2 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark3 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark4 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark5 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark6 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark7 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark8 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark9 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark10 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark11 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark12 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark13 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark14 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark15 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark16 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark17 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark18 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark19 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark20 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark21 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark22 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark23 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark24 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark25 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark26 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark27 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark28 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark29 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark30 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark31 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark32 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark33 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xl);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark34 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark35 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark36 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark37 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark38 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark39 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark40 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark41 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark42 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark43 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark44 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark45 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark46 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark47 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark48 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark49 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark50 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark51 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark52 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark53 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark54 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark55 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark56 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark57 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark58 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark59 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark60 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark61 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark62 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark63 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark64 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tickMark65 {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  flex-shrink: 0;
+  position: relative;
+}

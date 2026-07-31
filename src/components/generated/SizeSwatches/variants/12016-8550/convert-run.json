@@ -1,0 +1,43 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:8550",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "5ea541ccab472b34003b0fb62b765baa3692714d2a799e0c8650c8bcf919c266",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12016:8550",
+      "class": "sizeLarge",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:8551",
+      "class": "l",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Size",
+      "propName": "size",
+      "type": "VARIANT",
+      "defaultValue": "Freeform",
+      "variantOptions": [
+        "Freeform",
+        "Medium",
+        "Small",
+        "Large",
+        "None"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

@@ -1,0 +1,34 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8018:27921",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "3bd44ae332533032a66a796b0fa87787503e33d5f366027a0d39f976e4f2fbf2",
+  "targetKind": "component",
+  "iconRoot": true,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8018:27921",
+      "class": "redoMini",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8018:27921",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    }
+  ]
+}

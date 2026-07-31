@@ -1,0 +1,23 @@
+.sizeMedium {
+  width: 20px;
+  height: 20px;
+  position: relative;
+  transform: scaleY(-1);
+}
+
+.m {
+  width: var(--sem-dim-fluid-standard-l);
+  height: var(--sem-dim-fluid-standard-l);
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  color: var(--sem-col-text-primary-default);
+  transform: rotate(-180deg);
+  font-family: var(--sem-type-fluid-label-m-font);
+  font-size: var(--sem-type-fluid-label-m-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-m-line-height);
+  letter-spacing: var(--sem-type-fluid-label-m-letter-spacing);
+  text-align: center;
+  align-content: center;
+}

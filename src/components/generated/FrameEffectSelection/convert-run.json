@@ -1,0 +1,58 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12007:18284",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "00e1df8a8cf3d578496f3c87a02b035b3d31c3c16e02cdcde3a0ebb50534fbc5",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 2,
+  "figmaAbsoluteCount": 2,
+  "helperAbsoluteCount": 1,
+  "idMap": [
+    {
+      "figmaId": "12007:18284",
+      "class": "frameEffectSelection",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:18178",
+      "class": "maskGroup",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:18179",
+      "class": "ellipse14",
+      "kind": "svg"
+    },
+    {
+      "figmaId": "12002:18180",
+      "class": "effectCard",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [
+    {
+      "ownerFigmaId": "12007:18284",
+      "role": "stroke",
+      "sourceIndex": null,
+      "class": "fcPaint1Stroke",
+      "order": 0,
+      "technique": "live-dash-svg"
+    }
+  ],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "12002:18179",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12002:4330",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "12b68e2f3a84ed3df15447d4f37403efc45ff5c069ed5568ef0eb385bc9efe0c",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12002:4330",
+      "class": "mode1",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:4331",
+      "class": "badge",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:4332",
+      "class": "badge2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:4333",
+      "class": "badge3",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "12002:4331",
+      "targetId": "12002:3882",
+      "props": {
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Active"
+        }
+      },
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 56
+      }
+    },
+    {
+      "instanceId": "12002:4332",
+      "targetId": "12002:3886",
+      "props": {
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Passive"
+        }
+      },
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 56
+      }
+    },
+    {
+      "instanceId": "12002:4333",
+      "targetId": "12002:3886",
+      "props": {
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Passive"
+        }
+      },
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 56
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Mode",
+      "propName": "mode",
+      "type": "VARIANT",
+      "defaultValue": "2",
+      "variantOptions": [
+        "2",
+        "1",
+        "3"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

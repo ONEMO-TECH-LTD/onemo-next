@@ -1,0 +1,33 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12010:22538",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "fc287c37aa5e0d68f95fdd78b94274a202507554fef7b1d861f69401e4a55c3e",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12010:22538",
+      "class": "toolTitle",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12010:22531",
+      "class": "frame12",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12010:22532",
+      "class": "small",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

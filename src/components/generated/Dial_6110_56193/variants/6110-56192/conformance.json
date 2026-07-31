@@ -1,0 +1,142 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6110:56192",
+  "fileVersion": "2382085534573304220",
+  "elements": 6,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 79,
+  "tokenDecls": 15,
+  "styleableDecls": 19,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "stateActive",
+      "prop": "width",
+      "value": "48px",
+      "line": 2,
+      "candidates": []
+    },
+    {
+      "className": "stateActive",
+      "prop": "height",
+      "value": "48px",
+      "line": 3,
+      "candidates": []
+    },
+    {
+      "className": "el8",
+      "prop": "font-weight",
+      "value": "500",
+      "line": 47,
+      "candidates": []
+    },
+    {
+      "className": "dialFill",
+      "prop": "width",
+      "value": "24px",
+      "line": 55,
+      "candidates": []
+    },
+    {
+      "className": "dialFill",
+      "prop": "height",
+      "value": "38.11px",
+      "line": 56,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [
+    "Chillax"
+  ],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [
+    {
+      "nodeId": "6110:56188",
+      "nodeName": "DIal FIll",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "6110:56188",
+      "nodeName": "DIal FIll",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    }
+  ],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 1,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "fail",
+      "blockingStatus": "pass",
+      "roots": 1,
+      "liveColorBindings": 1,
+      "residualBindings": 2,
+      "residualLayouts": 0,
+      "findings": [
+        {
+          "nodeId": "6110:56188",
+          "nodeName": "DIal FIll",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "6110:56188",
+          "nodeName": "DIal FIll",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        }
+      ]
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

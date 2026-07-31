@@ -1,0 +1,58 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8015:4822",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "b885d268c6a2c7d1925d9f678aa9f7a782c27a1092fa7fcb4ea5002c6bb56b30",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8015:4822",
+      "class": "buttonPillReg",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8015:4822;6103:704",
+      "class": "label",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8015:4822;6103:705",
+      "class": "label2",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "internalEntry": {
+    "id": "56c1a9e7f1c9",
+    "public": false,
+    "localName": "ButtonPillRegInternal_56c1a9e7f1c9",
+    "ownerMasterId": "8018:27668",
+    "instanceId": "8015:4822",
+    "targetId": "6103:707",
+    "targetArtifactId": "6103:707",
+    "targetMasterId": "6103:707",
+    "targetCodeName": "ButtonPillReg",
+    "relativePath": "ButtonPillReg/internal/56c1a9e7f1c9/ButtonPillRegInternal_56c1a9e7f1c9.tsx",
+    "pinned": [
+      {
+        "nodeId": "I8015:4822;6103:705",
+        "sourceNodeId": "6103:705",
+        "path": [
+          "6103:705"
+        ],
+        "field": "characters",
+        "value": "Save",
+        "sourceValue": "Label"
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

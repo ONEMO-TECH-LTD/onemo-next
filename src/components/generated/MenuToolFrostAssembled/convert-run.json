@@ -1,0 +1,59 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8018:28072",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "ea6d646dfea8d9f32ed8d33ceaf6f536acdd4736fa4016a07bafcda6e63abe0b",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8018:28072",
+      "class": "menuToolFrostAssembled",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:27932",
+      "class": "menuToolFrostSingleTemplate",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8018:27932",
+      "targetId": "6103:702",
+      "props": {
+        "Button 2#6105:3": {
+          "type": "BOOLEAN",
+          "value": true
+        },
+        "Button 3#6105:4": {
+          "type": "BOOLEAN",
+          "value": true
+        },
+        "Button 4#6105:5": {
+          "type": "BOOLEAN",
+          "value": true
+        },
+        "Button 5#6105:6": {
+          "type": "BOOLEAN",
+          "value": true
+        }
+      },
+      "layout": {
+        "height": 208,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "HUG",
+        "layoutSizingVertical": "HUG",
+        "width": 48
+      }
+    }
+  ],
+  "componentProperties": [],
+  "refusals": [],
+  "notes": []
+}

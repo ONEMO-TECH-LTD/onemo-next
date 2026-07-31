@@ -1,0 +1,24 @@
+.stateLocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-m);
+}
+
+.buttonRoundSmall {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-xl);
+  flex-shrink: 0;
+  background-color: var(--sem-col-bg-app-quaternary);
+  box-shadow: inset 0 0 0 var(--sem-border-micro-s) var(--sem-col-border-primary-default);
+  backdrop-filter: blur(calc(var(--effects-blur-dense) / 2));
+  border-radius: var(--sem-radii-full);
+}
+
+.lockClosed {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}

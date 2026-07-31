@@ -1,0 +1,103 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8019:1146",
+  "fileVersion": "2382085534573304220",
+  "elements": 13,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 83,
+  "tokenDecls": 22,
+  "styleableDecls": 24,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "toolSwatches",
+      "prop": "width",
+      "value": "402px",
+      "line": 5,
+      "candidates": []
+    },
+    {
+      "className": "swatchMasked",
+      "prop": "width",
+      "value": "402px",
+      "line": 9,
+      "candidates": []
+    },
+    {
+      "className": "swatchMasked",
+      "prop": "height",
+      "value": "32px",
+      "line": 10,
+      "candidates": []
+    },
+    {
+      "className": "alpha",
+      "prop": "width",
+      "value": "402px",
+      "line": 24,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 1
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

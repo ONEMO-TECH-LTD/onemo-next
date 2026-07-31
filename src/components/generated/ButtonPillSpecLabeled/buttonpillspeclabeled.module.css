@@ -1,0 +1,29 @@
+.buttonPillSpecLabeled {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-m);
+}
+
+.buttonPillSpec {
+  flex-shrink: 0;
+}
+
+.label {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.menu {
+  flex-shrink: 0;
+  color: var(--sem-col-text-primary-subtle);
+  font-family: var(--sem-type-fluid-label-2xs-font);
+  font-size: var(--sem-type-fluid-label-2xs-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-2xs-line-height);
+  letter-spacing: var(--sem-type-fluid-label-2xs-letter-spacing);
+  text-align: center;
+}

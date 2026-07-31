@@ -1,0 +1,40 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12002:3886",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "f99f3e1f845a46c51b897d9605604853be77ab8a0ff809a1abe464592e79d6bd",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12002:3886",
+      "class": "statePassive",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12002:3887",
+      "class": "label",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Active",
+      "variantOptions": [
+        "Active",
+        "Passive"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

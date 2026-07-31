@@ -1,0 +1,152 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:26682",
+  "fileVersion": "2382085534573304220",
+  "elements": 7,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 23,
+  "tokenDecls": 3,
+  "styleableDecls": 13,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "selectedEdit",
+      "prop": "width",
+      "value": "402px",
+      "line": 6,
+      "candidates": []
+    },
+    {
+      "className": "tab",
+      "prop": "width",
+      "value": "71.6px",
+      "line": 19,
+      "candidates": []
+    },
+    {
+      "className": "tab",
+      "prop": "height",
+      "value": "38px",
+      "line": 20,
+      "candidates": []
+    },
+    {
+      "className": "tab2",
+      "prop": "width",
+      "value": "71.6px",
+      "line": 25,
+      "candidates": []
+    },
+    {
+      "className": "tab2",
+      "prop": "height",
+      "value": "38px",
+      "line": 26,
+      "candidates": []
+    },
+    {
+      "className": "tab3",
+      "prop": "width",
+      "value": "71.6px",
+      "line": 31,
+      "candidates": []
+    },
+    {
+      "className": "tab3",
+      "prop": "height",
+      "value": "38px",
+      "line": 32,
+      "candidates": []
+    },
+    {
+      "className": "tab4",
+      "prop": "width",
+      "value": "71.6px",
+      "line": 37,
+      "candidates": []
+    },
+    {
+      "className": "tab4",
+      "prop": "height",
+      "value": "38px",
+      "line": 38,
+      "candidates": []
+    },
+    {
+      "className": "tab5",
+      "prop": "width",
+      "value": "71.6px",
+      "line": 43,
+      "candidates": []
+    },
+    {
+      "className": "tab5",
+      "prop": "height",
+      "value": "38px",
+      "line": 44,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

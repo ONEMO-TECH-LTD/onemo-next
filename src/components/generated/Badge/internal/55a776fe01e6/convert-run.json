@@ -1,0 +1,65 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12002:3894",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "7f557d25bfae1a2da86778b3fa3830a9c028971255c59f453ea629e24c9c184f",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12002:3894",
+      "class": "badge",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I12002:3894;12002:3887",
+      "class": "label",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Active",
+      "variantOptions": [
+        "Active",
+        "Passive"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "internalEntry": {
+    "id": "55a776fe01e6",
+    "public": false,
+    "localName": "BadgeInternal_55a776fe01e6",
+    "ownerMasterId": "12002:3902",
+    "instanceId": "12002:3894",
+    "targetId": "12002:3886",
+    "targetArtifactId": "12002:3885",
+    "targetMasterId": "12002:3886",
+    "targetCodeName": "Badge",
+    "relativePath": "Badge/internal/55a776fe01e6/BadgeInternal_55a776fe01e6.tsx",
+    "pinned": [
+      {
+        "nodeId": "I12002:3894;12002:3887",
+        "sourceNodeId": "12002:3887",
+        "path": [
+          "12002:3887"
+        ],
+        "field": "characters",
+        "value": "Modify",
+        "sourceValue": "Label"
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

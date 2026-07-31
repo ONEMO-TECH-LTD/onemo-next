@@ -1,0 +1,23 @@
+.dial {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: var(--sem-dim-fluid-nano-xs);
+  width: var(--sem-dim-fluid-standard-xl);
+  height: var(--sem-dim-fluid-standard-xl);
+  box-sizing: border-box;
+  border-radius: var(--sem-radii-full);
+}
+
+.swatch {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  background-color: #a19c9c;
+  border: var(--sem-border-micro-s) solid var(--sem-col-border-max-default);
+  border-radius: var(--sem-radii-full);
+}

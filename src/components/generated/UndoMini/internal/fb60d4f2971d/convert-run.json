@@ -1,0 +1,69 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6104:659",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "f659cb7456335eba1e4dec687cec3b189bc039a897c245c7154dc29ac596bc47",
+  "targetKind": "component",
+  "iconRoot": true,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6104:659",
+      "class": "undoMini",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "internalEntry": {
+    "id": "fb60d4f2971d",
+    "public": false,
+    "localName": "UndoMiniInternal_fb60d4f2971d",
+    "ownerMasterId": "6104:641",
+    "instanceId": "6104:659",
+    "targetId": "8018:27923",
+    "targetArtifactId": "8018:27923",
+    "targetMasterId": "8018:27923",
+    "targetCodeName": "UndoMini",
+    "relativePath": "UndoMini/internal/fb60d4f2971d/UndoMiniInternal_fb60d4f2971d.tsx",
+    "pinned": [
+      {
+        "nodeId": "6104:659",
+        "sourceNodeId": "8018:27923",
+        "path": [],
+        "field": "fills",
+        "value": [],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "color": {
+              "a": 1,
+              "b": 1,
+              "g": 1,
+              "r": 1
+            },
+            "type": "SOLID",
+            "visible": false
+          }
+        ]
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6104:659",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    }
+  ]
+}

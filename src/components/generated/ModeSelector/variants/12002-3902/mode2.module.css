@@ -1,0 +1,27 @@
+.mode2 {
+  display: flex;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-s);
+  padding: var(--sem-dim-fluid-nano-s);
+  background-color: var(--sem-col-bg-overlay-tint-min);
+  border-radius: var(--sem-radii-full);
+}
+
+.badge {
+  width: var(--sem-dim-fluid-big-l);
+  height: var(--sem-dim-fluid-standard-l);
+  flex-shrink: 0;
+}
+
+.badge2 {
+  width: var(--sem-dim-fluid-big-l);
+  height: var(--sem-dim-fluid-standard-l);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.badge3 {
+  width: var(--sem-dim-fluid-big-l);
+  height: var(--sem-dim-fluid-standard-l);
+  flex-shrink: 0;
+}

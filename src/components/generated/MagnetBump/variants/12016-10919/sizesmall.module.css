@@ -1,0 +1,4 @@
+.sizeSmall {
+  width: var(--fc-icon-w, 32px);
+  height: var(--fc-icon-h, 32px);
+}

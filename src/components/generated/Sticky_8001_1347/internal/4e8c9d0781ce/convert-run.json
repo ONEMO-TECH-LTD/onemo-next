@@ -1,0 +1,93 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:20923",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "638ed912909d32a46a6767aceff9677a906941d2a0effbf7579c7b1cefb9a342",
+  "targetKind": "component",
+  "iconRoot": true,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8017:20923",
+      "class": "sticky",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [],
+  "internalEntry": {
+    "id": "4e8c9d0781ce",
+    "public": false,
+    "localName": "Sticky_8001_1347Internal_4e8c9d0781ce",
+    "ownerMasterId": "8017:20930",
+    "instanceId": "8017:20923",
+    "targetId": "8001:1347",
+    "targetArtifactId": "8001:1347",
+    "targetMasterId": "8001:1347",
+    "targetCodeName": "Sticky_8001_1347",
+    "relativePath": "Sticky_8001_1347/internal/4e8c9d0781ce/Sticky_8001_1347Internal_4e8c9d0781ce.tsx",
+    "pinned": [
+      {
+        "nodeId": "I8017:20923;8001:1345",
+        "sourceNodeId": "8001:1345",
+        "path": [
+          "8001:1345"
+        ],
+        "field": "fills",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "boundVariables": {
+              "color": {
+                "id": "VariableID:4375:36210",
+                "type": "VARIABLE_ALIAS"
+              }
+            },
+            "color": {
+              "a": 1,
+              "b": 0.9803921580314636,
+              "g": 0.9803921580314636,
+              "r": 0.9803921580314636
+            },
+            "type": "SOLID"
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "boundVariables": {
+              "color": {
+                "id": "VariableID:34:1324",
+                "type": "VARIABLE_ALIAS"
+              }
+            },
+            "color": {
+              "a": 1,
+              "b": 0.07450980693101883,
+              "g": 0.062745101749897,
+              "r": 0.027450980618596077
+            },
+            "type": "SOLID"
+          }
+        ]
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8017:20923",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    }
+  ]
+}

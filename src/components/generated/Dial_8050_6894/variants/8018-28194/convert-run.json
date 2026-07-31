@@ -1,0 +1,40 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8018:28194",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "9d6f508ed18460937968094e7af368a9816082a8352c3838660ed547289663f3",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8018:28194",
+      "class": "stateDefault",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8018:28193",
+      "class": "swatch",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Default",
+      "variantOptions": [
+        "Selected",
+        "Default"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

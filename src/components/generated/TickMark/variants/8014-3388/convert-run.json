@@ -1,0 +1,40 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8014:3388",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "be275eb3279c0dc9157e5f2aa33e2a293a20117961d2e77ee68609a12ff15284",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 1,
+  "figmaAbsoluteCount": 1,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8014:3388",
+      "class": "sizeSmall",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8014:2856",
+      "class": "tickMark",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Size",
+      "propName": "size",
+      "type": "VARIANT",
+      "defaultValue": "Small",
+      "variantOptions": [
+        "Small",
+        "Center"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": []
+}

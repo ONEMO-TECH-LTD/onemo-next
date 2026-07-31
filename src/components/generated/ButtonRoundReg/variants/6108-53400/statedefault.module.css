@@ -1,0 +1,16 @@
+.stateDefault {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: var(--sem-dim-fluid-big-m);
+  height: var(--sem-dim-fluid-big-m);
+  box-sizing: border-box;
+  border: var(--sem-border-micro-s) solid var(--sem-col-border-primary-strong);
+  border-radius: var(--sem-radii-full);
+}
+
+.circle {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}

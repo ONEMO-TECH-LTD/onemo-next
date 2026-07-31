@@ -1,0 +1,4 @@
+.rectanglePortrait {
+  width: var(--fc-icon-w, 20px);
+  height: var(--fc-icon-h, 20px);
+}

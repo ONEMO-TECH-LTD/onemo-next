@@ -1,0 +1,23 @@
+.stateOpen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sem-dim-fluid-nano-m);
+}
+
+.buttonRoundSmall {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-xl);
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 var(--sem-border-micro-s) var(--sem-col-border-primary-default);
+  border-radius: var(--sem-radii-full);
+}
+
+.lockOpen {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transform: scaleX(-1);
+}

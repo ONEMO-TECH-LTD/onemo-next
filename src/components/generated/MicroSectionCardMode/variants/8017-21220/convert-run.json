@@ -1,0 +1,167 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:21220",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "7d5a5b078c76c10a7aac4c3c3f221732d73ebf73a2208dbb03a788a13e62af19",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8017:21220",
+      "class": "stateBackside",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:21221",
+      "class": "sideIndicator",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Frontside",
+      "variantOptions": [
+        "Frontside",
+        "Backside"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8017:21221",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 2,
+      "residualBindings": 12,
+      "residualLayouts": 1,
+      "findings": [
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "paddingLeft",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "paddingTop",
+          "variableIds": [
+            "VariableID:2018:4396"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "paddingRight",
+          "variableIds": [
+            "VariableID:2018:4399"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "paddingBottom",
+          "variableIds": [
+            "VariableID:2018:4396"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "rectangleCornerRadii.RECTANGLE_TOP_LEFT_CORNER_RADIUS",
+          "variableIds": [
+            "VariableID:34:1498"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "rectangleCornerRadii.RECTANGLE_TOP_RIGHT_CORNER_RADIUS",
+          "variableIds": [
+            "VariableID:34:1498"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "rectangleCornerRadii.RECTANGLE_BOTTOM_LEFT_CORNER_RADIUS",
+          "variableIds": [
+            "VariableID:34:1498"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "rectangleCornerRadii.RECTANGLE_BOTTOM_RIGHT_CORNER_RADIUS",
+          "variableIds": [
+            "VariableID:34:1498"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21222",
+          "descendantName": "Dot",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4397"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21222",
+          "descendantName": "Dot",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4397"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21223",
+          "descendantName": "Dot",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4397"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21223",
+          "descendantName": "Dot",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4397"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "8017:21221",
+          "descendantName": "Side-indicator",
+          "propertyPath": "layoutMode",
+          "category": "baked-auto-layout",
+          "detail": "HORIZONTAL"
+        }
+      ],
+      "note": "svg descendants: 2 live colour binding(s), 12 unsupported binding(s), 1 baked auto-layout frame(s)"
+    }
+  ]
+}

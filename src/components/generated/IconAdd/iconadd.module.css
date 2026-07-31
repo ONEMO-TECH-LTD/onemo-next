@@ -1,0 +1,4 @@
+.iconAdd {
+  width: var(--fc-icon-w, var(--sem-dim-fluid-standard-2l));
+  height: var(--fc-icon-h, var(--sem-dim-fluid-standard-2l));
+}

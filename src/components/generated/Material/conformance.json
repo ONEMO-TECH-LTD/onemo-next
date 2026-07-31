@@ -1,0 +1,74 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8001:1156",
+  "fileVersion": "2382085534573304220",
+  "elements": 1,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 33,
+  "tokenDecls": 1,
+  "styleableDecls": 3,
+  "unresolved": [],
+  "raws": [],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 1,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

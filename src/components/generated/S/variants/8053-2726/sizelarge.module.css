@@ -1,0 +1,21 @@
+.sizeLarge {
+  width: 20px;
+  height: 20px;
+  position: relative;
+}
+
+.l {
+  width: var(--sem-dim-fluid-standard-l);
+  height: var(--sem-dim-fluid-standard-l);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--sem-col-text-primary-default);
+  font-family: var(--sem-type-fluid-label-m-font);
+  font-size: var(--sem-type-fluid-label-m-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-m-line-height);
+  letter-spacing: var(--sem-type-fluid-label-m-letter-spacing);
+  text-align: center;
+  align-content: center;
+}

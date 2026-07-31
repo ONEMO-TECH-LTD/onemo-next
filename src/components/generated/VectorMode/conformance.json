@@ -1,0 +1,805 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12007:18281",
+  "fileVersion": "2382085534573304220",
+  "elements": 4,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 50,
+  "tokenDecls": 5,
+  "styleableDecls": 10,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "vectorMode",
+      "prop": "width",
+      "value": "296px",
+      "line": 2,
+      "candidates": []
+    },
+    {
+      "className": "vectorMode",
+      "prop": "height",
+      "value": "296px",
+      "line": 3,
+      "candidates": []
+    },
+    {
+      "className": "outline",
+      "prop": "width",
+      "value": "288px",
+      "line": 8,
+      "candidates": []
+    },
+    {
+      "className": "outline",
+      "prop": "height",
+      "value": "288px",
+      "line": 9,
+      "candidates": []
+    },
+    {
+      "className": "anchors",
+      "prop": "width",
+      "value": "296px",
+      "line": 18,
+      "candidates": []
+    },
+    {
+      "className": "anchors",
+      "prop": "height",
+      "value": "296px",
+      "line": 19,
+      "candidates": []
+    },
+    {
+      "className": "radius",
+      "prop": "width",
+      "value": "228px",
+      "line": 26,
+      "candidates": []
+    },
+    {
+      "className": "radius",
+      "prop": "height",
+      "value": "228px",
+      "line": 27,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [
+    {
+      "nodeId": "12007:18263",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18263",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18263",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18264",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18264",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18264",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18265",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18265",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18265",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18266",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18266",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18266",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18267",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18267",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18267",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18268",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18268",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18268",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18269",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18269",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18269",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18270",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18270",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18270",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18271",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18271",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18271",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18272",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18272",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18272",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18273",
+      "nodeName": "Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18273",
+      "nodeName": "Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18273",
+      "nodeName": "Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18274",
+      "nodeName": "Anchor-Selected",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18274",
+      "nodeName": "Anchor-Selected",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18274",
+      "nodeName": "Anchor-Selected",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18276",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18276",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18276",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18277",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18277",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18277",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18278",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18278",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18278",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18279",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "strokeWeight",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18279",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.x",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    },
+    {
+      "nodeId": "12007:18279",
+      "nodeName": "Radius-Anchor",
+      "propertyPath": "size.y",
+      "kind": "unsupported-node-binding",
+      "reason": "node binding has no live inline SVG carrier"
+    }
+  ],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 1,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "fail",
+      "blockingStatus": "pass",
+      "roots": 2,
+      "liveColorBindings": 10,
+      "residualBindings": 48,
+      "residualLayouts": 0,
+      "findings": [
+        {
+          "nodeId": "12007:18263",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18263",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18263",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18264",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18264",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18264",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18265",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18265",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18265",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18266",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18266",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18266",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18267",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18267",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18267",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18268",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18268",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18268",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18269",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18269",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18269",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18270",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18270",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18270",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18271",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18271",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18271",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18272",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18272",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18272",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18273",
+          "nodeName": "Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18273",
+          "nodeName": "Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18273",
+          "nodeName": "Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18274",
+          "nodeName": "Anchor-Selected",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18274",
+          "nodeName": "Anchor-Selected",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18274",
+          "nodeName": "Anchor-Selected",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18276",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18276",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18276",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18277",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18277",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18277",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18278",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18278",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18278",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18279",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "strokeWeight",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18279",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.x",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        },
+        {
+          "nodeId": "12007:18279",
+          "nodeName": "Radius-Anchor",
+          "propertyPath": "size.y",
+          "kind": "unsupported-node-binding",
+          "reason": "node binding has no live inline SVG carrier"
+        }
+      ]
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

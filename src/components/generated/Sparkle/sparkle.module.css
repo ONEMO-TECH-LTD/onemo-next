@@ -1,0 +1,5 @@
+.sparkle {
+  width: var(--fc-icon-w, var(--sem-dim-fluid-standard-l));
+  height: var(--fc-icon-h, var(--sem-dim-fluid-standard-l));
+  color: var(--sem-col-fg-primary-default);
+}

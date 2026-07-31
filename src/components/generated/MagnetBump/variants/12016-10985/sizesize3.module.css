@@ -1,0 +1,4 @@
+.sizeSize3 {
+  width: var(--fc-icon-w, 24px);
+  height: var(--fc-icon-h, 24px);
+}

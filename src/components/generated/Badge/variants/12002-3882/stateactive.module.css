@@ -1,0 +1,30 @@
+.stateActive {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: var(--sem-dim-fluid-big-l);
+  height: var(--sem-dim-fluid-standard-l);
+  position: relative;
+  filter: drop-shadow(0 var(--effects-blur-ghost) calc(var(--effects-blur-soft) / 2) var(--effects-shadow-regular));
+  border-radius: var(--sem-radii-full);
+}
+
+.fcPaint1Fill {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--sem-col-bg-control-default);
+  border-radius: inherit;
+}
+
+.label {
+  flex-shrink: 0;
+  position: relative;
+  color: var(--sem-col-text-primary-default);
+  font-family: var(--sem-type-fluid-label-xs-font);
+  font-size: var(--sem-type-fluid-label-xs-size);
+  font-weight: 500;
+  line-height: var(--sem-type-fluid-label-xs-line-height);
+  letter-spacing: var(--sem-type-fluid-label-xs-letter-spacing);
+  text-align: center;
+}

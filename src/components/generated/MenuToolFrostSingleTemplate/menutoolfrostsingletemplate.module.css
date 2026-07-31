@@ -1,0 +1,41 @@
+.menuToolFrostSingleTemplate {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  background-color: var(--sem-col-bg-overlay-frost-thin);
+  box-shadow: inset 0 0 0 var(--sem-border-micro-s) var(--sem-col-border-primary-default);
+  backdrop-filter: blur(calc(var(--effects-blur-mild) / 2));
+  border-radius: var(--sem-radii-full);
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sem-dim-fluid-nano-xl);
+  padding: var(--sem-dim-fluid-nano-xl);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.buttonRoundFrostMini {
+  flex-shrink: 0;
+}
+
+.buttonRoundFrostMini2 {
+  flex-shrink: 0;
+}
+
+.buttonRoundFrostMini3 {
+  flex-shrink: 0;
+}
+
+.buttonRoundFrostMini4 {
+  flex-shrink: 0;
+}
+
+.buttonRoundFrostMini5 {
+  flex-shrink: 0;
+}

@@ -1,0 +1,110 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8001:998",
+  "fileVersion": "2382085534573304220",
+  "elements": 69,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 96,
+  "tokenDecls": 134,
+  "styleableDecls": 137,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "toolRuller",
+      "prop": "height",
+      "value": "56px",
+      "line": 5,
+      "candidates": []
+    },
+    {
+      "className": "rulerMasked",
+      "prop": "width",
+      "value": "402px",
+      "line": 9,
+      "candidates": []
+    },
+    {
+      "className": "rulerMasked",
+      "prop": "height",
+      "value": "24px",
+      "line": 10,
+      "candidates": []
+    },
+    {
+      "className": "frame9",
+      "prop": "width",
+      "value": "402px",
+      "line": 24,
+      "candidates": []
+    },
+    {
+      "className": "ruller",
+      "prop": "height",
+      "value": "24px",
+      "line": 38,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 1
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}

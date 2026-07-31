@@ -1,0 +1,87 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8018:28201",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "d365651eb12a505a3f5b22013276a84da026a218d0cc4925eae42c16940f1e40",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8018:28201",
+      "class": "dial",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8018:28201;8018:28193",
+      "class": "swatch",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Default",
+      "variantOptions": [
+        "Selected",
+        "Default"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "internalEntry": {
+    "id": "da9567d8f39e",
+    "public": false,
+    "localName": "Dial_8050_6894Internal_da9567d8f39e",
+    "ownerMasterId": "8019:1146",
+    "instanceId": "8018:28201",
+    "targetId": "8018:28194",
+    "targetArtifactId": "8050:6894",
+    "targetMasterId": "8018:28194",
+    "targetCodeName": "Dial_8050_6894",
+    "relativePath": "Dial_8050_6894/internal/da9567d8f39e/Dial_8050_6894Internal_da9567d8f39e.tsx",
+    "pinned": [
+      {
+        "nodeId": "I8018:28201;8018:28193",
+        "sourceNodeId": "8018:28193",
+        "path": [
+          "8018:28193"
+        ],
+        "field": "fills",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "color": {
+              "a": 1,
+              "b": 0.8470588326454163,
+              "g": 0.7766013145446777,
+              "r": 0.24313725531101227
+            },
+            "type": "SOLID"
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "color": {
+              "a": 1,
+              "b": 0.24313725531101227,
+              "g": 0.8274509906768799,
+              "r": 0.8470588326454163
+            },
+            "type": "SOLID"
+          }
+        ]
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

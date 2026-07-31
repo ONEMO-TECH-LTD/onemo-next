@@ -1,0 +1,133 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:20929",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "ce4876bc93c916da19c2153ecd3efaa9e2f052f6e746b142b9854e52d8b8b3f3",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8017:20929",
+      "class": "modeMagnetic",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20906",
+      "class": "toggle",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20907",
+      "class": "buttonToggle",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20908",
+      "class": "magnetic",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20909",
+      "class": "buttonToggle2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20910",
+      "class": "sticky",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20911",
+      "class": "labelBox",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20912",
+      "class": "label",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20913",
+      "class": "magnetic2",
+      "kind": "text"
+    },
+    {
+      "figmaId": "8017:20914",
+      "class": "label2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "8017:20915",
+      "class": "sticky2",
+      "kind": "text"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "8017:20908",
+      "targetId": "8001:1153",
+      "props": {},
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 20
+      }
+    },
+    {
+      "instanceId": "8017:20910",
+      "targetId": "8001:1347",
+      "props": {},
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 20
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Mode",
+      "propName": "mode",
+      "type": "VARIANT",
+      "defaultValue": "Magnetic",
+      "variantOptions": [
+        "Magnetic",
+        "Sticky"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "8017:20908",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    },
+    {
+      "nodeId": "8017:20910",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    }
+  ]
+}

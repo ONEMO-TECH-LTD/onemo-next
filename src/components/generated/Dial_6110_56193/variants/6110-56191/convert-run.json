@@ -1,0 +1,130 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6110:56191",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "cf6ac9449f446c0c676b0277142925d1c599e016c405e10f25c9402495589aa2",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 2,
+  "figmaAbsoluteCount": 2,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6110:56191",
+      "class": "stateNewValue",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6110:56180",
+      "class": "dialBox",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6110:56181",
+      "class": "dialReg",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6110:56183",
+      "class": "hexagon",
+      "kind": "element",
+      "propertyRefs": {
+        "mainComponent": "Icons#6110:15"
+      }
+    },
+    {
+      "figmaId": "6110:56182",
+      "class": "dialFill",
+      "kind": "svg"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "6110:56183",
+      "targetId": "6110:54836",
+      "props": {},
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 20
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Icons#6110:15",
+      "propName": "icons",
+      "type": "INSTANCE_SWAP",
+      "defaultValue": "6110:54836",
+      "preferredValues": [],
+      "bindingScope": [
+        {
+          "masterId": "6110:56191",
+          "sites": [
+            {
+              "nodeId": "6110:56183",
+              "field": "mainComponent"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "New value",
+      "variantOptions": [
+        "Active",
+        "New value"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6110:56183",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    },
+    {
+      "nodeId": "6110:56182",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 2,
+      "residualLayouts": 0,
+      "findings": [
+        {
+          "descendantId": "6110:56182",
+          "descendantName": "DIal FIll",
+          "propertyPath": "size.x",
+          "variableIds": [
+            "VariableID:2018:4408"
+          ],
+          "category": "unsupported-node-binding"
+        },
+        {
+          "descendantId": "6110:56182",
+          "descendantName": "DIal FIll",
+          "propertyPath": "size.y",
+          "variableIds": [
+            "VariableID:2018:4408"
+          ],
+          "category": "unsupported-node-binding"
+        }
+      ],
+      "note": "svg descendants: 1 live colour binding(s), 2 unsupported binding(s), 0 baked auto-layout frame(s)"
+    }
+  ]
+}

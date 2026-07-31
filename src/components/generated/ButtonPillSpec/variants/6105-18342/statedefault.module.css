@@ -1,0 +1,16 @@
+.stateDefault {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sem-dim-fluid-nano-m) var(--sem-dim-fluid-standard-m);
+  background-image: linear-gradient(0deg, var(--sem-col-bg-spec-pill-primary) 67.12%, var(--sem-col-bg-spec-gradient-secondary-mono) 119.64%);
+  background-origin: border-box;
+  box-shadow: inset 0 0 0 var(--sem-border-micro-s) var(--sem-col-border-spec-pill-primary-mono), 0 var(--effects-blur-trace) var(--effects-blur-soft) var(--effects-shadow-strong);
+  border-radius: 9999px;
+}
+
+.menu {
+  width: var(--com-controls-icon);
+  height: var(--com-controls-icon);
+  flex-shrink: 0;
+}

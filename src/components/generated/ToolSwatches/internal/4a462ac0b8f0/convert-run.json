@@ -1,0 +1,386 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8019:1570",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "03148916feb49689385c41d6ec40444fbb0173e94323dde79d5cf27f49a6f055",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 2,
+  "figmaAbsoluteCount": 2,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "8019:1570",
+      "class": "toolSwatches",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8014:4429",
+      "class": "swatchMasked",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8014:4430",
+      "class": "alpha",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8014:4431",
+      "class": "swatchRow",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28195",
+      "class": "dial",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28197",
+      "class": "dial2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28199",
+      "class": "dial3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28201",
+      "class": "dial4",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28205",
+      "class": "dial5",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28203",
+      "class": "dial6",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28207",
+      "class": "dial7",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28209",
+      "class": "dial8",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I8019:1570;8018:28211",
+      "class": "dial9",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "I8019:1570;8018:28195",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28197",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28199",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28201",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28205",
+      "targetId": "8050:6895",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Selected"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28203",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28207",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28209",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    },
+    {
+      "instanceId": "I8019:1570;8018:28211",
+      "targetId": "8018:28194",
+      "props": {
+        "Icons#8050:5": {
+          "preferredValues": [],
+          "type": "INSTANCE_SWAP",
+          "value": "6110:54836"
+        },
+        "State": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Default"
+        },
+        "Value#8050:6": {
+          "type": "TEXT",
+          "value": "8"
+        }
+      },
+      "layout": {
+        "height": 24,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 24
+      }
+    }
+  ],
+  "componentProperties": [],
+  "internalEntry": {
+    "id": "4a462ac0b8f0",
+    "public": false,
+    "localName": "ToolSwatchesInternal_4a462ac0b8f0",
+    "ownerMasterId": "8019:1593",
+    "instanceId": "8019:1570",
+    "targetId": "8019:1146",
+    "targetArtifactId": "8019:1146",
+    "targetMasterId": "8019:1146",
+    "targetCodeName": "ToolSwatches",
+    "relativePath": "ToolSwatches/internal/4a462ac0b8f0/ToolSwatchesInternal_4a462ac0b8f0.tsx",
+    "pinned": [
+      {
+        "nodeId": "I8019:1570;8018:28205;8054:3299",
+        "sourceNodeId": "8054:3299",
+        "path": [
+          "8018:28205",
+          "8054:3299"
+        ],
+        "field": "fills",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "color": {
+              "a": 1,
+              "b": 0.1384653002023697,
+              "g": 0.1384653002023697,
+              "r": 0.1384653002023697
+            },
+            "type": "SOLID"
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "color": {
+              "a": 1,
+              "b": 0.24313725531101227,
+              "g": 0.8274509906768799,
+              "r": 0.8470588326454163
+            },
+            "type": "SOLID"
+          }
+        ]
+      }
+    ],
+    "childEntryIds": [
+      "eaebbb52aa00"
+    ]
+  },
+  "refusals": [],
+  "notes": []
+}

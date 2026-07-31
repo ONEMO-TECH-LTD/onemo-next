@@ -1,0 +1,215 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:11146",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "e51022d01d1f8c0ed7e8adf919ec61be0948af77c18ac503617bd45ab8d433d7",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 1,
+  "figmaAbsoluteCount": 1,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "12016:11146",
+      "class": "property1Medium",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11092",
+      "class": "effectCard",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11093",
+      "class": "magneticGridSM",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11094",
+      "class": "top",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11095",
+      "class": "magnetBump",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11096",
+      "class": "magnetBump2",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11097",
+      "class": "bottom",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11098",
+      "class": "magnetBump3",
+      "kind": "element"
+    },
+    {
+      "figmaId": "12016:11099",
+      "class": "magnetBump4",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "12016:11092",
+      "targetId": "8054:4017",
+      "props": {
+        "Side": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Back"
+        }
+      },
+      "layout": {
+        "height": 288,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutPositioning": "ABSOLUTE",
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 288
+      }
+    },
+    {
+      "instanceId": "12016:11095",
+      "targetId": "12016:10933",
+      "props": {
+        "SIze": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Medium"
+        }
+      },
+      "layout": {
+        "height": 28,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 28
+      }
+    },
+    {
+      "instanceId": "12016:11096",
+      "targetId": "12016:10933",
+      "props": {
+        "SIze": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Medium"
+        }
+      },
+      "layout": {
+        "height": 28,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 28
+      }
+    },
+    {
+      "instanceId": "12016:11098",
+      "targetId": "12016:10933",
+      "props": {
+        "SIze": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Medium"
+        }
+      },
+      "layout": {
+        "height": 28,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 28
+      }
+    },
+    {
+      "instanceId": "12016:11099",
+      "targetId": "12016:10933",
+      "props": {
+        "SIze": {
+          "boundVariables": {},
+          "type": "VARIANT",
+          "value": "Medium"
+        }
+      },
+      "layout": {
+        "height": 28,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 28
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Property 1",
+      "propName": "property1",
+      "type": "VARIANT",
+      "defaultValue": "SMALL",
+      "variantOptions": [
+        "LARGE",
+        "MEDIUM",
+        "SMALL",
+        "Variant4"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "12016:11095",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    },
+    {
+      "nodeId": "12016:11096",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    },
+    {
+      "nodeId": "12016:11098",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    },
+    {
+      "nodeId": "12016:11099",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    }
+  ]
+}

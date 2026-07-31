@@ -1,0 +1,46 @@
+.selectedShape {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0 var(--sem-dim-fluid-standard-2l) var(--sem-dim-fluid-standard-m);
+  width: 402px;
+  box-sizing: border-box;
+}
+
+.tabBarColourTunedIcons {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 var(--sem-dim-fluid-none);
+  flex-shrink: 0;
+}
+
+.tab {
+  width: 71.6px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.tab2 {
+  width: 71.6px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.tab3 {
+  width: 71.6px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.tab4 {
+  width: 71.6px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.tab5 {
+  width: 71.6px;
+  height: 38px;
+  flex-shrink: 0;
+}

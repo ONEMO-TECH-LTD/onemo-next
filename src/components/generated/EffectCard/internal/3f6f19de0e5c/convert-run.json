@@ -1,0 +1,125 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "12016:11092",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "3764ea47c1cdae3bc061788054368ae67068f97e8534538e772eb2dc22953823",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 1,
+  "figmaAbsoluteCount": 1,
+  "helperAbsoluteCount": 2,
+  "idMap": [
+    {
+      "figmaId": "12016:11092",
+      "class": "effectCard",
+      "kind": "element"
+    },
+    {
+      "figmaId": "I12016:11092;8054:4018",
+      "class": "effectCard2",
+      "kind": "element"
+    }
+  ],
+  "helperMap": [
+    {
+      "ownerFigmaId": "I12016:11092;8054:4018",
+      "role": "fill:0",
+      "sourceIndex": 0,
+      "class": "fcPaint1Fill",
+      "order": 0
+    },
+    {
+      "ownerFigmaId": "I12016:11092;8054:4018",
+      "role": "stroke",
+      "sourceIndex": null,
+      "class": "fcPaint2Stroke",
+      "order": 1
+    }
+  ],
+  "componentSurface": [],
+  "componentProperties": [
+    {
+      "authoredKey": "Side",
+      "propName": "side",
+      "type": "VARIANT",
+      "defaultValue": "Face-Modify-frame1",
+      "variantOptions": [
+        "Face",
+        "Back",
+        "Face-Modify-frame1"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "internalEntry": {
+    "id": "3f6f19de0e5c",
+    "public": false,
+    "localName": "EffectCardInternal_3f6f19de0e5c",
+    "ownerMasterId": "12016:11146",
+    "instanceId": "12016:11092",
+    "targetId": "8054:4017",
+    "targetArtifactId": "8054:4016",
+    "targetMasterId": "8054:4017",
+    "targetCodeName": "EffectCard",
+    "relativePath": "EffectCard/internal/3f6f19de0e5c/EffectCardInternal_3f6f19de0e5c.tsx",
+    "pinned": [
+      {
+        "nodeId": "I12016:11092;8054:4018",
+        "sourceNodeId": "8054:4018",
+        "path": [
+          "8054:4018"
+        ],
+        "field": "fills",
+        "value": [
+          {
+            "blendMode": "NORMAL",
+            "filters": {
+              "exposure": -0.41999998688697815
+            },
+            "imageRef": "279f910f370a2325793fad0360f98b53eb0c69cd",
+            "imageTransform": [
+              [
+                0.9574775695800781,
+                0,
+                0.021261222660541534
+              ],
+              [
+                0,
+                0.716819167137146,
+                0.07715941965579987
+              ]
+            ],
+            "scaleMode": "STRETCH",
+            "type": "IMAGE"
+          }
+        ],
+        "sourceValue": [
+          {
+            "blendMode": "NORMAL",
+            "filters": {
+              "exposure": 0.07999999821186066
+            },
+            "imageRef": "279f910f370a2325793fad0360f98b53eb0c69cd",
+            "imageTransform": [
+              [
+                0.9574775695800781,
+                0,
+                0.021261222660541534
+              ],
+              [
+                0,
+                0.716819167137146,
+                0.07715941965579987
+              ]
+            ],
+            "scaleMode": "STRETCH",
+            "type": "IMAGE"
+          }
+        ]
+      }
+    ],
+    "childEntryIds": []
+  },
+  "refusals": [],
+  "notes": []
+}

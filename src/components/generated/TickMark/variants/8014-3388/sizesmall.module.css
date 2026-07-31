@@ -1,0 +1,15 @@
+.sizeSmall {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  position: relative;
+}
+
+.tickMark {
+  width: var(--sem-dim-fluid-nano-s);
+  height: var(--sem-dim-fluid-standard-xs);
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-color: var(--sem-col-fg-primary-muted);
+  border-radius: var(--sem-radii-full);
+}

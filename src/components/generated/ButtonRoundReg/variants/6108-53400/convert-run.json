@@ -1,0 +1,276 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6108:53400",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "5bf5cf305184db8668ee14b1f95c07ae394044bdba884d01c67995e50759823a",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6108:53400",
+      "class": "stateDefault",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6108:53399",
+      "class": "circle",
+      "kind": "element",
+      "propertyRefs": {
+        "mainComponent": "Icons#8050:0"
+      }
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "6108:53399",
+      "targetId": "6108:52031",
+      "props": {},
+      "layout": {
+        "height": 20,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 20
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Icons#8050:0",
+      "propName": "icons",
+      "type": "INSTANCE_SWAP",
+      "defaultValue": "6108:52031",
+      "preferredValues": [
+        {
+          "type": "COMPONENT",
+          "key": "bb0cfbb1891548e0f576a7d0e514a770a4d91c08"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "ebc6ca9f7f3f55b5e9ac12f80715238e77dc7c8d"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "c53700dffe9d2bb218b9b256e433e760ed3757fe"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f4efce79dc3adf15b65af2aa30f41c91f7d488b6"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "7c03a9bc1068b126cbaba86063840d41d526dcd2"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "09ef4c3a2289283aa7a8f0de1031c91329c59431"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "793d88c14c978af066f1179248060dcfc7c4a3c9"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f6326317d82666a67f92a446b63bf620371c9c68"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "1460470e6301acd2835739e9c400b261e03e2e86"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f76b7d21fa2282165a4e05fe446a58d398cf9575"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f8d64bf0c37a5cca3c549233d681b56420342a51"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "0da6e676cb045d7d1f2ea95814c41b286e88cac9"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "9c8f8aab394b50bac624fe5eb9b87717cfd6aea6"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "8f9ff4a5c053d552d8401c43d9d30bf6d8386ac5"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "43101cdc28268cb469e8b53888da8ee232d5b529"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "981cb876faed59bd07c3bdcebe172d0d91fb6591"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "8b512e7165b1d5e0d2f5d7954913d2059ae8ac3a"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "003454c063963abebfa3b7ec80dd4ac64c64949f"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "46d173d9360a946871672ae276b18c0d9df8be35"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a7f0c691f21d252ea657a1ff3fc29dbab8bd2d33"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "63c466d33e72a54777115f2cf6e846bbd3066e68"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "1c97948d09d176fbb945576ae889bcbecfe65e95"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "73c210dbe3eae21bbeee1870b68d490b8c388753"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "063a5e9acd3307e8971343ae792c6f220548f339"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "de073c5a34269591fc76153191bac9fb5f08b3c4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "e50efa9a9f84861f73afac61e25ac757d26aa832"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "5bff9c86629e74e979022ad53e047b4b9e0b9d78"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "cbf73d9440471c2d4da27ef69724daf0c2ba807d"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "47df3587735c498ed4dd79647d238f4e52aad541"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "dc97cb71f078006ad193739cbc6bce569d5ef08e"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "8117f273c235bf22ae461456a9039612a9443eb1"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "63d7571a1f8523fe0d1056db251c7a3ba8c667af"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "b5650dda53a59029c6eab3a2a2c55ec2ddfcc6f4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "ccaa9d87d43ffc477f37e271f10ebad96e91774e"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "4306bcd94211f72fb5bc8aca562e1286ff887aca"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "66ae050c19b7f17bd941bf042bb077c78b03a197"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "7a99e1c45b4a8fca072fa62d793c95dab57d61f2"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "94ffb540fec1e0514f9a2007fbed7a29cef9c971"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "2ce95546787b23dbd347da76d3d06b25cafd58d4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "96e746aaa4ee0641939b635a0a275205c7c514db"
+        },
+        {
+          "type": "COMPONENT_SET",
+          "key": "8e814d59469348e4b96032b766e8b76e830dd4ad"
+        }
+      ],
+      "bindingScope": [
+        {
+          "masterId": "6108:53400",
+          "sites": [
+            {
+              "nodeId": "6108:53399",
+              "field": "mainComponent"
+            }
+          ]
+        },
+        {
+          "masterId": "8050:6869",
+          "sites": [
+            {
+              "nodeId": "8050:6870",
+              "field": "mainComponent"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "authoredKey": "State",
+      "propName": "state",
+      "type": "VARIANT",
+      "defaultValue": "Default",
+      "variantOptions": [
+        "Default",
+        "Selected"
+      ],
+      "bindingScope": []
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6108:53399",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 0 live colour binding(s), no residual semantics"
+    }
+  ]
+}

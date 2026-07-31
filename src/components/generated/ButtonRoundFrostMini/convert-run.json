@@ -1,0 +1,124 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "6104:641",
+  "fileVersion": "2382085534573304220",
+  "contentHash": "75cecb8044881d9e5b1b647534af91d2de8aff8a1bbdab3b0fe0381cfcb89dbd",
+  "targetKind": "component",
+  "iconRoot": false,
+  "absoluteCount": 0,
+  "figmaAbsoluteCount": 0,
+  "helperAbsoluteCount": 0,
+  "idMap": [
+    {
+      "figmaId": "6104:641",
+      "class": "buttonRoundFrostMini",
+      "kind": "element"
+    },
+    {
+      "figmaId": "6104:659",
+      "class": "undoMini",
+      "kind": "element",
+      "propertyRefs": {
+        "mainComponent": "Icons#6104:1"
+      }
+    }
+  ],
+  "helperMap": [],
+  "componentSurface": [
+    {
+      "instanceId": "6104:659",
+      "targetId": "8018:27923",
+      "props": {},
+      "layout": {
+        "height": 16,
+        "layoutAlign": "INHERIT",
+        "layoutGrow": 0,
+        "layoutSizingHorizontal": "FIXED",
+        "layoutSizingVertical": "FIXED",
+        "width": 16
+      }
+    }
+  ],
+  "componentProperties": [
+    {
+      "authoredKey": "Icons#6104:1",
+      "propName": "icons",
+      "type": "INSTANCE_SWAP",
+      "defaultValue": "8018:27923",
+      "preferredValues": [
+        {
+          "type": "COMPONENT",
+          "key": "793d88c14c978af066f1179248060dcfc7c4a3c9"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a8cb8f0e78bfed63a67db4675747baa8ff717fe3"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "fa1220224598fcf20358f9a48c0a2d99212b99ea"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f6326317d82666a67f92a446b63bf620371c9c68"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "1460470e6301acd2835739e9c400b261e03e2e86"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "a74a299f791aa638bc4957d10a5fd04ace1bd600"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "f4164ac11b5fc7deade064da1b9907573a4f86a4"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "490749882fa69c9f03db08a44857d10cb544fd27"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "854a3341e1f1552957688393a16554b6f981ccfc"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "79d7d500f90fbd77de719fc1eb7c3fe3d00fcc46"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "0377e27be1912459cf39f8e989e3f12573b0fa5d"
+        },
+        {
+          "type": "COMPONENT",
+          "key": "6d697d805b2b5bc92a69244522240c1e8b848a23"
+        }
+      ],
+      "bindingScope": [
+        {
+          "masterId": "6104:641",
+          "sites": [
+            {
+              "nodeId": "6104:659",
+              "field": "mainComponent"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "nodeId": "6104:659",
+      "kind": "svg-descendant-semantics",
+      "visual": false,
+      "liveColorBindings": 1,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": [],
+      "note": "svg descendants: 1 live colour binding(s), no residual semantics"
+    }
+  ]
+}

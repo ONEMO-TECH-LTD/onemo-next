@@ -1,0 +1,119 @@
+{
+  "fileKey": "tRRmrnP9IeG9G0Oxe0eMgL",
+  "nodeId": "8017:20929",
+  "fileVersion": "2382085534573304220",
+  "elements": 11,
+  "evidence": {
+    "raw": {
+      "status": "pass"
+    },
+    "paint": {
+      "status": "pass"
+    }
+  },
+  "tokenCoveragePct": 96,
+  "tokenDecls": 26,
+  "styleableDecls": 27,
+  "unresolved": [],
+  "raws": [
+    {
+      "className": "buttonToggle",
+      "prop": "border-radius",
+      "value": "9999px",
+      "line": 25,
+      "candidates": []
+    },
+    {
+      "className": "magnetic",
+      "prop": "width",
+      "value": "20px",
+      "line": 29,
+      "candidates": []
+    },
+    {
+      "className": "magnetic",
+      "prop": "height",
+      "value": "20px",
+      "line": 30,
+      "candidates": []
+    },
+    {
+      "className": "buttonToggle2",
+      "prop": "border-radius",
+      "value": "9999px",
+      "line": 40,
+      "candidates": []
+    },
+    {
+      "className": "magnetic2",
+      "prop": "font-weight",
+      "value": "500",
+      "line": 72,
+      "candidates": []
+    },
+    {
+      "className": "sticky2",
+      "prop": "font-weight",
+      "value": "500",
+      "line": 92,
+      "candidates": []
+    }
+  ],
+  "refusals": [],
+  "approximations": [],
+  "valueParity": [],
+  "fonts": [
+    "Chillax"
+  ],
+  "missingAssets": [],
+  "paintParity": [],
+  "effectParity": [],
+  "cascade": [],
+  "nativeCarrierFindings": [],
+  "svgDescendantFindings": [],
+  "matrix": {
+    "tokens": {
+      "unresolved": 0,
+      "status": "pass"
+    },
+    "numeric": {
+      "drift": 0,
+      "status": "pass"
+    },
+    "paint": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "effects": {
+      "mismatches": 0,
+      "status": "pass"
+    },
+    "cascade": {
+      "broken": 0,
+      "status": "pass"
+    },
+    "nativeCarriers": {
+      "status": "pass",
+      "counts": {
+        "stroke": 0,
+        "opacity": 0,
+        "backgroundBlur": 0,
+        "alphaMaskHeight": 0
+      },
+      "findings": []
+    },
+    "svgDescendants": {
+      "status": "pass",
+      "blockingStatus": "pass",
+      "roots": 0,
+      "liveColorBindings": 0,
+      "residualBindings": 0,
+      "residualLayouts": 0,
+      "findings": []
+    },
+    "status": "pass",
+    "pass": true
+  },
+  "status": "pass",
+  "pass": true
+}
