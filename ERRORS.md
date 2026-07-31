@@ -166,3 +166,12 @@
   run a tracked script file with `npx tsx --tsconfig tsconfig.json <file>`.
 - Remember: an empty diagnostic is not a pass. Print an unconditional executed
   comparison count, and verify the probe launcher with one literal output first.
+
+## 2026-07-31 — Playwright CLI `run-code` expects one function
+
+- Failed: bare `return`, then bare `await page`, then a dynamic `node:fs` import
+  inside the CLI VM while capturing the pre-cutover compositor golden.
+- Worked: pass `async (page) => ...` as the complete argument and compute the PNG
+  hash inside `locator.evaluate` with browser `crypto.subtle`.
+- Remember: `run-code` invokes one function with `page`; its VM has no dynamic-import
+  callback. Prove the launcher with a one-line executed count before a real probe.

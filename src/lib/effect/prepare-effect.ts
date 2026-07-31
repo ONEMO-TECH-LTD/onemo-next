@@ -37,7 +37,7 @@ export interface ShapeBuildConfig {
 import { loadImageData, segment, adapterIdFor, dilateMask, smoothMask, effectiveTextureDim, type MaskResult } from './mask'
 import { segmentML, type MLResult } from './segment-ml'
 import { traceContourRaw } from './contour'
-import { composeFront, blurCanvas, imageDataToCanvas } from './composite'
+import { blendPixelsToPercent, composeEffectArtwork, blurCanvas, imageDataToCanvas } from './composite'
 import type { EffectType } from './effect-types'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 // REBUILD-PLAN-v2 §B1 — truth at birth: geometry is born as ONE VShape; the manufacturing contour
@@ -88,7 +88,7 @@ export interface PreparedEffect {
   /** strongly-blurred edge-lip composite (smooth rim colour, no banding). */
   edgeComposite: HTMLCanvasElement
   /** source layers for live re-blend (toggle / intensity) without re-segmentation. */
-  frontSrc: { origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number }
+  frontSrc: { origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number; defaultBlendPercent: number }
   widthMM: number
   heightMM: number
 }
@@ -255,8 +255,14 @@ export async function prepareEffect(
   // ── composite (the ONE magic-blend) + edge-lip source (strong blur). Reused, never re-composed per surface.
   // v5.3·P2 (KAI-9147): composeFront / blurCanvas now bake through the cross-browser SVG-filter engine
   // (async — SVG Image onload). Run both in parallel.
-  const [composite, edgeComposite] = await Promise.all([
-    composeFront(origCanvas, subjCanvas, defaultBlurPx),
+  const defaultBlendPercent = blendPixelsToPercent(defaultBlurPx, fw)
+  const [initialArtwork, edgeComposite] = await Promise.all([
+    composeEffectArtwork({
+      originalCanvas: origCanvas,
+      subjectCanvas: subjCanvas,
+      blendPercent: defaultBlendPercent,
+      fillMode: 'clamp',
+    }),
     blurCanvas(origCanvas, Math.max(16, Math.round(fw / 22))),
   ])
 
@@ -282,9 +288,9 @@ export async function prepareEffect(
 
   return {
     spec,
-    composite,
+    composite: initialArtwork.canvas,
     edgeComposite,
-    frontSrc: { origCanvas, subjCanvas, defaultBlurPx },
+    frontSrc: { origCanvas, subjCanvas, defaultBlurPx, defaultBlendPercent },
     widthMM,
     heightMM,
   }

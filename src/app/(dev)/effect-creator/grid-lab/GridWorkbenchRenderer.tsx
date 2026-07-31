@@ -34,6 +34,8 @@ interface GridWorkbenchFrontArtwork {
   imageUrl: string
   imgW: number
   imgH: number
+  originX: number
+  originY: number
   pixelsToMM: number
 }
 
@@ -137,8 +139,8 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
                 <image
                   data-v531-engine-artwork="composite"
                   href={frontArtwork.imageUrl}
-                  x={0}
-                  y={0}
+                  x={frontArtwork.originX}
+                  y={frontArtwork.originY}
                   width={frontArtwork.imgW}
                   height={frontArtwork.imgH}
                   preserveAspectRatio="xMidYMid slice"

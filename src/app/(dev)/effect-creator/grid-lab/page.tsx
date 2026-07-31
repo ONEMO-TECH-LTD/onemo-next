@@ -16,7 +16,12 @@ import {
   TRACE_OUTLINE_DEFAULTS,
   type TraceOutlineSettings,
 } from '../v5.3.1/user/editor/producers'
-import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
+import {
+  composeEffectArtwork,
+  loadImage,
+  prepareShaped,
+  type ArtworkFillMode,
+} from '../v5.3.1/core/primitives'
 import { contourFromShape, MANUFACTURING_TOLERANCE_MM } from '@/lib/effect/geometry-truth'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { DEFAULT_ROUNDED_SQUARE_CALIBRATION } from '@/lib/effect/effect-calibration'
@@ -47,10 +52,18 @@ type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
 type StdGeo = StdShape
 type MagicState = {
   prepared: PreparedEffect
-  compositeUrl: string
   adapter: string
   imgUrl: string
+  initialCompositeSha256: string
 } | null
+type LiveArtwork = {
+  key: string
+  imageUrl: string
+  imgW: number
+  imgH: number
+  originX: number
+  originY: number
+}
 interface NormalizedContour {
   contour: Contour
   longestPx: number
@@ -87,6 +100,21 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
   for (const p of pts) { if (p.x < a) a = p.x; if (p.x > c) c = p.x; if (p.y < b) b = p.y; if (p.y > d) d = p.y }
   return { w: c - a, h: d - b }
+}
+
+function contourBoundsPx(contour: Contour, pixelsToMM: number) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of contour.outer.pts) {
+    minX = Math.min(minX, x / pixelsToMM); maxX = Math.max(maxX, x / pixelsToMM)
+    minY = Math.min(minY, y / pixelsToMM); maxY = Math.max(maxY, y / pixelsToMM)
+  }
+  return { minX, minY, maxX, maxY }
+}
+
+async function canvasSha256(canvas: HTMLCanvasElement): Promise<string> {
+  const bytes = await (await fetch(canvas.toDataURL())).arrayBuffer()
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 /** VShape → contour normalized so its longest side = 1mm. The source is flattened at the
  * manufacturing tolerance of the largest physical rung, not at an arbitrary source-pixel scale:
@@ -164,6 +192,9 @@ export default function GridLab() {
   const [outlineSettings, setOutlineSettings] = useState<TraceOutlineSettings>(
     () => ({ ...TRACE_OUTLINE_DEFAULTS }),
   )
+  const [blendPercent, setBlendPercent] = useState(50)
+  const [fillMode, setFillMode] = useState<ArtworkFillMode>('clamp')
+  const [liveArtwork, setLiveArtwork] = useState<LiveArtwork | null>(null)
   const handleSliderInteractionChange = useCallback((transient: boolean) => {
     if (transient) suspendGridWork()
     setSliderTransient(transient)
@@ -180,13 +211,15 @@ export default function GridLab() {
     setOutlineSettings({ ...TRACE_OUTLINE_DEFAULTS })
     setSrc((current) => current === 'magic2' ? 'magic2' : 'magic'); setMagStatus('cutting')
     prepareShaped(loaded.url, undefined, (s) => setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s))
-      .then((p) => {
+      .then(async (p) => {
         setMagic({
           prepared: p,
-          compositeUrl: p.composite.toDataURL(),
           adapter: p.spec.generator?.adapter ?? 'cut',
           imgUrl: loaded.url,
+          initialCompositeSha256: await canvasSha256(p.composite),
         })
+        setBlendPercent(Math.round(p.frontSrc.defaultBlendPercent))
+        setFillMode('clamp')
         setMagStatus('')
       })
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
@@ -523,6 +556,45 @@ export default function GridLab() {
         ? 'resolving-sizes'
         : 'ready'
 
+  const artworkRequest = useMemo(() => {
+    if (!isMagicSource || !magic || !model || !magicBase) return null
+    const pixelsToMM = model.designSize / magicBase.longestPx
+    const bounds = contourBoundsPx(model.contour, pixelsToMM)
+    return {
+      key: `${magic.imgUrl}|${model.planKey}|${blendPercent}|${fillMode}|${bounds.minX},${bounds.minY},${bounds.maxX},${bounds.maxY}`,
+      pixelsToMM,
+      bounds,
+      magic,
+    }
+  }, [isMagicSource, magic, model, magicBase, blendPercent, fillMode])
+
+  useEffect(() => {
+    if (!artworkRequest) return
+    let current = true
+    const { key, bounds } = artworkRequest
+    const { origCanvas, subjCanvas } = artworkRequest.magic.prepared.frontSrc
+    composeEffectArtwork({
+      originalCanvas: origCanvas,
+      subjectCanvas: subjCanvas,
+      outputBoundsPx: bounds,
+      blendPercent,
+      fillMode,
+    }).then(({ canvas, frame }) => {
+      if (!current) return
+      setLiveArtwork({
+        key,
+        imageUrl: canvas.toDataURL(),
+        imgW: canvas.width,
+        imgH: canvas.height,
+        originX: frame.originX,
+        originY: frame.originY,
+      })
+    }).catch((error) => {
+      if (current) console.error('[grid-lab] image recomposition failed', error)
+    })
+    return () => { current = false }
+  }, [artworkRequest])
+
   useEffect(() => {
     const committedModel = model?.planKey === renderedPlanKey ? model : null
     window.__GRID_LAB_PROOF__ = {
@@ -541,12 +613,14 @@ export default function GridLab() {
   }, [runtimeStatus, ladderKey, planKey, renderedPlanKey, resolvedPlan, model])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
-  const frontArtwork = isMagicSource && magic && model && magicBase
+  const frontArtwork = artworkRequest && liveArtwork?.key === artworkRequest.key
     ? {
-        imageUrl: magic.compositeUrl,
-        imgW: magic.prepared.spec.maskWidthPx,
-        imgH: magic.prepared.spec.maskHeightPx,
-        pixelsToMM: model.designSize / magicBase.longestPx,
+        imageUrl: liveArtwork.imageUrl,
+        imgW: liveArtwork.imgW,
+        imgH: liveArtwork.imgH,
+        originX: liveArtwork.originX,
+        originY: liveArtwork.originY,
+        pixelsToMM: artworkRequest.pixelsToMM,
       }
     : null
   const panelProps: GridWorkbenchPanelProps = {
@@ -561,6 +635,8 @@ export default function GridLab() {
   const outlinePanelProps: GridWorkbenchOutlinePanelProps = {
     values: outlineSettings,
     offsetJoin: outlineSettings.offsetJoin,
+    blendPercent,
+    fillMode,
     setValue: (key, value) => setOutlineSettings((current) => ({
       ...current,
       [key]: Math.max(0, Math.min(100, value)),
@@ -569,6 +645,8 @@ export default function GridLab() {
       ...current,
       offsetJoin,
     })),
+    setBlendPercent: value => setBlendPercent(Math.max(0, Math.min(100, value))),
+    setFillMode,
     onSliderInteractionChange: handleSliderInteractionChange,
   }
   const adminPanelProps: GridWorkbenchAdminPanelProps = {
@@ -615,6 +693,7 @@ export default function GridLab() {
       data-grid-ladder-key={ladderKey}
       data-grid-plan-key={planKey ?? ''}
       data-grid-rendered-plan-key={renderedPlanKey ?? ''}
+      data-v531-initial-composite-sha256={magic?.initialCompositeSha256 ?? ''}
     >
       <style>{CSS}</style>
       <header className="gl-head">
