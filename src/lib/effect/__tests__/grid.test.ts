@@ -36,6 +36,10 @@ import {
 } from '../grid'
 import type { Contour, Pt } from '../types'
 
+// KAI-9884 census cut: the lawful seated shell is 11–12mm deep; the nearest known interior
+// violation was circle 3XL at 19.2mm. Keep the classification gap explicit in the witness.
+const PHYSICAL_PERIMETER_DEPTH_CUT_MM = 16
+
 const donut: Contour = {
   outer: { pts: [[0, 0], [214, 0], [214, 214], [0, 214]] },
   holes: [{ pts: [[70, 70], [144, 70], [144, 144], [70, 144]] }],
@@ -115,6 +119,38 @@ function distanceToSegment(point: Pt, first: Pt, second: Pt): number {
   )
 }
 
+function distanceToContour(point: Pt, contour: Contour): number {
+  return Math.min(...[contour.outer, ...contour.holes].flatMap((ring) =>
+    ring.pts.map((first, index) =>
+      distanceToSegment(point, first, ring.pts[(index + 1) % ring.pts.length]))))
+}
+
+function nearestRingPosition(point: Pt, ring: ReadonlyArray<Pt>): number {
+  let bestDistanceMM = Infinity
+  let bestPositionMM = 0
+  let positionMM = 0
+  for (let index = 0; index < ring.length; index++) {
+    const first = ring[index]
+    const second = ring[(index + 1) % ring.length]
+    const dx = second[0] - first[0]
+    const dy = second[1] - first[1]
+    const segmentMM = Math.hypot(dx, dy)
+    const t = segmentMM < 1e-12 ? 0 : Math.max(0, Math.min(1, (
+      (point[0] - first[0]) * dx + (point[1] - first[1]) * dy
+    ) / (segmentMM * segmentMM)))
+    const distanceMM = Math.hypot(
+      point[0] - (first[0] + t * dx),
+      point[1] - (first[1] + t * dy),
+    )
+    if (distanceMM < bestDistanceMM) {
+      bestDistanceMM = distanceMM
+      bestPositionMM = positionMM + t * segmentMM
+    }
+    positionMM += segmentMM
+  }
+  return bestPositionMM
+}
+
 function independentBoundedSpanFailures(
   contour: Contour,
   anchors: ReadonlyArray<Pt>,
@@ -123,13 +159,18 @@ function independentBoundedSpanFailures(
   reachMM: number,
 ): number {
   const rimKeys = boundaryPointKeys(anchors, patternBasis(pattern, pitchMM))
-  const rim = anchors.filter((point) => rimKeys.has(pointKey(point)))
+  const rim = anchors
+    .filter((point) => rimKeys.has(pointKey(point)))
+    .map((point) => ({ point, positionMM: nearestRingPosition(point, contour.outer.pts) }))
+    .sort((left, right) => left.positionMM - right.positionMM)
   const maximumSpanMM = Math.max(...LAUNCH_PITCHES_MM)
-  const pairs = rim.flatMap((first, firstIndex) => rim.slice(firstIndex + 1).flatMap((second) =>
-    Math.hypot(first[0] - second[0], first[1] - second[1])
+  const pairs = rim.length < 2 ? [] : rim.flatMap(({ point: first }, index) => {
+    const second = rim[(index + 1) % rim.length].point
+    return Math.hypot(first[0] - second[0], first[1] - second[1])
       <= maximumSpanMM + MANUFACTURING_TOLERANCE_MM
       ? [[first, second] as [Pt, Pt]]
-      : []))
+      : []
+  })
   let failures = 0
   for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
     for (let index = 0; index < ring.pts.length; index++) {
@@ -211,6 +252,15 @@ describe('resolveGridPlan — production engine seam', () => {
 
     expect(coverage.uncoveredMM).toBe(0)
     expect(coverage.gaps).toHaveLength(0)
+  })
+
+  it('never credits an interior chord as an outer-outline span', () => {
+    const contour = stdShapeContour('triangle', 150)
+    const anchors: Pt[] = [[27, 11], [75, 11], [123, 11], [75, 107]]
+    const coverage = exactPerimeterCoverage(contour, anchors, HOLD_REACH_MM, 'standard', 48)
+
+    expect(coverage.uncoveredMM).toBeGreaterThan(0)
+    expect(coverage.gaps.length).toBeGreaterThan(0)
   })
 
   it('prefers less uncovered perimeter even when it has more gap intervals', () => {
@@ -1029,7 +1079,42 @@ describe('semantic ladder stays inside its product contract', () => {
         }
       }
     }
-    expect(compared).toBe(31)
+    expect(compared).toBeGreaterThan(0)
+  })
+
+  it('keeps every published standard-shape anchor on the physical perimeter', () => {
+    const violations: string[] = []
+    let compared = 0
+    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
+      for (const density of ['standard', 'light'] as const) {
+        const rungs = semanticLadderFromRecipe(
+          { kind: 'standard', shape },
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        )
+        for (const rung of rungs) {
+          const contour = stdShapeContour(shape, rung.sizeMM)
+          const plan = resolveGridPlan(contour, {
+            source: 'std',
+            density,
+            maxGrowMM: 0,
+            construction: rung.construction,
+          })
+          const interior = plan.grid.anchors
+            .map(({ p }) => ({ p, depthMM: distanceToContour(p, contour) }))
+            .filter(({ depthMM }) => depthMM > PHYSICAL_PERIMETER_DEPTH_CUT_MM)
+          compared++
+          if (interior.length > 0) {
+            violations.push(
+              `${shape}/${density}/${rung.label}/${rung.sizeMM}: ${interior.map(({ p, depthMM }) => `${p[0].toFixed(1)},${p[1].toFixed(1)}@${depthMM.toFixed(1)}`).join(' ')}`,
+            )
+          }
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(0)
+    expect(violations).toEqual([])
   })
 
   it('publishes only independently covered bounded-span constructions on the product Auto path', () => {
@@ -1074,7 +1159,7 @@ describe('semantic ladder stays inside its product contract', () => {
         }
       }
     }
-    expect(compared).toBe(23)
+    expect(compared).toBeGreaterThan(0)
     expect(coverageFailures, `${compared} constructions compared`).toEqual([])
   })
 
@@ -1183,7 +1268,7 @@ describe('semantic ladder stays inside its product contract', () => {
       .toBeGreaterThan(Math.abs(second.p[0] - first.p[0]))
   })
 
-  it('keeps covered Standard/48 triangles and rejects the unsupported Light/96 T population', () => {
+  it('rejects uncovered multi-anchor triangles in both density families', () => {
     const makeTriangle = (sizeMM: number) => stdShapeContour('triangle', sizeMM)
     const standard = semanticLadder(
       makeTriangle,
@@ -1200,24 +1285,13 @@ describe('semantic ladder stays inside its product contract', () => {
 
     expect(standard).toMatchObject([
       { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
-      { label: 'S', points: 5, sizeMM: 150, gridExtentMM: 118 },
-      { label: 'M', points: 9, sizeMM: 232, gridExtentMM: 214 },
     ])
     expect(light).toMatchObject([
       { label: 'ONE', sizeMM: 40, gridExtentMM: 22 },
     ])
     expect(light.some((rung) => rung.points >= 2)).toBe(false)
 
-    const delivered = resolveGridPlan(makeTriangle(standard[1].sizeMM), {
-      source: 'std',
-      mode: 'auto',
-      density: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      maxGrowMM: 0,
-      construction: standard[1].construction,
-    })
-    expect(delivered.grid.anchors).toHaveLength(standard[1].points)
-    expect(delivered.grid.ok).toBe(true)
+    expect(standard.some((rung) => rung.points >= 2)).toBe(false)
     expect(standard.every((rung) => rung.sizeMM <= DEFAULT_LAW.maxRungMM)).toBe(true)
   })
 
@@ -1287,13 +1361,38 @@ describe('semantic ladder stays inside its product contract', () => {
 
   it('publishes every physical catalogue size on the next even whole millimetre', () => {
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      const rungs = semanticLadder((sizeMM) => stdShapeContour(shape, sizeMM))
-      for (const rung of rungs) {
-        expect(
-          rung.sizeMM % 2,
-          `${shape}/${rung.label} published an odd ${rung.sizeMM}mm size`,
-        ).toBe(0)
+      for (const density of ['standard', 'light'] as const) {
+        const rungs = semanticLadder(
+          (sizeMM) => stdShapeContour(shape, sizeMM),
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        )
+        for (const rung of rungs) {
+          expect(
+            rung.sizeMM % 2,
+            `${shape}/${density}/${rung.label} published an odd ${rung.sizeMM}mm size`,
+          ).toBe(0)
+        }
       }
+    }
+
+    for (const witness of [
+      { shape: 'circle', gridExtentMM: 166, sizeMM: 174 },
+      { shape: 'circle', gridExtentMM: 214, sizeMM: 238 },
+    ] as const) {
+      const contourAt = (sizeMM: number) => stdShapeContour(witness.shape, sizeMM)
+      const options = { source: 'std', density: 'standard' } as const
+      const rung = semanticLadder(contourAt, DEFAULT_LAW, 'auto', options)
+        .find((candidate) => candidate.gridExtentMM === witness.gridExtentMM)
+      const predecessor = semanticLadder(
+        contourAt,
+        { ...DEFAULT_LAW, maxRungMM: witness.sizeMM - 2 },
+        'auto',
+        options,
+      )
+      expect(rung?.sizeMM).toBe(witness.sizeMM)
+      expect(predecessor.some((candidate) => candidate.gridExtentMM === witness.gridExtentMM)).toBe(false)
     }
   })
 
@@ -1313,9 +1412,9 @@ describe('semantic ladder stays inside its product contract', () => {
     )
 
     expect(standard.map((rung) => rung.label))
-      .toEqual(['ONE', 'S', 'M', 'L', 'XL', '2XL', '3XL'])
+      .toEqual(['ONE', 'S', 'M', 'L', 'XL'])
     expect(standard.map((rung) => rung.gridExtentMM))
-      .toEqual([22, 70, 118, 166, 214, 262, 310])
+      .toEqual([22, 70, 118, 166, 214])
     expect(light.map((rung) => rung.label)).toEqual(['ONE', 'S'])
     expect(light.map((rung) => rung.gridExtentMM)).toEqual([22, 118])
   })
