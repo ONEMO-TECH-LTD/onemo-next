@@ -175,3 +175,26 @@
   hash inside `locator.evaluate` with browser `crypto.subtle`.
 - Remember: `run-code` invokes one function with `page`; its VM has no dynamic-import
   callback. Prove the launcher with a one-line executed count before a real probe.
+
+## 2026-07-31 — repeated AI upload outlives Playwright's action timeout
+
+- Failed: three single-command `run-code` probes waited for an upload to leave the cutting state;
+  two hit Playwright's 30-second action cap and the third hit an explicit 120-second cap.
+- Worked: separate the probe into a page-resident transition observer, an immediate file upload, and
+  short polling reads. This preserves the phase start/end even when inference outlives one CLI call.
+- Remember: an AI run exceeding the harness timeout is a lower bound, not a completed timing. Never
+  report the timeout value as the runtime or rerun the model merely to make one command own the clock.
+
+## 2026-07-31 — broad npm audit remediation increased the advisory count
+
+- Failed: `npm audit fix` updated unrelated transitive toolchain packages and changed the audit from
+  15 findings to 37; pinning Storybook back by itself did not restore the previous dependency graph.
+  Forcing `brace-expansion@5` then reduced the count to 12 but broke ESLint 9's `minimatch@3` caller
+  (`TypeError: expand is not a function`).
+- Worked: restore the clean staging lockfile, retain only reviewed direct upgrades plus compatible
+  `esbuild`/`fast-uri` overrides, and leave `brace-expansion` on the major versions its callers require.
+  The critical and moderate findings are gone; npm expands the remaining brace advisory through its
+  dependent lint/tool packages, so the final count is 37 even though the compatible graph is safer.
+- Remember: use `npm audit` as evidence, not as a bulk updater or a score to game. Never force a
+  transitive dependency across its caller's declared major; the real gate is audit classification plus
+  the affected tool running successfully.

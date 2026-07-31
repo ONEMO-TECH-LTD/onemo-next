@@ -54,6 +54,7 @@ type MagicState = {
   prepared: PreparedEffect
   adapter: string
   imgUrl: string
+  fileKey: string
   initialCompositeSha256: string
 } | null
 type LiveArtwork = {
@@ -111,10 +112,17 @@ function contourBoundsPx(contour: Contour, pixelsToMM: number) {
   return { minX, minY, maxX, maxY }
 }
 
-async function canvasSha256(canvas: HTMLCanvasElement): Promise<string> {
-  const bytes = await (await fetch(canvas.toDataURL())).arrayBuffer()
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function canvasSha256(canvas: HTMLCanvasElement): Promise<string> {
+  return sha256Hex(await (await fetch(canvas.toDataURL())).arrayBuffer())
+}
+
+async function sessionFileKey(file: File): Promise<string> {
+  return sha256Hex(await file.arrayBuffer())
 }
 /** VShape → contour normalized so its longest side = 1mm. The source is flattened at the
  * manufacturing tolerance of the largest physical rung, not at an arbitrary source-pixel scale:
@@ -203,26 +211,57 @@ export default function GridLab() {
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
   const fileRef = useRef<HTMLInputElement>(null)
+  const magicRequestRef = useRef(0)
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
+    const request = ++magicRequestRef.current
+    setSrc((current) => current === 'magic2' ? 'magic2' : 'magic')
+    const fileKey = await sessionFileKey(f)
+    if (request !== magicRequestRef.current) return
+    const cached = magic?.fileKey === fileKey ? magic : null
+    setMagStatus(cached ? '' : 'cutting')
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
     setOutlineSettings({ ...TRACE_OUTLINE_DEFAULTS })
-    setSrc((current) => current === 'magic2' ? 'magic2' : 'magic'); setMagStatus('cutting')
-    prepareShaped(loaded.url, undefined, (s) => setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s))
+    const prepared = cached
+      ? Promise.resolve({
+          ...cached.prepared,
+          spec: { ...cached.prepared.spec, sourceRef: loaded.url },
+        })
+      : prepareShaped(loaded.url,
+          undefined,
+          (s) => {
+            if (request === magicRequestRef.current) {
+              setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s)
+            }
+          },
+        )
+    prepared
       .then(async (p) => {
+        const initialCompositeSha256 = cached?.initialCompositeSha256
+          ?? await canvasSha256(p.composite)
+        if (request !== magicRequestRef.current) {
+          URL.revokeObjectURL(loaded.url)
+          return
+        }
         setMagic({
           prepared: p,
           adapter: p.spec.generator?.adapter ?? 'cut',
           imgUrl: loaded.url,
-          initialCompositeSha256: await canvasSha256(p.composite),
+          fileKey,
+          initialCompositeSha256,
         })
         setBlendPercent(Math.round(p.frontSrc.defaultBlendPercent))
         setFillMode('clamp')
         setMagStatus('')
       })
-      .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
+      .catch((err) => {
+        URL.revokeObjectURL(loaded.url)
+        if (request !== magicRequestRef.current) return
+        console.error('[grid-lab] magic failed', err)
+        setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed'))
+      })
   }
 
   const isMagicSource = src === 'magic' || src === 'magic2'

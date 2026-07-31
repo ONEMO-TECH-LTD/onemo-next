@@ -61,10 +61,18 @@ function settle(id: number) {
   return p
 }
 
+function resetBenWorker(error: Error, worker = benWorker): void {
+  if (worker !== benWorker) return
+  benWorker = null
+  worker?.terminate()
+  for (const [id] of pending) settle(id)?.reject(error)
+}
+
 function getBenWorker(): Worker {
   if (!benWorker) {
-    benWorker = new Worker(new URL('./ben.worker.ts', import.meta.url), { type: 'module' })
-    benWorker.onmessage = (e: MessageEvent) => {
+    const worker = new Worker(new URL('./ben.worker.ts', import.meta.url), { type: 'module' })
+    benWorker = worker
+    worker.onmessage = (e: MessageEvent) => {
       const { id, ok, data, width, height, error, progress, adapter } = e.data as {
         id: number; ok?: boolean; data?: ArrayBuffer; width?: number; height?: number; error?: string
         progress?: SegmentProgress; adapter?: string
@@ -76,10 +84,7 @@ function getBenWorker(): Worker {
       else if (ok) p.resolve({ data: new Uint8ClampedArray(0), width: 0, height: 0 }) // preload ack — no matte
       else p.reject(new Error(error || 'BEN worker failed'))
     }
-    benWorker.onerror = (e) => {
-      const err = new Error(e.message || 'BEN worker error')
-      for (const [id] of pending) settle(id)?.reject(err)
-    }
+    worker.onerror = (e) => resetBenWorker(new Error(e.message || 'BEN worker error'), worker)
   }
   return benWorker
 }
@@ -92,7 +97,8 @@ function runBenInWorker(
   const id = ++reqSeq
   return new Promise((resolve, reject) => {
     const watchdog = setTimeout(() => {
-      settle(id)?.reject(new Error(`Magic timed out after ${INFERENCE_WATCHDOG_MS / 1000}s — the cut-out model never responded`))
+      if (!pending.has(id)) return
+      resetBenWorker(new Error(`Magic timed out after ${INFERENCE_WATCHDOG_MS / 1000}s — the cut-out model never responded`))
     }, INFERENCE_WATCHDOG_MS)
     pending.set(id, { resolve, reject, onProgress, watchdog })
     getBenWorker().postMessage({ id, url, seg: segParam() })

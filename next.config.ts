@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // This repository carries required webpack aliases below, so development and production must run
+  // the same bundler. Allow the loopback hostname used by local browser probes to hydrate normally.
+  allowedDevOrigins: ["127.0.0.1"],
+  outputFileTracingRoot: process.cwd(),
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
   // WebGPU falls back to SINGLE-threaded wasm — historically a 30–60 s page freeze per Magic run.

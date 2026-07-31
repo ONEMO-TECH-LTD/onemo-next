@@ -1,0 +1,91 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  DEFAULT_LAW,
+  GRID_ENGINE_CACHE_VERSION,
+  GRID_ENGINE_POLICY_SIGNATURE,
+  handleGridJob,
+  type GridDensity,
+  type GridJob,
+  type GridPlanOptions,
+  type StandardLadderShape,
+} from '../grid'
+import { createGridWorkerClient, gridJobKey } from '../grid-client'
+import {
+  GRID_STATIC_CATALOGUE_CACHE_VERSION,
+  GRID_STATIC_CATALOGUE_ENTRIES,
+  GRID_STATIC_CATALOGUE_POLICY_SIGNATURE,
+} from '../grid-static-catalogue.generated'
+
+const shapes: readonly StandardLadderShape[] = [
+  'square',
+  'circle',
+  'triangle',
+  'diamondShape',
+]
+const densities: readonly GridDensity[] = ['standard', 'light']
+
+function liveGridLabJob(shape: StandardLadderShape, density: GridDensity): GridJob {
+  const options: GridPlanOptions = {
+    attachment: 'magnetic',
+    source: 'std',
+    mode: 'auto',
+    density,
+    paddingMM: 10,
+    plan: 'auto',
+    center: 'centroid',
+    baseMarginMM: 0,
+    maxGrowMM: 0,
+    signedBaseMargin: true,
+    diagnosticVelcro: true,
+  }
+  return {
+    operation: 'ladder',
+    recipe: { kind: 'standard', shape },
+    law: { ...DEFAULT_LAW, paddingMM: 10 },
+    mode: 'auto',
+    options,
+  }
+}
+
+describe('version-locked Grid Lab static catalogue', () => {
+  it('matches the current engine generation and every direct engine result byte-for-byte', () => {
+    expect(GRID_STATIC_CATALOGUE_CACHE_VERSION).toBe(GRID_ENGINE_CACHE_VERSION)
+    expect(GRID_STATIC_CATALOGUE_POLICY_SIGNATURE).toBe(GRID_ENGINE_POLICY_SIGNATURE)
+    expect(GRID_STATIC_CATALOGUE_ENTRIES).toHaveLength(shapes.length * densities.length)
+
+    for (const entry of GRID_STATIC_CATALOGUE_ENTRIES) {
+      expect(JSON.stringify(entry.result)).toBe(JSON.stringify(handleGridJob(entry.job)))
+    }
+  })
+
+  it('covers every standard shape and density through the exact live Grid Lab identity', () => {
+    const client = createGridWorkerClient()
+    const observed = new Set<string>()
+
+    for (const shape of shapes) for (const density of densities) {
+      const job = liveGridLabJob(shape, density)
+      const result = client.peek(job)
+      expect(result?.key).toBe(gridJobKey(job))
+      observed.add(`${shape}/${density}`)
+    }
+
+    expect([...observed].sort()).toEqual(
+      shapes.flatMap((shape) => densities.map((density) => `${shape}/${density}`)).sort(),
+    )
+    client.dispose()
+  })
+
+  it('leaves a changed law out of the static table for exact lazy worker fallback', () => {
+    const client = createGridWorkerClient()
+    const job = liveGridLabJob('square', 'standard')
+    if (job.operation !== 'ladder') throw new Error('Expected a ladder job.')
+    const changedLaw = {
+      ...job,
+      law: { ...DEFAULT_LAW, paddingMM: DEFAULT_LAW.paddingMM + 1 },
+    } satisfies GridJob
+
+    expect(client.peek(changedLaw)).toBeUndefined()
+    client.dispose()
+  })
+})
