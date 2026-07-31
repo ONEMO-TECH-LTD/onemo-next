@@ -4,6 +4,7 @@ import {
   blendPercentToPixels,
   buildArtworkFillDraws,
   resolveArtworkFrame,
+  resolveArtworkSubjectDraw,
   type ArtworkFillDraw,
 } from '../composite'
 
@@ -44,6 +45,12 @@ describe('v5.3.1 framed 2D compositor', () => {
   it('resolves one integer frame beyond all four source edges', () => {
     expect(resolveArtworkFrame(2, 2, { minX: -1, minY: -1, maxX: 3, maxY: 3 }))
       .toEqual({ originX: -1, originY: -1, width: 4, height: 4 })
+  })
+
+  it('keeps the sharp subject registered to a non-zero source-space frame', () => {
+    const frame = { originX: -7, originY: -11, width: 134, height: 102 }
+    expect(resolveArtworkSubjectDraw(120, 80, frame))
+      .toEqual({ dx: 7, dy: 11, dw: 120, dh: 80 })
   })
 
   it('clamps deterministic edge pixels into every exposed edge and corner with no void', () => {

@@ -108,6 +108,20 @@ export function resolveArtworkFrame(
   }
 }
 
+/** Destination rect that preserves the subject's source coordinates inside an expanded frame. */
+export function resolveArtworkSubjectDraw(
+  sourceWidth: number,
+  sourceHeight: number,
+  frame: ArtworkFrame,
+): Pick<ArtworkFillDraw, 'dx' | 'dy' | 'dw' | 'dh'> {
+  return {
+    dx: -frame.originX,
+    dy: -frame.originY,
+    dw: sourceWidth,
+    dh: sourceHeight,
+  }
+}
+
 interface AxisDraw {
   source: number
   sourceLength: number
@@ -304,7 +318,8 @@ export async function composeEffectArtwork({
   let composed = document.createElement('canvas')
   composed.width = fw; composed.height = fh
   composed.getContext('2d')!.drawImage(bg, 0, 0)
-  composed.getContext('2d')!.drawImage(subjectCanvas, -frame.originX, -frame.originY, originalCanvas.width, originalCanvas.height)
+  const subjectDraw = resolveArtworkSubjectDraw(originalCanvas.width, originalCanvas.height, frame)
+  composed.getContext('2d')!.drawImage(subjectCanvas, subjectDraw.dx, subjectDraw.dy, subjectDraw.dw, subjectDraw.dh)
   // COLOUR fx over the finished composite — spec-exact SVG primitives (sRGB → matches CSS filter).
   const colourBody = cssColorFilterToSvg(fxFilter)
   if (colourBody) composed = await svgFilterBake(composed, colourBody, 'sRGB')
