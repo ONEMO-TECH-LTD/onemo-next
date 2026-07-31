@@ -3407,6 +3407,10 @@
   --sem-motion-opacity-inactive: var(--al-motion-opacity-80);
 }
 
+/* KAI-9680 isolated load-order falsifier: the run-local sheet must override this global value. */
+:root { --kai-sealed-probe: rgb(255 255 0); }
+[data-theme="dark"] { --kai-sealed-probe: rgb(255 165 0); }
+
 [data-theme="dark"] {
   --prim-col-base-white-black: oklch(0% 0 0);
   --prim-col-base-ink-snow: oklch(98.51% 0 0);
