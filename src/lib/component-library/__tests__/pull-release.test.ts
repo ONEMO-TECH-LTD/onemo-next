@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-// @ts-ignore — the production transaction is deliberately import-safe ESM.
+// @ts-expect-error — the production transaction is deliberately import-safe ESM.
 import { pullComponentRelease } from '../../../../scripts/components/pull-release.mjs';
-// @ts-ignore — independent verifier is plain ESM shared with the CLI.
+// @ts-expect-error — independent verifier is plain ESM shared with the CLI.
 import { verifyPulledGenerated } from '../../../../scripts/components/verify-release.mjs';
-// @ts-ignore — API compatibility is independently derived by the app verifier.
+// @ts-expect-error — API compatibility is independently derived by the app verifier.
 import { compareApi } from '../../../../scripts/components/verify-release.mjs';
 
 const roots: string[] = [];
