@@ -1,0 +1,44 @@
+/* Chrome for the component library. Deliberately neutral — it must never influence
+   how a component renders, only how the page around it looks. */
+.lib-root {
+  min-height: 100dvh;
+  background: #0f1113;
+  color: #e6e8ea;
+  font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+  padding: 32px 40px 80px;
+}
+.lib-h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+.lib-sub { color: #8b9299; margin: 0 0 28px; }
+.lib-sub code { color: #b8c0c7; }
+
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.lib-card {
+  display: block; padding: 14px 16px; border: 1px solid #23282c; border-radius: 10px;
+  background: #15181b; color: inherit; text-decoration: none;
+}
+.lib-card:hover { border-color: #3a444c; background: #191d21; }
+.lib-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.lib-meta { color: #7d858c; font-size: 12px; }
+.lib-warn { color: #e0a33e; }
+
+.lib-back { color: #7d858c; text-decoration: none; font-size: 12px; }
+.lib-back:hover { color: #b8c0c7; }
+
+.lib-props { margin: 16px 0 28px; border-collapse: collapse; font-size: 12px; }
+.lib-props th, .lib-props td { text-align: left; padding: 5px 18px 5px 0; border-bottom: 1px solid #1e2226; }
+.lib-props th { color: #7d858c; font-weight: 500; }
+
+.lib-variants { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.lib-variant { border: 1px solid #23282c; border-radius: 10px; overflow: hidden; background: #15181b; }
+.lib-variant-label {
+  padding: 7px 12px; font-size: 11px; color: #8b9299;
+  border-bottom: 1px solid #23282c; font-family: ui-monospace, monospace;
+}
+/* The stage is where the component actually renders. Nothing here may cascade into it
+   beyond the design-system tokens the layout already loaded. */
+.lib-stage { padding: 24px; display: flex; align-items: center; justify-content: center; }
+
+.lib-details { margin-top: 36px; color: #7d858c; font-size: 12px; }
+.lib-details summary { cursor: pointer; padding: 6px 0; font-family: ui-monospace, monospace; }
+.lib-details summary:hover { color: #b8c0c7; }
+.lib-variants { margin-top: 16px; }
