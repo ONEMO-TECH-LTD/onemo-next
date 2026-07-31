@@ -1,7 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
-  GridWorkerRequestCoalescer,
   GridWorkerDisposedError,
   GridWorkerInactiveError,
   GridWorkerScheduler,
@@ -261,94 +260,5 @@ describe('preemptive exact grid worker scheduler', () => {
     await expect(queuedRejected).resolves.toBeInstanceOf(GridWorkerDisposedError)
     await expect(scheduler.request({ key: 'after', value: 3 }))
       .rejects.toBeInstanceOf(GridWorkerDisposedError)
-  })
-})
-
-describe('transient grid worker request coalescer', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('reduces ten transient drag values from ten worker starts to one exact final request', async () => {
-    vi.useFakeTimers()
-    const direct = fixture()
-    const directRejections: Promise<unknown>[] = []
-    for (let value = 0; value < 10; value++) {
-      directRejections.push(
-        direct.scheduler.request({ key: `direct-${value}`, value }).catch(error => error),
-      )
-    }
-    expect(direct.workers).toHaveLength(10)
-    expect(direct.workers.filter(worker => worker.terminated)).toHaveLength(9)
-    direct.scheduler.dispose()
-    await Promise.all(directRejections)
-
-    const coalesced = fixture()
-    const requests = new GridWorkerRequestCoalescer<TestJob, TestResult>({ delayMS: 50 })
-    const staleRejections: Promise<unknown>[] = []
-    let final!: Promise<TestResult>
-    for (let value = 0; value < 10; value++) {
-      const promise = requests.request(
-        { key: `drag-${value}`, value },
-        `drag-${value}`,
-        job => coalesced.scheduler.request(job),
-      )
-      if (value < 9) staleRejections.push(promise.catch(error => error))
-      else final = promise
-    }
-
-    expect(coalesced.workers).toHaveLength(0)
-    expect(requests.flush(
-      { key: 'drag-9', value: 9 },
-      'drag-9',
-      job => coalesced.scheduler.request(job),
-    )).toBe(final)
-    expect(coalesced.workers).toHaveLength(1)
-    expect(coalesced.workers[0].requests).toHaveLength(1)
-    expect(coalesced.workers[0].requests[0].job).toEqual({ key: 'drag-9', value: 9 })
-    expect(coalesced.workers[0].terminated).toBe(false)
-
-    coalesced.workers[0].succeed()
-    await expect(final).resolves.toEqual({ key: 'drag-9', value: 9 })
-    for (const rejected of staleRejections) {
-      await expect(rejected).resolves.toBeInstanceOf(GridWorkerSupersededError)
-    }
-    coalesced.scheduler.dispose()
-  })
-
-  it('physically preempts a paused transient solve when the settled value supersedes it', async () => {
-    vi.useFakeTimers()
-    const { scheduler, workers } = fixture()
-    const requests = new GridWorkerRequestCoalescer<TestJob, TestResult>({ delayMS: 50 })
-    const stale = requests.request(
-      { key: 'paused-drag', value: 1 },
-      'paused-drag',
-      job => scheduler.request(job),
-    )
-    const staleRejected = stale.catch(error => error)
-
-    await vi.advanceTimersByTimeAsync(50)
-    expect(workers).toHaveLength(1)
-    expect(workers[0].requests[0].job.key).toBe('paused-drag')
-
-    const latest = requests.request(
-      { key: 'settled', value: 2 },
-      'settled',
-      job => scheduler.request(job),
-    )
-    expect(requests.flush(
-      { key: 'settled', value: 2 },
-      'settled',
-      job => scheduler.request(job),
-    )).toBe(latest)
-
-    expect(workers).toHaveLength(2)
-    expect(workers[0].terminated).toBe(true)
-    expect(workers[1].requests[0].job).toEqual({ key: 'settled', value: 2 })
-    await expect(staleRejected).resolves.toBeInstanceOf(GridWorkerSupersededError)
-
-    workers[1].succeed()
-    await expect(latest).resolves.toEqual({ key: 'settled', value: 2 })
-    scheduler.dispose()
   })
 })

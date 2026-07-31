@@ -263,7 +263,7 @@ describe('exact grid cache identity', () => {
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(13)
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(14)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')

@@ -1,6 +1,7 @@
 type GridDensity = 'standard' | 'light'
 type GridPattern = 'standard' | 'quincunx' | 'diamond'
 type MagnetPlan = 'auto' | 'all6' | 'all8' | 'corners8'
+type MarginMode = 'auto' | 'manual'
 
 interface GridWorkbenchAdminPanelModel {
   pitch: number
@@ -16,8 +17,15 @@ export interface GridWorkbenchAdminPanelProps {
   setDensity: (value: GridDensity) => void
   pad: number
   setPad: (value: number) => void
-  offsetMM: number
-  setOffsetMM: (value: number) => void
+  marginMode: MarginMode
+  setMarginMode: (value: MarginMode) => void
+  appliedMarginMM: number
+  manualMarginMM: number
+  setManualMarginMM: (value: number) => void
+  minMarginMM: number
+  setMinMarginMM: (value: number) => void
+  maxMarginMM: number
+  setMaxMarginMM: (value: number) => void
   pattern: GridPattern
   setPattern: (value: GridPattern) => void
   patternAuto: boolean
@@ -28,8 +36,6 @@ export interface GridWorkbenchAdminPanelProps {
   setFront: (value: boolean) => void
   centerMode: 'centroid' | 'bbox'
   setCenterMode: (value: 'centroid' | 'bbox') => void
-  maxGrowMM: number
-  setMaxGrowMM: (value: number) => void
   roundedSquareRadiusMM: number
   setRoundedSquareRadiusMM: (value: number) => void
   roundedSquareRadiusMaxMM: number
@@ -47,9 +53,11 @@ export interface GridWorkbenchAdminPanelProps {
 
 export function GridWorkbenchAdminPanel({
   pitch, setPitch, pitchAuto, setPitchAuto,
-  density, setDensity, pad, setPad, offsetMM, setOffsetMM, pattern, setPattern,
+  density, setDensity, pad, setPad,
+  marginMode, setMarginMode, appliedMarginMM, manualMarginMM, setManualMarginMM,
+  minMarginMM, setMinMarginMM, maxMarginMM, setMaxMarginMM,
+  pattern, setPattern,
   patternAuto, setPatternAuto, plan, setPlan, front, setFront, centerMode, setCenterMode,
-  maxGrowMM, setMaxGrowMM,
   roundedSquareRadiusMM, setRoundedSquareRadiusMM, roundedSquareRadiusMaxMM,
   showRoundedSquareRadius,
   testSizeMM, setTestSizeMM, testSizeMin, testSizeMax,
@@ -73,8 +81,48 @@ export function GridWorkbenchAdminPanel({
         </div>
       </div>
       <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} onInteractionChange={onSliderInteractionChange} />
-      <Slider label="Base margin · outward offset" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} onInteractionChange={onSliderInteractionChange} />
-      <Slider label="Max auto-margin · balance" unit="mm" v={maxGrowMM} set={setMaxGrowMM} min={0} max={80} onInteractionChange={onSliderInteractionChange} />
+      <div className="gl-field" data-grid-margin-mode={marginMode}><span>Fit offset mode</span>
+        <div className="gl-seg">
+          <button aria-pressed={marginMode === 'auto'} onClick={() => setMarginMode('auto')}>Auto</button>
+          <button
+            aria-pressed={marginMode === 'manual'}
+            onClick={() => {
+              setManualMarginMM(appliedMarginMM)
+              setMarginMode('manual')
+            }}
+          >Manual</button>
+        </div>
+      </div>
+      <NumberField
+        label={marginMode === 'auto' ? 'Applied offset' : 'Manual offset'}
+        unit="mm"
+        v={marginMode === 'auto' ? appliedMarginMM : manualMarginMM}
+        set={setManualMarginMM}
+        min={0}
+        max={80}
+        readOnly={marginMode === 'auto'}
+        onInteractionChange={onSliderInteractionChange}
+      />
+      <NumberField
+        label="Minimum auto offset"
+        unit="mm"
+        v={minMarginMM}
+        set={setMinMarginMM}
+        min={0}
+        max={maxMarginMM}
+        disabled={marginMode !== 'auto'}
+        onInteractionChange={onSliderInteractionChange}
+      />
+      <NumberField
+        label="Maximum auto offset"
+        unit="mm"
+        v={maxMarginMM}
+        set={setMaxMarginMM}
+        min={minMarginMM}
+        max={80}
+        disabled={marginMode !== 'auto'}
+        onInteractionChange={onSliderInteractionChange}
+      />
       {showRoundedSquareRadius && <Slider
         label="Rounded-square corner radius"
         unit="mm"
@@ -130,6 +178,40 @@ export function GridWorkbenchAdminPanel({
 }
 
 const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'])
+
+function NumberField({ label, v, set, min, max, unit, readOnly = false, disabled = false, onInteractionChange }: {
+  label: string
+  v: number
+  set: (n: number) => void
+  min: number
+  max: number
+  unit?: string
+  readOnly?: boolean
+  disabled?: boolean
+  onInteractionChange: (transient: boolean) => void
+}) {
+  return (
+    <label className="gl-number-field">
+      <span>{label}</span>
+      <span className="gl-number-input">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={1}
+          value={v}
+          readOnly={readOnly}
+          disabled={disabled}
+          onChange={e => set(+e.target.value)}
+          onFocus={() => onInteractionChange(true)}
+          onBlur={() => onInteractionChange(false)}
+          onKeyDown={e => { if (e.key === 'Enter') onInteractionChange(false) }}
+        />
+        {unit && <b>{unit}</b>}
+      </span>
+    </label>
+  )
+}
 
 function Slider({ label, v, displayV = v, set, min, max, unit, onInteractionChange }: {
   label: string

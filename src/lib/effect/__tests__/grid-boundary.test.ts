@@ -3,6 +3,7 @@ import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { GridWorkbenchAdminPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchAdminPanel'
+import { GridWorkbenchOutlinePanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchOutlinePanel'
 import { GridWorkbenchPanel } from '@/app/(dev)/effect-creator/grid-lab/GridWorkbenchPanel'
 
 const CREATE_PAGE_PATH = 'src/app/(store)/create/page.tsx'
@@ -10,6 +11,7 @@ const HOME_PAGE_PATH = 'src/app/page.tsx'
 const PAGE_PATH = 'src/app/(dev)/effect-creator/grid-lab/page.tsx'
 const PANEL_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchPanel.tsx'
 const ADMIN_PANEL_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchAdminPanel.tsx'
+const OUTLINE_PANEL_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchOutlinePanel.tsx'
 const USER_PANEL_PATH = `src/app/(dev)/effect-creator/grid-lab/${'GridWorkbenchUser' + 'Panel.tsx'}`
 const RENDERER_PATH = 'src/app/(dev)/effect-creator/grid-lab/GridWorkbenchRenderer.tsx'
 const ENTRY_PATH = 'src/lib/effect/grid.ts'
@@ -30,6 +32,7 @@ describe('Creator magnetic-grid module boundary', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
     const adminPanelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
+    const outlinePanelSource = readFileSync(OUTLINE_PANEL_PATH, 'utf8')
 
     expect(existsSync(USER_PANEL_PATH)).toBe(false)
     expect(pageSource).toMatch(/from ['"]@\/lib\/effect\/grid['"]/)
@@ -37,10 +40,14 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource.match(/<GridWorkbenchStage/g)).toHaveLength(1)
     expect(pageSource.match(/<GridWorkbenchPanel/g)).toHaveLength(1)
     expect(pageSource.match(/<GridWorkbenchAdminPanel/g)).toHaveLength(1)
+    expect(pageSource.match(/<GridWorkbenchOutlinePanel/g)).toHaveLength(1)
     expect(pageSource.indexOf('<GridWorkbenchAdminPanel')).toBeLessThan(
       pageSource.indexOf('<GridWorkbenchStage'),
     )
     expect(pageSource.indexOf('<GridWorkbenchStage')).toBeLessThan(
+      pageSource.indexOf('<GridWorkbenchOutlinePanel'),
+    )
+    expect(pageSource.indexOf('<GridWorkbenchOutlinePanel')).toBeLessThan(
       pageSource.indexOf('<GridWorkbenchPanel'),
     )
     expect(pageSource).toContain('requestGridJob')
@@ -53,12 +60,14 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).not.toContain('data-grid-door')
     expect(panelSource).toContain("'quincunx'")
     expect(adminPanelSource).toContain('Dice-5')
+    expect(outlinePanelSource).toContain('Outline vector · v5.3.1 engine')
   })
 
   it('renders every control exactly once in its product or admin panel', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
     const adminPanelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
+    const outlinePanelSource = readFileSync(OUTLINE_PANEL_PATH, 'utf8')
     const combined = `${panelSource}\n${adminPanelSource}`
     const productControls = [
       '<div className="gl-glabel">Shape source</div>',
@@ -76,8 +85,10 @@ describe('Creator magnetic-grid module boundary', () => {
       '<div className="gl-field"><span>Density</span>',
       '<div className="gl-field"><span>Grid pitch ·',
       '<Slider label="Magnet padding · per spot · min 10"',
-      '<Slider label="Base margin · outward offset"',
-      '<Slider label="Max auto-margin · balance"',
+      '<span>Fit offset mode</span>',
+      'label={marginMode === \'auto\' ? \'Applied offset\' : \'Manual offset\'}',
+      'label="Minimum auto offset"',
+      'label="Maximum auto offset"',
       'label="Rounded-square corner radius"',
       '<div className="gl-field"><span>Grid pattern ·',
       '<div className="gl-field"><span>Grid centering · A/B</span>',
@@ -102,6 +113,8 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(adminPanelSource).not.toContain('Size ·')
     expect(adminPanelSource).not.toContain('Long side · size')
     expect(adminPanelSource).not.toContain('Short side · size')
+    expect(outlinePanelSource).not.toContain('Grid pitch')
+    expect(outlinePanelSource).not.toContain('Shape source')
     expect(`${pageSource}\n${panelSource}\n${adminPanelSource}`).not.toContain('showUntestedRungs')
   })
 
@@ -168,8 +181,15 @@ describe('Creator magnetic-grid module boundary', () => {
       setDensity: noop,
       pad: 10,
       setPad: noop,
-      offsetMM: 0,
-      setOffsetMM: noop,
+      marginMode: 'auto',
+      setMarginMode: noop,
+      appliedMarginMM: 6,
+      manualMarginMM: 6,
+      setManualMarginMM: noop,
+      minMarginMM: 0,
+      setMinMarginMM: noop,
+      maxMarginMM: 12,
+      setMaxMarginMM: noop,
       pattern: 'standard',
       setPattern: noop,
       patternAuto: true,
@@ -180,8 +200,6 @@ describe('Creator magnetic-grid module boundary', () => {
       setFront: noop,
       centerMode: 'centroid',
       setCenterMode: noop,
-      maxGrowMM: 12,
-      setMaxGrowMM: noop,
       roundedSquareRadiusMM: 10,
       setRoundedSquareRadiusMM: noop,
       roundedSquareRadiusMaxMM: 35,
@@ -273,12 +291,16 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(productMagicV2).toContain('Replace image')
 
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
-    expect(pageSource).toContain("maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2' ? maxGrowMM : 0")
+    expect(pageSource).toContain(
+      "maxGrowMM: src === 'gen' || src === 'magic' || src === 'magic2'",
+    )
+    expect(pageSource).toContain('Math.max(0, fitMarginMaxMM - fitMarginMinMM)')
     expect(pageSource).toContain("{ kind: 'uniform-contour', unitContour: presetUnitContour }")
     expect(pageSource).toContain("src === 'magic2' ? 'magic' : src")
     expect(pageSource).toContain(
-      "{ kind: 'uniform-contour', unitContour: magicUnitContour, maxMarginMM: maxGrowMM }",
+      'minMarginMM: fitMarginMinMM',
     )
+    expect(pageSource).toContain('maxMarginMM: fitMarginMaxMM')
     expect(pageSource).toContain('activeSnapRung.designSizeMM')
     expect(pageSource).toContain('? activeSnapRung.marginMM')
     expect(pageSource).toContain('baseMarginMM: snappedMarginMM')
@@ -286,6 +308,8 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain("kind: 'rounded-square'")
     expect(pageSource).toContain('radiusMM: roundedSquareRadiusMM')
     expect(pageSource).toContain('minimumAnchors: DEFAULT_ROUNDED_SQUARE_CALIBRATION.minimumAnchors')
+    expect(pageSource).toContain('resolveTraceOutline(')
+    expect(pageSource).toContain('rawTracePx: spec.rawTracePx')
 
     const continuousAdmin = renderAdmin({})
     expect(continuousAdmin).toContain('data-grid-size-snap="off"')
@@ -303,6 +327,55 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(roundedAdmin).toContain('Rounded-square corner radius')
     expect(roundedAdmin).toContain('max="35"')
     expect(roundedAdmin).toContain('value="10"')
+
+    const autoMarginAdmin = renderAdmin({})
+    expect(autoMarginAdmin).toContain('data-grid-margin-mode="auto"')
+    expect(autoMarginAdmin).toContain('Applied offset')
+    expect(autoMarginAdmin).toContain('value="6"')
+    expect(autoMarginAdmin).toContain('Minimum auto offset')
+    expect(autoMarginAdmin).toContain('Maximum auto offset')
+    expect(autoMarginAdmin).toContain('value="12"')
+
+    const manualMarginAdmin = renderAdmin({
+      marginMode: 'manual',
+      manualMarginMM: 7,
+    })
+    expect(manualMarginAdmin).toContain('data-grid-margin-mode="manual"')
+    expect(manualMarginAdmin).toContain('Manual offset')
+    expect(manualMarginAdmin).toContain('value="7"')
+  })
+
+  it('renders every v5.3.1 whole-outline setting with its actual current value', () => {
+    const noop = () => {}
+    const markup = renderToStaticMarkup(createElement(GridWorkbenchOutlinePanel, {
+      values: {
+        detail: 100,
+        offset: 8,
+        radius: 12,
+        curve: 24,
+        simplify: 36,
+        smooth: 48,
+        straighten: 60,
+      },
+      offsetJoin: 'round',
+      setValue: noop,
+      setOffsetJoin: noop,
+      onSliderInteractionChange: noop,
+    }))
+
+    for (const [label, value] of [
+      ['Detail', 100],
+      ['Vector offset', 8],
+      ['Radius', 12],
+      ['Curve', 24],
+      ['Simplify', 36],
+      ['Smooth', 48],
+      ['Straighten', 60],
+    ] as const) {
+      expect(markup).toContain(label)
+      expect(markup).toContain(`<b>${value}%</b>`)
+    }
+    expect(markup).toContain('aria-pressed="true">Round</button>')
   })
 
   it('keeps the serializable handler, worker, and client behind one neutral entry', () => {
@@ -361,7 +434,7 @@ describe('Creator magnetic-grid module boundary', () => {
     )
 
     expect(pageSource).toContain('useGridWorkerJob')
-    expect(pageSource).toContain('requestGridWorkerJobInBackground')
+    expect(pageSource).toContain('suspendGridWork')
     expect(planDesignSource).not.toContain('stdRungs')
     expect(planDesignSource).toContain("if (geo === 'rect')")
     expect(planDesignSource).toContain('if (!rectRungs) return null')
@@ -461,9 +534,10 @@ describe('Creator magnetic-grid module boundary', () => {
     // upload or importing the obsolete editor/store recreates two truth paths.
     expect(pageSource).toContain('prepared: p')
     expect(pageSource).toContain('compositeUrl: p.composite.toDataURL()')
-    expect(pageSource).toContain('magic.prepared.spec.vectorShape')
+    expect(pageSource).toContain('vectorShape: spec.vectorShape')
     expect(pageSource).toContain('imageUrl: magic.compositeUrl')
     expect(pageSource).toContain('frontArtwork={')
+    expect(pageSource).toContain('data-theme="dark"')
     expect(pageSource).not.toContain('frontImg={isMagicSource && magic ? magic.imgUrl : null}')
     expect(pageSource).not.toContain('OutlineEditor')
     expect(pageSource).not.toContain('useOutlineStore')
@@ -492,10 +566,11 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(hookSource).toContain("errorName === 'GridWorkerInactiveError'")
   })
 
-  it('coalesces only transient slider work before the exact worker lane', () => {
+  it('holds every transient slider change and dispatches only the settled exact worker job', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
     const adminPanelSource = readFileSync(ADMIN_PANEL_PATH, 'utf8')
+    const outlinePanelSource = readFileSync(OUTLINE_PANEL_PATH, 'utf8')
     const hookSource = readFileSync(WORKER_HOOK_PATH, 'utf8')
     const panelsSource = `${panelSource}\n${adminPanelSource}`
 
@@ -503,10 +578,27 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(panelsSource).toContain('onPointerUp={() => onInteractionChange(false)}')
     expect(panelsSource).toContain('onKeyDown=')
     expect(panelsSource).toContain('onKeyUp=')
-    expect(pageSource).toContain('onSliderInteractionChange: setSliderTransient')
+    expect(pageSource).toContain('onSliderInteractionChange: handleSliderInteractionChange')
     expect(pageSource).toContain('data-grid-slider-transient={sliderTransient}')
-    expect(hookSource).toContain('coalescer.request(job, key, request)')
-    expect(hookSource).toContain('coalescer.flush(job, key, request)')
+    expect(pageSource).toContain('if (transient) suspendGridWork()')
+    expect(hookSource).toContain('if (!job || !key || transient) return')
+    expect(hookSource).not.toContain('GridWorkerRequestCoalescer')
+    expect(outlinePanelSource).toContain('defaultValue={v}')
+    expect(outlinePanelSource).toContain('commit(e.currentTarget.value)')
+    expect(outlinePanelSource).not.toContain('onChange={e => set(+e.target.value)}')
     expect(hookSource).not.toMatch(/grid-(?:user|admin|core)/)
+  })
+
+  it('flattens scale-free vectors only as finely as the largest physical rung requires', () => {
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
+    const normSource = pageSource.slice(
+      pageSource.indexOf('function normBase'),
+      pageSource.indexOf('function normGeneratedRing'),
+    )
+
+    expect(normSource).toContain('DEFAULT_LAW.maxRungMM / sourceLongestPx')
+    expect(normSource).toContain('contourFromShape(vs, {')
+    expect(normSource).toContain('mmPerPx: maxRungMMPerPx')
+    expect(normSource).not.toContain('mmPerPx: 1')
   })
 })

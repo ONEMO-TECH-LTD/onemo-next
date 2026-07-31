@@ -6,22 +6,18 @@
 // 0 = sharp (off), reversible. Remove this tool = delete this file + its TOOL_REGISTRY line.
 
 import type { ToolDescriptor, EditorCtx } from '../types'
-import type { OutlineAdjustments } from '@/lib/effect/outline-resolve'
-import { shapeBBox } from '@/lib/vector-core'
+import {
+  outlineRadiusMaxPx,
+  outlineRadiusPx,
+  type OutlineAdjustments,
+} from '@/lib/effect/outline-resolve'
 import { representativeLocal } from '../../seed-defaults'
-
-/** maxRadius = half the short side of the display bbox (the slider's geometric 100%). */
-function maxRadiusOf(ctx: EditorCtx): number {
-  const d = ctx.getDisplay()
-  if (!d) return 1
-  const bb = shapeBBox(d, 1)
-  return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
-}
 
 /** Build the next adjustments for a 0–100% slider value (selection-routed). */
 function nextAdj(ctx: EditorCtx, pct: number): OutlineAdjustments {
   const adj = ctx.getAdjustments()
-  const px = (Math.max(0, Math.min(100, pct)) / 100) * maxRadiusOf(ctx)
+  const display = ctx.getDisplay()
+  const px = display ? outlineRadiusPx(pct, display) : 0
   const sel = ctx.sourceIdForSelection()
   if (sel) return { global: adj.global, local: { ...adj.local, [sel]: { ...adj.local[sel], radius: px } } } // per-corner → Paper
   return { global: { ...adj.global, radius: Math.max(0, px) }, local: adj.local }                            // whole-shape → Clipper
@@ -40,7 +36,8 @@ export const radiusDescriptor: ToolDescriptor<number> = {
     return (!!s && s.shape.paths.some((p) => p.anchors.some((a) => a.corner))) || (!!d && d.paths[0].anchors.some((a) => a.corner))
   },
   read: (ctx) => {
-    const adj = ctx.getAdjustments(); const max = maxRadiusOf(ctx); const sel = ctx.sourceIdForSelection(); const src = ctx.getSource()
+    const display = ctx.getDisplay()
+    const adj = ctx.getAdjustments(); const max = display ? outlineRadiusMaxPx(display) : 1; const sel = ctx.sourceIdForSelection(); const src = ctx.getSource()
     const px = sel ? (adj.local[sel]?.radius ?? 0) : (adj.global.radius || (src ? representativeLocal(adj, src.shape, 'radius') : 0))
     return Math.round((Math.min(px, max) / Math.max(max, 1)) * 100)
   },

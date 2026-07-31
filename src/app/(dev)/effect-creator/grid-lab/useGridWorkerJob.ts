@@ -1,7 +1,4 @@
 import { useEffect, useState } from 'react'
-import { GridWorkerRequestCoalescer } from '@/lib/effect/grid-worker-client'
-
-const SLIDER_JOB_COALESCE_MS = 80
 
 interface KeyedResult {
   key: string
@@ -22,21 +19,13 @@ export function useGridWorkerJob<Job, Result extends KeyedResult>(
   transient = false,
 ): { result: Result | null; pending: boolean; error: string | null } {
   const [settled, setSettled] = useState<Settled<Result> | null>(null)
-  const [coalescer] = useState(
-    () => new GridWorkerRequestCoalescer<Job, Result>({ delayMS: SLIDER_JOB_COALESCE_MS }),
-  )
   const cached = job && key ? peek(job) : null
   const exactCached = cached?.key === key ? cached : null
 
   useEffect(() => {
-    if (!job || !key) {
-      coalescer.cancel()
-      return
-    }
+    if (!job || !key || transient) return
     let current = true
-    const pending = transient
-      ? coalescer.request(job, key, request)
-      : coalescer.flush(job, key, request)
+    const pending = request(job)
     pending.then((result) => {
       if (current && result.key === key) {
         setSettled({ key, result, error: null })
@@ -52,9 +41,8 @@ export function useGridWorkerJob<Job, Result extends KeyedResult>(
     })
     return () => {
       current = false
-      if (transient) coalescer.cancel(key)
     }
-  }, [job, key, request, transient, coalescer])
+  }, [job, key, request, transient])
 
   const exact = key && settled?.key === key ? settled : null
   return {

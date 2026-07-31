@@ -733,6 +733,71 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(compared).toBeGreaterThan(1)
   })
 
+  it('honours automatic margin bounds and an exact manual margin in serialized outline ladders', () => {
+    const unitContour: Contour = {
+      outer: { pts: [[0, 0], [1, 0], [1, 0.72], [0.54, 1], [0, 0.72]] },
+      holes: [],
+    }
+    const law = { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 }
+    const options = { source: 'magic' as const, density: 'standard' as const }
+    const automatic = semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
+      law,
+      'auto',
+      options,
+    )
+    const manual = semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
+      law,
+      'auto',
+      options,
+    )
+
+    expect(automatic.length).toBeGreaterThan(1)
+    expect(automatic.every(({ marginMM }) => marginMM >= 3 && marginMM <= 9)).toBe(true)
+    expect(manual.length).toBeGreaterThan(1)
+    expect(manual.every(({ marginMM }) => marginMM === 6)).toBe(true)
+    expect(manual.every(({ sizeMM, designSizeMM }) => sizeMM === designSizeMM + 12)).toBe(true)
+    expect(gridLadderCacheKey(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
+      law,
+      'auto',
+      options,
+    )).not.toBe(gridLadderCacheKey(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
+      law,
+      'auto',
+      options,
+    ))
+    expect(() => semanticLadderFromRecipe(
+      { kind: 'uniform-contour', unitContour, minMarginMM: 10, maxMarginMM: 9 },
+      law,
+      'auto',
+      options,
+    )).toThrow(/minimum margin/i)
+  })
+
+  it('prepares each physical size once even when multiple extents and pattern combos reject it', () => {
+    const calls: number[] = []
+    const impossible: Contour = {
+      outer: { pts: [[0, 0], [1, 0], [0, 1]] },
+      holes: [],
+    }
+    semanticLadder(
+      (sizeMM) => {
+        calls.push(sizeMM)
+        return impossible
+      },
+      { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 },
+      'auto',
+      { source: 'magic', density: 'standard' },
+    )
+
+    expect(calls.length, 'probe must execute candidate preparation').toBeGreaterThan(0)
+    expect(calls.length, 'the same physical candidate was prepared more than once')
+      .toBe(new Set(calls).size)
+  })
+
   it('fails closed instead of publishing a rotated population as Standard', () => {
     const angle = Math.PI / 4
     const ux = Math.cos(angle), uy = Math.sin(angle)

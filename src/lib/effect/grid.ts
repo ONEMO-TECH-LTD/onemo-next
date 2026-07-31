@@ -87,7 +87,8 @@ export function handleGridWorkerJob(job: GridJob): GridWorkerEnvelope {
   const cacheSeeds: GridCacheSeed[] = []
   let envelopeBytes = 0
   for (const rung of result.value) {
-    const options = job.recipe.kind === 'uniform-contour' && job.recipe.maxMarginMM != null
+    const options = job.recipe.kind === 'uniform-contour'
+      && (job.recipe.minMarginMM != null || job.recipe.maxMarginMM != null)
       ? { ...job.options, baseMarginMM: rung.marginMM }
       : job.options
     const seedJob: GridPlanJob = {
