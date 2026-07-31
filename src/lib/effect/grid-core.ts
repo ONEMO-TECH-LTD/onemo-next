@@ -500,6 +500,20 @@ function constructionPoints(construction: GridConstruction): Pt[] {
   ])
 }
 
+/** Published standard-shape sizes round the first exact fit upward to an even whole millimetre, so
+ * their true perimeter shell can sit at most 1mm deeper than the shallowest seated node. Keep that
+ * shell when freezing the catalogue construction; clipped-lattice stair steps are not perimeter. */
+function standardShapePerimeterAnchors(
+  anchors: ReadonlyArray<Anchor>,
+  prepared: PreparedContour,
+): Anchor[] {
+  if (anchors.length <= 1) return [...anchors]
+  const depths = anchors.map(({ p }) => distanceToPreparedContour(p, prepared))
+  const shallowestMM = Math.min(...depths)
+  return anchors.filter((_, index) =>
+    depths[index] <= shallowestMM + 1 + GRID_ARITHMETIC_EPSILON_MM)
+}
+
 /**
  * Magnet grid for a silhouette contour (mm). Phase-optimizes the fixed-pitch lattice for conformance,
  * boundary registration, exact ring coverage, population, then balance; in perimeter mode
@@ -1192,7 +1206,11 @@ function semanticSteps(
             sparseThin: false,
           }, gridExtentMM)
           if (!grid.anchors.length) return null
-          const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, grid.anchors)
+          const perimeterAnchors = source === 'std'
+            ? standardShapePerimeterAnchors(grid.anchors, prepared)
+            : grid.anchors
+          if (!perimeterAnchors.length) return null
+          const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, perimeterAnchors)
           return {
             designSizeMM,
             grid: computePreparedGridForExtent(prepared, {
@@ -1651,7 +1669,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 14
+export const GRID_ENGINE_CACHE_VERSION = 15
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
