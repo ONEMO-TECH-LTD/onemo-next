@@ -565,20 +565,22 @@ export default function GridLab() {
       pixelsToMM,
       bounds,
       magic,
+      blendPercent,
+      fillMode,
     }
   }, [isMagicSource, magic, model, magicBase, blendPercent, fillMode])
 
   useEffect(() => {
     if (!artworkRequest) return
     let current = true
-    const { key, bounds } = artworkRequest
+    const { key, bounds, blendPercent: requestedBlendPercent, fillMode: requestedFillMode } = artworkRequest
     const { origCanvas, subjCanvas } = artworkRequest.magic.prepared.frontSrc
     composeEffectArtwork({
       originalCanvas: origCanvas,
       subjectCanvas: subjCanvas,
       outputBoundsPx: bounds,
-      blendPercent,
-      fillMode,
+      blendPercent: requestedBlendPercent,
+      fillMode: requestedFillMode,
     }).then(({ canvas, frame }) => {
       if (!current) return
       setLiveArtwork({

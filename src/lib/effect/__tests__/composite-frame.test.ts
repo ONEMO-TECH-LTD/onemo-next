@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  blendPixelsToPercent,
   blendPercentToPixels,
   buildArtworkFillDraws,
   resolveArtworkFrame,
@@ -29,8 +30,13 @@ function rasterize(
 
 describe('v5.3.1 framed 2D compositor', () => {
   it('keeps the initial source-frame operation byte-sized like composeFront', () => {
-    expect(resolveArtworkFrame(120, 80)).toEqual({ originX: 0, originY: 0, width: 120, height: 80 })
+    const frame = resolveArtworkFrame(120, 80)
+    expect(frame).toEqual({ originX: 0, originY: 0, width: 120, height: 80 })
+    expect(buildArtworkFillDraws(120, 80, frame, 'clamp')).toEqual([
+      { sx: 0, sy: 0, sw: 120, sh: 80, dx: 0, dy: 0, dw: 120, dh: 80 },
+    ])
     expect(blendPercentToPixels(50, 1000)).toBe(20)
+    expect(blendPixelsToPercent(20, 1000)).toBe(50)
     expect(blendPercentToPixels(0, 1000)).toBe(0)
     expect(blendPercentToPixels(100, 1000)).toBe(40)
   })

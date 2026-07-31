@@ -403,11 +403,15 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain("fillMode")
     expect(pageSource).toContain('blendPercent')
     expect(pageSource).toContain('data-v531-initial-composite-sha256')
+    expect(pageSource.match(/prepareShaped\(loaded\.url/g)).toHaveLength(1)
     const recomposeEffect = pageSource.slice(
       pageSource.indexOf("useEffect(() => {\n    if (!artworkRequest)"),
       pageSource.indexOf("useEffect(() => {\n    const committedModel"),
     )
     expect(recomposeEffect).toContain('composeEffectArtwork({')
+    expect(recomposeEffect).toContain('outputBoundsPx: bounds')
+    expect(recomposeEffect).toContain('if (!current) return')
+    expect(recomposeEffect).toContain('imageUrl: canvas.toDataURL()')
     expect(recomposeEffect).not.toContain('prepareShaped')
     expect(rendererSource).toContain('frontArtwork.originX')
     expect(rendererSource).toContain('frontArtwork.originY')
