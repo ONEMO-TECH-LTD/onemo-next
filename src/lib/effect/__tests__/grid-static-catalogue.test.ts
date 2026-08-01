@@ -57,8 +57,9 @@ describe('version-locked Grid Lab static catalogue', () => {
     for (const entry of GRID_STATIC_CATALOGUE_ENTRIES) {
       expect(JSON.stringify(entry.result)).toBe(JSON.stringify(handleGridJob(entry.job)))
       if (entry.result.operation === 'ladder') {
+        const labels: string[] = entry.result.value.map((rung) => rung.label)
         expect(entry.result.value.every((rung) => rung.points >= 2)).toBe(true)
-        expect(entry.result.value.some((rung) => rung.label === 'ONE')).toBe(false)
+        expect(labels).not.toContain('ONE')
       }
     }
   })

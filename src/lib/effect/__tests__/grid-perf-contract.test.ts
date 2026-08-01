@@ -157,8 +157,8 @@ describe('exact grid recipe handlers', () => {
 
     expect(handled.operation).toBe('ladder')
     if (handled.operation !== 'ladder') throw new Error('Expected a ladder result.')
-    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([20, 116, 212, 308])
-    expect(handled.value.map((rung) => rung.points)).toEqual([1, 4, 8, 12])
+    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([116, 212, 308])
+    expect(handled.value.map((rung) => rung.points)).toEqual([4, 8, 12])
     expect(handled.key).toBe(gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', options))
     expect(handled.key).not.toBe(gridLadderCacheKey(
       recipe,

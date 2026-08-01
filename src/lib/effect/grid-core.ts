@@ -1423,24 +1423,6 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>): SemanticRung[] 
   return rungs
 }
 
-/** Freeform sources retain the one-anchor capability; every product-like source fails closed to the
- *  engine's existing multi-anchor floor. Name every current source so a new source cannot silently
- *  inherit permission to publish ONE. */
-function minimumPublishedAnchorsForSource(
-  source: GridSource,
-  strictMinimum: number = MIN_ANCHORS,
-): number {
-  switch (source) {
-    case 'gen':
-    case 'magic':
-      return 1
-    case 'std':
-    case 'preset':
-    default:
-      return strictMinimum
-  }
-}
-
 export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
   options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
@@ -1451,7 +1433,7 @@ export function semanticLadder(
       makeShape,
       law,
       modeCombos(mode, options.pitchMM, source),
-      minimumPublishedAnchorsForSource(source),
+      isFreeformSource(source) ? 1 : MIN_ANCHORS,
       options,
     ),
   )
@@ -1926,7 +1908,7 @@ export function semanticLadderFromRecipe(
 ): SemanticRung[] {
   const source = options.source ?? 'std'
   const strictMinimum = recipe.kind === 'rounded-square' ? recipe.minimumAnchors : MIN_ANCHORS
-  const minimumAnchors = minimumPublishedAnchorsForSource(source, strictMinimum)
+  const minimumAnchors = isFreeformSource(source) ? 1 : strictMinimum
   return labelSemanticSteps(
     semanticSteps(
       ladderShapeFromRecipe(recipe),

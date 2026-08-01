@@ -494,6 +494,38 @@ describe('resolveGridPlan — production engine seam', () => {
 })
 
 describe('grid-derived catalogue completeness', () => {
+  it('applies the source-aware anchor floor through both public ladder entry points', () => {
+    const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
+    const xs = realContour.outer.pts.map(([x]) => x)
+    const ys = realContour.outer.pts.map(([, y]) => y)
+    const longestMM = Math.max(
+      Math.max(...xs) - Math.min(...xs),
+      Math.max(...ys) - Math.min(...ys),
+    )
+    const freeformUnit = scaleContour(realContour, 1 / longestMM)
+    const presetUnit = normalizedPresetContour('heart')
+    let compared = 0
+    for (const source of ['std', 'preset', 'gen', 'magic'] as const) {
+      const unitContour = source === 'preset' ? presetUnit : freeformUnit
+      const recipe: LadderRecipe = source === 'std'
+        ? { kind: 'standard', shape: 'square' }
+        : { kind: 'uniform-contour', unitContour }
+      const makeShape = source === 'std'
+        ? (sizeMM: number) => stdShapeContour('square', sizeMM)
+        : (sizeMM: number) => scaleContour(unitContour, sizeMM)
+      for (const rungs of [
+        semanticLadder(makeShape, DEFAULT_LAW, 'auto', { source, density: 'standard' }),
+        semanticLadderFromRecipe(recipe, DEFAULT_LAW, 'auto', { source, density: 'standard' }),
+      ]) {
+        compared++
+        expect(rungs.length, `${source} produced no witness`).toBeGreaterThan(0)
+        expect(rungs[0].label, `${source} used the wrong anchor floor`)
+          .toBe(source === 'gen' || source === 'magic' ? 'ONE' : 'S')
+      }
+    }
+    expect(compared).toBe(8)
+  })
+
   it('starts every geometric catalogue at the first lawful multi-anchor S rung', () => {
     let compared = 0
     for (const shape of completenessShapes()) for (const density of ['standard', 'light'] as const) {
