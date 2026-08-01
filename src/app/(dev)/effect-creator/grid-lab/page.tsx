@@ -165,8 +165,8 @@ export default function GridLab() {
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
   // rect system A: two legal axis rungs (equal = square) → orientation
-  const [longMM, setLongMM] = useState(118)
-  const [shortMM, setShortMM] = useState(70)
+  const [longMM, setLongMM] = useState(116)
+  const [shortMM, setShortMM] = useState(68)
   const [orient, setOrient] = useState<'landscape' | 'portrait'>('landscape')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')
@@ -177,12 +177,13 @@ export default function GridLab() {
   const [roundedSquareRadiusMM, setRoundedSquareRadiusMM] = useState<number>(
     DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM,
   )
-  const [sizeMM, setSizeMM] = useState(70)
+  const [sizeMM, setSizeMM] = useState(68)
   const [pitch, setPitch] = useState(48)
   const [pitchAuto, setPitchAuto] = useState(true)
   const [attachment, setAttachment] = useState<Attachment>('magnetic')
   const [density, setDensity] = useState<GridDensity>('light') // cell count: standard = more cells (48-first), light = fewer (96-first)
   const [pad, setPad] = useState(10)
+  const [frameBufferMM, setFrameBufferMM] = useState(0)
   const [marginMode, setMarginMode] = useState<'auto' | 'manual'>('auto')
   const [manualMarginMM, setManualMarginMM] = useState(0)
   const [minMarginMM, setMinMarginMM] = useState(0)
@@ -190,10 +191,6 @@ export default function GridLab() {
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [patternAuto, setPatternAuto] = useState(true) // pattern joins the auto system — same physics search as pitch
   const [plan, setPlan] = useState<MagnetPlan>('auto') // engine law default: size-driven focal ramp
-  // NOTE: frame is NOT a control — it is a fixed engine law (DEFAULT_LAW.frameMM = 1, always baked into
-  // minEffectMM + semanticLadder). The 1mm suede edge always renders (it also carries the flap-risk signal);
-  // there is no user toggle, because a toggle here would only hide the drawn border while the manufactured
-  // size keeps the frame — a lying control. Frame thickness, if ever tunable, belongs in the engine law inputs.
   const [front, setFront] = useState(false) // front-face overlay: magnets shown over the design/art
   const [centerMode, setCenterMode] = useState<'centroid' | 'bbox'>('centroid')
   const [snapToGrid, setSnapToGrid] = useState(true)
@@ -281,7 +278,7 @@ export default function GridLab() {
   const fitMarginMaxMM = marginMode === 'auto' ? maxMarginMM : manualMarginMM
 
   // PER-GEOMETRY standard sizes (Dan): each geometry's rungs are solved numerically from the live
-  // recipe (padding/frame/pattern law) — square 70/118/…, circle and triangle their own. Rect derives
+  // recipe (padding/pattern law) — each shape derives its own frameless base. Rect derives
   // per-axis from the square ladder.
   // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …).
   const gridMode: GridMode = patternAuto ? 'auto' : pattern
@@ -364,6 +361,7 @@ export default function GridLab() {
     mode: gridMode,
     density,
     paddingMM: pad,
+    frameBufferMM,
     plan,
     center: centerMode,
     baseMarginMM: fitMarginMinMM,
@@ -376,7 +374,7 @@ export default function GridLab() {
     signedBaseMargin: true,
     diagnosticVelcro: true,
   }), [
-    attachment, engineSource, gridMode, density, pad, plan, centerMode,
+    attachment, engineSource, gridMode, density, pad, frameBufferMM, plan, centerMode,
     fitMarginMinMM, fitMarginMaxMM, pitchAuto, pitch, src,
   ])
 
@@ -435,8 +433,10 @@ export default function GridLab() {
         // continuous size or advance it to the next engine-derived rung.
         if (geo === 'rect') {
           if (!rectRungs) return null
-          const longSizeMM = snapToGrid ? effectiveTestSizeMM : longMM
-          const shortSizeMM = snapToGrid ? rectRungs.shortRung.sizeMM : shortMM
+          const longSizeMM = snapToGrid
+            ? activeSnapRung?.designSizeMM ?? effectiveTestSizeMM
+            : longMM
+          const shortSizeMM = snapToGrid ? rectRungs.shortRung.designSizeMM : shortMM
           const widthMM = orient === 'landscape' ? longSizeMM : shortSizeMM
           const heightMM = orient === 'landscape' ? shortSizeMM : longSizeMM
           const design = stdShapeContour(geo, widthMM, heightMM)
@@ -565,16 +565,18 @@ export default function GridLab() {
   const model = useMemo(() => {
     if (!preparedDesign || !resolvedPlan || !activePlanResult) return null
     const effect = resolvedPlan.effectContourMM
-    const eff = Math.round(Math.max(dim(effect, 0), dim(effect, 1)))
     const anchorPair = nearestAnchorPair(resolvedPlan.grid.anchors)
     return {
       planKey: activePlanResult.key,
       contour: effect,
+      base: resolvedPlan.baseContourMM,
       design: preparedDesign.design,
       grid: resolvedPlan.grid,
       marginMM: resolvedPlan.resolvedMarginMM,
       grew: resolvedPlan.grewMM,
-      effSize: eff,
+      effSize: Math.round(resolvedPlan.publishedSizeMM),
+      baseSize: Math.round(resolvedPlan.baseSizeMM),
+      frameBufferMM: resolvedPlan.frameBufferMM,
       designSize: preparedDesign.designSize,
       pitch: resolvedPlan.pitchMM,
       patternUsed: resolvedPlan.pattern ?? 'surface',
@@ -692,6 +694,10 @@ export default function GridLab() {
   }
   const adminPanelProps: GridWorkbenchAdminPanelProps = {
     pitch, setPitch, pitchAuto, setPitchAuto, density, setDensity, pad, setPad,
+    frameBufferMM,
+    setFrameBufferMM: value => setFrameBufferMM(
+      Number.isFinite(value) ? Math.max(0, value) : 0,
+    ),
     marginMode, setMarginMode,
     appliedMarginMM: model?.marginMM ?? fitMarginMinMM,
     manualMarginMM,
@@ -794,11 +800,11 @@ export default function GridLab() {
 
 const CSS = `
 .gl{--bg:#eef1f5;--panel:#fff;--panel-2:#f6f8fb;--line:#dbe1ea;--ink:#18202e;--ink-2:#5a6577;--ink-3:#93a0b3;
-  --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#ccd0d7;--margin:#aeb4bf;--suede-edge:#8a919c;--magnet:#20242c;
+  --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#ccd0d7;--margin:#aeb4bf;--frame:#d8c19a;--suede-edge:#8a919c;--magnet:#20242c;
   --magnet-hi:#6b7280;--mag8:#c98a12;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
-.gl[data-theme=dark]{--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}
+.gl[data-theme=dark]{--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--frame:#66583f;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}
 .gl *{box-sizing:border-box}
 .gl-head{max-width:1060px;margin:0 auto 20px}
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}

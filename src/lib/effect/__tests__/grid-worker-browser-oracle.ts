@@ -3,10 +3,8 @@ import {
   gridLadderCacheKey,
   gridPlanCacheKey,
   handleGridJob,
-  ladderShapeFromRecipe,
-  planContourFromRecipe,
-  resolveGridPlan,
-  semanticLadder,
+  resolveGridPlanFromRecipe,
+  semanticLadderFromRecipe,
   type Attachment,
   type GridJobResult,
   type GridPlanOptions,
@@ -43,7 +41,7 @@ async function run(): Promise<string[]> {
     const squareExpected: GridJobResult = {
       operation: 'ladder',
       key: gridLadderCacheKey(squareRecipe),
-      value: semanticLadder(ladderShapeFromRecipe(squareRecipe)),
+      value: semanticLadderFromRecipe(squareRecipe),
     }
     const squareActual = await client.request({ operation: 'ladder', recipe: squareRecipe })
     assertBytes('Neutral standard ladder', squareActual, squareExpected)
@@ -64,7 +62,7 @@ async function run(): Promise<string[]> {
     const diamondExpected: GridJobResult = {
       operation: 'ladder',
       key: gridLadderCacheKey(diamondRecipe, DEFAULT_LAW, 'diamond'),
-      value: semanticLadder(ladderShapeFromRecipe(diamondRecipe), DEFAULT_LAW, 'diamond'),
+      value: semanticLadderFromRecipe(diamondRecipe, DEFAULT_LAW, 'diamond'),
     }
     const diamondActual = await client.request({
       operation: 'ladder',
@@ -96,7 +94,7 @@ async function run(): Promise<string[]> {
     const diagnosticExpected: GridJobResult = {
       operation: 'plan',
       key: gridPlanCacheKey(diagnosticRecipe, diagnosticOptions),
-      value: resolveGridPlan(planContourFromRecipe(diagnosticRecipe), diagnosticOptions),
+      value: resolveGridPlanFromRecipe(diagnosticRecipe, diagnosticOptions),
     }
     const diagnosticActual = await client.request({
       operation: 'plan',

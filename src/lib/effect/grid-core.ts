@@ -17,7 +17,7 @@
 import type { Contour, Pt } from './types'
 import { DEFAULT_CIRCLE_TESSELLATION_CALIBRATION } from './effect-calibration'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
-import { roundedSquareContourMM } from './rounded-square'
+import { roundedSquareClearanceMM, roundedSquareContourMM } from './rounded-square'
 import { insetRingMM, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from './offset'
 import {
   PreparedContourSource,
@@ -50,9 +50,9 @@ export const LAUNCH_PITCHES_MM = [48, 96] as const
 export const PADDING_FLOOR_MM = 10
 export const MIN_ANCHORS = 2
 export const TARGET_ANCHORS = 4
-/** Prepared contours approximate curves with straight chords. At the 70mm zero-point, the 0.05mm
- * manufacturing flatten produces 0.00333mm chord sagitta on the R=11 corner; one tenth of the source
- * tolerance bounds it. This is an internal representation epsilon, never a product padding tolerance. */
+/** Prepared contours approximate curves with straight chords. A derived fraction of the source
+ * tolerance absorbs sub-tolerance arithmetic drift at inclusive tangency. This is an internal
+ * representation epsilon, never a product padding tolerance. */
 const GRID_ARITHMETIC_EPSILON_MM = MANUFACTURING_TOLERANCE_MM / 10
 /** Cross-engine trigonometry can differ below meaningful manufacturing precision. Rank physically
  * equal phases and serialize their construction on one derived quantum so Node/WebKit publish the
@@ -115,6 +115,19 @@ export interface GridResult {
 }
 
 function dist(a: Pt, b: Pt) { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
+
+type SeatClearanceMM = (point: Pt) => number
+type SeatClearanceAtSizeMM = (sizeMM: number) => SeatClearanceMM
+
+function circleSeatClearanceAtSizeMM(sizeMM: number): SeatClearanceMM {
+  const radiusMM = sizeMM / 2
+  const centre: Pt = [radiusMM, radiusMM]
+  return (point) => radiusMM - dist(point, centre)
+}
+
+function roundedSquareSeatClearanceAtSizeMM(radiusMM: number): SeatClearanceAtSizeMM {
+  return (sizeMM) => (point) => roundedSquareClearanceMM(point, sizeMM, sizeMM, radiusMM)
+}
 
 /** The most-interior point of the silhouette (pole of inaccessibility, sampled) + its distance to the edge.
  *  Used as the guaranteed single-magnet fallback when the sparse grid seats none. */
@@ -559,6 +572,7 @@ function computePreparedGridForExtent(
   prepared: PreparedContour,
   cfg: GridConfig,
   requiredGridExtentMM?: number,
+  seatClearanceMM?: SeatClearanceMM,
 ): GridResult {
   const contourMM = prepared.contour
   const attachment: Attachment = cfg.attachment ?? 'magnetic'
@@ -592,6 +606,12 @@ function computePreparedGridForExtent(
   // contour. The same physical floor governs sizing and delivery; no corner-specific rescue exists.
   const valid = (p: Pt) => {
     if (!pointInPreparedContour(p, prepared)) return false
+    if (seatClearanceMM) {
+      return seatClearanceMM([
+        canonicalGridCoordinate(p[0]),
+        canonicalGridCoordinate(p[1]),
+      ]) >= pad
+    }
     return distanceToPreparedContour(p, prepared) + GRID_ARITHMETIC_EPSILON_MM >= pad
   }
 
@@ -728,7 +748,7 @@ function computePreparedGridForExtent(
     // existing count/balance ranking decides exactly as before. Rectangles reach the floor on all
     // four sides and win; circles reach it on none or some, tie, and stay untouched.
     const fullyRegistered = (pts: ReadonlyArray<Pt>): boolean => {
-      return fullyRegisteredOnBBox(bb, pts, pad + DEFAULT_LAW.frameMM)
+      return fullyRegisteredOnBBox(bb, pts, pad)
     }
     type Cand = {
       fin: { seated: Pt[]; interior: Pt[] }
@@ -858,13 +878,11 @@ export function legalPatterns(pitchMM: number): GridPattern[] {
 /** The LAW INPUTS that generate every size procedurally — no hand-picked numbers. */
 export interface SizeLaw {
   paddingMM: number   // mag-safe radius from magnet centre (default 10)
-  frameMM: number     // frame stroke per side (default 1; 0 = frameless… padding then absorbs it)
   maxTestedMM: number // largest physically tested size → rungs above ship hidden (default 214)
   maxRungMM: number   // generator stop (default 310 — the 4-column shirt max)
 }
 export const DEFAULT_LAW: SizeLaw = {
   paddingMM: PADDING_FLOOR_MM,
-  frameMM: 1,
   maxTestedMM: 214,
   maxRungMM: 310,
 }
@@ -882,8 +900,20 @@ export function maxDesignMM(source: GridSource, law: SizeLaw = DEFAULT_LAW): num
 /** LAW: the default adaptive-plan margin allowance — the outward band a freeform plan may add to seek
  *  balance. Catalogue ladders never consume it: a published size is the exact zero-margin grid extent. */
 export const DEFAULT_MARGIN_MM = 12
-/** LAW: the smallest effect is the single-point (ONE) size — one magnet with its full pad ring. */
-export function minEffectMM(law: SizeLaw = DEFAULT_LAW): number { return 2 * (law.paddingMM + law.frameMM) }
+/** Absolute engine/freeform boundary: one magnet with its full pad ring. Geometric and preset
+ *  catalogues apply their stricter multi-anchor publication floor separately. */
+export function minEffectMM(law: SizeLaw = DEFAULT_LAW): number { return 2 * law.paddingMM }
+
+function normalizeFrameBufferMM(value = 0): number {
+  if (!Number.isFinite(value)) throw new RangeError('Frame buffer must be finite.')
+  return Math.max(0, value)
+}
+
+/** Publish no smaller than the base plus both buffer sides, on the next even whole millimetre. */
+function publishedEffectSizeMM(baseSizeMM: number, frameBufferMM: number): number {
+  if (!Number.isFinite(baseSizeMM)) throw new RangeError('Base effect size must be finite.')
+  return 2 * Math.ceil((baseSizeMM + 2 * normalizeFrameBufferMM(frameBufferMM)) / 2)
+}
 /** LAW: resolve a requested design size against the selected source's complete product bounds. */
 export function resolveDesignSizeMM(
   requestedMM: number,
@@ -962,13 +992,17 @@ function modeCombos(
 export interface SemanticRung {
   label: string
   points: number
-  /** Published total effect longest side: design plus both outward margin sides. */
+  /** Published total effect longest side after the caller's frame buffer and even-mm rounding. */
   sizeMM: number
+  /** Magnetic effect longest side before the separately carried frame buffer. */
+  baseSizeMM: number
   /** Longest side of the artwork/shape before its selected outward margin. */
   designSizeMM: number
   /** Selected outward margin per side. */
   marginMM: number
-  /** Shape-independent rectangular extent of the seated lattice, including pad + frame on both sides. */
+  /** Caller-owned frame buffer requested outside the magnetic base, per side. */
+  frameBufferMM: number
+  /** Shape-independent rectangular extent of the seated lattice, including padding on both sides. */
   gridExtentMM: number
   visible: boolean
   /** Complete lattice identity consumed by this rung's delivery. */
@@ -1037,7 +1071,7 @@ export function deriveRectangleConstruction(
   mode: GridMode = 'auto',
   options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
 ): GridConstruction | null {
-  const padEff = law.paddingMM + law.frameMM
+  const padEff = law.paddingMM
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
   const requestedCombos = modeCombos(mode, options.pitchMM, source)
@@ -1052,8 +1086,8 @@ export function deriveRectangleConstruction(
     pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM))
   const prepared = prepareExactContour(stdShapeContour(
     'rect',
-    widthRung.sizeMM,
-    heightRung.sizeMM,
+    widthRung.baseSizeMM,
+    heightRung.baseSizeMM,
   ))
   for (const combo of combos) {
     if (directPerimeter) {
@@ -1124,8 +1158,10 @@ function bandLabel(idx: number): string {
 interface SemanticStep {
   points: number
   sizeMM: number
+  baseSizeMM: number
   designSizeMM: number
   marginMM: number
+  frameBufferMM: number
   gridExtentMM: number
   construction: GridConstruction
 }
@@ -1135,11 +1171,13 @@ function semanticSteps(
   law: SizeLaw,
   combos: ReadonlyArray<{ pitchMM: number; pattern: GridPattern }>,
   minimumAnchors: number,
-  options: Pick<GridPlanOptions, 'source' | 'density' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
   minMarginMM = 0,
   maxMarginMM = 0,
+  seatClearanceAtSizeMM?: SeatClearanceAtSizeMM,
 ): SemanticStep[] {
-  const padEff = law.paddingMM + law.frameMM
+  const padEff = law.paddingMM
+  const frameBufferMM = normalizeFrameBufferMM(options.frameBufferMM)
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
   const directPerimeter = !isFreeformSource(source)
@@ -1166,6 +1204,7 @@ function semanticSteps(
   const preparedCandidates = new Map<string, {
     designSizeMM: number
     prepared: PreparedContour
+    seatClearanceMM?: SeatClearanceMM
   } | null>()
   const preparedAt = (sizeMM: number, marginMM: number) => {
     const key = `${sizeMM}:${marginMM}`
@@ -1182,6 +1221,7 @@ function semanticSteps(
     const candidate = {
       designSizeMM,
       prepared: prepareExactContour(effectContour),
+      seatClearanceMM: marginMM === 0 ? seatClearanceAtSizeMM?.(designSizeMM) : undefined,
     }
     preparedCandidates.set(key, candidate)
     return candidate
@@ -1208,6 +1248,7 @@ function semanticSteps(
       grid: GridResult
       construction: GridConstruction
       prepared: PreparedContour
+      seatClearanceMM?: SeatClearanceMM
       combo: typeof orderedCombos[number]
     } | null = null
     const extentCombos = gridExtentMM === firstExtentMM
@@ -1219,10 +1260,11 @@ function semanticSteps(
         grid: GridResult
         construction: GridConstruction
         prepared: PreparedContour
+        seatClearanceMM?: SeatClearanceMM
       } | null => {
         const candidate = preparedAt(sizeMM, marginMM)
         if (!candidate) return null
-        const { designSizeMM, prepared } = candidate
+        const { designSizeMM, prepared, seatClearanceMM } = candidate
         if (directPerimeter) {
           const grid = computePreparedGridForExtent(prepared, {
             pitchMM: combo.pitchMM,
@@ -1231,7 +1273,7 @@ function semanticSteps(
             center: options.center,
             perimeterOnly: true,
             sparseThin: false,
-          }, gridExtentMM)
+          }, gridExtentMM, seatClearanceMM)
           if (!grid.anchors.length) return null
           const perimeterAnchors = source === 'std'
             ? standardShapePerimeterAnchors(grid.anchors, prepared)
@@ -1248,9 +1290,10 @@ function semanticSteps(
               perimeterOnly: true,
               sparseThin: false,
               construction,
-            }, gridExtentMM),
+            }, gridExtentMM, seatClearanceMM),
             construction,
             prepared,
+            seatClearanceMM,
           }
         }
         const full = computePreparedGridForExtent(prepared, {
@@ -1260,7 +1303,7 @@ function semanticSteps(
           center: options.center,
           perimeterOnly: false,
           sparseThin: false,
-        }, gridExtentMM)
+        }, gridExtentMM, seatClearanceMM)
         if (!full.anchors.length) return null
         const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, full.anchors)
         const grid = computePreparedGridForExtent(prepared, {
@@ -1271,8 +1314,8 @@ function semanticSteps(
           perimeterOnly: true,
           sparseThin: true,
           construction,
-        }, gridExtentMM)
-        return { designSizeMM, grid, construction, prepared }
+        }, gridExtentMM, seatClearanceMM)
+        return { designSizeMM, grid, construction, prepared, seatClearanceMM }
       }
       const accepts = (grid: GridResult): boolean =>
         grid.anchors.length >= minimumAnchors
@@ -1306,6 +1349,7 @@ function semanticSteps(
               grid,
               construction: candidate.construction,
               prepared: candidate.prepared,
+              seatClearanceMM: candidate.seatClearanceMM,
               combo,
             }
             break
@@ -1326,12 +1370,14 @@ function semanticSteps(
           perimeterOnly: false,
           sparseThin: false,
           construction: solved.construction,
-        }, gridExtentMM)
+        }, gridExtentMM, solved.seatClearanceMM)
     steps.push({
       points: publishedGrid.anchors.length,
-      sizeMM: solved.sizeMM,
+      sizeMM: publishedEffectSizeMM(solved.sizeMM, frameBufferMM),
+      baseSizeMM: solved.sizeMM,
       designSizeMM: solved.designSizeMM,
       marginMM: solved.marginMM,
+      frameBufferMM,
       gridExtentMM,
       construction: solved.construction,
     })
@@ -1340,9 +1386,9 @@ function semanticSteps(
   return steps
 }
 
-function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): SemanticRung[] {
-  // LABEL LAW: ONE is the no-grid boundary. The first real grid extent is S, then M/L/XL sequentially
-  // with no skips. Labels belong to the grid progression, never to the enclosing shape's physical mm.
+function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>): SemanticRung[] {
+  // ONE remains the freeform one-anchor boundary. Geometric/preset ladders start at S. Subsequent
+  // labels belong to grid progression, never to the enclosing shape's physical millimetres.
   const rungs: SemanticRung[] = []
   let nextIdx = BASE_BAND_LABELS.indexOf('S')
   for (const st of steps) {
@@ -1351,8 +1397,10 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
         label: 'ONE',
         points: 1,
         sizeMM: st.sizeMM,
+        baseSizeMM: st.baseSizeMM,
         designSizeMM: st.designSizeMM,
         marginMM: st.marginMM,
+        frameBufferMM: st.frameBufferMM,
         gridExtentMM: st.gridExtentMM,
         visible: true,
         construction: st.construction,
@@ -1363,8 +1411,10 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
       label: bandLabel(nextIdx++),
       points: st.points,
       sizeMM: st.sizeMM,
+      baseSizeMM: st.baseSizeMM,
       designSizeMM: st.designSizeMM,
       marginMM: st.marginMM,
+      frameBufferMM: st.frameBufferMM,
       gridExtentMM: st.gridExtentMM,
       visible: true,
       construction: st.construction,
@@ -1373,13 +1423,37 @@ function labelSemanticSteps(steps: ReadonlyArray<SemanticStep>, law: SizeLaw): S
   return rungs
 }
 
+/** Freeform sources retain the one-anchor capability; every product-like source fails closed to the
+ *  engine's existing multi-anchor floor. Name every current source so a new source cannot silently
+ *  inherit permission to publish ONE. */
+function minimumPublishedAnchorsForSource(
+  source: GridSource,
+  strictMinimum: number = MIN_ANCHORS,
+): number {
+  switch (source) {
+    case 'gen':
+    case 'magic':
+      return 1
+    case 'std':
+    case 'preset':
+    default:
+      return strictMinimum
+  }
+}
+
 export function semanticLadder(
   makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
 ): SemanticRung[] {
+  const source = options.source ?? 'std'
   return labelSemanticSteps(
-    semanticSteps(makeShape, law, modeCombos(mode, options.pitchMM, options.source), 1, options),
-    law,
+    semanticSteps(
+      makeShape,
+      law,
+      modeCombos(mode, options.pitchMM, source),
+      minimumPublishedAnchorsForSource(source),
+      options,
+    ),
   )
 }
 
@@ -1412,6 +1486,7 @@ export function autoGrid(
 function autoPreparedGrid(
   withMargin: PreparedContourSource, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { minN?: number; density?: GridDensity; pitchMM?: number; pattern?: GridPattern; patterns?: ReadonlyArray<GridPattern> } = {},
+  seatClearanceAtMarginMM?: SeatClearanceAtSizeMM,
 ): AutoGridSelection {
   const minN = opts.minN ?? TARGET_ANCHORS
   let pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
@@ -1445,16 +1520,23 @@ function autoPreparedGrid(
       fromMM,
       maxGrowMM,
       { target: opts.minN },
+      seatClearanceAtMarginMM,
     )
   for (const p of pitches) for (const pat of patFor(p)) {
-    const fit = balancedPreparedFit(withMargin, { ...cfg, pitchMM: p, pattern: pat }, fromMM, maxGrowMM)
+    const fit = balancedPreparedFit(
+      withMargin,
+      { ...cfg, pitchMM: p, pattern: pat },
+      fromMM,
+      maxGrowMM,
+      {},
+      seatClearanceAtMarginMM,
+    )
     if (p === fb.pitchMM && pat === fb.pattern) fb.selectionFit = fit
     if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) {
       const selected = { pitchMM: p, pattern: pat, fit: finalFit(p, pat, fit) }
       if (!firstCovered) firstCovered = selected
       const prepared = withMargin.get(selected.fit.sizeMM)
       const floorMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-        + DEFAULT_LAW.frameMM
       if (fullyRegisteredOnBBox(
         prepared.bbox,
         selected.fit.grid.anchors.map((anchor) => anchor.p),
@@ -1509,6 +1591,7 @@ export function balancedFit(
 function balancedPreparedFit(
   sized: PreparedContourSource, cfg: GridConfig, fromMM: number, maxGrowMM: number,
   opts: { target?: number; step?: number } = {},
+  seatClearanceAtSizeMM?: SeatClearanceAtSizeMM,
 ): BalancedGridFit {
   const target = opts.target ?? TARGET_ANCHORS
   const step = opts.step ?? 3
@@ -1516,7 +1599,12 @@ function balancedPreparedFit(
   const end = start + Math.max(0, maxGrowMM)
   let best: { sizeMM: number; grid: GridResult } | null = null
   for (let mm = start; mm <= end; mm += step) {
-    const grid = computePreparedGrid(sized.get(mm), cfg)
+    const grid = computePreparedGridForExtent(
+      sized.get(mm),
+      cfg,
+      undefined,
+      seatClearanceAtSizeMM?.(mm),
+    )
     // perfect = fully covered AND ≥ target magnets → take the first (smallest) such size immediately
     if (grid.flaps.length === 0 && grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
     // otherwise rank physical uncovered length first, then more magnets; iteration keeps smaller size.
@@ -1532,7 +1620,12 @@ function balancedPreparedFit(
     }
   }
   if (best) return { ...best, grew: best.sizeMM - start }
-  const grid = computePreparedGrid(sized.get(start), cfg)
+  const grid = computePreparedGridForExtent(
+    sized.get(start),
+    cfg,
+    undefined,
+    seatClearanceAtSizeMM?.(start),
+  )
   return { sizeMM: start, grid, grew: 0 }
 }
 
@@ -1550,6 +1643,8 @@ export interface GridPlanOptions {
   plan?: MagnetPlan
   center?: 'centroid' | 'bbox'
   baseMarginMM?: number
+  /** Caller-owned material buffer outside the magnetic base, per side. */
+  frameBufferMM?: number
   maxGrowMM?: number
   pitchMM?: number
   targetAnchors?: number
@@ -1562,7 +1657,13 @@ export interface GridPlanOptions {
 /** Complete engine verdict. A caller renders these facts; it does not reimplement their laws. */
 export interface ResolvedGridPlan {
   designContourMM: Contour
+  /** Magnetic effect after adaptive offset and before the separate frame buffer. */
+  baseContourMM: Contour
   effectContourMM: Contour
+  baseSizeMM: number
+  publishedSizeMM: number
+  /** Actual per-side buffer after upward-even publication rounding. */
+  frameBufferMM: number
   grid: GridResult
   pitchMM: number
   pattern: GridPattern | null
@@ -1580,6 +1681,30 @@ export function contourWithOuterMargin(contour: Contour, marginMM: number): Cont
   return {
     outer: { pts: outer },
     holes: contour.holes.map((hole) => ({ pts: hole.pts.map(([x, y]) => [x, y] as Pt) })),
+  }
+}
+
+function withFrameBuffer(contour: Contour, requestedFrameBufferMM = 0): {
+  contour: Contour
+  baseSizeMM: number
+  publishedSizeMM: number
+  frameBufferMM: number
+} {
+  const prepared = prepareExactContour(contour)
+  const baseSizeMM = Math.max(
+    prepared.bbox.maxX - prepared.bbox.minX,
+    prepared.bbox.maxY - prepared.bbox.minY,
+  )
+  const requestedMM = normalizeFrameBufferMM(requestedFrameBufferMM)
+  const publishedSizeMM = requestedMM > 0
+    ? publishedEffectSizeMM(baseSizeMM, requestedMM)
+    : baseSizeMM
+  const frameBufferMM = (publishedSizeMM - baseSizeMM) / 2
+  return {
+    contour: frameBufferMM > 0 ? contourWithOuterMargin(contour, frameBufferMM) : contour,
+    baseSizeMM,
+    publishedSizeMM,
+    frameBufferMM,
   }
 }
 
@@ -1611,6 +1736,7 @@ export function nearestAnchorPair(anchors: ReadonlyArray<Anchor>): NearestAnchor
 export function resolveGridPlan(
   contourMM: Contour,
   opts: GridPlanOptions = {},
+  seatClearanceAtMarginMM?: SeatClearanceAtSizeMM,
 ): ResolvedGridPlan {
   const attachment = opts.attachment ?? 'magnetic'
   const source = opts.source ?? 'std'
@@ -1635,11 +1761,16 @@ export function resolveGridPlan(
   }
 
   if (attachment === 'velcro' && !opts.diagnosticVelcro) {
-    const effectContour = marginVariants.get(baseMarginMM)
-    const grid = computePreparedGrid(effectContour, { ...cfg, attachment })
+    const baseContour = marginVariants.get(baseMarginMM)
+    const framed = withFrameBuffer(baseContour.contour, opts.frameBufferMM)
+    const grid = computePreparedGrid(baseContour, { ...cfg, attachment })
     return {
       designContourMM: contourMM,
-      effectContourMM: effectContour.contour,
+      baseContourMM: baseContour.contour,
+      effectContourMM: framed.contour,
+      baseSizeMM: framed.baseSizeMM,
+      publishedSizeMM: framed.publishedSizeMM,
+      frameBufferMM: framed.frameBufferMM,
       grid,
       pitchMM: 0,
       pattern: null,
@@ -1651,16 +1782,21 @@ export function resolveGridPlan(
   }
 
   if (opts.construction && attachment !== 'velcro') {
-    const effectContour = marginVariants.get(baseMarginMM)
-    const grid = computePreparedGrid(effectContour, {
+    const baseContour = marginVariants.get(baseMarginMM)
+    const framed = withFrameBuffer(baseContour.contour, opts.frameBufferMM)
+    const grid = computePreparedGridForExtent(baseContour, {
       ...cfg,
       pitchMM: opts.construction.pitchMM,
       pattern: opts.construction.pattern,
       construction: opts.construction,
-    })
+    }, undefined, seatClearanceAtMarginMM?.(baseMarginMM))
     return {
       designContourMM: contourMM,
-      effectContourMM: effectContour.contour,
+      baseContourMM: baseContour.contour,
+      effectContourMM: framed.contour,
+      baseSizeMM: framed.baseSizeMM,
+      publishedSizeMM: framed.publishedSizeMM,
+      frameBufferMM: framed.frameBufferMM,
       grid,
       pitchMM: opts.construction.pitchMM,
       pattern: opts.construction.pattern,
@@ -1678,11 +1814,17 @@ export function resolveGridPlan(
       ?? (isFreeformSource(source) ? undefined : density === 'standard' ? 48 : 96),
     pattern: manualPattern,
     patterns: mode === 'auto' ? automaticPatternsForSource(source) : undefined,
-  })
+  }, seatClearanceAtMarginMM)
   const fit = selected.fit
+  const baseContour = marginVariants.get(fit.sizeMM)
+  const framed = withFrameBuffer(baseContour.contour, opts.frameBufferMM)
   return {
     designContourMM: contourMM,
-    effectContourMM: marginVariants.get(fit.sizeMM).contour,
+    baseContourMM: baseContour.contour,
+    effectContourMM: framed.contour,
+    baseSizeMM: framed.baseSizeMM,
+    publishedSizeMM: framed.publishedSizeMM,
+    frameBufferMM: framed.frameBufferMM,
     grid: fit.grid,
     pitchMM: selected.pitchMM,
     pattern: selected.pattern,
@@ -1696,7 +1838,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 15
+export const GRID_ENGINE_CACHE_VERSION = 16
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
@@ -1717,6 +1859,16 @@ export type PlanRecipe =
   | { kind: 'rounded-square'; sizeMM: number; radiusMM: number }
   | { kind: 'uniform-contour'; unitContour: Contour; longestMM: number }
   | { kind: 'final-contour'; contourMM: Contour }
+
+function ladderSeatClearanceAtSizeMM(recipe: LadderRecipe): SeatClearanceAtSizeMM | undefined {
+  if (recipe.kind === 'standard' && recipe.shape === 'circle') {
+    return circleSeatClearanceAtSizeMM
+  }
+  if (recipe.kind === 'rounded-square') {
+    return roundedSquareSeatClearanceAtSizeMM(recipe.radiusMM)
+  }
+  return undefined
+}
 
 function exactContourCopy(contour: Contour, label: string): Contour {
   const ring = (pts: ReadonlyArray<Pt>, ringLabel: string): Pt[] => {
@@ -1770,20 +1922,22 @@ export function semanticLadderFromRecipe(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
 ): SemanticRung[] {
-  const minimumAnchors = recipe.kind === 'rounded-square' ? recipe.minimumAnchors : 1
+  const source = options.source ?? 'std'
+  const strictMinimum = recipe.kind === 'rounded-square' ? recipe.minimumAnchors : MIN_ANCHORS
+  const minimumAnchors = minimumPublishedAnchorsForSource(source, strictMinimum)
   return labelSemanticSteps(
     semanticSteps(
       ladderShapeFromRecipe(recipe),
       law,
-      modeCombos(mode, options.pitchMM, options.source),
+      modeCombos(mode, options.pitchMM, source),
       minimumAnchors,
       options,
       recipe.kind === 'uniform-contour' ? recipe.minMarginMM ?? 0 : 0,
       recipe.kind === 'uniform-contour' ? recipe.maxMarginMM ?? 0 : 0,
+      ladderSeatClearanceAtSizeMM(recipe),
     ),
-    law,
   )
 }
 
@@ -1805,6 +1959,36 @@ export function planContourFromRecipe(recipe: PlanRecipe): Contour {
     return scaleContour(exactContourCopy(recipe.unitContour, 'Plan recipe'), recipe.longestMM)
   }
   return exactContourCopy(recipe.contourMM, 'Plan recipe')
+}
+
+function planSeatClearanceAtMarginMM(recipe: PlanRecipe): SeatClearanceAtSizeMM | undefined {
+  if (recipe.kind === 'standard' && recipe.shape === 'circle') {
+    return (marginMM) => {
+      const exact = circleSeatClearanceAtSizeMM(recipe.widthMM + 2 * marginMM)
+      return ([x, y]) => exact([x + marginMM, y + marginMM])
+    }
+  }
+  if (recipe.kind === 'rounded-square') {
+    return (marginMM) => (point) => roundedSquareClearanceMM(
+      [point[0] + marginMM, point[1] + marginMM],
+      recipe.sizeMM + 2 * marginMM,
+      recipe.sizeMM + 2 * marginMM,
+      recipe.radiusMM + marginMM,
+    )
+  }
+  return undefined
+}
+
+/** Resolve a serialized recipe without losing its curved geometry measurement authority. */
+export function resolveGridPlanFromRecipe(
+  recipe: PlanRecipe,
+  opts: GridPlanOptions = {},
+): ResolvedGridPlan {
+  return resolveGridPlan(
+    planContourFromRecipe(recipe),
+    opts,
+    planSeatClearanceAtMarginMM(recipe),
+  )
 }
 
 /** Stable, exact serialization for cache identity. Numbers are never rounded and object keys are sorted. */
@@ -1856,7 +2040,6 @@ export const GRID_ENGINE_POLICY_SIGNATURE = canonicalGridCacheValue(GRID_ENGINE_
 function normalizedLaw(law: SizeLaw = DEFAULT_LAW): SizeLaw {
   return {
     paddingMM: law.paddingMM,
-    frameMM: law.frameMM,
     maxTestedMM: law.maxTestedMM,
     maxRungMM: law.maxRungMM,
   }
@@ -1875,7 +2058,7 @@ export function gridLadderCacheKey(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
   mode: GridMode = 'auto',
-  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
+  options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
 ): string {
   ladderShapeFromRecipe(recipe)
   return gridCacheKey('ladder', {
@@ -1886,6 +2069,7 @@ export function gridLadderCacheKey(
       source: options.source ?? 'std',
       density: options.density ?? 'light',
       center: options.center ?? 'centroid',
+      frameBufferMM: normalizeFrameBufferMM(options.frameBufferMM),
     },
     recipe,
   })
@@ -1901,6 +2085,7 @@ function effectiveGridPlanOptions(opts: GridPlanOptions = {}) {
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
     baseMarginMM: opts.baseMarginMM ?? 0,
+    frameBufferMM: normalizeFrameBufferMM(opts.frameBufferMM),
     maxGrowMM: Math.max(0, opts.maxGrowMM ?? DEFAULT_MARGIN_MM),
     pitchMM: opts.pitchMM ?? null,
     targetAnchors: opts.targetAnchors ?? TARGET_ANCHORS,
