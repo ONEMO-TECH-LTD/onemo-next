@@ -1008,6 +1008,19 @@ export interface SemanticRung {
   /** Complete lattice identity consumed by this rung's delivery. */
   construction: GridConstruction
 }
+
+/** Apply a caller-owned frame to a solved magnetic ladder without re-solving its construction. */
+export function applyFrameBufferToSemanticLadder(
+  rungs: ReadonlyArray<SemanticRung>,
+  requestedFrameBufferMM: number,
+): SemanticRung[] {
+  const frameBufferMM = normalizeFrameBufferMM(requestedFrameBufferMM)
+  return rungs.map((rung) => ({
+    ...rung,
+    sizeMM: publishedEffectSizeMM(rung.baseSizeMM, frameBufferMM),
+    frameBufferMM,
+  }))
+}
 export type SemanticRungTieBreak = 'higher' | 'first'
 
 /** Select the closest semantic rung. Exact ties are explicit so callers cannot drift. */
