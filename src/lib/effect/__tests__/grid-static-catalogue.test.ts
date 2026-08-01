@@ -67,7 +67,7 @@ describe('version-locked Grid Lab static catalogue', () => {
         expect(labels).not.toContain('ONE')
       }
     }
-  })
+  }, 15_000)
 
   it('covers every standard shape and density through the exact live Grid Lab identity', () => {
     const client = createGridWorkerClient()

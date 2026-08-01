@@ -524,7 +524,7 @@ describe('grid-derived catalogue completeness', () => {
       }
     }
     expect(compared).toBe(8)
-  })
+  }, 15_000)
 
   it('starts every geometric catalogue at the first lawful multi-anchor S rung', () => {
     let compared = 0

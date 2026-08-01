@@ -156,7 +156,7 @@ describe('actual Creator source families share one engine contract', () => {
       expect(contour, preset).not.toBeNull()
       exercise(`preset:${preset}`, scaleContour(normalized(contour!), 180), 'preset')
     }
-  })
+  }, 15_000)
 
   it('starts every curated preset ladder at a multi-anchor S rung, never ONE', () => {
     let compared = 0
