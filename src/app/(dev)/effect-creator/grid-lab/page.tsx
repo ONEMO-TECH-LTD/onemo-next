@@ -49,6 +49,7 @@ const VP = 440
 const FIT = 0.86
 
 type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
+type GridTheme = 'light' | 'dark'
 type StdGeo = StdShape
 type MagicState = {
   prepared: PreparedEffect
@@ -162,6 +163,7 @@ function normGeneratedRing(ring: ReadonlyArray<Pt>): Contour | null {
 export default function GridLab() {
   const [renderedPlanKey, setRenderedPlanKey] = useState<string | null>(null)
   const [sliderTransient, setSliderTransient] = useState(false)
+  const [theme, setTheme] = useState<GridTheme>('dark')
   const [src, setSrc] = useState<Src>('std')
   const [geo, setGeo] = useState<StdGeo>('square')
   // rect system A: two legal axis rungs (equal = square) → orientation
@@ -734,7 +736,7 @@ export default function GridLab() {
   return (
     <div
       className="gl"
-      data-theme="dark"
+      data-theme={theme}
       data-grid-runtime-status={runtimeStatus}
       data-grid-slider-transient={sliderTransient}
       data-grid-ladder-key={ladderKey}
@@ -744,7 +746,18 @@ export default function GridLab() {
     >
       <style>{CSS}</style>
       <header className="gl-head">
-        <h1>Magnetic Grid Lab <span className="gl-tag">s59 · registration engine</span></h1>
+        <div className="gl-head-top">
+          <h1>Magnetic Grid Lab <span className="gl-tag">s59 · registration engine</span></h1>
+          <button
+            type="button"
+            className="gl-theme-toggle"
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            aria-pressed={theme === 'dark'}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            Theme · {theme === 'dark' ? 'Dark' : 'Light'}
+          </button>
+        </div>
         <p>Every engine shape source — presets, generators, and <b>AI image cut-out</b> — through the mm magnetic grid.
           The window is fixed; change the effect&apos;s real size and the proportions move. Drawn entirely from millimetres.</p>
       </header>
@@ -807,8 +820,11 @@ const CSS = `
 .gl[data-theme=dark]{--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--margin:#4d535e;--frame:#66583f;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}
 .gl *{box-sizing:border-box}
 .gl-head{max-width:1060px;margin:0 auto 20px}
-.gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.gl-head-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 5px}
+.gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
 .gl-tag{font:600 11px var(--mono);color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;letter-spacing:.02em}
+.gl-theme-toggle{flex:none;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);padding:7px 10px;font:600 11px var(--mono);cursor:pointer;box-shadow:var(--shadow)}
+.gl-theme-toggle:hover{border-color:var(--accent);color:var(--accent)}
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
 .gl-body{max-width:1436px;margin:0 auto;display:grid;grid-template-columns:336px minmax(0,1fr) 336px;gap:20px;align-items:start}
 @media (max-width:840px){.gl-body{grid-template-columns:1fr}}

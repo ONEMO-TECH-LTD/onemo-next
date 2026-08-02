@@ -31,6 +31,16 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(homeSource).toContain('redirect("/effect-creator/grid-lab")')
   })
 
+  it('binds the Grid Lab theme toggle to the page root without forcing either theme', () => {
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
+
+    expect(pageSource).toContain("const [theme, setTheme] = useState<GridTheme>('dark')")
+    expect(pageSource).toContain('data-theme={theme}')
+    expect(pageSource).toContain("onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}")
+    expect(pageSource).not.toContain('data-theme="dark"')
+    expect(pageSource).not.toContain('data-theme="light"')
+  })
+
   it('uses one neutral engine lane behind separate product and admin control panels', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
@@ -654,7 +664,6 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain('vectorShape: spec.vectorShape')
     expect(pageSource).toContain('imageUrl: liveArtwork.imageUrl')
     expect(pageSource).toContain('frontArtwork={')
-    expect(pageSource).toContain('data-theme="dark"')
     expect(pageSource).not.toContain('frontImg={isMagicSource && magic ? magic.imgUrl : null}')
     expect(pageSource).not.toContain('OutlineEditor')
     expect(pageSource).not.toContain('useOutlineStore')
