@@ -752,7 +752,6 @@ export default function GridLab() {
             type="button"
             className="gl-theme-toggle"
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-            aria-pressed={theme === 'dark'}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
             Theme · {theme === 'dark' ? 'Dark' : 'Light'}
