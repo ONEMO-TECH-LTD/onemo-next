@@ -37,6 +37,7 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain("const [theme, setTheme] = useState<GridTheme>('dark')")
     expect(pageSource).toContain('data-theme={theme}')
     expect(pageSource).toContain("onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}")
+    expect(pageSource).not.toContain('aria-pressed={theme')
     expect(pageSource).not.toContain('data-theme="dark"')
     expect(pageSource).not.toContain('data-theme="light"')
   })
