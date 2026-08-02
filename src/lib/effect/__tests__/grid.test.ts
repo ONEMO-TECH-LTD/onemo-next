@@ -957,6 +957,58 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(compared).toBe(5)
   })
 
+  it('auto-selects the lawful perimeter-only 96mm Dice construction for Diamond Light', () => {
+    const ladder = semanticLadderFromRecipe(
+      { kind: 'standard', shape: 'diamondShape' },
+      DEFAULT_LAW,
+      'auto',
+      { source: 'std', density: 'light' },
+    )
+
+    expect(ladder.map(({ sizeMM, points }) => [sizeMM, points])).toEqual([
+      [126, 4],
+      [222, 8],
+    ])
+
+    let compared = 0
+    for (const rung of ladder) {
+      const population = constructionPoints(rung.construction)
+      const rimKeys = boundaryPointKeys(population, rung.construction.basisMM)
+      const recipe = {
+        kind: 'standard' as const,
+        shape: 'diamondShape' as const,
+        widthMM: rung.baseSizeMM,
+        heightMM: rung.baseSizeMM,
+      }
+      const plan = resolveGridPlanFromRecipe(recipe, {
+        source: 'std',
+        mode: 'auto',
+        density: 'light',
+        maxGrowMM: 0,
+        construction: rung.construction,
+      })
+      const directPlan = resolveGridPlanFromRecipe(recipe, {
+        source: 'std',
+        mode: 'auto',
+        density: 'light',
+        maxGrowMM: 0,
+      })
+      compared++
+      expect(rung.construction.pattern).toBe('quincunx')
+      expect(rung.construction.pitchMM).toBe(96)
+      expect(rimKeys.size).toBe(population.length)
+      expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
+      expect(plan.pattern).toBe(rung.construction.pattern)
+      expect(plan.pitchMM).toBe(rung.construction.pitchMM)
+      expect(directPlan.pattern).toBe('quincunx')
+      expect(directPlan.pitchMM).toBe(96)
+      expect(directPlan.grid.ok).toBe(true)
+    }
+
+    expect(compared).toBe(2)
+    expect(ladder.at(-1)?.points).toBeGreaterThan(4)
+  })
+
   it('expands AI Magic 2 on the lawful 96mm family without bypassing its real outline', () => {
     const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
     const xs = realContour.outer.pts.map(([x]) => x)
@@ -1213,21 +1265,33 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(grown.nearestAnchorMM).toBeCloseTo(48, 9)
   })
 
-  it('keeps every visible geometric product rung on the standard pattern in Auto', () => {
-    const nonStandardRungs = new Set<string>()
+  it('keeps Auto product patterns standard except the ruled Diamond Light Dice construction', () => {
+    const unexpectedPatterns = new Set<string>()
     const visibleRungs = { standard: 0, light: 0 }
     const hiddenRungs = new Set<string>()
 
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       for (const density of ['standard', 'light'] as const) {
-        const ladder = semanticLadder(contourAt, DEFAULT_LAW, 'auto', { source: 'std', density })
+        const ladder = semanticLadderFromRecipe(
+          { kind: 'standard', shape },
+          DEFAULT_LAW,
+          'auto',
+          { source: 'std', density },
+        )
+        const expectedPattern = shape === 'diamondShape' && density === 'light'
+          ? 'quincunx'
+          : 'standard'
         for (const rung of ladder) {
           if (!rung.visible) hiddenRungs.add(`${shape}/${density}/${rung.label}/${rung.sizeMM}`)
         }
         for (const rung of ladder.filter(({ visible }) => visible)) {
           visibleRungs[density]++
-          const plan = resolveGridPlan(contourAt(rung.sizeMM), {
+          const plan = resolveGridPlanFromRecipe({
+            kind: 'standard',
+            shape,
+            widthMM: rung.baseSizeMM,
+            heightMM: rung.baseSizeMM,
+          }, {
             source: 'std',
             mode: 'auto',
             density,
@@ -1235,22 +1299,25 @@ describe('semantic ladder stays inside its product contract', () => {
             maxGrowMM: 0,
             construction: rung.construction,
           })
-          if (plan.pattern !== 'standard') {
-            nonStandardRungs.add(`${shape}/${density}/${rung.label}/${rung.sizeMM}`)
+          if (plan.pattern !== expectedPattern) {
+            unexpectedPatterns.add(
+              `${shape}/${density}/${rung.label}/${rung.sizeMM}:${plan.pattern ?? 'none'}`,
+            )
           }
         }
       }
     }
 
-    // The law under test is "every VISIBLE product rung is standard-pattern in Auto" — the rung
-    // COUNT is not the law. The old pin (18/7) was arithmetic of the unsanctioned visibility
+    // The law under test is recipe-aware product eligibility, not a rung count: product Auto is
+    // standard except Diamond Light, whose ruled 96mm midpoints require the Dice construction.
+    // The old pin (18/7) was arithmetic of the unsanctioned visibility
     // filter, not of 4.1: it only held while sizes above the tested ceiling were hidden, so it
     // failed the moment that filter was removed on Dan's ruling ("I never said to hide them").
     // Pinning a count here re-creates the filter by the back door. Assert the property, plus a
     // non-empty denominator so the sweep cannot pass by examining nothing.
     expect(visibleRungs.standard).toBeGreaterThan(0)
     expect(visibleRungs.light).toBeGreaterThan(0)
-    expect([...nonStandardRungs]).toEqual([])
+    expect([...unexpectedPatterns]).toEqual([])
 
     // …and the visibility law itself, which the pattern property CANNOT carry: a re-introduced
     // filter simply removes rungs from the sweep above, so every survivor is still standard and
@@ -1345,11 +1412,13 @@ describe('semantic ladder stays inside its product contract', () => {
   it('builds every standard-shape density as its own perimeter-only 48/96 construction', () => {
     let compared = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       for (const density of ['standard', 'light'] as const) {
         const expectedPitchMM = density === 'standard' ? 48 : 96
-        const rungs = semanticLadder(
-          contourAt,
+        const expectedPattern = shape === 'diamondShape' && density === 'light'
+          ? 'quincunx'
+          : 'standard'
+        const rungs = semanticLadderFromRecipe(
+          { kind: 'standard', shape },
           DEFAULT_LAW,
           'auto',
           { source: 'std', density },
@@ -1357,7 +1426,12 @@ describe('semantic ladder stays inside its product contract', () => {
         for (const rung of rungs) {
           const population = constructionPoints(rung.construction)
           const rimKeys = boundaryPointKeys(population, rung.construction.basisMM)
-          const plan = resolveGridPlan(contourAt(rung.sizeMM), {
+          const plan = resolveGridPlanFromRecipe({
+            kind: 'standard',
+            shape,
+            widthMM: rung.baseSizeMM,
+            heightMM: rung.baseSizeMM,
+          }, {
             source: 'std',
             mode: 'auto',
             density,
@@ -1367,7 +1441,7 @@ describe('semantic ladder stays inside its product contract', () => {
           })
           compared++
           expect(rung.construction.pitchMM).toBe(expectedPitchMM)
-          expect(rung.construction.pattern).toBe('standard')
+          expect(rung.construction.pattern).toBe(expectedPattern)
           expect(rimKeys.size).toBe(population.length)
           expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
           expect(plan.grid.anchors).toHaveLength(rung.points)

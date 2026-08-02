@@ -955,8 +955,9 @@ export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM)
 
 
 /** GRID MODE — the four exposed modes (§ goal 2026-07-21):
- *  auto = source-aware: standard only for product geometries/presets, every legal pattern for
- *  freeform generators/AI · standard = straight (48-atom) links only · quincunx (dice) = the
+ *  auto = recipe-aware: standard for product geometries/presets, with 96mm Dice admitted for
+ *  Diamond Light so its required midpoints stay on the rim; every legal pattern for freeform
+ *  generators/AI · standard = straight (48-atom) links only · quincunx (dice) = the
  *  standard+diamond mix (96 pitch) · diamond = diagonal (68-atom) links only. */
 export type GridMode = 'auto' | GridPattern
 function automaticPatternsForSource(source: GridSource): ReadonlyArray<GridPattern> {
@@ -964,19 +965,32 @@ function automaticPatternsForSource(source: GridSource): ReadonlyArray<GridPatte
     ? ['standard', 'diamond', 'quincunx']
     : ['standard']
 }
+function automaticPatternsForRecipe(
+  recipe: LadderRecipe | PlanRecipe,
+  source: GridSource,
+  density: GridDensity,
+): ReadonlyArray<GridPattern> {
+  const sourcePatterns = automaticPatternsForSource(source)
+  return density === 'light'
+    && recipe.kind === 'standard'
+    && recipe.shape === 'diamondShape'
+    && !isFreeformSource(source)
+    ? [...sourcePatterns, 'quincunx']
+    : sourcePatterns
+}
 function modeCombos(
   mode: GridMode,
   pinnedPitchMM?: number,
   source: GridSource = 'std',
+  automaticPatterns: ReadonlyArray<GridPattern> = automaticPatternsForSource(source),
 ): { pitchMM: number; pattern: GridPattern }[] {
   const std = [{ pitchMM: 48, pattern: 'standard' as GridPattern }, { pitchMM: 96, pattern: 'standard' as GridPattern }]
   const dia = [{ pitchMM: 48, pattern: 'diamond' as GridPattern }, { pitchMM: 96, pattern: 'diamond' as GridPattern }]
   const dice = [{ pitchMM: 96, pattern: 'quincunx' as GridPattern }]
-  const automatic = automaticPatternsForSource(source)
   const combos = mode === 'standard' ? std
     : mode === 'diamond' ? dia
       : mode === 'quincunx' ? dice
-        : [...std, ...dia, ...dice].filter(({ pattern }) => automatic.includes(pattern))
+        : [...std, ...dia, ...dice].filter(({ pattern }) => automaticPatterns.includes(pattern))
   if (pinnedPitchMM == null) return combos
   if (!(LAUNCH_PITCHES_MM as readonly number[]).includes(pinnedPitchMM)) {
     throw new RangeError(`Unsupported magnetic-grid pitch ${pinnedPitchMM}mm; launch pitches are 48mm and 96mm.`)
@@ -1733,6 +1747,20 @@ export function resolveGridPlan(
   opts: GridPlanOptions = {},
   seatClearanceAtMarginMM?: SeatClearanceAtSizeMM,
 ): ResolvedGridPlan {
+  return resolveGridPlanWithAutomaticPatterns(
+    contourMM,
+    opts,
+    automaticPatternsForSource(opts.source ?? 'std'),
+    seatClearanceAtMarginMM,
+  )
+}
+
+function resolveGridPlanWithAutomaticPatterns(
+  contourMM: Contour,
+  opts: GridPlanOptions,
+  automaticPatterns: ReadonlyArray<GridPattern>,
+  seatClearanceAtMarginMM?: SeatClearanceAtSizeMM,
+): ResolvedGridPlan {
   const attachment = opts.attachment ?? 'magnetic'
   const source = opts.source ?? 'std'
   const mode = opts.mode ?? 'auto'
@@ -1808,7 +1836,7 @@ export function resolveGridPlan(
     pitchMM: opts.pitchMM
       ?? (isFreeformSource(source) ? undefined : density === 'standard' ? 48 : 96),
     pattern: manualPattern,
-    patterns: mode === 'auto' ? automaticPatternsForSource(source) : undefined,
+    patterns: mode === 'auto' ? automaticPatterns : undefined,
   }, seatClearanceAtMarginMM)
   const fit = selected.fit
   const baseContour = marginVariants.get(fit.sizeMM)
@@ -1833,7 +1861,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 16
+export const GRID_ENGINE_CACHE_VERSION = 17
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
@@ -1926,7 +1954,12 @@ export function semanticLadderFromRecipe(
     semanticSteps(
       ladderShapeFromRecipe(recipe),
       law,
-      modeCombos(mode, options.pitchMM, source),
+      modeCombos(
+        mode,
+        options.pitchMM,
+        source,
+        automaticPatternsForRecipe(recipe, source, options.density ?? 'light'),
+      ),
       minimumAnchors,
       options,
       recipe.kind === 'uniform-contour' ? recipe.minMarginMM ?? 0 : 0,
@@ -1979,9 +2012,10 @@ export function resolveGridPlanFromRecipe(
   recipe: PlanRecipe,
   opts: GridPlanOptions = {},
 ): ResolvedGridPlan {
-  return resolveGridPlan(
+  return resolveGridPlanWithAutomaticPatterns(
     planContourFromRecipe(recipe),
     opts,
+    automaticPatternsForRecipe(recipe, opts.source ?? 'std', opts.density ?? 'light'),
     planSeatClearanceAtMarginMM(recipe),
   )
 }
@@ -2022,6 +2056,13 @@ const GRID_ENGINE_POLICY_CONTRACT = {
     autoBySource: {
       product: modeCombos('auto', undefined, 'std'),
       freeform: modeCombos('auto', undefined, 'gen'),
+    },
+    autoRecipeExceptions: {
+      diamondShapeLight: automaticPatternsForRecipe(
+        { kind: 'standard', shape: 'diamondShape' },
+        'std',
+        'light',
+      ),
     },
     standard: modeCombos('standard'),
     quincunx: modeCombos('quincunx'),
