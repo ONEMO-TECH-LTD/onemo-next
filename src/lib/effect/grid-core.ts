@@ -837,16 +837,11 @@ function computePreparedGridForExtent(
  *  shapes use the density's pitch directly through semanticSteps. */
 export type GridDensity = 'standard' | 'light'
 function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
-function isFreeformSource(source: GridSource): boolean {
-  return source === 'gen' || source === 'magic'
-}
-/** Standard shapes are perimeter-only in both densities. Freeform retains the earlier adaptive
- *  Standard-full / Light-rim policy until Dan re-rules it. */
-export function perimeterForDensity(density: GridDensity, source: GridSource = 'std'): boolean {
-  return isFreeformSource(source) ? density === 'light' : true
-}
-function sparseThinForDensity(density: GridDensity, source: GridSource): boolean {
-  return isFreeformSource(source) && density === 'light'
+/** Dan 08-03: "the standard mode must show all magnets - the light perimeter only". The mode is the
+ *  magnet mask and nothing else selects it — not the shape, not the menu the shape came from. An
+ *  identical contour therefore delivers an identical population under every source label (8.8). */
+export function perimeterForDensity(density: GridDensity): boolean {
+  return density === 'light'
 }
 /** Legal patterns per pitch under the 48/68 system: dice centres live at half-pitch, so quincunx is
  *  legal ONLY at 96 (centres at 48-offsets = the shirt's own dice). Nothing ever sits at 24-offsets. */
@@ -1041,7 +1036,11 @@ export function deriveRectangleConstruction(
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
   const requestedCombos = modeCombos(mode, options.pitchMM, source)
-  const directPerimeter = !isFreeformSource(source)
+  // 8.8: pitch is chosen by density for every source, never by where the shape came from.
+  const directPerimeter = true
+  // Dan 08-03: Standard mode delivers all magnets, Light delivers the perimeter. The mask follows
+  // density alone — it is NOT the same decision as pitch selection, which is why these are separate.
+  const perimeterMask = perimeterForDensity(density)
   const densityPitchMM = density === 'standard' ? 48 : 96
   const densityCombos = directPerimeter
     ? requestedCombos.filter(({ pitchMM }) => pitchMM === densityPitchMM)
@@ -1056,7 +1055,7 @@ export function deriveRectangleConstruction(
     heightRung.sizeMM,
   ))
   for (const combo of combos) {
-    if (directPerimeter) {
+    if (perimeterMask) {
       const grid = computePreparedGridForExtent(
         prepared,
         {
@@ -1142,7 +1141,11 @@ function semanticSteps(
   const padEff = law.paddingMM + law.frameMM
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
-  const directPerimeter = !isFreeformSource(source)
+  // 8.8: pitch is chosen by density for every source, never by where the shape came from.
+  const directPerimeter = true
+  // Dan 08-03: Standard mode delivers all magnets, Light delivers the perimeter. The mask follows
+  // density alone — it is NOT the same decision as pitch selection, which is why these are separate.
+  const perimeterMask = perimeterForDensity(density)
   const densityPitchMM = density === 'standard' ? 48 : 96
   const densityCombos = directPerimeter
     ? combos.filter(({ pitchMM }) => pitchMM === densityPitchMM)
@@ -1223,7 +1226,7 @@ function semanticSteps(
         const candidate = preparedAt(sizeMM, marginMM)
         if (!candidate) return null
         const { designSizeMM, prepared } = candidate
-        if (directPerimeter) {
+        if (perimeterMask) {
           const grid = computePreparedGridForExtent(prepared, {
             pitchMM: combo.pitchMM,
             pattern: combo.pattern,
@@ -1316,7 +1319,7 @@ function semanticSteps(
       if (solved) break
     }
     if (!solved) continue
-    const publishedGrid = directPerimeter || density === 'light'
+    const publishedGrid = perimeterMask
       ? solved.grid
       : computePreparedGridForExtent(solved.prepared, {
           pitchMM: solved.combo.pitchMM,
@@ -1630,8 +1633,8 @@ export function resolveGridPlan(
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
-    perimeterOnly: perimeterForDensity(density, source),
-    sparseThin: sparseThinForDensity(density, source),
+    perimeterOnly: perimeterForDensity(density),
+    sparseThin: false,
   }
 
   if (attachment === 'velcro' && !opts.diagnosticVelcro) {
@@ -1675,7 +1678,7 @@ export function resolveGridPlan(
     minN: opts.targetAnchors,
     density,
     pitchMM: opts.pitchMM
-      ?? (isFreeformSource(source) ? undefined : density === 'standard' ? 48 : 96),
+      ?? (density === 'standard' ? 48 : 96),
     pattern: manualPattern,
     patterns: mode === 'auto' ? automaticPatternsForSource(source) : undefined,
   })
