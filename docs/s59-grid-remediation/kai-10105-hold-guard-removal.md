@@ -289,6 +289,30 @@ the paused suites, and neither a scan pin nor a coverage fossil:
 Both are the same root as the triangle: with coverage and the count objective removed, nothing decides
 occupancy.
 
+## Remaining suite failures, partitioned by owning ticket
+
+Forced focused run on the final head: **9 failed · 37 passed · 2 skipped** in `grid.test.ts` (down from
+14). Grid QA's forced 4-file gate: **85 pass / 10 fail / 2 O3-skips**. The 2 skips are the deliberate
+O3-pending witnesses, greppable and named in any run.
+
+**Not one of these is a hold-guard fossil, and not one is tuned.** An earlier draft of this ledger and of
+the commit body assigned all nine to KAI-10078/O3. That was wrong, and Grid QA corrected it: five are
+control-decoupling tests owned by **KAI-10090** under its live contract, and 10078 must not be made to own
+them.
+
+| Owner | Failing test | Why it is theirs |
+|---|---|---|
+| **KAI-10090** | composes every reachable rectangle from the active density construction | pins the density↔composition coupling Dan overruled |
+| **KAI-10090** | uses Light as the one omitted-density default across ladder and delivery seams | pins the old default-density behaviour |
+| **KAI-10090** | builds standard shapes as direct 48/96 constructions masked by density | pins mask→spacing, the coupling 4.7d removed |
+| **KAI-10090** | retains adaptive patterns for freeform and explicit admin modes | pins Pattern Auto, deleted under 8.8c |
+| **KAI-10090** | masks every standard-shape density by mode | same coupling, delivery seam |
+| **KAI-10078 / O3** | derives AI Magic 2 sizes from the real outline, retains its one-point construction | ladder values move when the scan dies |
+| **KAI-10078 / O3** | accepts exact 10mm rounded-corner tangency, seats all four frameless corners | occupancy — resolves 1 anchor, not 4 |
+| **KAI-10078 / O3** | publishes every physical catalogue size on the next even whole millimetre | the scan itself |
+| **KAI-10078 / O3** | deduplicates circle count changes inside one extent and never skips labels | the scalar identity |
+| **KAI-10076** | the product/admin margin-mode boundary | control layer, independent of O3 |
+
 ## Verdict I am handing to QA
 
 Stated precisely, because these are two different claims and the first does not imply the second:
