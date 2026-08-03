@@ -856,7 +856,19 @@ function computePreparedGridForExtent(
 /** Freeform density preference: Light tries coarse 96 first; Standard tries 48 first. Standard
  *  shapes use the density's pitch directly through semanticSteps. */
 export type GridDensity = 'standard' | 'light'
-function allowedPitches(density: GridDensity): number[] { return density === 'standard' ? [48, 96] : [96, 48] }
+/** Dan, 08-03: "standard is all magnets visible internal and perimeter - 48/96 mm modes control the
+ *  density - hardcoding the density into standard and light mode is wrong standard and light must be
+ *  switch between perimeter only and full grid."
+ *
+ *  THREE INDEPENDENT INPUTS, and none of them derives another:
+ *    MASK    Standard = every magnet in the population · Light = its perimeter ring   (perimeterForDensity)
+ *    SPACING 48 or 96mm — the admin's own control, never implied by the mask          (pitchMM)
+ *    PATTERN straight · dice-5 · diamond — selected, never inferred (8.8c)            (GridMode)
+ *
+ *  The engine used to read the mask and hand back a pitch. That is what made Light mean "96 AND rim"
+ *  and Standard mean "48 AND full", so the two controls could contradict each other and the loser was
+ *  resolved silently. Both axes are now the caller's. */
+const DEFAULT_LADDER_PITCHES_MM: ReadonlyArray<number> = LAUNCH_PITCHES_MM
 /** Dan 08-03: "the standard mode must show all magnets - the light perimeter only". The mode is the
  *  magnet mask and nothing else selects it — not the shape, not the menu the shape came from. An
  *  identical contour therefore delivers an identical population under every source label (8.8). */
@@ -1090,19 +1102,10 @@ export function deriveRectangleConstruction(
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
   const requestedCombos = modeCombos(mode, options.pitchMM)
-  // 8.8: pitch is chosen by density for every source, never by where the shape came from.
-  const directPerimeter = true
-  // Dan 08-03: Standard mode delivers all magnets, Light delivers the perimeter. The mask follows
-  // density alone — it is NOT the same decision as pitch selection, which is why these are separate.
+  // The mask is the ONLY thing density decides. Spacing arrives through options.pitchMM.
   const perimeterMask = perimeterForDensity(density)
-  const densityPitchMM = density === 'standard' ? 48 : 96
-  const densityCombos = directPerimeter
-    ? requestedCombos.filter(({ pitchMM }) => pitchMM === densityPitchMM)
-    : requestedCombos
-  const activeCombos = densityCombos.length ? densityCombos : requestedCombos
-  const pitchOrder = allowedPitches(directPerimeter ? density : 'standard')
-  const combos = activeCombos.sort((a, b) =>
-    pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM))
+  const combos = [...requestedCombos].sort((a, b) =>
+    DEFAULT_LADDER_PITCHES_MM.indexOf(a.pitchMM) - DEFAULT_LADDER_PITCHES_MM.indexOf(b.pitchMM))
   const prepared = prepareExactContour(stdShapeContour(
     'rect',
     widthRung.baseSizeMM,
@@ -1199,19 +1202,12 @@ function semanticSteps(
   const frameBufferMM = normalizeFrameBufferMM(options.frameBufferMM)
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
-  // 8.8: pitch is chosen by density for every source, never by where the shape came from.
-  const directPerimeter = true
-  // Dan 08-03: Standard mode delivers all magnets, Light delivers the perimeter. The mask follows
-  // density alone — it is NOT the same decision as pitch selection, which is why these are separate.
+  // The mask is the ONLY thing density decides. Spacing arrives through options.pitchMM; when the
+  // admin has not pinned one, both launch pitches are candidates and the finest is tried first.
   const perimeterMask = perimeterForDensity(density)
-  const densityPitchMM = density === 'standard' ? 48 : 96
-  const densityCombos = directPerimeter
-    ? combos.filter(({ pitchMM }) => pitchMM === densityPitchMM)
-    : combos
-  const activeCombos = densityCombos.length ? densityCombos : combos
-  const pitchOrder = allowedPitches(directPerimeter ? density : 'standard')
-  const orderedCombos = [...activeCombos].sort((a, b) => {
-    const pitchDifference = pitchOrder.indexOf(a.pitchMM) - pitchOrder.indexOf(b.pitchMM)
+  const orderedCombos = [...combos].sort((a, b) => {
+    const pitchDifference = DEFAULT_LADDER_PITCHES_MM.indexOf(a.pitchMM)
+      - DEFAULT_LADDER_PITCHES_MM.indexOf(b.pitchMM)
     return pitchDifference || legalPatterns(a.pitchMM).indexOf(a.pattern)
       - legalPatterns(b.pitchMM).indexOf(b.pattern)
   })
@@ -1517,7 +1513,8 @@ function autoPreparedGrid(
   seatClearanceAtMarginMM?: SeatClearanceAtSizeMM,
 ): AutoGridSelection {
   const minN = opts.minN ?? TARGET_ANCHORS
-  let pitches = opts.pitchMM != null ? [opts.pitchMM] : allowedPitches(opts.density ?? 'light')
+  // Spacing is the admin's control; the mask never implies it.
+  let pitches: number[] = opts.pitchMM != null ? [opts.pitchMM] : [...DEFAULT_LADDER_PITCHES_MM]
   // a pinned pattern restricts the pitch search to its legal pitches (dice → 96 only)
   if (opts.pattern != null) {
     const legal = pitches.filter((p) => legalPatterns(p).includes(opts.pattern!))
@@ -1839,8 +1836,7 @@ export function resolveGridPlan(
   const selected = autoPreparedGrid(marginVariants, cfg, baseMarginMM, maxGrowMM, {
     minN: opts.targetAnchors,
     density,
-    pitchMM: opts.pitchMM
-      ?? (density === 'standard' ? 48 : 96),
+    pitchMM: opts.pitchMM,
     pattern: manualPattern,
   }, seatClearanceAtMarginMM)
   const fit = selected.fit

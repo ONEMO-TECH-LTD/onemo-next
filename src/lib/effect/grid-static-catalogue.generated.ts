@@ -832,19 +832,19 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
           "visible": false,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               10,
               10
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
@@ -858,28 +858,28 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         {
           "label": "S",
           "points": 4,
-          "sizeMM": 116,
-          "baseSizeMM": 116,
-          "designSizeMM": 116,
+          "sizeMM": 68,
+          "baseSizeMM": 68,
+          "designSizeMM": 68,
           "marginMM": 0,
           "frameBufferMM": 0,
-          "gridExtentMM": 116,
+          "gridExtentMM": 68,
           "visible": true,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               10,
               10
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
@@ -905,28 +905,28 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         {
           "label": "M",
           "points": 8,
-          "sizeMM": 212,
-          "baseSizeMM": 212,
-          "designSizeMM": 212,
+          "sizeMM": 116,
+          "baseSizeMM": 116,
+          "designSizeMM": 116,
           "marginMM": 0,
           "frameBufferMM": 0,
-          "gridExtentMM": 212,
+          "gridExtentMM": 116,
           "visible": true,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               10,
               10
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
@@ -968,28 +968,28 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         {
           "label": "L",
           "points": 12,
-          "sizeMM": 308,
-          "baseSizeMM": 308,
-          "designSizeMM": 308,
+          "sizeMM": 164,
+          "baseSizeMM": 164,
+          "designSizeMM": 164,
           "marginMM": 0,
           "frameBufferMM": 0,
-          "gridExtentMM": 308,
+          "gridExtentMM": 164,
           "visible": true,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               10,
               10
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
@@ -1040,6 +1040,339 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
               [
                 3,
                 3
+              ]
+            ]
+          }
+        },
+        {
+          "label": "XL",
+          "points": 16,
+          "sizeMM": 212,
+          "baseSizeMM": 212,
+          "designSizeMM": 212,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 212,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              10,
+              10
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                3
+              ],
+              [
+                0,
+                4
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                4
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                4
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                4,
+                0
+              ],
+              [
+                4,
+                1
+              ],
+              [
+                4,
+                2
+              ],
+              [
+                4,
+                3
+              ],
+              [
+                4,
+                4
+              ]
+            ]
+          }
+        },
+        {
+          "label": "2XL",
+          "points": 20,
+          "sizeMM": 260,
+          "baseSizeMM": 260,
+          "designSizeMM": 260,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 260,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              10,
+              10
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                3
+              ],
+              [
+                0,
+                4
+              ],
+              [
+                0,
+                5
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                5
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                5
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                5
+              ],
+              [
+                4,
+                0
+              ],
+              [
+                4,
+                5
+              ],
+              [
+                5,
+                0
+              ],
+              [
+                5,
+                1
+              ],
+              [
+                5,
+                2
+              ],
+              [
+                5,
+                3
+              ],
+              [
+                5,
+                4
+              ],
+              [
+                5,
+                5
+              ]
+            ]
+          }
+        },
+        {
+          "label": "3XL",
+          "points": 24,
+          "sizeMM": 308,
+          "baseSizeMM": 308,
+          "designSizeMM": 308,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 308,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              10,
+              10
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                3
+              ],
+              [
+                0,
+                4
+              ],
+              [
+                0,
+                5
+              ],
+              [
+                0,
+                6
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                6
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                6
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                6
+              ],
+              [
+                4,
+                0
+              ],
+              [
+                4,
+                6
+              ],
+              [
+                5,
+                0
+              ],
+              [
+                5,
+                6
+              ],
+              [
+                6,
+                0
+              ],
+              [
+                6,
+                1
+              ],
+              [
+                6,
+                2
+              ],
+              [
+                6,
+                3
+              ],
+              [
+                6,
+                4
+              ],
+              [
+                6,
+                5
+              ],
+              [
+                6,
+                6
               ]
             ]
           }
@@ -1433,19 +1766,19 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
           "visible": false,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               10,
               10
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
@@ -1458,29 +1791,115 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         },
         {
           "label": "S",
+          "points": 2,
+          "sizeMM": 68,
+          "baseSizeMM": 68,
+          "designSizeMM": 68,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 68,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              34,
+              10
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ]
+            ]
+          }
+        },
+        {
+          "label": "M",
           "points": 4,
-          "sizeMM": 156,
-          "baseSizeMM": 156,
-          "designSizeMM": 156,
+          "sizeMM": 116,
+          "baseSizeMM": 116,
+          "designSizeMM": 116,
           "marginMM": 0,
           "frameBufferMM": 0,
           "gridExtentMM": 116,
           "visible": true,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
-              30,
-              30
+              10,
+              58
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                -1
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                2,
+                0
+              ]
+            ]
+          }
+        },
+        {
+          "label": "L",
+          "points": 8,
+          "sizeMM": 172,
+          "baseSizeMM": 172,
+          "designSizeMM": 172,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 164,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              14,
+              62
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
               ]
             ],
             "population": [
@@ -1494,11 +1913,90 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
               ],
               [
                 1,
-                0
+                -1
               ],
               [
                 1,
+                2
+              ],
+              [
+                2,
+                -1
+              ],
+              [
+                2,
+                2
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
                 1
+              ]
+            ]
+          }
+        },
+        {
+          "label": "XL",
+          "points": 8,
+          "sizeMM": 236,
+          "baseSizeMM": 236,
+          "designSizeMM": 236,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 212,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              22,
+              70
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                1,
+                -1
+              ],
+              [
+                1,
+                3
+              ],
+              [
+                3,
+                -1
+              ],
+              [
+                3,
+                3
+              ],
+              [
+                4,
+                0
+              ],
+              [
+                4,
+                2
               ]
             ]
           }
@@ -1682,25 +2180,64 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
           "visible": false,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               18,
               10.3923
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
               [
                 0,
                 0
+              ]
+            ]
+          }
+        },
+        {
+          "label": "S",
+          "points": 2,
+          "sizeMM": 92,
+          "baseSizeMM": 92,
+          "designSizeMM": 92,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 68,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              46,
+              10
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
               ]
             ]
           }
@@ -1947,25 +2484,300 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
           "visible": false,
           "construction": {
             "pattern": "standard",
-            "pitchMM": 96,
+            "pitchMM": 48,
             "originMM": [
               15,
               15
             ],
             "basisMM": [
               [
-                96,
+                48,
                 0
               ],
               [
                 0,
-                96
+                48
               ]
             ],
             "population": [
               [
                 0,
                 0
+              ]
+            ]
+          }
+        },
+        {
+          "label": "S",
+          "points": 2,
+          "sizeMM": 78,
+          "baseSizeMM": 78,
+          "designSizeMM": 78,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 68,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              39,
+              15
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ]
+            ]
+          }
+        },
+        {
+          "label": "M",
+          "points": 4,
+          "sizeMM": 126,
+          "baseSizeMM": 126,
+          "designSizeMM": 126,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 116,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              15,
+              63
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                -1
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                2,
+                0
+              ]
+            ]
+          }
+        },
+        {
+          "label": "L",
+          "points": 6,
+          "sizeMM": 174,
+          "baseSizeMM": 174,
+          "designSizeMM": 174,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 164,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              39,
+              63
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                -1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                1
+              ]
+            ]
+          }
+        },
+        {
+          "label": "XL",
+          "points": 8,
+          "sizeMM": 222,
+          "baseSizeMM": 222,
+          "designSizeMM": 222,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 212,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              15,
+              111
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                -1
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                2,
+                -2
+              ],
+              [
+                2,
+                2
+              ],
+              [
+                3,
+                -1
+              ],
+              [
+                3,
+                1
+              ],
+              [
+                4,
+                0
+              ]
+            ]
+          }
+        },
+        {
+          "label": "2XL",
+          "points": 10,
+          "sizeMM": 270,
+          "baseSizeMM": 270,
+          "designSizeMM": 270,
+          "marginMM": 0,
+          "frameBufferMM": 0,
+          "gridExtentMM": 260,
+          "visible": true,
+          "construction": {
+            "pattern": "standard",
+            "pitchMM": 48,
+            "originMM": [
+              39,
+              111
+            ],
+            "basisMM": [
+              [
+                48,
+                0
+              ],
+              [
+                0,
+                48
+              ]
+            ],
+            "population": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                -1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                -2
+              ],
+              [
+                2,
+                3
+              ],
+              [
+                3,
+                -1
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                4,
+                0
+              ],
+              [
+                4,
+                1
               ]
             ]
           }
