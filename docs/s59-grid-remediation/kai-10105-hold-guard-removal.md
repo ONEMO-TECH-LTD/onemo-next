@@ -328,4 +328,3 @@ an invented guard, and none of them is fixed by this ticket.
 scan with population-first sizing — necessary, and **not sufficient**: it cannot select Dan's ragged
 construction until the occupancy and registration rule exists, which is registered as **O3** in the law
 book and waits on his ruling. Sequencing 10078 before O3 is answered would rebuild the same gap.
-

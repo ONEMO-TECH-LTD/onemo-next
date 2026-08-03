@@ -37,10 +37,8 @@ import {
   type SemanticRung,
 } from '../grid'
 
-/** This suite's OWN probe radius for `exactPerimeterCoverage`, which takes the radius as an argument.
- *  It is not an engine constant: `HOLD_REACH_MM` was deleted with the hold guard (KAI-10105), because
- *  a reach that decided what the engine published was never Dan's rule (8.2). Coverage assertions
- *  below measure geometry; none of them may become an acceptance criterion again. */
+/** This suite's own probe radius for `exactPerimeterCoverage`, which takes the radius as an argument.
+ *  Not an engine constant, and no coverage assertion below may become an acceptance criterion (S22). */
 const PROBE_REACH_MM = 48
 import { roundedSquareClearanceMM, roundedSquareContourMM } from '../rounded-square'
 import type { Contour, Pt } from '../types'
@@ -136,8 +134,7 @@ function distanceToContour(point: Pt, contour: Contour): number {
 
 
 
-// 'coverage' is gone from the reason set (S22) — an outline running past a reach constant is not a
-// lawful reason for a size to be absent, so it may not appear here as an explanation.
+// Coverage is not a lawful reason for a size to be absent (S22), so it is not in this set.
 type CompletenessReason = 'pattern' | 'padding-floor'
   | 'perimeter-only' | 'ceiling' | 'extent-collision' | 'geometric-minimum'
 
@@ -359,11 +356,7 @@ describe('resolveGridPlan — production engine seam', () => {
     expect(coverage.gaps.length).toBeGreaterThan(0)
   })
 
-  // REFRAMED (KAI-10105): this asserted the engine PREFERS the less-uncovered layout. It no longer
-  // does — coverage selects nothing (S22) — so the old title described a rule that is gone while the
-  // assertion below kept passing coincidentally. What it still measures honestly is `exactPerimeterCoverage`
-  // itself: given two concrete layouts on one star, the spread one leaves less outline far from a magnet.
-  // That is geometry, and it gates nothing.
+  // Pure geometry on two concrete layouts. Coverage selects nothing (S22) — no preference is implied.
   it('measures less uncovered perimeter on the spread layout than the dice layout (no engine preference implied)', () => {
     const star = (sizeMM: number): Contour => {
       const pts: [number, number][] = []
@@ -1511,7 +1504,7 @@ describe('semantic ladder stays inside its product contract', () => {
     )
 
     expect(standard.length, 'standard family publishes').toBeGreaterThan(0)
-    expect(light.length, 'light family publishes — it was emptied by the guard').toBeGreaterThan(0)
+    expect(light.length, 'light family publishes').toBeGreaterThan(0)
     expect(standard.some((rung) => rung.points >= 2)).toBe(true)
     expect(light.some((rung) => rung.points >= 2)).toBe(true)
     for (const rung of [...standard, ...light]) {

@@ -7,10 +7,8 @@
 //   • PER-SPOT padding (interp A): a node is valid = inside the silhouette AND ≥ pad (10mm radius from
 //     the magnet centre) from the REAL outline — per-node, no erosion (pinched shapes keep all regions).
 //   • Grid geometry chooses the legal topology, ranked by pattern conformance → edge registration →
-//     balance. NEITHER COVERAGE NOR MAGNET COUNT IS A CRITERION: the "hold reach" that once ranked
-//     phases and refused sizes was never Dan's rule and is struck (8.2), and preferring the phase that
-//     seats more is the maximality rule 3.24 forbids. `exactPerimeterCoverage` remains a pure
-//     measurement for calibration, with its radius supplied by whoever calls it.
+//     balance. Neither coverage (S22) nor magnet count (3.24) is a criterion.
+//     `exactPerimeterCoverage` is a pure calibration measurement; its radius is the caller's.
 //   • MARGIN model: the design never resizes; an outward margin band grows (capped) until the layout
 //     reaches its anchor target.
 //   • Procedural sizes: enumerate legal lattice extents, then solve the earliest upward even-whole-mm
@@ -1582,9 +1580,7 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
 /**
  * Sizing ADAPTS (always-on, capped): from the selected size, nudge UP in small steps up to `maxGrowMM`
  * and keep the first size that seats ≥ target magnets. If nothing within the cap reaches the target,
- * keep the SMALLEST size — growing to fit more magnets is the maximality rule 3.24 forbids. Coverage
- * was the criterion here until 08-03 and is struck: it
- * grew the design to satisfy an invented 48mm reach rather than to seat magnets (8.2).
+ * keep the SMALLEST size — growing to fit more magnets is the maximality rule 3.24 forbids.
  * `sized(mm)` produces the real-mm contour. `maxGrowMM = 0` disables growth.
  */
 export function balancedFit(

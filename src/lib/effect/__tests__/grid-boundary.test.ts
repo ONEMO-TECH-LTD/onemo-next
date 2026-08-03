@@ -635,8 +635,7 @@ describe('Creator magnetic-grid module boundary', () => {
     const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
 
     expect(rendererSource).not.toContain('var(--suede-edge)')
-    // The red flap outline is GONE, not merely unstyled — Dan: "what is this red system - wont hold
-    // reliably - false". Struck with the hold guard (KAI-10105), so this now asserts its absence.
+    // No red flap outline exists (S22) — asserted absent, not merely unstyled.
     expect(rendererSource).not.toContain('hasFlap')
     expect(rendererSource).not.toContain('var(--fail)')
   })

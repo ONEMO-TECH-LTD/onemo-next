@@ -228,9 +228,7 @@ describe('S1d exact neutral ladder cache seeds', () => {
       recipe: { kind: 'standard', shape: 'square' },
     })
     const malformed = cloneSeed(transport.cacheSeeds[0])
-    // Was `uncoveredMM` — the engine's coverage verdict, deleted with the hold guard (KAI-10105), so
-    // removing it no longer malforms anything and this test silently passed on a no-op. `anchors` is
-    // a field the validator genuinely requires, which is what this test was always about.
+    // `anchors` is a field the validator genuinely requires — the point of this test.
     delete (malformed.result.value.grid as unknown as Record<string, unknown>).anchors
 
     expect(() => decodeGridWorkerResult(
