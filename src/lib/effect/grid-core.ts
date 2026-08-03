@@ -1699,7 +1699,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 15
+export const GRID_ENGINE_CACHE_VERSION = 16
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
