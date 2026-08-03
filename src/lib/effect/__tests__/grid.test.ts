@@ -132,8 +132,6 @@ function distanceToContour(point: Pt, contour: Contour): number {
       distanceToSegment(point, first, ring.pts[(index + 1) % ring.pts.length]))))
 }
 
-
-
 // Coverage is not a lawful reason for a size to be absent (S22), so it is not in this set.
 type CompletenessReason = 'pattern' | 'padding-floor'
   | 'perimeter-only' | 'ceiling' | 'extent-collision' | 'geometric-minimum'

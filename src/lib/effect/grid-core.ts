@@ -570,7 +570,6 @@ function computePreparedGridForExtent(
   requiredGridExtentMM?: number,
   seatClearanceMM?: SeatClearanceMM,
 ): GridResult {
-  const contourMM = prepared.contour
   const attachment: Attachment = cfg.attachment ?? 'magnetic'
   // VELCRO LAW: no grid exists — the back is a full velcro hook in the silhouette. Any shape, any
   // size; nothing to seat, nothing to cover. (Engine-owned: ladders, auto and UI all inherit.)
