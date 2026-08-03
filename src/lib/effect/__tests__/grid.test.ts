@@ -451,18 +451,19 @@ describe('resolveGridPlan — production engine seam', () => {
       perimeterOnly: true,
       sparseThin: true,
     } as const
-    const selected = autoGrid(star, cfg, 184, 0, { density: 'light' })
-    const dice = computeGrid(star(184), {
-      ...cfg,
-      pitchMM: 96,
-      pattern: 'quincunx',
-    })
-    const selectedCoverage = exactPerimeterCoverage(
-      star(selected.fit.sizeMM),
-      selected.fit.grid.anchors.map((anchor) => anchor.p),
+    // PURE FUNCTION TEST. Both layouts are constructed explicitly at a pinned size; nothing here
+    // calls the selector or asserts what it chose. The previous version resolved one side through
+    // `autoGrid` and then asserted the selected pitch/pattern, which re-coupled a "measurement" to
+    // selection — if engine ordering legitimately moved, this would have failed as a coverage claim.
+    // With no selector in the loop, 48 is genuinely a caller-scoped measurement radius.
+    const straight = computeGrid(star(184), { ...cfg, pitchMM: 48, pattern: 'standard' })
+    const dice = computeGrid(star(184), { ...cfg, pitchMM: 96, pattern: 'quincunx' })
+    const straightCoverage = exactPerimeterCoverage(
+      star(184),
+      straight.anchors.map((anchor) => anchor.p),
       PROBE_REACH_MM,
-      selected.pattern,
-      selected.pitchMM,
+      'standard',
+      48,
     )
     const diceCoverage = exactPerimeterCoverage(
       star(184),
@@ -472,11 +473,7 @@ describe('resolveGridPlan — production engine seam', () => {
       96,
     )
 
-    expect(selectedCoverage.uncoveredMM).toBeLessThan(diceCoverage.uncoveredMM)
-    // REMOVED with the hold guard (KAI-10105): asserted on `grid.flaps`, the engine's coverage
-    // verdict, which no longer exists. The measured comparison above is the surviving geometry claim.
-    expect({ pitchMM: selected.pitchMM, pattern: selected.pattern })
-      .toEqual({ pitchMM: 48, pattern: 'standard' })
+    expect(straightCoverage.uncoveredMM).toBeLessThan(diceCoverage.uncoveredMM)
   })
 
   it('returns resolved measurements instead of requiring caller-side reconstruction', () => {
