@@ -222,13 +222,16 @@ describe('S1d exact neutral ladder cache seeds', () => {
     }])
   }, 20_000)
 
-  it('rejects a seed missing the physical coverage severity', () => {
+  it('rejects a seed missing a required plan field', () => {
     const transport = handleGridWorkerJob({
       operation: 'ladder',
       recipe: { kind: 'standard', shape: 'square' },
     })
     const malformed = cloneSeed(transport.cacheSeeds[0])
-    delete (malformed.result.value.grid as unknown as Record<string, unknown>).uncoveredMM
+    // Was `uncoveredMM` — the engine's coverage verdict, deleted with the hold guard (KAI-10105), so
+    // removing it no longer malforms anything and this test silently passed on a no-op. `anchors` is
+    // a field the validator genuinely requires, which is what this test was always about.
+    delete (malformed.result.value.grid as unknown as Record<string, unknown>).anchors
 
     expect(() => decodeGridWorkerResult(
       { result: transport.result, cacheSeeds: [malformed] },

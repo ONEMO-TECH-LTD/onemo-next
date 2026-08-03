@@ -9,7 +9,6 @@ interface GridWorkbenchAnchor {
 interface GridWorkbenchGrid {
   anchors: GridWorkbenchAnchor[]
   candidates: Pt[]
-  flaps: Pt[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   applicationPadMM: number
@@ -89,7 +88,6 @@ export function GridWorkbenchStage({
         <span><i style={{ background: 'var(--frame)' }} />frame buffer</span>
         <span><i style={{ background: 'var(--margin)' }} />margin band</span>
         <span><i style={{ background: 'var(--grid)', opacity: .55 }} />node · no material</span>
-        <span><i style={{ background: 'var(--fail)' }} />flap risk</span>
       </div>
     </section>
   )
@@ -127,7 +125,6 @@ function Stage({ contour, base, design, marginMM, frameBufferMM, grid, anchorPai
   const dD = hasMargin ? pathFrom(dPts) : ''
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
-  const hasFlap = grid.flaps.length > 0
   return (
     <svg width={vbW * S} height={vbH * S} viewBox={`${minX - pad} ${minY - pad} ${vbW} ${vbH}`}>
       <defs><clipPath id="frontclip"><path d={eD} /></clipPath></defs>
@@ -167,8 +164,6 @@ function Stage({ contour, base, design, marginMM, frameBufferMM, grid, anchorPai
       <path d={eD} fill={hasFrame ? 'var(--frame)' : hasMargin ? 'var(--margin)' : 'var(--suede)'} />
       {hasFrame && <path d={bD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />}
       {hasMargin && <path d={dD} fill="var(--suede)" />}
-      {/* Flap risk remains diagnostic; passing shapes have no cosmetic outline over their material. */}
-      {hasFlap && <path d={eD} fill="none" stroke="var(--fail)" strokeOpacity={0.85} strokeWidth={1.5} strokeLinejoin="round" />}
       {hasFrame && <path d={bD} fill="none" stroke="var(--ink-3)" strokeOpacity={0.65} strokeWidth={0.8} strokeDasharray="2 2" />}
       {hasMargin && <path d={dD} fill="none" stroke="var(--accent)" strokeOpacity={0.6} strokeWidth={0.8} strokeDasharray="3 2" />}
       {grid.candidates.filter(c => !seat.has(c[0].toFixed(2) + ',' + c[1].toFixed(2))).map((c, i) => {

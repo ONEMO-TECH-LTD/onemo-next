@@ -103,8 +103,6 @@ function isPlanResult(value: unknown): value is GridPlanJobResult {
     isRecord(plan.designContourMM)
     && isRecord(plan.effectContourMM)
     && Array.isArray(plan.grid.anchors)
-    && Array.isArray(plan.grid.flaps)
-    && typeof plan.grid.uncoveredMM === 'number'
     && typeof plan.pitchMM === 'number'
     && typeof plan.baseMarginMM === 'number'
     && typeof plan.resolvedMarginMM === 'number'

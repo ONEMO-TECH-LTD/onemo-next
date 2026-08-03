@@ -585,7 +585,6 @@ describe('Creator magnetic-grid module boundary', () => {
           grid: {
             anchors: [{ p: [x1, 40], dia: 6 }, { p: [x2, 40], dia: 6 }],
             candidates: [],
-            flaps: [],
             pitchCentreMM: 48,
             edgeRangeMM: [48, 48],
             applicationPadMM: 10,
@@ -636,8 +635,10 @@ describe('Creator magnetic-grid module boundary', () => {
     const rendererSource = readFileSync(RENDERER_PATH, 'utf8')
 
     expect(rendererSource).not.toContain('var(--suede-edge)')
-    expect(rendererSource).toContain("hasFlap && <path d={eD}")
-    expect(rendererSource).toContain('stroke="var(--fail)"')
+    // The red flap outline is GONE, not merely unstyled — Dan: "what is this red system - wont hold
+    // reliably - false". Struck with the hold guard (KAI-10105), so this now asserts its absence.
+    expect(rendererSource).not.toContain('hasFlap')
+    expect(rendererSource).not.toContain('var(--fail)')
   })
 
   it('fills the real outward offset with the v5.3.1 blended composite, never a grey proxy', () => {

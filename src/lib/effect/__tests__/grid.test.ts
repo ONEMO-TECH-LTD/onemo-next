@@ -18,7 +18,6 @@ import {
   deriveRectangleConstruction,
   exactPerimeterCoverage,
   gridLadderCacheKey,
-  HOLD_REACH_MM,
   LAUNCH_PITCHES_MM,
   nearestAnchorPair,
   nearestSemanticRung,
@@ -38,6 +37,12 @@ import {
   type PlanRecipe,
   type SemanticRung,
 } from '../grid'
+
+/** This suite's OWN probe radius for `exactPerimeterCoverage`, which takes the radius as an argument.
+ *  It is not an engine constant: `HOLD_REACH_MM` was deleted with the hold guard (KAI-10105), because
+ *  a reach that decided what the engine published was never Dan's rule (8.2). Coverage assertions
+ *  below measure geometry; none of them may become an acceptance criterion again. */
+const PROBE_REACH_MM = 48
 import { roundedSquareClearanceMM, roundedSquareContourMM } from '../rounded-square'
 import type { Contour, Pt } from '../types'
 
@@ -200,7 +205,9 @@ function independentBoundedSpanFailures(
   return failures
 }
 
-type CompletenessReason = 'coverage' | 'pattern' | 'padding-floor'
+// 'coverage' is gone from the reason set (S22) — an outline running past a reach constant is not a
+// lawful reason for a size to be absent, so it may not appear here as an explanation.
+type CompletenessReason = 'pattern' | 'padding-floor'
   | 'perimeter-only' | 'ceiling' | 'extent-collision' | 'geometric-minimum'
 
 interface CompletenessShape {
@@ -247,7 +254,6 @@ function catalogueCompleteness(
   unexplained: string[]
 } {
   const classified: Record<CompletenessReason, number> = {
-    coverage: 0,
     pattern: 0,
     'padding-floor': 0,
     'perimeter-only': 0,
@@ -332,16 +338,11 @@ function catalogueCompleteness(
           producerReasons.push('perimeter-only')
           continue
         }
-        if (independentBoundedSpanFailures(
-          contour,
-          anchors,
-          'standard',
-          producer.pitchMM,
-          HOLD_REACH_MM,
-        ) > 0) {
-          producerReasons.push('coverage')
-          continue
-        }
+        // 'coverage' is NO LONGER A LAWFUL ABSENCE REASON (S22): a size is never missing because an
+        // outline ran past a reach constant, so classifying it that way would explain an absence with
+        // a struck rule. The probe is deleted rather than re-tuned, and the absences it used to absorb
+        // now surface as 'unexplained' — which is the honest state until O3 is ruled. An unexplained
+        // absence is a finding, never something to tune to green.
         producerReasons.push('unexplained')
       }
 
@@ -400,7 +401,7 @@ describe('resolveGridPlan — production engine seam', () => {
     const coverage = exactPerimeterCoverage(
       contour,
       grid.anchors.map((anchor) => anchor.p),
-      HOLD_REACH_MM,
+      PROBE_REACH_MM,
       'standard',
       96,
     )
@@ -412,7 +413,7 @@ describe('resolveGridPlan — production engine seam', () => {
   it('holds only the bounded outer span between 96mm-neighbouring magnets', () => {
     const contour = stdShapeContour('square', 118)
     const anchors: Pt[] = [[11, 11], [107, 11], [107, 107], [11, 107]]
-    const coverage = exactPerimeterCoverage(contour, anchors, HOLD_REACH_MM, 'standard', 96)
+    const coverage = exactPerimeterCoverage(contour, anchors, PROBE_REACH_MM, 'standard', 96)
 
     expect(coverage.uncoveredMM).toBe(0)
     expect(coverage.gaps).toHaveLength(0)
@@ -421,13 +422,18 @@ describe('resolveGridPlan — production engine seam', () => {
   it('never credits an interior chord as an outer-outline span', () => {
     const contour = stdShapeContour('triangle', 150)
     const anchors: Pt[] = [[27, 11], [75, 11], [123, 11], [75, 107]]
-    const coverage = exactPerimeterCoverage(contour, anchors, HOLD_REACH_MM, 'standard', 48)
+    const coverage = exactPerimeterCoverage(contour, anchors, PROBE_REACH_MM, 'standard', 48)
 
     expect(coverage.uncoveredMM).toBeGreaterThan(0)
     expect(coverage.gaps.length).toBeGreaterThan(0)
   })
 
-  it('prefers less uncovered perimeter even when it has more gap intervals', () => {
+  // REFRAMED (KAI-10105): this asserted the engine PREFERS the less-uncovered layout. It no longer
+  // does — coverage selects nothing (S22) — so the old title described a rule that is gone while the
+  // assertion below kept passing coincidentally. What it still measures honestly is `exactPerimeterCoverage`
+  // itself: given two concrete layouts on one star, the spread one leaves less outline far from a magnet.
+  // That is geometry, and it gates nothing.
+  it('measures less uncovered perimeter on the spread layout than the dice layout (no engine preference implied)', () => {
     const star = (sizeMM: number): Contour => {
       const pts: [number, number][] = []
       for (let i = 0; i < 10; i++) {
@@ -454,20 +460,21 @@ describe('resolveGridPlan — production engine seam', () => {
     const selectedCoverage = exactPerimeterCoverage(
       star(selected.fit.sizeMM),
       selected.fit.grid.anchors.map((anchor) => anchor.p),
-      HOLD_REACH_MM,
+      PROBE_REACH_MM,
       selected.pattern,
       selected.pitchMM,
     )
     const diceCoverage = exactPerimeterCoverage(
       star(184),
       dice.anchors.map((anchor) => anchor.p),
-      HOLD_REACH_MM,
+      PROBE_REACH_MM,
       'quincunx',
       96,
     )
 
     expect(selectedCoverage.uncoveredMM).toBeLessThan(diceCoverage.uncoveredMM)
-    expect(selected.fit.grid.flaps.length).toBeGreaterThan(dice.flaps.length)
+    // REMOVED with the hold guard (KAI-10105): asserted on `grid.flaps`, the engine's coverage
+    // verdict, which no longer exists. The measured comparison above is the surviving geometry claim.
     expect({ pitchMM: selected.pitchMM, pattern: selected.pattern })
       .toEqual({ pitchMM: 48, pattern: 'standard' })
   })
@@ -1437,8 +1444,14 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(violations).toEqual([])
   })
 
-  it('publishes only independently covered bounded-span constructions on the product Auto path', () => {
-    const coverageFailures: string[] = []
+  // REFRAMED with the hold guard (KAI-10105). This test asserted that every published rung passes a
+  // 48mm reach — the struck publication guard preserved as an executable test, and it failed on 14
+  // layouts once the guard left the engine. It is NOT made green by new values: the coverage
+  // assertion is DELETED because coverage no longer decides what may be published (8.2). What
+  // survives is the real invariant it also carried — every published multi-anchor rung must resolve
+  // to a lawful plan through the production path. Coverage as a pure measurement is still exercised
+  // by the `exactPerimeterCoverage` tests above, which assert geometry and gate nothing.
+  it('resolves every published multi-anchor rung to a lawful plan on the product Auto path', () => {
     let compared = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
@@ -1463,28 +1476,15 @@ describe('semantic ladder stays inside its product contract', () => {
             maxGrowMM: 0,
             construction: rung.construction,
           })
-          const failedSamples = independentBoundedSpanFailures(
-            contour,
-            plan.grid.anchors.map(({ p }) => p),
-            rung.construction.pattern,
-            rung.construction.pitchMM,
-            HOLD_REACH_MM,
-          )
           compared++
-          if (failedSamples > 0) {
-            coverageFailures.push(
-              `${shape}/${density}/${rung.label}/${rung.sizeMM} failed=${failedSamples}`,
-            )
-          }
           expect(
             plan.grid.ok,
-            `${shape}/${density}/${rung.label}/${rung.sizeMM} engine verdict was uncovered`,
+            `${shape}/${density}/${rung.label}/${rung.sizeMM} did not resolve a lawful plan`,
           ).toBe(true)
         }
       }
     }
     expect(compared).toBeGreaterThan(0)
-    expect(coverageFailures, `${compared} constructions compared`).toEqual([])
   })
 
   it('seats every published anchor at or above the hard padding floor', () => {

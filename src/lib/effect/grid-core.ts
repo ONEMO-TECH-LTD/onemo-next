@@ -6,10 +6,13 @@
 //     law while restricting the pitch/pattern family.
 //   • PER-SPOT padding (interp A): a node is valid = inside the silhouette AND ≥ pad (10mm radius from
 //     the magnet centre) from the REAL outline — per-node, no erosion (pinched shapes keep all regions).
-//   • Grid geometry chooses the legal topology. HOLD COVERAGE is radial at each actual magnet and
-//     includes only the finite outer span of outline-adjacent lawful population-rim pairs no farther
-//     than 96mm; holes stay radial. Inside one topology, covered phase beats uncovered phase.
-//   • MARGIN model: the design never resizes; an outward margin band grows (capped) until covered.
+//   • Grid geometry chooses the legal topology, ranked by pattern conformance → edge registration →
+//     balance. NEITHER COVERAGE NOR MAGNET COUNT IS A CRITERION: the "hold reach" that once ranked
+//     phases and refused sizes was never Dan's rule and is struck (8.2), and preferring the phase that
+//     seats more is the maximality rule 3.24 forbids. `exactPerimeterCoverage` remains a pure
+//     measurement for calibration, with its radius supplied by whoever calls it.
+//   • MARGIN model: the design never resizes; an outward margin band grows (capped) until the layout
+//     reaches its anchor target.
 //   • Procedural sizes: enumerate legal lattice extents, then solve the earliest upward even-whole-mm
 //     contour size that accepts each extent. The grid extent is the catalogue authority; shape mm is
 //     derived output.
@@ -65,9 +68,6 @@ function canonicalGridCoordinate(value: number): number {
   const canonical = gridConstructionUnit(value) * GRID_CONSTRUCTION_QUANTUM_MM
   return Object.is(canonical, -0) ? 0 : canonical
 }
-/** How far a magnet holds material down before an edge would lift — a PHYSICAL distance, independent of
- *  the chosen grid pitch. Tunable after coupon testing. */
-export const HOLD_REACH_MM = 48
 /** Focal-ramp law thresholds (§10.7, coupon-tunable): below FOCAL_SIZE all-6; above, radial extremes
  *  take 8mm; from RAMP2 the focal window widens to 75% of max radius. */
 export const FOCAL_SIZE_MM = 100
@@ -105,8 +105,6 @@ export interface GridResult {
   twinRequired: boolean
   anchors: Anchor[]
   candidates: Pt[]      // interior points dropped by perimeter mode (faint viz)
-  flaps: Pt[]
-  uncoveredMM: number
   ok: boolean
   issues: string[]
   pitchCentreMM: number
@@ -556,7 +554,7 @@ function standardShapePerimeterAnchors(
 
 /**
  * Magnet grid for a silhouette contour (mm). Phase-optimizes the fixed-pitch lattice for conformance,
- * boundary registration, exact ring coverage, population, then balance; in perimeter mode
+ * boundary registration, then balance; in perimeter mode
  * it drops fully-surrounded interior nodes to produce the magnetic belt. Each magnet keeps its
  * application ring on material.
  */
@@ -580,7 +578,7 @@ function computePreparedGridForExtent(
   // size; nothing to seat, nothing to cover. (Engine-owned: ladders, auto and UI all inherit.)
   if (attachment === 'velcro') {
     return {
-      attachment, twinRequired: false, anchors: [], candidates: [], flaps: [], uncoveredMM: 0, ok: true,
+      attachment, twinRequired: false, anchors: [], candidates: [], ok: true,
       issues: [], pitchCentreMM: 0, edgeRangeMM: [0, 0], applicationPadMM: 0,
     }
   }
@@ -670,10 +668,9 @@ function computePreparedGridForExtent(
   // A/B: centroid balances MATERIAL (lopsided shapes); bbox-centre balances the FRAME (regular shapes).
   // Each parity's CONSTRUCTION population is scored by: PATTERN CONFORMANCE (nearest-neighbour spacing
   // must match the pattern's own geometry: standard = pitch, quincunx = pitch/√2,
-  // diamond = pitch·√2) → EDGE REGISTRATION → COVERAGE → population → best centred. Any requested
-  // freeform thinning happens inside finalize without re-solving the phase. Coverage ranks only
-  // inside equally registered legal topology; it cannot resurrect
-  // dead-border phases or turn standard into dice.
+  // diamond = pitch·√2) → EDGE REGISTRATION → best centred. Population count is NOT a term: 3.24
+  // forbids a maximality rule. Any requested freeform thinning happens inside finalize without
+  // re-solving the phase.
   let seated: Pt[] = []
   let interior: Pt[] = []
   if (cfg.construction) {
@@ -754,7 +751,6 @@ function computePreparedGridForExtent(
       fin: { seated: Pt[]; interior: Pt[] }
       population: Pt[]
       conform: number
-      uncoveredPerimeterMM: number
       registered: number
       bal: number
     }
@@ -770,18 +766,15 @@ function computePreparedGridForExtent(
       const conform = seat.length < 2
         ? 1
         : Math.abs(mp - expectedMp) <= MANUFACTURING_TOLERANCE_MM ? 1 : 0
-      const uncoveredPerimeterMM = seat.length
-        ? exactPerimeterCoverage(contourMM, fin.seated, HOLD_REACH_MM, pattern, pitch).uncoveredMM
-        : Infinity
       const registered = fullyRegistered(seat) ? 1 : 0
       let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
       const bal = seat.length ? Math.hypot(sx / seat.length - c[0], sy / seat.length - c[1]) : 1e9
-      cands.push({ fin, population: seat, conform, uncoveredPerimeterMM, registered, bal })
+      cands.push({ fin, population: seat, conform, registered, bal })
     }
     // STANDARD and DIAMOND are HARD conformance laws (Dan): standard shows straight pitch-spaced rows
     // or nothing; diamond shows 68-atom (pitch·√2) links or nothing — neither may quietly resolve into
-    // the other's arrangement (the honest outcome is flaps + margin growth, or switching mode). Dice
-    // keeps coverage-first (its geometry is inherently the mix).
+    // the other's arrangement (the honest outcome is margin growth, or switching mode). Dice is
+    // unfiltered — its geometry is inherently the mix.
     const extentPool = requiredGridExtentMM == null
       ? cands
       : cands.filter((candidate) =>
@@ -794,11 +787,12 @@ function computePreparedGridForExtent(
       : extentPool
     let bestKey: number[] | null = null
     for (const k of pool) {
+      // CONFORMANCE → EDGE REGISTRATION → BALANCE. Neither coverage (S22) nor magnet count (3.24,
+      // no maximality rule) is a term: a phase is chosen on pattern legality, edge registration and
+      // centredness alone.
       const key = [
         -k.conform,
         -k.registered,
-        gridConstructionUnit(k.uncoveredPerimeterMM),
-        -k.population.length,
         gridConstructionUnit(k.bal),
       ]
       let better = !bestKey
@@ -829,19 +823,12 @@ function computePreparedGridForExtent(
 
   if (!seated.length) issues.push(`No room for a magnet — too small/thin to keep a magnet ${pad}mm from every edge.`)
   else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
-  const coverage = seated.length
-    ? exactPerimeterCoverage(contourMM, seated, HOLD_REACH_MM, pattern, pitch)
-    : { gaps: [], uncoveredMM: 0 }
-  const flaps = coverage.gaps
-  if (flaps.length > 0) issues.push(`Some edge areas sit outside the supported magnet spans (red edge) and could lift. Raise the size / max auto-grow.`)
-
   let minD = 8, maxD = 6
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
   if (anchors.length === 0) { minD = 6; maxD = 6 }
 
   return {
-    attachment, twinRequired: attachment === 'twinfix', anchors, candidates: interior, flaps,
-    uncoveredMM: coverage.uncoveredMM,
+    attachment, twinRequired: attachment === 'twinfix', anchors, candidates: interior,
     ok: issues.length === 0,
     issues,
     pitchCentreMM: pitch,
@@ -1125,7 +1112,7 @@ export function deriveRectangleConstruction(
         },
         Math.max(widthRung.gridExtentMM, heightRung.gridExtentMM),
       )
-      if (!grid.anchors.length || grid.flaps.length > 0) continue
+      if (!grid.anchors.length) continue
       const dimensions = anchorGridDimensionsMM(grid.anchors, padEff)
       if (
         dimensions[0] === widthRung.gridExtentMM
@@ -1164,8 +1151,7 @@ export function deriveRectangleConstruction(
     )
     const dimensions = anchorGridDimensionsMM(light.anchors, padEff)
     if (
-      light.flaps.length === 0
-      && dimensions[0] === widthRung.gridExtentMM
+      dimensions[0] === widthRung.gridExtentMM
       && dimensions[1] === heightRung.gridExtentMM
     ) {
       return construction
@@ -1247,7 +1233,7 @@ function semanticSteps(
   }
 
   // GRID-FIRST: enumerate canonical lattice extents, then exhaust the bounded integer-mm domain for
-  // each legal combo and take its first covered construction. The acceptance predicate can contain
+  // each legal combo and take its first accepted construction. The acceptance predicate can contain
   // disjoint islands as a curved contour crosses lattice phases, so bisection is unsound. Extent
   // remains the catalogue authority and physical mm is derived within the configured production bound.
   const steps: SemanticStep[] = []
@@ -1348,9 +1334,9 @@ function semanticSteps(
         }, gridExtentMM, seatClearanceMM)
         return { designSizeMM, grid, construction, prepared, seatClearanceMM }
       }
+      // A rung is accepted on POPULATION and EXTENT. Coverage is never consulted (S22).
       const accepts = (grid: GridResult): boolean =>
         grid.anchors.length >= minimumAnchors
-        && grid.flaps.length === 0
         && anchorGridExtentMM(grid.anchors, padEff) === gridExtentMM
 
       const minimumCandidateMM = gridExtentMM === firstExtentMM
@@ -1494,11 +1480,12 @@ export interface AutoGridSelection {
 }
 
 /**
- * Unified auto selection (pitch × pattern) under the ONE coverage physics — no shape-name branches.
+ * Unified auto selection (pitch × pattern) under one seating law — no shape-name branches.
  * AUTO mode covers everything legal in the 48/68 system (standard straight, diamond diagonal, 96-dice
  * mix) and, via per-node validity + the deepest-point guarantee, can place one fallback anchor in the
  * deepest legal region of an irregular silhouette. Pin `pitchMM`/`pattern` for manual modes — they behave
- * literally. Fewest-uncovered fallback when nothing fully covers.
+ * literally. When no family reaches the anchor target the FIRST family that seats at all wins, in the
+ * declared pitch × pattern order — deterministic, carrying no policy (3.24: no maximality rule).
  */
 export function autoGrid(
   withMargin: (m: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
@@ -1531,8 +1518,8 @@ function autoPreparedGrid(
     pitchMM: pitches[pitches.length - 1],
     pattern: patFor(pitches[pitches.length - 1]).slice(-1)[0],
   }
-  let fbUncoveredMM = Infinity
-  let firstCovered: AutoGridSelection | null = null
+  let firstSeated: AutoGridSelection | null = null
+  let fbSeated = false
   const finalFit = (
     pitchMM: number,
     pattern: GridPattern,
@@ -1557,9 +1544,10 @@ function autoPreparedGrid(
       seatClearanceAtMarginMM,
     )
     if (p === fb.pitchMM && pat === fb.pattern) fb.selectionFit = fit
-    if (fit.grid.anchors.length >= minN && fit.grid.flaps.length === 0) {
+    // Selection is on POPULATION, then edge registration. Coverage never gates it (S22).
+    if (fit.grid.anchors.length >= minN) {
       const selected = { pitchMM: p, pattern: pat, fit: finalFit(p, pat, fit) }
-      if (!firstCovered) firstCovered = selected
+      if (!firstSeated) firstSeated = selected
       const prepared = withMargin.get(selected.fit.sizeMM)
       const floorMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
       if (fullyRegisteredOnBBox(
@@ -1569,22 +1557,15 @@ function autoPreparedGrid(
       )) return selected
       continue
     }
-    const fallbackAnchors = fb.selectionFit?.grid.anchors.length ?? 0
-    if (
-      fit.grid.anchors.length >= MIN_ANCHORS
-      && (
-        fit.grid.uncoveredMM < fbUncoveredMM
-        || (
-          Math.abs(fit.grid.uncoveredMM - fbUncoveredMM) < 1e-9
-          && fit.grid.anchors.length > fallbackAnchors
-        )
-      )
-    ) {
+    // FALLBACK when no family reaches minN: the FIRST family that seats at all, in the declared
+    // pitch × pattern order. Deliberately not ranked — neither by coverage (S22) nor by magnet count
+    // (3.24, no maximality rule). Deterministic order carries no policy, which is the point.
+    if (!fbSeated && fit.grid.anchors.length >= MIN_ANCHORS) {
       fb = { pitchMM: p, pattern: pat, selectionFit: fit }
-      fbUncoveredMM = fit.grid.uncoveredMM
+      fbSeated = true
     }
   }
-  if (firstCovered) return firstCovered
+  if (firstSeated) return firstSeated
   return {
     pitchMM: fb.pitchMM,
     pattern: fb.pattern,
@@ -1600,11 +1581,11 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
 
 /**
  * Sizing ADAPTS (always-on, capped): from the selected size, nudge UP in small steps up to `maxGrowMM`
- * and keep the first size that is BALANCED — full hold coverage (zero flaps under the shared radial
- * plus bounded-pair oracle) and ≥ target magnets. Coverage is the shape-agnostic criterion (the
- * old `gaps` bbox heuristic mis-ranked curved shapes — a disc's rim always has padding-blocked nodes).
- * If nothing within the cap fully covers, keep the size with the least uncovered perimeter length (then
- * most magnets). `sized(mm)` produces the real-mm contour. `maxGrowMM = 0` disables growth.
+ * and keep the first size that seats ≥ target magnets. If nothing within the cap reaches the target,
+ * keep the SMALLEST size — growing to fit more magnets is the maximality rule 3.24 forbids. Coverage
+ * was the criterion here until 08-03 and is struck: it
+ * grew the design to satisfy an invented 48mm reach rather than to seat magnets (8.2).
+ * `sized(mm)` produces the real-mm contour. `maxGrowMM = 0` disables growth.
  */
 export function balancedFit(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, maxGrowMM: number,
@@ -1630,19 +1611,11 @@ function balancedPreparedFit(
       undefined,
       seatClearanceAtSizeMM?.(mm),
     )
-    // perfect = fully covered AND ≥ target magnets → take the first (smallest) such size immediately
-    if (grid.flaps.length === 0 && grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
-    // otherwise rank physical uncovered length first, then more magnets; iteration keeps smaller size.
-    if (
-      !best
-      || grid.uncoveredMM < best.grid.uncoveredMM
-      || (
-        Math.abs(grid.uncoveredMM - best.grid.uncoveredMM) < 1e-9
-        && grid.anchors.length > best.grid.anchors.length
-      )
-    ) {
-      best = { sizeMM: mm, grid }
-    }
+    // Enough magnets → take the first (smallest) such size immediately.
+    if (grid.anchors.length >= target) return { sizeMM: mm, grid, grew: mm - start }
+    // Otherwise keep the SMALLEST size. Ranking the shortfall by magnet count would grow the design
+    // to fit more magnets — the maximality rule 3.24 forbids.
+    if (!best) best = { sizeMM: mm, grid }
   }
   if (best) return { ...best, grew: best.sizeMM - start }
   const grid = computePreparedGridForExtent(
@@ -1755,7 +1728,7 @@ export function nearestAnchorPair(anchors: ReadonlyArray<Anchor>): NearestAnchor
 
 /**
  * Resolve the complete magnetic-grid law for a production contour. This is the portable engine seam:
- * mode legality, density/coverage, pitch selection, padding, margin adaptation, and truthful resolved
+ * mode legality, density, pitch selection, padding, margin adaptation, and truthful resolved
  * measurements live here once. Creator flows call one operation and render the returned facts.
  */
 export function resolveGridPlan(
@@ -1862,7 +1835,7 @@ export function resolveGridPlan(
 // ─── EXACT ASYNC/CACHE CONTRACT ─────────────────────────────────────────────
 
 /** Manual cache contract version. Bump whenever an output-affecting engine algorithm or policy changes. */
-export const GRID_ENGINE_CACHE_VERSION = 17
+export const GRID_ENGINE_CACHE_VERSION = 18
 
 export type StandardLadderShape = Exclude<StdShape, 'rect'>
 
@@ -2044,7 +2017,6 @@ const GRID_ENGINE_POLICY_CONTRACT = {
   constructionQuantumMM: GRID_CONSTRUCTION_QUANTUM_MM,
   circleTessellation: DEFAULT_CIRCLE_TESSELLATION_CALIBRATION,
   manufacturingOffsetArcToleranceMM: MANUFACTURING_OFFSET_ARC_TOLERANCE_MM,
-  holdReachMM: HOLD_REACH_MM,
   focalSizeMM: FOCAL_SIZE_MM,
   focalRamp2MM: FOCAL_RAMP2_MM,
   defaultLaw: DEFAULT_LAW,

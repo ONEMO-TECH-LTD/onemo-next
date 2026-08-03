@@ -88,7 +88,6 @@ for (const shape of SHAPES) {
           pitchMM,
           points: grid.anchors.length,
           extentMM,
-          uncoveredMM: grid.uncoveredMM,
           anchors: grid.anchors.map(({ p }) => p),
         }))
         const belowGrid = computeGrid(contourAt(rung.sizeMM - 1), {
@@ -100,7 +99,6 @@ for (const shape of SHAPES) {
         console.log(JSON.stringify({
           belowPitchMM: pitchMM,
           belowPoints: belowGrid.anchors.length,
-          belowUncoveredMM: belowGrid.uncoveredMM,
           belowAnchors: belowGrid.anchors.map(({ p }) => p),
         }))
         const lightGrid = computeGrid(contourAt(rung.sizeMM), {
@@ -113,7 +111,6 @@ for (const shape of SHAPES) {
         console.log(JSON.stringify({
           lightPitchMM: pitchMM,
           lightPoints: lightGrid.anchors.length,
-          lightUncoveredMM: lightGrid.uncoveredMM,
           lightAnchors: lightGrid.anchors.map(({ p }) => p),
         }))
       }

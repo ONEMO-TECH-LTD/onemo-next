@@ -48,7 +48,6 @@ function planT2(plan: ResolvedGridPlan) {
   }
   return {
     anchorCount: nodes.length,
-    flapCount: plan.grid.flaps.length,
     ok: plan.grid.ok,
     pitchMM: plan.pitchMM,
     pattern: plan.pattern,

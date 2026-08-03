@@ -56,7 +56,6 @@ function planSummary(contour: Contour, mode: GridMode, density: GridDensity, sou
     pattern: plan.pattern,
     pitchMM: plan.pitchMM,
     anchors: plan.grid.anchors.length,
-    flaps: plan.grid.flaps.length,
     ok: plan.grid.ok,
   }
 }
@@ -104,8 +103,10 @@ function standardSuitable(rows: ReturnType<typeof presetRows>) {
   const plans = rows.flatMap((row) => Object.values(row.densities))
   const multiAnchor = plans.filter((plan) => plan.anchors >= 2)
   const singleAnchor = plans.filter((plan) => plan.anchors === 1).length
+  // The `flaps !== 0` term is removed with the hold guard (KAI-10105): this report judged a plan
+  // unsuitable for any outline running past an invented 48mm reach, which is the struck rule (8.2).
   const failures = multiAnchor.filter((plan) =>
-    plan.pattern !== 'standard' || !plan.ok || plan.flaps !== 0
+    plan.pattern !== 'standard' || !plan.ok
   ).length
   return { suitable: failures === 0, multiAnchor: multiAnchor.length, singleAnchor, failures }
 }
@@ -140,7 +141,7 @@ const report = {
     modes: MODES,
     standardRungs: 'shape-specific',
     presetRungs: 'square-reference, matching the current page',
-    presetSuitability: 'every multi-anchor standard plan is ok, zero-flap, and standard-pattern',
+    presetSuitability: 'every multi-anchor standard plan is ok and standard-pattern',
     oneAnchor: 'classified boundary; never counted as a pass',
   },
   productAutoGate: {

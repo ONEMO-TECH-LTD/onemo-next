@@ -139,16 +139,22 @@ describe('edge-registration law — every edge registers on its own zero-point',
     }
   })
 
-  it('does not trade coverage for registration', () => {
-    // Registration leads only inside the conforming pool; an accepted registered layout must still
-    // be covered, so zero-point selection cannot bring back a flap-bearing construction.
+  // RENAMED + RE-ASSERTED (KAI-10105). This was 'does not trade coverage for registration' and its
+  // coverage half asserted zero flaps against the struck 48mm reach (S22). Deleting that left only
+  // `plan.grid.ok`, which means "enough magnets seated, no seating error" and proves nothing about
+  // registration — a vacuous green in the registration suite. It now asserts registration DIRECTLY,
+  // on the same two pinned rectangles, via the file's own zero-point measure.
+  it('registers both pinned rectangles on all four sides', () => {
     for (const [longMM, shortMM] of [[164, 68], [164, 116]] as Array<[number, number]>) {
       const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), {
         ...BASE_OPTIONS,
         density: 'standard',
       })
-      expect(plan.grid.flaps.length, `${longMM}x${shortMM} flaps`).toBe(0)
-      expect(plan.grid.ok).toBe(true)
+      expect(plan.grid.ok, `${longMM}x${shortMM} seats a lawful grid`).toBe(true)
+      expect(
+        registrationSlackMM(plan),
+        `${longMM}x${shortMM} outermost anchors sit beyond the ${FLOOR_MM}mm zero-point`,
+      ).toBeCloseTo(0, 3)
     }
   })
 

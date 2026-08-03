@@ -222,16 +222,17 @@ function optimalSizingTable() {
           paddingMM: DEFAULT_LAW.paddingMM,
           maxGrowMM: 0,
         })
+        // The uncovered-perimeter violation is removed with the hold guard (KAI-10105): this audit
+        // failed a rung for outline running past an invented 48mm reach, the rule Dan struck (8.2).
         if (rung.points >= 2 && !plan.grid.ok) {
           throw new Error(
-            `${shape} ${rung.label} ${rung.sizeMM}mm publishes ${plan.grid.uncoveredMM}mm uncovered`,
+            `${shape} ${rung.label} ${rung.sizeMM}mm does not seat a lawful grid: ${plan.grid.issues.join('; ')}`,
           )
         }
         return {
           label: rung.label,
           sizeMM: rung.sizeMM,
           points: rung.points,
-          uncoveredMM: plan.grid.uncoveredMM,
         }
       })
       return [shape, table]
