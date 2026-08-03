@@ -341,7 +341,12 @@ export default function GridLab() {
           }
       : src === 'magic2'
         ? null
-      : snapToGrid && sourceUnitContour
+      // ONE CONTROL, ONE JOB. `snapToGrid` decides whether the TEST SIZE snaps to a rung — nothing
+      // else. It used to also pick the ladder recipe here, so switching snap off silently rebuilt a
+      // generator/AI ladder from a SQUARE REFERENCE instead of the shape's own outline: an unrelated
+      // toggle changing which shape the engine measures, and a neutrality break, because one contour
+      // then produced two different ladders depending on a switch that is about sizes.
+      : sourceUnitContour
         ? { kind: 'uniform-contour', unitContour: sourceUnitContour }
       : { kind: 'standard', shape: ladderShape },
     [
@@ -352,7 +357,6 @@ export default function GridLab() {
       magicUnitContour,
       presetUnitContour,
       roundedSquareRadiusMM,
-      snapToGrid,
       sourceUnitContour,
       src,
     ],
