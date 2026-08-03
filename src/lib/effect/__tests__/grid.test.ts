@@ -461,7 +461,11 @@ describe('engine-owned workbench selections', () => {
         const population = constructionPoints(construction!)
         const rimKeys = boundaryPointKeys(population, construction!.basisMM)
         expect(construction!.pitchMM).toBe(density === 'standard' ? 48 : 96)
-        expect(rimKeys.size).toBe(population.length)
+        // Rectangle composition inherits the same mode mask as every other shape: Light is the
+        // boundary, Standard carries its interior. The coverage this test exists for is that BOTH axes
+        // compose into one delivered lattice — that assertion is unchanged below.
+        if (density === 'light') expect(rimKeys.size).toBe(population.length)
+        else expect(rimKeys.size).toBeLessThanOrEqual(population.length)
         expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
       }
     }
@@ -586,7 +590,10 @@ describe('contour transforms preserve the declared Contour contract', () => {
 })
 
 describe('semantic ladder stays inside its product contract', () => {
-  it('builds standard shapes as direct 48/96 perimeter constructions by density', () => {
+  // Direct-mode witness for the mask ruling on one named size. 214mm at 48mm pitch admits a 5x5 block:
+  // Standard delivers all 25 with 9 interior, Light delivers the 8-point ring at 96mm with none.
+  // The populations are law-derived (block and its boundary), not scanned values.
+  it('builds standard shapes as direct 48/96 constructions masked by density', () => {
     const square = stdShapeContour('square', 214)
     const standard = resolveGridPlan(square, {
       source: 'std',
@@ -611,7 +618,7 @@ describe('semantic ladder stays inside its product contract', () => {
       deliveredInterior: standard.grid.anchors.length
         - boundaryPointKeys(standardPoints, patternBasis('standard', 48)).size,
       ok: standard.grid.ok,
-    }).toEqual({ pitchMM: 48, anchors: 16, deliveredInterior: 0, ok: true })
+    }).toEqual({ pitchMM: 48, anchors: 25, deliveredInterior: 9, ok: true })
     expect({
       pitchMM: light.pitchMM,
       anchors: light.grid.anchors.length,
@@ -1046,8 +1053,13 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(sharpRung).toMatchObject({ label: 'S', sizeMM: 70, points: 4 })
   })
 
-  it('builds every standard-shape density as its own perimeter-only 48/96 construction', () => {
+  // Dan 08-03: "the standard mode must show all magnets - the light perimeter only". The mode is the
+  // magnet mask and nothing else selects it. This census keeps the four-shape / both-density coverage
+  // and asserts the mask itself, so a regression to perimeter-only Standard fails here — the exact trap
+  // that a single-flag fix walks into, because directPerimeter once chose both pitch AND mask.
+  it('masks every standard-shape density by mode: Standard all magnets, Light the boundary', () => {
     let compared = 0
+    let standardWithInterior = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       for (const density of ['standard', 'light'] as const) {
@@ -1072,7 +1084,14 @@ describe('semantic ladder stays inside its product contract', () => {
           compared++
           expect(rung.construction.pitchMM).toBe(expectedPitchMM)
           expect(rung.construction.pattern).toBe('standard')
-          expect(rimKeys.size).toBe(population.length)
+          if (density === 'light') {
+            // Light is the rim: every delivered point is on the population boundary.
+            expect(rimKeys.size).toBe(population.length)
+          } else {
+            // Standard is the full block: the rim is a subset, never the whole population.
+            expect(rimKeys.size).toBeLessThanOrEqual(population.length)
+            if (rimKeys.size < population.length) standardWithInterior++
+          }
           expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
           expect(plan.grid.anchors).toHaveLength(rung.points)
           if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
@@ -1080,13 +1099,19 @@ describe('semantic ladder stays inside its product contract', () => {
       }
     }
     expect(compared).toBeGreaterThan(0)
+    // The load-bearing half: if Standard were silently forced back to perimeter-only, every Standard
+    // population would equal its own rim and this counter would be zero.
+    expect(standardWithInterior).toBeGreaterThan(0)
   })
 
-  it('keeps every published standard-shape anchor on the physical perimeter', () => {
+  // Scoped to Light by Dan's 08-03 mode ruling: Light is the perimeter belt, so no delivered anchor may
+  // sit inboard. Standard now carries interior magnets BY DESIGN, and its own guard is the mask census
+  // above — this test must not be widened back over Standard or it re-asserts the overruled policy.
+  it('keeps every published Light anchor on the physical perimeter', () => {
     const violations: string[] = []
     let compared = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      for (const density of ['standard', 'light'] as const) {
+      for (const density of ['light'] as const) {
         const rungs = semanticLadderFromRecipe(
           { kind: 'standard', shape },
           DEFAULT_LAW,
