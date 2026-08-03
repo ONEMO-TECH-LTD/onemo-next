@@ -1236,9 +1236,9 @@ function semanticSteps(
             sparseThin: false,
           }, gridExtentMM)
           if (!grid.anchors.length) return null
-          const perimeterAnchors = source === 'std'
-            ? standardShapePerimeterAnchors(grid.anchors, prepared)
-            : grid.anchors
+          // 8.8: the perimeter shell is geometry, not provenance. Trimming the clipped-lattice stair
+          // step is the same operation whichever menu the outline arrived from.
+          const perimeterAnchors = standardShapePerimeterAnchors(grid.anchors, prepared)
           if (!perimeterAnchors.length) return null
           const construction = constructionFromAnchors(combo.pattern, combo.pitchMM, perimeterAnchors)
           return {
