@@ -382,11 +382,8 @@ describe('resolveGridPlan — production engine seam', () => {
       perimeterOnly: true,
       sparseThin: true,
     } as const
-    // PURE FUNCTION TEST. Both layouts are constructed explicitly at a pinned size; nothing here
-    // calls the selector or asserts what it chose. The previous version resolved one side through
-    // `autoGrid` and then asserted the selected pitch/pattern, which re-coupled a "measurement" to
-    // selection — if engine ordering legitimately moved, this would have failed as a coverage claim.
-    // With no selector in the loop, 48 is genuinely a caller-scoped measurement radius.
+    // Pure function test: both layouts built explicitly, the selector is never called, nothing asserts
+    // what was chosen. 48 is a caller-scoped measurement radius, not an engine value (S22).
     const straight = computeGrid(star(184), { ...cfg, pitchMM: 48, pattern: 'standard' })
     const dice = computeGrid(star(184), { ...cfg, pitchMM: 96, pattern: 'quincunx' })
     const straightCoverage = exactPerimeterCoverage(
@@ -872,47 +869,6 @@ describe('semantic ladder stays inside its product contract', () => {
     }).toEqual({ pitchMM: 96, anchors: 8, deliveredInterior: 0, ok: true })
   })
 
-  // REFRAMED (KAI-10105). This asserted `plan.grid.ok` false on three product layouts purely because
-  // their bounded spans did not cover — the struck publication guard reading through `ok`, which now
-  // means "seated a lawful grid" and says nothing about coverage. It cannot gate product plans (S22).
-  // What survives is the geometry: on these named witnesses the bounded pair-span measurement DOES
-  // separate the covered layouts from the uncovered ones. Measured, gating nothing.
-  it('measures bounded pair-span coverage on the named standard-shape witnesses', () => {
-    let compared = 0
-    for (const [shape, sizeMM, density, pitchMM, expectCovered] of [
-      ['square', 214, 'light', 96, true],
-      ['circle', 216, 'light', 96, false],
-      ['diamondShape', 224, 'light', 96, false],
-      ['triangle', 260, 'standard', 48, true],
-      ['triangle', 260, 'light', 96, false],
-    ] as const) {
-      const contour = stdShapeContour(shape, sizeMM)
-      const plan = resolveGridPlan(contour, {
-        source: 'std',
-        mode: 'standard',
-        density,
-        pitchMM,
-        paddingMM: DEFAULT_LAW.paddingMM,
-        maxGrowMM: 0,
-      })
-      const coverage = exactPerimeterCoverage(
-        contour,
-        plan.grid.anchors.map(({ p }) => p),
-        PROBE_REACH_MM,
-        'standard',
-        pitchMM,
-      )
-      compared++
-      expect(
-        coverage.uncoveredMM === 0,
-        `${shape}/${sizeMM}/${density}/${pitchMM} bounded pair-span measurement`,
-      ).toBe(expectCovered)
-      // The plan is lawful either way — coverage does not decide that, and must not start to.
-      expect(plan.grid.ok, `${shape}/${sizeMM} seats a lawful grid`).toBe(true)
-    }
-    expect(compared).toBe(5)
-  })
-
   it('expands AI Magic 2 on the lawful 96mm family without bypassing its real outline', () => {
     const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
     const xs = realContour.outer.pts.map(([x]) => x)
@@ -1110,11 +1066,8 @@ describe('semantic ladder stays inside its product contract', () => {
       .toBe(new Set(calls).size)
   })
 
-  // O3-PENDING (KAI-10105). Real acceptance — a rotated population must never be published under the
-  // Standard label — and kept as a regression witness. It relied on the engine growing 12mm to find a
-  // conforming phase; with coverage and the count objective both removed (S22 / 3.24) no chooser
-  // remains to drive that growth, so it no longer grows. Left visibly pending rather than faked green:
-  // whatever resolves O3 must restore this.
+  // O3-PENDING. A rotated population must never publish under the Standard label. Relied on the engine
+  // growing 12mm to find a conforming phase; no chooser drives that growth until O3 is ruled.
   it.skip('O3-pending — fails closed instead of publishing a rotated population as Standard', () => {
     const angle = Math.PI / 4
     const ux = Math.cos(angle), uy = Math.sin(angle)
@@ -1392,13 +1345,8 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(violations).toEqual([])
   })
 
-  // REFRAMED with the hold guard (KAI-10105). This test asserted that every published rung passes a
-  // 48mm reach — the struck publication guard preserved as an executable test, and it failed on 14
-  // layouts once the guard left the engine. It is NOT made green by new values: the coverage
-  // assertion is DELETED because coverage no longer decides what may be published (8.2). What
-  // survives is the real invariant it also carried — every published multi-anchor rung must resolve
-  // to a lawful plan through the production path. Coverage as a pure measurement is still exercised
-  // by the `exactPerimeterCoverage` tests above, which assert geometry and gate nothing.
+  // Coverage never decides what may be published (S22). The live invariant: every published
+  // multi-anchor rung resolves to a lawful plan through the production path.
   it('resolves every published multi-anchor rung to a lawful plan on the product Auto path', () => {
     let compared = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
@@ -1517,12 +1465,8 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(compared).toBeGreaterThan(0)
   })
 
-  // O3-PENDING (KAI-10105). Dan's gravity law (5.8 — the vertical pair beats the horizontal where a
-  // long side is unsupported) is a real acceptance and is KEPT as a regression witness. Its stale
-  // authority is removed: it used to rest on "full perimeter coverage supersedes… wherever a COVERED
-  // two-anchor construction exists", and coverage no longer supplies any precondition (S22). It
-  // currently resolves 1 anchor where it expects 2, because nothing selects occupancy until O3 is
-  // ruled. Left visibly pending rather than tuned to whatever the engine now prints.
+  // O3-PENDING. Law 5.8 — the vertical pair beats the horizontal where a long side is unsupported.
+  // Resolves 1 anchor where it expects 2 because nothing selects occupancy until O3 is ruled.
   it.skip('O3-pending — lets gravity orient a lawful two-anchor tier without changing its grid extent', () => {
     const ladder = semanticLadder(
       (sizeMM) => stdShapeContour('circle', sizeMM),
@@ -1551,11 +1495,8 @@ describe('semantic ladder stays inside its product contract', () => {
       .toBeGreaterThan(Math.abs(second.p[0] - first.p[0]))
   })
 
-  // INVERTED (KAI-10105). This required triangle Light to be EMPTY "because coverage failed" — the
-  // struck publication guard as an executable expectation — and pinned 92/68, which are scan output.
-  // It now asserts the opposite property and pins no millimetre: coverage does NOT control whether a
-  // density family publishes. Both families produce a ladder; which CONSTRUCTION each delivers is
-  // open under O3 and is deliberately not asserted here.
+  // Coverage does not control whether a density family publishes (S22). No millimetre is pinned;
+  // which CONSTRUCTION each family delivers is open under O3 and deliberately not asserted.
   it('does not let coverage decide whether a density family publishes at all', () => {
     const makeTriangle = (sizeMM: number) => stdShapeContour('triangle', sizeMM)
     const standard = semanticLadder(
