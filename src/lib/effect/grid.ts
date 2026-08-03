@@ -3,8 +3,7 @@ import { jsonByteLength } from './grid-cache'
 import {
   gridLadderCacheKey,
   gridPlanCacheKey,
-  planContourFromRecipe,
-  resolveGridPlan,
+  resolveGridPlanFromRecipe,
   semanticLadderFromRecipe,
   type GridMode,
   type GridPlanOptions,
@@ -53,7 +52,7 @@ export function handleGridJob(job: GridJob): GridJobResult {
   return {
     operation: 'plan',
     key: gridPlanCacheKey(job.recipe, job.options),
-    value: resolveGridPlan(planContourFromRecipe(job.recipe), job.options),
+    value: resolveGridPlanFromRecipe(job.recipe, job.options),
   }
 }
 
@@ -101,7 +100,7 @@ export function handleGridWorkerJob(job: GridJob): GridWorkerEnvelope {
       result: {
         operation: 'plan',
         key: gridPlanCacheKey(seedJob.recipe, seedJob.options),
-        value: resolveGridPlan(planContourFromRecipe(seedJob.recipe), seedJob.options),
+        value: resolveGridPlanFromRecipe(seedJob.recipe, seedJob.options),
       },
     }
     const seedBytes = jsonByteLength(seed)

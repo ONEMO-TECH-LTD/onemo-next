@@ -15,6 +15,7 @@ import { GLOBAL_OFF, resolve, type OutlineAdjustments, type OutlineSource } from
 import {
   resolveGridPlan,
   scaleContour,
+  semanticLadderFromRecipe,
   stdShapeContour,
   type GridDensity,
   type GridMode,
@@ -155,7 +156,34 @@ describe('actual Creator source families share one engine contract', () => {
       expect(contour, preset).not.toBeNull()
       exercise(`preset:${preset}`, scaleContour(normalized(contour!), 180), 'preset')
     }
-  })
+  }, 15_000)
+
+  it('starts every curated preset ladder at a multi-anchor S rung, never ONE', () => {
+    let compared = 0
+    for (const preset of PRESETS) {
+      const contour = contourFromShape(
+        getShape(preset, 1000, 1000),
+        { mmPerPx: 1, maskHeightPx: 1000 },
+      )
+      expect(contour, preset).not.toBeNull()
+      const unitContour = normalized(contour!)
+      for (const density of DENSITIES) {
+        const rungs = semanticLadderFromRecipe(
+          { kind: 'uniform-contour', unitContour },
+          undefined,
+          'auto',
+          { source: 'preset', density },
+        )
+        compared++
+        // Presets do not OFFER a one-magnet size; the construction is still retained (8.8(d)).
+        const offered = rungs.filter((rung) => rung.visible)
+        expect(offered.every((rung) => rung.points >= 2), `${preset}/${density}`).toBe(true)
+        expect(offered.some((rung) => rung.label === 'ONE'), `${preset}/${density}`).toBe(false)
+        if (offered.length) expect(offered[0].label, `${preset}/${density}`).toBe('S')
+      }
+    }
+    expect(compared).toBe(PRESETS.length * DENSITIES.length)
+  }, 120_000)
 
   it('covers every procedural generator in every mode and density', () => {
     for (const { kind, params } of GENERATORS) {

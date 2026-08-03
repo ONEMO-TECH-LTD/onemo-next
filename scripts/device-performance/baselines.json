@@ -3,16 +3,15 @@
   "executor": "Node.js current engine",
   "fixtures": {
     "canonical-ladder": {
-      "sha256": "b0afd8bf8646034cb32315bd085524ce5de08ab4e5da469994b71c13f3aca74f",
+      "sha256": "a7b12ea8e6967d7cb1f19670f8b7d54375ac2b1df5d3e1fbcc97c0ef3ca2a682",
       "t2": {
         "rungs": [
-          { "label": "ONE", "points": 1, "sizeMM": 24, "visible": true },
-          { "label": "S", "points": 4, "sizeMM": 158, "visible": true }
+          { "label": "S", "points": 4, "sizeMM": 156, "visible": true }
         ]
       }
     },
     "dense-live-plan": {
-      "sha256": "a3f1a99f38049ff9bd3076151e676715a2e9105cadc70345e8f773dba42191dd",
+      "sha256": "09b820495f6a58f642e1f8e5a93b0799b3e47b93061a657fff022a506f280c9f",
       "t2": {
         "anchorCount": 2,
         "flapCount": 0,
@@ -27,7 +26,7 @@
       }
     },
     "small-contour-plan": {
-      "sha256": "09cad563d2ee9556835489505316cd1269e1f9136d15f4b58167780c02049e33",
+      "sha256": "a5ca44bc90990241c1f23bd21d1312e864e030d94e1f46adbfc82a275d281b59",
       "t2": {
         "anchorCount": 4,
         "flapCount": 0,

@@ -6,10 +6,8 @@ import {
   handleGridJob,
   gridLadderCacheKey,
   gridPlanCacheKey,
-  ladderShapeFromRecipe,
-  planContourFromRecipe,
-  resolveGridPlan,
-  semanticLadder,
+  resolveGridPlanFromRecipe,
+  semanticLadderFromRecipe,
   type GridJob,
 } from '../grid'
 import { assertGridJsonByteEqual, gridJsonBytes } from '../grid-byte-oracle'
@@ -24,12 +22,12 @@ function directGridJob(job: GridJob) {
     ? {
         operation: 'ladder' as const,
         key: gridLadderCacheKey(job.recipe, job.law, job.mode, job.options),
-        value: semanticLadder(ladderShapeFromRecipe(job.recipe), job.law, job.mode, job.options),
+        value: semanticLadderFromRecipe(job.recipe, job.law, job.mode, job.options),
       }
     : {
         operation: 'plan' as const,
         key: gridPlanCacheKey(job.recipe, job.options),
-        value: resolveGridPlan(planContourFromRecipe(job.recipe), job.options),
+        value: resolveGridPlanFromRecipe(job.recipe, job.options),
       }
 }
 

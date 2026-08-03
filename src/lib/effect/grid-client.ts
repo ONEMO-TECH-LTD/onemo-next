@@ -1,4 +1,5 @@
 import {
+  applyFrameBufferToSemanticLadder,
   GRID_CACHE_SEED_ENVELOPE_MAX_BYTES,
   GRID_CACHE_SEED_MAX_BYTES,
   GRID_ENGINE_CACHE_VERSION,
@@ -28,9 +29,28 @@ import {
 
 let sharedClient: GridWorkerScheduler<GridJob, GridJobResult, GridWorkerEnvelope> | null = null
 
+function neutralLadderJob(job: GridJob): GridJob {
+  if (job.operation !== 'ladder' || (job.options?.frameBufferMM ?? 0) <= 0) return job
+  return {
+    ...job,
+    options: { ...job.options, frameBufferMM: 0 },
+  }
+}
+
+function applyRequestedLadderFrame(job: GridJob, result: GridJobResult): GridJobResult {
+  if (job.operation !== 'ladder' || result.operation !== 'ladder') return result
+  const frameBufferMM = job.options?.frameBufferMM ?? 0
+  if (frameBufferMM <= 0) return result
+  return {
+    operation: 'ladder',
+    key: gridLadderCacheKey(job.recipe, job.law, job.mode, job.options),
+    value: applyFrameBufferToSemanticLadder(result.value, frameBufferMM),
+  }
+}
+
 export function gridJobKey(job: GridJob): string {
-  // Ladder identity includes every option that selects its serialized construction. Remaining plan
-  // options are seed-only and do not fragment the ladder cache.
+  // Ladder identity includes every option that changes its serialized result. The client may reuse
+  // the neutral construction solve for a presentation-only frame; the returned key remains exact.
   return job.operation === 'ladder'
     ? gridLadderCacheKey(job.recipe, job.law, job.mode, job.options)
     : gridPlanCacheKey(job.recipe, job.options)
@@ -152,11 +172,13 @@ export function requestGridJob(
   job: GridJob,
   priority: GridWorkerPriority = 'active',
 ): Promise<GridJobResult> {
-  return client().request(job, priority)
+  return client().request(neutralLadderJob(job), priority)
+    .then((result) => applyRequestedLadderFrame(job, result))
 }
 
 export function cachedGridJob(job: GridJob): GridJobResult | undefined {
-  return client().peek(job)
+  const result = client().peek(neutralLadderJob(job))
+  return result === undefined ? undefined : applyRequestedLadderFrame(job, result)
 }
 
 export function suspendGridWork(): void {

@@ -1,7 +1,7 @@
 import type { VAnchor, VShape } from '@/lib/vector-core'
 
 import { contourFromShape } from './geometry-truth'
-import type { Contour } from './types'
+import type { Contour, Pt } from './types'
 
 function finiteDimension(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) {
@@ -65,4 +65,20 @@ export function roundedSquareContourMM(
   )
   if (!contour) throw new Error('Rounded-square geometry did not produce a contour.')
   return contour
+}
+
+/** Exact clearance to the circular-arc rounded rectangle, independent of its flattened proxy. */
+export function roundedSquareClearanceMM(
+  [x, y]: Pt,
+  widthMM: number,
+  heightMM: number,
+  radiusMM: number,
+): number {
+  const radius = Math.min(finiteRadius(radiusMM), widthMM / 2, heightMM / 2)
+  const qx = Math.abs(x - widthMM / 2) - (widthMM / 2 - radius)
+  const qy = Math.abs(y - heightMM / 2) - (heightMM / 2 - radius)
+  const signedDistanceMM = Math.hypot(Math.max(qx, 0), Math.max(qy, 0))
+    + Math.min(Math.max(qx, qy), 0)
+    - radius
+  return -signedDistanceMM
 }

@@ -9,9 +9,9 @@ import {
   canonicalGridCacheValue,
   handleGridJob,
   resolveGridPlan,
+  resolveGridPlanFromRecipe,
   scaleContour,
-  semanticLadder,
-  stdShapeContour,
+  semanticLadderFromRecipe,
   type Attachment,
   type GridDensity,
   type GridMode,
@@ -41,11 +41,7 @@ describe('exact grid recipe handlers', () => {
   for (const shape of STANDARD_SHAPES) for (const mode of MODES) {
     it(`keeps the neutral ${shape}/${mode} ladder byte-identical`, () => {
       const recipe: LadderRecipe = { kind: 'standard', shape }
-      const direct = semanticLadder(
-        (sizeMM) => stdShapeContour(shape, sizeMM, sizeMM),
-        DEFAULT_LAW,
-        mode,
-      )
+      const direct = semanticLadderFromRecipe(recipe, DEFAULT_LAW, mode)
       const handled = handleGridJob({ operation: 'ladder', recipe, law: DEFAULT_LAW, mode })
 
       expect(handled.operation).toBe('ladder')
@@ -58,7 +54,7 @@ describe('exact grid recipe handlers', () => {
     it(`keeps the default ${shape}/${attachment} plan byte-identical`, () => {
       const recipe: PlanRecipe = { kind: 'standard', shape, widthMM: 118, heightMM: 118 }
       const options = { attachment }
-      const direct = resolveGridPlan(stdShapeContour(shape, 118, 118), options)
+      const direct = resolveGridPlanFromRecipe(recipe, options)
       const handled = handleGridJob({ operation: 'plan', recipe, options })
 
       expect(handled.operation).toBe('plan')
@@ -83,7 +79,7 @@ describe('exact grid recipe handlers', () => {
           signedBaseMargin: true,
           diagnosticVelcro: true,
         }
-        const direct = resolveGridPlan(stdShapeContour(shape, 118, 118), options)
+        const direct = resolveGridPlanFromRecipe(recipe, options)
         const handled = handleGridJob({ operation: 'plan', recipe, options })
 
         expect(handled.operation).toBe('plan')
@@ -161,8 +157,11 @@ describe('exact grid recipe handlers', () => {
 
     expect(handled.operation).toBe('ladder')
     if (handled.operation !== 'ladder') throw new Error('Expected a ladder result.')
-    expect(handled.value.map((rung) => rung.sizeMM)).toEqual([22, 118, 214, 310])
-    expect(handled.value.map((rung) => rung.points)).toEqual([1, 4, 8, 12])
+    // The OFFERED range is what the panel publishes; ONE stays in the result as a retained
+    // construction (8.8(d): a range limit never changes what the solver found).
+    const offered = handled.value.filter((rung) => rung.visible)
+    expect(offered.map((rung) => rung.sizeMM)).toEqual([116, 212, 308])
+    expect(offered.map((rung) => rung.points)).toEqual([4, 8, 12])
     expect(handled.key).toBe(gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', options))
     expect(handled.key).not.toBe(gridLadderCacheKey(
       recipe,
@@ -209,7 +208,6 @@ describe('exact grid cache identity', () => {
     const base = gridLadderCacheKey(squareLadder, baseLaw, 'auto')
     const mutations: SizeLaw[] = [
       { ...baseLaw, paddingMM: 11 },
-      { ...baseLaw, frameMM: 2 },
       { ...baseLaw, maxTestedMM: 215 },
       { ...baseLaw, maxRungMM: 309 },
     ]
@@ -218,6 +216,7 @@ describe('exact grid cache identity', () => {
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { source: 'gen' })).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'standard' })).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { center: 'bbox' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { frameBufferMM: 1 })).not.toBe(base)
   })
 
   it('changes the plan key for every consumed option and normalizes effective defaults', () => {
@@ -249,6 +248,7 @@ describe('exact grid cache identity', () => {
       { targetAnchors: 5 },
       { signedBaseMargin: true },
       { diagnosticVelcro: true },
+      { frameBufferMM: 1 },
       {
         construction: {
           pattern: 'standard',
@@ -263,7 +263,10 @@ describe('exact grid cache identity', () => {
   })
 
   it('includes the explicit engine version and engine-owned policy signature', () => {
-    expect(GRID_ENGINE_CACHE_VERSION).toBe(15)
+    // 17, not 16: the mode-mask line and the frameless-sizing line each independently reached 16, so a
+    // client holding either parent's catalogue would have matched the merged engine and been served
+    // stale ladders. Same defect class as the bump that made 16 necessary in the first place.
+    expect(GRID_ENGINE_CACHE_VERSION).toBe(17)
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"user"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).not.toContain('"admin"')
     expect(GRID_ENGINE_POLICY_SIGNATURE).toContain('"preparedContourEpsilonMM"')

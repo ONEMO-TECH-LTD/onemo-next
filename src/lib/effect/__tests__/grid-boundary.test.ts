@@ -31,6 +31,17 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(homeSource).toContain('redirect("/effect-creator/grid-lab")')
   })
 
+  it('binds the Grid Lab theme toggle to the page root without forcing either theme', () => {
+    const pageSource = readFileSync(PAGE_PATH, 'utf8')
+
+    expect(pageSource).toContain("const [theme, setTheme] = useState<GridTheme>('dark')")
+    expect(pageSource).toContain('data-theme={theme}')
+    expect(pageSource).toContain("onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}")
+    expect(pageSource).not.toContain('aria-pressed={theme')
+    expect(pageSource).not.toContain('data-theme="dark"')
+    expect(pageSource).not.toContain('data-theme="light"')
+  })
+
   it('uses one neutral engine lane behind separate product and admin control panels', () => {
     const pageSource = readFileSync(PAGE_PATH, 'utf8')
     const panelSource = readFileSync(PANEL_PATH, 'utf8')
@@ -88,6 +99,7 @@ describe('Creator magnetic-grid module boundary', () => {
       '<div className="gl-field"><span>Density</span>',
       '<div className="gl-field"><span>Grid pitch ·',
       '<Slider label="Magnet padding · per spot · min 10"',
+      'label="Frame buffer"',
       '<span>Fit offset mode</span>',
       'label={marginMode === \'auto\' ? \'Applied offset\' : \'Manual offset\'}',
       'label="Minimum auto offset"',
@@ -124,17 +136,17 @@ describe('Creator magnetic-grid module boundary', () => {
   it('keeps every engine-derived size tier in the product panel and none in the admin panel', () => {
     const noop = () => {}
     const stdRungs = [
-      { label: 'VISIBLE_STD', points: 4, sizeMM: 70, visible: true },
-      { label: 'HIDDEN_STD', points: 8, sizeMM: 118, visible: false },
+      { label: 'VISIBLE_STD', points: 4, sizeMM: 68, visible: true },
+      { label: 'HIDDEN_STD', points: 8, sizeMM: 116, visible: false },
     ]
     const rectRungs = {
       longOptions: [
-        { label: 'VISIBLE_LONG', points: 4, sizeMM: 70, visible: true },
-        { label: 'HIDDEN_LONG', points: 8, sizeMM: 118, visible: false },
+        { label: 'VISIBLE_LONG', points: 4, sizeMM: 68, visible: true },
+        { label: 'HIDDEN_LONG', points: 8, sizeMM: 116, visible: false },
       ],
       shortOptions: [
-        { label: 'VISIBLE_SHORT', points: 1, sizeMM: 22, visible: true },
-        { label: 'HIDDEN_SHORT', points: 4, sizeMM: 70, visible: false },
+        { label: 'VISIBLE_SHORT', points: 1, sizeMM: 20, visible: true },
+        { label: 'HIDDEN_SHORT', points: 4, sizeMM: 68, visible: false },
       ],
     }
     const baseProductProps: ComponentProps<typeof GridWorkbenchPanel> = {
@@ -166,8 +178,8 @@ describe('Creator magnetic-grid module boundary', () => {
       fileRef: { current: null },
       onFile: noop,
       sizeMax: 310,
-      sizeMin: 22,
-      resolvedSizeMM: 70,
+      sizeMin: 20,
+      resolvedSizeMM: 68,
       maxRungMM: 310,
       gridMode: 'auto',
       stdRungs,
@@ -184,6 +196,8 @@ describe('Creator magnetic-grid module boundary', () => {
       setDensity: noop,
       pad: 10,
       setPad: noop,
+      frameBufferMM: 0,
+      setFrameBufferMM: noop,
       marginMode: 'auto',
       setMarginMode: noop,
       appliedMarginMM: 6,
@@ -209,7 +223,7 @@ describe('Creator magnetic-grid module boundary', () => {
       showRoundedSquareRadius: false,
       testSizeMM: 143,
       setTestSizeMM: noop,
-      testSizeMin: 22,
+      testSizeMin: 20,
       testSizeMax: 310,
       snapToGrid: false,
       setSnapToGrid: noop,
@@ -231,7 +245,9 @@ describe('Creator magnetic-grid module boundary', () => {
 
     const productDiagonalSurvivors = renderProduct({
       model: {
-        effSize: 128,
+        effSize: 134,
+        baseSize: 128,
+        frameBufferMM: 3,
         marginMM: 0,
         designSize: 128,
         grew: 0,
@@ -246,11 +262,14 @@ describe('Creator magnetic-grid module boundary', () => {
     })
     expect(productDiagonalSurvivors).toContain('standard construction')
     expect(productDiagonalSurvivors).toContain('nearest delivered spacing 68mm')
+    expect(productDiagonalSurvivors).toContain('base 128mm + 3mm frame each side')
     expect(productDiagonalSurvivors).not.toContain('grid diagonal')
 
     const productHybridRung = renderProduct({
       model: {
         effSize: 150,
+        baseSize: 150,
+        frameBufferMM: 0,
         marginMM: 6,
         designSize: 138,
         grew: 0,
@@ -307,6 +326,12 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain('activeSnapRung.designSizeMM')
     expect(pageSource).toContain('? activeSnapRung.marginMM')
     expect(pageSource).toContain('baseMarginMM: snappedMarginMM')
+    const planOptionsSource = pageSource.slice(
+      pageSource.indexOf('const planOptions = useMemo<GridPlanOptions>'),
+      pageSource.indexOf('const ladderJob = useMemo<GridJob | null>'),
+    )
+    expect(planOptionsSource).toContain('frameBufferMM,')
+    expect(planOptionsSource).not.toContain('frameBufferMM: 0')
     expect(pageSource).toContain('const ladderJob = useMemo<GridJob | null>')
     expect(pageSource).toContain("kind: 'rounded-square'")
     expect(pageSource).toContain('radiusMM: roundedSquareRadiusMM')
@@ -316,7 +341,7 @@ describe('Creator magnetic-grid module boundary', () => {
 
     const continuousAdmin = renderAdmin({})
     expect(continuousAdmin).toContain('data-grid-size-snap="off"')
-    expect(continuousAdmin).toContain('min="22"')
+    expect(continuousAdmin).toContain('min="20"')
     expect(continuousAdmin).toContain('max="310"')
     expect(continuousAdmin).toContain('value="143"')
 
@@ -547,7 +572,10 @@ describe('Creator magnetic-grid module boundary', () => {
         model: {
           planKey: 'wide-oblong',
           contour,
+          base: contour,
           design: contour,
+          marginMM: 0,
+          frameBufferMM: 0,
           patternUsed: 'standard',
           anchorPair: {
             first: { p: [x1, 40] },
@@ -637,7 +665,6 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(pageSource).toContain('vectorShape: spec.vectorShape')
     expect(pageSource).toContain('imageUrl: liveArtwork.imageUrl')
     expect(pageSource).toContain('frontArtwork={')
-    expect(pageSource).toContain('data-theme="dark"')
     expect(pageSource).not.toContain('frontImg={isMagicSource && magic ? magic.imgUrl : null}')
     expect(pageSource).not.toContain('OutlineEditor')
     expect(pageSource).not.toContain('useOutlineStore')

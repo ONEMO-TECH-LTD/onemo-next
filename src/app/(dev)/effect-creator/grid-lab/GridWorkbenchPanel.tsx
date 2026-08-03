@@ -19,6 +19,8 @@ interface SemanticRungView {
 
 interface GridWorkbenchPanelModel {
   effSize: number
+  baseSize: number
+  frameBufferMM: number
   marginMM: number
   designSize: number
   grew: number
@@ -194,7 +196,8 @@ export function GridWorkbenchPanel({
       {model && <div className="gl-total">
         <span className="gl-total-k">Total effect size</span>
         <b className="gl-total-v">{model.effSize}<small> mm</small></b>
-        <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm margin${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no margin`}</span>
+        <span className="gl-total-note">base {model.baseSize}mm + {Number.isInteger(model.frameBufferMM) ? model.frameBufferMM : model.frameBufferMM.toFixed(1)}mm frame each side</span>
+        <span className="gl-total-note">{model.marginMM > 0.5 ? `design ${model.designSize}mm + ${Math.round(model.marginMM)}mm fit offset${model.grew > 0.5 ? ` (+${Math.round(model.grew)} auto)` : ''}` : `design ${model.designSize}mm · no fit offset`}</span>
         <span className="gl-total-note gl-total-grid">{model.patternUsed === 'quincunx' ? 'dice-5' : model.patternUsed} construction · grid pitch {model.pitch}mm{model.magDist != null ? ` · nearest delivered spacing ${Math.round(model.magDist)}mm` : ''}</span>
         <span className="gl-total-note">{model.format
           ? model.rung && model.rungH
