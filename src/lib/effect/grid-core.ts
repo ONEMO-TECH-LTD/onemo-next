@@ -784,12 +784,24 @@ function computePreparedGridForExtent(
       : extentPool
     let bestKey: number[] | null = null
     for (const k of pool) {
-      // CONFORMANCE → EDGE REGISTRATION → BALANCE. Neither coverage (S22) nor magnet count (3.24,
-      // no maximality rule) is a term: a phase is chosen on pattern legality, edge registration and
-      // centredness alone.
+      // CONFORMANCE → EDGE REGISTRATION → THE PRODUCED POPULATION → BALANCE.
+      //
+      // 4.7c: "Density selects which magnets are taken from THE POPULATION THE GRID ALREADY PRODUCED."
+      // The population is not chosen — the grid produces it by keeping every lattice point that sits
+      // its released padding inside the real outline. A phase that leaves such a point unseated has
+      // not produced the population, so population size ranks the phases.
+      //
+      // This is NOT the maximality rule 3.24 forbids. That rule is about SIZES — "we do not have as
+      // many as can fit law" bars growing a shape to admit more magnets. Here the size is fixed and
+      // the only question is where the rigid lattice sits; seating a point that already fits invents
+      // nothing. Removing this term is what made an 88mm circle seat 1 magnet where Dan's own worked
+      // example has 4 — the lawful 2×2 exists at that size and lost to a centred single on a tie.
+      //
+      // Coverage remains absent (S22).
       const key = [
         -k.conform,
         -k.registered,
+        -k.population.length,
         gridConstructionUnit(k.bal),
       ]
       let better = !bestKey
