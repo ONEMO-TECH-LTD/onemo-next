@@ -34,7 +34,8 @@ const GENERATORS: Array<{ kind: ShapeKind; params: Record<string, number> }> = [
   { kind: 'daisy', params: { depth: 55, petals: 8 } },
   { kind: 'pinwheel', params: { swirl: 55, blades: 5 } },
 ]
-const MODES: GridMode[] = ['auto', 'standard', 'diamond', 'quincunx']
+// 8.8c: 'auto' is deleted -- the grid type is selected, never inferred.
+const MODES: GridMode[] = ['standard', 'diamond', 'quincunx']
 const DENSITIES: GridDensity[] = ['standard', 'light']
 
 function normalized(contour: Contour): Contour {
@@ -52,10 +53,9 @@ function exercise(name: string, contour: Contour, source: GridSource) {
   for (const mode of MODES) for (const density of DENSITIES) {
     const plan = resolveGridPlan(contour, { source, mode, density, maxGrowMM: 12 })
     expect([48, 96], `${name}/${mode}/${density}`).toContain(plan.pitchMM)
-    if (mode !== 'auto') expect(plan.pattern, `${name}/${mode}/${density}`).toBe(mode)
-    if (mode === 'auto' && (source === 'std' || source === 'preset')) {
-      expect(plan.pattern, `${name}/${mode}/${density}`).toBe('standard')
-    }
+    // Every mode is now explicit, so the delivered pattern must equal the selected one for EVERY
+    // source -- that equality is the source-neutrality assertion (8.8a/8.8c).
+    expect(plan.pattern, `${name}/${mode}/${density}`).toBe(mode)
     if (mode === 'quincunx') expect(plan.pitchMM, `${name}/${mode}/${density}`).toBe(96)
     expect(plan.resolvedMarginMM, `${name}/${mode}/${density}`).toBeGreaterThanOrEqual(0)
   }
@@ -170,8 +170,7 @@ describe('actual Creator source families share one engine contract', () => {
       for (const density of DENSITIES) {
         const rungs = semanticLadderFromRecipe(
           { kind: 'uniform-contour', unitContour },
-          undefined,
-          'auto',
+          undefined, 'standard',
           { source: 'preset', density },
         )
         compared++

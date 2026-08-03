@@ -2,7 +2,7 @@
 import type { GridJob, GridJobResult } from './grid'
 
 export const GRID_STATIC_CATALOGUE_CACHE_VERSION = 17 as const
-export const GRID_STATIC_CATALOGUE_POLICY_SIGNATURE = "{\"circleTessellation\":{\"minimumPoints\":96},\"constructionQuantumMM\":0.00005,\"defaultLaw\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"defaultMarginMM\":12,\"focalRamp2MM\":200,\"focalSizeMM\":100,\"holdReachMM\":48,\"manufacturingOffsetArcToleranceMM\":0.025,\"minAnchors\":2,\"modes\":{\"autoBySource\":{\"freeform\":[{\"pattern\":\"standard\",\"pitchMM\":48},{\"pattern\":\"standard\",\"pitchMM\":96},{\"pattern\":\"diamond\",\"pitchMM\":48},{\"pattern\":\"diamond\",\"pitchMM\":96},{\"pattern\":\"quincunx\",\"pitchMM\":96}],\"product\":[{\"pattern\":\"standard\",\"pitchMM\":48},{\"pattern\":\"standard\",\"pitchMM\":96}]},\"diamond\":[{\"pattern\":\"diamond\",\"pitchMM\":48},{\"pattern\":\"diamond\",\"pitchMM\":96}],\"quincunx\":[{\"pattern\":\"quincunx\",\"pitchMM\":96}],\"standard\":[{\"pattern\":\"standard\",\"pitchMM\":48},{\"pattern\":\"standard\",\"pitchMM\":96}]},\"paddingFloorMM\":10,\"pitchesMM\":[48,96],\"preparedContourEpsilonMM\":0.005,\"randomShapeMaxMM\":180,\"targetAnchors\":4}" as const
+export const GRID_STATIC_CATALOGUE_POLICY_SIGNATURE = "{\"circleTessellation\":{\"minimumPoints\":96},\"constructionQuantumMM\":0.00005,\"defaultLaw\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"defaultMarginMM\":12,\"defaultMode\":\"standard\",\"focalRamp2MM\":200,\"focalSizeMM\":100,\"holdReachMM\":48,\"manufacturingOffsetArcToleranceMM\":0.025,\"minAnchors\":2,\"modes\":{\"diamond\":[{\"pattern\":\"diamond\",\"pitchMM\":48},{\"pattern\":\"diamond\",\"pitchMM\":96}],\"quincunx\":[{\"pattern\":\"quincunx\",\"pitchMM\":96}],\"standard\":[{\"pattern\":\"standard\",\"pitchMM\":48},{\"pattern\":\"standard\",\"pitchMM\":96}]},\"paddingFloorMM\":10,\"pitchesMM\":[48,96],\"preparedContourEpsilonMM\":0.005,\"randomShapeMaxMM\":180,\"targetAnchors\":4}" as const
 export const GRID_STATIC_CATALOGUE_ENTRIES = [
   {
     "job": {
@@ -11,7 +11,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "square"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "standard",
@@ -20,7 +20,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"square\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"square\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -809,7 +809,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "square"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "light",
@@ -818,7 +818,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"square\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"square\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -1054,7 +1054,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "circle"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "standard",
@@ -1063,7 +1063,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"circle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"circle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -1410,7 +1410,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "circle"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "light",
@@ -1419,7 +1419,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"circle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"circle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -1513,7 +1513,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "triangle"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "standard",
@@ -1522,7 +1522,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"triangle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"triangle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -1659,7 +1659,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "triangle"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "light",
@@ -1668,7 +1668,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"triangle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"triangle\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -1715,7 +1715,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "diamondShape"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "standard",
@@ -1724,7 +1724,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"diamondShape\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"standard\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"diamondShape\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",
@@ -1924,7 +1924,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
         "kind": "standard",
         "shape": "diamondShape"
       },
-      "mode": "auto",
+      "mode": "standard",
       "options": {
         "source": "std",
         "density": "light",
@@ -1933,7 +1933,7 @@ export const GRID_STATIC_CATALOGUE_ENTRIES = [
     },
     "result": {
       "operation": "ladder",
-      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"auto\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"diamondShape\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"autoBySource\\\":{\\\"freeform\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96},{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"product\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
+      "key": "{\"body\":{\"law\":{\"maxRungMM\":310,\"maxTestedMM\":214,\"paddingMM\":10},\"mode\":\"standard\",\"options\":{\"center\":\"centroid\",\"density\":\"light\",\"frameBufferMM\":0,\"pitchMM\":null,\"source\":\"std\"},\"recipe\":{\"kind\":\"standard\",\"shape\":\"diamondShape\"}},\"cacheVersion\":17,\"operation\":\"ladder\",\"policy\":\"{\\\"circleTessellation\\\":{\\\"minimumPoints\\\":96},\\\"constructionQuantumMM\\\":0.00005,\\\"defaultLaw\\\":{\\\"maxRungMM\\\":310,\\\"maxTestedMM\\\":214,\\\"paddingMM\\\":10},\\\"defaultMarginMM\\\":12,\\\"defaultMode\\\":\\\"standard\\\",\\\"focalRamp2MM\\\":200,\\\"focalSizeMM\\\":100,\\\"holdReachMM\\\":48,\\\"manufacturingOffsetArcToleranceMM\\\":0.025,\\\"minAnchors\\\":2,\\\"modes\\\":{\\\"diamond\\\":[{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"diamond\\\",\\\"pitchMM\\\":96}],\\\"quincunx\\\":[{\\\"pattern\\\":\\\"quincunx\\\",\\\"pitchMM\\\":96}],\\\"standard\\\":[{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":48},{\\\"pattern\\\":\\\"standard\\\",\\\"pitchMM\\\":96}]},\\\"paddingFloorMM\\\":10,\\\"pitchesMM\\\":[48,96],\\\"preparedContourEpsilonMM\\\":0.005,\\\"randomShapeMaxMM\\\":180,\\\"targetAnchors\\\":4}\"}",
       "value": [
         {
           "label": "ONE",

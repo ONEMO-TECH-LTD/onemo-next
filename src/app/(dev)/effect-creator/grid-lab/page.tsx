@@ -283,7 +283,7 @@ export default function GridLab() {
   // recipe (padding/pattern law) — each shape derives its own frameless base. Rect derives
   // per-axis from the square ladder.
   // SEMANTIC SIZES: every shape's own T-shirt ladder (2XS=1pt · XS=2 · S=3 · M=4 · L/XL/2XL/3XL …).
-  const gridMode: GridMode = patternAuto ? 'auto' : pattern
+  const gridMode: GridMode = pattern
   const ladderShape: StandardLadderShape = src === 'std'
     ? (geo === 'rect' ? 'square' : geo)
     : 'square'

@@ -181,7 +181,7 @@ describe('Creator magnetic-grid module boundary', () => {
       sizeMin: 20,
       resolvedSizeMM: 68,
       maxRungMM: 310,
-      gridMode: 'auto',
+      gridMode: 'standard',
       stdRungs,
       rectRungs,
       model: null,
@@ -357,7 +357,7 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(roundedAdmin).toContain('value="10"')
 
     const autoMarginAdmin = renderAdmin({})
-    expect(autoMarginAdmin).toContain('data-grid-margin-mode="auto"')
+    expect(autoMarginAdmin).toContain('data-grid-margin-mode="standard"')
     expect(autoMarginAdmin).toContain('Applied offset')
     expect(autoMarginAdmin).toContain('value="6"')
     expect(autoMarginAdmin).toContain('Minimum auto offset')

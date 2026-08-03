@@ -20,7 +20,7 @@ const PRESETS: VectorShapeKind[] = [
   'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie',
 ]
 const DENSITIES = ['light', 'standard'] as const satisfies readonly GridDensity[]
-const MODES = ['auto', 'standard'] as const satisfies readonly GridMode[]
+const MODES = ['standard', 'standard'] as const satisfies readonly GridMode[]
 const IMG = 1000
 
 function presetUnitContour(preset: VectorShapeKind): Contour {
@@ -116,7 +116,7 @@ const standardShapes = Object.fromEntries(STANDARD_SHAPES.map((shape) => [
 ]))
 
 const presets = Object.fromEntries(PRESETS.map((preset) => {
-  const auto = presetRows(preset, 'auto')
+  const auto = presetRows(preset, 'standard')
   const standard = presetRows(preset, 'standard')
   return [preset, {
     classification: standardSuitable(standard),
@@ -126,7 +126,7 @@ const presets = Object.fromEntries(PRESETS.map((preset) => {
 }))
 
 const visibleProductRows = STANDARD_SHAPES.flatMap((shape) =>
-  standardShapeRows(shape, 'auto')
+  standardShapeRows(shape, 'standard')
     .filter(({ visible }) => visible)
     .map((row) => ({ shape, ...row })))
 const nonStandardProductRows = visibleProductRows.filter(({ densities }) =>

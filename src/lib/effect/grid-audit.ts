@@ -20,10 +20,11 @@ const wrap = (d: Contour) => (m: number): Contour => { if (Math.abs(m) < 0.01) r
 const SEQ = ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL']
 
 for (const [nm, mk] of SH) {
-  for (const mode of ['auto', 'standard', 'quincunx', 'diamond'] as const) {
+  // 8.8c: 'auto' is deleted. Every mode is an explicit admin selection.
+  for (const mode of ['standard', 'quincunx', 'diamond'] as const) {
     for (const s of [80, 140, 200, 250]) {
       const d = mk(s); const w = wrap(d)
-      const pin = mode === 'auto' ? undefined : mode
+      const pin = mode
       const sel = autoGrid(w, { paddingMM: 10, perimeterOnly: true, sparseThin: true }, 0, 12, { pattern: pin })
       const f = balancedFit(w, { paddingMM: 10, perimeterOnly: true, sparseThin: true, pitchMM: sel.pitchMM, pattern: sel.pattern }, 0, 12)
       const a = f.grid.anchors
@@ -38,20 +39,23 @@ for (const [nm, mk] of SH) {
       }
     }
     const lad = semanticLadder((s) => mk(s), DEFAULT_LAW, mode)
+    // 3.10a: ONE is retained in the ladder and withheld from the panel. The audit judges what is
+    // OFFERED; asserting on lad[0] instead reports the deliberately-hidden rung as a defect.
+    const offered = lad.filter(r => r.visible)
     if (!lad.length) flag(`${nm}/${mode}: EMPTY ladder`)
-    if (lad.length && lad[0].label !== 'S') flag(`${nm}/${mode}: first rung not S`)
-    // multi-point sizes are required in AUTO (the default mode — union of all legal layouts);
-    // strict sub-modes may legitimately express fewer (a triangle's 60° tips can't take dice/diamond)
-    if (mode === 'auto' && ['square', 'diamond', 'circle', 'triangle'].includes(nm) && !lad.some(r => r.points >= 2)) flag(`${nm}/auto: no multi-point sizes`)
+    if (offered.length && offered[0].label !== 'S') flag(`${nm}/${mode}: first offered rung not S`)
+    // The straight grid is the default and every standard shape must reach a multi-anchor size on it.
+    // Strict sub-modes may legitimately express fewer (a triangle's 60° tips can't take dice/diamond).
+    if (mode === 'standard' && ['square', 'diamond', 'circle', 'triangle'].includes(nm) && !offered.some(r => r.points >= 2)) flag(`${nm}/standard: no multi-point sizes`)
     let li = -2
-    for (const r of lad) {
+    for (const r of offered) {
       if (r.label === 'ONE') { if (r.points !== 1) flag(`${nm}/${mode}: ONE with ${r.points}pt`); continue }
       const i = SEQ.indexOf(r.label)
       if (i < 0) flag(`${nm}/${mode}: label outside audit sequence ${r.label}`)
       if (li >= 0 && i !== li + 1) flag(`${nm}/${mode}: label skip ${SEQ[li]}→${r.label}`)
       li = i
     }
-    for (let i = 1; i < lad.length; i++) if (lad[i].sizeMM <= lad[i - 1].sizeMM) flag(`${nm}/${mode}: sizes not ascending`)
+    for (let i = 1; i < offered.length; i++) if (offered[i].sizeMM <= offered[i - 1].sizeMM) flag(`${nm}/${mode}: sizes not ascending`)
   }
   const d = mk(160)
   const g = computeGrid(d, { pitchMM: 48, paddingMM: 10, pattern: 'standard', perimeterOnly: true, plan: 'corners8' })
@@ -93,7 +97,7 @@ for (const [nm, mk] of SH.slice(0, 4)) {
 const sqLad = semanticLadder(
   (s) => stdShapeContour('square', s),
   DEFAULT_LAW,
-  'auto',
+  'standard',
   { source: 'std', density: 'standard' },
 )
 for (const rung of sqLad) {

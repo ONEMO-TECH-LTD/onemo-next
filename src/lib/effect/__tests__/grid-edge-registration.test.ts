@@ -54,7 +54,7 @@ function registrationSlackMM(plan: ResolvedGridPlan): number {
   )
 }
 
-const BASE_OPTIONS = { mode: 'auto', baseMarginMM: 0, maxGrowMM: 0 } as const
+const BASE_OPTIONS = { mode: 'standard', baseMarginMM: 0, maxGrowMM: 0 } as const
 
 describe('edge-registration law — every edge registers on its own zero-point', () => {
   it('registers a rectangle long edge exactly as the same-length square edge (164x68)', () => {
@@ -108,7 +108,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
       const canon = semanticLadder(
         (sizeMM: number) => stdShapeContour('square', sizeMM),
         DEFAULT_LAW,
-        'auto',
+        'standard',
         { source: 'std', density },
       ).filter(({ points }) => points >= 2).map(({ sizeMM }) => sizeMM)
       for (const sizeMM of canon) {
@@ -165,7 +165,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
       const sizes = semanticLadder(
         (sizeMM: number) => stdShapeContour('rect', sizeMM, sizeMM),
         DEFAULT_LAW,
-        'auto',
+        'standard',
         { source: 'std', density },
       ).map((rung) => rung.sizeMM)
       expected += sizes.length * (sizes.length - 1)

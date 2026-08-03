@@ -8,7 +8,7 @@ const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, {
 type Src = 'std' | 'preset' | 'gen' | 'magic' | 'magic2'
 type StdGeo = 'square' | 'diamondShape' | 'rect' | 'circle' | 'triangle'
 type Attachment = 'magnetic' | 'twinfix' | 'velcro'
-type GridMode = 'auto' | 'standard' | 'quincunx' | 'diamond'
+type GridMode = 'standard' | 'standard' | 'quincunx' | 'diamond'
 
 interface SemanticRungView {
   label: string

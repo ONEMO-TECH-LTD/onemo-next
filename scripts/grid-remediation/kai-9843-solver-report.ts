@@ -15,11 +15,11 @@ let visibleRungs = 0
 
 for (const shape of SHAPES) {
   const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
-  const rungs = semanticLadder(contourAt, DEFAULT_LAW, 'auto')
+  const rungs = semanticLadder(contourAt, DEFAULT_LAW, 'standard')
   for (const rung of rungs.filter(({ visible }) => visible)) {
     visibleRungs++
     const plan = resolveGridPlan(contourAt(rung.sizeMM), {
-      mode: 'auto',
+      mode: 'standard',
       density: 'light',
       paddingMM: DEFAULT_LAW.paddingMM,
       maxGrowMM: 0,

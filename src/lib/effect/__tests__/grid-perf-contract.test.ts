@@ -24,7 +24,8 @@ import { BoundedResultCache, StaticResultTable } from '../grid-cache'
 import type { Contour } from '../types'
 
 const STANDARD_SHAPES = ['square', 'diamondShape', 'triangle', 'circle'] as const
-const MODES: GridMode[] = ['auto', 'standard', 'diamond', 'quincunx']
+// 8.8c: 'auto' is deleted -- the grid type is selected, never inferred.
+const MODES: GridMode[] = ['standard', 'diamond', 'quincunx']
 const DENSITIES: GridDensity[] = ['standard', 'light']
 const ATTACHMENTS: Attachment[] = ['magnetic', 'twinfix', 'velcro']
 
@@ -205,18 +206,18 @@ describe('exact grid cache identity', () => {
 
   it('changes the ladder key for every mutable ladder input', () => {
     const baseLaw = { ...DEFAULT_LAW }
-    const base = gridLadderCacheKey(squareLadder, baseLaw, 'auto')
+    const base = gridLadderCacheKey(squareLadder, baseLaw, 'standard')
     const mutations: SizeLaw[] = [
       { ...baseLaw, paddingMM: 11 },
       { ...baseLaw, maxTestedMM: 215 },
       { ...baseLaw, maxRungMM: 309 },
     ]
-    for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'auto')).not.toBe(base)
+    for (const law of mutations) expect(gridLadderCacheKey(squareLadder, law, 'standard')).not.toBe(base)
     expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard')).not.toBe(base)
-    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { source: 'gen' })).not.toBe(base)
-    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { density: 'standard' })).not.toBe(base)
-    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { center: 'bbox' })).not.toBe(base)
-    expect(gridLadderCacheKey(squareLadder, baseLaw, 'auto', { frameBufferMM: 1 })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard', { source: 'gen' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard', { density: 'standard' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard', { center: 'bbox' })).not.toBe(base)
+    expect(gridLadderCacheKey(squareLadder, baseLaw, 'standard', { frameBufferMM: 1 })).not.toBe(base)
   })
 
   it('changes the plan key for every consumed option and normalizes effective defaults', () => {
@@ -224,7 +225,7 @@ describe('exact grid cache identity', () => {
     expect(gridPlanCacheKey(squarePlan, {})).toBe(defaults)
     expect(gridPlanCacheKey(squarePlan, {
       attachment: 'magnetic',
-      mode: 'auto',
+      mode: 'standard',
       density: 'light',
       paddingMM: 10,
       plan: 'auto',

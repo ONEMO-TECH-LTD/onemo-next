@@ -957,29 +957,28 @@ export function stdShapeContour(shape: StdShape, wMM: number, hMM: number = wMM)
 
 
 
-/** GRID MODE — the four exposed modes (§ goal 2026-07-21):
- *  auto = source-aware: standard only for product geometries/presets, every legal pattern for
- *  freeform generators/AI · standard = straight (48-atom) links only · quincunx (dice) = the
- *  standard+diamond mix (96 pitch) · diamond = diagonal (68-atom) links only. */
-export type GridMode = 'auto' | GridPattern
-function automaticPatternsForSource(source: GridSource): ReadonlyArray<GridPattern> {
-  return source === 'gen' || source === 'magic'
-    ? ['standard', 'diamond', 'quincunx']
-    : ['standard']
-}
+/** GRID MODE — the grid type is SELECTED, never inferred (law 8.8c, Dan 08-03: "straight grid is
+ *  default - dice and diamond only admin triggered exceptions - there cannot be auto mode for the grid
+ *  only manual selection of the grid type").
+ *
+ *  standard = straight (48-atom) links · quincunx (dice) = the standard+diamond mix, 96 pitch only ·
+ *  diamond = diagonal (68-atom) links. There is no 'auto': an engine that decides which pattern a
+ *  shape deserves is choosing on the admin's behalf, and it decided from the shape's SOURCE — the
+ *  same label test that gave one contour 16 magnets as a product and 25 as an AI cut-out.
+ *
+ *  NOT affected, and must not be swept up by a grep for "auto": MagnetPlan 'auto' (§10.7 — magnet
+ *  DIAMETER is size-driven and is Dan's own rule) and the adaptive margin search. Those are different
+ *  systems that happen to share the word. */
+export type GridMode = GridPattern
+export const DEFAULT_GRID_MODE: GridMode = 'standard'
 function modeCombos(
   mode: GridMode,
   pinnedPitchMM?: number,
-  source: GridSource = 'std',
 ): { pitchMM: number; pattern: GridPattern }[] {
   const std = [{ pitchMM: 48, pattern: 'standard' as GridPattern }, { pitchMM: 96, pattern: 'standard' as GridPattern }]
   const dia = [{ pitchMM: 48, pattern: 'diamond' as GridPattern }, { pitchMM: 96, pattern: 'diamond' as GridPattern }]
   const dice = [{ pitchMM: 96, pattern: 'quincunx' as GridPattern }]
-  const automatic = automaticPatternsForSource(source)
-  const combos = mode === 'standard' ? std
-    : mode === 'diamond' ? dia
-      : mode === 'quincunx' ? dice
-        : [...std, ...dia, ...dice].filter(({ pattern }) => automatic.includes(pattern))
+  const combos = mode === 'diamond' ? dia : mode === 'quincunx' ? dice : std
   if (pinnedPitchMM == null) return combos
   if (!(LAUNCH_PITCHES_MM as readonly number[]).includes(pinnedPitchMM)) {
     throw new RangeError(`Unsupported magnetic-grid pitch ${pinnedPitchMM}mm; launch pitches are 48mm and 96mm.`)
@@ -1084,13 +1083,13 @@ export function deriveRectangleConstruction(
   widthRung: SemanticRung,
   heightRung: SemanticRung,
   law: SizeLaw = DEFAULT_LAW,
-  mode: GridMode = 'auto',
+  mode: GridMode = DEFAULT_GRID_MODE,
   options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center'> = {},
 ): GridConstruction | null {
   const padEff = law.paddingMM
   const source = options.source ?? 'std'
   const density = options.density ?? 'light'
-  const requestedCombos = modeCombos(mode, options.pitchMM, source)
+  const requestedCombos = modeCombos(mode, options.pitchMM)
   // 8.8: pitch is chosen by density for every source, never by where the shape came from.
   const directPerimeter = true
   // Dan 08-03: Standard mode delivers all magnets, Light delivers the perimeter. The mask follows
@@ -1469,7 +1468,7 @@ function labelSemanticSteps(
 }
 
 export function semanticLadder(
-  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = 'auto',
+  makeShape: (sizeMM: number) => Contour, law: SizeLaw = DEFAULT_LAW, mode: GridMode = DEFAULT_GRID_MODE,
   options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
 ): SemanticRung[] {
   const source = options.source ?? 'std'
@@ -1478,7 +1477,7 @@ export function semanticLadder(
     semanticSteps(
       makeShape,
       law,
-      modeCombos(mode, options.pitchMM, source),
+      modeCombos(mode, options.pitchMM),
       1,
       options,
     ),
@@ -1769,7 +1768,7 @@ export function resolveGridPlan(
 ): ResolvedGridPlan {
   const attachment = opts.attachment ?? 'magnetic'
   const source = opts.source ?? 'std'
-  const mode = opts.mode ?? 'auto'
+  const mode = opts.mode ?? DEFAULT_GRID_MODE
   const density = opts.density ?? 'light'
   const requestedBaseMarginMM = opts.baseMarginMM ?? 0
   const baseMarginMM = opts.signedBaseMargin
@@ -1779,7 +1778,8 @@ export function resolveGridPlan(
   const marginVariants = new PreparedContourSource(
     (marginMM) => contourWithOuterMargin(contourMM, marginMM),
   )
-  const manualPattern = mode === 'auto' ? undefined : mode
+  // 8.8c: the pattern is always the selected one. There is no inferred alternative.
+  const manualPattern = mode
   const cfg: GridConfig = {
     attachment,
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
@@ -1842,7 +1842,6 @@ export function resolveGridPlan(
     pitchMM: opts.pitchMM
       ?? (density === 'standard' ? 48 : 96),
     pattern: manualPattern,
-    patterns: mode === 'auto' ? automaticPatternsForSource(source) : undefined,
   }, seatClearanceAtMarginMM)
   const fit = selected.fit
   const baseContour = marginVariants.get(fit.sizeMM)
@@ -1950,7 +1949,7 @@ export function ladderShapeFromRecipe(recipe: LadderRecipe): (sizeMM: number) =>
 export function semanticLadderFromRecipe(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
-  mode: GridMode = 'auto',
+  mode: GridMode = DEFAULT_GRID_MODE,
   options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
 ): SemanticRung[] {
   const source = options.source ?? 'std'
@@ -1962,7 +1961,7 @@ export function semanticLadderFromRecipe(
     semanticSteps(
       ladderShapeFromRecipe(recipe),
       law,
-      modeCombos(mode, options.pitchMM, source),
+      modeCombos(mode, options.pitchMM),
       minimumAnchors,
       options,
       recipe.kind === 'uniform-contour' ? recipe.minMarginMM ?? 0 : 0,
@@ -2055,11 +2054,11 @@ const GRID_ENGINE_POLICY_CONTRACT = {
   defaultLaw: DEFAULT_LAW,
   defaultMarginMM: DEFAULT_MARGIN_MM,
   randomShapeMaxMM: RANDOM_SHAPE_MAX_MM,
+  // 8.8c: one selected-mode table. The former `autoBySource` entry is deleted rather than emptied --
+  // its existence in the policy signature is what recorded "the engine picks a pattern from the
+  // source" as part of the engine's identity.
+  defaultMode: DEFAULT_GRID_MODE,
   modes: {
-    autoBySource: {
-      product: modeCombos('auto', undefined, 'std'),
-      freeform: modeCombos('auto', undefined, 'gen'),
-    },
     standard: modeCombos('standard'),
     quincunx: modeCombos('quincunx'),
     diamond: modeCombos('diamond'),
@@ -2089,7 +2088,7 @@ function gridCacheKey(operation: 'ladder' | 'plan', body: unknown): string {
 export function gridLadderCacheKey(
   recipe: LadderRecipe,
   law: SizeLaw = DEFAULT_LAW,
-  mode: GridMode = 'auto',
+  mode: GridMode = DEFAULT_GRID_MODE,
   options: Pick<GridPlanOptions, 'pitchMM' | 'source' | 'density' | 'center' | 'frameBufferMM'> = {},
 ): string {
   ladderShapeFromRecipe(recipe)
@@ -2111,7 +2110,7 @@ function effectiveGridPlanOptions(opts: GridPlanOptions = {}) {
   return {
     attachment: opts.attachment ?? 'magnetic',
     source: opts.source ?? 'std',
-    mode: opts.mode ?? 'auto',
+    mode: opts.mode ?? DEFAULT_GRID_MODE,
     density: opts.density ?? 'light',
     paddingMM: Math.max(PADDING_FLOOR_MM, opts.paddingMM ?? PADDING_FLOOR_MM),
     plan: opts.plan ?? 'auto',

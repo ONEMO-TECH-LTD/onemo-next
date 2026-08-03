@@ -262,8 +262,7 @@ function catalogueCompleteness(
     const expectedPitchMM = density === 'standard' ? 48 : 96
     const rungs = semanticLadderFromRecipe(
       shape.ladderRecipe,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: shape.source, density },
     ).filter((rung) => !(
       omit?.shape === shape.key
@@ -475,7 +474,7 @@ describe('resolveGridPlan — production engine seam', () => {
 
   it('returns resolved measurements instead of requiring caller-side reconstruction', () => {
     const plan = resolveGridPlan(stdShapeContour('square', 118), {
-      mode: 'auto', density: 'light', baseMarginMM: 0, maxGrowMM: 12,
+      mode: 'standard', density: 'light', baseMarginMM: 0, maxGrowMM: 12,
     })
     expect([48, 96]).toContain(plan.pitchMM)
     expect(plan.resolvedMarginMM).toBe(plan.baseMarginMM + plan.grewMM)
@@ -514,8 +513,8 @@ describe('grid-derived catalogue completeness', () => {
         ? (sizeMM: number) => stdShapeContour('square', sizeMM)
         : (sizeMM: number) => scaleContour(unitContour, sizeMM)
       for (const rungs of [
-        semanticLadder(makeShape, DEFAULT_LAW, 'auto', { source, density: 'standard' }),
-        semanticLadderFromRecipe(recipe, DEFAULT_LAW, 'auto', { source, density: 'standard' }),
+        semanticLadder(makeShape, DEFAULT_LAW, 'standard', { source, density: 'standard' }),
+        semanticLadderFromRecipe(recipe, DEFAULT_LAW, 'standard', { source, density: 'standard' }),
       ]) {
         compared++
         expect(rungs.length, `${source} produced no witness`).toBeGreaterThan(0)
@@ -536,8 +535,7 @@ describe('grid-derived catalogue completeness', () => {
     for (const shape of completenessShapes()) for (const density of ['standard', 'light'] as const) {
       const rungs = semanticLadderFromRecipe(
         shape.ladderRecipe,
-        DEFAULT_LAW,
-        'auto',
+        DEFAULT_LAW, 'standard',
         { source: shape.source, density },
       )
       compared++
@@ -661,8 +659,7 @@ describe('engine-owned workbench selections', () => {
   it('snaps both rectangle axes upward within the published catalogue', () => {
     const axisRungs = semanticLadderFromRecipe(
       { kind: 'standard', shape: 'square' },
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { density: 'standard' },
     )
     const rectangle = resolveRectangleRungs(axisRungs, {
@@ -681,8 +678,7 @@ describe('engine-owned workbench selections', () => {
     for (const density of ['standard', 'light'] as const) {
       const axisRungs = semanticLadderFromRecipe(
         { kind: 'standard', shape: 'square' },
-        DEFAULT_LAW,
-        'auto',
+        DEFAULT_LAW, 'standard',
         { source: 'std', density },
       )
       for (const widthRung of axisRungs) for (const heightRung of axisRungs) {
@@ -690,7 +686,7 @@ describe('engine-owned workbench selections', () => {
           widthRung,
           heightRung,
           DEFAULT_LAW,
-          'auto',
+          'standard',
           { source: 'std', density },
         )
         compared++
@@ -701,7 +697,7 @@ describe('engine-owned workbench selections', () => {
         const contour = stdShapeContour('rect', widthRung.sizeMM, heightRung.sizeMM)
         const plan = resolveGridPlan(contour, {
           source: 'std',
-          mode: 'auto',
+          mode: 'standard',
           density,
           paddingMM: DEFAULT_LAW.paddingMM,
           maxGrowMM: 0,
@@ -725,8 +721,7 @@ describe('engine-owned workbench selections', () => {
     const recipe = { kind: 'standard', shape: 'square' } as const
     const explicitLight = semanticLadderFromRecipe(
       recipe,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { density: 'light' },
     )
     const omitted = semanticLadderFromRecipe(recipe)
@@ -738,7 +733,7 @@ describe('engine-owned workbench selections', () => {
       deriveRectangleConstruction(firstMultiAnchor, firstMultiAnchor)?.pitchMM,
     ).toBe(96)
     expect(gridLadderCacheKey(recipe)).toBe(
-      gridLadderCacheKey(recipe, DEFAULT_LAW, 'auto', { density: 'light' }),
+      gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', { density: 'light' }),
     )
 
     const delivered = resolveGridPlan(
@@ -843,20 +838,17 @@ describe('semantic ladder stays inside its product contract', () => {
     const makeSquare = (sizeMM: number) => stdShapeContour('square', sizeMM)
     const zero = semanticLadder(
       makeSquare,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'standard', frameBufferMM: 0 },
     )
     const buffered = semanticLadder(
       makeSquare,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'standard', frameBufferMM: 3 },
     )
     const halfMillimetre = semanticLadder(
       makeSquare,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'standard', frameBufferMM: 0.5 },
     )
 
@@ -914,14 +906,14 @@ describe('semantic ladder stays inside its product contract', () => {
     const square = stdShapeContour('square', 214)
     const standard = resolveGridPlan(square, {
       source: 'std',
-      mode: 'auto',
+      mode: 'standard',
       density: 'standard',
       paddingMM: DEFAULT_LAW.paddingMM,
       maxGrowMM: 0,
     })
     const light = resolveGridPlan(square, {
       source: 'std',
-      mode: 'auto',
+      mode: 'standard',
       density: 'light',
       paddingMM: DEFAULT_LAW.paddingMM,
       maxGrowMM: 0,
@@ -1003,14 +995,12 @@ describe('semantic ladder stays inside its product contract', () => {
     const options = { source: 'magic' as const, density: 'light' as const }
     const actualOutline = semanticLadderFromRecipe(
       { kind: 'uniform-contour', unitContour },
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       options,
     )
     const squareReference = semanticLadderFromRecipe(
       { kind: 'standard', shape: 'square' },
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       options,
     )
 
@@ -1036,7 +1026,7 @@ describe('semantic ladder stays inside its product contract', () => {
     for (const rung of actualOutline) {
       const plan = resolveGridPlan(scaleContour(unitContour, rung.sizeMM), {
         source: 'magic',
-        mode: 'auto',
+        mode: 'standard',
         density: 'light',
         paddingMM: DEFAULT_LAW.paddingMM,
         maxGrowMM: 0,
@@ -1069,20 +1059,19 @@ describe('semantic ladder stays inside its product contract', () => {
     const testLaw = { ...DEFAULT_LAW, maxTestedMM: 166, maxRungMM: 166 }
     const rungs = semanticLadderFromRecipe(
       hybridRecipe,
-      testLaw,
-      'auto',
+      testLaw, 'standard',
       { source: 'magic', density: 'standard' },
     )
 
     expect(gridLadderCacheKey(
       hybridRecipe,
       testLaw,
-      'auto',
+      'standard',
       { source: 'magic', density: 'standard' },
     )).not.toBe(gridLadderCacheKey(
       { ...hybridRecipe, maxMarginMM: 0 },
       testLaw,
-      'auto',
+      'standard',
       { source: 'magic', density: 'standard' },
     ))
     expect(rungs.some(({ marginMM }) => marginMM > 0)).toBe(true)
@@ -1093,7 +1082,7 @@ describe('semantic ladder stays inside its product contract', () => {
     for (const rung of rungs) {
       const plan = resolveGridPlan(scaleContour(unitContour, rung.designSizeMM), {
         source: 'magic',
-        mode: 'auto',
+        mode: 'standard',
         density: 'standard',
         paddingMM: DEFAULT_LAW.paddingMM,
         baseMarginMM: rung.marginMM,
@@ -1117,14 +1106,12 @@ describe('semantic ladder stays inside its product contract', () => {
     const options = { source: 'magic' as const, density: 'standard' as const }
     const automatic = semanticLadderFromRecipe(
       { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
-      law,
-      'auto',
+      law, 'standard',
       options,
     )
     const manual = semanticLadderFromRecipe(
       { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
-      law,
-      'auto',
+      law, 'standard',
       options,
     )
 
@@ -1137,18 +1124,17 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(gridLadderCacheKey(
       { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
       law,
-      'auto',
+      'standard',
       options,
     )).not.toBe(gridLadderCacheKey(
       { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
       law,
-      'auto',
+      'standard',
       options,
     ))
     expect(() => semanticLadderFromRecipe(
       { kind: 'uniform-contour', unitContour, minMarginMM: 10, maxMarginMM: 9 },
-      law,
-      'auto',
+      law, 'standard',
       options,
     )).toThrow(/minimum margin/i)
   })
@@ -1165,7 +1151,7 @@ describe('semantic ladder stays inside its product contract', () => {
         return impossible
       },
       { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 },
-      'auto',
+      'standard',
       { source: 'magic', density: 'standard' },
     )
 
@@ -1235,7 +1221,7 @@ describe('semantic ladder stays inside its product contract', () => {
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       for (const density of ['standard', 'light'] as const) {
-        const ladder = semanticLadder(contourAt, DEFAULT_LAW, 'auto', { source: 'std', density })
+        const ladder = semanticLadder(contourAt, DEFAULT_LAW, 'standard', { source: 'std', density })
         for (const rung of ladder) {
           // ONE is withheld from geometric panels BY DESIGN (Dan 08-03). Any OTHER hidden rung means a
           // lawful size stopped being offered without a rule saying so — that is the regression here.
@@ -1247,7 +1233,7 @@ describe('semantic ladder stays inside its product contract', () => {
           visibleRungs[density]++
           const plan = resolveGridPlan(contourAt(rung.sizeMM), {
             source: 'std',
-            mode: 'auto',
+            mode: 'standard',
             density,
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
@@ -1286,13 +1272,13 @@ describe('semantic ladder stays inside its product contract', () => {
     const contour = stdShapeContour('circle', 119)
     const product = resolveGridPlan(contour, {
       source: 'std',
-      mode: 'auto',
+      mode: 'standard',
       density: 'light',
       maxGrowMM: 0,
     })
     const freeform = resolveGridPlan(contour, {
       source: 'gen',
-      mode: 'auto',
+      mode: 'standard',
       density: 'light',
       maxGrowMM: 0,
     })
@@ -1332,8 +1318,7 @@ describe('semantic ladder stays inside its product contract', () => {
     const roundedAt = (sizeMM: number) => scaleContour(normalizedPresetContour('squircle'), sizeMM)
     const roundedRung = nextSemanticRung(semanticLadder(
       roundedAt,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'preset', density: 'standard' },
     ), 68)
     const roundedPlan = resolveGridPlan(roundedAt(roundedRung.baseSizeMM), {
@@ -1349,7 +1334,7 @@ describe('semantic ladder stays inside its product contract', () => {
       semanticLadder(
         (sizeMM) => stdShapeContour('square', sizeMM),
         DEFAULT_LAW,
-        'auto',
+        'standard',
         { source: 'std', density: 'standard' },
       ),
       68,
@@ -1373,8 +1358,7 @@ describe('semantic ladder stays inside its product contract', () => {
         const expectedPitchMM = density === 'standard' ? 48 : 96
         const rungs = semanticLadder(
           contourAt,
-          DEFAULT_LAW,
-          'auto',
+          DEFAULT_LAW, 'standard',
           { source: 'std', density },
         )
         for (const rung of rungs) {
@@ -1382,7 +1366,7 @@ describe('semantic ladder stays inside its product contract', () => {
           const rimKeys = boundaryPointKeys(population, rung.construction.basisMM)
           const plan = resolveGridPlan(contourAt(rung.sizeMM), {
             source: 'std',
-            mode: 'auto',
+            mode: 'standard',
             density,
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
@@ -1421,8 +1405,7 @@ describe('semantic ladder stays inside its product contract', () => {
       for (const density of ['light'] as const) {
         const rungs = semanticLadderFromRecipe(
           { kind: 'standard', shape },
-          DEFAULT_LAW,
-          'auto',
+          DEFAULT_LAW, 'standard',
           { source: 'std', density },
         )
         for (const rung of rungs) {
@@ -1462,8 +1445,7 @@ describe('semantic ladder stays inside its product contract', () => {
       for (const density of ['standard', 'light'] as const) {
         const rungs = semanticLadderFromRecipe(
           { kind: 'standard', shape },
-          DEFAULT_LAW,
-          'auto',
+          DEFAULT_LAW, 'standard',
           { source: 'std', density },
         )
         for (const rung of rungs.filter((candidate) => candidate.points >= 2)) {
@@ -1475,7 +1457,7 @@ describe('semantic ladder stays inside its product contract', () => {
             heightMM: rung.baseSizeMM,
           }, {
             source: 'std',
-            mode: 'auto',
+            mode: 'standard',
             density,
             paddingMM: DEFAULT_LAW.paddingMM,
             maxGrowMM: 0,
@@ -1512,7 +1494,7 @@ describe('semantic ladder stays inside its product contract', () => {
       { mode: 'diamond', pitchMM: 48 },
       { mode: 'diamond', pitchMM: 96 },
       { mode: 'quincunx', pitchMM: 96 },
-      { mode: 'auto', pitchMM: undefined },
+      { mode: 'standard', pitchMM: undefined },
     ] as const
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
       for (const { mode, pitchMM } of combos) {
@@ -1560,7 +1542,7 @@ describe('semantic ladder stays inside its product contract', () => {
   }, 15_000)
 
   it('snaps one continuous target through every active mode, pitch, and density', () => {
-    const modes = ['auto', 'standard', 'quincunx', 'diamond'] as const
+    const modes = ['standard', 'standard', 'quincunx', 'diamond'] as const
     let compared = 0
     for (const mode of modes) for (const pitchMM of [48, 96] as const) {
       const ladder = semanticLadder(
@@ -1582,7 +1564,7 @@ describe('semantic ladder stays inside its product contract', () => {
         })
         expect(plan.designContourMM).toEqual(contour)
         expect(plan.pitchMM).toBe(mode === 'quincunx' && pitchMM === 48 ? 96 : pitchMM)
-        if (mode !== 'auto') expect(plan.pattern).toBe(mode)
+        if (mode !== 'standard') expect(plan.pattern).toBe(mode)
         compared++
       }
     }
@@ -1623,14 +1605,12 @@ describe('semantic ladder stays inside its product contract', () => {
     const makeTriangle = (sizeMM: number) => stdShapeContour('triangle', sizeMM)
     const standard = semanticLadder(
       makeTriangle,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'standard' },
     )
     const light = semanticLadder(
       makeTriangle,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'light' },
     )
 
@@ -1713,7 +1693,7 @@ describe('semantic ladder stays inside its product contract', () => {
         const rungs = semanticLadder(
           (sizeMM) => stdShapeContour(shape, sizeMM),
           DEFAULT_LAW,
-          'auto',
+          'standard',
           { source: 'std', density },
         )
         for (const rung of rungs) {
@@ -1731,12 +1711,11 @@ describe('semantic ladder stays inside its product contract', () => {
     ] as const) {
       const contourAt = (sizeMM: number) => stdShapeContour(witness.shape, sizeMM)
       const options = { source: 'std', density: 'standard' } as const
-      const rung = semanticLadder(contourAt, DEFAULT_LAW, 'auto', options)
+      const rung = semanticLadder(contourAt, DEFAULT_LAW, 'standard', options)
         .find((candidate) => candidate.gridExtentMM === witness.gridExtentMM)
       const predecessor = semanticLadder(
         contourAt,
-        { ...DEFAULT_LAW, maxRungMM: witness.sizeMM - 2 },
-        'auto',
+        { ...DEFAULT_LAW, maxRungMM: witness.sizeMM - 2 }, 'standard',
         options,
       )
       expect(rung?.sizeMM).toBe(witness.sizeMM)
@@ -1748,14 +1727,12 @@ describe('semantic ladder stays inside its product contract', () => {
     const contourAt = (sizeMM: number) => stdShapeContour('circle', sizeMM)
     const standard = semanticLadder(
       contourAt,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'standard' },
     )
     const light = semanticLadder(
       contourAt,
-      DEFAULT_LAW,
-      'auto',
+      DEFAULT_LAW, 'standard',
       { source: 'std', density: 'light' },
     )
 

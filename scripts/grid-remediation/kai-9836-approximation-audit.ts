@@ -217,7 +217,7 @@ function optimalSizingTable() {
       const rungs = semanticLadder(contourAt)
       const table = rungs.map((rung) => {
         const plan = resolveGridPlan(contourAt(rung.sizeMM), {
-          mode: 'auto',
+          mode: 'standard',
           density: 'light',
           paddingMM: DEFAULT_LAW.paddingMM,
           maxGrowMM: 0,

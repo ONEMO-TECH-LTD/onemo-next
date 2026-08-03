@@ -21,7 +21,7 @@ const densities: readonly GridDensity[] = ['standard', 'light']
 const jobs: GridJob[] = shapes.flatMap((shape) => densities.map((density) => ({
   operation: 'ladder' as const,
   recipe: { kind: 'standard' as const, shape },
-  mode: 'auto' as const,
+  mode: 'standard' as const,
   options: { source: 'std' as const, density, center: 'centroid' as const },
 })))
 

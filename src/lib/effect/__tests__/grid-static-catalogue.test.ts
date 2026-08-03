@@ -34,7 +34,7 @@ function liveGridLabJob(shape: StandardLadderShape, density: GridDensity): GridJ
   const options: GridPlanOptions = {
     attachment: 'magnetic',
     source: 'std',
-    mode: 'auto',
+    mode: 'standard',
     density,
     paddingMM: 10,
     plan: 'auto',
@@ -48,7 +48,7 @@ function liveGridLabJob(shape: StandardLadderShape, density: GridDensity): GridJ
     operation: 'ladder',
     recipe: { kind: 'standard', shape },
     law: { ...DEFAULT_LAW, paddingMM: 10 },
-    mode: 'auto',
+    mode: 'standard',
     options,
   }
 }
