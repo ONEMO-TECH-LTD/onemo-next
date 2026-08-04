@@ -18,6 +18,13 @@ const shoelace = (ring: Pt[]) => {
   }
   return Math.abs(a) / 2;
 };
+const distSeg = (p: Pt, a: Pt, b: Pt) => {
+  const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+};
+const clearanceTo = (p: Pt, ring: Pt[]) =>
+  Math.min(...ring.map((_, i) => distSeg(p, ring[i], ring[(i + 1) % ring.length])));
 const req = (o: Partial<ShapeRequest> & Pick<ShapeRequest, 'family'>): ShapeRequest => ({
   span: { nx: 3, ny: 3 }, pitchMM: 48, mode: 'standard', ...o,
 });
@@ -167,9 +174,14 @@ describe('P3 · ShapeGenerator — construction law (link magnet centres → off
       const rounded = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 10 }), defaultConfig);
       expect(shoelace(rounded.contour.paths[0])).toBeLessThan(shoelace(sharp.contour.paths[0]));
     });
-    it('clamps the radius to the padding (radius cannot exceed the safe margin)', () => {
-      const rounded = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 100 }), defaultConfig);
-      expect((rounded.contour.analytic as { cornerRadiusMM: number }).cornerRadiusMM).toBe(10);
+    it('the flagship 20mm rounded square (r > padding): exact radius, grows, every magnet ≥ padding clear', () => {
+      const sharp = generateShape(req({ family: 'square', span: { nx: 2, ny: 2 }, cornerRadiusMM: 0 }), defaultConfig);
+      const r20 = generateShape(req({ family: 'square', span: { nx: 2, ny: 2 }, cornerRadiusMM: 20 }), defaultConfig);
+      expect((r20.contour.analytic as { cornerRadiusMM: number }).cornerRadiusMM).toBe(20); // NOT clamped to padding
+      expect(r20.population).toEqual(sharp.population); // count-invariant (§3.22)
+      expect(w(r20)).toBeGreaterThan(w(sharp)); // the outline grows (§3.22)
+      const minClear = Math.min(...r20.population.map((m) => clearanceTo(m, r20.contour.paths[0])));
+      expect(minClear).toBeGreaterThanOrEqual(10 - 1e-3); // every magnet keeps padding clearance at radius r
     });
   });
 

@@ -109,15 +109,20 @@ function seatLattice(poly: Pt[], pitchMM: number, insetMM: number, anchor: Pt): 
 }
 
 /**
- * Rounded-corner polygon (law §3.21/§3.22): the corner radius is the USER's; corner rounding
- * moves the size, never the magnet count. Two-step offset keeps the outline `paddingMM` from the
- * magnets while rounding the corners at `cornerRadiusMM`: inset by (padding − r) sharp, then
- * expand by r round → net padding, corners of radius r. The analytic carries the true params (F6).
+ * Rounded-corner polygon (law §3.21/§3.22): the corner radius is the USER's — never clamped;
+ * corner rounding moves the size, never the magnet count.
+ *  · r ≥ padding: offset the magnet skeleton outward by r with a round join → corner radius exactly
+ *    r and every magnet clears the outline by r ≥ padding. The outline GROWS with r (the flagship
+ *    20mm rounded square; v1's 92-vs-88 arithmetic).
+ *  · 0 < r < padding: keep the straight edges snug at padding while rounding the corners tighter —
+ *    expand by (padding − r) sharp, then by r round → net padding edges, corners of radius r.
+ * The analytic carries the true params (F6).
  */
 function roundedPolygon(vertices: Pt[], paddingMM: number, cornerRadiusMM: number, config: EngineConfig): Contour {
-  const r = Math.max(0, Math.min(cornerRadiusMM, paddingMM)); // radius within [0, padding]
-  const innerRing = paddingMM - r <= EPS ? vertices : offset(vertices, paddingMM - r, 'miter', true, config).paths[0];
-  const rounded = offset(innerRing, r, 'round', true, config);
+  const r = Math.max(0, cornerRadiusMM);
+  const rounded = r >= paddingMM
+    ? offset(vertices, r, 'round', true, config) // grows: clearance = r ≥ padding, corner radius r
+    : offset(offset(vertices, paddingMM - r, 'miter', true, config).paths[0], r, 'round', true, config);
   return {
     paths: rounded.paths,
     analytic: { kind: 'rounded', vertices, paddingMM, cornerRadiusMM: r },
