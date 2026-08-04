@@ -91,13 +91,36 @@ export function applyFrame(size: SizeMM, frameMM: number): SizeMM {
   return { widthMM: size.widthMM + 2 * frameMM, heightMM: size.heightMM + 2 * frameMM };
 }
 
+/** Convex hull (monotone chain) — the outermost points, strict turns drop collinear interiors. */
+function convexHull(points: Pt[]): Pt[] {
+  const pts = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+  if (pts.length < 3) return pts;
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: Pt[] = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Pt[] = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
 /**
- * Focal-8 magnet plan (law §5.7, F5): the shape-defining magnets (the radial extremes — corners,
- * tips, the circle ring) get the focal diameter; every other magnet gets the base diameter. Never
- * all-8 whenever an interior exists. Sizes are config-tuned.
+ * Focal-8 magnet plan (law §5.7, F5): the radial extremes get the focal diameter, every other
+ * magnet the base diameter. Extremes are the convex-hull vertices of the POPULATION — computed
+ * from the magnets themselves so it holds for freeform too (an outline's points never coincide
+ * with lattice magnets, which is why a vertex-match shipped zero 8mm). Never all-6 (the hull is
+ * always non-empty) and never all-8 whenever an interior exists. Sizes are config-tuned.
  */
-export function magnetPlan(population: Pt[], vertices: Pt[], config: EngineConfig): MagnetSpec[] {
-  const extreme = new Set(vertices.map(keyOf));
+export function magnetPlan(population: Pt[], config: EngineConfig): MagnetSpec[] {
+  const extreme = new Set(convexHull(population).map(keyOf));
   return population.map((p) => ({
     x: p.x,
     y: p.y,
@@ -120,10 +143,18 @@ export function oneOffered(config: EngineConfig): boolean {
   return config.publication.offerONE;
 }
 
-/** Snapping advances UPWARD to the next rung, never the nearest (law §3.15). */
+/**
+ * Snapping advances UPWARD to the next rung, never the nearest (law §3.15). An oversize request —
+ * larger than the largest rung — has no upward rung and fails loudly; it is never silently snapped
+ * down (law §4.11, §9.2).
+ */
 export function snapUp(sizeMM: number, rungsMM: number[]): number {
   const sorted = [...rungsMM].sort((a, b) => a - b);
-  return sorted.find((r) => r >= sizeMM) ?? sorted[sorted.length - 1];
+  const rung = sorted.find((r) => r >= sizeMM);
+  if (rung === undefined) {
+    throw new Error(`size ${sizeMM}mm exceeds the largest rung ${sorted[sorted.length - 1]}mm — oversize, no downward snap (law §3.15/§4.11)`);
+  }
+  return rung;
 }
 
 /** A mode switch never silently shrinks the effect (law §4.11). */
@@ -162,7 +193,7 @@ export function manufacturingSpec(result: ShapeResult, config: EngineConfig): Ma
     areaMM2: Math.round(areaWithHoles(result.contour.paths) * 10) / 10,
     paddingMM: config.padding.radiusMM,
     population: result.population,
-    magnetPlan: magnetPlan(result.population, result.vertices, config),
+    magnetPlan: magnetPlan(result.population, config),
     attachment: {
       mode: config.attachment.default,
       compatibleLayouts: attachmentSupport(config.attachment.default, config),

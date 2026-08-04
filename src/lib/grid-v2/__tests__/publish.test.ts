@@ -25,17 +25,26 @@ describe('P4 · Publication + mm manufacturing spec', () => {
   });
 
   describe('focal-8 magnet plan (law §5.7, F5)', () => {
-    it('square 3×3: the 4 corners get 8mm, the rest 6mm — never all-8', () => {
+    it('square 3×3: the 4 hull corners get 8mm, the rest 6mm — never all-8', () => {
       const s = square(3);
-      const plan = magnetPlan(s.population, s.vertices, defaultConfig);
+      const plan = magnetPlan(s.population, defaultConfig);
       expect(plan).toHaveLength(9);
-      expect(plan.filter((m) => m.diameterMM === 8)).toHaveLength(4); // corners = radial extremes
+      expect(plan.filter((m) => m.diameterMM === 8)).toHaveLength(4); // hull corners = radial extremes
       expect(plan.filter((m) => m.diameterMM === 6)).toHaveLength(5); // interior + edges
       expect(plan.some((m) => m.diameterMM === 6)).toBe(true); // never all-8
     });
+    it('freeform ships real 8mm magnets — extremes come from the population, not lattice-miss vertices', () => {
+      const blob = Array.from({ length: 10 }, (_, i) => {
+        const a = (i / 10) * 2 * Math.PI, r = i % 2 === 0 ? 120 : 70;
+        return { x: 200 + r * Math.cos(a), y: 200 + r * Math.sin(a) };
+      });
+      const f = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'standard', contour: blob }, defaultConfig);
+      const plan = magnetPlan(f.population, defaultConfig);
+      expect(plan.some((m) => m.diameterMM === 8)).toBe(true); // never all-6 (the v1-style zero-8 bug)
+      expect(plan.some((m) => m.diameterMM === 6)).toBe(true); // never all-8
+    });
     it('is config-tuned — changing the hardware set re-derives the plan', () => {
-      const s = square(3);
-      const plan = magnetPlan(s.population, s.vertices, resolveConfig({ magnets: { extremeMM: 10, interiorMM: 5 } }));
+      const plan = magnetPlan(square(3).population, resolveConfig({ magnets: { extremeMM: 10, interiorMM: 5 } }));
       expect(plan.filter((m) => m.diameterMM === 10)).toHaveLength(4);
       expect(plan.filter((m) => m.diameterMM === 5)).toHaveLength(5);
     });
@@ -58,6 +67,9 @@ describe('P4 · Publication + mm manufacturing spec', () => {
     it('snapping advances upward to the next rung, never the nearest (law §3.15)', () => {
       expect(snapUp(70, [68, 116, 164])).toBe(116); // 70 is above 68 → next rung up, not nearest (68)
       expect(snapUp(68, [68, 116, 164])).toBe(68);
+    });
+    it('an oversize request fails loudly — never silently snaps DOWN (law §4.11)', () => {
+      expect(() => snapUp(400, [68, 116])).toThrow(/oversize/); // 400 > 116 → no downward shrink
     });
     it('a mode switch never silently shrinks (law §4.11)', () => {
       const std = sizeOf(square(3, 'standard').contour, defaultConfig);
