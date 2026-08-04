@@ -201,6 +201,28 @@ describe('P3 · ShapeGenerator — construction law (link magnet centres → off
       expect(has(out.population, 48, 48)).toBe(false); // a leaked interior magnet — must be gone
       expect(has(out.population, 96, 144)).toBe(false);
     });
+    it('freeform WIDE concave (big body + notch) Light keeps ZERO deep-interior magnets (F-LIGHT-2)', () => {
+      // A 384×384 body with a top-centre notch — genuine deep interior AND a concave edge.
+      const wide: Pt[] = [
+        { x: 0, y: 0 }, { x: 384, y: 0 }, { x: 384, y: 384 }, { x: 240, y: 384 },
+        { x: 240, y: 336 }, { x: 144, y: 336 }, { x: 144, y: 384 }, { x: 0, y: 384 },
+      ];
+      const std = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'standard', contour: wide }, defaultConfig);
+      const light = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'light', contour: wide }, defaultConfig);
+      const deep = (pop: Pt[]) => pop.filter((p) => clearanceTo(p, wide) >= 10 + 48).length; // ≥ padding+pitch = a full row inside
+      expect(deep(std.population)).toBeGreaterThan(0); // the wide body has genuine interior
+      expect(deep(light.population)).toBe(0); // Light is the outline only — no interior band
+      expect(light.population.length).toBeLessThan(std.population.length);
+    });
+    it('freeform THIN concave (U, 48mm single-file arms) Light keeps the whole chain', () => {
+      const thinU: Pt[] = [
+        { x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }, { x: 152, y: 300 },
+        { x: 152, y: 48 }, { x: 48, y: 48 }, { x: 48, y: 300 }, { x: 0, y: 300 },
+      ];
+      const std = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'standard', contour: thinU }, defaultConfig);
+      const light = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'light', contour: thinU }, defaultConfig);
+      expect(light.population.length).toBe(std.population.length); // single-file: every magnet is perimeter
+    });
     it('freeform Light drops the deep interior, keeps the outer shell', () => {
       const blob = Array.from({ length: 24 }, (_, i) => {
         const a = (i / 24) * 2 * Math.PI;

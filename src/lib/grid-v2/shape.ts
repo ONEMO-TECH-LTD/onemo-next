@@ -87,16 +87,41 @@ function onBoundary(population: Pt[], boundary: Pt[]): Pt[] {
   return population.filter((p) => clearanceToEdges(p, boundary) < TOL);
 }
 
+/** Nearest point on a polygon boundary to `p`, and the distance to it. */
+function nearestOnBoundary(p: Pt, poly: Pt[]): { pt: Pt; dist: number } {
+  let best: Pt = poly[0], bestD = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+    const cx = a.x + t * dx, cy = a.y + t * dy;
+    const d = Math.hypot(p.x - cx, p.y - cy);
+    if (d < bestD) { bestD = d; best = { x: cx, y: cy }; }
+  }
+  return { pt: best, dist: bestD };
+}
+
 /**
- * Light mask for freeform, whose magnets sit padding-INSIDE a curved contour (none on the edge):
- * keep the outermost shell — magnets within one pitch of the nearest-to-contour magnet — and drop
- * the deep interior (law §4.1). A thin shape is all-perimeter (the degenerate case).
+ * Light mask for freeform, whose magnets sit padding-INSIDE a curved/concave contour (law §4.1):
+ * a magnet is on the perimeter only if NO other seated magnet sits between it and its nearest
+ * contour point — i.e. it is the outermost magnet along its own inward normal. Concave-safe (each
+ * magnet uses its own nearest edge, including notch edges) and independent of edge angle, so a
+ * WIDE concave arm keeps only its outline; a thin/single-file shape is all-perimeter.
  */
 function outerShell(population: Pt[], contour: Pt[], pitchMM: number): Pt[] {
   if (population.length === 0) return [];
-  const clr = population.map((p) => clearanceToEdges(p, contour));
-  const minC = Math.min(...clr);
-  return population.filter((_, i) => clr[i] < minC + pitchMM - EPS);
+  return population.filter((p) => {
+    const c = nearestOnBoundary(p, contour).pt;
+    const vx = c.x - p.x, vy = c.y - p.y, di = Math.hypot(vx, vy) || 1;
+    const ux = vx / di, uy = vy / di; // unit inward-normal, toward the contour
+    for (const q of population) {
+      if (q === p) continue;
+      const proj = (q.x - p.x) * ux + (q.y - p.y) * uy;      // distance toward the contour
+      const perp = Math.abs((q.x - p.x) * -uy + (q.y - p.y) * ux); // lateral offset from the normal
+      if (proj > EPS && proj < di + EPS && perp < pitchMM * 0.6) return false; // q is between p and the edge → p is interior
+    }
+    return true;
+  });
 }
 
 /** The registration reference the lattice is anchored to (law §4.9 → config). Deterministic. */
