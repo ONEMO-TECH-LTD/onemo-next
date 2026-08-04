@@ -67,10 +67,36 @@ describe('P0 · EngineConfig — released inputs as data (law §7, §10.6)', () 
     expect(defaultConfig.attachment.compatibility.magnetic).toEqual(['48-straight', '96-dice']);
   });
 
-  it('resolveConfig() hands out a fresh object, never the frozen default reference', () => {
+  it('resolveConfig() deep-clones — nested refs are independent, mutating a result never corrupts the default', () => {
     const a = resolveConfig();
     expect(a).toEqual(defaultConfig);
     expect(a).not.toBe(defaultConfig);
+    // Every nested object is its own instance, not shared with the frozen default.
+    expect(a.padding).not.toBe(defaultConfig.padding);
+    expect(a.magnets.setMM).not.toBe(defaultConfig.magnets.setMM);
+    expect(a.attachment.compatibility.magnetic).not.toBe(defaultConfig.attachment.compatibility.magnetic);
+    // Mutating the result — nested field and array — leaves the released default untouched.
+    a.padding.radiusMM = 999;
+    a.magnets.setMM.push(99);
+    a.attachment.compatibility.magnetic.push('96-straight');
+    expect(defaultConfig.padding.radiusMM).toBe(10);
+    expect(defaultConfig.magnets.setMM).toEqual([6, 8]);
+    expect(defaultConfig.attachment.compatibility.magnetic).toEqual(['48-straight', '96-dice']);
+  });
+
+  it('the released defaultConfig is deep-frozen against accidental in-place mutation', () => {
+    expect(Object.isFrozen(defaultConfig)).toBe(true);
+    expect(Object.isFrozen(defaultConfig.padding)).toBe(true);
+    expect(Object.isFrozen(defaultConfig.magnets.setMM)).toBe(true);
+    expect(() => {
+      (defaultConfig.padding as { radiusMM: number }).radiusMM = 1;
+    }).toThrow();
+  });
+
+  it('registration is a changeable released input, not type-locked to one value (§B)', () => {
+    const bbox = resolveConfig({ registration: { default: 'bbox-center' } });
+    expect(bbox.registration.default).toBe('bbox-center');
+    expect(defaultConfig.registration.default).toBe('centroid');
   });
 
   it('configHash is stable, order-independent, and sensitive to any value change', () => {

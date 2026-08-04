@@ -25,6 +25,8 @@ export type Mode = 'standard' | 'light';
 export type JoinStyle = 'miter' | 'round';
 export type AttachmentMode = 'magnetic' | 'twin-fix' | 'velcro';
 export type GarmentLayout = '48-straight' | '96-straight' | '96-dice';
+/** Freeform registration reference — a released input, admin-changeable (§B). */
+export type RegistrationMode = 'centroid' | 'bbox-center';
 
 // ── The released configuration ────────────────────────────────────────────────
 export interface EngineConfig {
@@ -99,7 +101,8 @@ export interface EngineConfig {
 
   /** Freeform registration — a released input, no search loops (law §4.9 → config). */
   registration: {
-    default: 'centroid';
+    /** Reference point for freeform placement; 'centroid' is the current released default. */
+    default: RegistrationMode;
   };
 
   /** Publication rules — released, not baked (law §8, §3.12–3.15, §4.3). */
@@ -128,7 +131,19 @@ export interface EngineConfig {
 }
 
 // ── Default (released) config, imported as build-time data ────────────────────
-export const defaultConfig: EngineConfig = configData as EngineConfig;
+function deepFreeze<T>(obj: T): T {
+  if (obj && typeof obj === 'object' && !Object.isFrozen(obj)) {
+    for (const v of Object.values(obj)) deepFreeze(v);
+    Object.freeze(obj);
+  }
+  return obj;
+}
+
+/**
+ * The released config, deep-frozen so it can never be mutated in place — the process-wide
+ * source of truth. `resolveConfig()` always returns an independent deep clone, never this.
+ */
+export const defaultConfig: EngineConfig = deepFreeze(configData as EngineConfig);
 
 // ── Overrides ─────────────────────────────────────────────────────────────────
 export type DeepPartial<T> = {
@@ -143,29 +158,30 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function deepMerge<T>(base: T, patch: unknown): T {
-  if (!isPlainObject(patch)) return (patch as T) ?? base;
-  const out: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+/** Mutate `target` in place with `patch`: plain objects merge recursively, arrays & primitives replace. */
+function deepAssign(target: Record<string, unknown>, patch: unknown): void {
+  if (!isPlainObject(patch)) return;
   for (const key of Object.keys(patch)) {
     const pv = (patch as Record<string, unknown>)[key];
-    const bv = out[key];
-    // Plain objects merge recursively; arrays and primitives replace wholesale.
-    out[key] = isPlainObject(pv) && isPlainObject(bv) ? deepMerge(bv, pv) : pv;
+    const tv = target[key];
+    if (isPlainObject(pv) && isPlainObject(tv)) deepAssign(tv, pv);
+    else target[key] = pv;
   }
-  return out as T;
 }
 
 /**
  * Produce the config for a solve by deep-merging admin overrides onto a base config.
- * Pure: never reads storage, never mutates its inputs. This is the mechanism by which every
- * focal value is a live input — the admin layer supplies `overrides`, the engine gets a config.
+ * Pure: never reads storage, never mutates its inputs, and returns a fully independent deep
+ * clone (zero shared references with `base`) — mutating the result can never corrupt the
+ * released default. This is the mechanism by which every focal value is a live input.
  */
 export function resolveConfig(
   overrides?: DeepPartial<EngineConfig>,
   base: EngineConfig = defaultConfig,
 ): EngineConfig {
-  if (!overrides) return deepMerge(base, {}); // fresh clone; never hand out the frozen default
-  return deepMerge(base, overrides);
+  const out = structuredClone(base) as EngineConfig;
+  if (overrides) deepAssign(out as unknown as Record<string, unknown>, overrides);
+  return out;
 }
 
 // ── Config identity hash ──────────────────────────────────────────────────────
