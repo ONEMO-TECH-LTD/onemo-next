@@ -213,6 +213,22 @@ describe('P3 · ShapeGenerator — construction law (link magnet centres → off
     });
   });
 
+  describe('pattern-aware population (law §4.3a) — the garment canon needs dice@96', () => {
+    it('square dice@96 seats the 96-grid PLUS its cell centres', () => {
+      const dice = generateShape({ family: 'square', span: { nx: 3, ny: 3 }, pitchMM: 96, mode: 'standard', pattern: 'dice' }, defaultConfig);
+      const straight = generateShape({ family: 'square', span: { nx: 3, ny: 3 }, pitchMM: 96, mode: 'standard', pattern: 'straight' }, defaultConfig);
+      expect(dice.population.length).toBeGreaterThan(straight.population.length);
+      expect(has(dice.population, 48, 48)).toBe(true); // a cell centre on the 48-offset
+    });
+    it('dice at 48 is rejected — its centres would land at 24mm (law §4.3a)', () => {
+      expect(() => generateShape({ family: 'square', span: { nx: 3, ny: 3 }, pitchMM: 48, mode: 'standard', pattern: 'dice' }, defaultConfig)).toThrow(/legal only at pitch 96/);
+    });
+    it('diamond pattern seats the checkerboard subset', () => {
+      const diamondPat = generateShape({ family: 'square', span: { nx: 3, ny: 3 }, pitchMM: 48, mode: 'standard', pattern: 'diamond' }, defaultConfig);
+      expect(diamondPat.population.every((p) => ((Math.round(p.x / 48) + Math.round(p.y / 48)) & 1) === 0)).toBe(true);
+    });
+  });
+
   it('every family resolves under the 100ms budget (law §9)', () => {
     const start = performance.now();
     for (const family of ['square', 'triangle', 'diamond', 'circle', 'pill'] as const) {

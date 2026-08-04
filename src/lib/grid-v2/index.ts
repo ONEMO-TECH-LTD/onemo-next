@@ -14,7 +14,8 @@ import {
 } from './publish';
 import {
   resolveConfig, defaultConfig, configHash,
-  type EngineConfig, type DeepPartial, type ShapeFamily, type Mode,
+  type EngineConfig, type DeepPartial, type ShapeFamily, type Mode, type Pattern,
+  type AttachmentMode, type GarmentLayout,
 } from './config';
 import type { Pt, GridSpan } from './types';
 import type { Contour } from './offset';
@@ -27,6 +28,8 @@ export interface EngineInput {
   pitchMM?: number;
   /** Defaults to the config product mode (Light). */
   mode?: Mode;
+  /** Population pattern (straight/diamond/dice); defaults to the config default (straight). */
+  pattern?: Pattern;
   /** The traced/AI outline (mm) — required for freeform. */
   contour?: Pt[];
   /** Corner rounding for polygon families (law §3.21). */
@@ -64,6 +67,7 @@ function toShapeRequest(input: EngineInput, config: EngineConfig): ShapeRequest 
     span: input.span,
     pitchMM: input.pitchMM ?? config.lattice.basePitchMM,
     mode: input.mode ?? config.publication.defaultMode,
+    pattern: input.pattern ?? config.patterns.default,
     contour: input.contour,
     cornerRadiusMM: input.cornerRadiusMM,
   };
@@ -112,4 +116,7 @@ export function solveLadder(input: EngineInput): LadderRung[] {
 
 // ── The config surface (for the admin control layer) — the only other public export ──
 export { defaultConfig, resolveConfig, configHash };
-export type { EngineConfig, DeepPartial, ManufacturingSpec, SizeMM, Rung, Contour, Pt, GridSpan, ShapeFamily, Mode };
+export type {
+  EngineConfig, DeepPartial, ManufacturingSpec, SizeMM, Rung, Contour, Pt, GridSpan,
+  ShapeFamily, Mode, Pattern, AttachmentMode, GarmentLayout,
+};

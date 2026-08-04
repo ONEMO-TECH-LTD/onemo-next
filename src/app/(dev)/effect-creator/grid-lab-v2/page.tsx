@@ -1,11 +1,11 @@
 'use client'
 
-// Grid Lab v2 — Control surface (P6).
+// Grid Lab v2 — Control surface (P6, fresh build).
 //
-// The ADMIN control/config surface for the grid engine. It holds ZERO engine logic (law §10.2):
-// it edits + SAVES the EngineConfig, calls the sealed API (`solveGrid` / `solveLadder`), and renders
-// what comes back. Clipper is controlled by the engine, never touched here. Every focal value is an
-// editable, saved input (law §7/§10.6). Disposable viewer — the engine is the product.
+// The ADMIN control/config surface. ZERO engine logic (law §10.2): it edits + SAVES the EngineConfig,
+// reaches EVERY focal handle, calls the sealed API (solveGrid/solveLadder), feeds AI outlines to the
+// freeform strategy, and renders what comes back. Clipper is driven by the engine, never touched here.
+// Boot = the garment canon: Light · 96 · dice · magnetic (law §4.3, §6.2).
 
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -13,22 +13,25 @@ import {
   solveLadder,
   defaultConfig,
   type EngineInput,
+  type EngineOutput,
   type ShapeFamily,
   type Mode,
+  type Pattern,
+  type AttachmentMode,
+  type GarmentLayout,
 } from '@/lib/grid-v2'
 
 const FAMILIES: ShapeFamily[] = ['square', 'rectangle', 'triangle', 'diamond', 'circle', 'pill', 'freeform']
+const PATTERNS: Pattern[] = ['straight', 'diamond', 'dice']
+const ATTACHMENTS: AttachmentMode[] = ['magnetic', 'twin-fix', 'velcro']
+const ROUNDABLE: ReadonlySet<ShapeFamily> = new Set(['square', 'rectangle', 'triangle', 'diamond'])
 const STORAGE_KEY = 'grid-lab-v2.config'
 
-// A sample freeform (AI-class) outline — the engine only ever receives a finished contour.
-function sampleBlob(points = 12, wobble = 0.45): { x: number; y: number }[] {
-  const out: { x: number; y: number }[] = []
-  for (let i = 0; i < points; i++) {
-    const a = (i / points) * 2 * Math.PI
-    const r = 120 * (1 + (i % 2 === 0 ? wobble : -wobble))
-    out.push({ x: 300 + r * Math.cos(a), y: 300 + r * Math.sin(a) })
-  }
-  return out
+/** pitch + pattern → the garment layout it represents (for the 5.1a attachment filter). */
+function garmentLayout(pitchMM: number, pattern: Pattern): GarmentLayout | null {
+  if (pattern === 'straight') return pitchMM === 48 ? '48-straight' : pitchMM === 96 ? '96-straight' : null
+  if (pattern === 'dice' && pitchMM === 96) return '96-dice'
+  return null // diamond pattern / 48-dice are not garment-canon layouts
 }
 
 interface ConfigOverrides {
@@ -37,62 +40,81 @@ interface ConfigOverrides {
   ceilingMM: number
   extremeMM: number
   interiorMM: number
+  marginAllowanceMM: number
+  registration: 'centroid' | 'bbox-center'
 }
-
 const DEFAULT_OVERRIDES: ConfigOverrides = {
   paddingMM: defaultConfig.padding.radiusMM,
   frameMM: defaultConfig.frame.defaultMM,
   ceilingMM: defaultConfig.bounds.ceilingMM,
   extremeMM: defaultConfig.magnets.extremeMM,
   interiorMM: defaultConfig.magnets.interiorMM,
+  marginAllowanceMM: defaultConfig.padding.marginAllowanceMM,
+  registration: defaultConfig.registration.default,
 }
-
 function toEngineConfig(o: ConfigOverrides) {
   return {
-    padding: { radiusMM: o.paddingMM },
+    padding: { radiusMM: o.paddingMM, marginAllowanceMM: o.marginAllowanceMM },
     frame: { defaultMM: o.frameMM },
     bounds: { ceilingMM: o.ceilingMM },
     magnets: { extremeMM: o.extremeMM, interiorMM: o.interiorMM },
+    registration: { default: o.registration },
   }
 }
 
 export default function GridLabV2Bench() {
+  // Boot = garment canon (law §4.3/§6.2): Light · 96 · dice · magnetic.
   const [family, setFamily] = useState<ShapeFamily>('square')
-  const [mode, setMode] = useState<Mode>(defaultConfig.publication.defaultMode) // Light is the product default (§4.3)
-  const [pitchMM, setPitchMM] = useState<number>(defaultConfig.lattice.basePitchMM)
+  const [mode, setMode] = useState<Mode>('light')
+  const [pitchMM, setPitchMM] = useState<number>(96)
+  const [pattern, setPattern] = useState<Pattern>('dice')
+  const [attachment, setAttachment] = useState<AttachmentMode>('magnetic')
   const [nx, setNx] = useState(3)
   const [ny, setNy] = useState(3)
-  const [cornerRadiusMM, setCornerRadiusMM] = useState(0)
+  const [radiusByFamily, setRadiusByFamily] = useState<Partial<Record<ShapeFamily, number>>>({}) // per-family, no leak
   const [overrides, setOverrides] = useState<ConfigOverrides>(DEFAULT_OVERRIDES)
   const [saved, setSaved] = useState<string | null>(null)
+  const [aiOutline, setAiOutline] = useState<{ x: number; y: number }[] | null>(null)
+  const [aiStatus, setAiStatus] = useState<string | null>(null)
 
-  // Load saved config on mount (the persistence side of the admin layer).
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
       if (raw) setOverrides({ ...DEFAULT_OVERRIDES, ...JSON.parse(raw) })
     } catch {
-      /* first run / private mode — fall back to defaults */
+      /* first run */
     }
   }, [])
 
-  const contour = useMemo(() => (family === 'freeform' ? sampleBlob() : undefined), [family])
-
-  // A triangle's base must be odd for its apex to land on a magnet (law §3.2) — keep the bench lawful.
+  const cornerRadiusMM = ROUNDABLE.has(family) ? radiusByFamily[family] ?? 0 : 0
   const lawfulNx = family === 'triangle' && nx % 2 === 0 ? nx + 1 : nx
+  const diceLegal = pitchMM === 96
+  const layout = garmentLayout(pitchMM, pattern)
+  const compatibleLayouts = defaultConfig.attachment.compatibility[attachment]
+  const attachmentOk = layout != null && compatibleLayouts.includes(layout)
 
   const input: EngineInput = useMemo(
-    () => ({ family, span: { nx: lawfulNx, ny }, pitchMM, mode, cornerRadiusMM, contour, config: toEngineConfig(overrides) }),
-    [family, lawfulNx, ny, pitchMM, mode, cornerRadiusMM, contour, overrides],
+    () => ({
+      family,
+      span: { nx: lawfulNx, ny },
+      pitchMM,
+      mode,
+      pattern,
+      cornerRadiusMM,
+      contour: family === 'freeform' ? aiOutline ?? undefined : undefined,
+      config: toEngineConfig(overrides),
+    }),
+    [family, lawfulNx, ny, pitchMM, mode, pattern, cornerRadiusMM, aiOutline, overrides],
   )
 
   const { result, error } = useMemo(() => {
+    if (family === 'freeform' && !aiOutline) return { result: null as EngineOutput | null, error: 'Upload an image for AI Magic →' }
     try {
       return { result: solveGrid(input), error: null as string | null }
     } catch (e) {
-      return { result: null, error: (e as Error).message }
+      return { result: null as EngineOutput | null, error: (e as Error).message }
     }
-  }, [input])
+  }, [input, family, aiOutline])
 
   const ladder = useMemo(() => {
     try {
@@ -104,7 +126,7 @@ export default function GridLabV2Bench() {
 
   const save = () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides))
-    setSaved(`saved ${new Date().toLocaleTimeString()}`)
+    setSaved(`saved`)
   }
   const reload = () => {
     try {
@@ -116,125 +138,157 @@ export default function GridLabV2Bench() {
     }
   }
 
+  // AI Magic: image → v5.3.1 cut-out + traced outline → freeform contour (mm) → engine.
+  const onImage = async (file: File | undefined) => {
+    if (!file) return
+    setAiStatus('cutting…')
+    setFamily('freeform')
+    const url = URL.createObjectURL(file)
+    try {
+      const { prepareShaped } = await import('../v5.3.1/core/primitives')
+      const prepared = await prepareShaped(url, undefined, (s) => setAiStatus(s))
+      // geometryMM is the derived manufacturing contour (mm, y-up); its points are [x, y] tuples.
+      const pts = prepared.spec.geometryMM.outer.pts.map((p) => ({ x: p[0], y: p[1] }))
+      if (pts.length < 3) throw new Error('outline too small')
+      setAiOutline(pts)
+      setAiStatus(`outline: ${pts.length} pts`)
+    } catch (e) {
+      setAiOutline(null)
+      setAiStatus(`AI error: ${(e as Error).message}`) // fail loud, never a silent spinner (law §9.2)
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.h1}>Grid Lab v2 — control surface</h1>
-        <span style={styles.sub}>engine: <code>src/lib/grid-v2</code> · sealed API · clipper-driven</span>
+    <div style={S.page}>
+      <header style={S.header}>
+        <h1 style={S.h1}>Grid Lab v2 — control surface</h1>
+        <span style={S.sub}>engine <code>src/lib/grid-v2</code> · sealed API · clipper-driven · boot = garment canon (Light·96·dice·magnetic)</span>
       </header>
 
-      <div style={styles.body}>
-        {/* ── Controls ───────────────────────────────────────────────── */}
-        <aside style={styles.panel}>
-          <Section title="Shape">
-            <div style={styles.chips}>
-              {FAMILIES.map((f) => (
-                <button key={f} onClick={() => setFamily(f)} style={chip(f === family)}>{f}</button>
-              ))}
-            </div>
-          </Section>
+      <div style={S.body}>
+        <aside style={S.panel}>
+          <Sec title="Shape">
+            <Chips items={FAMILIES} value={family} onPick={setFamily} />
+          </Sec>
 
-          <Section title="Mode (Light = product default)">
-            <div style={styles.chips}>
-              {(['light', 'standard'] as Mode[]).map((m) => (
-                <button key={m} onClick={() => setMode(m)} style={chip(m === mode)}>{m}</button>
-              ))}
-            </div>
-          </Section>
+          <Sec title="Mode — Light is the product default; Standard is admin">
+            <Chips items={['light', 'standard'] as Mode[]} value={mode} onPick={setMode} />
+          </Sec>
 
-          <Section title="Density (pitch)">
-            <div style={styles.chips}>
-              {defaultConfig.lattice.pitchSetMM.map((p) => (
-                <button key={p} onClick={() => setPitchMM(p)} style={chip(p === pitchMM)}>{p}mm</button>
-              ))}
-            </div>
-          </Section>
+          <Sec title="Density (pitch)">
+            <Chips items={defaultConfig.lattice.pitchSetMM} value={pitchMM} onPick={(p) => { setPitchMM(p); if (p === 48 && pattern === 'dice') setPattern('straight') }} suffix="mm" />
+          </Sec>
 
-          <Section title="Size (magnet span)">
-            <Range label={`nx = ${nx}`} min={2} max={8} value={nx} onChange={setNx} />
-            <Range label={`ny = ${ny}`} min={1} max={8} value={ny} onChange={setNy} />
-            {(family === 'square' || family === 'triangle' || family === 'diamond') && (
-              <Range label={`corner radius = ${cornerRadiusMM}mm`} min={0} max={40} value={cornerRadiusMM} onChange={setCornerRadiusMM} />
+          <Sec title="Pattern (dice = the garment canvas, legal only at 96)">
+            <div style={S.chips}>
+              {PATTERNS.map((p) => {
+                const disabled = p === 'dice' && !diceLegal
+                return (
+                  <button key={p} disabled={disabled} onClick={() => setPattern(p)} style={chip(p === pattern, disabled)}>{p}</button>
+                )
+              })}
+            </div>
+            {!diceLegal && <div style={S.note}>dice is greyed at 48mm — its cell centres would land at 24mm (law §4.3a)</div>}
+          </Sec>
+
+          <Sec title="Attachment — live 5.1a compatibility">
+            <Chips items={ATTACHMENTS} value={attachment} onPick={setAttachment} />
+            <div style={S.note}>
+              holds on: {compatibleLayouts.join(' · ')}
+              {layout && (attachmentOk
+                ? <span style={S.ok}> — current {layout} ✓</span>
+                : <span style={S.bad}> — current {layout} ✗ incompatible (law §5.1a)</span>)}
+              {!layout && <span style={S.bad}> — {pattern}·{pitchMM} is not a garment layout</span>}
+            </div>
+          </Sec>
+
+          <Sec title="Size (magnet span)">
+            <Range label={`nx = ${lawfulNx}${family === 'triangle' && nx % 2 === 0 ? ' (triangle base must be odd)' : ''}`} min={2} max={8} value={nx} onChange={setNx} />
+            {family === 'rectangle' && <Range label={`ny = ${ny}`} min={1} max={8} value={ny} onChange={setNy} />}
+            {ROUNDABLE.has(family) && (
+              <Range label={`corner radius = ${cornerRadiusMM}mm`} min={0} max={40} value={cornerRadiusMM}
+                onChange={(v) => setRadiusByFamily((r) => ({ ...r, [family]: v }))} />
             )}
-          </Section>
+          </Sec>
 
-          <Section title="Admin config (editable · saved)">
-            <NumField label="padding (mm)" value={overrides.paddingMM} onChange={(v) => setOverrides({ ...overrides, paddingMM: v })} />
-            <NumField label="frame (mm)" value={overrides.frameMM} onChange={(v) => setOverrides({ ...overrides, frameMM: v })} />
-            <NumField label="ceiling (mm)" value={overrides.ceilingMM} onChange={(v) => setOverrides({ ...overrides, ceilingMM: v })} />
-            <NumField label="focal magnet (mm)" value={overrides.extremeMM} onChange={(v) => setOverrides({ ...overrides, extremeMM: v })} />
-            <NumField label="interior magnet (mm)" value={overrides.interiorMM} onChange={(v) => setOverrides({ ...overrides, interiorMM: v })} />
-            <div style={styles.chips}>
-              <button onClick={save} style={chip(false)}>save</button>
-              <button onClick={reload} style={chip(false)}>reload</button>
-              {saved && <span style={styles.saved}>{saved}</span>}
-            </div>
-          </Section>
+          <Sec title="AI Magic — image → v5.3.1 outline → freeform">
+            <input type="file" accept="image/*" onChange={(e) => onImage(e.target.files?.[0])} style={S.file} />
+            {aiStatus && <div style={S.note}>{aiStatus}</div>}
+          </Sec>
         </aside>
 
-        {/* ── Stage ──────────────────────────────────────────────────── */}
-        <main style={styles.stage}>
+        <main style={S.stage}>
           {error ? (
-            <div style={styles.error}>engine error: {error}</div>
+            <div style={S.error}>{error}</div>
           ) : result ? (
             <>
               <Stage result={result} />
-              <div style={styles.readout}>
-                <b>{result.family}</b> · {mode} · {pitchMM}mm ·{' '}
-                <b>{result.sizeMM.widthMM}×{result.sizeMM.heightMM}mm</b>
-                {result.spec.frameMM > 0 && <> · frame {result.spec.frameMM}mm → {result.spec.framedBboxMM.widthMM}×{result.spec.framedBboxMM.heightMM}</>}
-                {' · '}{result.population.length} magnets · area {result.spec.areaMM2}mm²
-                {' · '}{result.contour.analytic.kind}
+              <div style={S.readout}>
+                <b>{result.family}</b> · {mode} · {pattern} · {pitchMM}mm · <b>{result.sizeMM.widthMM}×{result.sizeMM.heightMM}mm</b>
+                {result.spec.frameMM > 0 && <> · frame {result.spec.frameMM}mm → {result.spec.framedBboxMM.widthMM}×{result.spec.framedBboxMM.heightMM}mm</>}
+                {' · '}{result.population.length} magnets · attach {attachment}
               </div>
             </>
           ) : (
-            <div style={styles.error}>no result</div>
+            <div style={S.error}>no result</div>
           )}
         </main>
 
-        {/* ── Ladder ─────────────────────────────────────────────────── */}
-        <aside style={styles.panel}>
-          <Section title="Size ladder">
+        <aside style={S.panel}>
+          <Sec title="Size ladder (vs published catalogue)">
             {ladder.length === 0 ? (
-              <span style={styles.sub}>slider family — no tier ladder</span>
+              <span style={S.sub}>slider family — no tier ladder (law §3.14)</span>
             ) : (
-              <div style={styles.ladder}>
+              <div style={S.ladder}>
                 {ladder.map((r) => (
-                  <button
-                    key={r.label}
-                    onClick={() => { setNx(r.span.nx); setNy(r.span.ny) }}
-                    style={chip(r.span.nx === nx && r.span.ny === ny)}
-                  >
+                  <button key={r.label} onClick={() => { setNx(r.span.nx); setNy(r.span.ny) }} style={chip(r.span.nx === lawfulNx && r.span.ny === ny, false)}>
                     <b>{r.label}</b> · {r.sizeMM}mm
                   </button>
                 ))}
               </div>
             )}
-          </Section>
+          </Sec>
+
+          <Sec title="Admin config (editable · saved · reloaded)">
+            <Num label="padding" value={overrides.paddingMM} onChange={(v) => setOverrides({ ...overrides, paddingMM: v })} />
+            <Num label="frame" value={overrides.frameMM} onChange={(v) => setOverrides({ ...overrides, frameMM: v })} />
+            <Num label="ceiling" value={overrides.ceilingMM} onChange={(v) => setOverrides({ ...overrides, ceilingMM: v })} />
+            <Num label="focal magnet" value={overrides.extremeMM} onChange={(v) => setOverrides({ ...overrides, extremeMM: v })} />
+            <Num label="interior magnet" value={overrides.interiorMM} onChange={(v) => setOverrides({ ...overrides, interiorMM: v })} />
+            <Num label="margin band" value={overrides.marginAllowanceMM} onChange={(v) => setOverrides({ ...overrides, marginAllowanceMM: v })} />
+            <label style={S.numField}>
+              <span style={S.rangeLabel}>registration</span>
+              <select value={overrides.registration} onChange={(e) => setOverrides({ ...overrides, registration: e.target.value as ConfigOverrides['registration'] })} style={S.numInput}>
+                <option value="centroid">centroid</option>
+                <option value="bbox-center">bbox-center</option>
+              </select>
+            </label>
+            <div style={S.chips}>
+              <button onClick={save} style={chip(false, false)}>save</button>
+              <button onClick={reload} style={chip(false, false)}>reload</button>
+              {saved && <span style={S.ok}>{saved}</span>}
+            </div>
+          </Sec>
         </aside>
       </div>
     </div>
   )
 }
 
-// ── The visual stage — draws contour + magnets from the spec (no engine logic here) ──
-function Stage({ result }: { result: ReturnType<typeof solveGrid> }) {
+function Stage({ result }: { result: EngineOutput }) {
   const paths = result.contour.paths
   const plan = result.spec.magnetPlan
   const all = [...paths.flat(), ...plan.map((m) => ({ x: m.x, y: m.y }))]
   const pad = 24
-  const minX = Math.min(...all.map((p) => p.x)) - pad
-  const maxX = Math.max(...all.map((p) => p.x)) + pad
-  const minY = Math.min(...all.map((p) => p.y)) - pad
-  const maxY = Math.max(...all.map((p) => p.y)) + pad
-  const w = maxX - minX
-  const h = maxY - minY
-  const maxD = plan.reduce((mx, m) => Math.max(mx, m.diameterMM), 0) // the focal (extreme) diameter
-  // Flip Y (math y-up → SVG y-down) via viewBox + a scale(1,-1) group.
+  const minX = Math.min(...all.map((p) => p.x)) - pad, maxX = Math.max(...all.map((p) => p.x)) + pad
+  const minY = Math.min(...all.map((p) => p.y)) - pad, maxY = Math.max(...all.map((p) => p.y)) + pad
+  const w = maxX - minX, h = maxY - minY
+  const maxD = plan.reduce((mx, m) => Math.max(mx, m.diameterMM), 0)
   const d = paths.map((ring) => 'M ' + ring.map((p) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' L ') + ' Z').join(' ')
-
   return (
-    <svg viewBox={`${minX} ${minY} ${w} ${h}`} style={styles.svg} preserveAspectRatio="xMidYMid meet">
+    <svg viewBox={`${minX} ${minY} ${w} ${h}`} style={S.svg} preserveAspectRatio="xMidYMid meet">
       <g transform={`translate(0 ${minY + maxY}) scale(1 -1)`}>
         <path d={d} fill="rgba(80,140,255,0.12)" stroke="#3b82f6" strokeWidth={Math.max(w, h) / 260} fillRule="evenodd" />
         {plan.map((m, i) => (
@@ -245,53 +299,43 @@ function Stage({ result }: { result: ReturnType<typeof solveGrid> }) {
   )
 }
 
-// ── tiny presentational helpers ──
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section style={{ marginBottom: 18 }}>
-      <div style={styles.sectionTitle}>{title}</div>
-      {children}
-    </section>
-  )
+function Sec({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section style={{ marginBottom: 16 }}><div style={S.secTitle}>{title}</div>{children}</section>
+}
+function Chips<T extends string | number>({ items, value, onPick, suffix = '' }: { items: readonly T[]; value: T; onPick: (v: T) => void; suffix?: string }) {
+  return <div style={S.chips}>{items.map((it) => <button key={String(it)} onClick={() => onPick(it)} style={chip(it === value, false)}>{it}{suffix}</button>)}</div>
 }
 function Range({ label, min, max, value, onChange }: { label: string; min: number; max: number; value: number; onChange: (v: number) => void }) {
-  return (
-    <label style={styles.range}>
-      <span style={styles.rangeLabel}>{label}</span>
-      <input type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ width: '100%' }} />
-    </label>
-  )
+  return <label style={S.range}><span style={S.rangeLabel}>{label}</span><input type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ width: '100%' }} /></label>
 }
-function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  return (
-    <label style={styles.numField}>
-      <span style={styles.rangeLabel}>{label}</span>
-      <input type="number" value={value} onChange={(e) => onChange(Number(e.target.value))} style={styles.numInput} />
-    </label>
-  )
+function Num({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return <label style={S.numField}><span style={S.rangeLabel}>{label}</span><input type="number" value={value} onChange={(e) => onChange(Number(e.target.value))} style={S.numInput} /></label>
 }
-const chip = (active: boolean): React.CSSProperties => ({
-  padding: '6px 12px', borderRadius: 8, border: '1px solid', cursor: 'pointer', fontSize: 13,
+const chip = (active: boolean, disabled: boolean): React.CSSProperties => ({
+  padding: '6px 12px', borderRadius: 8, border: '1px solid', fontSize: 13,
+  cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
   borderColor: active ? '#3b82f6' : '#d1d5db', background: active ? '#3b82f6' : '#fff', color: active ? '#fff' : '#374151',
 })
-
-const styles: Record<string, React.CSSProperties> = {
+const S: Record<string, React.CSSProperties> = {
   page: { fontFamily: 'ui-sans-serif, system-ui, sans-serif', color: '#111827', background: '#f9fafb', minHeight: '100vh' },
-  header: { padding: '16px 24px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'baseline', gap: 16 },
-  h1: { fontSize: 18, fontWeight: 700, margin: 0 },
+  header: { padding: '14px 22px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' },
+  h1: { fontSize: 17, fontWeight: 700, margin: 0 },
   sub: { fontSize: 12, color: '#6b7280' },
-  body: { display: 'grid', gridTemplateColumns: '300px 1fr 220px', gap: 16, padding: 16, alignItems: 'start' },
-  panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 },
-  sectionTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9ca3af', marginBottom: 8, fontWeight: 600 },
+  body: { display: 'grid', gridTemplateColumns: '300px 1fr 240px', gap: 14, padding: 14, alignItems: 'start' },
+  panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 },
+  secTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: '#9ca3af', marginBottom: 7, fontWeight: 600 },
   chips: { display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  note: { fontSize: 11, color: '#6b7280', marginTop: 6, lineHeight: 1.5 },
+  ok: { color: '#059669' },
+  bad: { color: '#b91c1c' },
   range: { display: 'block', marginBottom: 10 },
   rangeLabel: { display: 'block', fontSize: 12, color: '#4b5563', marginBottom: 2 },
-  numField: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 },
-  numInput: { width: 80, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 },
-  stage: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 },
-  svg: { width: '100%', height: 460, background: '#fbfbfd', borderRadius: 8 },
+  numField: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, gap: 8 },
+  numInput: { width: 96, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 },
+  file: { fontSize: 12, width: '100%' },
+  stage: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 },
+  svg: { width: '100%', height: 470, background: '#fbfbfd', borderRadius: 8 },
   readout: { fontSize: 13, color: '#374151' },
-  error: { color: '#b91c1c', fontSize: 14, padding: 24 },
-  ladder: { display: 'flex', flexDirection: 'column', gap: 6 },
-  saved: { fontSize: 11, color: '#059669' },
+  error: { color: '#b45309', fontSize: 14, padding: 24 },
+  ladder: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 },
 }

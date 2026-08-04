@@ -7,7 +7,7 @@
  *   population (law §3.1) → link the defining magnet centres (law §3.2) → offset by padding (law §3.3).
  * Interior magnets sit inside the hull and never change the outline or the size (law §3.4).
  */
-import type { EngineConfig, ShapeFamily, RegistrationMode } from './config';
+import type { EngineConfig, ShapeFamily, RegistrationMode, Pattern } from './config';
 import type { GridSpan, Pt } from './types';
 import { offset, circle, type Contour } from './offset';
 
@@ -25,6 +25,8 @@ export interface ShapeRequest {
   contour?: Pt[];
   /** Corner rounding for polygon families (law §3.21/§3.22) — the user's radius; 0 = sharp. */
   cornerRadiusMM?: number;
+  /** Population pattern (law §4.3a); defaults to the config default (straight, law §1.2). */
+  pattern?: Pattern;
 }
 
 export interface ShapeResult {
@@ -107,28 +109,38 @@ function registrationAnchor(poly: Pt[], mode: RegistrationMode): Pt {
 }
 
 /**
- * Lattice points seated inside a polygon at pitch, with a magnet ON the `anchor`.
- * Anchoring the lattice to the shape (rather than the world origin) makes seating
- * translation-invariant — an identical outline seats identically wherever it sits (law §5.1) —
- * and centres the grid on the shape so thin/offset outlines get magnets.
- * `insetMM` = the clearance a magnet needs to be fully seated (0 for geometric shapes whose
- * corner magnets sit ON the outline; = padding for freeform's fits-it-sits, law §2.4).
+ * The pattern lattice over a bounding box, anchored so a base node sits on `anchor` (law §4.3a):
+ * straight = full Cartesian; diamond = the checkerboard subset (48√2 diagonal); dice = the grid
+ * plus its cell centres (the 48-offset midpoints). A magnet lands on the anchor.
  */
-function seatLattice(poly: Pt[], pitchMM: number, insetMM: number, anchor: Pt): Pt[] {
-  const xs = poly.map((p) => p.x), ys = poly.map((p) => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const i0 = Math.floor((minX - anchor.x) / pitchMM), i1 = Math.ceil((maxX - anchor.x) / pitchMM);
-  const j0 = Math.floor((minY - anchor.y) / pitchMM), j1 = Math.ceil((maxY - anchor.y) / pitchMM);
+function patternPoints(minX: number, minY: number, maxX: number, maxY: number, pitchMM: number, pattern: Pattern, anchor: Pt): Pt[] {
+  const h = pitchMM / 2;
+  const i0 = Math.floor((minX - anchor.x) / pitchMM) - 1, i1 = Math.ceil((maxX - anchor.x) / pitchMM) + 1;
+  const j0 = Math.floor((minY - anchor.y) / pitchMM) - 1, j1 = Math.ceil((maxY - anchor.y) / pitchMM) + 1;
   const out: Pt[] = [];
   for (let i = i0; i <= i1; i++) {
     for (let j = j0; j <= j1; j++) {
-      const p = { x: anchor.x + i * pitchMM, y: anchor.y + j * pitchMM };
-      if (insetMM <= EPS ? insideOrOn(p, poly) : rayCastInside(p, poly) && clearanceToEdges(p, poly) >= insetMM - EPS) {
-        out.push(p);
-      }
+      if (pattern === 'diamond' && ((i + j) & 1)) continue; // checkerboard
+      out.push({ x: anchor.x + i * pitchMM, y: anchor.y + j * pitchMM });
+      if (pattern === 'dice') out.push({ x: anchor.x + i * pitchMM + h, y: anchor.y + j * pitchMM + h }); // cell centre
     }
   }
   return out;
+}
+
+/**
+ * Magnets of the chosen pattern seated inside a polygon, with a base node ON the `anchor`.
+ * Anchoring the lattice to the shape (not the world origin) makes seating translation-invariant —
+ * an identical outline seats identically wherever it sits (law §5.1).
+ * `insetMM` = the clearance a magnet needs to be fully seated (0 for geometric families whose corner
+ * magnets sit ON the outline; = padding for freeform's fits-it-sits, law §2.4).
+ */
+function seatLattice(poly: Pt[], pitchMM: number, insetMM: number, anchor: Pt, pattern: Pattern): Pt[] {
+  const xs = poly.map((p) => p.x), ys = poly.map((p) => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  return patternPoints(minX, minY, maxX, maxY, pitchMM, pattern, anchor).filter((p) =>
+    insetMM <= EPS ? insideOrOn(p, poly) : rayCastInside(p, poly) && clearanceToEdges(p, poly) >= insetMM - EPS,
+  );
 }
 
 /**
@@ -191,6 +203,11 @@ function polygonSkeleton(family: ShapeFamily, span: GridSpan, p: number): Pt[] {
 export function generateShape(request: ShapeRequest, config: EngineConfig): ShapeResult {
   const { family, span, pitchMM, mode } = request;
   const paddingMM = config.padding.radiusMM;
+  const pattern = request.pattern ?? config.patterns.default;
+  // Dice/quincunx is legal ONLY at the released dice pitch (96) — its centres must land on the lattice.
+  if (pattern === 'dice' && pitchMM !== config.patterns.dicePitchMM) {
+    throw new Error(`dice pattern is legal only at pitch ${config.patterns.dicePitchMM}mm (got ${pitchMM}mm) — law §4.3a`);
+  }
 
   // ── Freeform: the supplied contour IS the skeleton (law §3.2). Engine-native custom shapes (v1). ──
   if (family === 'freeform') {
@@ -202,7 +219,7 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
     // circles never overlap because pitch ≥ 2×padding (law §2.5). The lattice is REGISTERED to the
     // outline (config default = centroid) — deterministic, translation-invariant, no search loops (F3).
     const anchor = registrationAnchor(outline, config.registration.default);
-    const seated = seatLattice(outline, pitchMM, paddingMM, anchor);
+    const seated = seatLattice(outline, pitchMM, paddingMM, anchor, pattern);
     // Light = the outer shell of seated magnets (law §4.1) — freeform magnets sit padding-inside,
     // so "perimeter" is the outermost ring, not on-the-edge.
     const population = mode === 'light' ? outerShell(seated, outline, pitchMM) : seated;
@@ -214,7 +231,7 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
   if (family === 'circle') {
     const block = rectCorners(span.nx, span.ny, pitchMM);
     const c = centroid(block);
-    const seated = seatLattice(block, pitchMM, 0, ORIGIN);
+    const seated = seatLattice(block, pitchMM, 0, ORIGIN, pattern);
     const radius = Math.max(...seated.map((m) => Math.hypot(m.x - c.x, m.y - c.y))) + paddingMM;
     const ring = onBoundary(seated, block); // the outer ring — magnets on the block boundary
     const population = mode === 'light' ? ring : seated;
@@ -233,7 +250,7 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
   // ── Polygon families: link the corner magnets, miter-offset by padding (law §3.2–3.3). ──
   if (POLYGON_FAMILIES.has(family)) {
     const vertices = polygonSkeleton(family, span, pitchMM);
-    const seated = seatLattice(vertices, pitchMM, 0, ORIGIN); // corner magnets sit ON the hull
+    const seated = seatLattice(vertices, pitchMM, 0, ORIGIN, pattern); // corner magnets sit ON the hull
     // Law §3.2: every skeleton vertex passes through a magnet centre. A span that puts a corner
     // off-lattice (e.g. an even-base triangle apex) is unlawful — fail loud, never a fitted template.
     const seatedKeys = new Set(seated.map(ptKey));
