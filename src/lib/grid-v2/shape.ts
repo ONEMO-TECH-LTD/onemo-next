@@ -7,12 +7,13 @@
  *   population (law §3.1) → link the defining magnet centres (law §3.2) → offset by padding (law §3.3).
  * Interior magnets sit inside the hull and never change the outline or the size (law §3.4).
  */
-import type { EngineConfig, ShapeFamily } from './config';
+import type { EngineConfig, ShapeFamily, RegistrationMode } from './config';
 import type { GridSpan, Pt } from './types';
 import { boundaryRing } from './grid';
 import { offset, circle, type Contour } from './offset';
 
 const EPS = 1e-6;
+const ORIGIN: Pt = { x: 0, y: 0 };
 
 export interface ShapeRequest {
   family: ShapeFamily;
@@ -22,6 +23,8 @@ export interface ShapeRequest {
   mode: 'standard' | 'light';
   /** Required for freeform — the traced/AI outline (mm) that IS the skeleton. */
   contour?: Pt[];
+  /** Corner rounding for polygon families (law §3.21/§3.22) — the user's radius; 0 = sharp. */
+  cornerRadiusMM?: number;
 }
 
 export interface ShapeResult {
@@ -71,26 +74,55 @@ function rayCastInside(p: Pt, poly: Pt[]): boolean {
 
 const insideOrOn = (p: Pt, poly: Pt[]): boolean => rayCastInside(p, poly) || clearanceToEdges(p, poly) < EPS;
 
+/** The registration reference the lattice is anchored to (law §4.9 → config). Deterministic. */
+function registrationAnchor(poly: Pt[], mode: RegistrationMode): Pt {
+  if (mode === 'bbox-center') {
+    const xs = poly.map((p) => p.x), ys = poly.map((p) => p.y);
+    return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+  }
+  return centroid(poly); // 'centroid'
+}
+
 /**
- * Lattice points seated inside a polygon at pitch.
+ * Lattice points seated inside a polygon at pitch, with a magnet ON the `anchor`.
+ * Anchoring the lattice to the shape (rather than the world origin) makes seating
+ * translation-invariant — an identical outline seats identically wherever it sits (law §5.1) —
+ * and centres the grid on the shape so thin/offset outlines get magnets.
  * `insetMM` = the clearance a magnet needs to be fully seated (0 for geometric shapes whose
  * corner magnets sit ON the outline; = padding for freeform's fits-it-sits, law §2.4).
  */
-function seatLattice(poly: Pt[], pitchMM: number, insetMM: number): Pt[] {
+function seatLattice(poly: Pt[], pitchMM: number, insetMM: number, anchor: Pt): Pt[] {
   const xs = poly.map((p) => p.x), ys = poly.map((p) => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const i0 = Math.floor(minX / pitchMM), i1 = Math.ceil(maxX / pitchMM);
-  const j0 = Math.floor(minY / pitchMM), j1 = Math.ceil(maxY / pitchMM);
+  const i0 = Math.floor((minX - anchor.x) / pitchMM), i1 = Math.ceil((maxX - anchor.x) / pitchMM);
+  const j0 = Math.floor((minY - anchor.y) / pitchMM), j1 = Math.ceil((maxY - anchor.y) / pitchMM);
   const out: Pt[] = [];
   for (let i = i0; i <= i1; i++) {
     for (let j = j0; j <= j1; j++) {
-      const p = { x: i * pitchMM, y: j * pitchMM };
+      const p = { x: anchor.x + i * pitchMM, y: anchor.y + j * pitchMM };
       if (insetMM <= EPS ? insideOrOn(p, poly) : rayCastInside(p, poly) && clearanceToEdges(p, poly) >= insetMM - EPS) {
         out.push(p);
       }
     }
   }
   return out;
+}
+
+/**
+ * Rounded-corner polygon (law §3.21/§3.22): the corner radius is the USER's; corner rounding
+ * moves the size, never the magnet count. Two-step offset keeps the outline `paddingMM` from the
+ * magnets while rounding the corners at `cornerRadiusMM`: inset by (padding − r) sharp, then
+ * expand by r round → net padding, corners of radius r. The analytic carries the true params (F6).
+ */
+function roundedPolygon(vertices: Pt[], paddingMM: number, cornerRadiusMM: number, config: EngineConfig): Contour {
+  const r = Math.max(0, Math.min(cornerRadiusMM, paddingMM)); // radius within [0, padding]
+  const innerRing = paddingMM - r <= EPS ? vertices : offset(vertices, paddingMM - r, 'miter', true, config).paths[0];
+  const rounded = offset(innerRing, r, 'round', true, config);
+  return {
+    paths: rounded.paths,
+    analytic: { kind: 'rounded', vertices, paddingMM, cornerRadiusMM: r },
+    bounds: rounded.bounds,
+  };
 }
 
 // ── family construction rules (the declared skeletons — law §3.2) ─────────────
@@ -140,9 +172,10 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
     }
     const outline = request.contour;
     // fits-it-sits: a magnet is seated only if it + its padding halo fit fully inside (law §2.4);
-    // circles never overlap because pitch ≥ 2×padding (law §2.5). Registration is the centroid
-    // (config default) — no search loops (F3). The lattice is registered to the outline as given.
-    const seated = seatLattice(outline, pitchMM, paddingMM);
+    // circles never overlap because pitch ≥ 2×padding (law §2.5). The lattice is REGISTERED to the
+    // outline (config default = centroid) — deterministic, translation-invariant, no search loops (F3).
+    const anchor = registrationAnchor(outline, config.registration.default);
+    const seated = seatLattice(outline, pitchMM, paddingMM, anchor);
     const population = mode === 'light' ? boundaryRing(seated, populationPattern, pitchMM) : seated;
     const contour = offset(outline, paddingMM, config.joins.freeform, true, config);
     return { family, contour, population, vertices: outline };
@@ -152,7 +185,7 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
   if (family === 'circle') {
     const block = rectCorners(span.nx, span.ny, pitchMM);
     const c = centroid(block);
-    const seated = seatLattice(block, pitchMM, 0);
+    const seated = seatLattice(block, pitchMM, 0, ORIGIN);
     const radius = Math.max(...seated.map((m) => Math.hypot(m.x - c.x, m.y - c.y))) + paddingMM;
     const ring = boundaryRing(seated, populationPattern, pitchMM);
     const population = mode === 'light' ? ring : seated;
@@ -171,9 +204,14 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
   // ── Polygon families: link the corner magnets, miter-offset by padding (law §3.2–3.3). ──
   if (POLYGON_FAMILIES.has(family)) {
     const vertices = polygonSkeleton(family, span, pitchMM);
-    const seated = seatLattice(vertices, pitchMM, 0); // corner magnets sit ON the hull
+    const seated = seatLattice(vertices, pitchMM, 0, ORIGIN); // corner magnets sit ON the hull
     const population = mode === 'light' ? boundaryRing(seated, populationPattern, pitchMM) : seated;
-    const contour = offset(vertices, paddingMM, config.joins[family], true, config);
+    // Corner rounding is the user's radius (law §3.21/§3.22) — it moves the outline, never the
+    // magnet count (population is derived above, before rounding).
+    const r = request.cornerRadiusMM ?? 0;
+    const contour = r > 0
+      ? roundedPolygon(vertices, paddingMM, r, config)
+      : offset(vertices, paddingMM, config.joins[family], true, config);
     return { family, contour, population, vertices };
   }
 

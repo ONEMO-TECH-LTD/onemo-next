@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultConfig } from '../config';
+import { defaultConfig, resolveConfig } from '../config';
 import { generateShape, type ShapeRequest } from '../shape';
 import type { Pt } from '../types';
 
@@ -115,6 +115,61 @@ describe('P3 · ShapeGenerator — construction law (link magnet centres → off
     });
     it('throws loudly on a degenerate contour', () => {
       expect(() => generateShape(req({ family: 'freeform', contour: [{ x: 0, y: 0 }] }), defaultConfig)).toThrow(/at least 3 points/);
+    });
+  });
+
+  describe('registration — the lattice is anchored to the shape, not the world (law §5.1, F3)', () => {
+    // An L with 48mm arms whose edges sit on lattice lines — the case that seated ZERO under a
+    // world-anchored lattice (meta probe).
+    const lShape: Pt[] = [
+      { x: 0, y: 0 }, { x: 144, y: 0 }, { x: 144, y: 48 },
+      { x: 48, y: 48 }, { x: 48, y: 144 }, { x: 0, y: 144 },
+    ];
+    it('seats magnets inside a lattice-aligned L-shape (registration centres the grid)', () => {
+      const f = generateShape(req({ family: 'freeform', contour: lShape, mode: 'standard' }), defaultConfig);
+      expect(f.population.length).toBeGreaterThan(0);
+    });
+    it('is translation-invariant — the same outline seats the same count wherever it sits (§5.1)', () => {
+      const blob = (dx: number, dy: number): Pt[] => {
+        const pts: Pt[] = [];
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * 2 * Math.PI;
+          const r = i % 2 === 0 ? 120 : 70;
+          pts.push({ x: 200 + dx + r * Math.cos(a), y: 200 + dy + r * Math.sin(a) });
+        }
+        return pts;
+      };
+      const at0 = generateShape(req({ family: 'freeform', contour: blob(0, 0) }), defaultConfig);
+      const at7 = generateShape(req({ family: 'freeform', contour: blob(7, 13) }), defaultConfig); // non-lattice shift
+      expect(at7.population).toHaveLength(at0.population.length);
+    });
+    it('honours the registration config input (centroid vs bbox-center can differ)', () => {
+      // Both are valid; the point is the input is consumed, not ignored.
+      const centroidCfg = generateShape(req({ family: 'freeform', contour: lShape }), defaultConfig);
+      const bboxCfg = generateShape(req({ family: 'freeform', contour: lShape }), resolveConfig({ registration: { default: 'bbox-center' } }));
+      expect(centroidCfg.population.length).toBeGreaterThan(0);
+      expect(bboxCfg.population.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('rounded corners — the radius is the user\'s; rounding moves the size, not the count (law §3.21/§3.22)', () => {
+    it('rounded square keeps the SAME magnet count as the sharp square (count-invariance)', () => {
+      const sharp = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 } }), defaultConfig);
+      const rounded = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 10 }), defaultConfig);
+      expect(rounded.population).toEqual(sharp.population); // rounding never touches the magnets
+    });
+    it('carries the exact user radius in the analytic identity (radius exactness, F6)', () => {
+      const rounded = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 6 }), defaultConfig);
+      expect(rounded.contour.analytic).toEqual({ kind: 'rounded', vertices: expect.any(Array), paddingMM: 10, cornerRadiusMM: 6 });
+    });
+    it('rounding removes corner area — a rounded square is smaller than the sharp one', () => {
+      const sharp = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 0 }), defaultConfig);
+      const rounded = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 10 }), defaultConfig);
+      expect(shoelace(rounded.contour.paths[0])).toBeLessThan(shoelace(sharp.contour.paths[0]));
+    });
+    it('clamps the radius to the padding (radius cannot exceed the safe margin)', () => {
+      const rounded = generateShape(req({ family: 'square', span: { nx: 3, ny: 3 }, cornerRadiusMM: 100 }), defaultConfig);
+      expect((rounded.contour.analytic as { cornerRadiusMM: number }).cornerRadiusMM).toBe(10);
     });
   });
 

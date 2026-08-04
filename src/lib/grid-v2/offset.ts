@@ -31,7 +31,8 @@ export interface Bounds {
 /** The TRUE shape definition (law §9.2a/b) — carried alongside the tessellated contour. */
 export type AnalyticSpec =
   | { kind: 'offset'; rings: Pt[][]; paddingMM: number; join: JoinStyle; closed: boolean }
-  | { kind: 'circle'; centre: Pt; radiusMM: number };
+  | { kind: 'circle'; centre: Pt; radiusMM: number }
+  | { kind: 'rounded'; vertices: Pt[]; paddingMM: number; cornerRadiusMM: number };
 
 export interface Contour {
   /** Tessellated mm rings — outer boundary first, then any holes. */
