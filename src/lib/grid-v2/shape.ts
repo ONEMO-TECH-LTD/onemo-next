@@ -9,7 +9,6 @@
  */
 import type { EngineConfig, ShapeFamily, RegistrationMode } from './config';
 import type { GridSpan, Pt } from './types';
-import { boundaryRing } from './grid';
 import { offset, circle, type Contour } from './offset';
 
 const EPS = 1e-6;
@@ -74,6 +73,29 @@ function rayCastInside(p: Pt, poly: Pt[]): boolean {
 }
 
 const insideOrOn = (p: Pt, poly: Pt[]): boolean => rayCastInside(p, poly) || clearanceToEdges(p, poly) < EPS;
+
+/**
+ * Light mask for a shape whose magnets sit ON its boundary (geometric families): keep only the
+ * magnets lying on the shape's outline edges; every strictly-interior magnet drops (law §4.1).
+ * This is GEOMETRIC, not lattice-adjacency — so it reduces a diamond/triangle to its true
+ * perimeter, not a thick interior band (the v1 slop). Reproduces the square ring 4/8/12 too.
+ */
+function onBoundary(population: Pt[], boundary: Pt[]): Pt[] {
+  const TOL = 1e-3; // a magnet is "on the outline" only if it lies on a boundary edge
+  return population.filter((p) => clearanceToEdges(p, boundary) < TOL);
+}
+
+/**
+ * Light mask for freeform, whose magnets sit padding-INSIDE a curved contour (none on the edge):
+ * keep the outermost shell — magnets within one pitch of the nearest-to-contour magnet — and drop
+ * the deep interior (law §4.1). A thin shape is all-perimeter (the degenerate case).
+ */
+function outerShell(population: Pt[], contour: Pt[], pitchMM: number): Pt[] {
+  if (population.length === 0) return [];
+  const clr = population.map((p) => clearanceToEdges(p, contour));
+  const minC = Math.min(...clr);
+  return population.filter((_, i) => clr[i] < minC + pitchMM - EPS);
+}
 
 /** The registration reference the lattice is anchored to (law §4.9 → config). Deterministic. */
 function registrationAnchor(poly: Pt[], mode: RegistrationMode): Pt {
@@ -169,7 +191,6 @@ function polygonSkeleton(family: ShapeFamily, span: GridSpan, p: number): Pt[] {
 export function generateShape(request: ShapeRequest, config: EngineConfig): ShapeResult {
   const { family, span, pitchMM, mode } = request;
   const paddingMM = config.padding.radiusMM;
-  const populationPattern = config.patterns.default; // straight is the default population lattice (law §1.2)
 
   // ── Freeform: the supplied contour IS the skeleton (law §3.2). Engine-native custom shapes (v1). ──
   if (family === 'freeform') {
@@ -182,7 +203,9 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
     // outline (config default = centroid) — deterministic, translation-invariant, no search loops (F3).
     const anchor = registrationAnchor(outline, config.registration.default);
     const seated = seatLattice(outline, pitchMM, paddingMM, anchor);
-    const population = mode === 'light' ? boundaryRing(seated, populationPattern, pitchMM) : seated;
+    // Light = the outer shell of seated magnets (law §4.1) — freeform magnets sit padding-inside,
+    // so "perimeter" is the outermost ring, not on-the-edge.
+    const population = mode === 'light' ? outerShell(seated, outline, pitchMM) : seated;
     const contour = offset(outline, paddingMM, config.joins.freeform, true, config);
     return { family, contour, population, vertices: outline };
   }
@@ -193,7 +216,7 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
     const c = centroid(block);
     const seated = seatLattice(block, pitchMM, 0, ORIGIN);
     const radius = Math.max(...seated.map((m) => Math.hypot(m.x - c.x, m.y - c.y))) + paddingMM;
-    const ring = boundaryRing(seated, populationPattern, pitchMM);
+    const ring = onBoundary(seated, block); // the outer ring — magnets on the block boundary
     const population = mode === 'light' ? ring : seated;
     const contour = circle(c, radius, config);
     return { family, contour, population, vertices: ring }; // the ring magnets define the circle
@@ -219,7 +242,9 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
         throw new Error(`unlawful span for ${family}: skeleton vertex (${v.x}, ${v.y}) has no magnet centre under it (law §3.2)`);
       }
     }
-    const population = mode === 'light' ? boundaryRing(seated, populationPattern, pitchMM) : seated;
+    // Light = the magnets on the shape's outline; interior drops (law §4.1) — geometric, so a
+    // triangle/diamond reduces to its true perimeter, not a thick band.
+    const population = mode === 'light' ? onBoundary(seated, vertices) : seated;
     // Corner rounding is the user's radius (law §3.21/§3.22) — it moves the outline, never the
     // magnet count (population is derived above, before rounding).
     const r = request.cornerRadiusMM ?? 0;

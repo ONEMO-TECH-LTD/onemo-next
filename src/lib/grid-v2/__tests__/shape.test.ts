@@ -185,6 +185,34 @@ describe('P3 · ShapeGenerator — construction law (link magnet centres → off
     });
   });
 
+  describe('Light is PERIMETER-ONLY for every shape — no interior band (law §4.1, Dan 4-screenshot catch)', () => {
+    it.each([['square', 3], ['square', 4], ['triangle', 5], ['diamond', 3], ['circle', 3]] as const)(
+      '%s nx=%i Light keeps ZERO strictly-interior magnets',
+      (family, nx) => {
+        const out = generateShape({ family, span: { nx, ny: nx }, pitchMM: 48, mode: 'light' }, defaultConfig);
+        // an interior magnet is one NOT on the shape's outline (its defining boundary)
+        const interior = out.population.filter((p) => clearanceTo(p, out.vertices) > 0.5).length;
+        expect(interior).toBe(0);
+      },
+    );
+    it('triangle base-5 Light = the 8 perimeter magnets (the interior band of 3 is gone)', () => {
+      const out = generateShape({ family: 'triangle', span: { nx: 5, ny: 5 }, pitchMM: 48, mode: 'light' }, defaultConfig);
+      expect(out.population).toHaveLength(8);
+      expect(has(out.population, 48, 48)).toBe(false); // a leaked interior magnet — must be gone
+      expect(has(out.population, 96, 144)).toBe(false);
+    });
+    it('freeform Light drops the deep interior, keeps the outer shell', () => {
+      const blob = Array.from({ length: 24 }, (_, i) => {
+        const a = (i / 24) * 2 * Math.PI;
+        return { x: 400 + 200 * Math.cos(a), y: 400 + 200 * Math.sin(a) };
+      });
+      const std = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'standard', contour: blob }, defaultConfig);
+      const light = generateShape({ family: 'freeform', span: { nx: 1, ny: 1 }, pitchMM: 48, mode: 'light', contour: blob }, defaultConfig);
+      expect(light.population.length).toBeLessThan(std.population.length); // deep interior dropped
+      expect(light.population.length).toBeGreaterThan(0);
+    });
+  });
+
   it('every family resolves under the 100ms budget (law §9)', () => {
     const start = performance.now();
     for (const family of ['square', 'triangle', 'diamond', 'circle', 'pill'] as const) {
