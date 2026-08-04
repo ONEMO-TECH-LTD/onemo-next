@@ -154,10 +154,10 @@ describe('S1d exact neutral ladder cache seeds', () => {
 
     expect(rungIndex).toBeGreaterThanOrEqual(0)
     expect(seed.job.recipe).toMatchObject({
-      kind: 'uniform-contour',
-      longestMM: rung.designSizeMM,
+      kind: 'final-contour',
+      contourMM: rung.derivedContourMM,
     })
-    expect(seed.job.options?.baseMarginMM).toBe(rung.marginMM)
+    expect(seed.job.options?.baseMarginMM).toBeUndefined()
     expect(seed.result.value.grid.anchors).toHaveLength(rung.points)
     expect(gridJsonBytes(seed.result)).toBe(gridJsonBytes(handleGridJob(seed.job)))
   }, 20_000)

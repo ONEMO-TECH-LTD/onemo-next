@@ -56,23 +56,8 @@ export function handleGridJob(job: GridJob): GridJobResult {
   }
 }
 
-function rungPlanRecipe(recipe: LadderRecipe, rung: SemanticRung): PlanRecipe {
-  if (recipe.kind === 'standard') {
-    return {
-      kind: 'standard',
-      shape: recipe.shape,
-      widthMM: rung.designSizeMM,
-      heightMM: rung.designSizeMM,
-    }
-  }
-  if (recipe.kind === 'rounded-square') {
-    return { kind: 'rounded-square', sizeMM: rung.designSizeMM, radiusMM: recipe.radiusMM }
-  }
-  return {
-    kind: 'uniform-contour',
-    unitContour: recipe.unitContour,
-    longestMM: rung.designSizeMM,
-  }
+function rungPlanRecipe(rung: SemanticRung): PlanRecipe {
+  return { kind: 'final-contour', contourMM: rung.derivedContourMM }
 }
 
 /** Worker transport adds exact retained-rung plans without changing the public result. */
@@ -86,14 +71,10 @@ export function handleGridWorkerJob(job: GridJob): GridWorkerEnvelope {
   const cacheSeeds: GridCacheSeed[] = []
   let envelopeBytes = 0
   for (const rung of result.value) {
-    const options = job.recipe.kind === 'uniform-contour'
-      && (job.recipe.minMarginMM != null || job.recipe.maxMarginMM != null)
-      ? { ...job.options, baseMarginMM: rung.marginMM }
-      : job.options
     const seedJob: GridPlanJob = {
       operation: 'plan',
-      recipe: rungPlanRecipe(job.recipe, rung),
-      options: { ...options, construction: rung.construction },
+      recipe: rungPlanRecipe(rung),
+      options: { ...job.options, construction: rung.construction },
     }
     const seed: GridCacheSeed = {
       job: seedJob,

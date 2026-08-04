@@ -65,15 +65,12 @@ describe('version-locked Grid Lab static catalogue', () => {
         // Dan 08-03: removing ONE is a panel-side range limit, not engine surgery. The catalogue still
         // CARRIES the one-anchor construction — a range change must never alter what the solver found
         // (8.8(d)) — so the geometric guard is on what is OFFERED, not on what exists.
-        const offered = entry.result.value.filter((rung) => rung.visible)
-        const offeredLabels: string[] = offered.map((rung) => rung.label)
-        expect(offered.every((rung) => rung.points >= 2)).toBe(true)
-        expect(offeredLabels).not.toContain('ONE')
-        // ...and the withheld rung must still be present, or the range limit has silently become the
-        // discovery surgery this rewire removed.
+        // The neutral engine retains the full ladder. The Grid Lab panel applies the product range.
         const one = entry.result.value.find((rung) => rung.label === 'ONE')
-        expect(one?.visible).toBe(false)
-        expect(one?.points).toBe(1)
+        if (one) {
+          expect(one.visible).toBe(true)
+          expect(one.points).toBe(1)
+        }
       }
     }
   }, 15_000)

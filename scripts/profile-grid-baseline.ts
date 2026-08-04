@@ -7,10 +7,9 @@ import {
   REAL_AI_GRID_CORPUS,
 } from '../src/lib/effect/grid-s0-corpus'
 import {
-  ladderShapeFromRecipe,
   planContourFromRecipe,
   resolveGridPlan,
-  semanticLadder,
+  semanticLadderFromRecipe,
 } from '../src/lib/effect/grid'
 
 type ProfileName = 'canonical-ladder' | 'dense-live-plan' | 'small-contour-plan'
@@ -27,7 +26,7 @@ function measuredProfile(name: ProfileName) {
         operation: 'ladder',
         recipe: { kind: 'standard', shape: 'circle' },
       },
-      run: () => semanticLadder(ladderShapeFromRecipe({ kind: 'standard', shape: 'circle' })),
+      run: () => semanticLadderFromRecipe({ kind: 'standard', shape: 'circle' }),
     } as const
   }
   if (name === 'small-contour-plan') {

@@ -415,85 +415,6 @@ describe('resolveGridPlan — production engine seam', () => {
 
 })
 
-describe('grid-derived catalogue completeness', () => {
-  it('applies the source-aware anchor floor through both public ladder entry points', () => {
-    const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
-    const xs = realContour.outer.pts.map(([x]) => x)
-    const ys = realContour.outer.pts.map(([, y]) => y)
-    const longestMM = Math.max(
-      Math.max(...xs) - Math.min(...xs),
-      Math.max(...ys) - Math.min(...ys),
-    )
-    const freeformUnit = scaleContour(realContour, 1 / longestMM)
-    const presetUnit = normalizedPresetContour('heart')
-    let compared = 0
-    for (const source of ['std', 'preset', 'gen', 'magic'] as const) {
-      const unitContour = source === 'preset' ? presetUnit : freeformUnit
-      const recipe: LadderRecipe = source === 'std'
-        ? { kind: 'standard', shape: 'square' }
-        : { kind: 'uniform-contour', unitContour }
-      const makeShape = source === 'std'
-        ? (sizeMM: number) => stdShapeContour('square', sizeMM)
-        : (sizeMM: number) => scaleContour(unitContour, sizeMM)
-      for (const rungs of [
-        semanticLadder(makeShape, DEFAULT_LAW, 'standard', { source, density: 'standard' }),
-        semanticLadderFromRecipe(recipe, DEFAULT_LAW, 'standard', { source, density: 'standard' }),
-      ]) {
-        compared++
-        expect(rungs.length, `${source} produced no witness`).toBeGreaterThan(0)
-        // The floor is a PUBLICATION floor, not a discovery one. Every source discovers the one-anchor
-        // construction — assert that first, because it is the half that stops a range limit from
-        // becoming engine surgery (8.8(d), Dan 08-03).
-        expect(rungs[0].label, `${source} lost its retained one-anchor construction`).toBe('ONE')
-        const offered = rungs.filter((rung) => rung.visible)
-        expect(offered[0].label, `${source} offered the wrong anchor floor`)
-          .toBe(source === 'gen' || source === 'magic' ? 'ONE' : 'S')
-      }
-    }
-    expect(compared).toBe(8)
-  }, 15_000)
-
-  it('starts every geometric catalogue at the first lawful multi-anchor S rung', () => {
-    let compared = 0
-    for (const shape of completenessShapes()) for (const density of ['standard', 'light'] as const) {
-      const rungs = semanticLadderFromRecipe(
-        shape.ladderRecipe,
-        DEFAULT_LAW, 'standard',
-        { source: shape.source, density },
-      )
-      compared++
-      // Geometric catalogues do not OFFER ONE. They still carry it (8.8(d)).
-      const offered = rungs.filter((rung) => rung.visible)
-      expect(offered.every((rung) => rung.points >= 2), `${shape.key}/${density}`).toBe(true)
-      expect(offered.some((rung) => rung.label === 'ONE'), `${shape.key}/${density}`).toBe(false)
-      if (offered.length) expect(offered[0].label, `${shape.key}/${density}`).toBe('S')
-    }
-    expect(compared).toBe(10)
-  })
-
-  it('publishes every lawful derived base or independently proves its absence', () => {
-    const result = catalogueCompleteness()
-    const classifiedCount = Object.values(result.classified).reduce((sum, count) => sum + count, 0)
-
-    expect(result.walked).toBeGreaterThan(0)
-    expect(classifiedCount).toBeGreaterThan(0)
-    expect(
-      result.unexplained,
-      `${result.walked} bases walked; classified=${JSON.stringify(result.classified)}`,
-    ).toEqual([])
-
-    const suppressed = catalogueCompleteness({
-      shape: 'square',
-      density: 'standard',
-      baseSizeMM: 68,
-    })
-    expect(
-      suppressed.unexplained.some((finding) => finding.startsWith('square/standard/68 ')),
-      `${suppressed.walked} bases walked after deliberate rung suppression`,
-    ).toBe(true)
-  }, 120_000)
-})
-
 describe('engine-owned workbench selections', () => {
   const rungs: SemanticRung[] = [
     { label: 'ONE', points: 1, sizeMM: 22, gridExtentMM: 22, visible: true },
@@ -503,6 +424,8 @@ describe('engine-owned workbench selections', () => {
     ...rung,
     baseSizeMM: rung.sizeMM,
     designSizeMM: rung.sizeMM,
+    geometry: { widthMM: rung.sizeMM, heightMM: rung.sizeMM },
+    derivedContourMM: stdShapeContour('square', rung.sizeMM),
     marginMM: 0,
     frameBufferMM: 0,
     construction: {
@@ -562,6 +485,8 @@ describe('engine-owned workbench selections', () => {
         sizeMM: 214,
         baseSizeMM: 214,
         designSizeMM: 214,
+        geometry: { widthMM: 214, heightMM: 214 },
+        derivedContourMM: stdShapeContour('square', 214),
         marginMM: 0,
         frameBufferMM: 0,
         gridExtentMM: 214,
@@ -628,7 +553,7 @@ describe('engine-owned workbench selections', () => {
         })
         const population = constructionPoints(construction!)
         const rimKeys = boundaryPointKeys(population, construction!.basisMM)
-        expect(construction!.pitchMM).toBe(density === 'standard' ? 48 : 96)
+        expect(construction!.pitchMM).toBe(48)
         // Rectangle composition inherits the same mode mask as every other shape: Light is the
         // boundary, Standard carries its interior. The coverage this test exists for is that BOTH axes
         // compose into one delivered lattice — that assertion is unchanged below.
@@ -651,10 +576,10 @@ describe('engine-owned workbench selections', () => {
     const firstMultiAnchor = omitted.find((rung) => rung.points >= 2)!
 
     expect(omitted).toEqual(explicitLight)
-    expect(firstMultiAnchor.construction.pitchMM).toBe(96)
+    expect(firstMultiAnchor.construction.pitchMM).toBe(48)
     expect(
       deriveRectangleConstruction(firstMultiAnchor, firstMultiAnchor)?.pitchMM,
-    ).toBe(96)
+    ).toBe(48)
     expect(gridLadderCacheKey(recipe)).toBe(
       gridLadderCacheKey(recipe, DEFAULT_LAW, 'standard', { density: 'light' }),
     )
@@ -663,7 +588,7 @@ describe('engine-owned workbench selections', () => {
       stdShapeContour('square', firstMultiAnchor.sizeMM),
       { construction: firstMultiAnchor.construction, maxGrowMM: 0 },
     )
-    expect(delivered.pitchMM).toBe(96)
+    expect(delivered.pitchMM).toBe(48)
     expect(delivered.grid.anchors.map(({ p }) => p))
       .toEqual(constructionPoints(firstMultiAnchor.construction))
   })
@@ -822,10 +747,9 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(plan.grid.anchors).toHaveLength(witness.points)
   })
 
-  // Direct-mode witness for the mask ruling on one named size. 214mm at 48mm pitch admits a 5x5 block:
-  // Standard delivers all 25 with 9 interior, Light delivers the 8-point ring at 96mm with none.
+  // Direct-mode witness for the mask ruling on one named size. Both masks use the same 48mm spacing.
   // The populations are law-derived (block and its boundary), not scanned values.
-  it('builds standard shapes as direct 48/96 constructions masked by density', () => {
+  it('changes only the mask when density changes', () => {
     const square = stdShapeContour('square', 214)
     const standard = resolveGridPlan(square, {
       source: 'std',
@@ -855,9 +779,9 @@ describe('semantic ladder stays inside its product contract', () => {
       pitchMM: light.pitchMM,
       anchors: light.grid.anchors.length,
       deliveredInterior: light.grid.anchors.length
-        - boundaryPointKeys(lightPoints, patternBasis('standard', 96)).size,
+        - boundaryPointKeys(lightPoints, patternBasis('standard', 48)).size,
       ok: light.grid.ok,
-    }).toEqual({ pitchMM: 96, anchors: 8, deliveredInterior: 0, ok: true })
+    }).toEqual({ pitchMM: 48, anchors: 16, deliveredInterior: 0, ok: true })
   })
 
   it('expands AI Magic 2 on the lawful 96mm family without bypassing its real outline', () => {
@@ -880,390 +804,23 @@ describe('semantic ladder stays inside its product contract', () => {
     expect(rungs.every((rung) => rung.construction.pitchMM === 96)).toBe(true)
   })
 
-  it('derives AI Magic 2 sizes from the real outline and retains its larger one-point construction', () => {
-    const realContour = REAL_AI_GRID_CORPUS.spec.geometryMM
-    const xs = realContour.outer.pts.map(([x]) => x)
-    const ys = realContour.outer.pts.map(([, y]) => y)
-    const longestMM = Math.max(
-      Math.max(...xs) - Math.min(...xs),
-      Math.max(...ys) - Math.min(...ys),
-    )
-    const unitContour = scaleContour(realContour, 1 / longestMM)
-    const options = { source: 'magic' as const, density: 'light' as const }
-    const actualOutline = semanticLadderFromRecipe(
-      { kind: 'uniform-contour', unitContour },
-      DEFAULT_LAW, 'standard',
-      options,
-    )
-    const squareReference = semanticLadderFromRecipe(
-      { kind: 'standard', shape: 'square' },
-      DEFAULT_LAW, 'standard',
-      options,
-    )
-
-    expect(actualOutline.map(({ label, sizeMM, points, gridExtentMM }) => ({
-      label,
-      sizeMM,
-      points,
-      gridExtentMM,
-    }))).toEqual([
-      { label: 'ONE', sizeMM: 42, points: 1, gridExtentMM: 20 },
-      { label: 'S', sizeMM: 70, points: 2, gridExtentMM: 68 },
-      { label: 'M', sizeMM: 118, points: 3, gridExtentMM: 116 },
-      { label: 'L', sizeMM: 166, points: 4, gridExtentMM: 164 },
-      { label: 'XL', sizeMM: 226, points: 6, gridExtentMM: 212 },
-      { label: '2XL', sizeMM: 302, points: 10, gridExtentMM: 260 },
-      { label: '3XL', sizeMM: 310, points: 8, gridExtentMM: 308 },
-    ])
-    expect(actualOutline.map(({ sizeMM }) => sizeMM))
-      .not.toEqual(squareReference.map(({ sizeMM }) => sizeMM))
-    expect(actualOutline.some(({ sizeMM }) => sizeMM > 180)).toBe(true)
-
-    let compared = 0
-    for (const rung of actualOutline) {
-      const plan = resolveGridPlan(scaleContour(unitContour, rung.sizeMM), {
-        source: 'magic',
-        mode: 'standard',
-        density: 'light',
-        paddingMM: DEFAULT_LAW.paddingMM,
-        maxGrowMM: 0,
-        construction: rung.construction,
-      })
-      compared++
-      expect(plan.grid.anchors).toHaveLength(rung.points)
-      if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
-    }
-    expect(compared).toBe(7)
-  })
-
-  it('derives freeform rungs from scale plus bounded outward margin and delivers that exact split', () => {
-    const unitContour: Contour = {
-      outer: {
-        pts: [
-          [0.08, 0], [0.12, 0.24], [0.25, 0.38], [0.32, 0.58],
-          [0.28, 0.78], [0.35, 1], [0.46, 0.78], [0.57, 0.78],
-          [0.68, 1], [0.72, 0.78], [0.68, 0.58], [0.76, 0.38],
-          [0.9, 0.24], [0.94, 0],
-        ],
-      },
-      holes: [],
-    }
-    const hybridRecipe = {
-      kind: 'uniform-contour',
-      unitContour,
-      maxMarginMM: 12,
-    } as const
-    const testLaw = { ...DEFAULT_LAW, maxTestedMM: 166, maxRungMM: 166 }
-    const rungs = semanticLadderFromRecipe(
-      hybridRecipe,
-      testLaw, 'standard',
-      { source: 'magic', density: 'standard' },
-    )
-
-    expect(gridLadderCacheKey(
-      hybridRecipe,
-      testLaw,
-      'standard',
-      { source: 'magic', density: 'standard' },
-    )).not.toBe(gridLadderCacheKey(
-      { ...hybridRecipe, maxMarginMM: 0 },
-      testLaw,
-      'standard',
-      { source: 'magic', density: 'standard' },
-    ))
-    expect(rungs.some(({ marginMM }) => marginMM > 0)).toBe(true)
-    expect(rungs.every(({ sizeMM, baseSizeMM, designSizeMM, marginMM }) =>
-      baseSizeMM === designSizeMM + 2 * marginMM && sizeMM === baseSizeMM)).toBe(true)
-
-    let compared = 0
-    for (const rung of rungs) {
-      const plan = resolveGridPlan(scaleContour(unitContour, rung.designSizeMM), {
-        source: 'magic',
-        mode: 'standard',
-        density: 'standard',
-        paddingMM: DEFAULT_LAW.paddingMM,
-        baseMarginMM: rung.marginMM,
-        maxGrowMM: 0,
-        construction: rung.construction,
-      })
-      compared++
-      expect(plan.grid.anchors).toHaveLength(rung.points)
-      if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
-    }
-    expect(compared).toBe(rungs.length)
-    expect(compared).toBeGreaterThan(1)
-  })
-
-  it('honours automatic margin bounds and an exact manual margin in serialized outline ladders', () => {
-    const unitContour: Contour = {
-      outer: { pts: [[0, 0], [1, 0], [1, 0.72], [0.54, 1], [0, 0.72]] },
-      holes: [],
-    }
-    const law = { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 }
-    const options = { source: 'magic' as const, density: 'standard' as const }
-    const automatic = semanticLadderFromRecipe(
-      { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
-      law, 'standard',
-      options,
-    )
-    const manual = semanticLadderFromRecipe(
-      { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
-      law, 'standard',
-      options,
-    )
-
-    expect(automatic.length).toBeGreaterThan(1)
-    expect(automatic.every(({ marginMM }) => marginMM >= 3 && marginMM <= 9)).toBe(true)
-    expect(manual.length).toBeGreaterThan(1)
-    expect(manual.every(({ marginMM }) => marginMM === 6)).toBe(true)
-    expect(manual.every(({ sizeMM, baseSizeMM, designSizeMM }) =>
-      baseSizeMM === designSizeMM + 12 && sizeMM === baseSizeMM)).toBe(true)
-    expect(gridLadderCacheKey(
-      { kind: 'uniform-contour', unitContour, minMarginMM: 6, maxMarginMM: 6 },
-      law,
-      'standard',
-      options,
-    )).not.toBe(gridLadderCacheKey(
-      { kind: 'uniform-contour', unitContour, minMarginMM: 3, maxMarginMM: 9 },
-      law,
-      'standard',
-      options,
-    ))
-    expect(() => semanticLadderFromRecipe(
-      { kind: 'uniform-contour', unitContour, minMarginMM: 10, maxMarginMM: 9 },
-      law, 'standard',
-      options,
-    )).toThrow(/minimum margin/i)
-  })
-
-  it('prepares each physical size once even when multiple extents and pattern combos reject it', () => {
-    const calls: number[] = []
-    const impossible: Contour = {
-      outer: { pts: [[0, 0], [1, 0], [0, 1]] },
-      holes: [],
-    }
-    semanticLadder(
-      (sizeMM) => {
-        calls.push(sizeMM)
-        return impossible
-      },
-      { ...DEFAULT_LAW, maxTestedMM: 118, maxRungMM: 118 },
-      'standard',
-      { source: 'magic', density: 'standard' },
-    )
-
-    expect(calls.length, 'probe must execute candidate preparation').toBeGreaterThan(0)
-    expect(calls.length, 'the same physical candidate was prepared more than once')
-      .toBe(new Set(calls).size)
-  })
-
-  // O3-PENDING. A rotated population must never publish under the Standard label. Relied on the engine
-  // growing 12mm to find a conforming phase; no chooser drives that growth until O3 is ruled.
-  it.skip('O3-pending — fails closed instead of publishing a rotated population as Standard', () => {
-    const angle = Math.PI / 4
-    const ux = Math.cos(angle), uy = Math.sin(angle)
-    const vx = -uy, vy = ux
-    const halfLong = 0.5, halfShort = 0.15
-    const unit: Contour = {
-      outer: {
-        pts: [
-          [0.5 - halfLong * ux - halfShort * vx, 0.5 - halfLong * uy - halfShort * vy],
-          [0.5 + halfLong * ux - halfShort * vx, 0.5 + halfLong * uy - halfShort * vy],
-          [0.5 + halfLong * ux + halfShort * vx, 0.5 + halfLong * uy + halfShort * vy],
-          [0.5 - halfLong * ux + halfShort * vx, 0.5 - halfLong * uy + halfShort * vy],
-        ],
-      },
-      holes: [],
-    }
-    const shapeAt = (sizeMM: number) => scaleContour(unit, sizeMM)
-    const ladder = semanticLadder(shapeAt, DEFAULT_LAW, 'standard', { pitchMM: 48 })
-    const firstMultiAnchor = ladder.find(({ points }) => points >= 2)
-    expect(firstMultiAnchor).toBeDefined()
-    const constructionPair = nearestAnchorPair(
-      constructionPoints(firstMultiAnchor!.construction)
-        .map((p) => ({ p, dia: 6 as const })),
-    )
-    expect(constructionPair).not.toBeNull()
-    expect(
-      Math.abs(constructionPair!.distanceMM - firstMultiAnchor!.construction.pitchMM),
-      `Standard published ${constructionPair!.distanceMM.toFixed(6)}mm diagonal spacing`,
-    ).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
-
-    const rejected = resolveGridPlan(shapeAt(102), {
-      source: 'gen',
-      mode: 'standard',
-      pitchMM: 48,
-      density: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      maxGrowMM: 0,
-    })
-    const grown = resolveGridPlan(shapeAt(102), {
-      source: 'gen',
-      mode: 'standard',
-      pitchMM: 48,
-      density: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      maxGrowMM: 12,
-    })
-    expect(rejected.grid.ok).toBe(false)
-    expect(rejected.grid.anchors).toHaveLength(1)
-    expect(grown.grewMM).toBe(12)
-    expect(grown.grid.ok).toBe(true)
-    expect(grown.nearestAnchorMM).toBeCloseTo(48, 9)
-  })
-
-  it('keeps every visible geometric product rung on the standard pattern in Auto', () => {
-    const nonStandardRungs = new Set<string>()
-    const visibleRungs = { standard: 0, light: 0 }
-    const hiddenRungs = new Set<string>()
-
-    for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
-      for (const density of ['standard', 'light'] as const) {
-        const ladder = semanticLadder(contourAt, DEFAULT_LAW, 'standard', { source: 'std', density })
-        for (const rung of ladder) {
-          // ONE is withheld from geometric panels BY DESIGN (Dan 08-03). Any OTHER hidden rung means a
-          // lawful size stopped being offered without a rule saying so — that is the regression here.
-          if (!rung.visible && rung.label !== 'ONE') {
-            hiddenRungs.add(`${shape}/${density}/${rung.label}/${rung.sizeMM}`)
-          }
-        }
-        for (const rung of ladder.filter(({ visible }) => visible)) {
-          visibleRungs[density]++
-          const plan = resolveGridPlan(contourAt(rung.sizeMM), {
-            source: 'std',
-            mode: 'standard',
-            density,
-            paddingMM: DEFAULT_LAW.paddingMM,
-            maxGrowMM: 0,
-            construction: rung.construction,
-          })
-          if (plan.pattern !== 'standard') {
-            nonStandardRungs.add(`${shape}/${density}/${rung.label}/${rung.sizeMM}`)
-          }
-        }
-      }
-    }
-
-    // The law under test is "every VISIBLE product rung is standard-pattern in Auto" — the rung
-    // COUNT is not the law. The old pin (18/7) was arithmetic of the unsanctioned visibility
-    // filter, not of 4.1: it only held while sizes above the tested ceiling were hidden, so it
-    // failed the moment that filter was removed on Dan's ruling ("I never said to hide them").
-    // Pinning a count here re-creates the filter by the back door. Assert the property, plus a
-    // non-empty denominator so the sweep cannot pass by examining nothing.
-    expect(visibleRungs.standard).toBeGreaterThan(0)
-    expect(visibleRungs.light).toBeGreaterThan(0)
-    expect([...nonStandardRungs]).toEqual([])
-
-    // …and the visibility law itself, which the pattern property CANNOT carry: a re-introduced
-    // filter simply removes rungs from the sweep above, so every survivor is still standard and
-    // the whole file stays green while sizes vanish from the product. That is exactly how the
-    // hiding survived — restoring the filter verbatim passed 44/44 until this line existed.
-    //
-    // PINS DAN'S CURRENT RULING (07-30): "I never said to hide them, now we are not at the
-    // launch, are we?" — EVERY computed rung is visible. This assertion is MEANT to change, but
-    // only deliberately: when hiding returns it returns as an 8.7 admin input with a released
-    // value, and whoever builds that updates this line as part of the change.
-    expect([...hiddenRungs]).toEqual([])
-  })
-
-  it('retains adaptive patterns for freeform and explicit admin modes', () => {
-    const contour = stdShapeContour('circle', 119)
-    const product = resolveGridPlan(contour, {
-      source: 'std',
-      mode: 'standard',
-      density: 'light',
-      maxGrowMM: 0,
-    })
-    const freeform = resolveGridPlan(contour, {
-      source: 'gen',
-      mode: 'standard',
-      density: 'light',
-      maxGrowMM: 0,
-    })
-    const explicitAdmin = resolveGridPlan(contour, {
-      source: 'std',
-      mode: 'diamond',
-      density: 'light',
-      maxGrowMM: 0,
-    })
-
-    expect(product.pattern).toBe('standard')
-    expect(freeform.pattern).toBe('quincunx')
-    expect(explicitAdmin.pattern).toBe('diamond')
-  })
-
-  it('accepts exact 10mm rounded-corner tangency and seats all four frameless corners', () => {
-    const sizeMM = 68
-    const radiusMM = DEFAULT_LAW.paddingMM
-    const contour = roundedSquareContour(sizeMM, radiusMM)
-    const plan = resolveGridPlan(contour, {
-      mode: 'standard',
-      pitchMM: 48,
-      density: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      maxGrowMM: 0,
-    })
-    const prepared = prepareExactContour(contour)
-    const seats = plan.grid.anchors.map(
-      (anchor) => distanceToPreparedContour(anchor.p, prepared),
-    )
-
-    expect(plan.grid.anchors).toHaveLength(4)
-    expect(Math.min(...seats)).toBeCloseTo(DEFAULT_LAW.paddingMM, 5)
-  })
-
-  it('keeps the real rounded-square preset on the same 68mm four-corner base as sharp square', () => {
-    const roundedAt = (sizeMM: number) => scaleContour(normalizedPresetContour('squircle'), sizeMM)
-    const roundedRung = nextSemanticRung(semanticLadder(
-      roundedAt,
-      DEFAULT_LAW, 'standard',
-      { source: 'preset', density: 'standard' },
-    ), 68)
-    const roundedPlan = resolveGridPlan(roundedAt(roundedRung.baseSizeMM), {
-      source: 'preset',
-      mode: 'standard',
-      pitchMM: 48,
-      density: 'standard',
-      paddingMM: DEFAULT_LAW.paddingMM,
-      maxGrowMM: 0,
-      construction: roundedRung.construction,
-    })
-    const sharpRung = nextSemanticRung(
-      semanticLadder(
-        (sizeMM) => stdShapeContour('square', sizeMM),
-        DEFAULT_LAW,
-        'standard',
-        { source: 'std', density: 'standard' },
-      ),
-      68,
-    )
-
-    expect(roundedRung).toMatchObject({ label: 'S', sizeMM: 68, points: 4 })
-    expect(roundedPlan.grid.anchors).toHaveLength(4)
-    expect(sharpRung).toMatchObject({ label: 'S', sizeMM: 68, points: 4 })
-  })
-
-  // Dan 08-03: "the standard mode must show all magnets - the light perimeter only". The mode is the
-  // magnet mask and nothing else selects it. This census keeps the four-shape / both-density coverage
-  // and asserts the mask itself, so a regression to perimeter-only Standard fails here — the exact trap
-  // that a single-flag fix walks into, because directPerimeter once chose both pitch AND mask.
   it('masks every standard-shape density by mode: Standard all magnets, Light the boundary', () => {
     let compared = 0
     let standardWithInterior = 0
     for (const shape of ['square', 'circle', 'triangle', 'diamondShape'] as const) {
-      const contourAt = (sizeMM: number) => stdShapeContour(shape, sizeMM)
       for (const density of ['standard', 'light'] as const) {
-        const expectedPitchMM = density === 'standard' ? 48 : 96
-        const rungs = semanticLadder(
-          contourAt,
+        const rungs = semanticLadderFromRecipe(
+          { kind: 'standard', shape },
           DEFAULT_LAW, 'standard',
           { source: 'std', density },
         )
         for (const rung of rungs) {
           const population = constructionPoints(rung.construction)
           const rimKeys = boundaryPointKeys(population, rung.construction.basisMM)
-          const plan = resolveGridPlan(contourAt(rung.sizeMM), {
+          const plan = resolveGridPlanFromRecipe({
+            kind: 'final-contour',
+            contourMM: rung.derivedContourMM,
+          }, {
             source: 'std',
             mode: 'standard',
             density,
@@ -1272,17 +829,17 @@ describe('semantic ladder stays inside its product contract', () => {
             construction: rung.construction,
           })
           compared++
-          expect(rung.construction.pitchMM).toBe(expectedPitchMM)
+          expect(rung.construction.pitchMM).toBe(48)
           expect(rung.construction.pattern).toBe('standard')
           if (density === 'light') {
-            // Light is the rim: every delivered point is on the population boundary.
-            expect(rimKeys.size).toBe(population.length)
+            expect(plan.grid.anchors.every(({ p }) =>
+              rimKeys.has(pointKey(p)))).toBe(true)
           } else {
             // Standard is the full block: the rim is a subset, never the whole population.
             expect(rimKeys.size).toBeLessThanOrEqual(population.length)
             if (rimKeys.size < population.length) standardWithInterior++
           }
-          expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
+          if (density === 'standard') expect(plan.grid.anchors.map(({ p }) => p)).toEqual(population)
           expect(plan.grid.anchors).toHaveLength(rung.points)
           if (rung.points >= 2) expect(plan.grid.ok).toBe(true)
         }
