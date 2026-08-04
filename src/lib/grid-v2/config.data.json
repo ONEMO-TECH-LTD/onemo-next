@@ -1,0 +1,64 @@
+{
+  "version": "grid-v2-config@1",
+  "lattice": {
+    "basePitchMM": 48,
+    "pitchSetMM": [48, 96]
+  },
+  "padding": {
+    "radiusMM": 10,
+    "marginAllowanceMM": 12
+  },
+  "frame": {
+    "defaultMM": 0
+  },
+  "rounding": {
+    "quantumMM": 2
+  },
+  "bounds": {
+    "ceilingMM": 310,
+    "minAnchorsGeometric": 2,
+    "minAnchorsFreeform": 1
+  },
+  "magnets": {
+    "setMM": [6, 8],
+    "extremeMM": 8,
+    "interiorMM": 6
+  },
+  "joins": {
+    "square": "miter",
+    "rectangle": "miter",
+    "triangle": "miter",
+    "diamond": "miter",
+    "ngon": "miter",
+    "circle": "round",
+    "pill": "round",
+    "freeform": "round"
+  },
+  "patterns": {
+    "available": ["straight", "diamond", "dice"],
+    "dicePitchMM": 96,
+    "default": "straight"
+  },
+  "tessellation": {
+    "circleSteps": 180,
+    "arcToleranceMM": 0.05
+  },
+  "registration": {
+    "default": "centroid"
+  },
+  "publication": {
+    "defaultMode": "light",
+    "offerONE": true,
+    "sliderFamilies": ["freeform"],
+    "hideUntestedSizes": false
+  },
+  "attachment": {
+    "default": "magnetic",
+    "garmentCanon": "96-dice",
+    "compatibility": {
+      "magnetic": ["48-straight", "96-dice"],
+      "twin-fix": ["48-straight", "96-straight", "96-dice"],
+      "velcro": ["48-straight", "96-straight", "96-dice"]
+    }
+  }
+}
