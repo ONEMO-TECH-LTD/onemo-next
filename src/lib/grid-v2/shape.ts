@@ -14,6 +14,7 @@ import { offset, circle, type Contour } from './offset';
 
 const EPS = 1e-6;
 const ORIGIN: Pt = { x: 0, y: 0 };
+const ptKey = (p: Pt): string => `${Math.round(p.x * 1000)}:${Math.round(p.y * 1000)}`;
 
 export interface ShapeRequest {
   family: ShapeFamily;
@@ -210,6 +211,14 @@ export function generateShape(request: ShapeRequest, config: EngineConfig): Shap
   if (POLYGON_FAMILIES.has(family)) {
     const vertices = polygonSkeleton(family, span, pitchMM);
     const seated = seatLattice(vertices, pitchMM, 0, ORIGIN); // corner magnets sit ON the hull
+    // Law §3.2: every skeleton vertex passes through a magnet centre. A span that puts a corner
+    // off-lattice (e.g. an even-base triangle apex) is unlawful — fail loud, never a fitted template.
+    const seatedKeys = new Set(seated.map(ptKey));
+    for (const v of vertices) {
+      if (!seatedKeys.has(ptKey(v))) {
+        throw new Error(`unlawful span for ${family}: skeleton vertex (${v.x}, ${v.y}) has no magnet centre under it (law §3.2)`);
+      }
+    }
     const population = mode === 'light' ? boundaryRing(seated, populationPattern, pitchMM) : seated;
     // Corner rounding is the user's radius (law §3.21/§3.22) — it moves the outline, never the
     // magnet count (population is derived above, before rounding).

@@ -38,6 +38,8 @@ export interface EngineInput {
 export interface EngineOutput {
   family: ShapeFamily;
   population: Pt[];
+  /** The shape-defining magnets (corners / tips / axis / ring) — every one sits under a magnet (law §3.2). */
+  vertices: Pt[];
   contour: Contour;
   /** Frameless even-mm size. */
   sizeMM: SizeMM;
@@ -74,6 +76,7 @@ export function solveGrid(input: EngineInput): EngineOutput {
   return {
     family: shape.family,
     population: shape.population,
+    vertices: shape.vertices,
     contour: shape.contour,
     sizeMM: sizeOf(shape.contour, config),
     spec: manufacturingSpec(shape, config),
@@ -92,7 +95,11 @@ export function solveLadder(input: EngineInput): LadderRung[] {
   }
   const rungs: LadderRung[] = [];
   const maxAnchors = 64; // hard loop bound; the ceiling stops it far sooner
-  for (let n = config.bounds.minAnchorsGeometric; n <= maxAnchors; n++) {
+  // Lawful spans only — a triangle needs an odd base so its apex lands on a magnet (law §3.2);
+  // the ladder must never walk a span whose skeleton has no magnet under a corner.
+  const start = input.family === 'triangle' ? 3 : config.bounds.minAnchorsGeometric;
+  const step = input.family === 'triangle' ? 2 : 1;
+  for (let n = start; n <= maxAnchors; n += step) {
     const span: GridSpan = SYMMETRIC.has(input.family) ? { nx: n, ny: n } : { nx: n, ny: input.span.ny };
     const shape = generateShape(toShapeRequest({ ...input, span }, config), config);
     const size = sizeOf(shape.contour, config);

@@ -82,4 +82,27 @@ describe('P5 · Sealed public API (law §10.1–10.2)', () => {
       expect(capped.every((r) => r.sizeMM <= 120)).toBe(true);
     });
   });
+
+  describe('lawful spans — every skeleton vertex sits under a magnet (law §3.2)', () => {
+    const key = (p: { x: number; y: number }) => `${Math.round(p.x)}:${Math.round(p.y)}`;
+    it.each(['square', 'rectangle', 'triangle', 'diamond', 'circle', 'pill'] as const)(
+      '%s ladder: every rung seats all of its skeleton vertices',
+      (family) => {
+        const rungs = solveLadder({ family, span: { nx: 3, ny: 3 } });
+        expect(rungs.length).toBeGreaterThan(0);
+        for (const rung of rungs) {
+          const out = solveGrid({ family, span: rung.span });
+          const pop = new Set(out.population.map(key));
+          for (const v of out.vertices) expect(pop.has(key(v))).toBe(true);
+        }
+      },
+    );
+    it('the triangle ladder walks only odd bases (never the unlawful even-base apex)', () => {
+      const rungs = solveLadder({ family: 'triangle', span: { nx: 3, ny: 3 } });
+      expect(rungs.every((r) => r.span.nx % 2 === 1)).toBe(true);
+    });
+    it('an even-base triangle is rejected at the engine — fail loud, not a fitted template (§3.2)', () => {
+      expect(() => solveGrid({ family: 'triangle', span: { nx: 2, ny: 2 } })).toThrow(/unlawful span/);
+    });
+  });
 });

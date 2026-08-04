@@ -188,7 +188,8 @@ describe('P3 · ShapeGenerator — construction law (link magnet centres → off
   it('every family resolves under the 100ms budget (law §9)', () => {
     const start = performance.now();
     for (const family of ['square', 'triangle', 'diamond', 'circle', 'pill'] as const) {
-      generateShape(req({ family, span: { nx: 4, ny: 4 } }), defaultConfig);
+      const nx = family === 'triangle' ? 5 : 4; // triangle needs an odd base (law §3.2)
+      generateShape(req({ family, span: { nx, ny: nx } }), defaultConfig);
     }
     expect(performance.now() - start).toBeLessThan(100);
   });
