@@ -95,8 +95,12 @@ export interface EngineConfig {
   tessellation: {
     /** Steps for the analytic circle/ellipse. */
     circleSteps: number;
-    /** Arc tolerance for round joins. */
+    /** Arc tolerance for round joins (mm). */
     arcToleranceMM: number;
+    /** Miter join limit — how far a sharp corner may project before it bevels (offset backend). */
+    miterLimit: number;
+    /** Decimal precision for the offset backend's internal integer scaling. */
+    precision: number;
   };
 
   /** Freeform registration — a released input, no search loops (law §4.9 → config). */

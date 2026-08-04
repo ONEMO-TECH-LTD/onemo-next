@@ -41,7 +41,9 @@
   },
   "tessellation": {
     "circleSteps": 180,
-    "arcToleranceMM": 0.05
+    "arcToleranceMM": 0.05,
+    "miterLimit": 3,
+    "precision": 4
   },
   "registration": {
     "default": "centroid"
