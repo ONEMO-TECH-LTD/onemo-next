@@ -366,3 +366,30 @@ export async function composeStickerEngine(
   for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx.fillRect(x, y, t, t) }
   ctx.drawImage(baked.canvas, 0, 0)
 }
+
+/** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
+ *  WYSIWYG with the brush cursor), plus the enclosed interior when the gesture closes a loop
+ *  (Dan's green-blob semantics: a loop means the whole region). */
+export function swathMask(
+  stroke: { x: number; y: number }[], brushPx: number, w: number, h: number,
+): Mask {
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
+  ctx.lineWidth = Math.max(2, brushPx * 2)
+  ctx.beginPath()
+  stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+  ctx.stroke()
+  // closed gesture → fill the interior too
+  const first = stroke[0], last = stroke[stroke.length - 1]
+  let perim = 0
+  for (let i = 1; i < stroke.length; i++) perim += Math.hypot(stroke[i].x - stroke[i - 1].x, stroke[i].y - stroke[i - 1].y)
+  if (perim > 0 && Math.hypot(first.x - last.x, first.y - last.y) < perim * 0.2) {
+    ctx.closePath(); ctx.fill()
+  }
+  const px = ctx.getImageData(0, 0, w, h).data
+  const data = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) data[i] = px[i * 4 + 3] > 128 ? 1 : 0
+  return { data, w, h }
+}

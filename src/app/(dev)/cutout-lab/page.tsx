@@ -14,7 +14,7 @@ import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeSticker, bakeStickerEngine, BLEND_DEFAULTS, composeSticker, composeStickerEngine,
-  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI,
+  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, swathMask,
   subtractMasks, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
 } from './finish'
@@ -78,7 +78,41 @@ export default function CutoutLab() {
   const engineSelRef = useRef(engineSel); engineSelRef.current = engineSel
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
+  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null }
+  const histRef = useRef<Snap[]>([])
+  const histIdx = useRef(-1)
+  const [histTick, setHistTick] = useState(0)
+  const snapNow = (): Snap => ({
+    mask: maskRef.current ? { data: maskRef.current.data.slice(), w: maskRef.current.w, h: maskRef.current.h, soft: maskRef.current.soft?.slice() } : null,
+    drawn: drawnRef.current,
+  })
+  const pushHistory = () => {
+    histRef.current = histRef.current.slice(0, histIdx.current + 1)
+    histRef.current.push(snapNow())
+    if (histRef.current.length > 30) histRef.current.shift()
+    histIdx.current = histRef.current.length - 1
+    setHistTick((t) => t + 1)
+  }
+  const restore = async (s: Snap) => {
+    maskRef.current = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
+    drawnRef.current = s.drawn
+    setHasCut(!!(s.mask || s.drawn))
+    if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
+      try { preparedRef.current = await prepareAI(urlRef.current, imgCanvas.current, maskRef.current!) } catch { /* keep last prepared */ }
+    }
+    applyFinish()
+  }
+  const undo = async () => { if (histIdx.current > 0) { histIdx.current--; setHistTick((t) => t + 1); await restore(histRef.current[histIdx.current]) } }
+  const redo = async () => { if (histIdx.current < histRef.current.length - 1) { histIdx.current++; setHistTick((t) => t + 1); await restore(histRef.current[histIdx.current]) } }
+  const clearAll = () => {
+    maskRef.current = null; drawnRef.current = null; preparedRef.current = null
+    dRef.current = null; boundsRef.current = null; shapeRef.current = null
+    setHasCut(false); pushHistory(); render()
+    setStatus('🗑 cleared — paint a shape with the hand brush, or Re-detect')
+  }
 
+  const dispW2 = useRef(disp.w); dispW2.current = disp.w
+  const dispRefW = () => dispW2.current
   const p2w = () => preparedRef.current?.spec.maskWidthPx ?? imgCanvas.current?.width ?? 1
   const p2h = () => preparedRef.current?.spec.maskHeightPx ?? imgCanvas.current?.height ?? 1
 
@@ -117,9 +151,10 @@ export default function CutoutLab() {
       const t = toolRef.current
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'
       if (t === 'draw' || t === 'draw-erase') {
-        // sculpt ink: solid violet (add) / red (erase)
-        ctx.strokeStyle = t === 'draw' ? 'rgba(124,58,237,0.6)' : 'rgba(239,68,68,0.6)'
-        ctx.lineWidth = Math.max(3, img.width / 300)
+        // PAINT ink (WYSIWYG): the stroke renders at the actual brush width — what you paint is
+        // the area that lands. Violet = add, red = erase.
+        ctx.strokeStyle = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
+        ctx.lineWidth = Math.max(2, brushRef.current * (img.width / disp.w) * 2)
         ctx.beginPath(); ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
         for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
         ctx.stroke()
@@ -177,7 +212,9 @@ export default function CutoutLab() {
     }
     setHasCut(true)
     applyFinish()
+    pushHistory()
     setStatus('✨ done — brush, draw, edit, tune, or Save')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish])
 
   const edgeFault = useCallback((why: string) => {
@@ -294,27 +331,32 @@ export default function CutoutLab() {
       const img = imgCanvas.current!
       const erase = toolRef.current === 'draw-erase'
       const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
-      const r = strokeToShape(pts)
-      if (!r) { setStatus('✏️ draw a CLOSED loop — the shape is what you draw (no AI)'); render(); return }
-      const loopMask = maskFromShape(r.shape, img.width, img.height)
-      if (maskRef.current && hasCutRef.current) {
-        // Dan's two examples: green loop UNIONS into the selection, red loop SUBTRACTS — geometric;
-        // the result re-enters the ENGINE pipeline (prepareAI) for the elegant joins + compositing.
-        drawnRef.current = null
-        const combined = erase ? subtractMasks(maskRef.current, loopMask) : unionMasks(maskRef.current, loopMask)
-        setBusy(true)
-        await acceptMask(combined)
-        setBusy(false)
-        setStatus(erase ? '✂️ shape cut — geometric erase applied' : '✏️ shape added — geometric union applied')
-      } else if (!erase) {
-        drawnRef.current = { shape: r.shape, ring: r.ring }
-        maskRef.current = loopMask
-        setHasCut(true)
-        applyFinish()
-        setStatus(`✏️ drawn shape recognized: ${r.verdict} — tune, edit, redraw, or Save`)
-      } else {
-        setStatus('✂️ nothing to erase yet — make a cut or draw a shape first')
+      const brushPx = brushRef.current * (img.width / dispRefW())
+      // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
+      const painted = swathMask(pts, brushPx, img.width, img.height)
+      if (!maskRef.current || !hasCutRef.current) {
+        if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); render(); return }
+        // fresh creation: a closed loop gets the primitive-snap magic (circle/rect/blob harmonizer)
+        const r = strokeToShape(pts)
+        if (r) {
+          drawnRef.current = { shape: r.shape, ring: r.ring }
+          maskRef.current = maskFromShape(r.shape, img.width, img.height)
+          setHasCut(true); applyFinish(); pushHistory()
+          setStatus(`✏️ shape recognized: ${r.verdict} — keep painting to extend, or erase`)
+        } else {
+          drawnRef.current = null
+          setBusy(true); await acceptMask(painted); setBusy(false)
+          setStatus('✏️ painted shape created — keep painting, erase, or tune')
+        }
+        return
       }
+      // existing shape: paint UNIONS in, erase SUBTRACTS — auto-tuned by the engine pipeline
+      drawnRef.current = null
+      const combined = erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted)
+      setBusy(true)
+      await acceptMask(combined)
+      setBusy(false)
+      setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
       return
     }
     setBusy(true)
@@ -354,6 +396,7 @@ export default function CutoutLab() {
     drawnRef.current = { shape: next, ring }
     maskRef.current = maskFromShape(next, img.width, img.height)
     applyFinish()
+    pushHistory()
   }
 
   const redetect = async () => { if (!busy && lastFileRef.current) await onFile(lastFileRef.current) }
@@ -391,13 +434,16 @@ export default function CutoutLab() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
-      <h1 style={{ fontSize: 19, fontWeight: 700 }}>Cutout Lab</h1>
+      <h1 style={{ fontSize: 19, fontWeight: 700 }} data-hist={histTick}>Cutout Lab</h1>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center' }}>
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
         <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
-        <button onClick={redetect} disabled={!hasCut || busy} style={btn}>↻ Re-detect</button>
+        <button onClick={redetect} disabled={busy || !lastFileRef.current} style={btn}>↻ Re-detect</button>
+        <button onClick={undo} disabled={busy || histIdx.current <= 0} style={btn}>↩ Undo</button>
+        <button onClick={redo} disabled={busy || histIdx.current >= histRef.current.length - 1} style={btn}>↪ Redo</button>
+        <button onClick={clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
         <button onClick={() => { setPreview((v) => { previewRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
         <button onClick={() => { setOverlayOn((v) => { overlayRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
@@ -454,8 +500,8 @@ export default function CutoutLab() {
           {blend.tint && <button onClick={() => setBlendTune({ tint: null })} style={chipBtn(false)}>tint off</button>}
         </>)}
         {tab === 'edit' && (<>
-          <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>✏️ Draw add</button>
-          <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>✂️ Draw erase</button>
+          <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
+          <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
           <button onClick={() => enterEdit('nodes')} disabled={!shapeRef.current} style={chipBtn(tool === 'nodes')}>⬡ Nodes</button>
           <button onClick={() => enterEdit('frame')} disabled={!shapeRef.current} style={chipBtn(tool === 'frame')}>▣ Frame</button>
           {tool === 'frame' && (
