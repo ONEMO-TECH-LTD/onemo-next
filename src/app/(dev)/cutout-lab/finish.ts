@@ -4,7 +4,7 @@
 
 import type { Mask } from '@/lib/cutout-ai/types'
 import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
-import { postProcessMask, smoothMask } from '@/lib/effect/mask'
+import { dilateMask, postProcessMask, smoothMask } from '@/lib/effect/mask'
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenShape, shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
@@ -22,6 +22,9 @@ export type { TraceOutlineSettings }
 export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
+const PADDING_MM = 1.5 // v5.3.1 EFFECT_BUILD_CONFIG.paddingMM — the cut line NEVER touches the
+// subject edge: the mask is dilated outward by this physical margin before tracing, so the visible
+// outline is clean margin, not the segmentation staircase (the original 'perfect edges' rule #1)
 
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
 
@@ -31,7 +34,10 @@ export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape 
 
 export function finishOutline(mask: Mask, settings: TraceOutlineSettings): FinishResult | null {
   const { w, h } = mask
-  const clean = smoothMask(postProcessMask(mask.data, w, h), w, h, 3)
+  const mmPerPx = MM_BASE / Math.max(w, h)
+  const padPx = Math.max(0, Math.round(PADDING_MM / mmPerPx))
+  const padded = padPx > 0 ? dilateMask(postProcessMask(mask.data, w, h), w, h, padPx) : postProcessMask(mask.data, w, h)
+  const clean = smoothMask(padded, w, h, 3)
   const ring = traceContourRaw(clean, w, h) // canvas ImageData is y-down = editor space already
   if (!ring) return null
   const straight = rdpClosed(ring.map(([x, y]) => [x, y] as Vec2Px), 1.0)
@@ -92,22 +98,28 @@ export interface BlendSettings {
   panX: number             // artwork pan, % of width  (−50..50)
   panY: number             // artwork pan, % of height (−50..50)
 }
-export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 }
+export const BLEND_DEFAULTS: BlendSettings = { blend: 50, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // blend 50 ≈ v5.3.1's default magic-blend blur (max(6, w/50)px) — rule #3: the blend is the product look, always on
 export { PRESET_LABELS }
 export type { PresetKey }
 
-/** Subject pixels = the image masked by the AI mask (alpha from mask, colour from the image). */
+/** Subject pixels = the image masked by the AI mask — with a SOFT feathered alpha edge (rule #2 of
+ *  the original 'perfect edges' compositing: v5.3.1's matte is continuous/anti-aliased, never a
+ *  hard 1px binary cut; residual tracing imperfections dissolve in the feather + blend). */
 export function subjectFromMask(image: HTMLCanvasElement, mask: Mask): HTMLCanvasElement {
   const { w, h } = mask
   const alpha = document.createElement('canvas'); alpha.width = w; alpha.height = h
   const av = new ImageData(w, h)
   for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = mask.data[i] ? 255 : 0
   alpha.getContext('2d')!.putImageData(av, 0, 0)
+  const soft = document.createElement('canvas'); soft.width = w; soft.height = h
+  const sctx = soft.getContext('2d')!
+  sctx.filter = `blur(${Math.max(1, w / 700)}px)` // ~1.5px feather at working res
+  sctx.drawImage(alpha, 0, 0)
   const c = document.createElement('canvas'); c.width = image.width; c.height = image.height
   const ctx = c.getContext('2d')!
   ctx.drawImage(image, 0, 0)
   ctx.globalCompositeOperation = 'destination-in'
-  ctx.drawImage(alpha, 0, 0, c.width, c.height)
+  ctx.drawImage(soft, 0, 0, c.width, c.height)
   return c
 }
 
