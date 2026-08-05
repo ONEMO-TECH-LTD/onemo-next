@@ -3,7 +3,7 @@
 // vector-core doctrine's own "circle = 4 smooth kappa anchors"). Corners stay SHARP per the
 // v5.3.1 birth philosophy — rounding is the Radius knob's job, never baked here.
 
-import { ringToVPath, type VShape } from '@/lib/vector-core'
+import { flattenShape, ringToVPath, type VShape } from '@/lib/vector-core'
 import { repairSimplePolygon, validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
 import { axisAngle, type Classification } from './classify'
 import type { Vec2 } from './types'
@@ -61,32 +61,11 @@ function fitBlob(ring: Vec2[], cls: Classification, diag: number): VShape {
   const maxError = Math.max(1.5, diag * 0.012)
   const path = ringToVPath(ring, 361 /* detector owns corners */, maxError, cls.corners, maxError, diag * 0.03)
   const shape: VShape = { paths: [path] }
-  // fold-guard: sample the fitted outline and check it stays simple
-  const flat: Vec2Px[] = sampleShape(shape, 64)
+  // fold-guard: flatten the fitted outline with the ENGINE's own flattener and check it stays simple
+  const flat: Vec2Px[] = (flattenShape(shape, 0.5)[0] ?? []).map((p) => [p.x, p.y] as Vec2Px)
   if (flat.length >= 4 && validateSelfIntersection(flat, 'freeshape').length === 0) return shape
   const repaired = repairSimplePolygon(ring.map((p) => [p.x, p.y] as Vec2Px), Math.max(1, diag * 0.01))
   return polygonShape(repaired.map(([x, y]) => ({ x, y })))
-}
-
-/** Cheap uniform sampler over the shape's segments (lines + cubics) for validation only. */
-function sampleShape(shape: VShape, perSeg: number): Vec2Px[] {
-  const out: Vec2Px[] = []
-  const a = shape.paths[0]?.anchors ?? []
-  const n = a.length
-  for (let i = 0; i < n; i++) {
-    const p0 = a[i], p1 = a[(i + 1) % n]
-    const c1 = p0.hOut ?? p0.p, c2 = p1.hIn ?? p1.p
-    const straight = !p0.hOut && !p1.hIn
-    const steps = straight ? 1 : Math.max(2, Math.round(perSeg / n) + 2)
-    for (let s = 0; s < steps; s++) {
-      const t = s / steps, w = 1 - t
-      out.push([
-        w * w * w * p0.p.x + 3 * w * w * t * c1.x + 3 * w * t * t * c2.x + t * t * t * p1.p.x,
-        w * w * w * p0.p.y + 3 * w * w * t * c1.y + 3 * w * t * t * c2.y + t * t * t * p1.p.y,
-      ])
-    }
-  }
-  return out
 }
 
 /** verdict → the idealized shape, fitted on the classifier's SMOOTHED ring (the drawn intent);

@@ -72,113 +72,7 @@ export const BLEND_DEFAULTS: BlendSettings = { blend: 50, fill: 'clamp', preset:
 export { PRESET_LABELS }
 export type { PresetKey }
 
-/** Subject pixels = the image masked by the AI mask — with a SOFT feathered alpha edge (rule #2 of
- *  the original 'perfect edges' compositing: v5.3.1's matte is continuous/anti-aliased, never a
- *  hard 1px binary cut; residual tracing imperfections dissolve in the feather + blend). */
-export function subjectFromMask(image: HTMLCanvasElement, mask: Mask): HTMLCanvasElement {
-  const { w, h } = mask
-  // DEFRINGE (the actual dirty-edge cure): the mask's outermost 1–2px rim is background-coloured
-  // contamination — feathering alone BLURS the dirt. Erode the matte into the subject first (eat
-  // the rim), THEN feather. Erode = dilate the inverse (mask.ts has the octagonal dilate).
-  const inv = new Uint8Array(w * h)
-  for (let i = 0; i < inv.length; i++) inv[i] = mask.data[i] ? 0 : 1
-  const invGrown = dilateMask(inv, w, h, 2)
-  const alpha = document.createElement('canvas'); alpha.width = w; alpha.height = h
-  const av = new ImageData(w, h)
-  for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = invGrown[i] ? 0 : 255
-  alpha.getContext('2d')!.putImageData(av, 0, 0)
-  const soft = document.createElement('canvas'); soft.width = w; soft.height = h
-  const sctx = soft.getContext('2d')!
-  sctx.filter = `blur(${Math.max(1.5, w / 450)}px)` // ~2.3px feather at working res
-  sctx.drawImage(alpha, 0, 0)
-  const c = document.createElement('canvas'); c.width = image.width; c.height = image.height
-  const ctx = c.getContext('2d')!
-  ctx.drawImage(image, 0, 0)
-  ctx.globalCompositeOperation = 'destination-in'
-  ctx.drawImage(soft, 0, 0, c.width, c.height)
-  return c
-}
 
-/** Bake the sticker at the OUTLINE's bounds: the engine expands the canvas past the image frame and
- *  fills the exposed space (Clamp stretches edge pixels / Tile repeats) — background expansion
- *  faked with zero generative AI (the s59 frame-origin capability). Returns a transparent-backed
- *  canvas clipped to the outline, plus its frame origin in image space. */
-/** Artwork transform: the image (and its subject matte) move/zoom UNDER the fixed shape —
- *  v5.3.1's art-transform semantics, applied in image space before the compose. */
-function transformArtwork(src: HTMLCanvasElement, b: BlendSettings): HTMLCanvasElement {
-  if (b.scale === 100 && b.panX === 0 && b.panY === 0) return src
-  const w = src.width, h = src.height
-  const c = document.createElement('canvas'); c.width = w; c.height = h
-  const ctx = c.getContext('2d')!
-  const s = Math.max(0.05, b.scale / 100)
-  ctx.translate(w / 2 + (b.panX / 100) * w, h / 2 + (b.panY / 100) * h)
-  ctx.scale(s, s)
-  ctx.drawImage(src, -w / 2, -h / 2)
-  return c
-}
-
-/** 3×3 mirror mosaic — each neighbour tile is the image flipped about the shared edge, so the
- *  expansion transitions seamlessly (Dan: tile must MIRROR, plain repeat seams). Glue-built:
- *  the engine's tile/clamp fill stays untouched; mirror hands the engine a bigger original. */
-function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
-  const w = src.width, h = src.height
-  const c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3
-  const ctx = c.getContext('2d')!
-  for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) {
-    ctx.save()
-    const fx = tx === 1 ? 1 : -1, fy = ty === 1 ? 1 : -1
-    ctx.translate(tx * w + (fx === -1 ? w : 0), ty * h + (fy === -1 ? h : 0))
-    ctx.scale(fx, fy)
-    ctx.drawImage(src, 0, 0)
-    ctx.restore()
-  }
-  return c
-}
-
-export async function bakeSticker(
-  image: HTMLCanvasElement, mask: Mask, d: string, bounds: OutlineBounds, b: BlendSettings,
-): Promise<{ canvas: HTMLCanvasElement; originX: number; originY: number }> {
-  const art = transformArtwork(image, b)
-  const subj = transformArtwork(subjectFromMask(image, mask), b)
-  const mirror = b.fill === 'mirror'
-  const sx = mirror ? image.width : 0, sy = mirror ? image.height : 0
-  let original = art, subject = subj
-  if (mirror) {
-    original = mirrorMosaic(art)
-    const big = document.createElement('canvas'); big.width = original.width; big.height = original.height
-    big.getContext('2d')!.drawImage(subj, sx, sy) // subject sits in the centre tile, untiled
-    subject = big
-  }
-  const { canvas, frame } = await composeEffectArtwork({
-    originalCanvas: original,
-    subjectCanvas: subject,
-    outputBoundsPx: { minX: bounds.minX + sx, minY: bounds.minY + sy, maxX: bounds.maxX + sx, maxY: bounds.maxY + sy },
-    blendPercent: b.blend,
-    fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode), // mirror: the mosaic covers the frame; clamp guards its rim
-    fxFilter: presetFilter(b.preset),
-    vignette: b.vignette / 100,
-    tint: b.tint,
-  })
-  const out = document.createElement('canvas'); out.width = frame.width; out.height = frame.height
-  const ctx = out.getContext('2d')!
-  ctx.translate(-(frame.originX - sx), -(frame.originY - sy))
-  ctx.clip(new Path2D(d))
-  ctx.drawImage(canvas, frame.originX - sx, frame.originY - sy)
-  return { canvas: out, originX: frame.originX - sx, originY: frame.originY - sy }
-}
-
-/** Preview: the baked sticker over a checkerboard, at the expanded frame size. */
-export async function composeSticker(
-  target: HTMLCanvasElement, image: HTMLCanvasElement, mask: Mask, d: string, bounds: OutlineBounds, b: BlendSettings,
-): Promise<void> {
-  const baked = await bakeSticker(image, mask, d, bounds, b)
-  const w = baked.canvas.width, h = baked.canvas.height
-  target.width = w; target.height = h
-  const ctx = target.getContext('2d')!
-  const t = 16
-  for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx.fillRect(x, y, t, t) }
-  ctx.drawImage(baked.canvas, 0, 0)
-}
 
 // ── drawn shapes (freeshape / Sculpt) — same finishing, same knobs, no AI ──
 
@@ -230,6 +124,38 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   const data = new Uint8Array(base.data)
   for (let i = 0; i < data.length; i++) if (sub.data[i]) data[i] = 0
   return { data, w: base.w, h: base.h }
+}
+
+/** Artwork transform: the image (and its subject matte) move/zoom UNDER the fixed shape —
+ *  v5.3.1's art-transform semantics (EditorCanvas artXform: centre-scale + pan), image space. */
+function transformArtwork(src: HTMLCanvasElement, b: BlendSettings): HTMLCanvasElement {
+  if (b.scale === 100 && b.panX === 0 && b.panY === 0) return src
+  const w = src.width, h = src.height
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const ctx = c.getContext('2d')!
+  const s = Math.max(0.05, b.scale / 100)
+  ctx.translate(w / 2 + (b.panX / 100) * w, h / 2 + (b.panY / 100) * h)
+  ctx.scale(s, s)
+  ctx.drawImage(src, -w / 2, -h / 2)
+  return c
+}
+
+/** 3×3 mirror mosaic — each neighbour tile is the image flipped about the shared edge, so the
+ *  expansion transitions seamlessly (Dan's mirror fill). Glue on TOP of the untouched engine op:
+ *  mirror hands the engine a bigger original; the engine's own clamp/tile stays as shipped. */
+function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
+  const w = src.width, h = src.height
+  const c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3
+  const ctx = c.getContext('2d')!
+  for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) {
+    ctx.save()
+    const fx = tx === 1 ? 1 : -1, fy = ty === 1 ? 1 : -1
+    ctx.translate(tx * w + (fx === -1 ? w : 0), ty * h + (fy === -1 ? h : 0))
+    ctx.scale(fx, fy)
+    ctx.drawImage(src, 0, 0)
+    ctx.restore()
+  }
+  return c
 }
 
 // ── ENGINE-NATIVE AI path (Dan's root-cause call, s62): STOP approximating the compositing —

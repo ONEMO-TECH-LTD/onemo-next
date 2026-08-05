@@ -13,7 +13,7 @@ import { strokeToShape } from '@/lib/freeshape'
 import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
-  AUTO_SETTINGS, bakeSticker, bakeStickerEngine, BLEND_DEFAULTS, composeSticker, composeStickerEngine,
+  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, composeStickerEngine,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, swathMask,
   subtractMasks, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
@@ -123,9 +123,10 @@ export default function CutoutLab() {
     if (previewRef.current && dRef.current && boundsRef.current && maskRef.current) {
       const seq = ++previewSeq.current
       const [m, d, bounds] = [maskRef.current, dRef.current, boundsRef.current]
-      const p = preparedRef.current && !drawnRef.current
+      void m
+      const p = preparedRef.current
         ? composeStickerEngine(view, preparedRef.current, d, bounds, p2w(), p2h(), blendRef.current)
-        : composeSticker(view, img, m, d, bounds, blendRef.current)
+        : Promise.reject(new Error('no prepared'))
       p.catch(() => { if (seq === previewSeq.current) drawCutout(view, img, d) })
       return
     }
@@ -341,6 +342,7 @@ export default function CutoutLab() {
         if (r) {
           drawnRef.current = { shape: r.shape, ring: r.ring }
           maskRef.current = maskFromShape(r.shape, img.width, img.height)
+          if (urlRef.current) { try { preparedRef.current = await prepareAI(urlRef.current, img, maskRef.current) } catch { /* bake falls back */ } }
           setHasCut(true); applyFinish(); pushHistory()
           setStatus(`✏️ shape recognized: ${r.verdict} — keep painting to extend, or erase`)
         } else {
@@ -395,6 +397,7 @@ export default function CutoutLab() {
     const ring = (flattenShape(next, 0.5)[0] ?? []).map((p) => ({ x: p.x, y: p.y }))
     drawnRef.current = { shape: next, ring }
     maskRef.current = maskFromShape(next, img.width, img.height)
+    if (urlRef.current) prepareAI(urlRef.current, img, maskRef.current).then((p) => { preparedRef.current = p; render() }).catch(() => {})
     applyFinish()
     pushHistory()
   }
@@ -404,9 +407,8 @@ export default function CutoutLab() {
   const save = async () => {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current) return
-    const baked = preparedRef.current && !drawnRef.current
-      ? await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, p2w(), p2h(), blendRef.current)
-      : await bakeSticker(img, maskRef.current, dRef.current, boundsRef.current, blendRef.current)
+    if (!preparedRef.current) return
+    const baked = await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, p2w(), p2h(), blendRef.current)
     baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
   }
 

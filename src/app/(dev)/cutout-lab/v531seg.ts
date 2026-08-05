@@ -3,13 +3,12 @@
 // cutout-ai sub (ARCHITECTURE.md: u2net is v5.3.1's; the UI reaches it through v5.3.1's own path).
 // Auto-only (no prompt → no brush); the lab uses it to separate model failures from infrastructure.
 
-import { preloadBen, segmentML } from '@/lib/effect/segment-ml'
+import { segmentML } from '@/lib/effect/segment-ml'
 import type { Mask } from '@/lib/cutout-ai/types'
 
 export const V531_KEY = 'u2net-v531'
 export const V531_LABEL = 'u2net · v5.3.1 native (auto, no brush)'
 
-export { preloadBen }
 
 /** image URL → binary mask via v5.3.1's own worker chain. segment-ml rasterizes Y-UP; the lab
  *  canvas is y-down, so flip rows. Mask dims track the matte's own bound (≈ the lab's, ±1px). */
