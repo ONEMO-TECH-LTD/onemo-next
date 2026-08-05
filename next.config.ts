@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // cutout-lab runs the same self-hosted onnxruntime WASM as the effect-creator routes —
+        // same isolation headers (the proven mobile-Safari setup for these artifacts).
+        source: "/cutout-lab",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+      {
         // A dedicated worker spawned from a crossOriginIsolated page is BLOCKED unless the worker
         // script's own response carries a compatible COEP — and the worker chunk is served from
         // /_next/*, outside the route rule above. COEP on a plain <script> chunk response is inert,
