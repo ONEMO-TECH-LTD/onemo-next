@@ -3,6 +3,7 @@
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
 import type { Mask } from '@/lib/cutout-ai/types'
+import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { postProcessMask, smoothMask } from '@/lib/effect/mask'
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
@@ -15,8 +16,10 @@ import {
 
 export type { TraceOutlineSettings }
 
-/** Sticker-ish auto defaults (Dan: refinements automatic, user fine-tunes). All v5.3.1 controls. */
-export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, detail: 85, offset: 3, offsetJoin: 'round', smooth: 30 }
+/** Birth defaults per v5.3.1's DELIBERATE generation philosophy (Dan 2026-08-05): the first vector
+ *  is ANGLED and SIMPLIFIED with an offset — squared straight lines, SHARP joins, no rounding, no
+ *  smoothing. Rounding/smooth/radius/curve are user TOOLS applied after, never baked into birth. */
+export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, detail: 70, offset: 4, offsetJoin: 'sharp' }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
@@ -68,4 +71,49 @@ export function drawCutout(target: HTMLCanvasElement, image: HTMLCanvasElement, 
   ctx.clip(new Path2D(d))
   ctx.drawImage(image, 0, 0)
   ctx.restore()
+}
+
+// ── blend layer (the s59-decoupled v5.3.1 2D artwork operation, verified by its own test gates) ──
+
+export interface BlendSettings {
+  blend: number            // 0..100 — magic-blend percent (blurred bg + sharp subject)
+  fill: ArtworkFillMode    // clamp | tile
+  preset: PresetKey        // colour preset (composite.ts PRESET_LABELS)
+  vignette: number         // 0..100 → 0..1
+  tint: string | null      // css colour wash or null
+}
+export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'clamp', preset: 'none', vignette: 0, tint: null }
+export { PRESET_LABELS }
+export type { PresetKey }
+
+/** Subject pixels = the image masked by the AI mask (alpha from mask, colour from the image). */
+export function subjectFromMask(image: HTMLCanvasElement, mask: Mask): HTMLCanvasElement {
+  const { w, h } = mask
+  const alpha = document.createElement('canvas'); alpha.width = w; alpha.height = h
+  const av = new ImageData(w, h)
+  for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = mask.data[i] ? 255 : 0
+  alpha.getContext('2d')!.putImageData(av, 0, 0)
+  const c = document.createElement('canvas'); c.width = image.width; c.height = image.height
+  const ctx = c.getContext('2d')!
+  ctx.drawImage(image, 0, 0)
+  ctx.globalCompositeOperation = 'destination-in'
+  ctx.drawImage(alpha, 0, 0, c.width, c.height)
+  return c
+}
+
+/** The sticker artwork: v5.3.1's one 2D compose (blend/fill/preset/vignette/tint) clipped by the
+ *  resolved outline, over a checkerboard. Async (the engine's SVG-filter bake). */
+export async function composeSticker(
+  target: HTMLCanvasElement, image: HTMLCanvasElement, mask: Mask, d: string, b: BlendSettings,
+): Promise<void> {
+  const { canvas } = await composeEffectArtwork({
+    originalCanvas: image,
+    subjectCanvas: subjectFromMask(image, mask),
+    blendPercent: b.blend,
+    fillMode: b.fill,
+    fxFilter: presetFilter(b.preset),
+    vignette: b.vignette / 100,
+    tint: b.tint,
+  })
+  drawCutout(target, canvas, d)
 }

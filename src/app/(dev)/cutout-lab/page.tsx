@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CutoutClient } from '@/lib/cutout-ai/client'
 import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
-import { AUTO_SETTINGS, drawCutout, finishOutline, maskOverlay, type TraceOutlineSettings } from './finish'
+import { AUTO_SETTINGS, BLEND_DEFAULTS, composeSticker, drawCutout, finishOutline, maskOverlay, PRESET_LABELS, type BlendSettings, type PresetKey, type TraceOutlineSettings } from './finish'
 import { preloadBen, segmentV531 } from './v531seg'
 
 const WORK_MAX = 1024 // bounded working resolution (perf fix, s62)
@@ -20,6 +20,7 @@ export default function CutoutLab() {
   const [mode, setMode] = useState<'add' | 'erase'>('add')
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
+  const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [status, setStatus] = useState('ready — upload an image')
   const [busy, setBusy] = useState(false)
   const [hasCut, setHasCut] = useState(false)
@@ -40,6 +41,8 @@ export default function CutoutLab() {
   const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
   const edgeEncodedRef = useRef(false)  // current image encoded in the worker
   const settingsRef = useRef(settings); settingsRef.current = settings
+  const blendRef = useRef(blend); blendRef.current = blend
+  const previewSeq = useRef(0)
   const modeRef = useRef(mode); modeRef.current = mode
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
@@ -75,7 +78,12 @@ export default function CutoutLab() {
       ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'
       ctx.stroke()
     }
-    if (prevRef.current && dRef.current) drawCutout(prevRef.current, img, dRef.current)
+    if (prevRef.current && dRef.current && maskRef.current) {
+      const seq = ++previewSeq.current
+      const [mask, d] = [maskRef.current, dRef.current]
+      composeSticker(prevRef.current, img, mask, d, blendRef.current)
+        .catch(() => { if (seq === previewSeq.current && prevRef.current) drawCutout(prevRef.current!, img, d) })
+    }
   }, [disp.w])
 
   const applyFinish = useCallback(() => {
@@ -211,6 +219,7 @@ export default function CutoutLab() {
   }
 
   const setTune = (patch: Partial<TraceOutlineSettings>) => { setSettings((s) => { const n = { ...s, ...patch }; settingsRef.current = n; return n }); requestAnimationFrame(applyFinish) }
+  const setBlendTune = (patch: Partial<BlendSettings>) => { setBlend((b) => { const n = { ...b, ...patch }; blendRef.current = n; return n }); requestAnimationFrame(render) }
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
@@ -228,14 +237,38 @@ export default function CutoutLab() {
         <span style={{ fontSize: 12, color: edge === 'dead' ? '#b45309' : '#475569' }}>engine: <b>{edge === 'ready' ? 'EdgeSAM (auto + brush)' : edge === 'loading' ? 'EdgeSAM loading…' : 'u2net fallback (auto only, brush off)'}</b></span>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
         {(['add', 'erase'] as const).map((m) => (
           <button key={m} onClick={() => setMode(m)} style={{ ...btn, background: mode === m ? '#0f172a' : '#f1f5f9', color: mode === m ? '#fff' : '#0f172a' }}>{m === 'add' ? '🟢 Add (fill)' : '🔴 Erase'}</button>
         ))}
         <label style={lbl}>Brush {brushR}<input type="range" min={8} max={120} value={brushR} onChange={(e) => setBrushR(+e.target.value)} style={{ width: 80 }} /></label>
-        <label style={lbl}>Detail {settings.detail}<input type="range" min={0} max={100} value={settings.detail} onChange={(e) => setTune({ detail: +e.target.value })} style={{ width: 80 }} /></label>
-        <label style={lbl}>Offset {settings.offset}<input type="range" min={0} max={20} value={settings.offset} onChange={(e) => setTune({ offset: +e.target.value })} style={{ width: 80 }} /></label>
-        <label style={lbl}>Smooth {settings.smooth}<input type="range" min={0} max={100} value={settings.smooth} onChange={(e) => setTune({ smooth: +e.target.value })} style={{ width: 80 }} /></label>
+      </div>
+
+      {/* VECTOR — the full v5.3.1 outline tool set (resolveTraceOutline). Birth = angled/simplified/offset, sharp. */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
+        <span style={{ fontWeight: 700 }}>Vector:</span>
+        {([['detail', 0, 100], ['offset', 0, 20], ['simplify', 0, 100], ['smooth', 0, 100], ['straighten', 0, 100], ['radius', 0, 100], ['curve', 0, 100]] as const).map(([k, lo, hi]) => (
+          <label key={k} style={lbl}>{k} {settings[k]}<input type="range" min={lo} max={hi} value={settings[k]} onChange={(e) => setTune({ [k]: +e.target.value })} style={{ width: 70 }} /></label>
+        ))}
+        <span>join:</span>
+        {(['sharp', 'round', 'bevel'] as const).map((j) => (
+          <button key={j} onClick={() => setTune({ offsetJoin: j })} style={{ ...btn, padding: '4px 8px', fontSize: 11, background: settings.offsetJoin === j ? '#0f172a' : '#f1f5f9', color: settings.offsetJoin === j ? '#fff' : '#0f172a' }}>{j}</button>
+        ))}
+      </div>
+
+      {/* BLEND — the s59-decoupled v5.3.1 2D artwork operation (composite.ts). */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
+        <span style={{ fontWeight: 700 }}>Blend:</span>
+        <label style={lbl}>blend {blend.blend}<input type="range" min={0} max={100} value={blend.blend} onChange={(e) => setBlendTune({ blend: +e.target.value })} style={{ width: 70 }} /></label>
+        <label style={lbl}>vignette {blend.vignette}<input type="range" min={0} max={100} value={blend.vignette} onChange={(e) => setBlendTune({ vignette: +e.target.value })} style={{ width: 70 }} /></label>
+        {(['clamp', 'tile'] as const).map((f) => (
+          <button key={f} onClick={() => setBlendTune({ fill: f })} style={{ ...btn, padding: '4px 8px', fontSize: 11, background: blend.fill === f ? '#0f172a' : '#f1f5f9', color: blend.fill === f ? '#fff' : '#0f172a' }}>{f}</button>
+        ))}
+        <select value={blend.preset} onChange={(e) => setBlendTune({ preset: e.target.value as PresetKey })} style={{ ...btn, fontSize: 11, padding: '4px 8px' }}>
+          {Object.entries(PRESET_LABELS).map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
+        </select>
+        <label style={lbl}>tint<input type="color" value={blend.tint ?? '#000000'} onChange={(e) => setBlendTune({ tint: e.target.value })} style={{ width: 28, height: 22, padding: 0, border: 'none' }} /></label>
+        {blend.tint && <button onClick={() => setBlendTune({ tint: null })} style={{ ...btn, padding: '4px 8px', fontSize: 11 }}>tint off</button>}
       </div>
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
