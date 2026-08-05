@@ -10,6 +10,7 @@ import { CutoutClient } from '@/lib/cutout-ai/client'
 import { DEFAULT_MODEL, MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import { AUTO_SETTINGS, drawCutout, finishOutline, maskOverlay, type TraceOutlineSettings } from './finish'
+import { preloadBen, segmentV531, V531_KEY, V531_LABEL } from './v531seg'
 
 const WORK_MAX = 1024 // bounded working resolution (perf fix, s62)
 
@@ -38,6 +39,7 @@ export default function CutoutLab() {
   const lastFileRef = useRef<File | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
   const modeRef = useRef(mode); modeRef.current = mode
+  const v531 = modelKey === V531_KEY; const v531Ref = useRef(false); v531Ref.current = v531
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
 
@@ -65,7 +67,7 @@ export default function CutoutLab() {
       ctx.stroke()
     }
     const cur = cursorRef.current
-    if (cur && hasCutRef.current) {
+    if (cur && hasCutRef.current && !v531Ref.current) {
       ctx.beginPath()
       ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
       ctx.lineWidth = Math.max(2, img.width * 0.003)
@@ -92,6 +94,12 @@ export default function CutoutLab() {
   // ── model lifecycle (fresh worker per model/engine = true cold-start timing) ──
   const loadModel = useCallback(async (key: string) => {
     setReady(false); setHasCut(false); maskRef.current = null; dRef.current = null; setMs({})
+    if (key === V531_KEY) {
+      preloadBen() // v5.3.1's own worker warms itself; the cut runs through segmentML
+      setDevice('wasm · u2netp (v5.3.1)'); setReady(true); setStatus('ready — upload an image')
+      if (lastFileRef.current) await onFile(lastFileRef.current)
+      return
+    }
     setStatus(`loading ${MODELS[key].label}…`)
     const c = client.current!
     c.spawn()
@@ -123,22 +131,32 @@ export default function CutoutLab() {
     const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s)
     const master = document.createElement('canvas'); master.width = w; master.height = h
     const mctx = master.getContext('2d', { willReadFrequently: true })!
-    mctx.drawImage(img, 0, 0, w, h); URL.revokeObjectURL(url)
+    mctx.drawImage(img, 0, 0, w, h)
     imgCanvas.current = master
     const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     render()
-    setBusy(true); setStatus('🧠 encoding image…')
+    setBusy(true)
     try {
-      const t0 = performance.now()
-      await client.current!.encode(mctx.getImageData(0, 0, w, h).data, w, h)
-      setMs((m) => ({ ...m, encode: Math.round(performance.now() - t0) }))
-      setStatus('✨ detecting the object…')
-      const t1 = performance.now()
-      const r = await client.current!.redetect()
-      acceptMask(r.mask, Math.round(performance.now() - t1))
+      if (v531Ref.current) {
+        setStatus('✨ v5.3.1 cut (u2netp)…')
+        const t1 = performance.now()
+        const r = await segmentV531(url, WORK_MAX)
+        setDevice('wasm · ' + r.adapter + ' (v5.3.1)')
+        acceptMask(r.mask, Math.round(performance.now() - t1))
+      } else {
+        setStatus('🧠 encoding image…')
+        const t0 = performance.now()
+        await client.current!.encode(mctx.getImageData(0, 0, w, h).data, w, h)
+        setMs((m) => ({ ...m, encode: Math.round(performance.now() - t0) }))
+        setStatus('✨ detecting the object…')
+        const t1 = performance.now()
+        const r = await client.current!.redetect()
+        acceptMask(r.mask, Math.round(performance.now() - t1))
+      }
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
+    URL.revokeObjectURL(url)
     setBusy(false)
   }, [acceptMask, render])
 
@@ -147,7 +165,7 @@ export default function CutoutLab() {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1 }
   }
-  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
+  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy || v531Ref.current) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
   const onMove = (e: React.PointerEvent) => { cursorRef.current = nrm(e); if (paintingRef.current) strokeRef.current.push(nrm(e)); render() }
   const onUp = async () => {
     if (!paintingRef.current) return
@@ -165,6 +183,7 @@ export default function CutoutLab() {
 
   const redetect = async () => {
     if (!ready || busy || !imgCanvas.current) return
+    if (v531 && lastFileRef.current) { await onFile(lastFileRef.current); return }
     setBusy(true); setStatus('✨ re-detecting (replaces the selection)…')
     try { const t0 = performance.now(); const r = await client.current!.redetect(); acceptMask(r.mask, Math.round(performance.now() - t0)) }
     catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
@@ -202,11 +221,13 @@ export default function CutoutLab() {
         <span style={{ fontWeight: 700 }}>Model:</span>
         <select value={modelKey} disabled={busy} onChange={(e) => { setModelKey(e.target.value); loadModel(e.target.value) }} style={{ ...btn, fontSize: 12 }}>
           {Object.values(MODELS).map((m) => (<option key={m.key} value={m.key}>{m.label}</option>))}
+          <option value={V531_KEY}>{V531_LABEL}</option>
         </select>
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
-        {(['add', 'erase'] as const).map((m) => (
+        {v531 && <span style={{ color: '#b45309' }}>auto model — brush off (comparison control)</span>}
+        {!v531 && (['add', 'erase'] as const).map((m) => (
           <button key={m} onClick={() => setMode(m)} style={{ ...btn, background: mode === m ? '#0f172a' : '#f1f5f9', color: mode === m ? '#fff' : '#0f172a' }}>{m === 'add' ? '🟢 Add (fill)' : '🔴 Erase'}</button>
         ))}
         <label style={lbl}>Brush {brushR}<input type="range" min={8} max={120} value={brushR} onChange={(e) => setBrushR(+e.target.value)} style={{ width: 80 }} /></label>
