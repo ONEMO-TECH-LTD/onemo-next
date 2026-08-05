@@ -1,65 +1,55 @@
-# cutout-ai — architecture contract (s62, locked with Dan 2026-08-05)
+# cutout-ai — architecture contract (s62; refreshed 2026-08-06 to the locked state)
 
 The fixed reference. Any code in this folder that violates a line here is slop by definition
 and gets deleted, not defended.
 
 ## Mission
-Promptable AI cutout (SAM family) as **add-on microservices** wired to the **untouched v5.3.1
-engine**, tested in onemo-next behind a thin UI shell, liftable later to the clean engine repo
-as one unit.
+Promptable AI segmentation (the SELECTED model: EdgeSAM) as an **add-on microservice** for the
+**untouched v5.3.1 engine**. This folder produces MASKS + SOFT MATTES only; ALL finishing and
+compositing is the engine's (`prepareShaped` consumes the matte via its preseg seam). Liftable
+to the clean engine repo as one unit.
 
 ## Laws
 1. **v5.3.1 engine is read-only.** No file under `src/lib/effect/` or the v5.3.1 app dir changes.
-   Its post-processing (trace → outline-resolve → compose) is THE finishing — never reimplemented
-   here. No raster blur/offset/clean/composite code in this folder, ever.
-2. **One sub = one job = one file.** Each AI model is its own sub behind the one shared interface.
-   The brush is its own sub. No sub imports another sub except through the declared interfaces.
-3. **No logic in the UI.** The shell holds state and render only. If a loop over pixels appears in
-   a React component, it is slop.
-4. **Pure and portable.** Subs have zero React/DOM/Next imports (workers/canvas boundary code lives
-   only in the declared transport files). The folder lifts to the new repo by copy.
+   No post-processing/compositing code in this folder, ever — the engine owns it.
+2. **One sub = one job = one file.** Each AI model is its own sub behind the one `SegModel`
+   interface. The brush is its own sub. Re-adding a model = one new file + one registry entry.
+3. **No logic in the UI.** Shells hold state and render only.
+4. **Pure and portable.** Subs have zero React/DOM/Next imports (worker/client transport and the
+   runtime loader are the declared boundary files). The folder lifts by copy.
 5. **No duplication of registries or math.** Model configs exist once (registry). Preprocessing
-   exists once (preprocess). The page never carries its own copy of anything.
-6. **Brush edits, never replaces.** The accepted mask is the base. Add = model-snapped fill,
-   unioned into the base. Erase = subtract. Full re-detect is a separate explicit action.
+   exists once (preprocess).
+6. **Brush edits, never replaces.** The accepted mask is the base. Add = model-snapped fill
+   unioned in. Erase = subtract. Full re-detect is a separate explicit action. `setBase` seeds
+   the base from any externally produced mask.
+7. **Soft matte parity.** Model logits are upsampled BILINEARLY; the binary mask thresholds after
+   interpolation and the `soft` channel (sigmoid) rides along — the engine's compositing expects
+   a continuous matte, never a hard binary cut.
+8. **One AI runtime resident per page** (iPhone OOM law, s62 device evidence). The shell enforces
+   it; this folder enables it (fresh worker per spawn, watchdog kills hung workers so iOS freezes
+   become registered faults).
 
-## Modules
+## Modules (current)
 ```
 src/lib/cutout-ai/
   ARCHITECTURE.md      this contract
-  types.ts             Mask, Point, Frame, SegModelConfig, the SegModel interface — data only
-  registry.ts          the model list (one entry per sub), default model, central auto-prompt
-  preprocess.ts        pure tensor builders: samCHW / samHWC (+ scale mapping). No runtime imports.
+  types.ts             Mask (+soft), Point, Frame, SegModelConfig, the SegModel interface
+  registry.ts          the model list (EdgeSAM — the s62 selection), central auto-prompt
+  preprocess.ts        pure tensor builders: samCHW/samHWC · logitsToMask (bilinear + soft out)
   select.ts            pure candidate-mask pick: auto = largest valid, guided = best score
-  models/
-    slimsam.ts         SlimSAM-77/50 (transformers.js SamModel)     — implements SegModel
-    sam2.ts            SAM2-tiny     (transformers.js Sam2Model)    — implements SegModel
-    mobilesam.ts       MobileSAM     (raw ORT, HWC encoder)         — implements SegModel
-    edgesam.ts         EdgeSAM       (raw ORT, CHW encoder)         — implements SegModel
-  brush.ts             the brush microservice: base-retain mask state,
-                       addStroke(stroke) → prompt → model → union · eraseStroke → subtract ·
-                       redetect() explicit. Pure; the model is an injected SegModel.
-  runtime.ts           lazy loaders for the two runtimes (self-hosted /ort webgpu build,
-                       @huggingface/transformers). The only file that touches them.
-  worker.ts            thin transport: postMessage ↔ SegModel + brush. No logic.
-  client.ts            thin main-thread handle over worker.ts. No logic.
+  models/edgesam.ts    EdgeSAM (raw ORT, CHW encoder, padded-square-aware decode) — SegModel
+  brush.ts             base-retain mask state: addStroke→union · eraseStroke→subtract ·
+                       redetect explicit · setBase. Pure; model injected.
+  runtime.ts           ORT loaders: self-hosted /ort, build picked by REAL WebGPU adapter probe,
+                       session-probe fallback to pure WASM, streamed fetch with byte progress
+  worker.ts            thin transport (watchdogged by client) — no logic
+  client.ts            thin main-thread handle; per-call WATCHDOG converts silent iOS freezes
+                       into registered faults (progress re-arms it) — no logic
 ```
-u2net/silueta are NOT re-implemented here — they are v5.3.1's (`ben-chain`); the UI reaches them
-through v5.3.1's own path.
+Killed on the s62 verdict (git history preserves them): SlimSAM, SAM2-tiny, MobileSAM subs +
+their weights. u2net/silueta were never here — they are v5.3.1's (`ben-chain`).
 
-## The SegModel interface (every model sub, identical)
-```ts
-load(exec: 'auto'|'wasm'): Promise<void>       // cold-start, own runtime pick
-encode(frame: Frame): Promise<void>            // once per image
-segment(points: Point[], auto: boolean): Promise<Mask>  // prompt → binary mask at frame res
-```
-
-## Wiring for the proto shell
-upload → client(model sub).encode → auto segment → mask → **v5.3.1 finishing**
-(`traceContourRaw` → `resolveTraceOutline` → `composeEffectArtwork`) → sticker preview.
-Brush strokes → brush.ts (union/subtract) → same finishing. Timings shown per stage.
-
-## Verification gate (before "done")
-Each model sub + the brush exercised through the real shell on the real bench (Batman + Porsche
-cases), v5.3.1 finishing applied, timings visible, and the ear-gap case: brushing a missed ear
-tip FILLS it while the rest of the selection stays.
+## Verification gates
+Every change exercised through the real shell on the launched bench (headless gates alone are
+never "done"), plus: the ear-gap case (a brushed gap FILLS, selection retained), and the
+non-square alignment case (padded-square decode maps to image space exactly).

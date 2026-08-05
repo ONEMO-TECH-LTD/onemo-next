@@ -49,12 +49,13 @@ src/lib/freeshape/
                     gesture is a separate future sub)
 ```
 
-## Wiring (the shell's side, not this folder's)
-cutout-lab gains a **Draw mode**: comet-ink rendering while drawing (the same fading-trail
-pattern as the AI pointer), release → `strokeToShape` → the result seeds the outline source →
-the SAME v5.3.1 finishing pipeline (AUTO_TUNE default + all knobs + blend row) runs on it →
-sticker preview fills the drawn shape with the image. Draw replaces the current outline
-explicitly (it is a shape authoring act, not an edit of the AI cut).
+## Wiring (the shell's side, not this folder's — refreshed 2026-08-06 to the locked state)
+The hand tool is a PAINT brush (Dan's spec): strokes render at the real brush width and deposit
+AREA. Fresh closed loop → `strokeToShape` (this module) gives the primitive-snap magic; painted
+swaths union into / subtract from the current selection as mask booleans; EVERY result re-enters
+the v5.3.1 engine pipeline (prepareShaped preseg) for finishing + compositing — one compositor,
+no glue bake. Undo/redo/clear are the shell's history stack. Comet-trail ink belongs to the AI
+pointer only; the paint brush renders solid WYSIWYG ink.
 
 ## Acceptance gates (from Dan's evidence, 2026-08-05)
 1. The green-blob sequence: Dan's wobbly closed "e"-loop → a clean balanced blob outline —

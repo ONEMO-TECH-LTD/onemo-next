@@ -21,17 +21,10 @@ import {
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { segmentV531 } from './v531seg'
 
+import { HistoryStack } from './history'
+import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
+
 const WORK_MAX = 1024
-
-type Tool = 'add' | 'erase' | 'draw' | 'draw-erase' | 'nodes' | 'frame'
-type Tab = 'ai' | 'vector' | 'blend' | 'edit'
-
-const VEC_CHIPS = ['detail', 'offset', 'simplify', 'smooth', 'straighten', 'radius', 'curve'] as const
-const BLEND_CHIPS = ['blend', 'vignette', 'scale', 'panX', 'panY'] as const
-const CHIP_RANGE: Record<string, [number, number]> = {
-  detail: [0, 100], offset: [0, 60], simplify: [0, 100], smooth: [0, 100], straighten: [0, 100],
-  radius: [0, 100], curve: [0, 100], blend: [0, 100], vignette: [0, 100], scale: [25, 300], panX: [-50, 50], panY: [-50, 50],
-}
 
 export default function CutoutLab() {
   const [tool, setTool] = useState<Tool>('add')
@@ -79,20 +72,13 @@ export default function CutoutLab() {
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
   type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null }
-  const histRef = useRef<Snap[]>([])
-  const histIdx = useRef(-1)
+  const histRef = useRef(new HistoryStack<Snap>(30))
   const [histTick, setHistTick] = useState(0)
   const snapNow = (): Snap => ({
     mask: maskRef.current ? { data: maskRef.current.data.slice(), w: maskRef.current.w, h: maskRef.current.h, soft: maskRef.current.soft?.slice() } : null,
     drawn: drawnRef.current,
   })
-  const pushHistory = () => {
-    histRef.current = histRef.current.slice(0, histIdx.current + 1)
-    histRef.current.push(snapNow())
-    if (histRef.current.length > 30) histRef.current.shift()
-    histIdx.current = histRef.current.length - 1
-    setHistTick((t) => t + 1)
-  }
+  const pushHistory = () => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }
   const restore = async (s: Snap) => {
     maskRef.current = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
     drawnRef.current = s.drawn
@@ -102,8 +88,8 @@ export default function CutoutLab() {
     }
     applyFinish()
   }
-  const undo = async () => { if (histIdx.current > 0) { histIdx.current--; setHistTick((t) => t + 1); await restore(histRef.current[histIdx.current]) } }
-  const redo = async () => { if (histIdx.current < histRef.current.length - 1) { histIdx.current++; setHistTick((t) => t + 1); await restore(histRef.current[histIdx.current]) } }
+  const undo = async () => { const s = histRef.current.undo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }
+  const redo = async () => { const s = histRef.current.redo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }
   const clearAll = () => {
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null
@@ -443,8 +429,8 @@ export default function CutoutLab() {
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
         <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
         <button onClick={redetect} disabled={busy || !lastFileRef.current} style={btn}>↻ Re-detect</button>
-        <button onClick={undo} disabled={busy || histIdx.current <= 0} style={btn}>↩ Undo</button>
-        <button onClick={redo} disabled={busy || histIdx.current >= histRef.current.length - 1} style={btn}>↪ Redo</button>
+        <button onClick={undo} disabled={busy || !histRef.current.canUndo()} style={btn}>↩ Undo</button>
+        <button onClick={redo} disabled={busy || !histRef.current.canRedo()} style={btn}>↪ Redo</button>
         <button onClick={clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
         <button onClick={() => { setPreview((v) => { previewRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>

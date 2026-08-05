@@ -50,9 +50,6 @@ let resolvedKind: OrtKind | null = null
 /** The ORT module matching the resolved session build — model subs create tensors from THIS. */
 export const ortFor = (exec: 'auto' | 'wasm'): Promise<OrtModule> => loadOrtBuild(resolvedKind ?? ortKindFor(exec))
 
-let txP: Promise<any> | null = null
-export const loadTransformers = (): Promise<any> => (txP ??= import('@huggingface/transformers'))
-
 /** Streamed same-origin fetch with byte progress (models are 15–45MB — the first-load wait must be
  *  visible, not a silent hang). */
 export async function fetchWithProgress(url: string, onProgress?: (loaded: number, total: number) => void): Promise<Uint8Array> {

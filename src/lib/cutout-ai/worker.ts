@@ -3,15 +3,9 @@
 
 import { BrushSession } from './brush'
 import { EdgeSamModel } from './models/edgesam'
-import { MobileSamModel } from './models/mobilesam'
-import { Sam2Model } from './models/sam2'
-import { SlimSamModel } from './models/slimsam'
 import type { Mask, SegModel, SegModelConfig } from './types'
 
 const SUBS: Record<SegModelConfig['sub'], new () => SegModel> = {
-  slimsam: SlimSamModel,
-  sam2: Sam2Model,
-  mobilesam: MobileSamModel,
   edgesam: EdgeSamModel,
 }
 
