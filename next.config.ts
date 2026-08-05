@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // This repository carries required webpack aliases below, so development and production must run
   // the same bundler. Allow the loopback hostname used by local browser probes to hydrate normally.
-  allowedDevOrigins: ["127.0.0.1"],
+  // LAN IPs are allowed too so mobile devices on the same Wi-Fi can hydrate the dev probes.
+  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.4.67", "192.168.4.*", "192.168.*", "10.*"],
   outputFileTracingRoot: process.cwd(),
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
