@@ -47,8 +47,13 @@ ctx.onmessage = async (e: MessageEvent) => {
       const src = m.data as Uint8Array, plane = H * W
       const scores = Array.from(out.iou_scores.data as Float32Array)
       let best = 0
-      if (!d.guided) { best = -1; let bs = -1; for (let i = 0; i < n; i++) { let a = 0; for (let k = 0; k < plane; k++) a += src[i * plane + k]; const f = a / plane; if (f > 0.02 && f < 0.85 && scores[i] > bs) { bs = scores[i]; best = i } } if (best < 0) { best = 0; for (let i = 1; i < n; i++) if (scores[i] > scores[best]) best = i } }
-      else for (let i = 1; i < n; i++) if (scores[i] > scores[best]) best = i
+      if (!d.guided) {
+        // auto-detect = the WHOLE object → pick the LARGEST valid mask (stable across fp16/q8), not
+        // best-IoU (which flips between the face sub-mask and the full figure on tiny score deltas).
+        best = -1; let ba = -1
+        for (let i = 0; i < n; i++) { let a = 0; for (let k = 0; k < plane; k++) a += src[i * plane + k]; const f = a / plane; if (f > 0.05 && f < 0.92 && a > ba) { ba = a; best = i } }
+        if (best < 0) { best = 0; for (let i = 1; i < n; i++) if (scores[i] > scores[best]) best = i }
+      } else for (let i = 1; i < n; i++) if (scores[i] > scores[best]) best = i
       const buf = new Uint8Array(plane), off = best * plane; for (let i = 0; i < plane; i++) buf[i] = src[off + i]
       post({ type: 'decoded', id: d.id, mask: buf.buffer, W, H, ms: Math.round(performance.now() - t0) }, [buf.buffer])
     }

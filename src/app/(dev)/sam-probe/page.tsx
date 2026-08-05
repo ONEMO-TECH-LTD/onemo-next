@@ -123,9 +123,10 @@ export default function SamProbe() {
 
   const loadModel = useCallback(async () => {
     setReady(false); setStatus(`loading ${MODELS[modelKeyRef.current].label} (${execRef.current === 'wasm' ? 'WASM' : 'auto'})…`)
+    const t0 = performance.now()
     const r = await call({ type: 'load', modelId: MODELS[modelKeyRef.current].id, exec: execRef.current })
     if (r.type === 'error') { setStatus('⚠️ model load failed: ' + r.error); return }
-    setDevice(`${r.device} · ${modelKeyRef.current}`); setLoadMs(r.ms); setReady(true); setStatus('ready — upload an image')
+    setDevice(`${r.device} · ${modelKeyRef.current}`); setLoadMs(Math.round(performance.now() - t0)); setReady(true); setStatus('ready — upload an image')
   }, [call])
 
   // spawn a FRESH worker (terminates any prior) → true from-scratch load timing per model/engine
@@ -184,13 +185,13 @@ export default function SamProbe() {
     const points = [...fg, ...bg], labels = [...fg.map(() => 1), ...bg.map(() => 0)]
     if (!points.length) return
     setBusy(true); setStatus(guided ? '🔎 recognizing…' : '✨ auto-detecting the object…')
+    const t0 = performance.now()
     const r = await call({ type: 'decode', points, labels, guided })
-    setBusy(false)
-    if (r.type === 'error') { setStatus('⚠️ recognize failed: ' + r.error); return }
-    setCutMs(r.ms)
+    if (r.type === 'error') { setBusy(false); setStatus('⚠️ recognize failed: ' + r.error); return }
     const raw = new Uint8Array(r.mask), W = r.W, H = r.H
     cleanMask(raw, W, H); rawRef.current = raw; dimRef.current = { W, H }; setHasCut(true)
-    refine(); setStatus('✨ done — tune Detail/Offset, brush edge cases, or Save')
+    refine(); setCutMs(Math.round(performance.now() - t0)); setBusy(false) // wall-clock: decode + geometry + render
+    setStatus('✨ done — tune Detail/Offset, brush edge cases, or Save')
   }, [call, refine])
 
   const onFile = useCallback(async (file: File) => {
@@ -206,10 +207,11 @@ export default function SamProbe() {
     const ictx = imgRef.current!.getContext('2d')!
     ictx.drawImage(img, 0, 0, w, h); URL.revokeObjectURL(url); renderAll()
     setStatus('🧠 encoding image (one-time)…')
+    const t0 = performance.now()
     const px = ictx.getImageData(0, 0, w, h)
     const r = await call({ type: 'encode', data: px.data.buffer, W: w, H: h }, [px.data.buffer])
     if (r.type === 'error') { setStatus('⚠️ encode failed: ' + r.error); return }
-    setEncodeMs(r.ms)
+    setEncodeMs(Math.round(performance.now() - t0)) // wall-clock: getImageData + transfer + worker compute
     await recognize(false)
   }, [call, recognize, renderAll])
 
