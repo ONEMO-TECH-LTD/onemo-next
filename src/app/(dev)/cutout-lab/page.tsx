@@ -107,7 +107,7 @@ export default function CutoutLab() {
     const [d, bounds] = [dRef.current, boundsRef.current]
     bakeStickerEngine(preparedRef.current, d, bounds, p2w(), p2h(), blendRef.current)
       .then((r) => { if (seq === bakeSeq.current) { liveBakeRef.current = { canvas: r.canvas, bounds }; render() } })
-      .catch(() => {})
+      .catch((e) => setStatus('⚠️ compose failed: ' + String((e as Error)?.message ?? e))) // fail LOUD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -426,8 +426,10 @@ export default function CutoutLab() {
     baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
   }
 
-  const setTune = (patch: Partial<TraceOutlineSettings>) => { setSettings((s) => { const n = { ...s, ...patch }; settingsRef.current = n; return n }); requestAnimationFrame(applyFinish) }
-  const setBlendTune = (patch: Partial<BlendSettings>) => { setBlend((b) => { const n = { ...b, ...patch }; blendRef.current = n; return n }); recomposeLive() }
+  // refs update SYNCHRONOUSLY, then state, then recompute — React runs setState updaters
+  // DEFERRED, so a ref write inside the updater races the recompute (the stale-blend bug).
+  const setTune = (patch: Partial<TraceOutlineSettings>) => { const n = { ...settingsRef.current, ...patch }; settingsRef.current = n; setSettings(n); requestAnimationFrame(applyFinish) }
+  const setBlendTune = (patch: Partial<BlendSettings>) => { const n = { ...blendRef.current, ...patch }; blendRef.current = n; setBlend(n); recomposeLive() }
 
   // adaptive knob wiring (item 10): one knob, bound to the active tab's chip
   const knob = (() => {
@@ -460,9 +462,9 @@ export default function CutoutLab() {
         <button onClick={undo} disabled={busy || !histRef.current.canUndo()} style={btn}>↩ Undo</button>
         <button onClick={redo} disabled={busy || !histRef.current.canRedo()} style={btn}>↪ Redo</button>
         <button onClick={clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
-        <button onClick={() => { setPreview((v) => { previewRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
+        <button onClick={() => { const v = !previewRef.current; previewRef.current = v; setPreview(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
-        <button onClick={() => { setOverlayOn((v) => { overlayRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
+        <button onClick={() => { const v = !overlayRef.current; overlayRef.current = v; setOverlayOn(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: overlayOn ? '#f1f5f9' : '#0f172a', color: overlayOn ? '#0f172a' : '#fff' }}>{overlayOn ? '🎭 Mask on' : '🎭 Mask off'}</button>
         <span style={{ fontSize: 12, color: '#b45309' }}>{edge === 'loading' ? 'EdgeSAM loading…' : edge === 'dead' ? 'EdgeSAM dead — u2net only' : ''}</span>
       </div>
