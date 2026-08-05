@@ -3,18 +3,22 @@
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
 import type { Mask } from '@/lib/cutout-ai/types'
+import { dilateMask } from '@/lib/effect/mask'
 import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
-import { dilateMask, postProcessMask, smoothMask } from '@/lib/effect/mask'
-import { traceContourRaw } from '@/lib/effect/contour'
-import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenShape, shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import {
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
   type TraceOutlineSettings,
 } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
+import { prepareShaped } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
+import type { PreparedEffect } from '@/lib/effect/prepare-effect'
+import type { MLResult } from '@/lib/effect/segment-ml'
 
 export type { TraceOutlineSettings }
+
+export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
+export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape }
 
 /** Calibration baseline (Dan 2026-08-05): EVERYTHING ZERO — the raw full-fidelity sharp trace,
  *  no recipe applied (engine detail 100 renders as knob 0: the Detail knob is UI-inverted).
@@ -22,42 +26,8 @@ export type { TraceOutlineSettings }
 export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
-const PADDING_MM = 1.5 // v5.3.1 EFFECT_BUILD_CONFIG.paddingMM — the cut line NEVER touches the
-// subject edge: the mask is dilated outward by this physical margin before tracing, so the visible
-// outline is clean margin, not the segmentation staircase (the original 'perfect edges' rule #1)
 
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
-
-/** AI mask → v5.3.1 finishing → resolved outline as an SVG path d + its bounds (image-px space).
- *  Bounds may extend past the image (Offset) — the compose expands the canvas to them. */
-export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape }
-
-export function finishOutline(mask: Mask, settings: TraceOutlineSettings): FinishResult | null {
-  const { w, h } = mask
-  const mmPerPx = MM_BASE / Math.max(w, h)
-  const padPx = Math.max(0, Math.round(PADDING_MM / mmPerPx))
-  const padded = padPx > 0 ? dilateMask(postProcessMask(mask.data, w, h), w, h, padPx) : postProcessMask(mask.data, w, h)
-  const clean = smoothMask(padded, w, h, 3)
-  const ring = traceContourRaw(clean, w, h) // canvas ImageData is y-down = editor space already
-  if (!ring) return null
-  const straight = rdpClosed(ring.map(([x, y]) => [x, y] as Vec2Px), 1.0)
-  if (straight.length < 3) return null
-  const vectorShape: VShape = { paths: [{ anchors: straight.map(([x, y]) => ({ p: { x, y }, hIn: null, hOut: null, corner: true })) }] }
-  const resolved = resolveTraceOutline(
-    {
-      vectorShape,
-      // producers' re-derive flips rawTracePx y-up→down internally, so hand it y-up:
-      rawTracePx: ring.map(([x, y]) => [x, h - y] as [number, number]),
-      maskWidthPx: w,
-      maskHeightPx: h,
-      mmPerPx: MM_BASE / Math.max(w, h),
-    },
-    settings,
-  )
-  if (!resolved) return null
-  const bb = shapeBBox(resolved, 1)
-  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
-}
 
 /** Green-kept / red-removed overlay pixels for the mask. */
 export function maskOverlay(mask: Mask): ImageData {
@@ -260,4 +230,139 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   const data = new Uint8Array(base.data)
   for (let i = 0; i < data.length; i++) if (sub.data[i]) data[i] = 0
   return { data, w: base.w, h: base.h }
+}
+
+// ── ENGINE-NATIVE AI path (Dan's root-cause call, s62): STOP approximating the compositing —
+// build the engine's own preseg (MLResult) from the model's SOFT matte and run prepareShaped:
+// padding, soft-matte subject, default blend, composite — all the v1→v5.3.1 behavior BY DEFAULT,
+// zero glue re-implementation. Removing u2net never removed the settings; the glue had bypassed
+// the pipeline (prepareEffect) that owns them.
+
+/** Model mask (+soft alpha) → the engine's MLResult preseg. The engine convention is Y-UP
+ *  (segment-ml rasterize): flip rows. imageData/texImage = the image RGB with matte alpha. */
+export function buildPreseg(image: HTMLCanvasElement, mask: Mask): MLResult {
+  const { w, h } = mask
+  // soft alpha: the model's continuous channel, else a feathered binary (brushed/boolean masks)
+  let soft = mask.soft
+  if (!soft) {
+    const a = document.createElement('canvas'); a.width = w; a.height = h
+    const av = new ImageData(w, h)
+    for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = mask.data[i] ? 255 : 0
+    a.getContext('2d')!.putImageData(av, 0, 0)
+    const sc = document.createElement('canvas'); sc.width = w; sc.height = h
+    const sctx = sc.getContext('2d')!
+    sctx.filter = `blur(${Math.max(1, w / 700)}px)`
+    sctx.drawImage(a, 0, 0)
+    const sd = sctx.getImageData(0, 0, w, h).data
+    soft = new Uint8Array(w * h)
+    for (let i = 0; i < w * h; i++) soft[i] = sd[i * 4 + 3]
+  }
+  // y-up image pixels (engine rasterize convention)
+  const flip = document.createElement('canvas'); flip.width = w; flip.height = h
+  const fctx = flip.getContext('2d', { willReadFrequently: true })!
+  fctx.translate(0, h); fctx.scale(1, -1)
+  fctx.drawImage(image, 0, 0, w, h)
+  const img = fctx.getImageData(0, 0, w, h)
+  // matte alpha into the y-up pixels + the y-up binary mask
+  const data = img.data
+  const binUp = new Uint8Array(w * h)
+  for (let y = 0; y < h; y++) {
+    const src = (h - 1 - y) * w
+    for (let x = 0; x < w; x++) {
+      data[(y * w + x) * 4 + 3] = soft[src + x]
+      binUp[y * w + x] = mask.data[src + x]
+    }
+  }
+  return {
+    mask: binUp, width: w, height: h, imageData: img,
+    texImage: img, texMask: binUp, texW: w, texH: h,
+    adapterId: mask.soft ? 'edgesam' : 'brushed',
+  }
+}
+
+/** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out. */
+export function prepareAI(url: string, image: HTMLCanvasElement, mask: Mask): Promise<PreparedEffect> {
+  return prepareShaped(url, buildPreseg(image, mask))
+}
+
+/** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim. */
+export function finishSpec(prepared: PreparedEffect, settings: TraceOutlineSettings): FinishResult | null {
+  const spec = prepared.spec
+  const resolved = resolveTraceOutline(
+    {
+      vectorShape: spec.vectorShape,
+      rawTracePx: spec.rawTracePx,
+      maskWidthPx: spec.maskWidthPx,
+      maskHeightPx: spec.maskHeightPx,
+      mmPerPx: spec.mmPerPx,
+    },
+    settings,
+  )
+  if (!resolved) return null
+  const bb = shapeBBox(resolved, 1)
+  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
+}
+
+/** Engine-native sticker bake: the engine's OWN matted subject + original (frontSrc, y-up) through
+ *  the one 2D artwork op at the outline's bounds; mirror/scale/pan glue layers on top unchanged.
+ *  d/bounds live in mask space (y-down) — mapped into the frontSrc tex space here. */
+export async function bakeStickerEngine(
+  prepared: PreparedEffect, d: string, bounds: OutlineBounds, maskW: number, maskH: number, b: BlendSettings,
+): Promise<{ canvas: HTMLCanvasElement }> {
+  const { origCanvas, subjCanvas } = prepared.frontSrc
+  const k = origCanvas.width / maskW
+  // y-up tex-space bounds
+  const texH = origCanvas.height
+  const bUp: OutlineBounds = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }
+  const art = transformArtwork(origCanvas, { ...b, panY: -b.panY }) // y-up: pan direction flips
+  const subj = transformArtwork(subjCanvas, { ...b, panY: -b.panY })
+  const mirror = b.fill === 'mirror'
+  const sx = mirror ? origCanvas.width : 0, sy = mirror ? texH : 0
+  let original = art, subject = subj
+  if (mirror) {
+    original = mirrorMosaic(art)
+    const big = document.createElement('canvas'); big.width = original.width; big.height = original.height
+    big.getContext('2d')!.drawImage(subj, sx, sy)
+    subject = big
+  }
+  const { canvas, frame } = await composeEffectArtwork({
+    originalCanvas: original,
+    subjectCanvas: subject,
+    outputBoundsPx: { minX: bUp.minX + sx, minY: bUp.minY + sy, maxX: bUp.maxX + sx, maxY: bUp.maxY + sy },
+    blendPercent: b.blend,
+    fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode),
+    fxFilter: presetFilter(b.preset),
+    vignette: b.vignette / 100,
+    tint: b.tint,
+  })
+  // flip the composed frame to y-down and clip with the outline (scaled into tex space)
+  const fw = frame.width, fh = frame.height
+  const ox = frame.originX - sx, oy = frame.originY - sy // y-up tex-space origin
+  const flipped = document.createElement('canvas'); flipped.width = fw; flipped.height = fh
+  const fctx = flipped.getContext('2d')!
+  fctx.translate(0, fh); fctx.scale(1, -1)
+  fctx.drawImage(canvas, 0, 0)
+  // y-down origin of the frame in tex space
+  const oyDown = texH - (oy + fh)
+  const out = document.createElement('canvas'); out.width = fw; out.height = fh
+  const ctx = out.getContext('2d')!
+  const path = new Path2D()
+  path.addPath(new Path2D(d), new DOMMatrix().scale(k))
+  ctx.translate(-ox, -oyDown)
+  ctx.clip(path)
+  ctx.drawImage(flipped, ox, oyDown)
+  return { canvas: out }
+}
+
+/** Engine-native preview: baked sticker over a checkerboard. */
+export async function composeStickerEngine(
+  target: HTMLCanvasElement, prepared: PreparedEffect, d: string, bounds: OutlineBounds, maskW: number, maskH: number, b: BlendSettings,
+): Promise<void> {
+  const baked = await bakeStickerEngine(prepared, d, bounds, maskW, maskH, b)
+  const w = baked.canvas.width, h = baked.canvas.height
+  target.width = w; target.height = h
+  const ctx = target.getContext('2d')!
+  const t = 16
+  for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx.fillRect(x, y, t, t) }
+  ctx.drawImage(baked.canvas, 0, 0)
 }

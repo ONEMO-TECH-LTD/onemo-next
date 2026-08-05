@@ -43,7 +43,7 @@ export function samHWC(rgba: Uint8ClampedArray, w: number, h: number): TensorDat
  * stretching the whole padded square onto w×h smears the mask toward the corner on non-square
  * images — the misalignment Dan hit on the phone). Default 1 = the map covers the image exactly.
  */
-export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: number, h: number, fx = 1, fy = 1): Uint8Array {
+export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: number, h: number, fx = 1, fy = 1, softOut?: Uint8Array): Uint8Array {
   // BILINEAR upsample of the continuous logit field, threshold AFTER interpolation — the same trick
   // v5.3.1 plays with u2net's soft saliency matte. Hard-thresholding at 256² then nearest-neighbour
   // upscaling bakes the low-res staircase into the edge (the "choppy outline"); interpolating the
@@ -59,6 +59,7 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
       const v = (map[i] as number) * (1 - tx) * (1 - ty) + (map[i + 1] as number) * tx * (1 - ty)
         + (map[i + mw] as number) * (1 - tx) * ty + (map[i + mw + 1] as number) * tx * ty
       if (v > 0) out[y * w + x] = 1
+      if (softOut) softOut[y * w + x] = Math.round(255 / (1 + Math.exp(-v))) // sigmoid → soft alpha
     }
   }
   return out

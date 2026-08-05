@@ -58,6 +58,7 @@ export class EdgeSamModel implements SegModel {
     // EdgeSAM's low-res mask covers the PADDED 1024 square — sample only the valid nw×nh fraction,
     // or non-square images come back shifted toward the corner (the phone misalignment).
     const fx = (W * this.scale) / 1024, fy = (H * this.scale) / 1024
-    return { data: logitsToMask(sub, mh, mw, W, H, fx, fy), w: W, h: H }
+    const soft = new Uint8Array(plane)
+    return { data: logitsToMask(sub, mh, mw, W, H, fx, fy, soft), w: W, h: H, soft }
   }
 }

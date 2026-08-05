@@ -1,10 +1,13 @@
 // cutout-ai — data types + the one SegModel interface (ARCHITECTURE.md). No runtime, no DOM.
 
-/** Binary mask, row-major, length w*h. 1 = object, 0 = background. */
+/** Binary mask, row-major, length w*h. 1 = object, 0 = background. `soft` (optional) is the
+ *  CONTINUOUS alpha (0-255) from the model's logits — the engine-parity matte channel: v5.3.1's
+ *  compositing expects a soft matte, never a hard binary cut. */
 export interface Mask {
   data: Uint8Array
   w: number
   h: number
+  soft?: Uint8Array
 }
 
 /** Normalized prompt point (0..1 in image space). label 1 = include, 0 = exclude. */

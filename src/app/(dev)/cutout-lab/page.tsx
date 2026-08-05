@@ -13,10 +13,12 @@ import { strokeToShape } from '@/lib/freeshape'
 import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
-  AUTO_SETTINGS, bakeSticker, BLEND_DEFAULTS, composeSticker, drawCutout, finishDrawn, finishOutline,
-  maskFromShape, maskOverlay, PRESET_LABELS, subtractMasks, unionMasks,
+  AUTO_SETTINGS, bakeSticker, bakeStickerEngine, BLEND_DEFAULTS, composeSticker, composeStickerEngine,
+  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI,
+  subtractMasks, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
 } from './finish'
+import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { segmentV531 } from './v531seg'
 
 const WORK_MAX = 1024
@@ -65,6 +67,8 @@ export default function CutoutLab() {
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const lastFileRef = useRef<File | null>(null)
+  const urlRef = useRef<string | null>(null) // object URL kept alive for engine re-prepare
+  const preparedRef = useRef<PreparedEffect | null>(null)
   const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
   const edgeEncodedRef = useRef(false)
   const settingsRef = useRef(settings); settingsRef.current = settings
@@ -75,6 +79,9 @@ export default function CutoutLab() {
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
 
+  const p2w = () => preparedRef.current?.spec.maskWidthPx ?? imgCanvas.current?.width ?? 1
+  const p2h = () => preparedRef.current?.spec.maskHeightPx ?? imgCanvas.current?.height ?? 1
+
   // ── render (draw only) ── ONE canvas: working view, or the baked sticker when Preview is on
   const render = useCallback(() => {
     const view = viewRef.current, img = imgCanvas.current
@@ -82,8 +89,10 @@ export default function CutoutLab() {
     if (previewRef.current && dRef.current && boundsRef.current && maskRef.current) {
       const seq = ++previewSeq.current
       const [m, d, bounds] = [maskRef.current, dRef.current, boundsRef.current]
-      composeSticker(view, img, m, d, bounds, blendRef.current)
-        .catch(() => { if (seq === previewSeq.current) drawCutout(view, img, d) })
+      const p = preparedRef.current && !drawnRef.current
+        ? composeStickerEngine(view, preparedRef.current, d, bounds, p2w(), p2h(), blendRef.current)
+        : composeSticker(view, img, m, d, bounds, blendRef.current)
+      p.catch(() => { if (seq === previewSeq.current) drawCutout(view, img, d) })
       return
     }
     view.width = img.width; view.height = img.height
@@ -149,7 +158,7 @@ export default function CutoutLab() {
     const drawn = drawnRef.current
     const fin: FinishResult | null = drawn && img
       ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, settingsRef.current)
-      : maskRef.current ? finishOutline(maskRef.current, settingsRef.current) : null
+      : preparedRef.current ? finishSpec(preparedRef.current, settingsRef.current) : null
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
@@ -157,9 +166,15 @@ export default function CutoutLab() {
     render()
   }, [render])
 
-  const acceptMask = useCallback((mask: Mask) => {
+  const acceptMask = useCallback(async (mask: Mask) => {
     drawnRef.current = null
     maskRef.current = mask
+    const img = imgCanvas.current, url = urlRef.current
+    if (img && url) {
+      try {
+        preparedRef.current = await prepareAI(url, img, mask) // the engine's own compositing, verbatim
+      } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message)); return }
+    }
     setHasCut(true)
     applyFinish()
     setStatus('✨ done — brush, draw, edit, tune, or Save')
@@ -189,9 +204,11 @@ export default function CutoutLab() {
   // ── upload → auto cut on the SELECTED engine (item 7) ──
   const onFile = useCallback(async (file: File) => {
     lastFileRef.current = file
-    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; setHasCut(false); setMs({})
+    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; setHasCut(false); setMs({})
     edgeEncodedRef.current = false
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     const url = URL.createObjectURL(file)
+    urlRef.current = url
     const img = new Image(); img.src = url
     try { await img.decode() } catch (e) { URL.revokeObjectURL(url); setStatus('⚠️ could not open image: ' + String(e)); return }
     const s = Math.min(1, WORK_MAX / Math.max(img.naturalWidth, img.naturalHeight))
@@ -214,8 +231,8 @@ export default function CutoutLab() {
         edgeEncodedRef.current = true
         const r = await client.current!.redetect()
         setMs({ cut: Math.round(performance.now() - t0) })
-        acceptMask(r.mask)
-        URL.revokeObjectURL(url); setBusy(false)
+        await acceptMask(r.mask)
+        setBusy(false)
         return
       } catch (e) { edgeFault('AI froze on this image (' + String((e as Error).message) + ')') }
     }
@@ -224,9 +241,8 @@ export default function CutoutLab() {
       const t0 = performance.now()
       const r = await segmentV531(url, WORK_MAX)
       setMs({ cut: Math.round(performance.now() - t0) })
-      acceptMask(r.mask)
+      await acceptMask(r.mask)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
-    URL.revokeObjectURL(url)
     setBusy(false)
   }, [acceptMask, render, edgeFault])
 
@@ -282,11 +298,13 @@ export default function CutoutLab() {
       if (!r) { setStatus('✏️ draw a CLOSED loop — the shape is what you draw (no AI)'); render(); return }
       const loopMask = maskFromShape(r.shape, img.width, img.height)
       if (maskRef.current && hasCutRef.current) {
-        // Dan's two examples: green loop UNIONS into the selection, red loop SUBTRACTS — geometric,
-        // then finishOutline's smoothing + padding produce the elegant joins.
+        // Dan's two examples: green loop UNIONS into the selection, red loop SUBTRACTS — geometric;
+        // the result re-enters the ENGINE pipeline (prepareAI) for the elegant joins + compositing.
         drawnRef.current = null
-        maskRef.current = erase ? subtractMasks(maskRef.current, loopMask) : unionMasks(maskRef.current, loopMask)
-        applyFinish()
+        const combined = erase ? subtractMasks(maskRef.current, loopMask) : unionMasks(maskRef.current, loopMask)
+        setBusy(true)
+        await acceptMask(combined)
+        setBusy(false)
         setStatus(erase ? '✂️ shape cut — geometric erase applied' : '✏️ shape added — geometric union applied')
       } else if (!erase) {
         drawnRef.current = { shape: r.shape, ring: r.ring }
@@ -306,7 +324,7 @@ export default function CutoutLab() {
       const t0 = performance.now()
       const r = toolRef.current === 'add' ? await client.current!.addStroke(stroke) : await client.current!.eraseStroke(stroke)
       setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
-      acceptMask(r.mask)
+      await acceptMask(r.mask)
     } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
     setBusy(false)
   }
@@ -343,7 +361,9 @@ export default function CutoutLab() {
   const save = async () => {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current) return
-    const baked = await bakeSticker(img, maskRef.current, dRef.current, boundsRef.current, blendRef.current)
+    const baked = preparedRef.current && !drawnRef.current
+      ? await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, p2w(), p2h(), blendRef.current)
+      : await bakeSticker(img, maskRef.current, dRef.current, boundsRef.current, blendRef.current)
     baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
   }
 
@@ -396,7 +416,17 @@ export default function CutoutLab() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
         {tab === 'ai' && (<>
-          <select value={engineSel} onChange={(e) => setEngineSel(e.target.value as 'edge' | 'u2net')} style={{ ...btn, fontSize: 12 }}>
+          <select value={engineSel} onChange={(e) => {
+            const v = e.target.value as 'edge' | 'u2net'
+            setEngineSel(v); engineSelRef.current = v
+            if (v === 'u2net') { client.current?.dispose(); edgeRef.current = 'dead'; setEdge('dead'); setStatus('u2net engine — one runtime resident') }
+            else {
+              const c = client.current!
+              c.spawn(); edgeRef.current = 'loading'; setEdge('loading'); edgeEncodedRef.current = false
+              c.load(MODELS.edgesam, 'auto').then(() => { edgeRef.current = 'ready'; setEdge('ready'); setStatus('EdgeSAM ready') })
+                .catch((err) => { edgeRef.current = 'dead'; setEdge('dead'); setStatus('⚠️ ' + String(err?.message)) })
+            }
+          }} style={{ ...btn, fontSize: 12 }}>
             <option value="edge">EdgeSAM · auto + brush</option>
             <option value="u2net">u2net · v5.3.1 (auto only)</option>
           </select>

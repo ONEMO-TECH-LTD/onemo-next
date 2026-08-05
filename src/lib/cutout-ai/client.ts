@@ -51,7 +51,7 @@ export class CutoutClient {
   private async maskCall(msg: any): Promise<MaskReply> {
     const r = await this.call(msg)
     if (r.type === 'error') throw new Error(r.error)
-    return { mask: { data: new Uint8Array(r.mask), w: r.w, h: r.h }, ms: r.ms }
+    return { mask: { data: new Uint8Array(r.mask), w: r.w, h: r.h, soft: r.soft ? new Uint8Array(r.soft) : undefined }, ms: r.ms }
   }
 
   async load(cfg: SegModelConfig, exec: Exec): Promise<{ device: string; ms: number }> {

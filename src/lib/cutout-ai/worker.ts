@@ -22,7 +22,9 @@ const ctx = self as unknown as { onmessage: ((e: MessageEvent) => void) | null; 
 const post = (m: unknown, t?: Transferable[]) => ctx.postMessage(m, t || [])
 const postMask = (id: number, type: string, mask: Mask, t0: number) => {
   const copy = mask.data.slice() // the brush keeps its base; transfer a copy
-  post({ type, id, mask: copy.buffer, w: mask.w, h: mask.h, ms: Math.round(performance.now() - t0) }, [copy.buffer])
+  const soft = mask.soft ? mask.soft.slice() : null
+  const transfer: Transferable[] = soft ? [copy.buffer, soft.buffer] : [copy.buffer]
+  post({ type, id, mask: copy.buffer, soft: soft?.buffer ?? null, w: mask.w, h: mask.h, ms: Math.round(performance.now() - t0) }, transfer)
 }
 
 ctx.onmessage = async (e: MessageEvent) => {
