@@ -22,6 +22,11 @@ const MODELS: Record<string, any> = {
   sam2tiny: { kind: 'sam2-tjs', label: 'SAM2-tiny · best', id: 'onnx-community/sam2-hiera-tiny-ONNX' },
 }
 const DETAIL_DEFAULT = 6, OFFSET_DEFAULT = 4
+// Process at a BOUNDED working resolution, not the source's full res. A 2048² photo = 4.2M px churned
+// through getImageData + transfer + connected-components + blur + distance-transform every run — that
+// overhead dwarfs a fast model's inference. Cap the longest side; the display is ~540px so this is
+// visually lossless for the probe, and it makes u2net/EdgeSAM near-instant.
+const WORK_MAX = 1024
 const CENTRAL: Pt[] = [{ x: 0.5, y: 0.5 }, { x: 0.4, y: 0.4 }, { x: 0.6, y: 0.4 }, { x: 0.4, y: 0.6 }, { x: 0.6, y: 0.6 }, { x: 0.5, y: 0.3 }, { x: 0.5, y: 0.7 }]
 
 // ── mask geometry (pure, runs on the main thread — fast) ─────────────────────────────────────────
@@ -208,7 +213,9 @@ export default function SamProbe() {
     const img = new Image()
     img.src = url
     try { await img.decode() } catch (e) { URL.revokeObjectURL(url); setStatus('⚠️ could not open image: ' + String(e)); return }
-    const w = img.naturalWidth, h = img.naturalHeight
+    const nw = img.naturalWidth, nh = img.naturalHeight
+    const ws = Math.min(1, WORK_MAX / Math.max(nw, nh))
+    const w = Math.round(nw * ws), h = Math.round(nh * ws) // bounded working resolution
     dimRef.current = { W: w, H: h }; setDisp(fitDisp(w, h))
     for (const c of [imgRef.current!, maskCanvas.current!, prevRef.current!]) { c.width = w; c.height = h }
     const ictx = imgRef.current!.getContext('2d')!
