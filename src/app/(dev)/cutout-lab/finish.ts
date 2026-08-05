@@ -7,7 +7,7 @@ import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode
 import { postProcessMask, smoothMask } from '@/lib/effect/mask'
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
-import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
+import { shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import {
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
@@ -25,8 +25,11 @@ export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, 
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
-/** AI mask → v5.3.1 finishing → resolved outline as an SVG path d (image-px space). */
-export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: string } | null {
+export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
+
+/** AI mask → v5.3.1 finishing → resolved outline as an SVG path d + its bounds (image-px space).
+ *  Bounds may extend past the image (Offset) — the compose expands the canvas to them. */
+export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: string; bounds: OutlineBounds } | null {
   const { w, h } = mask
   const clean = smoothMask(postProcessMask(mask.data, w, h), w, h, 3)
   const ring = traceContourRaw(clean, w, h) // canvas ImageData is y-down = editor space already
@@ -46,7 +49,8 @@ export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: 
     settings,
   )
   if (!resolved) return null
-  return { d: shapeToSVGPathD(resolved, 2) }
+  const bb = shapeBBox(resolved, 1)
+  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY } }
 }
 
 /** Green-kept / red-removed overlay pixels for the mask. */
@@ -103,19 +107,40 @@ export function subjectFromMask(image: HTMLCanvasElement, mask: Mask): HTMLCanva
   return c
 }
 
-/** The sticker artwork: v5.3.1's one 2D compose (blend/fill/preset/vignette/tint) clipped by the
- *  resolved outline, over a checkerboard. Async (the engine's SVG-filter bake). */
-export async function composeSticker(
-  target: HTMLCanvasElement, image: HTMLCanvasElement, mask: Mask, d: string, b: BlendSettings,
-): Promise<void> {
-  const { canvas } = await composeEffectArtwork({
+/** Bake the sticker at the OUTLINE's bounds: the engine expands the canvas past the image frame and
+ *  fills the exposed space (Clamp stretches edge pixels / Tile repeats) — background expansion
+ *  faked with zero generative AI (the s59 frame-origin capability). Returns a transparent-backed
+ *  canvas clipped to the outline, plus its frame origin in image space. */
+export async function bakeSticker(
+  image: HTMLCanvasElement, mask: Mask, d: string, bounds: OutlineBounds, b: BlendSettings,
+): Promise<{ canvas: HTMLCanvasElement; originX: number; originY: number }> {
+  const { canvas, frame } = await composeEffectArtwork({
     originalCanvas: image,
     subjectCanvas: subjectFromMask(image, mask),
+    outputBoundsPx: bounds,
     blendPercent: b.blend,
     fillMode: b.fill,
     fxFilter: presetFilter(b.preset),
     vignette: b.vignette / 100,
     tint: b.tint,
   })
-  drawCutout(target, canvas, d)
+  const out = document.createElement('canvas'); out.width = frame.width; out.height = frame.height
+  const ctx = out.getContext('2d')!
+  ctx.translate(-frame.originX, -frame.originY)
+  ctx.clip(new Path2D(d))
+  ctx.drawImage(canvas, frame.originX, frame.originY)
+  return { canvas: out, originX: frame.originX, originY: frame.originY }
+}
+
+/** Preview: the baked sticker over a checkerboard, at the expanded frame size. */
+export async function composeSticker(
+  target: HTMLCanvasElement, image: HTMLCanvasElement, mask: Mask, d: string, bounds: OutlineBounds, b: BlendSettings,
+): Promise<void> {
+  const baked = await bakeSticker(image, mask, d, bounds, b)
+  const w = baked.canvas.width, h = baked.canvas.height
+  target.width = w; target.height = h
+  const ctx = target.getContext('2d')!
+  const t = 16
+  for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx.fillRect(x, y, t, t) }
+  ctx.drawImage(baked.canvas, 0, 0)
 }

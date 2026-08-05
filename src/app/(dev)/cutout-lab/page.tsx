@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CutoutClient } from '@/lib/cutout-ai/client'
 import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
-import { AUTO_SETTINGS, BLEND_DEFAULTS, composeSticker, drawCutout, finishOutline, maskOverlay, PRESET_LABELS, type BlendSettings, type PresetKey, type TraceOutlineSettings } from './finish'
+import { AUTO_SETTINGS, bakeSticker, BLEND_DEFAULTS, composeSticker, drawCutout, finishOutline, maskOverlay, PRESET_LABELS, type BlendSettings, type OutlineBounds, type PresetKey, type TraceOutlineSettings } from './finish'
 import { preloadBen, segmentV531 } from './v531seg'
 
 const WORK_MAX = 1024 // bounded working resolution (perf fix, s62)
@@ -34,6 +34,7 @@ export default function CutoutLab() {
   const prevRef = useRef<HTMLCanvasElement>(null)
   const maskRef = useRef<Mask | null>(null)
   const dRef = useRef<string | null>(null)
+  const boundsRef = useRef<OutlineBounds | null>(null)
   const strokeRef = useRef<Point[]>([])
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
@@ -78,17 +79,19 @@ export default function CutoutLab() {
       ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'
       ctx.stroke()
     }
-    if (prevRef.current && dRef.current && maskRef.current) {
+    if (prevRef.current && dRef.current && boundsRef.current && maskRef.current) {
       const seq = ++previewSeq.current
-      const [mask, d] = [maskRef.current, dRef.current]
-      composeSticker(prevRef.current, img, mask, d, blendRef.current)
+      const [mask, d, bounds] = [maskRef.current, dRef.current, boundsRef.current]
+      composeSticker(prevRef.current, img, mask, d, bounds, blendRef.current)
         .catch(() => { if (seq === previewSeq.current && prevRef.current) drawCutout(prevRef.current!, img, d) })
     }
   }, [disp.w])
 
   const applyFinish = useCallback(() => {
     const mask = maskRef.current
-    dRef.current = mask ? finishOutline(mask, settingsRef.current)?.d ?? null : null
+    const fin = mask ? finishOutline(mask, settingsRef.current) : null
+    dRef.current = fin?.d ?? null
+    boundsRef.current = fin?.bounds ?? null
     render()
   }, [render])
 
@@ -209,13 +212,11 @@ export default function CutoutLab() {
     await onFile(lastFileRef.current) // full reset = re-run the u2net magic
   }
 
-  const save = () => {
+  const save = async () => {
     const img = imgCanvas.current
-    if (!img || !dRef.current) return
-    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height
-    const ctx = c.getContext('2d')!
-    ctx.clip(new Path2D(dRef.current)); ctx.drawImage(img, 0, 0)
-    c.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
+    if (!img || !dRef.current || !boundsRef.current || !maskRef.current) return
+    const baked = await bakeSticker(img, maskRef.current, dRef.current, boundsRef.current, blendRef.current)
+    baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
   }
 
   const setTune = (patch: Partial<TraceOutlineSettings>) => { setSettings((s) => { const n = { ...s, ...patch }; settingsRef.current = n; return n }); requestAnimationFrame(applyFinish) }
