@@ -44,10 +44,22 @@ export function samHWC(rgba: Uint8ClampedArray, w: number, h: number): TensorDat
  * images — the misalignment Dan hit on the phone). Default 1 = the map covers the image exactly.
  */
 export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: number, h: number, fx = 1, fy = 1): Uint8Array {
+  // BILINEAR upsample of the continuous logit field, threshold AFTER interpolation — the same trick
+  // v5.3.1 plays with u2net's soft saliency matte. Hard-thresholding at 256² then nearest-neighbour
+  // upscaling bakes the low-res staircase into the edge (the "choppy outline"); interpolating the
+  // logits first puts the 0-crossing at sub-pixel positions, so the edge comes out smooth.
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
-    const sy = Math.min(mh - 1, (y * fy * mh / h) | 0)
-    for (let x = 0; x < w; x++) { const sx = Math.min(mw - 1, (x * fx * mw / w) | 0); if (map[sy * mw + sx] > 0) out[y * w + x] = 1 }
+    const gy = Math.min(mh - 1.001, Math.max(0, (y + 0.5) * fy * mh / h - 0.5))
+    const y0 = gy | 0, ty = gy - y0
+    for (let x = 0; x < w; x++) {
+      const gx = Math.min(mw - 1.001, Math.max(0, (x + 0.5) * fx * mw / w - 0.5))
+      const x0 = gx | 0, tx = gx - x0
+      const i = y0 * mw + x0
+      const v = (map[i] as number) * (1 - tx) * (1 - ty) + (map[i + 1] as number) * tx * (1 - ty)
+        + (map[i + mw] as number) * (1 - tx) * ty + (map[i + mw + 1] as number) * tx * ty
+      if (v > 0) out[y * w + x] = 1
+    }
   }
   return out
 }

@@ -48,6 +48,13 @@ export class CutoutClient {
     return { ms: r.ms }
   }
 
+  /** Seed the brush base with an external mask (copy is transferred; caller keeps its data). */
+  async setBase(mask: Mask): Promise<void> {
+    const buf = mask.data.slice().buffer
+    const r = await this.call({ type: 'setBase', mask: buf, w: mask.w, h: mask.h }, [buf])
+    if (r.type === 'error') throw new Error(r.error)
+  }
+
   redetect(): Promise<MaskReply> { return this.maskCall({ type: 'redetect' }) }
   addStroke(stroke: Point[]): Promise<MaskReply> { return this.maskCall({ type: 'add', stroke }) }
   eraseStroke(stroke: Point[]): Promise<MaskReply> { return this.maskCall({ type: 'erase', stroke }) }

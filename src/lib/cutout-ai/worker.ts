@@ -43,6 +43,9 @@ ctx.onmessage = async (e: MessageEvent) => {
       brush!.reset()
       await model!.encode({ rgba: new Uint8ClampedArray(d.data), w: d.w, h: d.h })
       post({ type: 'encoded', id: d.id, ms: Math.round(performance.now() - t0) })
+    } else if (d.type === 'setBase') {
+      brush!.setBase({ data: new Uint8Array(d.mask), w: d.w, h: d.h })
+      post({ type: 'based', id: d.id })
     } else if (d.type === 'redetect') {
       postMask(d.id, 'mask', await brush!.redetect(), t0)
     } else if (d.type === 'add') {

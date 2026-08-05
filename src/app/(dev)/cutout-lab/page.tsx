@@ -1,30 +1,28 @@
 'use client'
 
-// cutout-lab — proto shell over the cutout-ai subs + the v5.3.1 engine (ARCHITECTURE.md).
-// STATE + RENDER ONLY: models run in the cutout-ai worker (client.ts), the brush semantics live in
-// brush.ts (add=union / erase=subtract, base retained), finishing is v5.3.1's (finish.ts glue).
-// Safari-safe upload (<img>.decode → canvas), bounded working res, per-stage wall-clock timings.
+// cutout-lab — the SELECTED flow (Dan 2026-08-05): u2net (v5.3.1 native) is the one-tap auto cut on
+// upload; EdgeSAM is the brush steering, LAZY-loaded on the first stroke so users who never brush
+// never download it. Strokes union/subtract into the u2net base (brush.ts law). Finishing is
+// v5.3.1's outline engine (finish.ts glue). Shell is STATE + RENDER only (ARCHITECTURE.md).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CutoutClient } from '@/lib/cutout-ai/client'
-import { DEFAULT_MODEL, MODELS } from '@/lib/cutout-ai/registry'
+import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import { AUTO_SETTINGS, drawCutout, finishOutline, maskOverlay, type TraceOutlineSettings } from './finish'
-import { preloadBen, segmentV531, V531_KEY, V531_LABEL } from './v531seg'
+import { preloadBen, segmentV531 } from './v531seg'
 
 const WORK_MAX = 1024 // bounded working resolution (perf fix, s62)
 
 export default function CutoutLab() {
-  const [modelKey, setModelKey] = useState(DEFAULT_MODEL)
   const [mode, setMode] = useState<'add' | 'erase'>('add')
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
-  const [status, setStatus] = useState('starting…')
-  const [device, setDevice] = useState('—')
-  const [ready, setReady] = useState(false)
+  const [status, setStatus] = useState('ready — upload an image')
   const [busy, setBusy] = useState(false)
   const [hasCut, setHasCut] = useState(false)
-  const [ms, setMs] = useState<{ load?: number; encode?: number; recognize?: number }>({})
+  const [edgeOn, setEdgeOn] = useState(false)
+  const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
   const [disp, setDisp] = useState({ w: 480, h: 360 })
 
   const client = useRef<CutoutClient | null>(null)
@@ -37,13 +35,14 @@ export default function CutoutLab() {
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const lastFileRef = useRef<File | null>(null)
+  const edgeLoadedRef = useRef(false)   // EdgeSAM weights + session live in the worker
+  const edgeEncodedRef = useRef(false)  // current image encoded in the worker
   const settingsRef = useRef(settings); settingsRef.current = settings
   const modeRef = useRef(mode); modeRef.current = mode
-  const v531 = modelKey === V531_KEY; const v531Ref = useRef(false); v531Ref.current = v531
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
 
-  // ── render (draw only — all pixel/geometry work is in finish.ts / the subs) ──
+  // ── render (draw only — pixel/geometry work lives in finish.ts / the subs) ──
   const render = useCallback(() => {
     const view = viewRef.current, img = imgCanvas.current
     if (!view || !img) return
@@ -67,7 +66,7 @@ export default function CutoutLab() {
       ctx.stroke()
     }
     const cur = cursorRef.current
-    if (cur && hasCutRef.current && !v531Ref.current) {
+    if (cur && hasCutRef.current) {
       ctx.beginPath()
       ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
       ctx.lineWidth = Math.max(2, img.width * 0.003)
@@ -83,48 +82,26 @@ export default function CutoutLab() {
     render()
   }, [render])
 
-  const acceptMask = useCallback((mask: Mask, recognizeMs: number) => {
+  const acceptMask = useCallback((mask: Mask) => {
     maskRef.current = mask
-    setMs((m) => ({ ...m, recognize: recognizeMs }))
     setHasCut(true)
     applyFinish()
     setStatus('✨ done — brush to fill/erase, tune sliders, Re-detect, or Save')
   }, [applyFinish])
 
-  // ── model lifecycle (fresh worker per model/engine = true cold-start timing) ──
-  const loadModel = useCallback(async (key: string) => {
-    setReady(false); setHasCut(false); maskRef.current = null; dRef.current = null; setMs({})
-    if (key === V531_KEY) {
-      preloadBen() // v5.3.1's own worker warms itself; the cut runs through segmentML
-      setDevice('wasm · u2netp (v5.3.1)'); setReady(true); setStatus('ready — upload an image')
-      if (lastFileRef.current) await onFile(lastFileRef.current)
-      return
-    }
-    setStatus(`loading ${MODELS[key].label}…`)
-    const c = client.current!
-    c.spawn()
-    try {
-      const t0 = performance.now()
-      const r = await c.load(MODELS[key], 'auto') // runtime probes the backend itself
-      setDevice(`${r.device} · ${key}`); setMs({ load: Math.round(performance.now() - t0) })
-      setReady(true); setStatus('ready — upload an image')
-      if (lastFileRef.current) await onFile(lastFileRef.current)
-    } catch (e) { setStatus('⚠️ model load failed: ' + String((e as Error).message)) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   useEffect(() => {
     client.current = new CutoutClient()
-    client.current.onError = (m) => setStatus('⚠️ worker: ' + m)
-    client.current.onProgress = (loaded, total) => setStatus(`⬇ downloading model ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-    loadModel(DEFAULT_MODEL)
+    client.current.onError = (m) => setStatus('⚠️ brush AI: ' + m)
+    client.current.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
+    preloadBen() // warm the tiny u2netp so the first Magic cut is instant
     return () => client.current?.dispose()
-  }, [loadModel])
+  }, [])
 
-  // ── upload (Safari-safe) → encode → auto detect ──
+  // ── upload → u2net auto cut (the selected one-tap magic) ──
   const onFile = useCallback(async (file: File) => {
     lastFileRef.current = file
-    maskRef.current = null; dRef.current = null; setHasCut(false)
+    maskRef.current = null; dRef.current = null; setHasCut(false); setMs({})
+    edgeEncodedRef.current = false // new image → EdgeSAM must re-encode if/when brushed
     const url = URL.createObjectURL(file)
     const img = new Image(); img.src = url
     try { await img.decode() } catch (e) { URL.revokeObjectURL(url); setStatus('⚠️ could not open image: ' + String(e)); return }
@@ -138,57 +115,64 @@ export default function CutoutLab() {
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     render()
-    setBusy(true)
+    setBusy(true); setStatus('✨ AI magic (u2net)…')
     try {
-      if (v531Ref.current) {
-        setStatus('✨ v5.3.1 cut (u2netp)…')
-        const t1 = performance.now()
-        const r = await segmentV531(url, WORK_MAX)
-        setDevice('wasm · ' + r.adapter + ' (v5.3.1)')
-        acceptMask(r.mask, Math.round(performance.now() - t1))
-      } else {
-        setStatus('🧠 encoding image…')
-        const t0 = performance.now()
-        await client.current!.encode(mctx.getImageData(0, 0, w, h).data, w, h)
-        setMs((m) => ({ ...m, encode: Math.round(performance.now() - t0) }))
-        setStatus('✨ detecting the object…')
-        const t1 = performance.now()
-        const r = await client.current!.redetect()
-        acceptMask(r.mask, Math.round(performance.now() - t1))
-      }
+      const t0 = performance.now()
+      const r = await segmentV531(url, WORK_MAX)
+      setMs({ cut: Math.round(performance.now() - t0) })
+      acceptMask(r.mask)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     URL.revokeObjectURL(url)
     setBusy(false)
   }, [acceptMask, render])
 
-  // ── brush (stroke = prompt; add fills into the base, erase subtracts — brush.ts owns it) ──
+  // ── EdgeSAM, lazy: loaded + encoded only when the user actually brushes ──
+  const ensureEdge = useCallback(async () => {
+    const c = client.current!
+    if (!edgeLoadedRef.current) {
+      setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
+      c.spawn()
+      await c.load(MODELS.edgesam, 'auto')
+      edgeLoadedRef.current = true
+      setEdgeOn(true)
+    }
+    if (!edgeEncodedRef.current) {
+      setStatus('🧠 brush AI reading the image…')
+      const img = imgCanvas.current!
+      const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
+      await c.encode(px.data, img.width, img.height)
+      edgeEncodedRef.current = true
+    }
+    if (maskRef.current) await c.setBase(maskRef.current) // strokes edit the CURRENT accepted cut
+  }, [])
+
+  // ── brush (stroke = prompt; add unions into the base, erase subtracts — brush.ts owns it) ──
   const nrm = (e: React.PointerEvent): Point => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1 }
   }
-  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy || v531Ref.current) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
+  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
   const onMove = (e: React.PointerEvent) => { cursorRef.current = nrm(e); if (paintingRef.current) strokeRef.current.push(nrm(e)); render() }
   const onUp = async () => {
     if (!paintingRef.current) return
     paintingRef.current = false
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 2) { render(); return }
-    setBusy(true); setStatus(modeRef.current === 'add' ? '🟢 filling…' : '🔴 erasing…')
+    setBusy(true)
     try {
+      await ensureEdge()
+      setStatus(modeRef.current === 'add' ? '🟢 filling…' : '🔴 erasing…')
       const t0 = performance.now()
       const r = modeRef.current === 'add' ? await client.current!.addStroke(stroke) : await client.current!.eraseStroke(stroke)
-      acceptMask(r.mask, Math.round(performance.now() - t0))
+      setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
+      acceptMask(r.mask)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
   }
 
   const redetect = async () => {
-    if (!ready || busy || !imgCanvas.current) return
-    if (v531 && lastFileRef.current) { await onFile(lastFileRef.current); return }
-    setBusy(true); setStatus('✨ re-detecting (replaces the selection)…')
-    try { const t0 = performance.now(); const r = await client.current!.redetect(); acceptMask(r.mask, Math.round(performance.now() - t0)) }
-    catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
-    setBusy(false)
+    if (busy || !lastFileRef.current) return
+    await onFile(lastFileRef.current) // full reset = re-run the u2net magic
   }
 
   const save = () => {
@@ -204,10 +188,10 @@ export default function CutoutLab() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
-      <h1 style={{ fontSize: 19, fontWeight: 700 }}>Cutout Lab — cutout-ai subs + v5.3.1 finishing</h1>
+      <h1 style={{ fontSize: 19, fontWeight: 700 }}>Cutout Lab — u2net magic + EdgeSAM brush</h1>
       <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
-        Upload → auto-detect → v5.3.1 outline finishing → <b>Save</b>. Brush: <b>Add fills into</b> the selection
-        (gaps close, the rest stays) · <b>Erase subtracts</b> · <b>Re-detect</b> is the only full reset.
+        Upload → <b>u2net auto cut</b> → v5.3.1 outline → <b>Save</b>. Brushing wakes <b>EdgeSAM</b> (one-time
+        download): <b>Add fills into</b> the cut, <b>Erase subtracts</b>, <b>Re-detect</b> re-runs the magic.
       </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0', alignItems: 'center' }}>
@@ -215,20 +199,11 @@ export default function CutoutLab() {
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
         <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
         <button onClick={redetect} disabled={!hasCut || busy} style={btn}>↻ Re-detect</button>
-        <span style={{ fontSize: 12, color: ready ? '#16a34a' : '#b45309', fontWeight: 600 }}>{ready ? `● ${device}` : '○ loading…'}</span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
-        <span style={{ fontWeight: 700 }}>Model:</span>
-        <select value={modelKey} disabled={busy} onChange={(e) => { setModelKey(e.target.value); loadModel(e.target.value) }} style={{ ...btn, fontSize: 12 }}>
-          {Object.values(MODELS).map((m) => (<option key={m.key} value={m.key}>{m.label}</option>))}
-          <option value={V531_KEY}>{V531_LABEL}</option>
-        </select>
+        <span style={{ fontSize: 12, color: '#475569' }}>auto: <b>u2netp · v5.3.1</b> · brush: <b>{edgeOn ? 'EdgeSAM ready' : 'EdgeSAM (loads on first stroke)'}</b></span>
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
-        {v531 && <span style={{ color: '#b45309' }}>auto model — brush off (comparison control)</span>}
-        {!v531 && (['add', 'erase'] as const).map((m) => (
+        {(['add', 'erase'] as const).map((m) => (
           <button key={m} onClick={() => setMode(m)} style={{ ...btn, background: mode === m ? '#0f172a' : '#f1f5f9', color: mode === m ? '#fff' : '#0f172a' }}>{m === 'add' ? '🟢 Add (fill)' : '🔴 Erase'}</button>
         ))}
         <label style={lbl}>Brush {brushR}<input type="range" min={8} max={120} value={brushR} onChange={(e) => setBrushR(+e.target.value)} style={{ width: 80 }} /></label>
@@ -249,11 +224,9 @@ export default function CutoutLab() {
         </div>
       </div>
 
-      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10, maxWidth: 620 }}>
-        <Stat label="engine · model" value={device} />
-        <Stat label="model load" value={ms.load != null ? `${ms.load}ms` : '—'} />
-        <Stat label="encode / image" value={ms.encode != null ? `${ms.encode}ms` : '—'} />
-        <Stat label="recognize" value={ms.recognize != null ? `${ms.recognize}ms` : '—'} />
+      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, maxWidth: 460 }}>
+        <Stat label="magic cut (u2net)" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
+        <Stat label="brush stroke (EdgeSAM)" value={ms.stroke != null ? `${ms.stroke}ms` : '—'} />
       </div>
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155' }}><b>Status:</b> {status}</p>
     </div>

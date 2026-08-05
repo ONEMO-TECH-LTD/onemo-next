@@ -25,6 +25,10 @@ export class BrushSession {
 
   reset(): void { this.base = null }
 
+  /** Seed/replace the base with an externally produced mask (the selected flow: u2net's auto cut
+   *  is the base; EdgeSAM strokes union/subtract into it). */
+  setBase(mask: Mask): void { this.base = mask }
+
   /** Explicit full auto re-detect — the ONLY operation that replaces the base. */
   async redetect(): Promise<Mask> {
     this.base = await this.segment(CENTRAL_PROMPT, true)
