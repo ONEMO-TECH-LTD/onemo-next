@@ -19,7 +19,7 @@ const ORT = () => (ortP ??= (async () => {
 let txP: Promise<typeof import('@huggingface/transformers')> | null = null
 const TX = () => (txP ??= import('@huggingface/transformers'))
 
-type Cfg = { kind: string; id?: string; enc?: string; dec?: string; onnx?: string; size?: number; mean?: number[]; std?: number[]; exec?: string }
+type Cfg = { kind: string; id?: string; enc?: string; dec?: string; onnx?: string; size?: number; mean?: number[]; std?: number[]; exec?: string; preproc?: string }
 let cfg: Cfg | null = null
 // transformers.js state
 let tModel: any = null, tProc: any = null, tInputs: any = null, tEmb: any = null
@@ -88,8 +88,16 @@ ctx.onmessage = async (e: MessageEvent) => {
         const tx = await TX(); const raw = new tx.RawImage(rgba, d.W, d.H, 4).rgb()
         tInputs = await tProc(raw); tEmb = await tModel.get_image_embeddings(tInputs)
       } else if (cfg!.kind === 'sam-onnx') {
-        const ort = await ORT(); const { tensor, scale } = chwSam(rgba, d.W, d.H, ort.Tensor); samScale = scale
-        const r = await encS.run({ [encS.inputNames[0]]: tensor }); samEmb = r[encS.outputNames[0]]
+        const ort = await ORT()
+        if (cfg!.preproc === 'hwc') { // MobileSAM: raw image HWC [H,W,3], model preprocesses internally → coords in ORIGINAL space
+          const hwc = new Float32Array(d.W * d.H * 3)
+          for (let i = 0; i < d.W * d.H; i++) { const j = i * 4; hwc[i * 3] = rgba[j]; hwc[i * 3 + 1] = rgba[j + 1]; hwc[i * 3 + 2] = rgba[j + 2] }
+          samScale = 1
+          const r = await encS.run({ [encS.inputNames[0]]: new ort.Tensor('float32', hwc, [d.H, d.W, 3]) }); samEmb = r[encS.outputNames[0]]
+        } else { // EdgeSAM: preprocessed CHW [1,3,1024,1024] → coords ×scale
+          const { tensor, scale } = chwSam(rgba, d.W, d.H, ort.Tensor); samScale = scale
+          const r = await encS.run({ [encS.inputNames[0]]: tensor }); samEmb = r[encS.outputNames[0]]
+        }
       } else { // u2net auto — run the full matte here
         const ort = await ORT(); const S = cfg!.size || 320
         const t = chwSquare(rgba, d.W, d.H, S, cfg!.mean!, cfg!.std!, true, ort.Tensor)

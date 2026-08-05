@@ -17,8 +17,8 @@ const MODELS: Record<string, any> = {
   silueta: { kind: 'u2net', label: 'Silueta · v5.3.1 (auto)', onnx: '/seg-models/silueta.onnx', size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225], auto: true },
   slim77: { kind: 'sam-tjs', label: 'SlimSAM-77 · ~5.5M', id: 'Xenova/slimsam-77-uniform' },
   slim50: { kind: 'sam-tjs', label: 'SlimSAM-50 · larger', id: 'Xenova/slimsam-50-uniform' },
-  mobilesam: { kind: 'sam-onnx', label: 'MobileSAM · ~10M', enc: '/seg-models/mobilesam.encoder.onnx', dec: '/seg-models/mobilesam.decoder.onnx' },
-  edgesam: { kind: 'sam-onnx', label: 'EdgeSAM · fastest', enc: '/seg-models/edgesam.encoder.onnx', dec: '/seg-models/edgesam.decoder.onnx' },
+  mobilesam: { kind: 'sam-onnx', label: 'MobileSAM · ~10M', enc: '/seg-models/mobilesam.encoder.onnx', dec: '/seg-models/mobilesam.decoder.onnx', preproc: 'hwc' },
+  edgesam: { kind: 'sam-onnx', label: 'EdgeSAM · fastest', enc: '/seg-models/edgesam.encoder.onnx', dec: '/seg-models/edgesam.decoder.onnx', preproc: 'chw' },
   sam2tiny: { kind: 'sam2-tjs', label: 'SAM2-tiny · best', id: 'onnx-community/sam2-hiera-tiny-ONNX' },
 }
 const DETAIL_DEFAULT = 6, OFFSET_DEFAULT = 4
