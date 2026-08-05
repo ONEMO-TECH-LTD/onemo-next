@@ -11,13 +11,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CutoutClient } from '@/lib/cutout-ai/client'
 import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
-import { AUTO_SETTINGS, bakeSticker, BLEND_DEFAULTS, composeSticker, drawCutout, finishOutline, maskOverlay, PRESET_LABELS, type BlendSettings, type OutlineBounds, type PresetKey, type TraceOutlineSettings } from './finish'
+import { AUTO_SETTINGS, bakeSticker, BLEND_DEFAULTS, composeSticker, drawCutout, finishDrawn, finishOutline, maskFromShape, maskOverlay, PRESET_LABELS, type BlendSettings, type OutlineBounds, type PresetKey, type TraceOutlineSettings } from './finish'
+import { strokeToShape } from '@/lib/freeshape'
+import type { VShape } from '@/lib/vector-core'
 import { preloadBen, segmentV531 } from './v531seg'
 
 const WORK_MAX = 1024 // bounded working resolution (perf fix, s62)
 
 export default function CutoutLab() {
-  const [mode, setMode] = useState<'add' | 'erase'>('add')
+  const [mode, setMode] = useState<'add' | 'erase' | 'draw'>('add')
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
@@ -45,6 +47,7 @@ export default function CutoutLab() {
   const blendRef = useRef(blend); blendRef.current = blend
   const previewSeq = useRef(0)
   const modeRef = useRef(mode); modeRef.current = mode
+  const drawnRef = useRef<{ shape: VShape; ring: { x: number; y: number }[] } | null>(null)
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
 
@@ -65,18 +68,18 @@ export default function CutoutLab() {
     const st = strokeRef.current
     if (st.length) {
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'
-      ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)'
+      ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,0.55)' : modeRef.current === 'draw' ? 'rgba(124,58,237,0.55)' : 'rgba(239,68,68,0.55)'
       ctx.lineWidth = brushRef.current * 2 * (img.width / disp.w)
       ctx.beginPath(); ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
       for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
       ctx.stroke()
     }
     const cur = cursorRef.current
-    if (cur && hasCutRef.current && edgeRef.current === 'ready') {
+    if (cur && (hasCutRef.current || modeRef.current === 'draw')) {
       ctx.beginPath()
       ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
       ctx.lineWidth = Math.max(2, img.width * 0.003)
-      ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'
+      ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,1)' : modeRef.current === 'draw' ? 'rgba(124,58,237,1)' : 'rgba(239,68,68,1)'
       ctx.stroke()
     }
     if (prevRef.current && dRef.current && boundsRef.current && maskRef.current) {
@@ -88,14 +91,18 @@ export default function CutoutLab() {
   }, [disp.w])
 
   const applyFinish = useCallback(() => {
-    const mask = maskRef.current
-    const fin = mask ? finishOutline(mask, settingsRef.current) : null
+    const img = imgCanvas.current
+    const drawn = drawnRef.current
+    const fin = drawn && img
+      ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, settingsRef.current)
+      : maskRef.current ? finishOutline(maskRef.current, settingsRef.current) : null
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     render()
   }, [render])
 
   const acceptMask = useCallback((mask: Mask) => {
+    drawnRef.current = null // an AI result supersedes a drawn shape
     maskRef.current = mask
     setHasCut(true)
     applyFinish()
@@ -128,7 +135,7 @@ export default function CutoutLab() {
   // ── upload → u2net auto cut (the selected one-tap magic) ──
   const onFile = useCallback(async (file: File) => {
     lastFileRef.current = file
-    maskRef.current = null; dRef.current = null; setHasCut(false); setMs({})
+    maskRef.current = null; dRef.current = null; drawnRef.current = null; setHasCut(false); setMs({})
     edgeEncodedRef.current = false // new image → EdgeSAM must re-encode if/when brushed
     const url = URL.createObjectURL(file)
     const img = new Image(); img.src = url
@@ -195,6 +202,18 @@ export default function CutoutLab() {
     paintingRef.current = false
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 2) { render(); return }
+    if (modeRef.current === 'draw') {
+      const img = imgCanvas.current!
+      const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
+      const r = strokeToShape(pts)
+      if (!r) { setStatus('✏️ draw a CLOSED loop — the shape is what you draw (no AI)'); render(); return }
+      drawnRef.current = { shape: r.shape, ring: r.ring }
+      maskRef.current = maskFromShape(r.shape, img.width, img.height) // blend matte = the drawn shape
+      setHasCut(true)
+      applyFinish()
+      setStatus(`✏️ drawn shape recognized: ${r.verdict} — tune knobs, redraw, or Save`)
+      return
+    }
     setBusy(true)
     try {
       await ensureEdge()
@@ -239,8 +258,8 @@ export default function CutoutLab() {
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
-        {(['add', 'erase'] as const).map((m) => (
-          <button key={m} onClick={() => setMode(m)} style={{ ...btn, background: mode === m ? '#0f172a' : '#f1f5f9', color: mode === m ? '#fff' : '#0f172a' }}>{m === 'add' ? '🟢 Add (fill)' : '🔴 Erase'}</button>
+        {(['add', 'erase', 'draw'] as const).map((m) => (
+          <button key={m} onClick={() => setMode(m)} style={{ ...btn, background: mode === m ? '#0f172a' : '#f1f5f9', color: mode === m ? '#fff' : '#0f172a' }}>{m === 'add' ? '🟢 Add (fill)' : m === 'erase' ? '🔴 Erase' : '✏️ Draw shape'}</button>
         ))}
         <Knob label="Brush" value={brushR} lo={8} hi={120} onChange={setBrushR} />
       </div>

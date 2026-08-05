@@ -7,6 +7,7 @@ import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode
 import { postProcessMask, smoothMask } from '@/lib/effect/mask'
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
+import { flattenShape } from '@/lib/vector-core'
 import { shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import {
   resolveTraceOutline,
@@ -143,4 +144,42 @@ export async function composeSticker(
   const t = 16
   for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx.fillRect(x, y, t, t) }
   ctx.drawImage(baked.canvas, 0, 0)
+}
+
+// ── drawn shapes (freeshape / Sculpt) — same finishing, same knobs, no AI ──
+
+/** A drawn (already-vector) shape through the SAME v5.3.1 resolver the AI trace uses — the drawn
+ *  shape is a first-class OutlineSource (freeshape contract law 3): every knob + reversibility
+ *  apply identically. `ring` = the raw resampled stroke (provenance → detail/offset re-derive). */
+export function finishDrawn(
+  shape: import('@/lib/vector-core').VShape, ring: { x: number; y: number }[], w: number, h: number,
+  settings: TraceOutlineSettings,
+): { d: string; bounds: OutlineBounds } | null {
+  const resolved = resolveTraceOutline(
+    {
+      vectorShape: shape,
+      rawTracePx: ring.map((p) => [p.x, h - p.y] as [number, number]), // producers expects y-up
+      maskWidthPx: w,
+      maskHeightPx: h,
+      mmPerPx: MM_BASE / Math.max(w, h),
+    },
+    settings,
+  )
+  if (!resolved) return null
+  const bb = shapeBBox(resolved, 1)
+  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY } }
+}
+
+/** Rasterize a drawn shape to a Mask (subject matte for the blend layer — inside = subject). */
+export function maskFromShape(shape: import('@/lib/vector-core').VShape, w: number, h: number): Mask {
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  const ring = flattenShape(shape, 0.5)[0] ?? []
+  ctx.beginPath()
+  ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+  ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill()
+  const px = ctx.getImageData(0, 0, w, h).data
+  const data = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) data[i] = px[i * 4 + 3] > 128 ? 1 : 0
+  return { data, w, h }
 }
