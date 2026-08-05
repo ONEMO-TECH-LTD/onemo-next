@@ -21,7 +21,7 @@ export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
 /** AI mask → v5.3.1 finishing → resolved outline as an SVG path d (image-px space). */
-export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: string; shape: VShape } | null {
+export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: string } | null {
   const { w, h } = mask
   const clean = smoothMask(postProcessMask(mask.data, w, h), w, h, 3)
   const ring = traceContourRaw(clean, w, h) // canvas ImageData is y-down = editor space already
@@ -41,7 +41,7 @@ export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: 
     settings,
   )
   if (!resolved) return null
-  return { d: shapeToSVGPathD(resolved, 2), shape: resolved }
+  return { d: shapeToSVGPathD(resolved, 2) }
 }
 
 /** Green-kept / red-removed overlay pixels for the mask. */
