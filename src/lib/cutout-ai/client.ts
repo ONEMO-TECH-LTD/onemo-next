@@ -9,6 +9,7 @@ export interface MaskReply { mask: Mask; ms: number }
 export class CutoutClient {
   private worker: Worker | null = null
   private pending = new Map<number, (v: any) => void>()
+  private kick = new Map<number, () => void>() // watchdog re-arm per in-flight call (progress = alive)
   private nextId = 1
   onError: ((msg: string) => void) | null = null
   onProgress: ((loaded: number, total: number) => void) | null = null
@@ -18,15 +19,33 @@ export class CutoutClient {
     this.worker?.terminate(); this.pending.clear()
     const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
     w.onmessage = (e) => {
-      if (e.data.type === 'progress') { this.onProgress?.(e.data.loaded, e.data.total); return }
-      const r = this.pending.get(e.data.id); if (r) { this.pending.delete(e.data.id); r(e.data) }
+      if (e.data.type === 'progress') { this.kick.get(e.data.id)?.(); this.onProgress?.(e.data.loaded, e.data.total); return }
+      const r = this.pending.get(e.data.id); if (r) { this.pending.delete(e.data.id); this.kick.delete(e.data.id); r(e.data) }
     }
     w.onerror = (ev) => this.onError?.(ev.message)
     this.worker = w
   }
 
-  private call(msg: any, transfer?: Transferable[]): Promise<any> {
-    return new Promise((res) => { const id = this.nextId++; this.pending.set(id, res); this.worker!.postMessage({ ...msg, id }, transfer || []) })
+  /** Watchdog (iOS: a WASM OOM can freeze the worker WITHOUT throwing — the hang must become a
+   *  registered fault). A call that outlives its deadline kills the worker and rejects. */
+  private call(msg: any, transfer?: Transferable[], timeoutMs = 60000): Promise<any> {
+    return new Promise((res, rej) => {
+      const id = this.nextId++
+      let watchdog: ReturnType<typeof setTimeout>
+      const arm = () => {
+        clearTimeout(watchdog)
+        watchdog = setTimeout(() => {
+          if (!this.pending.has(id)) return
+          this.pending.delete(id); this.kick.delete(id)
+          this.worker?.terminate(); this.worker = null
+          rej(new Error('brush AI froze (watchdog) — worker terminated'))
+        }, timeoutMs)
+      }
+      arm()
+      this.kick.set(id, arm) // download progress = alive → re-arm
+      this.pending.set(id, (v) => { clearTimeout(watchdog); res(v) })
+      this.worker!.postMessage({ ...msg, id }, transfer || [])
+    })
   }
 
   private async maskCall(msg: any): Promise<MaskReply> {
@@ -36,7 +55,7 @@ export class CutoutClient {
   }
 
   async load(cfg: SegModelConfig, exec: Exec): Promise<{ device: string; ms: number }> {
-    const r = await this.call({ type: 'load', cfg, exec })
+    const r = await this.call({ type: 'load', cfg, exec }, undefined, 180000) // download + init
     if (r.type === 'error') throw new Error(r.error)
     return { device: r.device, ms: r.ms }
   }

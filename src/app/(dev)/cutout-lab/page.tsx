@@ -1,8 +1,10 @@
 'use client'
 
-// cutout-lab — the SELECTED flow (Dan 2026-08-05): u2net (v5.3.1 native) is the one-tap auto cut on
-// upload; EdgeSAM is the brush steering, LAZY-loaded on the first stroke so users who never brush
-// never download it. Strokes union/subtract into the u2net base (brush.ts law). Finishing is
+// cutout-lab — EDGE-FIRST flow (Dan 2026-08-05, after the iPhone OOM): ONE AI runtime resident,
+// ever. EdgeSAM loads up front and does BOTH the auto cut and the brush; u2net (v5.3.1 native) is
+// the FALLBACK, entered only on a REGISTERED fault — a load/cut error or the client watchdog
+// killing a frozen worker (iOS OOM freezes don't throw; the watchdog converts them to faults).
+// Two runtimes in one iOS tab was the ceiling — that state no longer exists. Finishing is
 // v5.3.1's outline engine (finish.ts glue). Shell is STATE + RENDER only (ARCHITECTURE.md).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -21,7 +23,7 @@ export default function CutoutLab() {
   const [status, setStatus] = useState('ready — upload an image')
   const [busy, setBusy] = useState(false)
   const [hasCut, setHasCut] = useState(false)
-  const [edgeOn, setEdgeOn] = useState(false)
+  const [edge, setEdge] = useState<'loading' | 'ready' | 'dead'>('loading')
   const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
   const [disp, setDisp] = useState({ w: 480, h: 360 })
 
@@ -35,7 +37,7 @@ export default function CutoutLab() {
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const lastFileRef = useRef<File | null>(null)
-  const edgeLoadedRef = useRef(false)   // EdgeSAM weights + session live in the worker
+  const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
   const edgeEncodedRef = useRef(false)  // current image encoded in the worker
   const settingsRef = useRef(settings); settingsRef.current = settings
   const modeRef = useRef(mode); modeRef.current = mode
@@ -66,7 +68,7 @@ export default function CutoutLab() {
       ctx.stroke()
     }
     const cur = cursorRef.current
-    if (cur && hasCutRef.current) {
+    if (cur && hasCutRef.current && edgeRef.current === 'ready') {
       ctx.beginPath()
       ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
       ctx.lineWidth = Math.max(2, img.width * 0.003)
@@ -89,13 +91,28 @@ export default function CutoutLab() {
     setStatus('✨ done — brush to fill/erase, tune sliders, Re-detect, or Save')
   }, [applyFinish])
 
-  useEffect(() => {
-    client.current = new CutoutClient()
-    client.current.onError = (m) => setStatus('⚠️ brush AI: ' + m)
-    client.current.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-    preloadBen() // warm the tiny u2netp so the first Magic cut is instant
-    return () => client.current?.dispose()
+  const edgeFault = useCallback((why: string) => {
+    // REGISTERED fault → u2net takes over; the dead runtime's worker is gone (watchdog/terminate)
+    edgeRef.current = 'dead'; setEdge('dead')
+    preloadBen() // only NOW warm v5.3.1's engine — never two runtimes at once
+    setStatus('⚠️ ' + why + ' — switched to u2net (auto only)')
   }, [])
+
+  useEffect(() => {
+    const c = new CutoutClient()
+    client.current = c
+    c.onProgress = (loaded, total) => setStatus(`⬇ AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
+    ;(async () => {
+      try {
+        c.spawn()
+        setStatus('⬇ loading AI (EdgeSAM, one-time)…')
+        await c.load(MODELS.edgesam, 'auto')
+        edgeRef.current = 'ready'; setEdge('ready')
+        setStatus('ready — upload an image')
+      } catch (e) { edgeFault('AI failed to start (' + String((e as Error).message) + ')') }
+    })()
+    return () => c.dispose()
+  }, [edgeFault])
 
   // ── upload → u2net auto cut (the selected one-tap magic) ──
   const onFile = useCallback(async (file: File) => {
@@ -115,8 +132,24 @@ export default function CutoutLab() {
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     render()
-    setBusy(true); setStatus('✨ AI magic (u2net)…')
+    setBusy(true)
+    if (edgeRef.current === 'ready') {
+      try {
+        setStatus('✨ AI magic (EdgeSAM)…')
+        const t0 = performance.now()
+        const px = mctx.getImageData(0, 0, w, h)
+        await client.current!.encode(px.data, w, h)
+        edgeEncodedRef.current = true
+        const r = await client.current!.redetect()
+        setMs({ cut: Math.round(performance.now() - t0) })
+        acceptMask(r.mask)
+        URL.revokeObjectURL(url); setBusy(false)
+        return
+      } catch (e) { edgeFault('AI froze on this image (' + String((e as Error).message) + ')') }
+    }
+    // fallback path — u2net via v5.3.1's own engine (auto only)
     try {
+      setStatus('✨ AI magic (u2net fallback)…')
       const t0 = performance.now()
       const r = await segmentV531(url, WORK_MAX)
       setMs({ cut: Math.round(performance.now() - t0) })
@@ -126,26 +159,11 @@ export default function CutoutLab() {
     setBusy(false)
   }, [acceptMask, render])
 
-  // ── EdgeSAM, lazy: loaded + encoded only when the user actually brushes ──
+  // ── brush prep: Edge is already resident; just sync the base (and encode if a fallback cut ran) ──
   const ensureEdge = useCallback(async () => {
     const c = client.current!
-    if (!edgeLoadedRef.current) {
-      setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
-      try {
-        c.spawn()
-        await c.load(MODELS.edgesam, 'auto')
-      } catch {
-        // iOS memory-pressure OOM: a fresh worker = a fresh WASM heap. One breath, one retry.
-        setStatus('⏳ retrying brush AI (freeing memory)…')
-        await new Promise((r) => setTimeout(r, 800))
-        c.spawn()
-        await c.load(MODELS.edgesam, 'auto')
-      }
-      edgeLoadedRef.current = true
-      setEdgeOn(true)
-    }
     if (!edgeEncodedRef.current) {
-      setStatus('🧠 brush AI reading the image…')
+      setStatus('🧠 AI reading the image…')
       const img = imgCanvas.current!
       const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
       await c.encode(px.data, img.width, img.height)
@@ -159,7 +177,7 @@ export default function CutoutLab() {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1 }
   }
-  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
+  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy || edgeRef.current !== 'ready') return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
   const onMove = (e: React.PointerEvent) => { cursorRef.current = nrm(e); if (paintingRef.current) strokeRef.current.push(nrm(e)); render() }
   const onUp = async () => {
     if (!paintingRef.current) return
@@ -174,7 +192,7 @@ export default function CutoutLab() {
       const r = modeRef.current === 'add' ? await client.current!.addStroke(stroke) : await client.current!.eraseStroke(stroke)
       setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
       acceptMask(r.mask)
-    } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
+    } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
     setBusy(false)
   }
 
@@ -196,10 +214,10 @@ export default function CutoutLab() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
-      <h1 style={{ fontSize: 19, fontWeight: 700 }}>Cutout Lab — u2net magic + EdgeSAM brush</h1>
+      <h1 style={{ fontSize: 19, fontWeight: 700 }}>Cutout Lab — EdgeSAM magic + brush · u2net fallback</h1>
       <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
-        Upload → <b>u2net auto cut</b> → v5.3.1 outline → <b>Save</b>. Brushing wakes <b>EdgeSAM</b> (one-time
-        download): <b>Add fills into</b> the cut, <b>Erase subtracts</b>, <b>Re-detect</b> re-runs the magic.
+        One AI resident: <b>EdgeSAM</b> auto-cuts on upload and powers the brush (<b>Add fills into</b> the cut,
+        <b>Erase subtracts</b>). If it faults or freezes, the watchdog registers it and <b>u2net</b> takes over (auto only).
       </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0', alignItems: 'center' }}>
@@ -207,7 +225,7 @@ export default function CutoutLab() {
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
         <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
         <button onClick={redetect} disabled={!hasCut || busy} style={btn}>↻ Re-detect</button>
-        <span style={{ fontSize: 12, color: '#475569' }}>auto: <b>u2netp · v5.3.1</b> · brush: <b>{edgeOn ? 'EdgeSAM ready' : 'EdgeSAM (loads on first stroke)'}</b></span>
+        <span style={{ fontSize: 12, color: edge === 'dead' ? '#b45309' : '#475569' }}>engine: <b>{edge === 'ready' ? 'EdgeSAM (auto + brush)' : edge === 'loading' ? 'EdgeSAM loading…' : 'u2net fallback (auto only, brush off)'}</b></span>
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
@@ -233,8 +251,8 @@ export default function CutoutLab() {
       </div>
 
       <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, maxWidth: 460 }}>
-        <Stat label="magic cut (u2net)" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
-        <Stat label="brush stroke (EdgeSAM)" value={ms.stroke != null ? `${ms.stroke}ms` : '—'} />
+        <Stat label="magic cut" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
+        <Stat label="brush stroke" value={ms.stroke != null ? `${ms.stroke}ms` : '—'} />
       </div>
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155' }}><b>Status:</b> {status}</p>
     </div>
