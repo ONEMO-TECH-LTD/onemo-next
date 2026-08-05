@@ -241,14 +241,14 @@ export default function CutoutLab() {
         {(['add', 'erase'] as const).map((m) => (
           <button key={m} onClick={() => setMode(m)} style={{ ...btn, background: mode === m ? '#0f172a' : '#f1f5f9', color: mode === m ? '#fff' : '#0f172a' }}>{m === 'add' ? '🟢 Add (fill)' : '🔴 Erase'}</button>
         ))}
-        <label style={lbl}>Brush {brushR}<input type="range" min={8} max={120} value={brushR} onChange={(e) => setBrushR(+e.target.value)} style={{ width: 80 }} /></label>
+        <Knob label="Brush" value={brushR} lo={8} hi={120} onChange={setBrushR} />
       </div>
 
       {/* VECTOR — the full v5.3.1 outline tool set (resolveTraceOutline). Birth = angled/simplified/offset, sharp. */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700 }}>Vector:</span>
         {([['detail', 0, 100], ['offset', 0, 20], ['simplify', 0, 100], ['smooth', 0, 100], ['straighten', 0, 100], ['radius', 0, 100], ['curve', 0, 100]] as const).map(([k, lo, hi]) => (
-          <label key={k} style={lbl}>{k} {settings[k]}<input type="range" min={lo} max={hi} value={settings[k]} onChange={(e) => setTune({ [k]: +e.target.value })} style={{ width: 70 }} /></label>
+          <Knob key={k} label={k} value={settings[k]} lo={lo} hi={hi} onChange={(v) => setTune({ [k]: v })} />
         ))}
         <span>join:</span>
         {(['sharp', 'round', 'bevel'] as const).map((j) => (
@@ -259,8 +259,8 @@ export default function CutoutLab() {
       {/* BLEND — the s59-decoupled v5.3.1 2D artwork operation (composite.ts). */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700 }}>Blend:</span>
-        <label style={lbl}>blend {blend.blend}<input type="range" min={0} max={100} value={blend.blend} onChange={(e) => setBlendTune({ blend: +e.target.value })} style={{ width: 70 }} /></label>
-        <label style={lbl}>vignette {blend.vignette}<input type="range" min={0} max={100} value={blend.vignette} onChange={(e) => setBlendTune({ vignette: +e.target.value })} style={{ width: 70 }} /></label>
+        <Knob label="blend" value={blend.blend} lo={0} hi={100} onChange={(v) => setBlendTune({ blend: v })} />
+        <Knob label="vignette" value={blend.vignette} lo={0} hi={100} onChange={(v) => setBlendTune({ vignette: v })} />
         {(['clamp', 'tile'] as const).map((f) => (
           <button key={f} onClick={() => setBlendTune({ fill: f })} style={{ ...btn, padding: '4px 8px', fontSize: 11, background: blend.fill === f ? '#0f172a' : '#f1f5f9', color: blend.fill === f ? '#fff' : '#0f172a' }}>{f}</button>
         ))}
@@ -293,6 +293,17 @@ export default function CutoutLab() {
 }
 
 const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9', fontWeight: 600 }
+function Knob({ label, value, lo, hi, onChange }: { label: string; value: number; lo: number; hi: number; onChange: (v: number) => void }) {
+  const clamp = (v: number) => Math.max(lo, Math.min(hi, Math.round(v)))
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {label}
+      <input type="number" min={lo} max={hi} value={value} onChange={(e) => onChange(clamp(+e.target.value))}
+        style={{ width: 44, padding: '3px 4px', fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 4 }} />
+      <input type="range" min={lo} max={hi} step={1} value={value} onChange={(e) => onChange(clamp(+e.target.value))} style={{ width: 130 }} />
+    </label>
+  )
+}
 const lbl: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 }
 const cap: React.CSSProperties = { fontSize: 11, textTransform: 'uppercase', color: '#64748b', marginBottom: 4 }
 function Stat({ label, value }: { label: string; value: string }) {
