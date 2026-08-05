@@ -16,10 +16,12 @@ import {
 
 export type { TraceOutlineSettings }
 
-/** Birth defaults per v5.3.1's DELIBERATE generation philosophy (Dan 2026-08-05): the first vector
- *  is ANGLED and SIMPLIFIED with an offset — squared straight lines, SHARP joins, no rounding, no
- *  smoothing. Rounding/smooth/radius/curve are user TOOLS applied after, never baked into birth. */
-export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, detail: 70, offset: 4, offsetJoin: 'sharp' }
+/** v5.3.1's OWN auto config (seed-defaults.ts AUTO_TUNE — "organic by default", T6): the SOURCE
+ *  stays the sharp low-node trace (detail 100, offset 0, sharp joins — v5.3.1's deliberate birth,
+ *  mobile-editable), and the default look is applied as REVERSIBLE adjustments on top:
+ *  simplify 40 · straighten 20 · smooth 45. Zero the sliders → the raw sharp trace. These are the
+ *  starting constants Dan tunes on-device; the locked golden config replaces them here. */
+export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, simplify: 40, straighten: 20, smooth: 45 }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
