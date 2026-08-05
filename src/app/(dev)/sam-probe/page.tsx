@@ -128,13 +128,16 @@ export default function SamProbe() {
     setDevice(`${r.device} · ${modelKeyRef.current}`); setLoadMs(r.ms); setReady(true); setStatus('ready — upload an image')
   }, [call])
 
-  useEffect(() => {
+  // spawn a FRESH worker (terminates any prior) → true from-scratch load timing per model/engine
+  const spawnWorker = useCallback(() => {
+    if (workerRef.current) { workerRef.current.terminate(); pending.current.clear() }
     const w = new Worker(new URL('./sam.worker.ts', import.meta.url), { type: 'module' })
     w.onmessage = (e) => { const r = pending.current.get(e.data.id); if (r) { pending.current.delete(e.data.id); r(e.data) } }
     w.onerror = (ev) => setStatus('⚠️ worker error: ' + ev.message)
-    workerRef.current = w; loadModel()
-    return () => w.terminate()
-  }, [loadModel])
+    workerRef.current = w
+  }, [])
+
+  useEffect(() => { spawnWorker(); loadModel(); return () => workerRef.current?.terminate() }, [spawnWorker, loadModel])
 
   useEffect(() => { const f = () => setVw(window.innerWidth); f(); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f) }, [])
   const fitDisp = (w: number, h: number) => { const maxW = Math.min(560, vwRef.current - 34), maxH = 460, s = Math.min(maxW / w, maxH / h, 1); return { w: Math.round(w * s), h: Math.round(h * s) } }
@@ -211,10 +214,11 @@ export default function SamProbe() {
   }, [call, recognize, renderAll])
 
   const reloadPipeline = useCallback(async () => {
-    rawRef.current = null; bufRef.current = null; setHasCut(false)
+    rawRef.current = null; bufRef.current = null; setHasCut(false); setLoadMs(null); setEncodeMs(null); setCutMs(null)
+    spawnWorker() // FRESH worker → measure this model/engine from a cold start
     await loadModel()
-    if (lastFileRef.current) await onFile(lastFileRef.current); else setStatus('reloaded — upload an image')
-  }, [loadModel, onFile])
+    if (lastFileRef.current) await onFile(lastFileRef.current); else setStatus('fresh reload — upload an image')
+  }, [spawnWorker, loadModel, onFile])
 
   const depositAlong = (a: Pt, b: Pt, add: boolean) => {
     const { W } = dimRef.current, r = brushRef.current * (W / dispRef.current.w)
@@ -252,9 +256,9 @@ export default function SamProbe() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700, color: '#334155' }}>Model:</span>
-        {Object.entries(MODELS).map(([k, m]) => (
-          <button key={k} disabled={busy} onClick={() => { setModelKey(k); modelKeyRef.current = k; reloadPipeline() }} style={{ ...btn, fontSize: 12, background: modelKey === k ? '#0f172a' : '#f1f5f9', color: modelKey === k ? '#fff' : '#0f172a', borderColor: modelKey === k ? '#0f172a' : '#cbd5e1' }}>{narrow ? k : m.label}</button>
-        ))}
+        <select value={modelKey} disabled={busy} onChange={(e) => { setModelKey(e.target.value); modelKeyRef.current = e.target.value; reloadPipeline() }} style={{ ...btn, fontSize: 12, cursor: 'pointer' }}>
+          {Object.entries(MODELS).map(([k, m]) => (<option key={k} value={k}>{m.label}</option>))}
+        </select>
         <span style={{ fontWeight: 700, color: '#334155', marginLeft: 4 }}>Engine:</span>
         {([['auto', narrow ? 'Auto' : 'Auto (WebGPU→WASM)'], ['wasm', narrow ? 'WASM' : 'Force WASM · Safari']] as ['auto' | 'wasm', string][]).map(([e, lbl]) => (
           <button key={e} disabled={busy} onClick={() => { setExec(e); execRef.current = e; reloadPipeline() }} style={{ ...btn, fontSize: 12, background: exec === e ? '#7c3aed' : '#f1f5f9', color: exec === e ? '#fff' : '#0f172a', borderColor: exec === e ? '#7c3aed' : '#cbd5e1' }}>{lbl}</button>
