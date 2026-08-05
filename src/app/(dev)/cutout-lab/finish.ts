@@ -107,13 +107,19 @@ export type { PresetKey }
  *  hard 1px binary cut; residual tracing imperfections dissolve in the feather + blend). */
 export function subjectFromMask(image: HTMLCanvasElement, mask: Mask): HTMLCanvasElement {
   const { w, h } = mask
+  // DEFRINGE (the actual dirty-edge cure): the mask's outermost 1–2px rim is background-coloured
+  // contamination — feathering alone BLURS the dirt. Erode the matte into the subject first (eat
+  // the rim), THEN feather. Erode = dilate the inverse (mask.ts has the octagonal dilate).
+  const inv = new Uint8Array(w * h)
+  for (let i = 0; i < inv.length; i++) inv[i] = mask.data[i] ? 0 : 1
+  const invGrown = dilateMask(inv, w, h, 2)
   const alpha = document.createElement('canvas'); alpha.width = w; alpha.height = h
   const av = new ImageData(w, h)
-  for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = mask.data[i] ? 255 : 0
+  for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = invGrown[i] ? 0 : 255
   alpha.getContext('2d')!.putImageData(av, 0, 0)
   const soft = document.createElement('canvas'); soft.width = w; soft.height = h
   const sctx = soft.getContext('2d')!
-  sctx.filter = `blur(${Math.max(1, w / 700)}px)` // ~1.5px feather at working res
+  sctx.filter = `blur(${Math.max(1.5, w / 450)}px)` // ~2.3px feather at working res
   sctx.drawImage(alpha, 0, 0)
   const c = document.createElement('canvas'); c.width = image.width; c.height = image.height
   const ctx = c.getContext('2d')!
@@ -240,4 +246,18 @@ export function maskFromShape(shape: import('@/lib/vector-core').VShape, w: numb
   const data = new Uint8Array(w * h)
   for (let i = 0; i < w * h; i++) data[i] = px[i * 4 + 3] > 128 ? 1 : 0
   return { data, w, h }
+}
+
+/** Mask booleans for the DRAW add/erase combination (Dan's two examples: a drawn loop unions into
+ *  or subtracts from the current selection GEOMETRICALLY — no AI). The result re-enters
+ *  finishOutline, so padding + smoothing give the elegant joins. */
+export function unionMasks(base: Mask, add: Mask): Mask {
+  const data = new Uint8Array(base.data)
+  for (let i = 0; i < data.length; i++) if (add.data[i]) data[i] = 1
+  return { data, w: base.w, h: base.h }
+}
+export function subtractMasks(base: Mask, sub: Mask): Mask {
+  const data = new Uint8Array(base.data)
+  for (let i = 0; i < data.length; i++) if (sub.data[i]) data[i] = 0
+  return { data, w: base.w, h: base.h }
 }

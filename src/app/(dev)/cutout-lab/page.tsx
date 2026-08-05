@@ -14,14 +14,14 @@ import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeSticker, BLEND_DEFAULTS, composeSticker, drawCutout, finishDrawn, finishOutline,
-  maskFromShape, maskOverlay, PRESET_LABELS,
+  maskFromShape, maskOverlay, PRESET_LABELS, subtractMasks, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
 } from './finish'
 import { segmentV531 } from './v531seg'
 
 const WORK_MAX = 1024
 
-type Tool = 'add' | 'erase' | 'draw' | 'nodes' | 'frame'
+type Tool = 'add' | 'erase' | 'draw' | 'draw-erase' | 'nodes' | 'frame'
 type Tab = 'ai' | 'vector' | 'blend' | 'edit'
 
 const VEC_CHIPS = ['detail', 'offset', 'simplify', 'smooth', 'straighten', 'radius', 'curve'] as const
@@ -48,17 +48,20 @@ export default function CutoutLab() {
   const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
   const [disp, setDisp] = useState({ w: 480, h: 360 })
   const [shapeTick, setShapeTick] = useState(0) // re-render signal for the edit overlay
+  const [preview, setPreview] = useState(false)
+  const previewRef = useRef(false); previewRef.current = preview
+  const [overlayOn, setOverlayOn] = useState(true)
+  const overlayRef = useRef(true); overlayRef.current = overlayOn
 
   const client = useRef<CutoutClient | null>(null)
   const imgCanvas = useRef<HTMLCanvasElement | null>(null)
   const viewRef = useRef<HTMLCanvasElement>(null)
-  const prevRef = useRef<HTMLCanvasElement>(null)
   const maskRef = useRef<Mask | null>(null)
   const dRef = useRef<string | null>(null)
   const boundsRef = useRef<OutlineBounds | null>(null)
   const shapeRef = useRef<VShape | null>(null) // resolved shape (edit overlay target)
   const drawnRef = useRef<{ shape: VShape; ring: { x: number; y: number }[] } | null>(null)
-  const strokeRef = useRef<Point[]>([])
+  const strokeRef = useRef<(Point & { t: number })[]>([])
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const lastFileRef = useRef<File | null>(null)
@@ -72,41 +75,55 @@ export default function CutoutLab() {
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
 
-  // ── render (draw only) ──
+  // ── render (draw only) ── ONE canvas: working view, or the baked sticker when Preview is on
   const render = useCallback(() => {
     const view = viewRef.current, img = imgCanvas.current
     if (!view || !img) return
+    if (previewRef.current && dRef.current && boundsRef.current && maskRef.current) {
+      const seq = ++previewSeq.current
+      const [m, d, bounds] = [maskRef.current, dRef.current, boundsRef.current]
+      composeSticker(view, img, m, d, bounds, blendRef.current)
+        .catch(() => { if (seq === previewSeq.current) drawCutout(view, img, d) })
+      return
+    }
     view.width = img.width; view.height = img.height
     const ctx = view.getContext('2d')!
     ctx.drawImage(img, 0, 0)
     const mask = maskRef.current
-    if (mask) {
+    if (mask && overlayRef.current) {
       const tmp = document.createElement('canvas'); tmp.width = mask.w; tmp.height = mask.h
       tmp.getContext('2d')!.putImageData(maskOverlay(mask), 0, 0)
       ctx.drawImage(tmp, 0, 0)
     }
-    if (dRef.current) { ctx.strokeStyle = '#2563eb'; ctx.lineWidth = Math.max(2, img.width / 400); ctx.stroke(new Path2D(dRef.current)) }
+    if (dRef.current) {
+      // scrim: dim everything OUTSIDE the final shape — the sticker reads at all times (v5.3.1 pattern)
+      const scrim = new Path2D()
+      scrim.rect(0, 0, img.width, img.height)
+      scrim.addPath(new Path2D(dRef.current))
+      ctx.save(); ctx.fillStyle = 'rgba(6,8,14,0.55)'; ctx.fill(scrim, 'evenodd'); ctx.restore()
+      ctx.strokeStyle = '#2563eb'; ctx.lineWidth = Math.max(2, img.width / 400); ctx.stroke(new Path2D(dRef.current))
+    }
     const st = strokeRef.current
     if (st.length > 1) {
       const t = toolRef.current
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'
-      if (t === 'draw') {
-        // sculpt ink: solid violet
-        ctx.strokeStyle = 'rgba(124,58,237,0.6)'
+      if (t === 'draw' || t === 'draw-erase') {
+        // sculpt ink: solid violet (add) / red (erase)
+        ctx.strokeStyle = t === 'draw' ? 'rgba(124,58,237,0.6)' : 'rgba(239,68,68,0.6)'
         ctx.lineWidth = Math.max(3, img.width / 300)
         ctx.beginPath(); ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
         for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
         ctx.stroke()
       } else {
-        // AI pointer: COMET TAIL — bright head, fading tail (item 9)
+        // AI pointer: COMET TAIL — bright head, tail dissolves in TIME like a keyboard swipe (item 9)
         const col = t === 'add' ? '34,197,94' : '239,68,68'
-        const n = st.length
-        for (let i = 1; i < n; i++) {
-          const age = (n - i) / Math.min(n, 40)
-          const a = Math.max(0, 1 - age)
+        const now = performance.now()
+        const LIFE = 700 // ms a trail point stays visible
+        for (let i = 1; i < st.length; i++) {
+          const a = Math.max(0, 1 - (now - (st[i] as { t: number }).t) / LIFE)
           if (a <= 0) continue
-          ctx.strokeStyle = `rgba(${col},${(a * 0.85).toFixed(2)})`
-          ctx.lineWidth = Math.max(2, brushRef.current * (img.width / disp.w) * (0.35 + 0.65 * a))
+          ctx.strokeStyle = `rgba(${col},${(a * 0.9).toFixed(2)})`
+          ctx.lineWidth = Math.max(2, brushRef.current * (img.width / disp.w) * (0.3 + 0.7 * a))
           ctx.beginPath()
           ctx.moveTo(st[i - 1].x * img.width, st[i - 1].y * img.height)
           ctx.lineTo(st[i].x * img.width, st[i].y * img.height)
@@ -115,21 +132,15 @@ export default function CutoutLab() {
       }
     }
     const cur = cursorRef.current
-    if (cur && (hasCutRef.current || toolRef.current === 'draw')) {
+    if (cur && (hasCutRef.current || toolRef.current === 'draw' || toolRef.current === 'draw-erase')) {
       const t = toolRef.current
-      if (t === 'add' || t === 'erase' || t === 'draw') {
+      if (t !== 'nodes' && t !== 'frame') {
         ctx.beginPath()
         ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
         ctx.lineWidth = Math.max(2, img.width * 0.003)
         ctx.strokeStyle = t === 'add' ? 'rgba(34,197,94,1)' : t === 'draw' ? 'rgba(124,58,237,1)' : 'rgba(239,68,68,1)'
         ctx.stroke()
       }
-    }
-    if (prevRef.current && dRef.current && boundsRef.current && maskRef.current) {
-      const seq = ++previewSeq.current
-      const [m, d, bounds] = [maskRef.current, dRef.current, boundsRef.current]
-      composeSticker(prevRef.current, img, m, d, bounds, blendRef.current)
-        .catch(() => { if (seq === previewSeq.current && prevRef.current) drawCutout(prevRef.current!, img, d) })
     }
   }, [disp.w])
 
@@ -232,33 +243,60 @@ export default function CutoutLab() {
   }, [])
 
   // ── pointer strokes (add/erase = AI · draw = freeshape · nodes/frame = overlay's job) ──
-  const nrm = (e: React.PointerEvent): Point => {
+  const nrm = (e: React.PointerEvent): Point & { t: number } => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1 }
+    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1, t: performance.now() }
   }
+  // comet animation: while painting an AI stroke, keep repainting so the tail dissolves in TIME
+  const cometRaf = useRef(0)
+  const cometLoop = useCallback(() => {
+    if (!paintingRef.current) { cometRaf.current = 0; return }
+    render()
+    cometRaf.current = requestAnimationFrame(cometLoop)
+  }, [render])
   const brushable = () => {
+    if (previewRef.current) return false
     const t = toolRef.current
-    if (t === 'draw') return !!imgCanvas.current
+    if (t === 'draw' || t === 'draw-erase') return !!imgCanvas.current
     if (t === 'add' || t === 'erase') return hasCutRef.current && engineSelRef.current === 'edge' && edgeRef.current === 'ready'
     return false
   }
-  const onDown = (e: React.PointerEvent) => { if (busy || !brushable()) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
+  const onDown = (e: React.PointerEvent) => {
+    if (busy || !brushable()) return
+    paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]
+    const t = toolRef.current
+    if ((t === 'add' || t === 'erase') && !cometRaf.current) cometRaf.current = requestAnimationFrame(cometLoop)
+    render()
+  }
   const onMove = (e: React.PointerEvent) => { cursorRef.current = nrm(e); if (paintingRef.current) strokeRef.current.push(nrm(e)); render() }
   const onUp = async () => {
     if (!paintingRef.current) return
     paintingRef.current = false
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 2) { render(); return }
-    if (toolRef.current === 'draw') {
+    if (toolRef.current === 'draw' || toolRef.current === 'draw-erase') {
       const img = imgCanvas.current!
+      const erase = toolRef.current === 'draw-erase'
       const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
       const r = strokeToShape(pts)
       if (!r) { setStatus('✏️ draw a CLOSED loop — the shape is what you draw (no AI)'); render(); return }
-      drawnRef.current = { shape: r.shape, ring: r.ring }
-      maskRef.current = maskFromShape(r.shape, img.width, img.height)
-      setHasCut(true)
-      applyFinish()
-      setStatus(`✏️ drawn shape recognized: ${r.verdict} — tune, edit, redraw, or Save`)
+      const loopMask = maskFromShape(r.shape, img.width, img.height)
+      if (maskRef.current && hasCutRef.current) {
+        // Dan's two examples: green loop UNIONS into the selection, red loop SUBTRACTS — geometric,
+        // then finishOutline's smoothing + padding produce the elegant joins.
+        drawnRef.current = null
+        maskRef.current = erase ? subtractMasks(maskRef.current, loopMask) : unionMasks(maskRef.current, loopMask)
+        applyFinish()
+        setStatus(erase ? '✂️ shape cut — geometric erase applied' : '✏️ shape added — geometric union applied')
+      } else if (!erase) {
+        drawnRef.current = { shape: r.shape, ring: r.ring }
+        maskRef.current = loopMask
+        setHasCut(true)
+        applyFinish()
+        setStatus(`✏️ drawn shape recognized: ${r.verdict} — tune, edit, redraw, or Save`)
+      } else {
+        setStatus('✂️ nothing to erase yet — make a cut or draw a shape first')
+      }
       return
     }
     setBusy(true)
@@ -340,6 +378,10 @@ export default function CutoutLab() {
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
         <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
         <button onClick={redetect} disabled={!hasCut || busy} style={btn}>↻ Re-detect</button>
+        <button onClick={() => { setPreview((v) => { previewRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
+          style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
+        <button onClick={() => { setOverlayOn((v) => { overlayRef.current = !v; return !v }); requestAnimationFrame(render) }} disabled={!hasCut}
+          style={{ ...btn, background: overlayOn ? '#f1f5f9' : '#0f172a', color: overlayOn ? '#0f172a' : '#fff' }}>{overlayOn ? '🎭 Mask on' : '🎭 Mask off'}</button>
         <span style={{ fontSize: 12, color: '#b45309' }}>{edge === 'loading' ? 'EdgeSAM loading…' : edge === 'dead' ? 'EdgeSAM dead — u2net only' : ''}</span>
       </div>
 
@@ -382,7 +424,8 @@ export default function CutoutLab() {
           {blend.tint && <button onClick={() => setBlendTune({ tint: null })} style={chipBtn(false)}>tint off</button>}
         </>)}
         {tab === 'edit' && (<>
-          <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>✏️ Draw shape</button>
+          <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>✏️ Draw add</button>
+          <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>✂️ Draw erase</button>
           <button onClick={() => enterEdit('nodes')} disabled={!shapeRef.current} style={chipBtn(tool === 'nodes')}>⬡ Nodes</button>
           <button onClick={() => enterEdit('frame')} disabled={!shapeRef.current} style={chipBtn(tool === 'frame')}>▣ Frame</button>
           {tool === 'frame' && (
@@ -403,22 +446,18 @@ export default function CutoutLab() {
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={cap}>Selection — green kept / red removed · blue = final outline</div>
+          <div style={cap}>{preview ? 'Sticker preview (v5.3.1 outline · bounds = the sticker, not the photo)' : 'Selection — green kept / red removed · blue = final outline'}</div>
           <div style={{ position: 'relative', width: disp.w }}>
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
               onWheel={(e) => { setBrushR((b) => Math.max(8, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
               style={{ width: disp.w, height: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: '#0b1220', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
-            {editing && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
+            {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
                 onEdit={onEditLive} onCommit={onEditCommit} />
             )}
           </div>
-        </div>
-        <div>
-          <div style={cap}>Sticker preview (v5.3.1 outline)</div>
-          <canvas ref={prevRef} style={{ width: disp.w, height: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }} />
         </div>
       </div>
 
