@@ -3,15 +3,18 @@
 
 import type { Point, SegModelConfig } from './types'
 
+// DEFAULT = EdgeSAM: weights SELF-HOSTED same-origin (no hub download — the mobile "stuck loading"
+// was SlimSAM pulling ~40MB from HF on the phone), fastest CPU/WASM encode, quality ≈ slim on the
+// Mac A/B (Dan 2026-08-05). The hub-fetched models stay for desktop comparison only.
 export const MODELS: Record<string, SegModelConfig> = {
-  slim77: { key: 'slim77', label: 'SlimSAM-77 · ~5.5M', sub: 'slimsam', id: 'Xenova/slimsam-77-uniform' },
-  slim50: { key: 'slim50', label: 'SlimSAM-50 · larger', sub: 'slimsam', id: 'Xenova/slimsam-50-uniform' },
-  mobilesam: { key: 'mobilesam', label: 'MobileSAM · ~10M', sub: 'mobilesam', enc: '/seg-models/mobilesam.encoder.onnx', dec: '/seg-models/mobilesam.decoder.onnx' },
-  edgesam: { key: 'edgesam', label: 'EdgeSAM · fastest', sub: 'edgesam', enc: '/seg-models/edgesam.encoder.onnx', dec: '/seg-models/edgesam.decoder.onnx' },
-  sam2tiny: { key: 'sam2tiny', label: 'SAM2-tiny · best', sub: 'sam2', id: 'onnx-community/sam2-hiera-tiny-ONNX' },
+  edgesam: { key: 'edgesam', label: 'EdgeSAM · default (self-hosted, fastest)', sub: 'edgesam', enc: '/seg-models/edgesam.encoder.onnx', dec: '/seg-models/edgesam.decoder.onnx' },
+  mobilesam: { key: 'mobilesam', label: 'MobileSAM · self-hosted', sub: 'mobilesam', enc: '/seg-models/mobilesam.encoder.onnx', dec: '/seg-models/mobilesam.decoder.onnx' },
+  slim77: { key: 'slim77', label: 'SlimSAM-77 · hub download', sub: 'slimsam', id: 'Xenova/slimsam-77-uniform' },
+  slim50: { key: 'slim50', label: 'SlimSAM-50 · hub download', sub: 'slimsam', id: 'Xenova/slimsam-50-uniform' },
+  sam2tiny: { key: 'sam2tiny', label: 'SAM2-tiny · hub download', sub: 'sam2', id: 'onnx-community/sam2-hiera-tiny-ONNX' },
 }
 
-export const DEFAULT_MODEL = 'slim77'
+export const DEFAULT_MODEL = 'edgesam'
 
 /** Central auto-prompt when no user hint exists (recognise the main object). */
 export const CENTRAL_PROMPT: Point[] = [

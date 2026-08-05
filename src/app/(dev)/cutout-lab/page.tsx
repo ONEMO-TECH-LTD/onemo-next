@@ -8,14 +8,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CutoutClient } from '@/lib/cutout-ai/client'
 import { DEFAULT_MODEL, MODELS } from '@/lib/cutout-ai/registry'
-import type { Exec, Mask, Point } from '@/lib/cutout-ai/types'
+import type { Mask, Point } from '@/lib/cutout-ai/types'
 import { AUTO_SETTINGS, drawCutout, finishOutline, maskOverlay, type TraceOutlineSettings } from './finish'
 
 const WORK_MAX = 1024 // bounded working resolution (perf fix, s62)
 
 export default function CutoutLab() {
   const [modelKey, setModelKey] = useState(DEFAULT_MODEL)
-  const [exec, setExec] = useState<Exec>('auto')
   const [mode, setMode] = useState<'add' | 'erase'>('add')
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
@@ -35,9 +34,11 @@ export default function CutoutLab() {
   const dRef = useRef<string | null>(null)
   const strokeRef = useRef<Point[]>([])
   const paintingRef = useRef(false)
+  const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const lastFileRef = useRef<File | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
   const modeRef = useRef(mode); modeRef.current = mode
+  const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
 
   // ── render (draw only — all pixel/geometry work is in finish.ts / the subs) ──
@@ -63,6 +64,14 @@ export default function CutoutLab() {
       for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
       ctx.stroke()
     }
+    const cur = cursorRef.current
+    if (cur && hasCutRef.current) {
+      ctx.beginPath()
+      ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
+      ctx.lineWidth = Math.max(2, img.width * 0.003)
+      ctx.strokeStyle = modeRef.current === 'add' ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'
+      ctx.stroke()
+    }
     if (prevRef.current && dRef.current) drawCutout(prevRef.current, img, dRef.current)
   }, [disp.w])
 
@@ -81,14 +90,14 @@ export default function CutoutLab() {
   }, [applyFinish])
 
   // ── model lifecycle (fresh worker per model/engine = true cold-start timing) ──
-  const loadModel = useCallback(async (key: string, ex: Exec) => {
+  const loadModel = useCallback(async (key: string) => {
     setReady(false); setHasCut(false); maskRef.current = null; dRef.current = null; setMs({})
     setStatus(`loading ${MODELS[key].label}…`)
     const c = client.current!
     c.spawn()
     try {
       const t0 = performance.now()
-      const r = await c.load(MODELS[key], ex)
+      const r = await c.load(MODELS[key], 'auto') // runtime probes the backend itself
       setDevice(`${r.device} · ${key}`); setMs({ load: Math.round(performance.now() - t0) })
       setReady(true); setStatus('ready — upload an image')
       if (lastFileRef.current) await onFile(lastFileRef.current)
@@ -99,7 +108,7 @@ export default function CutoutLab() {
   useEffect(() => {
     client.current = new CutoutClient()
     client.current.onError = (m) => setStatus('⚠️ worker: ' + m)
-    loadModel(DEFAULT_MODEL, 'auto')
+    loadModel(DEFAULT_MODEL)
     return () => client.current?.dispose()
   }, [loadModel])
 
@@ -138,8 +147,8 @@ export default function CutoutLab() {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1 }
   }
-  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy) return; paintingRef.current = true; strokeRef.current = [nrm(e)]; render() }
-  const onMove = (e: React.PointerEvent) => { if (!paintingRef.current) return; strokeRef.current.push(nrm(e)); render() }
+  const onDown = (e: React.PointerEvent) => { if (!hasCut || busy) return; paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]; render() }
+  const onMove = (e: React.PointerEvent) => { cursorRef.current = nrm(e); if (paintingRef.current) strokeRef.current.push(nrm(e)); render() }
   const onUp = async () => {
     if (!paintingRef.current) return
     paintingRef.current = false
@@ -191,13 +200,9 @@ export default function CutoutLab() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700 }}>Model:</span>
-        <select value={modelKey} disabled={busy} onChange={(e) => { setModelKey(e.target.value); loadModel(e.target.value, exec) }} style={{ ...btn, fontSize: 12 }}>
+        <select value={modelKey} disabled={busy} onChange={(e) => { setModelKey(e.target.value); loadModel(e.target.value) }} style={{ ...btn, fontSize: 12 }}>
           {Object.values(MODELS).map((m) => (<option key={m.key} value={m.key}>{m.label}</option>))}
         </select>
-        <span style={{ fontWeight: 700, marginLeft: 4 }}>Engine:</span>
-        {(['auto', 'wasm'] as Exec[]).map((e) => (
-          <button key={e} disabled={busy} onClick={() => { setExec(e); loadModel(modelKey, e) }} style={{ ...btn, fontSize: 12, background: exec === e ? '#7c3aed' : '#f1f5f9', color: exec === e ? '#fff' : '#0f172a' }}>{e === 'auto' ? 'Auto (WebGPU→WASM)' : 'Force WASM · Safari'}</button>
-        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center', fontSize: 12, color: '#475569' }}>
@@ -213,8 +218,8 @@ export default function CutoutLab() {
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={cap}>Selection — green kept / red removed · blue = final outline</div>
-          <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
-            style={{ width: disp.w, height: disp.h, border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: '#0b1220' }} />
+          <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { cursorRef.current = null; onUp() }}
+            style={{ width: disp.w, height: disp.h, border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: '#0b1220', cursor: 'crosshair' }} />
         </div>
         <div>
           <div style={cap}>Sticker preview (v5.3.1 outline)</div>
