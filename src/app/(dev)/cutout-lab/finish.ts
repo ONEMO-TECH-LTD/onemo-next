@@ -280,18 +280,6 @@ export async function bakeStickerEngine(
   return { canvas: out }
 }
 
-/** Engine-native preview: baked sticker over a checkerboard. */
-export async function composeStickerEngine(
-  target: HTMLCanvasElement, prepared: PreparedEffect, d: string, bounds: OutlineBounds, maskW: number, maskH: number, b: BlendSettings,
-): Promise<void> {
-  const baked = await bakeStickerEngine(prepared, d, bounds, maskW, maskH, b)
-  const w = baked.canvas.width, h = baked.canvas.height
-  target.width = w; target.height = h
-  const ctx = target.getContext('2d')!
-  const t = 16
-  for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx.fillRect(x, y, t, t) }
-  ctx.drawImage(baked.canvas, 0, 0)
-}
 
 /** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
  *  WYSIWYG with the brush cursor), plus the enclosed interior when the gesture closes a loop

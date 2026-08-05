@@ -13,7 +13,7 @@ import { strokeToShape } from '@/lib/freeshape'
 import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
-  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, composeStickerEngine,
+  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, swathMask,
   subtractMasks, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
@@ -67,6 +67,8 @@ export default function CutoutLab() {
   const settingsRef = useRef(settings); settingsRef.current = settings
   const blendRef = useRef(blend); blendRef.current = blend
   const previewSeq = useRef(0)
+  const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
+  const bakeSeq = useRef(0)
   const toolRef = useRef(tool); toolRef.current = tool
   const engineSelRef = useRef(engineSel); engineSelRef.current = engineSel
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
@@ -99,6 +101,16 @@ export default function CutoutLab() {
 
   const dispW2 = useRef(disp.w); dispW2.current = disp.w
   const dispRefW = () => dispW2.current
+  const recomposeLive = useCallback(() => {
+    if (!preparedRef.current || !dRef.current || !boundsRef.current) { liveBakeRef.current = null; return }
+    const seq = ++bakeSeq.current
+    const [d, bounds] = [dRef.current, boundsRef.current]
+    bakeStickerEngine(preparedRef.current, d, bounds, p2w(), p2h(), blendRef.current)
+      .then((r) => { if (seq === bakeSeq.current) { liveBakeRef.current = { canvas: r.canvas, bounds }; render() } })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const p2w = () => preparedRef.current?.spec.maskWidthPx ?? imgCanvas.current?.width ?? 1
   const p2h = () => preparedRef.current?.spec.maskHeightPx ?? imgCanvas.current?.height ?? 1
 
@@ -106,14 +118,20 @@ export default function CutoutLab() {
   const render = useCallback(() => {
     const view = viewRef.current, img = imgCanvas.current
     if (!view || !img) return
-    if (previewRef.current && dRef.current && boundsRef.current && maskRef.current) {
-      const seq = ++previewSeq.current
-      const [m, d, bounds] = [maskRef.current, dRef.current, boundsRef.current]
-      void m
-      const p = preparedRef.current
-        ? composeStickerEngine(view, preparedRef.current, d, bounds, p2w(), p2h(), blendRef.current)
-        : Promise.reject(new Error('no prepared'))
-      p.catch(() => { if (seq === previewSeq.current) drawCutout(view, img, d) })
+    const ctx0 = view.getContext('2d')!
+    if (previewRef.current && dRef.current) {
+      // PREVIEW = the SAME bake the editor shows, only cut out (checkerboard instead of the photo).
+      // One compositor, one cache — edit/preview divergence is impossible by construction.
+      const live = liveBakeRef.current
+      if (live) {
+        const w = live.canvas.width, h = live.canvas.height
+        view.width = w; view.height = h
+        const t = 16
+        for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx0.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx0.fillRect(x, y, t, t) }
+        ctx0.drawImage(live.canvas, 0, 0)
+      } else {
+        drawCutout(view, img, dRef.current)
+      }
       return
     }
     view.width = img.width; view.height = img.height
@@ -126,7 +144,16 @@ export default function CutoutLab() {
       ctx.drawImage(tmp, 0, 0)
     }
     if (dRef.current) {
-      // scrim: dim everything OUTSIDE the final shape — the sticker reads at all times (v5.3.1 pattern)
+      // LIVE RESULT (Dan's one-canvas law): the ENGINE-composed sticker drawn in place inside the
+      // outline — blend/fill/presets react in real time; the raw image shows only outside, dimmed.
+      const live = liveBakeRef.current
+      if (live) {
+        const b = live.bounds
+        ctx.save()
+        ctx.clip(new Path2D(dRef.current))
+        ctx.drawImage(live.canvas, b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY)
+        ctx.restore()
+      }
       const scrim = new Path2D()
       scrim.rect(0, 0, img.width, img.height)
       scrim.addPath(new Path2D(dRef.current))
@@ -185,8 +212,9 @@ export default function CutoutLab() {
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
     setShapeTick((t) => t + 1)
+    recomposeLive()
     render()
-  }, [render])
+  }, [render, recomposeLive])
 
   const acceptMask = useCallback(async (mask: Mask) => {
     drawnRef.current = null
@@ -399,7 +427,7 @@ export default function CutoutLab() {
   }
 
   const setTune = (patch: Partial<TraceOutlineSettings>) => { setSettings((s) => { const n = { ...s, ...patch }; settingsRef.current = n; return n }); requestAnimationFrame(applyFinish) }
-  const setBlendTune = (patch: Partial<BlendSettings>) => { setBlend((b) => { const n = { ...b, ...patch }; blendRef.current = n; return n }); requestAnimationFrame(render) }
+  const setBlendTune = (patch: Partial<BlendSettings>) => { setBlend((b) => { const n = { ...b, ...patch }; blendRef.current = n; return n }); recomposeLive() }
 
   // adaptive knob wiring (item 10): one knob, bound to the active tab's chip
   const knob = (() => {
@@ -508,10 +536,10 @@ export default function CutoutLab() {
           onChange={(e) => knob.set(+e.target.value)} style={{ flex: 1, maxWidth: 420 }} />
       </div>
 
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div>
-          <div style={cap}>{preview ? 'Sticker preview (v5.3.1 outline · bounds = the sticker, not the photo)' : 'Selection — green kept / red removed · blue = final outline'}</div>
-          <div style={{ position: 'relative', width: disp.w }}>
+          <div style={{ ...cap, textAlign: 'center' }}>{preview ? 'Preview — same result, cut out' : 'Live result — dimmed outside the shape'}</div>
+          <div style={{ position: 'relative', width: disp.w, margin: '0 auto' }}>
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
               onWheel={(e) => { setBrushR((b) => Math.max(8, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
