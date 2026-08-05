@@ -38,8 +38,9 @@ export interface SegModelConfig {
 
 /** The ONE interface every model sub implements (ARCHITECTURE.md). */
 export interface SegModel {
-  /** cold-start load; resolves the actual device label (e.g. 'webgpu' | 'wasm'). */
-  load(cfg: SegModelConfig, exec: Exec): Promise<string>
+  /** cold-start load; resolves the actual device label (e.g. 'webgpu' | 'wasm').
+   *  `onProgress` reports model download bytes (loaded, total) so first load is never a silent hang. */
+  load(cfg: SegModelConfig, exec: Exec, onProgress?: (loaded: number, total: number) => void): Promise<string>
   /** once per image. */
   encode(frame: Frame): Promise<void>
   /** prompt → binary mask at frame resolution. `auto` = pick the whole object. */

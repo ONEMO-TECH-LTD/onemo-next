@@ -11,12 +11,16 @@ export class CutoutClient {
   private pending = new Map<number, (v: any) => void>()
   private nextId = 1
   onError: ((msg: string) => void) | null = null
+  onProgress: ((loaded: number, total: number) => void) | null = null
 
   /** (Re)spawn a fresh worker — call before loading a model to measure it cold. */
   spawn(): void {
     this.worker?.terminate(); this.pending.clear()
     const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
-    w.onmessage = (e) => { const r = this.pending.get(e.data.id); if (r) { this.pending.delete(e.data.id); r(e.data) } }
+    w.onmessage = (e) => {
+      if (e.data.type === 'progress') { this.onProgress?.(e.data.loaded, e.data.total); return }
+      const r = this.pending.get(e.data.id); if (r) { this.pending.delete(e.data.id); r(e.data) }
+    }
     w.onerror = (ev) => this.onError?.(ev.message)
     this.worker = w
   }

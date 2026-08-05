@@ -43,9 +43,28 @@ export const ortFor = (exec: 'auto' | 'wasm'): Promise<OrtModule> => loadOrtBuil
 let txP: Promise<any> | null = null
 export const loadTransformers = (): Promise<any> => (txP ??= import('@huggingface/transformers'))
 
+/** Streamed same-origin fetch with byte progress (models are 15–45MB — the first-load wait must be
+ *  visible, not a silent hang). */
+export async function fetchWithProgress(url: string, onProgress?: (loaded: number, total: number) => void): Promise<Uint8Array> {
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`fetch ${url}: ${resp.status}`)
+  const total = Number(resp.headers.get('content-length')) || 0
+  if (!resp.body || !onProgress || !total) return new Uint8Array(await resp.arrayBuffer())
+  const reader = resp.body.getReader()
+  const out = new Uint8Array(total)
+  let loaded = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    out.set(value, loaded); loaded += value.length
+    onProgress(loaded, total)
+  }
+  return loaded === total ? out : out.slice(0, loaded)
+}
+
 /** Create an ORT session from a same-origin asset: preferred build first, pure-WASM fallback. */
-export async function ortSession(url: string, exec: 'auto' | 'wasm'): Promise<OrtSession> {
-  const buf = new Uint8Array(await (await fetch(url)).arrayBuffer())
+export async function ortSession(url: string, exec: 'auto' | 'wasm', onProgress?: (loaded: number, total: number) => void): Promise<OrtSession> {
+  const buf = await fetchWithProgress(url, onProgress)
   const create = async (kind: OrtKind) => {
     const ort = await loadOrtBuild(kind)
     const s = await ort.InferenceSession.create(buf, { executionProviders: kind === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'] })

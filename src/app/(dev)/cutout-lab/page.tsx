@@ -116,6 +116,7 @@ export default function CutoutLab() {
   useEffect(() => {
     client.current = new CutoutClient()
     client.current.onError = (m) => setStatus('⚠️ worker: ' + m)
+    client.current.onProgress = (loaded, total) => setStatus(`⬇ downloading model ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
     loadModel(DEFAULT_MODEL)
     return () => client.current?.dispose()
   }, [loadModel])

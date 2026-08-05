@@ -15,15 +15,16 @@ export class Sam2Model implements SegModel {
   private W = 1
   private H = 1
 
-  async load(cfg: SegModelConfig, exec: Exec): Promise<string> {
+  async load(cfg: SegModelConfig, exec: Exec, onProgress?: (loaded: number, total: number) => void): Promise<string> {
     const tx = await loadTransformers()
+    const progress_callback = (p: any) => { if (p?.status === 'progress' && p.total) onProgress?.(p.loaded ?? 0, p.total) }
     let device = 'wasm'
     if (exec === 'auto') {
-      try { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'fp16', device: 'webgpu' }); device = 'webgpu' }
-      catch { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'q8', device: 'wasm' }) }
+      try { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'fp16', device: 'webgpu', progress_callback }); device = 'webgpu' }
+      catch { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'q8', device: 'wasm', progress_callback }) }
     } else {
-      try { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'q8', device: 'wasm' }) }
-      catch { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'fp32', device: 'wasm' }) }
+      try { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'q8', device: 'wasm', progress_callback }) }
+      catch { this.model = await tx.Sam2Model.from_pretrained(cfg.id, { dtype: 'fp32', device: 'wasm', progress_callback }) }
     }
     this.proc = await tx.AutoProcessor.from_pretrained(cfg.id)
     return device

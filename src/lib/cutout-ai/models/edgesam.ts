@@ -18,10 +18,12 @@ export class EdgeSamModel implements SegModel {
   private H = 1
   private exec: Exec = 'auto'
 
-  async load(cfg: SegModelConfig, exec: Exec): Promise<string> {
+  async load(cfg: SegModelConfig, exec: Exec, onProgress?: (loaded: number, total: number) => void): Promise<string> {
     this.exec = exec
-    this.enc = await ortSession(cfg.enc!, exec)
-    this.dec = await ortSession(cfg.dec!, exec)
+    // report enc+dec as one combined byte stream so the UI shows a single honest download bar
+    let encTotal = 0
+    this.enc = await ortSession(cfg.enc!, exec, (l, t) => { encTotal = t; onProgress?.(l, t * 2) })
+    this.dec = await ortSession(cfg.dec!, exec, (l, t) => onProgress?.(encTotal + l, encTotal + t))
     return ortKindFor(exec)
   }
 
@@ -53,6 +55,9 @@ export class EdgeSamModel implements SegModel {
     const best = pickMask(areas, scores as number[], mp, auto)
     const sub = data.subarray(best * mp, best * mp + mp)
     if (mh === H && mw === W) { const out = new Uint8Array(plane); for (let i = 0; i < plane; i++) out[i] = sub[i] > 0 ? 1 : 0; return { data: out, w: W, h: H } }
-    return { data: logitsToMask(sub, mh, mw, W, H), w: W, h: H }
+    // EdgeSAM's low-res mask covers the PADDED 1024 square — sample only the valid nw×nh fraction,
+    // or non-square images come back shifted toward the corner (the phone misalignment).
+    const fx = (W * this.scale) / 1024, fy = (H * this.scale) / 1024
+    return { data: logitsToMask(sub, mh, mw, W, H, fx, fy), w: W, h: H }
   }
 }

@@ -33,7 +33,11 @@ ctx.onmessage = async (e: MessageEvent) => {
       const cfg = d.cfg as SegModelConfig
       model = new SUBS[cfg.sub]()
       brush = new BrushSession((pts, auto) => model!.segment(pts, auto))
-      const device = await model.load(cfg, d.exec)
+      let lastPost = 0
+      const device = await model.load(cfg, d.exec, (loaded, total) => {
+        const now = performance.now()
+        if (now - lastPost > 150 || loaded === total) { lastPost = now; post({ type: 'progress', id: d.id, loaded, total }) }
+      })
       post({ type: 'loaded', id: d.id, device, ms: Math.round(performance.now() - t0) })
     } else if (d.type === 'encode') {
       brush!.reset()

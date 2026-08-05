@@ -17,10 +17,12 @@ export class MobileSamModel implements SegModel {
   private H = 1
   private exec: Exec = 'auto'
 
-  async load(cfg: SegModelConfig, exec: Exec): Promise<string> {
+  async load(cfg: SegModelConfig, exec: Exec, onProgress?: (loaded: number, total: number) => void): Promise<string> {
     this.exec = exec
-    this.enc = await ortSession(cfg.enc!, exec)
-    this.dec = await ortSession(cfg.dec!, exec)
+    // report enc+dec as one combined byte stream so the UI shows a single honest download bar
+    let encTotal = 0
+    this.enc = await ortSession(cfg.enc!, exec, (l, t) => { encTotal = t; onProgress?.(l, t * 2) })
+    this.dec = await ortSession(cfg.dec!, exec, (l, t) => onProgress?.(encTotal + l, encTotal + t))
     return ortKindFor(exec)
   }
 

@@ -36,12 +36,18 @@ export function samHWC(rgba: Uint8ClampedArray, w: number, h: number): TensorDat
   return { data, dims: [h, w, 3] }
 }
 
-/** Threshold a logit map (mh×mw) to a binary mask at (w×h), nearest-neighbour upscaled. */
-export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: number, h: number): Uint8Array {
+/**
+ * Threshold a logit map (mh×mw) to a binary mask at (w×h), nearest-neighbour upscaled.
+ * `fx`/`fy` (0..1] = the VALID fraction of the map when it covers a zero-PADDED square (EdgeSAM:
+ * aspect-preserving resize + pad → the object lives only in the top-left nw×nh of the 1024 space;
+ * stretching the whole padded square onto w×h smears the mask toward the corner on non-square
+ * images — the misalignment Dan hit on the phone). Default 1 = the map covers the image exactly.
+ */
+export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: number, h: number, fx = 1, fy = 1): Uint8Array {
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
-    const sy = Math.min(mh - 1, (y * mh / h) | 0)
-    for (let x = 0; x < w; x++) { const sx = Math.min(mw - 1, (x * mw / w) | 0); if (map[sy * mw + sx] > 0) out[y * w + x] = 1 }
+    const sy = Math.min(mh - 1, (y * fy * mh / h) | 0)
+    for (let x = 0; x < w; x++) { const sx = Math.min(mw - 1, (x * fx * mw / w) | 0); if (map[sy * mw + sx] > 0) out[y * w + x] = 1 }
   }
   return out
 }
