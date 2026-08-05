@@ -131,8 +131,16 @@ export default function CutoutLab() {
     const c = client.current!
     if (!edgeLoadedRef.current) {
       setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
-      c.spawn()
-      await c.load(MODELS.edgesam, 'auto')
+      try {
+        c.spawn()
+        await c.load(MODELS.edgesam, 'auto')
+      } catch {
+        // iOS memory-pressure OOM: a fresh worker = a fresh WASM heap. One breath, one retry.
+        setStatus('⏳ retrying brush AI (freeing memory)…')
+        await new Promise((r) => setTimeout(r, 800))
+        c.spawn()
+        await c.load(MODELS.edgesam, 'auto')
+      }
       edgeLoadedRef.current = true
       setEdgeOn(true)
     }

@@ -14,6 +14,16 @@ type OrtKind = 'webgpu' | 'wasm'
 const hasWebGPU = (): boolean => typeof navigator !== 'undefined' && !!(navigator as any).gpu
 export const ortKindFor = (exec: 'auto' | 'wasm'): OrtKind => (exec === 'wasm' || !hasWebGPU() ? 'wasm' : 'webgpu')
 
+/** navigator.gpu existing ≠ a usable adapter (headless, or a memory-pressured iOS tab). Probe the
+ *  REAL adapter once so we never instantiate the webgpu build just to watch it fail into its
+ *  heavier CPU fallback — on iPhone that double-runtime churn was itself the OOM amplifier. */
+let adapterOk: boolean | null = null
+async function webgpuUsable(): Promise<boolean> {
+  if (adapterOk !== null) return adapterOk
+  try { adapterOk = !!(await (navigator as any).gpu?.requestAdapter?.()) } catch { adapterOk = false }
+  return adapterOk!
+}
+
 const ortCache = new Map<OrtKind, Promise<OrtModule>>()
 function loadOrtBuild(kind: OrtKind): Promise<OrtModule> {
   let p = ortCache.get(kind)
@@ -71,7 +81,8 @@ export async function ortSession(url: string, exec: 'auto' | 'wasm', onProgress?
     resolvedKind = kind
     return s
   }
-  const kind = resolvedKind ?? ortKindFor(exec)
+  let kind = resolvedKind ?? ortKindFor(exec)
+  if (kind === 'webgpu' && !(await webgpuUsable())) kind = 'wasm' // real adapter probe, not just the API
   if (kind === 'wasm') return create('wasm')
   try { return await create('webgpu') } catch { return create('wasm') }
 }
