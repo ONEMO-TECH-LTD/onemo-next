@@ -5,7 +5,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { samHWC, logitsToMask } from '../preprocess'
-import { loadOrt, ortSession, type OrtSession } from '../runtime'
+import { ortFor, ortKindFor, ortSession, type OrtSession } from '../runtime'
 import { pickMask } from '../select'
 import type { Exec, Frame, Mask, Point, SegModel, SegModelConfig } from '../types'
 
@@ -15,15 +15,17 @@ export class MobileSamModel implements SegModel {
   private emb: any = null
   private W = 1
   private H = 1
+  private exec: Exec = 'auto'
 
   async load(cfg: SegModelConfig, exec: Exec): Promise<string> {
+    this.exec = exec
     this.enc = await ortSession(cfg.enc!, exec)
     this.dec = await ortSession(cfg.dec!, exec)
-    return exec === 'wasm' ? 'wasm' : 'webgpu'
+    return ortKindFor(exec)
   }
 
   async encode(frame: Frame): Promise<void> {
-    const ort = await loadOrt()
+    const ort = await ortFor(this.exec)
     this.W = frame.w; this.H = frame.h
     const pre = samHWC(frame.rgba, frame.w, frame.h)
     const r = await this.enc!.run({ [this.enc!.inputNames[0]]: new ort.Tensor('float32', pre.data, pre.dims) })
@@ -31,7 +33,7 @@ export class MobileSamModel implements SegModel {
   }
 
   async segment(points: Point[], auto: boolean): Promise<Mask> {
-    const ort = await loadOrt()
+    const ort = await ortFor(this.exec)
     const W = this.W, H = this.H, plane = W * H
     const pc: number[] = [], pl: number[] = []
     for (const q of points) { pc.push(q.x * W, q.y * H); pl.push(q.label) }

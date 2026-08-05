@@ -5,7 +5,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { samCHW, logitsToMask } from '../preprocess'
-import { loadOrt, ortSession, type OrtSession } from '../runtime'
+import { ortFor, ortKindFor, ortSession, type OrtSession } from '../runtime'
 import { pickMask } from '../select'
 import type { Exec, Frame, Mask, Point, SegModel, SegModelConfig } from '../types'
 
@@ -16,15 +16,17 @@ export class EdgeSamModel implements SegModel {
   private scale = 1
   private W = 1
   private H = 1
+  private exec: Exec = 'auto'
 
   async load(cfg: SegModelConfig, exec: Exec): Promise<string> {
+    this.exec = exec
     this.enc = await ortSession(cfg.enc!, exec)
     this.dec = await ortSession(cfg.dec!, exec)
-    return exec === 'wasm' ? 'wasm' : 'webgpu'
+    return ortKindFor(exec)
   }
 
   async encode(frame: Frame): Promise<void> {
-    const ort = await loadOrt()
+    const ort = await ortFor(this.exec)
     this.W = frame.w; this.H = frame.h
     const pre = samCHW(frame.rgba, frame.w, frame.h)
     this.scale = pre.scale
@@ -33,7 +35,7 @@ export class EdgeSamModel implements SegModel {
   }
 
   async segment(points: Point[], auto: boolean): Promise<Mask> {
-    const ort = await loadOrt()
+    const ort = await ortFor(this.exec)
     const W = this.W, H = this.H, plane = W * H
     const pc: number[] = [], pl: number[] = []
     for (const q of points) { pc.push(q.x * W * this.scale, q.y * H * this.scale); pl.push(q.label) }
