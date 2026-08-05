@@ -7,8 +7,7 @@ import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode
 import { postProcessMask, smoothMask } from '@/lib/effect/mask'
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
-import { flattenShape } from '@/lib/vector-core'
-import { shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
+import { flattenShape, shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import {
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
@@ -17,12 +16,10 @@ import {
 
 export type { TraceOutlineSettings }
 
-/** v5.3.1's OWN auto config (seed-defaults.ts AUTO_TUNE — "organic by default", T6): the SOURCE
- *  stays the sharp low-node trace (detail 100, offset 0, sharp joins — v5.3.1's deliberate birth,
- *  mobile-editable), and the default look is applied as REVERSIBLE adjustments on top:
- *  simplify 40 · straighten 20 · smooth 45. Zero the sliders → the raw sharp trace. These are the
- *  starting constants Dan tunes on-device; the locked golden config replaces them here. */
-export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, simplify: 40, straighten: 20, smooth: 45 }
+/** Calibration baseline (Dan 2026-08-05): EVERYTHING ZERO — the raw full-fidelity sharp trace,
+ *  no recipe applied (engine detail 100 renders as knob 0: the Detail knob is UI-inverted).
+ *  The golden config gets dialed from zero on-device and locked here. */
+export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
@@ -30,7 +27,9 @@ export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY:
 
 /** AI mask → v5.3.1 finishing → resolved outline as an SVG path d + its bounds (image-px space).
  *  Bounds may extend past the image (Offset) — the compose expands the canvas to them. */
-export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: string; bounds: OutlineBounds } | null {
+export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape }
+
+export function finishOutline(mask: Mask, settings: TraceOutlineSettings): FinishResult | null {
   const { w, h } = mask
   const clean = smoothMask(postProcessMask(mask.data, w, h), w, h, 3)
   const ring = traceContourRaw(clean, w, h) // canvas ImageData is y-down = editor space already
@@ -51,7 +50,7 @@ export function finishOutline(mask: Mask, settings: TraceOutlineSettings): { d: 
   )
   if (!resolved) return null
   const bb = shapeBBox(resolved, 1)
-  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY } }
+  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
 }
 
 /** Green-kept / red-removed overlay pixels for the mask. */
@@ -82,14 +81,18 @@ export function drawCutout(target: HTMLCanvasElement, image: HTMLCanvasElement, 
 
 // ── blend layer (the s59-decoupled v5.3.1 2D artwork operation, verified by its own test gates) ──
 
+export type FillChoice = ArtworkFillMode | 'mirror'
 export interface BlendSettings {
-  blend: number            // 0..100 — magic-blend percent (blurred bg + sharp subject)
-  fill: ArtworkFillMode    // clamp | tile
+  blend: number            // 0..100 — magic-blend percent (blurred bg + sharp subject) = fill intensity
+  fill: FillChoice         // clamp | tile | mirror (mirror = seamless flipped expansion, glue-built)
   preset: PresetKey        // colour preset (composite.ts PRESET_LABELS)
   vignette: number         // 0..100 → 0..1
   tint: string | null      // css colour wash or null
+  scale: number            // artwork zoom %, 100 = 1:1 (the shape stays; the image moves under it)
+  panX: number             // artwork pan, % of width  (−50..50)
+  panY: number             // artwork pan, % of height (−50..50)
 }
-export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'clamp', preset: 'none', vignette: 0, tint: null }
+export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 }
 export { PRESET_LABELS }
 export type { PresetKey }
 
@@ -112,25 +115,68 @@ export function subjectFromMask(image: HTMLCanvasElement, mask: Mask): HTMLCanva
  *  fills the exposed space (Clamp stretches edge pixels / Tile repeats) — background expansion
  *  faked with zero generative AI (the s59 frame-origin capability). Returns a transparent-backed
  *  canvas clipped to the outline, plus its frame origin in image space. */
+/** Artwork transform: the image (and its subject matte) move/zoom UNDER the fixed shape —
+ *  v5.3.1's art-transform semantics, applied in image space before the compose. */
+function transformArtwork(src: HTMLCanvasElement, b: BlendSettings): HTMLCanvasElement {
+  if (b.scale === 100 && b.panX === 0 && b.panY === 0) return src
+  const w = src.width, h = src.height
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const ctx = c.getContext('2d')!
+  const s = Math.max(0.05, b.scale / 100)
+  ctx.translate(w / 2 + (b.panX / 100) * w, h / 2 + (b.panY / 100) * h)
+  ctx.scale(s, s)
+  ctx.drawImage(src, -w / 2, -h / 2)
+  return c
+}
+
+/** 3×3 mirror mosaic — each neighbour tile is the image flipped about the shared edge, so the
+ *  expansion transitions seamlessly (Dan: tile must MIRROR, plain repeat seams). Glue-built:
+ *  the engine's tile/clamp fill stays untouched; mirror hands the engine a bigger original. */
+function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
+  const w = src.width, h = src.height
+  const c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3
+  const ctx = c.getContext('2d')!
+  for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) {
+    ctx.save()
+    const fx = tx === 1 ? 1 : -1, fy = ty === 1 ? 1 : -1
+    ctx.translate(tx * w + (fx === -1 ? w : 0), ty * h + (fy === -1 ? h : 0))
+    ctx.scale(fx, fy)
+    ctx.drawImage(src, 0, 0)
+    ctx.restore()
+  }
+  return c
+}
+
 export async function bakeSticker(
   image: HTMLCanvasElement, mask: Mask, d: string, bounds: OutlineBounds, b: BlendSettings,
 ): Promise<{ canvas: HTMLCanvasElement; originX: number; originY: number }> {
+  const art = transformArtwork(image, b)
+  const subj = transformArtwork(subjectFromMask(image, mask), b)
+  const mirror = b.fill === 'mirror'
+  const sx = mirror ? image.width : 0, sy = mirror ? image.height : 0
+  let original = art, subject = subj
+  if (mirror) {
+    original = mirrorMosaic(art)
+    const big = document.createElement('canvas'); big.width = original.width; big.height = original.height
+    big.getContext('2d')!.drawImage(subj, sx, sy) // subject sits in the centre tile, untiled
+    subject = big
+  }
   const { canvas, frame } = await composeEffectArtwork({
-    originalCanvas: image,
-    subjectCanvas: subjectFromMask(image, mask),
-    outputBoundsPx: bounds,
+    originalCanvas: original,
+    subjectCanvas: subject,
+    outputBoundsPx: { minX: bounds.minX + sx, minY: bounds.minY + sy, maxX: bounds.maxX + sx, maxY: bounds.maxY + sy },
     blendPercent: b.blend,
-    fillMode: b.fill,
+    fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode), // mirror: the mosaic covers the frame; clamp guards its rim
     fxFilter: presetFilter(b.preset),
     vignette: b.vignette / 100,
     tint: b.tint,
   })
   const out = document.createElement('canvas'); out.width = frame.width; out.height = frame.height
   const ctx = out.getContext('2d')!
-  ctx.translate(-frame.originX, -frame.originY)
+  ctx.translate(-(frame.originX - sx), -(frame.originY - sy))
   ctx.clip(new Path2D(d))
-  ctx.drawImage(canvas, frame.originX, frame.originY)
-  return { canvas: out, originX: frame.originX, originY: frame.originY }
+  ctx.drawImage(canvas, frame.originX - sx, frame.originY - sy)
+  return { canvas: out, originX: frame.originX - sx, originY: frame.originY - sy }
 }
 
 /** Preview: the baked sticker over a checkerboard, at the expanded frame size. */
@@ -154,7 +200,7 @@ export async function composeSticker(
 export function finishDrawn(
   shape: import('@/lib/vector-core').VShape, ring: { x: number; y: number }[], w: number, h: number,
   settings: TraceOutlineSettings,
-): { d: string; bounds: OutlineBounds } | null {
+): FinishResult | null {
   const resolved = resolveTraceOutline(
     {
       vectorShape: shape,
@@ -167,7 +213,7 @@ export function finishDrawn(
   )
   if (!resolved) return null
   const bb = shapeBBox(resolved, 1)
-  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY } }
+  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
 }
 
 /** Rasterize a drawn shape to a Mask (subject matte for the blend layer — inside = subject). */
