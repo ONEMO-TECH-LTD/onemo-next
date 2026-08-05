@@ -10,9 +10,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 type Pt = { x: number; y: number }
 type Mode = 'add' | 'erase'
 
-const MODELS: Record<string, { id: string; label: string }> = {
-  slim77: { id: 'Xenova/slimsam-77-uniform', label: 'SlimSAM-77 · ~5.5M (smallest)' },
-  slim50: { id: 'Xenova/slimsam-50-uniform', label: 'SlimSAM-50 · larger (better)' },
+// every mobile-capable model < 50MB, wired for head-to-head testing. `auto` models (u2net family) are
+// salient-object mattes with no prompt — brush does nothing for them; the rest are promptable.
+const MODELS: Record<string, any> = {
+  u2net: { kind: 'u2net', label: 'u2net · v5.3.1 (auto)', onnx: '/seg-models/u2netp.onnx', size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225], auto: true },
+  silueta: { kind: 'u2net', label: 'Silueta · v5.3.1 (auto)', onnx: '/seg-models/silueta.onnx', size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225], auto: true },
+  slim77: { kind: 'sam-tjs', label: 'SlimSAM-77 · ~5.5M', id: 'Xenova/slimsam-77-uniform' },
+  slim50: { kind: 'sam-tjs', label: 'SlimSAM-50 · larger', id: 'Xenova/slimsam-50-uniform' },
+  mobilesam: { kind: 'sam-onnx', label: 'MobileSAM · ~10M', enc: '/seg-models/mobilesam.encoder.onnx', dec: '/seg-models/mobilesam.decoder.onnx' },
+  edgesam: { kind: 'sam-onnx', label: 'EdgeSAM · fastest', enc: '/seg-models/edgesam.encoder.onnx', dec: '/seg-models/edgesam.decoder.onnx' },
+  sam2tiny: { kind: 'sam2-tjs', label: 'SAM2-tiny · best', id: 'onnx-community/sam2-hiera-tiny-ONNX' },
 }
 const DETAIL_DEFAULT = 6, OFFSET_DEFAULT = 4
 const CENTRAL: Pt[] = [{ x: 0.5, y: 0.5 }, { x: 0.4, y: 0.4 }, { x: 0.6, y: 0.4 }, { x: 0.4, y: 0.6 }, { x: 0.6, y: 0.6 }, { x: 0.5, y: 0.3 }, { x: 0.5, y: 0.7 }]
@@ -124,7 +131,7 @@ export default function SamProbe() {
   const loadModel = useCallback(async () => {
     setReady(false); setStatus(`loading ${MODELS[modelKeyRef.current].label} (${execRef.current === 'wasm' ? 'WASM' : 'auto'})…`)
     const t0 = performance.now()
-    const r = await call({ type: 'load', modelId: MODELS[modelKeyRef.current].id, exec: execRef.current })
+    const r = await call({ type: 'load', cfg: MODELS[modelKeyRef.current], exec: execRef.current })
     if (r.type === 'error') { setStatus('⚠️ model load failed: ' + r.error); return }
     setDevice(`${r.device} · ${modelKeyRef.current}`); setLoadMs(Math.round(performance.now() - t0)); setReady(true); setStatus('ready — upload an image')
   }, [call])
