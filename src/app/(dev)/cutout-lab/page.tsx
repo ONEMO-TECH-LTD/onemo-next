@@ -542,7 +542,14 @@ export default function CutoutLab() {
           {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
           <span style={{ color: '#94a3b8' }}>sens:</span>
           {[1, 1.5, 2, 3].map((mult) => (
-            <button key={mult} onClick={() => { setSens(mult); sensRef.current = mult; applyFinish() }} style={chipBtn(sens === mult)}>×{mult}</button>
+            <button key={mult} onClick={() => {
+              // value-truth (Dan): switching sensitivity RESETS the knobs to zero — no hidden
+              // scaled state carries across modes; values dialed afterwards are true in-mode.
+              setSens(mult); sensRef.current = mult
+              const zero = { ...AUTO_SETTINGS }
+              settingsRef.current = zero; setSettings(zero)
+              applyFinish()
+            }} style={chipBtn(sens === mult)}>×{mult}</button>
           ))}
         </>)}
         {tab === 'blend' && (<>
