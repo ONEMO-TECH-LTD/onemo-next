@@ -57,6 +57,19 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
   let hiL = 0
   if (softOut) for (let i = 0, n = mh * mw; i < n; i++) { const v = map[i] as number; if (v > hiL) hiL = v }
   const Tramp = Math.max(1e-6, hiL / 4)
+  // spatial parity with the roster slot: two separable [1,2,1] passes at MAP res widen the boundary
+  // to the same signal class before interpolation (plateaus invariant).
+  let src: ArrayLike<number> = map
+  if (softOut) {
+    const sm = Float32Array.from({ length: mh * mw }, (_, i) => map[i] as number)
+    for (let pass = 0; pass < 2; pass++) {
+      const tmp = new Float32Array(sm)
+      for (let y = 0; y < mh; y++) for (let x = 1; x < mw - 1; x++) { const i = y * mw + x; sm[i] = (tmp[i - 1] + 2 * tmp[i] + tmp[i + 1]) / 4 }
+      tmp.set(sm)
+      for (let y = 1; y < mh - 1; y++) for (let x = 0; x < mw; x++) { const i = y * mw + x; sm[i] = (tmp[i - mw] + 2 * tmp[i] + tmp[i + mw]) / 4 }
+    }
+    src = sm
+  }
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
     const gy = Math.min(mh - 1.001, Math.max(0, (y + 0.5) * fy * mh / h - 0.5))
@@ -65,8 +78,8 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
       const gx = Math.min(mw - 1.001, Math.max(0, (x + 0.5) * fx * mw / w - 0.5))
       const x0 = gx | 0, tx = gx - x0
       const i = y0 * mw + x0
-      const v = (map[i] as number) * (1 - tx) * (1 - ty) + (map[i + 1] as number) * tx * (1 - ty)
-        + (map[i + mw] as number) * (1 - tx) * ty + (map[i + mw + 1] as number) * tx * ty
+      const v = (src[i] as number) * (1 - tx) * (1 - ty) + (src[i + 1] as number) * tx * (1 - ty)
+        + (src[i + mw] as number) * (1 - tx) * ty + (src[i + mw + 1] as number) * tx * ty
       if (v > 0) out[y * w + x] = 1
       if (softOut) softOut[y * w + x] = Math.round(255 * Math.min(1, Math.max(0, 0.5 + v / (2 * Tramp))))
     }

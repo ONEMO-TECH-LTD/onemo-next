@@ -11,6 +11,19 @@ export type SegmentFn = (points: Point[], auto: boolean) => Promise<Mask>
 
 const union = (base: Uint8Array, add: Uint8Array) => { for (let i = 0; i < base.length; i++) if (add[i]) base[i] = 1 }
 const subtract = (base: Uint8Array, rem: Uint8Array) => { for (let i = 0; i < base.length; i++) if (rem[i]) base[i] = 0 }
+// The SOFT matte channel must merge with the SAME algebra as the binary (Dan 2026-08-06: repeated
+// strokes composited with a STALE soft matte — first generation clean, repeats artifacted).
+const softOf = (m: Mask): Uint8Array => m.soft ?? Uint8Array.from(m.data, (v) => (v ? 255 : 0))
+const unionSoft = (base: Mask, add: Mask): Uint8Array => {
+  const a = softOf(base), b = softOf(add), out = new Uint8Array(a.length)
+  for (let i = 0; i < a.length; i++) out[i] = Math.max(a[i], b[i])
+  return out
+}
+const subtractSoft = (base: Mask, rem: Mask): Uint8Array => {
+  const a = softOf(base), b = softOf(rem), out = new Uint8Array(a.length)
+  for (let i = 0; i < a.length; i++) out[i] = Math.min(a[i], 255 - b[i])
+  return out
+}
 
 /** Thin a dense stroke trail to at most `max` prompt points (SAM degrades on huge point sets). */
 export const thinStroke = (pts: Point[], max = 32): Point[] =>
@@ -40,6 +53,7 @@ export class BrushSession {
     const pts = thinStroke(stroke).map((p) => ({ ...p, label: 1 as const }))
     const region = await this.segment(pts, false)
     if (!this.base) { this.base = region; return this.base }
+    this.base.soft = unionSoft(this.base, region)
     union(this.base.data, region.data)
     return this.base
   }
@@ -49,6 +63,7 @@ export class BrushSession {
     if (!this.base) return { data: new Uint8Array(0), w: 0, h: 0 }
     const pts = thinStroke(stroke).map((p) => ({ ...p, label: 1 as const }))
     const region = await this.segment(pts, false)
+    this.base.soft = subtractSoft(this.base, region)
     subtract(this.base.data, region.data)
     return this.base
   }
