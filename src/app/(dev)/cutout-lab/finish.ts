@@ -25,7 +25,12 @@ export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape 
 /** Calibration baseline (Dan 2026-08-05): EVERYTHING ZERO — the raw full-fidelity sharp trace,
  *  no recipe applied (engine detail 100 renders as knob 0: the Detail knob is UI-inverted).
  *  The golden config gets dialed from zero on-device and locked here. */
-export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS, offset: 3 } // Dan 2026-08-06: default offset 3 (sticker margin baseline)
+export const AUTO_SETTINGS: TraceOutlineSettings = {
+  ...TRACE_OUTLINE_DEFAULTS,
+  // Dan's default config for ANY shape (2026-08-06): offset 3, the rest 10.
+  // detail is UI-inverted (knob 10 = engine 90); straighten/curve stay 0 (off the surface).
+  detail: 90, offset: 3, simplify: 10, smooth: 10, radius: 10,
+}
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
