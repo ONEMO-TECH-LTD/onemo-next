@@ -27,13 +27,19 @@ edit loop composites nothing. The lab gets the same shape.
    - compose cadence (the Cadence Law below) + bake sequencing, coalescing, cancellation
    - the auto-blend-on-outgrowth rule (value-true: sets the knob state, never a silent override)
    - undo/redo/clear history semantics (HistoryStack stays a pure module; the flow drives it)
-   - engine selection (`?seg=` roster param) + segmentation calls (bridge `runCutout`/preseg)
+   - engine selection STATE + segmentation calls (bridge `runCutout`/preseg). The `?seg=` URL
+     read/write stays a SHELL adapter duty (the flow never touches location — CreatorAdapters
+     precedent: `segPresent` is injected); the flow owns what the selection MEANS.
+   - fault policy: the brush watchdog fault → edge-dead state → u2net-only degradation (the
+     `edgeFault` path) — a flow state, not a shell decision
    - tool actions: AI brush strokes, wand fill/erase, paint add/erase, node/frame edit commits —
      all enter as flow ACTIONS; their orchestration (accept → prepare → finish → bake) is flow code
    - PerfHUD gesture marking (`perfGesture`) on every bake/resolve/segment
 3. **Layer-3 — the shell (`page.tsx` + `EditorOverlay`) — NEUTRAL + SWAPPABLE.** Binds ONLY to
-   `{state, actions}`. Render, gesture capture, coordinate mapping, ink/comet drawing, CSS. ZERO
-   policy: no compose calls, no cadence decisions, no engine imports, no default-value decisions.
+   `{state, actions}`. Render, gesture capture, coordinate mapping, ink/comet drawing, CSS, URL
+   adapter duties (read/write `?seg=`, `?perf=` — values passed to the flow, never read inside it).
+   ZERO policy: no compose calls, no cadence decisions, no RUNTIME engine imports (type-only
+   imports are permitted — types are not behavior), no default-value decisions.
    Test: the Figma shell (I5) must be mountable on the same flow with no flow changes.
 
 ## The Cadence Law (the crash fix, stated as architecture)
@@ -52,7 +58,9 @@ edit loop composites nothing. The lab gets the same shape.
 ## Performance budgets (PerfHUD-enforced, `?perf=1`)
 
 - Editor tick ≤ **16 ms** · no main-thread task > **50 ms** per interaction tick (the engine's own
-  §9 budgets, ported with PerfHUD).
+  §9 budgets). **PerfHUD is IMPORTED from `v5.3.1/dev/PerfHUD` and mounted — never copied** (the
+  lab already imports v5.3.1 app modules: producers, primitives; a copied HUD would be the exact
+  clone class this contract forbids).
 - A 10-step Detail drag at blend-100/mirror defaults allocates ≤ **0.2 GB** total, **zero** canvases
   over the edit-time ceiling (I1: no 61 MB mosaics mid-drag; I2 lowers the ceiling to ~4 MB via
   preview-res compose — out of I1 scope, do not build it early).
