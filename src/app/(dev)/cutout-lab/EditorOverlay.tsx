@@ -15,6 +15,8 @@ interface Props {
   imgW: number
   imgH: number
   dispW: number
+  /** working-view extent (image ∪ outline) — the canvas under this overlay renders this box */
+  view?: { x: number; y: number; w: number; h: number }
   mode: EditMode
   aspectLocked: boolean
   onEdit: (shape: VShape) => void   // live (during drag)
@@ -39,7 +41,8 @@ function scaleShape(s: VShape, ax: number, ay: number, sx: number, sy: number): 
   return { paths: s.paths.map((p) => ({ anchors: p.anchors.map((a) => ({ ...a, p: m(a.p), hIn: a.hIn ? m(a.hIn) : a.hIn, hOut: a.hOut ? m(a.hOut) : a.hOut })) })) }
 }
 
-export function EditorOverlay({ shape, imgW, imgH, dispW, mode, aspectLocked, onEdit, onCommit }: Props) {
+export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLocked, onEdit, onCommit }: Props) {
+  const vb = view ?? { x: 0, y: 0, w: imgW, h: imgH }
   const dragRef = useRef<{ kind: 'node'; pi: number; ai: number; base: VShape } | { kind: 'grip'; grip: string; base: VShape; bb: ReturnType<typeof bboxOf> } | null>(null)
   const liveRef = useRef<VShape>(shape)
 
@@ -47,7 +50,7 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, mode, aspectLocked, on
   const toImg = (e: React.PointerEvent<SVGSVGElement | SVGElement>) => {
     const svg = (e.currentTarget as SVGElement).closest('svg')!
     const r = svg.getBoundingClientRect()
-    return { x: ((e.clientX - r.left) / r.width) * imgW, y: ((e.clientY - r.top) / r.height) * imgH }
+    return { x: vb.x + ((e.clientX - r.left) / r.width) * vb.w, y: vb.y + ((e.clientY - r.top) / r.height) * vb.h }
   }
 
   const move = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -99,7 +102,7 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, mode, aspectLocked, on
 
   return (
     <svg
-      viewBox={`0 0 ${imgW} ${imgH}`}
+      viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       style={{ position: 'absolute', inset: 0, width: dispW, height: 'auto', touchAction: 'none', overflow: 'visible' }}
       onPointerMove={move} onPointerUp={up} onPointerLeave={up}
     >

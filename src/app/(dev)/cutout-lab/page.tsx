@@ -69,6 +69,7 @@ export default function CutoutLab() {
   const blendRef = useRef(blend); blendRef.current = blend
   const previewSeq = useRef(0)
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
+  const viewBoxRef = useRef({ x: 0, y: 0, w: 1, h: 1 }) // working-view extent (image ∪ outline)
   const bakeSeq = useRef(0)
   const toolRef = useRef(tool); toolRef.current = tool
   const engineSelRef = useRef(engineSel); engineSelRef.current = engineSel
@@ -135,14 +136,29 @@ export default function CutoutLab() {
       }
       return
     }
-    view.width = img.width; view.height = img.height
+    // VIEW ADAPTS TO THE OUTLINE (Dan 2026-08-06): the working view covers the outline's FULL
+    // extent — an offset past the frame zooms the view out (object reads smaller) instead of
+    // hiding under the canvas edge. viewport CSS width stays fixed.
+    const b0 = boundsRef.current
+    const m = b0 ? Math.max(4, img.width / 100) : 0
+    const vb = {
+      x: Math.min(0, b0 ? Math.floor(b0.minX - m) : 0),
+      y: Math.min(0, b0 ? Math.floor(b0.minY - m) : 0),
+      w: 0, h: 0,
+    }
+    vb.w = Math.max(img.width, b0 ? Math.ceil(b0.maxX + m) : 0) - vb.x
+    vb.h = Math.max(img.height, b0 ? Math.ceil(b0.maxY + m) : 0) - vb.y
+    viewBoxRef.current = vb
+    view.width = vb.w; view.height = vb.h
     const ctx = view.getContext('2d')!
+    ctx.save()
+    ctx.translate(-vb.x, -vb.y)
     ctx.drawImage(img, 0, 0)
     const mask = maskRef.current
     if (mask && overlayRef.current) {
       const tmp = document.createElement('canvas'); tmp.width = mask.w; tmp.height = mask.h
       tmp.getContext('2d')!.putImageData(maskOverlay(mask), 0, 0)
-      ctx.drawImage(tmp, 0, 0)
+      ctx.drawImage(tmp, 0, 0, img.width, img.height)
     }
     if (dRef.current) {
       // LIVE RESULT (Dan's one-canvas law): the ENGINE-composed sticker drawn in place inside the
@@ -156,7 +172,7 @@ export default function CutoutLab() {
         ctx.restore()
       }
       const scrim = new Path2D()
-      scrim.rect(0, 0, img.width, img.height)
+      scrim.rect(vb.x, vb.y, vb.w, vb.h)
       scrim.addPath(new Path2D(dRef.current))
       ctx.save(); ctx.fillStyle = 'rgba(6,8,14,0.55)'; ctx.fill(scrim, 'evenodd'); ctx.restore()
       ctx.strokeStyle = '#2563eb'; ctx.lineWidth = Math.max(2, img.width / 400); ctx.stroke(new Path2D(dRef.current))
@@ -169,7 +185,7 @@ export default function CutoutLab() {
         // PAINT ink (WYSIWYG): the stroke renders at the actual brush width — what you paint is
         // the area that lands. Violet = add, red = erase.
         ctx.strokeStyle = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
-        ctx.lineWidth = Math.max(2, brushRef.current * (img.width / disp.w) * 2)
+        ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * 2)
         ctx.beginPath(); ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
         for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
         ctx.stroke()
@@ -182,7 +198,7 @@ export default function CutoutLab() {
           const a = Math.max(0, 1 - (now - (st[i] as { t: number }).t) / LIFE)
           if (a <= 0) continue
           ctx.strokeStyle = `rgba(${col},${(a * 0.9).toFixed(2)})`
-          ctx.lineWidth = Math.max(2, brushRef.current * (img.width / disp.w) * (0.3 + 0.7 * a))
+          ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * (0.3 + 0.7 * a))
           ctx.beginPath()
           ctx.moveTo(st[i - 1].x * img.width, st[i - 1].y * img.height)
           ctx.lineTo(st[i].x * img.width, st[i].y * img.height)
@@ -195,12 +211,13 @@ export default function CutoutLab() {
       const t = toolRef.current
       if (t !== 'nodes' && t !== 'frame') {
         ctx.beginPath()
-        ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (img.width / disp.w), 0, 6.29)
+        ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (viewBoxRef.current.w / disp.w), 0, 6.29)
         ctx.lineWidth = Math.max(2, img.width * 0.003)
         ctx.strokeStyle = t === 'add' ? 'rgba(34,197,94,1)' : t === 'draw' ? 'rgba(124,58,237,1)' : 'rgba(239,68,68,1)'
         ctx.stroke()
       }
     }
+    ctx.restore() // view-box translate
   }, [disp.w])
 
   const applyFinish = useCallback(() => {
@@ -311,7 +328,13 @@ export default function CutoutLab() {
   // ── pointer strokes (add/erase = AI · draw = freeshape · nodes/frame = overlay's job) ──
   const nrm = (e: React.PointerEvent): Point & { t: number } => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, label: 1, t: performance.now() }
+    const vb = viewBoxRef.current, img = imgCanvas.current
+    const iw = img?.width ?? 1, ih = img?.height ?? 1
+    return {
+      x: (vb.x + ((e.clientX - r.left) / r.width) * vb.w) / iw,
+      y: (vb.y + ((e.clientY - r.top) / r.height) * vb.h) / ih,
+      label: 1, t: performance.now(),
+    }
   }
   // comet animation: while painting an AI stroke, keep repainting so the tail dissolves in TIME
   const cometRaf = useRef(0)
@@ -548,7 +571,7 @@ export default function CutoutLab() {
               onWheel={(e) => { setBrushR((b) => Math.max(8, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
               style={{ width: disp.w, height: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
-              <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height}
+              <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
                 onEdit={onEditLive} onCommit={onEditCommit} />
             )}
