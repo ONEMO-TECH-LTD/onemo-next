@@ -70,7 +70,7 @@ export interface BlendSettings {
   panX: number             // artwork pan, % of width  (−50..50)
   panY: number             // artwork pan, % of height (−50..50)
 }
-export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: DEFAULT = NO COMPOSITING — the original image under the vector mask; the compositor engages only when blend (or another effect) is switched on
+export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'mirror', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: DEFAULT = NO COMPOSITING — the original image under the vector mask; the compositor engages only when blend (or another effect) is switched on
 export { PRESET_LABELS }
 export type { PresetKey }
 
@@ -258,7 +258,7 @@ export async function bakeStickerEngine(
   // so no matte artifact can exist by construction. The engine op below engages ONLY when blend or
   // another blend-tab effect is switched on (the opt-in edge-case layer: decouple the object,
   // normalise/expand the background).
-  const off = b.blend === 0 && b.fill === 'clamp' && b.scale === 100 && !b.panX && !b.panY
+  const neutral = b.blend === 0 && b.scale === 100 && !b.panX && !b.panY
     && b.preset === 'none' && !b.vignette && !b.tint
   // OFFSET PAST THE FRAME (Dan 2026-08-06): when the outline crosses the image boundary,
   // COMPOSITING ENGAGES BY DEFAULT — the engine's default magic blend wakes (hides the invented
@@ -266,8 +266,8 @@ export async function bakeStickerEngine(
   // the default — per-axis flipped tiles, edge-to-edge continuity). Inside the frame at blend 0
   // nothing composites — the original image under the vector mask.
   const outgrown = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > maskW || bounds.maxY > maskH
-  if (off && outgrown) b = { ...b, blend: prepared.frontSrc.defaultBlendPercent, fill: 'mirror' }
-  else if (off) {
+  if (neutral && outgrown) b = { ...b, blend: prepared.frontSrc.defaultBlendPercent } // the USER'S fill choice stands (mirror = default)
+  else if (neutral) {
     const src = origCanvas // the untouched original (y-up, engine convention)
     const fw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * k))
     const fh = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * k))
