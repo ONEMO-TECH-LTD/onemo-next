@@ -29,11 +29,6 @@ export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
-/** Admin sensitivity multiplier (ceiling probe, Dan 2026-08-06): scales the scale-relative knobs
- *  into the engine's calibration headroom. Module-owned — never computed in the component. */
-export function withSensitivity(s: TraceOutlineSettings, m: number): TraceOutlineSettings {
-  return m === 1 ? s : { ...s, straighten: s.straighten * m, simplify: s.simplify * m, curve: s.curve * m }
-}
 
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
 
