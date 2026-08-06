@@ -21,6 +21,9 @@ interface Props {
   aspectLocked: boolean
   onEdit: (shape: VShape) => void   // live (during drag)
   onCommit: (shape: VShape) => void // on release
+  /** single-node selection (nodes mode): tap an anchor to select; the shell shows its vector knobs */
+  selected?: { pi: number; ai: number } | null
+  onSelect?: (sel: { pi: number; ai: number } | null) => void
 }
 
 const cloneShape = (s: VShape): VShape =>
@@ -41,9 +44,9 @@ function scaleShape(s: VShape, ax: number, ay: number, sx: number, sy: number): 
   return { paths: s.paths.map((p) => ({ anchors: p.anchors.map((a) => ({ ...a, p: m(a.p), hIn: a.hIn ? m(a.hIn) : a.hIn, hOut: a.hOut ? m(a.hOut) : a.hOut })) })) }
 }
 
-export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLocked, onEdit, onCommit }: Props) {
+export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLocked, onEdit, onCommit, selected, onSelect }: Props) {
   const vb = view ?? { x: 0, y: 0, w: imgW, h: imgH }
-  const dragRef = useRef<{ kind: 'node'; pi: number; ai: number; base: VShape } | { kind: 'grip'; grip: string; base: VShape; bb: ReturnType<typeof bboxOf> } | null>(null)
+  const dragRef = useRef<{ kind: 'node'; pi: number; ai: number; base: VShape } | { kind: 'handle'; pi: number; ai: number; which: 'hIn' | 'hOut'; base: VShape } | { kind: 'grip'; grip: string; base: VShape; bb: ReturnType<typeof bboxOf> } | null>(null)
   const liveRef = useRef<VShape>(shape)
 
   const nodeR = Math.max(6, imgW / 70)
@@ -59,6 +62,16 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLock
     const d = dragRef.current
     if (!d) return
     const p = toImg(e)
+    if (d.kind === 'handle') {
+      // bezier tangent drag on the SELECTED anchor — moves one handle; the anchor stays
+      const next = cloneShape(d.base)
+      const a = next.paths[d.pi].anchors[d.ai]
+      a[d.which] = { x: p.x, y: p.y }
+      a.corner = false
+      liveRef.current = next
+      onEdit(next)
+      return
+    }
     if (d.kind === 'node') {
       const next = cloneShape(d.base)
       const a = next.paths[d.pi].anchors[d.ai]
@@ -112,13 +125,28 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLock
         <rect x={bb.minX} y={bb.minY} width={bb.maxX - bb.minX} height={bb.maxY - bb.minY}
           fill="none" stroke="#7c3aed" strokeWidth={Math.max(1, imgW / 500)} strokeDasharray={`${imgW / 100} ${imgW / 150}`} />
       )}
-      {mode === 'nodes' && shape.paths.map((p, pi) => p.anchors.map((a, ai) => (
-        <circle key={`${pi}-${ai}`} cx={a.p.x} cy={a.p.y} r={nodeR}
-          fill="#fff" stroke="#7c3aed" strokeWidth={Math.max(1.5, imgW / 400)}
-          style={{ cursor: 'grab' }}
-          onPointerDown={(e) => { e.stopPropagation(); (e.target as SVGElement).setPointerCapture?.(e.pointerId); dragRef.current = { kind: 'node', pi, ai, base: cloneShape(shape) }; liveRef.current = shape }}
-        />
-      )))}
+      {mode === 'nodes' && shape.paths.map((p, pi) => p.anchors.map((a, ai) => {
+        const isSel = selected?.pi === pi && selected?.ai === ai
+        return (
+          <g key={`${pi}-${ai}`}>
+            {isSel && a.hIn && (<>
+              <line x1={a.p.x} y1={a.p.y} x2={a.hIn.x} y2={a.hIn.y} stroke="#0ea5e9" strokeWidth={Math.max(1, imgW / 600)} />
+              <circle cx={a.hIn.x} cy={a.hIn.y} r={nodeR * 0.75} fill="#0ea5e9" stroke="#fff" strokeWidth={Math.max(1, imgW / 600)} style={{ cursor: 'grab' }}
+                onPointerDown={(e) => { e.stopPropagation(); (e.target as SVGElement).setPointerCapture?.(e.pointerId); dragRef.current = { kind: 'handle', pi, ai, which: 'hIn', base: cloneShape(shape) }; liveRef.current = shape }} />
+            </>)}
+            {isSel && a.hOut && (<>
+              <line x1={a.p.x} y1={a.p.y} x2={a.hOut.x} y2={a.hOut.y} stroke="#0ea5e9" strokeWidth={Math.max(1, imgW / 600)} />
+              <circle cx={a.hOut.x} cy={a.hOut.y} r={nodeR * 0.75} fill="#0ea5e9" stroke="#fff" strokeWidth={Math.max(1, imgW / 600)} style={{ cursor: 'grab' }}
+                onPointerDown={(e) => { e.stopPropagation(); (e.target as SVGElement).setPointerCapture?.(e.pointerId); dragRef.current = { kind: 'handle', pi, ai, which: 'hOut', base: cloneShape(shape) }; liveRef.current = shape }} />
+            </>)}
+            <circle cx={a.p.x} cy={a.p.y} r={isSel ? nodeR * 1.25 : nodeR}
+              fill={isSel ? '#7c3aed' : '#fff'} stroke={isSel ? '#fff' : '#7c3aed'} strokeWidth={Math.max(1.5, imgW / 400)}
+              style={{ cursor: 'grab' }}
+              onPointerDown={(e) => { e.stopPropagation(); (e.target as SVGElement).setPointerCapture?.(e.pointerId); onSelect?.({ pi, ai }); dragRef.current = { kind: 'node', pi, ai, base: cloneShape(shape) }; liveRef.current = shape }}
+            />
+          </g>
+        )
+      }))}
       {grips.map(({ g, x, y }) => (
         <rect key={g} x={x - nodeR} y={y - nodeR} width={nodeR * 2} height={nodeR * 2} rx={nodeR / 3}
           fill="#7c3aed" stroke="#fff" strokeWidth={Math.max(1, imgW / 500)}

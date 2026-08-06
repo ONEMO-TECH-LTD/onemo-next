@@ -14,7 +14,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
-  editableShape, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  editableShape, nodeAdjust, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -36,6 +36,11 @@ export default function CutoutLab() {
   const wasOutgrownRef = useRef(false)
   const [wandTol, setWandTol] = useState(WAND_TOLERANCE) // live wand calibration (Dan 17:45)
   const wandTolRef = useRef(WAND_TOLERANCE); wandTolRef.current = wandTol
+  // single-node vector editing (Dan 17:57): select an anchor → its radius/curve knobs (ENGINE local pass)
+  const [selNode, setSelNode] = useState<{ pi: number; ai: number } | null>(null)
+  const [nodeChip, setNodeChip] = useState<'radius' | 'curve'>('radius')
+  const [nodeAdj, setNodeAdj] = useState({ radius: 0, curve: 0 })
+  const nodeBaseRef = useRef<VShape | null>(null)
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
@@ -452,6 +457,7 @@ export default function CutoutLab() {
       const zero = { ...ZERO_SETTINGS }
       settingsRef.current = zero; setSettings(zero) // adjustments fold into the baked source — TRUE zero, not the default recipe
     }
+    setSelNode(null)
     setTool(m)
     applyFinish()
   }
@@ -498,6 +504,15 @@ export default function CutoutLab() {
       const k = blendChip
       const [lo, hi] = CHIP_RANGE[k]
       return { label: k, lo, hi, value: blend[k], set: (v: number) => setBlendTune({ [k]: v }) }
+    }
+    if (tool === 'nodes' && selNode && nodeBaseRef.current) {
+      const apply = (adj: { radius: number; curve: number }) => {
+        setNodeAdj(adj)
+        const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, { radius: adj.radius, curve: adj.curve / 100 })
+        onEditCommit(next)
+      }
+      if (nodeChip === 'radius') return { label: 'node radius', lo: 0, hi: 200, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
+      return { label: 'node curve', lo: 0, hi: 200, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
     }
     if (tool === 'wand' || tool === 'wand-erase')
       return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: setWandTol } // live calibration (Dan 17:45; full 100)
@@ -570,6 +585,13 @@ export default function CutoutLab() {
           <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
           <button onClick={() => setTool('wand')} style={chipBtn(tool === 'wand')}>🪄 Wand fill</button>
           <button onClick={() => setTool('wand-erase')} style={chipBtn(tool === 'wand-erase')}>🪄 Wand erase</button>
+          {tool === 'nodes' && selNode && (<>
+            <span style={{ color: '#94a3b8' }}>node:</span>
+            {(['radius', 'curve'] as const).map((k) => (
+              <button key={k} onClick={() => setNodeChip(k)} style={chipBtn(nodeChip === k)}>{k}</button>
+            ))}
+            <button onClick={() => setSelNode(null)} style={chipBtn(false)}>✕</button>
+          </>)}
           <button onClick={() => enterEdit('nodes')} disabled={!shapeRef.current} style={chipBtn(tool === 'nodes')}>⬡ Nodes</button>
           <button onClick={() => enterEdit('frame')} disabled={!shapeRef.current} style={chipBtn(tool === 'frame')}>▣ Frame</button>
           {tool === 'frame' && (
@@ -607,6 +629,7 @@ export default function CutoutLab() {
               style={{ width: '100%', height: '100%', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
+                selected={selNode} onSelect={(sel) => { setSelNode(sel); nodeBaseRef.current = shapeRef.current; setNodeAdj({ radius: 0, curve: 0 }) }}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
                 onEdit={onEditLive} onCommit={onEditCommit} />
             )}

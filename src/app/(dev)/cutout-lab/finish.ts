@@ -15,6 +15,7 @@ import {
   type TraceOutlineSettings,
 } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
+import { GLOBAL_OFF, mintIds, resolve } from '@/lib/effect/outline-resolve'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
 
@@ -125,6 +126,19 @@ export function editableShape(shape: VShape): VShape {
   const tol = Math.max(2, Math.min(maxX - minX, maxY - minY) * 0.01)
   const fitted = ringToVPath(dense, 60, tol)
   return fitted.anchors.length >= 3 ? { paths: [fitted] } : shape
+}
+
+/** PER-NODE vector edit through the ENGINE's local-adjustment machinery (outline-resolve
+ *  LocalAdjustment: radius = single-corner fillet px, curve = tangent bend factor 0..2). The base
+ *  shape stays immutable; each call re-resolves from it — reversible, value-true. */
+export function nodeAdjust(base: VShape, pi: number, ai: number, adj: { radius?: number; curve?: number }): VShape {
+  const withIds = mintIds(base)
+  const id = withIds.paths[pi]?.anchors[ai]?.id
+  if (!id) return base
+  return resolve(
+    { shape: withIds, klass: 'generated', mmPerPx: 1, maskHeightPx: 1 },
+    { global: { ...GLOBAL_OFF }, local: { [id]: adj } },
+  )
 }
 
 /** Flattened ring of a shape (vector-core op kept OUT of the UI — module boundary). */
