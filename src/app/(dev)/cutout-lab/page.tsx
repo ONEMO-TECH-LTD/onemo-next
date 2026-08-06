@@ -14,7 +14,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
-  deleteNode, editableShape, insertNode, measureNode, nodeAdjust, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -499,7 +499,7 @@ export default function CutoutLab() {
   const onNodesTap = (pt: { x: number; y: number }) => {
     const shape = shapeRef.current
     if (!shape) return
-    const r = insertNode(shape, pt.x, pt.y, Math.max(8, imgCanvas.current!.width / 60))
+    const r = insertNode(shape, pt.x, pt.y, nodeTapTol(imgCanvas.current!.width))
     if (r) { onEditCommit(r.shape); selectNode({ pi: r.pi, ai: r.ai }) } else selectNode(null)
   }
   const onNodeDelete = () => {
@@ -541,12 +541,13 @@ export default function CutoutLab() {
         setNodeAdj(adj)
         // ONE adjustment per mode: radius chip sends radius only, curve chip curve only — sending
         // both together makes the bend rebuild the handles and the corner fillet silently no-op.
-        const delta = nodeChip === 'radius' ? { radius: adj.radius } : { curve: adj.curve / 100 }
+        const delta = nodeChip === 'radius' ? { radius: adj.radius } : { curveKnob: adj.curve }
         const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, delta)
         onEditCommit(next)
       }
-      if (nodeChip === 'radius') return { label: 'node radius', lo: 0, hi: 200, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
-      return { label: 'node curve', lo: 0, hi: 200, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
+      const [rLo, rHi] = CHIP_RANGE.nodeRadius, [cLo, cHi] = CHIP_RANGE.nodeCurve
+      if (nodeChip === 'radius') return { label: 'node radius', lo: rLo, hi: rHi, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
+      return { label: 'node curve', lo: cLo, hi: cHi, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
     }
     if (tool === 'wand' || tool === 'wand-erase')
       return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: setWandTol } // live calibration (Dan 17:45; full 100)

@@ -2,6 +2,7 @@
 // ARCHITECTURE.md law 1): AI mask → v5.3.1 mask hygiene → trace → outline-resolve → SVG path.
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
+import { CHIP_RANGE } from './ui-config'
 import type { Mask } from '@/lib/cutout-ai/types'
 import { dilateMask, effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
@@ -131,7 +132,10 @@ export function editableShape(shape: VShape): VShape {
 /** PER-NODE vector edit through the ENGINE's local-adjustment machinery (outline-resolve
  *  LocalAdjustment: radius = single-corner fillet px, curve = tangent bend factor 0..2). The base
  *  shape stays immutable; each call re-resolves from it — reversible, value-true. */
-export function nodeAdjust(base: VShape, pi: number, ai: number, adj: { radius?: number; curve?: number }): VShape {
+/** Curve knob units (0–200) → engine bend factor (0–2): ONE mapping, shared by nodeAdjust and
+ *  measureNode so the knob reads and writes the same scale. */
+const NODE_CURVE_KNOB = 100
+export function nodeAdjust(base: VShape, pi: number, ai: number, adj: { radius?: number; curveKnob?: number }): VShape {
   // SET-to-value semantics (Dan): sharpen the anchor first (corner, no handles), then apply the
   // engine's local fillet/bend — so radius 0 = a SHARP node, and every knob value is absolute,
   // not stacked on the current rounding.
@@ -143,10 +147,11 @@ export function nodeAdjust(base: VShape, pi: number, ai: number, adj: { radius?:
   const withIds = mintIds(sharpened)
   const id = withIds.paths[pi]?.anchors[ai]?.id
   if (!id) return base
-  if (!adj.radius && !adj.curve) return withIds // radius/curve 0 = the sharpened node
+  const engineAdj = { radius: adj.radius, curve: adj.curveKnob ? adj.curveKnob / NODE_CURVE_KNOB : undefined }
+  if (!engineAdj.radius && !engineAdj.curve) return withIds // radius/curve 0 = the sharpened node
   return resolve(
     { shape: withIds, klass: 'generated', mmPerPx: 1, maskHeightPx: 1 },
-    { global: { ...GLOBAL_OFF }, local: { [id]: adj } },
+    { global: { ...GLOBAL_OFF }, local: { [id]: engineAdj } },
   )
 }
 
@@ -160,7 +165,7 @@ export function measureNode(shape: VShape, pi: number, ai: number): { radius: nu
   const prev = path.anchors[(ai - 1 + n) % n].p, next = path.anchors[(ai + 1) % n].p
   const eMin = Math.min(Math.hypot(a.p.x - prev.x, a.p.y - prev.y), Math.hypot(next.x - a.p.x, next.y - a.p.y)) || 1
   const hLen = Math.max(a.hIn ? Math.hypot(a.hIn.x - a.p.x, a.hIn.y - a.p.y) : 0, a.hOut ? Math.hypot(a.hOut.x - a.p.x, a.hOut.y - a.p.y) : 0)
-  const curve = Math.round(Math.min(2, hLen / (0.33 * eMin)) * 100)
+  const curve = Math.round(Math.min(2, hLen / (0.33 * eMin)) * NODE_CURVE_KNOB)
   // local curvature radius AT the anchor: circumcircle of on-curve neighbours sampled just before
   // and after the node (handles are collinear on smooth anchors, so they can't be used directly)
   let radius = 0
@@ -177,12 +182,14 @@ export function measureNode(shape: VShape, pi: number, ai: number): { radius: nu
     const area2 = Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y))
     radius = area2 > 1e-6 ? Math.round((ab * bc * ca) / (2 * area2)) : 0
   }
-  return { radius: Math.min(200, radius), curve: Math.min(200, curve) } // clamped to the knob scale
+  return { radius: Math.min(CHIP_RANGE.nodeRadius[1], radius), curve: Math.min(CHIP_RANGE.nodeCurve[1], curve) } // clamped to the knob scale
 }
 
 /** Flattened ring of a shape (vector-core op kept OUT of the UI — module boundary). */
 /** Insert an anchor ON the outline nearest (x,y) — exact bezier split (de Casteljau), so the
  *  curve is unchanged by insertion. Returns null when the tap is farther than `tol` from the line. */
+/** Tap tolerance for inserting on the outline: finger-sized in image px, scale-aware. */
+export const nodeTapTol = (imgW: number): number => Math.max(8, imgW / 60)
 export function insertNode(shape: VShape, x: number, y: number, tol: number): { shape: VShape; pi: number; ai: number } | null {
   type Hit = { pi: number; ai: number; t: number; d: number }
   let best = null as Hit | null

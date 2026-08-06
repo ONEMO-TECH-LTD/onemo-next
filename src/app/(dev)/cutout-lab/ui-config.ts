@@ -10,4 +10,5 @@ export const BLEND_CHIPS = ['blend'] as const // vignette/presets/tint + scale/p
 export const CHIP_RANGE: Record<string, [number, number]> = {
   detail: [0, 100], offset: [0, 15], simplify: [0, 100], smooth: [0, 200], straighten: [0, 100],
   radius: [0, 100], curve: [0, 100], blend: [0, 100], vignette: [0, 100], scale: [25, 300], panX: [-50, 50], panY: [-50, 50],
+  nodeRadius: [0, 200], nodeCurve: [0, 200], // per-node editing knobs (match measureNode's knob scale)
 }
