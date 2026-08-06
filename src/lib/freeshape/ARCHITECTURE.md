@@ -1,7 +1,8 @@
 # freeshape — draw-normalizer contract (s62, designed with Dan 2026-08-05)
 
 The fixed reference for the freehand shape tool. Any code in this folder violating a line here is
-slop by definition and gets deleted, not defended.
+slop by definition and gets deleted, not defended. Enforcement procedure:
+`src/lib/cutout-ai/AUDIT.md` — the runnable audit checklist for the whole s62 cutout deliverable.
 
 ## Mission
 The user draws a shape with a finger — wobbly, imperfect — and gets back an ELEGANT normalized

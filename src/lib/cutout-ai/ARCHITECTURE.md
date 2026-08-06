@@ -1,7 +1,8 @@
 # cutout-ai — architecture contract (s62; refreshed 2026-08-06 to the locked state)
 
 The fixed reference. Any code in this folder that violates a line here is slop by definition
-and gets deleted, not defended.
+and gets deleted, not defended. Enforcement procedure: `AUDIT.md` (same folder) — the runnable
+audit checklist for the whole s62 cutout deliverable.
 
 ## Mission
 Promptable AI segmentation (the SELECTED model: EdgeSAM) as an **add-on microservice** for the
@@ -23,8 +24,11 @@ to the clean engine repo as one unit.
    unioned in. Erase = subtract. Full re-detect is a separate explicit action. `setBase` seeds
    the base from any externally produced mask.
 7. **Soft matte parity.** Model logits are upsampled BILINEARLY; the binary mask thresholds after
-   interpolation and the `soft` channel (sigmoid) rides along — the engine's compositing expects
-   a continuous matte, never a hard binary cut.
+   interpolation and the `soft` channel uses the u2net slot's own LINEAR min-max normalization —
+   NEVER a sigmoid (sigmoid re-sharpens the ramp to near-binary; the dirty edge Dan caught
+   2026-08-06). The engine's compositing expects a continuous matte, never a hard binary cut.
+   The engine-roster auto-cut path doesn't touch this folder at all: EdgeSAM's raw output plugs
+   into the engine's own `finishMatte` tail via `?seg=edgesam` — this folder serves the BRUSH only.
 8. **One AI runtime resident per page** (iPhone OOM law, s62 device evidence). The shell enforces
    it; this folder enables it (fresh worker per spawn, watchdog kills hung workers so iOS freezes
    become registered faults).
