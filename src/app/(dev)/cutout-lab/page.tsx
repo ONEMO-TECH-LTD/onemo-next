@@ -19,10 +19,15 @@ export default function CutoutLab() {
   // ── URL ADAPTER (shell duty per contract): read initial ?seg, write on engine change ──
   const [initialSeg] = useState<EngineSel>(() => {
     if (typeof window === 'undefined') return 'edge'
-    const u = new URL(location.href)
-    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u); return 'edge' }
-    return u.searchParams.get('seg') === 'edgesam' ? 'edge' : 'u2net'
+    const seg = new URL(location.href).searchParams.get('seg')
+    return !seg || seg === 'edgesam' ? 'edge' : 'u2net' // bare URL = EdgeSAM default
   })
+  useEffect(() => {
+    // the default-seg WRITE must run POST-MOUNT (QA KAI-10196 r1: a replaceState inside the state
+    // initializer is clobbered by Next's hydration history-sync → bare URLs silently cut u2net)
+    const u = new URL(location.href)
+    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u) }
+  }, [])
   const onSegChange = useCallback((v: EngineSel) => {
     // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
     // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
