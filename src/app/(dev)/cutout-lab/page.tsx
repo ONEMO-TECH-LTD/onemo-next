@@ -241,20 +241,20 @@ export default function CutoutLab() {
   }, [])
 
   useEffect(() => {
+    // Default engine = EdgeSAM via the v5.3.1 roster (`?seg=edgesam` — the engine's own swap param).
+    const u = new URL(location.href)
+    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u) }
+    else if (u.searchParams.get('seg') !== 'edgesam') { setEngineSel('u2net'); engineSelRef.current = 'u2net' }
+    // The cutout-ai worker is the BRUSH add-on only — spawned here, model loaded LAZILY on the first
+    // brush stroke (ensureEdge), so exactly one AI runtime is resident until the user steers.
     const c = new CutoutClient()
     client.current = c
-    c.onProgress = (loaded, total) => setStatus(`⬇ AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-    ;(async () => {
-      try {
-        c.spawn()
-        setStatus('⬇ loading AI (EdgeSAM, one-time)…')
-        await c.load(MODELS.edgesam, 'auto')
-        edgeRef.current = 'ready'; setEdge('ready')
-        setStatus('ready — upload an image')
-      } catch (e) { edgeFault('AI failed to start (' + String((e as Error).message) + ')') }
-    })()
+    c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
+    c.spawn()
+    edgeRef.current = 'ready'; setEdge('ready') // 'ready' = available; weights load on first use
+    setStatus('ready — upload an image')
     return () => c.dispose()
-  }, [edgeFault])
+  }, [])
 
   // ── upload → auto cut on the SELECTED engine (item 7) ──
   const onFile = useCallback(async (file: File) => {
@@ -278,32 +278,26 @@ export default function CutoutLab() {
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     render()
     setBusy(true)
-    if (engineSelRef.current === 'edge' && edgeRef.current === 'ready') {
-      try {
-        setStatus('✨ AI magic (EdgeSAM)…')
-        const t0 = performance.now()
-        const px = mctx.getImageData(0, 0, w, h)
-        await client.current!.encode(px.data, w, h)
-        edgeEncodedRef.current = true
-        const r = await client.current!.redetect()
-        setMs({ cut: Math.round(performance.now() - t0) })
-        await acceptMask(r.mask)
-        setBusy(false)
-        return
-      } catch (e) { edgeFault('AI froze on this image (' + String((e as Error).message) + ')') }
-    }
+    // ONE pipeline for every engine: the v5.3.1 worker chain, model picked by its own `?seg=`
+    // roster parameter (EdgeSAM or the u2netp trio). The cutout-ai worker is brush-only, lazy.
     try {
-      setStatus('✨ AI magic (u2net)…')
+      setStatus(`✨ AI magic (${engineSelRef.current === 'edge' ? 'EdgeSAM' : 'u2net'} · v5.3.1)…`)
       const t0 = performance.now()
       const r = await segmentV531(url, w, h)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
-  }, [acceptMask, render, edgeFault])
+  }, [acceptMask, render])
 
+  const brushLoadedRef = useRef(false)
   const ensureEdge = useCallback(async () => {
     const c = client.current!
+    if (!brushLoadedRef.current) {
+      setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
+      await c.load(MODELS.edgesam, 'auto')
+      brushLoadedRef.current = true
+    }
     if (!edgeEncodedRef.current) {
       setStatus('🧠 AI reading the image…')
       const img = imgCanvas.current!
@@ -487,13 +481,12 @@ export default function CutoutLab() {
           <select value={engineSel} onChange={(e) => {
             const v = e.target.value as 'edge' | 'u2net'
             setEngineSel(v); engineSelRef.current = v
-            if (v === 'u2net') { client.current?.dispose(); edgeRef.current = 'dead'; setEdge('dead'); setStatus('u2net engine — one runtime resident') }
-            else {
-              const c = client.current!
-              c.spawn(); edgeRef.current = 'loading'; setEdge('loading'); edgeEncodedRef.current = false
-              c.load(MODELS.edgesam, 'auto').then(() => { edgeRef.current = 'ready'; setEdge('ready'); setStatus('EdgeSAM ready') })
-                .catch((err) => { edgeRef.current = 'dead'; setEdge('dead'); setStatus('⚠️ ' + String(err?.message)) })
-            }
+            // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
+            // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
+            const u = new URL(location.href)
+            if (v === 'edge') u.searchParams.set('seg', 'edgesam'); else u.searchParams.delete('seg')
+            history.replaceState(null, '', u)
+            setStatus(v === 'edge' ? 'EdgeSAM engine (v5.3.1 roster)' : 'u2net engine (v5.3.1 default)')
           }} style={{ ...btn, fontSize: 12 }}>
             <option value="edge">EdgeSAM · auto + brush</option>
             <option value="u2net">u2net · v5.3.1 (auto only)</option>

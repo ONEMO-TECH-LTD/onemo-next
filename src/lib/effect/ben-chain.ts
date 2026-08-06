@@ -21,13 +21,39 @@ export const REMBG: Record<string, RembgSpec> = {
   isnet:   { adapter: 'isnet-general-use', url: `${REMBG_HOST}/isnet-general-use.onnx`, size: 1024, mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0] }, // harness only
 }
 
+// ── SAM roster entries (s62, Dan: "add the model to the roster of v5.3.1 and swap them") ─────────
+// Promptable segmentation slotted into the SAME worker chain as the rembg family. The worker runs
+// encoder+decoder with the model's documented preprocess and a central auto-prompt, then the raw
+// low-res mask map enters the IDENTICAL post-generation tail as u2net's saliency (min-max → alpha →
+// upscale → RGBA matte → degenerate guard). Selected via `?seg=edgesam`; the production trio rides
+// behind it as the fallback chain, so a SAM failure degrades exactly like a u2netp failure.
+export type SamSpec = {
+  kind: 'sam'; adapter: string; enc: string; dec: string; size: number
+  mean: [number, number, number]; std: [number, number, number]
+}
+export type ChainSpec = RembgSpec | SamSpec
+export const isSamSpec = (s: ChainSpec): s is SamSpec => (s as SamSpec).kind === 'sam'
+export const SAM: Record<string, SamSpec> = {
+  edgesam: {
+    kind: 'sam', adapter: 'edgesam',
+    enc: `${SEG_HOST}/edgesam.encoder.onnx`, dec: `${SEG_HOST}/edgesam.decoder.onnx`,
+    size: 1024, mean: [123.675, 116.28, 103.53], std: [58.395, 57.12, 57.375], // SAM-family ImageNet (raw-pixel scale)
+  },
+}
+/** Central auto-prompt (normalized coords) when no user hint exists — recognise the main object. */
+export const SAM_CENTRAL_PROMPT: ReadonlyArray<readonly [number, number]> = [
+  [0.5, 0.5], [0.4, 0.4], [0.6, 0.4], [0.4, 0.6], [0.6, 0.6], [0.5, 0.3], [0.5, 0.7],
+]
+
 // PRODUCTION CUT-OUT CHAIN (Dan, 2026-06-16). Default (no `?seg=`) runs the free, mobile-fit trio:
 //   u2netp (4 MB primary) → silueta (44 MB fallback) → [throw → prepare-effect flood-fill].
 // Silueta is LAZY: the run loop only reaches silueta after u2netp throws, so the 44 MB never lands on
 // the device unless the primary fails. `?seg=<model>` overrides with a single model (comparison
-// harness); ben2 / birefnet / an unknown key → null → the transformers.js path.
-export function resolveChain(seg?: string): RembgSpec[] | null {
+// harness) — or a SAM roster entry + the trio as fallback; ben2 / birefnet / an unknown key → null →
+// the transformers.js path.
+export function resolveChain(seg?: string): ChainSpec[] | null {
   if (!seg) return [REMBG.u2netp, REMBG.silueta] // production default trio
+  if (SAM[seg]) return [SAM[seg], REMBG.u2netp, REMBG.silueta] // SAM primary, trio fallback
   if (REMBG[seg]) return [REMBG[seg]]            // explicit single rembg model (test harness)
   return null                                    // ben2 / birefnet → transformers path
 }

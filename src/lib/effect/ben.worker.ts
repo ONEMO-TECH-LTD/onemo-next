@@ -21,7 +21,7 @@
 
 // KAI-9087: the rembg cut-out CHAIN composition + matte feasibility live in ./ben-chain — a PURE,
 // unit-tested module (a direct worker import would crash a test on onmessage/self/postMessage).
-import { REMBG, resolveChain, isDegenerateMatte, type RembgSpec } from './ben-chain'
+import { resolveChain, isDegenerateMatte, isSamSpec, SAM_CENTRAL_PROMPT, type RembgSpec, type SamSpec, type ChainSpec } from './ben-chain'
 
 // MODEL COMPARISON HARNESS — every candidate runs through the IDENTICAL pipeline method as BEN2
 // (webgpu → wasm fallback, fp16). The page chooses the model via the `?seg=` URL param (read in
@@ -159,15 +159,28 @@ async function runRembg(imageUrl: string, spec: RembgSpec, onProgress: (s: strin
   feeds[session.inputNames[0]] = new ort.Tensor('float32', input, [1, 3, S, S])
   const res = await withTimeout(session.run(feeds), 60000, 'run')
   const od = res[session.outputNames[0]].data // [1,1,S,S] saliency
+  return finishMatte(od, S, S, S, S, bmp, ow, oh)
+}
+
+/**
+ * THE one post-generation tail (extracted verbatim from runRembg — every roster model plugs into
+ * it): raw low-res model map → min-max normalize → alpha at map res → canvas upscale to ow×oh →
+ * RGBA matte over the original pixels → degenerate guard. `vw×vh` = the VALID region of the map
+ * (SAM's map covers its zero-padded square; rembg maps cover the image exactly, vw=mw/vh=mh).
+ */
+function finishMatte(
+  od: ArrayLike<number>, mw: number, mh: number, vw: number, vh: number,
+  bmp: ImageBitmap, ow: number, oh: number,
+): { data: Uint8ClampedArray; width: number; height: number } {
+  const plane = mw * mh
   let lo = Infinity, hi = -Infinity
-  for (let i = 0; i < plane; i++) { const v = od[i]; if (v < lo) lo = v; if (v > hi) hi = v }
+  for (let i = 0; i < plane; i++) { const v = od[i] as number; if (v < lo) lo = v; if (v > hi) hi = v }
   const rng = (hi - lo) || 1
-  // saliency → alpha at SxS, upscale to original
-  const mImg = new ImageData(S, S)
-  for (let i = 0; i < plane; i++) mImg.data[i * 4 + 3] = Math.round(((od[i] - lo) / rng) * 255)
-  const mc = new OffscreenCanvas(S, S); (mc.getContext('2d') as OffscreenCanvasRenderingContext2D).putImageData(mImg, 0, 0)
+  const mImg = new ImageData(mw, mh)
+  for (let i = 0; i < plane; i++) mImg.data[i * 4 + 3] = Math.round((((od[i] as number) - lo) / rng) * 255)
+  const mc = new OffscreenCanvas(mw, mh); (mc.getContext('2d') as OffscreenCanvasRenderingContext2D).putImageData(mImg, 0, 0)
   const ac = new OffscreenCanvas(ow, oh); const actx = ac.getContext('2d') as OffscreenCanvasRenderingContext2D
-  actx.drawImage(mc, 0, 0, ow, oh)
+  actx.drawImage(mc, 0, 0, vw, vh, 0, 0, ow, oh)
   const alpha = actx.getImageData(0, 0, ow, oh).data
   const dc = new OffscreenCanvas(ow, oh); const dctx = dc.getContext('2d') as OffscreenCanvasRenderingContext2D
   dctx.drawImage(bmp, 0, 0, ow, oh)
@@ -181,6 +194,57 @@ async function runRembg(imageUrl: string, spec: RembgSpec, onProgress: (s: strin
   const frac = subj / (ow * oh)
   if (isDegenerateMatte(frac)) throw new Error('rembg-degenerate:' + frac.toFixed(3))
   return { data: rgba, width: ow, height: oh }
+}
+
+/** SAM roster runner (s62): encoder+decoder with the spec's documented preprocess and the central
+ *  auto-prompt, then the raw low-res mask map plugs into the SAME finishMatte tail as u2net. */
+async function runSam(imageUrl: string, spec: SamSpec, onProgress: (s: string) => void): Promise<{ data: Uint8ClampedArray; width: number; height: number }> {
+  const ort = await getOrt()
+  const enc = await getRembgSession({ url: spec.enc } as RembgSpec, onProgress)
+  const dec = await getRembgSession({ url: spec.dec } as RembgSpec, onProgress)
+  onProgress('cutting')
+  const blob = await withTimeout(fetch(imageUrl).then((r) => r.blob()), 15000, 'fetch-img')
+  const bmp = await withTimeout(createImageBitmap(blob), 15000, 'bitmap')
+  const WORKER_DIM_CAP = 1536
+  const _wscale = Math.min(1, WORKER_DIM_CAP / Math.max(bmp.width, bmp.height))
+  const ow = Math.round(bmp.width * _wscale), oh = Math.round(bmp.height * _wscale)
+  // preprocess: aspect-preserving resize (longest side → size), zero-PAD, (px - mean)/std → CHW
+  const T = spec.size, scale = T / Math.max(bmp.width, bmp.height)
+  const nw = Math.round(bmp.width * scale), nh = Math.round(bmp.height * scale), plane = T * T
+  const pc = new OffscreenCanvas(T, T); const pctx = pc.getContext('2d') as OffscreenCanvasRenderingContext2D
+  pctx.drawImage(bmp, 0, 0, nw, nh)
+  const px = pctx.getImageData(0, 0, T, T).data
+  const input = new Float32Array(3 * plane) // zeros = padding
+  for (let y = 0; y < nh; y++) for (let x = 0; x < nw; x++) {
+    const di = y * T + x, j = di * 4
+    input[di] = (px[j] - spec.mean[0]) / spec.std[0]
+    input[plane + di] = (px[j + 1] - spec.mean[1]) / spec.std[1]
+    input[2 * plane + di] = (px[j + 2] - spec.mean[2]) / spec.std[2]
+  }
+  const embRes = await withTimeout(enc.run({ [enc.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, T, T]) }), 60000, 'sam-encode')
+  const emb = embRes[enc.outputNames[0]] as unknown as { data: Float32Array; dims?: number[] }
+  // decoder: central auto-prompt in the model's coordinate space (the VALID nw×nh region)
+  const pts = SAM_CENTRAL_PROMPT
+  const coords = new Float32Array(pts.length * 2)
+  const labels = new Float32Array(pts.length).fill(1)
+  pts.forEach(([nx, ny], i) => { coords[i * 2] = nx * nw; coords[i * 2 + 1] = ny * nh })
+  const feeds: Record<string, unknown> = {
+    [dec.inputNames[0]]: new ort.Tensor('float32', emb.data, (emb.dims ?? [1, 256, 64, 64]) as number[]),
+    point_coords: new ort.Tensor('float32', coords, [1, pts.length, 2]),
+    point_labels: new ort.Tensor('float32', labels, [1, pts.length]),
+  }
+  const out = await withTimeout(dec.run(feeds), 60000, 'sam-decode') as Record<string, { data: Float32Array; dims?: number[] }>
+  const maskName = dec.outputNames.find((n) => /mask/i.test(n)) ?? dec.outputNames[dec.outputNames.length - 1]
+  const scoreName = dec.outputNames.find((n) => /score|iou/i.test(n))
+  const masks = out[maskName], scores = scoreName ? out[scoreName] : undefined
+  const dims = masks.dims ?? [1, 1, 256, 256]
+  const num = dims[1] ?? 1, mh = dims[dims.length - 2], mw2 = dims[dims.length - 1]
+  let best = 0
+  if (scores && num > 1) { let bs = -Infinity; for (let i = 0; i < num; i++) { const s = scores.data[i]; if (s > bs) { bs = s; best = i } } }
+  const map = masks.data.subarray(best * mh * mw2, (best + 1) * mh * mw2)
+  // SAM's map covers the zero-padded square — only the nw×nh fraction is the image (the padded-square
+  // misalignment fix). Plug into the ONE shared tail.
+  return finishMatte(map, mw2, mh, Math.round(mw2 * (nw / T)), Math.round(mh * (nh / T)), bmp, ow, oh)
 }
 
 interface RawImageData {
@@ -204,7 +268,10 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
       // Warm ONLY the primary (chain[0] = u2netp). rembg runs on the WASM EP (no GPU session), so
       // creating the session here is safe (no WebGL context loss) and makes the first Magic instant.
       // The fallback (silueta) is deliberately NOT warmed — it stays un-fetched until u2netp errors.
-      try { await getRembgSession(chain[0], (s) => ctx.postMessage({ id, progress: s })) } catch { /* best-effort warm */ }
+      try {
+        const first = chain[0]
+        await getRembgSession(isSamSpec(first) ? ({ url: first.enc } as RembgSpec) : first, (s) => ctx.postMessage({ id, progress: s }))
+      } catch { /* best-effort warm */ }
       ctx.postMessage({ id, ok: true, preloaded: true })
       return
     }
@@ -239,11 +306,13 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; url: string; preload?: bool
       let lastErr: unknown
       for (const spec of chain) {
         try {
-          const r = await runRembg(url, spec, (s) => ctx.postMessage({ id, progress: s }))
+          const r = isSamSpec(spec)
+            ? await runSam(url, spec, (s) => ctx.postMessage({ id, progress: s }))
+            : await runRembg(url, spec, (s) => ctx.postMessage({ id, progress: s }))
           ctx.postMessage({ id, ok: true, data: r.data.buffer, width: r.width, height: r.height, adapter: spec.adapter }, [r.data.buffer])
           return
         } catch (err) {
-          lastErr = err // try the next model in the chain (e.g. u2netp → silueta)
+          lastErr = err // try the next model in the chain (e.g. edgesam → u2netp → silueta)
         }
       }
       throw lastErr ?? new Error('rembg-chain-empty')
