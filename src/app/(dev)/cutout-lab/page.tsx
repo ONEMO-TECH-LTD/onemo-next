@@ -500,8 +500,9 @@ export default function CutoutLab() {
           {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
           <span>join:</span>
           {(['sharp', 'round', 'bevel'] as const).map((j) => (
-            <button key={j} onClick={() => setTune({ offsetJoin: j })} style={chipBtn(settings.offsetJoin === j)}>{j}</button>
+            <button key={j} onClick={() => setTune({ offsetJoin: j })} disabled={settings.offset === 0} style={chipBtn(settings.offsetJoin === j)}>{j}</button>
           ))}
+          {settings.offset === 0 && <span style={{ color: '#94a3b8' }}>join shapes the Offset corners — raise Offset first</span>}
         </>)}
         {tab === 'blend' && (<>
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}

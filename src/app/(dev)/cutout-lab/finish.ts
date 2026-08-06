@@ -8,11 +8,12 @@ import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import {
+  detailToFloorMm,
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
   type TraceOutlineSettings,
 } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
-import { prepareShaped } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
+import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
 
@@ -197,15 +198,21 @@ export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   return matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
 }
 
+/** The lab's engine config = prepareShaped's, with ONE parameter changed through the engine's own
+ *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
+ *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
+ *  Offset knob's job, reflected truthfully). */
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }
+
 /** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out. */
 export async function prepareAI(url: string, mask: Mask): Promise<PreparedEffect> {
-  return prepareShaped(url, await buildPreseg(url, mask))
+  return prepareEffect(url, 'shaped', LAB_CFG, undefined, await buildPreseg(url, mask))
 }
 
-/** The TRUE v5.3.1 bridge: an untouched segmentML MLResult straight into prepareShaped — exactly
- *  what the v5.3.1 flow does. No lab reconstruction of the matte (that was the u2net quality gap). */
+/** The TRUE v5.3.1 bridge: an untouched segmentML MLResult straight into the shaped pipeline —
+ *  exactly what the v5.3.1 flow does. No lab reconstruction of the matte. */
 export function prepareNative(url: string, preseg: MLResult): Promise<PreparedEffect> {
-  return prepareShaped(url, preseg)
+  return prepareEffect(url, 'shaped', LAB_CFG, undefined, preseg)
 }
 
 /** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim.
