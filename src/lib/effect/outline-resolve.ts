@@ -200,12 +200,21 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
     //    on a fold — at tiny smooth the floor must be low enough to retreat to a clean result, else the
     //    1% case slips a borderline self-touch past the guard and shows a red outline.
+    //    BOOSTED CEILING (Dan 2026-08-06): the handle factor's math limit is 1.0 (beyond it curves
+    //    overshoot into self-crossings), so the knob's reach doubles via a SECOND PASS instead —
+    //    0–50 = the classic single-pass range (factor 0→1); 50–100 = a second rounding pass ramping
+    //    on top (continuous, monotonic, each pass fold-guarded with the same back-off).
     if (g.smooth > 0) {
-      let factor = smoothFactor(g.smooth)
-      let sm = smoothPaper(p, factor)
-      let n = 0
-      while (!ringSimple(pathToRing(sm)) && n++ < 12 && factor > 0.004) { factor *= 0.7; sm = smoothPaper(p, factor) }
-      if (ringSimple(pathToRing(sm))) p = sm
+      const energy = (Math.max(0, Math.min(100, g.smooth)) / 100) * 2 // 0..2 total rounding energy
+      const passes: number[] = energy <= 1 ? [energy] : [1, energy - 1]
+      for (const f0 of passes) {
+        if (f0 <= 0) continue
+        let factor = f0
+        let sm = smoothPaper(p, factor)
+        let n = 0
+        while (!ringSimple(pathToRing(sm)) && n++ < 12 && factor > 0.004) { factor *= 0.7; sm = smoothPaper(p, factor) }
+        if (ringSimple(pathToRing(sm))) p = sm
+      }
     }
     // 4. RADIUS (whole-shape) — Clipper2 offset-round: round EVERY convex corner uniformly, symmetric by
     //    construction (square @ ½ short-side → circle). This is the no-selection Radius path; a SELECTED
