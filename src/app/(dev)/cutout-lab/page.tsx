@@ -216,7 +216,10 @@ export default function CutoutLab() {
   }, [render])
   const brushable = () => !previewRef.current && flow.actions.canBrush(toolRef.current)
   const onDown = (e: React.PointerEvent) => {
-    if (busy || !brushable()) return
+    // AI comet strokes stay CAPTURABLE while a recognition is busy (the flow queues latest-wins;
+    // the comet must start instantly — Dan's device round). Other tools still wait out busy.
+    const ai = toolRef.current === 'add' || toolRef.current === 'erase'
+    if ((busy && !ai) || !brushable()) return
     paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]
     const t = toolRef.current
     if (t === 'add' || t === 'erase') { trailRef.current.push(...strokeRef.current); if (!cometRaf.current) cometRaf.current = requestAnimationFrame(cometLoop) }

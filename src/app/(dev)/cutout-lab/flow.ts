@@ -25,6 +25,7 @@ import {
 } from './finish'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
+import { preloadBen } from '@/lib/effect/segment-ml'
 import { HistoryStack } from './history'
 import type { EditMode } from './EditorOverlay'
 
@@ -256,7 +257,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
     c.spawn()
     edgeRef.current = 'ready'; setEdge('ready') // 'ready' = available; weights load on first use
-    setStatus('ready — upload an image')
+    // WARM-UP (Dan's device round): the ENGINE's own download-only preload — weights land in the
+    // browser cache at page open, so the first cut skips the download. Conscious, not silent.
+    preloadBen()
+    setStatus('ready — upload an image · ⬇ warming the AI model in the background')
     return () => c.dispose()
   }, [])
 
@@ -376,7 +380,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
   }, [acceptMask, requestRender])
 
+  const aiBusyRef = useRef(false)
+  const pendingStrokeRef = useRef<{ stroke: (Point & { t: number })[]; erase: boolean } | null>(null)
   const aiStroke = useCallback(async (stroke: (Point & { t: number })[], erase: boolean) => {
+    // LATEST-WINS QUEUE (Dan's device round: strokes during the 1–2s recognition were DROPPED —
+    // the comet never started and the app read as lagging). A stroke landing while one is in
+    // flight queues and runs right after; the comet keeps animating throughout (shell law 1).
+    if (aiBusyRef.current) { pendingStrokeRef.current = { stroke, erase }; return }
+    aiBusyRef.current = true
     setBusy(true)
     try {
       await ensureEdge()
@@ -387,6 +398,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       await acceptMask(r.mask)
     } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
     setBusy(false)
+    aiBusyRef.current = false
+    const q = pendingStrokeRef.current
+    if (q) { pendingStrokeRef.current = null; void aiStroke(q.stroke, q.erase) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptMask, edgeFault, ensureEdge])
 
   // ── vector edit orchestration (nodes/frame) ──
@@ -472,8 +487,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const clearAll = useCallback(() => {
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
+    // the brush worker must not keep the pre-Clear base — reset it to EMPTY via the existing API
+    if (brushLoadedRef.current && imgCanvas.current) {
+      const img = imgCanvas.current
+      withTimeout(client.current!.setBase({ data: new Uint8Array(img.width * img.height), w: img.width, h: img.height }), T_COMPUTE_MS, 'brush base reset')
+        .catch((e) => setStatus('⚠️ ' + String((e as Error).message)))
+    }
     setHasCut(false); pushHistory(); requestRender()
-    setStatus('🗑 cleared — paint a shape with the hand brush, or Re-detect')
+    setStatus('🗑 cleared — paint, wand, or comet-brush a new shape, or Re-detect')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestRender])
 
@@ -505,7 +526,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   const canBrush = useCallback((tool: string): boolean => {
     if (tool === 'draw' || tool === 'draw-erase' || tool === 'wand' || tool === 'wand-erase') return !!imgCanvas.current
-    if (tool === 'add' || tool === 'erase') return hasCutRef.current && engineSelRef.current === 'edge' && edgeRef.current === 'ready'
+    // add/erase need only an image + the promptable engine — an AI stroke CREATES the cut when
+    // none exists (Dan's device round: Clear must not kill the comet brush)
+    if (tool === 'add' || tool === 'erase') return !!imgCanvas.current && engineSelRef.current === 'edge' && edgeRef.current === 'ready'
     return false
   }, [])
 
