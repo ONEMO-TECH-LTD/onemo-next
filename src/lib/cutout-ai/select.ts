@@ -1,4 +1,7 @@
 // cutout-ai — candidate-mask pick. PURE. SAM returns N candidate masks per prompt; pick one.
+// The eligibility band is THE engine rule (ben-chain SAM_AREA) — never a local threshold.
+
+import { samAreaEligible } from '@/lib/effect/ben-chain'
 
 /**
  * @param areas   foreground pixel count per candidate
@@ -11,7 +14,7 @@ export function pickMask(areas: number[], scores: number[], plane: number, auto:
   const n = areas.length
   if (!auto) { let b = 0; for (let i = 1; i < n; i++) if (scores[i] > scores[b]) b = i; return b }
   let best = -1, bestArea = -1
-  for (let i = 0; i < n; i++) { const f = areas[i] / plane; if (f > 0.05 && f < 0.92 && areas[i] > bestArea) { bestArea = areas[i]; best = i } }
+  for (let i = 0; i < n; i++) { const f = areas[i] / plane; if (samAreaEligible(f) && areas[i] > bestArea) { bestArea = areas[i]; best = i } }
   if (best < 0) { best = 0; for (let i = 1; i < n; i++) if (scores[i] > scores[best]) best = i }
   return best
 }

@@ -29,6 +29,12 @@ export const AUTO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
+/** Admin sensitivity multiplier (ceiling probe, Dan 2026-08-06): scales the scale-relative knobs
+ *  into the engine's calibration headroom. Module-owned — never computed in the component. */
+export function withSensitivity(s: TraceOutlineSettings, m: number): TraceOutlineSettings {
+  return m === 1 ? s : { ...s, straighten: s.straighten * m, simplify: s.simplify * m, curve: s.curve * m }
+}
+
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
 
 /** Green-kept / red-removed overlay pixels for the mask. */
@@ -211,15 +217,20 @@ export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  Offset knob's job, reflected truthfully). */
 const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }
 
+/** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:
+ *  the flood-fill fallback has NO matte (its subject is the raw full image by engine design), so
+ *  the user must know when it ran (the 'two layered images' signature, Dan 2026-08-06). */
+export type PrepareProgress = 'downloading-model' | 'cutting' | 'fallback'
+
 /** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out. */
-export async function prepareAI(url: string, mask: Mask): Promise<PreparedEffect> {
-  return prepareEffect(url, 'shaped', LAB_CFG, undefined, await buildPreseg(url, mask))
+export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffect> {
+  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, await buildPreseg(url, mask))
 }
 
 /** The TRUE v5.3.1 bridge: an untouched segmentML MLResult straight into the shaped pipeline —
  *  exactly what the v5.3.1 flow does. No lab reconstruction of the matte. */
-export function prepareNative(url: string, preseg: MLResult): Promise<PreparedEffect> {
-  return prepareEffect(url, 'shaped', LAB_CFG, undefined, preseg)
+export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffect> {
+  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, preseg)
 }
 
 /** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim.

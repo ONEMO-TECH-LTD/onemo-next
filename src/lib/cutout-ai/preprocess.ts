@@ -6,9 +6,11 @@ export interface TensorData {
   dims: number[]
 }
 
-const SAM_MEAN = [123.675, 116.28, 103.53]
-const SAM_STD = [58.395, 57.12, 57.375]
-const SAM_SIZE = 1024
+// SAM preprocess constants come from THE engine roster spec (ben-chain SAM.edgesam) — one source.
+import { SAM } from '@/lib/effect/ben-chain'
+const SAM_MEAN = SAM.edgesam.mean
+const SAM_STD = SAM.edgesam.std
+const SAM_SIZE = SAM.edgesam.size
 
 /**
  * SAM CHW input (EdgeSAM): aspect-preserving resize (longest side → 1024), zero-pad, normalize.

@@ -40,6 +40,12 @@ export const SAM: Record<string, SamSpec> = {
     size: 1024, mean: [123.675, 116.28, 103.53], std: [58.395, 57.12, 57.375], // SAM-family ImageNet (raw-pixel scale)
   },
 }
+/** SAM auto-candidate eligibility (s62 device-verified): a mask is a plausible SUBJECT only when
+ *  it covers a sane fraction of the image. THE one rule — the worker roster runner AND the brush
+ *  add-on's picker both import it (no duplicated thresholds anywhere). */
+export const SAM_AREA = { min: 0.05, max: 0.92 } as const
+export const samAreaEligible = (frac: number): boolean => frac > SAM_AREA.min && frac < SAM_AREA.max
+
 /** Central auto-prompt (normalized coords) when no user hint exists — recognise the main object. */
 export const SAM_CENTRAL_PROMPT: ReadonlyArray<readonly [number, number]> = [
   [0.5, 0.5], [0.4, 0.4], [0.6, 0.4], [0.4, 0.6], [0.6, 0.6], [0.5, 0.3], [0.5, 0.7],

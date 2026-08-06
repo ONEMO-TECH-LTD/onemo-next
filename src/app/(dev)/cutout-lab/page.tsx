@@ -15,7 +15,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, prepareNative,
-  shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  shapePathD, shapeRing, subtractMasks, swathMask, unionMasks, withSensitivity,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -225,15 +225,7 @@ export default function CutoutLab() {
   const applyFinish = useCallback(() => {
     const img = imgCanvas.current
     const drawn = drawnRef.current
-    // admin sensitivity multiplier (x1/1.5/2/3): scales the scale-relative knobs into the engine's
-    // calibration headroom — a ceiling probe, not a config change; knobs keep their true values.
-    const m = sensRef.current
-    const eff = m === 1 ? settingsRef.current : {
-      ...settingsRef.current,
-      straighten: settingsRef.current.straighten * m,
-      simplify: settingsRef.current.simplify * m,
-      curve: settingsRef.current.curve * m,
-    }
+    const eff = withSensitivity(settingsRef.current, sensRef.current) // admin ceiling probe (module-owned)
     const fin: FinishResult | null = drawn && img
       ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, eff)
       : preparedRef.current ? finishSpec(preparedRef.current, eff, img?.width) : null
@@ -253,13 +245,14 @@ export default function CutoutLab() {
       try {
         // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
         // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
-        preparedRef.current = await (preseg ? prepareNative(url, preseg) : prepareAI(url, mask))
+        const loud = (st: string) => { if (st === 'fallback') setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)') }
+        preparedRef.current = await (preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud))
       } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message)); return }
     }
     setHasCut(true)
     applyFinish()
     pushHistory()
-    setStatus('✨ done — brush, draw, edit, tune, or Save')
+    setStatus(`✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — brush, draw, edit, tune, or Save`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish])
 

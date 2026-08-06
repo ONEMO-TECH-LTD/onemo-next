@@ -21,7 +21,7 @@
 
 // KAI-9087: the rembg cut-out CHAIN composition + matte feasibility live in ./ben-chain — a PURE,
 // unit-tested module (a direct worker import would crash a test on onmessage/self/postMessage).
-import { resolveChain, isDegenerateMatte, isSamSpec, SAM_CENTRAL_PROMPT, type RembgSpec, type SamSpec, type ChainSpec } from './ben-chain'
+import { resolveChain, isDegenerateMatte, isSamSpec, samAreaEligible, SAM_CENTRAL_PROMPT, type RembgSpec, type SamSpec, type ChainSpec } from './ben-chain'
 
 // MODEL COMPARISON HARNESS — every candidate runs through the IDENTICAL pipeline method as BEN2
 // (webgpu → wasm fallback, fp16). The page chooses the model via the `?seg=` URL param (read in
@@ -251,7 +251,7 @@ async function runSam(imageUrl: string, spec: SamSpec, onProgress: (s: string) =
     let pos = 0
     for (let y = 0; y < vy2; y++) for (let x = 0; x < vx2; x++) if (m[y * mw2 + x] > 0) pos++
     const frac = pos / validArea
-    if (frac < 0.05 || frac > 0.92) continue
+    if (!samAreaEligible(frac)) continue
     const s = scores ? scores.data[i] : 0
     if (s > bestScore) { bestScore = s; best = i }
   }
