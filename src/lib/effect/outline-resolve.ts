@@ -22,7 +22,7 @@
 //   • Curve is the one in-house op (native bézier tangent-handle math — no library "bend-by-amount").
 
 import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
-import { flattenPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
+import { flattenPath, ringToVPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
 import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
@@ -182,12 +182,19 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     const guard = (next: VPath): VPath => (ringSimple(pathToRing(next)) ? next : p)
     // 1. STRAIGHTEN — Clipper2 RDP/TrimCollinear: collapse near-collinear runs to true straight edges.
     if (g.straighten > 0) p = guard(straightenPath(p, straightenEpsPx(g.straighten, scalePx)))
-    // 2. SIMPLIFY — Paper simplify (curve-fit): 0 = OFF, higher = fewer anchors + smoother fit.
-    //    (Dan 2026-08-06 correction: the observed squash was SMOOTH's shrink, not this — the earlier
-    //    RDP swap made Simplify a duplicate of Straighten and is reverted; the trio is distinct:
-    //    Straighten = collinear collapse · Simplify = curve-fit reduce · Smooth = handle rounding.)
-    //    Runs only where redundant near-collinear vertices exist; a no-op on a clean sparse polygon.
-    if (g.simplify > 0) { const tol = simplifyTolPx(g.simplify, scalePx); if (hasRedundantVertices(p, tol)) p = guard(simplifyPaper(p, tol)) }
+    // 2. SIMPLIFY — PINNED-corner Schneider fit (the engine's own ringToVPath, Dan 2026-08-06):
+    //    Paper's free re-fit chorded high-curvature regions INWARD (the localized top-squash Dan
+    //    screenshotted — deviation is systematic toward the concave side). ringToVPath pins the
+    //    true corners ON the outline and fits minimal smooth cubic chains between them within the
+    //    tolerance — fewer anchors, flowing curves, extremities cannot pull in. Same knob, same
+    //    tolerance mapping; runs only where redundant vertices exist (clean polygons untouched).
+    if (g.simplify > 0) {
+      const tol = simplifyTolPx(g.simplify, scalePx)
+      if (hasRedundantVertices(p, tol)) {
+        const ring = flattenPath(p, 0.5)
+        if (ring.length >= 3) p = guard(ringToVPath(ring, 35, Math.max(0.5, tol)))
+      }
+    }
     // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
     //    on a fold — at tiny smooth the floor must be low enough to retreat to a clean result, else the
     //    1% case slips a borderline self-touch past the guard and shows a red outline.
