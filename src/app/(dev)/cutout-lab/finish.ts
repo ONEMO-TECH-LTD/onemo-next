@@ -253,7 +253,13 @@ export async function bakeStickerEngine(
   // normalise/expand the background).
   const off = b.blend === 0 && b.fill === 'clamp' && b.scale === 100 && !b.panX && !b.panY
     && b.preset === 'none' && !b.vignette && !b.tint
-  if (off) {
+  // OFFSET PAST THE FRAME (Dan 2026-08-06): the outline grows freely beyond the image; the
+  // out-of-frame band auto-fills with the MIRROR underlay (flipped per axis → every seam continues
+  // edge-to-edge) through the engine op's FILL machinery at blend 0 — filling, not blending: the
+  // interior stays the untouched original. Clamp/tile stay selectable in the Blend tab.
+  const outgrown = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > maskW || bounds.maxY > maskH
+  if (off && outgrown) b = { ...b, fill: 'mirror' }
+  else if (off) {
     const src = origCanvas // the untouched original (y-up, engine convention)
     const fw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * k))
     const fh = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * k))
