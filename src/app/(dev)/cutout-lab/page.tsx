@@ -14,9 +14,9 @@ import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
-  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, prepareNative,
+  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
   shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
-  type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
+  type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { segmentV531 } from './v531seg'
@@ -545,11 +545,6 @@ export default function CutoutLab() {
           {(['mirror', 'clamp'] as FillChoice[]).map((f) => (
             <button key={f} onClick={() => setBlendTune({ fill: f })} style={chipBtn(blend.fill === f)}>{f}</button>
           ))}
-          <select value={blend.preset} onChange={(e) => setBlendTune({ preset: e.target.value as PresetKey })} style={{ ...btn, fontSize: 11, padding: '4px 8px' }}>
-            {Object.entries(PRESET_LABELS).map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
-          </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>tint<input type="color" value={blend.tint ?? '#000000'} onChange={(e) => setBlendTune({ tint: e.target.value })} style={{ width: 26, height: 20, padding: 0, border: 'none' }} /></label>
-          {blend.tint && <button onClick={() => setBlendTune({ tint: null })} style={chipBtn(false)}>tint off</button>}
         </>)}
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>

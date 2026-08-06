@@ -5,7 +5,7 @@ export type Tool = 'add' | 'erase' | 'draw' | 'draw-erase' | 'nodes' | 'frame'
 export type Tab = 'ai' | 'vector' | 'blend' | 'edit'
 
 export const VEC_CHIPS = ['detail', 'offset', 'simplify', 'smooth', 'radius'] as const // straighten + curve dropped from the surface (Dan 2026-08-06) — engine keeps both
-export const BLEND_CHIPS = ['blend', 'vignette'] as const // scale/pan removed from the surface (Dan 2026-08-06)
+export const BLEND_CHIPS = ['blend'] as const // vignette/presets/tint + scale/pan removed from the surface (Dan 2026-08-06) — engine keeps them
 
 export const CHIP_RANGE: Record<string, [number, number]> = {
   detail: [0, 100], offset: [0, 15], simplify: [0, 100], smooth: [0, 200], straighten: [0, 100],
