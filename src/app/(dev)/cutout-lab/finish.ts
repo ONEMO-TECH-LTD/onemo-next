@@ -278,7 +278,13 @@ export async function bakeStickerEngine(
   // nothing composites — the original image under the vector mask.
   const outgrown = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > maskW || bounds.maxY > maskH
   if (neutral && outgrown) b = { ...b, blend: prepared.frontSrc.defaultBlendPercent } // the USER'S fill choice stands (mirror = default)
-  else if (neutral) {
+  // NO-MATTE GUARD (Dan's law: a full-image composite may not exist ANYWHERE): the flood-fill
+  // fallback has no object layer — its 'subject' is the raw full image, which drawn sharp over the
+  // blur COVERS it (blend looks dead) or double-layers under scale. With no matte, blend is forced
+  // off and the subject overlay is skipped; the band fill still works for outgrown offsets.
+  const matteless = prepared.spec.generator.adapter === 'alpha' || prepared.spec.generator.adapter === 'bg-flood'
+  if (matteless) b = { ...b, blend: 0 }
+  if (neutral && !outgrown && !matteless) {
     const src = origCanvas // the untouched original (y-up, engine convention)
     const fw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * k))
     const fh = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * k))
