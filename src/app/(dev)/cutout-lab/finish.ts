@@ -289,14 +289,19 @@ function transformArtwork(src: HTMLCanvasElement, b: BlendSettings): HTMLCanvasE
 /** 3×3 mirror mosaic — each neighbour tile is the image flipped about the shared edge, so the
  *  expansion transitions seamlessly (Dan's mirror fill). Glue on TOP of the untouched engine op:
  *  mirror hands the engine a bigger original; the engine's own clamp/tile stays as shipped. */
-function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
+/** Mirror mosaic materialized over ONLY the composed region (I2 contract: allocation O(region),
+ *  never the full 3w×3h). Same per-axis flip pattern as the full mosaic, drawn shifted by the
+ *  region origin — pixel-identical to the full-mosaic canvas over [rx0, ry0)+(W, H). */
+function mirrorMosaicRegion(src: HTMLCanvasElement, rx0: number, ry0: number, W: number, H: number): HTMLCanvasElement {
   const w = src.width, h = src.height
-  const c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3
+  const c = document.createElement('canvas'); c.width = W; c.height = H
   const ctx = c.getContext('2d')!
   for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) {
+    // tile box in mosaic space: [tx·w, ty·h) — skip tiles that miss the region entirely
+    if (tx * w >= rx0 + W || (tx + 1) * w <= rx0 || ty * h >= ry0 + H || (ty + 1) * h <= ry0) continue
     ctx.save()
     const fx = tx === 1 ? 1 : -1, fy = ty === 1 ? 1 : -1
-    ctx.translate(tx * w + (fx === -1 ? w : 0), ty * h + (fy === -1 ? h : 0))
+    ctx.translate(tx * w + (fx === -1 ? w : 0) - rx0, ty * h + (fy === -1 ? h : 0) - ry0)
     ctx.scale(fx, fy)
     ctx.drawImage(src, 0, 0)
     ctx.restore()
@@ -449,24 +454,39 @@ export async function bakeStickerEngine(
   const mirror = b.fill === 'mirror'
   const sx = mirror ? origCanvas.width : 0, sy = mirror ? texH : 0
   let original = art, subject = subj
-  bail() // → mosaic
-  if (mirror) {
-    original = mirrorMosaic(art)
-    const big = document.createElement('canvas'); big.width = original.width; big.height = original.height
-    big.getContext('2d')!.drawImage(subj, sx, sy)
-    subject = big
-  }
   // BLUR-FALLOFF PAD (Dan 16:43 'bottom transparency in preview'): the SVG blur at a canvas edge
   // bleeds into transparency; with the compose frame ending at the outline bbox, that falloff band
   // (≈3σ) reached INSIDE the outline — the semi-transparent ring. Pad the frame by 3σ so the
   // falloff lands in discarded margin, then crop back to the true frame.
-  const blendEff = mirror ? b.blend / 3 : b.blend // mosaic is 3x wide — keep the blur physically equal
-  const pad = Math.ceil(3 * blendPercentToPixels(blendEff, original.width)) + 2
+  // TARGET physical blur px — identical to the historical full-mosaic math (blend/3 on width 3w):
+  // the compose op derives blur from ITS source width, so the region-cropped canvas needs the
+  // percentage re-expressed for its own width to keep the physical blur byte-equal (I2 hash gate).
+  const blurPx = blendPercentToPixels(mirror ? b.blend / 3 : b.blend, mirror ? art.width * 3 : art.width)
+  const pad = Math.ceil(3 * blurPx) + 2
+  // region origin in mosaic space (mirror only) — INTEGER so the materialized pixels align exactly.
+  // The region carries ONE EXTRA blur margin beyond the compose frame: the SVG blur samples the
+  // SOURCE canvas, so frame-edge pixels need real mosaic content within kernel reach — beyond
+  // ~6σ total the Gaussian tail is below 8-bit quantization (the pixel-identity gate).
+  const margin = pad
+  const rx0 = mirror ? Math.max(0, Math.floor(bUp.minX + sx - pad) - margin) : 0
+  const ry0 = mirror ? Math.max(0, Math.floor(bUp.minY + sy - pad) - margin) : 0
+  let blendEff = b.blend
+  bail() // → mosaic
+  if (mirror) {
+    // O(region) materialization (I2): the mosaic exists only over the composed region + pad
+    const W = Math.min(art.width * 3, Math.ceil(bUp.maxX + sx + pad) + margin) - rx0
+    const H = Math.min(art.height * 3, Math.ceil(bUp.maxY + sy + pad) + margin) - ry0
+    original = mirrorMosaicRegion(art, rx0, ry0, W, H)
+    const small = document.createElement('canvas'); small.width = W; small.height = H
+    small.getContext('2d')!.drawImage(subj, sx - rx0, sy - ry0)
+    subject = small
+    blendEff = W > 0 ? (b.blend / 3) * (art.width * 3) / W : 0 // same blur px on the region width
+  }
   bail() // → compose
   const { canvas, frame } = await composeEffectArtwork({
     originalCanvas: original,
     subjectCanvas: subject,
-    outputBoundsPx: { minX: bUp.minX + sx - pad, minY: bUp.minY + sy - pad, maxX: bUp.maxX + sx + pad, maxY: bUp.maxY + sy + pad },
+    outputBoundsPx: { minX: bUp.minX + sx - pad - rx0, minY: bUp.minY + sy - pad - ry0, maxX: bUp.maxX + sx + pad - rx0, maxY: bUp.maxY + sy + pad - ry0 },
     blendPercent: blendEff,
     fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode),
     fxFilter: presetFilter(b.preset),
@@ -476,7 +496,7 @@ export async function bakeStickerEngine(
   bail() // → flip
   // flip the composed (padded) frame to y-down and clip with the outline (scaled into tex space)
   const fw = frame.width, fh = frame.height
-  const ox = frame.originX - sx, oy = frame.originY - sy // y-up tex-space origin
+  const ox = frame.originX + rx0 - sx, oy = frame.originY + ry0 - sy // y-up tex-space origin (region → mosaic → tex)
   const flipped = document.createElement('canvas'); flipped.width = fw; flipped.height = fh
   const fctx = flipped.getContext('2d')!
   fctx.translate(0, fh); fctx.scale(1, -1)
@@ -496,7 +516,7 @@ export async function bakeStickerEngine(
   const w0 = Math.max(1, Math.ceil(bUp.maxX + sx) - x0), h0 = Math.max(1, Math.ceil(bUp.maxY + sy) - y0u)
   const oyDown0 = texH - ((y0u - sy) + h0)
   const out = document.createElement('canvas'); out.width = w0; out.height = h0
-  out.getContext('2d')!.drawImage(clipped, (frame.originX - x0), (oyDown - oyDown0), fw, fh)
+  out.getContext('2d')!.drawImage(clipped, (frame.originX + rx0 - x0), (oyDown - oyDown0), fw, fh) // originX is REGION-space post-I2 — shift back to mosaic space
   return { canvas: out }
 }
 

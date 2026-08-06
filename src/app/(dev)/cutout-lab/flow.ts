@@ -112,20 +112,51 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const bakePending = useRef(false)
   const bakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const draggingRef = useRef(false) // knob gesture in progress — bakes DEFER to release (Cadence Law)
+  // ── I2: EDIT-TIME MEMORY FLOOR ── live bakes compose at DISPLAY resolution by feeding a cached
+  // display-res frontSrc pair to the SAME bakeStickerEngine (its k-scaling + width-relative blur
+  // make it resolution-agnostic — contract §I2; no engine change, no second pipeline). Full res
+  // exists only on Save and 👁 Preview, through this ONE scheduler + gen token.
+  const bakeModeRef = useRef<'display' | 'full'>('display')
+  const previewRef2 = useRef(false)
+  const displayFrontRef = useRef<{ src: PreparedEffect; shim: PreparedEffect } | null>(null)
+  const fullBakeWaiters = useRef<(() => void)[]>([])
+  const displayPrepared = (p: PreparedEffect): PreparedEffect => {
+    if (displayFrontRef.current?.src === p) return displayFrontRef.current.shim
+    const { origCanvas, subjCanvas } = p.frontSrc
+    const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 3) : 1
+    const scale = Math.min(1, (dispWRef.current * dpr) / origCanvas.width)
+    let shim = p
+    if (scale < 1) {
+      const dw = Math.max(1, Math.round(origCanvas.width * scale)), dh = Math.max(1, Math.round(origCanvas.height * scale))
+      const so = document.createElement('canvas'); so.width = dw; so.height = dh
+      so.getContext('2d')!.drawImage(origCanvas, 0, 0, dw, dh)
+      const ss = document.createElement('canvas'); ss.width = dw; ss.height = dh
+      ss.getContext('2d')!.drawImage(subjCanvas, 0, 0, dw, dh)
+      shim = { ...p, frontSrc: { ...p.frontSrc, origCanvas: so, subjCanvas: ss } }
+    }
+    displayFrontRef.current = { src: p, shim } // built ONCE per prepare (cache keyed on the prepared ref)
+    return shim
+  }
   const runBake = useCallback(async () => {
     if (bakeInFlight.current) { bakePending.current = true; return }
     if (!preparedRef.current || !dRef.current || !boundsRef.current) { liveBakeRef.current = null; requestRender(); return }
     bakeInFlight.current = true
     const gen = ++bakeGen.current
+    const mode = bakeModeRef.current
     const [d, bounds] = [dRef.current, boundsRef.current]
     const t0 = performance.now()
     try {
+      const src = mode === 'full' ? preparedRef.current : displayPrepared(preparedRef.current)
       const r = await bakeStickerEngine(
-        preparedRef.current, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height,
+        src, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height,
         blendRef.current, () => gen !== bakeGen.current,
       )
-      perfGesture('bake', performance.now() - t0)
-      if (gen === bakeGen.current) { liveBakeRef.current = { canvas: r.canvas, bounds }; requestRender() }
+      perfGesture(mode === 'full' ? 'bake-full' : 'bake', performance.now() - t0)
+      if (gen === bakeGen.current) {
+        liveBakeRef.current = { canvas: r.canvas, bounds }
+        requestRender()
+        if (mode === 'full') { for (const w of fullBakeWaiters.current) w(); fullBakeWaiters.current = [] }
+      }
     } catch (e) {
       if (!(e instanceof BakeCancelled)) setStatus('⚠️ compose failed: ' + String((e as Error)?.message ?? e)) // fail LOUD
     }
@@ -424,14 +455,30 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestRender])
 
+  /** await the next COMMITTED full-res bake (requested through the one scheduler + gen token) */
+  const awaitFullBake = useCallback((): Promise<void> => new Promise((res) => {
+    fullBakeWaiters.current.push(res)
+    bakeModeRef.current = 'full'
+    scheduleBake(true)
+  }), [scheduleBake])
+
+  /** 👁 Preview enter/exit — a FLOW policy: enter = full-res compose trigger (display-res bake may
+   *  show as the interim until it lands); exit = back to the display-res live bake. */
+  const setPreview = useCallback((on: boolean) => {
+    previewRef2.current = on
+    if (!preparedRef.current) return
+    bakeModeRef.current = on ? 'full' : 'display'
+    scheduleBake(true)
+  }, [scheduleBake])
+
   const save = useCallback(async () => {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current || !preparedRef.current) return
-    const t0 = performance.now()
-    const baked = await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, img.width, img.height, blendRef.current)
-    perfGesture('save-bake', performance.now() - t0)
-    baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
-  }, [])
+    await awaitFullBake() // Save = full-res trigger through the ONE scheduler (never two in flight)
+    const baked = liveBakeRef.current
+    if (!previewRef2.current) { bakeModeRef.current = 'display'; scheduleBake() } // return to edit-res
+    baked?.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
+  }, [awaitFullBake, scheduleBake])
 
   const canBrush = useCallback((tool: string): boolean => {
     if (tool === 'draw' || tool === 'draw-erase' || tool === 'wand' || tool === 'wand-erase') return !!imgCanvas.current
@@ -451,7 +498,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       upload, redetect, setEngine, setTune, setBlendTune,
       wandTap, paintStroke, aiStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging,
+      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

@@ -292,7 +292,7 @@ export default function CutoutLab() {
         <button onClick={flow.actions.undo} disabled={busy || !canUndo} style={btn}>↩ Undo</button>
         <button onClick={flow.actions.redo} disabled={busy || !canRedo} style={btn}>↪ Redo</button>
         <button onClick={flow.actions.clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
-        <button onClick={() => { const v = !previewRef.current; previewRef.current = v; setPreview(v); requestAnimationFrame(render) }} disabled={!hasCut}
+        <button onClick={() => { const v = !previewRef.current; previewRef.current = v; setPreview(v); flow.actions.setPreview(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
         <button onClick={() => { const v = !overlayRef.current; overlayRef.current = v; setOverlayOn(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: overlayOn ? '#f1f5f9' : '#0f172a', color: overlayOn ? '#0f172a' : '#fff' }}>{overlayOn ? '🎭 Mask on' : '🎭 Mask off'}</button>
