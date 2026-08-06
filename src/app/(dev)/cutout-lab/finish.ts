@@ -3,8 +3,9 @@
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
 import { CHIP_RANGE } from './ui-config'
+import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import type { Mask } from '@/lib/cutout-ai/types'
-import { dilateMask, effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
+import { effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { blendPercentToPixels, composeEffectArtwork, presetFilter, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, ringToVPath, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
@@ -321,32 +322,53 @@ function mirrorMosaicRegion(src: HTMLCanvasElement, rx0: number, ry0: number, W:
  *  RGB at the working cap, model alpha canvas-upscaled onto it — then run the engine's OWN shared
  *  tail (`matteToMLResult`: lo mask @ the bridge's maskDim + hi texture @ the device cap, y-up,
  *  post-processed). All dims are the BRIDGE'S config, none the lab's. */
+// EMPTY-STOMACH CACHE (§I2b law 4): the decoded original at the texture cap + the scratch
+// canvases are built ONCE per upload (keyed on the object URL; a new upload = new URL = new key)
+// and REUSED every tap — never re-decoded, never re-allocated. Clear keeps the URL → cache holds.
+let presegCache: {
+  url: string; base: HTMLCanvasElement; ow: number; oh: number
+  matte: HTMLCanvasElement; alpha: HTMLCanvasElement; av: ImageData; aw: number; ah: number
+} | null = null
+
 export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   const { w, h } = mask
   const texDim = effectiveTextureDim()
-  // original image at the working cap (y-down; matteToMLResult's rasterize does the y-up flip)
-  const img = new Image(); img.src = url
-  await img.decode()
-  const s = Math.min(1, texDim / Math.max(img.naturalWidth, img.naturalHeight))
-  const ow = Math.max(1, Math.round(img.naturalWidth * s)), oh = Math.max(1, Math.round(img.naturalHeight * s))
-  const matte = document.createElement('canvas'); matte.width = ow; matte.height = oh
+  if (presegCache?.url !== url) {
+    // original image at the working cap (y-down; matteToMLResult's rasterize does the y-up flip)
+    const img = new Image(); img.src = url
+    await img.decode()
+    const s = Math.min(1, texDim / Math.max(img.naturalWidth, img.naturalHeight))
+    const ow = Math.max(1, Math.round(img.naturalWidth * s)), oh = Math.max(1, Math.round(img.naturalHeight * s))
+    const base = document.createElement('canvas'); base.width = ow; base.height = oh
+    base.getContext('2d')!.drawImage(img, 0, 0, ow, oh)
+    const matte = document.createElement('canvas'); matte.width = ow; matte.height = oh
+    presegCache = { url, base, ow, oh, matte, alpha: document.createElement('canvas'), av: new ImageData(1, 1), aw: 0, ah: 0 }
+  }
+  const cache = presegCache
+  const { ow, oh, matte } = cache
   const mctx = matte.getContext('2d')!
-  mctx.drawImage(img, 0, 0, ow, oh)
+  mctx.clearRect(0, 0, ow, oh)
+  mctx.drawImage(cache.base, 0, 0) // reset the scratch from the cached decode — no per-tap decode
   // model alpha at its own res (soft channel when the model provides one, binary otherwise) —
   // canvas bilinear upscale to full res is EXACTLY how ben.worker turns model-res alpha into the
   // soft full-res matte (never ctx.filter — a documented Safari no-op, composite.ts KAI-9147).
-  const a = document.createElement('canvas'); a.width = w; a.height = h
-  const av = new ImageData(w, h)
+  if (cache.aw !== w || cache.ah !== h) { cache.alpha.width = w; cache.alpha.height = h; cache.av = new ImageData(w, h); cache.aw = w; cache.ah = h }
+  const a = cache.alpha, av = cache.av
   const soft = mask.soft
+  const tA = performance.now()
   for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = soft ? soft[i] : (mask.data[i] ? 255 : 0)
   a.getContext('2d')!.putImageData(av, 0, 0)
   mctx.globalCompositeOperation = 'destination-in'
   mctx.drawImage(a, 0, 0, ow, oh)
   mctx.globalCompositeOperation = 'source-over'
+  perfGesture('preseg-matte', performance.now() - tA)
   // ONE LAW for every source (Dan 2026-08-06 final): brushes define the OUTLINE only — the subject
   // is ALWAYS the outline's own matte, and the blend band is the OFFSET ring. No tool ever defines
   // a blend area; blur never depends on which tool drew the shape.
-  return matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
+  const tB = performance.now()
+  const r = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
+  perfGesture('preseg-mlresult', performance.now() - tB)
+  return r
 }
 
 /** The lab's engine config = prepareShaped's, with ONE parameter changed through the engine's own

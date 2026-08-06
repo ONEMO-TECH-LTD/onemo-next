@@ -30,6 +30,18 @@ import type { EditMode } from './EditorOverlay'
 
 const WORK_MAX = 1024
 const BAKE_IDLE_MS = 250 // Cadence Law: compose on release/idle — never per knob tick
+// §I2b law 3: EVERY await in a tool path carries a timeout → a hang becomes a visible ⚠️ fault
+// with busy released — a stuck-busy lockout is impossible by construction. Downloads get the
+// generous ceiling (weights on slow links); compute gets the tight one.
+const T_COMPUTE_MS = 30_000
+const T_DOWNLOAD_MS = 180_000
+class ToolTimeout extends Error { constructor(what: string, ms: number) { super(`${what} timed out after ${Math.round(ms / 1000)}s`) } }
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((res, rej) => {
+    const t = setTimeout(() => rej(new ToolTimeout(what, ms)), ms)
+    p.then((v) => { clearTimeout(t); res(v) }, (e) => { clearTimeout(t); rej(e) })
+  })
+}
 
 export type EngineSel = 'edge' | 'u2net'
 
@@ -219,7 +231,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
         const loud = (st: string) => { if (st === 'fallback') setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)') }
         const t0 = performance.now()
-        preparedRef.current = await (preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud))
+        preparedRef.current = await withTimeout(preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud), T_COMPUTE_MS, 'engine prepare')
         perfGesture('prepare', performance.now() - t0)
       } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message)); return }
     }
@@ -252,17 +264,17 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const c = client.current!
     if (!brushLoadedRef.current) {
       setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
-      await c.load(MODELS.edgesam, 'auto')
+      await withTimeout(c.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush AI load')
       brushLoadedRef.current = true
     }
     if (!edgeEncodedRef.current) {
       setStatus('🧠 AI reading the image…')
       const img = imgCanvas.current!
       const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
-      await c.encode(px.data, img.width, img.height)
+      await withTimeout(c.encode(px.data, img.width, img.height), T_COMPUTE_MS, 'AI encode')
       edgeEncodedRef.current = true
     }
-    if (maskRef.current) await c.setBase(maskRef.current)
+    if (maskRef.current) await withTimeout(c.setBase(maskRef.current), T_COMPUTE_MS, 'AI base sync')
   }, [])
 
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
@@ -293,7 +305,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     try {
       setStatus(`✨ AI magic (${engineSelRef.current === 'edge' ? 'EdgeSAM' : 'u2net'} · v5.3.1)…`)
       const t0 = performance.now()
-      const r = await segmentV531(url, w, h)
+      const r = await withTimeout(segmentV531(url, w, h), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
@@ -323,14 +335,18 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
   const wandTap = useCallback(async (p0: Point, tolerance: number, erase: boolean, brushR: number) => {
     const img = imgCanvas.current!
+    const tw0 = performance.now()
     const region = wandRegion(img, p0.x * img.width, p0.y * img.height, tolerance)
+    perfGesture('wand-region', performance.now() - tw0)
     const brushPx = brushR * (img.width / dispWRef.current)
     if (!maskRef.current || !hasCutRef.current) {
       if (erase) { setStatus('🪄 nothing to erase yet'); requestRender(); return }
       setBusy(true); await acceptMask(polishMask(region, brushPx)); setBusy(false)
       setStatus('🪄 region filled — tap more, or erase'); return
     }
+    const tp0 = performance.now()
     const combined = polishMask(erase ? subtractMasks(maskRef.current, region) : unionMasks(maskRef.current, region), brushPx)
+    perfGesture('wand-polish', performance.now() - tp0)
     setBusy(true); await acceptMask(combined); setBusy(false)
     setStatus(erase ? '🪄 region erased' : '🪄 region filled')
   }, [acceptMask, requestRender])
@@ -340,7 +356,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
     const brushPx = brushR * (img.width / dispWRef.current)
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
+    const ts0 = performance.now()
     const painted = swathMask(pts, brushPx, img.width, img.height)
+    perfGesture('swath', performance.now() - ts0)
     if (!maskRef.current || !hasCutRef.current) {
       if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); requestRender(); return }
       drawnRef.current = null
@@ -349,7 +367,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       return
     }
     drawnRef.current = null
+    const tp1 = performance.now()
     const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx)
+    perfGesture('paint-polish', performance.now() - tp1)
     setBusy(true)
     await acceptMask(combined)
     setBusy(false)
@@ -362,7 +382,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       await ensureEdge()
       setStatus(erase ? '🔴 erasing…' : '🟢 filling…')
       const t0 = performance.now()
-      const r = erase ? await client.current!.eraseStroke(stroke) : await client.current!.addStroke(stroke)
+      const r = await withTimeout(erase ? client.current!.eraseStroke(stroke) : client.current!.addStroke(stroke), T_COMPUTE_MS, 'AI stroke')
       setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
       await acceptMask(r.mask)
     } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
@@ -402,12 +422,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const zero = { ...ZERO_SETTINGS }
       settingsRef.current = zero; setSettings(zero)
     }
+    const tm0 = performance.now()
     maskRef.current = maskFromShape(next, img.width, img.height)
+    perfGesture('mask-from-shape', performance.now() - tm0)
     // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
     // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins.
     if (urlRef.current) {
       const gen = ++editPrepGen.current
-      prepareAI(urlRef.current, maskRef.current)
+      withTimeout(prepareAI(urlRef.current, maskRef.current), T_COMPUTE_MS, 'edit re-prepare')
         .then((p) => { if (gen === editPrepGen.current) { preparedRef.current = p; scheduleBake() } })
         .catch((e) => setStatus('⚠️ engine re-prepare failed on edit: ' + String((e as Error).message)))
     }
@@ -440,7 +462,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     drawnRef.current = s.drawn
     setHasCut(!!(s.mask || s.drawn))
     if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
-      try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current!) } catch { /* keep last prepared */ }
+      try { preparedRef.current = await withTimeout(prepareAI(urlRef.current, maskRef.current!), T_COMPUTE_MS, 'restore prepare') } catch { /* keep last prepared */ }
     }
     applyFinish()
     scheduleBake(true)
@@ -474,7 +496,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const save = useCallback(async () => {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current || !preparedRef.current) return
-    await awaitFullBake() // Save = full-res trigger through the ONE scheduler (never two in flight)
+    try { await withTimeout(awaitFullBake(), T_COMPUTE_MS, 'full-res bake') }
+    catch (e) { setStatus('⚠️ ' + String((e as Error).message)); if (!previewRef2.current) bakeModeRef.current = 'display'; return }
     const baked = liveBakeRef.current
     if (!previewRef2.current) { bakeModeRef.current = 'display'; scheduleBake() } // return to edit-res
     baked?.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })

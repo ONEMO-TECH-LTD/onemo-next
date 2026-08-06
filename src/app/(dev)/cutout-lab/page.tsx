@@ -64,6 +64,7 @@ export default function CutoutLab() {
 
   const viewRef = useRef<HTMLCanvasElement>(null)
   const strokeRef = useRef<(Point & { t: number })[]>([])
+  const trailRef = useRef<(Point & { t: number })[]>([]) // comet PRESENTATION trail — outlives the stroke (§I2b law 1)
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const viewBoxRef = useRef({ x: 0, y: 0, w: 1, h: 1 }) // working-view extent (image ∪ outline)
@@ -147,19 +148,27 @@ export default function CutoutLab() {
         ctx.beginPath(); ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
         for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
         ctx.stroke()
-      } else {
-        // AI pointer: COMET TAIL — bright head, tail dissolves in TIME like a keyboard swipe (item 9)
+      }
+    }
+    const trail = trailRef.current
+    if (trail.length > 1) {
+      const t = toolRef.current
+      if (t === 'add' || t === 'erase') {
+        // AI pointer: COMET TAIL — bright head, tail dissolves in TIME like a keyboard swipe
+        // (item 9); §I2b law 1: drawn from the persistent trail so it keeps dissolving through
+        // the recognition wait, not frozen by pointer-up.
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round'
         const col = t === 'add' ? '34,197,94' : '239,68,68'
         const now = performance.now()
         const LIFE = 700 // ms a trail point stays visible
-        for (let i = 1; i < st.length; i++) {
-          const a = Math.max(0, 1 - (now - (st[i] as { t: number }).t) / LIFE)
+        for (let i = 1; i < trail.length; i++) {
+          const a = Math.max(0, 1 - (now - trail[i].t) / LIFE)
           if (a <= 0) continue
           ctx.strokeStyle = `rgba(${col},${(a * 0.9).toFixed(2)})`
           ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * (0.3 + 0.7 * a))
           ctx.beginPath()
-          ctx.moveTo(st[i - 1].x * img.width, st[i - 1].y * img.height)
-          ctx.lineTo(st[i].x * img.width, st[i].y * img.height)
+          ctx.moveTo(trail[i - 1].x * img.width, trail[i - 1].y * img.height)
+          ctx.lineTo(trail[i].x * img.width, trail[i].y * img.height)
           ctx.stroke()
         }
       }
@@ -196,7 +205,12 @@ export default function CutoutLab() {
   // comet animation: while painting an AI stroke, keep repainting so the tail dissolves in TIME
   const cometRaf = useRef(0)
   const cometLoop = useCallback(function loop() {
-    if (!paintingRef.current) { cometRaf.current = 0; return }
+    // §I2b law 1: the fade loop runs until the TRAIL is empty — independent of the stroke ending
+    // or a recognition being in flight. Presentation frames never stop for tool work.
+    const LIFE = 700
+    const now = performance.now()
+    trailRef.current = trailRef.current.filter((q) => now - q.t < LIFE)
+    if (!paintingRef.current && trailRef.current.length === 0) { cometRaf.current = 0; return }
     render()
     cometRaf.current = requestAnimationFrame(loop)
   }, [render])
@@ -205,10 +219,19 @@ export default function CutoutLab() {
     if (busy || !brushable()) return
     paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]
     const t = toolRef.current
-    if ((t === 'add' || t === 'erase') && !cometRaf.current) cometRaf.current = requestAnimationFrame(cometLoop)
+    if (t === 'add' || t === 'erase') { trailRef.current.push(...strokeRef.current); if (!cometRaf.current) cometRaf.current = requestAnimationFrame(cometLoop) }
     render()
   }
-  const onMove = (e: React.PointerEvent) => { cursorRef.current = nrm(e); if (paintingRef.current) strokeRef.current.push(nrm(e)); render() }
+  const onMove = (e: React.PointerEvent) => {
+    cursorRef.current = nrm(e)
+    if (paintingRef.current) {
+      const q = nrm(e)
+      strokeRef.current.push(q)
+      const t = toolRef.current
+      if (t === 'add' || t === 'erase') trailRef.current.push(q)
+    }
+    render()
+  }
   const onUp = async () => {
     if (!paintingRef.current) return
     paintingRef.current = false
