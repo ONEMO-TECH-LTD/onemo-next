@@ -1,128 +1,74 @@
 'use client'
 
-// cutout-lab — calibration bench (s62). STATE + RENDER ONLY: AI subs in the cutout-ai worker,
-// paint hand tool via engine mask booleans in finish.ts glue, finishing/blend/expansion in v5.3.1, vector
-// editing gestures in EditorOverlay. Controls are TABS with ONE adaptive knob (Dan item 10).
-// Engine select: EdgeSAM (auto+brush) vs u2net (auto only) for on-device comparison (item 7).
+// cutout-lab — the NEUTRAL SHELL (Layer-3, I1 contract: ARCHITECTURE.md). Binds ONLY to
+// cutoutLabFlow's { state, actions } — render, gesture capture, coordinate mapping, ink/comet
+// drawing, URL adapter duties (?seg read/write). ZERO policy: no compose calls, no cadence,
+// no runtime engine imports. The Figma shell (I5) must mount on the same flow unchanged.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CutoutClient } from '@/lib/cutout-ai/client'
-import { MODELS } from '@/lib/cutout-ai/registry'
-import type { Mask, Point } from '@/lib/cutout-ai/types'
+import type { Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
-import {
-  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
-  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
-  deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
-  type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
-} from './finish'
-import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import { segmentV531 } from './v531seg'
-import { WAND_TOLERANCE, wandRegion } from '@/lib/cutout-wand'
-
-import { HistoryStack } from './history'
+import { drawCutout, maskOverlay, type FillChoice } from './finish'
+import { WAND_TOLERANCE } from '@/lib/cutout-wand'
+import { useCutoutLabFlow, type EngineSel } from './flow'
+import PerfHUD from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
 
-const WORK_MAX = 1024
-
 export default function CutoutLab() {
+  // ── URL ADAPTER (shell duty per contract): read initial ?seg, write on engine change ──
+  const [initialSeg] = useState<EngineSel>(() => {
+    if (typeof window === 'undefined') return 'edge'
+    const u = new URL(location.href)
+    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u); return 'edge' }
+    return u.searchParams.get('seg') === 'edgesam' ? 'edge' : 'u2net'
+  })
+  const onSegChange = useCallback((v: EngineSel) => {
+    // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
+    // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
+    const u = new URL(location.href)
+    if (v === 'edge') u.searchParams.set('seg', 'edgesam'); else u.searchParams.delete('seg')
+    history.replaceState(null, '', u)
+  }, [])
+  const renderRef = useRef<() => void>(() => {})
+  const requestRender = useCallback(() => renderRef.current(), [])
+
+  // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
+  const flow = useCutoutLabFlow({ initialSeg, onSegChange, requestRender })
+  const { status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile } = flow.state
+  const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
+
+  // ── shell-only UI state (presentation + gesture) ──
   const [tool, setTool] = useState<Tool>('add')
   const [tab, setTab] = useState<Tab>('ai')
   const [vecChip, setVecChip] = useState<(typeof VEC_CHIPS)[number]>('detail')
   const [blendChip, setBlendChip] = useState<(typeof BLEND_CHIPS)[number]>('blend')
-  const [engineSel, setEngineSel] = useState<'edge' | 'u2net'>('edge')
   const [aspectLocked, setAspectLocked] = useState(true)
-  const wasOutgrownRef = useRef(false)
   const [wandTol, setWandTol] = useState(WAND_TOLERANCE) // live wand calibration (Dan 17:45)
   const wandTolRef = useRef(WAND_TOLERANCE); wandTolRef.current = wandTol
-  // single-node vector editing (Dan 17:57): select an anchor → its radius/curve knobs (ENGINE local pass)
+  // single-node vector editing (Dan 17:57): select an anchor → its radius/curve knobs
   const [selNode, setSelNode] = useState<{ pi: number; ai: number } | null>(null)
   const [nodeChip, setNodeChip] = useState<'radius' | 'curve'>('radius')
   const [nodeAdj, setNodeAdj] = useState({ radius: 0, curve: 0 })
   const nodeBaseRef = useRef<VShape | null>(null)
   const [brushR, setBrushR] = useState(40)
-  const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
-  const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
-  const [status, setStatus] = useState('ready — upload an image')
-  const [busy, setBusy] = useState(false)
-  const [hasCut, setHasCut] = useState(false)
-  const [edge, setEdge] = useState<'loading' | 'ready' | 'dead'>('loading')
-  const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
-  const [disp, setDisp] = useState({ w: 480, h: 360 })
-  const [shapeTick, setShapeTick] = useState(0) // re-render signal for the edit overlay
   const [preview, setPreview] = useState(false)
-  const [hasImage, setHasImage] = useState(false)
   const previewRef = useRef(false); previewRef.current = preview
   const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
   const overlayRef = useRef(true); overlayRef.current = overlayOn
 
-  const client = useRef<CutoutClient | null>(null)
-  const imgCanvas = useRef<HTMLCanvasElement | null>(null)
   const viewRef = useRef<HTMLCanvasElement>(null)
-  const maskRef = useRef<Mask | null>(null)
-  const dRef = useRef<string | null>(null)
-  const boundsRef = useRef<OutlineBounds | null>(null)
-  const shapeRef = useRef<VShape | null>(null) // resolved shape (edit overlay target)
-  const drawnRef = useRef<{ shape: VShape; ring: { x: number; y: number }[] } | null>(null)
   const strokeRef = useRef<(Point & { t: number })[]>([])
   const paintingRef = useRef(false)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
-  const lastFileRef = useRef<File | null>(null)
-  const urlRef = useRef<string | null>(null) // object URL kept alive for engine re-prepare
-  const preparedRef = useRef<PreparedEffect | null>(null)
-  const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
-  const edgeEncodedRef = useRef(false)
-  const settingsRef = useRef(settings); settingsRef.current = settings
-  const blendRef = useRef(blend); blendRef.current = blend
-  const previewSeq = useRef(0)
-  const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const viewBoxRef = useRef({ x: 0, y: 0, w: 1, h: 1 }) // working-view extent (image ∪ outline)
-  const bakeSeq = useRef(0)
   const toolRef = useRef(tool); toolRef.current = tool
-  const engineSelRef = useRef(engineSel); engineSelRef.current = engineSel
-  const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const brushRef = useRef(brushR); brushRef.current = brushR
-  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null }
-  const histRef = useRef(new HistoryStack<Snap>(30))
-  const [histTick, setHistTick] = useState(0)
-  const snapNow = (): Snap => ({
-    mask: maskRef.current ? { data: maskRef.current.data.slice(), w: maskRef.current.w, h: maskRef.current.h, soft: maskRef.current.soft?.slice() } : null,
-    drawn: drawnRef.current,
-  })
-  const pushHistory = () => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }
-  const restore = async (s: Snap) => {
-    maskRef.current = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
-    drawnRef.current = s.drawn
-    setHasCut(!!(s.mask || s.drawn))
-    if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
-      try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current!) } catch { /* keep last prepared */ }
-    }
-    applyFinish()
-  }
-  const undo = async () => { const s = histRef.current.undo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }
-  const redo = async () => { const s = histRef.current.redo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }
-  const clearAll = () => {
-    maskRef.current = null; drawnRef.current = null; preparedRef.current = null
-    dRef.current = null; boundsRef.current = null; shapeRef.current = null
-    setHasCut(false); pushHistory(); render()
-    setStatus('🗑 cleared — paint a shape with the hand brush, or Re-detect')
-  }
+  const hasCutRef = useRef(false); hasCutRef.current = hasCut
 
   const dispW2 = useRef(disp.w); dispW2.current = disp.w
   const dispRefW = () => dispW2.current
-  const recomposeLive = useCallback(() => {
-    if (!preparedRef.current || !dRef.current || !boundsRef.current) { liveBakeRef.current = null; return }
-    const seq = ++bakeSeq.current
-    const [d, bounds] = [dRef.current, boundsRef.current]
-    bakeStickerEngine(preparedRef.current, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height, blendRef.current)
-      .then((r) => { if (seq === bakeSeq.current) { liveBakeRef.current = { canvas: r.canvas, bounds }; render() } })
-      .catch((e) => setStatus('⚠️ compose failed: ' + String((e as Error)?.message ?? e))) // fail LOUD
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const p2w = () => preparedRef.current?.spec.maskWidthPx ?? imgCanvas.current?.width ?? 1
-  const p2h = () => preparedRef.current?.spec.maskHeightPx ?? imgCanvas.current?.height ?? 1
+  void dispRefW
 
   // ── render (draw only) ── ONE canvas: working view, or the baked sticker when Preview is on
   const render = useCallback(() => {
@@ -225,127 +171,10 @@ export default function CutoutLab() {
       }
     }
     ctx.restore() // view-box translate
-  }, [disp.w])
+  }, [disp.w, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
+  useEffect(() => { renderRef.current = render }, [render])
 
-  const applyFinish = useCallback(() => {
-    const img = imgCanvas.current
-    const drawn = drawnRef.current
-    const eff = settingsRef.current
-    const fin: FinishResult | null = drawn && img
-      ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, eff)
-      : preparedRef.current ? finishSpec(preparedRef.current, eff, img?.width) : null
-    dRef.current = fin?.d ?? null
-    boundsRef.current = fin?.bounds ?? null
-    shapeRef.current = fin?.shape ?? null
-    // AUTO-COMPOSITING ON FRAME EXIT (Dan's law), value-TRUE: entering outgrowth sets the actual
-    // blend knob to the engine default — the control reflects what is applied; the user can still
-    // re-zero it (their override stands until the next transition into outgrowth).
-    const img2 = imgCanvas.current, bb = fin?.bounds
-    const og = !!(img2 && bb && (bb.minX < 0 || bb.minY < 0 || bb.maxX > img2.width || bb.maxY > img2.height))
-    if (og && !wasOutgrownRef.current && blendRef.current.blend === 0 && preparedRef.current) {
-      const def = Math.round(preparedRef.current.frontSrc.defaultBlendPercent)
-      blendRef.current = { ...blendRef.current, blend: def }
-      setBlend(blendRef.current)
-    }
-    wasOutgrownRef.current = og
-    setShapeTick((t) => t + 1)
-    recomposeLive()
-    render()
-  }, [render, recomposeLive])
-
-  const acceptMask = useCallback(async (mask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult) => {
-    drawnRef.current = null
-    maskRef.current = mask
-    const img = imgCanvas.current, url = urlRef.current
-    if (img && url) {
-      try {
-        // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
-        // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
-        const loud = (st: string) => { if (st === 'fallback') setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)') }
-        preparedRef.current = await (preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud))
-      } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message)); return }
-    }
-    setHasCut(true)
-    applyFinish()
-    pushHistory()
-    setStatus(`✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — brush, draw, edit, tune, or Save`)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyFinish])
-
-  const edgeFault = useCallback((why: string) => {
-    edgeRef.current = 'dead'; setEdge('dead')
-    setStatus('⚠️ ' + why + ' — u2net only now')
-  }, [])
-
-  useEffect(() => {
-    // Default engine = EdgeSAM via the v5.3.1 roster (`?seg=edgesam` — the engine's own swap param).
-    const u = new URL(location.href)
-    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u) }
-    else if (u.searchParams.get('seg') !== 'edgesam') { setEngineSel('u2net'); engineSelRef.current = 'u2net' }
-    // The cutout-ai worker is the BRUSH add-on only — spawned here, model loaded LAZILY on the first
-    // brush stroke (ensureEdge), so exactly one AI runtime is resident until the user steers.
-    const c = new CutoutClient()
-    client.current = c
-    c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-    c.spawn()
-    edgeRef.current = 'ready'; setEdge('ready') // 'ready' = available; weights load on first use
-    setStatus('ready — upload an image')
-    return () => c.dispose()
-  }, [])
-
-  // ── upload → auto cut on the SELECTED engine (item 7) ──
-  const onFile = useCallback(async (file: File) => {
-    lastFileRef.current = file
-    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; setHasCut(false); setMs({})
-    edgeEncodedRef.current = false
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
-    const url = URL.createObjectURL(file)
-    urlRef.current = url
-    const img = new Image(); img.src = url
-    try { await img.decode() } catch (e) { URL.revokeObjectURL(url); setStatus('⚠️ could not open image: ' + String(e)); return }
-    const s = Math.min(1, WORK_MAX / Math.max(img.naturalWidth, img.naturalHeight))
-    const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s)
-    const master = document.createElement('canvas'); master.width = w; master.height = h
-    const mctx = master.getContext('2d', { willReadFrequently: true })!
-    mctx.drawImage(img, 0, 0, w, h)
-    imgCanvas.current = master
-    setHasImage(true)
-    const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
-    const k = Math.min(maxW / w, 440 / h, 1)
-    setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
-    render()
-    setBusy(true)
-    // ONE pipeline for every engine: the v5.3.1 worker chain, model picked by its own `?seg=`
-    // roster parameter (EdgeSAM or the u2netp trio). The cutout-ai worker is brush-only, lazy.
-    try {
-      setStatus(`✨ AI magic (${engineSelRef.current === 'edge' ? 'EdgeSAM' : 'u2net'} · v5.3.1)…`)
-      const t0 = performance.now()
-      const r = await segmentV531(url, w, h)
-      setMs({ cut: Math.round(performance.now() - t0) })
-      await acceptMask(r.mask, r.preseg)
-    } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
-    setBusy(false)
-  }, [acceptMask, render])
-
-  const brushLoadedRef = useRef(false)
-  const ensureEdge = useCallback(async () => {
-    const c = client.current!
-    if (!brushLoadedRef.current) {
-      setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
-      await c.load(MODELS.edgesam, 'auto')
-      brushLoadedRef.current = true
-    }
-    if (!edgeEncodedRef.current) {
-      setStatus('🧠 AI reading the image…')
-      const img = imgCanvas.current!
-      const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
-      await c.encode(px.data, img.width, img.height)
-      edgeEncodedRef.current = true
-    }
-    if (maskRef.current) await c.setBase(maskRef.current)
-  }, [])
-
-  // ── pointer strokes (add/erase = AI · draw = paint · nodes/frame = overlay's job) ──
+  // ── gesture capture (shell duty): pointer → normalized stroke → FLOW actions ──
   const nrm = (e: React.PointerEvent): Point & { t: number } => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const vb = viewBoxRef.current, img = imgCanvas.current
@@ -361,18 +190,12 @@ export default function CutoutLab() {
   }
   // comet animation: while painting an AI stroke, keep repainting so the tail dissolves in TIME
   const cometRaf = useRef(0)
-  const cometLoop = useCallback(() => {
+  const cometLoop = useCallback(function loop() {
     if (!paintingRef.current) { cometRaf.current = 0; return }
     render()
-    cometRaf.current = requestAnimationFrame(cometLoop)
+    cometRaf.current = requestAnimationFrame(loop)
   }, [render])
-  const brushable = () => {
-    if (previewRef.current) return false
-    const t = toolRef.current
-    if (t === 'draw' || t === 'draw-erase' || t === 'wand' || t === 'wand-erase') return !!imgCanvas.current
-    if (t === 'add' || t === 'erase') return hasCutRef.current && engineSelRef.current === 'edge' && edgeRef.current === 'ready'
-    return false
-  }
+  const brushable = () => !previewRef.current && flow.actions.canBrush(toolRef.current)
   const onDown = (e: React.PointerEvent) => {
     if (busy || !brushable()) return
     paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]
@@ -386,141 +209,37 @@ export default function CutoutLab() {
     paintingRef.current = false
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 1) { render(); return } // a TAP (single point) is a valid smart-fill prompt (Dan)
-    if (toolRef.current === 'wand' || toolRef.current === 'wand-erase') {
-      // CONTRAST BUCKET (real magic-wand lib): tap → region grown by color tolerance → outline
-      // union/subtract. Pure pixels, no AI — the Photoshop bucket Dan asked for.
-      const img = imgCanvas.current!
-      const erase = toolRef.current === 'wand-erase'
-      const p0 = stroke[stroke.length - 1]
-      const region = wandRegion(img, p0.x * img.width, p0.y * img.height, wandTolRef.current)
-      const brushPx = brushRef.current * (img.width / dispRefW())
-      if (!maskRef.current || !hasCutRef.current) {
-        if (erase) { setStatus('🪄 nothing to erase yet'); render(); return }
-        setBusy(true); await acceptMask(polishMask(region, brushPx)); setBusy(false)
-        setStatus('🪄 region filled — tap more, or erase'); return
-      }
-      const combined = polishMask(erase ? subtractMasks(maskRef.current, region) : unionMasks(maskRef.current, region), brushPx)
-      setBusy(true); await acceptMask(combined); setBusy(false)
-      setStatus(erase ? '🪄 region erased' : '🪄 region filled')
-      return
-    }
-    if (toolRef.current === 'draw' || toolRef.current === 'draw-erase') {
-      const img = imgCanvas.current!
-      const erase = toolRef.current === 'draw-erase'
-      const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
-      const brushPx = brushRef.current * (img.width / dispRefW())
-      // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
-      const painted = swathMask(pts, brushPx, img.width, img.height)
-      if (!maskRef.current || !hasCutRef.current) {
-        if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); render(); return }
-        // PURE paint brush (Dan 2026-08-06: shape recognition removed) — the painted area IS the
-        // shape; closed loops fill their interior; the engine pipeline auto-tunes the outline.
-        drawnRef.current = null
-        setBusy(true); await acceptMask(polishMask(painted, brushPx)); setBusy(false)
-        setStatus('✏️ painted shape created — keep painting, erase, or tune')
-        return
-      }
-      // existing shape: paint UNIONS in, erase SUBTRACTS — auto-tuned by the engine pipeline
-      drawnRef.current = null
-      const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx)
-      setBusy(true)
-      await acceptMask(combined)
-      setBusy(false)
-      setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
-      return
-    }
-    setBusy(true)
-    try {
-      await ensureEdge()
-      setStatus(toolRef.current === 'add' ? '🟢 filling…' : '🔴 erasing…')
-      const t0 = performance.now()
-      const r = toolRef.current === 'add' ? await client.current!.addStroke(stroke) : await client.current!.eraseStroke(stroke)
-      setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
-      await acceptMask(r.mask)
-    } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
-    setBusy(false)
+    const t = toolRef.current
+    if (t === 'wand' || t === 'wand-erase') { await flow.actions.wandTap(stroke[stroke.length - 1], wandTolRef.current, t === 'wand-erase', brushRef.current); return }
+    if (t === 'draw' || t === 'draw-erase') { await flow.actions.paintStroke(stroke, t === 'draw-erase', brushRef.current); return }
+    await flow.actions.aiStroke(stroke, t === 'erase')
   }
 
-  // ── vector edit (item 8): entering nodes/frame bakes the resolved shape as the editable source ──
-  const isZero = (t: TraceOutlineSettings) => JSON.stringify(t) === JSON.stringify(ZERO_SETTINGS)
+  // ── vector edit (shell = selection/tool state; orchestration = flow) ──
   const exitEdit = () => { setSelNode(null); setTool('draw') }
   const enterEdit = (m: EditMode) => {
-    const img = imgCanvas.current, shape = shapeRef.current
-    if (!img || !shape) return
     if (tool === m) { exitEdit(); return } // active chip toggles OUT of edit mode
-    if (!drawnRef.current || drawnRef.current.shape !== shape) {
-      // EDIT-GRADE SKELETON (Dan 17:52: raw traces carry hundreds of nodes — uneditable on mobile).
-      // LAZY BAKE: the skeleton is shown for editing, but the vector recipe stays LIVE (knobs keep
-      // their true values) until a real edit commits — only then do adjustments fold into the base.
-      const editable = editableShape(shape)
-      shapeRef.current = editable
-      dRef.current = shapePathD(editable)
-    }
+    if (!flow.actions.enterEdit()) return
     setSelNode(null)
     setTool(m)
-    setShapeTick((t) => t + 1)
-    render()
   }
-  const onEditLive = (next: VShape) => {
-    if (drawnRef.current) drawnRef.current = { ...drawnRef.current, shape: next }
-    dRef.current = shapePathD(next)
-    shapeRef.current = next
-    setShapeTick((t) => t + 1) // the overlay's anchors must ride the line (Dan: 'glued to it always')
-    render()
-  }
-  const editPrepGen = useRef(0)
-  const onEditCommit = (next: VShape) => {
-    const img = imgCanvas.current!
-    const ring = shapeRing(next)
-    drawnRef.current = { shape: next, ring }
-    if (!isZero(settingsRef.current)) {
-      // first real edit folds the recipe into the edited base (rebase); knobs then read from zero
-      const zero = { ...ZERO_SETTINGS }
-      settingsRef.current = zero; setSettings(zero)
-    }
-    maskRef.current = maskFromShape(next, img.width, img.height)
-    // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
-    // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins on races.
-    if (urlRef.current) {
-      const gen = ++editPrepGen.current
-      prepareAI(urlRef.current, maskRef.current)
-        .then((p) => { if (gen === editPrepGen.current) { preparedRef.current = p; render() } })
-        .catch((e) => setStatus('⚠️ engine re-prepare failed on edit: ' + String((e as Error).message)))
-    }
-    applyFinish()
-    pushHistory()
-  }
+  const onEditLive = (next: VShape) => flow.actions.editLive(next)
+  const onEditCommit = (next: VShape) => flow.actions.editCommit(next)
   const selectNode = (sel: { pi: number; ai: number } | null) => {
     setSelNode(sel)
     nodeBaseRef.current = shapeRef.current
-    setNodeAdj(sel && shapeRef.current ? measureNode(shapeRef.current, sel.pi, sel.ai) : { radius: 0, curve: 0 })
+    setNodeAdj(sel && shapeRef.current ? flow.measureNode(shapeRef.current, sel.pi, sel.ai) : { radius: 0, curve: 0 })
   }
   const onNodesTap = (pt: { x: number; y: number }) => {
-    const shape = shapeRef.current
-    if (!shape) return
-    const r = insertNode(shape, pt.x, pt.y, nodeTapTol(imgCanvas.current!.width))
-    if (r) { onEditCommit(r.shape); selectNode({ pi: r.pi, ai: r.ai }) } else selectNode(null)
+    const ins = flow.actions.nodeInsert(pt)
+    if (ins) selectNode(ins); else selectNode(null)
   }
   const onNodeDelete = () => {
-    if (!selNode || !shapeRef.current) return
-    const next = deleteNode(shapeRef.current, selNode.pi, selNode.ai)
-    if (next) { selectNode(null); onEditCommit(next) }
+    if (!selNode) return
+    if (flow.actions.nodeDelete(selNode.pi, selNode.ai)) setSelNode(null)
   }
 
-  const redetect = async () => { if (!busy && lastFileRef.current) await onFile(lastFileRef.current) }
-
-  const save = async () => {
-    const img = imgCanvas.current
-    if (!img || !dRef.current || !boundsRef.current || !maskRef.current) return
-    if (!preparedRef.current) return
-    const baked = await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, imgCanvas.current!.width, imgCanvas.current!.height, blendRef.current)
-    baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
-  }
-
-  // refs update SYNCHRONOUSLY, then state, then recompute — React runs setState updaters
-  // DEFERRED, so a ref write inside the updater races the recompute (the stale-blend bug).
-  const setTune = (patch: Partial<TraceOutlineSettings>) => { const n = { ...settingsRef.current, ...patch }; settingsRef.current = n; setSettings(n); requestAnimationFrame(applyFinish) }
-  const setBlendTune = (patch: Partial<BlendSettings>) => { const n = { ...blendRef.current, ...patch }; blendRef.current = n; setBlend(n); recomposeLive() }
+  const { setTune, setBlendTune } = flow.actions
 
   // adaptive knob wiring (item 10): one knob, bound to the active tab's chip
   const knob = (() => {
@@ -541,8 +260,7 @@ export default function CutoutLab() {
         // ONE adjustment per mode: radius chip sends radius only, curve chip curve only — sending
         // both together makes the bend rebuild the handles and the corner fillet silently no-op.
         const delta = nodeChip === 'radius' ? { radius: adj.radius } : { curveKnob: adj.curve }
-        const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, delta)
-        onEditCommit(next)
+        flow.actions.nodeApply(nodeBaseRef.current!, selNode.pi, selNode.ai, delta)
       }
       const [rLo, rHi] = CHIP_RANGE.nodeRadius, [cLo, cHi] = CHIP_RANGE.nodeCurve
       if (nodeChip === 'radius') return { label: 'node radius', lo: rLo, hi: rHi, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
@@ -558,16 +276,17 @@ export default function CutoutLab() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
+      <PerfHUD />
       <h1 style={{ fontSize: 19, fontWeight: 700, textAlign: 'center' }} data-hist={histTick}>Cutout Lab</h1>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
-          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
-        <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
-        <button onClick={redetect} disabled={busy || !lastFileRef.current} style={btn}>↻ Re-detect</button>
-        <button onClick={undo} disabled={busy || !histRef.current.canUndo()} style={btn}>↩ Undo</button>
-        <button onClick={redo} disabled={busy || !histRef.current.canRedo()} style={btn}>↪ Redo</button>
-        <button onClick={clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && flow.actions.upload(e.target.files[0])} /></label>
+        <button onClick={flow.actions.save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
+        <button onClick={flow.actions.redetect} disabled={busy || !hasFile} style={btn}>↻ Re-detect</button>
+        <button onClick={flow.actions.undo} disabled={busy || !canUndo} style={btn}>↩ Undo</button>
+        <button onClick={flow.actions.redo} disabled={busy || !canRedo} style={btn}>↪ Redo</button>
+        <button onClick={flow.actions.clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
         <button onClick={() => { const v = !previewRef.current; previewRef.current = v; setPreview(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
         <button onClick={() => { const v = !overlayRef.current; overlayRef.current = v; setOverlayOn(v); requestAnimationFrame(render) }} disabled={!hasCut}
@@ -586,16 +305,7 @@ export default function CutoutLab() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
         {tab === 'ai' && (<>
-          <select value={engineSel} onChange={(e) => {
-            const v = e.target.value as 'edge' | 'u2net'
-            setEngineSel(v); engineSelRef.current = v
-            // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
-            // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
-            const u = new URL(location.href)
-            if (v === 'edge') u.searchParams.set('seg', 'edgesam'); else u.searchParams.delete('seg')
-            history.replaceState(null, '', u)
-            setStatus(v === 'edge' ? 'EdgeSAM engine (v5.3.1 roster)' : 'u2net engine (v5.3.1 default)')
-          }} style={{ ...btn, fontSize: 12 }}>
+          <select value={engineSel} onChange={(e) => flow.actions.setEngine(e.target.value as EngineSel)} style={{ ...btn, fontSize: 12 }}>
             <option value="edge">EdgeSAM · auto + brush</option>
             <option value="u2net">u2net · v5.3.1 (auto only)</option>
           </select>
@@ -642,7 +352,9 @@ export default function CutoutLab() {
           onChange={(e) => knob.set(Math.max(knob.lo, Math.min(knob.hi, Math.round(+e.target.value))))}
           style={{ width: 54, padding: '4px 6px', fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 4 }} />
         <input type="range" min={knob.lo} max={knob.hi} step={1} value={knob.value}
-          onChange={(e) => knob.set(+e.target.value)} style={{ flex: 1, maxWidth: 420 }} />
+          onChange={(e) => knob.set(+e.target.value)} style={{ flex: 1, maxWidth: 420 }}
+          onPointerDown={() => flow.actions.setDragging(true)} onPointerUp={() => flow.actions.setDragging(false)}
+          onPointerCancel={() => flow.actions.setDragging(false)} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -653,7 +365,7 @@ export default function CutoutLab() {
             <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, width: 'min(480px, 86vw)', height: 320, border: '1.5px dashed #cbd5e1', borderRadius: 12, cursor: 'pointer', color: '#64748b', background: 'transparent' }}>
               <span style={{ fontSize: 40, lineHeight: 1 }}>🖼️</span>
               <span style={{ fontSize: 14, fontWeight: 600 }}>Upload the image</span>
-              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && flow.actions.upload(e.target.files[0])} />
             </label>
           )}
           <div style={{ position: 'relative', width: disp.w, height: disp.h, margin: '0 auto', display: hasImage ? 'block' : 'none' }}>

@@ -80,7 +80,7 @@ export interface BlendSettings {
   panX: number             // artwork pan, % of width  (−50..50)
   panY: number             // artwork pan, % of height (−50..50)
 }
-export const BLEND_DEFAULTS: BlendSettings = { blend: 100, fill: 'mirror', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: default blend 100 (compositing ON by default); blend 0 remains the no-composite state — raw image under the vector mask
+export const BLEND_DEFAULTS: BlendSettings = { blend: 100, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: default blend 100 + fill CLAMP (v5.3.1's true default — its own mirror was broken); mirror stays the opt-in corrected mosaic. blend 0 remains the no-composite state — raw image under the vector mask
 
 
 
@@ -392,9 +392,18 @@ export function finishSpec(prepared: PreparedEffect, settings: TraceOutlineSetti
 /** Engine-native sticker bake: the engine's OWN matted subject + original (frontSrc, y-up) through
  *  the one 2D artwork op at the outline's bounds; mirror/scale/pan glue layers on top unchanged.
  *  d/bounds live in mask space (y-down) — mapped into the frontSrc tex space here. */
+/** Thrown when a bake is superseded — the flow's scheduler swallows it (Cadence Law). */
+export class BakeCancelled extends Error { constructor() { super('bake superseded') } }
+
 export async function bakeStickerEngine(
   prepared: PreparedEffect, d: string, bounds: OutlineBounds, maskW: number, maskH: number, b: BlendSettings,
+  cancelled?: () => boolean,
 ): Promise<{ canvas: HTMLCanvasElement }> {
+  // COOPERATIVE CANCELLATION (contract Cadence Law): the token is checked between pipeline stages
+  // (transform → mosaic → compose → flip → clip → crop); stages after a positive check are skipped
+  // and canvas references drop with this frame, so the memory frees. True mid-draw abort does not
+  // exist in the platform.
+  const bail = () => { if (cancelled?.()) throw new BakeCancelled() }
   const { origCanvas, subjCanvas } = prepared.frontSrc
   const k = origCanvas.width / maskW
   // DEFAULT = NO COMPOSITING (Dan 2026-08-06): at blend 0 with no other effect, the artwork IS the
@@ -434,11 +443,13 @@ export async function bakeStickerEngine(
   // y-up tex-space bounds
   const texH = origCanvas.height
   const bUp: OutlineBounds = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }
+  bail() // → transform
   const art = transformArtwork(origCanvas, { ...b, panY: -b.panY }) // y-up: pan direction flips
   const subj = transformArtwork(subjCanvas, { ...b, panY: -b.panY })
   const mirror = b.fill === 'mirror'
   const sx = mirror ? origCanvas.width : 0, sy = mirror ? texH : 0
   let original = art, subject = subj
+  bail() // → mosaic
   if (mirror) {
     original = mirrorMosaic(art)
     const big = document.createElement('canvas'); big.width = original.width; big.height = original.height
@@ -451,6 +462,7 @@ export async function bakeStickerEngine(
   // falloff lands in discarded margin, then crop back to the true frame.
   const blendEff = mirror ? b.blend / 3 : b.blend // mosaic is 3x wide — keep the blur physically equal
   const pad = Math.ceil(3 * blendPercentToPixels(blendEff, original.width)) + 2
+  bail() // → compose
   const { canvas, frame } = await composeEffectArtwork({
     originalCanvas: original,
     subjectCanvas: subject,
@@ -461,6 +473,7 @@ export async function bakeStickerEngine(
     vignette: b.vignette / 100,
     tint: b.tint,
   })
+  bail() // → flip
   // flip the composed (padded) frame to y-down and clip with the outline (scaled into tex space)
   const fw = frame.width, fh = frame.height
   const ox = frame.originX - sx, oy = frame.originY - sy // y-up tex-space origin
@@ -469,6 +482,7 @@ export async function bakeStickerEngine(
   fctx.translate(0, fh); fctx.scale(1, -1)
   fctx.drawImage(canvas, 0, 0)
   const oyDown = texH - (oy + fh) // y-down origin of the padded frame in tex space
+  bail() // → clip
   const clipped = document.createElement('canvas'); clipped.width = fw; clipped.height = fh
   const cctx = clipped.getContext('2d')!
   const path = new Path2D()
@@ -476,6 +490,7 @@ export async function bakeStickerEngine(
   cctx.translate(-ox, -oyDown)
   cctx.clip(path)
   cctx.drawImage(flipped, ox, oyDown)
+  bail() // → crop
   // crop the pad away — the returned canvas must match the outline bounds the caller draws with
   const x0 = Math.floor(bUp.minX + sx), y0u = Math.floor(bUp.minY + sy)
   const w0 = Math.max(1, Math.ceil(bUp.maxX + sx) - x0), h0 = Math.max(1, Math.ceil(bUp.maxY + sy) - y0u)
