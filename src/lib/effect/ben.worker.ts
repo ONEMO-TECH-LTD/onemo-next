@@ -21,7 +21,7 @@
 
 // KAI-9087: the rembg cut-out CHAIN composition + matte feasibility live in ./ben-chain — a PURE,
 // unit-tested module (a direct worker import would crash a test on onmessage/self/postMessage).
-import { resolveChain, isDegenerateMatte, isSamSpec, samAreaEligible, SAM_CENTRAL_PROMPT, type RembgSpec, type SamSpec, type ChainSpec } from './ben-chain'
+import { resolveChain, isDegenerateMatte, isSamSpec, samAreaEligible, samSoftProb, SAM_CENTRAL_PROMPT, type RembgSpec, type SamSpec, type ChainSpec } from './ben-chain'
 
 // MODEL COMPARISON HARNESS — every candidate runs through the IDENTICAL pipeline method as BEN2
 // (webgpu → wasm fallback, fp16). The page chooses the model via the `?seg=` URL param (read in
@@ -259,27 +259,11 @@ async function runSam(imageUrl: string, spec: SamSpec, onProgress: (s: string) =
   const map = masks.data.subarray(best * mh * mw2, (best + 1) * mh * mw2)
   // LOGITS → PROBABILITY before the shared tail (Dan's two-ghost-images catch, 2026-08-06): SAM
   // emits signed logits — a linear min-max (the u2net tail's math, correct for non-negative
-  // saliency) leaves the BACKGROUND at ~30-40% alpha, making the subject layer a ghost of the whole
-  // image. Sigmoid is SAM's own probability map: background → ~0, subject → ~1 — the same
-  // saliency-like field u2net hands the tail. Model-output conversion belongs to the model slot.
-  // Clamped linear ramp centred on the zero-crossing (adaptive width hi/4): background → exactly 0
-  // (no ghost layer), subject interior → exactly 1 (SOLID for print), boundary at the model's true
-  // zero-crossing, and a CONTINUOUS gradient so the upscale traces sub-pixel (a raw sigmoid at 256²
-  // is near-binary → the jittery outline + semi-transparent interior Dan caught, 15:32).
-  let hiL = 0
-  for (let i = 0; i < mh * mw2; i++) if (map[i] > hiL) hiL = map[i]
-  const Tramp = Math.max(1e-6, hiL / 4)
-  const prob = new Float32Array(mh * mw2)
-  for (let i = 0; i < prob.length; i++) prob[i] = Math.min(1, Math.max(0, 0.5 + map[i] / (2 * Tramp)))
-  // SPATIAL parity with u2net: SAM's logits flip within ~1 map px while u2net's saliency ramps over
-  // 2–3 px — the residual staircase Dan compared (15:32). Two separable [1,2,1] passes widen the
-  // boundary to the same ~2-3 px signal class; interior/背景 plateaus are invariant (stay 1/0 solid).
-  for (let pass = 0; pass < 2; pass++) {
-    const tmp = new Float32Array(prob)
-    for (let y = 0; y < mh; y++) for (let x = 1; x < mw2 - 1; x++) { const i = y * mw2 + x; prob[i] = (tmp[i - 1] + 2 * tmp[i] + tmp[i + 1]) / 4 }
-    tmp.set(prob)
-    for (let y = 1; y < mh - 1; y++) for (let x = 0; x < mw2; x++) { const i = y * mw2 + x; prob[i] = (tmp[i - mw2] + 2 * tmp[i] + tmp[i + mw2]) / 4 }
-  }
+  // saliency) leaves the BACKGROUND at ~30-40% alpha (ghost layer). samSoftProb is THE one shared
+  // conversion (ben-chain): zero-crossing ramp (solid interior, zero background, continuous
+  // gradient) + [1,2,1]² spatial widening for u2net edge parity — the brush add-on imports the
+  // same function, so the two bundles cannot drift.
+  const prob = samSoftProb(map, mh, mw2)
   // SAM's map covers the zero-padded square — only the nw×nh fraction is the image (the padded-square
   // misalignment fix). Plug into the ONE shared tail.
   return finishMatte(prob, mw2, mh, Math.round(mw2 * (nw / T)), Math.round(mh * (nh / T)), bmp, ow, oh)

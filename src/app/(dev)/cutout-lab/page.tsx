@@ -1,7 +1,7 @@
 'use client'
 
 // cutout-lab — calibration bench (s62). STATE + RENDER ONLY: AI subs in the cutout-ai worker,
-// hand tool in lib/freeshape, finishing/blend/expansion in v5.3.1 via finish.ts glue, vector
+// paint hand tool via engine mask booleans in finish.ts glue, finishing/blend/expansion in v5.3.1, vector
 // editing gestures in EditorOverlay. Controls are TABS with ONE adaptive knob (Dan item 10).
 // Engine select: EdgeSAM (auto+brush) vs u2net (auto only) for on-device comparison (item 7).
 
@@ -345,7 +345,7 @@ export default function CutoutLab() {
     if (maskRef.current) await c.setBase(maskRef.current)
   }, [])
 
-  // ── pointer strokes (add/erase = AI · draw = freeshape · nodes/frame = overlay's job) ──
+  // ── pointer strokes (add/erase = AI · draw = paint · nodes/frame = overlay's job) ──
   const nrm = (e: React.PointerEvent): Point & { t: number } => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const vb = viewBoxRef.current, img = imgCanvas.current

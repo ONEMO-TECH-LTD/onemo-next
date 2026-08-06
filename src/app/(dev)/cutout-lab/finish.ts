@@ -41,8 +41,6 @@ export const AUTO_SETTINGS: TraceOutlineSettings = {
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
 
-export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
-
 /** Green-kept / red-removed overlay pixels for the mask. */
 export function maskOverlay(mask: Mask): ImageData {
   const { data, w, h } = mask
@@ -86,10 +84,10 @@ export const BLEND_DEFAULTS: BlendSettings = { blend: 100, fill: 'mirror', prese
 
 
 
-// ── drawn shapes (freeshape / Sculpt) — same finishing, same knobs, no AI ──
+// ── drawn shapes (paint hand tool) — same finishing, same knobs, no AI ──
 
 /** A drawn (already-vector) shape through the SAME v5.3.1 resolver the AI trace uses — the drawn
- *  shape is a first-class OutlineSource (freeshape contract law 3): every knob + reversibility
+ *  shape is a first-class OutlineSource: every knob + reversibility
  *  apply identically. `ring` = the raw resampled stroke (provenance → detail/offset re-derive). */
 export function finishDrawn(
   shape: import('@/lib/vector-core').VShape, ring: { x: number; y: number }[], w: number, h: number,
@@ -340,7 +338,6 @@ export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   mctx.globalCompositeOperation = 'destination-in'
   mctx.drawImage(a, 0, 0, ow, oh)
   mctx.globalCompositeOperation = 'source-over'
-  const { EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
   // ONE LAW for every source (Dan 2026-08-06 final): brushes define the OUTLINE only — the subject
   // is ALWAYS the outline's own matte, and the blend band is the OFFSET ring. No tool ever defines
   // a blend area; blur never depends on which tool drew the shape.

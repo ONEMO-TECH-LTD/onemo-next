@@ -7,7 +7,7 @@ export interface TensorData {
 }
 
 // SAM preprocess constants come from THE engine roster spec (ben-chain SAM.edgesam) — one source.
-import { SAM } from '@/lib/effect/ben-chain'
+import { SAM, samSoftProb } from '@/lib/effect/ben-chain'
 const SAM_MEAN = SAM.edgesam.mean
 const SAM_STD = SAM.edgesam.std
 const SAM_SIZE = SAM.edgesam.size
@@ -31,13 +31,6 @@ export function samCHW(rgba: Uint8ClampedArray, w: number, h: number): TensorDat
   return { data, dims: [1, 3, T, T], scale }
 }
 
-/** SAM HWC raw input [h,w,3] float 0-255 (MobileSAM — preprocessing baked into the encoder). */
-export function samHWC(rgba: Uint8ClampedArray, w: number, h: number): TensorData {
-  const data = new Float32Array(w * h * 3)
-  for (let i = 0; i < w * h; i++) { const j = i * 4; data[i * 3] = rgba[j]; data[i * 3 + 1] = rgba[j + 1]; data[i * 3 + 2] = rgba[j + 2] }
-  return { data, dims: [h, w, 3] }
-}
-
 /**
  * Threshold a logit map (mh×mw) to a binary mask at (w×h), nearest-neighbour upscaled.
  * `fx`/`fy` (0..1] = the VALID fraction of the map when it covers a zero-PADDED square (EdgeSAM:
@@ -51,25 +44,9 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
   // upscaling bakes the low-res staircase into the edge (the "choppy outline"); interpolating the
   // logits first puts the 0-crossing at sub-pixel positions, so the edge comes out smooth.
   //
-  // SOFT ALPHA = clamped linear ramp centred on the zero-crossing (width = hiLogit/4): background
-  // exactly 0 (no ghost), interior exactly 255 (solid print), boundary at the true zero-crossing,
-  // continuous gradient (raw sigmoid at map res is near-binary → jitter + translucent interior).
-  let hiL = 0
-  if (softOut) for (let i = 0, n = mh * mw; i < n; i++) { const v = map[i] as number; if (v > hiL) hiL = v }
-  const Tramp = Math.max(1e-6, hiL / 4)
-  // spatial parity with the roster slot: two separable [1,2,1] passes at MAP res widen the boundary
-  // to the same signal class before interpolation (plateaus invariant).
-  let src: ArrayLike<number> = map
-  if (softOut) {
-    const sm = Float32Array.from({ length: mh * mw }, (_, i) => map[i] as number)
-    for (let pass = 0; pass < 2; pass++) {
-      const tmp = new Float32Array(sm)
-      for (let y = 0; y < mh; y++) for (let x = 1; x < mw - 1; x++) { const i = y * mw + x; sm[i] = (tmp[i - 1] + 2 * tmp[i] + tmp[i + 1]) / 4 }
-      tmp.set(sm)
-      for (let y = 1; y < mh - 1; y++) for (let x = 0; x < mw; x++) { const i = y * mw + x; sm[i] = (tmp[i - mw] + 2 * tmp[i] + tmp[i + mw]) / 4 }
-    }
-    src = sm
-  }
+  // SOFT ALPHA: samSoftProb — THE one shared logits→probability conversion (engine ben-chain):
+  // zero-crossing ramp + [1,2,1]² widening. Plugged-into, not cloned (QA #209 finding 4).
+  const src: ArrayLike<number> = softOut ? samSoftProb(map, mh, mw) : map
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
     const gy = Math.min(mh - 1.001, Math.max(0, (y + 0.5) * fy * mh / h - 0.5))
@@ -80,8 +57,8 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
       const i = y0 * mw + x0
       const v = (src[i] as number) * (1 - tx) * (1 - ty) + (src[i + 1] as number) * tx * (1 - ty)
         + (src[i + mw] as number) * (1 - tx) * ty + (src[i + mw + 1] as number) * tx * ty
-      if (v > 0) out[y * w + x] = 1
-      if (softOut) softOut[y * w + x] = Math.round(255 * Math.min(1, Math.max(0, 0.5 + v / (2 * Tramp))))
+      if (softOut ? v > 0.5 : v > 0) out[y * w + x] = 1
+      if (softOut) softOut[y * w + x] = Math.round(255 * Math.min(1, Math.max(0, v)))
     }
   }
   return out

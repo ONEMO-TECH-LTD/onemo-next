@@ -24,9 +24,12 @@ to the clean engine repo as one unit.
    unioned in. Erase = subtract. Full re-detect is a separate explicit action. `setBase` seeds
    the base from any externally produced mask.
 7. **Soft matte parity.** Model logits are upsampled BILINEARLY; the binary mask thresholds after
-   interpolation and the `soft` channel uses the u2net slot's own LINEAR min-max normalization —
-   NEVER a sigmoid (sigmoid re-sharpens the ramp to near-binary; the dirty edge Dan caught
-   2026-08-06). The engine's compositing expects a continuous matte, never a hard binary cut.
+   interpolation and the `soft` channel uses **`samSoftProb` — the ONE shared logits→probability
+   conversion exported by the engine's `ben-chain`** (clamped zero-crossing ramp, adaptive width
+   hi/4, + two [1,2,1] spatial passes for u2net edge-signal parity): background exactly 0, interior
+   exactly solid, continuous gradient. NEVER a raw sigmoid (near-binary at map res — the dirty
+   edge Dan caught 2026-08-06) and NEVER a local clone of the formula (QA #209 finding 4) — both
+   worker bundles import the same function. The engine's compositing expects a continuous matte.
    The engine-roster auto-cut path doesn't touch this folder at all: EdgeSAM's raw output plugs
    into the engine's own `finishMatte` tail via `?seg=edgesam` — this folder serves the BRUSH only.
 8. **One AI runtime resident per page** (iPhone OOM law, s62 device evidence). The shell enforces

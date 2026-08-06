@@ -67,3 +67,23 @@ export function resolveChain(seg?: string): ChainSpec[] | null {
 // Matte feasibility: an empty (subject-not-found) or full-frame matte is not a usable cut — the chain
 // treats it as a failure so it falls back to the next model (u2netp → silueta → flood-fill).
 export const isDegenerateMatte = (subjFrac: number) => subjFrac < 0.005 || subjFrac > 0.995
+
+/** SAM logits → SOFT PROBABILITY field — THE one conversion, shared by the worker roster slot and
+ *  the brush add-on (plugged-into, never cloned — Dan's law). Clamped linear ramp centred on the
+ *  zero-crossing (adaptive width hi/4): background exactly 0, interior exactly 1, boundary at the
+ *  model's true zero-crossing, continuous gradient — then two separable [1,2,1] passes at map res
+ *  for u2net edge-signal parity (plateaus invariant). */
+export function samSoftProb(map: ArrayLike<number>, mh: number, mw: number): Float32Array {
+  let hiL = 0
+  for (let i = 0, n = mh * mw; i < n; i++) { const v = map[i] as number; if (v > hiL) hiL = v }
+  const Tramp = Math.max(1e-6, hiL / 4)
+  const prob = new Float32Array(mh * mw)
+  for (let i = 0; i < prob.length; i++) prob[i] = Math.min(1, Math.max(0, 0.5 + (map[i] as number) / (2 * Tramp)))
+  for (let pass = 0; pass < 2; pass++) {
+    const tmp = new Float32Array(prob)
+    for (let y = 0; y < mh; y++) for (let x = 1; x < mw - 1; x++) { const i = y * mw + x; prob[i] = (tmp[i - 1] + 2 * tmp[i] + tmp[i + 1]) / 4 }
+    tmp.set(prob)
+    for (let y = 1; y < mh - 1; y++) for (let x = 0; x < mw; x++) { const i = y * mw + x; prob[i] = (tmp[i - mw] + 2 * tmp[i] + tmp[i + mw]) / 4 }
+  }
+  return prob
+}

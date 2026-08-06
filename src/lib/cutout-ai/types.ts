@@ -32,9 +32,7 @@ export interface SegModelConfig {
   label: string
   /** which sub implements it (models/<sub>.ts) */
   sub: 'edgesam'
-  /** transformers.js hub id (slimsam / sam2) */
-  id?: string
-  /** raw-ORT asset urls (mobilesam / edgesam) */
+  /** raw-ORT asset urls */
   enc?: string
   dec?: string
 }

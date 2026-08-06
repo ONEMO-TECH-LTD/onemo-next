@@ -11,8 +11,7 @@ export const MODELS: Record<string, SegModelConfig> = {
 
 export const DEFAULT_MODEL = 'edgesam'
 
-/** Central auto-prompt when no user hint exists (recognise the main object). */
-export const CENTRAL_PROMPT: Point[] = [
-  { x: 0.5, y: 0.5, label: 1 }, { x: 0.4, y: 0.4, label: 1 }, { x: 0.6, y: 0.4, label: 1 },
-  { x: 0.4, y: 0.6, label: 1 }, { x: 0.6, y: 0.6, label: 1 }, { x: 0.5, y: 0.3, label: 1 }, { x: 0.5, y: 0.7, label: 1 },
-]
+/** Central auto-prompt when no user hint exists — THE engine's own prompt (ben-chain), mapped to
+ *  the brush point format. One prompt, one source. */
+import { SAM_CENTRAL_PROMPT } from '@/lib/effect/ben-chain'
+export const CENTRAL_PROMPT: Point[] = SAM_CENTRAL_PROMPT.map(([x, y]) => ({ x, y, label: 1 }))

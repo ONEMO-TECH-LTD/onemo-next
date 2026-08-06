@@ -15,9 +15,9 @@ page.on('pageerror', (e) => console.log('[pageerror]', e.message))
 await page.goto(URL, { waitUntil: 'domcontentloaded' })
 log('page open')
 
-// 1 — model loads (slim77 default, webgpu on this Mac)
+// 1 — page + status line up (current UI: plain status text, no glyph)
 await page.waitForFunction(() => document.body.innerText.includes('ready — upload an image') || document.body.innerText.includes('done'), null, { timeout: 120000 })
-log('model loaded:', (await page.locator('text=●').first().textContent()).trim())
+log('page ready:', (await page.locator('text=Status:').first().textContent()).trim())
 
 // synthetic test image: dark head-like disc + a SEPARATE small "ear tip" blob (the gap), light bg
 const fileBuf = await page.evaluate(async () => {
@@ -34,22 +34,30 @@ const fileBuf = await page.evaluate(async () => {
 await page.setInputFiles('input[type=file]', { name: 'test.png', mimeType: 'image/png', buffer: Buffer.from(fileBuf) })
 log('uploaded — waiting for auto-detect + finishing')
 await page.waitForFunction(() => document.body.innerText.includes('✨ done'), null, { timeout: 120000 })
+log('cut:', await page.evaluate(() => document.body.innerText.match(/done \(cut: [a-z0-9]+\)/)?.[0]))
 
-const count = async () => await page.evaluate(() => {
-  // count green (kept) pixels on the selection canvas
-  const cv = document.querySelectorAll('canvas')[0]
-  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data
-  let g = 0
-  // green overlay composited over ANY base pixel: G clearly dominates R and B (relative, no abs threshold)
-  for (let i = 0; i < d.length; i += 4) if (d[i + 1] > d[i] + 20 && d[i + 1] > d[i + 2] + 15) g++
-  return { g, total: d.length / 4 }
-})
+// KEPT-AREA metric on the current UI: Preview renders the PURE cutout on transparency —
+// alpha>0 pixels = the kept region. Toggle in, count, toggle out.
+const count = async () => {
+  await page.locator('button', { hasText: 'Preview' }).or(page.locator('button', { hasText: 'Editing view' })).first().click()
+  await page.waitForTimeout(600)
+  const r = await page.evaluate(() => {
+    const cv = document.querySelector('canvas')
+    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data
+    let g = 0
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) g++
+    return { g, total: d.length / 4 }
+  })
+  await page.locator('button', { hasText: 'Editing view' }).first().click()
+  await page.waitForTimeout(400)
+  return r
+}
 const before = await count()
 log('auto-detect kept px:', before.g, '/', before.total, `(${(100 * before.g / before.total).toFixed(1)}%)`)
 if (before.g < before.total * 0.02) { console.log('FAIL: auto-detect produced (near) empty selection'); await browser.close(); process.exit(1) }
 
-const stats = await page.evaluate(() => document.body.innerText.match(/model load\n([\dms—]+).*?encode \/ image\n([\dms—]+).*?recognize\n([\dms—]+)/is)?.slice(1))
-log('timings load/encode/recognize:', stats)
+const stats = await page.evaluate(() => document.body.innerText.match(/MAGIC CUT\s*([\dms—.]+)/i)?.[1])
+log('magic-cut timing:', stats)
 
 // 3 — EAR-GAP union test: Add-stroke over the top-right ear area (likely outside/edge of selection)
 const box = await page.locator('canvas').first().boundingBox()

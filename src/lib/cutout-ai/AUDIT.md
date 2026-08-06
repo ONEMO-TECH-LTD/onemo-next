@@ -43,8 +43,10 @@ Contracts under enforcement: `src/lib/cutout-ai/ARCHITECTURE.md` · `src/lib/fre
       untouched. Any lab-side config override or matte mutation in between = FAIL.
 - [ ] 2.5 Exactly ONE of each: compositing path (`prepareShaped`/`composeEffectArtwork`),
       matte-construction tail, model registry. Grep for a second implementation of any = FAIL.
-- [ ] 2.6 No sigmoid anywhere in matte math (the ruled-out re-sharpening); soft alpha = linear
-      min-max normalize, threshold AFTER bilinear interpolation.
+- [ ] 2.6 No raw sigmoid anywhere in matte math (the ruled-out re-sharpening); soft alpha =
+      `samSoftProb` (engine ben-chain: zero-crossing ramp + [1,2,1]² widening), imported by BOTH
+      worker bundles — a local re-implementation of the formula = FAIL; threshold AFTER bilinear
+      interpolation.
 
 ## 3 — No UI-carried logic
 
