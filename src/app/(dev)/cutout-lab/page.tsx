@@ -130,14 +130,13 @@ export default function CutoutLab() {
     if (!view || !img) return
     const ctx0 = view.getContext('2d')!
     if (previewRef.current && dRef.current) {
-      // PREVIEW = the SAME bake the editor shows, only cut out (checkerboard instead of the photo).
-      // One compositor, one cache — edit/preview divergence is impossible by construction.
+      // PREVIEW = the SAME bake the editor shows, only cut out — PURE cutout on transparency, no
+      // background (Dan 2026-08-06). One compositor, one cache — divergence impossible by construction.
       const live = liveBakeRef.current
       if (live) {
         const w = live.canvas.width, h = live.canvas.height
         view.width = w; view.height = h
-        const t = 16
-        for (let y = 0; y < h; y += t) for (let x = 0; x < w; x += t) { ctx0.fillStyle = ((x / t + y / t) & 1) ? '#e5e7eb' : '#f8fafc'; ctx0.fillRect(x, y, t, t) }
+        ctx0.clearRect(0, 0, w, h)
         ctx0.drawImage(live.canvas, 0, 0)
       } else {
         drawCutout(view, img, dRef.current)
