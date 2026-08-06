@@ -260,7 +260,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // WARM-UP (Dan's device round): the ENGINE's own download-only preload — weights land in the
     // browser cache at page open, so the first cut skips the download. Conscious, not silent.
     preloadBen()
-    setStatus('ready — upload an image · ⬇ warming the AI model in the background')
+    // BRUSH warm-up too (Dan r3: 'load lazily on page load so it is ready to detect') — the brush
+    // model loads in the background NOW; the first stroke pays inference only. Failure is silent
+    // here (the stroke path re-tries with its own loud fault).
+    if (engineSelRef.current === 'edge') {
+      withTimeout(c.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush warm-up')
+        .then(() => { brushLoadedRef.current = true })
+        .catch(() => { /* first stroke re-attempts loudly */ })
+    }
+    setStatus('ready — upload an image · ⬇ warming the AI models in the background')
     return () => c.dispose()
   }, [])
 
@@ -313,6 +321,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
+      // PRE-ENCODE (Dan r3): the brush's image embedding computes NOW in its worker, in the
+      // background — a first stroke later finds everything ready and pays inference only.
+      if (engineSelRef.current === 'edge' && brushLoadedRef.current && !edgeEncodedRef.current) {
+        const img2 = imgCanvas.current!
+        const px2 = img2.getContext('2d')!.getImageData(0, 0, img2.width, img2.height)
+        withTimeout(client.current!.encode(px2.data, img2.width, img2.height), T_COMPUTE_MS, 'AI pre-encode')
+          .then(() => { edgeEncodedRef.current = true })
+          .catch(() => { /* first stroke re-attempts loudly */ })
+      }
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
   }, [acceptMask, requestRender])
@@ -351,8 +368,26 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const tp0 = performance.now()
     const combined = polishMask(erase ? subtractMasks(maskRef.current, region) : unionMasks(maskRef.current, region), brushPx)
     perfGesture('wand-polish', performance.now() - tp0)
+    // ONE-SOLID-SHAPE rule surfaced LOUDLY (Dan device r3: a disconnected wand fill silently
+    // vanished at trace — 'operating in weird way'): if the tapped region doesn't touch the
+    // existing shape, the engine's keep-largest rule will drop it — say so instead of swallowing.
+    let disconnected = false
+    if (!erase) {
+      const base = maskRef.current, w = base.w
+      disconnected = true
+      outer: for (let i = 0; i < region.data.length; i++) {
+        if (!region.data[i]) continue
+        const x = i % w, y = (i / w) | 0
+        for (let dy = -2; dy <= 2 && disconnected; dy++) for (let dx = -2; dx <= 2; dx++) {
+          const j = (y + dy) * w + (x + dx)
+          if (j >= 0 && j < base.data.length && base.data[j]) { disconnected = false; break outer }
+        }
+      }
+    }
     setBusy(true); await acceptMask(combined); setBusy(false)
-    setStatus(erase ? '🪄 region erased' : '🪄 region filled')
+    setStatus(erase ? '🪄 region erased'
+      : disconnected ? '🪄 filled a SEPARATE region — the one-shape rule drops it unless you bridge it to the main shape (paint a connector)'
+      : '🪄 region filled')
   }, [acceptMask, requestRender])
 
   const paintStroke = useCallback(async (stroke: Point[], erase: boolean, brushR: number) => {

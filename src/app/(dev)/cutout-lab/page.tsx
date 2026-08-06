@@ -174,7 +174,7 @@ export default function CutoutLab() {
       }
     }
     const cur = cursorRef.current
-    if (cur && (hasCutRef.current || toolRef.current === 'draw' || toolRef.current === 'draw-erase')) {
+    if (cur && imgCanvas.current) { // ring for EVERY brush tool once an image exists (post-Clear too)
       const t = toolRef.current
       if (t !== 'nodes' && t !== 'frame') {
         ctx.beginPath()
