@@ -443,23 +443,24 @@ export default function CutoutLab() {
   }
 
   // ── vector edit (item 8): entering nodes/frame bakes the resolved shape as the editable source ──
+  const isZero = (t: TraceOutlineSettings) => JSON.stringify(t) === JSON.stringify(ZERO_SETTINGS)
+  const exitEdit = () => { setSelNode(null); setTool('draw') }
   const enterEdit = (m: EditMode) => {
     const img = imgCanvas.current, shape = shapeRef.current
     if (!img || !shape) return
+    if (tool === m) { exitEdit(); return } // active chip toggles OUT of edit mode
     if (!drawnRef.current || drawnRef.current.shape !== shape) {
       // EDIT-GRADE SKELETON (Dan 17:52: raw traces carry hundreds of nodes — uneditable on mobile).
-      // Entering edit re-derives the shape through the engine's fitter into SPARSE anchors with
-      // curve handles; visually identical, node count Figma-class.
+      // LAZY BAKE: the skeleton is shown for editing, but the vector recipe stays LIVE (knobs keep
+      // their true values) until a real edit commits — only then do adjustments fold into the base.
       const editable = editableShape(shape)
-      const ring = shapeRing(editable)
-      drawnRef.current = { shape: editable, ring }
       shapeRef.current = editable
-      const zero = { ...ZERO_SETTINGS }
-      settingsRef.current = zero; setSettings(zero) // adjustments fold into the baked source — TRUE zero, not the default recipe
+      dRef.current = shapePathD(editable)
     }
     setSelNode(null)
     setTool(m)
-    applyFinish()
+    setShapeTick((t) => t + 1)
+    render()
   }
   const onEditLive = (next: VShape) => {
     if (drawnRef.current) drawnRef.current = { ...drawnRef.current, shape: next }
@@ -473,6 +474,11 @@ export default function CutoutLab() {
     const img = imgCanvas.current!
     const ring = shapeRing(next)
     drawnRef.current = { shape: next, ring }
+    if (!isZero(settingsRef.current)) {
+      // first real edit folds the recipe into the edited base (rebase); knobs then read from zero
+      const zero = { ...ZERO_SETTINGS }
+      settingsRef.current = zero; setSettings(zero)
+    }
     maskRef.current = maskFromShape(next, img.width, img.height)
     // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
     // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins on races.
@@ -533,7 +539,10 @@ export default function CutoutLab() {
     if (tool === 'nodes' && selNode && nodeBaseRef.current) {
       const apply = (adj: { radius: number; curve: number }) => {
         setNodeAdj(adj)
-        const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, { radius: adj.radius, curve: adj.curve / 100 })
+        // ONE adjustment per mode: radius chip sends radius only, curve chip curve only — sending
+        // both together makes the bend rebuild the handles and the corner fillet silently no-op.
+        const delta = nodeChip === 'radius' ? { radius: adj.radius } : { curve: adj.curve / 100 }
+        const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, delta)
         onEditCommit(next)
       }
       if (nodeChip === 'radius') return { label: 'node radius', lo: 0, hi: 200, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
