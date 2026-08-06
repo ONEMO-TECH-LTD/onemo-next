@@ -69,7 +69,7 @@ export interface BlendSettings {
   panX: number             // artwork pan, % of width  (−50..50)
   panY: number             // artwork pan, % of height (−50..50)
 }
-export const BLEND_DEFAULTS: BlendSettings = { blend: 50, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // blend 50 ≈ v5.3.1's default magic-blend blur (max(6, w/50)px) — rule #3: the blend is the product look, always on
+export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'clamp', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: DEFAULT = NO COMPOSITING — the original image under the vector mask; the compositor engages only when blend (or another effect) is switched on
 export { PRESET_LABELS }
 export type { PresetKey }
 
@@ -239,15 +239,15 @@ export async function bakeStickerEngine(
 ): Promise<{ canvas: HTMLCanvasElement }> {
   const { origCanvas, subjCanvas } = prepared.frontSrc
   const k = origCanvas.width / maskW
-  // DEFAULT SETTINGS → the ENGINE'S OWN finished composite (prepared.composite), VERBATIM — the
-  // exact canvas v5.3.1 displays. No re-compose, no lab logic: flip to y-down + crop to the outline
-  // frame + clip. The re-bake below runs ONLY when an add-on control diverges (fill/scale/pan/
-  // preset/vignette/tint or a non-default blend) — Dan 2026-08-06: compositing happens inside;
-  // the API calls just get results.
-  const plain = b.fill === 'clamp' && b.scale === 100 && !b.panX && !b.panY && b.preset === 'none'
-    && !b.vignette && !b.tint && Math.abs(b.blend - prepared.frontSrc.defaultBlendPercent) < 0.5
-  if (plain) {
-    const src = prepared.composite
+  // DEFAULT = NO COMPOSITING (Dan 2026-08-06): at blend 0 with no other effect, the artwork IS the
+  // ORIGINAL image under the vector mask — no subject re-lay, no blur, no compositor call at all,
+  // so no matte artifact can exist by construction. The engine op below engages ONLY when blend or
+  // another blend-tab effect is switched on (the opt-in edge-case layer: decouple the object,
+  // normalise/expand the background).
+  const off = b.blend === 0 && b.fill === 'clamp' && b.scale === 100 && !b.panX && !b.panY
+    && b.preset === 'none' && !b.vignette && !b.tint
+  if (off) {
+    const src = origCanvas // the untouched original (y-up, engine convention)
     const fw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * k))
     const fh = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * k))
     const out = document.createElement('canvas'); out.width = fw; out.height = fh
@@ -255,7 +255,7 @@ export async function bakeStickerEngine(
     ctx.translate(-bounds.minX * k, -bounds.minY * k)
     const path = new Path2D(); path.addPath(new Path2D(d), new DOMMatrix().scale(k))
     ctx.clip(path)
-    ctx.translate(0, src.height); ctx.scale(1, -1) // composite is y-up (engine convention)
+    ctx.translate(0, src.height); ctx.scale(1, -1)
     ctx.drawImage(src, 0, 0)
     return { canvas: out }
   }
