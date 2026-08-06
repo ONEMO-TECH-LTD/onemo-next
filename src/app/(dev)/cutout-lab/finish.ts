@@ -79,7 +79,7 @@ export interface BlendSettings {
   panX: number             // artwork pan, % of width  (−50..50)
   panY: number             // artwork pan, % of height (−50..50)
 }
-export const BLEND_DEFAULTS: BlendSettings = { blend: 0, fill: 'mirror', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: DEFAULT = NO COMPOSITING — the original image under the vector mask; the compositor engages only when blend (or another effect) is switched on
+export const BLEND_DEFAULTS: BlendSettings = { blend: 100, fill: 'mirror', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: DEFAULT = NO COMPOSITING — the original image under the vector mask; the compositor engages only when blend (or another effect) is switched on
 export { PRESET_LABELS }
 export type { PresetKey }
 
