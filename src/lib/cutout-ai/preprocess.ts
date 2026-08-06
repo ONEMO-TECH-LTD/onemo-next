@@ -51,16 +51,11 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
   // upscaling bakes the low-res staircase into the edge (the "choppy outline"); interpolating the
   // logits first puts the 0-crossing at sub-pixel positions, so the edge comes out smooth.
   //
-  // SOFT ALPHA = the u2net SLOT'S OWN post-generation math, cloned (ben.worker: min-max normalize
-  // the model map linearly, then upscale — `(v - lo) / rng * 255`). Linear normalization is affine,
-  // so normalizing after bilinear upsample is IDENTICAL to the worker's normalize-at-model-res-then-
-  // upscale order. NOT a sigmoid: sigmoid(logit) re-sharpens the interpolated ramp to near-binary —
-  // the steep dirty edge Dan caught on EdgeSAM (2026-08-06); the linear ramp is u2net's smooth blend.
-  let lo = Infinity, hi = -Infinity
-  if (softOut) {
-    for (let i = 0, n = mh * mw; i < n; i++) { const v = map[i] as number; if (v < lo) lo = v; if (v > hi) hi = v }
-  }
-  const rng = Math.max(1e-6, hi - lo)
+  // SOFT ALPHA = sigmoid(logit): SAM's own probability map — background → ~0 (truly transparent),
+  // subject → ~1. A linear min-max of SIGNED logits left the background at ~30-40% alpha (the
+  // ghost-full-image bug, Dan 2026-08-06); linear normalize is the u2net tail's math and only
+  // correct for non-negative saliency. The soft ramp width comes from the 256→full bilinear
+  // upsample either way.
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
     const gy = Math.min(mh - 1.001, Math.max(0, (y + 0.5) * fy * mh / h - 0.5))
@@ -72,7 +67,7 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
       const v = (map[i] as number) * (1 - tx) * (1 - ty) + (map[i + 1] as number) * tx * (1 - ty)
         + (map[i + mw] as number) * (1 - tx) * ty + (map[i + mw + 1] as number) * tx * ty
       if (v > 0) out[y * w + x] = 1
-      if (softOut) softOut[y * w + x] = Math.round(((v - lo) / rng) * 255) // the worker's linear matte math
+      if (softOut) softOut[y * w + x] = Math.round(255 / (1 + Math.exp(-v))) // sigmoid → probability alpha
     }
   }
   return out

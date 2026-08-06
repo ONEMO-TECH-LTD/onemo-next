@@ -257,9 +257,16 @@ async function runSam(imageUrl: string, spec: SamSpec, onProgress: (s: string) =
   }
   if (best < 0) { bmp.close(); throw new Error('sam-no-valid-candidate') }
   const map = masks.data.subarray(best * mh * mw2, (best + 1) * mh * mw2)
+  // LOGITS → PROBABILITY before the shared tail (Dan's two-ghost-images catch, 2026-08-06): SAM
+  // emits signed logits — a linear min-max (the u2net tail's math, correct for non-negative
+  // saliency) leaves the BACKGROUND at ~30-40% alpha, making the subject layer a ghost of the whole
+  // image. Sigmoid is SAM's own probability map: background → ~0, subject → ~1 — the same
+  // saliency-like field u2net hands the tail. Model-output conversion belongs to the model slot.
+  const prob = new Float32Array(mh * mw2)
+  for (let i = 0; i < prob.length; i++) prob[i] = 1 / (1 + Math.exp(-map[i]))
   // SAM's map covers the zero-padded square — only the nw×nh fraction is the image (the padded-square
   // misalignment fix). Plug into the ONE shared tail.
-  return finishMatte(map, mw2, mh, Math.round(mw2 * (nw / T)), Math.round(mh * (nh / T)), bmp, ow, oh)
+  return finishMatte(prob, mw2, mh, Math.round(mw2 * (nw / T)), Math.round(mh * (nh / T)), bmp, ow, oh)
 }
 
 interface RawImageData {
