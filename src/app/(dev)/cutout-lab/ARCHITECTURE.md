@@ -155,9 +155,15 @@ Laws:
 1. **The comet is real-time, always.** The fade loop runs until the trail is empty, independent
    of recognition; recognition progress may not stop presentation frames. Gate: trail visibly
    dissolving WHILE a recognition is in flight (screen-capture evidence).
-2. **No main-thread pixel op > 50 ms during tool use.** Post-processing (polish/swath/wand/mask
-   raster) moves off the main thread (worker) or is chunked under the budget. PerfHUD gestures
-   mark each; the budget law now applies to tools, not just knobs.
+2. **No main-thread pixel op > 50 ms during tool use — scoped to the GLUE.** Post-processing the
+   lab owns (polish/swath/wand/mask raster) moves off the main thread or is chunked under budget;
+   PerfHUD gestures mark each. **Engine-internal awaited spans (matteToMLResult, prepareEffect
+   trace stages) are RECORDED as the engine's own cost, not chunked and not worker-moved** — the
+   perimeter law outranks the budget here, and the original studio's HUD treats its own one-time
+   generation breach the same way (the I1 precedent). They are once-per-tap awaited spans, not
+   per-frame work. (Adjudicated on the lead's guard-1 question, 2026-08-06.) Moving engine prepare
+   into a worker is a possible LATER increment, opened only on Dan's device verdict — if the
+   residual once-per-tap hitch (~2× 53–117 ms) still reads as a freeze on the phone.
 3. **Every await in a tool path carries a timeout → fault status** (the I1 fault-policy pattern):
    a hang becomes a visible ⚠️ + `busy` released — a stuck-busy lockout is impossible by
    construction. Gate: injected stall → tool recovers without reload.
