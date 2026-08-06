@@ -51,11 +51,12 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
   // upscaling bakes the low-res staircase into the edge (the "choppy outline"); interpolating the
   // logits first puts the 0-crossing at sub-pixel positions, so the edge comes out smooth.
   //
-  // SOFT ALPHA = sigmoid(logit): SAM's own probability map — background → ~0 (truly transparent),
-  // subject → ~1. A linear min-max of SIGNED logits left the background at ~30-40% alpha (the
-  // ghost-full-image bug, Dan 2026-08-06); linear normalize is the u2net tail's math and only
-  // correct for non-negative saliency. The soft ramp width comes from the 256→full bilinear
-  // upsample either way.
+  // SOFT ALPHA = clamped linear ramp centred on the zero-crossing (width = hiLogit/4): background
+  // exactly 0 (no ghost), interior exactly 255 (solid print), boundary at the true zero-crossing,
+  // continuous gradient (raw sigmoid at map res is near-binary → jitter + translucent interior).
+  let hiL = 0
+  if (softOut) for (let i = 0, n = mh * mw; i < n; i++) { const v = map[i] as number; if (v > hiL) hiL = v }
+  const Tramp = Math.max(1e-6, hiL / 4)
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++) {
     const gy = Math.min(mh - 1.001, Math.max(0, (y + 0.5) * fy * mh / h - 0.5))
@@ -67,7 +68,7 @@ export function logitsToMask(map: ArrayLike<number>, mh: number, mw: number, w: 
       const v = (map[i] as number) * (1 - tx) * (1 - ty) + (map[i + 1] as number) * tx * (1 - ty)
         + (map[i + mw] as number) * (1 - tx) * ty + (map[i + mw + 1] as number) * tx * ty
       if (v > 0) out[y * w + x] = 1
-      if (softOut) softOut[y * w + x] = Math.round(255 / (1 + Math.exp(-v))) // sigmoid → probability alpha
+      if (softOut) softOut[y * w + x] = Math.round(255 * Math.min(1, Math.max(0, 0.5 + v / (2 * Tramp))))
     }
   }
   return out

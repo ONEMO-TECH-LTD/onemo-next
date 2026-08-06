@@ -277,7 +277,8 @@ export async function bakeStickerEngine(
   // the default — per-axis flipped tiles, edge-to-edge continuity). Inside the frame at blend 0
   // nothing composites — the original image under the vector mask.
   const outgrown = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > maskW || bounds.maxY > maskH
-  if (neutral && outgrown) b = { ...b, blend: prepared.frontSrc.defaultBlendPercent } // the USER'S fill choice stands (mirror = default)
+  // (value-reflection, Dan 15:34: auto-blend is set by the SHELL into the knob state — never a
+  // silent override here, so the control always shows the true applied blend.)
   // NO-MATTE GUARD (Dan's law: a full-image composite may not exist ANYWHERE): the flood-fill
   // fallback has no object layer — its 'subject' is the raw full image, which drawn sharp over the
   // blur COVERS it (blend looks dead) or double-layers under scale. With no matte, blend is forced

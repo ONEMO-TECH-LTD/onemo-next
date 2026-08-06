@@ -35,6 +35,7 @@ export default function CutoutLab() {
   const [aspectLocked, setAspectLocked] = useState(true)
   const [sens, setSens] = useState(1) // admin sensitivity multiplier for straighten/simplify/curve (ceiling probe)
   const sensRef = useRef(1)
+  const wasOutgrownRef = useRef(false)
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
@@ -232,6 +233,17 @@ export default function CutoutLab() {
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
+    // AUTO-COMPOSITING ON FRAME EXIT (Dan's law), value-TRUE: entering outgrowth sets the actual
+    // blend knob to the engine default — the control reflects what is applied; the user can still
+    // re-zero it (their override stands until the next transition into outgrowth).
+    const img2 = imgCanvas.current, bb = fin?.bounds
+    const og = !!(img2 && bb && (bb.minX < 0 || bb.minY < 0 || bb.maxX > img2.width || bb.maxY > img2.height))
+    if (og && !wasOutgrownRef.current && blendRef.current.blend === 0 && preparedRef.current) {
+      const def = Math.round(preparedRef.current.frontSrc.defaultBlendPercent)
+      blendRef.current = { ...blendRef.current, blend: def }
+      setBlend(blendRef.current)
+    }
+    wasOutgrownRef.current = og
     setShapeTick((t) => t + 1)
     recomposeLive()
     render()

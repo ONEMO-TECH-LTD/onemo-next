@@ -262,8 +262,24 @@ async function runSam(imageUrl: string, spec: SamSpec, onProgress: (s: string) =
   // saliency) leaves the BACKGROUND at ~30-40% alpha, making the subject layer a ghost of the whole
   // image. Sigmoid is SAM's own probability map: background → ~0, subject → ~1 — the same
   // saliency-like field u2net hands the tail. Model-output conversion belongs to the model slot.
+  // Clamped linear ramp centred on the zero-crossing (adaptive width hi/4): background → exactly 0
+  // (no ghost layer), subject interior → exactly 1 (SOLID for print), boundary at the model's true
+  // zero-crossing, and a CONTINUOUS gradient so the upscale traces sub-pixel (a raw sigmoid at 256²
+  // is near-binary → the jittery outline + semi-transparent interior Dan caught, 15:32).
+  let hiL = 0
+  for (let i = 0; i < mh * mw2; i++) if (map[i] > hiL) hiL = map[i]
+  const Tramp = Math.max(1e-6, hiL / 4)
   const prob = new Float32Array(mh * mw2)
-  for (let i = 0; i < prob.length; i++) prob[i] = 1 / (1 + Math.exp(-map[i]))
+  for (let i = 0; i < prob.length; i++) prob[i] = Math.min(1, Math.max(0, 0.5 + map[i] / (2 * Tramp)))
+  // SPATIAL parity with u2net: SAM's logits flip within ~1 map px while u2net's saliency ramps over
+  // 2–3 px — the residual staircase Dan compared (15:32). Two separable [1,2,1] passes widen the
+  // boundary to the same ~2-3 px signal class; interior/背景 plateaus are invariant (stay 1/0 solid).
+  for (let pass = 0; pass < 2; pass++) {
+    const tmp = new Float32Array(prob)
+    for (let y = 0; y < mh; y++) for (let x = 1; x < mw2 - 1; x++) { const i = y * mw2 + x; prob[i] = (tmp[i - 1] + 2 * tmp[i] + tmp[i + 1]) / 4 }
+    tmp.set(prob)
+    for (let y = 1; y < mh - 1; y++) for (let x = 0; x < mw2; x++) { const i = y * mw2 + x; prob[i] = (tmp[i - mw2] + 2 * tmp[i] + tmp[i + mw2]) / 4 }
+  }
   // SAM's map covers the zero-padded square — only the nw×nh fraction is the image (the padded-square
   // misalignment fix). Plug into the ONE shared tail.
   return finishMatte(prob, mw2, mh, Math.round(mw2 * (nw / T)), Math.round(mh * (nh / T)), bmp, ow, oh)
