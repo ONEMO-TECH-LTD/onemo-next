@@ -310,12 +310,17 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
-      // PRE-ENCODE (Dan r3): the brush's image embedding computes NOW in its worker, in the
-      // background — a first stroke later finds everything ready and pays inference only.
-      if (engineSelRef.current === 'edge' && brushLoadedRef.current && !edgeEncodedRef.current) {
+      // PRE-LOAD + PRE-ENCODE (Dan r3/r4): the brush SESSION initializes and the image pre-encodes
+      // in the background AFTER the cut lands (weights already in HTTP cache from warmup) — the
+      // first stroke pays inference only, and page open stays light (no session at open).
+      if (engineSelRef.current === 'edge' && !edgeEncodedRef.current) {
         const img2 = imgCanvas.current!
         const px2 = img2.getContext('2d')!.getImageData(0, 0, img2.width, img2.height)
-        withTimeout(client.current!.encode(px2.data, img2.width, img2.height), T_COMPUTE_MS, 'AI pre-encode')
+        const chain = brushLoadedRef.current
+          ? Promise.resolve()
+          : withTimeout(client.current!.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush load').then(() => { brushLoadedRef.current = true })
+        chain
+          .then(() => withTimeout(client.current!.encode(px2.data, img2.width, img2.height), T_COMPUTE_MS, 'AI pre-encode'))
           .then(() => { edgeEncodedRef.current = true })
           .catch(() => { /* first stroke re-attempts loudly */ })
       }
@@ -563,10 +568,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // stroke later pays inference only.
   const warmup = useCallback(() => {
     preloadBen()
-    if (engineSelRef.current === 'edge' && !brushLoadedRef.current) {
-      withTimeout(client.current!.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush warm-up')
-        .then(() => { brushLoadedRef.current = true })
-        .catch(() => { /* first stroke re-attempts loudly */ })
+    // DOWNLOAD-ONLY brush warm (Dan device r4: initializing the ORT session at page open spikes
+    // memory and iOS kills the tab — page loads then crashes). Weights land in the HTTP cache
+    // here; the SESSION initializes in the background after the first cut (below), so the first
+    // stroke still pays inference only.
+    if (engineSelRef.current === 'edge') {
+      fetch(MODELS.edgesam.enc!).catch(() => {})
+      fetch(MODELS.edgesam.dec!).catch(() => {})
     }
     setStatus('ready — upload an image · ⬇ warming the AI models in the background')
   }, [])
