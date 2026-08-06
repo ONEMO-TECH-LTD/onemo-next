@@ -19,7 +19,7 @@ import {
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { segmentV531 } from './v531seg'
-import { wandRegion } from '@/lib/cutout-wand'
+import { WAND_TOLERANCE, wandRegion } from '@/lib/cutout-wand'
 
 import { HistoryStack } from './history'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
@@ -34,6 +34,8 @@ export default function CutoutLab() {
   const [engineSel, setEngineSel] = useState<'edge' | 'u2net'>('edge')
   const [aspectLocked, setAspectLocked] = useState(true)
   const wasOutgrownRef = useRef(false)
+  const [wandTol, setWandTol] = useState(WAND_TOLERANCE) // live wand calibration (Dan 17:45)
+  const wandTolRef = useRef(WAND_TOLERANCE); wandTolRef.current = wandTol
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
@@ -386,7 +388,7 @@ export default function CutoutLab() {
       const img = imgCanvas.current!
       const erase = toolRef.current === 'wand-erase'
       const p0 = stroke[stroke.length - 1]
-      const region = wandRegion(img, p0.x * img.width, p0.y * img.height)
+      const region = wandRegion(img, p0.x * img.width, p0.y * img.height, wandTolRef.current)
       const brushPx = brushRef.current * (img.width / dispRefW())
       if (!maskRef.current || !hasCutRef.current) {
         if (erase) { setStatus('🪄 nothing to erase yet'); render(); return }
@@ -492,6 +494,8 @@ export default function CutoutLab() {
       const [lo, hi] = CHIP_RANGE[k]
       return { label: k, lo, hi, value: blend[k], set: (v: number) => setBlendTune({ [k]: v }) }
     }
+    if (tool === 'wand' || tool === 'wand-erase')
+      return { label: 'wand tolerance', lo: 4, hi: 90, value: wandTol, set: setWandTol } // live calibration (Dan 17:45)
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
   })()
 
