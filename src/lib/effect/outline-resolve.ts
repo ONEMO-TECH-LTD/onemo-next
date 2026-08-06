@@ -197,7 +197,13 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
         // is underconstrained: it bulges/folds between them). Uniform resample at fine spacing keeps
         // the fit pinned to the actual geometry regardless of how coarse the anchors are.
         const flat = flattenPath(p, 0.5).map((q) => [q.x, q.y] as Vec2Px)
-        const ring = resampleClosedUniform(flat, 2).map(([x, y]) => ({ x, y }))
+        // sample budget: 2px spacing on a big outline hands the fitter thousands of points and its
+        // error-split recursion stalls the page (Dan: 'simplify freezing'). ~500 samples is dense
+        // enough to pin the fit at any shape size.
+        let perim = 0
+        for (let i = 0; i < flat.length; i++) { const a = flat[i], b2 = flat[(i + 1) % flat.length]; perim += Math.hypot(b2[0] - a[0], b2[1] - a[1]) }
+        const spacing = Math.max(2, perim / 500)
+        const ring = resampleClosedUniform(flat, spacing).map(([x, y]) => ({ x, y }))
         // PURE smooth-cycle fit (Dan 2026-08-06): NO corner pinning — a hardcoded pin angle kept
         // locking Detail's coarse facet corners as intentionally-sharp (the odd sharp corners in
         // the Detail+Simplify combo). With cornersOverride [], the whole outline fits as smooth
