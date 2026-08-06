@@ -239,8 +239,23 @@ async function runSam(imageUrl: string, spec: SamSpec, onProgress: (s: string) =
   const masks = out[maskName], scores = scoreName ? out[scoreName] : undefined
   const dims = masks.dims ?? [1, 1, 256, 256]
   const num = dims[1] ?? 1, mh = dims[dims.length - 2], mw2 = dims[dims.length - 1]
-  let best = 0
-  if (scores && num > 1) { let bs = -Infinity; for (let i = 0; i < num; i++) { const s = scores.data[i]; if (s > bs) { bs = s; best = i } } }
+  // CANDIDATE PICK (s62 device-verified auto rule): a SAM candidate is ELIGIBLE only if its subject
+  // area is a sane fraction of the image (5–92%) — best-score-only kept selecting the near-full-
+  // frame mask (subject = the whole photo → 'no compositing', Dan 2026-08-06). Among eligible:
+  // highest score. None eligible → throw, and the chain falls back to u2netp like any model failure.
+  const vx2 = Math.round(mw2 * (nw / T)), vy2 = Math.round(mh * (nh / T))
+  const validArea = Math.max(1, vx2 * vy2)
+  let best = -1, bestScore = -Infinity
+  for (let i = 0; i < num; i++) {
+    const m = masks.data.subarray(i * mh * mw2, (i + 1) * mh * mw2)
+    let pos = 0
+    for (let y = 0; y < vy2; y++) for (let x = 0; x < vx2; x++) if (m[y * mw2 + x] > 0) pos++
+    const frac = pos / validArea
+    if (frac < 0.05 || frac > 0.92) continue
+    const s = scores ? scores.data[i] : 0
+    if (s > bestScore) { bestScore = s; best = i }
+  }
+  if (best < 0) { bmp.close(); throw new Error('sam-no-valid-candidate') }
   const map = masks.data.subarray(best * mh * mw2, (best + 1) * mh * mw2)
   // SAM's map covers the zero-padded square — only the nw×nh fraction is the image (the padded-square
   // misalignment fix). Plug into the ONE shared tail.
