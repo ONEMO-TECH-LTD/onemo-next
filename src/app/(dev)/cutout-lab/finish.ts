@@ -5,7 +5,7 @@
 import type { Mask } from '@/lib/cutout-ai/types'
 import { dilateMask, effectiveTextureDim } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
-import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
+import { blendPercentToPixels, composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import {
   detailToFloorMm,
@@ -315,32 +315,43 @@ export async function bakeStickerEngine(
     big.getContext('2d')!.drawImage(subj, sx, sy)
     subject = big
   }
+  // BLUR-FALLOFF PAD (Dan 16:43 'bottom transparency in preview'): the SVG blur at a canvas edge
+  // bleeds into transparency; with the compose frame ending at the outline bbox, that falloff band
+  // (≈3σ) reached INSIDE the outline — the semi-transparent ring. Pad the frame by 3σ so the
+  // falloff lands in discarded margin, then crop back to the true frame.
+  const blendEff = mirror ? b.blend / 3 : b.blend // mosaic is 3x wide — keep the blur physically equal
+  const pad = Math.ceil(3 * blendPercentToPixels(blendEff, original.width)) + 2
   const { canvas, frame } = await composeEffectArtwork({
     originalCanvas: original,
     subjectCanvas: subject,
-    outputBoundsPx: { minX: bUp.minX + sx, minY: bUp.minY + sy, maxX: bUp.maxX + sx, maxY: bUp.maxY + sy },
-    blendPercent: mirror ? b.blend / 3 : b.blend, // mosaic is 3x wide — keep the blur physically equal
+    outputBoundsPx: { minX: bUp.minX + sx - pad, minY: bUp.minY + sy - pad, maxX: bUp.maxX + sx + pad, maxY: bUp.maxY + sy + pad },
+    blendPercent: blendEff,
     fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode),
     fxFilter: presetFilter(b.preset),
     vignette: b.vignette / 100,
     tint: b.tint,
   })
-  // flip the composed frame to y-down and clip with the outline (scaled into tex space)
+  // flip the composed (padded) frame to y-down and clip with the outline (scaled into tex space)
   const fw = frame.width, fh = frame.height
   const ox = frame.originX - sx, oy = frame.originY - sy // y-up tex-space origin
   const flipped = document.createElement('canvas'); flipped.width = fw; flipped.height = fh
   const fctx = flipped.getContext('2d')!
   fctx.translate(0, fh); fctx.scale(1, -1)
   fctx.drawImage(canvas, 0, 0)
-  // y-down origin of the frame in tex space
-  const oyDown = texH - (oy + fh)
-  const out = document.createElement('canvas'); out.width = fw; out.height = fh
-  const ctx = out.getContext('2d')!
+  const oyDown = texH - (oy + fh) // y-down origin of the padded frame in tex space
+  const clipped = document.createElement('canvas'); clipped.width = fw; clipped.height = fh
+  const cctx = clipped.getContext('2d')!
   const path = new Path2D()
   path.addPath(new Path2D(d), new DOMMatrix().scale(k))
-  ctx.translate(-ox, -oyDown)
-  ctx.clip(path)
-  ctx.drawImage(flipped, ox, oyDown)
+  cctx.translate(-ox, -oyDown)
+  cctx.clip(path)
+  cctx.drawImage(flipped, ox, oyDown)
+  // crop the pad away — the returned canvas must match the outline bounds the caller draws with
+  const x0 = Math.floor(bUp.minX + sx), y0u = Math.floor(bUp.minY + sy)
+  const w0 = Math.max(1, Math.ceil(bUp.maxX + sx) - x0), h0 = Math.max(1, Math.ceil(bUp.maxY + sy) - y0u)
+  const oyDown0 = texH - ((y0u - sy) + h0)
+  const out = document.createElement('canvas'); out.width = w0; out.height = h0
+  out.getContext('2d')!.drawImage(clipped, (frame.originX - x0), (oyDown - oyDown0), fw, fh)
   return { canvas: out }
 }
 
