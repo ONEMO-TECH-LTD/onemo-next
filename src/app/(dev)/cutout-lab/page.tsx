@@ -13,7 +13,7 @@ import { strokeToShape } from '@/lib/freeshape'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
-  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS,
+  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, prepareNative,
   shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
@@ -432,8 +432,8 @@ export default function CutoutLab() {
     if (!drawnRef.current || drawnRef.current.shape !== shape) {
       const ring = shapeRing(shape)
       drawnRef.current = { shape, ring }
-      const zero = { ...AUTO_SETTINGS }
-      settingsRef.current = zero; setSettings(zero) // adjustments fold into the baked source
+      const zero = { ...ZERO_SETTINGS }
+      settingsRef.current = zero; setSettings(zero) // adjustments fold into the baked source — TRUE zero, not the default recipe
     }
     setTool(m)
     applyFinish()

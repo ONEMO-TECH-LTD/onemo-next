@@ -25,6 +25,9 @@ export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape 
 /** Calibration baseline (Dan 2026-08-05): EVERYTHING ZERO — the raw full-fidelity sharp trace,
  *  no recipe applied (engine detail 100 renders as knob 0: the Detail knob is UI-inverted).
  *  The golden config gets dialed from zero on-device and locked here. */
+/** TRUE all-off — the reset used when adjustments FOLD into a baked source (edit modes). */
+export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
+
 export const AUTO_SETTINGS: TraceOutlineSettings = {
   ...TRACE_OUTLINE_DEFAULTS,
   // Dan's default config for ANY shape (2026-08-06): offset 3, the rest 10.
