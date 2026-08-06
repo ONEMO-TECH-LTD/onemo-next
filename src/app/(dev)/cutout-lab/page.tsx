@@ -63,6 +63,7 @@ export default function CutoutLab() {
   const lastFileRef = useRef<File | null>(null)
   const urlRef = useRef<string | null>(null) // object URL kept alive for engine re-prepare
   const preparedRef = useRef<PreparedEffect | null>(null)
+  const autoPresegRef = useRef<import('@/lib/effect/segment-ml').MLResult | null>(null) // the AI cut — painted shapes intersect their subject with it
   const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
   const edgeEncodedRef = useRef(false)
   const settingsRef = useRef(settings); settingsRef.current = settings
@@ -88,14 +89,14 @@ export default function CutoutLab() {
     drawnRef.current = s.drawn
     setHasCut(!!(s.mask || s.drawn))
     if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
-      try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current!) } catch { /* keep last prepared */ }
+      try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current!, undefined, autoPresegRef.current ?? undefined) } catch { /* keep last prepared */ }
     }
     applyFinish()
   }
   const undo = async () => { const s = histRef.current.undo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }
   const redo = async () => { const s = histRef.current.redo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }
   const clearAll = () => {
-    maskRef.current = null; drawnRef.current = null; preparedRef.current = null
+    maskRef.current = null; drawnRef.current = null; preparedRef.current = null; autoPresegRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null
     setHasCut(false); pushHistory(); render()
     setStatus('🗑 cleared — paint a shape with the hand brush, or Re-detect')
@@ -255,7 +256,7 @@ export default function CutoutLab() {
         // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
         // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
         const loud = (st: string) => { if (st === 'fallback') setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)') }
-        preparedRef.current = await (preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud))
+        preparedRef.current = await (preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud, autoPresegRef.current ?? undefined))
       } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message)); return }
     }
     setHasCut(true)
@@ -315,6 +316,7 @@ export default function CutoutLab() {
       const t0 = performance.now()
       const r = await segmentV531(url, w, h)
       setMs({ cut: Math.round(performance.now() - t0) })
+      autoPresegRef.current = r.preseg
       await acceptMask(r.mask, r.preseg)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
@@ -440,7 +442,7 @@ export default function CutoutLab() {
     const ring = shapeRing(next)
     drawnRef.current = { shape: next, ring }
     maskRef.current = maskFromShape(next, img.width, img.height)
-    if (urlRef.current) prepareAI(urlRef.current, maskRef.current).then((p) => { preparedRef.current = p; render() }).catch(() => {})
+    if (urlRef.current) prepareAI(urlRef.current, maskRef.current, undefined, autoPresegRef.current ?? undefined).then((p) => { preparedRef.current = p; render() }).catch(() => {})
     applyFinish()
     pushHistory()
   }
