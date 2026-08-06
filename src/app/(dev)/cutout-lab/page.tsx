@@ -10,12 +10,12 @@ import { CutoutClient } from '@/lib/cutout-ai/client'
 import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import { strokeToShape } from '@/lib/freeshape'
-import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
+import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS,
-  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, prepareNative, swathMask,
-  subtractMasks, unionMasks,
+  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, prepareNative,
+  shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -413,7 +413,7 @@ export default function CutoutLab() {
     const img = imgCanvas.current, shape = shapeRef.current
     if (!img || !shape) return
     if (!drawnRef.current || drawnRef.current.shape !== shape) {
-      const ring = (flattenShape(shape, 0.5)[0] ?? []).map((p) => ({ x: p.x, y: p.y }))
+      const ring = shapeRing(shape)
       drawnRef.current = { shape, ring }
       const zero = { ...AUTO_SETTINGS }
       settingsRef.current = zero; setSettings(zero) // adjustments fold into the baked source
@@ -423,13 +423,13 @@ export default function CutoutLab() {
   }
   const onEditLive = (next: VShape) => {
     if (drawnRef.current) drawnRef.current = { ...drawnRef.current, shape: next }
-    dRef.current = shapeToSVGPathD(next, 2)
+    dRef.current = shapePathD(next)
     shapeRef.current = next
     render()
   }
   const onEditCommit = (next: VShape) => {
     const img = imgCanvas.current!
-    const ring = (flattenShape(next, 0.5)[0] ?? []).map((p) => ({ x: p.x, y: p.y }))
+    const ring = shapeRing(next)
     drawnRef.current = { shape: next, ring }
     maskRef.current = maskFromShape(next, img.width, img.height)
     if (urlRef.current) prepareAI(urlRef.current, maskRef.current).then((p) => { preparedRef.current = p; render() }).catch(() => {})

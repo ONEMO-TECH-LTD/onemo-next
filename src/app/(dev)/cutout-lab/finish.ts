@@ -100,6 +100,13 @@ export function finishDrawn(
   return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
 }
 
+/** Flattened ring of a shape (vector-core op kept OUT of the UI — module boundary). */
+export const shapeRing = (shape: VShape): { x: number; y: number }[] =>
+  (flattenShape(shape, 0.5)[0] ?? []).map((p) => ({ x: p.x, y: p.y }))
+
+/** SVG path of a shape (serialization kept OUT of the UI — module boundary). */
+export const shapePathD = (shape: VShape): string => shapeToSVGPathD(shape, 2)
+
 /** Rasterize a drawn shape to a Mask (subject matte for the blend layer — inside = subject). */
 export function maskFromShape(shape: import('@/lib/vector-core').VShape, w: number, h: number): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
