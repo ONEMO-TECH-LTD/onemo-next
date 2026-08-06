@@ -14,7 +14,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
-  editableShape, nodeAdjust, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  deleteNode, editableShape, insertNode, measureNode, nodeAdjust, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -465,16 +465,41 @@ export default function CutoutLab() {
     if (drawnRef.current) drawnRef.current = { ...drawnRef.current, shape: next }
     dRef.current = shapePathD(next)
     shapeRef.current = next
+    setShapeTick((t) => t + 1) // the overlay's anchors must ride the line (Dan: 'glued to it always')
     render()
   }
+  const editPrepGen = useRef(0)
   const onEditCommit = (next: VShape) => {
     const img = imgCanvas.current!
     const ring = shapeRing(next)
     drawnRef.current = { shape: next, ring }
     maskRef.current = maskFromShape(next, img.width, img.height)
-    if (urlRef.current) prepareAI(urlRef.current, maskRef.current).then((p) => { preparedRef.current = p; render() }).catch(() => {})
+    // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
+    // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins on races.
+    if (urlRef.current) {
+      const gen = ++editPrepGen.current
+      prepareAI(urlRef.current, maskRef.current)
+        .then((p) => { if (gen === editPrepGen.current) { preparedRef.current = p; render() } })
+        .catch((e) => setStatus('⚠️ engine re-prepare failed on edit: ' + String((e as Error).message)))
+    }
     applyFinish()
     pushHistory()
+  }
+  const selectNode = (sel: { pi: number; ai: number } | null) => {
+    setSelNode(sel)
+    nodeBaseRef.current = shapeRef.current
+    setNodeAdj(sel && shapeRef.current ? measureNode(shapeRef.current, sel.pi, sel.ai) : { radius: 0, curve: 0 })
+  }
+  const onNodesTap = (pt: { x: number; y: number }) => {
+    const shape = shapeRef.current
+    if (!shape) return
+    const r = insertNode(shape, pt.x, pt.y, Math.max(8, imgCanvas.current!.width / 60))
+    if (r) { onEditCommit(r.shape); selectNode({ pi: r.pi, ai: r.ai }) } else selectNode(null)
+  }
+  const onNodeDelete = () => {
+    if (!selNode || !shapeRef.current) return
+    const next = deleteNode(shapeRef.current, selNode.pi, selNode.ai)
+    if (next) { selectNode(null); onEditCommit(next) }
   }
 
   const redetect = async () => { if (!busy && lastFileRef.current) await onFile(lastFileRef.current) }
@@ -590,6 +615,7 @@ export default function CutoutLab() {
             {(['radius', 'curve'] as const).map((k) => (
               <button key={k} onClick={() => setNodeChip(k)} style={chipBtn(nodeChip === k)}>{k}</button>
             ))}
+            <button onClick={onNodeDelete} style={chipBtn(false)}>− delete</button>
             <button onClick={() => setSelNode(null)} style={chipBtn(false)}>✕</button>
           </>)}
           <button onClick={() => enterEdit('nodes')} disabled={!shapeRef.current} style={chipBtn(tool === 'nodes')}>⬡ Nodes</button>
@@ -629,7 +655,7 @@ export default function CutoutLab() {
               style={{ width: '100%', height: '100%', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
-                selected={selNode} onSelect={(sel) => { setSelNode(sel); nodeBaseRef.current = shapeRef.current; setNodeAdj({ radius: 0, curve: 0 }) }}
+                selected={selNode} showHandles={nodeChip === 'curve'} onSelect={selectNode} onTap={onNodesTap}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
                 onEdit={onEditLive} onCommit={onEditCommit} />
             )}
