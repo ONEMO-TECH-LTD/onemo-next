@@ -68,9 +68,13 @@ edit loop composites nothing. The lab gets the same shape.
   §9 budgets). **PerfHUD is IMPORTED from `v5.3.1/dev/PerfHUD` and mounted — never copied** (the
   lab already imports v5.3.1 app modules: producers, primitives; a copied HUD would be the exact
   clone class this contract forbids).
-- A 10-step Detail drag at blend-100/mirror defaults allocates ≤ **0.2 GB** total, **zero** canvases
-  over the edit-time ceiling (I1: no 61 MB mosaics mid-drag; I2 lowers the ceiling to ~4 MB via
-  preview-res compose — out of I1 scope, do not build it early).
+- **I1's gate is MID-DRAG**: pointerdown→last tick allocates ≤ **0.1 GB** with **zero** mosaic-class
+  canvases and the compositor provably never called; exactly ONE release bake follows, at full res —
+  its cost is RECORDED in the task, not gated in I1. (Adjudicated on the lead's guard-1 question,
+  2026-08-06: the earlier "≤0.2 GB total" contradicted "preview-res is I2 — don't build early";
+  mosaic-crop is also I2 scope, KAI-10197. The crash driver was dozens of uncancelled mosaics per
+  drag, not one release bake.) **I2's gate** then lowers the edit-time ceiling to ~4 MB via
+  preview-res compose + mosaic crop.
 - Every bake/resolve/segment emits a `perfGesture(label, ms)` marker.
 
 ## Conform vs never-clone
