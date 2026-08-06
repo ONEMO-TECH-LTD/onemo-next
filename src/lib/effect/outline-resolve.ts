@@ -25,7 +25,7 @@ import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
-import { roundCornersPaper, smoothPaper } from '@/lib/vector-core/paper-kernel'
+import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
 import { straightenPath, roundWholeShapePx } from '@/lib/vector-core/clipper-kernel'
 import type { Pt } from './types'
 
@@ -182,12 +182,12 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     const guard = (next: VPath): VPath => (ringSimple(pathToRing(next)) ? next : p)
     // 1. STRAIGHTEN — Clipper2 RDP/TrimCollinear: collapse near-collinear runs to true straight edges.
     if (g.straighten > 0) p = guard(straightenPath(p, straightenEpsPx(g.straighten, scalePx)))
-    // 2. SIMPLIFY — deviation-bounded NODE REDUCTION (Clipper2 RDP), not a curve re-fit: anchors are
-    //    a SUBSET of the original outline, so the shape cannot squash or drift (Dan 2026-08-06 —
-    //    Paper's least-squares curve-fit legally deviated up to the whole tolerance and distorted;
-    //    'fewer nodes, no distortion' is RDP's contract). Runs only where redundant near-collinear
-    //    vertices exist; a no-op on a clean sparse polygon (a square keeps its corners).
-    if (g.simplify > 0) { const tol = simplifyTolPx(g.simplify, scalePx); if (hasRedundantVertices(p, tol)) p = guard(straightenPath(p, tol)) }
+    // 2. SIMPLIFY — Paper simplify (curve-fit): 0 = OFF, higher = fewer anchors + smoother fit.
+    //    (Dan 2026-08-06 correction: the observed squash was SMOOTH's shrink, not this — the earlier
+    //    RDP swap made Simplify a duplicate of Straighten and is reverted; the trio is distinct:
+    //    Straighten = collinear collapse · Simplify = curve-fit reduce · Smooth = handle rounding.)
+    //    Runs only where redundant near-collinear vertices exist; a no-op on a clean sparse polygon.
+    if (g.simplify > 0) { const tol = simplifyTolPx(g.simplify, scalePx); if (hasRedundantVertices(p, tol)) p = guard(simplifyPaper(p, tol)) }
     // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
     //    on a fold — at tiny smooth the floor must be low enough to retreat to a clean result, else the
     //    1% case slips a borderline self-touch past the guard and shows a red outline.
