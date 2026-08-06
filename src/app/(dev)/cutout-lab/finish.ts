@@ -6,7 +6,7 @@ import type { Mask } from '@/lib/cutout-ai/types'
 import { dilateMask, effectiveTextureDim } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
-import { flattenShape, shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
+import { flattenShape, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import {
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
@@ -208,8 +208,11 @@ export function prepareNative(url: string, preseg: MLResult): Promise<PreparedEf
   return prepareShaped(url, preseg)
 }
 
-/** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim. */
-export function finishSpec(prepared: PreparedEffect, settings: TraceOutlineSettings): FinishResult | null {
+/** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim.
+ *  `viewW` maps the result from the spec's mask space (the BRIDGE'S dims) into the lab canvas's
+ *  space via the engine's own transformShape — the spec dims are the bridge's config and need not
+ *  match the lab canvas (they diverged when the bridge took over segmentation, 2026-08-06). */
+export function finishSpec(prepared: PreparedEffect, settings: TraceOutlineSettings, viewW?: number): FinishResult | null {
   const spec = prepared.spec
   const resolved = resolveTraceOutline(
     {
@@ -222,8 +225,10 @@ export function finishSpec(prepared: PreparedEffect, settings: TraceOutlineSetti
     settings,
   )
   if (!resolved) return null
-  const bb = shapeBBox(resolved, 1)
-  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
+  const k = viewW ? viewW / Math.max(1, spec.maskWidthPx) : 1
+  const view = k === 1 ? resolved : transformShape(resolved, (p) => ({ x: p.x * k, y: p.y * k }))
+  const bb = shapeBBox(view, 1)
+  return { d: shapeToSVGPathD(view, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: view }
 }
 
 /** Engine-native sticker bake: the engine's OWN matted subject + original (frontSrc, y-up) through
@@ -234,6 +239,26 @@ export async function bakeStickerEngine(
 ): Promise<{ canvas: HTMLCanvasElement }> {
   const { origCanvas, subjCanvas } = prepared.frontSrc
   const k = origCanvas.width / maskW
+  // DEFAULT SETTINGS → the ENGINE'S OWN finished composite (prepared.composite), VERBATIM — the
+  // exact canvas v5.3.1 displays. No re-compose, no lab logic: flip to y-down + crop to the outline
+  // frame + clip. The re-bake below runs ONLY when an add-on control diverges (fill/scale/pan/
+  // preset/vignette/tint or a non-default blend) — Dan 2026-08-06: compositing happens inside;
+  // the API calls just get results.
+  const plain = b.fill === 'clamp' && b.scale === 100 && !b.panX && !b.panY && b.preset === 'none'
+    && !b.vignette && !b.tint && Math.abs(b.blend - prepared.frontSrc.defaultBlendPercent) < 0.5
+  if (plain) {
+    const src = prepared.composite
+    const fw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * k))
+    const fh = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * k))
+    const out = document.createElement('canvas'); out.width = fw; out.height = fh
+    const ctx = out.getContext('2d')!
+    ctx.translate(-bounds.minX * k, -bounds.minY * k)
+    const path = new Path2D(); path.addPath(new Path2D(d), new DOMMatrix().scale(k))
+    ctx.clip(path)
+    ctx.translate(0, src.height); ctx.scale(1, -1) // composite is y-up (engine convention)
+    ctx.drawImage(src, 0, 0)
+    return { canvas: out }
+  }
   // y-up tex-space bounds
   const texH = origCanvas.height
   const bUp: OutlineBounds = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }

@@ -105,7 +105,7 @@ export default function CutoutLab() {
     if (!preparedRef.current || !dRef.current || !boundsRef.current) { liveBakeRef.current = null; return }
     const seq = ++bakeSeq.current
     const [d, bounds] = [dRef.current, boundsRef.current]
-    bakeStickerEngine(preparedRef.current, d, bounds, p2w(), p2h(), blendRef.current)
+    bakeStickerEngine(preparedRef.current, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height, blendRef.current)
       .then((r) => { if (seq === bakeSeq.current) { liveBakeRef.current = { canvas: r.canvas, bounds }; render() } })
       .catch((e) => setStatus('⚠️ compose failed: ' + String((e as Error)?.message ?? e))) // fail LOUD
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,7 +207,7 @@ export default function CutoutLab() {
     const drawn = drawnRef.current
     const fin: FinishResult | null = drawn && img
       ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, settingsRef.current)
-      : preparedRef.current ? finishSpec(preparedRef.current, settingsRef.current) : null
+      : preparedRef.current ? finishSpec(preparedRef.current, settingsRef.current, img?.width) : null
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
@@ -424,7 +424,7 @@ export default function CutoutLab() {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current) return
     if (!preparedRef.current) return
-    const baked = await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, p2w(), p2h(), blendRef.current)
+    const baked = await bakeStickerEngine(preparedRef.current, dRef.current, boundsRef.current, imgCanvas.current!.width, imgCanvas.current!.height, blendRef.current)
     baked.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
   }
 
