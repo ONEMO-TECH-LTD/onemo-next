@@ -3,7 +3,7 @@
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
 import type { Mask } from '@/lib/cutout-ai/types'
-import { dilateMask } from '@/lib/effect/mask'
+import { dilateMask, postProcessMask } from '@/lib/effect/mask'
 import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import {
@@ -168,18 +168,23 @@ function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
  *  (segment-ml rasterize): flip rows. imageData/texImage = the image RGB with matte alpha. */
 export function buildPreseg(image: HTMLCanvasElement, mask: Mask): MLResult {
   const { w, h } = mask
-  // soft alpha: the model's continuous channel, else a feathered binary (brushed/boolean masks)
+  // soft alpha: the model's continuous channel, else the ENGINE'S softening mechanism for a binary
+  // mask — resolution downscale + canvas bilinear upscale (exactly how ben.worker's model-res alpha
+  // becomes a soft full-res matte). NOT ctx.filter: that is a documented no-op on Safari's 2D canvas
+  // (composite.ts KAI-9147), which left brushed/boolean masks hard-edged on the phone.
   let soft = mask.soft
   if (!soft) {
     const a = document.createElement('canvas'); a.width = w; a.height = h
     const av = new ImageData(w, h)
     for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = mask.data[i] ? 255 : 0
     a.getContext('2d')!.putImageData(av, 0, 0)
-    const sc = document.createElement('canvas'); sc.width = w; sc.height = h
-    const sctx = sc.getContext('2d')!
-    sctx.filter = `blur(${Math.max(1, w / 700)}px)`
-    sctx.drawImage(a, 0, 0)
-    const sd = sctx.getImageData(0, 0, w, h).data
+    const dsW = Math.max(1, Math.round(w / 4)), dsH = Math.max(1, Math.round(h / 4))
+    const ds = document.createElement('canvas'); ds.width = dsW; ds.height = dsH
+    ds.getContext('2d')!.drawImage(a, 0, 0, dsW, dsH)
+    const up = document.createElement('canvas'); up.width = w; up.height = h
+    const uctx = up.getContext('2d', { willReadFrequently: true })!
+    uctx.drawImage(ds, 0, 0, w, h)
+    const sd = uctx.getImageData(0, 0, w, h).data
     soft = new Uint8Array(w * h)
     for (let i = 0; i < w * h; i++) soft[i] = sd[i * 4 + 3]
   }
@@ -199,9 +204,12 @@ export function buildPreseg(image: HTMLCanvasElement, mask: Mask): MLResult {
       binUp[y * w + x] = mask.data[src + x]
     }
   }
+  // the engine's preseg contract (prepare-effect.ts): "seg.mask is already post-processed" —
+  // run ITS hygiene (cleanup + largest-component), never hand over a raw model/boolean mask.
+  const cleanUp = postProcessMask(binUp, w, h)
   return {
-    mask: binUp, width: w, height: h, imageData: img,
-    texImage: img, texMask: binUp, texW: w, texH: h,
+    mask: cleanUp, width: w, height: h, imageData: img,
+    texImage: img, texMask: cleanUp, texW: w, texH: h,
     adapterId: mask.soft ? 'edgesam' : 'brushed',
   }
 }
