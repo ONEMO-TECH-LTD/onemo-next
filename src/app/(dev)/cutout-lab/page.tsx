@@ -9,7 +9,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CutoutClient } from '@/lib/cutout-ai/client'
 import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
-import { strokeToShape } from '@/lib/freeshape'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
@@ -379,7 +378,7 @@ export default function CutoutLab() {
     if (!paintingRef.current) return
     paintingRef.current = false
     const stroke = strokeRef.current; strokeRef.current = []
-    if (stroke.length < 2) { render(); return }
+    if (stroke.length < 1) { render(); return } // a TAP (single point) is a valid smart-fill prompt (Dan)
     if (toolRef.current === 'draw' || toolRef.current === 'draw-erase') {
       const img = imgCanvas.current!
       const erase = toolRef.current === 'draw-erase'
@@ -389,19 +388,11 @@ export default function CutoutLab() {
       const painted = swathMask(pts, brushPx, img.width, img.height)
       if (!maskRef.current || !hasCutRef.current) {
         if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); render(); return }
-        // fresh creation: a closed loop gets the primitive-snap magic (circle/rect/blob harmonizer)
-        const r = strokeToShape(pts)
-        if (r) {
-          drawnRef.current = { shape: r.shape, ring: r.ring }
-          maskRef.current = maskFromShape(r.shape, img.width, img.height)
-          if (urlRef.current) { try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current) } catch { /* bake falls back */ } }
-          setHasCut(true); applyFinish(); pushHistory()
-          setStatus(`✏️ shape recognized: ${r.verdict} — keep painting to extend, or erase`)
-        } else {
-          drawnRef.current = null
-          setBusy(true); await acceptMask(painted); setBusy(false)
-          setStatus('✏️ painted shape created — keep painting, erase, or tune')
-        }
+        // PURE paint brush (Dan 2026-08-06: shape recognition removed) — the painted area IS the
+        // shape; closed loops fill their interior; the engine pipeline auto-tunes the outline.
+        drawnRef.current = null
+        setBusy(true); await acceptMask(painted); setBusy(false)
+        setStatus('✏️ painted shape created — keep painting, erase, or tune')
         return
       }
       // existing shape: paint UNIONS in, erase SUBTRACTS — auto-tuned by the engine pipeline
