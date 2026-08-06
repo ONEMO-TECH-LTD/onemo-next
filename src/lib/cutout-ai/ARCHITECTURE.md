@@ -32,9 +32,12 @@ to the clean engine repo as one unit.
    worker bundles import the same function. The engine's compositing expects a continuous matte.
    The engine-roster auto-cut path doesn't touch this folder at all: EdgeSAM's raw output plugs
    into the engine's own `finishMatte` tail via `?seg=edgesam` — this folder serves the BRUSH only.
-8. **One AI runtime resident per page** (iPhone OOM law, s62 device evidence). The shell enforces
-   it; this folder enables it (fresh worker per spawn, watchdog kills hung workers so iOS freezes
-   become registered faults).
+8. **One AI MODEL FAMILY resident per page** (iPhone OOM law, s62 device evidence — AMENDED
+   2026-08-07 on Dan's r3 warm-up directive). The original OOM came from TWO different heavyweight
+   runtimes churning (u2net resident + EdgeSAM loading over it, double GPU/CPU fallback). The law's
+   intent survives as: never two model FAMILIES loaded; EdgeSAM-only warm-at-open (engine slot +
+   brush sub, same cached weights, two sessions) is sanctioned — watch old-device memory in
+   calibration. Watchdogs unchanged (hung workers become registered faults).
 
 ## Modules (current)
 ```
