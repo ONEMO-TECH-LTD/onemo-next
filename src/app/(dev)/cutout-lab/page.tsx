@@ -19,7 +19,7 @@ import {
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { segmentV531 } from './v531seg'
-import { wandMask } from '@/lib/cutout-wand'
+import { wandRegion } from '@/lib/cutout-wand'
 
 import { HistoryStack } from './history'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
@@ -386,8 +386,7 @@ export default function CutoutLab() {
       const img = imgCanvas.current!
       const erase = toolRef.current === 'wand-erase'
       const p0 = stroke[stroke.length - 1]
-      const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
-      const region = wandMask(px, p0.x * img.width, p0.y * img.height, 26)
+      const region = wandRegion(img, p0.x * img.width, p0.y * img.height)
       const brushPx = brushRef.current * (img.width / dispRefW())
       if (!maskRef.current || !hasCutRef.current) {
         if (erase) { setStatus('🪄 nothing to erase yet'); render(); return }

@@ -6,8 +6,19 @@
 import MagicWand from 'magic-wand-tool'
 import type { Mask } from '@/lib/cutout-ai/types'
 
+/** The module's own calibration default (Photoshop's classic wand default is ~32; 26 held best on
+ *  the s62 probes). The SHELL never passes a tolerance — replace/tune it HERE. */
+export const WAND_TOLERANCE = 26
+
+/** Contrast-grown region under a tap on a canvas: classic fuzzy-select (pixel I/O lives in the
+ *  module — the shell hands a canvas + a point, nothing else). */
+export function wandRegion(canvas: HTMLCanvasElement, x: number, y: number, tolerance = WAND_TOLERANCE): Mask {
+  const image = canvas.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height)
+  return wandMask(image, x, y, tolerance)
+}
+
 /** Contrast-grown region under a tap: classic fuzzy-select. tolerance = color distance (0-255). */
-export function wandMask(image: ImageData, x: number, y: number, tolerance = 26): Mask {
+export function wandMask(image: ImageData, x: number, y: number, tolerance = WAND_TOLERANCE): Mask {
   const res = MagicWand.floodFill(
     { data: image.data, width: image.width, height: image.height, bytes: 4 },
     Math.max(0, Math.min(image.width - 1, Math.round(x))),

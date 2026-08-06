@@ -5,7 +5,7 @@
 import type { Mask } from '@/lib/cutout-ai/types'
 import { dilateMask, effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
-import { blendPercentToPixels, composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
+import { blendPercentToPixels, composeEffectArtwork, presetFilter, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import {
   detailToFloorMm,
@@ -80,8 +80,6 @@ export interface BlendSettings {
   panY: number             // artwork pan, % of height (−50..50)
 }
 export const BLEND_DEFAULTS: BlendSettings = { blend: 100, fill: 'mirror', preset: 'none', vignette: 0, tint: null, scale: 100, panX: 0, panY: 0 } // Dan 2026-08-06: default blend 100 (compositing ON by default); blend 0 remains the no-composite state — raw image under the vector mask
-export { PRESET_LABELS }
-export type { PresetKey }
 
 
 
