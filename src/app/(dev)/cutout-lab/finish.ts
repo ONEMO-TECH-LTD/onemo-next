@@ -260,12 +260,13 @@ export async function bakeStickerEngine(
   // normalise/expand the background).
   const off = b.blend === 0 && b.fill === 'clamp' && b.scale === 100 && !b.panX && !b.panY
     && b.preset === 'none' && !b.vignette && !b.tint
-  // OFFSET PAST THE FRAME (Dan 2026-08-06): the outline grows freely beyond the image; the
-  // out-of-frame band auto-fills with the MIRROR underlay (flipped per axis → every seam continues
-  // edge-to-edge) through the engine op's FILL machinery at blend 0 — filling, not blending: the
-  // interior stays the untouched original. Clamp/tile stay selectable in the Blend tab.
+  // OFFSET PAST THE FRAME (Dan 2026-08-06): when the outline crosses the image boundary,
+  // COMPOSITING ENGAGES BY DEFAULT — the engine's default magic blend wakes (hides the invented
+  // band's seams) over the selectable fill underlay (clamp / tile / mirror, Blend tab; mirror is
+  // the default — per-axis flipped tiles, edge-to-edge continuity). Inside the frame at blend 0
+  // nothing composites — the original image under the vector mask.
   const outgrown = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > maskW || bounds.maxY > maskH
-  if (off && outgrown) b = { ...b, fill: 'mirror' }
+  if (off && outgrown) b = { ...b, blend: prepared.frontSrc.defaultBlendPercent, fill: 'mirror' }
   else if (off) {
     const src = origCanvas // the untouched original (y-up, engine convention)
     const fw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * k))

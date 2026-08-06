@@ -330,9 +330,12 @@ export default function CutoutLab() {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const vb = viewBoxRef.current, img = imgCanvas.current
     const iw = img?.width ?? 1, ih = img?.height ?? 1
+    // contain-fit letterbox mapping: the canvas element is a fixed box; the content is centered
+    const sc = Math.min(r.width / vb.w, r.height / vb.h)
+    const ox = (r.width - vb.w * sc) / 2, oy = (r.height - vb.h * sc) / 2
     return {
-      x: (vb.x + ((e.clientX - r.left) / r.width) * vb.w) / iw,
-      y: (vb.y + ((e.clientY - r.top) / r.height) * vb.h) / ih,
+      x: (vb.x + (e.clientX - r.left - ox) / sc) / iw,
+      y: (vb.y + (e.clientY - r.top - oy) / sc) / ih,
       label: 1, t: performance.now(),
     }
   }
@@ -565,11 +568,12 @@ export default function CutoutLab() {
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
             </label>
           )}
-          <div style={{ position: 'relative', width: disp.w, margin: '0 auto', display: hasImage ? 'block' : 'none' }}>
+          <div style={{ position: 'relative', width: disp.w, height: disp.h, margin: '0 auto', display: hasImage ? 'block' : 'none' }}>
+            {/* FIXED viewport (Dan): the box never grows — the content contain-fits, the object reads smaller */}
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
               onWheel={(e) => { setBrushR((b) => Math.max(8, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
-              style={{ width: disp.w, height: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
+              style={{ width: '100%', height: '100%', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}

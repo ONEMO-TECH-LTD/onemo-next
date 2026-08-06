@@ -50,7 +50,9 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLock
   const toImg = (e: React.PointerEvent<SVGSVGElement | SVGElement>) => {
     const svg = (e.currentTarget as SVGElement).closest('svg')!
     const r = svg.getBoundingClientRect()
-    return { x: vb.x + ((e.clientX - r.left) / r.width) * vb.w, y: vb.y + ((e.clientY - r.top) / r.height) * vb.h }
+    const sc = Math.min(r.width / vb.w, r.height / vb.h)
+    const ox = (r.width - vb.w * sc) / 2, oy = (r.height - vb.h * sc) / 2
+    return { x: vb.x + (e.clientX - r.left - ox) / sc, y: vb.y + (e.clientY - r.top - oy) / sc }
   }
 
   const move = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -103,7 +105,7 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLock
   return (
     <svg
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
-      style={{ position: 'absolute', inset: 0, width: dispW, height: 'auto', touchAction: 'none', overflow: 'visible' }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
       onPointerMove={move} onPointerUp={up} onPointerLeave={up}
     >
       {mode === 'frame' && (
