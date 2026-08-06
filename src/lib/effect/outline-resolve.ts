@@ -75,7 +75,7 @@ export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, 
 // tension is relative to anchor spacing; Radius = % of half the short side; Curve scales with each
 // anchor's neighbour legs — so all five tools are scale-relative.)
 const STRAIGHTEN_MAX_FRAC = 0.04 // 100% straightens runs deviating up to 4% of the short side (Dan 2026-08-06: 2x sensitivity)
-const SIMPLIFY_MAX_FRAC = 0.05 // 100% simplify tolerance = 5% of the short side (Dan 2026-08-06: 2x sensitivity)
+const SIMPLIFY_MAX_FRAC = 0.025 // 100% simplify tolerance = 2.5% of the short side (proven base; the admin multiplier provides x3 headroom)
 /** Straighten: Clipper2 RDP epsilon = pct × MAX_FRAC × shape short side (px). 0% = OFF. */
 export const straightenEpsPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(300, pct)) / 100) * STRAIGHTEN_MAX_FRAC * scalePx // 300 = admin calibration headroom (Dan 2026-08-06)
 /** Smooth: Paper catmull-rom handle factor. 0% = OFF (no handles introduced); 100% = max round.
