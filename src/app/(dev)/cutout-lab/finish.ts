@@ -384,7 +384,7 @@ export function swathMask(
   const ctx = c.getContext('2d', { willReadFrequently: true })!
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
-  ctx.lineWidth = Math.max(2, brushPx * 2)
+  ctx.lineWidth = Math.max(1, brushPx * 2) // 1px floor (Dan: brush down to 1)
   ctx.beginPath()
   stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
   ctx.stroke()

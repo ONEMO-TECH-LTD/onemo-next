@@ -475,7 +475,7 @@ export default function CutoutLab() {
       const [lo, hi] = CHIP_RANGE[k]
       return { label: k, lo, hi, value: blend[k], set: (v: number) => setBlendTune({ [k]: v }) }
     }
-    return { label: 'brush size', lo: 8, hi: 120, value: brushR, set: setBrushR }
+    return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
   })()
 
   const chipBtn = (active: boolean): React.CSSProperties => ({ ...btn, padding: '4px 10px', fontSize: 12, background: active ? '#0f172a' : '#f1f5f9', color: active ? '#fff' : '#0f172a' })
@@ -575,7 +575,7 @@ export default function CutoutLab() {
             {/* FIXED viewport (Dan): the box never grows — the content contain-fits, the object reads smaller */}
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
-              onWheel={(e) => { setBrushR((b) => Math.max(8, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
+              onWheel={(e) => { setBrushR((b) => Math.max(1, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
               style={{ width: '100%', height: '100%', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
