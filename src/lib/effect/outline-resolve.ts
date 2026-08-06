@@ -192,7 +192,9 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
       const tol = simplifyTolPx(g.simplify, scalePx)
       if (hasRedundantVertices(p, tol)) {
         const ring = flattenPath(p, 0.5)
-        if (ring.length >= 3) p = guard(ringToVPath(ring, 35, Math.max(0.5, tol)))
+        // corner-pin threshold 65°: only genuinely sharp features stay corners — at 35° residual
+        // trace angularity was pinned as hard corners on organic outlines (Dan 15:56).
+        if (ring.length >= 3) p = guard(ringToVPath(ring, 65, Math.max(0.5, tol)))
       }
     }
     // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
