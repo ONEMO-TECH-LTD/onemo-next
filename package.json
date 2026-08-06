@@ -39,6 +39,7 @@
     "jszip": "^3.10.1",
     "leva": "^0.10.1",
     "lucide-react": "^1.23.0",
+    "magic-wand-tool": "^1.1.7",
     "next": "16.2.12",
     "nucleo-core-essential-fill-24": "^1.1.5",
     "nucleo-core-essential-outline-24": "^1.1.6",

@@ -19,6 +19,7 @@ import {
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { segmentV531 } from './v531seg'
+import { wandMask } from '@/lib/cutout-wand'
 
 import { HistoryStack } from './history'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
@@ -362,7 +363,7 @@ export default function CutoutLab() {
   const brushable = () => {
     if (previewRef.current) return false
     const t = toolRef.current
-    if (t === 'draw' || t === 'draw-erase') return !!imgCanvas.current
+    if (t === 'draw' || t === 'draw-erase' || t === 'wand' || t === 'wand-erase') return !!imgCanvas.current
     if (t === 'add' || t === 'erase') return hasCutRef.current && engineSelRef.current === 'edge' && edgeRef.current === 'ready'
     return false
   }
@@ -379,6 +380,25 @@ export default function CutoutLab() {
     paintingRef.current = false
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 1) { render(); return } // a TAP (single point) is a valid smart-fill prompt (Dan)
+    if (toolRef.current === 'wand' || toolRef.current === 'wand-erase') {
+      // CONTRAST BUCKET (real magic-wand lib): tap → region grown by color tolerance → outline
+      // union/subtract. Pure pixels, no AI — the Photoshop bucket Dan asked for.
+      const img = imgCanvas.current!
+      const erase = toolRef.current === 'wand-erase'
+      const p0 = stroke[stroke.length - 1]
+      const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
+      const region = wandMask(px, p0.x * img.width, p0.y * img.height, 26)
+      const brushPx = brushRef.current * (img.width / dispRefW())
+      if (!maskRef.current || !hasCutRef.current) {
+        if (erase) { setStatus('🪄 nothing to erase yet'); render(); return }
+        setBusy(true); await acceptMask(polishMask(region, brushPx)); setBusy(false)
+        setStatus('🪄 region filled — tap more, or erase'); return
+      }
+      const combined = polishMask(erase ? subtractMasks(maskRef.current, region) : unionMasks(maskRef.current, region), brushPx)
+      setBusy(true); await acceptMask(combined); setBusy(false)
+      setStatus(erase ? '🪄 region erased' : '🪄 region filled')
+      return
+    }
     if (toolRef.current === 'draw' || toolRef.current === 'draw-erase') {
       const img = imgCanvas.current!
       const erase = toolRef.current === 'draw-erase'
@@ -540,6 +560,8 @@ export default function CutoutLab() {
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
           <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
+          <button onClick={() => setTool('wand')} style={chipBtn(tool === 'wand')}>🪄 Wand fill</button>
+          <button onClick={() => setTool('wand-erase')} style={chipBtn(tool === 'wand-erase')}>🪄 Wand erase</button>
           <button onClick={() => enterEdit('nodes')} disabled={!shapeRef.current} style={chipBtn(tool === 'nodes')}>⬡ Nodes</button>
           <button onClick={() => enterEdit('frame')} disabled={!shapeRef.current} style={chipBtn(tool === 'frame')}>▣ Frame</button>
           {tool === 'frame' && (

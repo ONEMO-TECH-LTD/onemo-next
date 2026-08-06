@@ -1,7 +1,7 @@
 // cutout-lab — control-surface config DATA (tabs → chips → knob ranges). Data only, no logic:
 // the shell renders from this; adding a knob = one entry here.
 
-export type Tool = 'add' | 'erase' | 'draw' | 'draw-erase' | 'nodes' | 'frame'
+export type Tool = 'add' | 'erase' | 'draw' | 'draw-erase' | 'wand' | 'wand-erase' | 'nodes' | 'frame'
 export type Tab = 'ai' | 'vector' | 'blend' | 'edit'
 
 export const VEC_CHIPS = ['detail', 'offset', 'simplify', 'smooth', 'radius'] as const // straighten + curve dropped from the surface (Dan 2026-08-06) — engine keeps both
