@@ -22,6 +22,7 @@
 //   • Curve is the one in-house op (native bézier tangent-handle math — no library "bend-by-amount").
 
 import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
+import { resampleClosedUniform } from '@/lib/outline-core'
 import { flattenPath, ringToVPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
@@ -90,7 +91,7 @@ export function outlineRadiusMaxPx(shape: VShape): number {
   return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
 }
 export const outlineRadiusPx = (pct: number, shape: VShape) =>
-  (Math.max(0, Math.min(100, pct)) / 100) * outlineRadiusMaxPx(shape)
+  (Math.max(0, Math.min(100, pct)) / 100) * outlineRadiusMaxPx(shape) * 0.5 // global 50% intensity — full-scale overshot the shape (Dan 2026-08-06)
 /** Whole-outline Curve slider geometry: 0..100% maps to the engine's 0..2 bend factor. */
 export const outlineCurveFactor = (pct: number) =>
   (Math.max(0, Math.min(300, pct)) / 100) * 2 // 300 = admin calibration headroom (Dan 2026-08-06)
@@ -191,7 +192,12 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     if (g.simplify > 0) {
       const tol = simplifyTolPx(g.simplify, scalePx)
       if (hasRedundantVertices(p, tol)) {
-        const ring = flattenPath(p, 0.5)
+        // DENSIFY before fitting (Dan 2026-08-06: Detail-then-Simplify broke — flattening a coarse
+        // faceted polygon yields only its corner vertices, and a curve fitted through sparse points
+        // is underconstrained: it bulges/folds between them). Uniform resample at fine spacing keeps
+        // the fit pinned to the actual geometry regardless of how coarse the anchors are.
+        const flat = flattenPath(p, 0.5).map((q) => [q.x, q.y] as Vec2Px)
+        const ring = resampleClosedUniform(flat, 2).map(([x, y]) => ({ x, y }))
         // corner-pin threshold 65°: only genuinely sharp features stay corners — at 35° residual
         // trace angularity was pinned as hard corners on organic outlines (Dan 15:56).
         if (ring.length >= 3) p = guard(ringToVPath(ring, 65, Math.max(0.5, tol)))
@@ -205,8 +211,9 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     //    0–50 = the classic single-pass range (factor 0→1); 50–100 = a second rounding pass ramping
     //    on top (continuous, monotonic, each pass fold-guarded with the same back-off).
     if (g.smooth > 0) {
-      const energy = (Math.max(0, Math.min(100, g.smooth)) / 100) * 2 // 0..2 total rounding energy
-      const passes: number[] = energy <= 1 ? [energy] : [1, energy - 1]
+      const energy = Math.max(0, Math.min(200, g.smooth)) / 50 // 0..4 total rounding energy (knob 0-200; each 50 = one full pass — Dan 2026-08-06)
+      const passes: number[] = []
+      for (let e = energy; e > 0; e -= 1) passes.push(Math.min(1, e))
       for (const f0 of passes) {
         if (f0 <= 0) continue
         let factor = f0

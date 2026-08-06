@@ -11,6 +11,7 @@ export * from './types'
 export { stableStringify, contentHash } from './hash'
 
 export {
+  resampleClosedUniform,
   flattenPath,
   normalizeRing,
   validateSelfIntersection,
