@@ -101,3 +101,42 @@ edit loop composites nothing. The lab gets the same shape.
    EdgeSAM parity · undo/redo/clear · Save output unchanged (hash vs pre-I1, same inputs/settings).
 5. Engine suite 402/402 · typecheck clean · `git diff` on the v5.3.1 perimeter empty.
 6. On-device (Dan): Detail drag on iPhone — no crash. The defining test; nothing is Done before it.
+
+## I2 — edit-time memory floor (KAI-10197 · contract added post-I1, grounded in the code @ 9b98dc45)
+
+The live editing bake composes at DISPLAY resolution; full resolution exists only on Save and 👁
+Preview. The mirror mosaic allocates O(composed region), never 9× texture area.
+
+**The design the code dictates (read, not assumed):**
+- `bakeStickerEngine`'s scale factor is `k = origCanvas.width / maskW` — it already composes
+  correctly at ANY input scale, and `blendPercentToPixels(pct, sourceWidth) = pct·width/2500`
+  scales the blur with source width, so a downscaled compose is visually proportional BY
+  CONSTRUCTION. Therefore: **the bake function does not change for preview-res.** The FLOW builds
+  a display-res `frontSrc` pair (orig + subj downscaled to the display width, built ONCE per
+  prepare, cached on the prepared ref) and passes it to the SAME `bakeStickerEngine`. No second
+  bake pipeline, no resolution parameter threaded through the engine.
+- **Preview becomes a full-res compose trigger**: the page's preview branch draws `liveBakeRef`
+  verbatim (read at head), so after I2 it would show the low-res bake. Entering 👁 Preview (and
+  Save — already full-res) requests a FULL-RES bake through the same single-flight scheduler;
+  the display-res bake may show as the interim until it lands. Exiting preview returns to the
+  display-res live bake. All of this is FLOW policy (cadence law applies unchanged).
+- **Mosaic crop** (mirror fill only — clamp default composes no mosaic): the composed region is
+  `outputBoundsPx + pad` (read from the compose call); the mosaic source must be materialized
+  only over that region (the per-axis flip pattern drawn into a region-sized canvas), never as
+  the full 3w×3h canvas. Implementation is the builder's; the GATES are: allocation O(region),
+  and the composed output pixel-identical (hash) to the full-mosaic compose for the same inputs.
+
+**Laws carried unchanged:** compositor never called mid-drag · single-flight + cooperative
+cancellation (the display-res and full-res bakes share the one scheduler and the one gen token —
+never two bakes in flight) · blend-0 short-circuit · engine perimeter untouched · shell untouched
+except, if needed, a preview-enter/exit action binding (no policy in the shell).
+
+**I2 verification gates (all with evidence):**
+1. Biggest single canvas allocated DURING EDITING ≤ ~4 MB (probe, drag + blend tweaks at defaults
+   and at fill=mirror).
+2. Save output byte-identical (hash) to pre-I2 Save for the same image + settings; Preview's
+   landed full-res bake likewise.
+3. Mirror-region hash gate: cropped-mosaic compose ≡ full-mosaic compose (same inputs).
+4. Mid-drag stays 0-compose (I1's gate re-run, unchanged).
+5. Suite 402/402 · tsc clean · perimeter diff empty · probe numbers pasted into KAI-10197.
+6. On-device (Dan): blend-100 + mirror drag on iPhone — smooth, no crash.
