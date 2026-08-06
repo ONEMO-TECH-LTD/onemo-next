@@ -198,9 +198,12 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
         // the fit pinned to the actual geometry regardless of how coarse the anchors are.
         const flat = flattenPath(p, 0.5).map((q) => [q.x, q.y] as Vec2Px)
         const ring = resampleClosedUniform(flat, 2).map(([x, y]) => ({ x, y }))
-        // corner-pin threshold 65°: only genuinely sharp features stay corners — at 35° residual
-        // trace angularity was pinned as hard corners on organic outlines (Dan 15:56).
-        if (ring.length >= 3) p = guard(ringToVPath(ring, 65, Math.max(0.5, tol)))
+        // PURE smooth-cycle fit (Dan 2026-08-06): NO corner pinning — a hardcoded pin angle kept
+        // locking Detail's coarse facet corners as intentionally-sharp (the odd sharp corners in
+        // the Detail+Simplify combo). With cornersOverride [], the whole outline fits as smooth
+        // curve chains, deviation bounded by the tolerance — sharpness survives only where the
+        // data forces it; deliberate corners are the editor's job, not this knob's.
+        if (ring.length >= 3) p = guard(ringToVPath(ring, 0, Math.max(0.5, tol), []))
       }
     }
     // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
