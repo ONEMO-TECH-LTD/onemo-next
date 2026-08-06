@@ -283,22 +283,8 @@ export async function bakeStickerEngine(
   // y-up tex-space bounds
   const texH = origCanvas.height
   const bUp: OutlineBounds = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }
-  let art = transformArtwork(origCanvas, { ...b, panY: -b.panY }) // y-up: pan direction flips
+  const art = transformArtwork(origCanvas, { ...b, panY: -b.panY }) // y-up: pan direction flips
   const subj = transformArtwork(subjCanvas, { ...b, panY: -b.panY })
-  // UNDER-LAYER FIRST (Dan 2026-08-06): the band stretches from the BLURRED COMPOSITE underneath
-  // the crisp cutout — never from the raw image edge — and the bloom never touches the foreground.
-  // The blur bakes into the background layer at the image frame FIRST (engine op, transparent
-  // subject = background-only); the fill/expansion then stretches THAT composite, and the sharp
-  // subject lands on top with zero further blur. Also cures the mirror fold-line: the reflected
-  // content is pre-blurred before folding.
-  let blendPct = b.blend
-  if (b.blend > 0) {
-    const empty = document.createElement('canvas'); empty.width = 1; empty.height = 1
-    art = (await composeEffectArtwork({
-      originalCanvas: art, subjectCanvas: empty, blendPercent: b.blend, fillMode: 'clamp',
-    })).canvas
-    blendPct = 0
-  }
   const mirror = b.fill === 'mirror'
   const sx = mirror ? origCanvas.width : 0, sy = mirror ? texH : 0
   let original = art, subject = subj
@@ -312,7 +298,7 @@ export async function bakeStickerEngine(
     originalCanvas: original,
     subjectCanvas: subject,
     outputBoundsPx: { minX: bUp.minX + sx, minY: bUp.minY + sy, maxX: bUp.maxX + sx, maxY: bUp.maxY + sy },
-    blendPercent: blendPct, // blur already baked into the under-layer above
+    blendPercent: mirror ? b.blend / 3 : b.blend, // mosaic is 3x wide — keep the blur physically equal
     fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode),
     fxFilter: presetFilter(b.preset),
     vignette: b.vignette / 100,
