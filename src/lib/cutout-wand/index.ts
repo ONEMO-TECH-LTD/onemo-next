@@ -6,9 +6,9 @@
 import MagicWand from 'magic-wand-tool'
 import type { Mask } from '@/lib/cutout-ai/types'
 
-/** The module's own calibration default (Photoshop's classic wand default is ~32; 26 held best on
- *  the s62 probes). The SHELL never passes a tolerance — replace/tune it HERE. */
-export const WAND_TOLERANCE = 26
+/** The module's own calibration default (Photoshop's classic wand default). The SHELL never
+ *  passes a tolerance — replace/tune it HERE. */
+export const WAND_TOLERANCE = 32
 
 /** Contrast-grown region under a tap on a canvas: classic fuzzy-select (pixel I/O lives in the
  *  module — the shell hands a canvas + a point, nothing else). */
@@ -26,6 +26,31 @@ export function wandMask(image: ImageData, x: number, y: number, tolerance = WAN
     tolerance, null, true,
   )
   const data = new Uint8Array(image.width * image.height)
-  if (res?.data) for (let i = 0; i < data.length; i++) data[i] = res.data[i] ? 1 : 0
+  if (res?.data) {
+    // the library's OWN border smoothing (gaussBlurOnlyBorder) — coarse flood edges → smooth
+    const sm = MagicWand.gaussBlurOnlyBorder({ data: res.data, width: image.width, height: image.height, bounds: res.bounds }, 5)
+    const src = sm?.data ?? res.data
+    for (let i = 0; i < data.length; i++) data[i] = src[i] ? 1 : 0
+    fillHoles(data, image.width, image.height)
+  }
   return { data, w: image.width, h: image.height }
+}
+
+/** Fill enclosed holes: background is only what connects to the image border — everything else
+ *  inside the region becomes region (the 'gaps' a tolerance flood leaves on textured content). */
+function fillHoles(mask: Uint8Array, w: number, h: number): void {
+  const outside = new Uint8Array(w * h)
+  const stack: number[] = []
+  const push = (p: number) => { if (!mask[p] && !outside[p]) { outside[p] = 1; stack.push(p) } }
+  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x) }
+  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1) }
+  while (stack.length) {
+    const p = stack.pop()!
+    const x = p % w, y = (p - x) / w
+    if (x > 0) push(p - 1)
+    if (x < w - 1) push(p + 1)
+    if (y > 0) push(p - w)
+    if (y < h - 1) push(p + w)
+  }
+  for (let i = 0; i < mask.length; i++) if (!mask[i] && !outside[i]) mask[i] = 1
 }
