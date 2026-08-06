@@ -44,6 +44,7 @@ export default function CutoutLab() {
   const [disp, setDisp] = useState({ w: 480, h: 360 })
   const [shapeTick, setShapeTick] = useState(0) // re-render signal for the edit overlay
   const [preview, setPreview] = useState(false)
+  const [hasImage, setHasImage] = useState(false)
   const previewRef = useRef(false); previewRef.current = preview
   const [overlayOn, setOverlayOn] = useState(true)
   const overlayRef = useRef(true); overlayRef.current = overlayOn
@@ -271,6 +272,7 @@ export default function CutoutLab() {
     const mctx = master.getContext('2d', { willReadFrequently: true })!
     mctx.drawImage(img, 0, 0, w, h)
     imgCanvas.current = master
+    setHasImage(true)
     const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
@@ -454,9 +456,9 @@ export default function CutoutLab() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
-      <h1 style={{ fontSize: 19, fontWeight: 700 }} data-hist={histTick}>Cutout Lab</h1>
+      <h1 style={{ fontSize: 19, fontWeight: 700, textAlign: 'center' }} data-hist={histTick}>Cutout Lab</h1>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
         <button onClick={save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
@@ -472,7 +474,7 @@ export default function CutoutLab() {
       </div>
 
       {/* TABS (item 10) — chips within, ONE adaptive knob below */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, justifyContent: 'center' }}>
         {(['ai', 'vector', 'blend', 'edit'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{ ...btn, background: tab === t ? '#7c3aed' : '#f1f5f9', color: tab === t ? '#fff' : '#0f172a' }}>
             {t === 'ai' ? '🤖 AI' : t === 'vector' ? '⬡ Vector' : t === 'blend' ? '🎨 Blend' : '✋ Edit'}
@@ -480,7 +482,7 @@ export default function CutoutLab() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
         {tab === 'ai' && (<>
           <select value={engineSel} onChange={(e) => {
             const v = e.target.value as 'edge' | 'u2net'
@@ -531,7 +533,7 @@ export default function CutoutLab() {
       </div>
 
       {/* the ONE adaptive knob for the active tab */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700, minWidth: 90 }}>{knob.label}</span>
         <input type="number" min={knob.lo} max={knob.hi} value={knob.value}
           onChange={(e) => knob.set(Math.max(knob.lo, Math.min(knob.hi, Math.round(+e.target.value))))}
@@ -542,12 +544,20 @@ export default function CutoutLab() {
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div>
-          <div style={{ ...cap, textAlign: 'center' }}>{preview ? 'Preview — same result, cut out' : 'Live result — dimmed outside the shape'}</div>
-          <div style={{ position: 'relative', width: disp.w, margin: '0 auto' }}>
+          {hasImage && <div style={{ ...cap, textAlign: 'center' }}>{preview ? 'Preview — same result, cut out' : 'Live result — dimmed outside the shape'}</div>}
+          {!hasImage && (
+            // EMPTY STATE: transparent, icon + upload prompt, centered (no canvas until an image exists)
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, width: 'min(480px, 86vw)', height: 320, border: '1.5px dashed #cbd5e1', borderRadius: 12, cursor: 'pointer', color: '#64748b', background: 'transparent' }}>
+              <span style={{ fontSize: 40, lineHeight: 1 }}>🖼️</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Upload the image</span>
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+            </label>
+          )}
+          <div style={{ position: 'relative', width: disp.w, margin: '0 auto', display: hasImage ? 'block' : 'none' }}>
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
               onWheel={(e) => { setBrushR((b) => Math.max(8, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
-              style={{ width: disp.w, height: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: '#0b1220', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
+              style={{ width: disp.w, height: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
@@ -557,11 +567,11 @@ export default function CutoutLab() {
         </div>
       </div>
 
-      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, maxWidth: 460 }}>
+      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
         <Stat label="magic cut" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
         <Stat label="brush stroke" value={ms.stroke != null ? `${ms.stroke}ms` : '—'} />
       </div>
-      <p style={{ marginTop: 12, fontSize: 13, color: '#334155' }}><b>Status:</b> {status}</p>
+      <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>
     </div>
   )
 }
