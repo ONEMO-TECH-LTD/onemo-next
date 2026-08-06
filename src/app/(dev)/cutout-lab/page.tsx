@@ -46,7 +46,7 @@ export default function CutoutLab() {
   const [preview, setPreview] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const previewRef = useRef(false); previewRef.current = preview
-  const [overlayOn, setOverlayOn] = useState(true)
+  const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
   const overlayRef = useRef(true); overlayRef.current = overlayOn
 
   const client = useRef<CutoutClient | null>(null)
@@ -527,7 +527,7 @@ export default function CutoutLab() {
         </>)}
         {tab === 'blend' && (<>
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}
-          {(['clamp', 'tile', 'mirror'] as FillChoice[]).map((f) => (
+          {(['mirror', 'clamp'] as FillChoice[]).map((f) => (
             <button key={f} onClick={() => setBlendTune({ fill: f })} style={chipBtn(blend.fill === f)}>{f}</button>
           ))}
           <select value={blend.preset} onChange={(e) => setBlendTune({ preset: e.target.value as PresetKey })} style={{ ...btn, fontSize: 11, padding: '4px 8px' }}>

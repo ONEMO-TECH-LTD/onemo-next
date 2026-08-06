@@ -298,7 +298,7 @@ export async function bakeStickerEngine(
     originalCanvas: original,
     subjectCanvas: subject,
     outputBoundsPx: { minX: bUp.minX + sx, minY: bUp.minY + sy, maxX: bUp.maxX + sx, maxY: bUp.maxY + sy },
-    blendPercent: b.blend,
+    blendPercent: mirror ? b.blend / 3 : b.blend, // mosaic is 3x wide — keep the blur physically equal
     fillMode: mirror ? 'clamp' : (b.fill as ArtworkFillMode),
     fxFilter: presetFilter(b.preset),
     vignette: b.vignette / 100,
