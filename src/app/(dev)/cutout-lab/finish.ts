@@ -196,7 +196,7 @@ function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
  *  RGB at the working cap, model alpha canvas-upscaled onto it — then run the engine's OWN shared
  *  tail (`matteToMLResult`: lo mask @ the bridge's maskDim + hi texture @ the device cap, y-up,
  *  post-processed). All dims are the BRIDGE'S config, none the lab's. */
-export async function buildPreseg(url: string, mask: Mask, autoPreseg?: MLResult): Promise<MLResult> {
+export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   const { w, h } = mask
   const texDim = effectiveTextureDim()
   // original image at the working cap (y-down; matteToMLResult's rasterize does the y-up flip)
@@ -219,24 +219,10 @@ export async function buildPreseg(url: string, mask: Mask, autoPreseg?: MLResult
   mctx.drawImage(a, 0, 0, ow, oh)
   mctx.globalCompositeOperation = 'source-over'
   const { EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
-  const preseg = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
-  // HAND-SHAPE MAGIC SEMANTICS (Dan 2026-08-06 'paint shape tool has no blur'): a painted shape's
-  // OUTLINE is the painted area, but its SUBJECT is the AI object ∩ the painted area — real objects
-  // inside the paint stay crisp, pure background inside it BLURS (the magic look); a from-scratch
-  // shape over background becomes a fully blended window. The MLResult contract carries mask
-  // (outline) and texImage (subject matte) as separate fields — no pipeline change.
-  if (autoPreseg && !mask.soft) {
-    const ti = preseg.texImage
-    const ac = document.createElement('canvas'); ac.width = ti.width; ac.height = ti.height
-    ac.getContext('2d')!.putImageData(autoPreseg.texImage, 0, 0) // y-up, alpha = the AI object matte
-    // rescale the auto matte to this preseg's tex dims and intersect alphas
-    const rc = document.createElement('canvas'); rc.width = ti.width; rc.height = ti.height
-    const rctx = rc.getContext('2d', { willReadFrequently: true })!
-    rctx.drawImage(ac, 0, 0, ti.width, ti.height)
-    const autoA = rctx.getImageData(0, 0, ti.width, ti.height).data
-    for (let i = 3; i < ti.data.length; i += 4) ti.data[i] = Math.min(ti.data[i], autoA[i])
-  }
-  return preseg
+  // ONE LAW for every source (Dan 2026-08-06 final): brushes define the OUTLINE only — the subject
+  // is ALWAYS the outline's own matte, and the blend band is the OFFSET ring. No tool ever defines
+  // a blend area; blur never depends on which tool drew the shape.
+  return matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
 }
 
 /** The lab's engine config = prepareShaped's, with ONE parameter changed through the engine's own
@@ -250,10 +236,9 @@ const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), pa
  *  the user must know when it ran (the 'two layered images' signature, Dan 2026-08-06). */
 export type PrepareProgress = 'downloading-model' | 'cutting' | 'fallback'
 
-/** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out.
- *  `autoPreseg` (painted shapes): the cached AI cut whose object matte intersects the painted area. */
-export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void, autoPreseg?: MLResult): Promise<PreparedEffect> {
-  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, await buildPreseg(url, mask, autoPreseg))
+/** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out. */
+export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffect> {
+  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, await buildPreseg(url, mask))
 }
 
 /** The TRUE v5.3.1 bridge: an untouched segmentML MLResult straight into the shaped pipeline —
