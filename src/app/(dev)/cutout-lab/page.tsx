@@ -14,7 +14,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
-  polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  editableShape, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -442,8 +442,13 @@ export default function CutoutLab() {
     const img = imgCanvas.current, shape = shapeRef.current
     if (!img || !shape) return
     if (!drawnRef.current || drawnRef.current.shape !== shape) {
-      const ring = shapeRing(shape)
-      drawnRef.current = { shape, ring }
+      // EDIT-GRADE SKELETON (Dan 17:52: raw traces carry hundreds of nodes — uneditable on mobile).
+      // Entering edit re-derives the shape through the engine's fitter into SPARSE anchors with
+      // curve handles; visually identical, node count Figma-class.
+      const editable = editableShape(shape)
+      const ring = shapeRing(editable)
+      drawnRef.current = { shape: editable, ring }
+      shapeRef.current = editable
       const zero = { ...ZERO_SETTINGS }
       settingsRef.current = zero; setSettings(zero) // adjustments fold into the baked source — TRUE zero, not the default recipe
     }
@@ -495,7 +500,7 @@ export default function CutoutLab() {
       return { label: k, lo, hi, value: blend[k], set: (v: number) => setBlendTune({ [k]: v }) }
     }
     if (tool === 'wand' || tool === 'wand-erase')
-      return { label: 'wand tolerance', lo: 4, hi: 90, value: wandTol, set: setWandTol } // live calibration (Dan 17:45)
+      return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: setWandTol } // live calibration (Dan 17:45; full 100)
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
   })()
 

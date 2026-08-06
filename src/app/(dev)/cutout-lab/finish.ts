@@ -6,7 +6,8 @@ import type { Mask } from '@/lib/cutout-ai/types'
 import { dilateMask, effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { blendPercentToPixels, composeEffectArtwork, presetFilter, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
-import { flattenShape, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
+import { flattenShape, ringToVPath, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
+import { resampleClosedUniform, type Vec2Px } from '@/lib/outline-core'
 import {
   detailToFloorMm,
   resolveTraceOutline,
@@ -105,6 +106,25 @@ export function finishDrawn(
   if (!resolved) return null
   const bb = shapeBBox(resolved, 1)
   return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
+}
+
+/** EDIT-GRADE SKELETON: the engine's fitter reduces any resolved outline to sparse anchors with
+ *  curve handles (corners >60° pinned as corner anchors) — visually identical, node count suitable
+ *  for finger editing (Dan 2026-08-06: raw traces are uneditable on mobile). */
+export function editableShape(shape: VShape): VShape {
+  const flat = (flattenShape(shape, 0.5)[0] ?? []).map((q) => [q.x, q.y] as Vec2Px)
+  if (flat.length < 3) return shape
+  let perim = 0, minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let i = 0; i < flat.length; i++) {
+    const a = flat[i], b = flat[(i + 1) % flat.length]
+    perim += Math.hypot(b[0] - a[0], b[1] - a[1])
+    if (a[0] < minX) minX = a[0]; if (a[0] > maxX) maxX = a[0]
+    if (a[1] < minY) minY = a[1]; if (a[1] > maxY) maxY = a[1]
+  }
+  const dense = resampleClosedUniform(flat, Math.max(2, perim / 500)).map(([x, y]) => ({ x, y }))
+  const tol = Math.max(2, Math.min(maxX - minX, maxY - minY) * 0.01)
+  const fitted = ringToVPath(dense, 60, tol)
+  return fitted.anchors.length >= 3 ? { paths: [fitted] } : shape
 }
 
 /** Flattened ring of a shape (vector-core op kept OUT of the UI — module boundary). */
