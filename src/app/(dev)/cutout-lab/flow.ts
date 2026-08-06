@@ -257,18 +257,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
     c.spawn()
     edgeRef.current = 'ready'; setEdge('ready') // 'ready' = available; weights load on first use
-    // WARM-UP (Dan's device round): the ENGINE's own download-only preload — weights land in the
-    // browser cache at page open, so the first cut skips the download. Conscious, not silent.
-    preloadBen()
-    // BRUSH warm-up too (Dan r3: 'load lazily on page load so it is ready to detect') — the brush
-    // model loads in the background NOW; the first stroke pays inference only. Failure is silent
-    // here (the stroke path re-tries with its own loud fault).
-    if (engineSelRef.current === 'edge') {
-      withTimeout(c.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush warm-up')
-        .then(() => { brushLoadedRef.current = true })
-        .catch(() => { /* first stroke re-attempts loudly */ })
-    }
-    setStatus('ready — upload an image · ⬇ warming the AI models in the background')
+    setStatus('ready — upload an image')
     return () => c.dispose()
   }, [])
 
@@ -375,7 +364,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (!erase) {
       const base = maskRef.current, w = base.w
       disconnected = true
-      outer: for (let i = 0; i < region.data.length; i++) {
+      outer: for (let i = 0; i < region.data.length; i += 5) { // stride-sampled — worst case stays under the 50ms tool budget
         if (!region.data[i]) continue
         const x = i % w, y = (i / w) | 0
         for (let dy = -2; dy <= 2 && disconnected; dy++) for (let dx = -2; dx <= 2; dx++) {
@@ -567,6 +556,21 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     return false
   }, [])
 
+  // WARM-UP (Dan device r3 + meta's round-3 finding): called by the SHELL AFTER its ?seg URL
+  // write is guaranteed — preloadBen() reads segParam() from the URL at call time, so calling it
+  // from the flow's own mount effect on a bare URL warmed the WRONG model (u2netp) while EdgeSAM
+  // still downloaded at first cut. The engine preload + the brush model both warm here; the first
+  // stroke later pays inference only.
+  const warmup = useCallback(() => {
+    preloadBen()
+    if (engineSelRef.current === 'edge' && !brushLoadedRef.current) {
+      withTimeout(client.current!.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush warm-up')
+        .then(() => { brushLoadedRef.current = true })
+        .catch(() => { /* first stroke re-attempts loudly */ })
+    }
+    setStatus('ready — upload an image · ⬇ warming the AI models in the background')
+  }, [])
+
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
 
   return {
@@ -579,7 +583,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       upload, redetect, setEngine, setTune, setBlendTune,
       wandTap, paintStroke, aiStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview,
+      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

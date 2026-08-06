@@ -27,6 +27,9 @@ export default function CutoutLab() {
     // initializer is clobbered by Next's hydration history-sync → bare URLs silently cut u2net)
     const u = new URL(location.href)
     if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u) }
+    // warm-up AFTER the URL is written — the flow's preload reads ?seg at call time (meta r3 finding)
+    flow.actions.warmup()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const onSegChange = useCallback((v: EngineSel) => {
     // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
