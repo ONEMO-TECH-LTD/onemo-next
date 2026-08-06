@@ -403,6 +403,15 @@ export default function CutoutLab() {
             </label>
           )}
           <div style={{ position: 'relative', width: disp.w, height: disp.h, margin: '0 auto', display: hasImage ? 'block' : 'none' }}>
+            {/* FIRST-CUT LOADER (Dan device r4): the ~2s auto-detection must READ as part of image
+                loading — a visible overlay, not a dead pause. Pure presentation. */}
+            {busy && !hasCut && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none' }}>
+                <div style={{ width: 34, height: 34, border: '3px solid #c7d2fe', borderTopColor: '#7c3aed', borderRadius: '50%', animation: 'cutlab-spin 0.8s linear infinite' }} />
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Loading your image — AI is finding the object…</div>
+                <style>{'@keyframes cutlab-spin { to { transform: rotate(360deg) } }'}</style>
+              </div>
+            )}
             {/* FIXED viewport (Dan): the box never grows — the content contain-fits, the object reads smaller */}
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
