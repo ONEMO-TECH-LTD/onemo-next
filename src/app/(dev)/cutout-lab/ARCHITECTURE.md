@@ -48,10 +48,17 @@ edit loop composites nothing. The lab gets the same shape.
   (`resolveTraceOutline` path). The live view during a drag shows the last committed bake clipped
   to the updating outline — never a fresh compose per tick.
 - **Compose is SINGLE-FLIGHT and LATCHED**: at most one bake in flight, ever; requests during a
-  bake coalesce to the latest settings; a superseded in-flight bake is CANCELLED (its canvases
-  released), not merely ignored. Trigger: knob release / idle (~250ms), upload-accept, tool-commit,
-  Save, Preview. Reference implementation: `twoDFirstFlow`'s first-blur watcher (latched,
-  in-flight-guarded, stale-guarded, reset-on-failure).
+  bake coalesce to the latest settings; a superseded in-flight bake is COOPERATIVELY cancelled —
+  a cancellation token checked between pipeline stages (transform → mosaic → compose → flip →
+  clip → crop), stages after the check skipped, canvas references dropped so memory frees. (True
+  mid-draw abort does not exist in the platform — do not attempt it, do not claim it.) Trigger:
+  knob release / idle (~250ms), upload-accept, tool-commit, Save, Preview. Reference
+  implementation: `twoDFirstFlow`'s first-blur watcher (latched, in-flight-guarded, stale-guarded,
+  reset-on-failure).
+- **Mid-drag visual (design decision, Dan-vetoable on device):** during a drag the view shows the
+  LAST COMMITTED bake clipped to the live-updating outline; the bake catches up on release. The
+  transient clip mismatch at the edge is accepted; if Dan rules otherwise after feeling it, the
+  fallback is raw-image-under-outline mid-drag — a flow-internal change, no shell impact.
 - **Blend-0 short-circuit stands**: neutral settings inside the frame = original under the vector
   mask, compositor not invoked at all (existing law, re-verified in I1).
 
