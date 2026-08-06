@@ -140,3 +140,32 @@ except, if needed, a preview-enter/exit action binding (no policy in the shell).
 4. Mid-drag stays 0-compose (I1's gate re-run, unchanged).
 5. Suite 402/402 · tsc clean · perimeter diff empty · probe numbers pasted into KAI-10197.
 6. On-device (Dan): blend-100 + mirror drag on iPhone — smooth, no crash.
+
+## I2b — tool-loop responsiveness (Dan's device findings 2026-08-06 · blocks I3)
+
+Grounded defects (code-cited, not assumed): the comet fade loop exits on pointer-up
+(`cometLoop` gated on `paintingRef`) so the trail freezes for the whole recognition wait;
+`polishMask`/`swathMask`/`wandRegion`/`maskFromShape`/`buildPreseg` run full-res pixel work ON THE
+MAIN THREAD (>50 ms tasks — the contract's own budget law, unenforced during tool use); `prepareAI`
+chain has NO timeout (a hang leaves `busy` stuck → all tools dead until reload); `buildPreseg`
+re-decodes the image and allocates fresh texture-res canvases EVERY tap (nothing reused — the
+"full stomach").
+
+Laws:
+1. **The comet is real-time, always.** The fade loop runs until the trail is empty, independent
+   of recognition; recognition progress may not stop presentation frames. Gate: trail visibly
+   dissolving WHILE a recognition is in flight (screen-capture evidence).
+2. **No main-thread pixel op > 50 ms during tool use.** Post-processing (polish/swath/wand/mask
+   raster) moves off the main thread (worker) or is chunked under the budget. PerfHUD gestures
+   mark each; the budget law now applies to tools, not just knobs.
+3. **Every await in a tool path carries a timeout → fault status** (the I1 fault-policy pattern):
+   a hang becomes a visible ⚠️ + `busy` released — a stuck-busy lockout is impossible by
+   construction. Gate: injected stall → tool recovers without reload.
+4. **Empty-stomach rule:** per-tap allocations are reused or released — the decoded image and
+   texture-res scratch canvases are cached per upload (invalidated on new upload), not rebuilt per
+   tap. Gate: 10 consecutive wand taps → allocation curve flat after tap 1 (probe numbers), no
+   degradation through ≥10 iterations incl. after Clear.
+5. Engine perimeter untouched · flow owns the policy · shell renders. Unchanged.
+
+Fallback recorded (Dan's, only if optimization genuinely hits a wall — not first resort):
+blend 0 default + clamp-only surface.
