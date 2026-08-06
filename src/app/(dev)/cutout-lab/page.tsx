@@ -14,7 +14,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS,
   drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, prepareAI, prepareNative,
-  shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -393,13 +393,13 @@ export default function CutoutLab() {
         // PURE paint brush (Dan 2026-08-06: shape recognition removed) — the painted area IS the
         // shape; closed loops fill their interior; the engine pipeline auto-tunes the outline.
         drawnRef.current = null
-        setBusy(true); await acceptMask(painted); setBusy(false)
+        setBusy(true); await acceptMask(polishMask(painted, brushPx)); setBusy(false)
         setStatus('✏️ painted shape created — keep painting, erase, or tune')
         return
       }
       // existing shape: paint UNIONS in, erase SUBTRACTS — auto-tuned by the engine pipeline
       drawnRef.current = null
-      const combined = erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted)
+      const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx)
       setBusy(true)
       await acceptMask(combined)
       setBusy(false)

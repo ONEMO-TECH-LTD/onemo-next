@@ -3,7 +3,7 @@
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
 import type { Mask } from '@/lib/cutout-ai/types'
-import { dilateMask, effectiveTextureDim } from '@/lib/effect/mask'
+import { dilateMask, effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { blendPercentToPixels, composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
@@ -138,6 +138,14 @@ export function unionMasks(base: Mask, add: Mask): Mask {
   for (let i = 0; i < data.length; i++) if (add.data[i]) data[i] = 1
   return { data, w: base.w, h: base.h }
 }
+/** Normalize a painted combination with the ENGINE'S own mask smoothing (box-blur + re-threshold):
+ *  fills concave bites and shaves nubs smaller than the radius — the 'insect bites' where strokes
+ *  meet the mask (Dan 2026-08-06). Radius rides the brush size (bold brush = bolder polish). */
+export function polishMask(mask: Mask, brushPx: number): Mask {
+  const r = Math.max(2, Math.round(brushPx / 3))
+  return { data: smoothMask(mask.data, mask.w, mask.h, r), w: mask.w, h: mask.h }
+}
+
 export function subtractMasks(base: Mask, sub: Mask): Mask {
   const data = new Uint8Array(base.data)
   for (let i = 0; i < data.length; i++) if (sub.data[i]) data[i] = 0
