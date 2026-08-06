@@ -33,6 +33,8 @@ export default function CutoutLab() {
   const [blendChip, setBlendChip] = useState<(typeof BLEND_CHIPS)[number]>('blend')
   const [engineSel, setEngineSel] = useState<'edge' | 'u2net'>('edge')
   const [aspectLocked, setAspectLocked] = useState(true)
+  const [sens, setSens] = useState(1) // admin sensitivity multiplier for straighten/simplify/curve (ceiling probe)
+  const sensRef = useRef(1)
   const [brushR, setBrushR] = useState(40)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
@@ -223,9 +225,18 @@ export default function CutoutLab() {
   const applyFinish = useCallback(() => {
     const img = imgCanvas.current
     const drawn = drawnRef.current
+    // admin sensitivity multiplier (x1/1.5/2/3): scales the scale-relative knobs into the engine's
+    // calibration headroom — a ceiling probe, not a config change; knobs keep their true values.
+    const m = sensRef.current
+    const eff = m === 1 ? settingsRef.current : {
+      ...settingsRef.current,
+      straighten: settingsRef.current.straighten * m,
+      simplify: settingsRef.current.simplify * m,
+      curve: settingsRef.current.curve * m,
+    }
     const fin: FinishResult | null = drawn && img
-      ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, settingsRef.current)
-      : preparedRef.current ? finishSpec(preparedRef.current, settingsRef.current, img?.width) : null
+      ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, eff)
+      : preparedRef.current ? finishSpec(preparedRef.current, eff, img?.width) : null
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
@@ -524,6 +535,10 @@ export default function CutoutLab() {
         </>)}
         {tab === 'vector' && (<>
           {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
+          <span style={{ color: '#94a3b8' }}>sens:</span>
+          {[1, 1.5, 2, 3].map((mult) => (
+            <button key={mult} onClick={() => { setSens(mult); sensRef.current = mult; applyFinish() }} style={chipBtn(sens === mult)}>×{mult}</button>
+          ))}
         </>)}
         {tab === 'blend' && (<>
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}
