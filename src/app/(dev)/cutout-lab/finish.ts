@@ -3,7 +3,8 @@
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
 import type { Mask } from '@/lib/cutout-ai/types'
-import { dilateMask, postProcessMask } from '@/lib/effect/mask'
+import { dilateMask, effectiveTextureDim } from '@/lib/effect/mask'
+import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { composeEffectArtwork, presetFilter, PRESET_LABELS, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, shapeBBox, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import {
@@ -164,59 +165,47 @@ function mirrorMosaic(src: HTMLCanvasElement): HTMLCanvasElement {
 // zero glue re-implementation. Removing u2net never removed the settings; the glue had bypassed
 // the pipeline (prepareEffect) that owns them.
 
-/** Model mask (+soft alpha) → the engine's MLResult preseg. The engine convention is Y-UP
- *  (segment-ml rasterize): flip rows. imageData/texImage = the image RGB with matte alpha. */
-export function buildPreseg(image: HTMLCanvasElement, mask: Mask): MLResult {
+/** Model mask (+soft alpha) → the SAME cutout format the worker trio renders (Dan's slot law:
+ *  u2net and SAM are slotted AI engines emitting one MLResult contract; nothing downstream may
+ *  differ from pure v5.3.1). Build the full-res RGBA matte exactly like ben.worker does — original
+ *  RGB at the working cap, model alpha canvas-upscaled onto it — then run the engine's OWN shared
+ *  tail (`matteToMLResult`: lo mask @ the bridge's maskDim + hi texture @ the device cap, y-up,
+ *  post-processed). All dims are the BRIDGE'S config, none the lab's. */
+export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   const { w, h } = mask
-  // soft alpha: the model's continuous channel, else the ENGINE'S softening mechanism for a binary
-  // mask — resolution downscale + canvas bilinear upscale (exactly how ben.worker's model-res alpha
-  // becomes a soft full-res matte). NOT ctx.filter: that is a documented no-op on Safari's 2D canvas
-  // (composite.ts KAI-9147), which left brushed/boolean masks hard-edged on the phone.
-  let soft = mask.soft
-  if (!soft) {
-    const a = document.createElement('canvas'); a.width = w; a.height = h
-    const av = new ImageData(w, h)
-    for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = mask.data[i] ? 255 : 0
-    a.getContext('2d')!.putImageData(av, 0, 0)
-    const dsW = Math.max(1, Math.round(w / 4)), dsH = Math.max(1, Math.round(h / 4))
-    const ds = document.createElement('canvas'); ds.width = dsW; ds.height = dsH
-    ds.getContext('2d')!.drawImage(a, 0, 0, dsW, dsH)
-    const up = document.createElement('canvas'); up.width = w; up.height = h
-    const uctx = up.getContext('2d', { willReadFrequently: true })!
-    uctx.drawImage(ds, 0, 0, w, h)
-    const sd = uctx.getImageData(0, 0, w, h).data
-    soft = new Uint8Array(w * h)
-    for (let i = 0; i < w * h; i++) soft[i] = sd[i * 4 + 3]
-  }
-  // y-up image pixels (engine rasterize convention)
-  const flip = document.createElement('canvas'); flip.width = w; flip.height = h
-  const fctx = flip.getContext('2d', { willReadFrequently: true })!
-  fctx.translate(0, h); fctx.scale(1, -1)
-  fctx.drawImage(image, 0, 0, w, h)
-  const img = fctx.getImageData(0, 0, w, h)
-  // matte alpha into the y-up pixels + the y-up binary mask
-  const data = img.data
-  const binUp = new Uint8Array(w * h)
-  for (let y = 0; y < h; y++) {
-    const src = (h - 1 - y) * w
-    for (let x = 0; x < w; x++) {
-      data[(y * w + x) * 4 + 3] = soft[src + x]
-      binUp[y * w + x] = mask.data[src + x]
-    }
-  }
-  // the engine's preseg contract (prepare-effect.ts): "seg.mask is already post-processed" —
-  // run ITS hygiene (cleanup + largest-component), never hand over a raw model/boolean mask.
-  const cleanUp = postProcessMask(binUp, w, h)
-  return {
-    mask: cleanUp, width: w, height: h, imageData: img,
-    texImage: img, texMask: cleanUp, texW: w, texH: h,
-    adapterId: mask.soft ? 'edgesam' : 'brushed',
-  }
+  const texDim = effectiveTextureDim()
+  // original image at the working cap (y-down; matteToMLResult's rasterize does the y-up flip)
+  const img = new Image(); img.src = url
+  await img.decode()
+  const s = Math.min(1, texDim / Math.max(img.naturalWidth, img.naturalHeight))
+  const ow = Math.max(1, Math.round(img.naturalWidth * s)), oh = Math.max(1, Math.round(img.naturalHeight * s))
+  const matte = document.createElement('canvas'); matte.width = ow; matte.height = oh
+  const mctx = matte.getContext('2d')!
+  mctx.drawImage(img, 0, 0, ow, oh)
+  // model alpha at its own res (soft channel when the model provides one, binary otherwise) —
+  // canvas bilinear upscale to full res is EXACTLY how ben.worker turns model-res alpha into the
+  // soft full-res matte (never ctx.filter — a documented Safari no-op, composite.ts KAI-9147).
+  const a = document.createElement('canvas'); a.width = w; a.height = h
+  const av = new ImageData(w, h)
+  const soft = mask.soft
+  for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = soft ? soft[i] : (mask.data[i] ? 255 : 0)
+  a.getContext('2d')!.putImageData(av, 0, 0)
+  mctx.globalCompositeOperation = 'destination-in'
+  mctx.drawImage(a, 0, 0, ow, oh)
+  mctx.globalCompositeOperation = 'source-over'
+  const { EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
+  return matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
 }
 
 /** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out. */
-export function prepareAI(url: string, image: HTMLCanvasElement, mask: Mask): Promise<PreparedEffect> {
-  return prepareShaped(url, buildPreseg(image, mask))
+export async function prepareAI(url: string, mask: Mask): Promise<PreparedEffect> {
+  return prepareShaped(url, await buildPreseg(url, mask))
+}
+
+/** The TRUE v5.3.1 bridge: an untouched segmentML MLResult straight into prepareShaped — exactly
+ *  what the v5.3.1 flow does. No lab reconstruction of the matte (that was the u2net quality gap). */
+export function prepareNative(url: string, preseg: MLResult): Promise<PreparedEffect> {
+  return prepareShaped(url, preseg)
 }
 
 /** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim. */

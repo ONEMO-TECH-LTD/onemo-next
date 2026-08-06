@@ -14,7 +14,7 @@ import { flattenShape, shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS,
-  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, swathMask,
+  drawCutout, finishDrawn, finishSpec, maskFromShape, maskOverlay, PRESET_LABELS, prepareAI, prepareNative, swathMask,
   subtractMasks, unionMasks,
   type BlendSettings, type FillChoice, type FinishResult, type OutlineBounds, type PresetKey, type TraceOutlineSettings,
 } from './finish'
@@ -86,7 +86,7 @@ export default function CutoutLab() {
     drawnRef.current = s.drawn
     setHasCut(!!(s.mask || s.drawn))
     if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
-      try { preparedRef.current = await prepareAI(urlRef.current, imgCanvas.current, maskRef.current!) } catch { /* keep last prepared */ }
+      try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current!) } catch { /* keep last prepared */ }
     }
     applyFinish()
   }
@@ -216,13 +216,15 @@ export default function CutoutLab() {
     render()
   }, [render, recomposeLive])
 
-  const acceptMask = useCallback(async (mask: Mask) => {
+  const acceptMask = useCallback(async (mask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult) => {
     drawnRef.current = null
     maskRef.current = mask
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
       try {
-        preparedRef.current = await prepareAI(url, img, mask) // the engine's own compositing, verbatim
+        // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
+        // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
+        preparedRef.current = await (preseg ? prepareNative(url, preseg) : prepareAI(url, mask))
       } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message)); return }
     }
     setHasCut(true)
@@ -291,9 +293,9 @@ export default function CutoutLab() {
     try {
       setStatus('✨ AI magic (u2net)…')
       const t0 = performance.now()
-      const r = await segmentV531(url, WORK_MAX)
+      const r = await segmentV531(url, w, h)
       setMs({ cut: Math.round(performance.now() - t0) })
-      await acceptMask(r.mask)
+      await acceptMask(r.mask, r.preseg)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
   }, [acceptMask, render, edgeFault])
@@ -356,7 +358,7 @@ export default function CutoutLab() {
         if (r) {
           drawnRef.current = { shape: r.shape, ring: r.ring }
           maskRef.current = maskFromShape(r.shape, img.width, img.height)
-          if (urlRef.current) { try { preparedRef.current = await prepareAI(urlRef.current, img, maskRef.current) } catch { /* bake falls back */ } }
+          if (urlRef.current) { try { preparedRef.current = await prepareAI(urlRef.current, maskRef.current) } catch { /* bake falls back */ } }
           setHasCut(true); applyFinish(); pushHistory()
           setStatus(`✏️ shape recognized: ${r.verdict} — keep painting to extend, or erase`)
         } else {
@@ -411,7 +413,7 @@ export default function CutoutLab() {
     const ring = (flattenShape(next, 0.5)[0] ?? []).map((p) => ({ x: p.x, y: p.y }))
     drawnRef.current = { shape: next, ring }
     maskRef.current = maskFromShape(next, img.width, img.height)
-    if (urlRef.current) prepareAI(urlRef.current, img, maskRef.current).then((p) => { preparedRef.current = p; render() }).catch(() => {})
+    if (urlRef.current) prepareAI(urlRef.current, maskRef.current).then((p) => { preparedRef.current = p; render() }).catch(() => {})
     applyFinish()
     pushHistory()
   }
