@@ -176,6 +176,19 @@ Laws:
 Fallback recorded (Dan's, only if optimization genuinely hits a wall — not first resort):
 blend 0 default + clamp-only surface.
 
+## PIVOT NOTE (2026-08-07 pm — Dan decision, supersedes the EdgeSAM-era clauses below)
+## "make default blend 0 - remove sam and wand brushes delete completely deslop - use u2 net and
+## lets test the grab cut as additional brush feature ... if it doesnt work we fallback to paint
+## shape and node system" + "whatever opaque changes you did ... better not affect pure u2 net."
+## EdgeSAM + the wand engine are DELETED (7c34a771). u2net is the ONLY cut, consumed VERBATIM
+## (no speculative matte fixes — fillPresegHoles/fillEnclosedHoles/solidifyInterior removed).
+## The refinement brush is GrabCut (src/lib/cutout-grabcut): deterministic, corridor-bounded
+## (~2.5×brush), never-empty floor, lazy OpenCV. Default blend 0 (raw cutout). §I2d's
+## EdgeSAM session/runtime laws and §I2f's SAM-driver clauses are HISTORICAL where they name
+## EdgeSAM; the tool-agnostic laws (§I2g erase/acceptance, tool queue, warm/swap discipline,
+## Cadence, memory floor) STAND and bind GrabCut identically. Restore point: tag
+## s62-snapshot-0807-lab-full @ 50dbba3b.
+
 ## I2d — the stack laws (REWRITTEN 2026-08-07 post-r8; supersedes the post-r7 dual-lazy
 ## version — both prior versions in git history with their concessions)
 
