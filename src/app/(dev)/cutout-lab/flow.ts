@@ -103,6 +103,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
   const wasOutgrownRef = useRef(false)
+  const faultNoteRef = useRef<string | null>(null) // R9-3: an edgeFault reason survives the fallback's status churn
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
   const client = useRef<CutoutClient | null>(null)
   const brushLoadedRef = useRef(false)
@@ -228,14 +229,20 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape, which is
   // safe by construction: one closed ring cannot enclose a hole; gated in the probe suite) ──
-  const acceptMask = useCallback(async (rawMask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean }) => {
+  const acceptMask = useCallback(async (rawMask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean; shapeTruth?: boolean }) => {
     // NO-HOLES LAW (Dan 2026-08-07): every accepted selection is normalized solid — enclosed
     // holes filled (data + soft) so the subject matte never lets the pillow bleed through.
-    const mask = fillEnclosedHoles(rawMask)
+    // micro-hole cap: AI/wand results keep model precision — only dropout-scale enclosed
+    // regions (≤0.2% of the image) are filled; paint sources go solid via shape-truth below.
+    const mask = fillEnclosedHoles(rawMask, opts?.shapeTruth ? 1 : 0.002)
     // LOUD NO-OP (meta amendment C): with holes refilled, a pure-interior erase changes nothing —
     // say so instead of looking dead ("erase does nothing" class).
     if (opts?.erase && maskRef.current && maskArea(mask) === maskArea(maskRef.current)) {
-      setStatus('🔒 inside stays solid — erase carves from the edge inward')
+      // R9-2: two different truths need two different messages — a stroke that removed nothing
+      // at all is NOT an interior refill.
+      setStatus(maskArea(rawMask) === maskArea(maskRef.current)
+        ? '✂️ nothing under the stroke to erase — brush over the shape'
+        : '🔒 inside stays solid — erase carves from the edge inward')
       requestRender()
       return false
     }
@@ -257,13 +264,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     maskRef.current = mask
     setHasCut(true)
     applyFinish()
-    // SHAPE-IS-TRUTH (E6/E7, meta-verified; Dan: "outlined shape is solid fill"): the resolved
-    // outline is the ONE truth — normalize mask+matte to it so tint ≡ outline ≡ matte ≡ Save.
-    // Orphan islands drop for real (the trace keeps the largest loop only — say so loudly, the
-    // wand's SEPARATE-region warning generalized to every add); unpainted interior slivers go
-    // solid. Native u2net preseg stays engine-verbatim (v5.3.1 law) — tool masks only.
+    // SHAPE-IS-TRUTH (E6/E7/E8) — PAINT-DEPOSIT SOURCES ONLY (Dan device 2026-08-07: stamping
+    // the outline onto an AI cut included background between legs/arms — the sticker outline is a
+    // smoothed ENVELOPE by design and must never redefine a model's precise subject). Paint
+    // defines geometry, so there outline ≡ subject is correct: islands drop loudly, slivers go
+    // solid, the blend band is parallel. AI + wand results stay verbatim (v5.3.1 matte law);
+    // their hole guard is fillEnclosedHoles alone — border-connected concavities are untouched.
     let droppedPx = 0
-    if (!preseg && img && url && shapeRef.current) {
+    if (opts?.shapeTruth && !preseg && img && url && shapeRef.current) {
       // E8: the subject derives from the resolved geometry AT OFFSET 0 — the Offset knob is the
       // pillow band's outer ring, never part of the subject. Inner blend line = the same
       // auto-tuned smooth shape → the band is parallel by construction, every tool.
@@ -281,9 +289,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     }
     scheduleBake(true) // tool-commit = a compose trigger (Cadence Law), immediate
     pushHistory()
+    const note = faultNoteRef.current ? ` · ⚠️ ${faultNoteRef.current}` : ''
     setStatus(droppedPx > 60
       ? '⚠️ a SEPARATE region was dropped — the one-shape rule keeps only the main shape (bridge it with a connector first)'
-      : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — brush, draw, edit, tune, or Save`)
+      : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — brush, draw, edit, tune, or Save${note}`)
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish, scheduleBake])
@@ -302,6 +311,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
     c.spawn()
     client.current = c
+    faultNoteRef.current = why
     setStatus('⚠️ ' + why + ' — u2net only now')
   }, [])
 
@@ -336,6 +346,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
     lastFileRef.current = file
+    faultNoteRef.current = null
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
     setHasCut(false); setMs({})
     edgeEncodedRef.current = false
@@ -373,22 +384,36 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // fallback (condition c).
     try {
       if (engineSelRef.current === 'edge') {
-        try {
-          setStatus('✨ AI magic (EdgeSAM · one session)…')
-          const t0 = performance.now()
-          await ensureEdge()
-          setStatus('✨ recognising…')
-          const r = await withTimeout(client.current!.redetect(), T_COMPUTE_MS, 'EdgeSAM detect')
-          perfGesture('segment-edge', performance.now() - t0)
-          setMs({ cut: Math.round(performance.now() - t0) })
-          await acceptMask(r.mask)
-          setBusy(false)
-          return
-        } catch (e) {
-          edgeFault('EdgeSAM failed (' + String((e as Error).message) + ')')
-          engineSelRef.current = 'u2net'; setEngineSel('u2net')
-          adapters.onSegChange('u2net') // URL follows through the shell adapter — loud degradation
+        // R9-3: ONE retry on a fresh worker before the loud fallback — transient load failures
+        // (deploy-env flakiness) were silently degrading to u2net on the first hiccup.
+        let edgeErr: Error | null = null
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            setStatus(attempt ? '✨ retrying EdgeSAM (fresh worker)…' : '✨ AI magic (EdgeSAM · one session)…')
+            const t0 = performance.now()
+            await ensureEdge()
+            setStatus('✨ recognising…')
+            const r = await withTimeout(client.current!.redetect(), T_COMPUTE_MS, 'EdgeSAM detect')
+            perfGesture('segment-edge', performance.now() - t0)
+            setMs({ cut: Math.round(performance.now() - t0) })
+            faultNoteRef.current = null
+            await acceptMask(r.mask)
+            setBusy(false)
+            return
+          } catch (e) {
+            edgeErr = e as Error
+            if (attempt === 0) { // corpse cleanup, then retry once
+              try { client.current?.dispose() } catch { /* gone */ }
+              brushLoadedRef.current = false; edgeEncodedRef.current = false
+              const c = new CutoutClient()
+              c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
+              c.spawn(); client.current = c
+            }
+          }
         }
+        edgeFault('EdgeSAM failed twice (' + String(edgeErr?.message) + ')')
+        engineSelRef.current = 'u2net'; setEngineSel('u2net')
+        adapters.onSegChange('u2net') // URL follows through the shell adapter — loud degradation
       }
       setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
@@ -468,7 +493,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // never holds): if the carved pixels are all enclosed, the fill law restores them exactly.
       const carved = subtractMasks(maskRef.current, region)
       if (maskArea(fillEnclosedHoles(carved)) === maskArea(maskRef.current)) {
-        setStatus('🔒 inside stays solid — erase carves from the edge inward')
+        setStatus(maskArea(carved) === maskArea(maskRef.current)
+          ? '✂️ nothing under the stroke to erase — brush over the shape'
+          : '🔒 inside stays solid — erase carves from the edge inward')
         requestRender(); return
       }
     }
@@ -507,7 +534,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (!maskRef.current || !hasCutRef.current) {
       if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); requestRender(); return }
       drawnRef.current = null
-      setBusy(true); await acceptMask(polishMask(painted, brushPx)); setBusy(false)
+      setBusy(true); await acceptMask(polishMask(painted, brushPx), undefined, { shapeTruth: true }); setBusy(false)
       setStatus('✏️ painted shape created — keep painting, erase, or tune')
       return
     }
@@ -516,23 +543,23 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx)
     perfGesture('paint-polish', performance.now() - tp1)
     setBusy(true)
-    const ok = await acceptMask(combined, undefined, { erase })
+    const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true })
     setBusy(false)
     if (ok) setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
   }), [acceptMask, requestRender, runTool])
 
   const brushStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => {
     if (driverRef.current === 'wand') return wandStroke(stroke, erase, brushR)
-    return aiStroke(stroke, erase)
+    return aiStroke(stroke, erase, brushR)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const aiStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean) => runTool(async () => {
+  const aiStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR = 12) => runTool(async () => {
     setBusy(true)
     try {
       await ensureEdge()
       setStatus(erase ? '🔴 erasing…' : '🟢 filling…')
       const t0 = performance.now()
-      const r = await withTimeout(erase ? client.current!.eraseStroke(stroke) : client.current!.addStroke(stroke), T_COMPUTE_MS, 'AI stroke')
+      const r = await withTimeout(erase ? client.current!.eraseStroke(stroke, brushR / dispWRef.current) : client.current!.addStroke(stroke), T_COMPUTE_MS, 'AI stroke')
       setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
       await acceptMask(r.mask, undefined, { erase })
     } catch (e) {

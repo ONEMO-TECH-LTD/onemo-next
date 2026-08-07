@@ -47,7 +47,7 @@ ctx.onmessage = async (e: MessageEvent) => {
     } else if (d.type === 'add') {
       postMask(d.id, 'mask', await brush!.addStroke(d.stroke), t0)
     } else if (d.type === 'erase') {
-      postMask(d.id, 'mask', await brush!.eraseStroke(d.stroke), t0)
+      postMask(d.id, 'mask', await brush!.eraseStroke(d.stroke, d.brushN), t0)
     }
   } catch (err) {
     post({ type: 'error', id: d?.id, stage: d?.type, error: String((err as Error)?.message ?? err) })

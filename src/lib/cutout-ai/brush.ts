@@ -63,15 +63,45 @@ export class BrushSession {
    *  around the stroke before subtracting — an edge-crossing stroke used to make the model snap
    *  to the WHOLE object and the subtract emptied the base ('No silhouette found', cut killed).
    *  An erase gesture is local by intent; the corridor keeps it local by construction. */
-  async eraseStroke(stroke: Point[]): Promise<Mask> {
+  async eraseStroke(stroke: Point[], brushN = 0.03): Promise<Mask> {
     if (!this.base) return { data: new Uint8Array(0), w: 0, h: 0 }
     const pts = thinStroke(stroke).map((p) => ({ ...p, label: 1 as const }))
-    const region = await this.segment(pts, false)
+    let region = await this.segment(pts, false)
     clipToCorridor(region, pts)
+    // SWATH FALLBACK (meta R9-1): positive-label prompts on a stroke ENTERING from background
+    // make the model segment the BACKGROUND — background ∩ base = ∅ and the carve-inward gesture
+    // erased nothing. If the model region barely touches the base, erase what is literally under
+    // the brush instead: the stroke swath ∩ base. Erase always carves what you brushed.
+    let overlap = 0
+    for (let i = 0; i < region.data.length; i++) if (region.data[i] && this.base.data[i]) overlap++
+    if (overlap < 16) region = strokeSwath(region.w, region.h, pts, brushN)
     this.base.soft = subtractSoft(this.base, region)
     subtract(this.base.data, region.data)
     return this.base
   }
+}
+
+/** Rasterize the stroke polyline as a swath mask (radius = brushN × width, floor 6px). */
+function strokeSwath(w: number, h: number, pts: Point[], brushN: number): Mask {
+  const data = new Uint8Array(w * h)
+  const r = Math.max(6, Math.round(brushN * w))
+  const P = pts.map((p) => ({ x: p.x * w, y: p.y * h }))
+  const r2 = r * r
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const p of P) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
+  const bx0 = Math.max(0, Math.floor(x0 - r)), by0 = Math.max(0, Math.floor(y0 - r))
+  const bx1 = Math.min(w - 1, Math.ceil(x1 + r)), by1 = Math.min(h - 1, Math.ceil(y1 + r))
+  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) {
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[Math.min(i + 1, P.length - 1)]
+      const dx = b.x - a.x, dy = b.y - a.y
+      const L2 = dx * dx + dy * dy
+      const t = L2 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / L2)) : 0
+      const px = a.x + t * dx - x, py = a.y + t * dy - y
+      if (px * px + py * py <= r2) { data[y * w + x] = 1; break }
+    }
+  }
+  return { data, w, h }
 }
 
 /** Zero every region pixel farther than ~12% of the long side from the stroke polyline

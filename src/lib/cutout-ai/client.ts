@@ -76,7 +76,7 @@ export class CutoutClient {
 
   redetect(): Promise<MaskReply> { return this.maskCall({ type: 'redetect' }) }
   addStroke(stroke: Point[]): Promise<MaskReply> { return this.maskCall({ type: 'add', stroke }) }
-  eraseStroke(stroke: Point[]): Promise<MaskReply> { return this.maskCall({ type: 'erase', stroke }) }
+  eraseStroke(stroke: Point[], brushN?: number): Promise<MaskReply> { return this.maskCall({ type: 'erase', stroke, brushN }) }
 
   dispose(): void { this.worker?.terminate(); this.worker = null }
 }
