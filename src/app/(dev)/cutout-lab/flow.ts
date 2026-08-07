@@ -15,7 +15,7 @@ import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import { wandRegion } from '@/lib/cutout-wand'
+import { initWand, wandRegion } from '@/lib/cutout-wand'
 import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
@@ -248,6 +248,17 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // ── fault policy: brush watchdog fault → edge-dead → u2net-only degradation ──
   const edgeFault = useCallback((why: string) => {
     edgeRef.current = 'dead'; setEdge('dead')
+    // RELEASE THE CORPSE (Dan device: manual u2net works, the automatic fallback didn't — a failed
+    // EdgeSAM init leaves the dead brush worker holding its whole WASM arena, strangling the tab
+    // the fallback then runs in; restart 'fixed' it by freeing that memory). Terminate the worker
+    // NOW, respawn it empty (no weights) so the memory is back before the fallback cut starts.
+    try { client.current?.dispose() } catch { /* already gone */ }
+    brushLoadedRef.current = false
+    edgeEncodedRef.current = false
+    const c = new CutoutClient()
+    c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
+    c.spawn()
+    client.current = c
     setStatus('⚠️ ' + why + ' — u2net only now')
   }, [])
 
@@ -309,32 +320,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       return
     }
     setBusy(true)
-    // ONE EDGESAM SESSION TOTAL (Dan critical; B1 law: 'EdgeSAM loads once and serves auto +
-    // brush'): in edge mode the auto-cut runs through the BRUSH worker's single session — the
-    // central-prompt redetect that always existed — and the ENGINE worker never loads EdgeSAM.
-    // The dual-session OOM ('loads, then brush kills it / no backend') is impossible by
-    // construction. The ?seg roster remains the law for auto-only models (u2net path below).
-    // Any edge failure faults LOUDLY and falls back to a u2net cut automatically.
+    // R4-PROVEN SHAPE RESTORED (meta-confirmed verdict on Dan's device evidence: the r6b brush-
+    // worker cut was the regression — the engine roster path is the config Dan's device proved for
+    // a full day; dual-lazy sessions at steady state were empirically fine, the crashes were init
+    // pile-ups + OpenCV-at-open, both dead). ONE pipeline for every AI engine: the v5.3.1 worker
+    // chain, model picked by its own `?seg=` roster parameter. Brush stays LAZY (first stroke).
     try {
-      if (engineSelRef.current === 'edge') {
-        try {
-          setStatus('✨ AI magic (EdgeSAM · one session)…')
-          const t0 = performance.now()
-          await ensureEdge()
-          setStatus('✨ recognising…')
-          const r = await withTimeout(client.current!.redetect(), T_COMPUTE_MS, 'EdgeSAM detect')
-          perfGesture('segment-edge', performance.now() - t0)
-          setMs({ cut: Math.round(performance.now() - t0) })
-          await acceptMask(r.mask)
-          setBusy(false)
-          return
-        } catch (e) {
-          edgeFault('EdgeSAM failed (' + String((e as Error).message) + ')')
-          engineSelRef.current = 'u2net'; setEngineSel('u2net')
-          adapters.onSegChange('u2net') // URL follows, through the shell adapter — loud degradation
-        }
-      }
-      setStatus('✨ AI magic (u2net · v5.3.1)…')
+      setStatus(`✨ AI magic (${engineSelRef.current === 'edge' ? 'EdgeSAM' : 'u2net'} · v5.3.1)…`)
       const t0 = performance.now()
       const r = await withTimeout(segmentV531(url, w, h), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
@@ -342,8 +334,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       await acceptMask(r.mask, r.preseg)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acceptMask, requestRender, ensureEdge, edgeFault])
+  }, [acceptMask, requestRender])
 
   const redetect = useCallback(async () => { if (lastFileRef.current) await upload(lastFileRef.current) }, [upload])
 
@@ -595,18 +586,35 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // still downloaded at first cut. The engine preload + the brush model both warm here; the first
   // stroke later pays inference only.
   const warmup = useCallback(() => {
-    // DOWNLOAD-ONLY at page open, NOTHING instantiates (r4 crash law + meta audit A2): no ORT
-    // session, no OpenCV runtime — sessions/runtimes initialize on first USE, queued visibly.
-    // Edge mode: brush weights into the HTTP cache (the engine worker never runs EdgeSAM — the
-    // one-session law — so preloadBen would session-create the wrong thing at open: meta finding).
-    // u2net mode: the engine's own preload. Manual mode: nothing, ever.
+    // R4-PROVEN WARM-UP (meta-confirmed): the ENGINE's own preload (its selected cut model, via
+    // preloadBen reading ?seg AFTER the shell writes it) + the brush weights into the HTTP cache.
+    // Downloads only — no ORT session, no OpenCV (that instantiates on wand-selector press).
+    // Manual mode warms nothing, ever.
+    if (engineSelRef.current === 'none') return
+    preloadBen()
     if (engineSelRef.current === 'edge') {
       fetch(MODELS.edgesam.enc!).catch(() => {})
       fetch(MODELS.edgesam.dec!).catch(() => {})
-    } else if (engineSelRef.current === 'u2net') {
-      preloadBen()
     }
-    if (engineSelRef.current !== 'none') setStatus('ready — upload an image · ⬇ warming the AI model in the background')
+    setStatus('ready — upload an image · ⬇ warming the AI models in the background')
+  }, [])
+
+  // SWAP-NOT-STACK (meta-confirmed, ASYMMETRIC by platform truth): entering wand DISPOSES the
+  // brush worker (real memory back — worker teardown) and warms OpenCV (user intent = the wand
+  // selector press). The reverse CANNOT dispose OpenCV (main-thread Emscripten heap, no teardown —
+  // resident for page life); leaving wand re-lazies the brush on the next stroke, where ensureEdge
+  // reloads, re-encodes, and re-seeds the base from the current cut (r4 behavior).
+  const wandModeEnter = useCallback(() => {
+    if (brushLoadedRef.current || edgeEncodedRef.current) {
+      try { client.current?.dispose() } catch { /* gone */ }
+      brushLoadedRef.current = false
+      edgeEncodedRef.current = false
+      const c = new CutoutClient()
+      c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
+      c.spawn()
+      client.current = c
+    }
+    void initWand().catch(() => { /* first tap retries loudly through the tool queue */ })
   }, [])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
@@ -621,7 +629,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       upload, redetect, setEngine, setTune, setBlendTune,
       wandTap, paintStroke, aiStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup,
+      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, wandModeEnter,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

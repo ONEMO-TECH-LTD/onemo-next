@@ -23,6 +23,10 @@ function loadCv(): Promise<any> {
   return cvReady
 }
 
+/** Instantiate the wand engine — called on WAND-SELECTOR PRESS (meta swap-not-stack law: OpenCV
+ *  loads on explicit user intent, never at page open; it cannot be torn down once up). */
+export function initWand(): Promise<void> { return loadCv().then(() => undefined) }
+
 /** Contrast-grown region from a tapped point (image px coords). Pixel I/O is module-owned. */
 export async function wandRegion(image: HTMLCanvasElement, x: number, y: number, tolerance: number = WAND_TOLERANCE): Promise<WandMask> {
   const cv = await loadCv()

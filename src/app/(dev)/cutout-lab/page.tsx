@@ -368,8 +368,8 @@ export default function CutoutLab() {
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
           <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
-          <button onClick={() => setTool('wand')} style={chipBtn(tool === 'wand')}>🪄 Wand v2 fill</button>
-          <button onClick={() => setTool('wand-erase')} style={chipBtn(tool === 'wand-erase')}>🪄 Wand v2 erase</button>
+          <button onClick={() => { setTool('wand'); flow.actions.wandModeEnter() }} style={chipBtn(tool === 'wand')}>🪄 Wand v2 fill</button>
+          <button onClick={() => { setTool('wand-erase'); flow.actions.wandModeEnter() }} style={chipBtn(tool === 'wand-erase')}>🪄 Wand v2 erase</button>
           {tool === 'nodes' && selNode && (<>
             <span style={{ color: '#94a3b8' }}>node:</span>
             {(['radius', 'curve'] as const).map((k) => (
