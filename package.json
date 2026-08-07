@@ -53,6 +53,7 @@
     "pikaicons": "^0.0.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "thinking-orbs": "^0.2.0",
     "three": "^0.183.2",
     "utopia-core": "^1.6.0",
     "zustand": "^5.0.12"

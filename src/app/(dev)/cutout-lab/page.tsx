@@ -12,6 +12,7 @@ import { EditorOverlay, type EditMode } from './EditorOverlay'
 import { drawCutout, maskOverlay, type FillChoice } from './finish'
 import { useCutoutLabFlow, type EngineSel } from './flow'
 import PerfHUD from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
+import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
 
 export default function CutoutLab() {
@@ -416,9 +417,8 @@ export default function CutoutLab() {
                 loading — a visible overlay, not a dead pause. Pure presentation. */}
             {busy && !hasCut && (
               <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none' }}>
-                <div style={{ width: 34, height: 34, border: '3px solid #c7d2fe', borderTopColor: '#7c3aed', borderRadius: '50%', animation: 'cutlab-spin 0.8s linear infinite' }} />
+                <ThinkingOrb state="shaping" size={64} theme="light" aria-label="Computing the cutout" />
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
-                <style>{'@keyframes cutlab-spin { to { transform: rotate(360deg) } }'}</style>
               </div>
             )}
             {/* FIXED viewport (Dan): the box never grows — the content contain-fits, the object reads smaller */}
