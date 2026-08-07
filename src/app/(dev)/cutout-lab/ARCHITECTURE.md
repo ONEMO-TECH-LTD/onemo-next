@@ -301,3 +301,46 @@ parked. The paint-deposit tools (draw/draw-erase) are OUTSIDE this ruling and un
 5. Zero regressions: suite 402/402 · perimeter EMPTY · standing probes green · Save byte-identity
    unchanged same-driver · mask tint = current selection, one color per mode (screenshot).
 6. Dan device gate: one brush, two drivers, zero mode confusion.
+
+## I2g — the ACCEPTANCE & TOOL-TRUTH LAWS (Dan rulings 2026-08-07, consolidated; supersedes the
+## blanket shape-truth wording that broke SAM precision — that failure is the provenance here)
+
+Every mask a tool produces passes ONE acceptance seam. What the seam may and may not do is law:
+
+1. **No-holes law** (Dan: "the entire shape must be no holes for wand and AI same … only
+   designated donut shapes may have holes"): every accepted selection has its ENCLOSED empty
+   regions filled solid (data=1, soft=255 — no semi-transparent residue). Border-connected
+   concavities are NEVER enclosed, so this can never eat between-legs/arm-crook precision.
+   Donut shapes = a future designated feature, not the lab.
+2. **Hole-guard scope law (E9, Dan: "the hole guard must not affect any AI generation")**:
+   AI and wand cut masks stay VERBATIM except the enclosed-hole fill and the island drop below.
+   NO outline stamping on AI results, ever — the model's concavities ARE the product precision
+   (the robot screenshots: SAM must read like u2net on the same image).
+3. **Shape-truth-for-paint law**: PAINTED shapes only are normalized solid to the resolved
+   outline — there the outline derives from the strokes and wobble is noise.
+4. **Parallel-band law (E8)**: the blend band's inner line = the resolved shape at the SAME
+   knobs with offset 0; the outer = the same shape + the Offset knob. Band parallel and uniform
+   BY CONSTRUCTION for every tool; raw stroke geometry never renders.
+5. **Erase-reshapes law** (Dan: "eraser must reshape based on the strokes, not erase internal
+   parts"): erase carves the boundary inward. A fully-interior erase is a DESIGNED no-op that
+   says so. An erase must always affect what is under the brush: when the model's region misses
+   the selection, fall back to carving the stroke corridor ∩ selection — an erase gesture can
+   never be silently answerless.
+6. **Erase-bounded law (E1/E2)**: erase magnitude is bounded by the gesture (stroke corridor),
+   never model-object-scale; an erase can NEVER destroy the cut — acceptance validates with the
+   engine BEFORE committing (E3), and failure keeps the last good selection, loudly.
+7. **One-solid-shape / island law**: disconnected additions are dropped FOR REAL at acceptance —
+   never lingering in the mask — and the drop is announced (the wand's SEPARATE-region message,
+   generalized to every add path).
+8. **Mask-view truth law**: the tint is the data truth, drawn on top — Add mode marks the
+   selection green; Erase mode marks the OUTSIDE red; one color per mode, follows the tool
+   instantly.
+9. **Loud-degradation law**: every fallback, drop, and designed no-op states its reason and the
+   reason SURVIVES subsequent status writes (an EdgeSAM fault reason must remain visible through
+   the u2net fallback); transient load failures get one retry before degrading.
+
+Gates (the standing battery, every acceptance-seam delta): SAM concavity ≤ u2net-tightness on
+the same concave subject (notch alpha < 32) · enclosed micro-holes filled after every tool op ·
+deep edge-cross erase SHRINKS, interior erase = loud no-op, erase never zeroes the cut ·
+disconnected-blob drop announced · spiky-blob parallel band uniform · fault reason visible after
+fallback · suite green · perimeter EMPTY · u2net native path byte-verbatim.
