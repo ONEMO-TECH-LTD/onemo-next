@@ -49,7 +49,7 @@ export default function CutoutLab() {
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
   const flow = useCutoutLabFlow({ initialSeg, onSegChange, requestRender })
-  const { status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile, wandTol } = flow.state
+  const { status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile, wandTol, driver } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -140,7 +140,7 @@ export default function CutoutLab() {
     const mask = maskRef.current
     if (mask && overlayRef.current) {
       const t0 = toolRef.current
-      const mode = t0 === 'erase' || t0 === 'draw-erase' || t0 === 'wand-erase' ? 'erase' as const : 'add' as const
+      const mode = t0 === 'erase' || t0 === 'draw-erase' ? 'erase' as const : 'add' as const
       const tmp = document.createElement('canvas'); tmp.width = mask.w; tmp.height = mask.h
       tmp.getContext('2d')!.putImageData(maskOverlay(mask, mode), 0, 0)
       ctx.drawImage(tmp, 0, 0, img.width, img.height)
@@ -250,9 +250,9 @@ export default function CutoutLab() {
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 1) { render(); return } // a TAP (single point) is a valid smart-fill prompt (Dan)
     const t = toolRef.current
-    if (t === 'wand' || t === 'wand-erase') { await flow.actions.wandTap(stroke[stroke.length - 1], wandTol, t === 'wand-erase', brushRef.current); return }
     if (t === 'draw' || t === 'draw-erase') { await flow.actions.paintStroke(stroke, t === 'draw-erase', brushRef.current); return }
-    await flow.actions.aiStroke(stroke, t === 'erase')
+    // I2f: THE brush — the flow routes by active driver (sam = semantic, wand = contrast)
+    await flow.actions.brushStroke(stroke, t === 'erase', brushRef.current)
   }
 
   // ── vector edit (shell = selection/tool state; orchestration = flow) ──
@@ -306,8 +306,8 @@ export default function CutoutLab() {
       if (nodeChip === 'radius') return { label: 'node radius', lo: rLo, hi: rHi, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
       return { label: 'node curve', lo: cLo, hi: cHi, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
     }
-    if (tool === 'wand' || tool === 'wand-erase')
-      return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: flow.actions.setWandTol } // live calibration (Dan 17:45; full 100)
+    if ((tool === 'add' || tool === 'erase') && driver === 'wand')
+      return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: flow.actions.setWandTol } // live calibration (Dan 17:45; full 100) — wand driver only
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
   })()
 
@@ -351,9 +351,13 @@ export default function CutoutLab() {
             <option value="none">No AI · wand + paint only</option>
           </select>
           {(['add', 'erase'] as Tool[]).map((t) => (
-            <button key={t} onClick={() => setTool(t)} disabled={engineSel === 'u2net'} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
+            <button key={t} onClick={() => setTool(t)} disabled={engineSel === 'u2net' && driver === 'sam'} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
           ))}
-          {engineSel === 'u2net' && <span style={{ color: '#b45309' }}>brush off — auto model; switch engine to steer</span>}
+          <span style={{ color: '#94a3b8' }}>driver:</span>
+          {(['sam', 'wand'] as const).map((d) => (
+            <button key={d} onClick={() => flow.actions.setDriver(d)} style={chipBtn(driver === d)}>{d === 'sam' ? '🧠 SAM' : '🪄 Wand2'}</button>
+          ))}
+          {engineSel === 'u2net' && driver === 'sam' && <span style={{ color: '#b45309' }}>SAM driver off on u2net — switch driver to Wand2</span>}
         </>)}
         {tab === 'vector' && (<>
           {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
@@ -368,8 +372,6 @@ export default function CutoutLab() {
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
           <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
-          <button onClick={() => { setTool('wand'); flow.actions.wandModeEnter() }} style={chipBtn(tool === 'wand')}>🪄 Wand v2 fill</button>
-          <button onClick={() => { setTool('wand-erase'); flow.actions.wandModeEnter() }} style={chipBtn(tool === 'wand-erase')}>🪄 Wand v2 erase</button>
           {tool === 'nodes' && selNode && (<>
             <span style={{ color: '#94a3b8' }}>node:</span>
             {(['radius', 'curve'] as const).map((k) => (
