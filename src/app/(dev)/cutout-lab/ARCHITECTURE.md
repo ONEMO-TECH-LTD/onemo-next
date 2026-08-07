@@ -176,32 +176,37 @@ Laws:
 Fallback recorded (Dan's, only if optimization genuinely hits a wall — not first resort):
 blend 0 default + clamp-only surface.
 
-## I2d — the stack laws (REWRITTEN 2026-08-07 post-r7 on device evidence; supersedes the
-## r6b one-session version — kept in git history with its concession)
+## I2d — the stack laws (REWRITTEN 2026-08-07 post-r8; supersedes the post-r7 dual-lazy
+## version — both prior versions in git history with their concessions)
 
-**Provenance note (the A1 concession, on the record):** meta's A1 finding ("two EdgeSAM sessions =
-the crash") was a confounded read — r4 (`31621791`) ran dual sessions at steady state and Dan's
-device called it good for a full day. The real killers were init pile-ups (r3), the OpenCV
-main-thread runtime at page open (wand v2 era), and r6b's runtime divergence. The one-session
-detour (r6/r6b) is reverted; this section is the device-proven configuration.
+**Provenance (two flips, both on device evidence — kept so the reasoning trail survives):**
+(1) meta's A1 ("two sessions = crash") was conceded post-r7 — r4 ran dual sessions at steady
+state and was device-good. (2) The dual-lazy restoration was then ITSELF refuted on device at
+6e9cae2b: the FIRST-STROKE DUAL-INIT (brush session + encode next to the engine's live cut
+session) is the standing crash — r4 had dodged it only by initing post-cut. r6b's one-session
+routing is exonerated: its device failure was the unpinned webgpu-first runtime, deleted since.
+The stable truth is BOTH halves together: one session AND the pinned runtime (meta B-on-pin
+verdict, r8 @ 568b52e7).
 
-1. **Dual-lazy law (the r4 config):** every AI cut runs through the ENGINE's `?seg=` roster
-   (EdgeSAM and u2net alike — the roster law fully restored); the brush is LAZY — session + encode
-   + base re-seed from the current cut on the FIRST stroke, comet masking the one-time ~2s. Dual
-   sessions at steady state are sanctioned (device-proven).
+1. **One-session-on-pin law (r8):** in edge mode the cut AND the strokes run through the brush
+   worker's single EdgeSAM session on the pinned runtime — the engine worker never runs EdgeSAM
+   and never spawns in edge mode. `?seg` stays the roster SELECTOR (the flow routes execution);
+   u2net and manual stay roster-verbatim through the engine chain. Edge failure degrades loudly
+   to u2net with the URL following.
 2. **Runtime-pin law:** every ORT consumer in the lab uses ben.worker's exact proven recipe —
    pure-WASM build, single thread, `['wasm']` EPs, self-hosted. The webgpu-first probe is DELETED
    (its own comment admitted the webgpu build's CPU fallback wants an artifact we don't ship; iOS
    answered "no backend"). No probing, no fallback chains — one boring proven runtime.
-3. **Warm law:** page open downloads bytes, instantiates NOTHING beyond the engine's own preload
-   (`preloadBen` — r4-proven livable): edge adds the two brush-weight fetches; manual ('none')
-   warms nothing; OpenCV loads ONLY on wand-selector press.
+3. **Warm law:** page open downloads bytes, instantiates NOTHING. Edge mode fetches the two
+   brush weights only (`preloadBen` would session-create a model the engine worker must never
+   run); u2net mode uses the engine's own preload; manual ('none') warms nothing; OpenCV loads
+   ONLY on wand-selector press.
 4. **Swap-not-stack law (ASYMMETRIC by platform truth):** entering wand DISPOSES the brush worker
    (terminate = real memory back) and instantiates OpenCV; the reverse cannot dispose OpenCV
    (main-thread Emscripten heap, no teardown — resident for page life). Leaving wand re-lazies the
-   brush: next stroke reloads, re-encodes, re-seeds. If the resident-OpenCV + brush envelope is
-   tight on the oldest target, the completion is OpenCV-in-a-worker (disposable) — measured
-   decision, not assumed.
+   brush: next stroke reloads, re-encodes, re-seeds — and in edge mode that same path restores
+   the CUT session (gate D). If the resident-OpenCV + brush envelope is tight on the oldest
+   target, the completion is OpenCV-in-a-worker (disposable) — measured decision, not assumed.
 5. **Fault law:** recoverable timeouts warn + stay retryable; real worker death → the corpse is
    DISPOSED AND RESPAWNED EMPTY (arena freed) BEFORE the loud u2net degradation runs — the
    fallback never executes inside a strangled tab.
@@ -212,10 +217,11 @@ detour (r6/r6b) is reverted; this section is the device-proven configuration.
    busy; queued taps say so.
 9. **History law:** undo/redo snapshots carry mask + drawn + knobs + blend — state restores whole.
 
-Gates (all probe-asserted in r7 QA): no OpenCV fetch at open · engine cut (`segment` marker,
-`cut: edgesam` via roster) · brush weights/session only at first stroke, base re-seeded · OpenCV
-chunk fetched exactly on wand press · brush revives after wand with the cut preserved · corpse
-disposal before fallback · suite 402/402 · perimeter EMPTY.
+Gates (flipped to r8, probe-asserted): edge mode = `segment-edge` marker present, engine
+`segment` marker ABSENT, ONLY ONE worker alive (the engine worker never spawns) · no u2netp
+fetch in edge mode · no OpenCV fetch at open, chunk exactly on wand press · brush revives after
+wand with the cut restored (gate D) · corpse disposal before fallback · suite 402/402 ·
+perimeter EMPTY.
 
 ## I2e — structure pass (micro-contract, meta audit 2026-08-07 · pure moves, zero behavior change)
 
