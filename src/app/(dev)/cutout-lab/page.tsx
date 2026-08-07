@@ -22,7 +22,7 @@ import { maskOverlay, drawCutout } from '@/lib/shell-render'
 // semantics (shell-edit-live over bridge-node-override).
 import { insertNode, deleteNode, nodeAdjust, measureNode, nodeTapTol } from '@/lib/tool-node-math'
 import { enterEditShape, NODE_MODE_DEFAULT, type NodeMode } from '@/lib/shell-edit-live'
-import { usePaintBinding, useComposeBinding, type LabNotify } from './flow-bindings'
+import { usePaintBinding, useComposeBinding, useControlBehaviors, type LabNotify } from './flow-bindings'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
 
 // ── v1 bench styles (presentation only) ──
@@ -109,6 +109,12 @@ function CutoutLabInner() {
   const effectivePrepared = paintPrepared ?? prepared
   const compose = useComposeBinding({ traced, display, prepared: effectivePrepared, blendVal, fillTile, imgW, imgH, bounds })
   const composed = compose.composed
+  // control-surface behaviors: AUTO_KNOBS once per upload's first cut · value-true auto-blend on outgrowth
+  useControlBehaviors({
+    traced, artworkUrl, bounds, imgW, imgH, blendVal,
+    engineDefaultBlend: effectivePrepared?.frontSrc.defaultBlendPercent ?? 0,
+    commitTool, notify,
+  })
 
   // ── gesture capture (shell duty): svg client point → mask space via the svg's own CTM ──
   const svgRef = useRef<SVGSVGElement>(null)

@@ -188,3 +188,55 @@ export function useComposeBinding(args: {
   const setDragging = useCallback((on: boolean) => sched.setDragging(on), [sched])
   return { composed, setDragging }
 }
+
+// ── CONTROL BEHAVIORS binding: bridge-control-surface's rulings over the descriptor session ─────
+// AUTO_KNOBS (Dan 2026-08-06: default config for ANY shape — offset 3, the rest 10, detail
+// UI-inverted) applied ONCE per upload's first cut; auto-blend-on-outgrowth (value-true: the knob
+// SHOWS the engaged blend; a user's re-zero stands until the next transition into outgrowth).
+import { AUTO_KNOBS, detailKnobToEngine, autoBlendOnOutgrowth } from '@/lib/bridge-control-surface'
+import { BLEND_POLICY_DEFAULTS as BPD } from '@/lib/bridge-compose-policy'
+
+export function useControlBehaviors(args: {
+  traced: boolean
+  artworkUrl: string | undefined
+  bounds: Bounds | null
+  imgW: number
+  imgH: number
+  blendVal: number
+  engineDefaultBlend: number
+  commitTool: (id: string, v: unknown) => unknown
+  notify: LabNotify
+}): void {
+  const { traced, artworkUrl, bounds, imgW, imgH, blendVal, engineDefaultBlend, commitTool, notify } = args
+  const appliedForUrl = useRef<string | undefined>(undefined)
+  const wasOutgrownRef = useRef(false)
+  const cbRef = useRef({ commitTool, notify })
+  useEffect(() => { cbRef.current = { commitTool, notify } }, [commitTool, notify])
+
+  // AUTO_KNOBS — once per upload's FIRST cut (later paint/node commits keep the user's tuning)
+  useEffect(() => {
+    if (!traced || !artworkUrl || appliedForUrl.current === artworkUrl) return
+    appliedForUrl.current = artworkUrl
+    const c = cbRef.current.commitTool
+    c('offset', { pct: AUTO_KNOBS.offset, join: 'sharp' })
+    c('simplify', AUTO_KNOBS.simplify)
+    c('smooth', AUTO_KNOBS.smooth)
+    c('radius', AUTO_KNOBS.radius) // refused harmlessly when the shape carries no corner
+    // detail + offset are BOTH generation params behind one gen record; committing them in the same
+    // tick makes the second clobber the first through the stale gen ref — detail lands a tick later.
+    const t = setTimeout(() => cbRef.current.commitTool('detail', detailKnobToEngine(AUTO_KNOBS.detail)), 120)
+    return () => clearTimeout(t)
+  }, [traced, artworkUrl])
+
+  // AUTO-BLEND on frame exit — the module's pure decision; the knob reflects what is applied
+  useEffect(() => {
+    const { nowOutgrown, setBlendTo } = autoBlendOnOutgrowth(
+      bounds, imgW, imgH, wasOutgrownRef.current, { ...BPD, blend: blendVal }, engineDefaultBlend,
+    )
+    wasOutgrownRef.current = nowOutgrown
+    if (setBlendTo != null && setBlendTo > 0) {
+      cbRef.current.commitTool('blend', setBlendTo)
+      cbRef.current.notify('info', 'blend engaged — the outgrown band gets its fill')
+    }
+  }, [bounds, imgW, imgH, blendVal, engineDefaultBlend])
+}
