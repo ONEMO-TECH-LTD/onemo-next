@@ -21,12 +21,9 @@ Contracts under enforcement: `src/lib/cutout-ai/ARCHITECTURE.md` · `src/lib/fre
 ## 1 — Engine perimeter
 
 - [ ] 1.1 `git diff origin/staging -- src/lib/effect 'src/app/(dev)/effect-creator'` — PASS = the
-      ONLY engine changes are the recorded exceptions: (a) the `finishMatte` shared
+      ONLY engine changes are the two recorded exceptions: (a) the `finishMatte` shared
       post-generation tail extracted verbatim from `runRembg` in `ben.worker.ts`, (b) the EdgeSAM
-      roster entry in `ben-chain.ts` (+ its runner), (c) the I2c holes exception — additive
-      flag-gated multi-ring trace (contour additive variant · prepare-effect cfg flag default OFF
-      · keep-largest scoped to outer components), Dan's 2026-08-07 directive, contract
-      cutout-lab/ARCHITECTURE.md §I2c. Anything else = FAIL.
+      roster entry in `ben-chain.ts` (+ its runner). Anything else = FAIL.
 - [ ] 1.2 The extraction is verbatim: diff `finishMatte` against the pre-extraction u2net path;
       engine suite green (402/402). Any behavioral delta = FAIL.
 
