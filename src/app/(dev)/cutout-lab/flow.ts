@@ -10,19 +10,17 @@
 // perfGesture marks. URL read/write stays a SHELL adapter duty — seg is injected, never read here.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CutoutClient } from '@/lib/cutout-ai/client'
-import { MODELS } from '@/lib/cutout-ai/registry'
-import type { Mask, Point } from '@/lib/cutout-ai/types'
+import type { Mask, Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import { initWand, WAND_TOLERANCE, wandRegion } from '@/lib/cutout-wand'
+import { grabCutRefine } from '@/lib/cutout-grabcut'
 import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
   finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
-import { fillEnclosedHoles, maskArea, maskFromShape, polishMask, solidShapeMask, solidifyInterior, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
+import { maskFromShape, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
@@ -45,7 +43,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   })
 }
 
-export type EngineSel = 'edge' | 'u2net' | 'none'
+export type EngineSel = 'u2net' | 'none'
 
 /** The adapters the flow needs injected (CreatorAdapters precedent — the flow never touches
  *  location/DOM chrome): initial engine from the URL, URL write-back, and a render request the
@@ -74,7 +72,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [busy, setBusy] = useState(false)
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
-  const [edge, setEdge] = useState<'loading' | 'ready' | 'dead'>('loading')
   const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
   const [engineSel, setEngineSel] = useState<EngineSel>(adapters.initialSeg)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
@@ -82,9 +79,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
   const [disp, setDisp] = useState({ w: 480, h: 360 })
-  const [wandTol, setWandTolState] = useState(WAND_TOLERANCE) // S2: the wand knob is BRIDGE state — the shell only renders it
-  const wandTolRef = useRef(WAND_TOLERANCE)
-  const setWandTol = useCallback((v: number) => { wandTolRef.current = v; setWandTolState(v) }, [])
 
   // ── flow-owned refs (policy + view) ──
   const imgCanvas = useRef<HTMLCanvasElement | null>(null)
@@ -101,13 +95,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const blendRef = useRef(blend); blendRef.current = blend
   const engineSelRef = useRef(engineSel); engineSelRef.current = engineSel
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
-  const edgeRef = useRef<'loading' | 'ready' | 'dead'>('loading'); edgeRef.current = edge
   const wasOutgrownRef = useRef(false)
-  const faultNoteRef = useRef<string | null>(null) // R9-3: an edgeFault reason survives the fallback's status churn
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
-  const client = useRef<CutoutClient | null>(null)
-  const brushLoadedRef = useRef(false)
-  const edgeEncodedRef = useRef(false)
   const requestRender = adapters.requestRender
 
   // ── history (pure module, flow-driven) ──
@@ -230,34 +219,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape, which is
   // safe by construction: one closed ring cannot enclose a hole; gated in the probe suite) ──
   const acceptMask = useCallback(async (rawMask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean; shapeTruth?: boolean }) => {
-    // NO-HOLES LAW (Dan 2026-08-07): every accepted selection is normalized solid — enclosed
-    // holes filled (data + soft) so the subject matte never lets the pillow bleed through.
-    // NO-HOLES LAW (Dan 2026-08-07, wiring-audited): fill enclosed holes UNCAPPED for EVERY source.
-    // This is safe by construction and needs no size cap or provenance split — fillEnclosedHoles
-    // floods from the border, so a real concavity (between legs, armpits: reachable from the edge)
-    // is NEVER filled; only a truly-enclosed model dropout is. A cut's leg-gap fills; an interior
-    // erase refills → the loud no-op below; an edge carve (border-reachable) stays carved. The
-    // v5.3.1 postProcessMask only closes 1px pinholes + keeps the largest island — it does NOT fill
-    // interior holes, so THIS is the real hole guard, and it must reach the u2net native matte too
-    // (fillPresegHoles below), not just the lab UI mask.
-    // fill enclosed holes (data-level gaps) THEN floor the interior soft matte to opaque
-    // (EdgeSAM's data=1/low-soft chrome-highlight dips — the internal imperfections u2net doesn't
-    // have; solidifyInterior is a no-op for the binary wand/paint masks and the clean u2net path).
-    const mask = solidifyInterior(fillEnclosedHoles(rawMask))
-    // LOUD NO-OP (meta amendment C): with holes refilled, a pure-interior erase changes nothing —
-    // say so instead of looking dead ("erase does nothing" class).
-    if (opts?.erase && maskRef.current) {
-      // R9-2/R10-2: two different truths, two messages — with a TOLERANCE (a swath fallback can
-      // shave a few anti-aliased edge px; exact equality read those as a real erase).
-      const prev = maskArea(maskRef.current)
-      if (prev - maskArea(mask) <= 24) {
-        setStatus(prev - maskArea(rawMask) <= 24
-          ? '✂️ nothing under the stroke to erase — brush over the shape'
-          : '🔒 inside stays solid — erase carves from the edge inward')
-        requestRender()
-        return false
-      }
-    }
+    // u2net's matte + every mask are consumed VERBATIM (Dan 2026-08-07: no speculative hole/opacity
+    // fixes on the pure path — the EdgeSAM-era guards are deleted with EdgeSAM). Paint sources still
+    // get shape-is-truth below (that is geometry the paint tool OWNS, not a guess on a model matte).
+    const mask = rawMask
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
       try {
@@ -276,12 +241,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     maskRef.current = mask
     setHasCut(true)
     applyFinish()
-    // SHAPE-IS-TRUTH (E6/E7/E8) — PAINT-DEPOSIT SOURCES ONLY (Dan device 2026-08-07: stamping
-    // the outline onto an AI cut included background between legs/arms — the sticker outline is a
-    // smoothed ENVELOPE by design and must never redefine a model's precise subject). Paint
-    // defines geometry, so there outline ≡ subject is correct: islands drop loudly, slivers go
-    // solid, the blend band is parallel. AI + wand results stay verbatim (v5.3.1 matte law);
-    // their hole guard is fillEnclosedHoles alone — border-connected concavities are untouched.
+    // SHAPE-IS-TRUTH (E6/E7/E8) — PAINT-DEPOSIT SOURCES ONLY (Dan device 2026-08-07): the outline
+    // is a smoothed ENVELOPE and must never redefine a model's subject; only paint (which OWNS its
+    // geometry) normalizes to the resolved outline — islands drop loudly, slivers go solid, the
+    // blend band is parallel. The u2net cut + GrabCut refine stay verbatim.
     let droppedPx = 0
     if (opts?.shapeTruth && !preseg && img && url && shapeRef.current) {
       // E8: the subject derives from the resolved geometry AT OFFSET 0 — the Offset knob is the
@@ -301,67 +264,18 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     }
     scheduleBake(true) // tool-commit = a compose trigger (Cadence Law), immediate
     pushHistory()
-    const note = faultNoteRef.current ? ` · ⚠️ ${faultNoteRef.current}` : ''
     setStatus(droppedPx > 60
       ? '⚠️ a SEPARATE region was dropped — the one-shape rule keeps only the main shape (bridge it with a connector first)'
-      : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — brush, draw, edit, tune, or Save${note}`)
+      : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — refine, draw, edit, tune, or Save`)
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish, scheduleBake])
 
-  // ── fault policy: brush watchdog fault → edge-dead → u2net-only degradation ──
-  const edgeFault = useCallback((why: string) => {
-    edgeRef.current = 'dead'; setEdge('dead')
-    // RELEASE THE CORPSE (Dan device: manual u2net works, the automatic fallback didn't — a failed
-    // EdgeSAM init leaves the dead brush worker holding its whole WASM arena, strangling the tab
-    // the fallback then runs in; restart 'fixed' it by freeing that memory). Terminate the worker
-    // NOW, respawn it empty (no weights) so the memory is back before the fallback cut starts.
-    try { client.current?.dispose() } catch { /* already gone */ }
-    brushLoadedRef.current = false
-    edgeEncodedRef.current = false
-    const c = new CutoutClient()
-    c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-    c.spawn()
-    client.current = c
-    faultNoteRef.current = why
-    setStatus('⚠️ ' + why + ' — u2net only now')
-  }, [])
-
-  // ── brush add-on lifecycle (one AI runtime, lazy weights) ──
-  useEffect(() => {
-    const c = new CutoutClient()
-    client.current = c
-    c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-    c.spawn()
-    edgeRef.current = 'ready'; setEdge('ready') // 'ready' = available; weights load on first use
-    setStatus('ready — upload an image')
-    return () => c.dispose()
-  }, [])
-
-  const ensureEdge = useCallback(async () => {
-    const c = client.current!
-    if (!brushLoadedRef.current) {
-      setStatus('⬇ loading brush AI (EdgeSAM, one-time)…')
-      await withTimeout(c.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush AI load')
-      brushLoadedRef.current = true
-    }
-    if (!edgeEncodedRef.current) {
-      setStatus('🧠 AI reading the image…')
-      const img = imgCanvas.current!
-      const px = img.getContext('2d')!.getImageData(0, 0, img.width, img.height)
-      await withTimeout(c.encode(px.data, img.width, img.height), T_COMPUTE_MS, 'AI encode')
-      edgeEncodedRef.current = true
-    }
-    if (maskRef.current) await withTimeout(c.setBase(maskRef.current), T_COMPUTE_MS, 'AI base sync')
-  }, [])
-
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
     lastFileRef.current = file
-    faultNoteRef.current = null
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
     setHasCut(false); setMs({})
-    edgeEncodedRef.current = false
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     const url = URL.createObjectURL(file)
     urlRef.current = url
@@ -378,55 +292,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     requestRender()
-    // MANUAL MODE (Dan, said three times: the wand is INDEPENDENT — no model may load for it):
-    // 'No AI' skips segmentation entirely. The image is ready as-is; wand/paint create the shape.
+    // MANUAL MODE ('No AI'): skip segmentation — the image is ready; paint/grabcut create the shape.
     if (engineSelRef.current === 'none') {
       setHasCut(false)
-      setStatus('🖼 image ready — no AI. Wand-tap or paint to create the shape')
+      setStatus('🖼 image ready — no AI. Paint a shape, or refine with the brush after a detect')
       return
     }
     setBusy(true)
-    // ONE-SESSION-ON-PINNED-WASM (meta verdict 2026-08-07, B-on-pin CONFIRMED): Dan's device
-    // refuted the dual-lazy config at 6e9cae2b — the FIRST-STROKE DUAL-INIT (brush session init
-    // next to the engine's live cut session) is the crash. Edge-mode cut runs through the BRUSH
-    // worker's single session on the PINNED pure-wasm runtime (r6b's routing, exonerated: its
-    // device failure was the now-deleted webgpu-first probe). The engine worker never runs
-    // EdgeSAM; ?seg stays the roster SELECTOR (condition a); u2net/manual stay roster-verbatim
-    // (condition e). Edge failure: corpse cleanup runs inside edgeFault BEFORE the loud u2net
-    // fallback (condition c).
     try {
-      if (engineSelRef.current === 'edge') {
-        // R9-3: ONE retry on a fresh worker before the loud fallback — transient load failures
-        // (deploy-env flakiness) were silently degrading to u2net on the first hiccup.
-        let edgeErr: Error | null = null
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            setStatus(attempt ? '✨ retrying EdgeSAM (fresh worker)…' : '✨ AI magic (EdgeSAM · one session)…')
-            const t0 = performance.now()
-            await ensureEdge()
-            setStatus('✨ recognising…')
-            const r = await withTimeout(client.current!.redetect(), T_COMPUTE_MS, 'EdgeSAM detect')
-            perfGesture('segment-edge', performance.now() - t0)
-            setMs({ cut: Math.round(performance.now() - t0) })
-            faultNoteRef.current = null
-            await acceptMask(r.mask)
-            setBusy(false)
-            return
-          } catch (e) {
-            edgeErr = e as Error
-            if (attempt === 0) { // corpse cleanup, then retry once
-              try { client.current?.dispose() } catch { /* gone */ }
-              brushLoadedRef.current = false; edgeEncodedRef.current = false
-              const c = new CutoutClient()
-              c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-              c.spawn(); client.current = c
-            }
-          }
-        }
-        edgeFault('EdgeSAM failed twice (' + String(edgeErr?.message) + ')')
-        engineSelRef.current = 'u2net'; setEngineSel('u2net')
-        adapters.onSegChange('u2net') // URL follows through the shell adapter — loud degradation
-      }
       setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
       const r = await withTimeout(segmentV531(url, w, h), T_DOWNLOAD_MS, 'AI cut')
@@ -436,14 +309,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acceptMask, requestRender, ensureEdge, edgeFault])
+  }, [acceptMask, requestRender])
 
   const redetect = useCallback(async () => { if (lastFileRef.current) await upload(lastFileRef.current) }, [upload])
 
   const setEngine = useCallback((v: EngineSel) => {
     setEngineSel(v); engineSelRef.current = v
     adapters.onSegChange(v) // URL write = shell adapter duty, invoked through the injected adapter
-    setStatus(v === 'edge' ? 'EdgeSAM engine (v5.3.1 roster)' : v === 'u2net' ? 'u2net engine (v5.3.1 default)' : '🖼 No AI — wand + paint only, no model loads')
+    setStatus(v === 'u2net' ? 'u2net engine (v5.3.1)' : '🖼 No AI — paint only, no model loads')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -473,67 +346,33 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (q) { pendingToolRef.current = null; void runTool(q) }
      
   }, [])
-  // ── I2f — ONE BRUSH, TWO DRIVERS (Dan verbatim: "unify means delete wand brush keep the
-  // engine - re-use brush from sam with wand engine"). The comet brush is THE brush; the driver
-  // decides where regions come from: 'sam' = semantic strokes→prompts (aiStroke, unchanged),
-  // 'wand' = contrast floods from the stroke's samples (coalesced ≥ brushPx spacing — never per
-  // pointer-move). The wand TOOL modes are deleted, not parked. ──
-  const driverRef = useRef<'sam' | 'wand'>('sam')
-  const [driver, setDriverState] = useState<'sam' | 'wand'>('sam')
-  const wandStroke = useCallback((stroke: Point[], erase: boolean, brushR: number) => runTool(async () => {
-    const img = imgCanvas.current!
-    const brushPx = Math.max(4, brushR * (img.width / dispWRef.current))
-    // coalesce the gesture to samples ≥ brushPx apart (a tap = one sample)
+  // ── THE BRUSH — GrabCut refinement (Dan 2026-08-07: EdgeSAM + wand DELETED; u2net is the only
+  // cut, GrabCut the only brush). Paint roughly over a missed area → OpenCV graph-cut snaps to the
+  // real edge and adds it (erase carves). Deterministic, no deep model, OpenCV lazy-loads on the
+  // first stroke. Falls back to a plain painted swath only when there is no base cut to refine. ──
+  const grabCutStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => runTool(async () => {
+    const img = imgCanvas.current
+    if (!img) return
+    const brushPx = brushR * (img.width / dispWRef.current)
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
-    const samples = [pts[0]]
-    for (const p of pts) { const l = samples[samples.length - 1]; if (Math.hypot(p.x - l.x, p.y - l.y) >= brushPx) samples.push(p) }
-    const tw0 = performance.now()
-    const region = { data: new Uint8Array(img.width * img.height), w: img.width, h: img.height }
-    for (const s of samples) {
-      const r = await withTimeout(wandRegion(img, s.x, s.y, wandTolRef.current), T_COMPUTE_MS, 'wand')
-      for (let i = 0; i < region.data.length; i++) if (r.data[i]) region.data[i] = 1
-    }
-    perfGesture('wand-region', performance.now() - tw0)
     if (!maskRef.current || !hasCutRef.current) {
-      if (erase) { setStatus('🪄 nothing to erase yet'); requestRender(); return }
-      setBusy(true); await acceptMask(polishMask(region, brushPx)); setBusy(false)
-      setStatus('🪄 region filled — brush more, or erase'); return
+      // no base to refine — GrabCut needs one; a stroke here PAINTS a shape from scratch (add only)
+      if (erase) { setStatus('✂️ nothing to refine yet — detect a shape or paint one first'); requestRender(); return }
+      drawnRef.current = null
+      setBusy(true); await acceptMask(polishMask(swathMask(pts, brushPx, img.width, img.height), brushPx), undefined, { shapeTruth: true }); setBusy(false)
+      setStatus('✏️ painted shape created — refine, keep painting, or tune')
+      return
     }
-    const tp0 = performance.now()
-    if (erase) {
-      // NO-HOLES no-op detection BEFORE polish (polish re-rounds edges, so post-polish equality
-      // never holds): if the carved pixels are all enclosed, the fill law restores them exactly.
-      const carved = subtractMasks(maskRef.current, region)
-      const prev = maskArea(maskRef.current)
-      if (prev - maskArea(fillEnclosedHoles(carved)) <= 24) {
-        setStatus(prev - maskArea(carved) <= 24
-          ? '✂️ nothing under the stroke to erase — brush over the shape'
-          : '🔒 inside stays solid — erase carves from the edge inward')
-        requestRender(); return
-      }
-    }
-    const combined = polishMask(erase ? subtractMasks(maskRef.current, region) : unionMasks(maskRef.current, region), brushPx)
-    perfGesture('wand-polish', performance.now() - tp0)
-    // ONE-SOLID-SHAPE rule surfaced LOUDLY (Dan device r3: a disconnected wand fill silently
-    // vanished at trace — 'operating in weird way'): if the grown region doesn't touch the
-    // existing shape, the engine's keep-largest rule will drop it — say so instead of swallowing.
-    let disconnected = false
-    if (!erase) {
-      const base = maskRef.current, w = base.w
-      disconnected = true
-      outer: for (let i = 0; i < region.data.length; i += 2) { // stride 2 (meta B4: 5 missed thin connectors → false warnings); early-exit keeps it under budget
-        if (!region.data[i]) continue
-        const x = i % w, y = (i / w) | 0
-        for (let dy = -2; dy <= 2 && disconnected; dy++) for (let dx = -2; dx <= 2; dx++) {
-          const j = (y + dy) * w + (x + dx)
-          if (j >= 0 && j < base.data.length && base.data[j]) { disconnected = false; break outer }
-        }
-      }
-    }
-    setBusy(true); const ok = await acceptMask(combined, undefined, { erase }); setBusy(false)
-    if (ok) setStatus(erase ? '🪄 region erased'
-      : disconnected ? '🪄 filled a SEPARATE region — the one-shape rule drops it unless you bridge it to the main shape (paint a connector)'
-      : '🪄 region filled')
+    setBusy(true)
+    setStatus(erase ? '✂️ refining the edge…' : '✨ finding the edge…')
+    try {
+      const t0 = performance.now()
+      const refined = await withTimeout(grabCutRefine(img, maskRef.current, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
+      perfGesture('grabcut', performance.now() - t0)
+      const ok = await acceptMask(refined, undefined, { erase })
+      if (ok) setStatus(erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge')
+    } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
+    setBusy(false)
   }), [acceptMask, requestRender, runTool])
 
   const paintStroke = useCallback((stroke: Point[], erase: boolean, brushR: number) => runTool(async () => {
@@ -560,29 +399,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setBusy(false)
     if (ok) setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
   }), [acceptMask, requestRender, runTool])
-
-  const brushStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => {
-    if (driverRef.current === 'wand') return wandStroke(stroke, erase, brushR)
-    return aiStroke(stroke, erase, brushR)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const aiStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR = 12) => runTool(async () => {
-    setBusy(true)
-    try {
-      await ensureEdge()
-      setStatus(erase ? '🔴 erasing…' : '🟢 filling…')
-      const t0 = performance.now()
-      const r = await withTimeout(erase ? client.current!.eraseStroke(stroke, brushR / dispWRef.current) : client.current!.addStroke(stroke), T_COMPUTE_MS, 'AI stroke')
-      setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
-      await acceptMask(r.mask, undefined, { erase })
-    } catch (e) {
-      // meta audit B1: a recoverable timeout must NOT kill the brush permanently — warn and stay
-      // ready for a retry; only real worker deaths flip edge-dead.
-      if (String((e as Error).message).includes('timed out')) setStatus('⚠️ ' + String((e as Error).message) + ' — try the stroke again')
-      else edgeFault('brush froze (' + String((e as Error).message) + ')')
-    }
-    setBusy(false)
-  }), [acceptMask, edgeFault, ensureEdge, runTool])
 
   // ── vector edit orchestration (nodes/frame) ──
   const isZero = (t: TraceOutlineSettings) => JSON.stringify(t) === JSON.stringify(ZERO_SETTINGS)
@@ -669,14 +485,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const clearAll = useCallback(() => {
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
-    // the brush worker must not keep the pre-Clear base — reset it to EMPTY via the existing API
-    if (brushLoadedRef.current && imgCanvas.current) {
-      const img = imgCanvas.current
-      withTimeout(client.current!.setBase({ data: new Uint8Array(img.width * img.height), w: img.width, h: img.height }), T_COMPUTE_MS, 'brush base reset')
-        .catch((e) => setStatus('⚠️ ' + String((e as Error).message)))
-    }
     setHasCut(false); pushHistory(); requestRender()
-    setStatus('🗑 cleared — paint, wand, or comet-brush a new shape, or Re-detect')
+    setStatus('🗑 cleared — paint a new shape, or Re-detect')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestRender])
 
@@ -708,82 +518,32 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   const canBrush = useCallback((tool: string): boolean => {
     if (tool === 'draw' || tool === 'draw-erase') return !!imgCanvas.current
-    // add/erase = THE brush (I2f): wand driver needs only an image (model-free); sam driver needs
-    // the promptable engine — an AI stroke CREATES the cut when none exists (Dan's device round:
-    // Clear must not kill the comet brush)
-    if (tool === 'add' || tool === 'erase') {
-      if (!imgCanvas.current) return false
-      if (driverRef.current === 'wand') return true
-      return engineSelRef.current === 'edge' && edgeRef.current === 'ready'
-    }
+    // add/erase = the GrabCut refinement brush — needs the image + a base cut to refine
+    if (tool === 'add' || tool === 'erase') return !!imgCanvas.current && hasCutRef.current
     return false
   }, [])
 
-  // WARM-UP (Dan device r3 + meta's round-3 finding): called by the SHELL AFTER its ?seg URL
-  // write is guaranteed — preloadBen() reads segParam() from the URL at call time, so calling it
-  // from the flow's own mount effect on a bare URL warmed the WRONG model (u2netp) while EdgeSAM
-  // still downloaded at first cut. The engine preload + the brush model both warm here; the first
-  // stroke later pays inference only.
+  // WARM-UP: prefetch u2net weights into the HTTP cache after the shell's ?seg write (downloads
+  // only — no runtime instantiated at open; GrabCut's OpenCV lazy-loads on the first brush stroke).
   const warmup = useCallback(() => {
-    // R4-PROVEN WARM-UP (meta-confirmed): the ENGINE's own preload (its selected cut model, via
-    // preloadBen reading ?seg AFTER the shell writes it) + the brush weights into the HTTP cache.
-    // Downloads only — no ORT session, no OpenCV (that instantiates on wand-selector press).
-    // Manual mode warms nothing, ever.
     if (engineSelRef.current === 'none') return
-    // edge mode: brush weights only (the engine worker never runs EdgeSAM — preloadBen would
-    // session-create the wrong thing at open); u2net mode: the engine's own preload.
-    if (engineSelRef.current === 'edge') {
-      fetch(MODELS.edgesam.enc!).catch(() => {})
-      fetch(MODELS.edgesam.dec!).catch(() => {})
-    } else {
-      preloadBen()
-    }
-    setStatus('ready — upload an image · ⬇ warming the AI models in the background')
-  }, [])
-
-  // SWAP-NOT-STACK (meta-confirmed, ASYMMETRIC by platform truth): entering wand DISPOSES the
-  // brush worker (real memory back — worker teardown) and warms OpenCV (user intent = the wand
-  // selector press). The reverse CANNOT dispose OpenCV (main-thread Emscripten heap, no teardown —
-  // resident for page life); leaving wand re-lazies the brush on the next stroke, where ensureEdge
-  // reloads, re-encodes, and re-seeds the base from the current cut (r4 behavior).
-  const setDriver = useCallback((d: 'sam' | 'wand') => {
-    if (driverRef.current === d) return
-    driverRef.current = d
-    setDriverState(d)
-    if (d === 'wand') {
-      // entering the wand driver DISPOSES the brush worker (real memory back) and warms OpenCV
-      // (user intent = the driver press; it cannot be torn down once up — §I2d.4 asymmetry)
-      if (brushLoadedRef.current || edgeEncodedRef.current) {
-        try { client.current?.dispose() } catch { /* gone */ }
-        brushLoadedRef.current = false
-        edgeEncodedRef.current = false
-        const c = new CutoutClient()
-        c.onProgress = (loaded, total) => setStatus(`⬇ brush AI ${(loaded / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB…`)
-        c.spawn()
-        client.current = c
-      }
-      void initWand().catch(() => { /* first stroke retries loudly through the tool queue */ })
-      setStatus('🪄 Wand2 driver — contrast regions, tolerance knob live')
-    } else {
-      // sam re-lazies on the next stroke (ensureEdge reloads + re-encodes + re-seeds the base)
-      setStatus('🧠 SAM driver — semantic regions')
-    }
+    preloadBen()
+    setStatus('ready — upload an image · ⬇ warming u2net in the background')
   }, [])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
 
   return {
     state: {
-      status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp,
-      wandTol, driver,
+      status, busy, hasCut, hasImage, ms, engineSel, settings, blend, shapeTick, histTick, disp,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
       hasFile: !!lastFileRef.current,
     },
     actions: {
       upload, redetect, setEngine, setTune, setBlendTune,
-      brushStroke, paintStroke, canBrush,
+      grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, setDriver, setWandTol,
+      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

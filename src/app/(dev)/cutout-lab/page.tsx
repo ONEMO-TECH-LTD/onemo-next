@@ -6,7 +6,7 @@
 // no runtime engine imports. The Figma shell (I5) must mount on the same flow unchanged.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Point } from '@/lib/cutout-ai/types'
+import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
 import { drawCutout, maskOverlay, type FillChoice } from './finish'
@@ -18,21 +18,14 @@ import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-co
 export default function CutoutLab() {
   // ── URL ADAPTER (shell duty per contract): read initial ?seg, write on engine change ──
   const [initialSeg] = useState<EngineSel>(() => {
-    if (typeof window === 'undefined') return 'edge'
-    const seg = new URL(location.href).searchParams.get('seg')
-    if (seg === 'off') return 'none' // manual mode: NO model loads at all (wand/paint standalone)
-    return !seg || seg === 'edgesam' ? 'edge' : 'u2net' // DEFAULT = EdgeSAM (Dan: main model is SAM); u2net = dropdown option
+    if (typeof window === 'undefined') return 'u2net'
+    return new URL(location.href).searchParams.get('seg') === 'off' ? 'none' : 'u2net' // DEFAULT = u2net (Dan 2026-08-07: EdgeSAM deleted); 'off' = paint-only
   })
   useEffect(() => {
     // ON-DEVICE CONSOLE (?debug=1): the desktop-vs-iPhone diagnosis gap has burned multiple rounds —
     // eruda surfaces the real device errors (backend init, OOM, worker deaths) on the phone itself.
     if (new URL(location.href).searchParams.get('debug') === '1') void import('eruda').then((e) => e.default.init())
-    // the default-seg WRITE must run POST-MOUNT (QA KAI-10196 r1: a replaceState inside the state
-    // initializer is clobbered by Next's hydration history-sync). DEFAULT = EdgeSAM (Dan: SAM is
-    // the main model; the cheap-stack switch was never decided — u2net stays a dropdown option).
-    const u = new URL(location.href)
-    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u) }
-    // warm-up AFTER the URL write — the flow's preload reads ?seg at call time (meta r3 finding)
+    // DEFAULT = u2net (no ?seg param). warm-up prefetches its weights.
     flow.actions.warmup()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -40,8 +33,7 @@ export default function CutoutLab() {
     // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
     // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
     const u = new URL(location.href)
-    if (v === 'edge') u.searchParams.set('seg', 'edgesam')
-    else if (v === 'none') u.searchParams.set('seg', 'off')
+    if (v === 'none') u.searchParams.set('seg', 'off')
     else u.searchParams.delete('seg')
     history.replaceState(null, '', u)
   }, [])
@@ -50,7 +42,7 @@ export default function CutoutLab() {
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
   const flow = useCutoutLabFlow({ initialSeg, onSegChange, requestRender })
-  const { status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile, wandTol, driver } = flow.state
+  const { status, busy, hasCut, hasImage, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -253,8 +245,8 @@ export default function CutoutLab() {
     if (stroke.length < 1) { render(); return } // a TAP (single point) is a valid smart-fill prompt (Dan)
     const t = toolRef.current
     if (t === 'draw' || t === 'draw-erase') { await flow.actions.paintStroke(stroke, t === 'draw-erase', brushRef.current); return }
-    // I2f: THE brush — the flow routes by active driver (sam = semantic, wand = contrast)
-    await flow.actions.brushStroke(stroke, t === 'erase', brushRef.current)
+    // THE brush — GrabCut refinement (paint roughly → edge-snapped add/erase on the u2net cut)
+    await flow.actions.grabCutStroke(stroke, t === 'erase', brushRef.current)
   }
 
   // ── vector edit (shell = selection/tool state; orchestration = flow) ──
@@ -308,8 +300,6 @@ export default function CutoutLab() {
       if (nodeChip === 'radius') return { label: 'node radius', lo: rLo, hi: rHi, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
       return { label: 'node curve', lo: cLo, hi: cHi, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
     }
-    if ((tool === 'add' || tool === 'erase') && driver === 'wand')
-      return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: flow.actions.setWandTol } // live calibration (Dan 17:45; full 100) — wand driver only
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
   })()
 
@@ -333,7 +323,6 @@ export default function CutoutLab() {
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
         <button onClick={() => { const v = !overlayRef.current; overlayRef.current = v; setOverlayOn(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: overlayOn ? '#f1f5f9' : '#0f172a', color: overlayOn ? '#0f172a' : '#fff' }}>{overlayOn ? '🎭 Mask on' : '🎭 Mask off'}</button>
-        <span style={{ fontSize: 12, color: '#b45309' }}>{edge === 'loading' ? 'EdgeSAM loading…' : edge === 'dead' ? 'EdgeSAM dead — u2net only' : ''}</span>
       </div>
 
       {/* TABS (item 10) — chips within, ONE adaptive knob below */}
@@ -348,18 +337,14 @@ export default function CutoutLab() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
         {tab === 'ai' && (<>
           <select value={engineSel} onChange={(e) => flow.actions.setEngine(e.target.value as EngineSel)} style={{ ...btn, fontSize: 12 }}>
-            <option value="edge">EdgeSAM · auto + brush</option>
-            <option value="u2net">u2net · v5.3.1 (auto only)</option>
-            <option value="none">No AI · wand + paint only</option>
+            <option value="u2net">u2net · v5.3.1 (auto cut)</option>
+            <option value="none">No AI · paint only</option>
           </select>
+          <span style={{ color: '#94a3b8' }}>brush:</span>
           {(['add', 'erase'] as Tool[]).map((t) => (
-            <button key={t} onClick={() => setTool(t)} disabled={engineSel === 'u2net' && driver === 'sam'} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
+            <button key={t} onClick={() => setTool(t)} disabled={!hasCut} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
           ))}
-          <span style={{ color: '#94a3b8' }}>driver:</span>
-          {(['sam', 'wand'] as const).map((d) => (
-            <button key={d} onClick={() => flow.actions.setDriver(d)} style={chipBtn(driver === d)}>{d === 'sam' ? '🧠 SAM' : '🪄 Wand2'}</button>
-          ))}
-          {engineSel === 'u2net' && driver === 'sam' && <span style={{ color: '#b45309' }}>SAM driver off on u2net — switch driver to Wand2</span>}
+          {!hasCut && <span style={{ color: '#94a3b8' }}>detect a shape to refine with the brush</span>}
         </>)}
         {tab === 'vector' && (<>
           {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}

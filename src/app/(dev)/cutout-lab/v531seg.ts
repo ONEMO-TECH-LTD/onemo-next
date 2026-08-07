@@ -5,7 +5,7 @@
 
 import { runCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import type { MLResult } from '@/lib/effect/segment-ml'
-import type { Mask } from '@/lib/cutout-ai/types'
+import type { Mask } from '@/lib/mask-tools/types'
 
 export const V531_KEY = 'u2net-v531'
 export const V531_LABEL = 'u2net · v5.3.1 native (auto, no brush)'

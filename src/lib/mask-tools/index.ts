@@ -4,7 +4,7 @@
 
 import { smoothMask } from '@/lib/effect/mask'
 import { flattenShape, type VShape } from '@/lib/vector-core'
-import type { Mask } from '@/lib/cutout-ai/types'
+import type { Mask } from '@/lib/mask-tools/types'
 
 /** Rasterize a drawn shape to a Mask (subject matte for the blend layer — inside = subject). */
 export function maskFromShape(shape: import('@/lib/vector-core').VShape, w: number, h: number): Mask {
@@ -42,58 +42,6 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   return { data, w: base.w, h: base.h }
 }
 
-/** NO-HOLES LAW (Dan 2026-08-07: "the entire shape must be no holes for wand and AI same" —
- *  micro-holes in the subject matte let the blur pillow bleed through as image artifacts).
- *  Flood the background from the border; any empty region NOT reachable from the border is an
- *  enclosed hole → filled solid (data=1, soft=255 — a SOLID subject, no semi-transparent residue;
- *  outer-edge softness is untouched because only border-unreachable zeros are filled).
- *  Applied at the flow's single mask-acceptance seam, every source. NOTE: editCommit's
- *  maskFromShape bypasses this seam SAFELY — one closed ring cannot enclose a hole. */
-export function fillEnclosedHoles(mask: Mask): Mask {
-  const { w, h } = mask
-  const src = mask.data
-  const reach = new Uint8Array(w * h)
-  const stack: number[] = []
-  for (let x = 0; x < w; x++) { if (!src[x]) stack.push(x); const b = (h - 1) * w + x; if (!src[b]) stack.push(b) }
-  for (let y = 0; y < h; y++) { const l = y * w; if (!src[l]) stack.push(l); const r = l + w - 1; if (!src[r]) stack.push(r) }
-  while (stack.length) {
-    const p = stack.pop()!
-    if (reach[p] || src[p]) continue
-    reach[p] = 1
-    const x = p % w
-    if (x > 0) stack.push(p - 1)
-    if (x < w - 1) stack.push(p + 1)
-    if (p >= w) stack.push(p - w)
-    if (p < w * (h - 1)) stack.push(p + w)
-  }
-  // fill per-REGION with a size cap (Dan 2026-08-07: the hole guard must never affect AI
-  // precision — a large 'enclosed' region behind a thin model bridge is a real concavity, e.g.
-  // between legs, not a micro-hole; only genuinely small dropouts are filled).
-  let data: Uint8Array | null = null
-  let soft: Uint8Array | null = null
-  const seen = new Uint8Array(w * h)
-  for (let p0 = 0; p0 < w * h; p0++) {
-    if (src[p0] || reach[p0] || seen[p0]) continue
-    const px: number[] = []
-    const q = [p0]
-    while (q.length) {
-      const p = q.pop()!
-      if (p < 0 || p >= w * h || seen[p] || src[p] || reach[p]) continue
-      seen[p] = 1; px.push(p)
-      const x = p % w
-      if (x > 0) q.push(p - 1)
-      if (x < w - 1) q.push(p + 1)
-      q.push(p - w, p + w)
-    }
-    if (!data) { data = new Uint8Array(src); soft = mask.soft ? new Uint8Array(mask.soft) : null }
-    for (const p of px) { data[p] = 1; if (soft) soft[p] = 255 }
-  }
-  if (!data) return mask
-  const out: Mask = { data, w, h }
-  if (soft) out.soft = soft
-  return out
-}
-
 /** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize
  *  the RESOLVED outline as the one truth — inside solid (data 1, soft 255), the outer edge band
  *  soft from the rasterizer's own anti-aliasing, outside dropped for real. After this, tint ≡
@@ -111,34 +59,6 @@ export function solidShapeMask(shape: VShape, w: number, h: number): Mask {
   const soft = new Uint8Array(w * h)
   for (let i = 0; i < w * h; i++) { const a = px[i * 4 + 3]; soft[i] = a; data[i] = a > 128 ? 1 : 0 }
   return { data, w, h, soft }
-}
-
-/** SOLID-INTERIOR matte (Dan 2026-08-07: "still internal imperfections on the first SAM
- *  generation; u2net is clean"). EdgeSAM's mask is data=1 where prob>0.5 but soft=255·prob, so a
- *  chrome-highlight pixel at prob≈0.55 is IN the silhouette yet only ~55% opaque — the pillow
- *  shows through as an internal imperfection. fillEnclosedHoles can't touch it (data=1, no hole).
- *  Floor the soft matte to opaque on every INTERIOR foreground pixel, keeping the 1px boundary
- *  ramp for a soft edge — exactly u2net's clean-interior behaviour. No-op when there is no soft
- *  channel (wand/paint are already binary-solid). */
-export function solidifyInterior(mask: Mask): Mask {
-  if (!mask.soft) return mask
-  const { data, w, h, soft } = mask
-  const out = new Uint8Array(soft)
-  let changed = false
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x
-    if (!data[i] || out[i] === 255) continue
-    const boundary = (x > 0 && !data[i - 1]) || (x < w - 1 && !data[i + 1]) || (y > 0 && !data[i - w]) || (y < h - 1 && !data[i + w])
-    if (!boundary) { out[i] = 255; changed = true }
-  }
-  return changed ? { data, w, h, soft: out } : mask
-}
-
-/** Live selection area — cheap op-effect check (the loud interior-erase no-op depends on it). */
-export function maskArea(mask: Mask): number {
-  let a = 0
-  for (let i = 0; i < mask.data.length; i++) if (mask.data[i]) a++
-  return a
 }
 
 /** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
