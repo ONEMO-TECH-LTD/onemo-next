@@ -195,8 +195,9 @@ export function repairSimplePolygon(ptsIn: Vec2Px[], minSpacingPx = 0): Vec2Px[]
 
 // ─── traced rings (exact contours) ───────────────────────────────────────────
 
-/** Uniform arc-length resample of a closed ring (pure; used by the fairing pipeline). */
-function resampleClosedUniform(pts: Vec2Px[], spacingPx: number): Vec2Px[] {
+/** Uniform arc-length resample of a closed ring (pure; used by the fairing pipeline + the Simplify
+ *  adjustor's fit densification). */
+export function resampleClosedUniform(pts: Vec2Px[], spacingPx: number): Vec2Px[] {
   const n = pts.length
   if (n < 3 || spacingPx <= 0) return pts
   let perim = 0
