@@ -228,6 +228,9 @@ export function useComposeBinding(args: {
 // UI-inverted) applied ONCE per upload's first cut; auto-blend-on-outgrowth (value-true: the knob
 // SHOWS the engaged blend; a user's re-zero stands until the next transition into outgrowth).
 import { AUTO_KNOBS, detailKnobToEngine, autoBlendOnOutgrowth } from '@/lib/bridge-control-surface'
+
+/** how long the outline must hold still before a state TRANSITION counts (transient commit shapes). */
+const SETTLE_MS = 400
 import { BLEND_POLICY_DEFAULTS as BPD } from '@/lib/bridge-compose-policy'
 
 export function useControlBehaviors(args: {
@@ -262,15 +265,22 @@ export function useControlBehaviors(args: {
     return () => clearTimeout(t)
   }, [traced, artworkUrl])
 
-  // AUTO-BLEND on frame exit — the module's pure decision; the knob reflects what is applied
+  // AUTO-BLEND on frame exit — the module's pure decision; the knob reflects what is applied.
+  // SETTLED-ONLY (Dan device 2026-08-07): a tool commit swaps the display shape through transient
+  // states (the pre-seed shape can momentarily exceed the frame), and evaluating the transition on
+  // one of those fired blend on an outline that never actually left the frame — an unasked-for
+  // pillow. The check therefore runs only after the bounds have stopped changing.
   useEffect(() => {
-    const { nowOutgrown, setBlendTo } = autoBlendOnOutgrowth(
-      bounds, imgW, imgH, wasOutgrownRef.current, { ...BPD, blend: blendVal }, engineDefaultBlend,
-    )
-    wasOutgrownRef.current = nowOutgrown
-    if (setBlendTo != null && setBlendTo > 0) {
-      cb.commitTool('blend', setBlendTo)
-      cb.notify('info', 'blend engaged — the outgrown band gets its fill')
-    }
-  }, [bounds, imgW, imgH, blendVal, engineDefaultBlend])
+    const t = setTimeout(() => {
+      const { nowOutgrown, setBlendTo } = autoBlendOnOutgrowth(
+        bounds, imgW, imgH, wasOutgrownRef.current, { ...BPD, blend: blendVal }, engineDefaultBlend,
+      )
+      wasOutgrownRef.current = nowOutgrown
+      if (setBlendTo != null && setBlendTo > 0) {
+        cb.commitTool('blend', setBlendTo)
+        cb.notify('info', 'blend engaged — the outgrown band gets its fill')
+      }
+    }, SETTLE_MS)
+    return () => clearTimeout(t)
+  }, [bounds, imgW, imgH, blendVal, engineDefaultBlend, cb])
 }
