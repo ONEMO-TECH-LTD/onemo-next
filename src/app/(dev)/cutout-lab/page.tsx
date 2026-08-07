@@ -27,6 +27,9 @@ import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 // the POOL's policy module (session62-task/v1-addon-modules): Dan's laws as tested code — the shell
 // BINDS these decisions, it never re-derives them (Meta directive 2026-08-07).
 import { BLEND_POLICY_DEFAULTS, neutralNoComposite, outgrown, viewBoxFor, ComposeScheduler, type Bounds } from '@/lib/bridge-compose-policy'
+// the v1 control surface as DATA (tabs/chips + the ONE detail-inversion mapping) — the shell renders
+// from this and drives the bridge's descriptor session; no face data or mapping duplicated here.
+import { VEC_CHIPS, type Tab, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
 
 /** outline extent from the display shape's anchors (+handles) — shell data extraction for the policies. */
@@ -47,8 +50,6 @@ const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1
 const cap: React.CSSProperties = { fontSize: 11, textTransform: 'uppercase', color: '#64748b', marginBottom: 4 }
 const chipBtn = (active: boolean, disabled = false): React.CSSProperties => ({ ...btn, padding: '4px 10px', fontSize: 12, background: active ? '#0f172a' : '#f1f5f9', color: disabled ? '#9ca3af' : active ? '#fff' : '#0f172a', cursor: disabled ? 'not-allowed' : 'pointer' })
 
-type Tab = 'ai' | 'vector' | 'blend' | 'edit'
-const VEC_CHIPS = ['detail', 'offset', 'simplify', 'smooth', 'radius'] as const // v1 vector surface
 
 function CutoutLabInner() {
   const searchParams = useSearchParams()
@@ -83,8 +84,8 @@ function CutoutLabInner() {
       const c = t.control
       if (c.kind === 'slider') {
         const v = (t.value as number) ?? 0
-        if (id === 'detail') { // v1 presentation: detail knob is UI-inverted (0 = full)
-          return { label: 'detail (0 = full)', lo: c.min, hi: c.max, value: c.max - v, available: t.available, preview: (x: number) => previewTool(id, c.max - x), commit: (x: number) => commitTool(id, c.max - x) }
+        if (id === 'detail') { // detail is UI-inverted (0 = full) — the ONE mapping lives in bridge-control-surface
+          return { label: 'detail (0 = full)', lo: c.min, hi: c.max, value: detailEngineToKnob(v), available: t.available, preview: (x: number) => previewTool(id, detailKnobToEngine(x)), commit: (x: number) => commitTool(id, detailKnobToEngine(x)) }
         }
         return { label: label ?? id, lo: c.min, hi: c.max, value: v, available: t.available, preview: (x: number) => previewTool(id, x), commit: (x: number) => commitTool(id, x) }
       }
