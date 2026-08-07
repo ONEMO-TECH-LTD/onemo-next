@@ -22,7 +22,7 @@ import {
   finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
-import { fillEnclosedHoles, maskArea, maskFromShape, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
+import { fillEnclosedHoles, maskArea, maskFromShape, polishMask, solidShapeMask, solidifyInterior, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
@@ -240,7 +240,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // v5.3.1 postProcessMask only closes 1px pinholes + keeps the largest island — it does NOT fill
     // interior holes, so THIS is the real hole guard, and it must reach the u2net native matte too
     // (fillPresegHoles below), not just the lab UI mask.
-    const mask = fillEnclosedHoles(rawMask)
+    // fill enclosed holes (data-level gaps) THEN floor the interior soft matte to opaque
+    // (EdgeSAM's data=1/low-soft chrome-highlight dips — the internal imperfections u2net doesn't
+    // have; solidifyInterior is a no-op for the binary wand/paint masks and the clean u2net path).
+    const mask = solidifyInterior(fillEnclosedHoles(rawMask))
     // LOUD NO-OP (meta amendment C): with holes refilled, a pure-interior erase changes nothing —
     // say so instead of looking dead ("erase does nothing" class).
     if (opts?.erase && maskRef.current) {

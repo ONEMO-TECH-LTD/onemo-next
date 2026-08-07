@@ -42,3 +42,28 @@ describe('fillEnclosedHoles — the no-holes law', () => {
     expect(out.soft![0]).toBe(200) // untouched
   })
 })
+
+import { solidifyInterior } from '../index'
+describe('solidifyInterior — EdgeSAM internal-imperfection floor', () => {
+  const withSoft = (rows: string[], soft: number[]) => {
+    const h = rows.length, w = rows[0].length
+    const data = new Uint8Array(w * h); const s = new Uint8Array(soft)
+    rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === '#') data[y * w + x] = 1 }))
+    return { data, w, h, soft: s } as Mask
+  }
+  it('floors an INTERIOR low-soft foreground pixel to 255, keeps the boundary ramp', () => {
+    // 5x5 with a background border so the shape has a REAL silhouette boundary
+    const rows = ['.....', '.###.', '.###.', '.###.', '.....']
+    const soft = Array(25).fill(0)
+    ;[6, 7, 8, 11, 12, 13, 16, 17, 18].forEach((i) => (soft[i] = 255)) // the 3x3 shape
+    soft[12] = 130 // centre (2,2) = interior chrome dip
+    soft[6] = 128  // (1,1) = boundary (adjacent to background) — a soft-edge ramp
+    const out = solidifyInterior(withSoft(rows, soft))
+    expect(out.soft![12]).toBe(255) // interior dip floored solid
+    expect(out.soft![6]).toBe(128)  // boundary ramp preserved (soft edge kept)
+  })
+  it('no-op without a soft channel (wand/paint binary masks)', () => {
+    const m = { data: new Uint8Array([1, 1, 1, 1]), w: 2, h: 2 } as Mask
+    expect(solidifyInterior(m)).toBe(m)
+  })
+})

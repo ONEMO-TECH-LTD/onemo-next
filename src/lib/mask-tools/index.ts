@@ -113,6 +113,27 @@ export function solidShapeMask(shape: VShape, w: number, h: number): Mask {
   return { data, w, h, soft }
 }
 
+/** SOLID-INTERIOR matte (Dan 2026-08-07: "still internal imperfections on the first SAM
+ *  generation; u2net is clean"). EdgeSAM's mask is data=1 where prob>0.5 but soft=255·prob, so a
+ *  chrome-highlight pixel at prob≈0.55 is IN the silhouette yet only ~55% opaque — the pillow
+ *  shows through as an internal imperfection. fillEnclosedHoles can't touch it (data=1, no hole).
+ *  Floor the soft matte to opaque on every INTERIOR foreground pixel, keeping the 1px boundary
+ *  ramp for a soft edge — exactly u2net's clean-interior behaviour. No-op when there is no soft
+ *  channel (wand/paint are already binary-solid). */
+export function solidifyInterior(mask: Mask): Mask {
+  if (!mask.soft) return mask
+  const { data, w, h, soft } = mask
+  const out = new Uint8Array(soft)
+  let changed = false
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x
+    if (!data[i] || out[i] === 255) continue
+    const boundary = (x > 0 && !data[i - 1]) || (x < w - 1 && !data[i + 1]) || (y > 0 && !data[i - w]) || (y < h - 1 && !data[i + w])
+    if (!boundary) { out[i] = 255; changed = true }
+  }
+  return changed ? { data, w, h, soft: out } : mask
+}
+
 /** Live selection area — cheap op-effect check (the loud interior-erase no-op depends on it). */
 export function maskArea(mask: Mask): number {
   let a = 0
