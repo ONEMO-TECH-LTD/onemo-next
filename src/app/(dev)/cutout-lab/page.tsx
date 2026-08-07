@@ -302,7 +302,6 @@ export default function CutoutLab() {
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && flow.actions.upload(e.target.files[0])} /></label>
         <button onClick={flow.actions.save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
-        <button onClick={flow.actions.redetect} disabled={busy || !hasFile} style={btn}>↻ Re-detect</button>
         <button onClick={flow.actions.undo} disabled={busy || !canUndo} style={btn}>↩ Undo</button>
         <button onClick={flow.actions.redo} disabled={busy || !canRedo} style={btn}>↪ Redo</button>
         <button onClick={flow.actions.clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>

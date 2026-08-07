@@ -300,19 +300,24 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const img = imgCanvas.current, url = urlRef.current
     if (!img || !url) return
     setBusy(true)
-    try {
-      setStatus('✨ AI magic (u2net · v5.3.1)…')
-      const t0 = performance.now()
-      const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
-      perfGesture('segment', performance.now() - t0)
-      setMs({ cut: Math.round(performance.now() - t0) })
-      await acceptMask(r.mask, r.preseg)
-    } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
+    // ONE retry before giving up loudly (Dan device: u2net can 'disconnect' on iOS — the loader
+    // flashes and no outline appears). The failure must be VISIBLE, never a silent no-op.
+    let lastErr: unknown = null
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        setStatus(attempt ? '✨ retrying u2net…' : '✨ AI magic (u2net · v5.3.1)…')
+        const t0 = performance.now()
+        const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
+        perfGesture('segment', performance.now() - t0)
+        setMs({ cut: Math.round(performance.now() - t0) })
+        if (await acceptMask(r.mask, r.preseg)) { setBusy(false); return }
+        lastErr = new Error('no silhouette (empty cut)')
+      } catch (e) { lastErr = e }
+    }
+    setStatus('⚠️ u2net produced no cut (' + String((lastErr as Error)?.message ?? '?') + ') — reload the page and Detect again, or brush the object to select it')
     setBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptMask])
-
-  const redetect = detect // 'Re-detect' re-runs the AI cut on the current image
 
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
   const setTune = useCallback((patch: Partial<TraceOutlineSettings>) => {
@@ -534,7 +539,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       hasFile: !!lastFileRef.current,
     },
     actions: {
-      upload, detect, redetect, setTune, setBlendTune,
+      upload, detect, setTune, setBlendTune,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
       undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, setPaintCfg,
