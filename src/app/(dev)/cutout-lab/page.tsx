@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
-import { EditorOverlay, type EditMode } from './EditorOverlay'
+import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
 import { drawCutout, maskOverlay, type FillChoice } from './finish'
 import { useCutoutLabFlow, type EngineSel } from './flow'
 import PerfHUD from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
@@ -62,6 +62,7 @@ export default function CutoutLab() {
   // single-node vector editing (Dan 17:57): select an anchor → its radius/curve knobs
   const [selNode, setSelNode] = useState<{ pi: number; ai: number } | null>(null)
   const [nodeChip, setNodeChip] = useState<'radius' | 'curve'>('radius')
+  const [nodeMode, setNodeMode] = useState<NodeMode>('move') // Dan: add/delete are selected modes; default = drag
   const [nodeAdj, setNodeAdj] = useState({ radius: 0, curve: 0 })
   const nodeBaseRef = useRef<VShape | null>(null)
   const [brushR, setBrushR] = useState(40)
@@ -262,6 +263,7 @@ export default function CutoutLab() {
     if (tool === m) { exitEdit(); return } // active chip toggles OUT of edit mode
     if (!flow.actions.enterEdit()) return
     setSelNode(null)
+    setNodeMode('move') // always land in drag mode (Dan: the simplest node view is dragging)
     setTool(m)
   }
   const onEditLive = (next: VShape) => flow.actions.editLive(next)
@@ -275,9 +277,8 @@ export default function CutoutLab() {
     const ins = flow.actions.nodeInsert(pt)
     if (ins) selectNode(ins); else selectNode(null)
   }
-  const onNodeDelete = () => {
-    if (!selNode) return
-    if (flow.actions.nodeDelete(selNode.pi, selNode.ai)) setSelNode(null)
+  const onDeleteNodeAt = (pi: number, ai: number) => {
+    if (flow.actions.nodeDelete(pi, ai) && selNode?.pi === pi && selNode?.ai === ai) setSelNode(null)
   }
 
   const { setTune, setBlendTune } = flow.actions
@@ -295,7 +296,7 @@ export default function CutoutLab() {
       const [lo, hi] = CHIP_RANGE[k]
       return { label: k, lo, hi, value: blend[k], set: (v: number) => setBlendTune({ [k]: v }) }
     }
-    if (tool === 'nodes' && selNode && nodeBaseRef.current) {
+    if (tool === 'nodes' && nodeMode === 'move' && selNode && nodeBaseRef.current) {
       const apply = (adj: { radius: number; curve: number }) => {
         setNodeAdj(adj)
         // ONE adjustment per mode: radius chip sends radius only, curve chip curve only — sending
@@ -373,13 +374,18 @@ export default function CutoutLab() {
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
           <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
-          {tool === 'nodes' && selNode && (<>
-            <span style={{ color: '#94a3b8' }}>node:</span>
-            {(['radius', 'curve'] as const).map((k) => (
-              <button key={k} onClick={() => setNodeChip(k)} style={chipBtn(nodeChip === k)}>{k}</button>
+          {tool === 'nodes' && (<>
+            <span style={{ color: '#94a3b8' }}>nodes:</span>
+            {([['move', '✥ Drag'], ['add', '➕ Add'], ['delete', '➖ Delete']] as [NodeMode, string][]).map(([m, label]) => (
+              <button key={m} onClick={() => { setNodeMode(m); if (m !== 'move') setSelNode(null) }} style={chipBtn(nodeMode === m)}>{label}</button>
             ))}
-            <button onClick={onNodeDelete} style={chipBtn(false)}>− delete</button>
-            <button onClick={() => setSelNode(null)} style={chipBtn(false)}>✕</button>
+            {nodeMode === 'move' && selNode && (<>
+              <span style={{ color: '#94a3b8' }}>shape:</span>
+              {(['radius', 'curve'] as const).map((k) => (
+                <button key={k} onClick={() => setNodeChip(k)} style={chipBtn(nodeChip === k)}>{k}</button>
+              ))}
+              <button onClick={() => setSelNode(null)} style={chipBtn(false)}>✕</button>
+            </>)}
           </>)}
           <button onClick={() => enterEdit('nodes')} disabled={!shapeRef.current} style={chipBtn(tool === 'nodes')}>⬡ Nodes</button>
           <button onClick={() => enterEdit('frame')} disabled={!shapeRef.current} style={chipBtn(tool === 'frame')}>▣ Frame</button>
@@ -428,7 +434,8 @@ export default function CutoutLab() {
               style={{ width: '100%', height: '100%', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />
             {editing && !preview && shapeRef.current && imgCanvas.current && shapeTick >= 0 && (
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
-                selected={selNode} showHandles={nodeChip === 'curve'} onSelect={selectNode} onTap={onNodesTap}
+                selected={selNode} showHandles={nodeMode === 'move' && nodeChip === 'curve'} onSelect={selectNode} onTap={onNodesTap}
+                nodeMode={nodeMode} onDeleteNode={onDeleteNodeAt}
                 dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
                 onEdit={onEditLive} onCommit={onEditCommit} />
             )}

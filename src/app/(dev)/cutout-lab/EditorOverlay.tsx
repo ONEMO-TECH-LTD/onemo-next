@@ -9,6 +9,9 @@ import { useRef } from 'react'
 import type { VShape } from '@/lib/vector-core'
 
 export type EditMode = 'nodes' | 'frame'
+/** Node sub-mode (Dan 2026-08-07: add/delete are SELECTED modes like add/erase, so the default is
+ *  pure drag — a tap never inserts, which is what made nodes undraggable on mobile). */
+export type NodeMode = 'move' | 'add' | 'delete'
 
 interface Props {
   shape: VShape
@@ -28,6 +31,10 @@ interface Props {
   showHandles?: boolean
   /** nodes mode: tap on empty space / the outline (not a node) — page inserts a node or deselects */
   onTap?: (pt: { x: number; y: number }) => void
+  /** node sub-mode: 'move' (default, drag only) · 'add' (tap outline inserts) · 'delete' (tap node removes) */
+  nodeMode?: NodeMode
+  /** delete mode: tap an anchor to remove it */
+  onDeleteNode?: (pi: number, ai: number) => void
 }
 
 const cloneShape = (s: VShape): VShape =>
@@ -48,7 +55,7 @@ function scaleShape(s: VShape, ax: number, ay: number, sx: number, sy: number): 
   return { paths: s.paths.map((p) => ({ anchors: p.anchors.map((a) => ({ ...a, p: m(a.p), hIn: a.hIn ? m(a.hIn) : a.hIn, hOut: a.hOut ? m(a.hOut) : a.hOut })) })) }
 }
 
-export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLocked, onEdit, onCommit, selected, onSelect, showHandles, onTap }: Props) {
+export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLocked, onEdit, onCommit, selected, onSelect, showHandles, onTap, nodeMode = 'move', onDeleteNode }: Props) {
   const vb = view ?? { x: 0, y: 0, w: imgW, h: imgH }
   const dragRef = useRef<{ kind: 'node'; pi: number; ai: number; base: VShape } | { kind: 'handle'; pi: number; ai: number; which: 'hIn' | 'hOut'; base: VShape } | { kind: 'grip'; grip: string; base: VShape; bb: ReturnType<typeof bboxOf> } | null>(null)
   const liveRef = useRef<VShape>(shape)
@@ -124,7 +131,14 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLock
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
       onPointerMove={move} onPointerUp={up} onPointerLeave={up}
-      onPointerDown={(e) => { if (mode === 'nodes' && !dragRef.current) onTap?.(toImg(e)) }}
+      onPointerDown={(e) => {
+        if (mode !== 'nodes' || dragRef.current) return
+        // ADD mode: an empty-space / outline tap inserts. MOVE/DELETE: a tap on empty space only
+        // deselects — it NEVER inserts (Dan: the tap-inserts-everywhere behavior made nodes
+        // undraggable on mobile, the finger missing the small target kept adding nodes).
+        if (nodeMode === 'add') onTap?.(toImg(e))
+        else onSelect?.(null)
+      }}
     >
       {mode === 'frame' && (
         <rect x={bb.minX} y={bb.minY} width={bb.maxX - bb.minX} height={bb.maxY - bb.minY}
@@ -144,10 +158,22 @@ export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLock
               <circle cx={a.hOut.x} cy={a.hOut.y} r={nodeR * 0.75} fill="#0ea5e9" stroke="#fff" strokeWidth={Math.max(1, imgW / 600)} style={{ cursor: 'grab' }}
                 onPointerDown={(e) => { e.stopPropagation(); (e.target as SVGElement).setPointerCapture?.(e.pointerId); dragRef.current = { kind: 'handle', pi, ai, which: 'hOut', base: cloneShape(shape) }; liveRef.current = shape }} />
             </>)}
+            {/* visible anchor */}
             <circle cx={a.p.x} cy={a.p.y} r={isSel ? nodeR * 1.25 : nodeR}
-              fill={isSel ? '#7c3aed' : '#fff'} stroke={isSel ? '#fff' : '#7c3aed'} strokeWidth={Math.max(1.5, imgW / 400)}
-              style={{ cursor: 'grab' }}
-              onPointerDown={(e) => { e.stopPropagation(); (e.target as SVGElement).setPointerCapture?.(e.pointerId); onSelect?.({ pi, ai }); dragRef.current = { kind: 'node', pi, ai, base: cloneShape(shape) }; liveRef.current = shape }}
+              fill={nodeMode === 'delete' ? '#ef4444' : isSel ? '#7c3aed' : '#fff'}
+              stroke={isSel ? '#fff' : nodeMode === 'delete' ? '#fff' : '#7c3aed'} strokeWidth={Math.max(1.5, imgW / 400)}
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* FINGER-SIZED hit target (Dan: nodes undraggable on mobile — the visible dot is too
+                small for a touch). Transparent, ~2.6× the dot; MOVE/ADD → select+drag, DELETE → remove. */}
+            <circle cx={a.p.x} cy={a.p.y} r={nodeR * 2.6} fill="transparent"
+              style={{ cursor: nodeMode === 'delete' ? 'pointer' : 'grab' }}
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                if (nodeMode === 'delete') { onDeleteNode?.(pi, ai); return }
+                ;(e.target as SVGElement).setPointerCapture?.(e.pointerId)
+                onSelect?.({ pi, ai }); dragRef.current = { kind: 'node', pi, ai, base: cloneShape(shape) }; liveRef.current = shape
+              }}
             />
           </g>
         )
