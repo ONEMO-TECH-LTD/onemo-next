@@ -20,7 +20,7 @@ import {
   finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
-import { maskArea, maskFromShape, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
+import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
@@ -74,6 +74,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
   const [disp, setDisp] = useState({ w: 480, h: 360 })
+  const [paintCfg, setPaintCfgState] = useState<PaintConfig>(PAINT_DEFAULTS) // Dan: admin-changeable paint-shaper config
+  const paintCfgRef = useRef(paintCfg); paintCfgRef.current = paintCfg
+  const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => { const n = { ...paintCfgRef.current, ...patch }; paintCfgRef.current = n; setPaintCfgState(n) }, [])
 
   // ── flow-owned refs (policy + view) ──
   const imgCanvas = useRef<HTMLCanvasElement | null>(null)
@@ -373,18 +376,18 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const brushPx = brushR * (img.width / dispWRef.current)
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
     const ts0 = performance.now()
-    const painted = swathMask(pts, brushPx, img.width, img.height)
+    const painted = swathMask(pts, brushPx, img.width, img.height, paintCfgRef.current)
     perfGesture('swath', performance.now() - ts0)
     if (!maskRef.current || !hasCutRef.current) {
       if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); requestRender(); return }
       drawnRef.current = null
-      setBusy(true); await acceptMask(polishMask(painted, brushPx), undefined, { shapeTruth: true }); setBusy(false)
+      setBusy(true); await acceptMask(polishMask(painted, brushPx, paintCfgRef.current.polishDiv), undefined, { shapeTruth: true }); setBusy(false)
       setStatus('✏️ painted shape created — keep painting, erase, or tune')
       return
     }
     drawnRef.current = null
     const tp1 = performance.now()
-    const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx)
+    const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx, paintCfgRef.current.polishDiv)
     perfGesture('paint-polish', performance.now() - tp1)
     setBusy(true)
     const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true })
@@ -526,7 +529,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   return {
     state: {
-      status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp,
+      status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, paintCfg,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
       hasFile: !!lastFileRef.current,
     },
@@ -534,7 +537,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       upload, detect, redetect, setTune, setBlendTune,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup,
+      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, setPaintCfg,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

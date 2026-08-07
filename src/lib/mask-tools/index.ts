@@ -6,6 +6,15 @@ import { smoothMask } from '@/lib/effect/mask'
 import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Mask } from '@/lib/mask-tools/types'
 
+/** PAINT-SHAPER config (Dan 2026-08-07: admin-changeable). The paint tool's internal factors,
+ *  formerly hardcoded — surfaced so an admin can calibrate the tool without a code change. */
+export interface PaintConfig {
+  swathMult: number  // stroke swath width = brush × swathMult
+  polishDiv: number  // outline smoothing radius = brush ÷ polishDiv (bigger = softer)
+  closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
+}
+export const PAINT_DEFAULTS: PaintConfig = { swathMult: 2, polishDiv: 3, closeFrac: 0.2 }
+
 /** Rasterize a drawn shape to a Mask (subject matte for the blend layer — inside = subject). */
 export function maskFromShape(shape: import('@/lib/vector-core').VShape, w: number, h: number): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
@@ -31,8 +40,8 @@ export function unionMasks(base: Mask, add: Mask): Mask {
 /** Normalize a painted combination with the ENGINE'S own mask smoothing (box-blur + re-threshold):
  *  fills concave bites and shaves nubs smaller than the radius — the 'insect bites' where strokes
  *  meet the mask (Dan 2026-08-06). Radius rides the brush size (bold brush = bolder polish). */
-export function polishMask(mask: Mask, brushPx: number): Mask {
-  const r = Math.max(2, Math.round(brushPx / 3))
+export function polishMask(mask: Mask, brushPx: number, polishDiv = PAINT_DEFAULTS.polishDiv): Mask {
+  const r = Math.max(2, Math.round(brushPx / polishDiv))
   return { data: smoothMask(mask.data, mask.w, mask.h, r), w: mask.w, h: mask.h }
 }
 
@@ -73,12 +82,13 @@ export function maskArea(mask: Mask): number {
  *  (Dan's green-blob semantics: a loop means the whole region). */
 export function swathMask(
   stroke: { x: number; y: number }[], brushPx: number, w: number, h: number,
+  cfg: Pick<PaintConfig, 'swathMult' | 'closeFrac'> = PAINT_DEFAULTS,
 ): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })!
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
-  ctx.lineWidth = Math.max(1, brushPx * 2) // 1px floor (Dan: brush down to 1)
+  ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult) // 1px floor (Dan: brush down to 1)
   ctx.beginPath()
   stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
   ctx.stroke()
@@ -86,7 +96,7 @@ export function swathMask(
   const first = stroke[0], last = stroke[stroke.length - 1]
   let perim = 0
   for (let i = 1; i < stroke.length; i++) perim += Math.hypot(stroke[i].x - stroke[i - 1].x, stroke[i].y - stroke[i - 1].y)
-  if (perim > 0 && Math.hypot(first.x - last.x, first.y - last.y) < perim * 0.2) {
+  if (perim > 0 && Math.hypot(first.x - last.x, first.y - last.y) < perim * cfg.closeFrac) {
     ctx.closePath(); ctx.fill()
   }
   const px = ctx.getImageData(0, 0, w, h).data

@@ -19,6 +19,7 @@ export default function CutoutLab() {
   useEffect(() => {
     // ON-DEVICE CONSOLE (?debug=1): eruda surfaces real device errors (OOM, worker deaths) on the phone.
     if (new URL(location.href).searchParams.get('debug') === '1') void import('eruda').then((e) => e.default.init())
+    if (new URL(location.href).searchParams.get('admin') === '1') setAdmin(true)
     flow.actions.warmup() // prefetch u2net weights at page open — the Detect push stays fast
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -27,12 +28,13 @@ export default function CutoutLab() {
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
   const flow = useCutoutLabFlow({ requestRender })
-  const { status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile } = flow.state
+  const { status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile, paintCfg } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
   const [tool, setTool] = useState<Tool>('add')
   const [tab, setTab] = useState<Tab>('ai')
+  const [admin, setAdmin] = useState(false) // ?admin=1 → paint-shaper config panel; set post-mount (no hydration mismatch)
   const [vecChip, setVecChip] = useState<(typeof VEC_CHIPS)[number]>('detail')
   const [blendChip, setBlendChip] = useState<(typeof BLEND_CHIPS)[number]>('blend')
   const [aspectLocked, setAspectLocked] = useState(true)
@@ -414,6 +416,23 @@ export default function CutoutLab() {
         <Stat label="magic cut" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
         <Stat label="brush stroke" value={ms.stroke != null ? `${ms.stroke}ms` : '—'} />
       </div>
+      {admin && (
+        <div style={{ marginTop: 16, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: '#64748b', marginBottom: 8 }}>⚙️ Paint-shaper config (admin)</div>
+          {([
+            ['swath width', 'swathMult', 0.5, 6, 0.1],
+            ['smoothing', 'polishDiv', 1, 12, 0.5],
+            ['loop-close', 'closeFrac', 0.05, 0.6, 0.01],
+          ] as [string, keyof typeof paintCfg, number, number, number][]).map(([lbl, key, lo, hi, step]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: '#475569', width: 92 }}>{lbl}</span>
+              <input type="range" min={lo} max={hi} step={step} value={paintCfg[key]} onChange={(e) => flow.actions.setPaintCfg({ [key]: Number(e.target.value) })} style={{ flex: 1 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{paintCfg[key]}</span>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>affects the 🖌 Paint shape / erase tools live</div>
+        </div>
+      )}
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>
     </div>
   )
