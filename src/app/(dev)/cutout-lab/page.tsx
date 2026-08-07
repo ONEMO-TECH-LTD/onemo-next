@@ -20,9 +20,13 @@ export default function CutoutLab() {
   const [initialSeg] = useState<EngineSel>(() => {
     if (typeof window === 'undefined') return 'edge'
     const seg = new URL(location.href).searchParams.get('seg')
-    return !seg || seg === 'edgesam' ? 'edge' : 'u2net' // DEFAULT = EdgeSAM (Dan: main model is SAM — no stack decision made); u2net = dropdown option
+    if (seg === 'off') return 'none' // manual mode: NO model loads at all (wand/paint standalone)
+    return !seg || seg === 'edgesam' ? 'edge' : 'u2net' // DEFAULT = EdgeSAM (Dan: main model is SAM); u2net = dropdown option
   })
   useEffect(() => {
+    // ON-DEVICE CONSOLE (?debug=1): the desktop-vs-iPhone diagnosis gap has burned multiple rounds —
+    // eruda surfaces the real device errors (backend init, OOM, worker deaths) on the phone itself.
+    if (new URL(location.href).searchParams.get('debug') === '1') void import('eruda').then((e) => e.default.init())
     // the default-seg WRITE must run POST-MOUNT (QA KAI-10196 r1: a replaceState inside the state
     // initializer is clobbered by Next's hydration history-sync). DEFAULT = EdgeSAM (Dan: SAM is
     // the main model; the cheap-stack switch was never decided — u2net stays a dropdown option).
@@ -36,7 +40,9 @@ export default function CutoutLab() {
     // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
     // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
     const u = new URL(location.href)
-    if (v === 'edge') u.searchParams.set('seg', 'edgesam'); else u.searchParams.delete('seg')
+    if (v === 'edge') u.searchParams.set('seg', 'edgesam')
+    else if (v === 'none') u.searchParams.set('seg', 'off')
+    else u.searchParams.delete('seg')
     history.replaceState(null, '', u)
   }, [])
   const renderRef = useRef<() => void>(() => {})
@@ -342,6 +348,7 @@ export default function CutoutLab() {
           <select value={engineSel} onChange={(e) => flow.actions.setEngine(e.target.value as EngineSel)} style={{ ...btn, fontSize: 12 }}>
             <option value="edge">EdgeSAM · auto + brush</option>
             <option value="u2net">u2net · v5.3.1 (auto only)</option>
+            <option value="none">No AI · wand + paint only</option>
           </select>
           {(['add', 'erase'] as Tool[]).map((t) => (
             <button key={t} onClick={() => setTool(t)} disabled={engineSel === 'u2net'} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
