@@ -71,7 +71,9 @@ export async function prepareShaped(
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
 ): Promise<PreparedEffect> {
   const { prepareEffect, EFFECT_BUILD_CONFIG } = await import('@/lib/effect/prepare-effect')
-  return prepareEffect(url, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100) }, onProgress, preseg)
+  // paddingMM 0 (Dan 2026-08-07): the trace hugs the subject — NO baked margin. The Offset tool is the
+  // SOLE margin source, so its knob is a true representation (0 = hug). Supersedes the engine default (1.5).
+  return prepareEffect(url, 'shaped', { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }, onProgress, preseg)
 }
 
 export type ExportResult =
