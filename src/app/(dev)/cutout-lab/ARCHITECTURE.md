@@ -175,3 +175,28 @@ Laws:
 
 Fallback recorded (Dan's, only if optimization genuinely hits a wall — not first resort):
 blend 0 default + clamp-only surface.
+
+## I2d — the stack laws as stabilized by device rounds 3–6 (locked 2026-08-07, post r6b)
+
+1. **One-session law (Dan critical, 02:04):** in edge mode the auto-cut AND the brush run through
+   the ONE brush-worker EdgeSAM session (`ensureEdge` → `redetect`); **the engine worker never
+   loads EdgeSAM.** The `?seg=` roster remains the selector law for auto-only models (u2net/
+   silueta/harness). Gate: network probe — zero engine-model fetches in edge mode; `segment-edge`
+   gesture present, engine `segment` absent.
+2. **Warm law (r4 + audit A2):** page open downloads bytes, instantiates NOTHING — no ORT session,
+   no OpenCV runtime. Edge: the two weight fetches. u2net: `preloadBen()` (its session-create is
+   the engine's own 4MB u2netp — sanctioned). Manual ('none'): nothing, ever. Runtimes initialize
+   on first USE behind the tool queue's visible status.
+3. **Speed law (the r3 feel, restored structurally):** after the edge cut, session + encode are
+   resident by construction (the cut used them) — strokes pay inference only (~0.3s measured).
+4. **Fault law (B1):** recoverable timeouts warn + stay retryable; only real worker death flips
+   edge-dead, which degrades LOUDLY to a u2net cut with the engine switch mirrored to the URL
+   through the shell adapter.
+5. **Manual mode:** `?seg=off` ↔ 'none' — no model may ever load; wand/paint are the creators.
+6. **Wand v2 vendor law:** OpenCV.js floodFill FIXED_RANGE (13MB wasm, lazy-instantiated on first
+   tap, module-owned) — the industrial standard, cited: `@techstark/opencv-js`; `magic-wand-tool`
+   and the fillHoles glue are dead, not parked.
+7. **Tool queue law (r5):** every tool op through ONE serialized latest-wins queue; no tool is
+   gated on busy anywhere; a queued tap says so in the status.
+8. **History law (B3):** undo/redo snapshots carry mask + drawn + knob settings + blend — state
+   restores whole (value-reflection survives undo).
