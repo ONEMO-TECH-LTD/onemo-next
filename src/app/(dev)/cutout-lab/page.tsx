@@ -217,10 +217,9 @@ export default function CutoutLab() {
   }, [render])
   const brushable = () => !previewRef.current && flow.actions.canBrush(toolRef.current)
   const onDown = (e: React.PointerEvent) => {
-    // AI comet strokes stay CAPTURABLE while a recognition is busy (the flow queues latest-wins;
-    // the comet must start instantly — Dan's device round). Other tools still wait out busy.
-    const ai = toolRef.current === 'add' || toolRef.current === 'erase'
-    if ((busy && !ai) || !brushable()) return
+    // NO tool is gated on busy (Dan device r5: gating silently swallowed taps — 'wand broken,
+    // paint not painting'). Every tool captures always; the FLOW's queue serializes execution.
+    if (!brushable()) return
     paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]
     const t = toolRef.current
     if (t === 'add' || t === 'erase') { trailRef.current.push(...strokeRef.current); if (!cometRaf.current) cometRaf.current = requestAnimationFrame(cometLoop) }

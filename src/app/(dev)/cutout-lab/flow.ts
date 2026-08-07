@@ -348,7 +348,22 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [scheduleBake])
 
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
-  const wandTap = useCallback(async (p0: Point, tolerance: number, erase: boolean, brushR: number) => {
+  // ── THE TOOL QUEUE (Dan device r5: tools were silently DEAD while busy — taps swallowed with
+  // zero feedback, reading as 'wand broken / paint not painting'). EVERY tool op runs through one
+  // serialized latest-wins queue: an op landing mid-processing queues (visible status), runs right
+  // after, and NOTHING is ever dropped. No tool is gated on busy anywhere anymore.
+  const toolBusyRef = useRef(false)
+  const pendingToolRef = useRef<(() => Promise<void>) | null>(null)
+  const runTool = useCallback(async (op: () => Promise<void>) => {
+    if (toolBusyRef.current) { pendingToolRef.current = op; setStatus('⏳ finishing the previous edit — your tap is queued'); return }
+    toolBusyRef.current = true
+    try { await op() } catch (e) { setStatus('⚠️ ' + String((e as Error)?.message ?? e)) }
+    toolBusyRef.current = false
+    const q = pendingToolRef.current
+    if (q) { pendingToolRef.current = null; void runTool(q) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const wandTap = useCallback((p0: Point, tolerance: number, erase: boolean, brushR: number) => runTool(async () => {
     const img = imgCanvas.current!
     const tw0 = performance.now()
     const region = await withTimeout(wandRegion(img, p0.x * img.width, p0.y * img.height, tolerance), T_COMPUTE_MS, 'wand')
@@ -382,9 +397,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setStatus(erase ? '🪄 region erased'
       : disconnected ? '🪄 filled a SEPARATE region — the one-shape rule drops it unless you bridge it to the main shape (paint a connector)'
       : '🪄 region filled')
-  }, [acceptMask, requestRender])
+  }), [acceptMask, requestRender, runTool])
 
-  const paintStroke = useCallback(async (stroke: Point[], erase: boolean, brushR: number) => {
+  const paintStroke = useCallback((stroke: Point[], erase: boolean, brushR: number) => runTool(async () => {
     const img = imgCanvas.current!
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
     const brushPx = brushR * (img.width / dispWRef.current)
@@ -407,16 +422,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     await acceptMask(combined)
     setBusy(false)
     setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
-  }, [acceptMask, requestRender])
+  }), [acceptMask, requestRender, runTool])
 
-  const aiBusyRef = useRef(false)
-  const pendingStrokeRef = useRef<{ stroke: (Point & { t: number })[]; erase: boolean } | null>(null)
-  const aiStroke = useCallback(async (stroke: (Point & { t: number })[], erase: boolean) => {
-    // LATEST-WINS QUEUE (Dan's device round: strokes during the 1–2s recognition were DROPPED —
-    // the comet never started and the app read as lagging). A stroke landing while one is in
-    // flight queues and runs right after; the comet keeps animating throughout (shell law 1).
-    if (aiBusyRef.current) { pendingStrokeRef.current = { stroke, erase }; return }
-    aiBusyRef.current = true
+  const aiStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean) => runTool(async () => {
     setBusy(true)
     try {
       await ensureEdge()
@@ -427,11 +435,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       await acceptMask(r.mask)
     } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
     setBusy(false)
-    aiBusyRef.current = false
-    const q = pendingStrokeRef.current
-    if (q) { pendingStrokeRef.current = null; void aiStroke(q.stroke, q.erase) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acceptMask, edgeFault, ensureEdge])
+  }), [acceptMask, edgeFault, ensureEdge, runTool])
 
   // ── vector edit orchestration (nodes/frame) ──
   const isZero = (t: TraceOutlineSettings) => JSON.stringify(t) === JSON.stringify(ZERO_SETTINGS)
