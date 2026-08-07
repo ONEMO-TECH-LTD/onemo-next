@@ -41,7 +41,12 @@ export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   const texDim = effectiveTextureDim()
   if (presegCache?.url !== url) {
     const img = new Image(); img.src = url
-    await img.decode()
+    // load-event await (img.decode() can hang unresolved on large blob images — Chromium decode queue)
+    await new Promise<void>((res, rej) => {
+      if (img.complete && img.naturalWidth) return res()
+      img.onload = () => res()
+      img.onerror = () => rej(new Error('image load failed'))
+    })
     const s = Math.min(1, texDim / Math.max(img.naturalWidth, img.naturalHeight))
     const ow = Math.max(1, Math.round(img.naturalWidth * s)), oh = Math.max(1, Math.round(img.naturalHeight * s))
     const base = document.createElement('canvas'); base.width = ow; base.height = oh
@@ -69,7 +74,9 @@ export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
 
 /** Painted mask in → the WHOLE v5.3.1 shaped pipeline out (engine performs everything). */
 export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffect> {
-  return prepareEffect(url, 'shaped', PAINT_LAB_CFG, onProgress, await buildPreseg(url, mask))
+  const ps = await buildPreseg(url, mask)
+  const out = await prepareEffect(url, 'shaped', PAINT_LAB_CFG, onProgress, ps)
+  return out
 }
 
 /** A drawn (already-vector) shape through the SAME v5.3.1 resolver the AI trace uses — every knob

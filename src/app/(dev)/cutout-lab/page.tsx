@@ -1,36 +1,30 @@
 'use client'
 
-// cutout-lab v2 — the FULL v1 BENCH SHELL wired to the clean v5.3.1 bridge (Dan 2026-08-07 rework).
-//
-// GROUND RULES (Dan + Meta, closed):
-//  • ZERO old-creator components render — no OutlineEditor, no Toolbar, no EmptyState, no EditOverlay.
-//    The flow's auto-begun editor session is simply never given a surface; upload lands on THIS bench.
-//  • The FACE is the v1 page clone: tabs ai/vector/blend/edit · chips · the ONE adaptive knob · canvas ·
-//    Upload/Detect/Save/Undo/Redo/Clear/Preview/Mask rows · status line.
-//  • Every control drives the BRIDGE: flow verbs (upload/magic/exportSvg/reset) + useEditor's descriptor
-//    mechanism (previewTool/commitTool by id) — the brain without its old face. No lab flow, no finish.ts,
-//    no tool modules, no parallel logic files.
-//  • A control with NO bridge backend yet (AI/paint brushes, mask overlay, preview, nodes/frame) renders
-//    PRESENT but disabled in its v1 look — visible truth, not absence.
-//  • The canvas is v1-style PRESENTATION: image + engine outline + dim-outside scrim from the composer's
-//    display shape. Blend-0 inside the frame = NO compositor call (photo clipped by the outline IS the
-//    result — Dan's law). Blend>0 or an outgrown offset = the ENGINE's own 2D compose op
-//    (composeEffectArtwork, s59: clamp/tile fill + magic blend) produces the frame; the shell only draws
-//    it. Mirror (v1's mosaic glue) stays dead. No bake wrapper, no pad/crop plumbing.
+// cutout-lab v2 — the CLEAN SHELL (render + gesture ONLY, Meta F1). Structure:
+//   engine (v5.3.1, byte-clean) < tool modules (pool) < bridge flow (useTwoDFirstFlow + useEditor +
+//   ./flow-bindings) < THIS page.
+// Laws live in the pool (bridge-compose-policy · bridge-paint-flow · bridge-tool-commit ·
+// bridge-tool-queue · bridge-control-surface); pixels live in the engine (composeEffectArtwork ·
+// prepareAI); orchestration lives in ./flow-bindings; this file renders the v1 bench face and maps
+// gestures. Blend-0 = photo clipped by the outline (no compositor call); tool outcomes surface on
+// the STATUS LINE (v1 truth) + toast.
 
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from '../effect-creator/v5.3.1/ui/Toast'
 import { useTwoDFirstFlow } from '../effect-creator/v5.3.1/flows/twoDFirstFlow'
 import { useEditor } from '../effect-creator/v5.3.1/user/editor/useEditor'
 import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
-// the POOL's policy module (session62-task/v1-addon-modules): Dan's laws as tested code — the shell
-// BINDS these decisions, it never re-derives them (Meta directive 2026-08-07).
-import { BLEND_POLICY_DEFAULTS, neutralNoComposite, outgrown, viewBoxFor, ComposeScheduler, type Bounds } from '@/lib/bridge-compose-policy'
-// the v1 control surface as DATA (tabs/chips + the ONE detail-inversion mapping) — the shell renders
-// from this and drives the bridge's descriptor session; no face data or mapping duplicated here.
-import { VEC_CHIPS, type Tab, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
+import { viewBoxFor, type Bounds } from '@/lib/bridge-compose-policy'
+import { VEC_CHIPS, type Tab, type Tool, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
+import { maskOverlay, drawCutout } from '@/lib/shell-render'
+import { usePaintBinding, useComposeBinding, type LabNotify } from './flow-bindings'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
+
+// ── v1 bench styles (presentation only) ──
+const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9', fontWeight: 600 }
+const cap: React.CSSProperties = { fontSize: 11, textTransform: 'uppercase', color: '#64748b', marginBottom: 4 }
+const chipBtn = (active: boolean, disabled = false): React.CSSProperties => ({ ...btn, padding: '4px 10px', fontSize: 12, background: active ? '#0f172a' : '#f1f5f9', color: disabled ? '#9ca3af' : active ? '#fff' : '#0f172a', cursor: disabled ? 'not-allowed' : 'pointer' })
 
 /** outline extent from the display shape's anchors (+handles) — shell data extraction for the policies. */
 function boundsFor(display: VShape | null): Bounds | null {
@@ -45,24 +39,19 @@ function boundsFor(display: VShape | null): Bounds | null {
   return { minX, minY, maxX, maxY }
 }
 
-// ── v1 bench styles (copied verbatim from the v1 shell — presentation only) ──
-const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9', fontWeight: 600 }
-const cap: React.CSSProperties = { fontSize: 11, textTransform: 'uppercase', color: '#64748b', marginBottom: 4 }
-const chipBtn = (active: boolean, disabled = false): React.CSSProperties => ({ ...btn, padding: '4px 10px', fontSize: 12, background: active ? '#0f172a' : '#f1f5f9', color: disabled ? '#9ca3af' : active ? '#fff' : '#0f172a', cursor: disabled ? 'not-allowed' : 'pointer' })
-
-
 function CutoutLabInner() {
   const searchParams = useSearchParams()
   const segPresent = !!searchParams.get('seg')
 
-  const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
+  // notify → the v1 STATUS LINE + toast (outcomes are never silent)
+  const [msg, setMsg] = useState<string | null>(null)
+  const notify = useCallback<LabNotify>((kind, message) => { setMsg(message); toast(kind, message) }, [])
 
   // ── THE BRIDGE, both layers: the flow (upload/magic/export/reset) + the editor composer (descriptors) ──
   const { state, actions } = useTwoDFirstFlow({ notify, segPresent })
   const { artworkUrl, prepared, hasArtwork, generating } = state
 
-  // useEditor headless — the descriptor brain WITHOUT its old face. Open while an image is prepared; the
-  // open-seed effect seeds the source from the flow-written spec. onClose never fires (no Done button here).
+  // useEditor headless — the descriptor brain WITHOUT its old face (zero old-creator components).
   const toolEnabled = useCallback(() => true, [])
   const ed = useEditor({ open: !!prepared, onClose: () => {}, notify, toolEnabled })
   const { tools, display, spec, imgW, imgH } = ed.state
@@ -70,13 +59,97 @@ function CutoutLabInner() {
 
   // ── shell-only UI state (v1 clone) ──
   const [tab, setTab] = useState<Tab>('ai')
+  const [tool, setTool] = useState<Tool>('draw')
   const [vecChip, setVecChip] = useState<(typeof VEC_CHIPS)[number]>('detail')
   const [brushR, setBrushR] = useState(15)
   const [dragVal, setDragVal] = useState<number | null>(null) // in-flight slider value: preview while dragging, commit on release
+  const [overlayOn, setOverlayOn] = useState(false) // 🎭 mask tint (default OFF, v1)
+  const [preview, setPreview] = useState(false)     // 👁 sticker preview (checkerboard + clipped photo)
 
   const toolById = useMemo(() => new Map(tools.map((t) => [t.id, t])), [tools])
 
-  // ── the ONE adaptive knob (v1 mechanism, bridge-driven values) ──
+  // Meta ruling: the bridge's auto-prepared 'standard' square is STATE, not a cut — the shell draws
+  // NO outline unless the generator is a real traced cut. Upload = bare photo; silhouette on Detect.
+  const traced = !!spec && spec.generator.adapter !== 'standard'
+  const pathD = useMemo(() => { try { return traced && display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [traced, display])
+  const bounds = useMemo(() => (traced ? boundsFor(display) : null), [traced, display])
+  const vb = useMemo(() => viewBoxFor(bounds, imgW, imgH), [bounds, imgW, imgH])
+
+  // fill (tile/clamp): shell-held mirror of the engine's wrapTile — the composer reads wrapTile
+  // non-reactively, so the shell mirror drives the recompose; commitTool keeps engine state truthful.
+  const [fillTile, setFillTile] = useState(false)
+  const setFill = useCallback((v: boolean) => { setFillTile(v); commitTool('fill', v) }, [commitTool])
+  const blendVal = (toolById.get('blend')?.value as number) ?? 0
+
+  // ── FLOW BINDINGS (the flow layer, ./flow-bindings): paint + engine compose ──
+  const paint = usePaintBinding({ artworkUrl, spec, display, traced, imgW, imgH, notify })
+  const { baseMask, paintPrepared, paintCfg } = paint.state
+  const effectivePrepared = paintPrepared ?? prepared
+  const compose = useComposeBinding({ traced, display, prepared: effectivePrepared, blendVal, fillTile, imgW, imgH, bounds })
+  const composed = compose.composed
+
+  // ── gesture capture (shell duty): svg client point → mask space via the svg's own CTM ──
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [strokeLive, setStrokeLive] = useState<{ x: number; y: number }[]>([])
+  const strokeRef = useRef<{ x: number; y: number }[]>([])
+  const paintingRef = useRef(false)
+  const toMaskPt = useCallback((e: React.PointerEvent): { x: number; y: number } | null => {
+    const svg = svgRef.current
+    if (!svg) return null
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY
+    const m = svg.getScreenCTM()
+    if (!m) return null
+    const p = pt.matrixTransform(m.inverse())
+    return { x: p.x, y: p.y }
+  }, [])
+  const paintTool = tool === 'draw' || tool === 'draw-erase'
+  const onCanvasDown = useCallback((e: React.PointerEvent) => {
+    if (!paintTool || !hasArtwork || preview) return
+    const p = toMaskPt(e); if (!p) return
+    paintingRef.current = true; strokeRef.current = [p]; setStrokeLive([p])
+    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+  }, [paintTool, hasArtwork, preview, toMaskPt])
+  const onCanvasMove = useCallback((e: React.PointerEvent) => {
+    if (!paintingRef.current) return
+    const p = toMaskPt(e); if (!p) return
+    strokeRef.current.push(p); setStrokeLive([...strokeRef.current])
+  }, [toMaskPt])
+  const onCanvasUp = useCallback(() => {
+    if (!paintingRef.current) return
+    paintingRef.current = false
+    const stroke = strokeRef.current; strokeRef.current = []
+    setStrokeLive([])
+    if (stroke.length > 0) paint.actions.strokeCommit(stroke, tool === 'draw-erase', brushR)
+  }, [paint.actions, tool, brushR])
+
+  // 🎭 mask tint (shell-render.maskOverlay) + 👁 preview (shell-render.drawCutout)
+  const overlayUrl = useMemo(() => {
+    if (!overlayOn || !baseMask) return null
+    const c = document.createElement('canvas'); c.width = baseMask.w; c.height = baseMask.h
+    c.getContext('2d')!.putImageData(maskOverlay(baseMask, tool === 'draw-erase' || tool === 'erase' ? 'erase' : 'add'), 0, 0)
+    return c.toDataURL()
+  }, [overlayOn, baseMask, tool])
+  const [displayCanvas, setDisplayCanvas] = useState<HTMLCanvasElement | null>(null)
+  useEffect(() => { // y-down photo canvas for drawCutout, rebuilt per upload
+    if (!artworkUrl) { setDisplayCanvas(null); return }
+    let dead = false
+    const img = new Image(); img.src = artworkUrl
+    img.onload = () => { // load-event, not decode() — decode() can hang on large blobs
+      if (dead) return
+      const c = document.createElement('canvas'); c.width = imgW; c.height = imgH
+      c.getContext('2d')!.drawImage(img, 0, 0, imgW, imgH)
+      setDisplayCanvas(c)
+    }
+    return () => { dead = true }
+  }, [artworkUrl, imgW, imgH])
+  const previewUrl = useMemo(() => {
+    if (!preview || !displayCanvas || !pathD) return null
+    const c = document.createElement('canvas')
+    drawCutout(c, displayCanvas, pathD)
+    return c.toDataURL()
+  }, [preview, displayCanvas, pathD])
+
+  // ── the ONE adaptive knob (v1 mechanism; values resolved by the bridge's descriptor session) ──
   const knob = (() => {
     const mk = (id: string, label?: string) => {
       const t = toolById.get(id)
@@ -100,68 +173,6 @@ function CutoutLabInner() {
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, available: true, preview: (v: number) => setBrushR(v), commit: (v: number) => setBrushR(v) }
   })()
 
-  // ── canvas presentation (v1 look): image + engine outline + dim-outside scrim — NO bake ──
-  // Meta ruling 2026-08-07: the bridge auto-prepares a 'standard' square at upload — that is STATE, not a
-  // cut. The shell draws NO outline unless the generator is a real traced cut: upload = bare photo (v1),
-  // the silhouette appears only on Detect.
-  const traced = !!spec && spec.generator.adapter !== 'standard'
-  const pathD = useMemo(() => { try { return traced && display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [traced, display])
-
-  // v1 VIEWPORT LAW — bound from the pool's policy (viewBoxFor): the view covers the outline's full
-  // extent; an offset past the frame zooms the view out; viewport CSS width stays fixed.
-  const bounds = useMemo(() => (traced ? boundsFor(display) : null), [traced, display])
-  const vb = useMemo(() => viewBoxFor(bounds, imgW, imgH), [bounds, imgW, imgH])
-  // fill (tile/clamp): shell-held mirror of the engine's wrapTile — the composer reads wrapTile
-  // non-reactively (getState in read()), so a commit alone would not re-render/recompose. The chip
-  // writes BOTH: local state (drives the recompose + chip highlight) and the engine state (commitTool,
-  // so undo/sessions/3D stay truthful).
-  const [fillTile, setFillTile] = useState(false)
-  const setFill = useCallback((v: boolean) => { setFillTile(v); commitTool('fill', v) }, [commitTool])
-  const blendVal = (toolById.get('blend')?.value as number) ?? 0
-
-  // ── ENGINE COMPOSE bound through the POOL's policies (bridge-compose-policy): blend-0 law +
-  // outgrowth law decide WHETHER; ComposeScheduler decides WHEN (never mid-drag, single-flight,
-  // latest-wins); the ENGINE's own composeEffectArtwork produces the pixels; the shell only draws.
-  // Matteless fallback cuts force blend 0 (v1's no-matte guard) but keep the band fill. ──
-  const [composed, setComposed] = useState<{ url: string; x: number; y: number; w: number; h: number } | null>(null)
-  const composeInputs = useRef({ traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds })
-  composeInputs.current = { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds }
-  const schedRef = useRef<ComposeScheduler | null>(null)
-  if (!schedRef.current) {
-    schedRef.current = new ComposeScheduler(async (cancelled) => {
-      const { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds } = composeInputs.current
-      if (!traced || !display || !prepared || !bounds) { setComposed(null); return }
-      const matteless = prepared.spec.generator.adapter === 'alpha' || prepared.spec.generator.adapter === 'bg-flood'
-      const blend = matteless ? 0 : blendVal
-      // the pool's laws: blend-0 = no compositor UNLESS the outline outgrew the frame
-      if (neutralNoComposite({ ...BLEND_POLICY_DEFAULTS, blend }) && !outgrown(bounds, imgW, imgH)) { setComposed(null); return }
-      const { origCanvas, subjCanvas } = prepared.frontSrc
-      const k = origCanvas.width / imgW
-      const texH = origCanvas.height
-      // outline bounds mapped to the engine's y-up tex space
-      const bUp = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }
-      const { composeEffectArtwork } = await import('@/lib/effect/composite')
-      if (cancelled()) return
-      const { canvas, frame } = await composeEffectArtwork({
-        originalCanvas: origCanvas,
-        subjectCanvas: subjCanvas,
-        outputBoundsPx: bUp,
-        blendPercent: blend,
-        fillMode: fillTile ? 'tile' : 'clamp',
-      })
-      if (cancelled()) return
-      setComposed({
-        url: canvas.toDataURL(),
-        x: frame.originX / k,
-        y: (texH - (frame.originY + frame.height)) / k, // y-up frame → y-down mask space
-        w: frame.width / k,
-        h: frame.height / k,
-      })
-    })
-  }
-  useEffect(() => { schedRef.current?.schedule() }, [traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds])
-  useEffect(() => () => schedRef.current?.cancel(), [])
-
   const onExport = useCallback(async () => {
     const svg = await actions.exportSvg()
     if (!svg) return
@@ -171,30 +182,32 @@ function CutoutLabInner() {
     document.body.appendChild(a); a.click(); a.remove()
   }, [actions])
 
-  // undo/redo: editor-local history first (knob commits land there), then the flow's (Magic/upload steps)
+  // undo/redo: editor-local history first (knob + tool commits land there), then the flow's
   const canUndo = ed.state.canUndo || state.canUndo
   const canRedo = ed.state.canRedo || state.canRedo
   const onUndo = useCallback(() => { if (ed.state.canUndo) ed.actions.undo(); else void actions.undo() }, [ed.state.canUndo, ed.actions, actions])
   const onRedo = useCallback(() => { if (ed.state.canRedo) ed.actions.redo(); else void actions.redo() }, [ed.state.canRedo, ed.actions, actions])
 
-  const status = generating ? 'Computing…' : prepared ? (pathD ? 'Ready — outline live' : 'Ready') : 'Upload an image to begin'
   const hasCut = !!pathD
+  const status = msg ?? (generating ? 'Computing…' : prepared ? (hasCut ? 'Ready — outline live' : 'Ready') : 'Upload an image to begin')
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
       <PerfHUD />
       <h1 style={{ fontSize: 19, fontWeight: 700, textAlign: 'center' }}>Cutout Lab</h1>
 
-      {/* v1 button row — bridge verbs; Preview/Mask present-but-disabled (no bridge backend yet) */}
+      {/* v1 button row — bridge verbs + tool toggles */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
-          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && actions.upload(e.target.files[0])} /></label>
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) { setMsg(null); actions.upload(e.target.files[0]) } }} /></label>
         <button onClick={onExport} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
         <button onClick={onUndo} disabled={!canUndo} style={btn}>↩ Undo</button>
         <button onClick={onRedo} disabled={!canRedo} style={btn}>↪ Redo</button>
-        <button onClick={() => void actions.reset()} disabled={!hasArtwork} style={btn}>🗑 Clear</button>
-        <button disabled style={{ ...btn, color: '#9ca3af' }} title="next increment">👁 Preview</button>
-        <button disabled style={{ ...btn, color: '#9ca3af' }} title="next increment">🎭 Mask off</button>
+        <button onClick={() => { paint.actions.invalidate(); setMsg(null); void actions.reset() }} disabled={!hasArtwork} style={btn}>🗑 Clear</button>
+        <button onClick={() => setPreview((v) => !v)} disabled={!hasCut}
+          style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
+        <button onClick={() => setOverlayOn((v) => !v)} disabled={!baseMask}
+          style={{ ...btn, background: overlayOn ? '#f1f5f9' : '#0f172a', color: overlayOn ? '#0f172a' : '#fff' }}>{overlayOn ? '🎭 Mask on' : '🎭 Mask off'}</button>
       </div>
 
       {/* v1 TABS — chips within, ONE adaptive knob below */}
@@ -208,11 +221,11 @@ function CutoutLabInner() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
         {tab === 'ai' && (<>
-          <button onClick={actions.magic} disabled={!hasArtwork || generating} style={{ ...btn, fontSize: 12, background: '#7c3aed', color: '#fff', fontWeight: 700 }}>🤖 Detect</button>
+          <button onClick={() => { setMsg(null); actions.magic() }} disabled={!hasArtwork || generating} style={{ ...btn, fontSize: 12, background: '#7c3aed', color: '#fff', fontWeight: 700 }}>🤖 Detect</button>
           <span style={{ color: '#94a3b8' }}>· brush:</span>
-          <button disabled style={chipBtn(false, true)} title="next increment">🟢 Add</button>
-          <button disabled style={chipBtn(false, true)} title="next increment">🔴 Erase</button>
-          {hasArtwork && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect to cut with u2net</span>}
+          <button disabled style={chipBtn(false, true)} title="grabcut increment (needs the slim provider)">🟢 Add</button>
+          <button disabled style={chipBtn(false, true)} title="grabcut increment (needs the slim provider)">🔴 Erase</button>
+          {hasArtwork && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect to cut with u2net, or paint a shape (✋ Edit)</span>}
         </>)}
         {tab === 'vector' && VEC_CHIPS.map((k) => {
           const t = toolById.get(k)
@@ -225,32 +238,33 @@ function CutoutLabInner() {
           <button onClick={() => setFill(false)} style={chipBtn(!fillTile)}>clamp</button>
         </>)}
         {tab === 'edit' && (<>
-          <button disabled style={chipBtn(false, true)} title="next increment">🖌 Paint shape</button>
-          <button disabled style={chipBtn(false, true)} title="next increment">🩹 Paint erase</button>
-          <button disabled style={chipBtn(false, true)} title="next increment">⬡ Nodes</button>
-          <button disabled style={chipBtn(false, true)} title="next increment">▣ Frame</button>
+          <button onClick={() => setTool('draw')} disabled={!hasArtwork} style={chipBtn(tool === 'draw', !hasArtwork)}>🖌 Paint shape</button>
+          <button onClick={() => setTool('draw-erase')} disabled={!hasArtwork} style={chipBtn(tool === 'draw-erase', !hasArtwork)}>🩹 Paint erase</button>
+          <button disabled style={chipBtn(false, true)} title="nodes increment">⬡ Nodes</button>
+          <button disabled style={chipBtn(false, true)} title="nodes increment">▣ Frame</button>
         </>)}
       </div>
 
-      {/* the ONE adaptive knob — previews while dragging (dragVal), commits on release (the descriptor F8 contract) */}
+      {/* the ONE adaptive knob — previews while dragging (dragVal), commits on release */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700, minWidth: 90 }}>{knob.label}</span>
         <input type="number" min={knob.lo} max={knob.hi} value={Math.round(dragVal ?? knob.value)} disabled={!knob.available}
           onChange={(e) => { setDragVal(null); knob.commit(Math.max(knob.lo, Math.min(knob.hi, Math.round(+e.target.value)))) }}
           style={{ width: 54, padding: '4px 6px', fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 4 }} />
         <input type="range" min={knob.lo} max={knob.hi} step={1} value={Math.round(dragVal ?? knob.value)} disabled={!knob.available}
-          onPointerDown={() => schedRef.current?.setDragging(true)}
+          onPointerDown={() => compose.setDragging(true)}
           onChange={(e) => { const v = +e.target.value; setDragVal(v); knob.preview(v) }}
-          onPointerUp={() => { if (dragVal != null) { knob.commit(dragVal); setDragVal(null) } schedRef.current?.setDragging(false) }}
-          onPointerCancel={() => { setDragVal(null); schedRef.current?.setDragging(false) }}
+          onPointerUp={() => { if (dragVal != null) { knob.commit(dragVal); setDragVal(null) } compose.setDragging(false) }}
+          onPointerCancel={() => { setDragVal(null); compose.setDragging(false) }}
           style={{ flex: 1, maxWidth: 420 }} />
         {!knob.available && <span style={{ color: '#94a3b8' }}>n/a for this shape</span>}
       </div>
 
-      {/* canvas — v1 look: image + engine outline + dim outside (evenodd scrim). Presentation only. */}
+      {/* canvas — v1 look: photo base, ENGINE-composed frame inside the outline when engaged,
+          dim-outside scrim, mask tint on top, sticker preview, live paint ink. */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div>
-          {hasArtwork && <div style={{ ...cap, textAlign: 'center' }}>{hasCut ? 'Live result — dimmed outside the shape' : 'Loaded — push 🤖 Detect to cut'}</div>}
+          {hasArtwork && <div style={{ ...cap, textAlign: 'center' }}>{preview ? 'Preview — same result, cut out' : hasCut ? 'Live result — dimmed outside the shape' : 'Loaded — push 🤖 Detect to cut, or paint a shape'}</div>}
           {!hasArtwork && (
             <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, width: 'min(480px, 86vw)', height: 320, border: '1.5px dashed #cbd5e1', borderRadius: 12, cursor: 'pointer', color: '#64748b', background: 'transparent' }}>
               <span style={{ fontSize: 40, lineHeight: 1 }}>🖼️</span>
@@ -264,26 +278,34 @@ function CutoutLabInner() {
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
               )}
               {/* FIXED viewport (v1 law): the BOX never grows or reflows — it locks to the image aspect;
-                  a growing view-box contain-fits inside it, so the object reads smaller, the page never jumps. */}
-              <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet"
-                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                {/* v1 RENDER: raw photo as the base (dimmed outside the shape by the scrim); when the
-                    ENGINE has composed a frame (blend>0 / outgrown offset), it draws INSIDE the outline
-                    on top — live result inside, raw image outside, one clip, no shell compositing. */}
+                  a growing view-box contain-fits inside it. */}
+              <svg ref={svgRef} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet"
+                onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={onCanvasUp} onPointerLeave={onCanvasUp}
+                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: paintTool ? 'none' : 'auto', cursor: paintTool && hasArtwork ? 'crosshair' : 'default' }}>
                 <defs>
                   {pathD && <clipPath id="labClip"><path d={pathD} /></clipPath>}
                 </defs>
-                {artworkUrl && <image href={artworkUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />}
-                {composed && pathD && (
+                {artworkUrl && !preview && <image href={artworkUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />}
+                {composed && pathD && !preview && (
                   <g clipPath="url(#labClip)">
                     <image href={composed.url} x={composed.x} y={composed.y} width={composed.w} height={composed.h} preserveAspectRatio="none"
                       transform={`translate(0 ${composed.y * 2 + composed.h}) scale(1 -1)`} />
                   </g>
                 )}
-                {pathD && (<>
+                {pathD && !preview && (<>
                   <path d={`M${vb.x} ${vb.y}H${vb.x + vb.w}V${vb.y + vb.h}H${vb.x}Z ${pathD}`} fill="rgba(6,8,14,0.55)" fillRule="evenodd" />
                   <path d={pathD} fill="none" stroke="#2563eb" strokeWidth={Math.max(2, imgW / 400)} />
                 </>)}
+                {/* 🎭 mask tint — on top, always the CURRENT selection (v1 r7 law) */}
+                {overlayUrl && !preview && <image href={overlayUrl} x={0} y={0} width={imgW} height={imgH} opacity={0.9} />}
+                {/* 👁 preview — shell-render.drawCutout truth (checkerboard + clipped photo) */}
+                {previewUrl && <image href={previewUrl} x={0} y={0} width={imgW} height={imgH} />}
+                {/* live paint ink (WYSIWYG): violet = add, red = erase, at the actual swath width */}
+                {strokeLive.length > 1 && (
+                  <polyline points={strokeLive.map((p) => `${p.x},${p.y}`).join(' ')} fill="none"
+                    stroke={tool === 'draw-erase' ? 'rgba(239,68,68,0.45)' : 'rgba(124,58,237,0.45)'}
+                    strokeWidth={Math.max(2, brushR * paintCfg.swathMult)} strokeLinecap="round" strokeLinejoin="round" />
+                )}
               </svg>
             </div>
           )}
@@ -291,7 +313,7 @@ function CutoutLabInner() {
       </div>
 
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>
-      <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>disabled controls (brushes · paint · nodes · frame · preview · mask) land in the next increments — spec {spec ? '✓' : '—'}</p>
+      <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>coming increments: nodes · frame · grabcut brush (slim provider)</p>
     </div>
   )
 }
