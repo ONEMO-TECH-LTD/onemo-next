@@ -86,6 +86,22 @@ function CutoutLabInner() {
   // the silhouette appears only on Detect.
   const traced = !!spec && spec.generator.adapter !== 'standard'
   const pathD = useMemo(() => { try { return traced && display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [traced, display])
+
+  // v1 VIEWPORT LAW (Meta refinement): the view adapts to the OUTLINE's full extent — an offset past the
+  // frame zooms the view out (the object reads smaller) instead of hiding under the canvas edge; the
+  // viewport CSS width stays fixed. Extent from the display shape's anchors (+handles), like v1's bounds.
+  const vb = useMemo(() => {
+    if (!traced || !display) return { x: 0, y: 0, w: imgW, h: imgH }
+    let minX = 0, minY = 0, maxX = imgW, maxY = imgH
+    for (const p of display.paths) for (const a of p.anchors) for (const pt of [a.p, a.hIn, a.hOut]) {
+      if (!pt) continue
+      if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y
+      if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y
+    }
+    const m = Math.max(4, imgW / 100)
+    const x = Math.min(0, Math.floor(minX - m)), y = Math.min(0, Math.floor(minY - m))
+    return { x, y, w: Math.max(imgW, Math.ceil(maxX + m)) - x, h: Math.max(imgH, Math.ceil(maxY + m)) - y }
+  }, [traced, display, imgW, imgH])
   const fillVal = toolById.get('fill')?.value as boolean | undefined
 
   const onExport = useCallback(async () => {
@@ -188,7 +204,7 @@ function CutoutLabInner() {
               {generating && (
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
               )}
-              <svg viewBox={`0 0 ${imgW} ${imgH}`} style={{ width: '100%', display: 'block', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} style={{ width: '100%', display: 'block', border: '1px solid #e2e8f0', borderRadius: 8 }}>
                 {/* v1 RENDER BEHAVIOR from engine outputs (EditorCanvas pattern, no old component mounted):
                     blend on → blurred background + the engine's subject matte sharp on top; else the photo. */}
                 <defs>
@@ -205,7 +221,7 @@ function CutoutLabInner() {
                   <image href={artworkUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />
                 ))}
                 {pathD && (<>
-                  <path d={`M0 0H${imgW}V${imgH}H0Z ${pathD}`} fill="rgba(6,8,14,0.55)" fillRule="evenodd" />
+                  <path d={`M${vb.x} ${vb.y}H${vb.x + vb.w}V${vb.y + vb.h}H${vb.x}Z ${pathD}`} fill="rgba(6,8,14,0.55)" fillRule="evenodd" />
                   <path d={pathD} fill="none" stroke="#2563eb" strokeWidth={Math.max(2, imgW / 400)} />
                 </>)}
               </svg>
