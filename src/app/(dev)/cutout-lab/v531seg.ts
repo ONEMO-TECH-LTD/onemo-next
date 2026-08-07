@@ -29,15 +29,30 @@ async function cutSource(url: string): Promise<{ url: string; revoke: boolean }>
   return blob ? { url: URL.createObjectURL(blob), revoke: true } : { url, revoke: false }
 }
 
+// CRASH BREADCRUMB (Dan device 2026-08-07: Detect HARD-CRASHES iOS Safari → the tab reloads,
+// destroying the eruda console before it can show the error). Each Detect stage is stamped to
+// localStorage BEFORE it runs and cleared on success; after a crash-reload the mount reader
+// (flow.warmup) surfaces the last stage reached — so we learn WHICH allocation died (engine cut vs
+// lab prepare/bake) with no surviving console. Lab-layer, always-on, ~two localStorage ops per cut.
+export function crashStage(s: string | null): void {
+  try { if (s === null) localStorage.removeItem('lab-detect-stage'); else localStorage.setItem('lab-detect-stage', s) } catch { /* private mode / no storage */ }
+}
+export function lastCrashStage(): string | null {
+  try { return localStorage.getItem('lab-detect-stage') } catch { return null }
+}
+
 /** image URL → v5.3.1's own segmentation through ITS OWN bridge primitive (`runCutout` owns the
  *  working-res config — mask/texture dims are the BRIDGE'S, never the lab's; Dan 2026-08-06: no
  *  engine logic outside the v5.3.1 perimeter). `preseg` is the untouched MLResult — the exact
  *  object the v5.3.1 flow hands prepareShaped (full soft saliency matte + hi-res texImage). The
  *  binary y-down `mask` is derived for UI overlay/brush state only. */
 export async function segmentV531(url: string, uiW: number, uiH: number): Promise<{ mask: Mask; adapter: string; preseg: MLResult }> {
+  crashStage('1·decode-source')                 // main-thread decode + downscale of the original photo
   const cut = await cutSource(url)
   let r: MLResult
+  crashStage('2·engine-cut')                     // the v5.3.1 cut worker (u2net/ORT) — engine perimeter
   try { r = await runCutout(cut.url) } finally { if (cut.revoke) URL.revokeObjectURL(cut.url) }
+  crashStage('3·derive-ui-mask')                 // lab-layer canvas flip/scale
   // Derive the y-down UI mask AT THE LAB'S canvas dims (the bridge's mask dims are its own config
   // and may differ) — canvas flip+scale in one pass. UI overlay/brush state only.
   const src = document.createElement('canvas'); src.width = r.width; src.height = r.height

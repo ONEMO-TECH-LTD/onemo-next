@@ -23,7 +23,7 @@ import {
 import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
-import { segmentV531 } from './v531seg'
+import { segmentV531, crashStage, lastCrashStage } from './v531seg'
 import { preloadBen } from '@/lib/effect/segment-ml'
 import { HistoryStack } from './history'
 import type { EditMode } from './EditorOverlay'
@@ -309,9 +309,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
+      crashStage('4·prepare+bake')                 // lab-layer engine prepare + compose (subject/texture/mosaics)
       // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
       await acceptMask(r.mask, r.preseg)
+      crashStage(null)                             // completed without a renderer crash — clear the breadcrumb
     } catch (e) {
+      crashStage(null)                             // a CAUGHT error means JS survived — not the hard crash we hunt
       setStatus('⚠️ u2net failed: ' + String((e as Error)?.message ?? '?') + ' — reload the page and Detect again, or brush the object')
     }
     setBusy(false)
@@ -530,8 +533,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // WARM-UP: prefetch u2net weights into the HTTP cache (downloads only — no runtime at open;
   // GrabCut's OpenCV lazy-loads on the first brush stroke).
   const warmup = useCallback(() => {
+    // Crash-survivor read: if a prior Detect stamped a stage and never cleared it, the tab crashed
+    // there (renderer OOM → Safari auto-reload). Surface WHICH stage so the fix targets the real
+    // allocation instead of a guess — then clear it so a later clean load reads 'ready'.
+    const crashed = lastCrashStage()
+    if (crashed) crashStage(null)
     preloadBen()
-    setStatus('ready — upload an image · ⬇ warming u2net in the background')
+    setStatus(crashed
+      ? '⚠️ last Detect crashed at stage ' + crashed + ' — report this stage to Kai'
+      : 'ready — upload an image · ⬇ warming u2net in the background')
   }, [])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
