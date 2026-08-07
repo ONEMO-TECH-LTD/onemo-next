@@ -12,16 +12,35 @@
 //    no tool modules, no parallel logic files.
 //  • A control with NO bridge backend yet (AI/paint brushes, mask overlay, preview, nodes/frame) renders
 //    PRESENT but disabled in its v1 look — visible truth, not absence.
-//  • The canvas is v1-style PRESENTATION only: image + engine outline + dim-outside scrim, rendered from
-//    the composer's display shape. No bake, no compositor call.
+//  • The canvas is v1-style PRESENTATION: image + engine outline + dim-outside scrim from the composer's
+//    display shape. Blend-0 inside the frame = NO compositor call (photo clipped by the outline IS the
+//    result — Dan's law). Blend>0 or an outgrown offset = the ENGINE's own 2D compose op
+//    (composeEffectArtwork, s59: clamp/tile fill + magic blend) produces the frame; the shell only draws
+//    it. Mirror (v1's mosaic glue) stays dead. No bake wrapper, no pad/crop plumbing.
 
-import { useState, useCallback, useMemo, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from '../effect-creator/v5.3.1/ui/Toast'
 import { useTwoDFirstFlow } from '../effect-creator/v5.3.1/flows/twoDFirstFlow'
 import { useEditor } from '../effect-creator/v5.3.1/user/editor/useEditor'
-import { shapeToSVGPathD } from '@/lib/vector-core'
+import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
+// the POOL's policy module (session62-task/v1-addon-modules): Dan's laws as tested code — the shell
+// BINDS these decisions, it never re-derives them (Meta directive 2026-08-07).
+import { BLEND_POLICY_DEFAULTS, neutralNoComposite, outgrown, viewBoxFor, ComposeScheduler, type Bounds } from '@/lib/bridge-compose-policy'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
+
+/** outline extent from the display shape's anchors (+handles) — shell data extraction for the policies. */
+function boundsFor(display: VShape | null): Bounds | null {
+  if (!display) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const p of display.paths) for (const a of p.anchors) for (const pt of [a.p, a.hIn, a.hOut]) {
+    if (!pt) continue
+    if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y
+    if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y
+  }
+  if (!isFinite(minX)) return null
+  return { minX, minY, maxX, maxY }
+}
 
 // ── v1 bench styles (copied verbatim from the v1 shell — presentation only) ──
 const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9', fontWeight: 600 }
@@ -45,7 +64,7 @@ function CutoutLabInner() {
   // open-seed effect seeds the source from the flow-written spec. onClose never fires (no Done button here).
   const toolEnabled = useCallback(() => true, [])
   const ed = useEditor({ open: !!prepared, onClose: () => {}, notify, toolEnabled })
-  const { tools, display, spec, imgW, imgH, subjMatteUrl, blendBlur } = ed.state
+  const { tools, display, spec, imgW, imgH } = ed.state
   const { previewTool, commitTool } = ed.actions
 
   // ── shell-only UI state (v1 clone) ──
@@ -87,22 +106,60 @@ function CutoutLabInner() {
   const traced = !!spec && spec.generator.adapter !== 'standard'
   const pathD = useMemo(() => { try { return traced && display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [traced, display])
 
-  // v1 VIEWPORT LAW (Meta refinement): the view adapts to the OUTLINE's full extent — an offset past the
-  // frame zooms the view out (the object reads smaller) instead of hiding under the canvas edge; the
-  // viewport CSS width stays fixed. Extent from the display shape's anchors (+handles), like v1's bounds.
-  const vb = useMemo(() => {
-    if (!traced || !display) return { x: 0, y: 0, w: imgW, h: imgH }
-    let minX = 0, minY = 0, maxX = imgW, maxY = imgH
-    for (const p of display.paths) for (const a of p.anchors) for (const pt of [a.p, a.hIn, a.hOut]) {
-      if (!pt) continue
-      if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y
-      if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y
-    }
-    const m = Math.max(4, imgW / 100)
-    const x = Math.min(0, Math.floor(minX - m)), y = Math.min(0, Math.floor(minY - m))
-    return { x, y, w: Math.max(imgW, Math.ceil(maxX + m)) - x, h: Math.max(imgH, Math.ceil(maxY + m)) - y }
-  }, [traced, display, imgW, imgH])
-  const fillVal = toolById.get('fill')?.value as boolean | undefined
+  // v1 VIEWPORT LAW — bound from the pool's policy (viewBoxFor): the view covers the outline's full
+  // extent; an offset past the frame zooms the view out; viewport CSS width stays fixed.
+  const bounds = useMemo(() => (traced ? boundsFor(display) : null), [traced, display])
+  const vb = useMemo(() => viewBoxFor(bounds, imgW, imgH), [bounds, imgW, imgH])
+  // fill (tile/clamp): shell-held mirror of the engine's wrapTile — the composer reads wrapTile
+  // non-reactively (getState in read()), so a commit alone would not re-render/recompose. The chip
+  // writes BOTH: local state (drives the recompose + chip highlight) and the engine state (commitTool,
+  // so undo/sessions/3D stay truthful).
+  const [fillTile, setFillTile] = useState(false)
+  const setFill = useCallback((v: boolean) => { setFillTile(v); commitTool('fill', v) }, [commitTool])
+  const blendVal = (toolById.get('blend')?.value as number) ?? 0
+
+  // ── ENGINE COMPOSE bound through the POOL's policies (bridge-compose-policy): blend-0 law +
+  // outgrowth law decide WHETHER; ComposeScheduler decides WHEN (never mid-drag, single-flight,
+  // latest-wins); the ENGINE's own composeEffectArtwork produces the pixels; the shell only draws.
+  // Matteless fallback cuts force blend 0 (v1's no-matte guard) but keep the band fill. ──
+  const [composed, setComposed] = useState<{ url: string; x: number; y: number; w: number; h: number } | null>(null)
+  const composeInputs = useRef({ traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds })
+  composeInputs.current = { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds }
+  const schedRef = useRef<ComposeScheduler | null>(null)
+  if (!schedRef.current) {
+    schedRef.current = new ComposeScheduler(async (cancelled) => {
+      const { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds } = composeInputs.current
+      if (!traced || !display || !prepared || !bounds) { setComposed(null); return }
+      const matteless = prepared.spec.generator.adapter === 'alpha' || prepared.spec.generator.adapter === 'bg-flood'
+      const blend = matteless ? 0 : blendVal
+      // the pool's laws: blend-0 = no compositor UNLESS the outline outgrew the frame
+      if (neutralNoComposite({ ...BLEND_POLICY_DEFAULTS, blend }) && !outgrown(bounds, imgW, imgH)) { setComposed(null); return }
+      const { origCanvas, subjCanvas } = prepared.frontSrc
+      const k = origCanvas.width / imgW
+      const texH = origCanvas.height
+      // outline bounds mapped to the engine's y-up tex space
+      const bUp = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }
+      const { composeEffectArtwork } = await import('@/lib/effect/composite')
+      if (cancelled()) return
+      const { canvas, frame } = await composeEffectArtwork({
+        originalCanvas: origCanvas,
+        subjectCanvas: subjCanvas,
+        outputBoundsPx: bUp,
+        blendPercent: blend,
+        fillMode: fillTile ? 'tile' : 'clamp',
+      })
+      if (cancelled()) return
+      setComposed({
+        url: canvas.toDataURL(),
+        x: frame.originX / k,
+        y: (texH - (frame.originY + frame.height)) / k, // y-up frame → y-down mask space
+        w: frame.width / k,
+        h: frame.height / k,
+      })
+    })
+  }
+  useEffect(() => { schedRef.current?.schedule() }, [traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds])
+  useEffect(() => () => schedRef.current?.cancel(), [])
 
   const onExport = useCallback(async () => {
     const svg = await actions.exportSvg()
@@ -162,10 +219,9 @@ function CutoutLabInner() {
         })}
         {tab === 'blend' && (<>
           <button style={chipBtn(true)}>blend</button>
-          {/* tile/clamp toggle engine state whose only consumer is the compositor — disabled until the
-              engine-compose increment lands (their commit would be a silent no-op on this surface). */}
-          <button disabled style={chipBtn(fillVal === true, true)} title="engine-compose increment">tile</button>
-          <button disabled style={chipBtn(fillVal === false, true)} title="engine-compose increment">clamp</button>
+          {/* tile/clamp — the engine compose's fillMode (visible when blend>0 or the offset outgrows the frame) */}
+          <button onClick={() => setFill(true)} style={chipBtn(fillTile)}>tile</button>
+          <button onClick={() => setFill(false)} style={chipBtn(!fillTile)}>clamp</button>
         </>)}
         {tab === 'edit' && (<>
           <button disabled style={chipBtn(false, true)} title="next increment">🖌 Paint shape</button>
@@ -182,9 +238,10 @@ function CutoutLabInner() {
           onChange={(e) => { setDragVal(null); knob.commit(Math.max(knob.lo, Math.min(knob.hi, Math.round(+e.target.value)))) }}
           style={{ width: 54, padding: '4px 6px', fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 4 }} />
         <input type="range" min={knob.lo} max={knob.hi} step={1} value={Math.round(dragVal ?? knob.value)} disabled={!knob.available}
+          onPointerDown={() => schedRef.current?.setDragging(true)}
           onChange={(e) => { const v = +e.target.value; setDragVal(v); knob.preview(v) }}
-          onPointerUp={() => { if (dragVal != null) { knob.commit(dragVal); setDragVal(null) } }}
-          onPointerCancel={() => setDragVal(null)}
+          onPointerUp={() => { if (dragVal != null) { knob.commit(dragVal); setDragVal(null) } schedRef.current?.setDragging(false) }}
+          onPointerCancel={() => { setDragVal(null); schedRef.current?.setDragging(false) }}
           style={{ flex: 1, maxWidth: 420 }} />
         {!knob.available && <span style={{ color: '#94a3b8' }}>n/a for this shape</span>}
       </div>
@@ -206,21 +263,19 @@ function CutoutLabInner() {
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
               )}
               <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} style={{ width: '100%', display: 'block', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                {/* v1 RENDER BEHAVIOR from engine outputs (EditorCanvas pattern, no old component mounted):
-                    blend on → blurred background + the engine's subject matte sharp on top; else the photo. */}
+                {/* v1 RENDER: raw photo as the base (dimmed outside the shape by the scrim); when the
+                    ENGINE has composed a frame (blend>0 / outgrown offset), it draws INSIDE the outline
+                    on top — live result inside, raw image outside, one clip, no shell compositing. */}
                 <defs>
-                  <filter id="labBgBlur" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation={(blendBlur / 100) * (imgW / 25)} />
-                  </filter>
+                  {pathD && <clipPath id="labClip"><path d={pathD} /></clipPath>}
                 </defs>
-                {artworkUrl && (blendBlur > 0 && subjMatteUrl ? (
-                  <>
-                    <image href={artworkUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" filter="url(#labBgBlur)" />
-                    <image href={subjMatteUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" transform={`translate(0 ${imgH}) scale(1 -1)`} />
-                  </>
-                ) : (
-                  <image href={artworkUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />
-                ))}
+                {artworkUrl && <image href={artworkUrl} x={0} y={0} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" />}
+                {composed && pathD && (
+                  <g clipPath="url(#labClip)">
+                    <image href={composed.url} x={composed.x} y={composed.y} width={composed.w} height={composed.h} preserveAspectRatio="none"
+                      transform={`translate(0 ${composed.y * 2 + composed.h}) scale(1 -1)`} />
+                  </g>
+                )}
                 {pathD && (<>
                   <path d={`M${vb.x} ${vb.y}H${vb.x + vb.w}V${vb.y + vb.h}H${vb.x}Z ${pathD}`} fill="rgba(6,8,14,0.55)" fillRule="evenodd" />
                   <path d={pathD} fill="none" stroke="#2563eb" strokeWidth={Math.max(2, imgW / 400)} />
