@@ -37,6 +37,9 @@ export interface PaintBinding {
     /** node/frame edits: an edited VShape through the SAME seam — mask ≡ shape (safe by geometry),
      *  matte re-prepared by the engine, committed into the bridge session (nodeCommitPlan semantics). */
     shapeCommit: (next: VShape, okMsg?: string) => void
+    /** AI brush: GrabCut recognise (no base) / corridor-bounded refine (base) → the SAME seam.
+     *  Tool + slim provider load ON PRESS (never at page open — Dan's swap-not-stack law). */
+    grabCutStroke: (stroke: { x: number; y: number }[], erase: boolean, brushPx: number, image: HTMLCanvasElement) => void
     invalidate: () => void
   }
 }
@@ -130,9 +133,38 @@ export function usePaintBinding(args: {
     })
   }, [imgW, imgH, queue, seam])
 
+  // AI brush (GrabCut) — same queue, same seam, same guards; module + provider lazy-loaded on press
+  const grabCutStroke = useCallback((stroke: { x: number; y: number }[], erase: boolean, brushPx: number, image: HTMLCanvasElement) => {
+    queue.run(async () => {
+      const base = baseMaskRef.current
+      if (erase && !base) { sink.notify('warn', 'nothing to erase yet — brush a shape first'); return }
+      sink.notify('info', '🧠 recognising…')
+      const [{ grabCutRefine, eraseWouldDestroy: gcWouldDestroy }, { slimCv }] = await Promise.all([
+        import('@/lib/tool-grabcut'),
+        import('@/lib/tool-grabcut-provider'),
+      ])
+      const next = await grabCutRefine(slimCv, image, base, stroke, brushPx, erase)
+      const area = (m: Mask) => { let a = 0; for (let i = 0; i < m.data.length; i++) if (m.data[i]) a++; return a }
+      const after = area(next)
+      if (after === 0) { sink.notify('warn', 'nothing recognised there — try a stroke inside the object'); return }
+      if (erase && base && gcWouldDestroy(area(base), after)) { sink.notify('warn', 'that erase would remove almost everything — kept your shape'); return }
+      const res = await seam.commit(next)
+      if (res.kind === 'stale') return
+      if (res.kind === 'kept') { sink.notify('warn', `kept your selection — ${res.reason}`); return }
+      const { prepared: p } = res
+      setMask(next)
+      setPaintPrepared(p)
+      lastPaintSpecRef.current = p.spec
+      const st = useOutlineStore.getState()
+      st.setSpec(p.spec)
+      try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { /* matte stays unset */ }
+      sink.notify('info', erase ? '🧠 erased — snapped to the edge' : '🧠 added — snapped to the edge')
+    })
+  }, [queue, seam, sink])
+
   return {
     state: { mask, baseMask, paintPrepared, paintCfg },
-    actions: { strokeCommit, shapeCommit, invalidate },
+    actions: { strokeCommit, shapeCommit, grabCutStroke, invalidate },
   }
 }
 

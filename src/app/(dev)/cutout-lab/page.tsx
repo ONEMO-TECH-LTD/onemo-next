@@ -109,6 +109,21 @@ function CutoutLabInner() {
     commitTool, notify,
   })
 
+  // the photo as a canvas — input for the AI brush (GrabCut) and the sticker preview
+  const [displayCanvas, setDisplayCanvas] = useState<HTMLCanvasElement | null>(null)
+  useEffect(() => { // y-down photo canvas for drawCutout, rebuilt per upload
+    if (!artworkUrl) { setDisplayCanvas(null); return }
+    let dead = false
+    const img = new Image(); img.src = artworkUrl
+    img.onload = () => { // load-event, not decode() — decode() can hang on large blobs
+      if (dead) return
+      const c = document.createElement('canvas'); c.width = imgW; c.height = imgH
+      c.getContext('2d')!.drawImage(img, 0, 0, imgW, imgH)
+      setDisplayCanvas(c)
+    }
+    return () => { dead = true }
+  }, [artworkUrl, imgW, imgH])
+
   // ── gesture capture (shell duty): svg client point → mask space via the svg's own CTM ──
   const svgRef = useRef<SVGSVGElement>(null)
   const [strokeLive, setStrokeLive] = useState<{ x: number; y: number }[]>([])
@@ -124,6 +139,8 @@ function CutoutLabInner() {
     return { x: p.x, y: p.y }
   }, [])
   const paintTool = tool === 'draw' || tool === 'draw-erase'
+  const aiTool = tool === 'add' || tool === 'erase'
+  const strokeTool = paintTool || aiTool
 
   // ── node/frame mode enter/exit (active chip toggles OUT; landing mode = drag — v1 law) ──
   const exitEdit = useCallback(() => { setEditShape(null); setSelNode(null); setTool('draw') }, [])
@@ -145,7 +162,7 @@ function CutoutLabInner() {
     if (!hasArtwork || preview) return
     const p = toMaskPt(e); if (!p) return
     clearMsg() // a new gesture supersedes the previous outcome
-    if (paintTool) {
+    if (strokeTool) {
       paintingRef.current = true; strokeRef.current = [p]; setStrokeLive([p])
       ;(e.target as Element).setPointerCapture?.(e.pointerId)
       return
@@ -211,13 +228,16 @@ function CutoutLabInner() {
       paintingRef.current = false
       const stroke = strokeRef.current; strokeRef.current = []
       setStrokeLive([])
-      if (stroke.length > 0) paint.actions.strokeCommit(stroke, tool === 'draw-erase', brushR)
+      if (stroke.length > 0) {
+        if (aiTool && displayCanvas) paint.actions.grabCutStroke(stroke, tool === 'erase', brushR, displayCanvas)
+        else if (paintTool) paint.actions.strokeCommit(stroke, tool === 'draw-erase', brushR)
+      }
       return
     }
     const drag = editDragRef.current
     editDragRef.current = null
     if (drag?.moved && editShape) paint.actions.shapeCommit(editShape, drag.kind === 'node' ? 'point moved — outline updated' : 'frame scaled — outline updated')
-  }, [paint.actions, tool, brushR, editShape])
+  }, [paint.actions, tool, brushR, editShape, aiTool, paintTool, displayCanvas])
 
   // 🎭 mask tint (shell-render.maskOverlay) + 👁 preview (shell-render.drawCutout)
   const overlayUrl = useMemo(() => {
@@ -226,19 +246,6 @@ function CutoutLabInner() {
     c.getContext('2d')!.putImageData(maskOverlay(baseMask, tool === 'draw-erase' || tool === 'erase' ? 'erase' : 'add'), 0, 0)
     return c.toDataURL()
   }, [overlayOn, baseMask, tool])
-  const [displayCanvas, setDisplayCanvas] = useState<HTMLCanvasElement | null>(null)
-  useEffect(() => { // y-down photo canvas for drawCutout, rebuilt per upload
-    if (!artworkUrl) { setDisplayCanvas(null); return }
-    let dead = false
-    const img = new Image(); img.src = artworkUrl
-    img.onload = () => { // load-event, not decode() — decode() can hang on large blobs
-      if (dead) return
-      const c = document.createElement('canvas'); c.width = imgW; c.height = imgH
-      c.getContext('2d')!.drawImage(img, 0, 0, imgW, imgH)
-      setDisplayCanvas(c)
-    }
-    return () => { dead = true }
-  }, [artworkUrl, imgW, imgH])
   const previewUrl = useMemo(() => {
     if (!preview || !displayCanvas || !pathD) return null
     const c = document.createElement('canvas')
@@ -333,9 +340,9 @@ function CutoutLabInner() {
         {tab === 'ai' && (<>
           <button onClick={() => { setMsg(null); actions.magic() }} disabled={!hasArtwork || generating} style={{ ...btn, fontSize: 12, background: '#7c3aed', color: '#fff', fontWeight: 700 }}>🤖 Detect</button>
           <span style={{ color: '#94a3b8' }}>· brush:</span>
-          <button disabled style={chipBtn(false, true)} title="grabcut increment (needs the slim provider)">🟢 Add</button>
-          <button disabled style={chipBtn(false, true)} title="grabcut increment (needs the slim provider)">🔴 Erase</button>
-          {hasArtwork && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect to cut with u2net, or paint a shape (✋ Edit)</span>}
+          <button onClick={() => { exitEdit(); setTool('add'); clearMsg() }} disabled={!hasArtwork} style={chipBtn(tool === 'add', !hasArtwork)}>🟢 Add</button>
+          <button onClick={() => { exitEdit(); setTool('erase'); clearMsg() }} disabled={!hasArtwork} style={chipBtn(tool === 'erase', !hasArtwork)}>🔴 Erase</button>
+          {hasArtwork && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect, or brush 🟢 Add over the object</span>}
         </>)}
         {tab === 'vector' && VEC_CHIPS.map((k) => {
           const t = toolById.get(k)
@@ -407,7 +414,7 @@ function CutoutLabInner() {
                   a growing view-box contain-fits inside it. */}
               <svg ref={svgRef} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet"
                 onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={onCanvasUp} onPointerLeave={onCanvasUp}
-                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: paintTool || editing ? 'none' : 'auto', cursor: paintTool && hasArtwork ? 'crosshair' : 'default' }}>
+                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: strokeTool || editing ? 'none' : 'auto', cursor: strokeTool && hasArtwork ? 'crosshair' : 'default' }}>
                 <defs>
                   {pathD && <clipPath id="labClip"><path d={pathD} /></clipPath>}
                 </defs>
@@ -429,7 +436,7 @@ function CutoutLabInner() {
                 {/* live paint ink (WYSIWYG): violet = add, red = erase, at the actual swath width */}
                 {strokeLive.length > 1 && (
                   <polyline points={strokeLive.map((p) => `${p.x},${p.y}`).join(' ')} fill="none"
-                    stroke={tool === 'draw-erase' ? 'rgba(239,68,68,0.45)' : 'rgba(124,58,237,0.45)'}
+                    stroke={tool === 'draw-erase' || tool === 'erase' ? 'rgba(239,68,68,0.45)' : tool === 'add' ? 'rgba(34,197,94,0.45)' : 'rgba(124,58,237,0.45)'}
                     strokeWidth={Math.max(2, brushR * paintCfg.swathMult)} strokeLinecap="round" strokeLinejoin="round" />
                 )}
                 {/* node anchors (⬡ Nodes) — finger-sized dots; selected = filled */}
@@ -450,7 +457,7 @@ function CutoutLabInner() {
       </div>
 
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>
-      <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>coming increments: nodes · frame · grabcut brush (slim provider)</p>
+      <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>AI brush = GrabCut (slim provider, loads on first press) · paint · nodes · frame</p>
     </div>
   )
 }
