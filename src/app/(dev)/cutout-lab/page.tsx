@@ -1,42 +1,43 @@
 'use client'
 
-// cutout-lab v2 — the CLEAN SHELL (Dan 2026-08-07 rebuild on clean v5.3.1 98ae0deb).
+// cutout-lab v2 — the v1 BENCH SHELL, wired to the clean v5.3.1 bridge (Dan 2026-08-07 rebuild on
+// pre-session v5.3.1 @ 98ae0deb). Increment 1: the engine wired to the UI, exposing ONLY what the
+// engine natively supports.
 //
-// GROUND RULE: the shell CONFORMS to the bridge, never the reverse. This page binds v5.3.1's own
-// `useTwoDFirstFlow` (the flow-contract bridge, built to support any UI) and drives it through its
-// native verbs — upload → upload, Detect → magic, knobs → the editor session — exactly as the
-// v5.3.1 2d shell does. NO lab flow, NO finish.ts glue, NO re-composited bake: the engine composites
-// through the flow's descriptors. Anything the bridge doesn't already expose is DEFERRED to its own
-// module increment, never glued in here.
+// GROUND RULE (Meta/Dan): the shell CONFORMS to the bridge, never the reverse. This page copies the v1
+// bench CHROME (title + the Upload/Detect/Save/Undo/Redo/Clear button row + status) and binds v5.3.1's own
+// `useTwoDFirstFlow` through its native verbs — upload → upload, Detect → magic (u2net cut), Save → exportSvg,
+// undo/redo, Clear → reset. The editing surface (shape / adjust / blend / nodes) is the bridge's OWN
+// `OutlineEditor`, driven by its descriptor mechanism (`useEditor`) — the flow opens it at upload. There is
+// NO lab flow, NO finish.ts, NO tool modules, NO cutSource, NO parallel knob path: the engine composites and
+// the descriptors edit. Import graph is exactly page → flows / OutlineEditor(→useEditor) / v5.3.1-ui.
 //
-// 2D-cutout only: the 3D-preview / trim / filter branches of the 2d shell are dropped (not needed
-// for the cutout lab, and the bridge keeps them optional).
+// Controls the bridge does not yet back are OMITTED (not glued, not approximated) and listed in the goal's
+// omission report — they land as their own later increments (per Dan's sequence: verbatim → calibration →
+// paint → grabcut). See the omissions comment at the foot of this file.
 
 import dynamic from 'next/dynamic'
 import { useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { UndoIcon, RedoIcon, ExportIcon } from '../effect-creator/v5.3.1/user/icons'
-import TopBar, { TopBarButton } from '../effect-creator/v5.3.1/user/TopBar'
-import edStyles from '../effect-creator/v5.3.1/user/outline-editor.module.css'
 import { toast } from '../effect-creator/v5.3.1/ui/Toast'
 import { useTwoDFirstFlow } from '../effect-creator/v5.3.1/flows/twoDFirstFlow'
 
-const Toolbar = dynamic(() => import('../effect-creator/v5.3.1/user/Toolbar'), { ssr: false })
-const EditOverlay = dynamic(() => import('../effect-creator/v5.3.1/user/EditOverlay'), { ssr: false })
 const OutlineEditor = dynamic(() => import('../effect-creator/v5.3.1/user/OutlineEditor'), { ssr: false })
-const EmptyState = dynamic(() => import('../effect-creator/v5.3.1/user/EmptyState'), { ssr: false })
 const GenerateShimmer = dynamic(() => import('../effect-creator/v5.3.1/user/GenerateShimmer'), { ssr: false })
+const EditOverlay = dynamic(() => import('../effect-creator/v5.3.1/user/EditOverlay'), { ssr: false })
 const ToastSurface = dynamic(() => import('../effect-creator/v5.3.1/ui/Toast'), { ssr: false })
 const PerfHUD = dynamic(() => import('../effect-creator/v5.3.1/dev/PerfHUD'), { ssr: false })
+
+// v1 bench button style (copied verbatim from the v1 shell — presentation only).
+const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9', fontWeight: 600 }
 
 function CutoutLabInner() {
   const searchParams = useSearchParams()
   const segPresent = !!searchParams.get('seg')
-  const internalTools = searchParams.get('internal') === '1'
 
   const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
   const { state, actions } = useTwoDFirstFlow({ notify, segPresent })
-  const { artworkUrl, prepared, sessions, editorMode, autoOutline, generating, colors } = state
+  const { artworkUrl, prepared, sessions, editorMode, hasArtwork, generating, canUndo, canRedo } = state
   const editingOutline = sessions.editor
 
   const [isDragging, setIsDragging] = useState(false)
@@ -47,6 +48,7 @@ function CutoutLabInner() {
     if (file) actions.upload(file)
   }, [actions])
 
+  // Save → export the mm-true cutline SVG (the socket returns the string; the UI writes the file).
   const onExport = useCallback(async () => {
     const svg = await actions.exportSvg()
     if (!svg) return
@@ -56,32 +58,51 @@ function CutoutLabInner() {
     document.body.appendChild(a); a.click(); a.remove()
   }, [actions])
 
+  const status = generating ? 'Computing…'
+    : editingOutline ? 'Editing — shape · adjust · blend'
+    : prepared ? 'Ready'
+    : hasArtwork ? 'Loaded'
+    : 'Upload an image to begin'
+
   return (
     <div
-      style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: colors.bgColor }}
+      style={{ maxWidth: 1180, margin: '0 auto', padding: 20, minHeight: '100vh', fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}
       onDrop={handleDrop}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
       onDragLeave={() => setIsDragging(false)}
     >
-      {!artworkUrl && <EmptyState onFile={actions.upload} />}
+      <PerfHUD />
+      <h1 style={{ fontSize: 19, fontWeight: 700, textAlign: 'center' }}>Cutout Lab</h1>
+
+      {/* v1 bench button row — every handler wired to a bridge verb */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>
+        <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && actions.upload(e.target.files[0])} /></label>
+        <button onClick={actions.magic} disabled={!hasArtwork || generating} style={{ ...btn, background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' }}>🤖 Detect</button>
+        <button onClick={onExport} disabled={!prepared} style={{ ...btn, background: prepared ? '#16a34a' : '#e5e7eb', color: prepared ? '#fff' : '#9ca3af' }}>💾 Save</button>
+        <button onClick={actions.undo} disabled={!canUndo} style={btn}>↩ Undo</button>
+        <button onClick={actions.redo} disabled={!canRedo} style={btn}>↪ Redo</button>
+        <button onClick={actions.reset} disabled={!hasArtwork} style={btn}>🗑 Clear</button>
+      </div>
+
       {generating && <GenerateShimmer onCancel={actions.cancelMagic} />}
 
-      <Toolbar
-        artworkUrl={artworkUrl}
-        auto={autoOutline}
-        showColors={false}
-        onFile={actions.upload}
-        onGenerate={actions.magic}
-        onToggleColors={() => {}}
-        onFilters={() => {}}
-        onEditor={() => actions.beginSession('editor', null)}
-        editorReady={!!prepared}
-      />
+      {/* pre-upload prompt (v1 bench look) — the file input drives the same bridge verb */}
+      {!hasArtwork && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, width: 'min(480px, 86vw)', height: 320, border: '1.5px dashed #cbd5e1', borderRadius: 12, cursor: 'pointer', color: '#64748b', background: 'transparent' }}>
+            <span style={{ fontSize: 40, lineHeight: 1 }}>🖼️</span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Upload the image</span>
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && actions.upload(e.target.files[0])} />
+          </label>
+        </div>
+      )}
 
       <EditOverlay isDragging={isDragging} />
 
-      {/* The 2D editor — the cutout surface: outline + knobs + blend, driven by the flow's editor
-          session. The engine composites through its descriptors; the shell never bakes. */}
+      {/* The editing/canvas surface = the bridge's OWN editor (its EditorCanvas + descriptor sheets, driven by
+          useEditor). The flow opens it at upload; Done commits the session. The engine composites — the shell
+          never bakes. Magic (Detect) is also reachable inside via the editor's own Magic dock button. */}
       <OutlineEditor
         open={editingOutline}
         openMode={editorMode}
@@ -91,24 +112,9 @@ function CutoutLabInner() {
         onClose={() => actions.commitSession('editor')}
       />
 
-      {!editingOutline && (
-        <div className={`${edStyles.topbarFixed}`}>
-          <TopBar
-            left={(
-              <>
-                <TopBarButton icon={<UndoIcon />} label="Undo" onClick={actions.undo} disabled={!state.canUndo} />
-                <TopBarButton icon={<RedoIcon />} label="Redo" onClick={actions.redo} disabled={!state.canRedo} />
-              </>
-            )}
-            dirty={state.dirty}
-            onReset={actions.reset}
-            right={internalTools ? <TopBarButton icon={<ExportIcon />} label="Export" onClick={onExport} disabled={!prepared} /> : null}
-          />
-        </div>
-      )}
+      <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>
 
       <ToastSurface />
-      <PerfHUD />
     </div>
   )
 }
@@ -120,3 +126,13 @@ export default function CutoutLabV2Page() {
     </Suspense>
   )
 }
+
+// ── OMITTED in increment 1 (would need lab code, new glue, or a parallel path to the bridge editor) ──
+//  • v1 page-level tabs (ai/vector/blend/edit) + chips + the single adaptive knob — the bridge already
+//    delivers shape/adjust/blend/detail/offset/smooth/radius/curve editing through OutlineEditor's own
+//    descriptor sheets (useEditor); a page-level knob is a PARALLEL path, so editing is the bridge editor's.
+//  • AI brush Add/Erase (grabcut), Paint shape / Paint erase — no bridge tool exists yet (later increments).
+//  • Mask on/off overlay, 2D Preview toggle, comet trail, cursor ring — v1 raster-canvas presentation; the
+//    bridge editor carries its own Preview.
+//  • Admin paint-shaper panel (?admin=1), the "magic cut" ms stat, on-device eruda console, warmup prefetch —
+//    v1 lab-flow internals / debug.
