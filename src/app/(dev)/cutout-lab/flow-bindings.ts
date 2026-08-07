@@ -55,9 +55,11 @@ export function usePaintBinding(args: {
   const [paintPrepared, setPaintPrepared] = useState<PreparedEffect | null>(null)
   const urlRef = useRef<string | undefined>(undefined)
   const lastPaintSpecRef = useRef<unknown>(null)
-  const notifyRef = useRef(notify)
+  // stable sink: a plain holder (not a ref) so the queue/seam callbacks read the CURRENT notify at
+  // call time without touching a ref during render.
+  const [sink] = useState<{ notify: LabNotify }>(() => ({ notify }))
   useEffect(() => { urlRef.current = artworkUrl }, [artworkUrl])
-  useEffect(() => { notifyRef.current = notify }, [notify])
+  useEffect(() => { sink.notify = notify }, [sink, notify])
 
   const paintCfg = PAINT_DEFAULTS
   const baseMask = useMemo(
@@ -71,8 +73,8 @@ export function usePaintBinding(args: {
   const [seam] = useState(() => new ToolCommitSeam<PreparedEffect>((m) =>
     withTimeout(prepareAI(urlRef.current!, m), T_COMPUTE_MS, 'paint prepare')))
   const [queue] = useState(() => new ToolQueue(
-    () => notifyRef.current('info', '⏳ your stroke is queued'),
-    (e) => notifyRef.current('error', `tool failed: ${(e as Error)?.message ?? e}`),
+    () => sink.notify('info', '⏳ your stroke is queued'),
+    (e) => sink.notify('error', `tool failed: ${(e as Error)?.message ?? e}`),
   ))
 
   const invalidate = useCallback(() => {
@@ -89,15 +91,15 @@ export function usePaintBinding(args: {
     queue.run(async () => {
       const base = baseMaskRef.current
       const out = paintPlan(base, stroke, brushPx, erase, imgW, imgH, paintCfg)
-      if (out.kind === 'nothing-to-erase') { notifyRef.current('warn', 'nothing to erase yet — paint a shape first'); return }
-      if (erase && base && eraseWouldDestroy(base, out.mask)) { notifyRef.current('warn', 'that erase would remove almost everything — kept your shape'); return }
+      if (out.kind === 'nothing-to-erase') { sink.notify('warn', 'nothing to erase yet — paint a shape first'); return }
+      if (erase && base && eraseWouldDestroy(base, out.mask)) { sink.notify('warn', 'that erase would remove almost everything — kept your shape'); return }
       const res = await seam.commit(out.mask)
       if (res.kind === 'stale') return
-      if (res.kind === 'kept') { notifyRef.current('warn', `kept your selection — ${res.reason}`); return }
+      if (res.kind === 'kept') { sink.notify('warn', `kept your selection — ${res.reason}`); return }
       const { prepared: p } = res
       // SHAPE-IS-TRUTH (paint sources only): the resolved outline is the one truth; islands drop loudly
       const truth = shapeTruthNormalize(res.mask, p.spec.vectorShape, imgW, imgH)
-      if (truth.separateRegionDropped) notifyRef.current('warn', 'a SEPARATE region was dropped — bridge it to the main shape')
+      if (truth.separateRegionDropped) sink.notify('warn', 'a SEPARATE region was dropped — bridge it to the main shape')
       setMask(truth.mask)
       setPaintPrepared(p)
       lastPaintSpecRef.current = p.spec
@@ -106,7 +108,7 @@ export function usePaintBinding(args: {
       const st = useOutlineStore.getState()
       st.setSpec(p.spec)
       try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { /* matte stays unset */ }
-      notifyRef.current('info', erase ? 'erased — outline updated' : 'painted — outline updated')
+      sink.notify('info', erase ? 'erased — outline updated' : 'painted — outline updated')
     })
   }, [imgW, imgH, paintCfg, queue, seam])
 
@@ -116,7 +118,7 @@ export function usePaintBinding(args: {
       const m = solidShapeMask(next, imgW, imgH)
       const res = await seam.commit(m)
       if (res.kind === 'stale') return
-      if (res.kind === 'kept') { notifyRef.current('warn', `kept your shape — ${res.reason}`); return }
+      if (res.kind === 'kept') { sink.notify('warn', `kept your shape — ${res.reason}`); return }
       const { prepared: p } = res
       setMask({ data: m.data, w: m.w, h: m.h })
       setPaintPrepared(p)
@@ -124,7 +126,7 @@ export function usePaintBinding(args: {
       const st = useOutlineStore.getState()
       st.setSpec(p.spec)
       try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { /* matte stays unset */ }
-      notifyRef.current('info', okMsg)
+      sink.notify('info', okMsg)
     })
   }, [imgW, imgH, queue, seam])
 
@@ -210,21 +212,21 @@ export function useControlBehaviors(args: {
   const { traced, artworkUrl, bounds, imgW, imgH, blendVal, engineDefaultBlend, commitTool, notify } = args
   const appliedForUrl = useRef<string | undefined>(undefined)
   const wasOutgrownRef = useRef(false)
-  const cbRef = useRef({ commitTool, notify })
-  useEffect(() => { cbRef.current = { commitTool, notify } }, [commitTool, notify])
+  const [cb] = useState<{ commitTool: (id: string, v: unknown) => unknown; notify: LabNotify }>(() => ({ commitTool, notify }))
+  useEffect(() => { cb.commitTool = commitTool; cb.notify = notify }, [cb, commitTool, notify])
 
   // AUTO_KNOBS — once per upload's FIRST cut (later paint/node commits keep the user's tuning)
   useEffect(() => {
     if (!traced || !artworkUrl || appliedForUrl.current === artworkUrl) return
     appliedForUrl.current = artworkUrl
-    const c = cbRef.current.commitTool
+    const c = cb.commitTool
     c('offset', { pct: AUTO_KNOBS.offset, join: 'sharp' })
     c('simplify', AUTO_KNOBS.simplify)
     c('smooth', AUTO_KNOBS.smooth)
     c('radius', AUTO_KNOBS.radius) // refused harmlessly when the shape carries no corner
     // detail + offset are BOTH generation params behind one gen record; committing them in the same
     // tick makes the second clobber the first through the stale gen ref — detail lands a tick later.
-    const t = setTimeout(() => cbRef.current.commitTool('detail', detailKnobToEngine(AUTO_KNOBS.detail)), 120)
+    const t = setTimeout(() => cb.commitTool('detail', detailKnobToEngine(AUTO_KNOBS.detail)), 120)
     return () => clearTimeout(t)
   }, [traced, artworkUrl])
 
@@ -235,8 +237,8 @@ export function useControlBehaviors(args: {
     )
     wasOutgrownRef.current = nowOutgrown
     if (setBlendTo != null && setBlendTo > 0) {
-      cbRef.current.commitTool('blend', setBlendTo)
-      cbRef.current.notify('info', 'blend engaged — the outgrown band gets its fill')
+      cb.commitTool('blend', setBlendTo)
+      cb.notify('info', 'blend engaged — the outgrown band gets its fill')
     }
   }, [bounds, imgW, imgH, blendVal, engineDefaultBlend])
 }

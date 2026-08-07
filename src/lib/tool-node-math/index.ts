@@ -136,3 +136,88 @@ export const shapeRing = (shape: VShape): { x: number; y: number }[] =>
 
 /** SVG path of a shape (serialization kept OUT of the UI — module boundary). */
 export const shapePathD = (shape: VShape): string => shapeToSVGPathD(shape, 2)
+
+// ── HIT-TEST + TRANSFORMS (node drag / frame scale) — the interaction math the SHELL must not own.
+// Dan's rule: no UI logic leak; every tool is a replaceable sub-module. The shell passes points and
+// renders; all geometry lives here beside insert/delete/adjust.
+
+/** Nearest anchor within `tol` of a point, or null — the node grab test. */
+export function hitAnchor(shape: VShape, p: { x: number; y: number }, tol: number): { pi: number; ai: number } | null {
+  let best: { pi: number; ai: number } | null = null
+  let bd = Infinity
+  shape.paths.forEach((path, pi) => path.anchors.forEach((a, ai) => {
+    const d = Math.hypot(a.p.x - p.x, a.p.y - p.y)
+    if (d <= tol && d < bd) { bd = d; best = { pi, ai } }
+  }))
+  return best
+}
+
+/** Move one anchor by (dx,dy) with its handles GLUED (v1: handles never detach from the line). */
+export function moveAnchor(shape: VShape, pi: number, ai: number, dx: number, dy: number): VShape {
+  return {
+    paths: shape.paths.map((path, i) => i !== pi ? path : ({
+      anchors: path.anchors.map((a, j) => j !== ai ? a : ({
+        ...a,
+        p: { x: a.p.x + dx, y: a.p.y + dy },
+        hIn: a.hIn ? { x: a.hIn.x + dx, y: a.hIn.y + dy } : a.hIn,
+        hOut: a.hOut ? { x: a.hOut.x + dx, y: a.hOut.y + dy } : a.hOut,
+      })),
+    })),
+  }
+}
+
+/** Frame-grip scale factors about the OPPOSITE corner; aspect lock averages the two axes. */
+export const FRAME_SCALE_LIMITS = { min: 0.05, max: 20 } as const
+export function frameScaleFactors(
+  origin: { x: number; y: number }, corner: { x: number; y: number }, p: { x: number; y: number }, aspectLocked: boolean,
+): { sx: number; sy: number } {
+  const clamp = (v: number) => Math.max(FRAME_SCALE_LIMITS.min, Math.min(FRAME_SCALE_LIMITS.max, v))
+  let sx = clamp((p.x - origin.x) / (corner.x - origin.x || 1))
+  let sy = clamp((p.y - origin.y) / (corner.y - origin.y || 1))
+  if (aspectLocked) { const s = (sx + sy) / 2; sx = s; sy = s }
+  return { sx, sy }
+}
+
+/** Scale a whole shape about an origin (points AND handles) — the frame transform. */
+export function scaleShape(shape: VShape, origin: { x: number; y: number }, sx: number, sy: number): VShape {
+  const tx = (pt: { x: number; y: number }) => ({ x: origin.x + (pt.x - origin.x) * sx, y: origin.y + (pt.y - origin.y) * sy })
+  return {
+    paths: shape.paths.map((path) => ({
+      anchors: path.anchors.map((a) => ({ ...a, p: tx(a.p), hIn: a.hIn ? tx(a.hIn) : a.hIn, hOut: a.hOut ? tx(a.hOut) : a.hOut })),
+    })),
+  }
+}
+
+/** Outline extent (anchors + handles) — the input the viewport/compose policies decide from. */
+export function shapeBounds(shape: VShape | null): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (!shape) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const path of shape.paths) for (const a of path.anchors) for (const pt of [a.p, a.hIn, a.hOut]) {
+    if (!pt) continue
+    if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y
+    if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y
+  }
+  return isFinite(minX) ? { minX, minY, maxX, maxY } : null
+}
+
+/** The four bbox corner grips of a frame, paired with the opposite (anchor) corner. */
+export function frameGrips(b: { minX: number; minY: number; maxX: number; maxY: number }): { corner: { x: number; y: number }; origin: { x: number; y: number } }[] {
+  const cs = [
+    { x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY },
+    { x: b.minX, y: b.maxY }, { x: b.maxX, y: b.maxY },
+  ]
+  return cs.map((corner, i) => ({ corner, origin: cs[3 - i] }))
+}
+
+/** Nearest frame grip within `tol` of a point (with its opposite anchor corner), or null. */
+export function hitGrip(
+  b: { minX: number; minY: number; maxX: number; maxY: number }, p: { x: number; y: number }, tol: number,
+): { corner: { x: number; y: number }; origin: { x: number; y: number } } | null {
+  let best: { corner: { x: number; y: number }; origin: { x: number; y: number } } | null = null
+  let bd = Infinity
+  for (const g of frameGrips(b)) {
+    const d = Math.hypot(g.corner.x - p.x, g.corner.y - p.y)
+    if (d <= tol && d < bd) { bd = d; best = g }
+  }
+  return best
+}

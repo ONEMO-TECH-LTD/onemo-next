@@ -15,12 +15,15 @@ import { toast } from '../effect-creator/v5.3.1/ui/Toast'
 import { useTwoDFirstFlow } from '../effect-creator/v5.3.1/flows/twoDFirstFlow'
 import { useEditor } from '../effect-creator/v5.3.1/user/editor/useEditor'
 import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
-import { viewBoxFor, type Bounds } from '@/lib/bridge-compose-policy'
+import { viewBoxFor } from '@/lib/bridge-compose-policy'
 import { VEC_CHIPS, CHIP_RANGE, type Tab, type Tool, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
 import { maskOverlay, drawCutout } from '@/lib/shell-render'
 // NODES/FRAME increment — pool modules: math (tool-node-math), budgeted skeleton + live-drag
 // semantics (shell-edit-live over bridge-node-override).
-import { insertNode, deleteNode, nodeAdjust, measureNode, nodeTapTol } from '@/lib/tool-node-math'
+import {
+  insertNode, deleteNode, nodeAdjust, measureNode, nodeTapTol,
+  hitAnchor, moveAnchor, frameScaleFactors, scaleShape, shapeBounds, frameGrips, hitGrip,
+} from '@/lib/tool-node-math'
 import { enterEditShape, NODE_MODE_DEFAULT, type NodeMode } from '@/lib/shell-edit-live'
 import { usePaintBinding, useComposeBinding, useControlBehaviors, type LabNotify } from './flow-bindings'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
@@ -30,26 +33,16 @@ const btn: React.CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1
 const cap: React.CSSProperties = { fontSize: 11, textTransform: 'uppercase', color: '#64748b', marginBottom: 4 }
 const chipBtn = (active: boolean, disabled = false): React.CSSProperties => ({ ...btn, padding: '4px 10px', fontSize: 12, background: active ? '#0f172a' : '#f1f5f9', color: disabled ? '#9ca3af' : active ? '#fff' : '#0f172a', cursor: disabled ? 'not-allowed' : 'pointer' })
 
-/** outline extent from the display shape's anchors (+handles) — shell data extraction for the policies. */
-function boundsFor(display: VShape | null): Bounds | null {
-  if (!display) return null
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const p of display.paths) for (const a of p.anchors) for (const pt of [a.p, a.hIn, a.hOut]) {
-    if (!pt) continue
-    if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y
-    if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y
-  }
-  if (!isFinite(minX)) return null
-  return { minX, minY, maxX, maxY }
-}
-
 function CutoutLabInner() {
   const searchParams = useSearchParams()
   const segPresent = !!searchParams.get('seg')
 
-  // notify → the v1 STATUS LINE + toast (outcomes are never silent)
+  // notify → the v1 STATUS LINE + toast (outcomes are never silent). The message describes the LAST
+  // action, so it is cleared the moment a new one starts — a stale warning must never masquerade as
+  // the current state.
   const [msg, setMsg] = useState<string | null>(null)
   const notify = useCallback<LabNotify>((kind, message) => { setMsg(message); toast(kind, message) }, [])
+  const clearMsg = useCallback(() => setMsg(null), [])
 
   // ── THE BRIDGE, both layers: the flow (upload/magic/export/reset) + the editor composer (descriptors) ──
   const { state, actions } = useTwoDFirstFlow({ notify, segPresent })
@@ -77,7 +70,7 @@ function CutoutLabInner() {
   const [nodeChip, setNodeChip] = useState<'radius' | 'curve'>('radius')
   const [nodeAdj, setNodeAdj] = useState({ radius: 0, curve: 0 })
   const [aspectLocked, setAspectLocked] = useState(true)
-  const nodeBaseRef = useRef<VShape | null>(null)
+  const [nodeBase, setNodeBase] = useState<VShape | null>(null)
   const editDragRef = useRef<
     | { kind: 'node'; pi: number; ai: number; orig: VShape; moved: boolean }
     | { kind: 'frame'; origin: { x: number; y: number }; corner: { x: number; y: number }; orig: VShape; moved: boolean }
@@ -94,7 +87,7 @@ function CutoutLabInner() {
   // commits re-enter through the seam and update the bridge display.
   const liveShape = editing && editShape ? editShape : display
   const pathD = useMemo(() => { try { return traced && liveShape ? shapeToSVGPathD(liveShape, 2) : '' } catch { return '' } }, [traced, liveShape])
-  const bounds = useMemo(() => (traced ? boundsFor(liveShape) : null), [traced, liveShape])
+  const bounds = useMemo(() => (traced ? shapeBounds(liveShape) : null), [traced, liveShape])
   const vb = useMemo(() => viewBoxFor(bounds, imgW, imgH), [bounds, imgW, imgH])
 
   // fill (tile/clamp): shell-held mirror of the engine's wrapTile — the composer reads wrapTile
@@ -144,23 +137,14 @@ function CutoutLabInner() {
   }, [tool, display, exitEdit])
   const selectNode = useCallback((sel: { pi: number; ai: number } | null, shape: VShape | null) => {
     setSelNode(sel)
-    nodeBaseRef.current = shape
+    setNodeBase(shape)
     setNodeAdj(sel && shape ? measureNode(shape, sel.pi, sel.ai) : { radius: 0, curve: 0 })
   }, [])
-
-  const nearestAnchor = (shape: VShape, p: { x: number; y: number }, tol: number): { pi: number; ai: number } | null => {
-    let best: { pi: number; ai: number } | null = null
-    let bd = Infinity
-    shape.paths.forEach((path, pi) => path.anchors.forEach((a, ai) => {
-      const d = Math.hypot(a.p.x - p.x, a.p.y - p.y)
-      if (d <= tol && d < bd) { bd = d; best = { pi, ai } }
-    }))
-    return best
-  }
 
   const onCanvasDown = useCallback((e: React.PointerEvent) => {
     if (!hasArtwork || preview) return
     const p = toMaskPt(e); if (!p) return
+    clearMsg() // a new gesture supersedes the previous outcome
     if (paintTool) {
       paintingRef.current = true; strokeRef.current = [p]; setStrokeLive([p])
       ;(e.target as Element).setPointerCapture?.(e.pointerId)
@@ -168,7 +152,7 @@ function CutoutLabInner() {
     }
     if (tool === 'nodes' && editShape) {
       const tol = nodeTapTol(imgW) * 1.6
-      const hit = nearestAnchor(editShape, p, tol)
+      const hit = hitAnchor(editShape, p, tol)
       if (nodeMode === 'delete') {
         if (hit) {
           const next = deleteNode(editShape, hit.pi, hit.ai)
@@ -196,14 +180,8 @@ function CutoutLabInner() {
     }
     if (tool === 'frame' && editShape && bounds) {
       // corner grips: grab the nearest bbox corner within a finger radius; opposite corner = origin
-      const cs = [
-        { x: bounds.minX, y: bounds.minY }, { x: bounds.maxX, y: bounds.minY },
-        { x: bounds.minX, y: bounds.maxY }, { x: bounds.maxX, y: bounds.maxY },
-      ]
-      const tol = nodeTapTol(imgW) * 2.2
-      let gi = -1, gd = Infinity
-      cs.forEach((c, i) => { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d <= tol && d < gd) { gi = i; gd = d } })
-      if (gi >= 0) editDragRef.current = { kind: 'frame', corner: cs[gi], origin: cs[3 - gi], orig: editShape, moved: false }
+      const hit = hitGrip(bounds, p, nodeTapTol(imgW) * 2.2)
+      if (hit) editDragRef.current = { kind: 'frame', corner: hit.corner, origin: hit.origin, orig: editShape, moved: false }
     }
   }, [hasArtwork, preview, toMaskPt, paintTool, tool, editShape, nodeMode, imgW, bounds, notify, selectNode, paint.actions])
 
@@ -218,33 +196,14 @@ function CutoutLabInner() {
     drag.moved = true
     if (drag.kind === 'node') {
       const { pi, ai, orig } = drag
-      const a0 = drag.orig.paths[pi].anchors[ai]
-      const dx = p.x - a0.p.x, dy = p.y - a0.p.y
-      const next: VShape = {
-        paths: orig.paths.map((path, i) => i !== pi ? path : ({
-          anchors: path.anchors.map((a, j) => j !== ai ? a : ({
-            ...a,
-            p: { x: a.p.x + dx, y: a.p.y + dy },
-            hIn: a.hIn ? { x: a.hIn.x + dx, y: a.hIn.y + dy } : a.hIn,   // glued anchors — handles ride the node
-            hOut: a.hOut ? { x: a.hOut.x + dx, y: a.hOut.y + dy } : a.hOut,
-          })),
-        })),
-      }
-      setEditShape(next)
+      const a0 = orig.paths[pi].anchors[ai]
+      setEditShape(moveAnchor(orig, pi, ai, p.x - a0.p.x, p.y - a0.p.y))
       return
     }
-    // frame: scale about the opposite corner (aspect lock = uniform)
+    // frame: scale about the opposite corner — factors + transform are the tool module's
     const { origin, corner, orig } = drag
-    const denomX = corner.x - origin.x || 1, denomY = corner.y - origin.y || 1
-    let sx = (p.x - origin.x) / denomX, sy = (p.y - origin.y) / denomY
-    sx = Math.max(0.05, Math.min(20, sx)); sy = Math.max(0.05, Math.min(20, sy))
-    if (aspectLocked) { const s = (Math.abs(sx) + Math.abs(sy)) / 2; sx = Math.sign(sx) * s || s; sy = Math.sign(sy) * s || s }
-    const tx = (pt: { x: number; y: number }) => ({ x: origin.x + (pt.x - origin.x) * sx, y: origin.y + (pt.y - origin.y) * sy })
-    setEditShape({
-      paths: orig.paths.map((path) => ({
-        anchors: path.anchors.map((a) => ({ ...a, p: tx(a.p), hIn: a.hIn ? tx(a.hIn) : a.hIn, hOut: a.hOut ? tx(a.hOut) : a.hOut })),
-      })),
-    })
+    const { sx, sy } = frameScaleFactors(origin, corner, p, aspectLocked)
+    setEditShape(scaleShape(orig, origin, sx, sy))
   }, [toMaskPt, aspectLocked])
 
   const onCanvasUp = useCallback(() => {
@@ -310,10 +269,10 @@ function CutoutLabInner() {
     if (tab === 'blend') { const k = mk('blend'); if (k) return k }
     // per-node knobs (v1): selected anchor + radius/curve chips — pool math (nodeAdjust/measureNode),
     // committed through the same seam on release.
-    if (tool === 'nodes' && nodeMode === 'move' && selNode && nodeBaseRef.current) {
+    if (tool === 'nodes' && nodeMode === 'move' && selNode && nodeBase) {
       const apply = (adj: { radius: number; curve: number }, commit: boolean) => {
         setNodeAdj(adj)
-        const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, nodeChip === 'radius' ? { radius: adj.radius } : { curveKnob: adj.curve })
+        const next = nodeAdjust(nodeBase, selNode.pi, selNode.ai, nodeChip === 'radius' ? { radius: adj.radius } : { curveKnob: adj.curve })
         setEditShape(next)
         if (commit) paint.actions.shapeCommit(next, `node ${nodeChip} set — outline updated`)
       }
@@ -364,7 +323,7 @@ function CutoutLabInner() {
       {/* v1 TABS — chips within, ONE adaptive knob below */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, justifyContent: 'center' }}>
         {(['ai', 'vector', 'blend', 'edit'] as Tab[]).map((t) => (
-          <button key={t} onClick={() => { setTab(t); setDragVal(null) }} style={{ ...btn, background: tab === t ? '#7c3aed' : '#f1f5f9', color: tab === t ? '#fff' : '#0f172a' }}>
+          <button key={t} onClick={() => { setTab(t); setDragVal(null); clearMsg() }} style={{ ...btn, background: tab === t ? '#7c3aed' : '#f1f5f9', color: tab === t ? '#fff' : '#0f172a' }}>
             {t === 'ai' ? '🤖 AI' : t === 'vector' ? '⬡ Vector' : t === 'blend' ? '🎨 Blend' : '✋ Edit'}
           </button>
         ))}
@@ -380,7 +339,7 @@ function CutoutLabInner() {
         </>)}
         {tab === 'vector' && VEC_CHIPS.map((k) => {
           const t = toolById.get(k)
-          return <button key={k} onClick={() => { setVecChip(k); setDragVal(null) }} disabled={!t} style={chipBtn(vecChip === k, !t)}>{k}</button>
+          return <button key={k} onClick={() => { setVecChip(k); setDragVal(null); clearMsg() }} disabled={!t} style={chipBtn(vecChip === k, !t)}>{k}</button>
         })}
         {tab === 'blend' && (<>
           <button style={chipBtn(true)}>blend</button>
@@ -389,8 +348,8 @@ function CutoutLabInner() {
           <button onClick={() => setFill(false)} style={chipBtn(!fillTile)}>clamp</button>
         </>)}
         {tab === 'edit' && (<>
-          <button onClick={() => { exitEdit(); setTool('draw') }} disabled={!hasArtwork} style={chipBtn(tool === 'draw', !hasArtwork)}>🖌 Paint shape</button>
-          <button onClick={() => { exitEdit(); setTool('draw-erase') }} disabled={!hasArtwork} style={chipBtn(tool === 'draw-erase', !hasArtwork)}>🩹 Paint erase</button>
+          <button onClick={() => { exitEdit(); setTool('draw'); clearMsg() }} disabled={!hasArtwork} style={chipBtn(tool === 'draw', !hasArtwork)}>🖌 Paint shape</button>
+          <button onClick={() => { exitEdit(); setTool('draw-erase'); clearMsg() }} disabled={!hasArtwork} style={chipBtn(tool === 'draw-erase', !hasArtwork)}>🩹 Paint erase</button>
           {tool === 'nodes' && (<>
             <span style={{ color: '#94a3b8' }}>nodes:</span>
             {([['move', '✥ Drag'], ['add', '➕ Add'], ['delete', '➖ Delete']] as [NodeMode, string][]).map(([m, label]) => (
@@ -404,8 +363,8 @@ function CutoutLabInner() {
               <button onClick={() => selectNode(null, null)} style={chipBtn(false)}>✕</button>
             </>)}
           </>)}
-          <button onClick={() => enterEdit('nodes')} disabled={!hasCut} style={chipBtn(tool === 'nodes', !hasCut)}>⬡ Nodes</button>
-          <button onClick={() => enterEdit('frame')} disabled={!hasCut} style={chipBtn(tool === 'frame', !hasCut)}>▣ Frame</button>
+          <button onClick={() => { clearMsg(); enterEdit('nodes') }} disabled={!hasCut} style={chipBtn(tool === 'nodes', !hasCut)}>⬡ Nodes</button>
+          <button onClick={() => { clearMsg(); enterEdit('frame') }} disabled={!hasCut} style={chipBtn(tool === 'frame', !hasCut)}>▣ Frame</button>
           {tool === 'frame' && (
             <button onClick={() => setAspectLocked((v) => !v)} style={chipBtn(aspectLocked)}>{aspectLocked ? '🔒 aspect' : '🔓 aspect'}</button>
           )}
@@ -480,10 +439,8 @@ function CutoutLabInner() {
                     stroke="#2563eb" strokeWidth={Math.max(1.5, imgW / 600)} />
                 )))}
                 {/* frame grips (▣ Frame) — bbox corner handles */}
-                {tool === 'frame' && bounds && !preview && ([
-                  [bounds.minX, bounds.minY], [bounds.maxX, bounds.minY], [bounds.minX, bounds.maxY], [bounds.maxX, bounds.maxY],
-                ] as [number, number][]).map(([x, y], i) => (
-                  <rect key={i} x={x - nodeTapTol(imgW)} y={y - nodeTapTol(imgW)} width={nodeTapTol(imgW) * 2} height={nodeTapTol(imgW) * 2}
+                {tool === 'frame' && bounds && !preview && frameGrips(bounds).map(({ corner }, i) => (
+                  <rect key={i} x={corner.x - nodeTapTol(imgW)} y={corner.y - nodeTapTol(imgW)} width={nodeTapTol(imgW) * 2} height={nodeTapTol(imgW) * 2}
                     fill="rgba(255,255,255,0.9)" stroke="#2563eb" strokeWidth={Math.max(1.5, imgW / 600)} />
                 ))}
               </svg>
