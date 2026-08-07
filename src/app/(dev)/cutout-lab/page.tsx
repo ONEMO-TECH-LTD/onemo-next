@@ -16,8 +16,12 @@ import { useTwoDFirstFlow } from '../effect-creator/v5.3.1/flows/twoDFirstFlow'
 import { useEditor } from '../effect-creator/v5.3.1/user/editor/useEditor'
 import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { viewBoxFor, type Bounds } from '@/lib/bridge-compose-policy'
-import { VEC_CHIPS, type Tab, type Tool, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
+import { VEC_CHIPS, CHIP_RANGE, type Tab, type Tool, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
 import { maskOverlay, drawCutout } from '@/lib/shell-render'
+// NODES/FRAME increment — pool modules: math (tool-node-math), budgeted skeleton + live-drag
+// semantics (shell-edit-live over bridge-node-override).
+import { insertNode, deleteNode, nodeAdjust, measureNode, nodeTapTol } from '@/lib/tool-node-math'
+import { enterEditShape, NODE_MODE_DEFAULT, type NodeMode } from '@/lib/shell-edit-live'
 import { usePaintBinding, useComposeBinding, type LabNotify } from './flow-bindings'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
 
@@ -66,13 +70,31 @@ function CutoutLabInner() {
   const [overlayOn, setOverlayOn] = useState(false) // 🎭 mask tint (default OFF, v1)
   const [preview, setPreview] = useState(false)     // 👁 sticker preview (checkerboard + clipped photo)
 
+  // ── NODES/FRAME edit state (shell = selection + live shape; math from the pool) ──
+  const [editShape, setEditShape] = useState<VShape | null>(null)
+  const [nodeMode, setNodeMode] = useState<NodeMode>(NODE_MODE_DEFAULT)
+  const [selNode, setSelNode] = useState<{ pi: number; ai: number } | null>(null)
+  const [nodeChip, setNodeChip] = useState<'radius' | 'curve'>('radius')
+  const [nodeAdj, setNodeAdj] = useState({ radius: 0, curve: 0 })
+  const [aspectLocked, setAspectLocked] = useState(true)
+  const nodeBaseRef = useRef<VShape | null>(null)
+  const editDragRef = useRef<
+    | { kind: 'node'; pi: number; ai: number; orig: VShape; moved: boolean }
+    | { kind: 'frame'; origin: { x: number; y: number }; corner: { x: number; y: number }; orig: VShape; moved: boolean }
+    | null
+  >(null)
+
   const toolById = useMemo(() => new Map(tools.map((t) => [t.id, t])), [tools])
 
   // Meta ruling: the bridge's auto-prepared 'standard' square is STATE, not a cut — the shell draws
   // NO outline unless the generator is a real traced cut. Upload = bare photo; silhouette on Detect.
   const traced = !!spec && spec.generator.adapter !== 'standard'
-  const pathD = useMemo(() => { try { return traced && display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [traced, display])
-  const bounds = useMemo(() => (traced ? boundsFor(display) : null), [traced, display])
+  const editing = tool === 'nodes' || tool === 'frame'
+  // while a node/frame edit is live, the LOCAL edit shape is the drawn truth (shell-edit-live pairing);
+  // commits re-enter through the seam and update the bridge display.
+  const liveShape = editing && editShape ? editShape : display
+  const pathD = useMemo(() => { try { return traced && liveShape ? shapeToSVGPathD(liveShape, 2) : '' } catch { return '' } }, [traced, liveShape])
+  const bounds = useMemo(() => (traced ? boundsFor(liveShape) : null), [traced, liveShape])
   const vb = useMemo(() => viewBoxFor(bounds, imgW, imgH), [bounds, imgW, imgH])
 
   // fill (tile/clamp): shell-held mirror of the engine's wrapTile — the composer reads wrapTile
@@ -103,24 +125,134 @@ function CutoutLabInner() {
     return { x: p.x, y: p.y }
   }, [])
   const paintTool = tool === 'draw' || tool === 'draw-erase'
+
+  // ── node/frame mode enter/exit (active chip toggles OUT; landing mode = drag — v1 law) ──
+  const exitEdit = useCallback(() => { setEditShape(null); setSelNode(null); setTool('draw') }, [])
+  const enterEdit = useCallback((m: 'nodes' | 'frame') => {
+    if (tool === m) { exitEdit(); return }
+    if (!display) return
+    setEditShape(enterEditShape(display, null)) // budgeted skeleton (bridge-node-override) — never the raw dense ring
+    setNodeMode(NODE_MODE_DEFAULT)
+    setSelNode(null)
+    setTool(m)
+  }, [tool, display, exitEdit])
+  const selectNode = useCallback((sel: { pi: number; ai: number } | null, shape: VShape | null) => {
+    setSelNode(sel)
+    nodeBaseRef.current = shape
+    setNodeAdj(sel && shape ? measureNode(shape, sel.pi, sel.ai) : { radius: 0, curve: 0 })
+  }, [])
+
+  const nearestAnchor = (shape: VShape, p: { x: number; y: number }, tol: number): { pi: number; ai: number } | null => {
+    let best: { pi: number; ai: number } | null = null
+    let bd = Infinity
+    shape.paths.forEach((path, pi) => path.anchors.forEach((a, ai) => {
+      const d = Math.hypot(a.p.x - p.x, a.p.y - p.y)
+      if (d <= tol && d < bd) { bd = d; best = { pi, ai } }
+    }))
+    return best
+  }
+
   const onCanvasDown = useCallback((e: React.PointerEvent) => {
-    if (!paintTool || !hasArtwork || preview) return
+    if (!hasArtwork || preview) return
     const p = toMaskPt(e); if (!p) return
-    paintingRef.current = true; strokeRef.current = [p]; setStrokeLive([p])
-    ;(e.target as Element).setPointerCapture?.(e.pointerId)
-  }, [paintTool, hasArtwork, preview, toMaskPt])
+    if (paintTool) {
+      paintingRef.current = true; strokeRef.current = [p]; setStrokeLive([p])
+      ;(e.target as Element).setPointerCapture?.(e.pointerId)
+      return
+    }
+    if (tool === 'nodes' && editShape) {
+      const tol = nodeTapTol(imgW) * 1.6
+      const hit = nearestAnchor(editShape, p, tol)
+      if (nodeMode === 'delete') {
+        if (hit) {
+          const next = deleteNode(editShape, hit.pi, hit.ai)
+          if (!next) { notify('warn', 'a shape needs at least 3 points'); return }
+          setEditShape(next); selectNode(null, null)
+          paint.actions.shapeCommit(next, 'point deleted — outline updated')
+        }
+        return
+      }
+      if (nodeMode === 'add') {
+        if (!hit) {
+          const ins = insertNode(editShape, p.x, p.y, tol)
+          if (!ins) { notify('warn', 'tap ON the outline to add a point'); return }
+          setEditShape(ins.shape); selectNode({ pi: ins.pi, ai: ins.ai }, ins.shape)
+          paint.actions.shapeCommit(ins.shape, 'point added — outline updated')
+        }
+        return
+      }
+      // move (default): grab a node to drag; empty tap only deselects — never inserts (v1 mobile law)
+      if (hit) {
+        selectNode(hit, editShape)
+        editDragRef.current = { kind: 'node', pi: hit.pi, ai: hit.ai, orig: editShape, moved: false }
+      } else selectNode(null, null)
+      return
+    }
+    if (tool === 'frame' && editShape && bounds) {
+      // corner grips: grab the nearest bbox corner within a finger radius; opposite corner = origin
+      const cs = [
+        { x: bounds.minX, y: bounds.minY }, { x: bounds.maxX, y: bounds.minY },
+        { x: bounds.minX, y: bounds.maxY }, { x: bounds.maxX, y: bounds.maxY },
+      ]
+      const tol = nodeTapTol(imgW) * 2.2
+      let gi = -1, gd = Infinity
+      cs.forEach((c, i) => { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d <= tol && d < gd) { gi = i; gd = d } })
+      if (gi >= 0) editDragRef.current = { kind: 'frame', corner: cs[gi], origin: cs[3 - gi], orig: editShape, moved: false }
+    }
+  }, [hasArtwork, preview, toMaskPt, paintTool, tool, editShape, nodeMode, imgW, bounds, notify, selectNode, paint.actions])
+
   const onCanvasMove = useCallback((e: React.PointerEvent) => {
-    if (!paintingRef.current) return
     const p = toMaskPt(e); if (!p) return
-    strokeRef.current.push(p); setStrokeLive([...strokeRef.current])
-  }, [toMaskPt])
+    if (paintingRef.current) {
+      strokeRef.current.push(p); setStrokeLive([...strokeRef.current])
+      return
+    }
+    const drag = editDragRef.current
+    if (!drag) return
+    drag.moved = true
+    if (drag.kind === 'node') {
+      const { pi, ai, orig } = drag
+      const a0 = drag.orig.paths[pi].anchors[ai]
+      const dx = p.x - a0.p.x, dy = p.y - a0.p.y
+      const next: VShape = {
+        paths: orig.paths.map((path, i) => i !== pi ? path : ({
+          anchors: path.anchors.map((a, j) => j !== ai ? a : ({
+            ...a,
+            p: { x: a.p.x + dx, y: a.p.y + dy },
+            hIn: a.hIn ? { x: a.hIn.x + dx, y: a.hIn.y + dy } : a.hIn,   // glued anchors — handles ride the node
+            hOut: a.hOut ? { x: a.hOut.x + dx, y: a.hOut.y + dy } : a.hOut,
+          })),
+        })),
+      }
+      setEditShape(next)
+      return
+    }
+    // frame: scale about the opposite corner (aspect lock = uniform)
+    const { origin, corner, orig } = drag
+    const denomX = corner.x - origin.x || 1, denomY = corner.y - origin.y || 1
+    let sx = (p.x - origin.x) / denomX, sy = (p.y - origin.y) / denomY
+    sx = Math.max(0.05, Math.min(20, sx)); sy = Math.max(0.05, Math.min(20, sy))
+    if (aspectLocked) { const s = (Math.abs(sx) + Math.abs(sy)) / 2; sx = Math.sign(sx) * s || s; sy = Math.sign(sy) * s || s }
+    const tx = (pt: { x: number; y: number }) => ({ x: origin.x + (pt.x - origin.x) * sx, y: origin.y + (pt.y - origin.y) * sy })
+    setEditShape({
+      paths: orig.paths.map((path) => ({
+        anchors: path.anchors.map((a) => ({ ...a, p: tx(a.p), hIn: a.hIn ? tx(a.hIn) : a.hIn, hOut: a.hOut ? tx(a.hOut) : a.hOut })),
+      })),
+    })
+  }, [toMaskPt, aspectLocked])
+
   const onCanvasUp = useCallback(() => {
-    if (!paintingRef.current) return
-    paintingRef.current = false
-    const stroke = strokeRef.current; strokeRef.current = []
-    setStrokeLive([])
-    if (stroke.length > 0) paint.actions.strokeCommit(stroke, tool === 'draw-erase', brushR)
-  }, [paint.actions, tool, brushR])
+    if (paintingRef.current) {
+      paintingRef.current = false
+      const stroke = strokeRef.current; strokeRef.current = []
+      setStrokeLive([])
+      if (stroke.length > 0) paint.actions.strokeCommit(stroke, tool === 'draw-erase', brushR)
+      return
+    }
+    const drag = editDragRef.current
+    editDragRef.current = null
+    if (drag?.moved && editShape) paint.actions.shapeCommit(editShape, drag.kind === 'node' ? 'point moved — outline updated' : 'frame scaled — outline updated')
+  }, [paint.actions, tool, brushR, editShape])
 
   // 🎭 mask tint (shell-render.maskOverlay) + 👁 preview (shell-render.drawCutout)
   const overlayUrl = useMemo(() => {
@@ -170,6 +302,19 @@ function CutoutLabInner() {
     }
     if (tab === 'vector') { const k = mk(vecChip); if (k) return k }
     if (tab === 'blend') { const k = mk('blend'); if (k) return k }
+    // per-node knobs (v1): selected anchor + radius/curve chips — pool math (nodeAdjust/measureNode),
+    // committed through the same seam on release.
+    if (tool === 'nodes' && nodeMode === 'move' && selNode && nodeBaseRef.current) {
+      const apply = (adj: { radius: number; curve: number }, commit: boolean) => {
+        setNodeAdj(adj)
+        const next = nodeAdjust(nodeBaseRef.current!, selNode.pi, selNode.ai, nodeChip === 'radius' ? { radius: adj.radius } : { curveKnob: adj.curve })
+        setEditShape(next)
+        if (commit) paint.actions.shapeCommit(next, `node ${nodeChip} set — outline updated`)
+      }
+      const [lo, hi] = nodeChip === 'radius' ? CHIP_RANGE.nodeRadius : CHIP_RANGE.nodeCurve
+      const value = nodeChip === 'radius' ? nodeAdj.radius : nodeAdj.curve
+      return { label: `node ${nodeChip}`, lo, hi, value, available: true, preview: (v: number) => apply(nodeChip === 'radius' ? { ...nodeAdj, radius: v } : { ...nodeAdj, curve: v }, false), commit: (v: number) => apply(nodeChip === 'radius' ? { ...nodeAdj, radius: v } : { ...nodeAdj, curve: v }, true) }
+    }
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, available: true, preview: (v: number) => setBrushR(v), commit: (v: number) => setBrushR(v) }
   })()
 
@@ -238,10 +383,26 @@ function CutoutLabInner() {
           <button onClick={() => setFill(false)} style={chipBtn(!fillTile)}>clamp</button>
         </>)}
         {tab === 'edit' && (<>
-          <button onClick={() => setTool('draw')} disabled={!hasArtwork} style={chipBtn(tool === 'draw', !hasArtwork)}>🖌 Paint shape</button>
-          <button onClick={() => setTool('draw-erase')} disabled={!hasArtwork} style={chipBtn(tool === 'draw-erase', !hasArtwork)}>🩹 Paint erase</button>
-          <button disabled style={chipBtn(false, true)} title="nodes increment">⬡ Nodes</button>
-          <button disabled style={chipBtn(false, true)} title="nodes increment">▣ Frame</button>
+          <button onClick={() => { exitEdit(); setTool('draw') }} disabled={!hasArtwork} style={chipBtn(tool === 'draw', !hasArtwork)}>🖌 Paint shape</button>
+          <button onClick={() => { exitEdit(); setTool('draw-erase') }} disabled={!hasArtwork} style={chipBtn(tool === 'draw-erase', !hasArtwork)}>🩹 Paint erase</button>
+          {tool === 'nodes' && (<>
+            <span style={{ color: '#94a3b8' }}>nodes:</span>
+            {([['move', '✥ Drag'], ['add', '➕ Add'], ['delete', '➖ Delete']] as [NodeMode, string][]).map(([m, label]) => (
+              <button key={m} onClick={() => { setNodeMode(m); if (m !== 'move') selectNode(null, null) }} style={chipBtn(nodeMode === m)}>{label}</button>
+            ))}
+            {nodeMode === 'move' && selNode && (<>
+              <span style={{ color: '#94a3b8' }}>shape:</span>
+              {(['radius', 'curve'] as const).map((k) => (
+                <button key={k} onClick={() => setNodeChip(k)} style={chipBtn(nodeChip === k)}>{k}</button>
+              ))}
+              <button onClick={() => selectNode(null, null)} style={chipBtn(false)}>✕</button>
+            </>)}
+          </>)}
+          <button onClick={() => enterEdit('nodes')} disabled={!hasCut} style={chipBtn(tool === 'nodes', !hasCut)}>⬡ Nodes</button>
+          <button onClick={() => enterEdit('frame')} disabled={!hasCut} style={chipBtn(tool === 'frame', !hasCut)}>▣ Frame</button>
+          {tool === 'frame' && (
+            <button onClick={() => setAspectLocked((v) => !v)} style={chipBtn(aspectLocked)}>{aspectLocked ? '🔒 aspect' : '🔓 aspect'}</button>
+          )}
         </>)}
       </div>
 
@@ -281,7 +442,7 @@ function CutoutLabInner() {
                   a growing view-box contain-fits inside it. */}
               <svg ref={svgRef} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet"
                 onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={onCanvasUp} onPointerLeave={onCanvasUp}
-                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: paintTool ? 'none' : 'auto', cursor: paintTool && hasArtwork ? 'crosshair' : 'default' }}>
+                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: paintTool || editing ? 'none' : 'auto', cursor: paintTool && hasArtwork ? 'crosshair' : 'default' }}>
                 <defs>
                   {pathD && <clipPath id="labClip"><path d={pathD} /></clipPath>}
                 </defs>
@@ -306,6 +467,19 @@ function CutoutLabInner() {
                     stroke={tool === 'draw-erase' ? 'rgba(239,68,68,0.45)' : 'rgba(124,58,237,0.45)'}
                     strokeWidth={Math.max(2, brushR * paintCfg.swathMult)} strokeLinecap="round" strokeLinejoin="round" />
                 )}
+                {/* node anchors (⬡ Nodes) — finger-sized dots; selected = filled */}
+                {tool === 'nodes' && editShape && !preview && editShape.paths.map((path, pi) => path.anchors.map((a, ai) => (
+                  <circle key={`${pi}-${ai}`} cx={a.p.x} cy={a.p.y} r={nodeTapTol(imgW) * 0.8}
+                    fill={selNode?.pi === pi && selNode?.ai === ai ? '#2563eb' : 'rgba(255,255,255,0.9)'}
+                    stroke="#2563eb" strokeWidth={Math.max(1.5, imgW / 600)} />
+                )))}
+                {/* frame grips (▣ Frame) — bbox corner handles */}
+                {tool === 'frame' && bounds && !preview && ([
+                  [bounds.minX, bounds.minY], [bounds.maxX, bounds.minY], [bounds.minX, bounds.maxY], [bounds.maxX, bounds.maxY],
+                ] as [number, number][]).map(([x, y], i) => (
+                  <rect key={i} x={x - nodeTapTol(imgW)} y={y - nodeTapTol(imgW)} width={nodeTapTol(imgW) * 2} height={nodeTapTol(imgW) * 2}
+                    fill="rgba(255,255,255,0.9)" stroke="#2563eb" strokeWidth={Math.max(1.5, imgW / 600)} />
+                ))}
               </svg>
             </div>
           )}

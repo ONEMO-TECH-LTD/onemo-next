@@ -34,6 +34,9 @@ export interface PaintBinding {
   }
   actions: {
     strokeCommit: (stroke: { x: number; y: number }[], erase: boolean, brushPx: number) => void
+    /** node/frame edits: an edited VShape through the SAME seam — mask ≡ shape (safe by geometry),
+     *  matte re-prepared by the engine, committed into the bridge session (nodeCommitPlan semantics). */
+    shapeCommit: (next: VShape, okMsg?: string) => void
     invalidate: () => void
   }
 }
@@ -107,9 +110,27 @@ export function usePaintBinding(args: {
     })
   }, [imgW, imgH, paintCfg, queue, seam])
 
+  // shared tail for shape-sourced edits (nodes/frame): mask ≡ shape, then the same seam pipeline
+  const shapeCommit = useCallback((next: VShape, okMsg = 'shape updated') => {
+    queue.run(async () => {
+      const m = solidShapeMask(next, imgW, imgH)
+      const res = await seam.commit(m)
+      if (res.kind === 'stale') return
+      if (res.kind === 'kept') { notifyRef.current('warn', `kept your shape — ${res.reason}`); return }
+      const { prepared: p } = res
+      setMask({ data: m.data, w: m.w, h: m.h })
+      setPaintPrepared(p)
+      lastPaintSpecRef.current = p.spec
+      const st = useOutlineStore.getState()
+      st.setSpec(p.spec)
+      try { st.setSubjMatteUrl(p.frontSrc.subjCanvas.toDataURL()) } catch { /* matte stays unset */ }
+      notifyRef.current('info', okMsg)
+    })
+  }, [imgW, imgH, queue, seam])
+
   return {
     state: { mask, baseMask, paintPrepared, paintCfg },
-    actions: { strokeCommit, invalidate },
+    actions: { strokeCommit, shapeCommit, invalidate },
   }
 }
 
