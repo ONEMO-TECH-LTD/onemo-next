@@ -322,13 +322,34 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       return
     }
     setBusy(true)
-    // R4-PROVEN SHAPE RESTORED (meta-confirmed verdict on Dan's device evidence: the r6b brush-
-    // worker cut was the regression — the engine roster path is the config Dan's device proved for
-    // a full day; dual-lazy sessions at steady state were empirically fine, the crashes were init
-    // pile-ups + OpenCV-at-open, both dead). ONE pipeline for every AI engine: the v5.3.1 worker
-    // chain, model picked by its own `?seg=` roster parameter. Brush stays LAZY (first stroke).
+    // ONE-SESSION-ON-PINNED-WASM (meta verdict 2026-08-07, B-on-pin CONFIRMED): Dan's device
+    // refuted the dual-lazy config at 6e9cae2b — the FIRST-STROKE DUAL-INIT (brush session init
+    // next to the engine's live cut session) is the crash. Edge-mode cut runs through the BRUSH
+    // worker's single session on the PINNED pure-wasm runtime (r6b's routing, exonerated: its
+    // device failure was the now-deleted webgpu-first probe). The engine worker never runs
+    // EdgeSAM; ?seg stays the roster SELECTOR (condition a); u2net/manual stay roster-verbatim
+    // (condition e). Edge failure: corpse cleanup runs inside edgeFault BEFORE the loud u2net
+    // fallback (condition c).
     try {
-      setStatus(`✨ AI magic (${engineSelRef.current === 'edge' ? 'EdgeSAM' : 'u2net'} · v5.3.1)…`)
+      if (engineSelRef.current === 'edge') {
+        try {
+          setStatus('✨ AI magic (EdgeSAM · one session)…')
+          const t0 = performance.now()
+          await ensureEdge()
+          setStatus('✨ recognising…')
+          const r = await withTimeout(client.current!.redetect(), T_COMPUTE_MS, 'EdgeSAM detect')
+          perfGesture('segment-edge', performance.now() - t0)
+          setMs({ cut: Math.round(performance.now() - t0) })
+          await acceptMask(r.mask)
+          setBusy(false)
+          return
+        } catch (e) {
+          edgeFault('EdgeSAM failed (' + String((e as Error).message) + ')')
+          engineSelRef.current = 'u2net'; setEngineSel('u2net')
+          adapters.onSegChange('u2net') // URL follows through the shell adapter — loud degradation
+        }
+      }
+      setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
       const r = await withTimeout(segmentV531(url, w, h), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
@@ -336,7 +357,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       await acceptMask(r.mask, r.preseg)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
-  }, [acceptMask, requestRender])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acceptMask, requestRender, ensureEdge, edgeFault])
 
   const redetect = useCallback(async () => { if (lastFileRef.current) await upload(lastFileRef.current) }, [upload])
 
@@ -593,10 +615,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // Downloads only — no ORT session, no OpenCV (that instantiates on wand-selector press).
     // Manual mode warms nothing, ever.
     if (engineSelRef.current === 'none') return
-    preloadBen()
+    // edge mode: brush weights only (the engine worker never runs EdgeSAM — preloadBen would
+    // session-create the wrong thing at open); u2net mode: the engine's own preload.
     if (engineSelRef.current === 'edge') {
       fetch(MODELS.edgesam.enc!).catch(() => {})
       fetch(MODELS.edgesam.dec!).catch(() => {})
+    } else {
+      preloadBen()
     }
     setStatus('ready — upload an image · ⬇ warming the AI models in the background')
   }, [])
