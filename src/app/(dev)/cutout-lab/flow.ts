@@ -20,7 +20,7 @@ import {
   finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
-import { maskFromShape, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
+import { maskArea, maskFromShape, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
@@ -367,8 +367,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setStatus(erase ? '✂️ refining the edge…' : '✨ finding the edge…')
     try {
       const t0 = performance.now()
-      const refined = await withTimeout(grabCutRefine(img, maskRef.current, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
+      const base = maskRef.current
+      const refined = await withTimeout(grabCutRefine(img, base, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
       perfGesture('grabcut', performance.now() - t0)
+      const before = maskArea(base), after = maskArea(refined)
+      // NEVER-DESTROY (meta R12-1): the corridor already bounds the snap, but guard the tail —
+      // an erase that would gut the shape reverts loudly instead of committing an empty selection.
+      if (erase && after <= before * 0.1) { setBusy(false); setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
+      if (before === after) { setBusy(false); setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
       const ok = await acceptMask(refined, undefined, { erase })
       if (ok) setStatus(erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge')
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }

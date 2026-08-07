@@ -67,11 +67,35 @@ export async function grabCutRefine(
     }
   }
 
-  const out = new Uint8Array(W * H)
+  const out = new Uint8Array(base.data) // start from the base; only the stroke corridor may change
   const bgd = new cv.Mat(), fgd = new cv.Mat()
   try {
     if (marked > 0) cv.grabCut(rgb, gc, new cv.Rect(0, 0, w, h), bgd, fgd, GC_ITERS, cv.GC_INIT_WITH_MASK)
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    // CORRIDOR BOUND (meta R12-1, 2026-08-07): cv.grabCut relabels EVERY probable pixel globally, so
+    // on a colour-uniform subject an erase stroke can flip the WHOLE object to background. Apply the
+    // grabcut label only INSIDE a corridor around the stroke; everywhere else the base is preserved.
+    // The snap stays local — erase can't destroy the shape, add can't over-reach. This is the
+    // erase-bounded-by-gesture law, now tool-agnostic (it died with EdgeSAM's corridor).
+    const corridorR = Math.max(brushPx * 2.5, 24)
+    const cr2 = corridorR * corridorR
+    const seg = stroke.length ? stroke : [{ x: 0, y: 0 }]
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const p of seg) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
+    const bx0 = Math.max(0, Math.floor(x0 - corridorR)), by0 = Math.max(0, Math.floor(y0 - corridorR))
+    const bx1 = Math.min(W - 1, Math.ceil(x1 + corridorR)), by1 = Math.min(H - 1, Math.ceil(y1 + corridorR))
+    const near = (x: number, y: number): boolean => {
+      for (let i = 0; i < seg.length; i++) {
+        const a = seg[i], b = seg[Math.min(i + 1, seg.length - 1)]
+        const dx = b.x - a.x, dy = b.y - a.y
+        const L2 = dx * dx + dy * dy
+        const t = L2 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / L2)) : 0
+        const px = a.x + t * dx - x, py = a.y + t * dy - y
+        if (px * px + py * py <= cr2) return true
+      }
+      return false
+    }
+    for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) {
+      if (!near(x, y)) continue
       const sx = Math.min(w - 1, Math.round(x * scale)), sy = Math.min(h - 1, Math.round(y * scale))
       const v = gc.data[sy * w + sx]
       out[y * W + x] = (v === cv.GC_FGD || v === cv.GC_PR_FGD) ? 1 : 0

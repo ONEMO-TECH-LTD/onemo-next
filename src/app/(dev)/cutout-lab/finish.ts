@@ -208,7 +208,7 @@ export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   // is ALWAYS the outline's own matte, and the blend band is the OFFSET ring. No tool ever defines
   // a blend area; blur never depends on which tool drew the shape.
   const tB = performance.now()
-  const r = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, mask.soft ? 'edgesam' : 'brushed')
+  const r = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, 'brushed') // brush/paint masks are binary (soft matte died with EdgeSAM)
   perfGesture('preseg-mlresult', performance.now() - tB)
   return r
 }

@@ -61,6 +61,13 @@ export function solidShapeMask(shape: VShape, w: number, h: number): Mask {
   return { data, w, h, soft }
 }
 
+/** Foreground pixel count — the never-empty erase guard uses it. */
+export function maskArea(mask: Mask): number {
+  let a = 0
+  for (let i = 0; i < mask.data.length; i++) if (mask.data[i]) a++
+  return a
+}
+
 /** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
  *  WYSIWYG with the brush cursor), plus the enclosed interior when the gesture closes a loop
  *  (Dan's green-blob semantics: a loop means the whole region). */
