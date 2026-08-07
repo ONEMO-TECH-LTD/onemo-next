@@ -300,21 +300,19 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const img = imgCanvas.current, url = urlRef.current
     if (!img || !url) return
     setBusy(true)
-    // ONE retry before giving up loudly (Dan device: u2net can 'disconnect' on iOS — the loader
-    // flashes and no outline appears). The failure must be VISIBLE, never a silent no-op.
-    let lastErr: unknown = null
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        setStatus(attempt ? '✨ retrying u2net…' : '✨ AI magic (u2net · v5.3.1)…')
-        const t0 = performance.now()
-        const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
-        perfGesture('segment', performance.now() - t0)
-        setMs({ cut: Math.round(performance.now() - t0) })
-        if (await acceptMask(r.mask, r.preseg)) { setBusy(false); return }
-        lastErr = new Error('no silhouette (empty cut)')
-      } catch (e) { lastErr = e }
+    // Single attempt + LOUD failure (Dan device: the loader flashed with no outline). A same-worker
+    // retry is useless when the WASM heap OOMs (it can't shrink) — the cut source is now capped
+    // (v531seg CUT_MAX) so the OOM should not occur; if it still fails, the message says what happened.
+    try {
+      setStatus('✨ AI magic (u2net · v5.3.1)…')
+      const t0 = performance.now()
+      const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
+      perfGesture('segment', performance.now() - t0)
+      setMs({ cut: Math.round(performance.now() - t0) })
+      if (!(await acceptMask(r.mask, r.preseg))) setStatus('⚠️ u2net returned an empty cut — try again, or brush the object to select it')
+    } catch (e) {
+      setStatus('⚠️ u2net failed: ' + String((e as Error)?.message ?? '?') + ' — reload the page and Detect again, or brush the object')
     }
-    setStatus('⚠️ u2net produced no cut (' + String((lastErr as Error)?.message ?? '?') + ') — reload the page and Detect again, or brush the object to select it')
     setBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptMask])

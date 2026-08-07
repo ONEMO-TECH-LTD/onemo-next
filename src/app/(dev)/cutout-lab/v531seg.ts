@@ -10,6 +10,27 @@ import type { Mask } from '@/lib/mask-tools/types'
 export const V531_KEY = 'u2net-v531'
 export const V531_LABEL = 'u2net · v5.3.1 native (auto, no brush)'
 
+// CUT-INPUT CAP (Dan device 2026-08-07: iOS `[wasm] RangeError: Out of memory` → 'no backend').
+// The cut worker decodes the SOURCE image (the engine notes a ~2GB 'upload half'); a 12MP phone
+// photo blows past iOS Safari's WASM heap. The lab already downscales for display but was handing
+// the ORIGINAL full-res URL to the cut — cap the cut's source here (lab-layer; the engine still
+// owns its own internal mask/texture config, it just receives a bounded image).
+const CUT_MAX = 1024
+
+/** Downscale the source to CUT_MAX before the cut (returns a blob URL to revoke, or the original
+ *  when already small). Keeps the worker's decode well inside the iOS memory envelope. */
+async function cutSource(url: string): Promise<{ url: string; revoke: boolean }> {
+  const img = new Image(); img.src = url
+  try { await img.decode() } catch { return { url, revoke: false } }
+  const long = Math.max(img.naturalWidth, img.naturalHeight)
+  if (long <= CUT_MAX) return { url, revoke: false }
+  const s = CUT_MAX / long
+  const w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s))
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+  const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'))
+  return blob ? { url: URL.createObjectURL(blob), revoke: true } : { url, revoke: false }
+}
 
 /** image URL → v5.3.1's own segmentation through ITS OWN bridge primitive (`runCutout` owns the
  *  working-res config — mask/texture dims are the BRIDGE'S, never the lab's; Dan 2026-08-06: no
@@ -17,7 +38,9 @@ export const V531_LABEL = 'u2net · v5.3.1 native (auto, no brush)'
  *  object the v5.3.1 flow hands prepareShaped (full soft saliency matte + hi-res texImage). The
  *  binary y-down `mask` is derived for UI overlay/brush state only. */
 export async function segmentV531(url: string, uiW: number, uiH: number): Promise<{ mask: Mask; adapter: string; preseg: MLResult }> {
-  const r = await runCutout(url)
+  const cut = await cutSource(url)
+  let r: MLResult
+  try { r = await runCutout(cut.url) } finally { if (cut.revoke) URL.revokeObjectURL(cut.url) }
   // Derive the y-down UI mask AT THE LAB'S canvas dims (the bridge's mask dims are its own config
   // and may differ) — canvas flip+scale in one pass. UI overlay/brush state only.
   const src = document.createElement('canvas'); src.width = r.width; src.height = r.height
