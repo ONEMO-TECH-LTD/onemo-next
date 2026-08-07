@@ -18,14 +18,17 @@ import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-co
 export default function CutoutLab() {
   // ── URL ADAPTER (shell duty per contract): read initial ?seg, write on engine change ──
   const [initialSeg] = useState<EngineSel>(() => {
-    if (typeof window === 'undefined') return 'u2net'
+    if (typeof window === 'undefined') return 'edge'
     const seg = new URL(location.href).searchParams.get('seg')
-    return seg === 'edgesam' ? 'edge' : 'u2net' // DEFAULT = u2net (Dan: cheap stack — u2net + wand v2 + paint); EdgeSAM = opt-in
+    return !seg || seg === 'edgesam' ? 'edge' : 'u2net' // DEFAULT = EdgeSAM (Dan: main model is SAM — no stack decision made); u2net = dropdown option
   })
   useEffect(() => {
-    // DEFAULT ENGINE = u2net (Dan's stack ruling): a bare URL stays bare — the engine's own chain
-    // default IS u2netp. ?seg=edgesam remains the opt-in switch (dropdown writes it).
-    // warm-up runs AFTER any URL state is settled — the flow's preload reads ?seg at call time.
+    // the default-seg WRITE must run POST-MOUNT (QA KAI-10196 r1: a replaceState inside the state
+    // initializer is clobbered by Next's hydration history-sync). DEFAULT = EdgeSAM (Dan: SAM is
+    // the main model; the cheap-stack switch was never decided — u2net stays a dropdown option).
+    const u = new URL(location.href)
+    if (!u.searchParams.get('seg')) { u.searchParams.set('seg', 'edgesam'); history.replaceState(null, '', u) }
+    // warm-up AFTER the URL write — the flow's preload reads ?seg at call time (meta r3 finding)
     flow.actions.warmup()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
