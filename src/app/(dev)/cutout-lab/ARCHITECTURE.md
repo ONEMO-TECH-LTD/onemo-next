@@ -175,3 +175,63 @@ Laws:
 
 Fallback recorded (Dan's, only if optimization genuinely hits a wall — not first resort):
 blend 0 default + clamp-only surface.
+
+## I2c — holes support: true transparency for erase (Dan's directive 2026-08-07 · authorizes the
+## engine-perimeter exception below)
+
+Authorizing directive (Dan, verbatim): "wand is not working on removing objects — it actually does
+holes that auto-filled with blur; without blur they would be holes — I need fully photoshop level
+working wand tool or fill bucket." This supersedes the tracer's earlier "Holes dropped (solid
+effect, per Dan)" ruling (contour.ts header) — both cited so provenance is unambiguous.
+
+**The defect, code-cited:** erase punches the hole in the MASK correctly; `traceContourRaw`
+(contour.ts:141) stitches ALL loops then keeps only the largest; `prepare-effect` hardcodes
+`holes: 0`; every clip is single-ring — so the hole region backfills (blur at blend>0, original
+at blend 0) instead of going transparent.
+
+**What the code already provides (read, not assumed):** marching-squares emits the hole loops
+today (they're discarded at the last step); `VShape.paths[]` is multi-path native;
+`shapeToSVGPathD` emits multi-subpath `d`; the page scrim already fills `'evenodd'`;
+outline-core's ring types already model `role:'hole'` (AMEND-C3). This increment CONNECTS
+existing capability; it does not invent a geometry system.
+
+### The sanctioned engine exception (third entry in the AUDIT §1.1 register)
+Additive + flag-gated only — v5.3.1 behavior byte-identical with the flag off (suite stays 402):
+1. **contour.ts** — an ADDITIVE trace variant returning outer + hole loops, winding-normalized
+   (outer CCW, holes CW), with a min-area floor so mask speckle never becomes pinholes. The
+   existing `traceContourRaw` is untouched.
+2. **prepare-effect** — a cfg flag (default OFF; the lab turns it on via its existing `LAB_CFG`
+   seam): when on, the spec's `vectorShape` carries the hole paths and `diagnostics.holes` reports
+   the real count. No other output changes.
+3. **mask.ts keep-largest — LAW AMENDED, not removed:** keep-largest applies to OUTER components
+   (disconnected islands still drop, still announced loudly per §I2b); the winner's ENCLOSED holes
+   are kept. A hole is not an island.
+
+### Behavior laws
+- **Erase = transparency everywhere:** live view, 👁 Preview, and Save PNG show alpha-0 inside
+  holes; the blur-backfill is impossible by construction because every clip seam (bake clip,
+  drawCutout, scrim) fills/clips `'evenodd'` on the multi-subpath `d`. At blend>0 the band exists
+  OUTSIDE the outer ring only — never inside a hole.
+- **Knob semantics on holes (defined, not implied):** detail/simplify/smooth/radius/curve apply
+  PER RING with the same fold-guard; a hole additionally must stay inside its outer ring and
+  vanishes (legitimately) if it collapses. **Offset is physical-material semantics:** positive
+  offset grows the outer ring AND shrinks holes by the same margin (Clipper multi-ring inflate
+  with correct windings does this natively); holes smaller than the offset are consumed — that is
+  correct sticker physics, stated so nobody "fixes" it.
+- **Matte/subject alpha:** already mask-driven and hole-correct — no change; the outline layer was
+  the only backfiller.
+- **Out of scope, flagged for the record:** manufacturing mm-spec/cutline export of inner rings
+  (the engine-spec gains an open item — holes = inner cutlines — decided at productization, not
+  here); multi-island shapes (separate product call already flagged to Dan, unchanged).
+
+### Gates
+1. Flag OFF: engine suite 402/402 AND the lab's Save byte-identity hash unchanged — proof the
+   exception is invisible until opted into.
+2. Flag ON: wand/paint erase inside the shape → Save PNG sampled alpha=0 in the hole; blend 100 →
+   hole still alpha-0 (backfill dead); blend 0 → same.
+3. Knob gates: offset grows outer + shrinks hole symmetrically (measured); smooth/radius on a
+   holed shape stay fold-guarded per ring; hole-collapse removes the ring without artifacts.
+4. Perf: trace with holes stays in the engine-span budget class (recorded, not chunked — §I2b
+   adjudication applies).
+5. On-device (Dan): the Photoshop test — wand-erase a region inside the object → a real see-through
+   hole, tunable, savable. His pass closes the increment.
