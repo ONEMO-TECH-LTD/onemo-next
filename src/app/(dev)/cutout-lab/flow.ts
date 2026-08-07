@@ -15,7 +15,7 @@ import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import { wandRegion } from '@/lib/cutout-wand'
+import { warmWand, wandRegion } from '@/lib/cutout-wand'
 import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
@@ -351,7 +351,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const wandTap = useCallback(async (p0: Point, tolerance: number, erase: boolean, brushR: number) => {
     const img = imgCanvas.current!
     const tw0 = performance.now()
-    const region = wandRegion(img, p0.x * img.width, p0.y * img.height, tolerance)
+    const region = await withTimeout(wandRegion(img, p0.x * img.width, p0.y * img.height, tolerance), T_COMPUTE_MS, 'wand')
     perfGesture('wand-region', performance.now() - tw0)
     const brushPx = brushR * (img.width / dispWRef.current)
     if (!maskRef.current || !hasCutRef.current) {
@@ -572,6 +572,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // memory and iOS kills the tab — page loads then crashes). Weights land in the HTTP cache
     // here; the SESSION initializes in the background after the first cut (below), so the first
     // stroke still pays inference only.
+    warmWand()
     if (engineSelRef.current === 'edge') {
       fetch(MODELS.edgesam.enc!).catch(() => {})
       fetch(MODELS.edgesam.dec!).catch(() => {})

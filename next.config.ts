@@ -46,6 +46,11 @@ const nextConfig: NextConfig = {
     // match, so the 'paper/dist/paper-core' specifier itself is untouched.
     config.resolve = config.resolve || {};
     config.resolve.alias = { ...(config.resolve.alias || {}), paper$: "paper/dist/paper-core" };
+    // opencv.js (cutout-wand v2) is an Emscripten UMD that probes node's fs/path/crypto at runtime;
+    // in the browser bundle those must resolve to empty stubs (standard Emscripten-on-webpack shim).
+    if (!isServer) {
+      config.resolve.fallback = { ...(config.resolve.fallback || {}), fs: false, path: false, crypto: false };
+    }
     if (isServer) {
       // paper is CLIENT-ONLY: the editor + geometry kernel run in the browser, and the page SSRs to
       // null (open=false) without ever calling resolve()'s radius path. paper-core still STATICALLY

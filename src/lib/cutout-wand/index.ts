@@ -1,56 +1,50 @@
-// cutout-wand — the contrast bucket (Photoshop magic-wand class), an add-on microservice.
-// REAL open-source algorithm (magic-wand-tool, MIT: scanline flood-fill by color tolerance +
-// contour tracing) — NOT an approximation (Dan 2026-08-06: "take existing lib, use it as bucket
-// fill"). Pure: pixels + a tap point in → a region Mask out. ONE-LAW compliant: the region only
-// ever shapes the OUTLINE (union/subtract in the shell); no blend semantics, no AI, no downloads.
-import MagicWand from 'magic-wand-tool'
-import type { Mask } from '@/lib/cutout-ai/types'
+// cutout-wand — CONTRAST BUCKET sub-module, v2 (Dan device r4: 'the best there is').
+// VENDOR: OpenCV.js floodFill — the industrial magic-wand (Photoshop-class): tolerance measured
+// against the SEED in FIXED_RANGE mode, 8-connectivity, mask-only fill. Replaces magic-wand-tool
+// (2014-era single-pixel-seed flood — leaked on photo noise) AND the glue fillHoles step (slop:
+// a background flood that surrounded the object swallowed the object as an 'enclosed hole').
+// Interface unchanged: tap in → region mask out. Loads lazily on first use (13MB wasm, cached).
 
-/** The module's own calibration default (Photoshop's classic wand default). The SHELL never
- *  passes a tolerance — replace/tune it HERE. */
-export const WAND_TOLERANCE = 32
+export const WAND_TOLERANCE = 32 // Photoshop's classic default; live knob 4–100 in the shell
 
-/** Contrast-grown region under a tap on a canvas: classic fuzzy-select (pixel I/O lives in the
- *  module — the shell hands a canvas + a point, nothing else). */
-export function wandRegion(canvas: HTMLCanvasElement, x: number, y: number, tolerance = WAND_TOLERANCE): Mask {
-  const image = canvas.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height)
-  return wandMask(image, x, y, tolerance)
+export interface WandMask { data: Uint8Array; w: number; h: number }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cvReady: Promise<any> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadCv(): Promise<any> {
+  if (!cvReady) {
+    cvReady = import('@techstark/opencv-js').then((m) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cv = (m as any).default ?? m
+      return cv.Mat ? cv : new Promise((res) => { cv.onRuntimeInitialized = () => res(cv) })
+    })
+  }
+  return cvReady
 }
 
-/** Contrast-grown region under a tap: classic fuzzy-select. tolerance = color distance (0-255). */
-export function wandMask(image: ImageData, x: number, y: number, tolerance = WAND_TOLERANCE): Mask {
-  const res = MagicWand.floodFill(
-    { data: image.data, width: image.width, height: image.height, bytes: 4 },
-    Math.max(0, Math.min(image.width - 1, Math.round(x))),
-    Math.max(0, Math.min(image.height - 1, Math.round(y))),
-    tolerance, null, true,
-  )
-  const data = new Uint8Array(image.width * image.height)
-  if (res?.data) {
-    // the library's OWN border smoothing (gaussBlurOnlyBorder) — coarse flood edges → smooth
-    const sm = MagicWand.gaussBlurOnlyBorder({ data: res.data, width: image.width, height: image.height, bounds: res.bounds }, 5)
-    const src = sm?.data ?? res.data
-    for (let i = 0; i < data.length; i++) data[i] = src[i] ? 1 : 0
-    fillHoles(data, image.width, image.height)
-  }
-  return { data, w: image.width, h: image.height }
-}
+/** Pre-warm the wand engine (optional — first tap otherwise pays the one-time wasm init). */
+export function warmWand(): void { void loadCv().catch(() => { cvReady = null }) }
 
-/** Fill enclosed holes: background is only what connects to the image border — everything else
- *  inside the region becomes region (the 'gaps' a tolerance flood leaves on textured content). */
-function fillHoles(mask: Uint8Array, w: number, h: number): void {
-  const outside = new Uint8Array(w * h)
-  const stack: number[] = []
-  const push = (p: number) => { if (!mask[p] && !outside[p]) { outside[p] = 1; stack.push(p) } }
-  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x) }
-  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1) }
-  while (stack.length) {
-    const p = stack.pop()!
-    const x = p % w, y = (p - x) / w
-    if (x > 0) push(p - 1)
-    if (x < w - 1) push(p + 1)
-    if (y > 0) push(p - w)
-    if (y < h - 1) push(p + w)
-  }
-  for (let i = 0; i < mask.length; i++) if (!mask[i] && !outside[i]) mask[i] = 1
+/** Contrast-grown region from a tapped point (image px coords). Pixel I/O is module-owned. */
+export async function wandRegion(image: HTMLCanvasElement, x: number, y: number, tolerance: number = WAND_TOLERANCE): Promise<WandMask> {
+  const cv = await loadCv()
+  const w = image.width, h = image.height
+  const id = image.getContext('2d')!.getImageData(0, 0, w, h)
+  const src = cv.matFromImageData(id)          // RGBA
+  const rgb = new cv.Mat()
+  cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB)
+  const mask = cv.Mat.zeros(h + 2, w + 2, cv.CV_8UC1)
+  const seed = new cv.Point(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y))))
+  const lo = new cv.Scalar(tolerance, tolerance, tolerance)
+  const up = new cv.Scalar(tolerance, tolerance, tolerance)
+  // FIXED_RANGE = Photoshop semantics (diff vs the SEED, not the neighbor — no gradient creep);
+  // MASK_ONLY: the image is never mutated; 8-connectivity; fill value 255 into the mask.
+  const flags = 8 | cv.FLOODFILL_MASK_ONLY | cv.FLOODFILL_FIXED_RANGE | (255 << 8)
+  cv.floodFill(rgb, mask, seed, new cv.Scalar(0, 0, 0), new cv.Rect(), lo, up, flags)
+  const out = new Uint8Array(w * h)
+  const md = mask.data, stride = w + 2
+  for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) out[yy * w + xx] = md[(yy + 1) * stride + (xx + 1)] ? 1 : 0
+  src.delete(); rgb.delete(); mask.delete()
+  return { data: out, w, h }
 }
