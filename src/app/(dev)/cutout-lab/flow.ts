@@ -232,19 +232,28 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const acceptMask = useCallback(async (rawMask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean; shapeTruth?: boolean }) => {
     // NO-HOLES LAW (Dan 2026-08-07): every accepted selection is normalized solid — enclosed
     // holes filled (data + soft) so the subject matte never lets the pillow bleed through.
-    // micro-hole cap: AI/wand results keep model precision — only dropout-scale enclosed
-    // regions (≤0.2% of the image) are filled; paint sources go solid via shape-truth below.
-    const mask = fillEnclosedHoles(rawMask, opts?.shapeTruth ? 1 : 0.002)
+    // NO-HOLES LAW (Dan 2026-08-07, wiring-audited): fill enclosed holes UNCAPPED for EVERY source.
+    // This is safe by construction and needs no size cap or provenance split — fillEnclosedHoles
+    // floods from the border, so a real concavity (between legs, armpits: reachable from the edge)
+    // is NEVER filled; only a truly-enclosed model dropout is. A cut's leg-gap fills; an interior
+    // erase refills → the loud no-op below; an edge carve (border-reachable) stays carved. The
+    // v5.3.1 postProcessMask only closes 1px pinholes + keeps the largest island — it does NOT fill
+    // interior holes, so THIS is the real hole guard, and it must reach the u2net native matte too
+    // (fillPresegHoles below), not just the lab UI mask.
+    const mask = fillEnclosedHoles(rawMask)
     // LOUD NO-OP (meta amendment C): with holes refilled, a pure-interior erase changes nothing —
     // say so instead of looking dead ("erase does nothing" class).
-    if (opts?.erase && maskRef.current && maskArea(mask) === maskArea(maskRef.current)) {
-      // R9-2: two different truths need two different messages — a stroke that removed nothing
-      // at all is NOT an interior refill.
-      setStatus(maskArea(rawMask) === maskArea(maskRef.current)
-        ? '✂️ nothing under the stroke to erase — brush over the shape'
-        : '🔒 inside stays solid — erase carves from the edge inward')
-      requestRender()
-      return false
+    if (opts?.erase && maskRef.current) {
+      // R9-2/R10-2: two different truths, two messages — with a TOLERANCE (a swath fallback can
+      // shave a few anti-aliased edge px; exact equality read those as a real erase).
+      const prev = maskArea(maskRef.current)
+      if (prev - maskArea(mask) <= 24) {
+        setStatus(prev - maskArea(rawMask) <= 24
+          ? '✂️ nothing under the stroke to erase — brush over the shape'
+          : '🔒 inside stays solid — erase carves from the edge inward')
+        requestRender()
+        return false
+      }
     }
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
@@ -492,8 +501,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // NO-HOLES no-op detection BEFORE polish (polish re-rounds edges, so post-polish equality
       // never holds): if the carved pixels are all enclosed, the fill law restores them exactly.
       const carved = subtractMasks(maskRef.current, region)
-      if (maskArea(fillEnclosedHoles(carved)) === maskArea(maskRef.current)) {
-        setStatus(maskArea(carved) === maskArea(maskRef.current)
+      const prev = maskArea(maskRef.current)
+      if (prev - maskArea(fillEnclosedHoles(carved)) <= 24) {
+        setStatus(prev - maskArea(carved) <= 24
           ? '✂️ nothing under the stroke to erase — brush over the shape'
           : '🔒 inside stays solid — erase carves from the edge inward')
         requestRender(); return

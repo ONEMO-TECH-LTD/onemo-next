@@ -7,6 +7,7 @@ import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import type { Mask } from '@/lib/cutout-ai/types'
 import { effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
+import { fillEnclosedHoles } from '@/lib/mask-tools'
 import { blendPercentToPixels, composeEffectArtwork, presetFilter, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
 import { flattenShape, ringToVPath, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import { resampleClosedUniform, type Vec2Px } from '@/lib/outline-core'
@@ -229,10 +230,33 @@ export async function prepareAI(url: string, mask: Mask, onProgress?: (s: Prepar
   return prepareEffect(url, 'shaped', LAB_CFG, onProgress, await buildPreseg(url, mask))
 }
 
-/** The TRUE v5.3.1 bridge: an untouched segmentML MLResult straight into the shaped pipeline —
- *  exactly what the v5.3.1 flow does. No lab reconstruction of the matte. */
+/** NO-HOLES on the native u2net preseg (wiring audit 2026-08-07): v5.3.1's postProcessMask closes
+ *  1px pinholes + keeps the largest island — it does NOT fill multi-pixel interior holes, so a
+ *  model dropout (Dan's robot leg gap) survives into the subject matte. The engine's own outline is
+ *  hole-free (single-path trace), but the SUBJECT layers (texImage alpha drives the render/Save,
+ *  texMask the edge composite) carry the hole. Fill enclosed holes in those hi-res layers — a
+ *  concavity open to the border is never enclosed, so precision is untouched. Engine perimeter
+ *  stays byte-untouched; this is a lab-seam normalization of the preseg before it enters the
+ *  pipeline, exactly like buildPreseg fills the EdgeSAM matte. */
+function fillPresegHoles(preseg: MLResult): MLResult {
+  const { texW, texH, texImage, texMask } = preseg
+  // binary from the hi-res alpha; border-flood to find enclosed holes
+  const bin = new Uint8Array(texW * texH)
+  for (let i = 0; i < bin.length; i++) bin[i] = texImage.data[i * 4 + 3] > 128 ? 1 : 0
+  const filled = fillEnclosedHoles({ data: bin, w: texW, h: texH })
+  if (filled.data === bin) return preseg // no enclosed holes — verbatim passthrough
+  const nextTexMask = new Uint8Array(texMask)
+  const nextAlpha = new Uint8ClampedArray(texImage.data)
+  for (let i = 0; i < bin.length; i++) if (filled.data[i] && !bin[i]) { nextTexMask[i] = 1; nextAlpha[i * 4 + 3] = 255 }
+  // the hole's COLOUR comes from the original photo downstream (subjectFromOriginal re-pulls RGB
+  // through the alpha), so filling alpha alone recovers the real leg pixels — no smear.
+  return { ...preseg, texMask: nextTexMask, texImage: new ImageData(nextAlpha, texW, texH) }
+}
+
+/** The TRUE v5.3.1 bridge: a segmentML MLResult straight into the shaped pipeline — exactly what
+ *  the v5.3.1 flow does, plus the enclosed-hole guard the engine's postProcessMask never had. */
 export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffect> {
-  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, preseg)
+  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, fillPresegHoles(preseg))
 }
 
 /** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim.

@@ -49,9 +49,8 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
  *  outer-edge softness is untouched because only border-unreachable zeros are filled).
  *  Applied at the flow's single mask-acceptance seam, every source. NOTE: editCommit's
  *  maskFromShape bypasses this seam SAFELY — one closed ring cannot enclose a hole. */
-export function fillEnclosedHoles(mask: Mask, maxHoleFrac = 1): Mask {
+export function fillEnclosedHoles(mask: Mask): Mask {
   const { w, h } = mask
-  const maxHolePx = Math.ceil(w * h * maxHoleFrac)
   const src = mask.data
   const reach = new Uint8Array(w * h)
   const stack: number[] = []
@@ -86,7 +85,6 @@ export function fillEnclosedHoles(mask: Mask, maxHoleFrac = 1): Mask {
       if (x < w - 1) q.push(p + 1)
       q.push(p - w, p + w)
     }
-    if (px.length > maxHolePx) continue // a real concavity/hole class — not ours to fill
     if (!data) { data = new Uint8Array(src); soft = mask.soft ? new Uint8Array(mask.soft) : null }
     for (const p of px) { data[p] = 1; if (soft) soft[p] = 255 }
   }
