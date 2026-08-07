@@ -34,7 +34,7 @@ export default function CutoutLab() {
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
   const flow = useCutoutLabFlow({ requestRender })
-  const { status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile, paintCfg } = flow.state
+  const { status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, paintCfg } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -54,6 +54,7 @@ export default function CutoutLab() {
   const [preview, setPreview] = useState(false)
   const previewRef = useRef(false); previewRef.current = preview
   const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
+  const COMET_LIFE_MS = 700 // ms a comet-trail point stays visible
   const overlayRef = useRef(false); overlayRef.current = overlayOn
 
   const viewRef = useRef<HTMLCanvasElement>(null)
@@ -64,7 +65,6 @@ export default function CutoutLab() {
   const viewBoxRef = useRef({ x: 0, y: 0, w: 1, h: 1 }) // working-view extent (image ∪ outline)
   const toolRef = useRef(tool); toolRef.current = tool
   const brushRef = useRef(brushR); brushRef.current = brushR
-  const hasCutRef = useRef(false); hasCutRef.current = hasCut
 
 
   // ── render (draw only) ── ONE canvas: working view, or the baked sticker when Preview is on
@@ -156,9 +156,8 @@ export default function CutoutLab() {
         ctx.lineCap = 'round'; ctx.lineJoin = 'round'
         const col = t === 'add' ? '34,197,94' : '239,68,68'
         const now = performance.now()
-        const LIFE = 700 // ms a trail point stays visible
         for (let i = 1; i < trail.length; i++) {
-          const a = Math.max(0, 1 - (now - trail[i].t) / LIFE)
+          const a = Math.max(0, 1 - (now - trail[i].t) / COMET_LIFE_MS)
           if (a <= 0) continue
           ctx.strokeStyle = `rgba(${col},${(a * 0.9).toFixed(2)})`
           ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * (0.3 + 0.7 * a))
@@ -196,7 +195,7 @@ export default function CutoutLab() {
     return {
       x: (vb.x + (e.clientX - r.left - ox) / sc) / iw,
       y: (vb.y + (e.clientY - r.top - oy) / sc) / ih,
-      label: 1, t: performance.now(),
+      t: performance.now(),
     }
   }
   // comet animation: while painting an AI stroke, keep repainting so the tail dissolves in TIME
@@ -204,9 +203,8 @@ export default function CutoutLab() {
   const cometLoop = useCallback(function loop() {
     // §I2b law 1: the fade loop runs until the TRAIL is empty — independent of the stroke ending
     // or a recognition being in flight. Presentation frames never stop for tool work.
-    const LIFE = 700
     const now = performance.now()
-    trailRef.current = trailRef.current.filter((q) => now - q.t < LIFE)
+    trailRef.current = trailRef.current.filter((q) => now - q.t < COMET_LIFE_MS)
     if (!paintingRef.current && trailRef.current.length === 0) { cometRaf.current = 0; return }
     render()
     cometRaf.current = requestAnimationFrame(loop)
@@ -273,8 +271,8 @@ export default function CutoutLab() {
     if (tab === 'vector') {
       const k = vecChip
       const [lo, hi] = CHIP_RANGE[k]
-      const value = k === 'detail' ? 100 - settings.detail : settings[k]
-      return { label: k === 'detail' ? 'detail (0 = full)' : k, lo, hi, value, set: (v: number) => setTune(k === 'detail' ? { detail: 100 - v } : { [k]: v }) }
+      const value = k === 'detail' ? hi - settings.detail : settings[k] // 'detail' knob is UI-inverted (0 = full)
+      return { label: k === 'detail' ? 'detail (0 = full)' : k, lo, hi, value, set: (v: number) => setTune(k === 'detail' ? { detail: hi - v } : { [k]: v }) }
     }
     if (tab === 'blend') {
       const k = blendChip
@@ -284,10 +282,9 @@ export default function CutoutLab() {
     if (tool === 'nodes' && nodeMode === 'move' && selNode && nodeBaseRef.current) {
       const apply = (adj: { radius: number; curve: number }) => {
         setNodeAdj(adj)
-        // ONE adjustment per mode: radius chip sends radius only, curve chip curve only — sending
-        // both together makes the bend rebuild the handles and the corner fillet silently no-op.
-        const delta = nodeChip === 'radius' ? { radius: adj.radius } : { curveKnob: adj.curve }
-        flow.actions.nodeApply(nodeBaseRef.current!, selNode.pi, selNode.ai, delta)
+        // pass the selected chip + its value; the flow constructs the engine delta (it owns the
+        // radius-vs-curve one-field rule — the shell must not know engine behavior).
+        flow.actions.nodeApply(nodeBaseRef.current!, selNode.pi, selNode.ai, nodeChip, nodeChip === 'radius' ? adj.radius : adj.curve)
       }
       const [rLo, rHi] = CHIP_RANGE.nodeRadius, [cLo, cHi] = CHIP_RANGE.nodeCurve
       if (nodeChip === 'radius') return { label: 'node radius', lo: rLo, hi: rHi, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
@@ -410,7 +407,7 @@ export default function CutoutLab() {
               <EditorOverlay shape={shapeRef.current} imgW={imgCanvas.current.width} imgH={imgCanvas.current.height} view={viewBoxRef.current}
                 selected={selNode} showHandles={nodeMode === 'move' && nodeChip === 'curve'} onSelect={selectNode} onTap={onNodesTap}
                 nodeMode={nodeMode} onDeleteNode={onDeleteNodeAt}
-                dispW={disp.w} mode={tool as EditMode} aspectLocked={aspectLocked}
+                mode={tool as EditMode} aspectLocked={aspectLocked}
                 onEdit={onEditLive} onCommit={onEditCommit} />
             )}
           </div>
@@ -419,7 +416,6 @@ export default function CutoutLab() {
 
       <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
         <Stat label="magic cut" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
-        <Stat label="brush stroke" value={ms.stroke != null ? `${ms.stroke}ms` : '—'} />
       </div>
       {admin && (
         <div style={{ marginTop: 16, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' }}>

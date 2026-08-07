@@ -7,9 +7,6 @@ import { runCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import type { MLResult } from '@/lib/effect/segment-ml'
 import type { Mask } from '@/lib/mask-tools/types'
 
-export const V531_KEY = 'u2net-v531'
-export const V531_LABEL = 'u2net · v5.3.1 native (auto, no brush)'
-
 // CUT-INPUT CAP (Dan device 2026-08-07: iOS `[wasm] RangeError: Out of memory` → 'no backend').
 // The cut worker decodes the SOURCE image (the engine notes a ~2GB 'upload half'); a 12MP phone
 // photo blows past iOS Safari's WASM heap. The lab already downscales for display but was handing

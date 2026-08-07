@@ -15,18 +15,10 @@ export interface PaintConfig {
 }
 export const PAINT_DEFAULTS: PaintConfig = { swathMult: 2, polishDiv: 3, closeFrac: 0.2 }
 
-/** Rasterize a drawn shape to a Mask (subject matte for the blend layer — inside = subject). */
-export function maskFromShape(shape: import('@/lib/vector-core').VShape, w: number, h: number): Mask {
-  const c = document.createElement('canvas'); c.width = w; c.height = h
-  const ctx = c.getContext('2d', { willReadFrequently: true })!
-  const ring = flattenShape(shape, 0.5)[0] ?? []
-  ctx.beginPath()
-  ring.forEach((p: { x: number; y: number }, i: number) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-  ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill()
-  const px = ctx.getImageData(0, 0, w, h).data
-  const data = new Uint8Array(w * h)
-  for (let i = 0; i < w * h; i++) data[i] = px[i * 4 + 3] > 128 ? 1 : 0
-  return { data, w, h }
+/** Rasterize a drawn shape to a BINARY Mask (subject matte for the blend layer — inside = subject).
+ *  Shares solidShapeMask's rasterizer; drops the soft channel (the paint-edit mask is binary). */
+export function maskFromShape(shape: VShape, w: number, h: number): Mask {
+  return { data: solidShapeMask(shape, w, h).data, w, h }
 }
 
 /** Mask booleans for the DRAW add/erase combination (Dan's two examples: a drawn loop unions into

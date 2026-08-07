@@ -20,9 +20,6 @@ function loadCv(): Promise<any> {
   return cvReady
 }
 
-/** Warm the OpenCV runtime (called on first brush intent — never at page open). */
-export function initGrabCut(): Promise<void> { return loadCv().then(() => undefined) }
-
 // GrabCut is O(pixels·iterations); cap the work resolution so a stroke stays well under a second on
 // a phone. The result is upscaled back to full res (the outline trace smooths the nearest-neighbour
 // stair-step). 512 is Photoshop-refine territory and keeps edges faithful.
@@ -30,6 +27,7 @@ const GC_MAX = 512        // work-resolution cap (grabcut is O(pixels·iters))
 const GC_ITERS = 3        // graph-cut iterations
 const HALO_MULT = 3       // standalone: probable-fg halo radius = HALO_MULT × brush (a colour model to grow from)
 const CORRIDOR_MULT = 2.5 // refine: the grabcut label only applies within CORRIDOR_MULT × brush of the stroke
+const CORRIDOR_MIN_PX = 24 // floor for the refine corridor radius (full-res px)
 
 /** GrabCut brush (Dan 2026-08-07: a SEPARATE tool that recognises a shape ON ITS OWN, and also
  *  refines the u2net cut). Two modes, chosen by whether a base selection exists:
@@ -68,6 +66,7 @@ export async function grabCutRefine(
     }
   }
   let marked = 0
+  if (fromScratch && erase) return { data: base ? new Uint8Array(base.data) : new Uint8Array(W * H), w: W, h: H } // nothing to carve from an empty base
   if (fromScratch) {
     // STANDALONE: bg everywhere, a generous halo of PROBABLE fg around the stroke (a fg colour
     // model to grow from), the stroke swath itself DEFINITE fg. GrabCut expands to the object edge.
@@ -99,7 +98,7 @@ export async function grabCutRefine(
       // a colour-uniform subject an erase stroke could flip the WHOLE object to background. Apply the
       // grabcut label only INSIDE a corridor around the stroke; everywhere else the base is preserved.
       // The snap stays local — erase can't destroy, add can't over-reach (erase-bounded-by-gesture).
-      const corridorR = Math.max(brushPx * CORRIDOR_MULT, 24)
+      const corridorR = Math.max(brushPx * CORRIDOR_MULT, CORRIDOR_MIN_PX)
       const cr2 = corridorR * corridorR
       const seg = stroke.length ? stroke : [{ x: 0, y: 0 }]
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity

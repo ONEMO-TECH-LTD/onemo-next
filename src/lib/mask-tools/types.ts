@@ -10,10 +10,8 @@ export interface Mask {
   soft?: Uint8Array
 }
 
-/** A point in normalized image space (0..1). label 1 = include, 0 = exclude (legacy field kept
- *  for the paint/grabcut stroke callers). */
+/** A point in normalized image space (0..1). */
 export interface Point {
   x: number
   y: number
-  label?: 0 | 1
 }

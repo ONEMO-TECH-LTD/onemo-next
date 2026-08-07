@@ -5,11 +5,11 @@
 // binds only to this surface; flows/flow-contract.ts is the reference, not an import: it is typed
 // against v5.3.1's DesignState/sceneStore). The flow OWNS ALL POLICY the shell used to carry
 // inline: compose cadence (Cadence Law: compositor NEVER called mid-drag; single-flight latched
-// bake with real cancellation), auto-blend-on-outgrowth (value-true), history semantics, engine
-// selection MEANING + segmentation calls, brush fault degradation, tool-action orchestration,
-// perfGesture marks. URL read/write stays a SHELL adapter duty — seg is injected, never read here.
+// bake with real cancellation), auto-blend-on-outgrowth (value-true), history semantics, the u2net
+// cut + GrabCut/paint tool orchestration, perfGesture marks. The shell only renders + captures
+// gestures + calls these actions.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { Mask, Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -35,6 +35,10 @@ const BAKE_IDLE_MS = 250 // Cadence Law: compose on release/idle — never per k
 // generous ceiling (weights on slow links); compute gets the tight one.
 const T_COMPUTE_MS = 30_000
 const T_DOWNLOAD_MS = 180_000
+const HISTORY_DEPTH = 30          // undo/redo ring size
+const MAX_DPR = 3                 // display-res bake DPR cap (memory floor)
+const MIN_DROPPED_REGION_PX = 60  // shape-truth: >this many dropped px = a disconnected region, warn
+const MIN_ERASE_KEEP_RATIO = 0.1  // never-destroy: an erase leaving <this fraction of the shape reverts
 class ToolTimeout extends Error { constructor(what: string, ms: number) { super(`${what} timed out after ${Math.round(ms / 1000)}s`) } }
 function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   return new Promise<T>((res, rej) => {
@@ -44,8 +48,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
 }
 
 /** The adapters the flow needs injected (CreatorAdapters precedent — the flow never touches
- *  location/DOM chrome): initial engine from the URL, URL write-back, and a render request the
- *  shell binds to its canvas draw. */
+ *  location/DOM chrome): a render request the shell binds to its canvas draw. */
 export interface LabAdapters {
   /** shell's imperative canvas redraw — the flow calls it after every view-affecting mutation */
   requestRender: () => void
@@ -68,7 +71,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [busy, setBusy] = useState(false)
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
-  const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
+  const [ms, setMs] = useState<{ cut?: number }>({})
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [shapeTick, setShapeTick] = useState(0)
@@ -98,7 +101,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   // ── history (pure module, flow-driven) ──
   type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings }
-  const histRef = useRef(new HistoryStack<Snap>(30))
+  const histRef = useRef(new HistoryStack<Snap>(HISTORY_DEPTH))
   const snapNow = (): Snap => ({
     mask: maskRef.current ? { data: maskRef.current.data.slice(), w: maskRef.current.w, h: maskRef.current.h, soft: maskRef.current.soft?.slice() } : null,
     drawn: drawnRef.current,
@@ -122,13 +125,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // make it resolution-agnostic — contract §I2; no engine change, no second pipeline). Full res
   // exists only on Save and 👁 Preview, through this ONE scheduler + gen token.
   const bakeModeRef = useRef<'display' | 'full'>('display')
-  const previewRef2 = useRef(false)
+  const previewRef = useRef(false)
   const displayFrontRef = useRef<{ src: PreparedEffect; shim: PreparedEffect } | null>(null)
   const fullBakeWaiters = useRef<(() => void)[]>([])
   const displayPrepared = (p: PreparedEffect): PreparedEffect => {
     if (displayFrontRef.current?.src === p) return displayFrontRef.current.shim
     const { origCanvas, subjCanvas } = p.frontSrc
-    const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 3) : 1
+    const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, MAX_DPR) : 1
     const scale = Math.min(1, (dispWRef.current * dpr) / origCanvas.width)
     let shim = p
     if (scale < 1) {
@@ -213,13 +216,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleBake])
 
-  // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape, which is
-  // safe by construction: one closed ring cannot enclose a hole; gated in the probe suite) ──
-  const acceptMask = useCallback(async (rawMask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean; shapeTruth?: boolean }) => {
+  // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape) ──
+  const acceptMask = useCallback(async (mask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean; shapeTruth?: boolean }) => {
     // u2net's matte + every mask are consumed VERBATIM (Dan 2026-08-07: no speculative hole/opacity
     // fixes on the pure path — the EdgeSAM-era guards are deleted with EdgeSAM). Paint sources still
     // get shape-is-truth below (that is geometry the paint tool OWNS, not a guess on a model matte).
-    const mask = rawMask
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
       try {
@@ -261,7 +262,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     }
     scheduleBake(true) // tool-commit = a compose trigger (Cadence Law), immediate
     pushHistory()
-    setStatus(droppedPx > 60
+    setStatus(droppedPx > MIN_DROPPED_REGION_PX
       ? '⚠️ a SEPARATE region was dropped — the one-shape rule keeps only the main shape (bridge it with a connector first)'
       : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — refine, draw, edit, tune, or Save`)
     return true
@@ -288,7 +289,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
-    setHasCut(false)
     requestRender()
     setStatus('🖼 image ready — push 🤖 Detect to auto-cut, or brush the object')
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,7 +309,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
-      if (!(await acceptMask(r.mask, r.preseg))) setStatus('⚠️ u2net returned an empty cut — try again, or brush the object to select it')
+      // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
+      await acceptMask(r.mask, r.preseg)
     } catch (e) {
       setStatus('⚠️ u2net failed: ' + String((e as Error)?.message ?? '?') + ' — reload the page and Detect again, or brush the object')
     }
@@ -343,10 +344,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (q) { pendingToolRef.current = null; void runTool(q) }
      
   }, [])
-  // ── THE BRUSH — GrabCut refinement (Dan 2026-08-07: EdgeSAM + wand DELETED; u2net is the only
-  // cut, GrabCut the only brush). Paint roughly over a missed area → OpenCV graph-cut snaps to the
-  // real edge and adds it (erase carves). Deterministic, no deep model, OpenCV lazy-loads on the
-  // first stroke. Falls back to a plain painted swath only when there is no base cut to refine. ──
+  // ── THE BRUSH — GrabCut (Dan 2026-08-07: EdgeSAM + wand DELETED; u2net is the only cut, GrabCut
+  // the only brush). Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
+  // carves). No base → it RECOGNISES the painted shape standalone; a base → it REFINES the cut.
+  // Deterministic, no deep model, OpenCV lazy-loads on the first stroke. ──
   const grabCutStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => runTool(async () => {
     const img = imgCanvas.current
     if (!img) return
@@ -365,7 +366,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const before = base ? maskArea(base) : 0, after = maskArea(refined)
       if (after === 0) { setBusy(false); setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
-      if (erase && after <= before * 0.1) { setBusy(false); setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
+      if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setBusy(false); setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
       if (base && before === after) { setBusy(false); setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
       const ok = await acceptMask(refined, undefined, { erase })
       if (ok) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
@@ -382,7 +383,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const painted = swathMask(pts, brushPx, img.width, img.height, paintCfgRef.current)
     perfGesture('swath', performance.now() - ts0)
     if (!maskRef.current || !hasCutRef.current) {
-      if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Re-detect'); requestRender(); return }
+      if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Detect'); requestRender(); return }
       drawnRef.current = null
       setBusy(true); await acceptMask(polishMask(painted, brushPx, paintCfgRef.current.polishDiv), undefined, { shapeTruth: true }); setBusy(false)
       setStatus('✏️ painted shape created — keep painting, erase, or tune')
@@ -461,8 +462,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     editCommit(next)
     return true
   }, [editCommit])
-  const nodeApply = useCallback((base: VShape, pi: number, ai: number, delta: { radius?: number; curveKnob?: number }) => {
-    editCommit(nodeAdjust(base, pi, ai, delta))
+  const nodeApply = useCallback((base: VShape, pi: number, ai: number, chip: 'radius' | 'curve', value: number) => {
+    // ONE adjustment field per call (engine behavior — the shell must not know this): sending
+    // radius AND curve together makes the engine's bend rebuild the handles and the corner fillet
+    // silently no-op. The shell passes the chip + value; the flow constructs the engine delta.
+    editCommit(nodeAdjust(base, pi, ai, chip === 'radius' ? { radius: value } : { curveKnob: value }))
   }, [editCommit])
 
   // ── history / save ──
@@ -472,8 +476,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
     blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
     setHasCut(!!(s.mask || s.drawn))
-    if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
-      try { preparedRef.current = await withTimeout(prepareAI(urlRef.current, maskRef.current!), T_COMPUTE_MS, 'restore prepare') } catch { /* keep last prepared */ }
+    // re-prepare the subject matte for the restored geometry — cut states from the restored mask,
+    // DRAWN states from the shape (else undo onto an edited shape bakes a stale subject).
+    const img = imgCanvas.current, url = urlRef.current
+    const forMask = s.drawn ? maskFromShape(s.drawn.shape, img?.width ?? 1, img?.height ?? 1) : maskRef.current
+    if (forMask && img && url) {
+      try { preparedRef.current = await withTimeout(prepareAI(url, forMask), T_COMPUTE_MS, 'restore prepare') } catch { /* keep last prepared */ }
     }
     applyFinish()
     scheduleBake(true)
@@ -484,7 +492,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
     setHasCut(false); pushHistory(); requestRender()
-    setStatus('🗑 cleared — paint a new shape, or Re-detect')
+    setStatus('🗑 cleared — paint a new shape, or Detect')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestRender])
 
@@ -498,7 +506,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   /** 👁 Preview enter/exit — a FLOW policy: enter = full-res compose trigger (display-res bake may
    *  show as the interim until it lands); exit = back to the display-res live bake. */
   const setPreview = useCallback((on: boolean) => {
-    previewRef2.current = on
+    previewRef.current = on
     if (!preparedRef.current) return
     bakeModeRef.current = on ? 'full' : 'display'
     scheduleBake(true)
@@ -508,17 +516,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current || !preparedRef.current) return
     try { await withTimeout(awaitFullBake(), T_COMPUTE_MS, 'full-res bake') }
-    catch (e) { setStatus('⚠️ ' + String((e as Error).message)); if (!previewRef2.current) bakeModeRef.current = 'display'; return }
+    catch (e) { setStatus('⚠️ ' + String((e as Error).message)); if (!previewRef.current) bakeModeRef.current = 'display'; return }
     const baked = liveBakeRef.current
-    if (!previewRef2.current) { bakeModeRef.current = 'display'; scheduleBake() } // return to edit-res
+    if (!previewRef.current) { bakeModeRef.current = 'display'; scheduleBake() } // return to edit-res
     baked?.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
   }, [awaitFullBake, scheduleBake])
 
   const canBrush = useCallback((tool: string): boolean => {
-    if (tool === 'draw' || tool === 'draw-erase') return !!imgCanvas.current
-    // add/erase = the GrabCut brush — works with just an image (recognises standalone, or refines a cut)
-    if (tool === 'add' || tool === 'erase') return !!imgCanvas.current
-    return false
+    // every brush (paint draw/erase + GrabCut add/erase) needs only an image; node/frame edit do not
+    return (tool === 'draw' || tool === 'draw-erase' || tool === 'add' || tool === 'erase') && !!imgCanvas.current
   }, [])
 
   // WARM-UP: prefetch u2net weights into the HTTP cache (downloads only — no runtime at open;
@@ -534,13 +540,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     state: {
       status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, paintCfg,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
-      hasFile: !!lastFileRef.current,
     },
     actions: {
       upload, detect, setTune, setBlendTune,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, setPaintCfg,
+      undo, redo, clearAll, save, setDragging, setPreview, warmup, setPaintCfg,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

@@ -17,7 +17,6 @@ interface Props {
   shape: VShape
   imgW: number
   imgH: number
-  dispW: number
   /** working-view extent (image ∪ outline) — the canvas under this overlay renders this box */
   view?: { x: number; y: number; w: number; h: number }
   mode: EditMode
@@ -55,7 +54,7 @@ function scaleShape(s: VShape, ax: number, ay: number, sx: number, sy: number): 
   return { paths: s.paths.map((p) => ({ anchors: p.anchors.map((a) => ({ ...a, p: m(a.p), hIn: a.hIn ? m(a.hIn) : a.hIn, hOut: a.hOut ? m(a.hOut) : a.hOut })) })) }
 }
 
-export function EditorOverlay({ shape, imgW, imgH, dispW, view, mode, aspectLocked, onEdit, onCommit, selected, onSelect, showHandles, onTap, nodeMode = 'move', onDeleteNode }: Props) {
+export function EditorOverlay({ shape, imgW, imgH, view, mode, aspectLocked, onEdit, onCommit, selected, onSelect, showHandles, onTap, nodeMode = 'move', onDeleteNode }: Props) {
   const vb = view ?? { x: 0, y: 0, w: imgW, h: imgH }
   const dragRef = useRef<{ kind: 'node'; pi: number; ai: number; base: VShape } | { kind: 'handle'; pi: number; ai: number; which: 'hIn' | 'hOut'; base: VShape } | { kind: 'grip'; grip: string; base: VShape; bb: ReturnType<typeof bboxOf> } | null>(null)
   const liveRef = useRef<VShape>(shape)

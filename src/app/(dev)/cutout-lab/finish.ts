@@ -2,14 +2,12 @@
 // ARCHITECTURE.md law 1): AI mask → v5.3.1 mask hygiene → trace → outline-resolve → SVG path.
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
-import { CHIP_RANGE } from './ui-config'
 import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import type { Mask } from '@/lib/mask-tools/types'
-import { effectiveTextureDim, smoothMask } from '@/lib/effect/mask'
+import { effectiveTextureDim } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
 import { blendPercentToPixels, composeEffectArtwork, presetFilter, type ArtworkFillMode, type PresetKey } from '@/lib/effect/composite'
-import { flattenShape, ringToVPath, shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
-import { resampleClosedUniform, type Vec2Px } from '@/lib/outline-core'
+import { shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import {
   detailToFloorMm,
   resolveTraceOutline,
@@ -17,7 +15,6 @@ import {
   type TraceOutlineSettings,
 } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
-import { GLOBAL_OFF, mintIds, resolve } from '@/lib/effect/outline-resolve'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
 
@@ -159,7 +156,7 @@ function mirrorMosaicRegion(src: HTMLCanvasElement, rx0: number, ry0: number, W:
 // the pipeline (prepareEffect) that owns them.
 
 /** Model mask (+soft alpha) → the SAME cutout format the worker trio renders (Dan's slot law:
- *  u2net and SAM are slotted AI engines emitting one MLResult contract; nothing downstream may
+ *  u2net is the sole cut; matteToMLResult stays slot-generic (one MLResult contract) so nothing downstream may
  *  differ from pure v5.3.1). Build the full-res RGBA matte exactly like ben.worker does — original
  *  RGB at the working cap, model alpha canvas-upscaled onto it — then run the engine's OWN shared
  *  tail (`matteToMLResult`: lo mask @ the bridge's maskDim + hi texture @ the device cap, y-up,
@@ -172,7 +169,7 @@ let presegCache: {
   matte: HTMLCanvasElement; alpha: HTMLCanvasElement; av: ImageData; aw: number; ah: number
 } | null = null
 
-export async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
+async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   const { w, h } = mask
   const texDim = effectiveTextureDim()
   if (presegCache?.url !== url) {
