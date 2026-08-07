@@ -262,7 +262,10 @@ function CutoutLabInner() {
               {generating && (
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
               )}
-              <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} style={{ width: '100%', display: 'block', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              {/* FIXED viewport (v1 law): the BOX never grows or reflows — it locks to the image aspect;
+                  a growing view-box contain-fits inside it, so the object reads smaller, the page never jumps. */}
+              <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet"
+                style={{ width: '100%', aspectRatio: `${imgW} / ${imgH}`, display: 'block', border: '1px solid #e2e8f0', borderRadius: 8 }}>
                 {/* v1 RENDER: raw photo as the base (dimmed outside the shape by the scrim); when the
                     ENGINE has composed a frame (blend>0 / outgrown offset), it draws INSIDE the outline
                     on top — live result inside, raw image outside, one clip, no shell compositing. */}
