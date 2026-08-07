@@ -81,7 +81,11 @@ function CutoutLabInner() {
   })()
 
   // ── canvas presentation (v1 look): image + engine outline + dim-outside scrim — NO bake ──
-  const pathD = useMemo(() => { try { return display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [display])
+  // Meta ruling 2026-08-07: the bridge auto-prepares a 'standard' square at upload — that is STATE, not a
+  // cut. The shell draws NO outline unless the generator is a real traced cut: upload = bare photo (v1),
+  // the silhouette appears only on Detect.
+  const traced = !!spec && spec.generator.adapter !== 'standard'
+  const pathD = useMemo(() => { try { return traced && display ? shapeToSVGPathD(display, 2) : '' } catch { return '' } }, [traced, display])
   const fillVal = toolById.get('fill')?.value as boolean | undefined
 
   const onExport = useCallback(async () => {
@@ -171,7 +175,7 @@ function CutoutLabInner() {
       {/* canvas — v1 look: image + engine outline + dim outside (evenodd scrim). Presentation only. */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div>
-          {hasArtwork && <div style={{ ...cap, textAlign: 'center' }}>Live result — dimmed outside the shape</div>}
+          {hasArtwork && <div style={{ ...cap, textAlign: 'center' }}>{hasCut ? 'Live result — dimmed outside the shape' : 'Loaded — push 🤖 Detect to cut'}</div>}
           {!hasArtwork && (
             <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, width: 'min(480px, 86vw)', height: 320, border: '1.5px dashed #cbd5e1', borderRadius: 12, cursor: 'pointer', color: '#64748b', background: 'transparent' }}>
               <span style={{ fontSize: 40, lineHeight: 1 }}>🖼️</span>
