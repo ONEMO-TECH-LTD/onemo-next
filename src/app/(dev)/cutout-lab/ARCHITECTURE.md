@@ -257,3 +257,46 @@ eruda (?debug=1) + scripts/cutout-lab-verify.mjs   bench-only — EXCLUDED from 
 - Import-graph proof: page.tsx runtime lib imports SHRINK (cutout-wand import gone); finish.ts
   line count ≈ halves; the two new libs have zero React/DOM/Next imports (grep).
 - Contracts current: this section IS the block map; AUDIT §4 checks against it from now on.
+
+## I2f — ONE BRUSH, pluggable region engines (Dan ruling 2026-08-07 · builds ON TOP of I2e's
+## moved modules; I2e stays byte-identical pure moves)
+
+Authorizing directive (Dan, verbatim): "the wand paint brush behaves same way confusing mode I
+suggest we remove differing paint logic form wand and have unified single behaviour with just
+different engines driving paint comment brush - AI sam and wand 2 same UI/ux."
+
+### The law
+There is ONE brush behavior — comet ink, Add/Erase, tap-or-drag, base-retain semantics
+(add = union, erase = subtract, polish after, engine finish after that, through the one tool
+queue) — and pluggable REGION ENGINES that answer one question: "what region does this gesture
+mean?" The wand STOPS being a separate tool mode; a brush-ENGINE selector picks the driver.
+
+### The seam (lives in mask-tools/ post-I2e — the one brush behavior module)
+`RegionSource`: `(stroke, ctx: { imgCanvas, brushPx, tolerance? }) → Promise<region Mask>`
+plus lifecycle `ensure()/dispose()` and a declared weight class, so the swap-not-stack law
+(§I2d.4, asymmetry included) applies AT THE ENGINE LEVEL — selecting a heavy engine disposes the
+other heavy one, exactly today's wandModeEnter generalized.
+- **edgesam** (semantic): stroke → prompts → model region. Heavy-worker class.
+- **wand2** (contrast): tap → flood; DRAG = continuous taps — flood at stroke samples spaced
+  ≥ brushPx apart, coalesced through the tool queue, each region unioned as the finger moves.
+  Heavy-main class (OpenCV asymmetry stands).
+- **paint** (literal) — RECOMMENDED third engine, implement if it drops out naturally: the region
+  IS the swath. Weight none. This deletes the draw/draw-erase special-casing entirely and the
+  whole tool surface collapses to: Brush [Add | Erase] + Engine [AI · Wand · Paint] + Edit
+  (nodes/frame). If it fights the diff, defer it to its own follow-up — do not force it.
+
+### UI consequence (deleted, not parked)
+The Edit tab's wand chips are REMOVED; the brush-engine selector lives with the brush (AI tab row
+or a chip beside Add/Erase — builder's presentation call, flow owns the MEANING). Manual/'none'
+cut mode is unaffected (it constrains the CUT, not the brush engines).
+
+### Gates
+1. Same UX both (all) engines, observed: comet ink + Add/Erase + tap + drag behave identically;
+   only the region source differs. Base-retain law re-verified per engine (ear-gap case on each).
+2. Wand drag: flood-per-sample stays inside the tool budget (spacing + queue coalescing —
+   probe numbers recorded); no flood on every pointer-move.
+3. Swap-not-stack at engine level: switching engines disposes the heavy loser (worker terminate /
+   OpenCV asymmetry stated in status), probe-asserted like r7.
+4. Zero regressions: suite 402/402 · perimeter EMPTY · standing probes green · Save hash unchanged
+   at same settings on the SAME engine.
+5. Dan device gate: the confusion is gone — one brush that feels identical while engines swap.
