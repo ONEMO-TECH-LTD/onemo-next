@@ -162,9 +162,10 @@ function CutoutLabInner() {
         })}
         {tab === 'blend' && (<>
           <button style={chipBtn(true)}>blend</button>
-          {(['mirror-off', 'tile', 'clamp'] as const).slice(1).map((f) => (
-            <button key={f} onClick={() => commitTool('fill', f === 'tile')} style={chipBtn(f === 'tile' ? fillVal === true : fillVal === false)}>{f}</button>
-          ))}
+          {/* tile/clamp toggle engine state whose only consumer is the compositor — disabled until the
+              engine-compose increment lands (their commit would be a silent no-op on this surface). */}
+          <button disabled style={chipBtn(fillVal === true, true)} title="engine-compose increment">tile</button>
+          <button disabled style={chipBtn(fillVal === false, true)} title="engine-compose increment">clamp</button>
         </>)}
         {tab === 'edit' && (<>
           <button disabled style={chipBtn(false, true)} title="next increment">🖌 Paint shape</button>
