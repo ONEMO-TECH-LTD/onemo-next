@@ -44,7 +44,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   })
 }
 
-export type EngineSel = 'edge' | 'u2net'
+export type EngineSel = 'edge' | 'u2net' | 'none'
 
 /** The adapters the flow needs injected (CreatorAdapters precedent — the flow never touches
  *  location/DOM chrome): initial engine from the URL, URL write-back, and a render request the
@@ -300,6 +300,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     requestRender()
+    // MANUAL MODE (Dan, said three times: the wand is INDEPENDENT — no model may load for it):
+    // 'No AI' skips segmentation entirely. The image is ready as-is; wand/paint create the shape.
+    if (engineSelRef.current === 'none') {
+      setHasCut(false)
+      setStatus('🖼 image ready — no AI. Wand-tap or paint to create the shape')
+      return
+    }
     setBusy(true)
     // ONE pipeline for every engine: the v5.3.1 worker chain, model picked by its own `?seg=`
     // roster parameter (EdgeSAM or the u2netp trio). The cutout-ai worker is brush-only, lazy.
@@ -323,7 +330,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const setEngine = useCallback((v: EngineSel) => {
     setEngineSel(v); engineSelRef.current = v
     adapters.onSegChange(v) // URL write = shell adapter duty, invoked through the injected adapter
-    setStatus(v === 'edge' ? 'EdgeSAM engine (v5.3.1 roster)' : 'u2net engine (v5.3.1 default)')
+    setStatus(v === 'edge' ? 'EdgeSAM engine (v5.3.1 roster)' : v === 'u2net' ? 'u2net engine (v5.3.1 default)' : '🖼 No AI — wand + paint only, no model loads')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -351,7 +358,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     toolBusyRef.current = false
     const q = pendingToolRef.current
     if (q) { pendingToolRef.current = null; void runTool(q) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
   const wandTap = useCallback((p0: Point, tolerance: number, erase: boolean, brushR: number) => runTool(async () => {
     const img = imgCanvas.current!
@@ -561,7 +568,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // still downloaded at first cut. The engine preload + the brush model both warm here; the first
   // stroke later pays inference only.
   const warmup = useCallback(() => {
-    preloadBen()
+    if (engineSelRef.current !== 'none') preloadBen() // manual mode loads NO model, ever
     // DOWNLOAD-ONLY brush warm (Dan device r4: initializing the ORT session at page open spikes
     // memory and iOS kills the tab — page loads then crashes). Weights land in the HTTP cache
     // here; the SESSION initializes in the background after the first cut (below), so the first
