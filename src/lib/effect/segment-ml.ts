@@ -163,15 +163,23 @@ export async function segmentML(
 ): Promise<MLResult> {
   const raw = await runBenInWorker(url, onProgress) // BEN inference OFF the main thread (no UI freeze)
   const srcCanvas = rgbaToCanvas(raw.data, raw.width, raw.height)
-  const lo = rasterize(srcCanvas, maskDim)
-  const hi = rasterize(srcCanvas, texDim)
+  // R1: the worker reports which model produced the cut (trio: u2netp/silueta; harness: ben2 etc.).
+  // Fall back to the constant only if a message somehow omits it (never on a real successful cut).
+  return matteToMLResult(srcCanvas, maskDim, texDim, raw.adapter ?? ML_ADAPTER_ID)
+}
+
+/** The one main-thread tail every slotted cut-out engine shares: a full-res RGBA matte canvas
+ *  (alpha = subject) → the MLResult contract (lo mask @maskDim + hi texture @texDim, y-up, mask
+ *  post-processed). Extracted from segmentML verbatim so an externally-slotted model (e.g. a
+ *  promptable SAM) renders the SAME cutout format as the worker trio — nothing downstream differs. */
+export function matteToMLResult(matte: HTMLCanvasElement, maskDim: number, texDim: number, adapterId: string): MLResult {
+  const lo = rasterize(matte, maskDim)
+  const hi = rasterize(matte, texDim)
   const mask = postProcessMask(lo.m, lo.w, lo.h)
   return {
     mask, width: lo.w, height: lo.h, imageData: lo.img,
     texImage: hi.img, texMask: hi.m, texW: hi.w, texH: hi.h,
-    // R1: the worker reports which model produced the cut (trio: u2netp/silueta; harness: ben2 etc.).
-    // Fall back to the constant only if a message somehow omits it (never on a real successful cut).
-    adapterId: raw.adapter ?? ML_ADAPTER_ID,
+    adapterId,
   }
 }
 
