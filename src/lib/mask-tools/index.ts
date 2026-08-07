@@ -42,6 +42,67 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   return { data, w: base.w, h: base.h }
 }
 
+/** NO-HOLES LAW (Dan 2026-08-07: "the entire shape must be no holes for wand and AI same" —
+ *  micro-holes in the subject matte let the blur pillow bleed through as image artifacts).
+ *  Flood the background from the border; any empty region NOT reachable from the border is an
+ *  enclosed hole → filled solid (data=1, soft=255 — a SOLID subject, no semi-transparent residue;
+ *  outer-edge softness is untouched because only border-unreachable zeros are filled).
+ *  Applied at the flow's single mask-acceptance seam, every source. NOTE: editCommit's
+ *  maskFromShape bypasses this seam SAFELY — one closed ring cannot enclose a hole. */
+export function fillEnclosedHoles(mask: Mask): Mask {
+  const { w, h } = mask
+  const src = mask.data
+  const reach = new Uint8Array(w * h)
+  const stack: number[] = []
+  for (let x = 0; x < w; x++) { if (!src[x]) stack.push(x); const b = (h - 1) * w + x; if (!src[b]) stack.push(b) }
+  for (let y = 0; y < h; y++) { const l = y * w; if (!src[l]) stack.push(l); const r = l + w - 1; if (!src[r]) stack.push(r) }
+  while (stack.length) {
+    const p = stack.pop()!
+    if (reach[p] || src[p]) continue
+    reach[p] = 1
+    const x = p % w
+    if (x > 0) stack.push(p - 1)
+    if (x < w - 1) stack.push(p + 1)
+    if (p >= w) stack.push(p - w)
+    if (p < w * (h - 1)) stack.push(p + w)
+  }
+  let holes = 0
+  for (let i = 0; i < w * h; i++) if (!src[i] && !reach[i]) holes++
+  if (!holes) return mask
+  const data = new Uint8Array(src)
+  const soft = mask.soft ? new Uint8Array(mask.soft) : undefined
+  for (let i = 0; i < w * h; i++) if (!data[i] && !reach[i]) { data[i] = 1; if (soft) soft[i] = 255 }
+  const out: Mask = { data, w, h }
+  if (soft) out.soft = soft
+  return out
+}
+
+/** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize
+ *  the RESOLVED outline as the one truth — inside solid (data 1, soft 255), the outer edge band
+ *  soft from the rasterizer's own anti-aliasing, outside dropped for real. After this, tint ≡
+ *  outline ≡ matte ≡ Save by construction: no orphan islands (the trace keeps the largest loop
+ *  only), no unpainted slivers (inside is solid). */
+export function solidShapeMask(shape: VShape, w: number, h: number): Mask {
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  const ring = flattenShape(shape, 0.5)[0] ?? []
+  ctx.beginPath()
+  ring.forEach((p: { x: number; y: number }, i: number) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+  ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill()
+  const px = ctx.getImageData(0, 0, w, h).data
+  const data = new Uint8Array(w * h)
+  const soft = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) { const a = px[i * 4 + 3]; soft[i] = a; data[i] = a > 128 ? 1 : 0 }
+  return { data, w, h, soft }
+}
+
+/** Live selection area — cheap op-effect check (the loud interior-erase no-op depends on it). */
+export function maskArea(mask: Mask): number {
+  let a = 0
+  for (let i = 0; i < mask.data.length; i++) if (mask.data[i]) a++
+  return a
+}
+
 /** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
  *  WYSIWYG with the brush cursor), plus the enclosed interior when the gesture closes a loop
  *  (Dan's green-blob semantics: a loop means the whole region). */

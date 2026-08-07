@@ -58,13 +58,54 @@ export class BrushSession {
     return this.base
   }
 
-  /** Erase-stroke: model-snap the region under the stroke, subtract from the base. */
+  /** Erase-stroke: model-snap the region under the stroke, subtract from the base.
+   *  CORRIDOR BOUND (E2, meta-verified 2026-08-07): the model region is clipped to a corridor
+   *  around the stroke before subtracting — an edge-crossing stroke used to make the model snap
+   *  to the WHOLE object and the subtract emptied the base ('No silhouette found', cut killed).
+   *  An erase gesture is local by intent; the corridor keeps it local by construction. */
   async eraseStroke(stroke: Point[]): Promise<Mask> {
     if (!this.base) return { data: new Uint8Array(0), w: 0, h: 0 }
     const pts = thinStroke(stroke).map((p) => ({ ...p, label: 1 as const }))
     const region = await this.segment(pts, false)
+    clipToCorridor(region, pts)
     this.base.soft = subtractSoft(this.base, region)
     subtract(this.base.data, region.data)
     return this.base
+  }
+}
+
+/** Zero every region pixel farther than ~12% of the long side from the stroke polyline
+ *  (normalized points → mask space). Bbox-limited; ≤32 thinned points keeps it cheap. */
+function clipToCorridor(region: Mask, pts: Point[]): void {
+  const { w, h, data } = region
+  if (!pts.length) return
+  const r = Math.max(24, Math.round(Math.max(w, h) * 0.12))
+  const P = pts.map((p) => ({ x: p.x * w, y: p.y * h }))
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const p of P) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
+  const bx0 = Math.max(0, Math.floor(x0 - r)), by0 = Math.max(0, Math.floor(y0 - r))
+  const bx1 = Math.min(w - 1, Math.ceil(x1 + r)), by1 = Math.min(h - 1, Math.ceil(y1 + r))
+  const r2 = r * r
+  const distOk = (x: number, y: number): boolean => {
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[Math.min(i + 1, P.length - 1)]
+      const dx = b.x - a.x, dy = b.y - a.y
+      const L2 = dx * dx + dy * dy
+      const t = L2 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / L2)) : 0
+      const px = a.x + t * dx - x, py = a.y + t * dy - y
+      if (px * px + py * py <= r2) return true
+    }
+    return false
+  }
+  for (let y = 0; y < h; y++) {
+    const inY = y >= by0 && y <= by1
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x
+      if (!data[p]) continue
+      if (!inY || x < bx0 || x > bx1 || !distOk(x, y)) {
+        data[p] = 0
+        if (region.soft) region.soft[p] = 0
+      }
+    }
   }
 }
