@@ -176,27 +176,43 @@ Laws:
 Fallback recorded (Dan's, only if optimization genuinely hits a wall — not first resort):
 blend 0 default + clamp-only surface.
 
-## I2d — the stack laws as stabilized by device rounds 3–6 (locked 2026-08-07, post r6b)
+## I2d — the stack laws (REWRITTEN 2026-08-07 post-r7 on device evidence; supersedes the
+## r6b one-session version — kept in git history with its concession)
 
-1. **One-session law (Dan critical, 02:04):** in edge mode the auto-cut AND the brush run through
-   the ONE brush-worker EdgeSAM session (`ensureEdge` → `redetect`); **the engine worker never
-   loads EdgeSAM.** The `?seg=` roster remains the selector law for auto-only models (u2net/
-   silueta/harness). Gate: network probe — zero engine-model fetches in edge mode; `segment-edge`
-   gesture present, engine `segment` absent.
-2. **Warm law (r4 + audit A2):** page open downloads bytes, instantiates NOTHING — no ORT session,
-   no OpenCV runtime. Edge: the two weight fetches. u2net: `preloadBen()` (its session-create is
-   the engine's own 4MB u2netp — sanctioned). Manual ('none'): nothing, ever. Runtimes initialize
-   on first USE behind the tool queue's visible status.
-3. **Speed law (the r3 feel, restored structurally):** after the edge cut, session + encode are
-   resident by construction (the cut used them) — strokes pay inference only (~0.3s measured).
-4. **Fault law (B1):** recoverable timeouts warn + stay retryable; only real worker death flips
-   edge-dead, which degrades LOUDLY to a u2net cut with the engine switch mirrored to the URL
-   through the shell adapter.
-5. **Manual mode:** `?seg=off` ↔ 'none' — no model may ever load; wand/paint are the creators.
-6. **Wand v2 vendor law:** OpenCV.js floodFill FIXED_RANGE (13MB wasm, lazy-instantiated on first
-   tap, module-owned) — the industrial standard, cited: `@techstark/opencv-js`; `magic-wand-tool`
-   and the fillHoles glue are dead, not parked.
-7. **Tool queue law (r5):** every tool op through ONE serialized latest-wins queue; no tool is
-   gated on busy anywhere; a queued tap says so in the status.
-8. **History law (B3):** undo/redo snapshots carry mask + drawn + knob settings + blend — state
-   restores whole (value-reflection survives undo).
+**Provenance note (the A1 concession, on the record):** meta's A1 finding ("two EdgeSAM sessions =
+the crash") was a confounded read — r4 (`31621791`) ran dual sessions at steady state and Dan's
+device called it good for a full day. The real killers were init pile-ups (r3), the OpenCV
+main-thread runtime at page open (wand v2 era), and r6b's runtime divergence. The one-session
+detour (r6/r6b) is reverted; this section is the device-proven configuration.
+
+1. **Dual-lazy law (the r4 config):** every AI cut runs through the ENGINE's `?seg=` roster
+   (EdgeSAM and u2net alike — the roster law fully restored); the brush is LAZY — session + encode
+   + base re-seed from the current cut on the FIRST stroke, comet masking the one-time ~2s. Dual
+   sessions at steady state are sanctioned (device-proven).
+2. **Runtime-pin law:** every ORT consumer in the lab uses ben.worker's exact proven recipe —
+   pure-WASM build, single thread, `['wasm']` EPs, self-hosted. The webgpu-first probe is DELETED
+   (its own comment admitted the webgpu build's CPU fallback wants an artifact we don't ship; iOS
+   answered "no backend"). No probing, no fallback chains — one boring proven runtime.
+3. **Warm law:** page open downloads bytes, instantiates NOTHING beyond the engine's own preload
+   (`preloadBen` — r4-proven livable): edge adds the two brush-weight fetches; manual ('none')
+   warms nothing; OpenCV loads ONLY on wand-selector press.
+4. **Swap-not-stack law (ASYMMETRIC by platform truth):** entering wand DISPOSES the brush worker
+   (terminate = real memory back) and instantiates OpenCV; the reverse cannot dispose OpenCV
+   (main-thread Emscripten heap, no teardown — resident for page life). Leaving wand re-lazies the
+   brush: next stroke reloads, re-encodes, re-seeds. If the resident-OpenCV + brush envelope is
+   tight on the oldest target, the completion is OpenCV-in-a-worker (disposable) — measured
+   decision, not assumed.
+5. **Fault law:** recoverable timeouts warn + stay retryable; real worker death → the corpse is
+   DISPOSED AND RESPAWNED EMPTY (arena freed) BEFORE the loud u2net degradation runs — the
+   fallback never executes inside a strangled tab.
+6. **Manual mode:** `?seg=off` ↔ 'none' — no model ever loads; wand/paint create the shape.
+7. **Wand v2 vendor law:** OpenCV.js floodFill FIXED_RANGE (`@techstark/opencv-js`), lazy on
+   selector press, module-owned I/O; `magic-wand-tool` + fillHoles dead, not parked.
+8. **Tool queue law:** every tool op through ONE serialized latest-wins queue; nothing gated on
+   busy; queued taps say so.
+9. **History law:** undo/redo snapshots carry mask + drawn + knobs + blend — state restores whole.
+
+Gates (all probe-asserted in r7 QA): no OpenCV fetch at open · engine cut (`segment` marker,
+`cut: edgesam` via roster) · brush weights/session only at first stroke, base re-seeded · OpenCV
+chunk fetched exactly on wand press · brush revives after wand with the cut preserved · corpse
+disposal before fallback · suite 402/402 · perimeter EMPTY.
