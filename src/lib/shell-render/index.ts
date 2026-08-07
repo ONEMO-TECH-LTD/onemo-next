@@ -2,7 +2,7 @@
 // canvas draws reading state, zero policy, zero engine math). Extracted verbatim from v1
 // finish.ts (maskOverlay, drawCutout). Nothing SAM/wand-era.
 
-import type { Mask } from '@/lib/mask-tools/types'
+import type { Mask } from '@/lib/tool-paint-math/types'
 
 /** Mask tint — ONE color at a time (Dan device r7): ADD tints the SELECTION green (what's
  *  included); ERASE tints the OUTSIDE red (what's excluded/erasable) — the selection stays clean. */

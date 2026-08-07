@@ -3,8 +3,8 @@
 // this and drives the BRIDGE's own descriptor session (previewTool/commitTool) — this module never
 // resolves an outline itself. Verbatim from v1 ui-config + the value-true auto-blend policy.
 
-import { NODE_KNOB_MAX } from '@/lib/vector-edit'
-import { outgrown, type Bounds, type BlendPolicy } from '@/lib/viewport-policy'
+import { NODE_KNOB_MAX } from '@/lib/tool-node-math'
+import { outgrown, type Bounds, type BlendPolicy } from '@/lib/bridge-compose-policy'
 
 export type Tool = 'add' | 'erase' | 'draw' | 'draw-erase' | 'nodes' | 'frame'
 export type Tab = 'ai' | 'vector' | 'blend' | 'edit'

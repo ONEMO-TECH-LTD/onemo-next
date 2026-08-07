@@ -5,7 +5,7 @@
 // increment supplies a CvProvider — a slim custom build (core+imgproc grabCut only, ~2–3MB) or a
 // standalone grabCut implementation. Until such a provider exists, this module stays unwired.
 
-import type { Mask } from '@/lib/mask-tools/types'
+import type { Mask } from '@/lib/tool-paint-math/types'
 
 /** The minimal OpenCV surface grabCut needs — the slim build must satisfy exactly this, no more. */
 export interface CvProvider {

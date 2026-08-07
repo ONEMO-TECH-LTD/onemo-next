@@ -4,7 +4,7 @@
 
 import { smoothMask } from '@/lib/effect/mask'
 import { flattenShape, type VShape } from '@/lib/vector-core'
-import type { Mask } from '@/lib/mask-tools/types'
+import type { Mask } from '@/lib/tool-paint-math/types'
 
 /** PAINT-SHAPER config (Dan 2026-08-07: admin-changeable). The paint tool's internal factors,
  *  formerly hardcoded — surfaced so an admin can calibrate the tool without a code change. */

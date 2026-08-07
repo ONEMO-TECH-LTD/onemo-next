@@ -6,7 +6,7 @@
 // seam matteToMLResult (segment-ml — the engine's own extracted tail; same add-on branch).
 // Nothing SAM/wand-era. The engine performs ALL work (prepareEffect, resolveTraceOutline).
 
-import type { Mask } from '@/lib/mask-tools/types'
+import type { Mask } from '@/lib/tool-paint-math/types'
 import { effectiveTextureDim } from '@/lib/effect/mask'
 import { matteToMLResult, type MLResult } from '@/lib/effect/segment-ml'
 import { prepareEffect, EFFECT_BUILD_CONFIG, type PreparedEffect } from '@/lib/effect/prepare-effect'

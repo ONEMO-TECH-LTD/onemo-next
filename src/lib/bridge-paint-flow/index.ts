@@ -7,8 +7,8 @@
 import {
   maskArea, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks,
   PAINT_DEFAULTS, type PaintConfig,
-} from '@/lib/mask-tools'
-import type { Mask } from '@/lib/mask-tools/types'
+} from '@/lib/tool-paint-math'
+import type { Mask } from '@/lib/tool-paint-math/types'
 import type { VShape } from '@/lib/vector-core'
 
 /** v1 status truth — the adopting shell maps codes to copy; the DECISIONS live here. */
