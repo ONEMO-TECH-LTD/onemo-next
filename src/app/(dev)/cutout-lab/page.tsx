@@ -408,7 +408,7 @@ export default function CutoutLab() {
             {busy && !hasCut && (
               <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none' }}>
                 <div style={{ width: 34, height: 34, border: '3px solid #c7d2fe', borderTopColor: '#7c3aed', borderRadius: '50%', animation: 'cutlab-spin 0.8s linear infinite' }} />
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Loading your image — AI is finding the object…</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
                 <style>{'@keyframes cutlab-spin { to { transform: rotate(360deg) } }'}</style>
               </div>
             )}
