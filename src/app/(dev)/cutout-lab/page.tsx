@@ -123,12 +123,6 @@ export default function CutoutLab() {
     ctx.save()
     ctx.translate(-vb.x, -vb.y)
     ctx.drawImage(img, 0, 0)
-    const mask = maskRef.current
-    if (mask && overlayRef.current) {
-      const tmp = document.createElement('canvas'); tmp.width = mask.w; tmp.height = mask.h
-      tmp.getContext('2d')!.putImageData(maskOverlay(mask), 0, 0)
-      ctx.drawImage(tmp, 0, 0, img.width, img.height)
-    }
     if (dRef.current) {
       // LIVE RESULT (Dan's one-canvas law): the ENGINE-composed sticker drawn in place inside the
       // outline — blend/fill/presets react in real time; the raw image shows only outside, dimmed.
@@ -145,6 +139,17 @@ export default function CutoutLab() {
       scrim.addPath(new Path2D(dRef.current))
       ctx.save(); ctx.fillStyle = 'rgba(6,8,14,0.55)'; ctx.fill(scrim, 'evenodd'); ctx.restore()
       ctx.strokeStyle = '#2563eb'; ctx.lineWidth = Math.max(2, img.width / 400); ctx.stroke(new Path2D(dRef.current))
+    }
+    // MASK VIEW ON TOP (Dan device r7: the old under-layer draw left stale green scraps peeking
+    // out from beneath the bake — never the current selection). One color by tool mode: green =
+    // the selection in add modes, red = the selection in erase modes.
+    const mask = maskRef.current
+    if (mask && overlayRef.current) {
+      const t0 = toolRef.current
+      const mode = t0 === 'erase' || t0 === 'draw-erase' || t0 === 'wand-erase' ? 'erase' as const : 'add' as const
+      const tmp = document.createElement('canvas'); tmp.width = mask.w; tmp.height = mask.h
+      tmp.getContext('2d')!.putImageData(maskOverlay(mask, mode), 0, 0)
+      ctx.drawImage(tmp, 0, 0, img.width, img.height)
     }
     const st = strokeRef.current
     if (st.length > 1) {
@@ -197,6 +202,7 @@ export default function CutoutLab() {
     ctx.restore() // view-box translate
   }, [disp.w, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
   useEffect(() => { renderRef.current = render }, [render])
+  useEffect(() => { requestAnimationFrame(() => renderRef.current()) }, [tool]) // mask tint follows the tool mode instantly
 
   // ── gesture capture (shell duty): pointer → normalized stroke → FLOW actions ──
   const nrm = (e: React.PointerEvent): Point & { t: number } => {

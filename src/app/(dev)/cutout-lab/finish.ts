@@ -43,13 +43,16 @@ const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales 
 
 
 /** Green-kept / red-removed overlay pixels for the mask. */
-export function maskOverlay(mask: Mask): ImageData {
+export function maskOverlay(mask: Mask, mode: 'add' | 'erase' = 'add'): ImageData {
+  // ONE color at a time (Dan device r7): the tint marks the CURRENT SELECTION only — green in
+  // add mode, red in erase mode. Unselected pixels stay untouched (no second color, no noise).
   const { data, w, h } = mask
   const ov = new ImageData(w, h)
+  const [r, g, b] = mode === 'erase' ? [239, 68, 68] : [34, 197, 94]
   for (let i = 0; i < w * h; i++) {
+    if (!data[i]) continue
     const o = i * 4
-    if (data[i]) { ov.data[o] = 34; ov.data[o + 1] = 197; ov.data[o + 2] = 94; ov.data[o + 3] = 104 }
-    else { ov.data[o] = 239; ov.data[o + 1] = 68; ov.data[o + 2] = 68; ov.data[o + 3] = 86 }
+    ov.data[o] = r; ov.data[o + 1] = g; ov.data[o + 2] = b; ov.data[o + 3] = 110
   }
   return ov
 }
