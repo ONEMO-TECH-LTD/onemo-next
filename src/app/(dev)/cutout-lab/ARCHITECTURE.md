@@ -216,3 +216,44 @@ Gates (all probe-asserted in r7 QA): no OpenCV fetch at open · engine cut (`seg
 `cut: edgesam` via roster) · brush weights/session only at first stroke, base re-seeded · OpenCV
 chunk fetched exactly on wand press · brush revives after wand with the cut preserved · corpse
 disposal before fallback · suite 402/402 · perimeter EMPTY.
+
+## I2e — structure pass (micro-contract, meta audit 2026-08-07 · pure moves, zero behavior change)
+
+**Goal:** every tool Dan named is its own liftable block, so the I6 migration cherry-picks by
+folder. This increment MOVES code; it rewrites nothing — behavior byte-identical by gate.
+
+### Target block map (the migration checklist)
+```
+src/lib/effect, vector-core, outline-core   ENGINE (untouched, lifts as the base)
+src/lib/cutout-ai/                          SAM brush add-on            (already clean)
+src/lib/cutout-wand/                        Wand add-on                 (already clean)
+src/lib/mask-tools/        ← NEW, moved OUT of finish.ts: swathMask · polishMask · unionMasks ·
+                             subtractMasks · maskFromShape  (the PAINT tool's math — pure,
+                             engine-calling via smoothMask, framework-free)
+src/lib/vector-edit/       ← NEW, moved OUT of finish.ts: nodeAdjust · insertNode · deleteNode ·
+                             measureNode · editableShape · nodeTapTol · shapeRing · shapePathD
+                             (the NODE/FRAME tool's math — pure over engine kernels)
+cutout-lab/finish.ts       shrinks to the true flow glue: preseg seam + cache · LAB_CFG ·
+                             prepareAI/Native · finishSpec/finishDrawn · bake (mosaic/transform/
+                             BakeCancelled) · render helpers (maskOverlay, drawCutout) · defaults
+cutout-lab/flow.ts         Layer-2 (unchanged role; imports the two new libs)
+cutout-lab/page.tsx        Layer-3 shell (unchanged role)
+v5.3.1/dev/PerfHUD         budget law — the I6 lift MUST carry it (or lift it to a lib then)
+eruda (?debug=1) + scripts/cutout-lab-verify.mjs   bench-only — EXCLUDED from the lift
+```
+
+### The three fixes
+1. **S1 split** — the two moves above. Import-only refactor; no function body changes.
+2. **S2 wand knob** — `wandTol` becomes FLOW state (like settings/blend); the shell renders it and
+   stops importing `WAND_TOLERANCE` (the flow seeds from the module default). Knob semantics
+   belong to the bridge; the Figma shell inherits it for free.
+3. **Deslop** — delete the `dispW2`/`dispRefW` dead shim (page.tsx ~85–87); fix the stale r3-era
+   docstring above `warmup` in flow.ts; fix `overlayRef` initial value to match state (`false`).
+
+### Gates (all must hold — this is a zero-behavior increment)
+- Suite 402/402 · typecheck clean · engine perimeter diff EMPTY (the two new libs are NEW dirs).
+- Save byte-identity hash unchanged (same image + settings pre/post pass).
+- Standing probes re-green: mid-drag 0-compose · wand flat-alloc · no-OpenCV-at-open · lazy brush.
+- Import-graph proof: page.tsx runtime lib imports SHRINK (cutout-wand import gone); finish.ts
+  line count ≈ halves; the two new libs have zero React/DOM/Next imports (grep).
+- Contracts current: this section IS the block map; AUDIT §4 checks against it from now on.
