@@ -36,13 +36,13 @@
 |---|---|---|
 | `shell-render/` | v1 presentation verbatim (mask tint add/erase, checkerboard cutout draw — blend-0 truth: photo clipped by the path) | Shell |
 
-## Still MISSING from the pool (named, not improvised)
-1. **The tool-commit seam** — how a tool's mask result enters the BRIDGE's session/state (v1's
-   acceptMask: validate-before-commit, selection-kept-on-failure). The load-bearing design of the
-   paint increment; must route through the bridge's transactions so there is ONE history.
-2. **Tool queue + timeouts** — serialized latest-wins, no busy-gating, every await times out loudly.
-3. **Full-res-on-Save orchestration** — pending the memory-floor measurement gate.
-4. **Live-drag edit presentation** (anchors glued mid-drag) — rides the shell.
+## Formerly-missing pool — NOW COMPILED (cloned clean from v1, 2026-08-07 late)
+| Module | Function |
+|---|---|
+| `bridge-tool-commit/` | v1 acceptMask seam: validate-before-commit, selection-kept-on-failure, last-edit-wins gen fencing + the WHOLE-STATE snapshot contract type (ONE history = the bridge's) |
+| `bridge-tool-queue/` | Serialized latest-wins queue (no busy-gating, nothing dropped) + withTimeout laws — tested 4/4 |
+| `bridge-save-flow/` | Display-res edit / full-res only on Save/Preview through the ONE scheduler (adopt only if gate #4 shows the bridge lacks it) |
+| `shell-edit-live/` | Enter-edit lazy skeleton, glued-anchors drag pairing, node-mode data (drag default) |
 
 ## Known CONFLICTS (resolved by ruling, not silently)
 - **History**: ONE history = the bridge's. Tool commits must enter bridge state; a second lab-side
