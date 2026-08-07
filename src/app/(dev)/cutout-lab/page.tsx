@@ -10,39 +10,24 @@ import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
 import { drawCutout, maskOverlay, type FillChoice } from './finish'
-import { useCutoutLabFlow, type EngineSel } from './flow'
+import { useCutoutLabFlow } from './flow'
 import PerfHUD from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
 
 export default function CutoutLab() {
-  // ── URL ADAPTER (shell duty per contract): read initial ?seg, write on engine change ──
-  const [initialSeg] = useState<EngineSel>(() => {
-    if (typeof window === 'undefined') return 'u2net'
-    return new URL(location.href).searchParams.get('seg') === 'off' ? 'none' : 'u2net' // DEFAULT = u2net (Dan 2026-08-07: EdgeSAM deleted); 'off' = paint-only
-  })
   useEffect(() => {
-    // ON-DEVICE CONSOLE (?debug=1): the desktop-vs-iPhone diagnosis gap has burned multiple rounds —
-    // eruda surfaces the real device errors (backend init, OOM, worker deaths) on the phone itself.
+    // ON-DEVICE CONSOLE (?debug=1): eruda surfaces real device errors (OOM, worker deaths) on the phone.
     if (new URL(location.href).searchParams.get('debug') === '1') void import('eruda').then((e) => e.default.init())
-    // DEFAULT = u2net (no ?seg param). warm-up prefetches its weights.
-    flow.actions.warmup()
+    flow.actions.warmup() // prefetch u2net weights at page open — the Detect push stays fast
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const onSegChange = useCallback((v: EngineSel) => {
-    // MODEL SWAP = the engine's own `?seg=` roster parameter (read by segment-ml's segParam) —
-    // both models run through the ONE v5.3.1 worker pipeline; nothing else changes.
-    const u = new URL(location.href)
-    if (v === 'none') u.searchParams.set('seg', 'off')
-    else u.searchParams.delete('seg')
-    history.replaceState(null, '', u)
   }, [])
   const renderRef = useRef<() => void>(() => {})
   const requestRender = useCallback(() => renderRef.current(), [])
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
-  const flow = useCutoutLabFlow({ initialSeg, onSegChange, requestRender })
-  const { status, busy, hasCut, hasImage, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile } = flow.state
+  const flow = useCutoutLabFlow({ requestRender })
+  const { status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -57,7 +42,7 @@ export default function CutoutLab() {
   const [nodeMode, setNodeMode] = useState<NodeMode>('move') // Dan: add/delete are selected modes; default = drag
   const [nodeAdj, setNodeAdj] = useState({ radius: 0, curve: 0 })
   const nodeBaseRef = useRef<VShape | null>(null)
-  const [brushR, setBrushR] = useState(40)
+  const [brushR, setBrushR] = useState(15) // Dan 2026-08-07
   const [preview, setPreview] = useState(false)
   const previewRef = useRef(false); previewRef.current = preview
   const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
@@ -336,15 +321,12 @@ export default function CutoutLab() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#475569', minHeight: 34 }}>
         {tab === 'ai' && (<>
-          <select value={engineSel} onChange={(e) => flow.actions.setEngine(e.target.value as EngineSel)} style={{ ...btn, fontSize: 12 }}>
-            <option value="u2net">u2net · v5.3.1 (auto cut)</option>
-            <option value="none">No AI · paint only</option>
-          </select>
-          <span style={{ color: '#94a3b8' }}>brush:</span>
+          <button onClick={() => flow.actions.detect()} disabled={!hasImage || busy} style={{ ...btn, fontSize: 12, background: '#7c3aed', color: '#fff', fontWeight: 700 }}>🤖 Detect</button>
+          <span style={{ color: '#94a3b8' }}>· brush:</span>
           {(['add', 'erase'] as Tool[]).map((t) => (
-            <button key={t} onClick={() => setTool(t)} disabled={!hasCut} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
+            <button key={t} onClick={() => setTool(t)} disabled={!hasImage} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
           ))}
-          {!hasCut && <span style={{ color: '#94a3b8' }}>detect a shape to refine with the brush</span>}
+          {hasImage && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect, or brush Add over the object</span>}
         </>)}
         {tab === 'vector' && (<>
           {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}

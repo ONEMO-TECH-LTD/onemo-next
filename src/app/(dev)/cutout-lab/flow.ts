@@ -43,14 +43,10 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   })
 }
 
-export type EngineSel = 'u2net' | 'none'
-
 /** The adapters the flow needs injected (CreatorAdapters precedent — the flow never touches
  *  location/DOM chrome): initial engine from the URL, URL write-back, and a render request the
  *  shell binds to its canvas draw. */
 export interface LabAdapters {
-  initialSeg: EngineSel
-  onSegChange: (sel: EngineSel) => void
   /** shell's imperative canvas redraw — the flow calls it after every view-affecting mutation */
   requestRender: () => void
 }
@@ -73,7 +69,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const [ms, setMs] = useState<{ cut?: number; stroke?: number }>({})
-  const [engineSel, setEngineSel] = useState<EngineSel>(adapters.initialSeg)
   const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [shapeTick, setShapeTick] = useState(0)
@@ -93,7 +88,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
   const blendRef = useRef(blend); blendRef.current = blend
-  const engineSelRef = useRef(engineSel); engineSelRef.current = engineSel
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const wasOutgrownRef = useRef(false)
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
@@ -291,34 +285,31 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
     const k = Math.min(maxW / w, 440 / h, 1)
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
+    setHasCut(false)
     requestRender()
-    // MANUAL MODE ('No AI'): skip segmentation — the image is ready; paint/grabcut create the shape.
-    if (engineSelRef.current === 'none') {
-      setHasCut(false)
-      setStatus('🖼 image ready — no AI. Paint a shape, or refine with the brush after a detect')
-      return
-    }
+    setStatus('🖼 image ready — push 🤖 Detect to auto-cut, or brush the object')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestRender])
+
+  // AI DETECT — u2net auto-cut on demand (Dan 2026-08-07: runs on button push, not on upload;
+  // the weights are prefetched at page open by warmup, so the push is fast).
+  const detect = useCallback(async () => {
+    const img = imgCanvas.current, url = urlRef.current
+    if (!img || !url) return
     setBusy(true)
     try {
       setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
-      const r = await withTimeout(segmentV531(url, w, h), T_DOWNLOAD_MS, 'AI cut')
+      const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acceptMask, requestRender])
+  }, [acceptMask])
 
-  const redetect = useCallback(async () => { if (lastFileRef.current) await upload(lastFileRef.current) }, [upload])
-
-  const setEngine = useCallback((v: EngineSel) => {
-    setEngineSel(v); engineSelRef.current = v
-    adapters.onSegChange(v) // URL write = shell adapter duty, invoked through the injected adapter
-    setStatus(v === 'u2net' ? 'u2net engine (v5.3.1)' : '🖼 No AI — paint only, no model loads')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const redetect = detect // 'Re-detect' re-runs the AI cut on the current image
 
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
   const setTune = useCallback((patch: Partial<TraceOutlineSettings>) => {
@@ -355,28 +346,23 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (!img) return
     const brushPx = brushR * (img.width / dispWRef.current)
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
-    if (!maskRef.current || !hasCutRef.current) {
-      // no base to refine — GrabCut needs one; a stroke here PAINTS a shape from scratch (add only)
-      if (erase) { setStatus('✂️ nothing to refine yet — detect a shape or paint one first'); requestRender(); return }
-      drawnRef.current = null
-      setBusy(true); await acceptMask(polishMask(swathMask(pts, brushPx, img.width, img.height), brushPx), undefined, { shapeTruth: true }); setBusy(false)
-      setStatus('✏️ painted shape created — refine, keep painting, or tune')
-      return
-    }
+    // STANDALONE when there is no cut (recognise the painted shape on its own); REFINE when one
+    // exists (add/erase the u2net cut). Dan 2026-08-07: GrabCut is a separate brush that does both.
+    const base = maskRef.current && hasCutRef.current ? maskRef.current : null
+    if (erase && !base) { setStatus('✂️ nothing to erase yet — brush Add over the object to select it first'); requestRender(); return }
     setBusy(true)
-    setStatus(erase ? '✂️ refining the edge…' : '✨ finding the edge…')
+    setStatus(base ? (erase ? '✂️ refining the edge…' : '✨ finding the edge…') : '✨ recognising the shape…')
     try {
       const t0 = performance.now()
-      const base = maskRef.current
       const refined = await withTimeout(grabCutRefine(img, base, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
       perfGesture('grabcut', performance.now() - t0)
-      const before = maskArea(base), after = maskArea(refined)
-      // NEVER-DESTROY (meta R12-1): the corridor already bounds the snap, but guard the tail —
-      // an erase that would gut the shape reverts loudly instead of committing an empty selection.
+      const before = base ? maskArea(base) : 0, after = maskArea(refined)
+      if (after === 0) { setBusy(false); setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
+      // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
       if (erase && after <= before * 0.1) { setBusy(false); setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
-      if (before === after) { setBusy(false); setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
+      if (base && before === after) { setBusy(false); setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
       const ok = await acceptMask(refined, undefined, { erase })
-      if (ok) setStatus(erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge')
+      if (ok) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
   }), [acceptMask, requestRender, runTool])
@@ -524,15 +510,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   const canBrush = useCallback((tool: string): boolean => {
     if (tool === 'draw' || tool === 'draw-erase') return !!imgCanvas.current
-    // add/erase = the GrabCut refinement brush — needs the image + a base cut to refine
-    if (tool === 'add' || tool === 'erase') return !!imgCanvas.current && hasCutRef.current
+    // add/erase = the GrabCut brush — works with just an image (recognises standalone, or refines a cut)
+    if (tool === 'add' || tool === 'erase') return !!imgCanvas.current
     return false
   }, [])
 
-  // WARM-UP: prefetch u2net weights into the HTTP cache after the shell's ?seg write (downloads
-  // only — no runtime instantiated at open; GrabCut's OpenCV lazy-loads on the first brush stroke).
+  // WARM-UP: prefetch u2net weights into the HTTP cache (downloads only — no runtime at open;
+  // GrabCut's OpenCV lazy-loads on the first brush stroke).
   const warmup = useCallback(() => {
-    if (engineSelRef.current === 'none') return
     preloadBen()
     setStatus('ready — upload an image · ⬇ warming u2net in the background')
   }, [])
@@ -541,12 +526,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   return {
     state: {
-      status, busy, hasCut, hasImage, ms, engineSel, settings, blend, shapeTick, histTick, disp,
+      status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
       hasFile: !!lastFileRef.current,
     },
     actions: {
-      upload, redetect, setEngine, setTune, setBlendTune,
+      upload, detect, redetect, setTune, setBlendTune,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
       undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup,
