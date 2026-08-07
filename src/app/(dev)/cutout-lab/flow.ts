@@ -310,20 +310,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
-      // PRE-LOAD + PRE-ENCODE (Dan r3/r4): the brush SESSION initializes and the image pre-encodes
-      // in the background AFTER the cut lands (weights already in HTTP cache from warmup) — the
-      // first stroke pays inference only, and page open stays light (no session at open).
-      if (engineSelRef.current === 'edge' && !edgeEncodedRef.current) {
-        const img2 = imgCanvas.current!
-        const px2 = img2.getContext('2d')!.getImageData(0, 0, img2.width, img2.height)
-        const chain = brushLoadedRef.current
-          ? Promise.resolve()
-          : withTimeout(client.current!.load(MODELS.edgesam, 'auto'), T_DOWNLOAD_MS, 'brush load').then(() => { brushLoadedRef.current = true })
-        chain
-          .then(() => withTimeout(client.current!.encode(px2.data, img2.width, img2.height), T_COMPUTE_MS, 'AI pre-encode'))
-          .then(() => { edgeEncodedRef.current = true })
-          .catch(() => { /* first stroke re-attempts loudly */ })
-      }
+      // NO post-cut session-init/pre-encode (Dan device r5: stacking a SECOND EdgeSAM session +
+      // encode right after the cut killed the brush worker on iPhone — the 'SAM loads then dies on
+      // brushes' regression). Weights are HTTP-cache-warm from page open; the brush session +
+      // encode initialize on the FIRST STROKE — one heavy operation at a time, comet masking it.
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
   }, [acceptMask, requestRender])
