@@ -15,14 +15,15 @@ import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import { initWand, wandRegion } from '@/lib/cutout-wand'
+import { initWand, WAND_TOLERANCE, wandRegion } from '@/lib/cutout-wand'
 import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
-  deleteNode, editableShape, finishDrawn, finishSpec, insertNode, maskFromShape, measureNode,
-  nodeAdjust, nodeTapTol, polishMask, shapePathD, shapeRing, subtractMasks, swathMask, unionMasks,
+  finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
+import { maskFromShape, polishMask, subtractMasks, swathMask, unionMasks } from '@/lib/mask-tools'
+import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
 import { preloadBen } from '@/lib/effect/segment-ml'
@@ -81,6 +82,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
   const [disp, setDisp] = useState({ w: 480, h: 360 })
+  const [wandTol, setWandTol] = useState(WAND_TOLERANCE) // S2: the wand knob is BRIDGE state — the shell only renders it
 
   // ── flow-owned refs (policy + view) ──
   const imgCanvas = useRef<HTMLCanvasElement | null>(null)
@@ -622,6 +624,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   return {
     state: {
       status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp,
+      wandTol,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
       hasFile: !!lastFileRef.current,
     },
@@ -629,7 +632,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       upload, redetect, setEngine, setTune, setBlendTune,
       wandTap, paintStroke, aiStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, wandModeEnter,
+      undo, redo, clearAll, save, requestBake: scheduleBake, setDragging, setPreview, warmup, wandModeEnter, setWandTol,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

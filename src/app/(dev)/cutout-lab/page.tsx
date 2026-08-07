@@ -10,7 +10,6 @@ import type { Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode } from './EditorOverlay'
 import { drawCutout, maskOverlay, type FillChoice } from './finish'
-import { WAND_TOLERANCE } from '@/lib/cutout-wand'
 import { useCutoutLabFlow, type EngineSel } from './flow'
 import PerfHUD from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
@@ -50,7 +49,7 @@ export default function CutoutLab() {
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
   const flow = useCutoutLabFlow({ initialSeg, onSegChange, requestRender })
-  const { status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile } = flow.state
+  const { status, busy, hasCut, hasImage, edge, ms, engineSel, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, hasFile, wandTol } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -59,8 +58,6 @@ export default function CutoutLab() {
   const [vecChip, setVecChip] = useState<(typeof VEC_CHIPS)[number]>('detail')
   const [blendChip, setBlendChip] = useState<(typeof BLEND_CHIPS)[number]>('blend')
   const [aspectLocked, setAspectLocked] = useState(true)
-  const [wandTol, setWandTol] = useState(WAND_TOLERANCE) // live wand calibration (Dan 17:45)
-  const wandTolRef = useRef(WAND_TOLERANCE); wandTolRef.current = wandTol
   // single-node vector editing (Dan 17:57): select an anchor → its radius/curve knobs
   const [selNode, setSelNode] = useState<{ pi: number; ai: number } | null>(null)
   const [nodeChip, setNodeChip] = useState<'radius' | 'curve'>('radius')
@@ -70,7 +67,7 @@ export default function CutoutLab() {
   const [preview, setPreview] = useState(false)
   const previewRef = useRef(false); previewRef.current = preview
   const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
-  const overlayRef = useRef(true); overlayRef.current = overlayOn
+  const overlayRef = useRef(false); overlayRef.current = overlayOn
 
   const viewRef = useRef<HTMLCanvasElement>(null)
   const strokeRef = useRef<(Point & { t: number })[]>([])
@@ -82,9 +79,6 @@ export default function CutoutLab() {
   const brushRef = useRef(brushR); brushRef.current = brushR
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
 
-  const dispW2 = useRef(disp.w); dispW2.current = disp.w
-  const dispRefW = () => dispW2.current
-  void dispRefW
 
   // ── render (draw only) ── ONE canvas: working view, or the baked sticker when Preview is on
   const render = useCallback(() => {
@@ -256,7 +250,7 @@ export default function CutoutLab() {
     const stroke = strokeRef.current; strokeRef.current = []
     if (stroke.length < 1) { render(); return } // a TAP (single point) is a valid smart-fill prompt (Dan)
     const t = toolRef.current
-    if (t === 'wand' || t === 'wand-erase') { await flow.actions.wandTap(stroke[stroke.length - 1], wandTolRef.current, t === 'wand-erase', brushRef.current); return }
+    if (t === 'wand' || t === 'wand-erase') { await flow.actions.wandTap(stroke[stroke.length - 1], wandTol, t === 'wand-erase', brushRef.current); return }
     if (t === 'draw' || t === 'draw-erase') { await flow.actions.paintStroke(stroke, t === 'draw-erase', brushRef.current); return }
     await flow.actions.aiStroke(stroke, t === 'erase')
   }
@@ -313,7 +307,7 @@ export default function CutoutLab() {
       return { label: 'node curve', lo: cLo, hi: cHi, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
     }
     if (tool === 'wand' || tool === 'wand-erase')
-      return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: setWandTol } // live calibration (Dan 17:45; full 100)
+      return { label: 'wand tolerance', lo: 4, hi: 100, value: wandTol, set: flow.actions.setWandTol } // live calibration (Dan 17:45; full 100)
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
   })()
 
