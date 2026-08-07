@@ -23,9 +23,6 @@ function loadCv(): Promise<any> {
   return cvReady
 }
 
-/** Pre-warm the wand engine (optional — first tap otherwise pays the one-time wasm init). */
-export function warmWand(): void { void loadCv().catch(() => { cvReady = null }) }
-
 /** Contrast-grown region from a tapped point (image px coords). Pixel I/O is module-owned. */
 export async function wandRegion(image: HTMLCanvasElement, x: number, y: number, tolerance: number = WAND_TOLERANCE): Promise<WandMask> {
   const cv = await loadCv()

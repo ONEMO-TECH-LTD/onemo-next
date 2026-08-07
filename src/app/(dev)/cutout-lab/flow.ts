@@ -15,7 +15,7 @@ import { MODELS } from '@/lib/cutout-ai/registry'
 import type { Mask, Point } from '@/lib/cutout-ai/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import { warmWand, wandRegion } from '@/lib/cutout-wand'
+import { wandRegion } from '@/lib/cutout-wand'
 import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
@@ -106,11 +106,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const requestRender = adapters.requestRender
 
   // ── history (pure module, flow-driven) ──
-  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null }
+  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings }
   const histRef = useRef(new HistoryStack<Snap>(30))
   const snapNow = (): Snap => ({
     mask: maskRef.current ? { data: maskRef.current.data.slice(), w: maskRef.current.w, h: maskRef.current.h, soft: maskRef.current.soft?.slice() } : null,
     drawn: drawnRef.current,
+    settings: { ...settingsRef.current }, blendS: { ...blendRef.current }, // meta B3: knobs travel with the state
   })
   const pushHistory = () => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }
 
@@ -308,22 +309,41 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       return
     }
     setBusy(true)
-    // ONE pipeline for every engine: the v5.3.1 worker chain, model picked by its own `?seg=`
-    // roster parameter (EdgeSAM or the u2netp trio). The cutout-ai worker is brush-only, lazy.
+    // ONE EDGESAM SESSION TOTAL (Dan critical; B1 law: 'EdgeSAM loads once and serves auto +
+    // brush'): in edge mode the auto-cut runs through the BRUSH worker's single session — the
+    // central-prompt redetect that always existed — and the ENGINE worker never loads EdgeSAM.
+    // The dual-session OOM ('loads, then brush kills it / no backend') is impossible by
+    // construction. The ?seg roster remains the law for auto-only models (u2net path below).
+    // Any edge failure faults LOUDLY and falls back to a u2net cut automatically.
     try {
-      setStatus(`✨ AI magic (${engineSelRef.current === 'edge' ? 'EdgeSAM' : 'u2net'} · v5.3.1)…`)
+      if (engineSelRef.current === 'edge') {
+        try {
+          setStatus('✨ AI magic (EdgeSAM · one session)…')
+          const t0 = performance.now()
+          await ensureEdge()
+          setStatus('✨ recognising…')
+          const r = await withTimeout(client.current!.redetect(), T_COMPUTE_MS, 'EdgeSAM detect')
+          perfGesture('segment-edge', performance.now() - t0)
+          setMs({ cut: Math.round(performance.now() - t0) })
+          await acceptMask(r.mask)
+          setBusy(false)
+          return
+        } catch (e) {
+          edgeFault('EdgeSAM failed (' + String((e as Error).message) + ')')
+          engineSelRef.current = 'u2net'; setEngineSel('u2net')
+          adapters.onSegChange('u2net') // URL follows, through the shell adapter — loud degradation
+        }
+      }
+      setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
       const r = await withTimeout(segmentV531(url, w, h), T_DOWNLOAD_MS, 'AI cut')
       perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       await acceptMask(r.mask, r.preseg)
-      // NO post-cut session-init/pre-encode (Dan device r5: stacking a SECOND EdgeSAM session +
-      // encode right after the cut killed the brush worker on iPhone — the 'SAM loads then dies on
-      // brushes' regression). Weights are HTTP-cache-warm from page open; the brush session +
-      // encode initialize on the FIRST STROKE — one heavy operation at a time, comet masking it.
     } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
     setBusy(false)
-  }, [acceptMask, requestRender])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acceptMask, requestRender, ensureEdge, edgeFault])
 
   const redetect = useCallback(async () => { if (lastFileRef.current) await upload(lastFileRef.current) }, [upload])
 
@@ -381,7 +401,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (!erase) {
       const base = maskRef.current, w = base.w
       disconnected = true
-      outer: for (let i = 0; i < region.data.length; i += 5) { // stride-sampled — worst case stays under the 50ms tool budget
+      outer: for (let i = 0; i < region.data.length; i += 2) { // stride 2 (meta B4: 5 missed thin connectors → false warnings); early-exit keeps it under budget
         if (!region.data[i]) continue
         const x = i % w, y = (i / w) | 0
         for (let dy = -2; dy <= 2 && disconnected; dy++) for (let dx = -2; dx <= 2; dx++) {
@@ -430,7 +450,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const r = await withTimeout(erase ? client.current!.eraseStroke(stroke) : client.current!.addStroke(stroke), T_COMPUTE_MS, 'AI stroke')
       setMs((m) => ({ ...m, stroke: Math.round(performance.now() - t0) }))
       await acceptMask(r.mask)
-    } catch (e) { edgeFault('brush froze (' + String((e as Error).message) + ')') }
+    } catch (e) {
+      // meta audit B1: a recoverable timeout must NOT kill the brush permanently — warn and stay
+      // ready for a retry; only real worker deaths flip edge-dead.
+      if (String((e as Error).message).includes('timed out')) setStatus('⚠️ ' + String((e as Error).message) + ' — try the stroke again')
+      else edgeFault('brush froze (' + String((e as Error).message) + ')')
+    }
     setBusy(false)
   }), [acceptMask, edgeFault, ensureEdge, runTool])
 
@@ -505,6 +530,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const restore = useCallback(async (s: Snap) => {
     maskRef.current = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
     drawnRef.current = s.drawn
+    settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
+    blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
     setHasCut(!!(s.mask || s.drawn))
     if (s.mask && !s.drawn && imgCanvas.current && urlRef.current) {
       try { preparedRef.current = await withTimeout(prepareAI(urlRef.current, maskRef.current!), T_COMPUTE_MS, 'restore prepare') } catch { /* keep last prepared */ }
@@ -568,17 +595,18 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // still downloaded at first cut. The engine preload + the brush model both warm here; the first
   // stroke later pays inference only.
   const warmup = useCallback(() => {
-    if (engineSelRef.current !== 'none') preloadBen() // manual mode loads NO model, ever
-    // DOWNLOAD-ONLY brush warm (Dan device r4: initializing the ORT session at page open spikes
-    // memory and iOS kills the tab — page loads then crashes). Weights land in the HTTP cache
-    // here; the SESSION initializes in the background after the first cut (below), so the first
-    // stroke still pays inference only.
-    warmWand()
+    // DOWNLOAD-ONLY at page open, NOTHING instantiates (r4 crash law + meta audit A2): no ORT
+    // session, no OpenCV runtime — sessions/runtimes initialize on first USE, queued visibly.
+    // Edge mode: brush weights into the HTTP cache (the engine worker never runs EdgeSAM — the
+    // one-session law — so preloadBen would session-create the wrong thing at open: meta finding).
+    // u2net mode: the engine's own preload. Manual mode: nothing, ever.
     if (engineSelRef.current === 'edge') {
       fetch(MODELS.edgesam.enc!).catch(() => {})
       fetch(MODELS.edgesam.dec!).catch(() => {})
+    } else if (engineSelRef.current === 'u2net') {
+      preloadBen()
     }
-    setStatus('ready — upload an image · ⬇ warming the AI models in the background')
+    if (engineSelRef.current !== 'none') setStatus('ready — upload an image · ⬇ warming the AI model in the background')
   }, [])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
