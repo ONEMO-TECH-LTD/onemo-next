@@ -92,15 +92,13 @@ function CutoutLabInner() {
 
   // fill (tile/clamp): shell-held mirror of the engine's wrapTile — the composer reads wrapTile
   // non-reactively, so the shell mirror drives the recompose; commitTool keeps engine state truthful.
-  const [fillTile, setFillTile] = useState(false)
-  const setFill = useCallback((v: boolean) => { setFillTile(v); commitTool('fill', v) }, [commitTool])
   const blendVal = (toolById.get('blend')?.value as number) ?? 0
 
   // ── FLOW BINDINGS (the flow layer, ./flow-bindings): paint + engine compose ──
   const paint = usePaintBinding({ artworkUrl, spec, display, traced, imgW, imgH, notify })
   const { baseMask, paintPrepared, paintCfg } = paint.state
   const effectivePrepared = paintPrepared ?? prepared
-  const compose = useComposeBinding({ traced, display, prepared: effectivePrepared, blendVal, fillTile, imgW, imgH, bounds })
+  const compose = useComposeBinding({ traced, display, prepared: effectivePrepared, blendVal, imgW, imgH, bounds })
   const composed = compose.composed
   // control-surface behaviors: AUTO_KNOBS once per upload's first cut · value-true auto-blend on outgrowth
   useControlBehaviors({
@@ -348,12 +346,11 @@ function CutoutLabInner() {
           const t = toolById.get(k)
           return <button key={k} onClick={() => { setVecChip(k); setDragVal(null); clearMsg() }} disabled={!t} style={chipBtn(vecChip === k, !t)}>{k}</button>
         })}
-        {tab === 'blend' && (<>
+        {tab === 'blend' && (
+          // Clamp is the DEFAULT and the only fill (Dan 2026-08-08: "clamp is default … no mirror").
+          // Mirror = tile flipped; neither is wanted — the out-of-frame band always clamp-extends.
           <button style={chipBtn(true)}>blend</button>
-          {/* tile/clamp — the engine compose's fillMode (visible when blend>0 or the offset outgrows the frame) */}
-          <button onClick={() => setFill(true)} style={chipBtn(fillTile)}>tile</button>
-          <button onClick={() => setFill(false)} style={chipBtn(!fillTile)}>clamp</button>
-        </>)}
+        )}
         {tab === 'edit' && (<>
           <button onClick={() => { exitEdit(); setTool('draw'); clearMsg() }} disabled={!hasArtwork} style={chipBtn(tool === 'draw', !hasArtwork)}>🖌 Paint shape</button>
           <button onClick={() => { exitEdit(); setTool('draw-erase'); clearMsg() }} disabled={!hasArtwork} style={chipBtn(tool === 'draw-erase', !hasArtwork)}>🩹 Paint erase</button>

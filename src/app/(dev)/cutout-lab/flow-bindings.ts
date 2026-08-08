@@ -187,7 +187,6 @@ export function useComposeBinding(args: {
   display: VShape | null
   prepared: PreparedEffect | null
   blendVal: number
-  fillTile: boolean
   imgW: number
   imgH: number
   bounds: Bounds | null
@@ -197,7 +196,7 @@ export function useComposeBinding(args: {
   useEffect(() => { inputs.current = args })
   const [sched] = useState(() =>
     new ComposeScheduler(async (cancelled) => {
-      const { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds } = inputs.current
+      const { traced, display, prepared, blendVal, imgW, imgH, bounds } = inputs.current
       if (!traced || !display || !prepared || !bounds) { setComposed(null); return }
       const matteless = prepared.spec.generator.adapter === 'alpha' || prepared.spec.generator.adapter === 'bg-flood'
       const blend = matteless ? 0 : blendVal
@@ -223,7 +222,7 @@ export function useComposeBinding(args: {
           ? { minX: bUp.minX - pad, minY: bUp.minY - pad, maxX: bUp.maxX + pad, maxY: bUp.maxY + pad }
           : bUp,
         blendPercent: blend,
-        fillMode: fillTile ? 'tile' : 'clamp',
+        fillMode: 'clamp', // Dan 2026-08-08: clamp is the default and only fill — no tile, no mirror
       })
       if (cancelled()) return
       // crop the pad back off — the frame the shell places must be the outline's own bounds again
@@ -240,8 +239,8 @@ export function useComposeBinding(args: {
         h: out.canvas.height / k,
       })
     }))
-  const { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds } = args
-  useEffect(() => { sched.schedule() }, [sched, traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds])
+  const { traced, display, prepared, blendVal, imgW, imgH, bounds } = args
+  useEffect(() => { sched.schedule() }, [sched, traced, display, prepared, blendVal, imgW, imgH, bounds])
   useEffect(() => () => sched.cancel(), [sched])
   const setDragging = useCallback((on: boolean) => sched.setDragging(on), [sched])
   return { composed, setDragging }
