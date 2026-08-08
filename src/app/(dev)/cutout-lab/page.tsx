@@ -446,7 +446,19 @@ function CutoutLabInner() {
           {hasArtwork && (
             <div style={{ position: 'relative', width: 'min(480px, 86vw)', margin: '0 auto' }}>
               {generating && (
-                <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }}>Computing…</div>
+                // First-cut loader (Dan 2026-08-07 option 3): the wait must read as active loading,
+                // not a frozen page. The dim + Computing copy existed; the SPINNER adds the motion.
+                // Self-contained SVG (animateTransform) — no asset, no dependency; the thinking-orbs
+                // orb v1 used is not in this tree and is deliberately not imported.
+                <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(248,250,252,0.55)', backdropFilter: 'blur(2px)', borderRadius: 8, pointerEvents: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }}>
+                  <svg width={26} height={26} viewBox="0 0 26 26" aria-hidden>
+                    <circle cx={13} cy={13} r={10} fill="none" stroke="#cbd5e1" strokeWidth={3} />
+                    <path d="M13 3 a10 10 0 0 1 10 10" fill="none" stroke="#7c3aed" strokeWidth={3} strokeLinecap="round">
+                      <animateTransform attributeName="transform" type="rotate" from="0 13 13" to="360 13 13" dur="0.8s" repeatCount="indefinite" />
+                    </path>
+                  </svg>
+                  Computing…
+                </div>
               )}
               {/* FIXED viewport (v1 law): the BOX never grows or reflows — it locks to the image aspect;
                   a growing view-box contain-fits inside it. */}
