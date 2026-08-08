@@ -649,12 +649,18 @@ describe('Creator magnetic-grid module boundary', () => {
     expect(rendererSource).not.toContain('dmnx')
   })
 
-  it('uses the v5.3.1 shaped-engine outline padding and fidelity defaults', () => {
+  it('uses the v5.3.1 shaped-engine fidelity default and NO baked outline padding', () => {
     const primitivesSource = readFileSync(PRIMITIVES_PATH, 'utf8')
 
+    // VALUE-TRUTH (Dan 2026-08-07): "1.5 mm margin must be 0 offset and all controls must be true
+    // representation of the outline." The engine's default paddingMM silently outset every trace by a
+    // margin the Offset knob never reported, so knob 0 did not mean zero margin. The override rides
+    // prepareEffect's OWN cfg seam (a parameter, not logic) — no engine file is edited. This guard is
+    // two-directional: it fails if the override is dropped (the hidden margin returns) AND if the
+    // fidelity default drifts.
     expect(primitivesSource).toContain('minFeatureMM: detailToFloorMm(100)')
-    expect(primitivesSource).not.toContain('paddingMM: 0')
-    expect(primitivesSource).toContain('{ ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100) }')
+    expect(primitivesSource).toContain('paddingMM: 0')
+    expect(primitivesSource).toContain('{ ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }')
   })
 
   it('retains generic lane cancellation after removing profile switching', () => {

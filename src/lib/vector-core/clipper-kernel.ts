@@ -40,15 +40,31 @@ export function straightenPath(path: VPath, epsPx: number): VPath {
   return { anchors: out.map((p) => ({ p: { x: p.x, y: p.y }, hIn: null, hOut: null, corner: true })) }
 }
 
+/** A radius result is rejected when it keeps less than this fraction of the source area — above the
+ *  legal square→circle loss (π/4 ≈ 0.785 … measured on the flattened ring it lands a little lower),
+ *  below the collapse that swallows spikes. */
+const RADIUS_MIN_AREA_KEEP = 0.75
+const RADIUS_BACKOFF = 0.72 // retry step when a radius would eat the shape's features
+const RADIUS_BACKOFF_TRIES = 8
+
 /**
- * WHOLE-SHAPE RADIUS — round every convex corner uniformly via Clipper2 morphological OPENING (erode −r
- * then dilate +r, ROUND joins), the standard CAD whole-shape round (blueprint v5.2 §4 / DEC-v5-03,04).
- * Symmetric BY CONSTRUCTION (no per-corner orchestration, no seam): a square at r = ½ short-side → a
- * circle. This replaces the per-corner Paper plugin for the WHOLE-SHAPE (no-selection) Radius case — the
- * Paper plugin (single-segment) stays for the per-corner case. `radiusPx` is clamped to just under ½ the
- * ring's short side so the erosion never fully collapses (which would lose the shape, not round it).
- * OFF (radiusPx<=0) returns the source. Runs on the FLATTENED outline (handles curved input too) and
- * returns a dense smooth point-ring (corner:false); the resolver fold-guards the result.
+ * WHOLE-SHAPE RADIUS — round every corner uniformly via Clipper2 morphology, the standard CAD
+ * whole-shape round (blueprint v5.2 §4 / DEC-v5-03,04). Symmetric BY CONSTRUCTION (no per-corner
+ * orchestration, no seam): a square at r = ½ short-side → a circle. This replaces the per-corner Paper
+ * plugin for the WHOLE-SHAPE (no-selection) Radius case — the Paper plugin (single-segment) stays for
+ * the per-corner case. `radiusPx` is clamped to just under ½ the ring's short side so the erosion never
+ * fully collapses (which would lose the shape, not round it). OFF (radiusPx<=0) returns the source.
+ * Runs on the FLATTENED outline (handles curved input too) and returns a dense smooth point-ring
+ * (corner:false); the resolver fold-guards the result.
+ *
+ * BOTH POLARITIES (Dan 2026-08-06, "why radius does not attack every corner"): an OPENING alone
+ * (erode → dilate) rounds only CONVEX corners — concave notches pass through sharp. The mirror CLOSING
+ * (dilate → erode) rounds the concave ones, so together every corner rounds uniformly.
+ *
+ * FEATURE-PRESERVATION BACK-OFF (Dan 2026-08-06, "above 70 it goes into smaller shape"): erosion at a
+ * large r swallows whole features — a spike thinner than 2r has no core left, and the grow-back cannot
+ * resurrect it, so the shape collapses toward its body. Rather than emit that, retreat r and retry: the
+ * knob SATURATES at the largest radius that keeps the shape's features instead of eating them.
  */
 export function roundWholeShapePx(path: VPath, radiusPx: number): VPath {
   if (radiusPx <= 0 || path.anchors.length < 3) return path
@@ -57,17 +73,30 @@ export function roundWholeShapePx(path: VPath, radiusPx: number): VPath {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const p of ring) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y }
   const shortSide = Math.min(maxX - minX, maxY - minY)
-  const r = Math.min(radiusPx, 0.499 * shortSide) // < ½ short side → erosion leaves a (tiny) core to round
-  if (r <= 0) return path
+  const rMax = Math.min(radiusPx, 0.499 * shortSide) // < ½ short side → erosion leaves a (tiny) core to round
+  if (rMax <= 0) return path
   const flat: number[] = []
   for (const p of ring) flat.push(Math.round(p.x * ROUND_SCALE), Math.round(p.y * ROUND_SCALE))
   const subj = [Clipper.makePath(flat)]
-  const eroded = Clipper.inflatePaths(subj, -r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
-  if (!eroded || eroded.length === 0) return path // over-eroded at this r — no round possible
-  const dilated = Clipper.inflatePaths(eroded, r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
-  if (!dilated || dilated.length === 0) return path
-  let best = dilated[0]
-  for (const rg of dilated) if (Math.abs(Clipper.area(rg)) > Math.abs(Clipper.area(best))) best = rg
-  if (!best || best.length < 3) return path
+  const srcArea = Math.abs(Clipper.area(subj[0]))
+  type Paths = ReturnType<typeof Clipper.inflatePaths>
+  const inflate = (paths: Paths | null, delta: number): Paths | null =>
+    paths && paths.length ? Clipper.inflatePaths(paths, delta * ROUND_SCALE, JoinType.Round, EndType.Polygon) : null
+  const attempt = (r: number): Paths[number] | null => {
+    const opened = inflate(inflate(subj, -r), r)   // OPENING — rounds convex corners
+    const closed = inflate(inflate(opened, r), -r) // CLOSING — rounds concave notches
+    if (!closed || closed.length === 0) return null
+    let bestRg = closed[0]
+    for (const rg of closed) if (Math.abs(Clipper.area(rg)) > Math.abs(Clipper.area(bestRg))) bestRg = rg
+    if (!bestRg || bestRg.length < 3) return null
+    if (Math.abs(Clipper.area(bestRg)) < srcArea * RADIUS_MIN_AREA_KEEP) return null // features eaten
+    return bestRg
+  }
+  let best: ReturnType<typeof attempt> = null
+  for (let r = rMax, n = 0; r > rMax * 0.1 && n < RADIUS_BACKOFF_TRIES; r *= RADIUS_BACKOFF, n++) {
+    best = attempt(r)
+    if (best) break
+  }
+  if (!best) return path
   return { anchors: best.map((p) => ({ p: { x: p.x / ROUND_SCALE, y: p.y / ROUND_SCALE }, hIn: null, hOut: null, corner: false })) }
 }

@@ -84,13 +84,18 @@ export const smoothFactor = (pct: number) => Math.max(0, Math.min(1, pct / 100))
 /** Simplify: Paper SIMPLIFY tolerance = pct × MAX_FRAC × shape short side (px). 0% = OFF; higher =
  *  fewer anchors + rounder curve-fit. Applied directly to the anchors; never a dense chain. */
 export const simplifyTolPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(100, pct)) / 100) * SIMPLIFY_MAX_FRAC * scalePx
-/** Whole-outline Radius slider geometry: 100% = half the resolved shape's short side. */
+/** The GEOMETRIC ceiling for whole-outline Radius: half the resolved shape's short side — the radius at
+ *  which a square becomes a circle. The SLIDER deliberately does not reach it (see `outlineRadiusPx`). */
 export function outlineRadiusMaxPx(shape: VShape): number {
   const bb = shapeBBox(shape, 1)
   return Math.max(1, Math.round(Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2))
 }
+/** Whole-outline Radius slider geometry. 100% = HALF the geometric ceiling (a quarter of the short
+ *  side): at full scale the rounding overshot what the shape could carry and read as deformation
+ *  rather than a fillet (Dan 2026-08-06). The kernel still reaches a true circle when handed the full
+ *  ceiling — that path stays available to callers, it is just not where the slider tops out. */
 export const outlineRadiusPx = (pct: number, shape: VShape) =>
-  (Math.max(0, Math.min(100, pct)) / 100) * outlineRadiusMaxPx(shape)
+  (Math.max(0, Math.min(100, pct)) / 100) * outlineRadiusMaxPx(shape) * 0.5
 /** Whole-outline Curve slider geometry: 0..100% maps to the engine's 0..2 bend factor. */
 export const outlineCurveFactor = (pct: number) =>
   (Math.max(0, Math.min(100, pct)) / 100) * 2

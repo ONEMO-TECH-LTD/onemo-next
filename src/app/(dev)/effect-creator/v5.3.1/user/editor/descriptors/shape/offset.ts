@@ -23,7 +23,9 @@ export const offsetDescriptor: ToolDescriptor<OffsetValue> = {
   control: {
     kind: 'slider-enum',
     min: 0,
-    max: 100,
+    // 15% of the longest side (Dan 2026-08-06) - the outline grows both sides, so ~1.3x total size at
+    // max. Past that the subject reads too small in the fixed viewport and the invented band dominates.
+    max: 15,
     format: (v) => `${Math.round(v)}%`,
     options: [{ id: 'round', label: 'Round' }, { id: 'sharp', label: 'Sharp' }, { id: 'bevel', label: 'Bevel' }],
   },
