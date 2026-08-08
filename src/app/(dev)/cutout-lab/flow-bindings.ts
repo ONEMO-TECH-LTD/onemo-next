@@ -171,6 +171,17 @@ export function usePaintBinding(args: {
 // ── COMPOSE binding: the pool's laws + scheduler over the ENGINE's own compose op ────────────────
 export interface ComposedFrame { url: string; x: number; y: number; w: number; h: number }
 
+/** Trim `pad` px off every side of a composed frame, returning the crop and its origin shift. The
+ *  frame is 1:1 with texture px, so the shift is `pad` in the same units the engine reports. */
+function cropPad(src: HTMLCanvasElement, pad: number): { canvas: HTMLCanvasElement; dx: number; dy: number } {
+  const w = src.width - pad * 2, h = src.height - pad * 2
+  if (w <= 0 || h <= 0) return { canvas: src, dx: 0, dy: 0 } // pad swallowed the frame — keep it whole
+  const out = document.createElement('canvas')
+  out.width = w; out.height = h
+  out.getContext('2d')!.drawImage(src, pad, pad, w, h, 0, 0, w, h)
+  return { canvas: out, dx: pad, dy: pad }
+}
+
 export function useComposeBinding(args: {
   traced: boolean
   display: VShape | null
@@ -196,24 +207,37 @@ export function useComposeBinding(args: {
       const k = origCanvas.width / imgW
       const texH = origCanvas.height
       const bUp = { minX: bounds.minX * k, minY: texH - bounds.maxY * k, maxX: bounds.maxX * k, maxY: texH - bounds.minY * k }
-      const { composeEffectArtwork } = await import('@/lib/effect/composite')
+      const { composeEffectArtwork, blendPercentToPixels } = await import('@/lib/effect/composite')
+      // BLUR-FALLOFF PAD (print-solid law). The engine frames EXACTLY the bounds it is handed
+      // (`resolveArtworkFrame`), and its background blur is an SVG feGaussianBlur — which fades to
+      // TRANSPARENT at its own canvas edge. With the frame ending at the outline's bbox, that ~3σ
+      // falloff reaches INSIDE the cut line: measured 25.8% of the composed frame semi-transparent at
+      // blend 60 (worst alpha 72) on the bench. A sticker must be print-solid, so pad the requested
+      // frame by the falloff and crop it back off — the fade then lands in discarded margin.
+      const pad = blend > 0 ? Math.ceil(3 * blendPercentToPixels(blend, origCanvas.width)) + 2 : 0
       if (cancelled()) return
       const { canvas, frame } = await composeEffectArtwork({
         originalCanvas: origCanvas,
         subjectCanvas: subjCanvas,
-        outputBoundsPx: bUp,
+        outputBoundsPx: pad
+          ? { minX: bUp.minX - pad, minY: bUp.minY - pad, maxX: bUp.maxX + pad, maxY: bUp.maxY + pad }
+          : bUp,
         blendPercent: blend,
         fillMode: fillTile ? 'tile' : 'clamp',
       })
       if (cancelled()) return
+      // crop the pad back off — the frame the shell places must be the outline's own bounds again
+      const out = pad ? cropPad(canvas, pad) : { canvas, dx: 0, dy: 0 }
+      const originX = frame.originX + out.dx
+      const originY = frame.originY + out.dy
       // F2 note: toDataURL churns big base64 on phones — object URLs / direct canvas refs are the
       // upgrade when the render path can consume them.
       setComposed({
-        url: canvas.toDataURL(),
-        x: frame.originX / k,
-        y: (texH - (frame.originY + frame.height)) / k, // y-up frame → y-down mask space
-        w: frame.width / k,
-        h: frame.height / k,
+        url: out.canvas.toDataURL(),
+        x: originX / k,
+        y: (texH - (originY + out.canvas.height)) / k, // y-up frame → y-down mask space
+        w: out.canvas.width / k,
+        h: out.canvas.height / k,
       })
     }))
   const { traced, display, prepared, blendVal, fillTile, imgW, imgH, bounds } = args
