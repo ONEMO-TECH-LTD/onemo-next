@@ -11,7 +11,6 @@ import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
 import { drawCutout, maskOverlay, type FillChoice } from './finish'
 import { useCutoutLabFlow } from './flow'
-import PerfHUD from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
 
@@ -298,7 +297,6 @@ export default function CutoutLab() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
-      <PerfHUD />
       <h1 style={{ fontSize: 19, fontWeight: 700, textAlign: 'center' }} data-hist={histTick}>Cutout Lab</h1>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>

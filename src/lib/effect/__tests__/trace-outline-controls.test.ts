@@ -4,7 +4,8 @@ import {
   resolveTraceOutline,
   type TraceOutlineInput,
   type TraceOutlineSettings,
-} from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
+} from '../trace-outline-controls'
+import { resolveTraceOutline as legacyResolveTraceOutline } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
 import type { VShape } from '@/lib/vector-core'
 
 const vectorShape: VShape = {
@@ -61,6 +62,10 @@ function bounds(shape: VShape) {
 }
 
 describe('grid-lab v5.3.1 outline-control binding', () => {
+  it('keeps the v5.3.1 producer import as an identity re-export', () => {
+    expect(legacyResolveTraceOutline).toBe(resolveTraceOutline)
+  })
+
   it('preserves the born vector exactly while every control is at its reflected default', () => {
     const resolved = resolveTraceOutline(input, OFF)
 

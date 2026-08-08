@@ -6,7 +6,7 @@
 // against v5.3.1's DesignState/sceneStore). The flow OWNS ALL POLICY the shell used to carry
 // inline: compose cadence (Cadence Law: compositor NEVER called mid-drag; single-flight latched
 // bake with real cancellation), auto-blend-on-outgrowth (value-true), history semantics, the u2net
-// cut + GrabCut/paint tool orchestration, perfGesture marks. The shell only renders + captures
+// cut + GrabCut/paint tool orchestration. The shell only renders + captures
 // gestures + calls these actions.
 
 import { useCallback, useRef, useState } from 'react'
@@ -14,7 +14,6 @@ import type { Mask, Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { grabCutRefine } from '@/lib/cutout-grabcut'
-import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
   finishDrawn, finishSpec,
@@ -90,7 +89,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const drawnRef = useRef<{ shape: VShape; ring: { x: number; y: number }[] } | null>(null)
   const preparedRef = useRef<PreparedEffect | null>(null)
   const urlRef = useRef<string | null>(null)
-  const lastFileRef = useRef<File | null>(null)
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
   const blendRef = useRef(blend); blendRef.current = blend
@@ -152,14 +150,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const gen = ++bakeGen.current
     const mode = bakeModeRef.current
     const [d, bounds] = [dRef.current, boundsRef.current]
-    const t0 = performance.now()
     try {
       const src = mode === 'full' ? preparedRef.current : displayPrepared(preparedRef.current)
       const r = await bakeStickerEngine(
         src, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height,
         blendRef.current, () => gen !== bakeGen.current,
       )
-      perfGesture(mode === 'full' ? 'bake-full' : 'bake', performance.now() - t0)
       if (gen === bakeGen.current) {
         liveBakeRef.current = { canvas: r.canvas, bounds }
         requestRender()
@@ -191,11 +187,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const img = imgCanvas.current
     const drawn = drawnRef.current
     const eff = settingsRef.current
-    const t0 = performance.now()
     const fin: FinishResult | null = drawn && img
       ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, eff)
       : preparedRef.current ? finishSpec(preparedRef.current, eff, img?.width) : null
-    perfGesture('resolve-tick', performance.now() - t0)
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
@@ -227,12 +221,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
         // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
         const loud = (st: string) => { if (st === 'fallback') setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)') }
-        const t0 = performance.now()
         // E3 (meta-verified): VALIDATE BEFORE COMMIT — prepare runs first; maskRef/drawnRef mutate
         // only on success. A failed prepare (e.g. an erase that emptied the mask → 'No silhouette
         // found') leaves the last good selection + outline fully live.
         preparedRef.current = await withTimeout(preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud), T_COMPUTE_MS, 'engine prepare')
-        perfGesture('prepare', performance.now() - t0)
       } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept'); return false }
     }
     drawnRef.current = null
@@ -271,7 +263,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
-    lastFileRef.current = file
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
     setHasCut(false); setMs({})
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
@@ -291,7 +282,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
     requestRender()
     setStatus('🖼 image ready — push 🤖 Detect to auto-cut, or brush the object')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestRender])
 
   // AI DETECT — u2net auto-cut on demand (Dan 2026-08-07: runs on button push, not on upload;
@@ -307,7 +297,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
       const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
-      perfGesture('segment', performance.now() - t0)
       setMs({ cut: Math.round(performance.now() - t0) })
       crashStage('4·prepare+bake')                 // lab-layer engine prepare + compose (subject/texture/mosaics)
       // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
@@ -318,7 +307,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       setStatus('⚠️ u2net failed: ' + String((e as Error)?.message ?? '?') + ' — reload the page and Detect again, or brush the object')
     }
     setBusy(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptMask])
 
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
@@ -363,9 +351,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setBusy(true)
     setStatus(base ? (erase ? '✂️ refining the edge…' : '✨ finding the edge…') : '✨ recognising the shape…')
     try {
-      const t0 = performance.now()
       const refined = await withTimeout(grabCutRefine(img, base, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
-      perfGesture('grabcut', performance.now() - t0)
       const before = base ? maskArea(base) : 0, after = maskArea(refined)
       if (after === 0) { setBusy(false); setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
@@ -382,9 +368,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
     const brushPx = brushR * (img.width / dispWRef.current)
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
-    const ts0 = performance.now()
     const painted = swathMask(pts, brushPx, img.width, img.height, paintCfgRef.current)
-    perfGesture('swath', performance.now() - ts0)
     if (!maskRef.current || !hasCutRef.current) {
       if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Detect'); requestRender(); return }
       drawnRef.current = null
@@ -393,9 +377,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       return
     }
     drawnRef.current = null
-    const tp1 = performance.now()
     const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx, paintCfgRef.current.polishDiv)
-    perfGesture('paint-polish', performance.now() - tp1)
     setBusy(true)
     const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true })
     setBusy(false)
@@ -435,9 +417,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const zero = { ...ZERO_SETTINGS }
       settingsRef.current = zero; setSettings(zero)
     }
-    const tm0 = performance.now()
     maskRef.current = maskFromShape(next, img.width, img.height)
-    perfGesture('mask-from-shape', performance.now() - tm0)
     // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
     // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins.
     if (urlRef.current) {

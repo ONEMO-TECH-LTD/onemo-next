@@ -3,7 +3,7 @@
 // cutout-ai sub (ARCHITECTURE.md: u2net is v5.3.1's; the UI reaches it through v5.3.1's own path).
 // Auto-only (no prompt → no brush); the lab uses it to separate model failures from infrastructure.
 
-import { runCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
+import { runCutout } from '@/lib/effect/cutout'
 import type { MLResult } from '@/lib/effect/segment-ml'
 import type { Mask } from '@/lib/mask-tools/types'
 

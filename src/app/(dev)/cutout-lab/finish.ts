@@ -2,7 +2,6 @@
 // ARCHITECTURE.md law 1): AI mask → v5.3.1 mask hygiene → trace → outline-resolve → SVG path.
 // Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
 
-import { perfGesture } from '@/app/(dev)/effect-creator/v5.3.1/dev/PerfHUD'
 import type { Mask } from '@/lib/mask-tools/types'
 import { effectiveTextureDim } from '@/lib/effect/mask'
 import { matteToMLResult } from '@/lib/effect/segment-ml'
@@ -13,7 +12,7 @@ import {
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
   type TraceOutlineSettings,
-} from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
+} from '@/lib/effect/trace-outline-controls'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
@@ -194,19 +193,15 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   if (cache.aw !== w || cache.ah !== h) { cache.alpha.width = w; cache.alpha.height = h; cache.av = new ImageData(w, h); cache.aw = w; cache.ah = h }
   const a = cache.alpha, av = cache.av
   const soft = mask.soft
-  const tA = performance.now()
   for (let i = 0; i < w * h; i++) av.data[i * 4 + 3] = soft ? soft[i] : (mask.data[i] ? 255 : 0)
   a.getContext('2d')!.putImageData(av, 0, 0)
   mctx.globalCompositeOperation = 'destination-in'
   mctx.drawImage(a, 0, 0, ow, oh)
   mctx.globalCompositeOperation = 'source-over'
-  perfGesture('preseg-matte', performance.now() - tA)
   // ONE LAW for every source (Dan 2026-08-06 final): brushes define the OUTLINE only — the subject
   // is ALWAYS the outline's own matte, and the blend band is the OFFSET ring. No tool ever defines
   // a blend area; blur never depends on which tool drew the shape.
-  const tB = performance.now()
   const r = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, 'brushed') // brush/paint masks are binary (soft matte died with EdgeSAM)
-  perfGesture('preseg-mlresult', performance.now() - tB)
   return r
 }
 
