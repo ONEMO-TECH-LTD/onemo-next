@@ -17,7 +17,7 @@ import { useEditor } from '../effect-creator/v5.3.1/user/editor/useEditor'
 import { shapeToSVGPathD, type VShape } from '@/lib/vector-core'
 import { viewBoxFor } from '@/lib/bridge-compose-policy'
 import { VEC_CHIPS, CHIP_RANGE, type Tab, type Tool, detailKnobToEngine, detailEngineToKnob } from '@/lib/bridge-control-surface'
-import { maskOverlay, drawCutout } from '@/lib/shell-render'
+import { maskOverlay, drawCutout, saveStickerPng } from '@/lib/shell-render'
 // NODES/FRAME increment — pool modules: math (tool-node-math), budgeted skeleton + live-drag
 // semantics (shell-edit-live over bridge-node-override).
 import {
@@ -288,13 +288,27 @@ function CutoutLabInner() {
     return { label: 'brush size', lo: 1, hi: 120, value: brushR, available: true, preview: (v: number) => setBrushR(v), commit: (v: number) => setBrushR(v) }
   })()
 
-  const onExport = useCallback(async () => {
+  // 💾 Save = the STICKER: the photo (+ engine-composed band when blend is engaged) clipped to the
+  // outline, transparent outside, as a PNG. The compose frame is already the engine's output; this
+  // only rasterizes what the canvas shows. blend-0 = the raw photo clipped, no compositor.
+  const download = (blob: Blob, name: string) => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = name
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href)
+  }
+  const onSave = useCallback(async () => {
+    if (!displayCanvas || !pathD) return
+    setMsg('Saving…')
+    const blob = await saveStickerPng(displayCanvas, pathD, imgW, imgH, composed)
+    if (!blob) { setMsg('⚠️ could not encode the sticker'); return }
+    download(blob, 'onemo-sticker.png')
+    setMsg('Saved onemo-sticker.png')
+  }, [displayCanvas, pathD, imgW, imgH, composed])
+  // ⤓ Cutline = the manufacturing vector (mm-space SVG) — a separate artifact, kept.
+  const onExportSvg = useCallback(async () => {
     const svg = await actions.exportSvg()
     if (!svg) return
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
-    a.download = 'onemo-cutline-mm.svg'
-    document.body.appendChild(a); a.click(); a.remove()
+    download(new Blob([svg], { type: 'image/svg+xml' }), 'onemo-cutline-mm.svg')
   }, [actions])
 
   // undo/redo: editor-local history first (knob + tool commits land there), then the flow's
@@ -315,7 +329,8 @@ function CutoutLabInner() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) { setMsg(null); actions.upload(e.target.files[0]) } }} /></label>
-        <button onClick={onExport} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
+        <button onClick={onSave} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
+        <button onClick={onExportSvg} disabled={!hasCut} style={btn}>⤓ Cutline</button>
         <button onClick={onUndo} disabled={!canUndo} style={btn}>↩ Undo</button>
         <button onClick={onRedo} disabled={!canRedo} style={btn}>↪ Redo</button>
         <button onClick={() => { paint.actions.invalidate(); setMsg(null); void actions.reset() }} disabled={!hasArtwork} style={btn}>🗑 Clear</button>
