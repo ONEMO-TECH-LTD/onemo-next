@@ -26,6 +26,7 @@ import {
 } from '@/lib/tool-node-math'
 import { enterEditShape, NODE_MODE_DEFAULT, type NodeMode } from '@/lib/shell-edit-live'
 import { usePaintBinding, useComposeBinding, useControlBehaviors, type LabNotify } from './flow-bindings'
+import { PAINT_DEFAULTS, type PaintConfig } from '@/lib/tool-paint-math'
 import PerfHUD from '../effect-creator/v5.3.1/dev/PerfHUD'
 
 // ── v1 bench styles (presentation only) ──
@@ -36,6 +37,12 @@ const chipBtn = (active: boolean, disabled = false): React.CSSProperties => ({ .
 function CutoutLabInner() {
   const searchParams = useSearchParams()
   const segPresent = !!searchParams.get('seg')
+  const admin = searchParams.get('admin') === '1' // ?admin=1 → paint-shaper calibration panel
+
+  // paint-shaper factors — PAINT_DEFAULTS in prod; admin-tunable so the tool calibrates without a
+  // code change (Dan 2026-08-07). Owned as a typed value by tool-paint-math, held here, applied by
+  // the paint binding — no logic in the UI.
+  const [paintCfg, setPaintCfg] = useState<PaintConfig>(PAINT_DEFAULTS)
 
   // notify → the v1 STATUS LINE + toast (outcomes are never silent). The message describes the LAST
   // action, so it is cleared the moment a new one starts — a stale warning must never masquerade as
@@ -95,8 +102,8 @@ function CutoutLabInner() {
   const blendVal = (toolById.get('blend')?.value as number) ?? 0
 
   // ── FLOW BINDINGS (the flow layer, ./flow-bindings): paint + engine compose ──
-  const paint = usePaintBinding({ artworkUrl, spec, display, traced, imgW, imgH, notify })
-  const { baseMask, paintPrepared, paintCfg } = paint.state
+  const paint = usePaintBinding({ artworkUrl, spec, display, traced, imgW, imgH, notify, paintCfg })
+  const { baseMask, paintPrepared } = paint.state
   const effectivePrepared = paintPrepared ?? prepared
   const compose = useComposeBinding({ traced, display, prepared: effectivePrepared, blendVal, imgW, imgH, bounds })
   const composed = compose.composed
@@ -324,6 +331,25 @@ function CutoutLabInner() {
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: 20, fontFamily: 'ui-sans-serif, system-ui', color: '#0f172a' }}>
       <PerfHUD />
       <h1 style={{ fontSize: 19, fontWeight: 700, textAlign: 'center' }}>Cutout Lab</h1>
+
+      {admin && (
+        <div style={{ position: 'fixed', top: 8, left: 8, zIndex: 20, background: '#0f172a', color: '#e2e8f0', padding: 10, borderRadius: 8, fontSize: 11, width: 210 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Paint-shaper config</div>
+          {([
+            ['swathMult', 'stroke width ×', 0.5, 6, 0.1],
+            ['polishDiv', 'smoothing ÷', 1, 12, 0.5],
+            ['closeFrac', 'loop-close frac', 0.05, 0.6, 0.01],
+          ] as [keyof PaintConfig, string, number, number, number][]).map(([key, label, min, max, step]) => (
+            <label key={key} style={{ display: 'block', marginBottom: 6 }}>
+              <span style={{ display: 'flex', justifyContent: 'space-between' }}><span>{label}</span><span>{paintCfg[key]}</span></span>
+              <input type="range" min={min} max={max} step={step} value={paintCfg[key]}
+                onChange={(e) => setPaintCfg((c) => ({ ...c, [key]: Number(e.target.value) }))}
+                style={{ width: '100%' }} />
+            </label>
+          ))}
+          <button onClick={() => setPaintCfg(PAINT_DEFAULTS)} style={{ ...btn, padding: '3px 8px', fontSize: 11, width: '100%' }}>reset</button>
+        </div>
+      )}
 
       {/* v1 button row — bridge verbs + tool toggles */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>

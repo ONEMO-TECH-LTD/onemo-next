@@ -30,7 +30,6 @@ export interface PaintBinding {
     mask: Mask | null
     baseMask: Mask | null            // explicit tool mask, else derived from the outline (mask ≡ shape)
     paintPrepared: PreparedEffect | null
-    paintCfg: PaintConfig
   }
   actions: {
     strokeCommit: (stroke: { x: number; y: number }[], erase: boolean, brushPx: number) => void
@@ -52,6 +51,7 @@ export function usePaintBinding(args: {
   imgW: number
   imgH: number
   notify: LabNotify
+  paintCfg?: PaintConfig // admin-calibratable (?admin=1); PAINT_DEFAULTS when unset
 }): PaintBinding {
   const { artworkUrl, spec, display, traced, imgW, imgH, notify } = args
   const [mask, setMask] = useState<Mask | null>(null)
@@ -64,7 +64,7 @@ export function usePaintBinding(args: {
   useEffect(() => { urlRef.current = artworkUrl }, [artworkUrl])
   useEffect(() => { sink.notify = notify }, [sink, notify])
 
-  const paintCfg = PAINT_DEFAULTS
+  const paintCfg = args.paintCfg ?? PAINT_DEFAULTS
   const baseMask = useMemo(
     () => mask ?? (traced && display ? solidShapeMask(display, imgW, imgH) : null),
     [mask, traced, display, imgW, imgH],
@@ -163,7 +163,7 @@ export function usePaintBinding(args: {
   }, [queue, seam, sink])
 
   return {
-    state: { mask, baseMask, paintPrepared, paintCfg },
+    state: { mask, baseMask, paintPrepared },
     actions: { strokeCommit, shapeCommit, grabCutStroke, invalidate },
   }
 }
