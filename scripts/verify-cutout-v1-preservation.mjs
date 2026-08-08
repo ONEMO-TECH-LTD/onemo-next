@@ -95,11 +95,13 @@ try {
   assert.deepEqual(replacementPng, firstPng, 'same-byte replacement must produce the exact same output')
   await page.getByRole('button', { name: /Editing view/ }).click()
 
-  // Frame: the east grip keeps the opposite edge fixed, changes the frame, and is undoable/redoable.
+  // Frame: expose all eight resize targets; the east side keeps its opposite edge fixed.
   await page.getByRole('button', { name: /^✋ Edit$/ }).click()
   await page.getByRole('button', { name: /Frame/ }).click()
   const outline = page.locator('svg rect').first()
-  const eastGrip = page.locator('svg rect').nth(5)
+  const frameGrips = page.locator('svg rect[style*="-resize"]')
+  assert.equal(await frameGrips.count(), 8, 'Frame must expose all eight resize targets')
+  const eastGrip = frameGrips.nth(4)
   const beforeFrame = {
     x: await numberAttr(outline, 'x'), y: await numberAttr(outline, 'y'),
     width: await numberAttr(outline, 'width'), height: await numberAttr(outline, 'height'),
@@ -163,7 +165,36 @@ try {
   await status.filter({ hasText: /added — snapped|nothing new|shape recognised/ }).waitFor({ timeout: 60_000 })
   await enterPreview()
   const editedInfo = pngInfo(await downloadCutout())
+  assert.deepEqual(editedInfo, {
+    width: 1415,
+    height: 660,
+    colorType: 6,
+    sha256: '55e6178e24616933bba926474da07a6e8340dc50938af494663152a1176e158d',
+  }, 'fixed-viewport real OpenCV edit must retain its exact RGBA result')
   await page.getByRole('button', { name: /Editing view/ }).click()
+
+  // A corner drag keeps its opposite corner fixed.
+  await page.getByRole('button', { name: /^✋ Edit$/ }).click()
+  await page.getByRole('button', { name: /Frame/ }).click()
+  const beforeCorner = {
+    x: await numberAttr(outline, 'x'), y: await numberAttr(outline, 'y'),
+    width: await numberAttr(outline, 'width'), height: await numberAttr(outline, 'height'),
+  }
+  const southEastGrip = frameGrips.nth(7)
+  const southEastBox = await southEastGrip.boundingBox()
+  assert(southEastBox, 'south-east frame grip must be visible')
+  await page.mouse.move(southEastBox.x + southEastBox.width / 2, southEastBox.y + southEastBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(southEastBox.x + southEastBox.width / 2 + 18, southEastBox.y + southEastBox.height / 2 + 12)
+  await page.mouse.up()
+  const afterCorner = {
+    x: await numberAttr(outline, 'x'), y: await numberAttr(outline, 'y'),
+    width: await numberAttr(outline, 'width'), height: await numberAttr(outline, 'height'),
+  }
+  assert(Math.abs(afterCorner.x - beforeCorner.x) < 0.01, 'south-east grip must anchor the north-west x')
+  assert(Math.abs(afterCorner.y - beforeCorner.y) < 0.01, 'south-east grip must anchor the north-west y')
+  assert(afterCorner.width > beforeCorner.width, 'south-east grip must enlarge the frame width')
+  assert(afterCorner.height > beforeCorner.height, 'south-east grip must enlarge the frame height')
 
   // Clear is a history state; Undo restores it and Redo clears it again.
   await clearButton.click()
