@@ -15,7 +15,9 @@ export const smoothDescriptor: ToolDescriptor<number> = {
   outlet: 'adjust',
   label: 'Smooth',
   icon: 'smooth',
-  control: { kind: 'slider', min: 0, max: 100, format: (v) => `${Math.round(v)}%` },
+  // 0-200 (Dan 2026-08-06 deployed; restored 08-08): 0-50 single-pass, each further 50 adds a
+  // fold-guarded rounding pass. Bites on the sparse anchors a Detail/Simplify workflow produces.
+  control: { kind: 'slider', min: 0, max: 200, format: (v) => `${Math.round(v)}%` },
   read: (ctx) => ctx.getAdjustments().global.smooth,
   preview: (v, ctx) => ctx.preview(next(ctx, v)),
   commit: (v, ctx) => ctx.commitAdjustments(next(ctx, v)),

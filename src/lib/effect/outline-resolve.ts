@@ -25,7 +25,7 @@ import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
 import { flattenPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
-import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
+import { roundCornersPaper, smoothPaper } from '@/lib/vector-core/paper-kernel'
 import { straightenPath, roundWholeShapePx } from '@/lib/vector-core/clipper-kernel'
 import type { Pt } from './types'
 
@@ -74,16 +74,14 @@ export const ADJUSTMENTS_OFF: OutlineAdjustments = { global: { ...GLOBAL_OFF }, 
 // MAX_FRACs are STARTING tuning constants (Dan-tuned). (Smooth is already scale-relative — catmull
 // tension is relative to anchor spacing; Radius = % of half the short side; Curve scales with each
 // anchor's neighbour legs — so all five tools are scale-relative.)
-const STRAIGHTEN_MAX_FRAC = 0.02 // 100% straightens runs deviating up to 2% of the short side
-const SIMPLIFY_MAX_FRAC = 0.025 // 100% simplify tolerance = 2.5% of the short side
+const STRAIGHTEN_MAX_FRAC = 0.04 // 100% straightens runs deviating up to 4% of the short side (Dan 2026-08-06)
+const SIMPLIFY_MAX_FRAC = 0.05 // 100% simplify tolerance = 5% of the short side (Dan 2026-08-08: raised from 2.5% so Simplify bites GRADUALLY even after Detail reduced the anchor count — before, 2.5% found no redundancy in a Detail-sparse outline and Simplify no-op'd). Squares stay square: their 90° corners are never near-collinear at any tolerance.
 /** Straighten: Clipper2 RDP epsilon = pct × MAX_FRAC × shape short side (px). 0% = OFF. */
-export const straightenEpsPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(100, pct)) / 100) * STRAIGHTEN_MAX_FRAC * scalePx
-/** Smooth: Paper catmull-rom handle factor. 0% = OFF (no handles introduced); 100% = max round.
- *  Already scale-invariant (catmull tension is relative to anchor spacing). */
-export const smoothFactor = (pct: number) => Math.max(0, Math.min(1, pct / 100))
-/** Simplify: Paper SIMPLIFY tolerance = pct × MAX_FRAC × shape short side (px). 0% = OFF; higher =
- *  fewer anchors + rounder curve-fit. Applied directly to the anchors; never a dense chain. */
-export const simplifyTolPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(100, pct)) / 100) * SIMPLIFY_MAX_FRAC * scalePx
+export const straightenEpsPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(300, pct)) / 100) * STRAIGHTEN_MAX_FRAC * scalePx
+/** Simplify: RDP collinear-collapse tolerance = pct × MAX_FRAC × shape short side (px). 0% = OFF;
+ *  higher = fewer anchors (facets), kept ON the outline. (Smooth's factor is inlined in globalPass now
+ *  — knob 0–200 → 0–1 — so the shared smoothFactor helper was removed.) */
+export const simplifyTolPx = (pct: number, scalePx: number) => (Math.max(0, Math.min(300, pct)) / 100) * SIMPLIFY_MAX_FRAC * scalePx
 /** The GEOMETRIC ceiling for whole-outline Radius: half the resolved shape's short side — the radius at
  *  which a square becomes a circle. The SLIDER deliberately does not reach it (see `outlineRadiusPx`). */
 export function outlineRadiusMaxPx(shape: VShape): number {
@@ -149,22 +147,6 @@ const pathToRing = (vp: VPath): Vec2Px[] => flattenPath(vp, VALIDATE_FLATTEN_TOL
 const ringFinite = (r: Vec2Px[]) => r.length >= 4 && r.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
 const ringSimple = (r: Vec2Px[]) => ringFinite(r) && validateSelfIntersection(r, 'resolve').length === 0
 
-/** Detail (Paper simplify) only has work where the path holds REDUNDANT near-collinear vertices — a
- *  real corner is structural and must survive. A clean sparse polygon (square, star, circle) has no
- *  redundant vertices, so Detail is a NO-OP on it (Paper's curve-fit would otherwise round + drop the
- *  seam corner — uneven). A dense trace has many, so Detail reduces it. (Perpendicular distance of each
- *  vertex from its neighbour chord — the RDP collinearity test — keeps this a guard, not a reshape.) */
-function hasRedundantVertices(path: VPath, tolPx: number): boolean {
-  const a = path.anchors, n = a.length
-  if (n < 4) return false
-  for (let i = 0; i < n; i++) {
-    if (a[i].hIn || a[i].hOut) continue // a curved anchor is structural, not redundant
-    const prev = a[(i - 1 + n) % n].p, cur = a[i].p, next = a[(i + 1) % n].p
-    const dx = next.x - prev.x, dy = next.y - prev.y, L = Math.hypot(dx, dy) || 1e-9
-    if (Math.abs((cur.x - prev.x) * dy - (cur.y - prev.y) * dx) / L < tolPx) return true // near-collinear
-  }
-  return false
-}
 
 /** The shape's short side (px) — the scale reference for the scale-relative tools (straighten/simplify). */
 function shortSidePx(path: VPath): number {
@@ -187,15 +169,22 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     const guard = (next: VPath): VPath => (ringSimple(pathToRing(next)) ? next : p)
     // 1. STRAIGHTEN — Clipper2 RDP/TrimCollinear: collapse near-collinear runs to true straight edges.
     if (g.straighten > 0) p = guard(straightenPath(p, straightenEpsPx(g.straighten, scalePx)))
-    // 2. SIMPLIFY — Paper simplify (curve-fit): 0 = OFF, higher = fewer anchors + smoother fit. Runs only
-    //    where there are redundant near-collinear vertices to remove (dense traces); a no-op on a clean
-    //    sparse polygon (so a square keeps its corners). Sparse, never dense.
-    if (g.simplify > 0) { const tol = simplifyTolPx(g.simplify, scalePx); if (hasRedundantVertices(p, tol)) p = guard(simplifyPaper(p, tol)) }
-    // 3. SMOOTH — Paper catmull-rom: handle roundness on the (sparse) anchors. Back off (to any factor)
-    //    on a fold — at tiny smooth the floor must be low enough to retreat to a clean result, else the
-    //    1% case slips a borderline self-touch past the guard and shows a red outline.
+    // 2. SIMPLIFY — RDP node reduction (Clipper2 collinear-collapse), NOT a curve-fit (Dan 2026-08-08,
+    //    "all vector tools must work collectively"). A curve-fit Simplify produced smooth béziers, which
+    //    left Smooth with no corners to round — the two overlapped instead of stacking. RDP keeps the
+    //    surviving anchors ON the outline (distortion-bounded, no inward squash) and reduces to clean
+    //    FACETS, so the collective flow is: Detail reduces at birth → Simplify reduces further to facets
+    //    → Smooth rounds those facets into curves. Squares stay square: 90° corners are never collinear.
+    if (g.simplify > 0) p = guard(straightenPath(p, simplifyTolPx(g.simplify, scalePx)))
+    // 3. SMOOTH — Paper catmull-rom handle roundness, ONE continuous pass over a 0–200 knob (Dan
+    //    2026-08-06 range; made genuinely continuous 08-08). The handle factor's math ceiling is 1.0
+    //    (beyond it curves self-cross), so the knob maps 0–200 → factor 0–1: every step up rounds MORE,
+    //    200 = full round. (v1's multi-pass "boost" was idempotent — a 2nd pass re-derives the same
+    //    handles from the same anchor positions, so smooth 100 and 200 rendered identical; this mapping
+    //    fixes that.) Fold-guarded with the same back-off. Rounds the sparse FACETS that Detail+Simplify
+    //    produce — the collective flow.
     if (g.smooth > 0) {
-      let factor = smoothFactor(g.smooth)
+      let factor = Math.max(0, Math.min(1, g.smooth / 200))
       let sm = smoothPaper(p, factor)
       let n = 0
       while (!ringSimple(pathToRing(sm)) && n++ < 12 && factor > 0.004) { factor *= 0.7; sm = smoothPaper(p, factor) }

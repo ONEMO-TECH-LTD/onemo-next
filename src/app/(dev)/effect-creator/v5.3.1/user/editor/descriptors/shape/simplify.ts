@@ -16,7 +16,9 @@ export const simplifyDescriptor: ToolDescriptor<number> = {
   outlet: 'adjust',
   label: 'Simplify',
   icon: 'detail',
-  control: { kind: 'slider', min: 0, max: 100, format: (v) => `${Math.round(v)}%` },
+  // 0-200 (Dan 2026-08-08): the wider range keeps Simplify biting AFTER Detail has already reduced
+  // the anchor count - so Detail + Simplify + Smooth compose instead of one silently no-op'ing.
+  control: { kind: 'slider', min: 0, max: 200, format: (v) => `${Math.round(v)}%` },
   read: (ctx) => ctx.getAdjustments().global.simplify,
   preview: (v, ctx) => ctx.preview(next(ctx, v)),
   commit: (v, ctx) => ctx.commitAdjustments(next(ctx, v)),
