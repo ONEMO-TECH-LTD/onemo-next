@@ -10,10 +10,10 @@ import type { Mask } from '@/lib/mask-tools/types'
  *  formerly hardcoded — surfaced so an admin can calibrate the tool without a code change. */
 export interface PaintConfig {
   swathMult: number  // stroke swath width = brush × swathMult
-  polishDiv: number  // outline smoothing radius = brush ÷ polishDiv (bigger = softer)
+  polishStrength: number  // 0..1; outline smoothing radius = brush × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { swathMult: 2, polishDiv: 3, closeFrac: 0.2 }
+export const PAINT_DEFAULTS: PaintConfig = { swathMult: 2, polishStrength: 1 / 3, closeFrac: 0.2 }
 
 /** Rasterize a drawn shape to a BINARY Mask (subject matte for the blend layer — inside = subject).
  *  Shares solidShapeMask's rasterizer; drops the soft channel (the paint-edit mask is binary). */
@@ -32,8 +32,9 @@ export function unionMasks(base: Mask, add: Mask): Mask {
 /** Normalize a painted combination with the ENGINE'S own mask smoothing (box-blur + re-threshold):
  *  fills concave bites and shaves nubs smaller than the radius — the 'insect bites' where strokes
  *  meet the mask (Dan 2026-08-06). Radius rides the brush size (bold brush = bolder polish). */
-export function polishMask(mask: Mask, brushPx: number, polishDiv = PAINT_DEFAULTS.polishDiv): Mask {
-  const r = Math.max(2, Math.round(brushPx / polishDiv))
+export function polishMask(mask: Mask, brushPx: number, strength = PAINT_DEFAULTS.polishStrength): Mask {
+  if (strength <= 0) return { data: mask.data.slice(), w: mask.w, h: mask.h }
+  const r = Math.max(2, Math.round(brushPx * strength))
   return { data: smoothMask(mask.data, mask.w, mask.h, r), w: mask.w, h: mask.h }
 }
 
@@ -80,12 +81,12 @@ export function swathMask(
   const ctx = c.getContext('2d', { willReadFrequently: true })!
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
-  ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult) // 1px floor (Dan: brush down to 1)
-  if (stroke.length === 1) {
+  ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult)
+  if (cfg.swathMult > 0 && stroke.length === 1) {
     ctx.beginPath()
     ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
     ctx.fill()
-  } else if (stroke.length > 1) {
+  } else if (cfg.swathMult > 0 && stroke.length > 1) {
     ctx.beginPath()
     stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
     ctx.stroke()

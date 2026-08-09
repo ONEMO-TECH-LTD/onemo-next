@@ -80,10 +80,10 @@ try {
   const firstPng = await downloadCutout()
   const firstInfo = pngInfo(firstPng)
   assert.deepEqual(firstInfo, {
-    width: 1330,
-    height: 621,
+    width: 1329,
+    height: 622,
     colorType: 6,
-    sha256: 'd7a28a6976223e9f82f73f16d3a77f3bbec770f727805dcb85d4041d9c0daf28',
+    sha256: 'b4e608322f2001e032187dfff40ff625e5b19265fd2fa0f7431cbec46943dc11',
   }, '1280x720 clean-start Detail-25 Save must retain its exact RGBA result')
 
   await upload({ name: 'replacement.png', mimeType: 'image/png', buffer: fixture })
@@ -166,10 +166,10 @@ try {
   await enterPreview()
   const editedInfo = pngInfo(await downloadCutout())
   assert.deepEqual(editedInfo, {
-    width: 1415,
-    height: 660,
+    width: 1416,
+    height: 661,
     colorType: 6,
-    sha256: '55e6178e24616933bba926474da07a6e8340dc50938af494663152a1176e158d',
+    sha256: '8424c2b2dd60347573e177668da41d7ce0710ccf95c9cf6bf393ad0e311b004a',
   }, 'fixed-viewport real OpenCV edit must retain its exact RGBA result')
   await page.getByRole('button', { name: /Editing view/ }).click()
 

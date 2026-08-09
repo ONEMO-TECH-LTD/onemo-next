@@ -12,6 +12,11 @@ export class HistoryStack<T> {
     if (this.items.length > this.cap) this.items.shift()
     this.idx = this.items.length - 1
   }
+  replaceCurrent(snap: T): void {
+    if (this.idx < 0) { this.push(snap); return }
+    this.items = this.items.slice(0, this.idx + 1)
+    this.items[this.idx] = snap
+  }
   canUndo(): boolean { return this.idx > 0 }
   canRedo(): boolean { return this.idx < this.items.length - 1 }
   undo(): T | null { return this.canUndo() ? this.items[--this.idx] : null }

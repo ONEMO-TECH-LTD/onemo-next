@@ -433,18 +433,18 @@ export default function CutoutLab() {
             <input aria-label="shared edge finish" type="range" min={0} max={12} step={1} value={edgeFinishPx} onChange={(e) => flow.actions.setEdgeFinishPx(Number(e.target.value))} style={{ flex: 1 }} />
             <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{edgeFinishPx}px</span>
           </div>
-          {([
-            ['swath width', 'swathMult', 0.5, 6, 0.1],
-            ['smoothing', 'polishDiv', 1, 12, 0.5],
-            ['loop-close', 'closeFrac', 0.05, 0.6, 0.01],
-          ] as [string, keyof typeof paintCfg, number, number, number][]).map(([lbl, key, lo, hi, step]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: '#475569', width: 92 }}>{lbl}</span>
-              <input type="range" min={lo} max={hi} step={step} value={paintCfg[key]} onChange={(e) => flow.actions.setPaintCfg({ [key]: Number(e.target.value) })} style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{paintCfg[key]}</span>
+          {[
+            { label: 'swath width', value: paintCfg.swathMult, lo: 0, hi: 12, step: 0.1, display: `${paintCfg.swathMult}×`, set: (value: number) => flow.actions.setPaintCfg({ swathMult: value }) },
+            { label: 'smoothing', value: Math.round(paintCfg.polishStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(paintCfg.polishStrength * 100)}%`, set: (value: number) => flow.actions.setPaintCfg({ polishStrength: value / 100 }) },
+            { label: 'loop-close', value: paintCfg.closeFrac, lo: 0, hi: 1, step: 0.01, display: paintCfg.closeFrac.toFixed(2), set: (value: number) => flow.actions.setPaintCfg({ closeFrac: value }) },
+          ].map(({ label, value, lo, hi, step, display, set }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: '#475569', width: 92 }}>{label}</span>
+              <input aria-label={`Paint ${label}`} type="range" min={lo} max={hi} step={step} value={value} onChange={(e) => set(Number(e.target.value))} style={{ flex: 1 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{display}</span>
             </div>
           ))}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>edge finish is shared by Detect/u2net and GrabCut; paint settings affect 🖌 Paint shape / erase</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke</div>
         </div>
       )}
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>

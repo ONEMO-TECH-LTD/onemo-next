@@ -5,7 +5,7 @@
 // binds only to this surface; flows/flow-contract.ts is the reference, not an import: it is typed
 // against v5.3.1's DesignState/sceneStore). The flow OWNS ALL POLICY the shell used to carry
 // inline: compose cadence (Cadence Law: compositor NEVER called mid-drag; single-flight latched
-// bake with real cancellation), auto-blend-on-outgrowth (value-true), history semantics, the u2net
+// bake with real cancellation), history semantics, the u2net
 // cut + GrabCut/paint tool orchestration. The shell only renders + captures
 // gestures + calls these actions.
 
@@ -46,6 +46,24 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   })
 }
 
+type PaintCalibrationSource = {
+  artwork: number
+  base: Mask | null
+  stroke: { x: number; y: number }[]
+  brushPx: number
+  erase: boolean
+}
+
+const cloneMask = (mask: Mask): Mask => ({ data: mask.data.slice(), w: mask.w, h: mask.h, soft: mask.soft?.slice() })
+
+function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, h: number): Mask {
+  const painted = swathMask(source.stroke, source.brushPx, w, h, cfg)
+  const combined = source.base
+    ? source.erase ? subtractMasks(source.base, painted) : unionMasks(source.base, painted)
+    : painted
+  return polishMask(combined, source.brushPx, cfg.polishStrength)
+}
+
 /** The adapters the flow needs injected (CreatorAdapters precedent — the flow never touches
  *  location/DOM chrome): a render request the shell binds to its canvas draw. */
 export interface LabAdapters {
@@ -80,7 +98,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [edgeFinishPx, setEdgeFinishState] = useState(EDGE_FINISH_DEFAULT)
   const paintCfgRef = useRef(paintCfg); paintCfgRef.current = paintCfg
   const edgeFinishRef = useRef(edgeFinishPx); edgeFinishRef.current = edgeFinishPx
-  const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => { const n = { ...paintCfgRef.current, ...patch }; paintCfgRef.current = n; setPaintCfgState(n) }, [])
 
   // ── flow-owned refs (policy + view) ──
   const imgCanvas = useRef<HTMLCanvasElement | null>(null)
@@ -96,23 +113,32 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const settingsRef = useRef(settings); settingsRef.current = settings
   const blendRef = useRef(blend); blendRef.current = blend
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
-  const wasOutgrownRef = useRef(false)
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
   const requestRender = adapters.requestRender
   const detectGen = useRef(0)
   const artworkGen = useRef(0)
   const uploadGen = useRef(0)
   const editPrepGen = useRef(0)
+  const paintTuneGen = useRef(0)
+  const paintTuneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const paintCalibrationRef = useRef<PaintCalibrationSource | null>(null)
+  const invalidatePaintCalibration = useCallback(() => {
+    paintTuneGen.current++
+    if (paintTuneTimer.current) clearTimeout(paintTuneTimer.current)
+    paintTuneTimer.current = null
+    paintCalibrationRef.current = null
+  }, [])
 
   // ── history (pure module, flow-driven) ──
-  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings }
+  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings; paint: PaintConfig }
   const histRef = useRef(new HistoryStack<Snap>(HISTORY_DEPTH))
   const snapNow = (): Snap => ({
-    mask: maskRef.current ? { data: maskRef.current.data.slice(), w: maskRef.current.w, h: maskRef.current.h, soft: maskRef.current.soft?.slice() } : null,
+    mask: maskRef.current ? cloneMask(maskRef.current) : null,
     drawn: drawnRef.current,
-    settings: { ...settingsRef.current }, blendS: { ...blendRef.current }, // meta B3: knobs travel with the state
+    settings: { ...settingsRef.current }, blendS: { ...blendRef.current }, paint: { ...paintCfgRef.current }, // meta B3: knobs travel with the state
   })
   const pushHistory = () => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }
+  const replaceHistory = () => { histRef.current.replaceCurrent(snapNow()); setHistTick((t) => t + 1) }
 
   // ── THE BAKE SCHEDULER (Cadence Law) ─────────────────────────────────────────────────────────
   // Single-flight + latched: at most one compose in flight; requests coalesce to the latest
@@ -226,17 +252,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     dRef.current = fin?.d ?? null
     boundsRef.current = fin?.bounds ?? null
     shapeRef.current = fin?.shape ?? null
-    // AUTO-COMPOSITING ON FRAME EXIT (Dan's law), value-TRUE: entering outgrowth sets the actual
-    // blend knob to the engine default — the control reflects what is applied; the user can still
-    // re-zero it (their override stands until the next transition into outgrowth).
-    const bb = fin?.bounds
-    const og = !!(img && bb && (bb.minX < 0 || bb.minY < 0 || bb.maxX > img.width || bb.maxY > img.height))
-    if (og && !wasOutgrownRef.current && blendRef.current.blend === 0 && preparedRef.current) {
-      const def = Math.round(preparedRef.current.frontSrc.defaultBlendPercent)
-      blendRef.current = { ...blendRef.current, blend: def }
-      setBlend(blendRef.current)
-    }
-    wasOutgrownRef.current = og
     setShapeTick((t) => t + 1)
     if (bake) scheduleBake()
     requestRender()
@@ -290,7 +305,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const acceptMask = useCallback(async (
     mask: Mask,
     preseg?: MLResult,
-    opts?: { erase?: boolean; shapeTruth?: boolean; isCurrent?: () => boolean },
+    opts?: { erase?: boolean; shapeTruth?: boolean; isCurrent?: () => boolean; replaceHistory?: boolean },
   ) => {
     const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
     if (!isCurrent()) return false
@@ -362,13 +377,44 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     }
     if (!isCurrent()) return false
     scheduleBake(true) // tool-commit = a compose trigger (Cadence Law), immediate
-    pushHistory()
+    if (opts?.replaceHistory) replaceHistory(); else pushHistory()
     setStatus(droppedPx > MIN_DROPPED_REGION_PX
       ? '⚠️ a SEPARATE region was dropped — the one-shape rule keeps only the main shape (bridge it with a connector first)'
       : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — refine, draw, edit, tune, or Save`)
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish, scheduleBake])
+
+  const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => {
+    const next = { ...paintCfgRef.current, ...patch }
+    paintCfgRef.current = next
+    setPaintCfgState(next)
+    const source = paintCalibrationRef.current
+    if (!source || source.artwork !== artworkGen.current) {
+      setStatus('⚙️ Paint settings ready — draw the next Paint shape / erase stroke')
+      return
+    }
+    const tune = ++paintTuneGen.current
+    if (paintTuneTimer.current) clearTimeout(paintTuneTimer.current)
+    setStatus('⚙️ recalculating the latest Paint stroke…')
+    paintTuneTimer.current = setTimeout(() => {
+      paintTuneTimer.current = null
+      const img = imgCanvas.current
+      const isCurrent = () => tune === paintTuneGen.current && source.artwork === artworkGen.current && paintCalibrationRef.current === source
+      if (!img || !isCurrent()) return
+      const recalculated = paintMask(source, paintCfgRef.current, img.width, img.height)
+      if (!maskArea(recalculated)) {
+        setStatus('⚠️ Paint calibration produced an empty shape — current shape kept')
+        return
+      }
+      setBusy(true)
+      void acceptMask(recalculated, undefined, { erase: source.erase, shapeTruth: true, isCurrent, replaceHistory: true })
+        .then((ok) => {
+          if (ok && isCurrent()) setStatus('⚙️ latest Paint stroke recalculated')
+        })
+        .finally(() => { if (isCurrent()) setBusy(false) })
+    }, 120)
+  }, [acceptMask])
 
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
@@ -402,11 +448,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     cancelSegmentML()
     settleToolQueue()
     settleBakes('full-res bake cancelled: artwork replaced')
+    invalidatePaintCalibration()
     previewRef.current = false
     disposePrepareAICache()
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; nativePresegRef.current = null; liveBakeRef.current = null
     boundsRef.current = null; displayFrontRef.current = null
-    hasCutRef.current = false; wasOutgrownRef.current = false
+    hasCutRef.current = false
     urlRef.current = url
     imgCanvas.current = master
     histRef.current = new HistoryStack<Snap>(HISTORY_DEPTH)
@@ -417,7 +464,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     requestRender()
     setStatus('🖼 image ready — push 🤖 Detect to auto-cut, or brush the object')
     if (oldUrl) URL.revokeObjectURL(oldUrl)
-  }, [requestRender, settleBakes, settleToolQueue])
+  }, [invalidatePaintCalibration, requestRender, settleBakes, settleToolQueue])
 
   // AI DETECT — fixed u2netp -> lazy Silueta -> visible flood-fill, on button push only.
   const detect = useCallback(async () => {
@@ -437,6 +484,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
       const accepted = await acceptMask(r.mask, r.preseg, { isCurrent })
       if (!isCurrent()) return
+      if (accepted) invalidatePaintCalibration()
       if (accepted && (r.adapter === 'bg-flood' || r.adapter === 'alpha')) {
         setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)')
       }
@@ -448,7 +496,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     } finally {
       if (isCurrent()) setBusy(false)
     }
-  }, [acceptMask])
+  }, [acceptMask, invalidatePaintCalibration])
 
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
   const setTune = useCallback((patch: Partial<TraceOutlineSettings>) => {
@@ -515,41 +563,37 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
       if (base && before === after) { setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
       const ok = await acceptMask(refined, undefined, { erase, isCurrent })
+      if (ok && isCurrent()) invalidatePaintCalibration()
       if (ok && isCurrent()) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
     } catch (e) {
       if (isCurrent()) setStatus('⚠️ ' + String((e as Error).message))
     } finally {
       if (isCurrent()) setBusy(false)
     }
-  }), [acceptMask, requestRender, runTool])
+  }), [acceptMask, invalidatePaintCalibration, requestRender, runTool])
 
   const paintStroke = useCallback((stroke: Point[], erase: boolean, brushR: number) => runTool(async (isCurrent) => {
     const img = imgCanvas.current
     if (!img || !isCurrent()) return
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
     const brushPx = brushR * (img.width / dispWRef.current)
-    // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
-    const painted = swathMask(pts, brushPx, img.width, img.height, paintCfgRef.current)
-    if (!maskRef.current || !hasCutRef.current) {
-      if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Detect'); requestRender(); return }
-      setBusy(true)
-      try {
-        const ok = await acceptMask(polishMask(painted, brushPx, paintCfgRef.current.polishDiv), undefined, { shapeTruth: true, isCurrent })
-        if (ok && isCurrent()) setStatus('✏️ painted shape created — keep painting, erase, or tune')
-      } finally {
-        if (isCurrent()) setBusy(false)
-      }
-      return
-    }
-    const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx, paintCfgRef.current.polishDiv)
+    const base = maskRef.current && hasCutRef.current ? cloneMask(maskRef.current) : null
+    if (erase && !base) { setStatus('✂️ nothing to erase yet — paint a shape first or Detect'); requestRender(); return }
+    invalidatePaintCalibration()
+    const source: PaintCalibrationSource = { artwork: artworkGen.current, base, stroke: pts, brushPx, erase }
+    // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too.
+    const combined = paintMask(source, paintCfgRef.current, img.width, img.height)
     setBusy(true)
     try {
       const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true, isCurrent })
-      if (ok && isCurrent()) setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
+      if (ok && isCurrent()) {
+        paintCalibrationRef.current = source
+        setStatus(base ? (erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned') : '✏️ painted shape created — keep painting, erase, or tune')
+      }
     } finally {
       if (isCurrent()) setBusy(false)
     }
-  }), [acceptMask, requestRender, runTool])
+  }), [acceptMask, invalidatePaintCalibration, requestRender, runTool])
 
   // ── vector edit orchestration (nodes/frame) ──
   const isZero = (t: TraceOutlineSettings) => JSON.stringify(t) === JSON.stringify(ZERO_SETTINGS)
@@ -575,6 +619,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     requestRender()
   }, [requestRender])
   const editCommit = useCallback((next: VShape) => {
+    invalidatePaintCalibration()
     const img = imgCanvas.current!
     const ring = shapeRing(next)
     drawnRef.current = { shape: next, ring }
@@ -601,7 +646,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     applyFinish()
     pushHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyFinish, scheduleBake])
+  }, [applyFinish, invalidatePaintCalibration, scheduleBake])
   const nodeInsert = useCallback((pt: { x: number; y: number }): { pi: number; ai: number } | null => {
     const shape = shapeRef.current
     if (!shape || !imgCanvas.current) return null
@@ -644,6 +689,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       cancelSegmentML()
       settleToolQueue()
       settleBakes('full-res bake cancelled: history restored')
+      invalidatePaintCalibration()
       maskRef.current = nextMask
       drawnRef.current = nextDrawn
       preparedRef.current = nextPrepared
@@ -652,8 +698,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       liveBakeRef.current = null
       settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
       blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
+      paintCfgRef.current = { ...s.paint }; setPaintCfgState(paintCfgRef.current)
       hasCutRef.current = !!(nextMask || nextDrawn)
-      wasOutgrownRef.current = false
       setHasCut(hasCutRef.current)
       applyFinish(false)
       scheduleBake(true)
@@ -666,7 +712,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       }
       return false
     }
-  }, [applyFinish, scheduleBake, settleBakes, settleToolQueue])
+  }, [applyFinish, invalidatePaintCalibration, scheduleBake, settleBakes, settleToolQueue])
   const undo = useCallback(async () => {
     const s = histRef.current.undo()
     if (!s) return
@@ -687,14 +733,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     cancelSegmentML()
     settleToolQueue()
     settleBakes('full-res bake cancelled: cut cleared')
+    invalidatePaintCalibration()
     previewRef.current = false
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
-    hasCutRef.current = false; wasOutgrownRef.current = false
+    hasCutRef.current = false
     setBusy(false); setHasCut(false); pushHistory(); requestRender()
     setStatus('🗑 cleared — paint a new shape, or Detect')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestRender, settleBakes, settleToolQueue])
+  }, [invalidatePaintCalibration, requestRender, settleBakes, settleToolQueue])
 
   /** await the next COMMITTED full-res bake (requested through the one scheduler + gen token) */
   const awaitFullBake = useCallback((): Promise<void> => new Promise((resolve, reject) => {
@@ -808,12 +855,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     disposeSegmentML()
     settleToolQueue()
     settleBakes('full-res bake cancelled: cutout flow unmounted')
+    invalidatePaintCalibration()
     disposePrepareAICache()
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     urlRef.current = null
     imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
-  }, [settleBakes, settleToolQueue])
+  }, [invalidatePaintCalibration, settleBakes, settleToolQueue])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
 

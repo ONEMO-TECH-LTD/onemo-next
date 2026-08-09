@@ -83,8 +83,8 @@ const finishedExpected = {
   },
 }
 const routeExpected = {
-  chromium: { width: 1265, height: 443, colorType: 6, sha256: '676c3d9979066dcccd5e218ff03fd38e5519a9ec6e7b330fd1527a517afafbfc' },
-  webkit: { width: 1264, height: 443, colorType: 6, sha256: 'c7a68d72eed1a8c573ba74d21a4fab8c9769b3f37437789ab5a1a5678a2c8787' },
+  chromium: { width: 1263, height: 443, colorType: 6, sha256: '2a6bf8c18c27237dd46e43065648fcb3161c6143b73c77588867613ad73b1827' },
+  webkit: { width: 1263, height: 443, colorType: 6, sha256: '824c2ff14aa03b55dfcefe8fa87063b115ccd3ca3c252e2b8db35ab49f60b75f' },
 }
 
 const pngInfo = (bytes) => ({
@@ -237,9 +237,7 @@ async function runBrowser(browserType) {
     assert.equal(opencvRequests.length, 1, `${browserName}: first real GrabCut must load exactly one provider`)
     assert(routeElapsedMs < 10_000, `${browserName}: real-route GrabCut left the current practical envelope`)
     const edgeFinish = routePage.getByRole('slider', { name: 'shared edge finish' })
-    assert.equal(await edgeFinish.inputValue(), '3', `${browserName}: shared edge finish default changed`)
-    await edgeFinish.fill('5')
-    await status.filter({ hasText: /shared u2net\/GrabCut edge finish: 5px/ }).waitFor({ timeout: 60_000 })
+    assert.equal(await edgeFinish.inputValue(), '8', `${browserName}: shared edge finish default changed`)
     const preview = routePage.getByRole('button', { name: /Preview|Editing view/ })
     if ((await preview.textContent())?.includes('Preview')) await preview.click()
     await routePage.getByText('Preview — same result, cut out').waitFor()
@@ -247,9 +245,64 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Save/ }).click()
     const routeOutput = pngInfo(readFileSync(await (await pending).path()))
     assert.deepEqual(routeOutput, routeExpected[browserName], `${browserName}: completed GrabCut output changed`)
+
+    // Paint calibration: the full useful ranges must re-run the latest real Paint stroke live.
+    await routePage.getByRole('button', { name: /Editing view/ }).click()
+    await routePage.getByRole('button', { name: /Clear/ }).click()
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
+    await routePage.getByRole('button', { name: /Paint shape/ }).click()
+    const swath = routePage.getByRole('slider', { name: 'Paint swath width' })
+    const smoothing = routePage.getByRole('slider', { name: 'Paint smoothing' })
+    const loopClose = routePage.getByRole('slider', { name: 'Paint loop-close' })
+    assert.deepEqual(
+      await Promise.all([swath, smoothing, loopClose].map(async (slider) => [await slider.getAttribute('min'), await slider.getAttribute('max')])),
+      [['0', '12'], ['0', '100'], ['0', '1']],
+      `${browserName}: Paint calibration must expose the full useful ranges`,
+    )
+    const paintBox = await routePage.locator('canvas').first().boundingBox()
+    assert(paintBox, `${browserName}: Paint canvas must be visible`)
+    await draw(routePage, [
+      { x: paintBox.x + paintBox.width * 0.35, y: paintBox.y + paintBox.height * 0.35 },
+      { x: paintBox.x + paintBox.width * 0.35, y: paintBox.y + paintBox.height * 0.65 },
+      { x: paintBox.x + paintBox.width * 0.65, y: paintBox.y + paintBox.height * 0.65 },
+      { x: paintBox.x + paintBox.width * 0.65, y: paintBox.y + paintBox.height * 0.35 },
+    ], 4)
+    await status.filter({ hasText: /painted shape created/ }).waitFor({ timeout: 60_000 })
+    const canvasData = () => routePage.locator('canvas').first().evaluate(async (canvas) => {
+      const blob = await new Promise((settle) => canvas.toBlob(settle))
+      const bytes = await blob.arrayBuffer()
+      return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+        .map((value) => value.toString(16).padStart(2, '0')).join('')
+    })
+    const tunePaint = async (slider, value, prior) => {
+      await slider.fill(value)
+      await status.filter({ hasText: /recalculating the latest Paint stroke/ }).waitFor({ timeout: 10_000 })
+      await status.filter({ hasText: /latest Paint stroke recalculated/ }).waitFor({ timeout: 60_000 })
+      const current = await canvasData()
+      assert.notEqual(current, prior, `${browserName}: ${await slider.getAttribute('aria-label')} did not change the current hand-drawn shape`)
+      return current
+    }
+    let paintedCanvas = await canvasData()
+    paintedCanvas = await tunePaint(loopClose, '1', paintedCanvas)
+    paintedCanvas = await tunePaint(loopClose, '0.2', paintedCanvas)
+    paintedCanvas = await tunePaint(swath, '12', paintedCanvas)
+    await tunePaint(smoothing, '100', paintedCanvas)
+
+    // Blend stays explicitly zero even when Frame pushes the shape beyond the artwork.
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
+    await routePage.getByRole('button', { name: /Frame/ }).click()
+    const eastFrameGrip = routePage.locator('svg rect[style*="-resize"]').nth(4)
+    const eastFrameBox = await eastFrameGrip.boundingBox()
+    assert(eastFrameBox, `${browserName}: east Frame grip must be visible`)
+    await routePage.mouse.move(eastFrameBox.x + eastFrameBox.width / 2, eastFrameBox.y + eastFrameBox.height / 2)
+    await routePage.mouse.down()
+    await routePage.mouse.move(eastFrameBox.x + eastFrameBox.width / 2 + paintBox.width, eastFrameBox.y + eastFrameBox.height / 2)
+    await routePage.mouse.up()
+    await routePage.getByRole('button', { name: /Blend/ }).click()
+    assert.equal(await routePage.locator('input[type=number]').inputValue(), '0', `${browserName}: Blend must not wake above zero on outgrowth`)
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
-    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, opencvRequests: opencvRequests.length }
+    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, paintLiveCalibration: true, opencvRequests: opencvRequests.length }
   } finally {
     await browser.close()
   }

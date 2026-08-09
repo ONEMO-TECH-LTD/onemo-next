@@ -111,23 +111,24 @@ try {
 
   // A committed node drag becomes the base for the next node adjustment.
   await page.getByRole('button', { name: /Nodes/ }).click()
-  const firstNode = page.locator('svg circle[fill="transparent"]').first()
-  const nodeBox = await firstNode.boundingBox()
+  // The last SVG target is topmost, so dense edge-finished anchors cannot intercept its drag.
+  const nodeTarget = page.locator('svg circle[fill="transparent"]').last()
+  const nodeBox = await nodeTarget.boundingBox()
   assert(nodeBox, 'node drag target must be visible')
-  const beforeNode = { x: Number(await firstNode.getAttribute('cx')), y: Number(await firstNode.getAttribute('cy')) }
+  const beforeNode = { x: Number(await nodeTarget.getAttribute('cx')), y: Number(await nodeTarget.getAttribute('cy')) }
   const nodeTick = await historyTick()
   await page.mouse.move(nodeBox.x + nodeBox.width / 2, nodeBox.y + nodeBox.height / 2)
   await page.mouse.down()
   await page.mouse.move(nodeBox.x + nodeBox.width / 2 + 14, nodeBox.y + nodeBox.height / 2 + 8)
   await page.mouse.up()
   await waitForHistory(nodeTick + 1)
-  const moved = { x: Number(await firstNode.getAttribute('cx')), y: Number(await firstNode.getAttribute('cy')) }
+  const moved = { x: Number(await nodeTarget.getAttribute('cx')), y: Number(await nodeTarget.getAttribute('cy')) }
   await page.getByRole('button', { name: /^curve$/ }).click()
   const knob = page.locator('input[type=number]').first()
   const adjustmentTick = await historyTick()
   await knob.fill(String(Number(await knob.inputValue()) + 3))
   await waitForHistory(adjustmentTick + 1)
-  const adjusted = { x: Number(await firstNode.getAttribute('cx')), y: Number(await firstNode.getAttribute('cy')) }
+  const adjusted = { x: Number(await nodeTarget.getAttribute('cx')), y: Number(await nodeTarget.getAttribute('cy')) }
   assert(
     Math.hypot(adjusted.x - moved.x, adjusted.y - moved.y) < 0.01
       && Math.hypot(adjusted.x - beforeNode.x, adjusted.y - beforeNode.y) > 1,
@@ -135,12 +136,12 @@ try {
   )
 
   const overlayCancelTick = await historyTick()
-  const adjustedBox = await firstNode.boundingBox()
+  const adjustedBox = await nodeTarget.boundingBox()
   assert(adjustedBox, 'adjusted node target must remain visible')
   await page.mouse.move(adjustedBox.x + adjustedBox.width / 2, adjustedBox.y + adjustedBox.height / 2)
   await page.mouse.down()
   await page.mouse.move(adjustedBox.x + adjustedBox.width / 2 + 6, adjustedBox.y + adjustedBox.height / 2 + 4)
-  await firstNode.evaluate((node) => node.closest('svg')?.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 })))
+  await nodeTarget.evaluate((node) => node.closest('svg')?.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 })))
   await page.mouse.up()
   await waitForHistory(overlayCancelTick + 1)
   await page.waitForTimeout(250)

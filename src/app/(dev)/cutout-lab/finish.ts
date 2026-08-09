@@ -153,7 +153,7 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
  *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
  *  Offset knob's job, reflected truthfully). */
-const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 3 }
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 8 }
 export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 
 /** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:
@@ -223,13 +223,11 @@ export async function bakeStickerEngine(
   // another blend-tab effect is switched on (the opt-in edge-case layer: decouple the object,
   // normalise/expand the background).
   const neutral = b.blend === 0
-  // OFFSET PAST THE FRAME (Dan 2026-08-06): when the outline crosses the image boundary,
-  // COMPOSITING ENGAGES BY DEFAULT — the engine's default magic blend wakes (hides the invented
-  // band's seams) over the Clamp underlay. Inside the frame at blend 0 nothing composites — the
+  // OFFSET PAST THE FRAME (Dan 2026-08-06): an outgrown outline still needs the Clamp underlay,
+  // but the blend value stays explicit. Inside the frame at blend 0 nothing composites — the
   // original image under the vector mask.
   const outgrown = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > maskW || bounds.maxY > maskH
-  // (value-reflection, Dan 15:34: auto-blend is set by the SHELL into the knob state — never a
-  // silent override here, so the control always shows the true applied blend.)
+  // Blend never wakes implicitly: zero remains a truthful raw-cut default until the user moves it.
   // NO-MATTE GUARD (Dan's law: a full-image composite may not exist ANYWHERE): the flood-fill
   // fallback has no object layer — its 'subject' is the raw full image, which drawn sharp over the
   // blur COVERS it (blend looks dead) or creates duplicate full-frame content. With no matte, blend is forced

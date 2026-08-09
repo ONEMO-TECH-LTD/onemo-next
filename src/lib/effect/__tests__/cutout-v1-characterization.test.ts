@@ -179,6 +179,15 @@ describe('KAI-10216 accepted behavior', () => {
     expect(history.undo()).toBe(3)
   })
 
+  it('replaces the current calibration snapshot without adding an undo step', () => {
+    const history = new HistoryStack<string>()
+    history.push('first cut')
+    history.replaceCurrent('calibrated cut')
+    expect(history.canUndo()).toBe(false)
+    history.push('next cut')
+    expect(history.undo()).toBe('calibrated cut')
+  })
+
   it('keeps the first accepted cut non-undoable and Clear undoable', () => {
     const history = new HistoryStack<string>()
     history.push('first cut')
@@ -238,5 +247,7 @@ describe('later increment defect reproductions', () => {
     expect(finish.match(/return prepareCut\(/g)).toHaveLength(2)
     expect(cutout('flow.ts')).not.toContain('smoothMask(')
     expect(cutout('page.tsx')).toContain('aria-label="shared edge finish"')
+    expect(cutout('finish.ts')).toContain('edgeFinishPx: 8')
+    expect(cutout('flow.ts')).not.toContain('wasOutgrownRef')
   })
 })
