@@ -16,7 +16,7 @@ import type { PreparedEffect } from '@/lib/effect/prepare-effect'
 import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
-  finishDrawn, finishSpec,
+  disposePrepareAICache, finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
@@ -97,6 +97,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
   const requestRender = adapters.requestRender
   const detectGen = useRef(0)
+  const artworkGen = useRef(0)
+  const uploadGen = useRef(0)
+  const editPrepGen = useRef(0)
 
   // ── history (pure module, flow-driven) ──
   type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings }
@@ -126,7 +129,24 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const bakeModeRef = useRef<'display' | 'full'>('display')
   const previewRef = useRef(false)
   const displayFrontRef = useRef<{ src: PreparedEffect; shim: PreparedEffect } | null>(null)
-  const fullBakeWaiters = useRef<(() => void)[]>([])
+  type FullBakeWaiter = { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+  const fullBakeWaiters = useRef<FullBakeWaiter[]>([])
+  const settleFullBakeWaiters = useCallback((error?: Error) => {
+    const waiters = fullBakeWaiters.current.splice(0)
+    for (const waiter of waiters) {
+      clearTimeout(waiter.timer)
+      if (error) waiter.reject(error); else waiter.resolve()
+    }
+  }, [])
+  const settleBakes = useCallback((reason: string) => {
+    if (bakeTimer.current) clearTimeout(bakeTimer.current)
+    bakeTimer.current = null
+    bakePending.current = false
+    draggingRef.current = false
+    bakeModeRef.current = 'display'
+    bakeGen.current++
+    settleFullBakeWaiters(new Error(reason))
+  }, [settleFullBakeWaiters])
   const displayPrepared = (p: PreparedEffect): PreparedEffect => {
     if (displayFrontRef.current?.src === p) return displayFrontRef.current.shim
     const { origCanvas, subjCanvas } = p.frontSrc
@@ -146,7 +166,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }
   const runBake = useCallback(async () => {
     if (bakeInFlight.current) { bakePending.current = true; return }
-    if (!preparedRef.current || !dRef.current || !boundsRef.current) { liveBakeRef.current = null; requestRender(); return }
+    if (!preparedRef.current || !dRef.current || !boundsRef.current) {
+      liveBakeRef.current = null
+      settleFullBakeWaiters(new Error('full-res bake cancelled: no prepared cut'))
+      requestRender()
+      return
+    }
     bakeInFlight.current = true
     const gen = ++bakeGen.current
     const mode = bakeModeRef.current
@@ -160,19 +185,23 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       if (gen === bakeGen.current) {
         liveBakeRef.current = { canvas: r.canvas, bounds }
         requestRender()
-        if (mode === 'full') { for (const w of fullBakeWaiters.current) w(); fullBakeWaiters.current = [] }
+        if (mode === 'full') settleFullBakeWaiters()
       }
     } catch (e) {
-      if (!(e instanceof BakeCancelled)) setStatus('⚠️ compose failed: ' + String((e as Error)?.message ?? e)) // fail LOUD
+      if (!(e instanceof BakeCancelled)) {
+        const error = e instanceof Error ? e : new Error(String(e))
+        if (mode === 'full' && gen === bakeGen.current) settleFullBakeWaiters(error)
+        if (gen === bakeGen.current) setStatus('⚠️ compose failed: ' + error.message) // fail LOUD
+      }
     }
     bakeInFlight.current = false
     if (bakePending.current) { bakePending.current = false; void runBake() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [requestRender, settleFullBakeWaiters])
   const scheduleBake = useCallback((immediate = false) => {
     if (bakeTimer.current) clearTimeout(bakeTimer.current)
     if (immediate) { bakeGen.current++; void runBake(); return } // supersede in-flight, compose now
     bakeTimer.current = setTimeout(() => {
+      bakeTimer.current = null
       if (draggingRef.current) { bakePending.current = true; return } // mid-drag: NEVER compose — defer to release
       bakeGen.current++; void runBake()
     }, BAKE_IDLE_MS)
@@ -211,12 +240,57 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleBake])
 
+  // ── one FIFO for every accepted Paint/GrabCut gesture ──
+  type ToolJob = {
+    artwork: number
+    run: (isCurrent: () => boolean) => Promise<void>
+    settle: () => void
+  }
+  const toolBusyRef = useRef(false)
+  const toolQueueRef = useRef<ToolJob[]>([])
+  const activeToolRef = useRef<ToolJob | null>(null)
+  const settleToolQueue = useCallback(() => {
+    activeToolRef.current?.settle()
+    for (const job of toolQueueRef.current.splice(0)) job.settle()
+  }, [])
+  const drainToolQueue = useCallback(async () => {
+    if (toolBusyRef.current) return
+    toolBusyRef.current = true
+    try {
+      while (toolQueueRef.current.length) {
+        const job = toolQueueRef.current.shift()!
+        activeToolRef.current = job
+        const isCurrent = () => job.artwork === artworkGen.current
+        try {
+          if (isCurrent()) await job.run(isCurrent)
+        } catch (e) {
+          if (isCurrent()) setStatus('⚠️ ' + String((e as Error)?.message ?? e))
+        } finally {
+          job.settle()
+          activeToolRef.current = null
+        }
+      }
+    } finally {
+      toolBusyRef.current = false
+    }
+  }, [])
+  const runTool = useCallback((op: ToolJob['run']): Promise<void> => new Promise((settle) => {
+    detectGen.current++
+    cancelSegmentML()
+    if (!toolBusyRef.current) setBusy(false)
+    toolQueueRef.current.push({ artwork: artworkGen.current, run: op, settle })
+    if (toolBusyRef.current) setStatus('⏳ finishing the previous edit — your gesture is queued')
+    void drainToolQueue()
+  }), [drainToolQueue])
+
   // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape) ──
   const acceptMask = useCallback(async (
     mask: Mask,
     preseg?: import('@/lib/effect/segment-ml').MLResult,
     opts?: { erase?: boolean; shapeTruth?: boolean; isCurrent?: () => boolean },
   ) => {
+    const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
+    if (!isCurrent()) return false
     // u2net's matte + every mask are consumed VERBATIM (Dan 2026-08-07: no speculative hole/opacity
     // fixes on the pure path. Paint sources still
     // get shape-is-truth below (that is geometry the paint tool OWNS, not a guess on a model matte).
@@ -225,17 +299,25 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       try {
         // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
         // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
-        const loud = (st: string) => { if (st === 'fallback') setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)') }
+        const loud = (st: string) => {
+          if (st === 'fallback' && isCurrent()) setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)')
+        }
         // E3 (meta-verified): VALIDATE BEFORE COMMIT — prepare runs first; maskRef/drawnRef mutate
         // only on success. A failed prepare (e.g. an erase that emptied the mask → 'No silhouette
         // found') leaves the last good selection + outline fully live.
         const nextPrepared = await withTimeout(preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud), T_COMPUTE_MS, 'engine prepare')
-        if (opts?.isCurrent && !opts.isCurrent()) return false
+        if (!isCurrent()) return false
         preparedRef.current = nextPrepared
-      } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept'); return false }
+      } catch (e) {
+        if (isCurrent()) setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept')
+        return false
+      }
     }
+    if (!isCurrent()) return false
+    editPrepGen.current++
     drawnRef.current = null
     maskRef.current = mask
+    hasCutRef.current = true
     setHasCut(true)
     applyFinish()
     // SHAPE-IS-TRUTH (E6/E7/E8) — PAINT-DEPOSIT SOURCES ONLY (Dan device 2026-08-07): the outline
@@ -255,10 +337,19 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       }
       maskRef.current = norm
       const gen = ++editPrepGen.current
+      const artwork = artworkGen.current
       withTimeout(prepareAI(url, norm), T_COMPUTE_MS, 'shape-truth re-prepare')
-        .then((p) => { if (gen === editPrepGen.current) { preparedRef.current = p; scheduleBake() } })
-        .catch((e) => setStatus('⚠️ engine re-prepare failed: ' + String((e as Error).message)))
+        .then((p) => {
+          if (gen === editPrepGen.current && artwork === artworkGen.current && isCurrent()) {
+            preparedRef.current = p
+            scheduleBake()
+          }
+        })
+        .catch((e) => {
+          if (gen === editPrepGen.current && artwork === artworkGen.current && isCurrent()) setStatus('⚠️ engine re-prepare failed: ' + String((e as Error).message))
+        })
     }
+    if (!isCurrent()) return false
     scheduleBake(true) // tool-commit = a compose trigger (Cadence Law), immediate
     pushHistory()
     setStatus(droppedPx > MIN_DROPPED_REGION_PX
@@ -270,36 +361,59 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
-    detectGen.current++
-    cancelSegmentML()
-    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
-    displayFrontRef.current = null; imgCanvas.current = null
-    setBusy(false); setHasCut(false); setMs({})
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    const request = ++uploadGen.current
     const url = URL.createObjectURL(file)
-    urlRef.current = url
     const img = new Image(); img.src = url
-    try { await img.decode() } catch (e) { URL.revokeObjectURL(url); setStatus('⚠️ could not open image: ' + String(e)); return }
-    const s = Math.min(1, WORK_MAX / Math.max(img.naturalWidth, img.naturalHeight))
-    const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s)
-    const master = document.createElement('canvas'); master.width = w; master.height = h
-    const mctx = master.getContext('2d', { willReadFrequently: true })!
-    mctx.drawImage(img, 0, 0, w, h)
+    let master: HTMLCanvasElement
+    let nextDisp: { w: number; h: number }
+    try {
+      await img.decode()
+      const s = Math.min(1, WORK_MAX / Math.max(img.naturalWidth, img.naturalHeight))
+      const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s)
+      master = document.createElement('canvas'); master.width = w; master.height = h
+      const mctx = master.getContext('2d', { willReadFrequently: true })
+      if (!mctx) throw new Error('2D canvas unavailable')
+      mctx.drawImage(img, 0, 0, w, h)
+      const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
+      const k = Math.min(maxW / w, 440 / h, 1)
+      nextDisp = { w: Math.round(w * k), h: Math.round(h * k) }
+    } catch (e) {
+      URL.revokeObjectURL(url)
+      if (request === uploadGen.current) setStatus('⚠️ could not open image: ' + String((e as Error)?.message ?? e) + ' — current artwork kept')
+      return
+    }
+    if (request !== uploadGen.current) { URL.revokeObjectURL(url); return }
+
+    const oldUrl = urlRef.current
+    artworkGen.current++
+    detectGen.current++
+    editPrepGen.current++
+    cancelSegmentML()
+    settleToolQueue()
+    settleBakes('full-res bake cancelled: artwork replaced')
+    disposePrepareAICache()
+    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
+    boundsRef.current = null; displayFrontRef.current = null
+    hasCutRef.current = false; wasOutgrownRef.current = false
+    urlRef.current = url
     imgCanvas.current = master
+    histRef.current = new HistoryStack<Snap>(HISTORY_DEPTH)
+    setHistTick((t) => t + 1)
+    setBusy(false); setHasCut(false); setMs({})
     setHasImage(true)
-    const maxW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 40 : 520)
-    const k = Math.min(maxW / w, 440 / h, 1)
-    setDisp({ w: Math.round(w * k), h: Math.round(h * k) })
+    setDisp(nextDisp)
     requestRender()
     setStatus('🖼 image ready — push 🤖 Detect to auto-cut, or brush the object')
-  }, [requestRender])
+    if (oldUrl) URL.revokeObjectURL(oldUrl)
+  }, [requestRender, settleBakes, settleToolQueue])
 
   // AI DETECT — fixed u2netp -> lazy Silueta -> visible flood-fill, on button push only.
   const detect = useCallback(async () => {
     const img = imgCanvas.current, url = urlRef.current
     if (!img || !url) return
+    const artwork = artworkGen.current
     const gen = ++detectGen.current
-    const isCurrent = () => gen === detectGen.current && urlRef.current === url
+    const isCurrent = () => gen === detectGen.current && artwork === artworkGen.current && urlRef.current === url
     setBusy(true)
     try {
       setStatus('✨ AI magic (u2net · v5.3.1)…')
@@ -335,27 +449,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [scheduleBake])
 
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
-  // ── THE TOOL QUEUE (Dan device r5: tools were silently DEAD while busy — taps swallowed with
-  // zero feedback, reading as 'wand broken / paint not painting'). EVERY tool op runs through one
-  // serialized latest-wins queue: an op landing mid-processing queues (visible status), runs right
-  // after, and NOTHING is ever dropped. No tool is gated on busy anywhere anymore.
-  const toolBusyRef = useRef(false)
-  const pendingToolRef = useRef<(() => Promise<void>) | null>(null)
-  const runTool = useCallback(async (op: () => Promise<void>) => {
-    if (toolBusyRef.current) { pendingToolRef.current = op; setStatus('⏳ finishing the previous edit — your tap is queued'); return }
-    toolBusyRef.current = true
-    try { await op() } catch (e) { setStatus('⚠️ ' + String((e as Error)?.message ?? e)) }
-    toolBusyRef.current = false
-    const q = pendingToolRef.current
-    if (q) { pendingToolRef.current = null; void runTool(q) }
-     
-  }, [])
   // ── THE BRUSH — GrabCut. Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
   // carves). No base → it RECOGNISES the painted shape standalone; a base → it REFINES the cut.
   // Deterministic, no deep model, OpenCV lazy-loads on the first stroke. ──
-  const grabCutStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => runTool(async () => {
+  const grabCutStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => runTool(async (isCurrent) => {
     const img = imgCanvas.current
-    if (!img) return
+    if (!img || !isCurrent()) return
     const brushPx = brushR * (img.width / dispWRef.current)
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
     // STANDALONE when there is no cut (recognise the painted shape on its own); REFINE when one
@@ -366,36 +465,47 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setStatus(base ? (erase ? '✂️ refining the edge…' : '✨ finding the edge…') : '✨ recognising the shape…')
     try {
       const refined = await withTimeout(grabCutRefine(img, base, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
+      if (!isCurrent()) return
       const before = base ? maskArea(base) : 0, after = maskArea(refined)
-      if (after === 0) { setBusy(false); setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
+      if (after === 0) { setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
-      if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setBusy(false); setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
-      if (base && before === after) { setBusy(false); setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
-      const ok = await acceptMask(refined, undefined, { erase })
-      if (ok) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
-    } catch (e) { setStatus('⚠️ ' + String((e as Error).message)) }
-    setBusy(false)
+      if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
+      if (base && before === after) { setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
+      const ok = await acceptMask(refined, undefined, { erase, isCurrent })
+      if (ok && isCurrent()) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
+    } catch (e) {
+      if (isCurrent()) setStatus('⚠️ ' + String((e as Error).message))
+    } finally {
+      if (isCurrent()) setBusy(false)
+    }
   }), [acceptMask, requestRender, runTool])
 
-  const paintStroke = useCallback((stroke: Point[], erase: boolean, brushR: number) => runTool(async () => {
-    const img = imgCanvas.current!
+  const paintStroke = useCallback((stroke: Point[], erase: boolean, brushR: number) => runTool(async (isCurrent) => {
+    const img = imgCanvas.current
+    if (!img || !isCurrent()) return
     const pts = stroke.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
     const brushPx = brushR * (img.width / dispWRef.current)
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too
     const painted = swathMask(pts, brushPx, img.width, img.height, paintCfgRef.current)
     if (!maskRef.current || !hasCutRef.current) {
       if (erase) { setStatus('✂️ nothing to erase yet — paint a shape first or Detect'); requestRender(); return }
-      drawnRef.current = null
-      setBusy(true); await acceptMask(polishMask(painted, brushPx, paintCfgRef.current.polishDiv), undefined, { shapeTruth: true }); setBusy(false)
-      setStatus('✏️ painted shape created — keep painting, erase, or tune')
+      setBusy(true)
+      try {
+        const ok = await acceptMask(polishMask(painted, brushPx, paintCfgRef.current.polishDiv), undefined, { shapeTruth: true, isCurrent })
+        if (ok && isCurrent()) setStatus('✏️ painted shape created — keep painting, erase, or tune')
+      } finally {
+        if (isCurrent()) setBusy(false)
+      }
       return
     }
-    drawnRef.current = null
     const combined = polishMask(erase ? subtractMasks(maskRef.current, painted) : unionMasks(maskRef.current, painted), brushPx, paintCfgRef.current.polishDiv)
     setBusy(true)
-    const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true })
-    setBusy(false)
-    if (ok) setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
+    try {
+      const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true, isCurrent })
+      if (ok && isCurrent()) setStatus(erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned')
+    } finally {
+      if (isCurrent()) setBusy(false)
+    }
   }), [acceptMask, requestRender, runTool])
 
   // ── vector edit orchestration (nodes/frame) ──
@@ -421,7 +531,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setShapeTick((t) => t + 1) // the overlay's anchors must ride the line (glued)
     requestRender()
   }, [requestRender])
-  const editPrepGen = useRef(0)
   const editCommit = useCallback((next: VShape) => {
     const img = imgCanvas.current!
     const ring = shapeRing(next)
@@ -435,10 +544,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
     // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins.
     if (urlRef.current) {
+      const artwork = artworkGen.current
       const gen = ++editPrepGen.current
       withTimeout(prepareAI(urlRef.current, maskRef.current), T_COMPUTE_MS, 'edit re-prepare')
-        .then((p) => { if (gen === editPrepGen.current) { preparedRef.current = p; scheduleBake() } })
-        .catch((e) => setStatus('⚠️ engine re-prepare failed on edit: ' + String((e as Error).message)))
+        .then((p) => {
+          if (gen === editPrepGen.current && artwork === artworkGen.current) { preparedRef.current = p; scheduleBake() }
+        })
+        .catch((e) => {
+          if (gen === editPrepGen.current && artwork === artworkGen.current) setStatus('⚠️ engine re-prepare failed on edit: ' + String((e as Error).message))
+        })
     }
     applyFinish()
     pushHistory()
@@ -467,37 +581,87 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [editCommit])
 
   // ── history / save ──
-  const restore = useCallback(async (s: Snap) => {
-    maskRef.current = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
-    drawnRef.current = s.drawn
-    settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
-    blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
-    setHasCut(!!(s.mask || s.drawn))
-    // re-prepare the subject matte for the restored geometry — cut states from the restored mask,
-    // DRAWN states from the shape (else undo onto an edited shape bakes a stale subject).
+  const restore = useCallback(async (s: Snap): Promise<boolean> => {
+    const generation = artworkGen.current
     const img = imgCanvas.current, url = urlRef.current
-    const forMask = s.drawn ? maskFromShape(s.drawn.shape, img?.width ?? 1, img?.height ?? 1) : maskRef.current
-    if (forMask && img && url) {
-      try { preparedRef.current = await withTimeout(prepareAI(url, forMask), T_COMPUTE_MS, 'restore prepare') } catch { /* keep last prepared */ }
+    setBusy(true)
+    try {
+      const nextMask = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
+      const nextDrawn = s.drawn
+      const forMask = nextDrawn ? maskFromShape(nextDrawn.shape, img?.width ?? 1, img?.height ?? 1) : nextMask
+      const nextPrepared = forMask && img && url
+        ? await withTimeout(prepareAI(url, forMask), T_COMPUTE_MS, 'restore prepare')
+        : null
+      if (generation !== artworkGen.current) return false
+
+      artworkGen.current++
+      detectGen.current++
+      editPrepGen.current++
+      cancelSegmentML()
+      settleToolQueue()
+      settleBakes('full-res bake cancelled: history restored')
+      maskRef.current = nextMask
+      drawnRef.current = nextDrawn
+      preparedRef.current = nextPrepared
+      displayFrontRef.current = null
+      liveBakeRef.current = null
+      settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
+      blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
+      hasCutRef.current = !!(nextMask || nextDrawn)
+      wasOutgrownRef.current = false
+      setHasCut(hasCutRef.current)
+      applyFinish(false)
+      scheduleBake(true)
+      setBusy(false)
+      return true
+    } catch (e) {
+      if (generation === artworkGen.current) {
+        setBusy(false)
+        setStatus('⚠️ history restore failed: ' + String((e as Error)?.message ?? e) + ' — current state kept')
+      }
+      return false
     }
-    applyFinish()
-    scheduleBake(true)
-  }, [applyFinish, scheduleBake])
-  const undo = useCallback(async () => { const s = histRef.current.undo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }, [restore])
-  const redo = useCallback(async () => { const s = histRef.current.redo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }, [restore])
+  }, [applyFinish, scheduleBake, settleBakes, settleToolQueue])
+  const undo = useCallback(async () => {
+    const s = histRef.current.undo()
+    if (!s) return
+    if (await restore(s)) { setHistTick((t) => t + 1); setStatus('↩ restored previous cut') }
+    else histRef.current.redo()
+  }, [restore])
+  const redo = useCallback(async () => {
+    const s = histRef.current.redo()
+    if (!s) return
+    if (await restore(s)) { setHistTick((t) => t + 1); setStatus('↪ restored next cut') }
+    else histRef.current.undo()
+  }, [restore])
   const clearAll = useCallback(() => {
+    uploadGen.current++
+    artworkGen.current++
     detectGen.current++
+    editPrepGen.current++
     cancelSegmentML()
+    settleToolQueue()
+    settleBakes('full-res bake cancelled: cut cleared')
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
+    hasCutRef.current = false; wasOutgrownRef.current = false
     setBusy(false); setHasCut(false); pushHistory(); requestRender()
     setStatus('🗑 cleared — paint a new shape, or Detect')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestRender])
+  }, [requestRender, settleBakes, settleToolQueue])
 
   /** await the next COMMITTED full-res bake (requested through the one scheduler + gen token) */
-  const awaitFullBake = useCallback((): Promise<void> => new Promise((res) => {
-    fullBakeWaiters.current.push(res)
+  const awaitFullBake = useCallback((): Promise<void> => new Promise((resolve, reject) => {
+    const waiter: FullBakeWaiter = {
+      resolve,
+      reject,
+      timer: setTimeout(() => {
+        const i = fullBakeWaiters.current.indexOf(waiter)
+        if (i >= 0) fullBakeWaiters.current.splice(i, 1)
+        reject(new ToolTimeout('full-res bake', T_COMPUTE_MS))
+      }, T_COMPUTE_MS),
+    }
+    fullBakeWaiters.current.push(waiter)
     bakeModeRef.current = 'full'
     scheduleBake(true)
   }), [scheduleBake])
@@ -507,18 +671,30 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const setPreview = useCallback((on: boolean) => {
     previewRef.current = on
     if (!preparedRef.current) return
+    if (!on && fullBakeWaiters.current.length) settleFullBakeWaiters(new Error('full-res bake cancelled: preview closed'))
     bakeModeRef.current = on ? 'full' : 'display'
     scheduleBake(true)
-  }, [scheduleBake])
+  }, [scheduleBake, settleFullBakeWaiters])
 
   const save = useCallback(async () => {
     const img = imgCanvas.current
     if (!img || !dRef.current || !boundsRef.current || !maskRef.current || !preparedRef.current) return
-    try { await withTimeout(awaitFullBake(), T_COMPUTE_MS, 'full-res bake') }
-    catch (e) { setStatus('⚠️ ' + String((e as Error).message)); if (!previewRef.current) bakeModeRef.current = 'display'; return }
+    const generation = artworkGen.current
+    try { await awaitFullBake() }
+    catch (e) {
+      if (generation === artworkGen.current) {
+        setStatus('⚠️ ' + String((e as Error).message))
+        if (!previewRef.current) bakeModeRef.current = 'display'
+      }
+      return
+    }
+    if (generation !== artworkGen.current) return
     const baked = liveBakeRef.current
     if (!previewRef.current) { bakeModeRef.current = 'display'; scheduleBake() } // return to edit-res
-    baked?.canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href) })
+    baked?.canvas.toBlob((b) => {
+      if (!b || generation !== artworkGen.current) return
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'cutout.png'; a.click(); URL.revokeObjectURL(a.href)
+    })
   }, [awaitFullBake, scheduleBake])
 
   const canBrush = useCallback((tool: string): boolean => {
@@ -540,13 +716,20 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [])
 
   useEffect(() => () => {
+    uploadGen.current++
+    artworkGen.current++
     detectGen.current++
+    editPrepGen.current++
+    cancelSegmentML()
     disposeSegmentML()
+    settleToolQueue()
+    settleBakes('full-res bake cancelled: cutout flow unmounted')
+    disposePrepareAICache()
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     urlRef.current = null
     imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
-  }, [])
+  }, [settleBakes, settleToolQueue])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
 

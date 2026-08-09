@@ -161,12 +161,15 @@ function mirrorMosaicRegion(src: HTMLCanvasElement, rx0: number, ry0: number, W:
  *  tail (`matteToMLResult`: lo mask @ the bridge's maskDim + hi texture @ the device cap, y-up,
  *  post-processed). All dims are the BRIDGE'S config, none the lab's. */
 // EMPTY-STOMACH CACHE (§I2b law 4): the decoded original at the texture cap + the scratch
-// canvases are built ONCE per upload (keyed on the object URL; a new upload = new URL = new key)
-// and REUSED every tap — never re-decoded, never re-allocated. Clear keeps the URL → cache holds.
+// canvases are built ONCE per accepted artwork (keyed on its object URL) and REUSED every tap —
+// never re-decoded or re-allocated — until replacement or unmount releases them.
 let presegCache: {
   url: string; base: HTMLCanvasElement; ow: number; oh: number
   matte: HTMLCanvasElement; alpha: HTMLCanvasElement; av: ImageData; aw: number; ah: number
 } | null = null
+
+/** Release upload-owned raster scratch when its artwork is replaced or unmounted. */
+export function disposePrepareAICache(): void { presegCache = null }
 
 async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   const { w, h } = mask

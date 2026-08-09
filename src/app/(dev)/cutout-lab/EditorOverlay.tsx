@@ -129,7 +129,7 @@ export function EditorOverlay({ shape, imgW, imgH, view, mode, aspectLocked, onE
     <svg
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
-      onPointerMove={move} onPointerUp={up} onPointerLeave={up}
+      onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
       onPointerDown={(e) => {
         if (mode !== 'nodes' || dragRef.current) return
         // ADD mode: an empty-space / outline tap inserts. MOVE/DELETE: a tap on empty space only

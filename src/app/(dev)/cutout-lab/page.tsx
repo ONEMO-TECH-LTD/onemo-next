@@ -127,17 +127,24 @@ export default function CutoutLab() {
       ctx.drawImage(tmp, 0, 0, img.width, img.height)
     }
     const st = strokeRef.current
-    if (st.length > 1) {
+    if (st.length > 0) {
       const t = toolRef.current
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'
       if (t === 'draw' || t === 'draw-erase') {
         // PAINT ink (WYSIWYG): the stroke renders at the actual brush width — what you paint is
         // the area that lands. Violet = add, red = erase.
-        ctx.strokeStyle = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
+        const ink = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
+        ctx.strokeStyle = ink; ctx.fillStyle = ink
         ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * 2)
-        ctx.beginPath(); ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
-        for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
-        ctx.stroke()
+        ctx.beginPath()
+        if (st.length === 1) {
+          ctx.arc(st[0].x * img.width, st[0].y * img.height, ctx.lineWidth / 2, 0, Math.PI * 2)
+          ctx.fill()
+        } else {
+          ctx.moveTo(st[0].x * img.width, st[0].y * img.height)
+          for (const q of st) ctx.lineTo(q.x * img.width, q.y * img.height)
+          ctx.stroke()
+        }
       }
     }
     const trail = trailRef.current
@@ -244,7 +251,13 @@ export default function CutoutLab() {
     setTool(m)
   }
   const onEditLive = (next: VShape) => flow.actions.editLive(next)
-  const onEditCommit = (next: VShape) => flow.actions.editCommit(next)
+  const onEditCommit = (next: VShape) => {
+    flow.actions.editCommit(next)
+    if (selNode) {
+      nodeBaseRef.current = next
+      setNodeAdj(flow.measureNode(next, selNode.pi, selNode.ai))
+    }
+  }
   const selectNode = (sel: { pi: number; ai: number } | null) => {
     setSelNode(sel)
     nodeBaseRef.current = shapeRef.current
@@ -393,6 +406,7 @@ export default function CutoutLab() {
             )}
             {/* FIXED viewport (Dan): the box never grows — the content contain-fits, the object reads smaller */}
             <canvas ref={viewRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
+              onPointerCancel={onUp}
               onPointerLeave={() => { cursorRef.current = null; onUp() }}
               onWheel={(e) => { setBrushR((b) => Math.max(1, Math.min(120, Math.round(b - e.deltaY * 0.08)))); requestAnimationFrame(render) }}
               style={{ width: '100%', height: '100%', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: 8, touchAction: 'none', background: 'transparent', cursor: editing ? 'default' : 'crosshair', display: 'block' }} />

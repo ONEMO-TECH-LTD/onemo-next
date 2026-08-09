@@ -81,9 +81,15 @@ export function swathMask(
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
   ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult) // 1px floor (Dan: brush down to 1)
-  ctx.beginPath()
-  stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-  ctx.stroke()
+  if (stroke.length === 1) {
+    ctx.beginPath()
+    ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (stroke.length > 1) {
+    ctx.beginPath()
+    stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+    ctx.stroke()
+  }
   // closed gesture → fill the interior too
   const first = stroke[0], last = stroke[stroke.length - 1]
   let perim = 0

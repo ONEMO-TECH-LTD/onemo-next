@@ -178,6 +178,17 @@ describe('KAI-10216 accepted behavior', () => {
     expect(history.canRedo()).toBe(false)
     expect(history.undo()).toBe(3)
   })
+
+  it('keeps the first accepted cut non-undoable and Clear undoable', () => {
+    const history = new HistoryStack<string>()
+    history.push('first cut')
+    expect(history.canUndo()).toBe(false)
+    history.push('clear')
+    expect(history.canUndo()).toBe(true)
+    expect(history.undo()).toBe('first cut')
+    expect(history.canRedo()).toBe(true)
+    expect(history.redo()).toBe('clear')
+  })
 })
 
 describe('later increment defect reproductions', () => {
@@ -186,16 +197,16 @@ describe('later increment defect reproductions', () => {
     expect(cutout('page.tsx')).toContain("u.searchParams.get('debug') === '1'")
   })
 
-  it.fails('KAI-10218 publishes a replacement only after decode succeeds', () => {
+  it('KAI-10218 publishes a replacement only after decode succeeds', () => {
     const source = cutout('flow.ts')
     expect(source.indexOf('await img.decode()')).toBeLessThan(source.indexOf('maskRef.current = null'))
   })
 
-  it.fails('KAI-10218 replaces the one-slot tool queue with FIFO ownership', () => {
+  it('KAI-10218 replaces the one-slot tool queue with FIFO ownership', () => {
     expect(cutout('flow.ts')).not.toContain('pendingToolRef')
   })
 
-  it.fails('KAI-10218 renders one-point Paint and settles canvas pointer cancellation', () => {
+  it('KAI-10218 renders one-point Paint and settles canvas pointer cancellation', () => {
     const source = cutout('page.tsx')
     expect(source).toContain('if (st.length > 0)')
     expect(source).toContain('onPointerCancel={onUp}')
