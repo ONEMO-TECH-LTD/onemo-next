@@ -13,7 +13,7 @@ export interface PaintConfig {
   polishStrength: number  // 0..1; outline smoothing radius = brush × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { swathMult: 2, polishStrength: 1 / 3, closeFrac: 0.2 }
+export const PAINT_DEFAULTS: PaintConfig = { swathMult: 1, polishStrength: 1 / 3, closeFrac: 0.2 }
 
 /** Rasterize a drawn shape to a BINARY Mask (subject matte for the blend layer — inside = subject).
  *  Shares solidShapeMask's rasterizer; drops the soft channel (the paint-edit mask is binary). */

@@ -79,6 +79,8 @@ try {
   assert.deepEqual(afterCorrupt, beforeCorrupt, 'corrupt replacement must retain exact output bytes')
 
   // Three rapidly accepted Paint gestures settle once each in capture order.
+  // Use a smaller brush than the standalone seed so the erase cannot legitimately empty it.
+  await page.locator('input[type=number]').fill('5')
   await page.evaluate(() => {
     window.__cutoutStatuses = []
     const line = [...document.querySelectorAll('p')].find((node) => node.textContent?.includes('Status:'))

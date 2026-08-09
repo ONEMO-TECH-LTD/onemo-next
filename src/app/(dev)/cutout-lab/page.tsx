@@ -139,7 +139,7 @@ export default function CutoutLab() {
         // the area that lands. Violet = add, red = erase.
         const ink = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
         ctx.strokeStyle = ink; ctx.fillStyle = ink
-        ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * 2)
+        ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * paintCfg.swathMult)
         ctx.beginPath()
         if (st.length === 1) {
           ctx.arc(st[0].x * img.width, st[0].y * img.height, ctx.lineWidth / 2, 0, Math.PI * 2)
@@ -177,15 +177,18 @@ export default function CutoutLab() {
     if (cur && imgCanvas.current) { // ring for EVERY brush tool once an image exists (post-Clear too)
       const t = toolRef.current
       if (t !== 'nodes' && t !== 'frame') {
+        const radius = t === 'draw' || t === 'draw-erase'
+          ? brushRef.current * paintCfg.swathMult / 2
+          : brushRef.current
         ctx.beginPath()
-        ctx.arc(cur.x * img.width, cur.y * img.height, brushRef.current * (viewBoxRef.current.w / disp.w), 0, 6.29)
+        ctx.arc(cur.x * img.width, cur.y * img.height, radius * (viewBoxRef.current.w / disp.w), 0, 6.29)
         ctx.lineWidth = Math.max(2, img.width * 0.003)
         ctx.strokeStyle = t === 'add' ? 'rgba(34,197,94,1)' : t === 'draw' ? 'rgba(124,58,237,1)' : 'rgba(239,68,68,1)'
         ctx.stroke()
       }
     }
     ctx.restore() // view-box translate
-  }, [disp.w, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
+  }, [disp.w, paintCfg.swathMult, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
   useEffect(() => { renderRef.current = render }, [render])
   useEffect(() => { requestAnimationFrame(() => renderRef.current()) }, [tool]) // mask tint follows the tool mode instantly
 

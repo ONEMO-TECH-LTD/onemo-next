@@ -53,6 +53,7 @@ type PaintCalibrationSource = {
   brushPx: number
   erase: boolean
 }
+type OutlineSourceKind = 'cutout' | 'paint'
 
 const cloneMask = (mask: Mask): Mask => ({ data: mask.data.slice(), w: mask.w, h: mask.h, soft: mask.soft?.slice() })
 
@@ -111,6 +112,19 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const urlRef = useRef<string | null>(null)
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
+  const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
+  const cutoutSettingsRef = useRef<TraceOutlineSettings>({ ...AUTO_SETTINGS })
+  const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
+  const activateOutlineSource = useCallback((source: OutlineSourceKind) => {
+    if (outlineSourceRef.current === source) return
+    const current = { ...settingsRef.current }
+    if (outlineSourceRef.current === 'paint') paintSettingsRef.current = current
+    else cutoutSettingsRef.current = current
+    outlineSourceRef.current = source
+    const next = { ...(source === 'paint' ? paintSettingsRef.current : cutoutSettingsRef.current) }
+    settingsRef.current = next
+    setSettings(next)
+  }, [])
   const blendRef = useRef(blend); blendRef.current = blend
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
@@ -130,11 +144,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [])
 
   // ── history (pure module, flow-driven) ──
-  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings; paint: PaintConfig }
+  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; outlineSource: OutlineSourceKind; settings: TraceOutlineSettings; blendS: BlendSettings; paint: PaintConfig }
   const histRef = useRef(new HistoryStack<Snap>(HISTORY_DEPTH))
   const snapNow = (): Snap => ({
     mask: maskRef.current ? cloneMask(maskRef.current) : null,
     drawn: drawnRef.current,
+    outlineSource: outlineSourceRef.current,
     settings: { ...settingsRef.current }, blendS: { ...blendRef.current }, paint: { ...paintCfgRef.current }, // meta B3: knobs travel with the state
   })
   const pushHistory = () => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }
@@ -305,7 +320,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const acceptMask = useCallback(async (
     mask: Mask,
     preseg?: MLResult,
-    opts?: { erase?: boolean; shapeTruth?: boolean; isCurrent?: () => boolean; replaceHistory?: boolean },
+    opts?: { erase?: boolean; shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean },
   ) => {
     const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
     if (!isCurrent()) return false
@@ -339,6 +354,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       }
     }
     if (!isCurrent()) return false
+    activateOutlineSource(opts?.source ?? 'cutout')
     editPrepGen.current++
     drawnRef.current = null
     maskRef.current = mask
@@ -383,7 +399,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — refine, draw, edit, tune, or Save`)
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyFinish, scheduleBake])
+  }, [activateOutlineSource, applyFinish, scheduleBake])
 
   const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => {
     const next = { ...paintCfgRef.current, ...patch }
@@ -408,7 +424,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         return
       }
       setBusy(true)
-      void acceptMask(recalculated, undefined, { erase: source.erase, shapeTruth: true, isCurrent, replaceHistory: true })
+      void acceptMask(recalculated, undefined, { erase: source.erase, shapeTruth: true, source: 'paint', isCurrent, replaceHistory: true })
         .then((ok) => {
           if (ok && isCurrent()) setStatus('⚙️ latest Paint stroke recalculated')
         })
@@ -482,7 +498,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       setMs({ cut: Math.round(performance.now() - t0) })
       crashStage('4·prepare+bake')                 // lab-layer engine prepare + compose (subject/texture/output)
       // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
-      const accepted = await acceptMask(r.mask, r.preseg, { isCurrent })
+      const accepted = await acceptMask(r.mask, r.preseg, { source: 'cutout', isCurrent })
       if (!isCurrent()) return
       if (accepted) invalidatePaintCalibration()
       if (accepted && (r.adapter === 'bg-flood' || r.adapter === 'alpha')) {
@@ -501,6 +517,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
   const setTune = useCallback((patch: Partial<TraceOutlineSettings>) => {
     const n = { ...settingsRef.current, ...patch }; settingsRef.current = n; setSettings(n)
+    if (outlineSourceRef.current === 'paint') paintSettingsRef.current = n
+    else cutoutSettingsRef.current = n
     requestAnimationFrame(() => applyFinish())
   }, [applyFinish])
   const setBlendTune = useCallback((patch: Partial<BlendSettings>) => {
@@ -562,7 +580,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
       if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
       if (base && before === after) { setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
-      const ok = await acceptMask(refined, undefined, { erase, isCurrent })
+      const ok = await acceptMask(refined, undefined, { erase, source: 'cutout', isCurrent })
       if (ok && isCurrent()) invalidatePaintCalibration()
       if (ok && isCurrent()) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
     } catch (e) {
@@ -585,7 +603,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const combined = paintMask(source, paintCfgRef.current, img.width, img.height)
     setBusy(true)
     try {
-      const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true, isCurrent })
+      const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true, source: 'paint', isCurrent })
       if (ok && isCurrent()) {
         paintCalibrationRef.current = source
         setStatus(base ? (erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned') : '✏️ painted shape created — keep painting, erase, or tune')
@@ -627,6 +645,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // first real edit folds the recipe into the edited base (rebase); knobs then read from zero
       const zero = { ...ZERO_SETTINGS }
       settingsRef.current = zero; setSettings(zero)
+      if (outlineSourceRef.current === 'paint') paintSettingsRef.current = zero
+      else cutoutSettingsRef.current = zero
     }
     maskRef.current = maskFromShape(next, img.width, img.height)
     nativePresegRef.current = null
@@ -696,7 +716,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       nativePresegRef.current = null
       displayFrontRef.current = null
       liveBakeRef.current = null
+      outlineSourceRef.current = s.outlineSource
       settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
+      if (s.outlineSource === 'paint') paintSettingsRef.current = settingsRef.current
+      else cutoutSettingsRef.current = settingsRef.current
       blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
       paintCfgRef.current = { ...s.paint }; setPaintCfgState(paintCfgRef.current)
       hasCutRef.current = !!(nextMask || nextDrawn)

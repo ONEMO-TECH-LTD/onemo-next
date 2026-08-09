@@ -246,14 +246,22 @@ async function runBrowser(browserType) {
     const routeOutput = pngInfo(readFileSync(await (await pending).path()))
     assert.deepEqual(routeOutput, routeExpected[browserName], `${browserName}: completed GrabCut output changed`)
 
-    // Paint calibration: the full useful ranges must re-run the latest real Paint stroke live.
+    // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
+    const vectorKnob = routePage.locator('input[type=number]')
+    await vectorKnob.fill('37')
+    assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: cutout vector recipe did not accept calibration`)
+
+    // Paint calibration: the full useful ranges must re-run the latest real Paint stroke live.
     await routePage.getByRole('button', { name: /Clear/ }).click()
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     await routePage.getByRole('button', { name: /Paint shape/ }).click()
     const swath = routePage.getByRole('slider', { name: 'Paint swath width' })
     const smoothing = routePage.getByRole('slider', { name: 'Paint smoothing' })
     const loopClose = routePage.getByRole('slider', { name: 'Paint loop-close' })
+    assert.equal(await swath.inputValue(), '1', `${browserName}: Paint swath must default to the brush width`)
     assert.deepEqual(
       await Promise.all([swath, smoothing, loopClose].map(async (slider) => [await slider.getAttribute('min'), await slider.getAttribute('max')])),
       [['0', '12'], ['0', '100'], ['0', '1']],
@@ -268,6 +276,11 @@ async function runBrowser(browserType) {
       { x: paintBox.x + paintBox.width * 0.65, y: paintBox.y + paintBox.height * 0.35 },
     ], 4)
     await status.filter({ hasText: /painted shape created/ }).waitFor({ timeout: 60_000 })
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
+    assert.equal(await vectorKnob.inputValue(), '0', `${browserName}: Paint must start from an unmodified vector recipe`)
+    await vectorKnob.fill('23')
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     const canvasData = () => routePage.locator('canvas').first().evaluate(async (canvas) => {
       const blob = await new Promise((settle) => canvas.toBlob(settle))
       const bytes = await blob.arrayBuffer()
@@ -300,9 +313,21 @@ async function runBrowser(browserType) {
     await routePage.mouse.up()
     await routePage.getByRole('button', { name: /Blend/ }).click()
     assert.equal(await routePage.locator('input[type=number]').inputValue(), '0', `${browserName}: Blend must not wake above zero on outgrowth`)
+
+    // Returning to an accepted GrabCut restores the prior sticker-cutout recipe, not Paint's recipe.
+    await routePage.getByRole('button', { name: /Clear/ }).click()
+    await routePage.getByRole('button', { name: /^🤖 AI$/ }).click()
+    await routePage.getByRole('button', { name: /Add/ }).click()
+    const restoredBox = await routePage.locator('canvas').first().boundingBox()
+    assert(restoredBox, `${browserName}: restored GrabCut canvas must be visible`)
+    await draw(routePage, [{ x: restoredBox.x + restoredBox.width * 0.43, y: restoredBox.y + restoredBox.height * 0.47 }, { x: restoredBox.x + restoredBox.width * 0.58, y: restoredBox.y + restoredBox.height * 0.54 }], 8)
+    await status.filter({ hasText: /shape recognised/ }).waitFor({ timeout: 60_000 })
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
+    assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: GrabCut did not restore the prior cutout vector recipe`)
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
-    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, paintLiveCalibration: true, opencvRequests: opencvRequests.length }
+    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, paintLiveCalibration: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
   } finally {
     await browser.close()
   }

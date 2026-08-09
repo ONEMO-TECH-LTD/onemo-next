@@ -30,7 +30,7 @@ export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
 export const AUTO_SETTINGS: TraceOutlineSettings = {
   ...TRACE_OUTLINE_DEFAULTS,
-  // Dan's default config for ANY shape (2026-08-06): offset 3, the rest 10.
+  // Dan's default sticker-cutout config for AI/GrabCut: offset 3, the rest 10.
   // detail is UI-inverted (knob 10 = engine 90); straighten/curve stay 0 (off the surface).
   detail: 90, offset: 3, simplify: 10, smooth: 10, radius: 10,
 }
