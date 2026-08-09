@@ -92,4 +92,15 @@ describe('grid-lab v5.3.1 outline-control binding', () => {
       expect(JSON.stringify(shape), `${control} must change the outline`).not.toBe(baseline)
     }
   })
+
+  it('keeps Simplify effective after Detail has coarsened a generated trace', () => {
+    const cutoutInput = { ...input, simplifyAfterDetail: true }
+    const detailOnly = resolveTraceOutline(cutoutInput, { ...OFF, detail: 0 })
+    const detailAndSimplify = resolveTraceOutline(cutoutInput, { ...OFF, detail: 0, simplify: 300 })
+
+    expect(detailOnly).not.toBeNull()
+    expect(detailAndSimplify).not.toBeNull()
+    expect(JSON.stringify(detailAndSimplify)).not.toBe(JSON.stringify(detailOnly))
+    expect(detailAndSimplify!.paths[0].anchors.some((anchor) => anchor.hIn || anchor.hOut)).toBe(true)
+  })
 })

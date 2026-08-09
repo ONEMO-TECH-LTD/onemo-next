@@ -31,7 +31,7 @@ export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 /** Owner-calibrated recipes in the original v1 visible control units. */
 export const VECTOR_PRESETS = [
   { name: 'ZERO', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
-  { name: 'PURE', detail: 1, offset: 1, simplify: 1, smooth: 1, radius: 1 },
+  { name: 'PURE', detail: 0, offset: 1, simplify: 15, smooth: 0, radius: 0 },
   { name: 'CLASSIC', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
   { name: 'TECHNO', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
   { name: 'EDGY', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
@@ -207,6 +207,7 @@ export function finishSpec(prepared: PreparedEffectBase, settings: TraceOutlineS
       maskWidthPx: spec.maskWidthPx,
       maskHeightPx: spec.maskHeightPx,
       mmPerPx: spec.mmPerPx,
+      simplifyAfterDetail: settings.detail !== 100,
     },
     settings,
   )

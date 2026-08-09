@@ -205,14 +205,14 @@ describe('KAI-10220 owner-named vector presets', () => {
   it('pins ZERO plus the six CSV recipes in original v1 control units', () => {
     expect(VECTOR_PRESETS).toEqual([
       { name: 'ZERO', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
-      { name: 'PURE', detail: 1, offset: 1, simplify: 1, smooth: 1, radius: 1 },
+      { name: 'PURE', detail: 0, offset: 1, simplify: 15, smooth: 0, radius: 0 },
       { name: 'CLASSIC', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
       { name: 'TECHNO', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
       { name: 'EDGY', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
       { name: 'FLUID', detail: 0, offset: 4, simplify: 100, smooth: 0, radius: 13 },
       { name: 'SPACE', detail: 80, offset: 15, simplify: 0, smooth: 0, radius: 5 },
     ])
-    expect(settingsForVectorPreset('PURE')).toMatchObject({ detail: 99, offset: 1, simplify: 1, smooth: 1, radius: 1 })
+    expect(settingsForVectorPreset('PURE')).toMatchObject({ detail: 100, offset: 1, simplify: 15, smooth: 0, radius: 0 })
     expect(settingsForVectorPreset('SPACE')).toMatchObject({ detail: 20, offset: 15, simplify: 0, smooth: 0, radius: 5 })
   })
 })

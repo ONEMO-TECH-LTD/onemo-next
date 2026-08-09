@@ -207,3 +207,12 @@
   to 5px, freeze both goldens, then rerun the complete two-browser oracle.
 - Remember: when a product-approved pixel change intentionally alters a golden, collect Chromium and
   WebKit witnesses separately before declaring the updated oracle deterministic.
+
+## 2026-08-09 — current-code GrabCut oracle hit the timing gate during golden refresh
+
+- Failed: two immediate reruns stopped at the existing 10-second real-route timing assertion before
+  reaching the intentional PURE-default output witnesses.
+- Worked: temporarily widen only the local capture pass, collect the new deterministic pixel goldens,
+  restore the 10-second acceptance threshold, then rerun the final oracle on an idle server.
+- Remember: a transient timing failure must not be hidden by permanently weakening the shipped gate;
+  separate golden collection from the final performance verdict.

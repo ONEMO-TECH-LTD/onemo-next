@@ -10,7 +10,7 @@ export const VEC_CHIPS = ['detail', 'offset', 'simplify', 'smooth', 'radius'] as
 export const BLEND_CHIPS = ['blend'] as const
 
 export const CHIP_RANGE: Record<string, [number, number]> = {
-  detail: [0, 100], offset: [0, 15], simplify: [0, 100], smooth: [0, 200], straighten: [0, 100],
+  detail: [0, 100], offset: [0, 25], simplify: [0, 300], smooth: [0, 200], straighten: [0, 100],
   radius: [0, 100], curve: [0, 100], blend: [0, 100],
   nodeRadius: [0, NODE_KNOB_MAX.radius], nodeCurve: [0, NODE_KNOB_MAX.curve], // per-node knobs — scale owned by vector-edit
 }

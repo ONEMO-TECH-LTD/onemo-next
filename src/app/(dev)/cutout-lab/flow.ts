@@ -92,8 +92,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const [ms, setMs] = useState<{ cut?: number }>({})
-  const [settings, setSettings] = useState<TraceOutlineSettings>(ZERO_SETTINGS)
-  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('ZERO')
+  const [settings, setSettings] = useState<TraceOutlineSettings>(() => settingsForVectorPreset('PURE'))
+  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('PURE')
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
@@ -121,9 +121,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const settingsRef = useRef(settings); settingsRef.current = settings
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
   const vectorPresetRef = useRef<VectorPresetName | null>(vectorPreset); vectorPresetRef.current = vectorPreset
-  const cutoutSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
+  const cutoutSettingsRef = useRef<TraceOutlineSettings>(settingsForVectorPreset('PURE'))
   const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
-  const cutoutPresetRef = useRef<VectorPresetName | null>('ZERO')
+  const cutoutPresetRef = useRef<VectorPresetName | null>('PURE')
   const paintPresetRef = useRef<VectorPresetName | null>('ZERO')
   const activateOutlineSource = useCallback((source: OutlineSourceKind) => {
     if (outlineSourceRef.current === source) return

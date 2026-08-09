@@ -83,12 +83,12 @@ const finishedExpected = {
   },
 }
 const routeExpected = {
-  chromium: { width: 1158, height: 349, colorType: 6, sha256: '0c04006cc6f6c0400586d1845d801e17323de916feddc63c447660e3c14f2b4c' },
-  webkit: { width: 1158, height: 349, colorType: 6, sha256: '648358ca3a944ba3b83441fbb907d64e8480d81d8a8c853558c0aec9bd785baf' },
+  chromium: { width: 1189, height: 381, colorType: 6, sha256: 'e75193693a0b61026266a8650edf32107357328a55a124c0b6e677daa6105271' },
+  webkit: { width: 1189, height: 381, colorType: 6, sha256: '8601035da228ed327432b55348a2969f5d2ba0bc9ce325a2600b3da82e6c70cd' },
 }
 const originalRouteExpected = {
-  chromium: { width: 1543, height: 465, colorType: 6, sha256: '33af8330d5a6b9566618a4854f27fe0b420583f722ffcd2c711b3674c5a7d78c' },
-  webkit: { width: 1543, height: 465, colorType: 6, sha256: '54ad0ecf80603370f4de04d8f33d336a58ffa18f8edf2418e9aab3ab42f85992' },
+  chromium: { width: 1585, height: 508, colorType: 6, sha256: '436381757e752b143016e6e87ac6dd7be9feadf730a71d228eeb3de5bab0308f' },
+  webkit: { width: 1585, height: 508, colorType: 6, sha256: 'd7913ac6c2b7895a988b2f6a6c0278a18eefb217ada040df861cee117e87bd69' },
 }
 
 const pngInfo = (bytes) => ({
@@ -244,12 +244,40 @@ async function runBrowser(browserType) {
     assert.equal(await edgeFinish.inputValue(), '8', `${browserName}: shared edge finish default changed`)
     await routePage.getByRole('button', { name: /Vector/ }).click()
     const vectorPreset = routePage.getByRole('combobox', { name: 'vector preset' })
+    const vectorKnob = routePage.locator('input[type=number]')
+    const canvasData = () => routePage.locator('canvas').first().evaluate(async (canvas) => {
+      const blob = await new Promise((settle) => canvas.toBlob(settle))
+      const bytes = await blob.arrayBuffer()
+      return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+        .map((value) => value.toString(16).padStart(2, '0')).join('')
+    })
     assert.deepEqual(
       await vectorPreset.locator('option').allTextContents(),
       ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'],
       `${browserName}: named vector preset order changed`,
     )
-    assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: vector preset must default to ZERO`)
+    assert.equal(await vectorPreset.inputValue(), 'PURE', `${browserName}: cutout vector preset must default to PURE`)
+    await routePage.getByRole('button', { name: 'offset', exact: true }).click()
+    assert.deepEqual(
+      [await vectorKnob.getAttribute('min'), await vectorKnob.getAttribute('max')],
+      ['0', '25'],
+      `${browserName}: restored Offset calibration range must extend to 25`,
+    )
+    await routePage.getByRole('button', { name: 'simplify', exact: true }).click()
+    assert.deepEqual(
+      [await vectorKnob.getAttribute('min'), await vectorKnob.getAttribute('max')],
+      ['0', '300'],
+      `${browserName}: Simplify must expose the engine's existing 3x intensity headroom`,
+    )
+    await routePage.getByRole('button', { name: 'detail', exact: true }).click()
+    await vectorKnob.fill('70')
+    await routePage.getByRole('button', { name: 'simplify', exact: true }).click()
+    await vectorKnob.fill('15'); await routePage.waitForTimeout(500)
+    const simplify15 = await canvasData()
+    await vectorKnob.fill('300'); await routePage.waitForTimeout(500)
+    assert.notEqual(await canvasData(), simplify15, `${browserName}: Simplify stayed ineffective after Detail coarsened the Cutout trace`)
+    await vectorPreset.selectOption('PURE')
+    await status.filter({ hasText: /PURE vector preset/ }).waitFor()
     const preview = routePage.getByRole('button', { name: /Preview|Editing view/ })
     if ((await preview.textContent())?.includes('Preview')) await preview.click()
     await routePage.getByText('Preview — same result, cut out').waitFor()
@@ -283,7 +311,6 @@ async function runBrowser(browserType) {
     await vectorPreset.selectOption('TECHNO')
     await status.filter({ hasText: /TECHNO vector preset/ }).waitFor()
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
-    const vectorKnob = routePage.locator('input[type=number]')
     assert.equal(await vectorKnob.inputValue(), '20', `${browserName}: TECHNO must retain its CSV Smooth value`)
 
     // Preset calibration replaces the accepted snapshot instead of adding an Undo step. A later
@@ -336,19 +363,13 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Vector/ }).click()
     assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: Paint must start on ZERO`)
     await vectorPreset.selectOption('PURE')
-    for (const control of ['detail', 'offset', 'simplify', 'smooth', 'radius']) {
+    for (const [control, expected] of Object.entries({ detail: '0', offset: '1', simplify: '15', smooth: '0', radius: '0' })) {
       await routePage.getByRole('button', { name: control, exact: true }).click()
-      assert.equal(await vectorKnob.inputValue(), '1', `${browserName}: PURE ${control} must equal 1 in original v1 units`)
+      assert.equal(await vectorKnob.inputValue(), expected, `${browserName}: PURE ${control} changed from the restored original-control recipe`)
     }
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     await vectorKnob.fill('23')
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
-    const canvasData = () => routePage.locator('canvas').first().evaluate(async (canvas) => {
-      const blob = await new Promise((settle) => canvas.toBlob(settle))
-      const bytes = await blob.arrayBuffer()
-      return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
-        .map((value) => value.toString(16).padStart(2, '0')).join('')
-    })
     const tunePaint = async (slider, value, prior) => {
       await slider.fill(value)
       await status.filter({ hasText: /recalculating the latest Paint stroke/ }).waitFor({ timeout: 10_000 })
@@ -394,6 +415,7 @@ async function runBrowser(browserType) {
     await publicPage.getByRole('button', { name: /Vector/ }).click()
     const publicPreset = publicPage.getByRole('combobox', { name: 'vector preset' })
     assert.deepEqual(await publicPreset.locator('option').allTextContents(), ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'], `${browserName}: normal users must receive the named presets`)
+    assert.equal(await publicPreset.inputValue(), 'PURE', `${browserName}: normal users must start on PURE`)
     assert.equal(await publicPage.getByRole('button', { name: 'detail', exact: true }).count(), 0, `${browserName}: raw vector calibration must stay admin-only`)
     assert.equal(await publicPage.locator('input[type=number]').count(), 0, `${browserName}: raw vector knob must stay admin-only on the Vector tab`)
     await publicPage.close()

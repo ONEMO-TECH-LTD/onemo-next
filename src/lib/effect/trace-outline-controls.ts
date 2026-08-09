@@ -64,6 +64,7 @@ export interface TraceOutlineInput {
   maskWidthPx: number
   maskHeightPx: number
   mmPerPx: number
+  simplifyAfterDetail?: boolean
 }
 
 export interface TraceOutlineSettings {
@@ -125,6 +126,7 @@ export function resolveTraceOutline(
     mmPerPx: input.mmPerPx,
     maskHeightPx: input.maskHeightPx,
     rawTracePx: raw ? raw.map(([x, y]) => [x, y]) : undefined,
+    simplifyAfterDetail: input.simplifyAfterDetail,
   }
   const global = {
     ...GLOBAL_OFF,

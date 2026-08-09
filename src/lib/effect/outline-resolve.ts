@@ -41,6 +41,8 @@ export interface OutlineSource {
   maskHeightPx: number
   /** raw marching-squares trace — PROVENANCE/debug only (VD3), never a resolution path. */
   rawTracePx?: Pt[]
+  /** Cutout-only calibration: Detail may leave a sparse generated trace that Simplify must still fit. */
+  simplifyAfterDetail?: boolean
 }
 
 /** Global tools — independent axes. OFF = `GLOBAL_OFF` below. */
@@ -188,10 +190,11 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     //    screenshotted — deviation is systematic toward the concave side). ringToVPath pins the
     //    true corners ON the outline and fits minimal smooth cubic chains between them within the
     //    tolerance — fewer anchors, flowing curves, extremities cannot pull in. Same knob, same
-    //    tolerance mapping; runs only where redundant vertices exist (clean polygons untouched).
+    //    tolerance mapping; normally runs where redundant vertices exist (clean polygons untouched).
+    //    Cutout may explicitly keep it active after Detail has already removed those vertices.
     if (g.simplify > 0) {
       const tol = simplifyTolPx(g.simplify, scalePx)
-      if (hasRedundantVertices(p, tol)) {
+      if (source.simplifyAfterDetail || hasRedundantVertices(p, tol)) {
         // DENSIFY before fitting (Dan 2026-08-06: Detail-then-Simplify broke — flattening a coarse
         // faceted polygon yields only its corner vertices, and a curve fitted through sparse points
         // is underconstrained: it bulges/folds between them). Uniform resample at fine spacing keeps
