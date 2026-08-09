@@ -14,7 +14,7 @@ export const LEGACY_VEC_RANGE: Record<(typeof VEC_CHIPS)[number], [number, numbe
 }
 
 export const CHIP_RANGE: Record<string, [number, number]> = {
-  detail: [0, 150], offset: [0, 160], simplify: [0, 30], smooth: [0, 200], straighten: [0, 100],
-  radius: [0, 260], curve: [0, 100], blend: [0, 100],
+  detail: [0, 100], offset: [0, 250], simplify: [0, 40], smooth: [0, 200], straighten: [0, 100],
+  radius: [0, 350], curve: [0, 100], blend: [0, 100],
   nodeRadius: [0, NODE_KNOB_MAX.radius], nodeCurve: [0, NODE_KNOB_MAX.curve], // per-node knobs — scale owned by vector-edit
 }

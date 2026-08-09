@@ -78,7 +78,7 @@ export interface TraceOutlineInput {
 }
 
 export interface TraceOutlineSettings {
-  /** Omitted/legacy preserves Creator/Grid scale-relative controls; px is Cutout's direct spatial UI. */
+  /** Omitted/legacy preserves Creator/Grid controls; px keeps Cutout Offset/Simplify/Radius in pixels. */
   spatialUnit?: 'legacy' | 'px'
   detail: number
   offset: number
@@ -102,18 +102,25 @@ export const TRACE_OUTLINE_DEFAULTS: TraceOutlineSettings = {
   straighten: 0,
 }
 
-/** Cutout's all-off recipe: every visible spatial control reads zero in direct working-canvas px. */
+/** Cutout's all-off recipe: Detail keeps its prior 0=full scale; the other spatial controls use px. */
 export const TRACE_OUTLINE_PIXEL_DEFAULTS: TraceOutlineSettings = {
   ...TRACE_OUTLINE_DEFAULTS,
   spatialUnit: 'px',
   detail: 0,
 }
 
-function traceSourceFromRawPx(
+function traceSourceFromRawCutout(
   rawTracePx: ReadonlyArray<readonly [number, number]>, maskHeightPx: number, mmPerPx: number,
-  detailPx: number, offsetPx: number, join: OffsetJoin,
+  detail: number, offsetPx: number, join: OffsetJoin,
 ): VShape | null {
-  return traceSourceFromRawUnits(rawTracePx, maskHeightPx, mmPerPx, detailPx, offsetPx * (mmPerPx || 1), join)
+  return traceSourceFromRawUnits(
+    rawTracePx,
+    maskHeightPx,
+    mmPerPx,
+    detailToFloorMm(100 - detail) / (mmPerPx || 1),
+    offsetPx * (mmPerPx || 1),
+    join,
+  )
 }
 
 /** Apply the existing v5.3.1 generation + whole-outline controls without its UI/store/history shell. */
@@ -126,7 +133,7 @@ export function resolveTraceOutline(
   const raw = input.rawTracePx
   const sourceShape = generationChanged && raw?.length
     ? pixelUnits
-      ? traceSourceFromRawPx(raw, input.maskHeightPx, input.mmPerPx, settings.detail, settings.offset, settings.offsetJoin)
+      ? traceSourceFromRawCutout(raw, input.maskHeightPx, input.mmPerPx, settings.detail, settings.offset, settings.offsetJoin)
       : traceSourceFromRaw(
           raw,
           input.maskHeightPx,
@@ -175,7 +182,7 @@ export function resolveTraceOutline(
 
 /**
  * Convert a pre-pixel Cutout recipe against its current source without changing its rendered shape.
- * The old values remain valid migration inputs; callers persist only the returned direct-px recipe.
+ * Detail keeps its prior visible 0=full value; Offset/Simplify/Radius become direct pixels.
  */
 export function traceSettingsToPixelUnits(
   input: TraceOutlineInput,
@@ -198,7 +205,7 @@ export function traceSettingsToPixelUnits(
   return {
     ...settings,
     spatialUnit: 'px',
-    detail: settings.detail === 100 ? 0 : Math.max(1, detailToFloorMm(settings.detail) / (input.mmPerPx || 1)),
+    detail: 100 - settings.detail,
     offset: (Math.max(0, settings.offset) / 100) * Math.max(input.maskWidthPx, input.maskHeightPx),
     simplify: simplifyTolPx(settings.simplify, shortSidePx),
     radius: outlineRadiusPx(settings.radius, withoutRadius),

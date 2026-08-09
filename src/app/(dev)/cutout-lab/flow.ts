@@ -556,7 +556,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       cutoutSettingsRef.current = n
       cutoutPresetRef.current = null
     }
+    if (hasCutRef.current) replaceHistory()
     requestAnimationFrame(() => applyFinish())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish])
   const setVectorPreset = useCallback((name: VectorPresetName) => {
     const prepared = preparedRef.current
@@ -573,8 +575,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       cutoutSettingsRef.current = next
       cutoutPresetRef.current = name
     }
+    if (hasCutRef.current) replaceHistory()
     setStatus(`⬡ ${name} vector preset`)
     requestAnimationFrame(() => applyFinish())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyFinish])
   const setBlendTune = useCallback((patch: Partial<BlendSettings>) => {
     const n = { ...blendRef.current, ...patch }; blendRef.current = n; setBlend(n)

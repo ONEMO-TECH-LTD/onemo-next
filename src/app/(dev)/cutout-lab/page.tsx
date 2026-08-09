@@ -291,9 +291,9 @@ export default function CutoutLab() {
       const k = vecChip
       const pixelUnits = settings.spatialUnit === 'px'
       const [lo, hi] = pixelUnits ? CHIP_RANGE[k] : LEGACY_VEC_RANGE[k]
-      const spatial = k !== 'smooth'
+      const spatial = k === 'offset' || k === 'simplify' || k === 'radius'
       const value = pixelUnits || k !== 'detail' ? settings[k] : 100 - settings.detail
-      const label = pixelUnits ? `${k} (${spatial ? 'px' : 'strength'})` : k === 'detail' ? 'detail (0 = full)' : k
+      const label = k === 'detail' ? 'detail (0 = full)' : pixelUnits ? `${k} (${spatial ? 'px' : 'strength'})` : k
       return { label, lo, hi, value, set: (v: number) => setTune(pixelUnits || k !== 'detail' ? { [k]: v } : { detail: 100 - v }) }
     }
     if (tab === 'blend') {

@@ -55,7 +55,6 @@ const OFF: TraceOutlineSettings = {
   straighten: 0,
 }
 const CALIBRATED_PRESETS = [
-  ['PURE', 0, 0, 0, 0, 0],
   ['CLASSIC', 0, 2, 15, 0, 10],
   ['TECHNO', 10, 3, 0, 20, 2],
   ['EDGY', 13, 4, 0, 1, 1],
@@ -103,7 +102,7 @@ describe('grid-lab v5.3.1 outline-control binding', () => {
     }
   })
 
-  it('uses direct working-canvas pixels for Cutout spatial controls', () => {
+  it('uses direct working-canvas pixels for Cutout Offset', () => {
     const offset = resolveTraceOutline(input, { ...TRACE_OUTLINE_PIXEL_DEFAULTS, offset: 1 })!
 
     expect(bounds(offset).minX).toBeCloseTo(bounds(vectorShape).minX - 1, 2)
@@ -122,6 +121,7 @@ describe('grid-lab v5.3.1 outline-control binding', () => {
     const migrated = traceSettingsToPixelUnits(input, legacy)
 
     expect(migrated.spatialUnit).toBe('px')
+    expect(migrated.detail).toBe(10)
     expect(migrated.smooth).toBe(legacy.smooth)
     expect(resolveTraceOutline(input, migrated)).toEqual(resolveTraceOutline(input, legacy))
   })
@@ -129,6 +129,7 @@ describe('grid-lab v5.3.1 outline-control binding', () => {
   it.each(CALIBRATED_PRESETS)('retains calibrated %s through the pixel-unit migration', (name, detail, offset, simplify, smooth, radius) => {
     const legacy: TraceOutlineSettings = { ...OFF, detail: 100 - detail, offset, simplify, smooth, radius }
     const migrated = traceSettingsToPixelUnits(input, legacy)
+    expect(migrated.detail, `${name}: Detail must keep its prior visible value`).toBe(detail)
     expect(migrated.smooth, `${name}: Smooth strength must stay numeric-identical`).toBe(smooth)
     expect(resolveTraceOutline(input, migrated), `${name}: pixel migration changed the shape`).toEqual(resolveTraceOutline(input, legacy))
   })

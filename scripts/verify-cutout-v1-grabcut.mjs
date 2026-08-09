@@ -283,17 +283,17 @@ async function runBrowser(browserType) {
     // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    for (const [control, unit, max] of [
-      ['detail', 'px', '150'], ['offset', 'px', '160'], ['simplify', 'px', '30'],
-      ['smooth', 'strength', '200'], ['radius', 'px', '260'],
+    for (const [control, label, max] of [
+      ['detail', 'detail (0 = full)', '100'], ['offset', 'offset (px)', '250'], ['simplify', 'simplify (px)', '40'],
+      ['smooth', 'smooth (strength)', '200'], ['radius', 'radius (px)', '350'],
     ]) {
       await routePage.getByRole('button', { name: control, exact: true }).click()
-      const row = routePage.getByText(`${control} (${unit})`, { exact: true }).locator('..')
+      const row = routePage.getByText(label, { exact: true }).locator('..')
       const slider = row.locator('input[type=range]')
       assert.deepEqual(
         [await slider.getAttribute('min'), await slider.getAttribute('max'), await slider.getAttribute('step')],
         ['0', max, '1'],
-        `${browserName}: ${control} must expose normalized ${unit} units`,
+        `${browserName}: ${control} range or step changed`,
       )
     }
     await vectorPreset.selectOption('TECHNO')
@@ -301,6 +301,28 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     const vectorKnob = routePage.locator('input[type=number]')
     assert.equal(await vectorKnob.inputValue(), '20', `${browserName}: TECHNO must retain its calibrated Smooth strength`)
+
+    // Preset calibration replaces the accepted snapshot instead of adding an Undo step. A later
+    // Paint acceptance must therefore Undo to the exact Cutout preset recipe and label.
+    const undo = routePage.getByRole('button', { name: /Undo/ })
+    assert.equal(await undo.isDisabled(), true, `${browserName}: selecting a preset added an Undo step`)
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
+    await routePage.getByRole('button', { name: /Paint shape/ }).click()
+    const historyPaintBox = await routePage.locator('canvas').first().boundingBox()
+    assert(historyPaintBox, `${browserName}: preset-history Paint canvas must be visible`)
+    await draw(routePage, [
+      { x: historyPaintBox.x + historyPaintBox.width * 0.40, y: historyPaintBox.y + historyPaintBox.height * 0.40 },
+      { x: historyPaintBox.x + historyPaintBox.width * 0.60, y: historyPaintBox.y + historyPaintBox.height * 0.60 },
+    ], 4)
+    await status.filter({ hasText: /added — auto-tuned/ }).waitFor({ timeout: 60_000 })
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: Paint history state must own ZERO`)
+    await undo.click()
+    await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
+    assert.equal(await vectorPreset.inputValue(), 'TECHNO', `${browserName}: Undo did not restore the preset label`)
+    await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
+    assert.equal(await vectorKnob.inputValue(), '20', `${browserName}: Undo did not restore the preset recipe`)
+
     await vectorKnob.fill('37')
     assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: cutout vector recipe did not accept calibration`)
     assert.equal(await vectorPreset.inputValue(), '', `${browserName}: raw tuning must mark the selected recipe CUSTOM`)
@@ -336,8 +358,10 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Vector/ }).click()
     assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: Paint must start on ZERO`)
     await vectorPreset.selectOption('PURE')
-    await routePage.getByRole('button', { name: 'offset', exact: true }).click()
-    assert.equal(await vectorKnob.inputValue(), '1', `${browserName}: PURE must be the direct 1px offset recipe`)
+    for (const control of ['detail', 'offset', 'simplify', 'smooth', 'radius']) {
+      await routePage.getByRole('button', { name: control, exact: true }).click()
+      assert.equal(await vectorKnob.inputValue(), '1', `${browserName}: PURE ${control} must equal 1`)
+    }
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     await vectorKnob.fill('23')
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()

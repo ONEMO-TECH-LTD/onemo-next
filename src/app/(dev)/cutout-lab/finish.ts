@@ -25,14 +25,14 @@ export type { TraceOutlineSettings }
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
 export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape }
 
-/** Direct-pixel all-off reset used for Paint and when edits fold a recipe into a baked source. */
+/** Cutout all-off reset used for Paint and when edits fold a recipe into a baked source. */
 export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_PIXEL_DEFAULTS }
 
-/** Dan's named vector recipes. ZERO/PURE are direct pixels; the retained CSV rows are converted
- * against each accepted source so their pre-pixel calibration remains shape-identical. */
+/** Dan's named vector recipes. ZERO/PURE use current Cutout units; the retained CSV rows are
+ * converted against each accepted source so their earlier calibration remains shape-identical. */
 export const VECTOR_PRESETS = [
   { name: 'ZERO', units: 'px', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
-  { name: 'PURE', units: 'px', detail: 0, offset: 1, simplify: 0, smooth: 0, radius: 0 },
+  { name: 'PURE', units: 'px', detail: 1, offset: 1, simplify: 1, smooth: 1, radius: 1 },
   { name: 'CLASSIC', units: 'legacy', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
   { name: 'TECHNO', units: 'legacy', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
   { name: 'EDGY', units: 'legacy', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
