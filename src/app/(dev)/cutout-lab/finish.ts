@@ -4,7 +4,7 @@
 
 import type { Mask } from '@/lib/mask-tools/types'
 import { effectiveTextureDim } from '@/lib/effect/mask'
-import { matteToMLResult } from '@/lib/effect/segment-ml'
+import { finishMLResultEdges, matteToMLResult } from '@/lib/effect/segment-ml'
 import { blendPercentToPixels, composeEffectArtwork } from '@/lib/effect/composite'
 import { shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/vector-core'
 import {
@@ -153,22 +153,28 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
  *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
  *  Offset knob's job, reflected truthfully). */
-const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0 }
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 3 }
+export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 
 /** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:
  *  the flood-fill fallback has NO matte (its subject is the raw full image by engine design), so
  *  the user must know when it ran (the 'two layered images' signature, Dan 2026-08-06). */
 export type PrepareProgress = 'downloading-model' | 'cutting' | 'fallback'
 
-/** The engine-native prepare: model matte in → the WHOLE v5.3.1 shaped pipeline out. */
-export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffectBase> {
-  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, await buildPreseg(url, mask), { buildOutputs: false })
+/** One post-segmentation path: detector identity stops mattering once an MLResult reaches here. */
+function prepareCut(url: string, preseg: MLResult, edgeFinishPx: number, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffectBase> {
+  const cfg = { ...LAB_CFG, edgeFinishPx }
+  return prepareEffect(url, 'shaped', cfg, onProgress, finishMLResultEdges(preseg, edgeFinishPx), { buildOutputs: false })
 }
 
-/** The TRUE v5.3.1 bridge: an UNTOUCHED segmentML MLResult straight into the shaped pipeline —
- *  exactly what the v5.3.1 flow does. The detector matte is consumed verbatim. */
-export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffectBase> {
-  return prepareEffect(url, 'shaped', LAB_CFG, onProgress, preseg, { buildOutputs: false })
+/** Non-AI/brush mask → MLResult → the same edge/prepare path as native u2net. */
+export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT): Promise<PreparedEffectBase> {
+  return prepareCut(url, await buildPreseg(url, mask), edgeFinishPx, onProgress)
+}
+
+/** Native u2net MLResult → the same edge/prepare path as every other segmentation source. */
+export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT): Promise<PreparedEffectBase> {
+  return prepareCut(url, preseg, edgeFinishPx, onProgress)
 }
 
 /** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim.

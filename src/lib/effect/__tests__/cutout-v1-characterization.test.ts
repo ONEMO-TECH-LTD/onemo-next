@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { HistoryStack } from '@/app/(dev)/cutout-lab/history'
 import { runCutout as legacyRunCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { maskArea, subtractMasks, unionMasks } from '@/lib/mask-tools'
-import { adapterIdFor, segment } from '../mask'
+import { adapterIdFor, featherMask, segment, smoothMask } from '../mask'
 import { runCutout } from '../cutout'
 
 const cutoutDir = 'src/app/(dev)/cutout-lab'
@@ -14,7 +14,7 @@ const cutout = (file: string) => read(`${cutoutDir}/${file}`)
 const owners = [
   {
     file: 'page.tsx', layer: 'test-shell-donor', destination: 'src/app/page.tsx', adoption: 'selective-donor',
-    excludes: ['eruda ?debug=1 diagnostics', '?admin=1 paint-calibration state and panel'],
+    excludes: ['eruda ?debug=1 diagnostics', '?admin=1 route-only calibration state and panel'],
   },
   { file: 'flow.ts', layer: 'react-studio', destination: 'src/app/studio/cutout/flow.ts', adoption: 'direct' },
   { file: 'finish.ts', layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/finish.ts', adoption: 'direct' },
@@ -87,13 +87,13 @@ describe('KAI-10216 Cutout V1 adoption boundary', () => {
     const pageOwner = owners.find(({ file }) => file === 'page.tsx')!
     expect(pageOwner).toEqual({
       file: 'page.tsx', layer: 'test-shell-donor', destination: 'src/app/page.tsx', adoption: 'selective-donor',
-      excludes: ['eruda ?debug=1 diagnostics', '?admin=1 paint-calibration state and panel'],
+      excludes: ['eruda ?debug=1 diagnostics', '?admin=1 route-only calibration state and panel'],
     })
     const source = cutout('page.tsx')
     expect(source).not.toMatch(/searchParams\.(?:has|get)\('seg'\)/)
     expect(source).toContain("u.searchParams.get('debug') === '1'")
     expect(source).toContain("u.searchParams.get('admin') === '1'")
-    expect(source).toContain('Paint-shaper config (admin)')
+    expect(source).toContain('Cutout calibration (admin)')
   })
 
   it('keeps the adoption closure product-owned and the headless owners DOM-free', () => {
@@ -224,5 +224,19 @@ describe('later increment defect reproductions', () => {
   it('KAI-10220 returns scratch+erase before loading OpenCV', () => {
     const source = read('src/lib/cutout-grabcut/index.ts')
     expect(source.indexOf('if (fromScratch && erase)')).toBeLessThan(source.indexOf('await loadCv()'))
+  })
+
+  it('KAI-10220 uses one edge filter for continuous alpha and binary contour', () => {
+    const raw = new Uint8Array(9 * 9)
+    for (let y = 2; y <= 6; y++) for (let x = 2; x <= 6; x++) raw[y * 9 + x] = 1
+    const feathered = featherMask(raw, 9, 9, 3)
+    expect(feathered.some((value) => value > 0 && value < 255)).toBe(true)
+    expect([...smoothMask(raw, 9, 9, 3)]).toEqual([...feathered].map((value) => value >= 128 ? 1 : 0))
+
+    const finish = cutout('finish.ts')
+    expect(finish).toContain('function prepareCut(')
+    expect(finish.match(/return prepareCut\(/g)).toHaveLength(2)
+    expect(cutout('flow.ts')).not.toContain('smoothMask(')
+    expect(cutout('page.tsx')).toContain('aria-label="shared edge finish"')
   })
 })

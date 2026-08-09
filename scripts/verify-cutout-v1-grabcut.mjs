@@ -28,7 +28,7 @@ const entry = join(temp, 'entry.ts')
 const shim = join(temp, 'opencv-shim.ts')
 const grabcutBundle = join(temp, 'grabcut.js')
 const providerBundle = join(temp, 'opencv.js')
-writeFileSync(entry, "export { grabCutRefine } from '@/lib/cutout-grabcut'\nexport { smoothMask } from '@/lib/effect/mask'\n")
+writeFileSync(entry, "export { grabCutRefine } from '@/lib/cutout-grabcut'\nexport { featherMask } from '@/lib/effect/mask'\nexport { finishMLResultEdges } from '@/lib/effect/segment-ml'\n")
 writeFileSync(shim, 'export default (globalThis).__cvResolved\n')
 execFileSync(resolve('node_modules/.bin/esbuild'), [
   entry, '--bundle', '--platform=browser', '--format=iife', '--global-name=GrabCutProbe',
@@ -68,13 +68,23 @@ const rawExpected = [
   ['refine-erase', 85_116, '24bbd40cf116cd5b1212a311272a1d6d02cb59926e44ce6f7a95268071a9b5ec'],
   ['standalone-repeat', 86_220, '715a7d76b01d7c6289fda9b677ab869ac415540cdeecaf172f2ec4f70def7980'],
 ]
-const polishedExpected = {
-  standalone: { area: 85_023, maskSha256: '2c05d44f0d9bb450c3e22bc6ef34e3d02b9ce4a91da6cfe0f924598611cad03e', softSha256: 'f08d4616100ea3b230be98a9da72f6e922d00e8e562a1abcab4a2deb9fa4bcb6' },
-  refineAdd: { area: 91_703, maskSha256: 'fe20db63cf73aed02d2d63017e9bea28a0597175d957c2e5d2ee9a11c3ca98b2', softSha256: '39bebc8273aca4b21d87da63fce6554e4d023dc9dbf66bd7a12c4389f85636b6' },
+const finishedExpected = {
+  grabcut: {
+    sourceSha256: 'a8939efe687c90a18311925c4211dd68a8291877956f94485d072143ec47ff78',
+    sourceAfterSha256: 'a8939efe687c90a18311925c4211dd68a8291877956f94485d072143ec47ff78',
+    finishedSha256: '3449afa41c3f3086c08e43498e30897969f9049fe706d5a4fe0d4448ef1c6bbd',
+    intermediatePixels: 21_788,
+  },
+  u2net: {
+    sourceSha256: '4a72924c9c7e9b03c45314bf9b75230cb0d38fce5145e1008b31e2facd140fb7',
+    sourceAfterSha256: '4a72924c9c7e9b03c45314bf9b75230cb0d38fce5145e1008b31e2facd140fb7',
+    finishedSha256: 'f1d1785e1482f01582cdcadcbb935f1878dd4ae6f01a7d05806e49616d046dd4',
+    intermediatePixels: 28_852,
+  },
 }
 const routeExpected = {
-  chromium: { width: 1267, height: 443, colorType: 6, sha256: '9f50b1e21c42b964b054ece5490e369759e35fb1445d3f3ec8ad196de5428627' },
-  webkit: { width: 1266, height: 443, colorType: 6, sha256: 'ef70064555075e5189a0942b8240d7356ee2efb7fe3f8b5b511ae89143f424fb' },
+  chromium: { width: 1265, height: 443, colorType: 6, sha256: '676c3d9979066dcccd5e218ff03fd38e5519a9ec6e7b330fd1527a517afafbfc' },
+  webkit: { width: 1264, height: 443, colorType: 6, sha256: 'c7a68d72eed1a8c573ba74d21a4fab8c9769b3f37437789ab5a1a5678a2c8787' },
 }
 
 const pngInfo = (bytes) => ({
@@ -107,7 +117,8 @@ async function runBrowser(browserType) {
     assert.equal((await scratchPage.evaluate((url) => performance.getEntriesByName(url).length, providerUrl)), 0, `${browserName}: scratch+erase must not request OpenCV`)
     await scratchPage.close()
 
-    // Load the sole retained provider, then invoke the real production module and freeze raw/final masks.
+    // Load the sole retained provider, then invoke the real production module and freeze raw masks
+    // plus the common MLResult edge finish used after both non-AI and u2net segmentation.
     const page = await browser.newPage({ viewport })
     await page.addInitScript(() => {
       window.__wasmMemories = []
@@ -153,17 +164,48 @@ async function runBrowser(browserType) {
       const refineAdd = await measure('refine-add', () => GrabCutProbe.grabCutRefine(canvas, standalone.mask, [{ x: w * 0.59, y: h * 0.45 }, { x: w * 0.64, y: h * 0.47 }], w * 0.02, false))
       const refineErase = await measure('refine-erase', () => GrabCutProbe.grabCutRefine(canvas, standalone.mask, [{ x: w * 0.42, y: h * 0.67 }, { x: w * 0.48, y: h * 0.68 }], w * 0.018, true))
       const repeat = await measure('standalone-repeat', () => GrabCutProbe.grabCutRefine(canvas, null, stroke, w * 0.025, false))
-      const polish = async (mask) => {
-        const data = GrabCutProbe.smoothMask(mask.data, mask.w, mask.h, 3)
-        const soft = data.map((value) => value * 255)
-        return { area: data.reduce((sum, value) => sum + (value ? 1 : 0), 0), maskSha256: await hash(data), softSha256: await hash(soft) }
+      const finish = async (mask, alpha, adapterId) => {
+        const texImage = new ImageData(mask.w, mask.h)
+        for (let i = 0; i < alpha.length; i++) {
+          texImage.data[i * 4] = 40
+          texImage.data[i * 4 + 1] = 80
+          texImage.data[i * 4 + 2] = 120
+          texImage.data[i * 4 + 3] = alpha[i]
+        }
+        const source = {
+          mask: mask.data, width: mask.w, height: mask.h, imageData: texImage,
+          texImage, texMask: mask.data, texW: mask.w, texH: mask.h, adapterId,
+        }
+        const sourceSha256 = await hash(alpha)
+        const finished = GrabCutProbe.finishMLResultEdges(source, 3)
+        const finishedAlpha = new Uint8Array(alpha.length)
+        for (let i = 0; i < finishedAlpha.length; i++) finishedAlpha[i] = finished.texImage.data[i * 4 + 3]
+        return {
+          sourceSha256,
+          sourceAfterSha256: await hash(alpha),
+          finishedSha256: await hash(finishedAlpha),
+          intermediatePixels: finishedAlpha.reduce((sum, value) => sum + (value > 0 && value < 255 ? 1 : 0), 0),
+        }
       }
+      const grabCutAlpha = standalone.mask.data.map((value) => value ? 255 : 0)
+      const u2netAlpha = GrabCutProbe.featherMask(standalone.mask.data, standalone.mask.w, standalone.mask.h, 1)
       const results = [standalone, refineAdd, refineErase, repeat].map((result) => ({ label: result.label, elapsedMs: result.elapsedMs, area: result.area, sha256: result.sha256 }))
-      return { results, polished: { standalone: await polish(standalone.mask), refineAdd: await polish(refineAdd.mask) } }
+      return {
+        results,
+        finished: {
+          grabcut: await finish(standalone.mask, grabCutAlpha, 'grabcut'),
+          u2net: await finish(standalone.mask, u2netAlpha, 'u2netp'),
+        },
+      }
     }, fixtureUrl)
     assert.deepEqual(masks.results.map(({ label, area, sha256 }) => [label, area, sha256]), rawExpected, `${browserName}: raw GrabCut masks changed`)
     assert(masks.results.every(({ elapsedMs }) => elapsedMs < 5_000), `${browserName}: GrabCut left the current practical latency envelope`)
-    assert.deepEqual(masks.polished, polishedExpected, `${browserName}: radius-3 completed matte changed`)
+    for (const [adapter, result] of Object.entries(masks.finished)) {
+      assert.equal(result.sourceAfterSha256, result.sourceSha256, `${browserName}: ${adapter} source matte was mutated`)
+      assert.notEqual(result.finishedSha256, result.sourceSha256, `${browserName}: ${adapter} skipped the shared edge finish`)
+      assert(result.intermediatePixels > 0, `${browserName}: ${adapter} shared edge finish produced no continuous alpha`)
+    }
+    assert.deepEqual(masks.finished, finishedExpected, `${browserName}: shared u2net/GrabCut edge finish changed`)
     await page.close()
 
     // Real route proof: upload and scratch+erase stay provider-cold; standalone loads it once and saves the polished output.
@@ -173,7 +215,7 @@ async function runBrowser(browserType) {
     context.on('request', (request) => { if (request.resourceType() === 'script') scriptRequests.push(request.url()) })
     const routePage = await context.newPage()
     routePage.on('console', (message) => { if (message.type() === 'error' || message.type() === 'warning') consoleProblems.push(`${message.type()}: ${message.text()}`) })
-    await routePage.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+    await routePage.goto(new URL('/cutout-lab?admin=1', baseUrl).href, { waitUntil: 'networkidle' })
     const baseline = scriptRequests.length
     const status = routePage.locator('p').filter({ hasText: 'Status:' })
     await routePage.locator('input[type=file]').first().setInputFiles(fixturePath)
@@ -194,6 +236,10 @@ async function runBrowser(browserType) {
     const opencvRequests = scriptRequests.slice(baseline).filter(isProviderRequest)
     assert.equal(opencvRequests.length, 1, `${browserName}: first real GrabCut must load exactly one provider`)
     assert(routeElapsedMs < 10_000, `${browserName}: real-route GrabCut left the current practical envelope`)
+    const edgeFinish = routePage.getByRole('slider', { name: 'shared edge finish' })
+    assert.equal(await edgeFinish.inputValue(), '3', `${browserName}: shared edge finish default changed`)
+    await edgeFinish.fill('5')
+    await status.filter({ hasText: /shared u2net\/GrabCut edge finish: 5px/ }).waitFor({ timeout: 60_000 })
     const preview = routePage.getByRole('button', { name: /Preview|Editing view/ })
     if ((await preview.textContent())?.includes('Preview')) await preview.click()
     await routePage.getByText('Preview — same result, cut out').waitFor()
@@ -203,7 +249,7 @@ async function runBrowser(browserType) {
     assert.deepEqual(routeOutput, routeExpected[browserName], `${browserName}: completed GrabCut output changed`)
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
-    return { browserName, providerLoad, masks: masks.results, polished: masks.polished, routeElapsedMs, routeOutput, opencvRequests: opencvRequests.length }
+    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, opencvRequests: opencvRequests.length }
   } finally {
     await browser.close()
   }

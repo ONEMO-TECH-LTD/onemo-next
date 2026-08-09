@@ -12,7 +12,7 @@
 //    the shimmer can say what the wait actually is.
 
 import type { MaskResult } from './mask'
-import { postProcessMask } from './mask'
+import { featherMask, postProcessMask } from './mask'
 
 /** ML result: low-res mask for the contour + a HIGH-RES texture buffer so the front isn't pixelated. */
 export interface MLResult extends MaskResult {
@@ -178,4 +178,23 @@ export function matteToMLResult(matte: HTMLCanvasElement, maskDim: number, texDi
     texImage: hi.img, texMask: hi.m, texW: hi.w, texH: hi.h,
     adapterId,
   }
+}
+
+/**
+ * Apply the one shared Cutout edge finish to an already-produced segmentation result. AI and
+ * non-AI sources enter here only after they have the same MLResult contract, so downstream
+ * preparation cannot diverge by detector. The raw binary masks remain untouched; only the
+ * continuous subject alpha used by composition is feathered.
+ */
+export function finishMLResultEdges(result: MLResult, radiusPx: number): MLResult {
+  const radius = Math.max(0, Math.round(radiusPx))
+  if (radius === 0) return result
+  const alpha = new Uint8Array(result.texW * result.texH)
+  for (let i = 0; i < alpha.length; i++) alpha[i] = result.texImage.data[i * 4 + 3]
+  const maskMax = Math.max(result.width, result.height, 1)
+  const texRadius = Math.max(1, Math.round(radius * Math.max(result.texW, result.texH) / maskMax))
+  const finishedAlpha = featherMask(alpha, result.texW, result.texH, texRadius)
+  const texImage = new ImageData(new Uint8ClampedArray(result.texImage.data), result.texW, result.texH)
+  for (let i = 0; i < finishedAlpha.length; i++) texImage.data[i * 4 + 3] = finishedAlpha[i]
+  return { ...result, texImage }
 }

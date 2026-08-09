@@ -198,3 +198,12 @@
 - Remember: use `npm audit` as evidence, not as a bulk updater or a score to game. Never force a
   transitive dependency across its caller's declared major; the real gate is audit classification plus
   the affected tool running successfully.
+
+## 2026-08-09 — changed Cutout output needed per-browser golden refresh
+
+- Failed: the shared edge-finish oracle retained the pre-feather Chromium and WebKit PNG dimensions
+  and hashes, so its first two runs stopped once each browser exposed the intentional new output.
+- Worked: capture each browser's exact fixed-viewport output after the admin value changed from 3px
+  to 5px, freeze both goldens, then rerun the complete two-browser oracle.
+- Remember: when a product-approved pixel change intentionally alters a golden, collect Chromium and
+  WebKit witnesses separately before declaring the updated oracle deterministic.

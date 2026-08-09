@@ -16,15 +16,14 @@ import type { PreparedEffectBase } from '@/lib/effect/prepare-effect'
 import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
-  disposePrepareAICache, finishDrawn, finishSpec,
+  disposePrepareAICache, EDGE_FINISH_DEFAULT, finishDrawn, finishSpec,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531, crashStage, lastCrashStage } from './v531seg'
-import { cancelSegmentML, disposeSegmentML } from '@/lib/effect/segment-ml'
-import { smoothMask } from '@/lib/effect/mask'
+import { cancelSegmentML, disposeSegmentML, type MLResult } from '@/lib/effect/segment-ml'
 import { HistoryStack } from './history'
 import type { EditMode } from './EditorOverlay'
 
@@ -78,7 +77,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [histTick, setHistTick] = useState(0)
   const [disp, setDisp] = useState({ w: 480, h: 360 })
   const [paintCfg, setPaintCfgState] = useState<PaintConfig>(PAINT_DEFAULTS) // Dan: admin-changeable paint-shaper config
+  const [edgeFinishPx, setEdgeFinishState] = useState(EDGE_FINISH_DEFAULT)
   const paintCfgRef = useRef(paintCfg); paintCfgRef.current = paintCfg
+  const edgeFinishRef = useRef(edgeFinishPx); edgeFinishRef.current = edgeFinishPx
   const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => { const n = { ...paintCfgRef.current, ...patch }; paintCfgRef.current = n; setPaintCfgState(n) }, [])
 
   // ── flow-owned refs (policy + view) ──
@@ -89,6 +90,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const shapeRef = useRef<VShape | null>(null)
   const drawnRef = useRef<{ shape: VShape; ring: { x: number; y: number }[] } | null>(null)
   const preparedRef = useRef<PreparedEffectBase | null>(null)
+  const nativePresegRef = useRef<MLResult | null>(null)
   const urlRef = useRef<string | null>(null)
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
@@ -287,28 +289,35 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape) ──
   const acceptMask = useCallback(async (
     mask: Mask,
-    preseg?: import('@/lib/effect/segment-ml').MLResult,
+    preseg?: MLResult,
     opts?: { erase?: boolean; shapeTruth?: boolean; isCurrent?: () => boolean },
   ) => {
     const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
     if (!isCurrent()) return false
-    // u2net's matte + every mask are consumed VERBATIM (Dan 2026-08-07: no speculative hole/opacity
-    // fixes on the pure path. Paint sources still
+    // Every source's raw mask/matte remains unchanged (Dan 2026-08-07: no speculative hole/opacity
+    // fixes on the pure path); the shared preparation seam applies only the calibrated edge finish. Paint sources still
     // get shape-is-truth below (that is geometry the paint tool OWNS, not a guess on a model matte).
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
       try {
-        // native preseg (u2net path) passes through VERBATIM — the v5.3.1 bridge, no lab rebuild;
-        // model/brush masks (no engine preseg exists) go through the buildPreseg seam.
+        // Native u2net keeps its original MLResult for recalibration; model/brush masks without an
+        // engine preseg go through buildPreseg. Both then enter prepareCut's one edge/engine path.
         const loud = (st: string) => {
           if (st === 'fallback' && isCurrent()) setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)')
         }
         // E3 (meta-verified): VALIDATE BEFORE COMMIT — prepare runs first; maskRef/drawnRef mutate
         // only on success. A failed prepare (e.g. an erase that emptied the mask → 'No silhouette
         // found') leaves the last good selection + outline fully live.
-        const nextPrepared = await withTimeout(preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud), T_COMPUTE_MS, 'engine prepare')
+        const nextPrepared = await withTimeout(
+          preseg
+            ? prepareNative(url, preseg, loud, edgeFinishRef.current)
+            : prepareAI(url, mask, loud, edgeFinishRef.current),
+          T_COMPUTE_MS,
+          'engine prepare',
+        )
         if (!isCurrent()) return false
         preparedRef.current = nextPrepared
+        nativePresegRef.current = preseg ?? null
       } catch (e) {
         if (isCurrent()) setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept')
         return false
@@ -324,7 +333,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // SHAPE-IS-TRUTH (E6/E7/E8) — PAINT-DEPOSIT SOURCES ONLY (Dan device 2026-08-07): the outline
     // is a smoothed ENVELOPE and must never redefine a model's subject; only paint (which OWNS its
     // geometry) normalizes to the resolved outline — islands drop loudly, slivers go solid, the
-    // blend band is parallel. The u2net cut + GrabCut refine stay verbatim.
+    // blend band is parallel. u2net and GrabCut raw segmentation truth stays verbatim.
     let droppedPx = 0
     if (opts?.shapeTruth && !preseg && img && url && shapeRef.current) {
       // E8: the subject derives from the resolved geometry AT OFFSET 0 — the Offset knob is the
@@ -339,7 +348,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       maskRef.current = norm
       const gen = ++editPrepGen.current
       const artwork = artworkGen.current
-      withTimeout(prepareAI(url, norm), T_COMPUTE_MS, 'shape-truth re-prepare')
+      nativePresegRef.current = null
+      withTimeout(prepareAI(url, norm, undefined, edgeFinishRef.current), T_COMPUTE_MS, 'shape-truth re-prepare')
         .then((p) => {
           if (gen === editPrepGen.current && artwork === artworkGen.current && isCurrent()) {
             preparedRef.current = p
@@ -394,7 +404,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     settleBakes('full-res bake cancelled: artwork replaced')
     previewRef.current = false
     disposePrepareAICache()
-    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
+    maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; nativePresegRef.current = null; liveBakeRef.current = null
     boundsRef.current = null; displayFrontRef.current = null
     hasCutRef.current = false; wasOutgrownRef.current = false
     urlRef.current = url
@@ -450,6 +460,37 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     scheduleBake()
   }, [scheduleBake])
 
+  const setEdgeFinishPx = useCallback((value: number) => {
+    const next = Math.max(0, Math.min(12, Math.round(value)))
+    edgeFinishRef.current = next
+    setEdgeFinishState(next)
+    const url = urlRef.current, mask = maskRef.current
+    if (!url || !mask || !hasCutRef.current) return
+    const artwork = artworkGen.current
+    const gen = ++editPrepGen.current
+    const source = nativePresegRef.current
+    setBusy(true)
+    setStatus(`⚙️ calibrating shared edge finish (${next}px)…`)
+    const prepared = source
+      ? prepareNative(url, source, undefined, next)
+      : prepareAI(url, mask, undefined, next)
+    withTimeout(prepared, T_COMPUTE_MS, 'edge calibration')
+      .then((result) => {
+        if (gen !== editPrepGen.current || artwork !== artworkGen.current) return
+        preparedRef.current = result
+        displayFrontRef.current = null
+        applyFinish(false)
+        scheduleBake(true)
+        setBusy(false)
+        setStatus(`⚙️ shared u2net/GrabCut edge finish: ${next}px`)
+      })
+      .catch((error) => {
+        if (gen !== editPrepGen.current || artwork !== artworkGen.current) return
+        setBusy(false)
+        setStatus('⚠️ edge calibration failed: ' + String((error as Error)?.message ?? error))
+      })
+  }, [applyFinish, scheduleBake])
+
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
   // ── THE BRUSH — GrabCut. Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
   // carves). No base → it RECOGNISES the painted shape standalone; a base → it REFINES the cut.
@@ -468,17 +509,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     try {
       const refined = await withTimeout(grabCutRefine(img, base, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
       if (!isCurrent()) return
-      // Keep raw data as the next refine/history truth; only the completed engine matte enters the
-      // existing 3px uniform smoother that removes the 512px nearest-neighbour stair-step.
-      const soft = smoothMask(refined.data, refined.w, refined.h, 3)
-      for (let i = 0; i < soft.length; i++) soft[i] *= 255
-      const finished = { ...refined, soft }
       const before = base ? maskArea(base) : 0, after = maskArea(refined)
       if (after === 0) { setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
       if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
       if (base && before === after) { setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
-      const ok = await acceptMask(finished, undefined, { erase, isCurrent })
+      const ok = await acceptMask(refined, undefined, { erase, isCurrent })
       if (ok && isCurrent()) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
     } catch (e) {
       if (isCurrent()) setStatus('⚠️ ' + String((e as Error).message))
@@ -548,12 +584,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       settingsRef.current = zero; setSettings(zero)
     }
     maskRef.current = maskFromShape(next, img.width, img.height)
+    nativePresegRef.current = null
     // ADAPTIVE MATTE (Dan): every shape edit recomputes the matte through the engine so blend/
     // compositing work out of the box on the EDITED shape. Loud on failure, last-edit-wins.
     if (urlRef.current) {
       const artwork = artworkGen.current
       const gen = ++editPrepGen.current
-      withTimeout(prepareAI(urlRef.current, maskRef.current), T_COMPUTE_MS, 'edit re-prepare')
+      withTimeout(prepareAI(urlRef.current, maskRef.current, undefined, edgeFinishRef.current), T_COMPUTE_MS, 'edit re-prepare')
         .then((p) => {
           if (gen === editPrepGen.current && artwork === artworkGen.current) { preparedRef.current = p; scheduleBake() }
         })
@@ -597,7 +634,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const nextDrawn = s.drawn
       const forMask = nextDrawn ? maskFromShape(nextDrawn.shape, img?.width ?? 1, img?.height ?? 1) : nextMask
       const nextPrepared = forMask && img && url
-        ? await withTimeout(prepareAI(url, forMask), T_COMPUTE_MS, 'restore prepare')
+        ? await withTimeout(prepareAI(url, forMask, undefined, edgeFinishRef.current), T_COMPUTE_MS, 'restore prepare')
         : null
       if (generation !== artworkGen.current) return false
 
@@ -610,6 +647,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       maskRef.current = nextMask
       drawnRef.current = nextDrawn
       preparedRef.current = nextPrepared
+      nativePresegRef.current = null
       displayFrontRef.current = null
       liveBakeRef.current = null
       settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
@@ -650,7 +688,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     settleToolQueue()
     settleBakes('full-res bake cancelled: cut cleared')
     previewRef.current = false
-    maskRef.current = null; drawnRef.current = null; preparedRef.current = null
+    maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
     hasCutRef.current = false; wasOutgrownRef.current = false
     setBusy(false); setHasCut(false); pushHistory(); requestRender()
@@ -773,7 +811,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     disposePrepareAICache()
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     urlRef.current = null
-    imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null
+    imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
   }, [settleBakes, settleToolQueue])
 
@@ -781,14 +819,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   return {
     state: {
-      status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, paintCfg,
+      status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, paintCfg, edgeFinishPx,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
     },
     actions: {
       upload, detect, setTune, setBlendTune,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, setDragging, setPreview, warmup, setPaintCfg,
+      undo, redo, clearAll, save, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

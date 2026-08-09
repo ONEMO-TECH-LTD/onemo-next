@@ -30,6 +30,7 @@ export interface ShapeBuildConfig {
   maxImageDim: number     // mask/contour downscale cap
   textureDim: number      // front-texture cap (high res so the projected image stays sharp)
   paddingMM: number       // flat image margin around the subject
+  edgeFinishPx?: number   // optional caller-owned contour edge radius; legacy engine default stays 3
   minCornerAngleDeg: number // unused (outline-core owns rounding) — kept for API compat
   cornerRadiusMM: number    // unused (outline-core owns rounding) — kept for API compat
   squareCornerMM: number    // corner radius of the standard square
@@ -230,7 +231,7 @@ export async function prepareEffect(
     // padding (flat image margin) + symmetric denoise, then the raw tracer
     const padPx = Math.max(0, Math.round(cfg.paddingMM / mmPerPx))
     const dilated = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
-    const workMask = smoothMask(dilated, width, height, 3)
+    const workMask = smoothMask(dilated, width, height, cfg.edgeFinishPx ?? 3)
     const raw = traceContourRaw(workMask, width, height)
     if (!raw) throw new Error('Contour build failed after segmentation.')
     ringPx = raw

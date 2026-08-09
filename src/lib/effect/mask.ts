@@ -176,35 +176,61 @@ function cleanup(mask: Uint8Array, w: number, h: number): Uint8Array {
   return erode(dilate(dilate(erode(mask)))) // open then close
 }
 
-/**
- * Uniform mask smoothing: separable box-blur of the binary mask + 0.5 re-threshold. Rounds small
- * sharp protrusions/notches (e.g. the marching-squares stair-steps at thin spike tips) the SAME way
- * everywhere — symmetric, position-independent, any image. radius is in mask pixels (small → only
- * sub-feature noise is rounded; major shape preserved).
- */
-export function smoothMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
-  const r = Math.max(1, Math.round(radius))
+/** One uniform separable box filter for both continuous subject alpha and the binary contour. */
+function blurMask(mask: Uint8Array, w: number, h: number, radius: number): Float32Array {
+  const r = Math.max(0, Math.round(radius))
+  const out = new Float32Array(w * h)
+  if (r === 0) {
+    for (let i = 0; i < out.length; i++) out[i] = mask[i] > 1 ? mask[i] / 255 : mask[i]
+    return out
+  }
   const win = 2 * r + 1
   const cl = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v)
   const tmp = new Float32Array(w * h)
   for (let y = 0; y < h; y++) {
     const row = y * w
     let sum = 0
-    for (let k = -r; k <= r; k++) sum += mask[row + cl(k, w - 1)]
+    for (let k = -r; k <= r; k++) {
+      const value = mask[row + cl(k, w - 1)]
+      sum += value > 1 ? value / 255 : value
+    }
     for (let x = 0; x < w; x++) {
       tmp[row + x] = sum / win
-      sum += mask[row + cl(x + r + 1, w - 1)] - mask[row + cl(x - r, w - 1)]
+      const add = mask[row + cl(x + r + 1, w - 1)]
+      const drop = mask[row + cl(x - r, w - 1)]
+      sum += (add > 1 ? add / 255 : add) - (drop > 1 ? drop / 255 : drop)
     }
   }
-  const out = new Uint8Array(w * h)
   for (let x = 0; x < w; x++) {
     let sum = 0
     for (let k = -r; k <= r; k++) sum += tmp[cl(k, h - 1) * w + x]
     for (let y = 0; y < h; y++) {
-      out[y * w + x] = sum / win >= 0.5 ? 1 : 0
+      out[y * w + x] = sum / win
       sum += tmp[cl(y + r + 1, h - 1) * w + x] - tmp[cl(y - r, h - 1) * w + x]
     }
   }
+  return out
+}
+
+/**
+ * Continuous 0–255 alpha from the same uniform mask filter used by `smoothMask`. This is the one
+ * post-segmentation edge owner for every matte source; it never changes the source's raw mask.
+ */
+export function featherMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
+  const blurred = blurMask(mask, w, h, radius)
+  const out = new Uint8Array(blurred.length)
+  for (let i = 0; i < out.length; i++) out[i] = Math.max(0, Math.min(255, Math.round(blurred[i] * 255)))
+  return out
+}
+
+/**
+ * Uniform contour smoothing: the shared edge filter followed by a 0.5 threshold. Rounds small
+ * sharp protrusions/notches while preserving a binary mask for marching squares.
+ */
+export function smoothMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
+  const blurred = blurMask(mask, w, h, radius)
+  const out = new Uint8Array(blurred.length)
+  for (let i = 0; i < out.length; i++) out[i] = blurred[i] >= 0.5 ? 1 : 0
   return out
 }
 
