@@ -221,7 +221,7 @@ describe('later increment defect reproductions', () => {
     expect(cutout('ui-config.ts')).not.toMatch(/\b(?:vignette|panX|panY)\b/)
   })
 
-  it.fails('KAI-10220 returns scratch+erase before loading OpenCV', () => {
+  it('KAI-10220 returns scratch+erase before loading OpenCV', () => {
     const source = read('src/lib/cutout-grabcut/index.ts')
     expect(source.indexOf('if (fromScratch && erase)')).toBeLessThan(source.indexOf('await loadCv()'))
   })

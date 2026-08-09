@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { chromium, webkit } from 'playwright'
 
 const baseUrl = process.env.CUTOUT_V1_BASE_URL
@@ -9,6 +9,11 @@ assert(baseUrl, 'CUTOUT_V1_BASE_URL must name the already-running current-code s
 const fixturePath = resolve(process.env.CUTOUT_V1_FIXTURE ?? 'public/assets/test-artwork.png')
 const fixture = readFileSync(fixturePath)
 const viewport = { width: 1280, height: 720 }
+const chunksDir = resolve('.next/static/chunks')
+const builtProviderChunk = existsSync(chunksDir)
+  ? readdirSync(chunksDir).find((name) => name.endsWith('.js') && readFileSync(join(chunksDir, name), 'utf8').includes('opencv-js'))
+  : undefined
+const isProviderRequest = (url) => /opencv/i.test(url) || !!builtProviderChunk && new URL(url).pathname.endsWith(`/${builtProviderChunk}`)
 
 async function upload(page, file = fixturePath) {
   await page.locator('input[type=file]').first().setInputFiles(file)
@@ -19,11 +24,13 @@ async function runBrowser(browserType) {
   const browser = await browserType.launch({ headless: true })
   const browserName = browserType.name()
   const modelRequests = []
+  const opencvRequests = []
 
   try {
     const context = await browser.newContext({ viewport })
     context.on('request', (request) => {
       if (request.url().includes('/seg-models/')) modelRequests.push(request.url())
+      if (isProviderRequest(request.url())) opencvRequests.push(request.url())
     })
 
     let releasePrimary
@@ -111,7 +118,8 @@ async function runBrowser(browserType) {
 
     const forbidden = [...modelRequests, ...fallbackRequests].filter((url) => /huggingface|transformers|xenova|edge.?sam/i.test(url))
     assert.deepEqual(forbidden, [], `${browserName}: detector traffic must stay inside the self-hosted production chain`)
-    return { browserName, modelRequests: modelRequests.length, fallbackOrder: fallbackRequests.map((url) => new URL(url).pathname) }
+    assert.deepEqual(opencvRequests, [], `${browserName}: upload and Detect must not load OpenCV`)
+    return { browserName, modelRequests: modelRequests.length, opencvRequests: opencvRequests.length, fallbackOrder: fallbackRequests.map((url) => new URL(url).pathname) }
   } finally {
     await browser.close()
   }

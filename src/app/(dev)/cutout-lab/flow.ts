@@ -24,6 +24,7 @@ import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTap
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531, crashStage, lastCrashStage } from './v531seg'
 import { cancelSegmentML, disposeSegmentML } from '@/lib/effect/segment-ml'
+import { smoothMask } from '@/lib/effect/mask'
 import { HistoryStack } from './history'
 import type { EditMode } from './EditorOverlay'
 
@@ -452,7 +453,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
   // ── THE BRUSH — GrabCut. Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
   // carves). No base → it RECOGNISES the painted shape standalone; a base → it REFINES the cut.
-  // Deterministic, no deep model, OpenCV lazy-loads on the first stroke. ──
+  // No deep model; OpenCV lazy-loads on the first stroke. ──
   const grabCutStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => runTool(async (isCurrent) => {
     const img = imgCanvas.current
     if (!img || !isCurrent()) return
@@ -467,12 +468,17 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     try {
       const refined = await withTimeout(grabCutRefine(img, base, pts, brushPx, erase), T_COMPUTE_MS, 'grabcut')
       if (!isCurrent()) return
+      // Keep raw data as the next refine/history truth; only the completed engine matte enters the
+      // existing 3px uniform smoother that removes the 512px nearest-neighbour stair-step.
+      const soft = smoothMask(refined.data, refined.w, refined.h, 3)
+      for (let i = 0; i < soft.length; i++) soft[i] *= 255
+      const finished = { ...refined, soft }
       const before = base ? maskArea(base) : 0, after = maskArea(refined)
       if (after === 0) { setStatus('⚠️ nothing recognised under the brush — paint over the object'); requestRender(); return }
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
       if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
       if (base && before === after) { setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
-      const ok = await acceptMask(refined, undefined, { erase, isCurrent })
+      const ok = await acceptMask(finished, undefined, { erase, isCurrent })
       if (ok && isCurrent()) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
     } catch (e) {
       if (isCurrent()) setStatus('⚠️ ' + String((e as Error).message))

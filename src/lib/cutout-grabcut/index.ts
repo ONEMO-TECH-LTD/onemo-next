@@ -1,6 +1,6 @@
 // cutout-grabcut — the LIGHT refinement brush (Dan 2026-08-07). Paint roughly over a missed area;
 // GrabCut (OpenCV iterated graph-cut) snaps to the real colour edges and adds it to the selection
-// (or carves it, on erase). Deterministic, NO deep model, runs on the OpenCV we already ship for
+// (or carves it, on erase). NO deep model; runs on the OpenCV we already ship for
 // nothing extra to download. Loads OpenCV lazily on the first stroke, never at page open.
 
 import type { Mask } from '@/lib/mask-tools/types'
@@ -20,8 +20,8 @@ function loadCv(): Promise<any> {
 }
 
 // GrabCut is O(pixels·iterations); cap the work resolution so a stroke stays well under a second on
-// a phone. The result is upscaled back to full res (the outline trace smooths the nearest-neighbour
-// stair-step). 512 is Photoshop-refine territory and keeps edges faithful.
+// a phone. The raw result is upscaled back to full res; the completed engine matte owns the
+// nearest-neighbour edge polish. 512 is Photoshop-refine territory and keeps edges faithful.
 const GC_MAX = 512        // work-resolution cap (grabcut is O(pixels·iters))
 const GC_ITERS = 3        // graph-cut iterations
 const HALO_MULT = 3       // standalone: probable-fg halo radius = HALO_MULT × brush (a colour model to grow from)
@@ -38,14 +38,15 @@ const CORRIDOR_MIN_PX = 24 // floor for the refine corridor radius (full-res px)
 export async function grabCutRefine(
   image: HTMLCanvasElement, base: Mask | null, stroke: { x: number; y: number }[], brushPx: number, erase: boolean,
 ): Promise<Mask> {
-  const cv = await loadCv()
   const W = image.width, H = image.height
-  const scale = Math.min(1, GC_MAX / Math.max(W, H))
-  const w = Math.max(1, Math.round(W * scale)), h = Math.max(1, Math.round(H * scale))
-
   let baseArea = 0
   if (base) for (let i = 0; i < base.data.length; i++) if (base.data[i]) baseArea++
   const fromScratch = baseArea === 0 // no cut yet → recognise the painted shape on its own
+  if (fromScratch && erase) return { data: base ? new Uint8Array(base.data) : new Uint8Array(W * H), w: W, h: H } // nothing to carve; do not load or allocate OpenCV
+
+  const cv = await loadCv()
+  const scale = Math.min(1, GC_MAX / Math.max(W, H))
+  const w = Math.max(1, Math.round(W * scale)), h = Math.max(1, Math.round(H * scale))
 
   const dc = document.createElement('canvas'); dc.width = w; dc.height = h
   const dctx = dc.getContext('2d', { willReadFrequently: true })!
@@ -65,7 +66,6 @@ export async function grabCutRefine(
     }
   }
   let marked = 0
-  if (fromScratch && erase) return { data: base ? new Uint8Array(base.data) : new Uint8Array(W * H), w: W, h: H } // nothing to carve from an empty base
   if (fromScratch) {
     // STANDALONE: bg everywhere, a generous halo of PROBABLE fg around the stroke (a fg colour
     // model to grow from), the stroke swath itself DEFINITE fg. GrabCut expands to the object edge.
