@@ -83,8 +83,8 @@ try {
     width: 1329,
     height: 622,
     colorType: 6,
-    sha256: 'b4e608322f2001e032187dfff40ff625e5b19265fd2fa0f7431cbec46943dc11',
-  }, '1280x720 clean-start Detail-25 Save must retain its exact RGBA result')
+    sha256: '30c148129ae16dfbabde64d1c4f0104d38e734fd6e1d43d97856f71cc5b28a5b',
+  }, '1280x720 direct-25px Detail Save must retain its exact RGBA result')
 
   await upload({ name: 'replacement.png', mimeType: 'image/png', buffer: fixture })
   assert.equal(await saveButton.isDisabled(), true, 'replacement must clear the prior cut')
@@ -169,8 +169,8 @@ try {
     width: 1416,
     height: 661,
     colorType: 6,
-    sha256: '8424c2b2dd60347573e177668da41d7ce0710ccf95c9cf6bf393ad0e311b004a',
-  }, 'fixed-viewport real OpenCV edit must retain its exact RGBA result')
+    sha256: '0bcb4a79537f5138a8e893a56e3cb0459006a46a0bd51a76bbbd649de315697e',
+  }, 'fixed-viewport direct-pixel recipe plus real OpenCV edit must retain its exact RGBA result')
   await page.getByRole('button', { name: /Editing view/ }).click()
 
   // A corner drag keeps its opposite corner fixed.

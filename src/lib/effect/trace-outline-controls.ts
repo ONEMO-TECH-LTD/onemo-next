@@ -7,6 +7,7 @@ import {
   outlineCurveFactor,
   outlineRadiusPx,
   resolve,
+  simplifyTolPx,
   type LocalAdjustment,
   type OutlineSource,
 } from './outline-resolve'
@@ -38,12 +39,12 @@ export const offsetPctToMm = (pct: number, imgLongestMm: number) => (Math.max(0,
  * smooth curves is the editor's Simplify tool (resolve adjustor), NOT here — this stays a raw sharp polygon
  * source (Generation births the raw sharp geometry; Editing shapes it). Returns null if degenerate.
  */
-export function traceSourceFromRaw(
+function traceSourceFromRawUnits(
   rawTracePx: ReadonlyArray<readonly [number, number]>, maskHeightPx: number, mmPerPx: number,
-  detailPct: number, offsetMM: number, join: OffsetJoin,
+  detailPx: number, offsetMM: number, join: OffsetJoin,
 ): VShape | null {
   if (!rawTracePx.length) return null
-  const eps = Math.max(1, detailToFloorMm(detailPct) / (mmPerPx || 1))
+  const eps = Math.max(1, detailPx)
   const yDown = rawTracePx.map(([x, y]) => [x, maskHeightPx - y] as Vec2Px)
   let pts = rdpClosed(yDown, eps)
   pts = repairSimplePolygon(pts, 1)
@@ -58,6 +59,16 @@ export function traceSourceFromRaw(
   return { paths: [path] }
 }
 
+export function traceSourceFromRaw(
+  rawTracePx: ReadonlyArray<readonly [number, number]>, maskHeightPx: number, mmPerPx: number,
+  detailPct: number, offsetMM: number, join: OffsetJoin,
+): VShape | null {
+  return traceSourceFromRawUnits(
+    rawTracePx, maskHeightPx, mmPerPx,
+    detailToFloorMm(detailPct) / (mmPerPx || 1), offsetMM, join,
+  )
+}
+
 export interface TraceOutlineInput {
   vectorShape: VShape
   rawTracePx?: ReadonlyArray<readonly [number, number]>
@@ -67,6 +78,8 @@ export interface TraceOutlineInput {
 }
 
 export interface TraceOutlineSettings {
+  /** Omitted/legacy preserves Creator/Grid scale-relative controls; px is Cutout's direct spatial UI. */
+  spatialUnit?: 'legacy' | 'px'
   detail: number
   offset: number
   offsetJoin: OffsetJoin
@@ -89,25 +102,42 @@ export const TRACE_OUTLINE_DEFAULTS: TraceOutlineSettings = {
   straighten: 0,
 }
 
+/** Cutout's all-off recipe: every visible spatial control reads zero in direct working-canvas px. */
+export const TRACE_OUTLINE_PIXEL_DEFAULTS: TraceOutlineSettings = {
+  ...TRACE_OUTLINE_DEFAULTS,
+  spatialUnit: 'px',
+  detail: 0,
+}
+
+function traceSourceFromRawPx(
+  rawTracePx: ReadonlyArray<readonly [number, number]>, maskHeightPx: number, mmPerPx: number,
+  detailPx: number, offsetPx: number, join: OffsetJoin,
+): VShape | null {
+  return traceSourceFromRawUnits(rawTracePx, maskHeightPx, mmPerPx, detailPx, offsetPx * (mmPerPx || 1), join)
+}
+
 /** Apply the existing v5.3.1 generation + whole-outline controls without its UI/store/history shell. */
 export function resolveTraceOutline(
   input: TraceOutlineInput,
   settings: TraceOutlineSettings,
 ): VShape | null {
-  const generationChanged = settings.detail !== 100 || settings.offset > 0
+  const pixelUnits = settings.spatialUnit === 'px'
+  const generationChanged = pixelUnits ? settings.detail > 0 || settings.offset > 0 : settings.detail !== 100 || settings.offset > 0
   const raw = input.rawTracePx
   const sourceShape = generationChanged && raw?.length
-    ? traceSourceFromRaw(
-        raw,
-        input.maskHeightPx,
-        input.mmPerPx,
-        settings.detail,
-        offsetPctToMm(
-          settings.offset,
-          Math.max(input.maskWidthPx, input.maskHeightPx) * input.mmPerPx,
-        ),
-        settings.offsetJoin,
-      )
+    ? pixelUnits
+      ? traceSourceFromRawPx(raw, input.maskHeightPx, input.mmPerPx, settings.detail, settings.offset, settings.offsetJoin)
+      : traceSourceFromRaw(
+          raw,
+          input.maskHeightPx,
+          input.mmPerPx,
+          settings.detail,
+          offsetPctToMm(
+            settings.offset,
+            Math.max(input.maskWidthPx, input.maskHeightPx) * input.mmPerPx,
+          ),
+          settings.offsetJoin,
+        )
     : input.vectorShape
   if (!sourceShape) return null
 
@@ -128,6 +158,7 @@ export function resolveTraceOutline(
   }
   const global = {
     ...GLOBAL_OFF,
+    spatialUnit: pixelUnits ? 'px' as const : 'scaled' as const,
     simplify: settings.simplify,
     smooth: settings.smooth,
     straighten: settings.straighten,
@@ -136,8 +167,40 @@ export function resolveTraceOutline(
   return resolve(source, {
     global: {
       ...global,
-      radius: outlineRadiusPx(settings.radius, withoutRadius),
+      radius: pixelUnits ? settings.radius : outlineRadiusPx(settings.radius, withoutRadius),
     },
     local,
   })
+}
+
+/**
+ * Convert a pre-pixel Cutout recipe against its current source without changing its rendered shape.
+ * The old values remain valid migration inputs; callers persist only the returned direct-px recipe.
+ */
+export function traceSettingsToPixelUnits(
+  input: TraceOutlineInput,
+  settings: TraceOutlineSettings,
+): TraceOutlineSettings {
+  if (settings.spatialUnit === 'px') return { ...settings }
+  const generationShape = resolveTraceOutline(input, {
+    ...settings,
+    curve: 0,
+    radius: 0,
+    simplify: 0,
+    smooth: 0,
+    straighten: 0,
+  }) ?? input.vectorShape
+  const path = generationShape.paths[0]
+  const xs = path?.anchors.map((anchor) => anchor.p.x) ?? [0, 1]
+  const ys = path?.anchors.map((anchor) => anchor.p.y) ?? [0, 1]
+  const shortSidePx = Math.max(1, Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)))
+  const withoutRadius = resolveTraceOutline(input, { ...settings, radius: 0 }) ?? generationShape
+  return {
+    ...settings,
+    spatialUnit: 'px',
+    detail: settings.detail === 100 ? 0 : Math.max(1, detailToFloorMm(settings.detail) / (input.mmPerPx || 1)),
+    offset: (Math.max(0, settings.offset) / 100) * Math.max(input.maskWidthPx, input.maskHeightPx),
+    simplify: simplifyTolPx(settings.simplify, shortSidePx),
+    radius: outlineRadiusPx(settings.radius, withoutRadius),
+  }
 }

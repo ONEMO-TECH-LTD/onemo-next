@@ -12,7 +12,7 @@ import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
 import { maskOverlay } from './finish'
 import { useCutoutLabFlow } from './flow'
 import { ThinkingOrb } from 'thinking-orbs'
-import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
+import { BLEND_CHIPS, CHIP_RANGE, LEGACY_VEC_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
 
 export default function CutoutLab() {
   useEffect(() => {
@@ -133,13 +133,13 @@ export default function CutoutLab() {
     const st = strokeRef.current
     if (st.length > 0) {
       const t = toolRef.current
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round'
-      if (t === 'draw' || t === 'draw-erase') {
+      if ((t === 'draw' || t === 'draw-erase') && paintCfg.swathMult > 0) {
         // PAINT ink (WYSIWYG): the stroke renders at the actual brush width — what you paint is
         // the area that lands. Violet = add, red = erase.
+        ctx.lineCap = paintCfg.cap; ctx.lineJoin = paintCfg.join
         const ink = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
         ctx.strokeStyle = ink; ctx.fillStyle = ink
-        ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * paintCfg.swathMult)
+        ctx.lineWidth = brushRef.current * (img.width / disp.w) * paintCfg.swathMult
         ctx.beginPath()
         if (st.length === 1) {
           ctx.arc(st[0].x * img.width, st[0].y * img.height, ctx.lineWidth / 2, 0, Math.PI * 2)
@@ -177,18 +177,20 @@ export default function CutoutLab() {
     if (cur && imgCanvas.current) { // ring for EVERY brush tool once an image exists (post-Clear too)
       const t = toolRef.current
       if (t !== 'nodes' && t !== 'frame') {
-        const radius = t === 'draw' || t === 'draw-erase'
-          ? brushRef.current * paintCfg.swathMult / 2
-          : brushRef.current
-        ctx.beginPath()
-        ctx.arc(cur.x * img.width, cur.y * img.height, radius * (viewBoxRef.current.w / disp.w), 0, 6.29)
-        ctx.lineWidth = Math.max(2, img.width * 0.003)
-        ctx.strokeStyle = t === 'add' ? 'rgba(34,197,94,1)' : t === 'draw' ? 'rgba(124,58,237,1)' : 'rgba(239,68,68,1)'
-        ctx.stroke()
+        const paint = t === 'draw' || t === 'draw-erase'
+        if (!paint || paintCfg.swathMult > 0) {
+          const radius = paint ? brushRef.current * paintCfg.swathMult / 2 : brushRef.current
+          const scale = paint ? img.width / disp.w : viewBoxRef.current.w / disp.w
+          ctx.beginPath()
+          ctx.arc(cur.x * img.width, cur.y * img.height, radius * scale, 0, 6.29)
+          ctx.lineWidth = Math.max(2, img.width * 0.003)
+          ctx.strokeStyle = t === 'add' ? 'rgba(34,197,94,1)' : t === 'draw' ? 'rgba(124,58,237,1)' : 'rgba(239,68,68,1)'
+          ctx.stroke()
+        }
       }
     }
     ctx.restore() // view-box translate
-  }, [disp.w, paintCfg.swathMult, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
+  }, [disp.w, paintCfg.cap, paintCfg.join, paintCfg.swathMult, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
   useEffect(() => { renderRef.current = render }, [render])
   useEffect(() => { requestAnimationFrame(() => renderRef.current()) }, [tool]) // mask tint follows the tool mode instantly
 
@@ -284,9 +286,12 @@ export default function CutoutLab() {
   const knob = (() => {
     if (tab === 'vector') {
       const k = vecChip
-      const [lo, hi] = CHIP_RANGE[k]
-      const value = k === 'detail' ? hi - settings.detail : settings[k] // 'detail' knob is UI-inverted (0 = full)
-      return { label: k === 'detail' ? 'detail (0 = full)' : k, lo, hi, value, set: (v: number) => setTune(k === 'detail' ? { detail: hi - v } : { [k]: v }) }
+      const pixelUnits = settings.spatialUnit === 'px'
+      const [lo, hi] = pixelUnits ? CHIP_RANGE[k] : LEGACY_VEC_RANGE[k]
+      const spatial = k !== 'smooth'
+      const value = pixelUnits || k !== 'detail' ? settings[k] : 100 - settings.detail
+      const label = pixelUnits ? `${k} (${spatial ? 'px' : 'strength'})` : k === 'detail' ? 'detail (0 = full)' : k
+      return { label, lo, hi, value, set: (v: number) => setTune(pixelUnits || k !== 'detail' ? { [k]: v } : { detail: 100 - v }) }
     }
     if (tab === 'blend') {
       const k = blendChip
@@ -447,6 +452,22 @@ export default function CutoutLab() {
               <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{display}</span>
             </div>
           ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <label htmlFor="paint-cap-style" style={{ fontSize: 12, color: '#475569', width: 92 }}>cap style</label>
+            <select id="paint-cap-style" aria-label="Paint cap style" value={paintCfg.cap}
+              onChange={(e) => flow.actions.setPaintCfg({ cap: e.target.value as CanvasLineCap })} style={{ flex: 1, padding: '4px 6px' }}>
+              {(['round', 'butt', 'square'] as CanvasLineCap[]).map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+            <span style={{ width: 40 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <label htmlFor="paint-join-style" style={{ fontSize: 12, color: '#475569', width: 92 }}>join style</label>
+            <select id="paint-join-style" aria-label="Paint join style" value={paintCfg.join}
+              onChange={(e) => flow.actions.setPaintCfg({ join: e.target.value as CanvasLineJoin })} style={{ flex: 1, padding: '4px 6px' }}>
+              {(['round', 'bevel', 'miter'] as CanvasLineJoin[]).map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+            <span style={{ width: 40 }} />
+          </div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke</div>
         </div>
       )}

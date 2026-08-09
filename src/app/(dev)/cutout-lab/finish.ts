@@ -11,6 +11,9 @@ import {
   detailToFloorMm,
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
+  TRACE_OUTLINE_PIXEL_DEFAULTS,
+  traceSettingsToPixelUnits,
+  type TraceOutlineInput,
   type TraceOutlineSettings,
 } from '@/lib/effect/trace-outline-controls'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
@@ -22,20 +25,39 @@ export type { TraceOutlineSettings }
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
 export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape }
 
-/** Calibration baseline (Dan 2026-08-05): EVERYTHING ZERO — the raw full-fidelity sharp trace,
- *  no recipe applied (engine detail 100 renders as knob 0: the Detail knob is UI-inverted).
- *  The golden config gets dialed from zero on-device and locked here. */
-/** TRUE all-off — the reset used when adjustments FOLD into a baked source (edit modes). */
-export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
+/** Direct-pixel all-off reset used for Paint and when edits fold a recipe into a baked source. */
+export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_PIXEL_DEFAULTS }
 
 export const AUTO_SETTINGS: TraceOutlineSettings = {
   ...TRACE_OUTLINE_DEFAULTS,
-  // Dan's default sticker-cutout config for AI/GrabCut: offset 3, the rest 10.
-  // detail is UI-inverted (knob 10 = engine 90); straighten/curve stay 0 (off the surface).
+  spatialUnit: 'legacy',
+  // Existing sticker-cutout calibration. It is converted once against the accepted source so the
+  // resulting direct-pixel recipe preserves this exact shape; Smooth remains direct strength.
   detail: 90, offset: 3, simplify: 10, smooth: 10, radius: 10,
 }
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
+
+const drawnOutlineInput = (
+  shape: VShape, ring: { x: number; y: number }[], w: number, h: number,
+): TraceOutlineInput => ({
+  vectorShape: shape,
+  rawTracePx: ring.map((p) => [p.x, h - p.y] as [number, number]),
+  maskWidthPx: w,
+  maskHeightPx: h,
+  mmPerPx: MM_BASE / Math.max(w, h),
+})
+
+const preparedOutlineInput = (prepared: PreparedEffectBase): TraceOutlineInput => ({
+  vectorShape: prepared.spec.vectorShape,
+  rawTracePx: prepared.spec.rawTracePx,
+  maskWidthPx: prepared.spec.maskWidthPx,
+  maskHeightPx: prepared.spec.maskHeightPx,
+  mmPerPx: prepared.spec.mmPerPx,
+})
+
+export const pixelSettingsForPrepared = (prepared: PreparedEffectBase, settings: TraceOutlineSettings) =>
+  traceSettingsToPixelUnits(preparedOutlineInput(prepared), settings)
 
 
 /** Green-kept / red-removed overlay pixels for the mask. */
@@ -72,16 +94,7 @@ export function finishDrawn(
   shape: import('@/lib/vector-core').VShape, ring: { x: number; y: number }[], w: number, h: number,
   settings: TraceOutlineSettings,
 ): FinishResult | null {
-  const resolved = resolveTraceOutline(
-    {
-      vectorShape: shape,
-      rawTracePx: ring.map((p) => [p.x, h - p.y] as [number, number]), // producers expects y-up
-      maskWidthPx: w,
-      maskHeightPx: h,
-      mmPerPx: MM_BASE / Math.max(w, h),
-    },
-    settings,
-  )
+  const resolved = resolveTraceOutline(drawnOutlineInput(shape, ring, w, h), settings)
   if (!resolved) return null
   const bb = shapeBBox(resolved, 1)
   return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
@@ -183,16 +196,7 @@ export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: Pr
  *  match the lab canvas (they diverged when the bridge took over segmentation, 2026-08-06). */
 export function finishSpec(prepared: PreparedEffectBase, settings: TraceOutlineSettings, viewW?: number): FinishResult | null {
   const spec = prepared.spec
-  const resolved = resolveTraceOutline(
-    {
-      vectorShape: spec.vectorShape,
-      rawTracePx: spec.rawTracePx,
-      maskWidthPx: spec.maskWidthPx,
-      maskHeightPx: spec.maskHeightPx,
-      mmPerPx: spec.mmPerPx,
-    },
-    settings,
-  )
+  const resolved = resolveTraceOutline(preparedOutlineInput(prepared), settings)
   if (!resolved) return null
   const k = viewW ? viewW / Math.max(1, spec.maskWidthPx) : 1
   const view = k === 1 ? resolved : transformShape(resolved, (p) => ({ x: p.x * k, y: p.y * k }))

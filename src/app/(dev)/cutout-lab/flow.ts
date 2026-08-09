@@ -17,6 +17,7 @@ import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
   AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
   disposePrepareAICache, EDGE_FINISH_DEFAULT, finishDrawn, finishSpec,
+  pixelSettingsForPrepared,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
 } from './finish'
 import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
@@ -115,15 +116,25 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
   const cutoutSettingsRef = useRef<TraceOutlineSettings>({ ...AUTO_SETTINGS })
   const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
-  const activateOutlineSource = useCallback((source: OutlineSourceKind) => {
-    if (outlineSourceRef.current === source) return
+  const activateOutlineSource = useCallback((source: OutlineSourceKind, resetPaint = false) => {
+    if (outlineSourceRef.current === source && !(source === 'paint' && resetPaint)) return
     const current = { ...settingsRef.current }
     if (outlineSourceRef.current === 'paint') paintSettingsRef.current = current
     else cutoutSettingsRef.current = current
     outlineSourceRef.current = source
+    if (source === 'paint' && resetPaint) paintSettingsRef.current = { ...ZERO_SETTINGS }
     const next = { ...(source === 'paint' ? paintSettingsRef.current : cutoutSettingsRef.current) }
     settingsRef.current = next
     setSettings(next)
+  }, [])
+  const migrateCutoutRecipe = useCallback((prepared: PreparedEffectBase) => {
+    if (cutoutSettingsRef.current.spatialUnit === 'px') return
+    const next = pixelSettingsForPrepared(prepared, cutoutSettingsRef.current)
+    cutoutSettingsRef.current = next
+    if (outlineSourceRef.current === 'cutout') {
+      settingsRef.current = next
+      setSettings(next)
+    }
   }, [])
   const blendRef = useRef(blend); blendRef.current = blend
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
@@ -347,6 +358,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         )
         if (!isCurrent()) return false
         preparedRef.current = nextPrepared
+        if ((opts?.source ?? 'cutout') === 'cutout') migrateCutoutRecipe(nextPrepared)
         nativePresegRef.current = preseg ?? null
       } catch (e) {
         if (isCurrent()) setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept')
@@ -354,7 +366,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       }
     }
     if (!isCurrent()) return false
-    activateOutlineSource(opts?.source ?? 'cutout')
+    const source = opts?.source ?? 'cutout'
+    activateOutlineSource(source, source === 'paint')
     editPrepGen.current++
     drawnRef.current = null
     maskRef.current = mask
@@ -399,7 +412,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — refine, draw, edit, tune, or Save`)
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activateOutlineSource, applyFinish, scheduleBake])
+  }, [activateOutlineSource, applyFinish, migrateCutoutRecipe, scheduleBake])
 
   const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => {
     const next = { ...paintCfgRef.current, ...patch }

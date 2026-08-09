@@ -225,6 +225,7 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Erase/ }).click()
     const box = await routePage.locator('canvas').first().boundingBox()
     assert(box, `${browserName}: route canvas must be visible`)
+    const workingWidth = await routePage.locator('canvas').first().evaluate((canvas) => canvas.width)
     await draw(routePage, [{ x: box.x + box.width * 0.48, y: box.y + box.height * 0.48 }, { x: box.x + box.width * 0.56, y: box.y + box.height * 0.52 }], 4)
     await status.filter({ hasText: /nothing to erase yet/ }).waitFor({ timeout: 10_000 })
     assert.equal(scriptRequests.slice(baseline).filter(isProviderRequest).length, 0, `${browserName}: route scratch+erase must stay provider-cold`)
@@ -249,6 +250,19 @@ async function runBrowser(browserType) {
     // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
     await routePage.getByRole('button', { name: /Vector/ }).click()
+    for (const [control, unit, max] of [
+      ['detail', 'px', '150'], ['offset', 'px', '160'], ['simplify', 'px', '30'],
+      ['smooth', 'strength', '200'], ['radius', 'px', '260'],
+    ]) {
+      await routePage.getByRole('button', { name: control, exact: true }).click()
+      const row = routePage.getByText(`${control} (${unit})`, { exact: true }).locator('..')
+      const slider = row.locator('input[type=range]')
+      assert.deepEqual(
+        [await slider.getAttribute('min'), await slider.getAttribute('max'), await slider.getAttribute('step')],
+        ['0', max, '1'],
+        `${browserName}: ${control} must expose normalized ${unit} units`,
+      )
+    }
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     const vectorKnob = routePage.locator('input[type=number]')
     await vectorKnob.fill('37')
@@ -261,7 +275,13 @@ async function runBrowser(browserType) {
     const swath = routePage.getByRole('slider', { name: 'Paint swath width' })
     const smoothing = routePage.getByRole('slider', { name: 'Paint smoothing' })
     const loopClose = routePage.getByRole('slider', { name: 'Paint loop-close' })
+    const capStyle = routePage.getByRole('combobox', { name: 'Paint cap style' })
+    const joinStyle = routePage.getByRole('combobox', { name: 'Paint join style' })
     assert.equal(await swath.inputValue(), '1', `${browserName}: Paint swath must default to the brush width`)
+    assert.equal(await capStyle.inputValue(), 'round', `${browserName}: Paint cap style default changed`)
+    assert.equal(await joinStyle.inputValue(), 'round', `${browserName}: Paint join style default changed`)
+    assert.deepEqual(await capStyle.locator('option').allTextContents(), ['round', 'butt', 'square'], `${browserName}: Paint cap styles incomplete`)
+    assert.deepEqual(await joinStyle.locator('option').allTextContents(), ['round', 'bevel', 'miter'], `${browserName}: Paint join styles incomplete`)
     assert.deepEqual(
       await Promise.all([swath, smoothing, loopClose].map(async (slider) => [await slider.getAttribute('min'), await slider.getAttribute('max')])),
       [['0', '12'], ['0', '100'], ['0', '1']],
@@ -297,9 +317,20 @@ async function runBrowser(browserType) {
     }
     let paintedCanvas = await canvasData()
     paintedCanvas = await tunePaint(loopClose, '1', paintedCanvas)
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
+    assert.equal(await vectorKnob.inputValue(), '0', `${browserName}: tuning Paint must reset the visible vector recipe`)
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     paintedCanvas = await tunePaint(loopClose, '0.2', paintedCanvas)
     paintedCanvas = await tunePaint(swath, '12', paintedCanvas)
-    await tunePaint(smoothing, '100', paintedCanvas)
+    paintedCanvas = await tunePaint(smoothing, '100', paintedCanvas)
+    await capStyle.selectOption('square')
+    await status.filter({ hasText: /latest Paint stroke recalculated/ }).waitFor({ timeout: 60_000 })
+    assert.notEqual(await canvasData(), paintedCanvas, `${browserName}: Paint cap style did not change the current hand-drawn shape`)
+    paintedCanvas = await canvasData()
+    await joinStyle.selectOption('bevel')
+    await status.filter({ hasText: /latest Paint stroke recalculated/ }).waitFor({ timeout: 60_000 })
+    assert.notEqual(await canvasData(), paintedCanvas, `${browserName}: Paint join style did not change the current hand-drawn shape`)
 
     // Blend stays explicitly zero even when Frame pushes the shape beyond the artwork.
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
@@ -311,6 +342,45 @@ async function runBrowser(browserType) {
     await routePage.mouse.down()
     await routePage.mouse.move(eastFrameBox.x + eastFrameBox.width / 2 + paintBox.width, eastFrameBox.y + eastFrameBox.height / 2)
     await routePage.mouse.up()
+
+    // Paint ink/cursor stay truthful to the image-space mask width after the view box outgrows it.
+    await routePage.getByRole('button', { name: /Paint shape/ }).click()
+    await swath.fill('1')
+    await routePage.evaluate(() => {
+      const proto = CanvasRenderingContext2D.prototype
+      const arc = proto.arc
+      const stroke = proto.stroke
+      let radius = 0
+      window.__cutoutPaintWidthProbe = { ink: [], cursor: [] }
+      proto.arc = function (...args) { radius = args[2]; return Reflect.apply(arc, this, args) }
+      proto.stroke = function (...args) {
+        const style = String(this.strokeStyle).replaceAll(' ', '')
+        if (style === 'rgba(124,58,237,0.45)') window.__cutoutPaintWidthProbe.ink.push(this.lineWidth)
+        else if (style.includes('124,58,237') || style === '#7c3aed') window.__cutoutPaintWidthProbe.cursor.push(radius * 2)
+        return Reflect.apply(stroke, this, args)
+      }
+    })
+    const outgrownPaintBox = await routePage.locator('canvas').first().boundingBox()
+    assert(outgrownPaintBox, `${browserName}: outgrown Paint canvas must be visible`)
+    const displayWidth = await routePage.locator('canvas').first().evaluate((canvas) => canvas.parentElement.getBoundingClientRect().width)
+    const brushSize = Number(await routePage.locator('input[type=number]').inputValue())
+    const expectedPaintWidth = brushSize * workingWidth / displayWidth
+    await routePage.mouse.move(outgrownPaintBox.x + outgrownPaintBox.width * 0.45, outgrownPaintBox.y + outgrownPaintBox.height * 0.45)
+    await routePage.mouse.down()
+    await routePage.mouse.move(outgrownPaintBox.x + outgrownPaintBox.width * 0.55, outgrownPaintBox.y + outgrownPaintBox.height * 0.55)
+    const paintedWidths = await routePage.evaluate(() => window.__cutoutPaintWidthProbe)
+    await routePage.mouse.up()
+    assert(Math.abs(paintedWidths.ink.at(-1) - expectedPaintWidth) < 0.01, `${browserName}: outgrown Paint ink diverged from deposited width`)
+    assert(Math.abs(paintedWidths.cursor.at(-1) - expectedPaintWidth) < 0.01, `${browserName}: outgrown Paint cursor diverged from deposited width`)
+    await swath.fill('0')
+    await routePage.evaluate(() => { window.__cutoutPaintWidthProbe = { ink: [], cursor: [] } })
+    await routePage.mouse.move(outgrownPaintBox.x + outgrownPaintBox.width * 0.60, outgrownPaintBox.y + outgrownPaintBox.height * 0.60)
+    await routePage.mouse.down()
+    await routePage.mouse.move(outgrownPaintBox.x + outgrownPaintBox.width * 0.65, outgrownPaintBox.y + outgrownPaintBox.height * 0.65)
+    const zeroWidths = await routePage.evaluate(() => window.__cutoutPaintWidthProbe)
+    await routePage.mouse.up()
+    assert.deepEqual(zeroWidths, { ink: [], cursor: [] }, `${browserName}: zero swath must render no Paint ink or cursor`)
+
     await routePage.getByRole('button', { name: /Blend/ }).click()
     assert.equal(await routePage.locator('input[type=number]').inputValue(), '0', `${browserName}: Blend must not wake above zero on outgrowth`)
 
@@ -327,7 +397,7 @@ async function runBrowser(browserType) {
     assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: GrabCut did not restore the prior cutout vector recipe`)
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
-    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, paintLiveCalibration: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
+    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, paintLiveCalibration: true, paintStrokeStyleCalibration: true, paintWidthProof: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
   } finally {
     await browser.close()
   }

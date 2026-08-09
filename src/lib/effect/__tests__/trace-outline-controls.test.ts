@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   resolveTraceOutline,
+  TRACE_OUTLINE_PIXEL_DEFAULTS,
+  traceSettingsToPixelUnits,
   type TraceOutlineInput,
   type TraceOutlineSettings,
 } from '../trace-outline-controls'
@@ -52,6 +54,14 @@ const OFF: TraceOutlineSettings = {
   smooth: 0,
   straighten: 0,
 }
+const CALIBRATED_PRESETS = [
+  ['PURE', 0, 0, 0, 0, 0],
+  ['CLASSIC', 0, 2, 15, 0, 10],
+  ['TECHNO', 10, 3, 0, 20, 2],
+  ['EDGY', 13, 4, 0, 1, 1],
+  ['FLUID', 0, 4, 100, 0, 13],
+  ['SPACE', 80, 15, 0, 0, 5],
+] as const
 
 function bounds(shape: VShape) {
   const points = shape.paths.flatMap((path) => path.anchors.map((anchor) => anchor.p))
@@ -91,5 +101,35 @@ describe('grid-lab v5.3.1 outline-control binding', () => {
       expect(shape, `${control} must return an outline`).not.toBeNull()
       expect(JSON.stringify(shape), `${control} must change the outline`).not.toBe(baseline)
     }
+  })
+
+  it('uses direct working-canvas pixels for Cutout spatial controls', () => {
+    const offset = resolveTraceOutline(input, { ...TRACE_OUTLINE_PIXEL_DEFAULTS, offset: 1 })!
+
+    expect(bounds(offset).minX).toBeCloseTo(bounds(vectorShape).minX - 1, 2)
+    expect(bounds(offset).maxX).toBeCloseTo(bounds(vectorShape).maxX + 1, 2)
+  })
+
+  it('migrates a calibrated legacy recipe without changing its resolved outline', () => {
+    const legacy: TraceOutlineSettings = {
+      ...OFF,
+      detail: 90,
+      offset: 3,
+      simplify: 10,
+      smooth: 10,
+      radius: 10,
+    }
+    const migrated = traceSettingsToPixelUnits(input, legacy)
+
+    expect(migrated.spatialUnit).toBe('px')
+    expect(migrated.smooth).toBe(legacy.smooth)
+    expect(resolveTraceOutline(input, migrated)).toEqual(resolveTraceOutline(input, legacy))
+  })
+
+  it.each(CALIBRATED_PRESETS)('retains calibrated %s through the pixel-unit migration', (name, detail, offset, simplify, smooth, radius) => {
+    const legacy: TraceOutlineSettings = { ...OFF, detail: 100 - detail, offset, simplify, smooth, radius }
+    const migrated = traceSettingsToPixelUnits(input, legacy)
+    expect(migrated.smooth, `${name}: Smooth strength must stay numeric-identical`).toBe(smooth)
+    expect(resolveTraceOutline(input, migrated), `${name}: pixel migration changed the shape`).toEqual(resolveTraceOutline(input, legacy))
   })
 })
