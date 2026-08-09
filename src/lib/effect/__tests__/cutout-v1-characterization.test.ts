@@ -212,8 +212,13 @@ describe('later increment defect reproductions', () => {
     expect(source).toContain('onPointerCancel={onUp}')
   })
 
-  it.fails('KAI-10219 removes Mirror and dormant Cutout output settings', () => {
-    expect(cutout('finish.ts')).not.toMatch(/\bmirror\b/i)
+  it('KAI-10219 removes Mirror and dormant Cutout output settings', () => {
+    const finish = cutout('finish.ts')
+    expect(finish).not.toMatch(/\bmirror\b/i)
+    expect(finish).not.toContain('presetFilter')
+    expect(finish).not.toMatch(/\b(?:vignette|tint|panX|panY)\b/)
+    expect(cutout('page.tsx')).not.toContain('FillChoice')
+    expect(cutout('ui-config.ts')).not.toMatch(/\b(?:vignette|panX|panY)\b/)
   })
 
   it.fails('KAI-10220 returns scratch+erase before loading OpenCV', () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fakes = vi.hoisted(() => {
   const imageData = { width: 4, height: 4, data: new Uint8ClampedArray(4 * 4 * 4) }
@@ -36,8 +36,11 @@ vi.mock('../geometry-truth', () => ({
 }))
 
 import { EFFECT_BUILD_CONFIG, prepareEffect } from '../prepare-effect'
+import { blurCanvas, composeEffectArtwork } from '../composite'
 
 describe('prepareEffect detector degradation', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   it('reports the visible flood-fill state through the existing progress callback', async () => {
     const progress: string[] = []
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -46,10 +49,28 @@ describe('prepareEffect detector degradation', () => {
 
     expect(progress).toEqual(['fallback'])
     expect(prepared.spec.generator.adapter).toBe('flood-fill-fixture')
+    expect(composeEffectArtwork).toHaveBeenCalledOnce()
+    expect(blurCanvas).toHaveBeenCalledOnce()
     expect(warn).toHaveBeenCalledWith(
       '[shaped] ML segmentation unavailable — falling back to flood-fill:',
       expect.any(Error),
     )
+    warn.mockRestore()
+  })
+
+  it('lets the bounded Cutout caller skip only the measured unused output canvases', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const prepared = await prepareEffect(
+      'fixture://cutout', 'shaped', EFFECT_BUILD_CONFIG, undefined, undefined, { buildOutputs: false },
+    )
+
+    expect(prepared.spec.generator.adapter).toBe('flood-fill-fixture')
+    expect(prepared.frontSrc).toBeDefined()
+    expect('composite' in prepared).toBe(false)
+    expect('edgeComposite' in prepared).toBe(false)
+    expect(composeEffectArtwork).not.toHaveBeenCalled()
+    expect(blurCanvas).not.toHaveBeenCalled()
     warn.mockRestore()
   })
 })

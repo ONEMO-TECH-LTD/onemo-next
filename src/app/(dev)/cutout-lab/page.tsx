@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
-import { drawCutout, maskOverlay, type FillChoice } from './finish'
+import { maskOverlay } from './finish'
 import { useCutoutLabFlow } from './flow'
 import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
@@ -50,6 +50,9 @@ export default function CutoutLab() {
   const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
   const COMET_LIFE_MS = 700 // ms a comet-trail point stays visible
   const overlayRef = useRef(false); overlayRef.current = overlayOn
+  useEffect(() => {
+    if (!hasCut && previewRef.current) { previewRef.current = false; setPreview(false) }
+  }, [hasCut])
 
   const viewRef = useRef<HTMLCanvasElement>(null)
   const strokeRef = useRef<(Point & { t: number })[]>([])
@@ -67,8 +70,8 @@ export default function CutoutLab() {
     if (!view || !img) return
     const ctx0 = view.getContext('2d')!
     if (previewRef.current && dRef.current) {
-      // PREVIEW = the SAME bake the editor shows, only cut out — PURE cutout on transparency, no
-      // background (Dan 2026-08-06). One compositor, one cache — divergence impossible by construction.
+      // PREVIEW is entered only after the full capped bake has settled. No checkerboard, raw clip,
+      // or display-resolution bake may substitute for the requested transparent output.
       const live = liveBakeRef.current
       if (live) {
         const w = live.canvas.width, h = live.canvas.height
@@ -76,7 +79,8 @@ export default function CutoutLab() {
         ctx0.clearRect(0, 0, w, h)
         ctx0.drawImage(live.canvas, 0, 0)
       } else {
-        drawCutout(view, img, dRef.current)
+        view.width = 1; view.height = 1
+        ctx0.clearRect(0, 0, 1, 1)
       }
       return
     }
@@ -100,7 +104,7 @@ export default function CutoutLab() {
     ctx.drawImage(img, 0, 0)
     if (dRef.current) {
       // LIVE RESULT (Dan's one-canvas law): the ENGINE-composed sticker drawn in place inside the
-      // outline — blend/fill/presets react in real time; the raw image shows only outside, dimmed.
+      // outline — Blend reacts in real time; the raw image shows only outside, dimmed.
       const live = liveBakeRef.current
       if (live) {
         const b = live.bounds
@@ -310,11 +314,11 @@ export default function CutoutLab() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0', alignItems: 'center', justifyContent: 'center' }}>
         <label style={{ ...btn, cursor: 'pointer', background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}>⬆ Upload
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && flow.actions.upload(e.target.files[0])} /></label>
-        <button onClick={flow.actions.save} disabled={!hasCut} style={{ ...btn, background: hasCut ? '#16a34a' : '#e5e7eb', color: hasCut ? '#fff' : '#9ca3af' }}>💾 Save</button>
+        <button onClick={flow.actions.save} disabled={!hasCut || busy} style={{ ...btn, background: hasCut && !busy ? '#16a34a' : '#e5e7eb', color: hasCut && !busy ? '#fff' : '#9ca3af' }}>💾 Save</button>
         <button onClick={flow.actions.undo} disabled={busy || !canUndo} style={btn}>↩ Undo</button>
         <button onClick={flow.actions.redo} disabled={busy || !canRedo} style={btn}>↪ Redo</button>
         <button onClick={flow.actions.clearAll} disabled={busy || !hasCut} style={btn}>🗑 Clear</button>
-        <button onClick={() => { const v = !previewRef.current; previewRef.current = v; setPreview(v); flow.actions.setPreview(v); requestAnimationFrame(render) }} disabled={!hasCut}
+        <button onClick={async () => { const v = !previewRef.current; if (await flow.actions.setPreview(v)) { previewRef.current = v; setPreview(v); requestAnimationFrame(render) } }} disabled={!hasCut || busy}
           style={{ ...btn, background: preview ? '#0f172a' : '#f1f5f9', color: preview ? '#fff' : '#0f172a' }}>{preview ? '👁 Editing view' : '👁 Preview'}</button>
         <button onClick={() => { const v = !overlayRef.current; overlayRef.current = v; setOverlayOn(v); requestAnimationFrame(render) }} disabled={!hasCut}
           style={{ ...btn, background: overlayOn ? '#f1f5f9' : '#0f172a', color: overlayOn ? '#0f172a' : '#fff' }}>{overlayOn ? '🎭 Mask on' : '🎭 Mask off'}</button>
@@ -344,9 +348,6 @@ export default function CutoutLab() {
         </>)}
         {tab === 'blend' && (<>
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}
-          {(['mirror', 'clamp'] as FillChoice[]).map((f) => (
-            <button key={f} onClick={() => setBlendTune({ fill: f })} style={chipBtn(blend.fill === f)}>{f}</button>
-          ))}
         </>)}
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>

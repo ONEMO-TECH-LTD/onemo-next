@@ -26,6 +26,13 @@ interface OracleResult {
     clampTopLeft: PixelWitness
     tileTopLeft: PixelWitness
   }
+  settlement: {
+    rejection: string
+    cancellation: string
+    timeout: string
+    blobUrlsCreated: number
+    blobUrlsRevoked: number
+  }
 }
 
 function expectPixel(
@@ -133,6 +140,57 @@ describe('composeEffectArtwork real-pixel oracle', () => {
             [0, 3], [1, 3], [2, 3], [3, 3],
           ]
 
+          const NativeImage = window.Image
+          const nativeSetTimeout = window.setTimeout.bind(window)
+          const nativeCreateObjectURL = URL.createObjectURL.bind(URL)
+          const nativeRevokeObjectURL = URL.revokeObjectURL.bind(URL)
+          let blobUrlsCreated = 0
+          let blobUrlsRevoked = 0
+          URL.createObjectURL = (blob) => { blobUrlsCreated += 1; return nativeCreateObjectURL(blob) }
+          URL.revokeObjectURL = (url) => { blobUrlsRevoked += 1; nativeRevokeObjectURL(url) }
+          const filteredInput = () => ({
+            originalCanvas: makeCanvas(2, 2, sourcePixels),
+            subjectCanvas: transparentSubject,
+            blendPercent: 50,
+            fillMode: 'clamp',
+          })
+          const rejectionOf = async (promise: Promise<unknown>): Promise<string> => {
+            try { await promise; return 'resolved unexpectedly' }
+            catch (error) { return String((error as Error).message) }
+          }
+          let rejection = ''
+          let cancellation = ''
+          let timeout = ''
+          try {
+            class RejectingImage {
+              onload: (() => void) | null = null
+              onerror: (() => void) | null = null
+              set src(value: string) { if (value) queueMicrotask(() => this.onerror?.()) }
+            }
+            Object.defineProperty(window, 'Image', { configurable: true, value: RejectingImage })
+            rejection = await rejectionOf(composeEffectArtwork(filteredInput()))
+
+            class HangingImage {
+              onload: (() => void) | null = null
+              onerror: (() => void) | null = null
+              set src(_value: string) { /* deliberately never settles */ }
+            }
+            Object.defineProperty(window, 'Image', { configurable: true, value: HangingImage })
+            let cancelled = false
+            nativeSetTimeout(() => { cancelled = true }, 5)
+            cancellation = await rejectionOf(composeEffectArtwork({ ...filteredInput(), cancelled: () => cancelled }))
+
+            window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => (
+              nativeSetTimeout(handler, delay === 30_000 ? 5 : delay, ...args)
+            )) as typeof window.setTimeout
+            timeout = await rejectionOf(composeEffectArtwork(filteredInput()))
+          } finally {
+            Object.defineProperty(window, 'Image', { configurable: true, value: NativeImage })
+            window.setTimeout = nativeSetTimeout as typeof window.setTimeout
+            URL.createObjectURL = nativeCreateObjectURL
+            URL.revokeObjectURL = nativeRevokeObjectURL
+          }
+
           return {
             orientation: {
               top: pixelAt(orientation.canvas, 0, 0),
@@ -148,6 +206,7 @@ describe('composeEffectArtwork real-pixel oracle', () => {
               clampTopLeft: pixelAt(clamp.canvas, 0, 0),
               tileTopLeft: pixelAt(tile.canvas, 0, 0),
             },
+            settlement: { rejection, cancellation, timeout, blobUrlsCreated, blobUrlsRevoked },
           }
         } finally {
           URL.revokeObjectURL(moduleUrl)
@@ -167,6 +226,13 @@ describe('composeEffectArtwork real-pixel oracle', () => {
 
       expectPixel('clamp-not-tile', '2x2 four-colour source; bounds=(-1,-1)..(3,3); blend=0', result.modes.clampTopLeft, [255, 0, 0, 255])
       expectPixel('clamp-not-tile', '2x2 four-colour source; bounds=(-1,-1)..(3,3); blend=0', result.modes.tileTopLeft, [255, 255, 0, 255])
+      expect(result.settlement).toEqual({
+        rejection: '[composite] SVG-filter image failed to load',
+        cancellation: '[composite] SVG-filter image cancelled',
+        timeout: '[composite] SVG-filter image timed out',
+        blobUrlsCreated: 3,
+        blobUrlsRevoked: 3,
+      })
     } finally {
       await browser.close()
     }
