@@ -88,7 +88,7 @@ try {
   await saveButton.click()
   const download = await pendingDownload
   const saved = await pngPixels(page, readFileSync(await download.path()))
-  assert.deepEqual(saved, preview, 'Preview and Save must share exact capped RGBA pixels and dimensions')
+  assert.deepEqual(saved, preview, 'Preview and Save must share exact original-resolution RGBA pixels and dimensions')
 
   await previewButton.click()
   await page.getByText('Live result — dimmed outside the shape').waitFor()
@@ -116,7 +116,7 @@ try {
 
   await installImage('hang')
   await previewButton.click()
-  await status.filter({ hasText: /preparing capped preview/ }).waitFor()
+  await status.filter({ hasText: /preparing original-resolution preview/ }).waitFor()
   await restoreImage()
   await page.locator('input[type=file]').first().setInputFiles({ name: 'replacement.png', mimeType: 'image/png', buffer: fixture })
   await status.filter({ hasText: /image ready/ }).waitFor({ timeout: 30_000 })
@@ -196,7 +196,7 @@ try {
     HTMLCanvasElement.prototype.toBlob = window.__cutoutNativeToBlob
     return result
   })
-  assert.equal(sourceWitness.sameCanvas, true, 'WebKit Preview and Save must use the same capped output canvas')
+  assert.equal(sourceWitness.sameCanvas, true, 'WebKit Preview and Save must use the same original-resolution output canvas')
   assert.deepEqual(
     { width: sourceWitness.viewWidth, height: sourceWitness.viewHeight },
     { width: saved.width, height: saved.height },

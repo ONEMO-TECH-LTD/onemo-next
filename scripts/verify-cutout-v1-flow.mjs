@@ -49,7 +49,7 @@ const download = async () => {
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
 try {
-  await page.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+  await page.goto(new URL('/cutout-lab?admin=1', baseUrl).href, { waitUntil: 'networkidle' })
   await upload()
   await page.getByRole('button', { name: /^✋ Edit$/ }).click()
   await page.getByRole('button', { name: /Paint shape/ }).click()

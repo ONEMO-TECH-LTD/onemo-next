@@ -12,16 +12,8 @@ export interface PaintConfig {
   swathMult: number  // stroke swath width = brush × swathMult
   polishStrength: number  // 0..1; outline smoothing radius = brush × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
-  cap: CanvasLineCap  // Paint-only stroke endpoint shape
-  join: CanvasLineJoin  // Paint-only stroke corner shape
 }
-export const PAINT_DEFAULTS: PaintConfig = {
-  swathMult: 1,
-  polishStrength: 1 / 3,
-  closeFrac: 0.2,
-  cap: 'round',
-  join: 'round',
-}
+export const PAINT_DEFAULTS: PaintConfig = { swathMult: 1, polishStrength: 1 / 3, closeFrac: 0.2 }
 
 /** Rasterize a drawn shape to a BINARY Mask (subject matte for the blend layer — inside = subject).
  *  Shares solidShapeMask's rasterizer; drops the soft channel (the paint-edit mask is binary). */
@@ -78,21 +70,19 @@ export function maskArea(mask: Mask): number {
   return a
 }
 
-/** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (configured
- *  cap/join — WYSIWYG with the live ink), plus the enclosed interior when the gesture closes a loop
+/** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
+ *  WYSIWYG with the brush cursor), plus the enclosed interior when the gesture closes a loop
  *  (Dan's green-blob semantics: a loop means the whole region). */
 export function swathMask(
   stroke: { x: number; y: number }[], brushPx: number, w: number, h: number,
-  cfg: Pick<PaintConfig, 'swathMult' | 'closeFrac' | 'cap' | 'join'> = PAINT_DEFAULTS,
+  cfg: Pick<PaintConfig, 'swathMult' | 'closeFrac'> = PAINT_DEFAULTS,
 ): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })!
-  ctx.lineCap = cfg.cap; ctx.lineJoin = cfg.join
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
   ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult)
   if (cfg.swathMult > 0 && stroke.length === 1) {
-    // A tap has no direction/endpoints, so it remains the established circular Paint deposit
-    // under every line-cap calibration.
     ctx.beginPath()
     ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
     ctx.fill()

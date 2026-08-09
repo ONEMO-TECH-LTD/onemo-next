@@ -80,11 +80,11 @@ try {
   const firstPng = await downloadCutout()
   const firstInfo = pngInfo(firstPng)
   assert.deepEqual(firstInfo, {
-    width: 1232,
-    height: 521,
+    width: 1642,
+    height: 694,
     colorType: 6,
-    sha256: '1741890c45fe349d5b1944f2463c43cd2554e040932af4d363d0d5f45fd66b7f',
-  }, '1280x720 direct-25px Detail Save must retain its exact RGBA result')
+    sha256: '2bf35ece2ab174d03fe8205a0a382595db128c07fedaf8e795b9e986a634ee8d',
+  }, '1280x720 original-resolution clean-start Detail-25 Save must retain its exact RGBA result')
 
   await upload({ name: 'replacement.png', mimeType: 'image/png', buffer: fixture })
   assert.equal(await saveButton.isDisabled(), true, 'replacement must clear the prior cut')
@@ -166,11 +166,11 @@ try {
   await enterPreview()
   const editedInfo = pngInfo(await downloadCutout())
   assert.deepEqual(editedInfo, {
-    width: 1315,
-    height: 580,
+    width: 1753,
+    height: 774,
     colorType: 6,
-    sha256: 'a8eb3a160d47e3602a56dc74d336f6d8d713080a37c6c98a6e083d2cb1b4aff0',
-  }, 'fixed-viewport direct-pixel recipe plus real OpenCV edit must retain its exact RGBA result')
+    sha256: 'fc5f58f1e4292257fcaf555f7983d738cbe7267edafd38d735ba23f8c332b6ab',
+  }, 'fixed-viewport original-resolution real OpenCV edit must retain its exact RGBA result')
   await page.getByRole('button', { name: /Editing view/ }).click()
 
   // A corner drag keeps its opposite corner fixed.

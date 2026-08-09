@@ -45,8 +45,6 @@ export interface OutlineSource {
 
 /** Global tools — independent axes. OFF = `GLOBAL_OFF` below. */
 export interface GlobalAdjustments {
-  /** Default `scaled` preserves Creator/Grid percentage semantics; Cutout may supply direct px. */
-  spatialUnit?: 'scaled' | 'px'
   simplify: number   // 0..100; 0 = OFF (full detail) — Paper simplify strength (curve-fit reduce)
   smooth: number     // 0..200 strength; 0 = OFF — Paper catmull-rom rounding energy
   straighten: number // 0..100; 0 = OFF — Clipper2 RDP collinear-collapse (stacks ON TOP of simplify)
@@ -192,7 +190,7 @@ function globalPass(source: OutlineSource, g: GlobalAdjustments, claimed: Set<st
     //    tolerance — fewer anchors, flowing curves, extremities cannot pull in. Same knob, same
     //    tolerance mapping; runs only where redundant vertices exist (clean polygons untouched).
     if (g.simplify > 0) {
-      const tol = g.spatialUnit === 'px' ? Math.max(0, g.simplify) : simplifyTolPx(g.simplify, scalePx)
+      const tol = simplifyTolPx(g.simplify, scalePx)
       if (hasRedundantVertices(p, tol)) {
         // DENSIFY before fitting (Dan 2026-08-06: Detail-then-Simplify broke — flattening a coarse
         // faceted polygon yields only its corner vertices, and a curve fitted through sparse points

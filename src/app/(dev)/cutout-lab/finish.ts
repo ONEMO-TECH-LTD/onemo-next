@@ -11,9 +11,6 @@ import {
   detailToFloorMm,
   resolveTraceOutline,
   TRACE_OUTLINE_DEFAULTS,
-  TRACE_OUTLINE_PIXEL_DEFAULTS,
-  traceSettingsToPixelUnits,
-  type TraceOutlineInput,
   type TraceOutlineSettings,
 } from '@/lib/effect/trace-outline-controls'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
@@ -25,65 +22,37 @@ export type { TraceOutlineSettings }
 export interface OutlineBounds { minX: number; minY: number; maxX: number; maxY: number }
 export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape }
 
-/** Cutout all-off reset used for Paint and when edits fold a recipe into a baked source. */
-export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_PIXEL_DEFAULTS }
+/** Calibration baseline (Dan 2026-08-05): EVERYTHING ZERO — the raw full-fidelity sharp trace,
+ *  no recipe applied (engine detail 100 renders as knob 0: the Detail knob is UI-inverted).
+ *  The golden config gets dialed from zero on-device and locked here. */
+/** TRUE all-off — the reset used when adjustments FOLD into a baked source (edit modes). */
+export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_DEFAULTS }
 
-/** Dan's named vector recipes. ZERO/PURE use current Cutout units; the retained CSV rows are
- * converted against each accepted source so their earlier calibration remains shape-identical. */
+/** Owner-calibrated recipes in the original v1 visible control units. */
 export const VECTOR_PRESETS = [
-  { name: 'ZERO', units: 'px', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
-  { name: 'PURE', units: 'px', detail: 1, offset: 1, simplify: 1, smooth: 1, radius: 1 },
-  { name: 'CLASSIC', units: 'legacy', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
-  { name: 'TECHNO', units: 'legacy', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
-  { name: 'EDGY', units: 'legacy', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
-  { name: 'FLUID', units: 'legacy', detail: 0, offset: 4, simplify: 100, smooth: 0, radius: 13 },
-  { name: 'SPACE', units: 'legacy', detail: 80, offset: 15, simplify: 0, smooth: 0, radius: 5 },
+  { name: 'ZERO', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
+  { name: 'PURE', detail: 1, offset: 1, simplify: 1, smooth: 1, radius: 1 },
+  { name: 'CLASSIC', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
+  { name: 'TECHNO', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
+  { name: 'EDGY', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
+  { name: 'FLUID', detail: 0, offset: 4, simplify: 100, smooth: 0, radius: 13 },
+  { name: 'SPACE', detail: 80, offset: 15, simplify: 0, smooth: 0, radius: 5 },
 ] as const
 export type VectorPresetName = (typeof VECTOR_PRESETS)[number]['name']
 
-const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
-
-const drawnOutlineInput = (
-  shape: VShape, ring: { x: number; y: number }[], w: number, h: number,
-): TraceOutlineInput => ({
-  vectorShape: shape,
-  rawTracePx: ring.map((p) => [p.x, h - p.y] as [number, number]),
-  maskWidthPx: w,
-  maskHeightPx: h,
-  mmPerPx: MM_BASE / Math.max(w, h),
-})
-
-const preparedOutlineInput = (prepared: PreparedEffectBase): TraceOutlineInput => ({
-  vectorShape: prepared.spec.vectorShape,
-  rawTracePx: prepared.spec.rawTracePx,
-  maskWidthPx: prepared.spec.maskWidthPx,
-  maskHeightPx: prepared.spec.maskHeightPx,
-  mmPerPx: prepared.spec.mmPerPx,
-})
-
-export const pixelSettingsForPrepared = (prepared: PreparedEffectBase, settings: TraceOutlineSettings) =>
-  traceSettingsToPixelUnits(preparedOutlineInput(prepared), settings)
-
-export function settingsForVectorPreset(prepared: PreparedEffectBase, name: VectorPresetName): TraceOutlineSettings {
+export function settingsForVectorPreset(name: VectorPresetName): TraceOutlineSettings {
   const preset = VECTOR_PRESETS.find((candidate) => candidate.name === name)!
-  if (preset.units === 'px') return {
+  return {
     ...ZERO_SETTINGS,
-    detail: preset.detail,
-    offset: preset.offset,
-    simplify: preset.simplify,
-    smooth: preset.smooth,
-    radius: preset.radius,
-  }
-  return pixelSettingsForPrepared(prepared, {
-    ...TRACE_OUTLINE_DEFAULTS,
-    spatialUnit: 'legacy',
     detail: 100 - preset.detail,
     offset: preset.offset,
     simplify: preset.simplify,
     smooth: preset.smooth,
     radius: preset.radius,
-  })
+  }
 }
+
+const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
 
 /** Green-kept / red-removed overlay pixels for the mask. */
@@ -120,7 +89,16 @@ export function finishDrawn(
   shape: import('@/lib/vector-core').VShape, ring: { x: number; y: number }[], w: number, h: number,
   settings: TraceOutlineSettings,
 ): FinishResult | null {
-  const resolved = resolveTraceOutline(drawnOutlineInput(shape, ring, w, h), settings)
+  const resolved = resolveTraceOutline(
+    {
+      vectorShape: shape,
+      rawTracePx: ring.map((p) => [p.x, h - p.y] as [number, number]), // producers expects y-up
+      maskWidthPx: w,
+      maskHeightPx: h,
+      mmPerPx: MM_BASE / Math.max(w, h),
+    },
+    settings,
+  )
   if (!resolved) return null
   const bb = shapeBBox(resolved, 1)
   return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
@@ -201,18 +179,18 @@ export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 export type PrepareProgress = 'downloading-model' | 'cutting' | 'fallback'
 
 /** One post-segmentation path: detector identity stops mattering once an MLResult reaches here. */
-function prepareCut(url: string, preseg: MLResult, edgeFinishPx: number, onProgress?: (s: PrepareProgress) => void, originalTexture = false): Promise<PreparedEffectBase> {
+function prepareCut(url: string, preseg: MLResult, edgeFinishPx: number, onProgress?: (s: PrepareProgress) => void, originalTexture = true): Promise<PreparedEffectBase> {
   const cfg = { ...LAB_CFG, edgeFinishPx }
   return prepareEffect(url, 'shaped', cfg, onProgress, finishMLResultEdges(preseg, edgeFinishPx), { buildOutputs: false, originalTexture })
 }
 
 /** Non-AI/brush mask → MLResult → the same edge/prepare path as native u2net. */
-export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT, originalTexture = false): Promise<PreparedEffectBase> {
+export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT, originalTexture = true): Promise<PreparedEffectBase> {
   return prepareCut(url, await buildPreseg(url, mask), edgeFinishPx, onProgress, originalTexture)
 }
 
 /** Native u2net MLResult → the same edge/prepare path as every other segmentation source. */
-export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT, originalTexture = false): Promise<PreparedEffectBase> {
+export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT, originalTexture = true): Promise<PreparedEffectBase> {
   return prepareCut(url, preseg, edgeFinishPx, onProgress, originalTexture)
 }
 
@@ -222,7 +200,16 @@ export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: Pr
  *  match the lab canvas (they diverged when the bridge took over segmentation, 2026-08-06). */
 export function finishSpec(prepared: PreparedEffectBase, settings: TraceOutlineSettings, viewW?: number): FinishResult | null {
   const spec = prepared.spec
-  const resolved = resolveTraceOutline(preparedOutlineInput(prepared), settings)
+  const resolved = resolveTraceOutline(
+    {
+      vectorShape: spec.vectorShape,
+      rawTracePx: spec.rawTracePx,
+      maskWidthPx: spec.maskWidthPx,
+      maskHeightPx: spec.maskHeightPx,
+      mmPerPx: spec.mmPerPx,
+    },
+    settings,
+  )
   if (!resolved) return null
   const k = viewW ? viewW / Math.max(1, spec.maskWidthPx) : 1
   const view = k === 1 ? resolved : transformShape(resolved, (p) => ({ x: p.x * k, y: p.y * k }))

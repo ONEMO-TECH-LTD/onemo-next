@@ -100,7 +100,7 @@ export interface PreparedEffect extends PreparedEffectBase {
 export interface PrepareEffectOptions {
   /** Preserve the shared full-output default; bounded callers that consume only spec/frontSrc may opt out. */
   buildOutputs?: boolean
-  /** Calibration only: decode the artwork at its uploaded pixel dimensions instead of the display cap. */
+  /** Cutout output only: decode the artwork at its uploaded pixel dimensions instead of the display cap. */
   originalTexture?: boolean
 }
 
@@ -189,10 +189,8 @@ export async function prepareEffect(
   preseg?: MLResult,
   options?: PrepareEffectOptions,
 ): Promise<PreparedEffect | PreparedEffectBase> {
-  // Full photo (texture res), y-up, for the composite + edge-lip source. Normal browser work stays
-  // within the mobile display budget. Cutout's admin-only comparison may deliberately decode the
-  // uploaded dimensions to measure whether that raster is safe on a physical phone; it does not
-  // change the segmentation/mask resolution or the shared default.
+  // Shared callers remain capped. Cutout may deliberately decode the uploaded dimensions for its
+  // lossless Preview/Save output while keeping segmentation and editor geometry at working size.
   const texDim = options?.originalTexture ? Number.POSITIVE_INFINITY : effectiveTextureDim()
   const orig = await loadImageData(url, texDim)
   const fw = orig.width, fh = orig.height
