@@ -4,29 +4,15 @@
 // Auto-only (no prompt → no brush); the lab uses it to separate model failures from infrastructure.
 
 import { runCutout } from '@/lib/effect/cutout'
-import type { MLResult } from '@/lib/effect/segment-ml'
+import { SegmentMLCancelled, type MLResult } from '@/lib/effect/segment-ml'
+import { adapterIdFor, segment } from '@/lib/effect/mask'
 import type { Mask } from '@/lib/mask-tools/types'
 
-// CUT-INPUT CAP (Dan device 2026-08-07: iOS `[wasm] RangeError: Out of memory` → 'no backend').
-// The cut worker decodes the SOURCE image (the engine notes a ~2GB 'upload half'); a 12MP phone
-// photo blows past iOS Safari's WASM heap. The lab already downscales for display but was handing
-// the ORIGINAL full-res URL to the cut — cap the cut's source here (lab-layer; the engine still
-// owns its own internal mask/texture config, it just receives a bounded image).
-const CUT_MAX = 1024
-
-/** Downscale the source to CUT_MAX before the cut (returns a blob URL to revoke, or the original
- *  when already small). Keeps the worker's decode well inside the iOS memory envelope. */
-async function cutSource(url: string): Promise<{ url: string; revoke: boolean }> {
-  const img = new Image(); img.src = url
-  try { await img.decode() } catch { return { url, revoke: false } }
-  const long = Math.max(img.naturalWidth, img.naturalHeight)
-  if (long <= CUT_MAX) return { url, revoke: false }
-  const s = CUT_MAX / long
-  const w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s))
-  const c = document.createElement('canvas'); c.width = w; c.height = h
-  c.getContext('2d')!.drawImage(img, 0, 0, w, h)
-  const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'))
-  return blob ? { url: URL.createObjectURL(blob), revoke: true } : { url, revoke: false }
+/** Encode the flow's already-decoded 1024px working canvas once for the worker. */
+async function cutSource(source: HTMLCanvasElement): Promise<string> {
+  const blob = await new Promise<Blob | null>((res) => source.toBlob(res, 'image/png'))
+  if (!blob) throw new Error('Could not create the bounded cut-out source')
+  return URL.createObjectURL(blob)
 }
 
 // CRASH BREADCRUMB (Dan device 2026-08-07: Detect HARD-CRASHES iOS Safari → the tab reloads,
@@ -41,17 +27,45 @@ export function lastCrashStage(): string | null {
   try { return localStorage.getItem('lab-detect-stage') } catch { return null }
 }
 
-/** image URL → v5.3.1's own segmentation through ITS OWN bridge primitive (`runCutout` owns the
+function fallbackCutout(source: HTMLCanvasElement): MLResult {
+  const yUp = document.createElement('canvas'); yUp.width = source.width; yUp.height = source.height
+  const ctx = yUp.getContext('2d', { willReadFrequently: true })!
+  ctx.translate(0, source.height); ctx.scale(1, -1); ctx.drawImage(source, 0, 0)
+  const imageData = ctx.getImageData(0, 0, source.width, source.height)
+  const fallback = segment(imageData)
+  return {
+    ...fallback,
+    texImage: imageData,
+    texMask: fallback.mask,
+    texW: fallback.width,
+    texH: fallback.height,
+    adapterId: adapterIdFor(imageData),
+  }
+}
+
+/** Bounded working canvas → v5.3.1's own segmentation through ITS OWN bridge primitive (`runCutout` owns the
  *  working-res config — mask/texture dims are the BRIDGE'S, never the lab's; Dan 2026-08-06: no
  *  engine logic outside the v5.3.1 perimeter). `preseg` is the untouched MLResult — the exact
  *  object the v5.3.1 flow hands prepareShaped (full soft saliency matte + hi-res texImage). The
  *  binary y-down `mask` is derived for UI overlay/brush state only. */
-export async function segmentV531(url: string, uiW: number, uiH: number): Promise<{ mask: Mask; adapter: string; preseg: MLResult }> {
-  crashStage('1·decode-source')                 // main-thread decode + downscale of the original photo
-  const cut = await cutSource(url)
+export async function segmentV531(
+  source: HTMLCanvasElement,
+  uiW: number,
+  uiH: number,
+  isCurrent: () => boolean,
+): Promise<{ mask: Mask; adapter: string; preseg: MLResult }> {
+  crashStage('1·encode-source')                 // encode the flow's already-bounded working canvas once
+  const cutUrl = await cutSource(source)
   let r: MLResult
-  crashStage('2·engine-cut')                     // the v5.3.1 cut worker (u2net/ORT) — engine perimeter
-  try { r = await runCutout(cut.url) } finally { if (cut.revoke) URL.revokeObjectURL(cut.url) }
+  try {
+    if (!isCurrent()) throw new SegmentMLCancelled()
+    crashStage('2·engine-cut')                   // the v5.3.1 cut worker (u2net/ORT) — engine perimeter
+    try { r = await runCutout(cutUrl) }
+    catch (error) {
+      if (error instanceof SegmentMLCancelled) throw error
+      r = fallbackCutout(source)
+    }
+  } finally { URL.revokeObjectURL(cutUrl) }
   crashStage('3·derive-ui-mask')                 // lab-layer canvas flip/scale
   // Derive the y-down UI mask AT THE LAB'S canvas dims (the bridge's mask dims are its own config
   // and may differ) — canvas flip+scale in one pass. UI overlay/brush state only.

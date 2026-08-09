@@ -1,5 +1,4 @@
-// mask-tools — the neutral mask/point types shared across the cutout lab. Moved out of the deleted
-// cutout-ai (SAM) stack (Dan 2026-08-07: EdgeSAM removed; u2net is the only cut, GrabCut the brush).
+// mask-tools — neutral mask/point types shared across Cutout Lab.
 
 /** Binary mask, row-major, length w*h. 1 = object, 0 = background. `soft` (optional) is the
  *  continuous alpha (0-255) — the engine-parity matte channel. */

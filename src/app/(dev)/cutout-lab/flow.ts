@@ -9,7 +9,7 @@
 // cut + GrabCut/paint tool orchestration. The shell only renders + captures
 // gestures + calls these actions.
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Mask, Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
@@ -23,7 +23,7 @@ import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, su
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531, crashStage, lastCrashStage } from './v531seg'
-import { preloadBen } from '@/lib/effect/segment-ml'
+import { cancelSegmentML, disposeSegmentML } from '@/lib/effect/segment-ml'
 import { HistoryStack } from './history'
 import type { EditMode } from './EditorOverlay'
 
@@ -96,6 +96,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const wasOutgrownRef = useRef(false)
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
   const requestRender = adapters.requestRender
+  const detectGen = useRef(0)
 
   // ── history (pure module, flow-driven) ──
   type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; settings: TraceOutlineSettings; blendS: BlendSettings }
@@ -211,9 +212,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [scheduleBake])
 
   // ── accept a mask (every tool converges here — EXCEPT editCommit's maskFromShape) ──
-  const acceptMask = useCallback(async (mask: Mask, preseg?: import('@/lib/effect/segment-ml').MLResult, opts?: { erase?: boolean; shapeTruth?: boolean }) => {
+  const acceptMask = useCallback(async (
+    mask: Mask,
+    preseg?: import('@/lib/effect/segment-ml').MLResult,
+    opts?: { erase?: boolean; shapeTruth?: boolean; isCurrent?: () => boolean },
+  ) => {
     // u2net's matte + every mask are consumed VERBATIM (Dan 2026-08-07: no speculative hole/opacity
-    // fixes on the pure path — the EdgeSAM-era guards are deleted with EdgeSAM). Paint sources still
+    // fixes on the pure path. Paint sources still
     // get shape-is-truth below (that is geometry the paint tool OWNS, not a guess on a model matte).
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
@@ -224,7 +229,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         // E3 (meta-verified): VALIDATE BEFORE COMMIT — prepare runs first; maskRef/drawnRef mutate
         // only on success. A failed prepare (e.g. an erase that emptied the mask → 'No silhouette
         // found') leaves the last good selection + outline fully live.
-        preparedRef.current = await withTimeout(preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud), T_COMPUTE_MS, 'engine prepare')
+        const nextPrepared = await withTimeout(preseg ? prepareNative(url, preseg, loud) : prepareAI(url, mask, loud), T_COMPUTE_MS, 'engine prepare')
+        if (opts?.isCurrent && !opts.isCurrent()) return false
+        preparedRef.current = nextPrepared
       } catch (e) { setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept'); return false }
     }
     drawnRef.current = null
@@ -263,8 +270,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
 
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
+    detectGen.current++
+    cancelSegmentML()
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; liveBakeRef.current = null
-    setHasCut(false); setMs({})
+    displayFrontRef.current = null; imgCanvas.current = null
+    setBusy(false); setHasCut(false); setMs({})
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     const url = URL.createObjectURL(file)
     urlRef.current = url
@@ -284,29 +294,34 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setStatus('🖼 image ready — push 🤖 Detect to auto-cut, or brush the object')
   }, [requestRender])
 
-  // AI DETECT — u2net auto-cut on demand (Dan 2026-08-07: runs on button push, not on upload;
-  // the weights are prefetched at page open by warmup, so the push is fast).
+  // AI DETECT — fixed u2netp -> lazy Silueta -> visible flood-fill, on button push only.
   const detect = useCallback(async () => {
     const img = imgCanvas.current, url = urlRef.current
     if (!img || !url) return
+    const gen = ++detectGen.current
+    const isCurrent = () => gen === detectGen.current && urlRef.current === url
     setBusy(true)
-    // Single attempt + LOUD failure (Dan device: the loader flashed with no outline). A same-worker
-    // retry is useless when the WASM heap OOMs (it can't shrink) — the cut source is now capped
-    // (v531seg CUT_MAX) so the OOM should not occur; if it still fails, the message says what happened.
     try {
       setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
-      const r = await withTimeout(segmentV531(url, img.width, img.height), T_DOWNLOAD_MS, 'AI cut')
+      const r = await withTimeout(segmentV531(img, img.width, img.height, isCurrent), T_DOWNLOAD_MS, 'AI cut')
+      if (!isCurrent()) return
       setMs({ cut: Math.round(performance.now() - t0) })
       crashStage('4·prepare+bake')                 // lab-layer engine prepare + compose (subject/texture/mosaics)
       // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
-      await acceptMask(r.mask, r.preseg)
+      const accepted = await acceptMask(r.mask, r.preseg, { isCurrent })
+      if (!isCurrent()) return
+      if (accepted && (r.adapter === 'bg-flood' || r.adapter === 'alpha')) {
+        setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)')
+      }
       crashStage(null)                             // completed without a renderer crash — clear the breadcrumb
     } catch (e) {
+      if (!isCurrent()) return
       crashStage(null)                             // a CAUGHT error means JS survived — not the hard crash we hunt
       setStatus('⚠️ u2net failed: ' + String((e as Error)?.message ?? '?') + ' — reload the page and Detect again, or brush the object')
+    } finally {
+      if (isCurrent()) setBusy(false)
     }
-    setBusy(false)
   }, [acceptMask])
 
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
@@ -335,8 +350,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (q) { pendingToolRef.current = null; void runTool(q) }
      
   }, [])
-  // ── THE BRUSH — GrabCut (Dan 2026-08-07: EdgeSAM + wand DELETED; u2net is the only cut, GrabCut
-  // the only brush). Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
+  // ── THE BRUSH — GrabCut. Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
   // carves). No base → it RECOGNISES the painted shape standalone; a base → it REFINES the cut.
   // Deterministic, no deep model, OpenCV lazy-loads on the first stroke. ──
   const grabCutStroke = useCallback((stroke: (Point & { t: number })[], erase: boolean, brushR: number) => runTool(async () => {
@@ -472,9 +486,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const undo = useCallback(async () => { const s = histRef.current.undo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }, [restore])
   const redo = useCallback(async () => { const s = histRef.current.redo(); if (s) { setHistTick((t) => t + 1); await restore(s) } }, [restore])
   const clearAll = useCallback(() => {
+    detectGen.current++
+    cancelSegmentML()
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null
-    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
-    setHasCut(false); pushHistory(); requestRender()
+    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
+    setBusy(false); setHasCut(false); pushHistory(); requestRender()
     setStatus('🗑 cleared — paint a new shape, or Detect')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestRender])
@@ -510,18 +526,26 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     return (tool === 'draw' || tool === 'draw-erase' || tool === 'add' || tool === 'erase') && !!imgCanvas.current
   }, [])
 
-  // WARM-UP: prefetch u2net weights into the HTTP cache (downloads only — no runtime at open;
-  // GrabCut's OpenCV lazy-loads on the first brush stroke).
+  // Mount diagnostics. Model warm-up is deliberately absent: no measured first-Detect/device-memory
+  // evidence justifies keeping an eager worker/session owner.
   const warmup = useCallback(() => {
     // Crash-survivor read: if a prior Detect stamped a stage and never cleared it, the tab crashed
     // there (renderer OOM → Safari auto-reload). Surface WHICH stage so the fix targets the real
     // allocation instead of a guess — then clear it so a later clean load reads 'ready'.
     const crashed = lastCrashStage()
     if (crashed) crashStage(null)
-    preloadBen()
     setStatus(crashed
       ? '⚠️ last Detect crashed at stage ' + crashed + ' — report this stage to Kai'
-      : 'ready — upload an image · ⬇ warming u2net in the background')
+      : 'ready — upload an image')
+  }, [])
+
+  useEffect(() => () => {
+    detectGen.current++
+    disposeSegmentML()
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    urlRef.current = null
+    imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null
+    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
   }, [])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }

@@ -14,7 +14,7 @@ const cutout = (file: string) => read(`${cutoutDir}/${file}`)
 const owners = [
   {
     file: 'page.tsx', layer: 'test-shell-donor', destination: 'src/app/page.tsx', adoption: 'selective-donor',
-    excludes: ['stale ?seg query stripping', 'eruda ?debug=1 diagnostics', '?admin=1 paint-calibration state and panel'],
+    excludes: ['eruda ?debug=1 diagnostics', '?admin=1 paint-calibration state and panel'],
   },
   { file: 'flow.ts', layer: 'react-studio', destination: 'src/app/studio/cutout/flow.ts', adoption: 'direct' },
   { file: 'finish.ts', layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/finish.ts', adoption: 'direct' },
@@ -87,10 +87,10 @@ describe('KAI-10216 Cutout V1 adoption boundary', () => {
     const pageOwner = owners.find(({ file }) => file === 'page.tsx')!
     expect(pageOwner).toEqual({
       file: 'page.tsx', layer: 'test-shell-donor', destination: 'src/app/page.tsx', adoption: 'selective-donor',
-      excludes: ['stale ?seg query stripping', 'eruda ?debug=1 diagnostics', '?admin=1 paint-calibration state and panel'],
+      excludes: ['eruda ?debug=1 diagnostics', '?admin=1 paint-calibration state and panel'],
     })
     const source = cutout('page.tsx')
-    expect(source).toContain("u.searchParams.has('seg')")
+    expect(source).not.toMatch(/searchParams\.(?:has|get)\('seg'\)/)
     expect(source).toContain("u.searchParams.get('debug') === '1'")
     expect(source).toContain("u.searchParams.get('admin') === '1'")
     expect(source).toContain('Paint-shaper config (admin)')
@@ -181,8 +181,9 @@ describe('KAI-10216 accepted behavior', () => {
 })
 
 describe('later increment defect reproductions', () => {
-  it.fails('KAI-10217 removes stale detector/query/debug residue', () => {
-    expect(cutout('page.tsx')).not.toMatch(/searchParams\.(?:has|get)\('(seg|debug)'\)/)
+  it('KAI-10217 removes the stale detector query while retaining current route diagnostics', () => {
+    expect(cutout('page.tsx')).not.toMatch(/searchParams\.(?:has|get)\('seg'\)/)
+    expect(cutout('page.tsx')).toContain("u.searchParams.get('debug') === '1'")
   })
 
   it.fails('KAI-10218 publishes a replacement only after decode succeeds', () => {

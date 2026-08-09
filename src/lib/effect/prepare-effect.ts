@@ -188,7 +188,7 @@ export async function prepareEffect(
       // Magic is instant. `preseg` is the cached segmentML result (same mask/tex dims as this cfg);
       // when absent (direct call / cache miss) we run segmentML inline exactly as before.
       const r = preseg ?? await segmentML(url, cfg.maxImageDim, texDim, onProgress)
-      // R1: record the model that ACTUALLY ran (u2netp/silueta/…), not a hard-coded 'ben2-onnx'.
+      // Record the model that actually ran (u2netp/silueta/…), not a hard-coded detector name.
       seg = r; adapterId = r.adapterId; texImage = r.texImage; mlMatte = true
     } catch (e) {
       console.warn('[shaped] ML segmentation unavailable — falling back to flood-fill:', e)

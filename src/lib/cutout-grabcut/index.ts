@@ -1,8 +1,7 @@
 // cutout-grabcut — the LIGHT refinement brush (Dan 2026-08-07). Paint roughly over a missed area;
 // GrabCut (OpenCV iterated graph-cut) snaps to the real colour edges and adds it to the selection
 // (or carves it, on erase). Deterministic, NO deep model, runs on the OpenCV we already ship for
-// nothing extra to download. Replaces the deleted EdgeSAM + wand brushes. Loads OpenCV lazily on
-// the first stroke, never at page open.
+// nothing extra to download. Loads OpenCV lazily on the first stroke, never at page open.
 
 import type { Mask } from '@/lib/mask-tools/types'
 

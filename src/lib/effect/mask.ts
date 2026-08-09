@@ -1,7 +1,7 @@
 // Segmentation → binary mask (Lane A / Kai)
 //
-// The production default is the self-hosted trio (u2netp -> silueta -> flood-fill) in the
-// cut-out worker (ben.worker.ts / ben-chain.ts); BEN2 was retired (iPhone OOM). The ML worker
+// The production chain is self-hosted u2netp -> lazy Silueta in the cut-out worker
+// (ben.worker.ts / ben-chain.ts), followed by the explicit caller-owned flood-fill fallback. The ML worker
 // (segment-ml.ts) is the active default; the fast built-in adapter here (alpha-channel when present, else border
 // flood-fill background removal) is the FALLBACK behind the same interface, used only when
 // the model can't load. Segmentation is one pluggable stage.

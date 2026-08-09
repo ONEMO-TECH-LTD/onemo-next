@@ -2,7 +2,7 @@
 
 // cutout-lab — the NEUTRAL SHELL (Layer-3, I1 contract: ARCHITECTURE.md). Binds ONLY to
 // cutoutLabFlow's { state, actions } — render, gesture capture, coordinate mapping, ink/comet
-// drawing, URL adapter duties (?seg read/write). ZERO policy: no compose calls, no cadence,
+// drawing and route-only diagnostics. ZERO policy: no compose calls, no cadence,
 // no runtime engine imports. The Figma shell (I5) must mount on the same flow unchanged.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -17,15 +17,10 @@ import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-co
 export default function CutoutLab() {
   useEffect(() => {
     const u = new URL(location.href)
-    // STRIP STALE ?seg BEFORE warmup (Dan device 2026-08-07): the lab RETIRED the ?seg model
-    // selector, but the engine's segParam() still reads it at call time — a pre-pivot tab
-    // auto-stamped with ?seg=edgesam reroutes Detect + preloadBen into the deleted 37MB EdgeSAM →
-    // iOS OOM → 'no backend'. Clean the param from stale tabs so u2net (default) always runs.
-    if (u.searchParams.has('seg')) { u.searchParams.delete('seg'); history.replaceState(null, '', u) }
     // ON-DEVICE CONSOLE (?debug=1): eruda surfaces real device errors (OOM, worker deaths) on the phone.
     if (u.searchParams.get('debug') === '1') void import('eruda').then((e) => e.default.init())
     if (u.searchParams.get('admin') === '1') setAdmin(true)
-    flow.actions.warmup() // prefetch u2net weights at page open — the Detect push stays fast
+    flow.actions.warmup() // surface a crash breadcrumb from the prior phone run, if one exists
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const renderRef = useRef<() => void>(() => {})

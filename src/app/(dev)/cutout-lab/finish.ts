@@ -201,7 +201,7 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
   // ONE LAW for every source (Dan 2026-08-06 final): brushes define the OUTLINE only — the subject
   // is ALWAYS the outline's own matte, and the blend band is the OFFSET ring. No tool ever defines
   // a blend area; blur never depends on which tool drew the shape.
-  const r = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, 'brushed') // brush/paint masks are binary (soft matte died with EdgeSAM)
+  const r = matteToMLResult(matte, EFFECT_BUILD_CONFIG.maxImageDim, texDim, 'brushed')
   return r
 }
 
@@ -222,8 +222,7 @@ export async function prepareAI(url: string, mask: Mask, onProgress?: (s: Prepar
 }
 
 /** The TRUE v5.3.1 bridge: an UNTOUCHED segmentML MLResult straight into the shaped pipeline —
- *  exactly what the v5.3.1 flow does. u2net's matte is verbatim (Dan 2026-08-07: no speculative
- *  fixes on the pure u2net path — they become bugs; the EdgeSAM-era hole guard is deleted with it). */
+ *  exactly what the v5.3.1 flow does. The detector matte is consumed verbatim. */
 export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffect> {
   return prepareEffect(url, 'shaped', LAB_CFG, onProgress, preseg)
 }
