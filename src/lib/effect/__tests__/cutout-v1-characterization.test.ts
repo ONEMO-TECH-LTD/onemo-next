@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { HistoryStack } from '@/app/(dev)/cutout-lab/history'
+import { VECTOR_PRESETS } from '@/app/(dev)/cutout-lab/finish'
 import { runCutout as legacyRunCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { maskArea, subtractMasks, unionMasks } from '@/lib/mask-tools'
 import { adapterIdFor, featherMask, segment, smoothMask } from '../mask'
@@ -197,6 +198,20 @@ describe('KAI-10216 accepted behavior', () => {
     expect(history.undo()).toBe('first cut')
     expect(history.canRedo()).toBe(true)
     expect(history.redo()).toBe('clear')
+  })
+})
+
+describe('KAI-10220 owner-named vector presets', () => {
+  it('pins the seven names and direct-pixel ZERO/PURE recipes', () => {
+    expect(VECTOR_PRESETS).toEqual([
+      { name: 'ZERO', units: 'px', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
+      { name: 'PURE', units: 'px', detail: 0, offset: 1, simplify: 0, smooth: 0, radius: 0 },
+      { name: 'CLASSIC', units: 'legacy', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
+      { name: 'TECHNO', units: 'legacy', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
+      { name: 'EDGY', units: 'legacy', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
+      { name: 'FLUID', units: 'legacy', detail: 0, offset: 4, simplify: 100, smooth: 0, radius: 13 },
+      { name: 'SPACE', units: 'legacy', detail: 80, offset: 15, simplify: 0, smooth: 0, radius: 5 },
+    ])
   })
 })
 

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
-import { maskOverlay } from './finish'
+import { maskOverlay, VECTOR_PRESETS, type VectorPresetName } from './finish'
 import { useCutoutLabFlow } from './flow'
 import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, LEGACY_VEC_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
@@ -30,7 +30,7 @@ export default function CutoutLab() {
   const flow = useCutoutLabFlow({ requestRender })
   const {
     status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo,
-    paintCfg, edgeFinishPx, outputOriginal, outputSourceSize, outputPrepareMs,
+    paintCfg, edgeFinishPx, vectorPreset, outputOriginal, outputSourceSize, outputPrepareMs,
   } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
@@ -354,8 +354,13 @@ export default function CutoutLab() {
           {hasImage && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect, or brush Add over the object</span>}
         </>)}
         {tab === 'vector' && (<>
-          {VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
-
+          <select aria-label="vector preset" value={vectorPreset ?? ''} disabled={!hasCut}
+            onChange={(e) => flow.actions.setVectorPreset(e.target.value as VectorPresetName)}
+            style={{ ...btn, minWidth: 128, background: '#fff' }}>
+            {vectorPreset == null && <option value="">CUSTOM</option>}
+            {VECTOR_PRESETS.map(({ name }) => <option key={name} value={name}>{name}</option>)}
+          </select>
+          {admin && VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
         </>)}
         {tab === 'blend' && (<>
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}
@@ -385,7 +390,7 @@ export default function CutoutLab() {
       </div>
 
       {/* the ONE adaptive knob for the active tab */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
+      {(tab !== 'vector' || admin) && <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700, minWidth: 90 }}>{knob.label}</span>
         <input type="number" min={knob.lo} max={knob.hi} value={knob.value}
           onChange={(e) => knob.set(Math.max(knob.lo, Math.min(knob.hi, Math.round(+e.target.value))))}
@@ -394,7 +399,7 @@ export default function CutoutLab() {
           onChange={(e) => knob.set(+e.target.value)} style={{ flex: 1, maxWidth: 420 }}
           onPointerDown={() => flow.actions.setDragging(true)} onPointerUp={() => flow.actions.setDragging(false)}
           onPointerCancel={() => flow.actions.setDragging(false)} />
-      </div>
+      </div>}
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div>

@@ -28,13 +28,18 @@ export interface FinishResult { d: string; bounds: OutlineBounds; shape: VShape 
 /** Direct-pixel all-off reset used for Paint and when edits fold a recipe into a baked source. */
 export const ZERO_SETTINGS: TraceOutlineSettings = { ...TRACE_OUTLINE_PIXEL_DEFAULTS }
 
-export const AUTO_SETTINGS: TraceOutlineSettings = {
-  ...TRACE_OUTLINE_DEFAULTS,
-  spatialUnit: 'legacy',
-  // Existing sticker-cutout calibration. It is converted once against the accepted source so the
-  // resulting direct-pixel recipe preserves this exact shape; Smooth remains direct strength.
-  detail: 90, offset: 3, simplify: 10, smooth: 10, radius: 10,
-}
+/** Dan's named vector recipes. ZERO/PURE are direct pixels; the retained CSV rows are converted
+ * against each accepted source so their pre-pixel calibration remains shape-identical. */
+export const VECTOR_PRESETS = [
+  { name: 'ZERO', units: 'px', detail: 0, offset: 0, simplify: 0, smooth: 0, radius: 0 },
+  { name: 'PURE', units: 'px', detail: 0, offset: 1, simplify: 0, smooth: 0, radius: 0 },
+  { name: 'CLASSIC', units: 'legacy', detail: 0, offset: 2, simplify: 15, smooth: 0, radius: 10 },
+  { name: 'TECHNO', units: 'legacy', detail: 10, offset: 3, simplify: 0, smooth: 20, radius: 2 },
+  { name: 'EDGY', units: 'legacy', detail: 13, offset: 4, simplify: 0, smooth: 1, radius: 1 },
+  { name: 'FLUID', units: 'legacy', detail: 0, offset: 4, simplify: 100, smooth: 0, radius: 13 },
+  { name: 'SPACE', units: 'legacy', detail: 80, offset: 15, simplify: 0, smooth: 0, radius: 5 },
+] as const
+export type VectorPresetName = (typeof VECTOR_PRESETS)[number]['name']
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
@@ -58,6 +63,27 @@ const preparedOutlineInput = (prepared: PreparedEffectBase): TraceOutlineInput =
 
 export const pixelSettingsForPrepared = (prepared: PreparedEffectBase, settings: TraceOutlineSettings) =>
   traceSettingsToPixelUnits(preparedOutlineInput(prepared), settings)
+
+export function settingsForVectorPreset(prepared: PreparedEffectBase, name: VectorPresetName): TraceOutlineSettings {
+  const preset = VECTOR_PRESETS.find((candidate) => candidate.name === name)!
+  if (preset.units === 'px') return {
+    ...ZERO_SETTINGS,
+    detail: preset.detail,
+    offset: preset.offset,
+    simplify: preset.simplify,
+    smooth: preset.smooth,
+    radius: preset.radius,
+  }
+  return pixelSettingsForPrepared(prepared, {
+    ...TRACE_OUTLINE_DEFAULTS,
+    spatialUnit: 'legacy',
+    detail: 100 - preset.detail,
+    offset: preset.offset,
+    simplify: preset.simplify,
+    smooth: preset.smooth,
+    radius: preset.radius,
+  })
+}
 
 
 /** Green-kept / red-removed overlay pixels for the mask. */

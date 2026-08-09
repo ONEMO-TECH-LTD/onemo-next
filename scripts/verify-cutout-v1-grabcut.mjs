@@ -83,12 +83,12 @@ const finishedExpected = {
   },
 }
 const routeExpected = {
-  chromium: { width: 1263, height: 443, colorType: 6, sha256: '2a6bf8c18c27237dd46e43065648fcb3161c6143b73c77588867613ad73b1827' },
-  webkit: { width: 1263, height: 443, colorType: 6, sha256: '824c2ff14aa03b55dfcefe8fa87063b115ccd3ca3c252e2b8db35ab49f60b75f' },
+  chromium: { width: 1158, height: 349, colorType: 6, sha256: '0c04006cc6f6c0400586d1845d801e17323de916feddc63c447660e3c14f2b4c' },
+  webkit: { width: 1158, height: 349, colorType: 6, sha256: '648358ca3a944ba3b83441fbb907d64e8480d81d8a8c853558c0aec9bd785baf' },
 }
 const originalRouteExpected = {
-  chromium: { width: 1683, height: 591, colorType: 6, sha256: 'a76410cb6b7d04f08ae23b6de0e58b2780a70b9ff99a86997dae4582b5e0339f' },
-  webkit: { width: 1684, height: 590, colorType: 6, sha256: 'd6b735de5372613eaf6d0c0ffe190b634e5e3c3fbc65c39b3a5e779f7f493b86' },
+  chromium: { width: 1543, height: 465, colorType: 6, sha256: '33af8330d5a6b9566618a4854f27fe0b420583f722ffcd2c711b3674c5a7d78c' },
+  webkit: { width: 1543, height: 465, colorType: 6, sha256: '54ad0ecf80603370f4de04d8f33d336a58ffa18f8edf2418e9aab3ab42f85992' },
 }
 
 const pngInfo = (bytes) => ({
@@ -243,6 +243,14 @@ async function runBrowser(browserType) {
     assert(routeElapsedMs < 10_000, `${browserName}: real-route GrabCut left the current practical envelope`)
     const edgeFinish = routePage.getByRole('slider', { name: 'shared edge finish' })
     assert.equal(await edgeFinish.inputValue(), '8', `${browserName}: shared edge finish default changed`)
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    const vectorPreset = routePage.getByRole('combobox', { name: 'vector preset' })
+    assert.deepEqual(
+      await vectorPreset.locator('option').allTextContents(),
+      ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'],
+      `${browserName}: named vector preset order changed`,
+    )
+    assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: vector preset must default to ZERO`)
     const preview = routePage.getByRole('button', { name: /Preview|Editing view/ })
     if ((await preview.textContent())?.includes('Preview')) await preview.click()
     await routePage.getByText('Preview — same result, cut out').waitFor()
@@ -288,10 +296,14 @@ async function runBrowser(browserType) {
         `${browserName}: ${control} must expose normalized ${unit} units`,
       )
     }
+    await vectorPreset.selectOption('TECHNO')
+    await status.filter({ hasText: /TECHNO vector preset/ }).waitFor()
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     const vectorKnob = routePage.locator('input[type=number]')
+    assert.equal(await vectorKnob.inputValue(), '20', `${browserName}: TECHNO must retain its calibrated Smooth strength`)
     await vectorKnob.fill('37')
     assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: cutout vector recipe did not accept calibration`)
+    assert.equal(await vectorPreset.inputValue(), '', `${browserName}: raw tuning must mark the selected recipe CUSTOM`)
 
     // Paint calibration: the full useful ranges must re-run the latest real Paint stroke live.
     await routePage.getByRole('button', { name: /Clear/ }).click()
@@ -322,8 +334,11 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /painted shape created/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
+    assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: Paint must start on ZERO`)
+    await vectorPreset.selectOption('PURE')
+    await routePage.getByRole('button', { name: 'offset', exact: true }).click()
+    assert.equal(await vectorKnob.inputValue(), '1', `${browserName}: PURE must be the direct 1px offset recipe`)
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
-    assert.equal(await vectorKnob.inputValue(), '0', `${browserName}: Paint must start from an unmodified vector recipe`)
     await vectorKnob.fill('23')
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     const canvasData = () => routePage.locator('canvas').first().evaluate(async (canvas) => {
@@ -345,6 +360,7 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Vector/ }).click()
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     assert.equal(await vectorKnob.inputValue(), '0', `${browserName}: tuning Paint must reset the visible vector recipe`)
+    assert.equal(await vectorPreset.inputValue(), 'ZERO', `${browserName}: tuning Paint must reset the Paint preset label`)
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     paintedCanvas = await tunePaint(loopClose, '0.2', paintedCanvas)
     paintedCanvas = await tunePaint(swath, '12', paintedCanvas)
@@ -420,6 +436,16 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Vector/ }).click()
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: GrabCut did not restore the prior cutout vector recipe`)
+    assert.equal(await vectorPreset.inputValue(), '', `${browserName}: GrabCut did not restore the prior CUSTOM label`)
+
+    const publicPage = await context.newPage()
+    await publicPage.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+    await publicPage.getByRole('button', { name: /Vector/ }).click()
+    const publicPreset = publicPage.getByRole('combobox', { name: 'vector preset' })
+    assert.deepEqual(await publicPreset.locator('option').allTextContents(), ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'], `${browserName}: normal users must receive the named presets`)
+    assert.equal(await publicPage.getByRole('button', { name: 'detail', exact: true }).count(), 0, `${browserName}: raw vector calibration must stay admin-only`)
+    assert.equal(await publicPage.locator('input[type=number]').count(), 0, `${browserName}: raw vector knob must stay admin-only on the Vector tab`)
+    await publicPage.close()
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
     return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, originalOutput, paintLiveCalibration: true, paintStrokeStyleCalibration: true, paintWidthProof: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }

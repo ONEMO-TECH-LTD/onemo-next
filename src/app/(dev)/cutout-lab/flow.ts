@@ -15,10 +15,11 @@ import type { VShape } from '@/lib/vector-core'
 import type { PreparedEffectBase } from '@/lib/effect/prepare-effect'
 import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
-  AUTO_SETTINGS, bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
+  bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
   disposePrepareAICache, EDGE_FINISH_DEFAULT, finishDrawn, finishSpec,
-  pixelSettingsForPrepared,
+  settingsForVectorPreset,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
+  type VectorPresetName,
 } from './finish'
 import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
@@ -91,7 +92,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const [ms, setMs] = useState<{ cut?: number }>({})
-  const [settings, setSettings] = useState<TraceOutlineSettings>(AUTO_SETTINGS)
+  const [settings, setSettings] = useState<TraceOutlineSettings>(ZERO_SETTINGS)
+  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('ZERO')
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
@@ -118,27 +120,32 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
-  const cutoutSettingsRef = useRef<TraceOutlineSettings>({ ...AUTO_SETTINGS })
+  const vectorPresetRef = useRef<VectorPresetName | null>(vectorPreset); vectorPresetRef.current = vectorPreset
+  const cutoutSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
   const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
+  const cutoutPresetRef = useRef<VectorPresetName | null>('ZERO')
+  const paintPresetRef = useRef<VectorPresetName | null>('ZERO')
   const activateOutlineSource = useCallback((source: OutlineSourceKind, resetPaint = false) => {
     if (outlineSourceRef.current === source && !(source === 'paint' && resetPaint)) return
     const current = { ...settingsRef.current }
-    if (outlineSourceRef.current === 'paint') paintSettingsRef.current = current
-    else cutoutSettingsRef.current = current
+    if (outlineSourceRef.current === 'paint') {
+      paintSettingsRef.current = current
+      paintPresetRef.current = vectorPresetRef.current
+    } else {
+      cutoutSettingsRef.current = current
+      cutoutPresetRef.current = vectorPresetRef.current
+    }
     outlineSourceRef.current = source
-    if (source === 'paint' && resetPaint) paintSettingsRef.current = { ...ZERO_SETTINGS }
+    if (source === 'paint' && resetPaint) {
+      paintSettingsRef.current = { ...ZERO_SETTINGS }
+      paintPresetRef.current = 'ZERO'
+    }
     const next = { ...(source === 'paint' ? paintSettingsRef.current : cutoutSettingsRef.current) }
+    const nextPreset = source === 'paint' ? paintPresetRef.current : cutoutPresetRef.current
     settingsRef.current = next
     setSettings(next)
-  }, [])
-  const migrateCutoutRecipe = useCallback((prepared: PreparedEffectBase) => {
-    if (cutoutSettingsRef.current.spatialUnit === 'px') return
-    const next = pixelSettingsForPrepared(prepared, cutoutSettingsRef.current)
-    cutoutSettingsRef.current = next
-    if (outlineSourceRef.current === 'cutout') {
-      settingsRef.current = next
-      setSettings(next)
-    }
+    vectorPresetRef.current = nextPreset
+    setVectorPresetState(nextPreset)
   }, [])
   const blendRef = useRef(blend); blendRef.current = blend
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
@@ -159,13 +166,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [])
 
   // ── history (pure module, flow-driven) ──
-  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; outlineSource: OutlineSourceKind; settings: TraceOutlineSettings; blendS: BlendSettings; paint: PaintConfig }
+  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; outlineSource: OutlineSourceKind; settings: TraceOutlineSettings; preset: VectorPresetName | null; blendS: BlendSettings; paint: PaintConfig }
   const histRef = useRef(new HistoryStack<Snap>(HISTORY_DEPTH))
   const snapNow = (): Snap => ({
     mask: maskRef.current ? cloneMask(maskRef.current) : null,
     drawn: drawnRef.current,
     outlineSource: outlineSourceRef.current,
-    settings: { ...settingsRef.current }, blendS: { ...blendRef.current }, paint: { ...paintCfgRef.current }, // meta B3: knobs travel with the state
+    settings: { ...settingsRef.current }, preset: vectorPresetRef.current,
+    blendS: { ...blendRef.current }, paint: { ...paintCfgRef.current }, // meta B3: knobs travel with the state
   })
   const pushHistory = () => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }
   const replaceHistory = () => { histRef.current.replaceCurrent(snapNow()); setHistTick((t) => t + 1) }
@@ -367,7 +375,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         )
         if (!isCurrent()) return false
         installPrepared(nextPrepared)
-        if ((opts?.source ?? 'cutout') === 'cutout') migrateCutoutRecipe(nextPrepared)
         nativePresegRef.current = preseg ?? null
       } catch (e) {
         if (isCurrent()) setStatus('⚠️ engine prepare failed: ' + String((e as Error).message) + ' — selection kept')
@@ -421,7 +428,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       : `✨ done (cut: ${preparedRef.current?.spec.generator.adapter ?? '?'}) — refine, draw, edit, tune, or Save`)
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activateOutlineSource, applyFinish, installPrepared, migrateCutoutRecipe, scheduleBake])
+  }, [activateOutlineSource, applyFinish, installPrepared, scheduleBake])
 
   const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => {
     const next = { ...paintCfgRef.current, ...patch }
@@ -540,8 +547,33 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
   const setTune = useCallback((patch: Partial<TraceOutlineSettings>) => {
     const n = { ...settingsRef.current, ...patch }; settingsRef.current = n; setSettings(n)
-    if (outlineSourceRef.current === 'paint') paintSettingsRef.current = n
-    else cutoutSettingsRef.current = n
+    vectorPresetRef.current = null
+    setVectorPresetState(null)
+    if (outlineSourceRef.current === 'paint') {
+      paintSettingsRef.current = n
+      paintPresetRef.current = null
+    } else {
+      cutoutSettingsRef.current = n
+      cutoutPresetRef.current = null
+    }
+    requestAnimationFrame(() => applyFinish())
+  }, [applyFinish])
+  const setVectorPreset = useCallback((name: VectorPresetName) => {
+    const prepared = preparedRef.current
+    if (!prepared) return
+    const next = settingsForVectorPreset(prepared, name)
+    settingsRef.current = next
+    setSettings(next)
+    vectorPresetRef.current = name
+    setVectorPresetState(name)
+    if (outlineSourceRef.current === 'paint') {
+      paintSettingsRef.current = next
+      paintPresetRef.current = name
+    } else {
+      cutoutSettingsRef.current = next
+      cutoutPresetRef.current = name
+    }
+    setStatus(`⬡ ${name} vector preset`)
     requestAnimationFrame(() => applyFinish())
   }, [applyFinish])
   const setBlendTune = useCallback((patch: Partial<BlendSettings>) => {
@@ -711,8 +743,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // first real edit folds the recipe into the edited base (rebase); knobs then read from zero
       const zero = { ...ZERO_SETTINGS }
       settingsRef.current = zero; setSettings(zero)
-      if (outlineSourceRef.current === 'paint') paintSettingsRef.current = zero
-      else cutoutSettingsRef.current = zero
+      vectorPresetRef.current = 'ZERO'; setVectorPresetState('ZERO')
+      if (outlineSourceRef.current === 'paint') {
+        paintSettingsRef.current = zero
+        paintPresetRef.current = 'ZERO'
+      } else {
+        cutoutSettingsRef.current = zero
+        cutoutPresetRef.current = 'ZERO'
+      }
     }
     maskRef.current = maskFromShape(next, img.width, img.height)
     nativePresegRef.current = null
@@ -785,8 +823,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       liveBakeRef.current = null
       outlineSourceRef.current = s.outlineSource
       settingsRef.current = { ...s.settings }; setSettings(settingsRef.current) // meta B3: undo restores the knobs too
-      if (s.outlineSource === 'paint') paintSettingsRef.current = settingsRef.current
-      else cutoutSettingsRef.current = settingsRef.current
+      vectorPresetRef.current = s.preset; setVectorPresetState(s.preset)
+      if (s.outlineSource === 'paint') {
+        paintSettingsRef.current = settingsRef.current
+        paintPresetRef.current = s.preset
+      } else {
+        cutoutSettingsRef.current = settingsRef.current
+        cutoutPresetRef.current = s.preset
+      }
       blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
       paintCfgRef.current = { ...s.paint }; setPaintCfgState(paintCfgRef.current)
       hasCutRef.current = !!(nextMask || nextDrawn)
@@ -960,11 +1004,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   return {
     state: {
       status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, paintCfg, edgeFinishPx,
-      outputOriginal, outputSourceSize, outputPrepareMs,
+      vectorPreset, outputOriginal, outputSourceSize, outputPrepareMs,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
     },
     actions: {
       upload, detect, setTune, setBlendTune,
+      setVectorPreset,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
       undo, redo, clearAll, save, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx, setOutputOriginal,

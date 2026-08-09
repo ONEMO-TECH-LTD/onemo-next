@@ -65,7 +65,7 @@ const draw = async (points) => {
 
 try {
   await context.clearCookies()
-  await page.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+  await page.goto(new URL('/cutout-lab?admin=1', baseUrl).href, { waitUntil: 'networkidle' })
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear() })
   await page.reload({ waitUntil: 'networkidle' })
 
@@ -80,10 +80,10 @@ try {
   const firstPng = await downloadCutout()
   const firstInfo = pngInfo(firstPng)
   assert.deepEqual(firstInfo, {
-    width: 1329,
-    height: 622,
+    width: 1232,
+    height: 521,
     colorType: 6,
-    sha256: '30c148129ae16dfbabde64d1c4f0104d38e734fd6e1d43d97856f71cc5b28a5b',
+    sha256: '1741890c45fe349d5b1944f2463c43cd2554e040932af4d363d0d5f45fd66b7f',
   }, '1280x720 direct-25px Detail Save must retain its exact RGBA result')
 
   await upload({ name: 'replacement.png', mimeType: 'image/png', buffer: fixture })
@@ -166,10 +166,10 @@ try {
   await enterPreview()
   const editedInfo = pngInfo(await downloadCutout())
   assert.deepEqual(editedInfo, {
-    width: 1416,
-    height: 661,
+    width: 1315,
+    height: 580,
     colorType: 6,
-    sha256: '0bcb4a79537f5138a8e893a56e3cb0459006a46a0bd51a76bbbd649de315697e',
+    sha256: 'a8eb3a160d47e3602a56dc74d336f6d8d713080a37c6c98a6e083d2cb1b4aff0',
   }, 'fixed-viewport direct-pixel recipe plus real OpenCV edit must retain its exact RGBA result')
   await page.getByRole('button', { name: /Editing view/ }).click()
 
@@ -214,7 +214,7 @@ try {
   await fallbackContext.route('**/seg-models/u2netp.onnx', async (route) => { u2netFailures += 1; await route.abort('failed') })
   fallbackContext.on('request', (request) => { if (request.url().includes('/seg-models/silueta.onnx')) siluetaRequests += 1 })
   const fallbackPage = await fallbackContext.newPage()
-  await fallbackPage.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+  await fallbackPage.goto(new URL('/cutout-lab?admin=1', baseUrl).href, { waitUntil: 'networkidle' })
   await fallbackPage.locator('input[type=file]').first().setInputFiles(fixturePath)
   await fallbackPage.locator('p').filter({ hasText: /image ready/ }).waitFor({ timeout: 30_000 })
   await fallbackPage.getByRole('button', { name: /Detect/ }).click()

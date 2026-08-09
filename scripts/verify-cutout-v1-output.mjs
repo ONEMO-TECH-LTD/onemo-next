@@ -69,7 +69,7 @@ const restoreImage = () => page.evaluate(() => {
 
 let chromiumResult
 try {
-  await page.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+  await page.goto(new URL('/cutout-lab?admin=1', baseUrl).href, { waitUntil: 'networkidle' })
   await page.locator('input[type=file]').first().setInputFiles(fixturePath)
   await status.filter({ hasText: /image ready/ }).waitFor({ timeout: 30_000 })
   await page.getByRole('button', { name: /Detect/ }).click()
@@ -141,7 +141,7 @@ webkitPage.on('console', (message) => {
 let webkitResult
 try {
   const webkitStatus = webkitPage.locator('p').filter({ hasText: 'Status:' })
-  await webkitPage.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
+  await webkitPage.goto(new URL('/cutout-lab?admin=1', baseUrl).href, { waitUntil: 'networkidle' })
   await webkitPage.locator('input[type=file]').first().setInputFiles(fixturePath)
   await webkitStatus.filter({ hasText: /image ready/ }).waitFor({ timeout: 30_000 })
   await webkitPage.getByRole('button', { name: /Detect/ }).click()
