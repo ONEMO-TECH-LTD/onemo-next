@@ -175,19 +175,19 @@ export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 export type PrepareProgress = 'downloading-model' | 'cutting' | 'fallback'
 
 /** One post-segmentation path: detector identity stops mattering once an MLResult reaches here. */
-function prepareCut(url: string, preseg: MLResult, edgeFinishPx: number, onProgress?: (s: PrepareProgress) => void): Promise<PreparedEffectBase> {
+function prepareCut(url: string, preseg: MLResult, edgeFinishPx: number, onProgress?: (s: PrepareProgress) => void, originalTexture = false): Promise<PreparedEffectBase> {
   const cfg = { ...LAB_CFG, edgeFinishPx }
-  return prepareEffect(url, 'shaped', cfg, onProgress, finishMLResultEdges(preseg, edgeFinishPx), { buildOutputs: false })
+  return prepareEffect(url, 'shaped', cfg, onProgress, finishMLResultEdges(preseg, edgeFinishPx), { buildOutputs: false, originalTexture })
 }
 
 /** Non-AI/brush mask → MLResult → the same edge/prepare path as native u2net. */
-export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT): Promise<PreparedEffectBase> {
-  return prepareCut(url, await buildPreseg(url, mask), edgeFinishPx, onProgress)
+export async function prepareAI(url: string, mask: Mask, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT, originalTexture = false): Promise<PreparedEffectBase> {
+  return prepareCut(url, await buildPreseg(url, mask), edgeFinishPx, onProgress, originalTexture)
 }
 
 /** Native u2net MLResult → the same edge/prepare path as every other segmentation source. */
-export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT): Promise<PreparedEffectBase> {
-  return prepareCut(url, preseg, edgeFinishPx, onProgress)
+export function prepareNative(url: string, preseg: MLResult, onProgress?: (s: PrepareProgress) => void, edgeFinishPx = EDGE_FINISH_DEFAULT, originalTexture = false): Promise<PreparedEffectBase> {
+  return prepareCut(url, preseg, edgeFinishPx, onProgress, originalTexture)
 }
 
 /** Knob resolution over the engine spec — v5.3.1's own generation-controls path, verbatim.

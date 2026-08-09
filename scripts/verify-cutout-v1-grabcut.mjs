@@ -86,6 +86,10 @@ const routeExpected = {
   chromium: { width: 1263, height: 443, colorType: 6, sha256: '2a6bf8c18c27237dd46e43065648fcb3161c6143b73c77588867613ad73b1827' },
   webkit: { width: 1263, height: 443, colorType: 6, sha256: '824c2ff14aa03b55dfcefe8fa87063b115ccd3ca3c252e2b8db35ab49f60b75f' },
 }
+const originalRouteExpected = {
+  chromium: { width: 1683, height: 591, colorType: 6, sha256: 'a76410cb6b7d04f08ae23b6de0e58b2780a70b9ff99a86997dae4582b5e0339f' },
+  webkit: { width: 1684, height: 590, colorType: 6, sha256: 'd6b735de5372613eaf6d0c0ffe190b634e5e3c3fbc65c39b3a5e779f7f493b86' },
+}
 
 const pngInfo = (bytes) => ({
   width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colorType: bytes[25],
@@ -247,6 +251,27 @@ async function runBrowser(browserType) {
     const routeOutput = pngInfo(readFileSync(await (await pending).path()))
     assert.deepEqual(routeOutput, routeExpected[browserName], `${browserName}: completed GrabCut output changed`)
 
+    // Admin phone comparison: switch only the output-source raster to the original upload. The
+    // accepted edit recipe/history stays fixed; switching back must reproduce the exact capped PNG.
+    const outputToggle = routePage.getByRole('checkbox', { name: 'original resolution output' })
+    assert.equal(await outputToggle.isChecked(), false, `${browserName}: output must default to the mobile cap`)
+    await routePage.getByText('1536×1536', { exact: false }).waitFor()
+    const historyBeforeOutputToggle = await routePage.getByRole('heading', { name: 'Cutout Lab' }).getAttribute('data-hist')
+    await outputToggle.click()
+    await status.filter({ hasText: /original upload output source: 2048×2048/ }).waitFor({ timeout: 60_000 })
+    assert.equal(await outputToggle.isChecked(), true, `${browserName}: original-resolution mode did not commit`)
+    assert.equal(await routePage.getByRole('heading', { name: 'Cutout Lab' }).getAttribute('data-hist'), historyBeforeOutputToggle, `${browserName}: output resolution changed the accepted recipe/history`)
+    const fullPending = routePage.waitForEvent('download')
+    await routePage.getByRole('button', { name: /Save/ }).click()
+    const originalOutput = pngInfo(readFileSync(await (await fullPending).path()))
+    assert.deepEqual(originalOutput, originalRouteExpected[browserName], `${browserName}: original-resolution output changed`)
+    await outputToggle.click()
+    await status.filter({ hasText: /capped output source: 1536×1536/ }).waitFor({ timeout: 60_000 })
+    const restoredPending = routePage.waitForEvent('download')
+    await routePage.getByRole('button', { name: /Save/ }).click()
+    const restoredOutput = pngInfo(readFileSync(await (await restoredPending).path()))
+    assert.deepEqual(restoredOutput, routeExpected[browserName], `${browserName}: capped output did not reproduce after the original-resolution comparison`)
+
     // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
     await routePage.getByRole('button', { name: /Vector/ }).click()
@@ -397,7 +422,7 @@ async function runBrowser(browserType) {
     assert.equal(await vectorKnob.inputValue(), '37', `${browserName}: GrabCut did not restore the prior cutout vector recipe`)
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
-    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, paintLiveCalibration: true, paintStrokeStyleCalibration: true, paintWidthProof: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
+    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, routeOutput, originalOutput, paintLiveCalibration: true, paintStrokeStyleCalibration: true, paintWidthProof: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
   } finally {
     await browser.close()
   }

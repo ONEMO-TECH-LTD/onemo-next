@@ -28,7 +28,10 @@ export default function CutoutLab() {
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
   const flow = useCutoutLabFlow({ requestRender })
-  const { status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo, paintCfg, edgeFinishPx } = flow.state
+  const {
+    status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo,
+    paintCfg, edgeFinishPx, outputOriginal, outputSourceSize, outputPrepareMs,
+  } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -437,6 +440,18 @@ export default function CutoutLab() {
         <div style={{ marginTop: 16, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: '#64748b', marginBottom: 8 }}>⚙️ Cutout calibration (admin)</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: '#475569', width: 92 }}>output source</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, flex: 1 }}>
+              <input aria-label="original resolution output" type="checkbox" checked={outputOriginal} disabled={!hasCut || busy}
+                onChange={(e) => flow.actions.setOutputOriginal(e.target.checked)} />
+              {outputOriginal ? 'original upload' : 'capped 1536px'}
+            </label>
+            <span style={{ fontSize: 11, fontWeight: 700, minWidth: 110, textAlign: 'right' }}>
+              {outputSourceSize ? `${outputSourceSize.w}×${outputSourceSize.h}` : '—'}
+              {outputPrepareMs != null ? ` · ${outputPrepareMs}ms` : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 12, color: '#475569', width: 92 }}>edge finish</span>
             <input aria-label="shared edge finish" type="range" min={0} max={12} step={1} value={edgeFinishPx} onChange={(e) => flow.actions.setEdgeFinishPx(Number(e.target.value))} style={{ flex: 1 }} />
             <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{edgeFinishPx}px</span>
@@ -468,7 +483,7 @@ export default function CutoutLab() {
             </select>
             <span style={{ width: 40 }} />
           </div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>output source changes Preview/Save only; the editor/mask stays at 1024px. Edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke.</div>
         </div>
       )}
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>

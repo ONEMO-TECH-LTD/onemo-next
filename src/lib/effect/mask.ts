@@ -21,7 +21,8 @@ export interface SegmentationAdapter {
 /** Load an image URL into ImageData, downscaled so max dimension ≤ maxDim (speed). */
 // deviceMaxTextureDim probes the device's physical GPU maximum (fallback 4096 for no-WebGL —
 // tests/SSR). NOTE: v5.5 adds a separate working-res cap (~1536, worker + display) for the
-// iPhone upload OOM (MOBILE_TEXTURE_DIM_CAP below); full-res original kept for manufacturing.
+// iPhone upload OOM (MOBILE_TEXTURE_DIM_CAP below). Manufacturing must separately retain the
+// uploaded original and replay the final recipe; this browser display path is not that authority.
 let cachedMaxTextureDim: number | null = null
 export function deviceMaxTextureDim(): number {
   if (cachedMaxTextureDim) return cachedMaxTextureDim
@@ -40,8 +41,8 @@ export function deviceMaxTextureDim(): number {
  *  allocate multi-GB canvases, and never above the device's GPU max. This caps the DISPLAY side
  *  (prepareEffect's texDim + the segment-ml rasterize); the cut-out WORKER's own full-res post-process is
  *  capped SEPARATELY inside `ben.worker.runRembg` (texDim does NOT reach the worker — it rasterizes only
- *  AFTER the worker returns, the expert's must-fix). The full-resolution original is re-baked for
- *  manufacturing at save/order, so this cap never touches print quality. */
+ *  AFTER the worker returns, the expert's must-fix). Manufacturing regeneration remains required
+ *  downstream and must never consume this capped raster. */
 export const MOBILE_TEXTURE_DIM_CAP = 1536
 export function effectiveTextureDim(): number {
   return Math.min(deviceMaxTextureDim(), MOBILE_TEXTURE_DIM_CAP)
