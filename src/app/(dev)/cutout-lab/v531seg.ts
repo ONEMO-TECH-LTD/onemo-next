@@ -1,6 +1,5 @@
 // cutout-lab — native v5.3.1 segmentation option (Dan: the infra-vs-model control). PURE GLUE over
-// v5.3.1's own segmentML/ben.worker (u2netp→silueta chain, self-hosted, phone-proven) — NOT a
-// cutout-ai sub (ARCHITECTURE.md: u2net is v5.3.1's; the UI reaches it through v5.3.1's own path).
+// v5.3.1's own segmentML/ben.worker (u2netp→silueta chain, self-hosted, phone-proven).
 // Auto-only (no prompt → no brush); the lab uses it to separate model failures from infrastructure.
 
 import { runCutout } from '@/lib/effect/cutout'
