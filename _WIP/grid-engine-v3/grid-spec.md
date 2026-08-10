@@ -226,7 +226,12 @@ Each of these has been in the build and been removed. They are listed so they ar
 
 ## 9 · Known limits, stated rather than discovered later
 
-- **Shapes with holes are unsupported** — single outline only. A donut would fail.
+- **Shapes with holes: NOT A LIMIT — ruled irrelevant.** *Dan, 08-10:* "Our cutout lab does not produce
+  shapes with holes… everything we generate is more or less solid… there is a free shape that the user
+  draws, and the drawing is basically like loops in, so it becomes a solid blob." Confirmed in code —
+  `traceContourRaw` (`src/lib/effect/contour.ts:141`) returns `Pt[] | null`, a **single ring**, and `Pt`
+  is `[number, number]`, which is already the engine's own outline type. Single-outline is the product,
+  not a shortcoming.
 - **The cap is a grid count and binds per pitch.** 9 across on the dense grid is not 9 across on the
   sparse one, so the cap may need to be stated per pitch. *(That the resulting millimetres differ per
   outline is not a problem to solve — it is what grid-first means.)*

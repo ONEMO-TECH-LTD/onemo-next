@@ -129,6 +129,37 @@ only the bottom row leaves the top to fall away. Support at the top is required,
 
 **(d) No flap, no orphaned area.** No large asymmetric region of the shape left uncovered by magnets.
 
+**3.1e — SYMMETRY BALANCE IS MEASURED PER QUADRANT, ABOUT THE CENTRE LINES. Never as an average.**
+*DAN, 08-10, defining the measure he named in the build directive:*
+> "the center lines vertically and horizontaly dividing a shape to judge each cell on the coverage of
+> the magnet"
+
+Draw the vertical and horizontal centre lines through the shape. They divide it into four regions. The
+measure is **whether each region holds magnets** — this is 3.1(a) *"centered and symetrical from each
+**side** of the shape"* stated as arithmetic, and it is the same fact as 3.1(d) seen per region.
+
+**Why an average is the wrong instrument, and it is not theoretical:** the distance between the
+magnets' mean position and the shape's centre is **exactly zero** for two magnets sitting diagonally
+opposite — while two of the four quadrants hold nothing. *Measured instance: on a real 2972-point
+traced contour at band 3, the engine returned 2 magnets with a centroid balance of 1.1mm and it was
+reported as near-perfect. Two magnets that close to centred are opposite one another, so half the shape
+was unheld and the measure could not see it.*
+
+A layout is balanced when every quadrant carrying material also carries support.
+
+**3.1f — THE FOLD IS HOW THE CENTRE LINES ARE FOUND. It is not a sizing method.** *DAN, 08-10:*
+> "The fold was used as hypothetical folding the shape in half to determine center lines vertically"
+
+Fold the shape in half — that is the centre. Two folds give the vertical and horizontal centre lines,
+and those lines give the quadrants of 3.1e. That is the fold's entire job, and it has no failure mode.
+
+**Recorded so it is not misread later:** an elaboration *on top of* the fold — scale each side until its
+magnet fits, then average the four scales to size the shape — was built and **falsified on 8 of 8 free
+shapes (undersized 18–65%; folding on the guaranteed area instead still failed 4 of 8)**. That invention
+failed. The fold did not. It measures reach along the axes, which is meaningless for sizing a free shape,
+but exact for locating a centre. Do not revive the sizing version, and do not discard the fold because of
+it.
+
 **3.2 — Balance outranks minimum size.** *DERIVED from 3.1*
 Where a tighter size exists but is asymmetric, the balanced layout wins and the tighter one is
 discarded. **Measured instance, recorded so the class is recognisable:** on Dan's 162mm star the
