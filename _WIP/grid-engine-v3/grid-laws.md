@@ -330,6 +330,140 @@ Rows and columns (`positionsPerAxis`, released at 9) are a released, guarded val
 through the one writer — not a number the engine holds. *(This is 1.1a applied: a value in the engine
 was the engine holding a value of its own.)*
 
+**10.6 — PADDING IS 12mm. THE SYSTEM STEPS IN 12mm ATOMS.** *DAN, 08-10, LOCKED:*
+> "12 mm agrees with the grid better cause it is like 16px REM standard in the web dev - we have 12mm atom
+> the entire grid steps in that size"
+>
+> "decided for 12mm padding - locked decision"
+
+**Supersedes the inherited v1 law 2.1 (10mm from the magnet centre, 20mm spot).** Padding is **12mm**, so
+the spot is **24mm** — exactly half the 48mm pitch.
+
+| | | |
+|---|---|---|
+| padding | 12mm | **1 atom** |
+| magnet spot | 24mm | 2 atoms |
+| half pitch | 24mm | 2 atoms |
+| pitch | 48mm | 4 atoms |
+| sparse pitch | 96mm | 8 atoms |
+
+**Consequences, measured before the decision:**
+- The rectangular ladder becomes 72 · 120 · 168 · 216 · 264 · 312 — **6 · 10 · 14 · 18 · 22 · 26 atoms.**
+  At 10mm padding *none* of 68/116/164/212 was a multiple of 12, so the system had no common step at all.
+- 12 is even, so a rectangular size **can never violate the whole-and-even rule** — publication has nothing
+  to correct there.
+- **Cost, measured on 8 random free shapes: 3 of 17 magnet positions lost (~18%), and every size grows 4mm.**
+  Some free shapes will hold three magnets where 10mm would have held four. This was known and accepted.
+- The atom does **not** reach round outlines — the diagonal carries the √2, so circles land on 92 / 160 / 228.
+  That is correct, not a compromise (see 12.3a).
+
+**10.7 — Size 1 is silent.** *DAN, 08-10*
+> "silent size is number 1 it can be coded in too we just not gonna show it in the ui selector or default
+> minimum untill product eveolves to need it"
+
+The ladder is **coded from one magnet upward** so the arithmetic is continuous, but the selector offers only
+**2, 3, 4** — the product range. A single magnet lets the shape pivot (11.3) and is never offered. It exists
+so that a later product needing it requires no change.
+
+---
+
+## 11 · The pair — the unit of measure
+
+**11.1 — THE PAIR IS THE ATOM.** *DAN, 08-10, verbatim:*
+> "pair is the unit of measure here"
+>
+> "Pair means shape must be minimum 20mm thick and 68 mm tall. And at those node points 48mm apart each
+> shape must have material on the inside to capture 20mm circle. Period"
+
+*Stated at 10mm padding. **Under the locked 12mm (10.6) the same rule reads: minimum 24mm thick and 72mm
+tall, capturing a 24mm circle.** The rule is unchanged — it is 2×padding thick and pitch+2×padding tall —
+only the value it resolves to moved.*
+
+**The whole test is one thing:** at both nodes, is there material holding the full 20mm circle. The 20mm
+thickness and the 68mm length are not separate checks — they are what that test *means* geometrically.
+Verified at the limit: 20 x 68 holds; 19.9 wide fails; 67.9 tall fails.
+
+**11.2 — Everything is pairs about the fold, optionally plus a centre.** *DERIVED from 11.1 and 9.2*
+A pair straddles the fold; a centre point sits on it. So the fold's position is not a rule to apply — it
+is simply whether a centre exists. **This generates the entire published ladder and nothing else does:**
+
+| pairs | centre | across | fold | square | circle |
+|---|---|---|---|---|---|
+| 1 | no | 2 | between | 72 | 92 |
+| 1 | yes | 3 | through | 120 | 160 |
+| 2 | no | 4 | between | 168 | 228 |
+| 2 | yes | 5 | through | 216 | 296 |
+| 3 | no | 6 | between | 264 | 364 |
+
+*(at the locked 12mm padding — 10.6)*
+
+**11.3 — One pair is the floor.** *DERIVED from 11.1*
+Below one pair there is a single magnet, and a single magnet lets the shape pivot. Any product must hold
+at least one pair, so at least one axis must reach **72mm** at 48mm pitch (**120mm** at 96mm).
+
+**11.4 — The arrangement follows the shape's own form.** *DAN, 08-10*
+> "If shape is narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum
+> L shape by definition will have 1 + 2 - as well as any triangle"
+
+*Measured, and it needs no shape classification: given a 2x2, an L-shape drops to 1+2 by itself because
+the fourth position has no fabric under it. Nothing anywhere names an L, a triangle or a tower.*
+
+**11.5 — The variants come from the internal guaranteed area.** *DAN, 08-10*
+> "From here variants can be built of the shapes internal guaranteed area and dimensions"
+
+The guaranteed area is the shape reduced by the padding — the region where a 20mm circle can sit. Its two
+dimensions generate every arrangement the shape supports. Past that point the outline's form no longer
+matters; only what it guarantees does.
+
+**11.6 — Size is set by edge-to-edge matching.** *DAN, 08-10*
+> "The size is determined by edge to edge optimal matching"
+
+Every edge of the shape and every magnet form a pair of constraints; the tightest demand sets the size.
+One pass, no search. **The binding (edge, magnet) pair is also the answer's explanation** — the engine can
+always name what set the size.
+
+---
+
+## 12 · No size inputs
+
+**12.1 — NO SIZE INPUT MAY EXIST.** *DAN, 08-10, verbatim:*
+> "No size inputs may exist"
+>
+> "there cannot be fail sizes it is not possible from the algorithm"
+
+There is no cap, target, range or test size anywhere in the unit. A shape is never "too small" — it scales
+until it holds. **Retires `maxSizeMM` from the spec and the size control from the shell.** *(Same defect
+class as 10.3/10.4: a number constraining the answer without deriving from the shape or the grid.)*
+
+**12.2 — Size is the OUTPUT.** *DAN, 08-10*
+> "Size is final value we manufacture form as dimension of the shape with locked aspect"
+
+**The contract, both ends:** IN — the shape's form, the pitch, the padding. OUT — the manufactured
+dimensions (one number, aspect locked) and the magnet positions. Nothing about size crosses inward.
+
+**12.3 — The ceiling is a GRID COUNT, never a millimetre.** *DAN, 08-10*
+> "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case we
+> create engine to match our 9x9 grid as max grid after we validate stable engine works we cap the grid
+> to specific number"
+
+**9x9 for now**, tightened once the engine is proven stable. *Measured: the old 310mm ceiling was exactly
+7 across (308mm) — always a grid count in millimetre costume, which is why it never sat right. A 9x9 cap
+reaches 404mm square / 564mm circle at 48mm, and 788 / 1108 at 96mm. Note the cap binds differently per
+outline, and per pitch — it may need to be per-pitch rather than global.*
+
+**12.3a — The atom is a consequence, never a requirement.** *DAN, 08-10*
+> "fine circle can be 92 but we dont really care as we have grid led shape sizing and rounding system to
+> the next even number that can be divided by 2"
+
+Publication rounds up to the next **even** number. That a 12mm padding makes every RECTANGULAR size a whole
+number of 12mm atoms is a consequence of the arithmetic, not a rule any shape must satisfy. A round outline
+publishes at 92 / 160 / 228 — off the atom, and correct. **Forcing circles onto the atom would need a
+per-rung fudge (4.12 / 8.24 / 0.35mm) — a lookup table, forbidden by 4.1.**
+
+**12.4 — The handle steps the ladder; it does not set a size.** *DERIVED from 12.1, 12.2*
+Dragging picks which arrangement, and the size is whatever that arrangement costs. A size that is not an
+engine output cannot be reached, because no such position exists.
+
 ---
 
 # OPEN

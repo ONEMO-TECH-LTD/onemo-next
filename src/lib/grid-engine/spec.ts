@@ -159,7 +159,7 @@ export const RELEASED: GridSystemSpec = Object.freeze({
   grid: Object.freeze({
     basePitchMM: 48,
     pitchMM: 48,
-    paddingMM: 10,
+    paddingMM: 12,
     maxSizeMM: 310,
     positionsPerAxis: 9,
   }),

@@ -268,3 +268,207 @@ population takes and where the lattice registers. It is a ruling, not an inferen
 
 **14:2x:**
 > rows and columns become a released, guarded law input — editable in the panel, not a constant in the engine
+
+---
+
+## 2026-08-10 · 14:5x — THE AUTOMATIC FIT BRIEF
+*Dan, to lead and meta both. Verbatim.*
+
+**On the state and what comes next:**
+> "So do we have UI shell now and everything separated and ready to be endowed with logic and compute?
+> And we need to understand how we're gonna do this."
+
+**On the behaviour he wants — this is the product definition of the engine:**
+> "if I, for example, place a shape and pull the kind of, like, imaginary handles to scale it and snap
+> it to the edges to be snapped to the magnet, this is the behavior I want to have with any shape.
+> whether it's geometric or other. So, basically, we need to first understand how to make it automatic.
+> Yeah? Means that any shape will have the outline optimal, and we defined what optimal is."
+
+**On how to answer:**
+> "let's discuss how we can do it and do it without unnecessary fucking reporting or, you know, talk.
+> Yeah? Just to the point how the math will work and how it will be automatic and fail proof."
+
+**On not repeating the failure — the 130mm star as the named counter-example:**
+> "I wanna repeat previous over engineering problems or previous failed attempts, I need either for you
+> to come up with the compute arithmetics and detection, smart detection, which means that your previous
+> attempt with hundred thirty millimeters on the star shape is the example of the arithmetic is not
+> working if symmetry is not unbalanced, is not taken into account. So we need to take this into account."
+
+**On prior art — research before inventing:**
+> "if we have something that can be used and already built as a compute engine for this by third parties,
+> as open source was something that is even not open source we can read and approximate and reuse for our
+> own logic, then let's fucking do it. So we don't... so we get research as inspiration if no solution
+> available, but we need to go online and research what it could be. because I'm pretty sure it's nothing
+> difficult there. Yeah? Nothing that has not been invented already."
+
+**Routing:**
+> "this was meant to be to be sent to lead, and to be honest for both, to consider… you need to share
+> this brief and save this brief to the briefs in linear and otherwise."
+
+---
+
+## 2026-08-10 · afternoon — DAN'S OWN MODEL. He derived it; it reproduces the canon.
+
+**On the padding, reframed — the nodes come first, the magnets are incidental:**
+> "what is the problem to think about 10mm as just padding for offset. If there was no magnets and padding there would be nodes 48mm apart in a lattice. The … connected nodes create shape geometrically if each line or node offsets outward it creates technical limits for any shape not to cross unless it snaps to the next available offset node point and line connecting nodes. So square fitting this will be calculated as 4 nodes connected - 48mm square offset by 20mm 68 square hugging the inner limits of connected nodes. Same for circle plus 10mm to the existing 10mm to account for radii of the circle making it 88mm circle. Free shapes and sticker outlines are complex shapes at first but internal limits of edges can be geometrically normalised to hold squares/rectangles and circles and ovals - and those are simple to calculate as above"
+
+**On symmetry — it is a fold, not a detection:**
+> "Symmetry is not a problem either it is folding the shape mid point 24 or 48mm depends on which grid dense or 96mm sparse - each side is mirror that can be individually treated left side can show 2point match and right side cannot we offset the side that does not fit till it does and bring the scale ratio to another side half way cause the center it will move shape to the side a bit"
+
+**On the two folds:**
+> "the mirroring top bottom and left right a can be adapted … calculating the scale % for each and normalising to the center to produced global %"
+
+**On narrow shapes — the count adapts:**
+> "not all will fit 4points in set size range if I want shape no bigger than 100mm for instance if it is narrow like 50 mm 4 points will not fit we use in this case 1 column not 2 and normalise and fold half on the longest axis vertical or horizontal only - this way 2 magnets 48mm or 96mm apart will be snug fit into the shape and hold it perfectly without need of 4magnets"
+
+**On scaling up:**
+> "Larger sizes will have more supporting grid points at the perimeter - for instance 120mm plus will have 3-4 grid points depending on on the 48-96mm layout so this logic scales same way"
+
+**On density — this removes population selection entirely:**
+> "Interior is not my concern we can produce full grid making sure the perimeter edges are held the inner points can be made to be ignored later or ignored at manufacturing selectively for now we use full grid density"
+
+**On pace:**
+> "One problem at a time"
+
+---
+
+*Verified by @s62-meta before recording. Dan's node-offset formula reproduces the entire published canon
+from two lines of arithmetic — square `(n−1)·48 + 20` gives 68/116/164/212/260/308; circle
+`(n−1)·48·√2 + 20` gives 88/156/224. The fold model was tested on a lopsided shape (70/90) and both
+sides land exactly on target after scaling and shifting by half the difference. The narrow-tower case
+was tested: 50mm wide under a 100mm cap gives 1 column × 2 rows on the 48mm grid, as he stated.*
+
+**On the reverse construction — magnets first, shape second:**
+> "In terms of logic as well as we inverses it we can reverse as well imagine magnetic grid with 4 points the 20mm circle (10mm from center ) padding — if center measured on the x and y axis of the circles each will produce boundary nodes for shape to touch"
+
+> "On the outside top and side of the circle"
+
+*Verified. For a SQUARE outline the outward top/side of each padding disc bind exactly: ±34 → 68mm.
+For a ROUND outline they do not — a circle through those same points is 68mm and CUTS the corner discs
+by 9.94mm; what binds a circle is the corner disc's outermost radial point, 24√2 + 10 = 43.94 → 87.88 → 88.
+General form: the shape touches the outermost point of each disc IN THE DIRECTION ITS OWN EDGE FACES.
+A square's edges face along the axes so top/side bind; a circle's edge faces radially so the diagonal binds.
+Which point wins is decided by the outline, never chosen. Same four magnets, same four discs, outline
+swapped: square 68 · circle 88 · 2:1 oval 144.9×72.4 · 3:1 oval 209.8×69.9 · triangle side 148.2.*
+
+**On pace:**
+> "One problem at a time"
+
+> "Save the ideas all in the briefs file and let's brainstorm now how the algorithm in the simplest way can be implemented"
+
+---
+
+## 2026-08-10 · late afternoon — THE PAIR, AND THE END OF SIZE INPUTS
+
+**On decimals — nothing fractional reaches fabric:**
+> "it cannot cut by 9.94 it must not be possible to have uneven numbers we cannot cut decimals of fabric"
+
+*(Context: the 9.94 was a counterexample showing why a square's top/side construction fails on a circle,
+not a produced size. Confirmed: every shipped number is whole and even; the square never produces a
+decimal at all, and only the circle does because a 48mm square's diagonal is irrational.)*
+
+**On the count — the shape decides it, not a size cap. Meta was told this was a red flag:**
+> "this is ambiguous! The shape siz is not dictated by input like 100mm grid dictates the size so you
+> asking this is red flag of you understanding shit."
+>
+> "If shape is narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum
+> L shape by definition will have 1 + 2 - as well as any triangle"
+
+**On how size is determined — stated as already-repeated:**
+> "The size is determined by edge to edge optimal matching I repeated it 100 times if this is not clear
+> and you still posing open questions you must resign"
+
+**On the unit of measure:**
+> "You already came up with good method on the top of the inverse logic with nodes and mirror method -
+> pair is the unit of measure here"
+
+**THE PAIR, defined — this is the atom of the whole system:**
+> "Pair means shape must be minimum 20mm thick and 68 mm tall. And at those node points 48mm apart each
+> shape must have material on the inside to capture 20mm circle. Period"
+
+**On generating the variants:**
+> "From here variants can be built of the shapes internal guaranteed area and dimensions"
+
+**On there being no such thing as a failing size:**
+> "when you say fails means you have an option to set size freely - you can select range the size is
+> calculated based on shape + grid matching - there cannot be fail sizes it is not possible from the
+> algorithm. Is that clear. You keep fucking setting sizes when you must focus on the algorithm of shape
+> and grid matching."
+
+**The law, flat:**
+> "No size inputs may exist"
+
+**On what size IS:**
+> "Size is final value we manufacture form as dimension of the shape with locked aspect"
+
+**On the ceiling — a grid count, never a millimetre:**
+> "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case we
+> create engine to match our 9x9 grid as max grid after we validate stable engine works we cap the grid
+> to specific number"
+
+*Measured: the old 310mm ceiling is exactly 7 across (308mm) — it was always a grid count in millimetre
+costume. A 9x9 cap reaches 404mm square / 564mm circle at 48mm pitch, and 788 / 1108 at 96mm.*
+
+**On pace and on documenting:**
+> "One problem at a time"
+> "Keep the briefs logged fill the gap between last brief and now read your transcript also extracts laws and spec as well"
+
+---
+
+## 2026-08-10 · evening — THE 12mm ATOM
+
+**On quadrants, and on what the test actually is:**
+> "each is quadrant is square - because shape has bounding geometric box still using geometry so breaking
+> down the shape by squares as quadrants should work if we need we can equalise and make the padding 24mm
+> half of the 48mm if it helps"
+
+> "But we don't need the square we have nodes at the center of each cell that needs guaranteed padding of
+> 10mm or 12mm"
+
+> "12mm padding =24mm full magnet circle = cell"
+
+**The reasoning — 12mm is the system's atom:**
+> "12 mm agrees with the grid better cause it is like 16px REM standard in the web dev - we have 12mm atom
+> the entire grid steps in that size"
+
+**Set live in the panel:**
+> "changed it in the locked padding now"
+
+*Verified. With a 12mm atom the whole system is whole multiples of one unit — padding 1 atom, magnet spot
+2, half pitch 2, pitch 4, sparse pitch 8 — and the rectangular ladder becomes 72 · 120 · 168 · 216 · 264 ·
+312, which is 6 · 10 · 14 · 18 · 22 · 26 atoms. At 10mm padding NONE of 68/116/164/212 is a multiple of 12,
+so the system has no common step. 12 is also even, so a rectangular size can never violate the whole-and-even
+rule and publication has nothing to correct there.*
+
+*Measured costs, stated plainly: every size grows 4mm, and across 8 random blobs 3 of 17 magnet positions
+were lost (~18%). The atom does not reach the circle — its diagonal carries the √2, so round shapes land on
+92 / 160 / 228 and only the third is a multiple of 12. No atom can fix that; the round-up rule covers it.*
+
+*Cell-as-test was FALSIFIED and is not adopted: substituting a square cell for the circular spot disagrees
+with the exact disc test on 4-5 of 8 blobs at 10mm padding, and still 1 of 8 at 12mm. The cell is the frame
+— it fixes where nodes sit and gives the registration (node at cell centre = fold between nodes = even
+count; node at cell corner = fold through a node = odd count). The hold test stays the disc, which is one
+distance calculation and already free.*
+
+**STATUS: 12mm is live in the running panel only. The released spec still says `paddingMM: 10`.
+Making it law is a one-line change to the released spec, which is a build action and is HALTED.**
+
+**On the circle landing off the atom — closed:**
+> "fine circle can be 92 but we dont really care as we have grid led shape sizing and rounding system to
+> the next even number that can be divided by 2"
+
+*So the governing publication rule is EVEN, not atom. The 12mm atom is a CONSEQUENCE for rectangular
+outlines, never a requirement on any shape. A round outline publishes at 92 / 160 / 228 and that is
+correct, not a compromise. No attempt should ever be made to force circles onto the 12 step — it would
+require a per-rung fudge (4.12mm, 8.24mm, 0.35mm...), which is a lookup table and is forbidden by 4.1.*
+
+**LOCKED DECISION — 12mm padding:**
+> "decided for 12mm padding - locked decision change the logic in laws and briefs and in the code"
+
+**On the smallest band:**
+> "silent size is number 1 it can be coded in too we just not gonna show it in the ui selector or default
+> minimum untill product eveolves to need it"
+
+*Applied: `paddingMM: 12` in the released spec; law 10.6 records the atom and the measured cost (~18% of
+magnet positions on free shapes, +4mm on every size); law 10.7 records silent size 1. The pair's own numbers
+move with it — minimum 24mm thick and 72mm tall, capturing a 24mm circle. The rule itself is unchanged.*
