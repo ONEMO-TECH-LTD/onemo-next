@@ -25,8 +25,8 @@ import {
   type WriteRefusal,
 } from '@/lib/grid-engine/spec'
 import { GridCanvas } from './GridCanvas'
-import { scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
-import { ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from './camera'
+import { moveShape, scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
+import { ZOOM_DEFAULT, ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from './camera'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -54,12 +54,17 @@ const CLASSIC_BAND_MM = 120
 const CUTOUT_OPACITY = 0.55
 
 /** The eight grips, as fractions of the box. Presentation — the engine names them, this places them. */
-const HANDLES: Array<{ id: HandleId; fx: number; fy: number }> = [
-  { id: 'nw', fx: 0, fy: 0 }, { id: 'n', fx: 0.5, fy: 0 }, { id: 'ne', fx: 1, fy: 0 },
-  { id: 'w', fx: 0, fy: 0.5 }, { id: 'e', fx: 1, fy: 0.5 },
-  { id: 'sw', fx: 0, fy: 1 }, { id: 's', fx: 0.5, fy: 1 }, { id: 'se', fx: 1, fy: 1 },
+const HANDLES: Array<{ id: HandleId; fx: number; fy: number; cursor: string }> = [
+  { id: 'nw', fx: 0, fy: 0, cursor: 'nwse-resize' },
+  { id: 'n', fx: 0.5, fy: 0, cursor: 'ns-resize' },
+  { id: 'ne', fx: 1, fy: 0, cursor: 'nesw-resize' },
+  { id: 'w', fx: 0, fy: 0.5, cursor: 'ew-resize' },
+  { id: 'e', fx: 1, fy: 0.5, cursor: 'ew-resize' },
+  { id: 'sw', fx: 0, fy: 1, cursor: 'nesw-resize' },
+  { id: 's', fx: 0.5, fy: 1, cursor: 'ns-resize' },
+  { id: 'se', fx: 1, fy: 1, cursor: 'nwse-resize' },
 ]
-const HANDLE_MM = 8
+const HANDLE_MM = 6
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
@@ -73,7 +78,7 @@ export default function GridEnginePage() {
   const [unlocked, setUnlocked] = useState<ReadonlySet<GridKey>>(new Set())
   const [refused, setRefused] = useState<WriteRefusal | null>(null)
   // Plain view scale. 1 is fit; it changes what is on screen and nothing about the field.
-  const [zoom, setZoom] = useState(ZOOM_FIT)
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT)
   const [view, setView] = useState<FieldSummary | null>(null)
   const onView = useCallback((r: FieldSummary) => setView(r), [])
   // UI-ONLY test fixture. A stand-in shape so the canvas can be driven before the engine lands —
@@ -103,6 +108,14 @@ export default function GridEnginePage() {
   const [cutout, setCutout] = useState<{ url: string; wPx: number; hPx: number } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [dragging, setDragging] = useState<HandleId | null>(null)
+  /**
+   * The box AS IT WAS when the grip was taken. Scaling must be measured from that, never from the
+   * live box: the anchor is derived from the box, so feeding back the box being changed compounds
+   * every frame and the shape runs off the canvas — it reached y = 7404mm before this was caught.
+   */
+  const dragFrom = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
+  /** Where the pointer last was, in mm, while dragging the picture itself. */
+  const panFrom = useRef<[number, number] | null>(null)
   const cutoutInput = useRef<HTMLInputElement>(null)
 
   const loadCutout = useCallback((file: File) => {
@@ -229,7 +242,7 @@ export default function GridEnginePage() {
         >
           −
         </button>
-        <button type="button" className={styles.chip} onClick={() => setZoom(ZOOM_FIT)} aria-label="Fit">
+        <button type="button" className={styles.chip} onClick={() => setZoom(ZOOM_DEFAULT)} aria-label="Fit">
           fit
         </button>
         <button
@@ -246,19 +259,40 @@ export default function GridEnginePage() {
       <div className={styles.canvas}>
         <GridCanvas
           spec={spec}
-          extentMM={box ?? { x: -sizeMM / 2, y: -sizeMM / 2, w: sizeMM, h: sizeMM }}
+          /* THE FIELD IS THE WORLD; the shape lands on it (law 5.1). It must never be framed from
+             the shape — driving the extent off the cut-out's box made the whole lattice re-solve and
+             the camera re-frame on every drag, so the grid appeared to move under the handles. */
+          extentMM={{ x: -sizeMM / 2, y: -sizeMM / 2, w: sizeMM, h: sizeMM }}
           zoom={zoom}
           onView={onView}
         >
           {cutout && box && (
             <g
               onPointerMove={(e) => {
-                if (!dragging) return
-                setBox(scaleShape(spec, box, dragging, toMM(e)))
+                if (dragging) {
+                  const origin = dragFrom.current
+                  if (origin) setBox(scaleShape(spec, origin, dragging, toMM(e)))
+                  return
+                }
+                const from = panFrom.current
+                if (!from) return
+                const [px, py] = toMM(e)
+                setBox(moveShape(box, [px - from[0], py - from[1]]))
+                panFrom.current = [px, py]
               }}
-              onPointerUp={() => setDragging(null)}
+              onPointerUp={(e) => {
+                setDragging(null)
+                dragFrom.current = null
+                panFrom.current = null
+                e.currentTarget.releasePointerCapture?.(e.pointerId)
+              }}
             >
               <image
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  panFrom.current = toMM(e)
+                }}
+                style={{ cursor: 'move' }}
                 href={cutout.url}
                 x={box.x}
                 y={box.y}
@@ -277,7 +311,7 @@ export default function GridEnginePage() {
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
-              {HANDLES.map(({ id, fx, fy }) => {
+              {HANDLES.map(({ id, fx, fy, cursor }) => {
                 const cx = box.x + fx * box.w
                 const cy = box.y + fy * box.h
                 return (
@@ -287,13 +321,15 @@ export default function GridEnginePage() {
                     y={cy - HANDLE_MM / 2}
                     width={HANDLE_MM}
                     height={HANDLE_MM}
-                    fill="#58c2ff"
-                    stroke="#ffffff"
-                    strokeWidth={1}
+                    rx={1}
+                    fill="#ffffff"
+                    stroke="#58c2ff"
+                    strokeWidth={1.5}
                     vectorEffect="non-scaling-stroke"
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor }}
                     onPointerDown={(e) => {
                       e.currentTarget.setPointerCapture(e.pointerId)
+                      dragFrom.current = box
                       setDragging(id)
                     }}
                   />

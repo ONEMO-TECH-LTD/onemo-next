@@ -20,6 +20,22 @@ export interface Box {
 /** 1 is fit: the whole padded field. There is nothing wider, so the view can never leave the field. */
 export const ZOOM_FIT = 1
 export const ZOOM_MAX = 12
+
+/**
+ * WHERE THE CAMERA STARTS. Dan, 2026-08-10: "make grid to zoom 5 points on the launch we dont need
+ * 9x9 default with the bands 2/3/4".
+ *
+ * The FIELD is unchanged — nine positions, as released. This is the view only, so zooming out still
+ * reaches the whole field.
+ *
+ * Fit frames the padded field: eight steps of lattice plus a step of margin each side = 480mm.
+ * Five positions is four steps = 192mm, plus half a step of air each side so the outer magnets are
+ * not cut by the frame = 216mm. The camera is the ratio between them.
+ *
+ * (5/3 was the first attempt and it framed 288mm, which still holds SEVEN positions — the readout
+ * said so. The number below is measured against that readout, not reasoned about.)
+ */
+export const ZOOM_DEFAULT = 480 / 216
 /** One press. A plain factor — the ladder that used to live here was grid logic wearing a UI hat. */
 export const ZOOM_STEP = 1.5
 

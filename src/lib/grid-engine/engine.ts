@@ -213,3 +213,17 @@ export function scaleBoxFromHandle(
   const y = ay <= box.y + box.h / 2 ? ay : ay - h
   return { x, y, w, h }
 }
+
+/**
+ * Move a placed shape. Whole millimetres, like the scale (Dan, 2026-08-10: "scaling must be in
+ * increments of 1mm") — a shape that lands on a fraction cannot be reasoned about in a system whose
+ * every other number is exact.
+ *
+ * SCAFFOLDING, and named as such: in the product nothing drags a shape onto the field. Registration
+ * is decided by the count's parity and nothing is chosen (law 9.2), and the layout must sit centred
+ * on the shape (law 3.1a). This exists so a placement can be set BY EYE and compared against the one
+ * the engine determines — it is a measuring instrument, not a behaviour the product has.
+ */
+export function moveBoxBy(box: RegionMM, deltaMM: PointMM): RegionMM {
+  return { ...box, x: Math.round(box.x + deltaMM[0]), y: Math.round(box.y + deltaMM[1]) }
+}

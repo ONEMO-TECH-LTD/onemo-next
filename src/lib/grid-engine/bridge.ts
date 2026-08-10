@@ -17,6 +17,7 @@
 import {
   cellDiameterMM,
   magnetsInRegion,
+  moveBoxBy,
   paddedFieldMM,
   registrationOffsetMM,
   scaleBoxFromHandle,
@@ -85,4 +86,9 @@ export function scaleShape(
 ): RegionMM {
   // The floor is the magnet's own spot — a shape smaller than one cell can hold nothing (law 11.3).
   return scaleBoxFromHandle(box, handle, pointerMM, cellDiameterMM(spec.grid))
+}
+
+/** Drag a placed shape. Scaffolding — see the engine's note; the product never does this. */
+export function moveShape(box: RegionMM, deltaMM: PointMM): RegionMM {
+  return moveBoxBy(box, deltaMM)
 }
