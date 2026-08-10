@@ -266,11 +266,15 @@ labelled "the complete event set" and lost the canonical 2x2.)*
 > algorithm we keep talking about problems of the basic shapes and it is drifting into the opposite
 > direction"
 
-Squares and circles are static and precalculated. **A defect found only on a circle or a square is not
-a blocking defect** — at a band size those outlines are exactly tangent to their magnets by construction,
-so their placement window is near-zero (measured: 0.059mm for the 92mm circle, exactly zero for the 72mm
-square) and they are the least representative case in the system. *(This law was breached by QA and by
-the builder simultaneously, for over an hour, on the 92mm circle.)*
+Squares and circles are static and precalculated. Dan's ruling is that they are **not the work** — the
+free-shape algorithm is.
+
+*DERIVED, not Dan's, and flagged as such:* at a band size those outlines are exactly tangent to their
+magnets by construction, so their placement window is near-zero — **measured 0.059mm for the 92mm circle
+and exactly zero for the 72mm square**. That makes them the least representative case in the system, so
+a defect appearing only there is weak evidence about free shapes. **Whether such a defect blocks is Dan's
+call, not a derivation.** *(Recorded because QA and the builder both spent over an hour driving the
+92mm circle as a blocking gate, directly against this ruling.)*
 
 **6.10 — Internal tests are not the test. Nothing is proven until a real cut-out is on screen.**
 *DAN, 08-10*
@@ -454,25 +458,27 @@ the spot is **24mm** — exactly half the 48mm pitch.
 > "we moved to 12mm even to create each magnet as grid cell that matches the steps of the grid - 24mm
 > two cells create 48mm single 4 point square no gaps it is Lego essentially"
 
-12mm padding makes each magnet a **24mm cell**, and the 48mm pitch is **exactly two cells**. Verified:
+12mm padding makes each magnet a **24mm cell**, and **the 48mm pitch is exactly two of those cells**.
+That is the whole statement: the system measures in 24mm units, so every band span is a whole number of
+them — `span = 24·(2n−1)` gives 72, 120, 168, 216.
 
-```
-band   span      in cells    magnets occupy cells
-  2     72mm   =  3 cells        1, 3
-  3    120mm   =  5 cells        1, 3, 5
-  4    168mm   =  7 cells        1, 3, 5, 7
-  5    216mm   =  9 cells        1, 3, 5, 7, 9
-```
+**What this does NOT mean — and the error is recorded because it was written into this book and had to
+be struck.** *DAN, 08-10, rejecting it:*
+> "There cannot be center cell on the shape centered 4 or pair of shape is slim."
 
-Every band is an **odd** number of cells — `span = 24·(2n−1)` — so a middle cell always exists, the
-centre lines of 3.1e fall on it, and magnets occupy **alternate cells**. **Registration is therefore not
-computed at all: it is which cells are occupied** (9.2 restated in whole units).
+An earlier draft of this clause claimed that "a middle cell always exists and magnets occupy alternate
+cells". **That was an inference, not Dan's statement, and it is false.** At a 48mm pitch the 24mm magnet
+cells **do not tile** — there is a bare 24mm gap between them. "No gaps" in Dan's sentence refers to two
+cells laid together measuring the 48mm step, not to magnet cells tessellating the plane.
 
-**This removes the floating-point failure class from the frame.** *(Measured instance: the defect that
-lost the canonical 2x2 was a magnet clearing by 0.007mm — a float knife-edge. In cell units there is no
-margin to be on the wrong side of: three cells, magnets at one and three.)* The outline remains
-continuous, so the hold test still measures true distance (11.1) — but the band, the magnet positions
-and the registration are integers.
+**There is no centre cell.** §9.2 already governs and is unchanged: an **even** count puts the shape's
+centre in the **gap between magnets** — a 2x2, or a pair on a slim shape, has no magnet at the centre —
+and an **odd** count puts a magnet on it. Registration is that parity, nothing more.
+
+**What the module does buy** is that the frame is whole numbers: the band, the span and the magnet
+positions are exact multiples of 24mm, with no float margin to fall the wrong side of. *(The defect that
+lost the canonical 2x2 was a magnet clearing by 0.007mm.)* The outline stays continuous, so the hold test
+still measures true distance (11.1).
 
 **Round outlines stay off the cell** by the √2 of the diagonal (91.88mm = 3.83 cells) — correct, and
 already covered by 12.3a.
@@ -648,9 +654,12 @@ arbitrary size, which is how "band 2 holds nothing" appears — a fail size, for
 - **Every band — 2, 3 and 4 — is tested and reported.**
 - **Both necessity lines are required** (6.3), and the method is sourced (6.7), researched by the lane
   (6.8), on real shapes (6.10).
-- **Precedence, from 3.1:** balance leads. Dan's own sentence makes coverage its consequence, not its
-  rival — *"centering and balancing **so there is no flap** and assymetric free uncovered by magnets
-  surface"*. A ranking that leaves either measure unable to decide fails this clause.
+- **Precedence — DERIVED, and it has not been ruled.** Dan's sentence reads *"centering and balancing
+  **so there is no flap** and assymetric free uncovered by magnets surface"*, which grammatically makes
+  coverage the consequence of balance rather than a rival to it. **That is a reading, not a ruling.**
+  What IS settled: a ranking that leaves either measure unable to decide fails the directive, since both
+  were named. *(An invented precedence, applied silently and then reversed, is one of the three
+  unsanctioned decisions of 2026-08-10.)*
 
 ---
 
