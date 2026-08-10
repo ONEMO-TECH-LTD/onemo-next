@@ -95,6 +95,18 @@ describe('4 — traffic is one-way: shell → bridge → unit', () => {
       expect(text, `${file} must not import from the app`).not.toMatch(/from ['"]@\/app\//)
     }
   })
+
+  it('the unit depends on no sibling of this repo', () => {
+    // s62-meta, 2026-08-10: a third-party package travels with the unit; a sibling module does not.
+    // The repo already wraps clipper2 twice (vector-core/clipper-kernel, effect/offset) and either
+    // import would tie the unit to onemo-next — the one property it exists to avoid.
+    for (const { file, text } of read(UNIT, /\.ts$/)) {
+      const siblings = (text.match(/from ['"]@\/lib\/[a-z-]+/g) ?? []).filter(
+        (i) => !i.endsWith('@/lib/grid-engine'),
+      )
+      expect(siblings, `${file} depends on repo code: ${siblings.join(', ')}`).toEqual([])
+    }
+  })
 })
 
 /**

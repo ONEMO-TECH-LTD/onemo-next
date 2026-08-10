@@ -59,10 +59,25 @@ interface MagnetSpec {
  */
 export type Registration = 'gap' | 'point'
 
+/**
+ * The solver's own budget — how finely it looks, not what it looks for.
+ *
+ * These live here because Sub 1 holds no values of its own, and that has to include the numbers its
+ * arithmetic runs on. They are resolution, not law: raising them costs time and sharpens the answer;
+ * they can never change WHICH layout is correct.
+ */
+interface SolverSpec {
+  /** Coarse passes across the scale range, to find where a magnet first becomes legal. */
+  scanSteps: number
+  /** Bisection passes inside the interval the scan found, to land on the exact threshold. */
+  refineSteps: number
+}
+
 export interface GridSystemSpec {
   grid: GridSpec
   magnet: MagnetSpec
   registration: Registration
+  solver: SolverSpec
 }
 
 export type GridKey = keyof GridSpec
@@ -172,6 +187,10 @@ export const RELEASED: GridSystemSpec = Object.freeze({
   // state off the back of a request about ONE layout, which was never anyone's call to make here.
   // Which registration a shape ships with is the ENGINE's answer for that shape, not a default.
   registration: 'point',
+  solver: Object.freeze({
+    scanSteps: 96,
+    refineSteps: 28,
+  }),
 }) as GridSystemSpec
 
 /** The launch pitches. 24 and 72 do not exist anywhere in the system (law 1.3). */

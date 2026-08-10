@@ -268,3 +268,39 @@ population takes and where the lattice registers. It is a ruling, not an inferen
 
 **14:2x:**
 > rows and columns become a released, guarded law input — editable in the panel, not a constant in the engine
+
+---
+
+## 2026-08-10 · 14:5x — THE AUTOMATIC FIT BRIEF
+*Dan, to lead and meta both. Verbatim.*
+
+**On the state and what comes next:**
+> "So do we have UI shell now and everything separated and ready to be endowed with logic and compute?
+> And we need to understand how we're gonna do this."
+
+**On the behaviour he wants — this is the product definition of the engine:**
+> "if I, for example, place a shape and pull the kind of, like, imaginary handles to scale it and snap
+> it to the edges to be snapped to the magnet, this is the behavior I want to have with any shape.
+> whether it's geometric or other. So, basically, we need to first understand how to make it automatic.
+> Yeah? Means that any shape will have the outline optimal, and we defined what optimal is."
+
+**On how to answer:**
+> "let's discuss how we can do it and do it without unnecessary fucking reporting or, you know, talk.
+> Yeah? Just to the point how the math will work and how it will be automatic and fail proof."
+
+**On not repeating the failure — the 130mm star as the named counter-example:**
+> "I wanna repeat previous over engineering problems or previous failed attempts, I need either for you
+> to come up with the compute arithmetics and detection, smart detection, which means that your previous
+> attempt with hundred thirty millimeters on the star shape is the example of the arithmetic is not
+> working if symmetry is not unbalanced, is not taken into account. So we need to take this into account."
+
+**On prior art — research before inventing:**
+> "if we have something that can be used and already built as a compute engine for this by third parties,
+> as open source was something that is even not open source we can read and approximate and reuse for our
+> own logic, then let's fucking do it. So we don't... so we get research as inspiration if no solution
+> available, but we need to go online and research what it could be. because I'm pretty sure it's nothing
+> difficult there. Yeah? Nothing that has not been invented already."
+
+**Routing:**
+> "this was meant to be to be sent to lead, and to be honest for both, to consider… you need to share
+> this brief and save this brief to the briefs in linear and otherwise."
