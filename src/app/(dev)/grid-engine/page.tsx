@@ -136,7 +136,7 @@ export default function GridEnginePage() {
 
         {view && (
           <span className={styles.fieldReadout}>
-            {view.cols}×{view.rows} · {Math.round(Math.max(view.spanXMM, view.spanYMM))}mm
+            {view.cols}×{view.rows} · {Math.max(view.spanXMM, view.spanYMM)}mm
           </span>
         )}
 

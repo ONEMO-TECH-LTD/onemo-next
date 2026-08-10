@@ -115,6 +115,26 @@ export function magnetsInRegion(
   return points
 }
 
+/**
+ * PUBLICATION (law 3.23). The exact wrap is the design size; only publication rounds it, and it
+ * rounds UP to the next even whole millimetre.
+ *
+ * Dan, 2026-07-29, having challenged the rule himself: *"we need round to the highest number
+ * obviously not lowest because the shape must not be smaller than grid. And this also must round to
+ * the next non-odd number so that grid is centered as well with no fractions — we cannot place
+ * anything on a fraction, it is just humanly impossible with fabric."*
+ *
+ * Up, never down: a smaller shape could not hold the grid it was solved for. Even: an odd size puts
+ * the grid off-centre. Rounding up can only ever increase a magnet's clearance, never reduce it —
+ * asserted in the gate rather than assumed, because a publication that broke the padding floor would
+ * be the 9.947mm class returning through a different door.
+ *
+ * Apply to the EXACT wrap only. Re-applying it to an already-published size drifts upward.
+ */
+export function publishedSizeMM(exactMM: number): number {
+  return 2 * Math.ceil(exactMM / 2)
+}
+
 /** What a region actually holds — the counts and spans a caller would want to state. */
 export interface FieldSummary {
   cols: number

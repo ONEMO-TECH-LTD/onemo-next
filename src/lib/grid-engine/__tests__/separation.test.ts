@@ -81,6 +81,18 @@ describe('3 — law values move only through the guard', () => {
   })
 })
 
+describe('3b — publication belongs to the unit', () => {
+  it('the shell never rounds a size itself', () => {
+    // Law 5.3: a surface holding a number the engine did not produce is how a screen goes stale.
+    for (const { file, text } of read(SHELL, /\.tsx?$/)) {
+      const rounding = codeLines(text).filter(({ line }) =>
+        /Math\.(ceil|floor|round)\s*\([^)]*(size|mm)/i.test(line),
+      )
+      expect(rounding, `${file} rounds a size: ${JSON.stringify(rounding)}`).toEqual([])
+    }
+  })
+})
+
 describe('4 — traffic is one-way: shell → bridge → unit', () => {
   it('the shell reaches the unit only through the bridge', () => {
     for (const { file, text } of read(SHELL, /\.tsx?$/)) {

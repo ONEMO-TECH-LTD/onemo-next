@@ -18,6 +18,7 @@ import {
   cellDiameterMM,
   magnetsInRegion,
   paddedFieldMM,
+  publishedSizeMM,
   registrationOffsetMM,
   summariseField,
   withMinimumSpan,
@@ -25,9 +26,10 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
+import { solveLayout, type Layout, type OutlineMM } from './solve'
 import type { GridSystemSpec } from './spec'
 
-export type { FieldSummary, PointMM, RegionMM }
+export type { FieldSummary, PointMM, RegionMM, Layout, OutlineMM }
 
 /** One field, solved. Everything a surface may draw or say about it is in here. */
 interface FieldLayout {
@@ -45,6 +47,25 @@ interface FieldLayout {
    * miss the centres they are meant to run through.
    */
   registrationMM: number
+}
+
+/**
+ * A solved shape, ready to state. The exact wrap is the design size (law 3.23); `publishedMM` is
+ * what a catalogue shows. The shell is handed both and computes neither — a surface that rounds is a
+ * surface holding a number the engine did not produce.
+ */
+export interface PublishedLayout extends Layout {
+  publishedMM: number
+}
+
+export function publish(layout: Layout): PublishedLayout {
+  return { ...layout, publishedMM: publishedSizeMM(layout.sizeMM) }
+}
+
+/** A shape in, a published layout out — the whole unit behind one call. */
+export function solveShape(spec: GridSystemSpec, outline: OutlineMM): PublishedLayout | null {
+  const layout = solveLayout(spec, outline)
+  return layout === null ? null : publish(layout)
 }
 
 /** Drive the unit: values out of the spec, geometry out of the engine, one call. */

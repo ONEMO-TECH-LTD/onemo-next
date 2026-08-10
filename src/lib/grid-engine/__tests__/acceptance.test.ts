@@ -11,6 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { publishedSizeMM } from '../engine'
 import { solveLayout, signedDistanceMM, type OutlineMM } from '../solve'
 import { applyGridValue, RELEASED, selectPitch } from '../spec'
 
@@ -148,6 +149,27 @@ describe('SUB 1 ACCEPTANCE', () => {
     }
     for (const s of ['circle', 'square', 'triangle', 'star', 'oval']) {
       expect(src, `${s} is a shape name and must not appear`).not.toMatch(new RegExp(`\\b${s}\\b`, 'i'))
+    }
+  })
+
+  it('publishes the exact wrap rounded UP to the next even whole millimetre (§3.23)', () => {
+    // Dan, 2026-07-29: "round to the highest number obviously not lowest because the shape must not
+    // be smaller than grid… and to the next non-odd number so that grid is centered as well with no
+    // fractions — we cannot place anything on a fraction, it is just humanly impossible with fabric."
+    for (const [exact, expected] of [[87.9, 88], [88, 88], [88.1, 90], [141.5, 142], [209.1, 210]]) {
+      expect(publishedSizeMM(exact)).toBe(expected)
+    }
+  })
+
+  it('publication can only improve clearance, never break the padding floor (§3.23 + v1 2.2)', () => {
+    // Asserted, not assumed. A publication that shrank the shape would be the 9.947mm class coming
+    // back through a different door.
+    const out = solved(RELEASED, circle(200))
+    const published = publishedSizeMM(out.sizeMM)
+    expect(published).toBeGreaterThanOrEqual(out.sizeMM)
+    const grown = atScale(circle(200), out.scale * (published / out.sizeMM))
+    for (const [x, y] of out.magnets) {
+      expect(signedDistanceMM(grown, x, y)).toBeGreaterThanOrEqual(RELEASED.grid.paddingMM)
     }
   })
 
