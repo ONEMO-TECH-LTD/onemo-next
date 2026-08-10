@@ -129,23 +129,30 @@ only the bottom row leaves the top to fall away. Support at the top is required,
 
 **(d) No flap, no orphaned area.** No large asymmetric region of the shape left uncovered by magnets.
 
-**3.1e — SYMMETRY BALANCE IS MEASURED PER QUADRANT, ABOUT THE CENTRE LINES. Never as an average.**
-*DAN, 08-10, defining the measure he named in the build directive:*
+**3.1e — SYMMETRY BALANCE IS JUDGED PER CELL, NOT AS AN AVERAGE.** *DAN, 08-10, verbatim, defining the
+measure he named in the build directive:*
 > "the center lines vertically and horizontaly dividing a shape to judge each cell on the coverage of
 > the magnet"
+>
+> "center the shape each of 4 sides will have cells - identify if the outmost cells covered by material
+> if not scale this segment till covered repeat for each segment combine scale % and average this will
+> give you overall scaling for fine tuning your scale by this number and center the shape"
 
-Draw the vertical and horizontal centre lines through the shape. They divide it into four regions. The
-measure is **whether each region holds magnets** — this is 3.1(a) *"centered and symetrical from each
-**side** of the shape"* stated as arithmetic, and it is the same fact as 3.1(d) seen per region.
+His terms are **centre lines**, **sides**, and **cells**. The centre lines are found by the fold (3.1f).
+Each of the four sides carries cells, and what is judged is **whether a cell is covered by material** —
+the same test as 11.1, applied at the cells that matter.
 
-**Why an average is the wrong instrument, and it is not theoretical:** the distance between the
-magnets' mean position and the shape's centre is **exactly zero** for two magnets sitting diagonally
-opposite — while two of the four quadrants hold nothing. *Measured instance: on a real 2972-point
-traced contour at band 3, the engine returned 2 magnets with a centroid balance of 1.1mm and it was
-reported as near-perfect. Two magnets that close to centred are opposite one another, so half the shape
-was unheld and the measure could not see it.*
+**An average is the wrong instrument as a MEASURE of a finished layout** — *DERIVED, with a measured
+instance:* the distance between the magnets' mean position and the shape's centre is **exactly zero**
+for two magnets sitting diagonally opposite, while the sides between them hold nothing. On a real traced
+contour at band 3 the engine returned 2 magnets with a centroid balance of 1.1mm and reported it as
+near-perfect; two magnets that close to centred are opposite one another.
 
-A layout is balanced when every quadrant carrying material also carries support.
+*(Dan's own use of an average is a separate thing and is not this: he averages the four **side scale
+percentages** to fine-tune the scale. That is his method, above, verbatim. Measured on a real silhouette
+at bands 2, 3 and 4, the average left a side uncovered where the most-demanding side did not —
+4.540 vs 4.970 at band 2, 4.647 vs 5.185 at band 3. Whether to use the mean or the most demanding side
+is his call, not a derivation.)*
 
 **3.1f — THE FOLD IS HOW THE CENTRE LINES ARE FOUND. It is not a sizing method.** *DAN, 08-10:*
 > "The fold was used as hypothetical folding the shape in half to determine center lines vertically"
