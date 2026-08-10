@@ -25,7 +25,7 @@ import {
   type WriteRefusal,
 } from '@/lib/grid-engine/spec'
 import { GridCanvas } from './GridCanvas'
-import { moveShape, scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
+import { moveShape, resizeShape, scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
 import { ZOOM_DEFAULT, ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from './camera'
 import styles from './page.module.css'
 
@@ -90,9 +90,22 @@ export default function GridEnginePage() {
   const [sizeMM, setSizeMM] = useState(162)
   const [sizeDraft, setSizeDraft] = useState('162')
 
+  /**
+   * ONE number for the shape's longest side, and it is the precision instrument: type an exact size
+   * or sweep the slider, and the picture follows. It also reads BACK from a handle drag, so the
+   * number on screen is always the shape's real size — never a stale fixture (law 5.3).
+   */
   const setSize = (next: number) => {
     setSizeMM(next)
     setSizeDraft(String(next))
+    setBox((b) => (b ? resizeShape(spec, b, next) : b))
+  }
+
+  /** A drag changed the shape; the readout follows it rather than the other way round. */
+  const syncSizeFromBox = (b: { w: number; h: number }) => {
+    const longest = Math.round(Math.max(b.w, b.h))
+    setSizeMM(longest)
+    setSizeDraft(String(longest))
   }
 
   const commitSize = () => {
@@ -128,6 +141,9 @@ export default function GridEnginePage() {
       const w = img.naturalWidth * k
       const h = img.naturalHeight * k
       setBox({ x: -w / 2, y: -h / 2, w, h })
+      const longest = Math.round(Math.max(w, h))
+      setSizeMM(longest)
+      setSizeDraft(String(longest))
     }
     img.src = url
   }, [])
@@ -182,7 +198,7 @@ export default function GridEnginePage() {
         <div className={styles.titleRow}>
           <span className={styles.title}>Grid engine</span>
           <span className={styles.readout}>
-            {sizeMM}mm
+            {box ? `${Math.round(box.w)} × ${Math.round(box.h)}mm` : `${sizeMM}mm`}
           </span>
         </div>
       </header>
@@ -271,7 +287,11 @@ export default function GridEnginePage() {
               onPointerMove={(e) => {
                 if (dragging) {
                   const origin = dragFrom.current
-                  if (origin) setBox(scaleShape(spec, origin, dragging, toMM(e)))
+                  if (origin) {
+                    const next = scaleShape(spec, origin, dragging, toMM(e))
+                    setBox(next)
+                    syncSizeFromBox(next)
+                  }
                   return
                 }
                 const from = panFrom.current
@@ -408,7 +428,7 @@ export default function GridEnginePage() {
         </details>
 
         <div className={styles.fixture}>
-          <span className={styles.fixtureName}>Test shape</span>
+          <span className={styles.fixtureName}>Size</span>
           <input
             className={styles.slider}
             type="range"

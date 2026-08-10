@@ -20,6 +20,7 @@ import {
   moveBoxBy,
   paddedFieldMM,
   registrationOffsetMM,
+  resizeBoxToLongest,
   scaleBoxFromHandle,
   summariseField,
   withMinimumSpan,
@@ -91,4 +92,9 @@ export function scaleShape(
 /** Drag a placed shape. Scaffolding — see the engine's note; the product never does this. */
 export function moveShape(box: RegionMM, deltaMM: PointMM): RegionMM {
   return moveBoxBy(box, deltaMM)
+}
+
+/** Drive the shape's longest side from a surface control. Scaffolding, like moveShape. */
+export function resizeShape(spec: GridSystemSpec, box: RegionMM, longestMM: number): RegionMM {
+  return resizeBoxToLongest(box, longestMM, cellDiameterMM(spec.grid))
 }

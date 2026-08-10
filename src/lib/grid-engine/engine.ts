@@ -227,3 +227,21 @@ export function scaleBoxFromHandle(
 export function moveBoxBy(box: RegionMM, deltaMM: PointMM): RegionMM {
   return { ...box, x: Math.round(box.x + deltaMM[0]), y: Math.round(box.y + deltaMM[1]) }
 }
+
+/**
+ * Set a shape's LONGEST side, keeping its proportions and its centre. Whole millimetres, like every
+ * other move (Dan, 2026-08-10: "scaling must be in increments of 1mm").
+ *
+ * The readout and the handles must agree — a surface that shows one number while the shape is
+ * another size is the stale-screen defect law 5.3 exists to prevent.
+ */
+export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: number): RegionMM {
+  if (box.w <= 0 || box.h <= 0) return box
+  const longest = Math.max(box.w, box.h)
+  const k = Math.max(minMM, Math.round(longestMM)) / longest
+  const w = box.w * k
+  const h = box.h * k
+  const cx = box.x + box.w / 2
+  const cy = box.y + box.h / 2
+  return { x: cx - w / 2, y: cy - h / 2, w, h }
+}
