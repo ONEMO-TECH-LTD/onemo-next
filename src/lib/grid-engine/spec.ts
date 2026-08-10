@@ -71,6 +71,17 @@ interface SolverSpec {
   scanSteps: number
   /** Bisection passes inside the interval the scan found, to land on the exact threshold. */
   refineSteps: number
+  /**
+   * How far a reflected boundary may land from the boundary — as a fraction of the shape's own
+   * radius — and still count as a mirror.
+   *
+   * A STATED DECISION, and the one number in the symmetry test. s62-meta measured the separation it
+   * sits in: an exact mirror scores 0.00000 (circle, square, five-point star) and a scalene triangle
+   * scores 0.01716. Anything inside that gap behaves identically on those fixtures; this is set an
+   * order of magnitude below the nearest asymmetric case so a genuinely lopsided shape is never read
+   * as symmetric. It is scale-free, so it does not change with the size of the shape.
+   */
+  mirrorMismatchMax: number
 }
 
 export interface GridSystemSpec {
@@ -190,6 +201,7 @@ export const RELEASED: GridSystemSpec = Object.freeze({
   solver: Object.freeze({
     scanSteps: 96,
     refineSteps: 28,
+    mirrorMismatchMax: 0.001,
   }),
 }) as GridSystemSpec
 

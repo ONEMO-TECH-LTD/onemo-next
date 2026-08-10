@@ -199,26 +199,67 @@ function populationCentroid(points: ReadonlyArray<PointMM>): PointMM {
 }
 
 /**
- * Is the population unchanged by reflection in the given axis through the origin?
+ * THE SHAPE'S OWN MIRROR AXES, at any angle.
  *
- * Exact: every magnet's mirror must also be a magnet. This is what rejects the bunched-into-one-lobe
- * layout — its mirror image is empty — and it is what accepts a 1-1-3 triangle, whose rows mirror
- * about the vertical even though the population is not symmetric top-to-bottom.
+ * The first version only ever examined the x and y axes, and s62-meta measured what that costs: a
+ * five-pointed star IS mirror-symmetric — five axes, the first at 54 degrees — and the test called
+ * it asymmetric, so law 3.1(a)'s symmetry binding was silently inert on it. The same held for any
+ * cut-out arriving at an arbitrary rotation, which is most of them. A false NEGATIVE, not the false
+ * positive I had been told to expect.
+ *
+ * A mirror axis passes through the centroid, so: reflect the boundary about a candidate angle and
+ * measure how far the reflected points land from the boundary. Zero is an exact mirror. Normalised
+ * by the shape's own radius, so it is scale-free and needs no tolerance to COMPUTE — which is what
+ * removed the old shapeTol, a geometric tolerance that had been derived from an iteration count.
+ *
+ * Finding the axes the shape actually has means a rotated cut-out is handled by construction, with
+ * no special case.
  */
-function mirrorsOnto(points: ReadonlyArray<PointMM>, axis: 'x' | 'y', tolMM: number): boolean {
-  return points.every(([x, y]) => {
-    const mx = axis === 'y' ? -x : x
-    const my = axis === 'x' ? -y : y
-    return points.some(([ax, ay]) => Math.hypot(ax - mx, ay - my) <= tolMM)
-  })
+function mirrorAxes(unit: OutlineMM, radius: number, spec: GridSystemSpec): number[] {
+  const axes: number[] = []
+  const steps = spec.solver.scanSteps
+  for (let i = 0; i < steps; i++) {
+    const a = (Math.PI * i) / steps
+    const cos2 = Math.cos(a + a)
+    const sin2 = Math.sin(a + a)
+    let total = 0
+    for (const [x, y] of unit) {
+      total += distanceToEdge(unit, cos2 * x + sin2 * y, sin2 * x - cos2 * y)
+    }
+    if (total / unit.length / radius <= spec.solver.mirrorMismatchMax && latticeCanMirror(a)) {
+      axes.push(a)
+    }
+  }
+  return axes
 }
 
-/** Does the outline itself mirror in that axis? Only then may the population be asked to. */
-function outlineMirrors(unit: OutlineMM, axis: 'x' | 'y', tolMM: number): boolean {
-  return unit.every(([x, y]) => {
-    const mx = axis === 'y' ? -x : x
-    const my = axis === 'x' ? -y : y
-    return signedDistanceMM(unit, mx, my) >= -tolMM
+/**
+ * Can the LATTICE be mirrored in this axis and land on itself?
+ *
+ * A population lives on a square lattice, so it can only be symmetric about an axis the lattice
+ * itself possesses — the multiples of 45 degrees. Asking for any other axis asks for something the
+ * grid cannot deliver at all: a circle has a mirror at every angle, and requiring a finite set of
+ * magnets to satisfy all of them returns no layout for any shape. A five-point star's axes sit at 54
+ * degrees, so its five-fold symmetry is simply not available on a four-fold grid — which is the same
+ * inherent limit s62-meta measured in its rotation figures, not a rule anyone chose.
+ *
+ * Tested exactly: the reflection matrix entries are 0 or +/-1 precisely on those axes.
+ */
+function latticeCanMirror(angle: number): boolean {
+  const cos2 = Math.cos(angle + angle)
+  const sin2 = Math.sin(angle + angle)
+  const onAxis = (v: number) => Math.abs(v) < Number.EPSILON || Math.abs(Math.abs(v) - 1) < Number.EPSILON
+  return onAxis(cos2) && onAxis(sin2)
+}
+
+/** Is the population unchanged by reflection in an axis at this angle through the shape's centre? */
+function mirrorsOnto(points: ReadonlyArray<PointMM>, angle: number, tolMM: number): boolean {
+  const cos2 = Math.cos(angle + angle)
+  const sin2 = Math.sin(angle + angle)
+  return points.every(([x, y]) => {
+    const mx = cos2 * x + sin2 * y
+    const my = sin2 * x - cos2 * y
+    return points.some(([ax, ay]) => Math.hypot(ax - mx, ay - my) <= tolMM)
   })
 }
 
@@ -243,7 +284,7 @@ interface Candidate {
 function balanced(
   spec: GridSystemSpec,
   unit: OutlineMM,
-  scale: number,
+  axes: ReadonlyArray<number>,
   magnets: ReadonlyArray<PointMM>,
 ): boolean {
   if (magnets.length === 0) return false
@@ -269,9 +310,8 @@ function balanced(
 
   // a magnet may land anywhere on the lattice, so two magnets "match" when they are the same magnet
   const same = spec.grid.pitchMM / 2
-  const shapeTol = Math.max(...unit.map(([x, y]) => Math.hypot(x, y))) / spec.solver.scanSteps
-  for (const axis of ['x', 'y'] as const) {
-    if (outlineMirrors(unit, axis, shapeTol) && !mirrorsOnto(magnets, axis, same)) return false
+  for (const angle of axes) {
+    if (!mirrorsOnto(magnets, angle, same)) return false
   }
   return true
 }
@@ -338,11 +378,13 @@ export function solveLayout(spec: GridSystemSpec, outline: OutlineMM): Layout | 
   const maxScale = spec.grid.maxSizeMM / (radius + radius)
   if (maxScale <= minScale) return null
 
+  const axes = mirrorAxes(unit, radius, spec)
+
   let best: { candidate: Candidate; registration: Layout['registration'] } | null = null
   for (const regX of ['point', 'gap'] as const) {
     for (const regY of ['point', 'gap'] as const) {
       for (const candidate of candidatesFor(spec, unit, radius, regX, regY, minScale, maxScale)) {
-        if (!balanced(spec, unit, candidate.scale, candidate.magnets)) continue
+        if (!balanced(spec, unit, axes, candidate.magnets)) continue
         if (best === null || candidate.scale < best.candidate.scale) {
           best = { candidate, registration: { x: regX, y: regY } }
         }
