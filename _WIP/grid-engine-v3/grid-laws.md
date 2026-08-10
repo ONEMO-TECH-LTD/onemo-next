@@ -493,6 +493,24 @@ would be five per axis, which is band 5.)*
 **Round outlines stay off the cell** by the √2 of the diagonal (91.88mm = 3.83 cells) — correct, and
 already covered by 12.3a.
 
+**10.6b — THE CELL IS 12x12mm. A MAGNET IS 4 CELLS. THE CENTRE POSITION ALWAYS EXISTS — IT IS SIZE 1.**
+*DAN, 08-10, verbatim:*
+> "the center magnit you were referring to is actually hypothetically possible because we are centering
+> to the canvas 4x48mm - it centers always to that but we have size 1 which is invisible and it is in
+> the center of the canvas i suppose regardless the cell is actually 12x12 not really 24 - 24 is 4 x12mm
+> - just adding this to the atomic logic and if size 1 exist it consists of 4 atoms"
+
+- **The cell is 12 x 12mm.** That is the atom.
+- **A magnet's 24mm spot is 4 cells** — a 2 x 2 block of atoms.
+- **Size 1 is one magnet = 4 atoms**, sitting at the centre of the canvas, and it is silent (10.7).
+
+**This resolves the centre question without a "middle cell".** Centring is to the canvas, and the centre
+position always exists — it is size 1. Whether a magnet is *shown* there is 9.2 per band: bands 2 and 4
+show none at the centre, band 3 shows one. Size 1 is the position at the centre that is never offered.
+
+*ARITHMETIC ONLY, following from the above — not a further ruling:* the 48mm pitch is 4 cells across and
+the 24mm spot is 2 cells across.
+
 **10.7 — Size 1 is silent.** *DAN, 08-10*
 > "silent size is number 1 it can be coded in too we just not gonna show it in the ui selector or default
 > minimum untill product eveolves to need it"
