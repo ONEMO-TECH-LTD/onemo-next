@@ -213,7 +213,7 @@ Each of these has been in the build and been removed. They are listed so they ar
 | Forbidden | Why |
 |---|---|
 | any size input — cap, target, range, test size | §12.1 |
-| `maxSizeMM` in the spec | §12.1 — the ceiling is a grid count |
+| a size input reaching the UNIT | §12.1 — the shell's own test size is not one (§12.1a) |
 | a tolerance of any kind | §10.4 — exact sizing, nothing to soften the clearance |
 | a view concept reaching engine arithmetic | §8.3 — zoom once moved the lattice 24mm |
 | a registration default set by anyone | §6.5 — it is the engine's answer per shape |

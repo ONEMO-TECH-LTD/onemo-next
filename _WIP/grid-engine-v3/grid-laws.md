@@ -60,6 +60,32 @@ cut-out's proportions are part of its identity and are never altered — width a
 independently adjustable. *(This is the exact defect measured in the old engine, where a circle, a
 3:1 oval and an 8:1 sliver all returned the identical ladder.)*
 
+**2.1a — THE SHAPE IS UNTOUCHABLE. Nothing is ever shrunk, eroded, offset or redrawn.** *DAN, 08-10,
+stated three times in fifteen minutes because the engine kept implying otherwise:*
+> "we are not shrinking anything we are scaling proportionately and we start at bands as i asked already
+> as fine tune steps use scaling and other methodologies we discussed"
+>
+> "this was ale=ways the case and repeated it many times "The shape is untouchable. The user's outline
+> and its proportions are locked. We never deform it, never stretch it, never redraw it. The only thing
+> we ever do to it is scale it up or down, aspect locked.""
+>
+> "locked proportions only scaling  was repeated 100 times today"
+
+**And on the internal restatement that caused the confusion** — *DAN, 08-10:*
+> "what is erroded region and what is it for precisely i still do not understand the purpose of the
+> clipper - we filtered clear methodology simple - we need to place magnets - clipper is svg powered
+> engine for drawing the shapes - we are not drawing the shapes here what is it for?"
+
+**Padding is an ENLARGEMENT OF THE MAGNET, never a reduction of the shape.** Each magnet centre carries
+a 12mm safe radius, so it occupies a 24mm disc that must sit wholly on fabric (10.6, 11.1). The
+equivalent phrasing — "a 12mm no-go band just inside the outline where no magnet centre may sit" — is
+the *same rule seen from the shape's side*, and is an internal convenience only.
+
+**No such curve is ever drawn, exported, manufactured or handed to a drawing library.** Constructing it
+as a polygon is what produced the two-boundaries defect: candidates generated from an approximated curve,
+scored against exact distance. **The hold test is the exact distance from the node to the outline
+(11.1). Nothing else is required, and nothing may modify the outline.**
+
 **2.2 — Optimal is tight: no breathing space between the magnet cells and the edge.** *DAN, 08-10*
 > "star encapsulates 2x2 grid with breathing space to the edges - this is fine but not optimal" ·
 > "look how close the edges of shape to gug the grid 2x2 - so in that case close to optimal is 162mm"
@@ -188,6 +214,42 @@ Both verdict lines are mandatory — necessity ("no unnecessary elements" / "shr
 rule says a **layout** should be four-point-centred; that is a layout the engine SELECTS, not the
 grid's standing state. Promoting a selection to a default is a scope decision, and it is Dan's.)*
 A layout the engine should choose may never be promoted to the system's standing state.
+
+**6.6 — Formulas are defended and proven BEFORE any code exists.** *DAN, 08-10*
+> "We need to create and defend formulas and prove them on real test before we build anything it is pure
+> match and geometry and arithmetic"
+
+**6.7 — Nothing is approximated or invented where real maths or working code exists.** *DAN, 08-10*
+> "i dont want you approximating it if we have the read math to copy or ready code somewhere that is
+> working - no vibe coding or approximating - unless it is planned and a necessity"
+
+An approximation is permitted only when it is **planned, named as a necessity, and stated** — never
+introduced silently, and never described as exact. *(Measured instance: an approximated boundary was
+labelled "the complete event set" and lost the canonical 2x2.)*
+
+**6.8 — The lane does its own research. A sub-agent is an extra, never the source.** *DAN, 08-10*
+> "i suggest research is done by you diligently and subagent is independent extra"
+
+**6.9 — The basic geometries are NOT the work.** *DAN, 08-10, naming it as drift:*
+> "and again the geometric shapes are static - we precalculate them easy - we need robust freeshape
+> algorithm we keep talking about problems of the basic shapes and it is drifting into the opposite
+> direction"
+
+Squares and circles are static and precalculated. **A defect found only on a circle or a square is not
+a blocking defect** — at a band size those outlines are exactly tangent to their magnets by construction,
+so their placement window is near-zero (measured: 0.059mm for the 92mm circle, exactly zero for the 72mm
+square) and they are the least representative case in the system. *(This law was breached by QA and by
+the builder simultaneously, for over an hour, on the 92mm circle.)*
+
+**6.10 — Internal tests are not the test. Nothing is proven until a real cut-out is on screen.**
+*DAN, 08-10*
+> "your internal tests are fine but we need to test on the real thing - we need to wire cutout lab to
+> generate the shape and see how the shape is covered essentially unless we do that all is good theory"
+>
+> "We must test on odd random blobs and outlines ideally"
+
+Synthetic fixtures are a proxy and are named as such. The gate is a real traced contour, its magnets
+visible, judged by eye against what Dan would have done by hand.
 
 ---
 
@@ -431,9 +493,25 @@ always name what set the size.
 >
 > "there cannot be fail sizes it is not possible from the algorithm"
 
-There is no cap, target, range or test size anywhere in the unit. A shape is never "too small" — it scales
-until it holds. **Retires `maxSizeMM` from the spec and the size control from the shell.** *(Same defect
-class as 10.3/10.4: a number constraining the answer without deriving from the shape or the grid.)*
+There is no cap, target, range or test size **inside the unit**. A shape is never "too small" — it scales
+until it holds. *(Same defect class as 10.3/10.4: a number constraining the answer without deriving from
+the shape or the grid.)*
+
+**12.1a — This law binds the UNIT, not the admin shell. The ceiling and the admin size control are
+correct.** *DAN, 08-10, ruling directly against a QA finding:*
+> "these two are not slop they are correct - we just edit 10mm to 12mm it is not such problems as you
+> theatrically state"
+
+**Strikes the earlier derived clause**, which read *"Retires `maxSizeMM` from the spec and the size
+control from the shell."* That was an inference, never Dan's ruling, and it contradicts 12.3 and 10.7:
+
+- **`maxSizeMM` IS the ceiling of 12.3** — Dan's 9x9 cap, currently written in millimetres. The work is
+  to express it as a **count**, never to delete it.
+- **The admin shell is explicitly NOT the unit** (§1.1 — "scaffolding so you can test. It does not
+  ship"). A test-size field on the scaffolding is not a size input to the engine.
+
+*(Recorded because the struck clause produced the same false finding repeatedly, from more than one
+reviewer. A derived consequence may never outrank the ruling it was derived from.)*
 
 **12.2 — Size is the OUTPUT.** *DAN, 08-10*
 > "Size is final value we manufacture form as dimension of the shape with locked aspect"
@@ -463,6 +541,58 @@ per-rung fudge (4.12 / 8.24 / 0.35mm) — a lookup table, forbidden by 4.1.**
 **12.4 — The handle steps the ladder; it does not set a size.** *DERIVED from 12.1, 12.2*
 Dragging picks which arrangement, and the size is whatever that arrangement costs. A size that is not an
 engine output cannot be reached, because no such position exists.
+
+---
+
+## 13 · THE METHOD — the product, end to end
+
+**13.1 — THE METHOD, in Dan's own sentence.** *DAN, 08-10, verbatim:*
+> "the method is > user defines locked shape > our grid engine under the hood produces the best sizing in
+> the chosen band range > we tell user the size of the shape exactly on this basis but we need to be dead
+> sure 100% mathematical certainty - so we do not change shapes for user we do not deform it sets the
+> band we scale up or down to match the shape locked proportions to the grid band"
+
+Read as a contract:
+
+| | |
+|---|---|
+| **the user gives** | a locked outline — form only, proportions fixed |
+| **the engine gives** | the size to manufacture, and where the magnets sit |
+| **the engine never** | deforms, stretches, redraws or reshapes anything (2.1a) |
+| **the only transform** | scale up or down, aspect locked (2.1) |
+| **the standard** | 100% mathematical certainty — not "close", not sampled, not tuned |
+
+**13.2 — ORDER OF OPERATIONS.** *DAN, 08-10, verbatim:*
+> "the band is auto determined by the bounding box first  > after that we need placement with engine
+> providing the coordinates"
+
+1. **Band** — read off the shape's bounding box. Not chosen by a person, not searched for.
+2. **Placement** — the engine returns the magnet coordinates.
+3. **Size** — what that match measures, published under 12.2 and rounded under 12.3a.
+
+**13.3 — The band is the STARTING POINT, and scaling fine-tunes from it.** *DAN, 08-10:*
+> "we dont need to start with no size we defined our size bands already so the bounding box of the shape
+> can be approximated at the starting point to classic size for example with the longest box side equal
+> 96mm+24mm yeah? and after that the algorithm can just gne tune using the candidate algorithm or mirror
+> (correctly formulated) and scale the shape to cover the grid"
+
+**Both halves are binding.** Seeding at a band without the scaling step leaves a shape sitting at an
+arbitrary size, which is how "band 2 holds nothing" appears — a fail size, forbidden by 12.1.
+
+**13.4 — HOW THE BUILD IS JUDGED.** *DAN, 08-10, the build directive, verbatim:*
+> "build the algorithm for the engine and test it - use /o-necessity and /o-deslop and remember to apply
+> our laws and decisions so you do not drift in the 102 time to measure against sizes and measure against
+> coverage and symetry balance - test each band 2/3/4 --- no vibecoding on assumptions - consult the
+> sources read the code and math text books and articles describing the metod and follow precise
+> theory/formulas and methodology."
+
+- **Measured on coverage and symmetry balance. Never on sizes.** No millimetre appears in a verdict.
+- **Every band — 2, 3 and 4 — is tested and reported.**
+- **Both necessity lines are required** (6.3), and the method is sourced (6.7), researched by the lane
+  (6.8), on real shapes (6.10).
+- **Precedence, from 3.1:** balance leads. Dan's own sentence makes coverage its consequence, not its
+  rival — *"centering and balancing **so there is no flap** and assymetric free uncovered by magnets
+  surface"*. A ranking that leaves either measure unable to decide fails this clause.
 
 ---
 

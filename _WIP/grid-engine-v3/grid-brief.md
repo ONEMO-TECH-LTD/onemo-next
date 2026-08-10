@@ -472,3 +472,105 @@ require a per-rung fudge (4.12mm, 8.24mm, 0.35mm...), which is a lookup table an
 *Applied: `paddingMM: 12` in the released spec; law 10.6 records the atom and the measured cost (~18% of
 magnet positions on free shapes, +4mm on every size); law 10.7 records silent size 1. The pair's own numbers
 move with it — minimum 24mm thick and 72mm tall, capturing a 24mm circle. The rule itself is unchanged.*
+
+---
+
+## 2026-08-10 · GAP FILL — 16:20 to 18:51
+*Logged 2026-08-10 by @s62-lead (QA). These directives were given but never written down; the books
+stopped at 17:31 while the build ran on. Verbatim, in timestamp order.*
+
+### Method discipline — prove before building
+
+**16:20 — formulas are defended and proven before any code:**
+> "We need to create and defend formulas and prove them on real test before we build anything it is
+> pure match and geometry and arithmetic"
+
+**16:31 — the only test that counts:**
+> "We must test on odd random blobs and outlines ideally"
+
+**17:26 — no invention where real maths or working code exists:**
+> "is there like clear formula to copy or what - i dont want you approximating it if we have the read
+> math to copy or ready code somewhere that is working - no vibe coding or approximating - unless it is
+> planned and a necessity - what is the situation ? and wheter our own logic needs to be added to that
+> like mirror ideas and grid-powered size bands?"
+
+**17:41 — research is the lane's own work:**
+> "i suggest research is done by you diligently and subagent is independent extra"
+
+### Scope — the basic geometries are not the problem
+
+**17:06 — stated as drift in the opposite direction:**
+> "and again the geometric shapes are static - we precalculate them easy - we need robust freeshape
+> algorithm we keep talking about problems of the basic shapes and it is drifting into the opposite
+> direction"
+
+### The bands as the starting point
+
+**17:16 — seed from the bounding box, then fine-tune by scaling:**
+> "one thing i just realised we dont need to start with no size we defined our size bands already so the
+> bounding box of the shape can be approximated at the starting point to classic size for example with
+> the longest box side equal 96mm+24mm yeah? and after that the algorithm can just gne tune using the
+> candidate algorithm or mirror (correctly formulated) and scale the shape to cover the grid"
+
+### THE BUILD DIRECTIVE
+
+**17:37 — the goal, and the acceptance criteria:**
+> "ok now lets build the algorithm for the engine and test it - use /o-necessity and /o-deslop and
+> remember to apply our laws and decisions so you do not drift in the 102 time to measure against sizes
+> and measure against coverage and symetry balance - test each band 2/3/4"
+
+*(restated at 17:38 with: "no vibecoding on assumptions - consult the sources read the code and math
+text books and articles describing the metod and follow precise theory/formulas and methodology.")*
+
+### Nothing is real until it is on the real thing
+
+**18:15 — internal tests are not the test:**
+> "ok what did you build just the engine compute? your internal tests are fine but we need to test on
+> the real thing - we need to wire cutout lab to generate the shape and see how the shape is covered
+> essentially unless we do that all is good theory"
+
+### The shape is never altered — challenged three times
+
+**18:29 — on the erosion and the drawing library:**
+> "what is erroded region and what is it for precisely i still do not understand the purpose of the
+> clipper - we filtered clear methodology simple - we need to place magnets - clipper is svg powered
+> engine for drawing the shapes - we are not drawing the shapes here what is it for?
+>
+> your reporting is mumbling with jargon - once again what is exact role and necessity for each ?"
+
+**18:32:**
+> "we are not shrinking anything we are scaling proportionately and we start at bands as i asked already
+> as fine tune steps use scaling and other methodologies we discussed"
+
+**18:38 — and it is not new:**
+> "this was ale=ways the case and repeated it many times " Clear, and let me say it back exactly so
+> there's no drift: The shape is untouchable. The user's outline and its proportions are locked. We never
+> deform it, never stretch it, never redraw it. The only thing we ever do to it is scale it up or down,
+> aspect locked.""
+
+**18:39:**
+> "locked proportions only scaling  was repeated 100 times today"
+
+### THE METHOD, end to end
+
+**18:37 — the product, stated in one sentence:**
+> "ok just to be clear - the method is > user defines locked shape > our grid engine under the hood
+> produces the best sizing in the chosen band range > we tell user the size of the shape exactly on this
+> basis but we need to be dead sure 100% mathematical certainty - so we do not change shapes for user we
+> do not deform it sets the band we scale up or down to match the shape locked proportions to the grid
+> band"
+
+**18:38 — the order of operations:**
+> "the band is auto determined by the bounding box first  > after that we need placement with engine
+> providing the coordinates"
+
+### The ceiling and the admin size control are correct
+
+**18:51 — ruling against a QA claim that they broke law 12.1:**
+> "these two are not slop they are correct - we just edit 10mm to 12mm it is not such problems as you
+> theatrically state"
+
+*(Context: the pre-build state was reported as breaching law 12.1 by carrying `maxSizeMM` and a size
+control in the admin shell. Dan ruled otherwise. The ceiling is his 9x9 grid cap of law 12.3, and the
+shell is admin scaffolding, not the unit. The derived clause in 12.1 that said to retire them is struck
+— see law 12.1a.)*
