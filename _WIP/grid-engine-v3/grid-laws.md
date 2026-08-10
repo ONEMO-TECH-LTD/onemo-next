@@ -450,6 +450,33 @@ the spot is **24mm** — exactly half the 48mm pitch.
 - The atom does **not** reach round outlines — the diagonal carries the √2, so circles land on 92 / 160 / 228.
   That is correct, not a compromise (see 12.3a).
 
+**10.6a — THE CELL IS THE MODULE. The frame is integer arithmetic, not floating point.** *DAN, 08-10:*
+> "we moved to 12mm even to create each magnet as grid cell that matches the steps of the grid - 24mm
+> two cells create 48mm single 4 point square no gaps it is Lego essentially"
+
+12mm padding makes each magnet a **24mm cell**, and the 48mm pitch is **exactly two cells**. Verified:
+
+```
+band   span      in cells    magnets occupy cells
+  2     72mm   =  3 cells        1, 3
+  3    120mm   =  5 cells        1, 3, 5
+  4    168mm   =  7 cells        1, 3, 5, 7
+  5    216mm   =  9 cells        1, 3, 5, 7, 9
+```
+
+Every band is an **odd** number of cells — `span = 24·(2n−1)` — so a middle cell always exists, the
+centre lines of 3.1e fall on it, and magnets occupy **alternate cells**. **Registration is therefore not
+computed at all: it is which cells are occupied** (9.2 restated in whole units).
+
+**This removes the floating-point failure class from the frame.** *(Measured instance: the defect that
+lost the canonical 2x2 was a magnet clearing by 0.007mm — a float knife-edge. In cell units there is no
+margin to be on the wrong side of: three cells, magnets at one and three.)* The outline remains
+continuous, so the hold test still measures true distance (11.1) — but the band, the magnet positions
+and the registration are integers.
+
+**Round outlines stay off the cell** by the √2 of the diagonal (91.88mm = 3.83 cells) — correct, and
+already covered by 12.3a.
+
 **10.7 — Size 1 is silent.** *DAN, 08-10*
 > "silent size is number 1 it can be coded in too we just not gonna show it in the ui selector or default
 > minimum untill product eveolves to need it"
