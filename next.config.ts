@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(process.env.FTC_FIDELITY_CAPTURE === "1" ? { devIndicators: false } : {}),
   // This repository carries required webpack aliases below, so development and production must run
   // the same bundler. Allow the loopback hostname used by local browser probes to hydrate normally.
   allowedDevOrigins: ["127.0.0.1"],
