@@ -18,7 +18,6 @@ import {
   cellDiameterMM,
   magnetsInRegion,
   paddedFieldMM,
-  publishedSizeMM,
   registrationOffsetMM,
   summariseField,
   withMinimumSpan,
@@ -26,7 +25,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { solveLayout, type Layout, type OutlineMM } from './solve'
+import { publishedSizeMM, solveLayout, type Layout, type OutlineMM } from './solve'
 import type { GridSystemSpec } from './spec'
 
 export type { FieldSummary, PointMM, RegionMM, Layout, OutlineMM }
@@ -58,14 +57,18 @@ export interface PublishedLayout extends Layout {
   publishedMM: number
 }
 
-export function publish(layout: Layout): PublishedLayout {
-  return { ...layout, publishedMM: publishedSizeMM(layout.sizeMM) }
+export function publish(
+  spec: GridSystemSpec,
+  outline: OutlineMM,
+  layout: Layout,
+): PublishedLayout {
+  return { ...layout, publishedMM: publishedSizeMM(spec, outline, layout) }
 }
 
 /** A shape in, a published layout out — the whole unit behind one call. */
 export function solveShape(spec: GridSystemSpec, outline: OutlineMM): PublishedLayout | null {
   const layout = solveLayout(spec, outline)
-  return layout === null ? null : publish(layout)
+  return layout === null ? null : publish(spec, outline, layout)
 }
 
 /** Drive the unit: values out of the spec, geometry out of the engine, one call. */

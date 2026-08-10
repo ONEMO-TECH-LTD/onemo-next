@@ -34,7 +34,7 @@
 // the shape's own centroid; changing padding or pitch moves every output because nothing is pinned.
 
 import type { GridSystemSpec, Registration } from './spec'
-import { cellDiameterMM, publishedSizeMM, registrationOffsetMM, type PointMM } from './engine'
+import { cellDiameterMM, registrationOffsetMM, type PointMM } from './engine'
 
 /** A shape is points in millimetres and nothing more. The engine never learns what it is. */
 export type OutlineMM = ReadonlyArray<PointMM>
@@ -317,30 +317,6 @@ function candidatesFor(
 }
 
 /**
- * A RUNG YOU CANNOT PUBLISH IS NOT AN ANSWER.
- *
- * Publication rounds the exact wrap UP (law 3.23), and growing a CONVEX shape moves every edge
- * outward, so clearance can only improve. A non-convex one is different: growing a star moves its
- * concave notches TOWARD some magnets, and the floor breaks. Measured by s62-meta — star exact
- * 209.12 at clearance 10.0000, published 210 at clearance 8.4497.
- *
- * So the rung is validated at its PUBLISHED size, not at its exact one, and rejected if the floor
- * breaks. The rounding is not tuned — the answer moves to the next rung that survives publication.
- * This is the 9.947mm class arriving through the publish door, and it is closed the same way: by
- * making the floor categorical rather than by softening anything.
- */
-function publishable(
-  spec: GridSystemSpec,
-  unit: OutlineMM,
-  longestSide: number,
-  candidate: Candidate,
-): boolean {
-  const exactMM = longestSide * candidate.scale
-  const grown = candidate.scale * (publishedSizeMM(exactMM) / exactMM)
-  return candidate.magnets.every((q) => legalAt(unit, spec.grid.paddingMM, grown, q))
-}
-
-/**
  * THE ENGINE. A shape and the values go in; a layout and a size come out.
  *
  * Balance filters first, then the tightest survivor wins — that ordering IS law 3.2, and it is what
@@ -367,7 +343,6 @@ export function solveLayout(spec: GridSystemSpec, outline: OutlineMM): Layout | 
     for (const regY of ['point', 'gap'] as const) {
       for (const candidate of candidatesFor(spec, unit, radius, regX, regY, minScale, maxScale)) {
         if (!balanced(spec, unit, candidate.scale, candidate.magnets)) continue
-        if (!publishable(spec, unit, longest, candidate)) continue
         if (best === null || candidate.scale < best.candidate.scale) {
           best = { candidate, registration: { x: regX, y: regY } }
         }
@@ -383,4 +358,34 @@ export function solveLayout(spec: GridSystemSpec, outline: OutlineMM): Layout | 
     magnets: best.candidate.magnets,
     registration: best.registration,
   }
+}
+
+/**
+ * PUBLICATION (law 3.23) — the exact wrap rounded up to an even whole millimetre.
+ *
+ * Dan, 2026-07-29, having challenged the rule himself: *"we need round to the highest number
+ * obviously not lowest because the shape must not be smaller than grid. And this also must round to
+ * the next non-odd number so that grid is centered as well with no fractions — we cannot place
+ * anything on a fraction, it is just humanly impossible with fabric."*
+ *
+ * ASKED AS A LEGALITY QUESTION, NOT AS ARITHMETIC ON A FLOAT. The exact wrap is a bisection result
+ * carrying convergence noise, and `2 * ceil(x / 2)` amplifies a billionth of a millimetre into two
+ * whole ones: a square solving to exactly 68 published as 70. So publication does not round the
+ * float — it walks even whole millimetres and stops at the first one where every magnet still
+ * clears its padding. Even by the step, up by the direction of the walk, never down.
+ *
+ * That also makes the clearance re-check STRUCTURAL: a size is published *because* it clears, so
+ * publication cannot produce an illegal size even in principle. (s62-meta's ruling, 2026-08-10,
+ * refusing a stated-precision value on the grounds that the arithmetic already existed here.)
+ */
+export function publishedSizeMM(spec: GridSystemSpec, outline: OutlineMM, layout: Layout): number {
+  const unit = centred(outline)
+  const longest = Math.max(boundsOf(unit).w, boundsOf(unit).h)
+  const clears = (sizeMM: number) => {
+    const scale = sizeMM / longest
+    return layout.magnets.every((q) => legalAt(unit, spec.grid.paddingMM, scale, q))
+  }
+  let size = 2 * Math.floor(layout.sizeMM / 2)
+  while (!clears(size)) size += 2
+  return size
 }

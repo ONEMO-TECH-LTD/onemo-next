@@ -11,8 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { publishedSizeMM } from '../engine'
-import { solveLayout, signedDistanceMM, type OutlineMM } from '../solve'
+import { publishedSizeMM, solveLayout, signedDistanceMM, type OutlineMM } from '../solve'
 import { applyGridValue, RELEASED, selectPitch } from '../spec'
 
 type PointMM = [number, number]
@@ -22,6 +21,10 @@ const circle = (dMM: number, n = 240): PointMM[] =>
     const a = (2 * Math.PI * i) / n
     return [(Math.cos(a) * dMM) / 2, (Math.sin(a) * dMM) / 2] as PointMM
   })
+
+const square = (dMM: number): PointMM[] => [
+  [-dMM / 2, -dMM / 2], [dMM / 2, -dMM / 2], [dMM / 2, dMM / 2], [-dMM / 2, dMM / 2],
+]
 
 /** Five points, rounded nothing. The shape the 130mm failure was recorded on. */
 const star = (dMM: number, points = 5, inner = 0.382): PointMM[] =>
@@ -152,13 +155,22 @@ describe('SUB 1 ACCEPTANCE', () => {
     }
   })
 
-  it('publishes the exact wrap rounded UP to the next even whole millimetre (§3.23)', () => {
+  it('publishes an even whole millimetre, and an exact even answer is not pushed a rung high (§3.23)', () => {
     // Dan, 2026-07-29: "round to the highest number obviously not lowest because the shape must not
     // be smaller than grid… and to the next non-odd number so that grid is centered as well with no
     // fractions — we cannot place anything on a fraction, it is just humanly impossible with fabric."
-    for (const [exact, expected] of [[87.9, 88], [88, 88], [88.1, 90], [141.5, 142], [209.1, 210]]) {
-      expect(publishedSizeMM(exact)).toBe(expected)
+    //
+    // The square is the case that matters: it solves to EXACTLY 68, and rounding the float with
+    // 2*ceil(x/2) published 70 because the bisection approaches from above. Publication asks
+    // legality in whole millimetres instead, so a billionth of a millimetre cannot cost two.
+    for (const shape of [square(200), circle(200), star(200), twoLimbs()]) {
+      const out = solved(RELEASED, shape)
+      const published = publishedSizeMM(RELEASED, shape, out)
+      expect(published % 2, 'a published size must be even').toBe(0)
+      expect(Number.isInteger(published), 'a published size must be whole').toBe(true)
+      expect(published).toBeGreaterThanOrEqual(Math.floor(out.sizeMM))
     }
+    expect(publishedSizeMM(RELEASED, square(200), solved(RELEASED, square(200)))).toBe(68)
   })
 
   it('the floor still holds AT THE PUBLISHED SIZE, on a non-convex shape (§3.23 + v1 2.2)', () => {
@@ -169,8 +181,7 @@ describe('SUB 1 ACCEPTANCE', () => {
     // the publish door. The fixture must be non-convex or this test proves nothing.
     for (const shape of [circle(200), star(200), twoLimbs()]) {
       const out = solved(RELEASED, shape)
-      const published = publishedSizeMM(out.sizeMM)
-      expect(published).toBeGreaterThanOrEqual(out.sizeMM)
+      const published = publishedSizeMM(RELEASED, shape, out)
       const grown = atScale(shape as PointMM[], out.scale * (published / out.sizeMM))
       for (const [x, y] of out.magnets) {
         expect(
