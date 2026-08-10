@@ -34,7 +34,7 @@
 // the shape's own centroid; changing padding or pitch moves every output because nothing is pinned.
 
 import type { GridSystemSpec, Registration } from './spec'
-import { cellDiameterMM, registrationOffsetMM, type PointMM } from './engine'
+import { cellDiameterMM, publishedSizeMM, registrationOffsetMM, type PointMM } from './engine'
 
 /** A shape is points in millimetres and nothing more. The engine never learns what it is. */
 export type OutlineMM = ReadonlyArray<PointMM>
@@ -317,6 +317,30 @@ function candidatesFor(
 }
 
 /**
+ * A RUNG YOU CANNOT PUBLISH IS NOT AN ANSWER.
+ *
+ * Publication rounds the exact wrap UP (law 3.23), and growing a CONVEX shape moves every edge
+ * outward, so clearance can only improve. A non-convex one is different: growing a star moves its
+ * concave notches TOWARD some magnets, and the floor breaks. Measured by s62-meta — star exact
+ * 209.12 at clearance 10.0000, published 210 at clearance 8.4497.
+ *
+ * So the rung is validated at its PUBLISHED size, not at its exact one, and rejected if the floor
+ * breaks. The rounding is not tuned — the answer moves to the next rung that survives publication.
+ * This is the 9.947mm class arriving through the publish door, and it is closed the same way: by
+ * making the floor categorical rather than by softening anything.
+ */
+function publishable(
+  spec: GridSystemSpec,
+  unit: OutlineMM,
+  longestSide: number,
+  candidate: Candidate,
+): boolean {
+  const exactMM = longestSide * candidate.scale
+  const grown = candidate.scale * (publishedSizeMM(exactMM) / exactMM)
+  return candidate.magnets.every((q) => legalAt(unit, spec.grid.paddingMM, grown, q))
+}
+
+/**
  * THE ENGINE. A shape and the values go in; a layout and a size come out.
  *
  * Balance filters first, then the tightest survivor wins — that ordering IS law 3.2, and it is what
@@ -333,6 +357,7 @@ export function solveLayout(spec: GridSystemSpec, outline: OutlineMM): Layout | 
   const radius = Math.max(...unit.map(([x, y]) => Math.hypot(x, y)))
   if (radius <= 0) return null
 
+  const longest = Math.max(boundsOf(unit).w, boundsOf(unit).h)
   const minScale = (cellDiameterMM(spec.grid) + spec.grid.paddingMM) / radius
   const maxScale = spec.grid.maxSizeMM / (radius + radius)
   if (maxScale <= minScale) return null
@@ -342,6 +367,7 @@ export function solveLayout(spec: GridSystemSpec, outline: OutlineMM): Layout | 
     for (const regY of ['point', 'gap'] as const) {
       for (const candidate of candidatesFor(spec, unit, radius, regX, regY, minScale, maxScale)) {
         if (!balanced(spec, unit, candidate.scale, candidate.magnets)) continue
+        if (!publishable(spec, unit, longest, candidate)) continue
         if (best === null || candidate.scale < best.candidate.scale) {
           best = { candidate, registration: { x: regX, y: regY } }
         }
@@ -351,9 +377,8 @@ export function solveLayout(spec: GridSystemSpec, outline: OutlineMM): Layout | 
   }
   if (best === null) return null
 
-  const base = boundsOf(unit)
   return {
-    sizeMM: Math.max(base.w, base.h) * best.candidate.scale,
+    sizeMM: longest * best.candidate.scale,
     scale: best.candidate.scale,
     magnets: best.candidate.magnets,
     registration: best.registration,

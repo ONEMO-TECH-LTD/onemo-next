@@ -161,15 +161,23 @@ describe('SUB 1 ACCEPTANCE', () => {
     }
   })
 
-  it('publication can only improve clearance, never break the padding floor (§3.23 + v1 2.2)', () => {
-    // Asserted, not assumed. A publication that shrank the shape would be the 9.947mm class coming
-    // back through a different door.
-    const out = solved(RELEASED, circle(200))
-    const published = publishedSizeMM(out.sizeMM)
-    expect(published).toBeGreaterThanOrEqual(out.sizeMM)
-    const grown = atScale(circle(200), out.scale * (published / out.sizeMM))
-    for (const [x, y] of out.magnets) {
-      expect(signedDistanceMM(grown, x, y)).toBeGreaterThanOrEqual(RELEASED.grid.paddingMM)
+  it('the floor still holds AT THE PUBLISHED SIZE, on a non-convex shape (§3.23 + v1 2.2)', () => {
+    // My first version of this only tested a CIRCLE, and a circle cannot fail it: growing a convex
+    // shape moves every edge outward, so clearance only improves. s62-meta measured the real case —
+    // star exact 209.12 at clearance 10.0000, published 210 at clearance 8.4497 — because growing a
+    // star moves its concave notches TOWARD the magnets. That is the 9.947mm class arriving through
+    // the publish door. The fixture must be non-convex or this test proves nothing.
+    for (const shape of [circle(200), star(200), twoLimbs()]) {
+      const out = solved(RELEASED, shape)
+      const published = publishedSizeMM(out.sizeMM)
+      expect(published).toBeGreaterThanOrEqual(out.sizeMM)
+      const grown = atScale(shape as PointMM[], out.scale * (published / out.sizeMM))
+      for (const [x, y] of out.magnets) {
+        expect(
+          signedDistanceMM(grown, x, y),
+          `clearance broke at the published size on a ${shape.length}-point outline`,
+        ).toBeGreaterThanOrEqual(RELEASED.grid.paddingMM)
+      }
     }
   })
 
