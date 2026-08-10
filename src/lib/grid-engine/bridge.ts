@@ -19,9 +19,11 @@ import {
   magnetsInRegion,
   paddedFieldMM,
   registrationOffsetMM,
+  scaleBoxFromHandle,
   summariseField,
   withMinimumSpan,
   type FieldSummary,
+  type HandleId,
   type PointMM,
   type RegionMM,
 } from './engine'
@@ -67,4 +69,20 @@ export function describeRegion(
   region: RegionMM,
 ): FieldSummary {
   return summariseField(spec.grid, region, layout.magnets)
+}
+
+export type { HandleId } from './engine'
+
+/**
+ * Drive a scale from the surface. The shell reports which grip moved and where the pointer is, in
+ * millimetres; the engine decides the box. No arithmetic happens on this side of the door.
+ */
+export function scaleShape(
+  spec: GridSystemSpec,
+  box: RegionMM,
+  handle: HandleId,
+  pointerMM: PointMM,
+): RegionMM {
+  // The floor is the magnet's own spot — a shape smaller than one cell can hold nothing (law 11.3).
+  return scaleBoxFromHandle(box, handle, pointerMM, cellDiameterMM(spec.grid))
 }

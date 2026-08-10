@@ -33,9 +33,12 @@ const MAGNET_SMALL_FILL = '#FFFFFF'
  * There is no 10mm level in the design; that one was mine, and it is the level that can never align
  * with a 48mm lattice.
  */
-const RULE_FINE_MM = 1
-const RULE_FINE_STROKE = 'rgba(0, 0, 0, 0.02)'
-const PITCH_RULE_STROKE = 'rgba(0, 0, 0, 0.05)'
+/** The notepad's fine rule is the ATOM — 12mm (law 10.6b). Dan: "the canvas also must have notepad
+ *  grid of 12mm not 24mm to match the atomic laws". */
+const RULE_FINE_MM = 12
+/** Ink follows the theme; the surface it is drawn on is not always white. */
+const RULE_FINE_STROKE = 'var(--rule-fine)'
+const PITCH_RULE_STROKE = 'var(--rule-pitch)'
 /** Hairline thickness in SCREEN pixels — Figma draws a layout grid at one device pixel, never scaled. */
 const RULE_HAIRLINE_PX = 1
 /**

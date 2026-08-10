@@ -4,6 +4,21 @@
   height: 100%;
   overflow: hidden;
   background: #ffffff;
+
+  /* The notepad's ink, on the element that draws it. Law 7.6 — 5% visibility, two levels. */
+  --rule-fine: rgba(0, 0, 0, 0.05);
+  --rule-pitch: rgba(0, 0, 0, 0.10);
+}
+
+/* Law 7.4: theme follows the system. The field is the largest surface on screen — left white it is
+   the thing that glares in the evening, and it sits ABOVE the page's own dark surface, so it has to
+   be themed here rather than on the container. */
+@media (prefers-color-scheme: dark) {
+  .frame {
+    background: #111c2e;
+    --rule-fine: rgba(255, 255, 255, 0.06);
+    --rule-pitch: rgba(255, 255, 255, 0.12);
+  }
 }
 
 .svg {

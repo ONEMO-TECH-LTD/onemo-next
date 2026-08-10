@@ -11,7 +11,7 @@
 // Built on the studio's own anatomy, measured from Figma "Prototypes / Control" (node 14209:26629)
 // at 402pt. Canvas is 402 x 402. The studio's visual design comes from Figma; this invents none.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   applyGridValue,
   isOptionsOnly,
@@ -25,7 +25,7 @@ import {
   type WriteRefusal,
 } from '@/lib/grid-engine/spec'
 import { GridCanvas } from './GridCanvas'
-import type { FieldSummary } from '@/lib/grid-engine/bridge'
+import { scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
 import { ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from './camera'
 import styles from './page.module.css'
 
@@ -44,6 +44,22 @@ const ROWS: Array<{ key: GridKey; name: string; step: number; unit: string }> = 
  */
 const SHAPE_MIN_MM = 20
 const SHAPE_STEP_MM = 2
+
+/**
+ * A loaded cut-out is laid on the canvas at the CLASSIC band — its longest side, so its proportions
+ * are untouched (law 2.1a). Presentation only: this places the picture under the magnets so the
+ * match can be seen. It is not a size the unit is told, and nothing computes from it.
+ */
+const CLASSIC_BAND_MM = 120
+const CUTOUT_OPACITY = 0.55
+
+/** The eight grips, as fractions of the box. Presentation — the engine names them, this places them. */
+const HANDLES: Array<{ id: HandleId; fx: number; fy: number }> = [
+  { id: 'nw', fx: 0, fy: 0 }, { id: 'n', fx: 0.5, fy: 0 }, { id: 'ne', fx: 1, fy: 0 },
+  { id: 'w', fx: 0, fy: 0.5 }, { id: 'e', fx: 1, fy: 0.5 },
+  { id: 'sw', fx: 0, fy: 1 }, { id: 's', fx: 0.5, fy: 1 }, { id: 'se', fx: 1, fy: 1 },
+]
+const HANDLE_MM = 8
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
@@ -79,6 +95,49 @@ export default function GridEnginePage() {
     if (Number.isFinite(next) && next > 0) setSize(next)
     else setSizeDraft(String(sizeMM))
   }
+
+  // THE CUT-OUT — the picture, laid on the field so the magnets show through it.
+  //
+  // Presentation only. The shell reads the file and draws it; nothing is traced, measured or handed
+  // to the unit. The engine is not involved and does not know a cut-out exists.
+  const [cutout, setCutout] = useState<{ url: string; wPx: number; hPx: number } | null>(null)
+  const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [dragging, setDragging] = useState<HandleId | null>(null)
+  const cutoutInput = useRef<HTMLInputElement>(null)
+
+  const loadCutout = useCallback((file: File) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      setCutout({ url, wPx: img.naturalWidth, hPx: img.naturalHeight })
+      // Laid on at the classic band, longest side, proportions untouched.
+      const k = CLASSIC_BAND_MM / Math.max(img.naturalWidth, img.naturalHeight)
+      const w = img.naturalWidth * k
+      const h = img.naturalHeight * k
+      setBox({ x: -w / 2, y: -h / 2, w, h })
+    }
+    img.src = url
+  }, [])
+
+  /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
+  const toMM = (e: React.PointerEvent<SVGElement>): [number, number] => {
+    const svg = e.currentTarget.ownerSVGElement
+    const m = svg?.getScreenCTM()
+    if (!svg || !m) return [0, 0]
+    const p = svg.createSVGPoint()
+    p.x = e.clientX
+    p.y = e.clientY
+    const u = p.matrixTransform(m.inverse())
+    return [u.x, u.y]
+  }
+
+  const clearCutout = useCallback(() => {
+    setCutout((c) => {
+      if (c) URL.revokeObjectURL(c.url)
+      return null
+    })
+    setBox(null)
+  }, [])
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
   // per keystroke meant every intermediate digit hit the guard and bounced as out-of-range.
@@ -132,6 +191,27 @@ export default function GridEnginePage() {
           </button>
         ))}
 
+        <button
+          type="button"
+          className={styles.chip}
+          data-on={Boolean(cutout)}
+          onClick={() => (cutout ? clearCutout() : cutoutInput.current?.click())}
+        >
+          {cutout ? 'clear' : 'cut-out'}
+        </button>
+        <input
+          ref={cutoutInput}
+          hidden
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) loadCutout(f)
+            e.target.value = ''
+          }}
+          aria-label="Load a cut-out"
+        />
+
         <span className={styles.spacer} />
 
         {view && (
@@ -166,19 +246,61 @@ export default function GridEnginePage() {
       <div className={styles.canvas}>
         <GridCanvas
           spec={spec}
-          extentMM={{ x: -sizeMM / 2, y: -sizeMM / 2, w: sizeMM, h: sizeMM }}
+          extentMM={box ?? { x: -sizeMM / 2, y: -sizeMM / 2, w: sizeMM, h: sizeMM }}
           zoom={zoom}
           onView={onView}
         >
-          <circle
-            cx={0}
-            cy={0}
-            r={sizeMM / 2}
-            fill="none"
-            stroke="#FF3B30"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
+          {cutout && box && (
+            <g
+              onPointerMove={(e) => {
+                if (!dragging) return
+                setBox(scaleShape(spec, box, dragging, toMM(e)))
+              }}
+              onPointerUp={() => setDragging(null)}
+            >
+              <image
+                href={cutout.url}
+                x={box.x}
+                y={box.y}
+                width={box.w}
+                height={box.h}
+                opacity={CUTOUT_OPACITY}
+                preserveAspectRatio="none"
+              />
+              <rect
+                x={box.x}
+                y={box.y}
+                width={box.w}
+                height={box.h}
+                fill="none"
+                stroke="#58c2ff"
+                strokeWidth={1}
+                vectorEffect="non-scaling-stroke"
+              />
+              {HANDLES.map(({ id, fx, fy }) => {
+                const cx = box.x + fx * box.w
+                const cy = box.y + fy * box.h
+                return (
+                  <rect
+                    key={id}
+                    x={cx - HANDLE_MM / 2}
+                    y={cy - HANDLE_MM / 2}
+                    width={HANDLE_MM}
+                    height={HANDLE_MM}
+                    fill="#58c2ff"
+                    stroke="#ffffff"
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                    style={{ cursor: 'pointer' }}
+                    onPointerDown={(e) => {
+                      e.currentTarget.setPointerCapture(e.pointerId)
+                      setDragging(id)
+                    }}
+                  />
+                )
+              })}
+            </g>
+          )}
         </GridCanvas>
       </div>
 

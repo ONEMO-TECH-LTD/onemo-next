@@ -385,8 +385,27 @@
 /* ── the system decides the theme ─────────────────────────────────────────── */
 
 @media (prefers-color-scheme: dark) {
+  /* The dark palette set text colours but never a surface to put them on, so the page stayed white
+     and every label read as disabled. The surface has to be the whole page, not the 768px column —
+     otherwise the gutters stay lit. Law 7.4: theme follows the system, and this is evening work. */
+
+  /* Paint the whole viewport, not just the 768px column, without reaching outside this module. */
+  .screen::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: #0f172a;
+    z-index: -1;
+  }
+
   .screen {
+    background: #0f172a;
     color: #e2e8f0;
+  }
+
+  /* The field is the largest surface on screen; leaving it white is what made this glare. */
+  .canvas {
+    background: #111c2e;
   }
 
   .readout,

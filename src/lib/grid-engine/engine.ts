@@ -54,11 +54,16 @@ export function registrationOffsetMM(grid: GridSpec, registration: Registration)
 }
 
 /**
- * The empty millimetres beyond the outermost cells, so the field visibly ENDS. Derived, not chosen:
- * the largest padding that still excludes the next position is the bare gap between two cells.
+ * The empty millimetres beyond the outermost cells, so the field visibly ENDS.
+ *
+ * ONE FULL LATTICE STEP. Dan, 2026-08-10: "make padding beyond grid 48mm not 40mm".
+ *
+ * (It was the bare gap between two cells — pitch minus cell — which is 24mm at the locked 12mm
+ * padding and read as cramped. A whole step is the ruling, and it still stops short of the next
+ * position, so the field ends where the law says it ends.)
  */
 function fieldMarginMM(grid: GridSpec): number {
-  return grid.basePitchMM - cellDiameterMM(grid)
+  return grid.basePitchMM
 }
 
 /** The span the field occupies at the released row and column count, in millimetres. */
@@ -141,4 +146,70 @@ export function summariseField(
     spanXMM: cols > 1 ? (cols - 1) * grid.pitchMM : 0,
     spanYMM: rows > 1 ? (rows - 1) * grid.pitchMM : 0,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCALING A PLACED SHAPE — all of it is arithmetic, so all of it is here (law 1.1a).
+//
+// Dan, 2026-08-10: "scale is the only part must be applied" · "locked proportions only scaling was
+// repeated 100 times today". So a handle may only ever scale. Nothing here can stretch a shape:
+// the ratio is taken from the box that came in and applied to both axes, so it cannot drift.
+
+/** The eight grips on a box. Named by compass point, as the surface draws them. */
+export type HandleId = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+
+/** The point a handle scales AWAY from — the opposite corner, or the opposite edge's midpoint. */
+function anchorFor(box: RegionMM, handle: HandleId): PointMM {
+  const l = box.x, r = box.x + box.w, t = box.y, b = box.y + box.h
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2
+  switch (handle) {
+    case 'nw': return [r, b]
+    case 'ne': return [l, b]
+    case 'se': return [l, t]
+    case 'sw': return [r, t]
+    case 'n': return [cx, b]
+    case 's': return [cx, t]
+    case 'w': return [r, cy]
+    case 'e': return [l, cy]
+  }
+}
+
+/**
+ * Drag a handle, get a box. ASPECT IS LOCKED — one factor is derived and applied to both axes, so
+ * width and height are never independently adjustable (law 2.1).
+ *
+ * A corner takes whichever axis the pointer moved furthest along, so the shape follows the hand
+ * without ever shearing. An edge takes its own axis alone and the other follows in proportion.
+ *
+ * The anchor stays put: the opposite corner for a corner grip, the opposite edge for an edge grip.
+ */
+export function scaleBoxFromHandle(
+  box: RegionMM,
+  handle: HandleId,
+  pointerMM: PointMM,
+  minMM: number,
+): RegionMM {
+  if (box.w <= 0 || box.h <= 0) return box
+  const [ax, ay] = anchorFor(box, handle)
+  const reachX = Math.abs(pointerMM[0] - ax)
+  const reachY = Math.abs(pointerMM[1] - ay)
+
+  const horizontal = handle === 'e' || handle === 'w'
+  const vertical = handle === 'n' || handle === 's'
+  const k = horizontal
+    ? reachX / box.w
+    : vertical
+      ? reachY / box.h
+      : Math.max(reachX / box.w, reachY / box.h)
+
+  // WHOLE MILLIMETRES. Dan, 2026-08-10: "scaling must be in increments of 1mm". The drag is
+  // continuous; what it lands on is not. Rounding the driven axis and deriving the other from the
+  // ratio keeps the step exact without ever letting the proportions drift.
+  const w = Math.max(minMM, Math.round(box.w * k))
+  const h = w * (box.h / box.w) // the ratio it arrived with — never recomputed from the pointer
+
+  // Grow away from the anchor, in the direction the handle already lay.
+  const x = ax <= box.x + box.w / 2 ? ax : ax - w
+  const y = ay <= box.y + box.h / 2 ? ay : ay - h
+  return { x, y, w, h }
 }
