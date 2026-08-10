@@ -458,27 +458,30 @@ the spot is **24mm** — exactly half the 48mm pitch.
 > "we moved to 12mm even to create each magnet as grid cell that matches the steps of the grid - 24mm
 > two cells create 48mm single 4 point square no gaps it is Lego essentially"
 
-12mm padding makes each magnet a **24mm cell**, and **the 48mm pitch is exactly two of those cells**.
-That is the whole statement: the system measures in 24mm units, so every band span is a whole number of
-them — `span = 24·(2n−1)` gives 72, 120, 168, 216.
+12mm padding makes each magnet a **24mm spot**, and **the 48mm pitch is exactly two of those spots**.
+That is the whole statement.
 
-**What this does NOT mean — and the error is recorded because it was written into this book and had to
-be struck.** *DAN, 08-10, rejecting it:*
+**The band IS the number of magnets per axis, and each band centres differently.** *DAN, 08-10:*
 > "There cannot be center cell on the shape centered 4 or pair of shape is slim."
+>
+> "If you have middle axis meeting the middle of the magnet center, the very center, it means that the
+> size is three cells in each direction, which means it's band three. So the band four will have no
+> magnets in the middle."
 
-An earlier draft of this clause claimed that "a middle cell always exists and magnets occupy alternate
-cells". **That was an inference, not Dan's statement, and it is false.** At a 48mm pitch the 24mm magnet
-cells **do not tile** — there is a bare 24mm gap between them. "No gaps" in Dan's sentence refers to two
-cells laid together measuring the 48mm step, not to magnet cells tessellating the plane.
+| band | magnets per axis | square total | span | the shape's centre |
+|---|---|---|---|---|
+| 2 | 2 | 4 | 72mm | **between** magnets — none in the middle |
+| 3 | 3 | 9 | 120mm | **on** a magnet |
+| 4 | 4 | 16 | 168mm | **between** magnets — none in the middle |
 
-**There is no centre cell.** §9.2 already governs and is unchanged: an **even** count puts the shape's
-centre in the **gap between magnets** — a 2x2, or a pair on a slim shape, has no magnet at the centre —
-and an **odd** count puts a magnet on it. Registration is that parity, nothing more.
+This is §9.2 stated per band, and nothing more is needed. **There is no "middle cell".** At a 48mm pitch
+the 24mm spots do not tile — there is a bare 24mm gap between them. "No gaps" in Dan's earlier sentence
+means two spots laid together measure the 48mm step, not that spots tessellate the plane.
 
-**What the module does buy** is that the frame is whole numbers: the band, the span and the magnet
-positions are exact multiples of 24mm, with no float margin to fall the wrong side of. *(The defect that
-lost the canonical 2x2 was a magnet clearing by 0.007mm.)* The outline stays continuous, so the hold test
-still measures true distance (11.1).
+*(Recorded because an earlier draft of this clause counted the SPAN in 24mm units — "72mm is three
+cells" — and concluded a middle cell always exists. That counts the measure, says nothing about magnets,
+and invented an object that does not exist. Struck. If a band had a middle magnet AND four per axis it
+would be five per axis, which is band 5.)*
 
 **Round outlines stay off the cell** by the √2 of the diagonal (91.88mm = 3.83 cells) — correct, and
 already covered by 12.3a.
