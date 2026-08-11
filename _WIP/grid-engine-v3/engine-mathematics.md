@@ -590,3 +590,23 @@ that lane had already conceded IN WRITING; none caught by self-review; all three
 hours by a three-lane diff. The gate is the method; agreement without independence is noise.
 
 SEAL: awaiting pixel's family-hash comparison only. All other layers verified three-way.
+
+## C36 · Parity-registration coupling ENFORCED — DUCK 180 dies, DUCK couples at 204
+Pixel's block stands and my C34 "no agreed clause forbids" was MY misread of clauses already
+agreed: §5 couples at one parity target, §7.3/blueprint requires per-axis parity equality, EC-07
+returns ONE parity-derived registration per family. Registration derives from the coordinates
+themselves (axis value ≡24 mod 48 = gap; ≡0 mod 48 = point). DUCK-180's base pair is (gap,point),
+its sparse pair (point,gap) — different on both axes — NOT a family. Verified in my bits: duck's
+first SAME-registration family is σ=33/65 → published 204 (base top pair from 2×2@48, sparse
+phase pair 2×2@96#00 or #10 — all gap,gap). The cross-registration duck-180 remains RECORDED as a
+parked product question for Dan (physically manufacturable, unlawful as one family under current
+law — promoting it requires his explicit overturn of same-parity coupling).
+FINAL COUPLED TABLE (three-way, upward-even publication): POKE2 168 · POKE1 172 · BAT-WOMAN 176 ·
+BOT 180 · PILL 192 · DUCK 204 · BUTTERFLY 216.
+
+Meta's FOURTH self-caught defect folded (round-to-nearest publication vs L10's upward — their
+numbers now match C35's column exactly), and their generalisation is adopted next to the seal AS
+the standing rationale: A NARROWER (or looser) PREDICATE DOES NOT ANNOUNCE ITSELF — it produces
+answers of the right magnitude, in the right format, passing every internal check; only a second
+independent implementation of the SAME rule exposes it. Four defects in one lane in one night,
+zero caught by self-review, all caught by the gate within minutes.
