@@ -120,10 +120,18 @@ export function containmentIntervals(
       if (B !== 0) {
         const sigma = A / B
         if (sigma > 0 && sigma <= sigmaMax) {
-          events.push({
-            sigma,
-            contact: { boxFeature: { kind: 'corner', index: ci }, outlineFeature: { kind: 'edge', index: i } },
-          })
+          // §7.2: retain σ only when "the contact lies on both finite closed segments" — the
+          // corner b must fall within the SCALED outline edge [σv, σw], not merely its line.
+          // (Omitting this filter kept every supporting-line root: 52s for one duck band.)
+          const sx = sigma * d[0]
+          const sy = sigma * d[1]
+          const t = Math.abs(sx) >= Math.abs(sy) ? (b[0] - sigma * v[0]) / sx : (b[1] - sigma * v[1]) / sy
+          if (t >= 0 && t <= 1) {
+            events.push({
+              sigma,
+              contact: { boxFeature: { kind: 'corner', index: ci }, outlineFeature: { kind: 'edge', index: i } },
+            })
+          }
         }
       }
       // A=B=0 (collinear at all scales): endpoint-coincidence scales on the dominant axis
@@ -156,10 +164,19 @@ export function containmentIntervals(
       if (B !== 0) {
         const sigma = A / B
         if (sigma > 0 && sigma <= sigmaMax) {
-          events.push({
-            sigma,
-            contact: { boxFeature: { kind: 'edge', index: ei }, outlineFeature: { kind: 'vertex', index: i } },
-          })
+          // §7.2's same finite-segment condition, other direction: the SCALED vertex σv must fall
+          // within the box edge's closed span.
+          const px = sigma * v[0]
+          const py = sigma * v[1]
+          const within =
+            Math.min(b[0], c[0]) <= px && px <= Math.max(b[0], c[0]) &&
+            Math.min(b[1], c[1]) <= py && py <= Math.max(b[1], c[1])
+          if (within) {
+            events.push({
+              sigma,
+              contact: { boxFeature: { kind: 'edge', index: ei }, outlineFeature: { kind: 'vertex', index: i } },
+            })
+          }
         }
       }
     }

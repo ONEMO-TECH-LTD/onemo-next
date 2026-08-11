@@ -82,6 +82,13 @@ export const samePoint = (a: PointMM, b: PointMM): boolean => a[0] === b[0] && a
 
 /** Is c on the CLOSED segment [a,b]? Exact: collinear by orientation, then bound by coordinates. */
 export function onSegment(a: PointMM, b: PointMM, c: PointMM): boolean {
+  // bbox reject FIRST — exact and free. A point outside the segment's closed bounding box cannot
+  // be on it, and this guard removes ~99% of orientation calls from the boundary loop (the
+  // point-in-polygon hot path on 6k-edge traces).
+  if (
+    c[0] < Math.min(a[0], b[0]) || c[0] > Math.max(a[0], b[0]) ||
+    c[1] < Math.min(a[1], b[1]) || c[1] > Math.max(a[1], b[1])
+  ) return false
   if (orientation(a, b, c) !== 0) return false
   return (
     Math.min(a[0], b[0]) <= c[0] &&
