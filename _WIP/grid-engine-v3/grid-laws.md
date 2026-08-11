@@ -84,6 +84,35 @@ fix, exactly as he said.
 *Applying the cap changes no selected winner on the corpus — the winners are 3- to 5-magnet layouts —
 so this removes unusable options without disturbing the answer.*
 
+**THE OVERHANG ALLOWANCE — and the corpus explains why his number is right.**
+*Dan:* "the offset can be like 168+12-24mm space to stick out or accomodate shapes to 168 bounding box"
+
+A twin fix's region is **72 × 24mm** — a 3:1 box. Measured, on rounded shapes of varying aspect:
+
+| shape aspect | published size | overhang L/R | overhang T/B | max | flap 12 | flap 24 |
+|---|---|---|---|---|---|---|
+| 1.0 : 1 | 76mm | 2 | 26 | 26 | fail | fail |
+| 1.5 : 1 | 82mm | 5 | 15 | 15 | fail | **pass** |
+| **2.0 : 1** | 88mm | 8 | 10 | **10** | **pass** | **pass** |
+| **2.5 : 1** | 94mm | 11 | 7 | **11** | **pass** | **pass** |
+| 3.0 : 1 | 102mm | 15 | 5 | 15 | fail | **pass** |
+| 3.5 : 1 | 112mm | 20 | 4 | 20 | fail | **pass** |
+| 4.0 : 1 | 122mm | 25 | 3 | 25 | fail | fail |
+
+**His 12–24mm allowance is exactly the natural range**: the twin fix's working window is roughly
+**1.5:1 to 3.5:1**, and it is happiest at **2:1–2.5:1** where overhang is 10–11mm and it clears even
+the strict limit. Every one of those sizes is 76–122mm, comfortably inside the 168mm cap — so the cap
+and the allowance never fight.
+
+*(Not 3:1 as the box's own ratio would suggest: a rounded outline's corners cut in, so the best match
+to a 3:1 box is a ~2:1 shape.)*
+
+**Why no real cut-out takes a twin fix, measured:** the corpus is 1.0–1.4:1 — blobby, not elongated —
+and their best twin-fix overhangs run **49 to 100mm**. BUTTERFLY 79, POKE1 53, BOT 59, PILL 91,
+POKE2 49. All far outside any 12–24mm allowance. That is L5 working exactly as written: *"If shape is
+narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum"* — the corpus
+is "normal", so it gets four, and the twin fix is for the narrow effects the corpus does not contain.
+
 **OPEN, and his:** the built-in-garment-grid case. He says larger sizes fit *"if tshirt has magnetic
 grid built in"*. Whether that is an engine input or a product rule outside the engine is unruled, and
 L8 forbids a size input crossing inward — a garment capability is not a size, but the boundary needs

@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 99 directives
+## 2026-08-11 · @s62-lead · 100 directives
 
 **06:26:48**
 
@@ -1486,6 +1486,10 @@ imagine 200mmx200mm used with 2 parts one on the surface of garment another unde
 **14:50:57**
 
 ok the 168mm band 4 is the max size for twinfix shaped effects hence we can calculate anything fitting that range
+
+**14:54:26**
+
+the offset can be like 168+12-24mm space to stick out or accomodate shapes to 168 bounding box
 
 
 ---
