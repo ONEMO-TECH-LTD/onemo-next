@@ -18,7 +18,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-03 · All required ranges.** The proof instrument assesses the cutout independently in bands 2, 3 and 4. Every returned family contains measured answers for both 48mm and 96mm. A successful earlier band does not remove later bands from the proof instrument.
 
-- [ ] **EC-04 · Population is measured, not assumed.** Inside each band the engine derives every distinct materially supported arrangement available to the locked shape. It must include a centred vertical pair, centred horizontal pair, rectangular arrangements and material-derived partial arrangements whenever lawful. It must not assume that a band is always a complete 2×2, 3×3 or 4×4 square.
+- [ ] **EC-04 · Population is measured, not assumed.** Inside each band the engine derives every distinct materially supported arrangement available to the locked shape. It must include a centred vertical pair, centred horizontal pair, rectangular arrangements and material-derived partial arrangements whenever lawful. The pair is the floor; each family reports whether four magnets at the outermost corners, fitted to the edge, are lawful and marks that arrangement as the `optimum` target when they are. Intermediate arrangements remain reported as intermediate. No score or ranking framework is introduced, and the engine must not assume that a band is always a complete 2×2, 3×3 or 4×4 square.
 
 - [ ] **EC-05 · Pair floor in both populations.** Every passing family contains at least one non-pivoting vertical or horizontal pair at 48mm and at least one at 96mm. A result that supports a pair at only one population does not pass. A single magnet is never an offered result.
 
@@ -57,12 +57,13 @@ sideReachSpreadMM
 tightnessContacts[]: { magnet, outlineLocation, clearanceMM }
 unsupportedZones[]: { side, reachMM, classification }
 flapLimitMM: 12 | 24
+classification: floor | intermediate | optimum
 status: lawful | failed | exception-pending
 ```
 
 ## Exclusions
 
-- No product winner or default centre method.
+- No automatic product winner, ranking framework or default centre method beyond EC-04's ruled optimum classification.
 - No rotation.
 - No mask or straight/dice/diamond pattern work.
 - No manufacturing export.
