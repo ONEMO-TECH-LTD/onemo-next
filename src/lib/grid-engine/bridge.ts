@@ -87,6 +87,18 @@ export function resizeShape(spec: GridSystemSpec, box: RegionMM, longestMM: numb
 }
 
 /**
+ * THE SMALLEST A SHAPE MAY BE — one magnet spot, because a shape narrower than the spot cannot hold
+ * a single magnet and is not a shape the system can answer about.
+ *
+ * ONE FLOOR, and the unit owns it. The surface used to carry its own (20mm) while the unit enforced
+ * this one (24mm), so asking for 20 gave you a 24mm shape and a control still reading 20 — a surface
+ * holding a number the engine did not produce, which is the defect law 5.3 exists to prevent.
+ */
+export function minShapeSpan(spec: GridSystemSpec): number {
+  return cellDiameterMM(spec.grid)
+}
+
+/**
  * THE ATOM — the millimetre square the whole system is built on (law 10.6b: "the cell is actually
  * 12x12 not really 24 - 24 is 4 x12mm"). It IS the padding, so it is read from the padding rather
  * than restated: a surface drawing the notepad rule asks for it instead of knowing it is 12.

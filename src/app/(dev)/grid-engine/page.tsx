@@ -30,6 +30,7 @@ import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
   fieldBlockSpan,
+  minShapeSpan,
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
@@ -46,11 +47,10 @@ const ROWS: Array<{ key: GridKey; name: string; step: number; unit: string }> = 
 ]
 
 /**
- * The test fixture's own bounds — presentation, not law. The slider sweeps the released size range
- * up to the spec's ceiling; the field will still take a number beyond it, so the viewport can be
- * pushed past what the generator would ever publish.
+ * The slider's step — presentation only. Its FLOOR and CEILING are not here: the floor is the unit's
+ * minimum shape span and the ceiling is the 9x9 grid, both asked for at the point of use, so the
+ * control cannot offer a size the unit would refuse to produce.
  */
-const SHAPE_MIN_MM = 20
 const SHAPE_STEP_MM = 2
 
 /**
@@ -148,7 +148,7 @@ export default function GridEnginePage() {
 
   const commitSize = () => {
     const next = Number(sizeDraft)
-    if (Number.isFinite(next) && next > 0) setSize(next)
+    if (Number.isFinite(next) && next > 0) setSize(Math.max(minSpanMM, Math.min(maxSpanMM, next)))
     else setSizeDraft(String(sizeMM))
   }
 
@@ -285,6 +285,8 @@ export default function GridEnginePage() {
    * number the moment either changes, without a line here moving.
    */
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
+  /** The unit's own floor. The control offers exactly what the unit will produce, never less. */
+  const minSpanMM = Math.round(minShapeSpan(spec))
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
@@ -312,7 +314,7 @@ export default function GridEnginePage() {
       // discarded it, so a hundred 0.1s moved nothing while one 10 moved thirteen millimetres — the
       // same defect as the drag, in the other gesture.
       const next = sizeExactMM.current * factor
-      const held = Math.min(maxSpanMM, Math.max(SHAPE_MIN_MM, next))
+      const held = Math.min(maxSpanMM, Math.max(minSpanMM, next))
       sizeExactMM.current = held
       setSize(Math.round(held))
     }
@@ -577,7 +579,7 @@ export default function GridEnginePage() {
           <input
             className={styles.slider}
             type="range"
-            min={SHAPE_MIN_MM}
+            min={minSpanMM}
             max={maxSpanMM}
             step={SHAPE_STEP_MM}
             value={Math.min(sizeMM, maxSpanMM)}
@@ -588,7 +590,7 @@ export default function GridEnginePage() {
             className={styles.input}
             type="number"
             inputMode="numeric"
-            min={SHAPE_MIN_MM}
+            min={minSpanMM}
             step={SHAPE_STEP_MM}
             value={sizeDraft}
             onChange={(e) => setSizeDraft(e.target.value)}
