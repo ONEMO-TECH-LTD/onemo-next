@@ -22,8 +22,8 @@
     "files": [
       {
         "file": "src/components/cutout-studio/CutoutStudio.tsx",
-        "bytes": 27439,
-        "sha256": "1bff5ba1686d3c3a782b4198e21c7c0e22f6aa182ad3f2735290646b69ff3807",
+        "bytes": 27526,
+        "sha256": "e152449eddcb9404f7718d667d633136611dc3166ab46a23bb510c52c771d4b4",
         "destination": "src/components/cutout-studio/CutoutStudio.tsx",
         "layer": "browser-react"
       },
@@ -43,8 +43,8 @@
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 53953,
-        "sha256": "0796dc416fedcc2543d1a0e61e9609ff821f802936a66dd9ffc8aef8a229d2cd",
+        "bytes": 53986,
+        "sha256": "77e5b5ee71adb307be7d843d10382955a65c13cc7a3f805b0a2ed4ec13a0184e",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -57,8 +57,8 @@
       },
       {
         "file": "src/components/cutout-studio/v531seg.ts",
-        "bytes": 4547,
-        "sha256": "213c60f5e4ec8f07451a5b2900781d847bef3481e5996fcc8a6fe9c95f755696",
+        "bytes": 3603,
+        "sha256": "37af52c282b47ca11659455f142ea3dfe078014a23640128ef52c70095ed6235",
         "destination": "src/components/cutout-studio/v531seg.ts",
         "layer": "browser-react"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 338335,
-    "closureSha256": "c8d083ab062a586d252635164d41019cd3510200b546c9f9f94c4d3d07a4f030"
+    "totalBytes": 337511,
+    "closureSha256": "f3ebf6d8fdcd2d8e14cac17e3053f08051247a707ce35d14e90694d8c8a6dc34"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-9e7dd5f47aa464cc.js",
-        "rawBytes": 62812,
-        "gzipBytesEstimate": 20804,
-        "brotliBytesEstimate": 18389
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-c42289c905387cd6.js",
+        "rawBytes": 63032,
+        "gzipBytesEstimate": 20863,
+        "brotliBytesEstimate": 18413
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1298638,
-    "gzipBytesEstimate": 363753,
-    "brotliBytesEstimate": 297094
+    "rawBytes": 1298858,
+    "gzipBytesEstimate": 363812,
+    "brotliBytesEstimate": 297118
   },
   "runtimeHeapEvidence": {
     "status": "not-captured-by-static-build-analyzer"

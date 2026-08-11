@@ -87,9 +87,11 @@ describe('KAI-10216 Cutout V1 adoption boundary', () => {
   it('keeps query diagnostics and calibration in the thin dev mount only', () => {
     const product = owners.map(({ file }) => owner(file)).join('\n')
     expect(product).not.toMatch(/import\('eruda'\)|Cutout calibration \(admin\)|searchParams\.get\('(debug|admin)'\)/)
+    expect(product).not.toContain("localStorage.setItem('lab-detect-stage'")
     expect(route('page.tsx')).toContain("query.get('debug') === '1'")
     expect(route('page.tsx')).toContain("query.get('admin') === '1'")
     expect(route('CutoutLabMount.tsx')).toContain('Cutout calibration (admin)')
+    expect(route('CutoutLabMount.tsx')).toContain("localStorage.setItem('lab-detect-stage'")
   })
 
   it('keeps the adoption closure product-owned and the headless owners DOM-free', () => {

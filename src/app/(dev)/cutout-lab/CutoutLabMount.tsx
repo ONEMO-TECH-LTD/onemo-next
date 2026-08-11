@@ -4,6 +4,15 @@ import { useState, type CSSProperties } from 'react'
 import CutoutStudio, { type CutoutStudioCalibrationSurface } from '@/components/cutout-studio/CutoutStudio'
 import { CHIP_RANGE, VEC_CHIPS } from '@/components/cutout-studio/ui-config'
 
+const phoneDiagnostics = {
+  setStage(stage: string | null) {
+    try { if (stage === null) localStorage.removeItem('lab-detect-stage'); else localStorage.setItem('lab-detect-stage', stage) } catch { /* private mode / no storage */ }
+  },
+  getLastStage() {
+    try { return localStorage.getItem('lab-detect-stage') } catch { return null }
+  },
+}
+
 export function CutoutLabMount({ admin }: { admin: boolean }) {
   const [vecChip, setVecChip] = useState<(typeof VEC_CHIPS)[number]>('detail')
 
@@ -36,7 +45,7 @@ export function CutoutLabMount({ admin }: { admin: boolean }) {
     }
   } : undefined
 
-  return <CutoutStudio calibration={calibration} />
+  return <CutoutStudio calibration={calibration} diagnostics={phoneDiagnostics} />
 }
 
 function CalibrationPanel({ surface }: { surface: CutoutStudioCalibrationSurface }) {

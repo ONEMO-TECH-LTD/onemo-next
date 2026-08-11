@@ -9,7 +9,7 @@ import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
 import { maskOverlay, VECTOR_PRESETS, type TraceOutlineSettings, type VectorPresetName } from './finish'
-import { useCutoutLabFlow } from './flow'
+import { useCutoutLabFlow, type LabAdapters } from './flow'
 import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, type Tab, type Tool } from './ui-config'
 
@@ -35,14 +35,15 @@ export interface CutoutStudioCalibrationSlots {
   panel: ReactNode
 }
 
-export default function CutoutStudio({ calibration }: {
+export default function CutoutStudio({ calibration, diagnostics }: {
   calibration?: (surface: CutoutStudioCalibrationSurface) => CutoutStudioCalibrationSlots
+  diagnostics?: LabAdapters['diagnostics']
 }) {
   const renderRef = useRef<() => void>(() => {})
   const requestRender = useCallback(() => renderRef.current(), [])
 
   // ── THE FLOW (Layer-2) — the shell binds only to this surface ──
-  const flow = useCutoutLabFlow({ requestRender })
+  const flow = useCutoutLabFlow({ requestRender, diagnostics })
   const {
     status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo,
     paintCfg, edgeFinishPx, vectorPreset, outputOriginal, outputSourceSize, outputPrepareMs,

@@ -19,7 +19,7 @@ import {
 import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
-import { segmentV531, crashStage, lastCrashStage } from './v531seg'
+import { segmentV531 } from './v531seg'
 import { cancelSegmentML, disposeSegmentML, type MLResult } from '@/lib/effect/segment-ml'
 import { HistoryStack } from '@/lib/cutout-studio/history'
 import { buildCutoutResult, type CutoutResult } from '@/lib/cutout-studio/result'
@@ -72,6 +72,10 @@ function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, 
 export interface LabAdapters {
   /** shell's imperative canvas redraw — the flow calls it after every view-affecting mutation */
   requestRender: () => void
+  diagnostics?: {
+    setStage: (stage: string | null) => void
+    getLastStage: () => string | null
+  }
 }
 
 /** Imperative view surface for the shell's canvas render (canvas inputs — sanctioned).
@@ -148,6 +152,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const hasCutRef = useRef(false); hasCutRef.current = hasCut
   const dispWRef = useRef(disp.w); dispWRef.current = disp.w
   const requestRender = adapters.requestRender
+  const diagnostics = adapters.diagnostics
   const detectGen = useRef(0)
   const artworkGen = useRef(0)
   const uploadGen = useRef(0)
@@ -520,10 +525,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     try {
       setStatus('✨ AI magic (u2net · v5.3.1)…')
       const t0 = performance.now()
-      const r = await withTimeout(segmentV531(img, img.width, img.height, isCurrent), T_DOWNLOAD_MS, 'AI cut')
+      const r = await withTimeout(segmentV531(img, img.width, img.height, isCurrent, diagnostics?.setStage), T_DOWNLOAD_MS, 'AI cut')
       if (!isCurrent()) return
       setMs({ cut: Math.round(performance.now() - t0) })
-      crashStage('4·prepare+bake')                 // lab-layer engine prepare + compose (subject/texture/output)
+      diagnostics?.setStage('4·prepare+bake')
       // acceptMask returns false on empty cut OR a prepare failure — in both cases it already set a precise ⚠️ status, so do not override it here
       const accepted = await acceptMask(r.mask, r.preseg, { source: 'cutout', isCurrent })
       if (!isCurrent()) return
@@ -531,15 +536,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       if (accepted && (r.adapter === 'bg-flood' || r.adapter === 'alpha')) {
         setStatus('⚠️ AI cut unavailable — flood-fill fallback (NO matte: blend has no object layer)')
       }
-      crashStage(null)                             // completed without a renderer crash — clear the breadcrumb
+      diagnostics?.setStage(null)
     } catch (e) {
       if (!isCurrent()) return
-      crashStage(null)                             // a CAUGHT error means JS survived — not the hard crash we hunt
+      diagnostics?.setStage(null)
       setStatus('⚠️ u2net failed: ' + String((e as Error)?.message ?? '?') + ' — reload the page and Detect again, or brush the object')
     } finally {
       if (isCurrent()) setBusy(false)
     }
-  }, [acceptMask, invalidatePaintCalibration])
+  }, [acceptMask, diagnostics, invalidatePaintCalibration])
 
   // knob cadence: vector ticks re-resolve ONLY; the bake follows at idle (Cadence Law)
   const setTune = useCallback((patch: Partial<TraceOutlineSettings>) => {
@@ -620,14 +625,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     bakeGen.current++
     setBusy(true)
     setStatus(next ? '⚙️ preparing original upload resolution…' : '⚙️ restoring capped 1536px output…')
-    if (next) crashStage('5·original-output-prepare')
+    if (next) diagnostics?.setStage('5·original-output-prepare')
     const prepared = source
       ? prepareNative(url, source, undefined, edgeFinishRef.current, next)
       : prepareAI(url, mask, undefined, edgeFinishRef.current, next)
     withTimeout(prepared, T_DOWNLOAD_MS, 'output resolution prepare')
       .then((result) => {
         if (gen !== editPrepGen.current || artwork !== artworkGen.current) {
-          if (next) crashStage(null)
+          if (next) diagnostics?.setStage(null)
           return
         }
         installPrepared(result)
@@ -635,7 +640,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         setOutputOriginalState(next)
         const elapsed = Math.round(performance.now() - started)
         setOutputPrepareMs(elapsed)
-        crashStage(null)
+        diagnostics?.setStage(null)
         applyFinish(false)
         if (previewRef.current) bakeModeRef.current = 'full'
         scheduleBake(true)
@@ -644,14 +649,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       })
       .catch((error) => {
         if (gen !== editPrepGen.current || artwork !== artworkGen.current) {
-          if (next) crashStage(null)
+          if (next) diagnostics?.setStage(null)
           return
         }
-        crashStage(null)
+        diagnostics?.setStage(null)
         setBusy(false)
         setStatus('⚠️ output resolution change failed: ' + String((error as Error)?.message ?? error) + ' — prior output kept')
       })
-  }, [applyFinish, installPrepared, scheduleBake])
+  }, [applyFinish, diagnostics, installPrepared, scheduleBake])
 
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
   // ── THE BRUSH — GrabCut. Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
@@ -1027,12 +1032,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // Crash-survivor read: if a prior Detect stamped a stage and never cleared it, the tab crashed
     // there (renderer OOM → Safari auto-reload). Surface WHICH stage so the fix targets the real
     // allocation instead of a guess — then clear it so a later clean load reads 'ready'.
-    const crashed = lastCrashStage()
-    if (crashed) crashStage(null)
+    const crashed = diagnostics?.getLastStage() ?? null
+    if (crashed) diagnostics?.setStage(null)
     setStatus(crashed
       ? '⚠️ last operation crashed at stage ' + crashed + ' — report this stage to Kai'
       : 'ready — upload an image')
-  }, [])
+  }, [diagnostics])
 
   useEffect(() => () => {
     uploadGen.current++
