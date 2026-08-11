@@ -20,6 +20,7 @@ import {
   framedSpanMM,
   magnetsInRegion,
   paddedFieldMM,
+  paddedSpanMM,
   registrationOffsetMM,
   resizeBoxToLongest,
   summariseField,
@@ -96,4 +97,9 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
 /** The span a run of lattice positions occupies with its margin — for framing, never for layout. */
 export function fieldSpan(spec: GridSystemSpec, positions: number): number {
   return framedSpanMM(spec.grid, positions)
+}
+
+/** The whole padded field across — what a camera frames, so it can scale against the real thing. */
+export function paddedSpan(spec: GridSystemSpec): number {
+  return paddedSpanMM(spec)
 }

@@ -102,6 +102,17 @@ export function withMinimumSpan(spec: GridSystemSpec, region: RegionMM): RegionM
   return out
 }
 
+/**
+ * The whole padded field across, at the released count — the region a camera actually frames.
+ *
+ * Distinct from `framedSpanMM` below, and the difference is not cosmetic: this one includes the
+ * magnets' own spots at the outer edge, that one does not. A camera dividing by the wrong one is
+ * scaled by 504/480 and never quite frames what it thinks it does.
+ */
+export function paddedSpanMM(spec: GridSystemSpec): number {
+  return fieldSpanMM(spec) + 2 * fieldMarginMM(spec.grid)
+}
+
 /** The field padded out, so its own edge is inside anything that frames it. */
 export function paddedFieldMM(grid: GridSpec, field: RegionMM): RegionMM {
   const m = fieldMarginMM(grid)
