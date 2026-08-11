@@ -1,4 +1,4 @@
-# Grid Engine Blueprint v2 — Architecture, Mathematics and Pipeline
+# Grid Engine Blueprint v2.1 — Architecture, Mathematics and Pipeline
 
 Status: next-version build specification for [`engine-contract.md`](./engine-contract.md)
 Scope: one portable engine that produces measured cutout-variant families  
@@ -32,7 +32,7 @@ One deterministic pipeline is sufficient:
 No shape classifier, free lattice translation, rotation, arbitrary ranking, physical-size input, render-loop calculation, or second production solver exists.
 
 Necessity: no unnecessary element is included.  
-Sufficiency: §§1–12 define every computation required by EC-01 through EC-12; open product judgements remain visible evidence, never invented gates.
+Sufficiency: §§1–12 define every settled computation required by EC-01 through EC-12 and EC-11b. The two explicitly open product judgements prevent a complete-engine freeze; they are not hidden behind invented defaults.
 
 ## 1. Code architecture
 
@@ -96,6 +96,12 @@ SolveResult {
   families: MeasuredCutoutVariantFamily[]
   emptyBands: { band, centreMethod, reason }[]
   diagnostics: { outlinePointCount, solveDurationMS }
+  offerings: {
+    status: complete | separation-policy-unresolved
+    rawFamilyIds[]
+    ladderFamilyIds[]
+    separationMM?: guarded product value
+  }
 }
 ```
 
@@ -110,6 +116,7 @@ Each family contains every field required by EC-07 plus:
 - separate 48/96 active-pair topology, padded pair boxes, region union, coordinates, implied disc clearances and region binding contacts;
 - per-population padded grid boxes, four overhangs, spread, extremities and outside-box zone records;
 - `floor | intermediate | optimum` as a classification only;
+- per-population `twin-fix | multi-fix` plus the size-only twin-fix eligibility fact from §7.7;
 - a status derived only from the settled hard predicates.
 
 All manufactured geometry is returned in the selected shape frame: origin at the tested centre `Cκ`, `+x` right, `+y` down. Thus returned magnet coordinate is `qshape=q-a`, returned outline coordinate is `σ(p-Cκ)`, and no consumer needs the engine's lattice target. Engine-frame coordinates may appear only as labelled diagnostics.
@@ -172,6 +179,8 @@ All methods are options. None is a product default or winner.
 The maximum-clearance method is not a sampled quadtree and has no resolution input. Segment-Voronoi candidates make its termination finite; the winner maximises exact boundary clearance. [CGAL's segment-Voronoi definition](https://doc.cgal.org/latest/Segment_Delaunay_graph_2/index.html) uses minimum Euclidean distance to point/segment sites, matching this construction. Area/perimeter centroid meanings follow the [OGC-conformant Boost.Geometry centroid model](https://www.boost.org/doc/libs/latest/libs/geometry/doc/html/geometry/reference/algorithms/centroid/centroid_2.html).
 
 Each centre is computed once for the frozen canonical outline and included in the request cache entry.
+
+**Measured centre sensitivity, not a default.** On the frozen seven-cutout corpus, maximum-clearance produces five to eight lawful four-point sizes for every shape. The Duck produces zero with box or area centre and five with maximum-clearance. Therefore centre methods are not interchangeable diagnostics: the chosen construction can change whether a lawful family exists. The engine continues to return all six until Dan rules the product-facing centre policy; no builder may silently default to the cheapest or first registry entry.
 
 ## 5. Fixed lattice, placement and parity
 
@@ -246,7 +255,7 @@ At scale `σ`, an edge is active exactly when its padded pair box is contained:
 Eσ = { e ∈ E : B(e) ⊆ Tκ,r,c,σ(P) }
 ```
 
-The material-derived arrangements are the connected components of `(V,Eσ)` that contain at least one edge. Vertices incident to no active edge disappear. Thus a full rectangle remains rectangular only while all of its connecting pair boxes fit; an L, T, run or unequal partial arises automatically when the material admits exactly those connections. No shape is named and no supported point is deliberately removed.
+The material-derived arrangements are the connected components of `(V,Eσ)` that contain at least one edge. Vertices incident to no active edge are excluded by the ruled pair floor: without an active connection they are pivoting single magnets, not arrangements. Thus a full rectangle remains rectangular only while all of its connecting pair boxes fit; an L, T, run or unequal partial arises automatically when the material admits exactly those connections. No shape is named and no active connection is deliberately removed.
 
 The 48mm three-position run and the 96mm sparse pair are generated independently by their own population graphs. `###` has two active 48mm edges; `#.#` has one active 96mm edge. Both occupy the same `120×24mm` padded region, so the sparse pair can be reported as the ruled preferred equivalent without mutating the 48mm arrangement.
 
@@ -266,6 +275,8 @@ These labels do not sort, rank, discard or gate.
 ### 6.4 Completeness boundary
 
 The generator exhausts every law-authorised centred rectangular extent up to its band and returns every connected component produced by its active pair boxes. It deliberately does not enumerate arbitrary mathematical subsets. A layout requiring a translated window or deliberate removal of an active connection is outside the ruled grammar and therefore outside the engine.
+
+**Declared product question — disconnected supported pairs.** Under the current component rule, two separated active pairs are returned as two pair arrangements, never as one four-magnet family. A butterfly whose two wings each hold a pair therefore cannot receive a four-corner classification from those disconnected pairs. Dan's four-corner balance ruling may instead intend their disconnected union to be one layout. This changes the returned arrangements and must be confirmed before §6 freezes; the blueprint does not silently combine them or silently claim they are forbidden.
 
 ## 7. M4 — exact pair-region containment solve
 
@@ -372,6 +383,28 @@ Each interval endpoint retains the exact region/outline feature contact that cre
 
 Also re-evaluate every magnet disc and retain its minimum clearance as an invariant. The region contact explains the manufactured size; the disc clearance proves the implied magnet support. They are distinct fields and may not be renamed into one another.
 
+### 7.7 Twin-fix classification
+
+Twin fix is a fixing classification, not a shape grammar or a new solve. For each population independently, an arrangement containing exactly two retained magnets is `twin-fix`; an arrangement containing three or more is `multi-fix`. At a published longest side `m`, the twin fix is size-eligible exactly when:
+
+```text
+m < twinFixLimitMM
+twinFixBaseSpanMM = (4 - 1)·basePitchMM + 2·paddingMM
+twinFixLimitMM = twinFixBaseSpanMM + max(flapLimitsMM)
+               = 168mm + 24mm
+               = 192mm under the released spec
+```
+
+The limit is derived from guarded values, never accepted as a size input or repeated as an engine literal. There is no aspect-ratio, elongation or shape-name condition. The limit does not apply to `multi-fix`; three or more magnets remain bounded by the count-derived field. The larger built-in-garment-grid regime remains an explicit product-boundary question: the current engine has no garment-capability input and must not infer one.
+
+### 7.8 Raw families and the user-facing size ladder
+
+The canonical answer always retains every lawful family in §9 order. The admin proof surface steps through that raw order without omission.
+
+The user-facing ladder is a derived ID view over those immutable families. EC-11b requires separated offerings but does not yet define the minimum separation value or the exact deterministic thinning rule. Until both are ruled and added as a guarded product input, `offerings.status=separation-policy-unresolved`, `rawFamilyIds` contains the complete canonical order, and `ladderFamilyIds` is empty. The engine may not guess 12, 24 or 48, use first-fit, or hide clustered answers behind an undocumented UI filter.
+
+When that product rule is settled, this section must define one deterministic pass over already-computed IDs; it may mark or index families but never delete them. An absent four-corner `optimum` remains absent: ladder construction degrades only through existing intermediate and floor families and never manufactures an optimum.
+
 ## 8. M2 — centre relationship, grid-box flap and limbs
 
 ### 8.0 Centre relationship
@@ -464,9 +497,11 @@ The portable engine is a pure `SolveRequest → SolveResult` function. The web p
 5. cache a bounded number of complete results;
 6. candidate browsing is an indexed lookup.
 
+Raw-family browsing and any later ladder browsing both use those indices. Neither invokes geometry or changes the immutable result.
+
 Pinch, resize, pan, drag, camera movement and browsing issue zero solve calls. Outline/spec change is the only invalidation trigger. First measure the decoupled cached runner. If a cache miss still creates a main-thread long task or visible input/animation stall, move the unchanged pure request/result boundary into one Web Worker. The worker is a measured execution escalation, never a second engine or a baseline mandate.
 
-Performance evidence records event count, window updates, canonical serialized-result bytes, peak memory, wall time and main-thread long tasks on the largest real trace. Result size is measured at the headless step-8 freeze, before proof-surface work. No unmeasured millisecond or memory budget is invented; any observed interaction stall fails EC-12.
+Performance evidence records event count, window updates, canonical serialized-result bytes, peak memory, wall time and main-thread long tasks on the largest real trace. Result size is measured at the headless complete-engine step-9 freeze, before proof-surface work. No unmeasured millisecond or memory budget is invented; any observed interaction stall fails EC-12.
 
 ### 10.1 Answer cardinality and browsing
 
@@ -514,12 +549,17 @@ The oracle carries one model-identity assertion, not a sampled example: whenever
 - boundary tangency: pair-region boundary contact accepted exactly;
 - concave notch crossing a region edge while every region vertex is inside: rejected;
 - complete 2×2 pair-box ring and its filled outer rectangle: identical on solid outlines;
+- disconnected two-pair fixture: records the current two-family result and keeps the product question in §6.4 visible until Dan rules whether their union is one layout;
+- twin-fix boundary: 190mm is eligible, 192mm and 194mm are not; changing aspect ratio alone changes no classification;
+- ladder: raw IDs are complete and ordered while unresolved policy produces no fabricated ladder IDs;
 - spec mutations: padding, base pitch, sparse factor and count rederive every answer;
 - unknown centre method: explicit refusal.
 
 ### 11.3 Real applied proof
 
 Run all seven saved cutouts through every centre method, operational bands 2/3, both populations and both flap switches. Every family must be selectable and steppable in canonical order. The SVG proof draws the transformed outline, each population's complete pair-box union, full discs, coordinates, padded grid box, four overhang segments, extremities, outside-box zones and binding contacts directly from the immutable answer.
+
+The corpus report groups lawful four-point counts by centre method. It must reproduce the measured load-bearing case: Duck has no four-point family under box or area centre and has five under maximum-clearance on the frozen fixtures. This is evidence for the pending centre policy, not permission to install maximum-clearance as a product default.
 
 An independent browser probe reads the drawn SVG and recomputes coordinates, pair-region containment, implied full-disc containment, grid boxes, overhangs and contacts without calling production geometry. Screenshot plus numeric probe are both required. A table saying `fits` is not evidence.
 
@@ -547,8 +587,9 @@ On the running current snapshot:
 | EC-07 | §§2.2, 5.2, 7.4–7.6 |
 | EC-08 | §§4, 5.2, 8 |
 | EC-09 | §§8.1–8.4 |
-| EC-10 | §8.5 |
+| EC-10 | §8.4 |
 | EC-11 | §11.3 |
+| EC-11b | §§7.7–7.8, 10–11 |
 | EC-12 | §§9–11 |
 
 Build in this order, with no build-ahead across a failed gate. The first milestone is deliberately headless and is the minimum viable algorithm/engine Dan required: formula first, algorithm second, test third, verified portable answer fourth. It does not wait for a screen.
@@ -560,11 +601,12 @@ Build in this order, with no build-ahead across a failed gate. The first milesto
 5. active-edge arrangement derivation and non-monotonic component-sweep attacks;
 6. 48/96 same-size coupling;
 7. region binding contacts, implied disc clearances, per-population grid boxes, overhangs, extremities and zones;
-8. complete answer assembly and byte-determinism attacks — **freeze and independently verify the headless minimum viable engine here**;
-9. runner cache/cancellation and zero-interaction-call proof;
-10. only after the headless gate passes, add the applied proof surface and independent SVG probe;
-11. seven-cutout, synthetic, performance and visual gates;
-12. Builder, QA and Meta each complete EC-01..EC-12 on one frozen snapshot.
+8. freeze and independently verify the headless containment kernel and its raw interval evidence; do not call it the complete engine while the two product questions remain open;
+9. after Dan resolves disconnected multi-pair membership and the ladder separation policy, add their exact deterministic rules, complete raw answer assembly and byte-determinism attacks — **freeze the headless minimum viable engine here**;
+10. runner cache/cancellation and zero-interaction-call proof;
+11. only after the headless engine gate passes, add the applied proof surface and independent SVG probe;
+12. seven-cutout, synthetic, performance and visual gates;
+13. Builder, QA and Meta each complete EC-01..EC-12 and EC-11b on one frozen snapshot.
 
 ## 13. Research disposition
 
