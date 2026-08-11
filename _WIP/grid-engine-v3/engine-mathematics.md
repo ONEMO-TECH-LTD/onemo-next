@@ -112,3 +112,59 @@ Q4 (pixel): integer-exact form of d(q̃,∂P)·E ≥ r·L — bound the magnitud
 anywhere) 64-bit doubles are insufficient at the 1mm floor. (Claim: nowhere; verify.)
 Q5 (meta): quadrant balance vs per-side flap spread — do they ever disagree on ranking a layout's
 evenness? If yes, both are reported; if provably never, one is redundant and dies.
+
+---
+# CONVERGENCE DRAFT 1 — after round-1 cross-attacks (lead ⇄ meta ⇄ pixel)
+
+## C1 · The canonical formula (pointwise form wins; ray form derived)
+    m(q, S) = d( C + (q−a)·L/S , ∂P ) · S/L − 12   ≥ 0     (closed; touching lawful)
+d = SIGNED full-nearest-boundary distance (negative outside; magnitude = min point-segment
+distance over ALL outline edges). This settles three round-1 breaks at once:
+- pixel's v=0: q=a puts the magnet at C for every S — pointwise form has no division; lawful ⟺
+  S ≥ 12·L/d(C,∂P). Only the ray form ρ(t)/t degenerates at t=0; it is DERIVED, not canonical.
+- pixel's off-ray notch: d is full-boundary clearance, never ray-polygon intersection. ρ(t) is
+  DEFINED as d evaluated at ray points — with that definition the notch binds correctly.
+- meta's star-shape worry: nothing assumes star-shapedness. The magnet's normalised position
+  slides along its ray; d is a total function of position; every re-entry is just m changing sign
+  again. Completeness needs no proof beyond d's own definition.
+
+## C2 · Combination is INTERSECTION of size-sets, never max-of-minima (unanimous)
+Per magnet: lawful S form disjoint bands (waists). Per layout: ∩ over its magnets. Assembly
+inverts the loop (meta's inversion = pixel's masks = lead's survivors): compute each of the ≤13
+window positions' lawfulness per candidate ONCE; a layout is whatever survives — components of
+axis-aligned pitch pairs. The L emerges; partials are free; nothing is enumerated per rectangle.
+
+## C3 · Domain reconciliation (pixel's break 3 — grid-dictated vs meta's 136)
+Both are right, on different axes. Candidates are GRID values on the BINDING AXIS: the dimension
+the grid span constrains steps the ladder G(b,p)+k·12 — generated before the shape exists (Dan's
+ruling). The published size is the LONGEST side, which follows from the locked aspect and rounds
+UP to even (EC-07): a non-grid number, but an OUTPUT, never a candidate. Meta's 136 for BOT is a
+published long side; its binding-axis value sits on the ladder. Coupling (Q3 answered): one
+candidate fixes one physical scale σ = ladder/bindingSide; BOTH pitches are tested at that same σ;
+family ⟺ both non-empty; published = ceil_even(σ·L).
+
+## C4 · No crossings are ever solved (unanimous after round 1)
+The engine evaluates sign(m) at candidates only — integer-exact at the 1mm floor by clearing the
+division: d(·)·S ≥ 12·L. Meta's ρ-curve remains the ANALYSIS/diagnostic form (names the exact
+crossing); pixel's per-magnet bitmasks (4 bits per band at 48, 8 at 96) are the engine's runtime
+form; they are the same information. Blind atom round-up is dead: publication selects candidates
+already inside the intersected lawful set (pixel's break 2).
+
+## C5 · One S-axis carries everything (meta's synthesis, adopted)
+Support = sign changes on S. Flap is LINEAR in S (extent = S × normalised extent; grid box fixed),
+so each flap switch is one more threshold on the same axis; ceiling is a cap; 48/96 coupling is an
+intersection. A shape's complete answer = a handful of intervals on one number line → the
+"fingerprint": ≤13 positions × per-candidate bits + two extents ≈ hundreds of BYTES per shape
+(vs 27–112MB). Library precomputes to nothing; a phone solves a fresh shape in ~13 distance walks.
+
+## C6 · Flagged for Dan, not decided (unchanged + one new)
+Centre policy (O-1) — NEW framing from meta: the formula prices any centre, so the centre could be
+an OUTPUT (minimise the worst quadrant's demand) instead of a menu; product call, parked. Ladder
+separation; joint-optimum definition; disconnected components; presentation order.
+
+## C7 · Verification plan for the agreed formula
+- pixel's brute-force disc oracle at 1mm (independent implementation) over the seven cutouts:
+  identical survivor masks per candidate, all six centres.
+- meta's C-fixture class: a layout whose magnets have disjoint lawful bands with staggered gaps —
+  proves intersection-not-max in code, kept as a permanent fixture.
+- BOT L-at-120/132, butterfly 4-disc-from-130: the two Dan-named cases as acceptance fixtures.
