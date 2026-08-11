@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 80 directives
+## 2026-08-11 · @s62-lead · 81 directives
 
 **06:26:48**
 
@@ -1410,6 +1410,10 @@ between magnets? flap= outer edges not supported by magnet connection and hold
 **14:06:10**
 
 the eventual mechanism in the interaction will be just selecting the band so under the hood we need to make sure that within selected band user gets the optimal size and we guarantee it - otherwise they can get surprises on the expected sizes
+
+**14:08:03**
+
+admin dash must allow us to move and review every increment defined by the engine and if we can we need to build the engine that hits the bulls eye so we dont have to create mystery sizing and user knows the size and confirmed by the system and we do not to polish the mnagnetic grid matching the shape manually post purchase by eye - theis will become real bottleneck for the production and bad UX
 
 
 ---
