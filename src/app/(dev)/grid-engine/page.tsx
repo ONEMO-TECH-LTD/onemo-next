@@ -69,8 +69,13 @@ const SHAPE_STEP_MM = 2
  * count puts the shape's centre in the gap between magnets — which is what makes the four symmetric.
  */
 const DEFAULT_BAND_MAGNETS = 2
-/** Where the camera starts, as a COUNT of lattice positions. The millimetres come from the unit. */
-const LAUNCH_POSITIONS = 5
+/**
+ * THE THREE BANDS, as counts (law 10.7 — the selector offers 2, 3 and 4; size 1 is coded, not shown).
+ * Their millimetres are the SQUARE STANDARD and come from the unit, never from here.
+ */
+const BANDS = [2, 3, 4] as const
+/** The biggest band offered. The launch view is framed to hold it (Dan: "adapt zoom to the largest size"). */
+const LARGEST_BAND = BANDS[BANDS.length - 1]
 const CUTOUT_OPACITY = 0.55
 
 
@@ -89,7 +94,7 @@ export default function GridEnginePage() {
   // Framing, not layout: how much narrower the launch view is than the whole field. Both spans come
   // from the unit; dividing two lengths to get a camera factor is screen maths, which is this side's.
   const launchZoom =
-    fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / fieldSpan(RELEASED, LAUNCH_POSITIONS)
+    fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / bandSpan(RELEASED, LARGEST_BAND + 1)
   const [zoom, setZoom] = useState(launchZoom)
   const [view, setView] = useState<FieldSummary | null>(null)
   const onView = useCallback((r: FieldSummary) => setView(r), [])
@@ -414,6 +419,21 @@ export default function GridEnginePage() {
 
         <div className={styles.fixture}>
           <span className={styles.fixtureName}>Size</span>
+          {BANDS.map((n) => {
+            const mm = Math.round(bandSpan(spec, n))
+            return (
+              <button
+                key={n}
+                type="button"
+                className={styles.chip}
+                data-on={sizeMM === mm}
+                onClick={() => setSize(mm)}
+                title={`band ${n} — ${n} magnets across, the square standard`}
+              >
+                {mm}
+              </button>
+            )
+          })}
           <input
             className={styles.slider}
             type="range"
@@ -422,7 +442,7 @@ export default function GridEnginePage() {
             step={SHAPE_STEP_MM}
             value={Math.min(sizeMM, spec.grid.maxSizeMM)}
             onChange={(e) => setSize(Number(e.target.value))}
-            aria-label="Test shape size"
+            aria-label="Shape size"
           />
           <input
             className={styles.input}
