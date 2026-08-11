@@ -168,3 +168,39 @@ separation; joint-optimum definition; disconnected components; presentation orde
 - meta's C-fixture class: a layout whose magnets have disjoint lawful bands with staggered gaps —
   proves intersection-not-max in code, kept as a permanent fixture.
 - BOT L-at-120/132, butterfly 4-disc-from-130: the two Dan-named cases as acceptance fixtures.
+
+---
+# ROUND 2 — pixel's attacks, adjudicated into the draft
+
+## C8 · Q4 was FALSE as written — the integer form is the distance transform, not cleared division
+Pixel's refutation stands: point-segment distance carries projection/division/sqrt; two centres
+(perimeter, max-clearance) are irrational; d·S ≥ 12·L does not integerise, and squared
+cross-multiplication can exceed 2^53. ADOPTED replacement (product-native, no kernel):
+per candidate, rasterise the manufactured shape at the 1mm floor (fixed deterministic raster rule),
+take the exact integer squared Euclidean distance transform, and support is
+    DT²(q) ≥ 144        (12² — constant, because the mask is at manufactured scale)
+All integers, no sqrt, no division, no exact kernel, ~96 small DTs per shape ≈ tens of ms worst
+case, and it IS L19: the computation happens at the resolution the product exists at. The margin
+value m = √DT² − 12 remains available as evidence (float for display only, never for decisions).
+
+## C9 · Coupling is by σ, never by rounding (Q3 closed)
+Equal ROUNDED published sizes can join two different exact scales — refuted by pixel. A family is
+one manufactured object: ONE candidate σ, both pitches tested at it, identical manufactured
+bbox/scale by construction. Publication rounds the longest side up to even for display and
+manufacture labelling; it never participates in coupling.
+
+## C10 · The grammar break — options are admissible SUBSETS, not just maximal components
+Components-of-survivors hides lawful sub-layouts when more magnets hold — and Dan has ruled the
+product wants them (the triangle: "mid bottom point can be hidden to leave 3 points only"; the
+engine presents ALL options). ADOPTED: an option is an admissible subset of the survivors — every
+selected magnet has a pitch-adjacent selected partner (pair floor, no isolated magnet), connected
+(disconnected unions stay parked in C6). ≤512 subsets at a 3×3 window; trivial at this scale.
+Maximal components remain as the default view; subsets are the complete option space.
+
+## C11 · Q5 closed: flap spread and quadrant-margin spread are NOT redundant
+Counterexample (pixel): symmetric bbox with an internal notch — flap spread 0, quadrant margins
+unequal. Both measures stay, reported separately (no blending; precedence is Dan's O-3).
+
+## C12 · Verified this round
+Q1 holds (disc ⊆ P ⟺ inside ∧ full-boundary d ≥ r — off-ray notches included by min-over-edges).
+Lead/meta formula equivalence confirmed by pixel after t = |q−a|·L/E substitution.
