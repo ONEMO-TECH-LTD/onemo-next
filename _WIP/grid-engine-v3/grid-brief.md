@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 94 directives
+## 2026-08-11 · @s62-lead · 95 directives
 
 **06:26:48**
 
@@ -1466,6 +1466,10 @@ this depends on how far is each size apart - for users we can calculate and make
 **14:42:31**
 
 or we cherry pick only sizes that are distanced between each other evenly not micro sizes
+
+**14:45:19**
+
+but to n=be honest system must select theoptimal by how fewer flap it has - if it is harmonious and centered and how snug it fits the bounding box of set mag layout
 
 
 ---
