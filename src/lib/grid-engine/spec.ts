@@ -146,6 +146,25 @@ export function limitsFor(key: GridKey): { min: number; max: number } {
   return LIMITS[key]
 }
 
+/** The registrations that exist. There is no third, and neither is ever typed in freehand. */
+const RELEASED_REGISTRATIONS: readonly Registration[] = Object.freeze(['gap', 'point'])
+
+/**
+ * THE GUARDED ROUTE FOR REGISTRATION — the one this value never had.
+ *
+ * `registration` is not a GridKey, so it was absent from LIMITS, SEALED_IN_CODE and OPTIONS_ONLY:
+ * the guard could not refuse a bad write because there was no door to refuse it at. The shell wrote
+ * it with a bare setState, and the separation test could not see that either — it watches for writes
+ * into `grid`, and this is a sibling key.
+ *
+ * It is a released OPTION, like the pitch: chosen between values the system has, never typed. What
+ * it should BE for a given shape is the engine's answer (law 6.5); this only guards how it is set.
+ */
+export function selectRegistration(spec: GridSystemSpec, registration: Registration): WriteResult {
+  if (!RELEASED_REGISTRATIONS.includes(registration)) return { spec, refused: 'options-only' }
+  return { spec: { ...spec, registration } }
+}
+
 /**
  * The current released values, frozen. Mutating them in place throws in strict mode rather than
  * corrupting the baseline every derived result is measured against.

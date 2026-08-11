@@ -22,6 +22,7 @@ import {
   limitsFor,
   RELEASED,
   selectPitch,
+  selectRegistration,
   type GridKey,
   type GridSystemSpec,
   type WriteRefusal,
@@ -176,9 +177,14 @@ export default function GridEnginePage() {
    * dependency list it used to carry meant it read whatever they were on first render.)
    */
   const loadCutout = ((file: File) => {
-    // Even band -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
+    // Even match -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
     // about it. This is the count's parity, not a default anyone picked (law 6.5).
-    setSpec((sp) => ({ ...sp, registration: DEFAULT_MATCH_MAGNETS % 2 === 0 ? 'gap' : 'point' }))
+    //
+    // Through the GUARD, like every other law value. It used to be a bare setState, which was a
+    // second write route into the spec that no guard and no test could see.
+    const r = selectRegistration(spec, DEFAULT_MATCH_MAGNETS % 2 === 0 ? 'gap' : 'point')
+    setRefused(r.refused ?? null)
+    if (!r.refused) setSpec(r.spec)
     // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
     setAsOutline(true)
     void traceCutout(file).then(setOutline)
