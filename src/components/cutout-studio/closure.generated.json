@@ -36,15 +36,15 @@
       },
       {
         "file": "src/components/cutout-studio/finish.ts",
-        "bytes": 19060,
-        "sha256": "0e29b01695731e295101d0f395e5c02c22d43566f7b38a093fb3bb7e10a5097d",
+        "bytes": 17752,
+        "sha256": "133627e796b891eb1bb453fce1e32b2ddec579e23277fd18ebd72ad7e3e5fbc7",
         "destination": "src/components/cutout-studio/finish.ts",
         "layer": "browser-react"
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 54680,
-        "sha256": "f3962944e1cb4514cf16f9fcc6f02f7d75126fd55af71b0d9c894b33d977c5bf",
+        "bytes": 52368,
+        "sha256": "1afd748ad3b28b8d7a21bb036bdd3523ed2431ec6e8d915c9511a64bdef4cf71",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -197,8 +197,8 @@
       },
       {
         "file": "src/lib/mask-tools/index.ts",
-        "bytes": 9879,
-        "sha256": "7c2e209e9f832b3628e6b54c7fa6076b0588cd95a54c71daea061cdb44815f18",
+        "bytes": 11307,
+        "sha256": "d438999660f5bd7340de4e1ba8a076e03d290722bff60923526e151a7876dc69",
         "destination": "src/lib/mask-tools/index.ts",
         "layer": "browser-adapter"
       },
@@ -274,8 +274,8 @@
       },
       {
         "file": "src/lib/vector-core/paper-kernel.ts",
-        "bytes": 11258,
-        "sha256": "f77d0e135188bf08a2c1e88328a849634cc14557489caafb5f2545f621c99e5f",
+        "bytes": 9119,
+        "sha256": "694af1aa8ddf84a80b3e720b8531d64729aa8cdbfd25669df74f9d2cb5e5513b",
         "destination": "src/lib/vector-core/paper-kernel.ts",
         "layer": "headless"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 344944,
-    "closureSha256": "30cc6700f7ee7fcd7d0bed8957fe5343e944394f5245d9994ccbe83d353f3ae9"
+    "totalBytes": 340613,
+    "closureSha256": "72b8184f9b4312f1fcf7c5368ed91e6fd7581d9413144bcd62b8b22c7c13cb59"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -339,10 +339,10 @@
         "brotliBytesEstimate": 53670
       },
       {
-        "file": ".next/static/chunks/651-52636ca8367bb0e4.js",
-        "rawBytes": 34471,
-        "gzipBytesEstimate": 13641,
-        "brotliBytesEstimate": 12166
+        "file": ".next/static/chunks/651-84fb6f360340732e.js",
+        "rawBytes": 33736,
+        "gzipBytesEstimate": 13426,
+        "brotliBytesEstimate": 12011
       },
       {
         "file": ".next/static/chunks/9776-d8f9c7623946cb00.js",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-812212923a37efb7.js",
-        "rawBytes": 64183,
-        "gzipBytesEstimate": 21261,
-        "brotliBytesEstimate": 18809
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-12bac4b6062417e9.js",
+        "rawBytes": 63138,
+        "gzipBytesEstimate": 21091,
+        "brotliBytesEstimate": 18669
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -375,10 +375,10 @@
         "brotliBytesEstimate": 35158
       },
       {
-        "file": ".next/static/chunks/webpack-6bddca03a0574198.js",
+        "file": ".next/static/chunks/webpack-b7c6b836ce69c591.js",
         "rawBytes": 5770,
         "gzipBytesEstimate": 2877,
-        "brotliBytesEstimate": 2526
+        "brotliBytesEstimate": 2528
       },
       {
         "file": ".next/static/css/407a9bc1bf490e7e.css",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1300744,
-    "gzipBytesEstimate": 364425,
-    "brotliBytesEstimate": 297667
+    "rawBytes": 1298964,
+    "gzipBytesEstimate": 364040,
+    "brotliBytesEstimate": 297374
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",

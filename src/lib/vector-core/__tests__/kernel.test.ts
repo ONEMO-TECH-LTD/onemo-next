@@ -7,7 +7,6 @@ import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBo
 import { insertAnchorAt } from '../ops' // live-internal, not a public barrel export
 import { filletPath } from './fillet-fixtures' // test fixture (moved out of production path.ts)
 import { roundCornersPaper } from '../paper-kernel' // L6: corner-round is the Paper kernel
-import { subtractShapePaper } from '../paper-kernel'
 import { unitShape, getShape } from '@/lib/shape-library'
 
 describe('vector-core kernel', () => {
@@ -325,37 +324,4 @@ describe('vector-core kernel', () => {
     expect(sb.maxY - sb.minY).toBeCloseTo(S, 1)
   })
 
-  test('difference — a crossing negative cuts locally without polygonizing untouched curves', () => {
-    const rect = (x0: number, y0: number, x1: number, y1: number) => ({ paths: [{ anchors: [
-      { id: 'top-left', p: { x: x0, y: y0 }, hIn: null, hOut: { x: x0 + 40, y: y0 }, corner: false },
-      { id: 'top-right', p: { x: x1, y: y0 }, hIn: { x: x1 - 40, y: y0 }, hOut: null, corner: false },
-      { id: 'bottom-right', p: { x: x1, y: y1 }, hIn: null, hOut: null, corner: true },
-      { id: 'bottom-left', p: { x: x0, y: y1 }, hIn: null, hOut: null, corner: true },
-    ] }] })
-    const subject = rect(0, 0, 100, 100)
-    const result = subtractShapePaper(subject, rect(40, -10, 60, 40))
-
-    expect(result).not.toBeNull()
-    const bb = shapeBBox(result!, 0.01)
-    expect(bb.minX).toBeCloseTo(0, 10); expect(bb.minY).toBeCloseTo(0, 10)
-    expect(bb.maxX).toBeCloseTo(100, 10); expect(bb.maxY).toBeCloseTo(100, 10)
-    expect(result!.paths).toHaveLength(1)
-    expect(result!.paths[0].anchors.length).toBeLessThan(12)
-    const points = result!.paths[0].anchors.map((anchor) => ({ x: Math.round(anchor.p.x) || 0, y: Math.round(anchor.p.y) || 0 }))
-    expect(points).toEqual(expect.arrayContaining([
-      { x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 40 },
-      { x: 60, y: 40 }, { x: 60, y: 0 }, { x: 100, y: 0 },
-      { x: 100, y: 100 }, { x: 0, y: 100 },
-    ]))
-    expect(result!.paths[0].anchors.find((anchor) => anchor.id === 'bottom-right')).toEqual(subject.paths[0].anchors[2])
-    expect(result!.paths[0].anchors.find((anchor) => anchor.id === 'bottom-left')).toEqual(subject.paths[0].anchors[3])
-    const untouched = subtractShapePaper(subject, rect(120, 120, 140, 140))
-    expect(untouched).toEqual(subject)
-
-    const split = subtractShapePaper(rect(0, 0, 100, 100), rect(45, -10, 55, 110))
-    expect(split).not.toBeNull()
-    expect(split!.paths).toHaveLength(1)
-    const splitBox = shapeBBox(split!, 0.01)
-    expect(splitBox.maxX - splitBox.minX).toBeLessThanOrEqual(45)
-  })
 })

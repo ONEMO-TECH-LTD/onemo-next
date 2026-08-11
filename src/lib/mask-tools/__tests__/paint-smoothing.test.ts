@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { grabCutBrushGeometry } from '@/lib/cutout-grabcut'
-import { finishMask, ZERO_SETTINGS } from '@/components/cutout-studio/finish'
-import { autoTunePaintStroke, paintSmoothingRadius, polishMask, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
+import { autoTunePaintStroke, fillEnclosedHoles, paintSmoothingRadius, polishMask, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
 import type { Mask } from '@/lib/mask-tools/types'
 
 function rectangle(w: number, h: number, x0: number, y0: number, x1: number, y1: number): Mask {
@@ -30,16 +29,7 @@ describe('Paint shape-relative smoothing', () => {
   })
 })
 
-describe('Paint eraser coordinate parity', () => {
-  it('returns the resolved negative shape where the mask stroke was drawn, not vertically mirrored', () => {
-    const negative = rectangle(40, 40, 8, 4, 24, 10)
-    const finished = finishMask(negative, ZERO_SETTINGS)
-
-    expect(finished).not.toBeNull()
-    expect(finished!.bounds.minY).toBeLessThan(6)
-    expect(finished!.bounds.maxY).toBeLessThan(12)
-  })
-
+describe('Paint eraser solid-blob law', () => {
   it('changes no accepted-main mask pixel outside the negative shape', () => {
     const base = rectangle(40, 40, 4, 4, 36, 36)
     const negative = rectangle(40, 40, 16, 12, 24, 28)
@@ -56,6 +46,20 @@ describe('Paint eraser coordinate parity', () => {
     ]
     expect(shouldClosePaintStroke(stroke, 0)).toBe(false)
     expect(shouldClosePaintStroke(stroke, 0.35)).toBe(true)
+  })
+
+  it('restores a fully internal erase so Paint cannot publish a hole', () => {
+    const base = rectangle(12, 12, 1, 1, 11, 11)
+    const internal = rectangle(12, 12, 4, 4, 8, 8)
+    expect(fillEnclosedHoles(subtractMasks(base, internal)).data).toEqual(base.data)
+  })
+
+  it('preserves a boundary-connected carve instead of filling it back', () => {
+    const base = rectangle(12, 12, 1, 1, 11, 11)
+    const boundary = rectangle(12, 12, 0, 4, 6, 8)
+    const carved = fillEnclosedHoles(subtractMasks(base, boundary))
+    expect(carved.data).not.toEqual(base.data)
+    expect(carved.data[6 * 12 + 2]).toBe(0)
   })
 })
 

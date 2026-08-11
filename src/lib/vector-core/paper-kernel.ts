@@ -65,45 +65,6 @@ function fromPaperPath(p: paper.Path): VPath {
   return { anchors }
 }
 
-/** Boolean-subtract a finished negative while retaining Paper's native curve segments. Unlike a
- * polygon kernel, Paper splits only the intersected curves; untouched anchors and Bezier handles
- * remain curves instead of being flattened into a new all-corner outline. */
-export function subtractShapePaper(subject: VShape, negative: VShape): VShape | null {
-  const toItem = (shape: VShape): paper.PathItem => {
-    const paths = shape.paths.map(toPaperPath)
-    return paths.length === 1 ? paths[0] : new paper.CompoundPath({ children: paths })
-  }
-  const subjectItem = toItem(subject)
-  const negativeItem = toItem(negative)
-  let result: paper.PathItem | null = null
-  try {
-    result = subjectItem.subtract(negativeItem, { insert: false }) as paper.PathItem
-    const resultPaths = result instanceof paper.CompoundPath
-      ? result.children.map((child) => child as paper.Path)
-      : [result as paper.Path]
-    if (!resultPaths.length) return null
-    // One-shape protocol: retain the largest connected outer result and only paths contained by it
-    // (legitimate holes). An erase may cut a chunk away; it may never publish detached islands.
-    const main = resultPaths.reduce((largest, path) => Math.abs(path.area) > Math.abs(largest.area) ? path : largest)
-    const connected = resultPaths.filter((path) => path === main || main.contains(path.interiorPoint))
-    const paths = connected.map(fromPaperPath)
-    if (!paths.length || paths.every((path) => path.anchors.length < 3)) return null
-
-    // Boolean operations drop segment metadata. Restore stable ids only where an output anchor is
-    // the same accepted anchor; newly-created cut-boundary anchors intentionally receive no id.
-    const sourceAnchors = subject.paths.flatMap((path) => path.anchors)
-    for (const path of paths) for (const anchor of path.anchors) {
-      const source = sourceAnchors.find((candidate) => Math.hypot(candidate.p.x - anchor.p.x, candidate.p.y - anchor.p.y) < 1e-6)
-      if (source?.id) anchor.id = source.id
-    }
-    return { paths }
-  } finally {
-    result?.remove()
-    subjectItem.remove()
-    negativeItem.remove()
-  }
-}
-
 /**
  * L1 — TRUE-ARC corner round (replaces the hand-rolled, leg-skewing `filletPathSmart`). Rounds every
  * anchor index for which `pick(i)` is true with `radiusPx`, via paperjs-round-corners — a single

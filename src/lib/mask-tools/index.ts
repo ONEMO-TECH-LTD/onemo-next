@@ -122,6 +122,49 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   return { data, w: base.w, h: base.h }
 }
 
+/** Paint shapes are solid blobs. Empty pixels reachable from the canvas edge remain the exterior;
+ * every other empty region is an enclosed hole and is filled. This is intentionally Paint-only:
+ * AI and GrabCut masks stay verbatim. */
+export function fillEnclosedHoles(mask: Mask): Mask {
+  const { w, h } = mask
+  const reach = new Uint8Array(w * h)
+  const stack: number[] = []
+  for (let x = 0; x < w; x++) {
+    if (!mask.data[x]) stack.push(x)
+    const bottom = (h - 1) * w + x
+    if (!mask.data[bottom]) stack.push(bottom)
+  }
+  for (let y = 0; y < h; y++) {
+    const left = y * w
+    if (!mask.data[left]) stack.push(left)
+    const right = left + w - 1
+    if (!mask.data[right]) stack.push(right)
+  }
+  while (stack.length) {
+    const index = stack.pop()!
+    if (reach[index] || mask.data[index]) continue
+    reach[index] = 1
+    const x = index % w
+    if (x > 0) stack.push(index - 1)
+    if (x < w - 1) stack.push(index + 1)
+    if (index >= w) stack.push(index - w)
+    if (index < w * (h - 1)) stack.push(index + w)
+  }
+  let data: Uint8Array | null = null
+  let soft: Uint8Array | undefined
+  for (let index = 0; index < mask.data.length; index++) {
+    if (mask.data[index] || reach[index]) continue
+    if (!data) {
+      data = mask.data.slice()
+      soft = mask.soft?.slice()
+    }
+    data[index] = 1
+    if (soft) soft[index] = 255
+  }
+  if (!data) return mask
+  return { data, w, h, ...(soft ? { soft } : {}) }
+}
+
 /** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize
  *  the RESOLVED outline as the one truth — inside solid (data 1, soft 255), the outer edge band
  *  soft from the rasterizer's own anti-aliasing, outside dropped for real. After this, tint ≡
@@ -130,12 +173,10 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
 export function solidShapeMask(shape: VShape, w: number, h: number): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })!
+  const ring = flattenShape(shape, 0.5)[0] ?? []
   ctx.beginPath()
-  for (const ring of flattenShape(shape, 0.5)) {
-    ring.forEach((p: { x: number; y: number }, i: number) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-    ctx.closePath()
-  }
-  ctx.fillStyle = '#fff'; ctx.fill('nonzero')
+  ring.forEach((p: { x: number; y: number }, i: number) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+  ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill()
   const px = ctx.getImageData(0, 0, w, h).data
   const data = new Uint8Array(w * h)
   const soft = new Uint8Array(w * h)

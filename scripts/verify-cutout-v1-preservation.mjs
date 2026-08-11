@@ -166,10 +166,10 @@ try {
   await enterPreview()
   const editedInfo = pngInfo(await downloadCutout())
   assert.deepEqual(editedInfo, {
-    width: 1833,
-    height: 814,
+    width: 1835,
+    height: 817,
     colorType: 6,
-    sha256: '038de053f589b3b7353b648d432260ec0ca9215a13544947334497d085442201',
+    sha256: '64c79250c782516c0cb57b79c29bd7f4c131d5fcd47459e7fd9986f5bc353d29',
   }, 'fixed-viewport original-resolution real OpenCV edit must retain its exact RGBA result')
   await page.getByRole('button', { name: /Editing view/ }).click()
 
