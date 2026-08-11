@@ -11,3 +11,19 @@
 - VISUAL GATE (EC-11) PASSED on 4200, profiled Chrome, tree b7343eb8: PILL → solve (worker, page responsive throughout) → 6,937 families → stepper instant → applied overlay correct. Independent SVG re-measurement (page-context arithmetic on rendered geometry only) reproduced flap L70.4/R70.4/T72.0/B72.0 exactly and confirmed disc containment. Screenshot committed: evidence/applied-proof-pill-family4.jpg.
 - Memory fix proven: PILL headless at DEFAULT heap = 6,907 families / 67s / 330MB (was FATAL OOM past 4GB). Browser vs headless family delta (6,937 vs 6,907) is the live tracer producing a slightly different outline than the archived corpus trace — different input, not nondeterminism.
 - Definitive corpus rerunning on final code (index-run zones, streaming hash).
+
+## 2026-08-11 late — architecture verdict + math convergence
+- Dan's interrogation collapsed the architecture: continuous-σ event solver + exactness layer solved
+  a problem the product never posed (fabricated 11.6 → "no scanning" misread → contract enshrined).
+  Meta rebuilt the simple engine from pre-build state: 13ms vs 27min. EC-06 box-interior rule
+  DISPROVEN by butterfly (4 discs on wings from ~130, box only from 212). My frozen build + corpus
+  + QA rework boundary = dead architecture; stood down.
+- Dan ruled L19 (1mm floor, fit/fill container model) — booked verbatim.
+- Three-lane math convergence in _WIP/grid-engine-v3/engine-mathematics.md (C1–C26): margin/support
+  predicate, intersection-not-max (meta's staggered-gaps proof), band-union candidate ladder on the
+  binding axis (BOT-144 fixture), template-vs-arrangement naming, σ-coupling never rounding,
+  admissible-subset grammar, predicate authority = EXACT disc-vs-polygon on quantised intake
+  (field invented 2 offers — demoted to prefilter), filter+BigInt-fallback measured (meta 0.015%,
+  lead 0.64% T-scaled), centre quantisation (rational/irrational split), canonical intake unit×400.
+- Artifacts for the three-way gate: lead-exact-verdicts.json (19,180), pixel oracle in progress,
+  meta rerun pending. Seal after three-way agreement.
