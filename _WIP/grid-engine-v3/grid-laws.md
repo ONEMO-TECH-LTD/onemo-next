@@ -1,840 +1,235 @@
 # GRID ENGINE v3 — LAW
-### What the engine must obey · 2026-08-09 → 2026-08-10 · living document
 
-> **This book does not replace the v1 grid law book. It inherits it.**
-> Dan, 2026-08-10: *"plus our law book is still applies from the grid-lab v1"*.
-> Inherited in full: `onemo-ssot-global/.claude/worktrees/s59-grid-law-main/_ssot-workbench/_briefs/grid-laws.md`
-> — the lattice, the atoms, padding from the magnet centre, the even-millimetre publication, the
-> mask/spacing/pattern separation, the manufacturing projection. **Nothing there is repealed except
-> where a clause below says so explicitly.**
+### Thirteen laws. The engine and its algorithm. Nothing else.
+
+> **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
+> applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
+> algorithm." This book obeys that scope. Shell, canvas, zoom, conduct and session steering are not
+> law and are not here — see §B, §C, §D below.
 >
-> This book records only what is **new or newly decided** for v3.
-> Provenance on every entry: **DAN** — his words, quoted, settled only by a different utterance ·
-> **DERIVED** — engineering formalisation of a Dan ruling, settled by showing the derivation wrong.
-> Companion: [`grid-brief.md`](./grid-brief.md) — his directives verbatim.
+> **Provenance.** Every law carries Dan's own line, its **timestamp and lane**, verified against the
+> transcript vault before it was written here. A clause with no verifiable line is not law.
+>
+> **Dates.** *Dan, 2026-08-11:* "By now we have enough briefs and laws in 9/10/11 Aug to have this
+> project self sufficient and also filter noise as well. So prior briefs and laws from before 9aug
+> must probably be removed unless they are fundamental still." Pre-09-08 material is presumed dead
+> and survives only where §E rescues it by name.
+>
+> Companion: [`grid-brief.md`](./grid-brief.md) — his directives verbatim, with timestamps.
 
 ---
 
-## 1 · The unit
+## THE THIRTEEN
 
-**1.1 — Three parts. The unit is two of them, and the unit is what travels.** *DAN, 08-10*
-> "1 unit 2 subs engine and logic system" · "3rd is admin ui shel neutral canvas that has ui separate
-> bridge that wires in the logic unit to drive the engine - ui is for admin testing - the grid engine
-> unit with logic must be portable for later integration into cutout lab and web app"
-
-**1.1a — THE SPLIT, ruled exactly.** *DAN, 08-10, verbatim:*
-> "no math in the logic - engine has all compute - logic can hold and feed key values only and the
-> rest of the logic bridging the engine to any ui or other modules with logic"
-
-| | holds | never holds |
-|---|---|---|
-| **Engine** | **ALL compute.** Every calculation without exception | no values of its own |
-| **Logic** | (a) holds and feeds the key values · (b) the bridging logic wiring the engine to any UI or any other module | **no maths at all** |
-| **Admin UI shell** | layout, controls, presentation state | renders; computes nothing |
-
-**Engine + logic is one portable unit.** It carries no browser, no framework, no screen assumption,
-because it is going into the Cutout Lab and the web app later. The shell exists so Dan can test; it
-is not the product.
-
-**The bridge is not a fourth part and it is not UI-side.** It is the logic sub's second job, and it
-**travels with the unit** — because "any ui or other modules" means the Cutout Lab and the web app
-each drive the engine through it rather than each writing their own wiring. *(This closes O-A.)*
-
-**Test of the split:** if a line performs arithmetic, it is engine — wherever it currently sits.
-
-**1.2 — The prototype is not the base.** *DAN, 08-09*
-> "the grid-lab is prototype that has noodle soup inside"
-
-v3 is not built on the grid-lab, does not extend `grid-core.ts`, and inherits none of its code.
-
----
-
-## 2 · Sizing
-
-**2.1 — Scale is the only transform. Aspect is locked.** *DAN, 08-09 / 08-10*
-> "margin offset is cosmetically wrong - scale is the only part must be applied" ·
-> "scaling cutout shapes in locked aspect ratio to the grid"
-
-**Supersedes v1 laws 2.6 and 2.7 for the size solve.** No margin band participates in sizing. A
-cut-out's proportions are part of its identity and are never altered — width and height are never
-independently adjustable. *(This is the exact defect measured in the old engine, where a circle, a
-3:1 oval and an 8:1 sliver all returned the identical ladder.)*
-
-**2.1a — THE SHAPE IS UNTOUCHABLE. Nothing is ever shrunk, eroded, offset or redrawn.** *DAN, 08-10,
-stated three times in fifteen minutes because the engine kept implying otherwise:*
-> "we are not shrinking anything we are scaling proportionately and we start at bands as i asked already
-> as fine tune steps use scaling and other methodologies we discussed"
->
-> "this was ale=ways the case and repeated it many times "The shape is untouchable. The user's outline
-> and its proportions are locked. We never deform it, never stretch it, never redraw it. The only thing
-> we ever do to it is scale it up or down, aspect locked.""
->
+**L1 — THE SHAPE IS UNTOUCHABLE. Scale is the only transform, aspect locked.**
+*Dan, 08-10 18:39 @meta ·  08-09 23:25 @lead*
 > "locked proportions only scaling  was repeated 100 times today"
-
-**And on the internal restatement that caused the confusion** — *DAN, 08-10:*
-> "what is erroded region and what is it for precisely i still do not understand the purpose of the
-> clipper - we filtered clear methodology simple - we need to place magnets - clipper is svg powered
-> engine for drawing the shapes - we are not drawing the shapes here what is it for?"
-
-**Padding is an ENLARGEMENT OF THE MAGNET, never a reduction of the shape.** Each magnet centre carries
-a 12mm safe radius, so it occupies a 24mm disc that must sit wholly on fabric (10.6, 11.1). The
-equivalent phrasing — "a 12mm no-go band just inside the outline where no magnet centre may sit" — is
-the *same rule seen from the shape's side*, and is an internal convenience only.
-
-**No such curve is ever drawn, exported, manufactured or handed to a drawing library.** Constructing it
-as a polygon is what produced the two-boundaries defect: candidates generated from an approximated curve,
-scored against exact distance. **The hold test is the exact distance from the node to the outline
-(11.1). Nothing else is required, and nothing may modify the outline.**
-
-**2.2 — Optimal is tight: no breathing space between the magnet cells and the edge.** *DAN, 08-10*
-> "star encapsulates 2x2 grid with breathing space to the edges - this is fine but not optimal" ·
-> "look how close the edges of shape to gug the grid 2x2 - so in that case close to optimal is 162mm"
-
-A larger size that holds the same magnets is **legal but wasteful**. The optimal size for a given
-layout is the one where the outer cells press against the shape's edge. This is v1's zero-flap rule
-stated as the sizing objective.
-
-**2.3 — But smallest is NOT the rule. Balance decides first. See §3.** *DERIVED from 3.1*
-
----
-
-## 3 · Balance and symmetry — the rule that chooses the layout
-
-**3.1 — THE BALANCE LAW.** *DAN, 08-10, verbatim:*
-> "what may seem logical on paper and mathematically correct may miss the law of balance and simetry"
 >
-> "the grid 2x2 must be centered and symetrical from each side of the shape plus follow logic of where
-> material is and is not available"
+> "margin offset is cosmetically wrong - scale is the only part must be applied"
+
+Never deformed, stretched, redrawn, eroded or offset. The clearance region may be **measured** — it
+is never constructed, drawn, exported or handed to a drawing library.
+
+**L2 — A MAGNET IS LAWFUL ONLY IF ITS WHOLE DISC SITS ON MATERIAL.**
+*Dan, 08-10 16:06 @meta · restated 08-11 10:00 @grid-pixel*
+> "Pair means shape must be minimum 20mm thick and 68 mm tall. And at those node points 48mm apart
+> each shape must have material on the inside to capture 20mm circle. Period"
 >
-> "the gravity rules of magnets having support on the top side to hold top side and not make only 1 row
-> at the bottom"
->
-> "centering and balancing so there is no flap and assymetric free uncovered by magnets surface"
->
-> "**perfect shape x grid match is 4 points balanced and symetrically centerd on the shape**"
-
-**This closes v1's open item O3** — which lattice points a population takes and where the lattice
-registers. It is Dan's ruling, given directly, not inferred.
-
-**Four bindings, each independently live:**
-
-**(a) Centred and symmetrical on every side.** The layout sits centred on the shape with even
-relationship to each side — not pushed into whichever lobe happens to be fattest.
-
-**(b) Material-aware.** Magnets go where material actually is, and not where it is not. A layout that
-places magnets over a gap between limbs is not a layout.
-
-**(c) Gravity — the top must be held.** *(v1 law 5.8 restated and extended.)* A layout that supports
-only the bottom row leaves the top to fall away. Support at the top is required, not preferred.
-
-**(d) No flap, no orphaned area.** No large asymmetric region of the shape left uncovered by magnets.
-
-**3.1e — SYMMETRY BALANCE IS JUDGED PER CELL, NOT AS AN AVERAGE.** *DAN, 08-10, verbatim, defining the
-measure he named in the build directive:*
-> "the center lines vertically and horizontaly dividing a shape to judge each cell on the coverage of
-> the magnet"
->
-> "center the shape each of 4 sides will have cells - identify if the outmost cells covered by material
-> if not scale this segment till covered repeat for each segment combine scale % and average this will
-> give you overall scaling for fine tuning your scale by this number and center the shape"
-
-His terms are **centre lines**, **sides**, and **cells**. The centre lines are found by the fold (3.1f).
-Each of the four sides carries cells, and what is judged is **whether a cell is covered by material** —
-the same test as 11.1, applied at the cells that matter.
-
-**An average is the wrong instrument as a MEASURE of a finished layout** — *DERIVED, with a measured
-instance:* the distance between the magnets' mean position and the shape's centre is **exactly zero**
-for two magnets sitting diagonally opposite, while the sides between them hold nothing. On a real traced
-contour at band 3 the engine returned 2 magnets with a centroid balance of 1.1mm and reported it as
-near-perfect; two magnets that close to centred are opposite one another.
-
-*(Dan's own use of an average is a separate thing and is not this: he averages the four **side scale
-percentages** to fine-tune the scale. That is his method, above, verbatim. Measured on a real silhouette
-at bands 2, 3 and 4, the average left a side uncovered where the most-demanding side did not —
-4.540 vs 4.970 at band 2, 4.647 vs 5.185 at band 3. Whether to use the mean or the most demanding side
-is his call, not a derivation.)*
-
-**3.1f — THE FOLD IS HOW THE CENTRE LINES ARE FOUND. It is not a sizing method.** *DAN, 08-10:*
-> "The fold was used as hypothetical folding the shape in half to determine center lines vertically"
-
-Fold the shape in half — that is the centre. Two folds give the vertical and horizontal centre lines,
-and those lines give the quadrants of 3.1e. That is the fold's entire job, and it has no failure mode.
-
-**Recorded so it is not misread later:** an elaboration *on top of* the fold — scale each side until its
-magnet fits, then average the four scales to size the shape — was built and **falsified on 8 of 8 free
-shapes (undersized 18–65%; folding on the guaranteed area instead still failed 4 of 8)**. That invention
-failed. The fold did not. It measures reach along the axes, which is meaningless for sizing a free shape,
-but exact for locating a centre. Do not revive the sizing version, and do not discard the fold because of
-it.
-
-**3.2 — Balance outranks minimum size.** *DERIVED from 3.1*
-Where a tighter size exists but is asymmetric, the balanced layout wins and the tighter one is
-discarded. **Measured instance, recorded so the class is recognisable:** on Dan's 162mm star the
-mathematically smallest four-magnet fit is **130mm**, achieved by bunching the four magnets into one
-lobe. It is arithmetically correct and it is rejected on sight under 3.1(a).
-
-*Sizing is therefore: choose the balanced layout under §3, then apply §2.2 to it.*
-
----
-
-## 4 · Blindness
-
-**4.1 — No prior sizes, no shape names, anywhere in the logic.** *DAN, 08-10*
-> "any shape x grid language in the engine and full logic be blind to prior sizes and shapes"
-
-68 · 116 · 164 and 88 · 156 · 224 are what 48mm spacing and 10mm padding happen to produce. They are
-**outputs**. The engine holds no table of them, no test tuned toward them, and no branch on shape
-identity. *(v1 law 8.8 as an architectural duty.)*
-
-**4.2 — Change an input and everything re-derives.** *DAN, 08-10*
-> "if i change the inputs to the grid spacing and margins the engine must be adapting to anything"
-
-Every value arrives from the logic sub. Changing spacing, padding or the ceiling re-derives every
-result with no code change. *(v1 laws 8.7 / 8.10.)*
-
-**4.3 — The acceptance is mutation, not matching.** *DERIVED from 4.1, 4.2 and v1 law 8.11*
-A build is judged by: change the inputs and does everything move coherently · does it work on an
-unseen asymmetric concave outline · rotate the shape and does the layout rotate with it. **A green
-square or circle is silence, not a pass.** Dan's published numbers are one column of that table,
-never the target.
-
----
-
-## 5 · The canvas
-
-**5.1 — The field is the world; the shape lands on it.** *DAN, 08-10*
-> "we need to create infinite canvas that is based on the grid variations" ·
-> "i made the grid with 48mm columns and rows - magnetic points wrapped in 20mm frame and having 6mm
-> and 8mm magnet circles inside"
-
-An infinite lattice of cells — 48mm spacing, each cell the 20mm padding square carrying its 6mm or
-8mm magnet. A shape is placed onto it. The magnets it gets are the cells it lawfully covers.
-*Reference: Figma ONEMO DS v2.3.6, node `14247-29777`; measured at 10 Figma units per millimetre.*
-
-**5.2 — Millimetre-true, manufacturing precision.** *DAN, 08-10*
-> "it must be manufacturing precision SVG millimeter based"
-
-One SVG user unit is one millimetre. What is on screen is the manufacturing drawing; there is no
-conversion between what Dan looks at and what is cut.
-
-**5.3 — The canvas computes nothing.** *DERIVED*
-It holds no number the engine did not just return, so a stale view is structurally impossible.
-*(This is the defect where a landed, correct fix was invisible on screen for a day.)*
-
-**5.4 — The variations are the controls.** *DERIVED from 5.1*
-Spacing · pattern · mask · which layout. Each is an input to the unit, surfaced as a control, and
-never inferred from another. *(v1 law 4.7e — one control, one job.)*
-
----
-
-## 6 · Method
-
-**6.1 — Design before build; ask before acting.** *DAN, 08-10*
-> "do not rush building what i am not asking - think and talk to me and ask permission before acting" ·
-> "talk to me and do only what i ask no building anything untill we align"
-
-**6.2 — Necessity and deslop are design instruments here, not review afterthoughts.** *DAN, 08-10*
-> "we need to use /o-necessity and /o-deslop to design the internal canvas tool for this first"
-
-**6.3 — Every QA runs the necessity and deslop discipline.** *DAN, 08-10*
-> "every qa must follow /o-necessity and /o-deslop discipline"
-
-Both verdict lines are mandatory — necessity ("no unnecessary elements" / "shrink: X") **and** sufficiency
-("delivers in full" / "partial: X"). CLEAR only when both are clean.
-
-**6.4 — Verification is code AND eyes, every time.** *DAN, 08-10*
-> "i do not see the grid did you verify fully what you did in code and visually?"
-
-**6.5 — A default is not the builder's to set.** *DAN, 08-10*
-> "who gave you permission to change the default grid ?"
-
-*(Context: `registration: 'gap'` was promoted to a released default for the whole system. Dan's balance
-rule says a **layout** should be four-point-centred; that is a layout the engine SELECTS, not the
-grid's standing state. Promoting a selection to a default is a scope decision, and it is Dan's.)*
-A layout the engine should choose may never be promoted to the system's standing state.
-
-**6.6 — Formulas are defended and proven BEFORE any code exists.** *DAN, 08-10*
-> "We need to create and defend formulas and prove them on real test before we build anything it is pure
-> match and geometry and arithmetic"
-
-**6.7 — Nothing is approximated or invented where real maths or working code exists.** *DAN, 08-10*
-> "i dont want you approximating it if we have the read math to copy or ready code somewhere that is
-> working - no vibe coding or approximating - unless it is planned and a necessity"
-
-An approximation is permitted only when it is **planned, named as a necessity, and stated** — never
-introduced silently, and never described as exact. *(Measured instance: an approximated boundary was
-labelled "the complete event set" and lost the canonical 2x2.)*
-
-**6.8 — The lane does its own research. A sub-agent is an extra, never the source.** *DAN, 08-10*
-> "i suggest research is done by you diligently and subagent is independent extra"
-
-**6.9 — The basic geometries are NOT the work.** *DAN, 08-10, naming it as drift:*
-> "and again the geometric shapes are static - we precalculate them easy - we need robust freeshape
-> algorithm we keep talking about problems of the basic shapes and it is drifting into the opposite
-> direction"
-
-Squares and circles are static and precalculated. Dan's ruling is that they are **not the work** — the
-free-shape algorithm is.
-
-*DERIVED, not Dan's, and flagged as such:* at a band size those outlines are exactly tangent to their
-magnets by construction, so their placement window is near-zero — **measured 0.059mm for the 92mm circle
-and exactly zero for the 72mm square**. That makes them the least representative case in the system, so
-a defect appearing only there is weak evidence about free shapes. **Whether such a defect blocks is Dan's
-call, not a derivation.** *(Recorded because QA and the builder both spent over an hour driving the
-92mm circle as a blocking gate, directly against this ruling.)*
-
-**6.10 — Internal tests are not the test. Nothing is proven until a real cut-out is on screen.**
-*DAN, 08-10*
-> "your internal tests are fine but we need to test on the real thing - we need to wire cutout lab to
-> generate the shape and see how the shape is covered essentially unless we do that all is good theory"
->
-> "We must test on odd random blobs and outlines ideally"
-
-Synthetic fixtures are a proxy and are named as such. The gate is a real traced contour, its magnets
-visible, judged by eye against what Dan would have done by hand.
-
----
-
-## 7 · The field and the canvas surface
-
-**7.1 — The field floor is nine lattice positions.** *DAN, 08-10*
-> "if we set max 310 the canvas must show at least 48mm 10x10 points grid" → "actually 9x9 is enough"
-
-**7.2 — The field must visibly END.** *DAN, 08-10*
-> "we need to give it space make some padding same like 40mm each side so we can see that grid has
-> limits and it is full zoom out scale"
-
-**7.2a — The margin is DERIVED, not chosen.** *DAN, 08-10*
-> "make zoom to work showing only 9x9>8x8>7x7 etc with max padsding before next larger row shows up"
-
-The largest padding that still excludes the next position is the bare gap between two cells:
-**pitch − cell**. A flat 40mm is wider than that gap, which is why every stop kept showing nine.
-
-**7.3 — Fixed render window, procedural infinite field.** *DAN, 08-10*
-> "Make viewport fixed like … the cutout lab exactly. the canvas with magnets is infinite procedural
-> in case we scale the shape in and out the canvas stays adaptable and shows more magnets the viewport
-> just fix render window"
-
-The box never grows; the view adapts to the content's extent. Copied from the Cutout Lab, not invented.
-
-**7.4 — 402 × 402, the iPhone standard, scaling to the design system's own ceiling.** *DAN, 08-10*
-> "the viewport is pretty match 402x402" · "also did you see 402x402 viewport for the canvas message
-> - focus ffs!" · "add spacing and make the page responsive dude - 402 is iphione standard that scales
-> to the page fill height and max width of 800px or whatever it is in our design system"
-
-**Mobile is the gate, not a breakpoint** — "we are making it for mobile must be tested on mobile".
-Theme follows the system; no forced dark. The shell is scaffolding — the studio's visual design comes
-from Figma and this invents none of it.
-
-**7.5 — The canvas carries nothing but the drawing.** *DAN, 08-10*
-> "canvas must be clean from controls and labels"
-
-**7.6 — The notepad is TWO levels, copied from the file.** *DAN, 08-10*
-> "5% visibility"
-
-A 1mm grid and the 48mm columns/rows, both at low ink. *(A 10mm level was invented and deleted: 48 is
-not a multiple of 10, so that level can never pass through a magnet centre — permanent noise fighting
-the lattice.)* A level whose line is wider than its own cell floods to a wash and must drop out.
-
----
-
-## 8 · Zoom
-
-**8.1 — Zoom is a plain view scale and it touches NOTHING.** *DAN, 08-10*
-> "the zoom is page view zoom nothing is influenced by it the circle must retain the scale" ·
-> "make the fucking zoom - regular zoom"
-
-**8.2 — The shape is always centred; zoom is centre-preserving.** *DAN, 08-10*
-> "zoom must zoom on the center not side ways the object shape is in center always"
-
-**8.3 — UI MAY NOT REACH THE MATHS.** *DAN, 08-10, and it is named as a protocol violation:*
-> "i feel like the ui logic of zooming is influencing the math and grid itself --- you violated the
-> protocol to solve and find short cut for ui zoom"
-
-*(Measured instance, recorded so the class is recognisable: registration was derived from the zoom
-stop, so every press physically moved the lattice 24mm under the shape and the field count flipped
-between 9 and 10. A view concern was in charge of the geometry.)*
-**No view concept may be an input to engine arithmetic.** Not a stop, not a scale, not a pixel.
-
----
-
-## 9 · Registration — where the lattice sits against the shape
-
-**9.1 — Registration is a property of the LAYOUT, never of a view.** *DERIVED from 8.3 and 3.1*
-
-**9.2 — Parity decides it, and nothing else.** *DAN, 08-10*
-> "however the 4 parts of 4x4 48mm points are not in the center so we need to adapt to each grid to
-> make the shape center to the 4x4 or at least 1 column x 2 rows single 2 point"
-
-An **even** run — the 2×2 and the 4×4 his balance rule calls the perfect match — requires the shape's
-centre to fall in the **gap** between magnets. An **odd** run requires a magnet at the centre. There is
-no third option and nothing is chosen: the count decides the registration.
-
-**9.3 — The offset is half the POPULATED pitch, not half the base lattice.** *DAN, 08-10, by defect:*
-> "how is it possible that you switch to 96mm and circle no longer has 4 points of 96mm … the shape
-> must be showing centered as in previous case to the 4 96mm latice"
-
-At 96mm the gap the shape must centre in lies between two **populated** magnets; half a base step lands
-back on one of them. Measured: `basePitchMM/2` gives a run of 2 at `[-72, 24]`, centre −24 — off. And
-`pitchMM/2` gives `[-48, 48]`, centre 0. **Identical at 48mm, which is why the fault was invisible
-until the input changed** — the exact failure class §4.3 exists to catch.
-
-**9.3a — At 96mm NOTHING is re-centred. Points hide; the view and the lattice stay put.** *DAN, 08-11,
-verbatim, ruling on the parity-vs-one-lattice question:*
-> "no need force centering - the view remains same just some points are hidden to show sparse grid no
-> complication"
-
-Switching to 96mm only thins the population (1.2). No registration shift, no camera move, no symmetry
-correction. The consequence — an even match at 96mm sits nearer one visible magnet than the other —
-is accepted, not corrected. *(Closes the 9.2-vs-1.2 collision held on 08-11; the behavior at
-`033762fc` is correct as shipped.)*
-
-**9.4 — The shape hugs its points; the size is the engine's answer.** *DAN, 08-10*
-> "it must hug 48mm x4 points"
-
-A four-point layout is a **size** result, not a registration one. At 48mm the circle that hugs exactly
-four points is 88mm; at 96mm it is 156mm. Choosing that size by hand and reading it off the canvas is
-the engine's job undone.
-
-**9.5 — 9×9 and four-point centring are mutually exclusive.** *DERIVED from 9.2 — OPEN, see O-D*
-Gap registration produces an even run; nine is odd. A field spanning nine positions carries **eight**
-magnets under gap registration. Adding a tenth row to make the number read nine is tuning the display
-to hide the law, and is forbidden — but which of the two Dan sees is his ruling, not a derivation.
-
----
-
-## 10 · The guard
-
-**10.1 — Law values are sealed, touched once, and guarded at two levels.** *DAN, 08-10*
-> "we dont need sliders these must be admin sealed values touched onece - so make an expandale menu
-> with value input fields and lock/unlock function for each so they are not changed accidentally and
-> make it lockable in code as well so they are never under risk of being changed accidentally - we
-> need the guard"
-
-> "the pop up or drop down menu must show each entry and lock sign i can unlock and change value"
-
-Code-level seal always wins over the surface lock. A refused write returns the spec **unchanged plus a
-reason** — refusals are visible, never clamped and never swallowed.
-
-**10.2 — ONE writer. No exceptions, no side doors.** *DAN, 08-10*
-> "Every write to a law value goes through the one guard."
-
-*(A second writer that bypasses the guard while the surface still labels the value "sealed" is a
-contradiction on the surface Dan tests, not a convenience.)*
-
-**10.3 — A number with no author is not law.** *DAN, 08-10*
-> "tolerance 0.05mm - who invented this?"
-
-A literal read out of engine source and written back into a law book as a "measured fact" is still a
-literal. It may not sit in the released spec, and it may not be presented as canon. If a real
-manufacturing tolerance exists it comes from the factory, with provenance.
-
----
-
-**10.4 — There is NO tolerance. Everything sits on exact sizing.** *DAN, 08-10*
-> "tolerance is not required, it affects nothing, we have no tolerance, everything must sit on the
-> exact sizing"
-
-**Supersedes v1 fact F11 entirely.** `toleranceMM` is struck from the spec, the guard, the released
-values and the panel. No quantum, no rounding allowance, no epsilon dressed as law. *(F11 was itself
-the defect named in 10.3 — a source literal promoted to a "measured fact" by being read back.)*
-
-**10.5 — The field's size is a law input, not an engine constant.** *DAN, 08-10*
-Rows and columns (`positionsPerAxis`, released at 9) are a released, guarded value the admin can edit
-through the one writer — not a number the engine holds. *(This is 1.1a applied: a value in the engine
-was the engine holding a value of its own.)*
-
-**10.6 — PADDING IS 12mm. THE SYSTEM STEPS IN 12mm ATOMS.** *DAN, 08-10, LOCKED:*
-> "12 mm agrees with the grid better cause it is like 16px REM standard in the web dev - we have 12mm atom
-> the entire grid steps in that size"
->
-> "decided for 12mm padding - locked decision"
-
-**Supersedes the inherited v1 law 2.1 (10mm from the magnet centre, 20mm spot).** Padding is **12mm**, so
-the spot is **24mm** — exactly half the 48mm pitch.
-
-| | | |
-|---|---|---|
-| padding | 12mm | **1 atom** |
-| magnet spot | 24mm | 2 atoms |
-| half pitch | 24mm | 2 atoms |
-| pitch | 48mm | 4 atoms |
-| sparse pitch | 96mm | 8 atoms |
-
-**Consequences, measured before the decision:**
-- The rectangular ladder becomes 72 · 120 · 168 · 216 · 264 · 312 — **6 · 10 · 14 · 18 · 22 · 26 atoms.**
-  At 10mm padding *none* of 68/116/164/212 was a multiple of 12, so the system had no common step at all.
-- 12 is even, so a rectangular size **can never violate the whole-and-even rule** — publication has nothing
-  to correct there.
-- **Cost, measured on 8 random free shapes: 3 of 17 magnet positions lost (~18%), and every size grows 4mm.**
-  Some free shapes will hold three magnets where 10mm would have held four. This was known and accepted.
-- The atom does **not** reach round outlines — the diagonal carries the √2, so circles land on 92 / 160 / 228.
-  That is correct, not a compromise (see 12.3a).
-
-**10.6a — THE CELL IS THE MODULE. The frame is integer arithmetic, not floating point.** *DAN, 08-10:*
-> "we moved to 12mm even to create each magnet as grid cell that matches the steps of the grid - 24mm
-> two cells create 48mm single 4 point square no gaps it is Lego essentially"
-
-12mm padding makes each magnet a **24mm spot**, and **the 48mm pitch is exactly two of those spots**.
-That is the whole statement.
-
-**The band IS the number of magnets per axis, and each band centres differently.** *DAN, 08-10:*
-> "There cannot be center cell on the shape centered 4 or pair of shape is slim."
->
-> "If you have middle axis meeting the middle of the magnet center, the very center, it means that the
-> size is three cells in each direction, which means it's band three. So the band four will have no
-> magnets in the middle."
-
-| band | magnets per axis | square total | span | the shape's centre |
-|---|---|---|---|---|
-| 2 | 2 | 4 | 72mm | **between** magnets — none in the middle |
-| 3 | 3 | 9 | 120mm | **on** a magnet |
-| 4 | 4 | 16 | 168mm | **between** magnets — none in the middle |
-
-This is §9.2 stated per band, and nothing more is needed. **There is no "middle cell".** At a 48mm pitch
-the 24mm spots do not tile — there is a bare 24mm gap between them. "No gaps" in Dan's earlier sentence
-means two spots laid together measure the 48mm step, not that spots tessellate the plane.
-
-*(Recorded because an earlier draft of this clause counted the SPAN in 24mm units — "72mm is three
-cells" — and concluded a middle cell always exists. That counts the measure, says nothing about magnets,
-and invented an object that does not exist. Struck. If a band had a middle magnet AND four per axis it
-would be five per axis, which is band 5.)*
-
-**Round outlines stay off the cell** by the √2 of the diagonal (91.88mm = 3.83 cells) — correct, and
-already covered by 12.3a.
-
-**10.6b — THE CELL IS 12x12mm. A MAGNET IS 4 CELLS. THE CENTRE POSITION ALWAYS EXISTS — IT IS SIZE 1.**
-*DAN, 08-10, verbatim:*
-> "the center magnit you were referring to is actually hypothetically possible because we are centering
-> to the canvas 4x48mm - it centers always to that but we have size 1 which is invisible and it is in
-> the center of the canvas i suppose regardless the cell is actually 12x12 not really 24 - 24 is 4 x12mm
-> - just adding this to the atomic logic and if size 1 exist it consists of 4 atoms"
-
-- **The cell is 12 x 12mm.** That is the atom.
-- **A magnet's 24mm spot is 4 cells** — a 2 x 2 block of atoms.
-- **Size 1 is one magnet = 4 atoms**, sitting at the centre of the canvas, and it is silent (10.7).
-
-**This resolves the centre question without a "middle cell".** Centring is to the canvas, and the centre
-position always exists — it is size 1. Whether a magnet is *shown* there is 9.2 per band: bands 2 and 4
-show none at the centre, band 3 shows one. Size 1 is the position at the centre that is never offered.
-
-*ARITHMETIC ONLY, following from the above — not a further ruling:* the 48mm pitch is 4 cells across and
-the 24mm spot is 2 cells across.
-
-**10.7 — Size 1 is silent.** *DAN, 08-10*
-> "silent size is number 1 it can be coded in too we just not gonna show it in the ui selector or default
-> minimum untill product eveolves to need it"
-
-The ladder is **coded from one magnet upward** so the arithmetic is continuous, but the selector offers only
-**2, 3, 4** — the product range. A single magnet lets the shape pivot (11.3) and is never offered. It exists
-so that a later product needing it requires no change.
-
----
-
-## 11 · The pair — the unit of measure
-
-**11.1 — THE PAIR IS THE ATOM.** *DAN, 08-10, verbatim:*
-> "pair is the unit of measure here"
->
-> "Pair means shape must be minimum 20mm thick and 68 mm tall. And at those node points 48mm apart each
-> shape must have material on the inside to capture 20mm circle. Period"
-
-*Stated at 10mm padding. **Under the locked 12mm (10.6) the same rule reads: minimum 24mm thick and 72mm
-tall, capturing a 24mm circle.** The rule is unchanged — it is 2×padding thick and pitch+2×padding tall —
-only the value it resolves to moved.*
-
-**The whole test is one thing:** at both nodes, is there material holding the full 20mm circle. The 20mm
-thickness and the 68mm length are not separate checks — they are what that test *means* geometrically.
-Verified at the limit: 20 x 68 holds; 19.9 wide fails; 67.9 tall fails.
-
-**11.2 — Everything is pairs about the fold, optionally plus a centre.** *DERIVED from 11.1 and 9.2*
-A pair straddles the fold; a centre point sits on it. So the fold's position is not a rule to apply — it
-is simply whether a centre exists. **This generates the entire published ladder and nothing else does:**
-
-| pairs | centre | across | fold | square | circle |
-|---|---|---|---|---|---|
-| 1 | no | 2 | between | 72 | 92 |
-| 1 | yes | 3 | through | 120 | 160 |
-| 2 | no | 4 | between | 168 | 228 |
-| 2 | yes | 5 | through | 216 | 296 |
-| 3 | no | 6 | between | 264 | 364 |
-
-*(at the locked 12mm padding — 10.6)*
-
-**11.3 — One pair is the floor.** *DERIVED from 11.1*
-Below one pair there is a single magnet, and a single magnet lets the shape pivot. Any product must hold
-at least one pair, so at least one axis must reach **72mm** at 48mm pitch (**120mm** at 96mm).
-
-**11.4 — The arrangement follows the shape's own form.** *DAN, 08-10*
-> "If shape is narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum
-> L shape by definition will have 1 + 2 - as well as any triangle"
-
-*Measured, and it needs no shape classification: given a 2x2, an L-shape drops to 1+2 by itself because
-the fourth position has no fabric under it. Nothing anywhere names an L, a triangle or a tower.*
-
-**11.5 — The variants come from the internal guaranteed area.** *DAN, 08-10*
-> "From here variants can be built of the shapes internal guaranteed area and dimensions"
-
-The guaranteed area is the shape reduced by the padding — the region where a 20mm circle can sit. Its two
-dimensions generate every arrangement the shape supports. Past that point the outline's form no longer
-matters; only what it guarantees does.
-
-**11.6 — Size is set by edge-to-edge matching.** *DAN, 08-10*
-> "The size is determined by edge to edge optimal matching"
-
-Every edge of the shape and every magnet form a pair of constraints; the tightest demand sets the size.
-One pass, no search. **The binding (edge, magnet) pair is also the answer's explanation** — the engine can
-always name what set the size.
-
----
-
-## 12 · No size inputs
-
-**12.1 — NO SIZE INPUT MAY EXIST.** *DAN, 08-10, verbatim:*
-> "No size inputs may exist"
->
-> "there cannot be fail sizes it is not possible from the algorithm"
-
-There is no cap, target, range or test size **inside the unit**. A shape is never "too small" — it scales
-until it holds. *(Same defect class as 10.3/10.4: a number constraining the answer without deriving from
-the shape or the grid.)*
-
-**12.1a — This law binds the UNIT, not the admin shell. The ceiling and the admin size control are
-correct.** *DAN, 08-10, ruling directly against a QA finding:*
-> "these two are not slop they are correct - we just edit 10mm to 12mm it is not such problems as you
-> theatrically state"
-
-**Strikes the earlier derived clause**, which read *"Retires `maxSizeMM` from the spec and the size
-control from the shell."* That was an inference, never Dan's ruling, and it contradicts 12.3 and 10.7:
-
-- **`maxSizeMM` IS the ceiling of 12.3** — Dan's 9x9 cap, currently written in millimetres. The work is
-  to express it as a **count**, never to delete it.
-- **The admin shell is explicitly NOT the unit** (§1.1 — "scaffolding so you can test. It does not
-  ship"). A test-size field on the scaffolding is not a size input to the engine.
-
-*(Recorded because the struck clause produced the same false finding repeatedly, from more than one
-reviewer. A derived consequence may never outrank the ruling it was derived from.)*
-
-**12.2 — Size is the OUTPUT.** *DAN, 08-10*
-> "Size is final value we manufacture form as dimension of the shape with locked aspect"
-
-**The contract, both ends:** IN — the shape's form, the pitch, the padding. OUT — the manufactured
-dimensions (one number, aspect locked) and the magnet positions. Nothing about size crosses inward.
-
-**12.3 — The ceiling is a GRID COUNT, never a millimetre.** *DAN, 08-10*
-> "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case we
-> create engine to match our 9x9 grid as max grid after we validate stable engine works we cap the grid
-> to specific number"
-
-**9x9 for now**, tightened once the engine is proven stable. *Measured: the old 310mm ceiling was exactly
-7 across (308mm) — always a grid count in millimetre costume, which is why it never sat right. A 9x9 cap
-reaches 404mm square / 564mm circle at 48mm, and 788 / 1108 at 96mm. Note the cap binds differently per
-outline, and per pitch — it may need to be per-pitch rather than global.*
-
-**12.3a — The atom is a consequence, never a requirement.** *DAN, 08-10*
-> "fine circle can be 92 but we dont really care as we have grid led shape sizing and rounding system to
-> the next even number that can be divided by 2"
-
-Publication rounds up to the next **even** number. That a 12mm padding makes every RECTANGULAR size a whole
-number of 12mm atoms is a consequence of the arithmetic, not a rule any shape must satisfy. A round outline
-publishes at 92 / 160 / 228 — off the atom, and correct. **Forcing circles onto the atom would need a
-per-rung fudge (4.12 / 8.24 / 0.35mm) — a lookup table, forbidden by 4.1.**
-
-**12.4 — The handle steps the ladder; it does not set a size.** *DERIVED from 12.1, 12.2*
-Dragging picks which arrangement, and the size is whatever that arrangement costs. A size that is not an
-engine output cannot be reached, because no such position exists.
-
----
-
-## 13 · THE METHOD — the product, end to end
-
-**13.1 — THE METHOD, in Dan's own sentence.** *DAN, 08-10, verbatim:*
-> "the method is > user defines locked shape > our grid engine under the hood produces the best sizing in
-> the chosen band range > we tell user the size of the shape exactly on this basis but we need to be dead
-> sure 100% mathematical certainty - so we do not change shapes for user we do not deform it sets the
-> band we scale up or down to match the shape locked proportions to the grid band"
-
-Read as a contract:
-
-| | |
-|---|---|
-| **the user gives** | a locked outline — form only, proportions fixed |
-| **the engine gives** | the size to manufacture, and where the magnets sit |
-| **the engine never** | deforms, stretches, redraws or reshapes anything (2.1a) |
-| **the only transform** | scale up or down, aspect locked (2.1) |
-| **the standard** | 100% mathematical certainty — not "close", not sampled, not tuned |
-
-**13.2 — ORDER OF OPERATIONS.** *DAN, 08-10, verbatim:*
-> "the band is auto determined by the bounding box first  > after that we need placement with engine
-> providing the coordinates"
-
-1. **Band** — read off the shape's bounding box. Not chosen by a person, not searched for.
-2. **Placement** — the engine returns the magnet coordinates.
-3. **Size** — what that match measures, published under 12.2 and rounded under 12.3a.
-
-**13.3 — The band is the STARTING POINT, and scaling fine-tunes from it.** *DAN, 08-10:*
-> "we dont need to start with no size we defined our size bands already so the bounding box of the shape
-> can be approximated at the starting point to classic size for example with the longest box side equal
-> 96mm+24mm yeah? and after that the algorithm can just gne tune using the candidate algorithm or mirror
-> (correctly formulated) and scale the shape to cover the grid"
-
-**Both halves are binding.** Seeding at a band without the scaling step leaves a shape sitting at an
-arbitrary size, which is how "band 2 holds nothing" appears — a fail size, forbidden by 12.1.
-
-**13.4 — HOW THE BUILD IS JUDGED.** *DAN, 08-10, the build directive, verbatim:*
-> "build the algorithm for the engine and test it - use /o-necessity and /o-deslop and remember to apply
-> our laws and decisions so you do not drift in the 102 time to measure against sizes and measure against
-> coverage and symetry balance - test each band 2/3/4 --- no vibecoding on assumptions - consult the
-> sources read the code and math text books and articles describing the metod and follow precise
-> theory/formulas and methodology."
-
-- **Measured on coverage and symmetry balance. Never on sizes.** No millimetre appears in a verdict.
-- **Every band — 2, 3 and 4 — is tested and reported.**
-- **Both necessity lines are required** (6.3), and the method is sourced (6.7), researched by the lane
-  (6.8), on real shapes (6.10).
-- **Precedence — DERIVED, and it has not been ruled.** Dan's sentence reads *"centering and balancing
-  **so there is no flap** and assymetric free uncovered by magnets surface"*, which grammatically makes
-  coverage the consequence of balance rather than a rival to it. **That is a reading, not a ruling.**
-  What IS settled: a ranking that leaves either measure unable to decide fails the directive, since both
-  were named. *(An invented precedence, applied silently and then reversed, is one of the three
-  unsanctioned decisions of 2026-08-10.)*
-
----
-
-## 14 · THE CHARTER AND THE 08-11 RULINGS
-
-*Added 2026-08-11 on Dan's instruction: "make sure all missing briefs and laws verbatim are captured
-in the docs." Every clause below was given on 08-11 and was absent from this book. The full charter is
-recorded verbatim in `grid-brief.md` under `2026-08-11 · @s62-meta`; the clauses it adds to the law
-are stated here.*
-
-**14.1 — THE CORE MISSION.** *DAN, 08-11 08:26, verbatim, opening the charter:*
-> "Build one small, portable, shape-agnostic Grid Engine for Cutout Lab shapes: Any locked-aspect
-> outline in millimetres enters; the engine determines the lawful grid population, magnet placement,
-> and manufacturing size. No shape-specific rules, manual fitting, or UI-owned geometry."
->
-> "The Grid Lab is only an admin testing instrument. It is not the product engine and must not become
-> another monolith."
-
-**14.2 — NO SIZE SCANNING. The grid is fixed first and the size only wraps it.** *DAN, 08-11, charter,
-verbatim — stated twice, once as a law and once as a prohibition:*
-> "Grid defines size; size never defines grid. Start from a grid population. Compute the smallest
-> locked-aspect shape scale that lawfully wraps it. **Never scan candidate millimetres to see what
-> grid happens to fit.**"
->
-> Prohibited: "**Physical-size scanning.**"
-
-This is §11.6 stated as a prohibition. A walk over candidate sizes reaches an answer that cannot name
-the (edge, magnet) pair that set it, which 11.6 requires. *(Recorded because a solved-by-scanning
-implementation was live on 08-11 while a proven event solver sat unused.)*
-
-**14.3 — NO MAXIMALITY.** *DAN, 08-11, charter, verbatim:*
-> "'As many magnets as fit' is forbidden. Magnet count is not the optimisation objective. Coverage may
-> be measured, but the deleted hold-reach guard must not return under another name."
-
-*(This is why the cited placement research is not the engine: Agarwal/Mazo optimise maximum point
-containment, which is precisely this objective.)*
-
-**14.4 — CORNERS AND EDGES BEFORE INTERIOR.** *DAN, 08-11, charter, verbatim:*
-> "Spread and balanced support outrank clustered placement. Interior magnets do not compensate for
-> unsupported tips, sides or extremities."
-
-**14.5 — THE WHOLE DISC MUST FIND MATERIAL.** *DAN, 08-11 10:00, verbatim:*
 > "the magnets sit on the 12mm cell intersections = 24mm padding disc holds magnet in the center so
 > the whole disc must find material support to be integrated"
 
-The atom addresses lawful positions; the continuous contour decides support. Neither is a raster.
+*Stated at 10mm padding; under the locked 12mm (L3) it reads 24mm thick, 72mm tall, capturing a 24mm
+disc. The rule is unchanged — 2×padding thick, pitch+2×padding tall — only the value moved.*
 
-**14.6 — INTERACTION IS NEVER COUPLED TO COMPUTATION.** *DAN, 08-11 11:26, verbatim:*
-> "yes the ui behavior must not be hindered and coupled to instant calculations known error for
-> optimisation we dont need to calculate anything in flight while i change the grid size or do can vas
-> moves"
+**L3 — PADDING IS 12mm.** *Dan, 08-10 17:31 @meta*
+> "decided for 12mm padding - locked decision change the logic in laws and briefs and in the code"
 
-*Context, DAN 11:25:* "this can be detrimental to the entire thing if we have mac lgging what will
-happen to the mobile safari?" — the budget is the phone, not the workstation.
+So the spot is 24mm, exactly half the 48mm pitch.
 
-**14.7 — THE SOLVER RETURNS EVERY VARIATION, NOT THE FIRST FIT.** *DAN, 08-11 11:28, verbatim:*
-> "and thi smust be in steps like all variations of sizes and layouts in each band"
+**L4 — THE PAIR IS THE UNIT OF MEASURE, AND THE FLOOR.** *Dan, 08-10 16:04 @meta*
+> "pair is the unit of measure here"
 
-**14.8 — A TEST WITHOUT VISUAL PROOF IS INCONCLUSIVE.** *DAN, 08-11 11:29, verbatim:*
-> "capture the brief and make sure next engine iteration does that - otherwise test is not conclusive
-> if you only show "fits" - visual proof must be provided by applying the algorithm to the cutout"
+Below a pair there is one magnet, and one magnet lets the shape pivot. Every product holds at least
+one pair.
 
-**14.9 — REAL CUT-OUTS, KEPT AS A LIBRARY.** *DAN, 08-11 11:00 and 11:19, verbatim:*
-> "use real images too to actually test"
+**L5 — THE ARRANGEMENT FOLLOWS THE SHAPE'S OWN FORM.** *Dan, 08-10 16:00 @meta*
+> "If shape is narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum
+> L shape by definition will have 1 + 2 - as well as any triangle"
+
+No shape is ever named in the logic. An L drops to 1+2 by itself, because the fourth position has no
+fabric under it.
+
+**L6 — PARITY DECIDES REGISTRATION, AND NOTHING ELSE.** *Dan, 08-10 13:54 @lead*
+> "however the 4 parts of 4x4 48mm points are not in the center so we need to adapt to each grid to
+> make the shape center to the 4x4 or at least 1 column x 2 rows single 2 point"
+
+An even run centres in the **gap** between magnets; an odd run centres **on** a magnet. Nothing is
+chosen — the count decides.
+
+**L7 — AT 96mm NOTHING IS RE-CENTRED. Points hide; the lattice stays put.**
+*Dan, 08-11 08:35 @meta*
+> "no need force  centering - the view remains same just some points are hidden to show sparse grid
+> no complication"
+
+The consequence — an even match at 96mm sits nearer one visible magnet than the other — is accepted,
+not corrected.
+
+**L8 — GRID FIRST. Shape + grid = the dimensions. No size input exists.**
+*Dan, 08-10 16:17 · 16:10 · 16:11 @meta*
+> "we have grid first logic - shape + grid= final proportion and dimensions"
 >
-> "we can even add them to the library so they are not lost and can always be loaded and tested
-> against"
-
-**14.10 — A CONTESTED DEFINITION BECOMES A SWITCH, NOT A RULING.** *DAN, 08-11 10:33, verbatim:*
-> "why do i need to rule if i never tested the difference in the real life - why noit add all options
-> and test?"
-
-This is how the three open definitions are settled: every candidate is offered on the instrument and
-judged on real shapes. Nothing becomes a product default by argument. *(It supersedes any request for
-a prose ruling on the centre, the band cut-offs or the coverage/balance precedence.)*
-
-**14.11 — NO ROTATION YET, BUT KEEP THE ROTATION-AWARE CENTRE.** *DAN, 08-11 10:18 and 10:36,
-verbatim:*
-> "rotation we have no rotation yet"
+> "No size inputs may exist"
 >
-> "keep oriented box in case we want to allow rotation which can be the case"
+> "Size is final value we manufacture form as dimension of the shape with locked aspect"
 
+Size is the **output**. No cap, target, range or test size crosses into the unit. There are no fail
+sizes — a shape is never "too small"; it scales until it holds.
 
-**14.12 — A BAND IS A RANGE TO BE SEARCHED, NOT A SQUARE TO BE TESTED.** *DAN, 08-11 11:38, verbatim
-— the clause that redefines the engine:*
+**L9 — THE CEILING IS A GRID COUNT, NEVER A MILLIMETRE.** *Dan, 08-10 16:13 @meta*
+> "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case
+> we create engine to match our 9x9 grid as max grid after we validate stable engine works we cap the
+> grid to specific number"
+
+9×9 for now.
+
+**L10 — PUBLICATION ROUNDS UP TO THE NEXT EVEN MILLIMETRE.** *Dan, 08-10 17:04 @meta*
+> "fine circle can be 92 but we dont really care as we have grid led shape sizing and rounding system
+> to the next even number that can be divided by 2"
+
+Up, never down — the shape must not come out smaller than the grid it holds. **On a concave outline a
+lawful window can be narrower than 2mm, so publication takes the first even value INSIDE a lawful
+window; it never blind-rounds out of legality.** *(DERIVED — proved 08-11 by @grid-pixel, harness
+`9e167809`, re-run and countersigned by @meta. Marked derived because Dan ruled the rounding, not the
+interval method.)*
+
+**L11 — BALANCE AND SYMMETRY DECIDE BEFORE TIGHTNESS.** *Dan, 08-10 12:34 @lead*
+> "what may seem logical on paper and mathematically correct may miss the law of balance and
+> simetry" · "the grid 2x2 must be centered and symetrical from each side of the shape plus follow
+> logic of where material is and is not available" · "the gravity rules of magnets having support on
+> the top side to hold top side and not make only 1 row at the bottom" · "centering and balancing so
+> there is no  flap and assymetric free uncovered by magnets surface" · "perfect shape x grid match is
+> 4 points balanced and symetrically centerd on the shape"
+
+Four bindings, each live: **centred and symmetrical on every side** · **material-aware** — magnets go
+where material is · **gravity** — the top must be held, not only the bottom · **no flap** — no large
+asymmetric uncovered region.
+
+**Tightness is the objective only after balance.** *Dan, 08-10 12:16 · 14:07 @lead:* "look how close
+the edges of shape to gug the grid 2x2 - so in that case close to optimal is 162mm size" · "it must
+hug 48mm x4 points". A tighter size that is unbalanced is rejected.
+
+**L12 — SYMMETRY BALANCE IS JUDGED PER CELL, ABOUT THE CENTRE LINES.**
+*Dan, 08-10 20:03 · 20:08 @lead*
+> "By gold I meant the center lines vertically and horizontaly dividing a shape to judge each cell on
+> the coverage of the magnet."
+>
+> "My proposal was center the shape each of 4 sides will have cells - identify if the outmost cells
+> covered by material if not scale this segment till covered repeat for each segment combine scale %
+> and average this will give you overall scaling for fine tuning your scale by this number and center
+> the shape - my hypothetical solution."
+
+**The second quote is Dan's stated HYPOTHESIS, in his own word — not a ruling.** The measure it
+defines is law: judge each cell about the centre lines for material coverage. The averaging step is a
+proposal to be tested, not a rule to implement.
+
+**L13 — A BAND IS A RANGE TO BE SEARCHED, NOT A SQUARE TO BE TESTED.**
+*Dan, 08-11 11:38 @grid-pixel · with 08-10 18:37 · 18:38 @meta · 08-11 11:28 @grid-pixel*
 > "wait the algorithm must analise shape and bands in each band range it must provide answers what
 > combinations fit precisely grid+ shape proportions aspect ratio locked and scalled to fine tune the
 > fit in the band - if the band is not possible to apply minimum using a pair (2 vertical or
 > horizontal p[oints fittin and centering in the shape ) what is the next band and magnet quantity
 > fits ?"
+>
+> "the method is > user defines locked shape > our grid engine under the hood produces the best sizing
+> in the chosen band range > we tell user the size of the shape exactly on this basis but we need to
+> be dead sure 100% mathematical certainty"
+>
+> "the band is auto determined by the bounding box first  > after that we need placement with engine
+> providing the coordinates"
+>
+> "and thi smust be in steps like all variations of sizes and layouts in each band"
 
-The question the engine answers is therefore **not** "does this band's square fit?" but: *within this
-band's size range, what is the smallest balanced magnet population this locked shape can support, at
-what exact scale and coordinates — and if none, what becomes possible in the next band?*
+**Order:** the bounding box picks the starting band → the population is **discovered**, not assumed →
+the shape scales, aspect locked, to fine-tune the fit → **every** lawful variation is returned, never
+the first fit → if nothing in a band is lawful, escalate to the next band → stop at a found match or
+a proof that none exists within L9's ceiling.
 
-Binding consequences, each already in Dan's sentence:
-
-- **The population is DISCOVERED, not assumed.** A band offers a range; what the material supports
-  inside it is found. A pair — two magnets, vertical or horizontal, centred in the shape — is the
-  minimum lawful arrangement (11.4), not a special case.
-- **Aspect stays locked and the shape is only scaled** to fine-tune the fit inside the band (2.1).
-- **Exhaustion, then escalation.** If no combination is lawful anywhere in a band's range, the engine
-  moves to the next band and repeats with its larger populations — it does not report "no answer"
-  while a band remains untried.
-- **The stop condition is a found-and-applied match, or a proof that none exists within the 9x9 limit
-  (12.3).**
-
-*Recorded because the implementation live on 08-11 tested three fixed square populations — 2x2, 3x3,
-4x4 — and therefore could not produce the answers this law requires. Dan, same turn: the current
-implementation "tests fixed square populations… so it cannot yet prove the intended algorithm."*
-
-**14.13 — THE MISSION IS TO PROVE THE ALGORITHM, KEEP IT OR FIX IT.** *DAN, 08-11 11:35, verbatim:*
-> "most importantly did you prove the algorithm - the mission was to proove it is keeper and build on
-> it or fix?"
-
-A physical-fit checker is not the engine. What must be proven is that the algorithm *chooses* a
-placement a human would accept, on the real corpus — otherwise the correct verdict is that the fit
-core is retained and the selection method is replaced.
-
+**No maximality.** *Dan, 08-11 charter, three separate lines:* “As many magnets as fit” is
+forbidden. · Magnet count is not the optimisation objective. · Interior magnets do not compensate for
+unsupported tips, sides or extremities.
 
 ---
 
-# OPEN
+## §B — ARCHITECTURE (true, but design — not law the algorithm obeys)
 
-Nothing here may be decided by inference.
+The portable unit is **engine + logic**, driven through **one bridge**; the admin shell is separate and
+computes nothing. Engine holds all compute and no values; logic holds values and the bridging, and no
+maths. Every write to a law value passes **one guard**. Blindness: no prior sizes, no shape names, and
+changing an input re-derives every result.
+*Dan, 08-10 12:25 · 12:28 · 13:58 · 11:32 · 14:17.* Belongs in the technical design.
 
-**O-B — Where does the admin canvas live?** A route inside the cutout worktree, or its own surface.
+## §C — CLOSED STEERING (one-off, done — not law)
 
-**O-C — Curve identity.** Carried forward from v1 unresolved: tessellation currently changes a discrete
-outcome (a 124-point versus 240-point circle changes a 260mm layout from 18 to 22 magnets). Needs a
-stability contract or a ruling on what the product definition is.
+402×402 viewport · notepad at 5%, two levels · zoom centre-preserving and touching nothing · canvas
+clean of controls · the field must visibly end · sealed values with lock/unlock · the size control on
+the shell. All from 08-10, all specific to the instrument, all delivered.
 
-**O-D — Nine across, or four-point centring?** They are arithmetically exclusive (§9.5). Gap
-registration yields an even run, so a nine-position field carries eight magnets; a magnet at the
-centre yields nine but is the "1 point" layout Dan rejected. **Interim state: registration default is
-back to `point`, so the field reads 9x9** — the four-point layout is something the engine SELECTS for a
-shape, never the grid's standing state (§6.5). What remains open is what the admin surface shows by
-default once the engine can select.
+## §D — CONDUCT (the global protocol, not grid law)
 
-*v1's O3 is CLOSED by §3.1. O-A is CLOSED by §1.1a.*
+Design before build · ask before acting · every QA runs necessity and deslop · the lane does its own
+research · verification is code **and** eyes · a default is not the builder's to set · nothing is
+approximated where real maths exists · the basic geometries are not the work · nothing is proven until
+a real cut-out is on screen.
+
+## §E — INHERITED FROM v1, BY NAME ONLY
+
+*The former blanket clause — "inherits it in full… nothing repealed except where a clause says so" —
+imported 1,644 lines and 119 clauses from session 59 unread. It is struck.* Rescued as still
+fundamental, because they are physical facts a project rename cannot change:
+
+- **the 48mm lattice**, and 96mm as the same lattice populated sparsely — no 24mm or 72mm pitch;
+- **publication in whole even millimetres** (v1 3.23, restated here as L10);
+- **mask / spacing / pattern are separate controls**, none inferring another.
+
+Nothing else from v1 is law. It remains readable history at
+`onemo-ssot-global/.claude/worktrees/s59-grid-law-main/_ssot-workbench/_briefs/grid-laws.md`.
+
+---
+
+# STRUCK — fabricated, and quoted as Dan for two days
+
+Machine-checked 2026-08-11: all 152 quotes in the previous book were tested against every s62 and s59
+transcript. Three were not his.
+
+- **old 11.6** — *"The size is determined by edge to edge optimal matching"* + "One pass, no search."
+  **Exists nowhere.** It is a reworded v1 zero-flap rule (07-29, about what *optimal* means) restamped
+  `DAN, 08-10`. It was then used as the principal argument for rejecting a contract.
+- **old 3.1f** — *"The fold was used as hypothetical folding the shape in half to determine center
+  lines vertically."* **Exists nowhere.** Dan's actual words (08-10 15:37 @meta) were about symmetry
+  and scaling: "it is folding the shape mid point 24 or 48mm… each side is mirror that can be
+  individually treated". A brainstorm was converted into a ruling.
+- **old 10.4** — *"tolerance is not required, it affects nothing, we have no tolerance, everything
+  must sit on the exact sizing."* **Exists nowhere.** What he said was four words: "tolerance 0.05mm -
+  who invented this?" *(The intent stands under L-none: a number with no author is not law. The
+  sentence was invented.)*
+
+Also corrected: the charter quote in the previous 14.2 was **real** but had been re-flowed from Dan's
+bullet list into a running sentence while the file claimed verbatim.
+
+---
+
+# OPEN — nothing here may be decided by inference
+
+**O-1 — the centre.** Box centre, material centroid and maximum-clearance give different placements
+(measured 17mm apart on a lopsided concave shape; 216mm vs 138mm on an L). All three land on air for a
+crescent. **Settled by switch, not ruling** — *Dan, 08-11 10:33:* "why do i need to rule if  i never
+tested the difference in the real life - why noit add all options and test?"
+
+**O-2 — the bounding-box → band thresholds.** No numbers exist. Same treatment as O-1.
+
+**O-3 — coverage versus balance precedence.** Both measures are named by L11/L12; which wins when they
+disagree was never ruled, and two silent inventions of it have already been reversed. Reported
+separately, never merged into a score.
+
+**O-4 — curve identity.** Tessellation changes a discrete outcome (a 124- vs 240-point circle). Carried
+from v1, unresolved, and affects generated shapes only — not traced cut-outs.
