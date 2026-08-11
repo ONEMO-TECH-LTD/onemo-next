@@ -104,3 +104,64 @@ so it can fail. A test that passes on the broken code is not coverage.
   instrument must be made against a painted tab.
 - **P7 (96mm parity) untouched** — closed by Dan's law 9.3a: points hide, nothing re-centres, the
   asymmetry is accepted rather than corrected. The shipped behaviour already matches it.
+
+---
+
+# Self-verification — /o-audit, /o-necessity, /o-deslop
+
+Run on Dan's instruction after the sprint was reported complete. He doubted I had run them. He was
+right: I had run typecheck, lint, tests and live checks, but not the three procedures — and
+**o-audit's critical step is the one I skipped: read every changed file.** I had edited through
+scripts and never read the finished files. Reading them found **six defects in work already
+reported as complete**, fixed in `2c9dad2b`.
+
+## /o-audit — findings
+
+| # | Defect | Why it mattered |
+|---|---|---|
+| 1 | `selectRegistration` took the **union** type | Its refusal could only fire on a cast. The AC "invalid writes fail explicitly" was satisfied **vacuously** — a compile-time promise wearing a runtime guard's clothes. Now takes the wide type, exactly as `selectPitch` takes `number`. |
+| 2 | The structural literal guard never scanned `positionsPerAxis` | A bare `9` in the shell walked through the guard written to stop exactly that — the **guards-nothing class, for the second time in the same task**. Falsified after fixing: CAUGHT. |
+| 3 | P4's deletion **orphaned a doc block** | The notepad description was left heading a stroke colour — precisely the defect D4 was raised to fix, reintroduced two commits later. |
+| 4 | P0 split one effect in two and left the listener's documentation on the wrong one | Comment/code drift introduced by the fix itself. |
+| 5 | **DEAD:** `FieldLayout.registrationMM` | Declared and set, zero consumers. My own P5 superseded it (`anchorMM` is registration **plus** pan) and I did not notice. |
+| 6 | **DEAD:** the cut-out's `wPx`/`hPx` | Recorded on load, never read — the shape is drawn from its millimetre box. |
+
+## /o-deslop — sweep of the touched surface
+
+Re-export-aware reference counts across `src/`, tests excluded. **KILLED:** `registrationMM`,
+`wPx`/`hPx` (both orphans of my own changes — rule 3). **KEEP-FLAGGED**, each with a reason:
+
+- the optional `zoom` prop and `ZOOM_FIT` — one caller, always passes; speculative optionality, but
+  KAI-10269 explicitly excluded touching `ZOOM_FIT`.
+- `spec.magnet`'s 6/8mm bodies — dormant since the inner discs were dropped; **D7 retains them by
+  decision**, and they are architecture-bearing (law 5.7).
+- camera's `Box` — Pixel's D10 rejection stands: collapsing it into `RegionMM` would be the first
+  import that file ever takes.
+- the slider's `Math.min` clamp — **I nearly cut this as unreachable and was wrong.** Lowering the
+  row count while a large size is set makes it fire. Kept.
+
+## /o-necessity — both verdict lines
+
+**Necessity — no unnecessary elements.** Every element traces to a named finding with a Linear
+acceptance criterion. The five functions added to the unit (`atomSpan`, `minShapeSpan`,
+`fieldBlockSpan`, `latticeAnchorMM`, `selectRegistration`) are each required by a specific AC;
+`pinchFactor` was extracted because the AC demanded regression coverage of packetization, which needs
+a testable pure function. The two genuinely unnecessary elements found by the sweep are deleted. The
+three that remain are decisions recorded by others (D7, D10, KAI-10269's exclusion), not drift.
+
+**Sufficiency — partial, and the slice is authorised.** This set delivers **Sprint 2 in full**: 18 of
+18 children, each with a commit and evidence. It delivers **none of Dan's standing build directive** —
+the engine that reads a band off a shape and returns where the magnets go, judged on coverage and
+symmetry balance across bands 2/3/4. Dan authorised Sprint 2 explicitly, so the partial is a
+**sanctioned slice, not a self-narrowed scope** — but it is partial, and reporting the cleanup as the
+solver would be a false claim.
+
+**Verdict: CLEAR against the sprint. NOT CLEAR against the governing directive set**, by
+authorisation rather than by omission.
+
+## The pattern worth recording
+
+Three of the six defects were introduced **by the fixes themselves** — an orphaned comment, a
+misplaced comment, and a guard with a hole. The sprint's own thesis was that pattern-shaped checks
+miss the class; my repair for it shipped with the same fault twice. Reading the finished files is
+what caught it. Tests, lint and live checks all passed the whole time.
