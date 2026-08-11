@@ -246,6 +246,11 @@
   outline-offset: 1px;
 }
 
+.librarySelect {
+  width: 132px;
+  text-align: left;
+}
+
 .lock {
   width: 32px;
   height: 32px;

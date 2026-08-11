@@ -97,6 +97,17 @@ const DEFAULT_SIZE_BAND = 3
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
+/** Dan's real cut-outs, kept with the admin bench so the comparison corpus is repeatable. */
+const CUTOUT_LIBRARY = [
+  'BAT-WOMAN.png',
+  'BOT.png',
+  'BUTTERFLY.png',
+  'DUCK.png',
+  'PILL.png',
+  'POKE1.png',
+  'POKE2.png',
+] as const
+
 const CENTRE_LABELS: Record<CentreMethod, string> = {
   box: 'box',
   'oriented-box': 'oriented box',
@@ -224,6 +235,12 @@ export default function GridEnginePage() {
     }
     img.src = url
   })
+
+  const loadLibraryCutout = async (name: (typeof CUTOUT_LIBRARY)[number]) => {
+    const response = await fetch(`/grid-engine/cutouts/${encodeURIComponent(name)}`)
+    if (!response.ok) throw new Error(`Could not load cut-out fixture: ${name}`)
+    loadCutout(new File([await response.blob()], name, { type: 'image/png' }))
+  }
 
   /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
   /**
@@ -427,6 +444,21 @@ export default function GridEnginePage() {
           }}
           aria-label="Load a cut-out"
         />
+
+        <select
+          className={`${styles.input} ${styles.librarySelect}`}
+          value=""
+          aria-label="Load a saved cut-out"
+          onChange={(event) => {
+            const name = event.target.value as (typeof CUTOUT_LIBRARY)[number]
+            if (name) void loadLibraryCutout(name)
+          }}
+        >
+          <option value="">saved cut-outs</option>
+          {CUTOUT_LIBRARY.map((name) => (
+            <option key={name} value={name}>{name.replace('.png', '')}</option>
+          ))}
+        </select>
 
         {cutout && (
           <button
