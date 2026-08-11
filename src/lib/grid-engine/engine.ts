@@ -120,6 +120,18 @@ export function paddedFieldMM(grid: GridSpec, field: RegionMM): RegionMM {
 }
 
 /**
+ * WHERE THE LATTICE ACTUALLY SITS, per axis — registration plus pan, in millimetres.
+ *
+ * This is a manufacturing coordinate: it is the point every magnet is measured from, and a surface
+ * drawing the lattice as a rule must anchor on it or the lines miss the centres they run through
+ * (law 8.3). It is produced HERE because adding two millimetre quantities is geometry, and the
+ * bridge does none — it was briefly assembled there, which put a coordinate in the wiring.
+ */
+export function latticeAnchorMM(offsetMM: number, panMM: PointMM): PointMM {
+  return [offsetMM + panMM[0], offsetMM + panMM[1]]
+}
+
+/**
  * Every populated magnet centre inside a region — and NOT one beyond it. Indices walk THE one
  * lattice from its registration; only every stride-th one carries a magnet (law 1.2).
  */
@@ -132,9 +144,8 @@ export function magnetsInRegion(
   const { basePitchMM } = grid
   const stride = populationStride(grid)
   // The lattice is infinite; PAN slides it against the shape. Per axis, because the shape is held
-  // still and the grid is what moves to meet it.
-  const ox = offsetMM + panMM[0]
-  const oy = offsetMM + panMM[1]
+  // still and the grid is what moves to meet it. Same anchor the rule is drawn on — one definition.
+  const [ox, oy] = latticeAnchorMM(offsetMM, panMM)
   const first = (lo: number, o: number) => Math.ceil((lo - o) / basePitchMM)
   const last = (hi: number, o: number) => Math.floor((hi - o) / basePitchMM)
   const onStride = (i: number) => ((i % stride) + stride) % stride === 0

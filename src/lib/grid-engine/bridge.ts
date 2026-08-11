@@ -18,6 +18,7 @@ import {
   bandSpanMM,
   cellDiameterMM,
   fieldSpanMM,
+  latticeAnchorMM,
   magnetsInRegion,
   paddedFieldMM,
   registrationOffsetMM,
@@ -67,7 +68,7 @@ export function layoutField(
     cellMM: cellDiameterMM(spec.grid),
     registrationMM: offset,
     /** Where the rule must anchor so its intersections stay ON the magnet centres (law 8.3). */
-    anchorMM: [offset + panMM[0], offset + panMM[1]],
+    anchorMM: latticeAnchorMM(offset, panMM),
   }
 }
 
