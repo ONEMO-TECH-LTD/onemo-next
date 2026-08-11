@@ -497,3 +497,14 @@
     color: #fdba74;
   }
 }
+
+/* The drag surface's cursor. CSS, not state: the browser already knows the pointer is down, so
+   :active says it without a render. It was an inline style reading a ref during render — which
+   lints as an error AND never worked, because changing a ref renders nothing. */
+.panSurface {
+  cursor: grab;
+}
+
+.panSurface:active {
+  cursor: grabbing;
+}

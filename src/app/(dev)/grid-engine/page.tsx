@@ -227,14 +227,17 @@ export default function GridEnginePage() {
     return [u.x, u.y]
   }
 
-  const clearCutout = useCallback(() => {
+  // Plain function. Hand-memoising it declared an empty dependency list the React Compiler could not
+  // reconcile with what it inferred, so it gave up optimising the WHOLE component -- and that bail-out
+  // was hidden behind the ref-in-render error until that was fixed. The compiler memoises this.
+  const clearCutout = () => {
     setCutout((c) => {
       if (c) URL.revokeObjectURL(c.url)
       return null
     })
     setBox(null)
     setOutline(null)
-  }, [])
+  }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
   // per keystroke meant every intermediate digit hit the guard and bounced as out-of-range.
@@ -429,7 +432,7 @@ export default function GridEnginePage() {
             width={10000}
             height={10000}
             fill="transparent"
-            style={{ cursor: panGrabbedAt.current ? 'grabbing' : 'grab' }}
+            className={styles.panSurface}
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId)
               panGrabbedAt.current = { atMM: toMM(e), panMM: pan }
