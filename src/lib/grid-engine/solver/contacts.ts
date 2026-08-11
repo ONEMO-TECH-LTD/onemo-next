@@ -126,7 +126,12 @@ export function containmentIntervals(
           const sx = sigma * d[0]
           const sy = sigma * d[1]
           const t = Math.abs(sx) >= Math.abs(sy) ? (b[0] - sigma * v[0]) / sx : (b[1] - sigma * v[1]) / sy
-          if (t >= 0 && t <= 1) {
+          // ADMISSION bound, not a truth tolerance: t is recomputed in floats from the solved σ,
+          // so an exact endpoint contact can land one ulp outside [0,1] and a REAL event would be
+          // dropped — dropping a true event corrupts whole intervals (QA B1's root cause class).
+          // Admitting a hair extra is harmless: witnesses decide status with the full predicate,
+          // so over-generated candidates can never create a wrong answer.
+          if (t >= -1e-9 && t <= 1 + 1e-9) {
             events.push({
               sigma,
               contact: { boxFeature: { kind: 'corner', index: ci }, outlineFeature: { kind: 'edge', index: i } },
@@ -166,11 +171,17 @@ export function containmentIntervals(
         if (sigma > 0 && sigma <= sigmaMax) {
           // §7.2's same finite-segment condition, other direction: the SCALED vertex σv must fall
           // within the box edge's closed span.
+          // The solved σ puts the vertex ON the box edge's line BY CONSTRUCTION — re-checking the
+          // perpendicular axis in floats demanded exact equality against a one-ulp rounding and
+          // silently dropped real transversal events (the missed 0.9677 exit that let a whole
+          // unlawful range publish as lawful — QA B1). Only the ALONG-edge span needs checking,
+          // with an admission slack in the harmless direction.
           const px = sigma * v[0]
           const py = sigma * v[1]
-          const within =
-            Math.min(b[0], c[0]) <= px && px <= Math.max(b[0], c[0]) &&
-            Math.min(b[1], c[1]) <= py && py <= Math.max(b[1], c[1])
+          const horizontal = b[1] === c[1]
+          const within = horizontal
+            ? Math.min(b[0], c[0]) - 1e-7 <= px && px <= Math.max(b[0], c[0]) + 1e-7
+            : Math.min(b[1], c[1]) - 1e-7 <= py && py <= Math.max(b[1], c[1]) + 1e-7
           if (within) {
             events.push({
               sigma,
