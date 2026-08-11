@@ -390,34 +390,38 @@ export default function GridEnginePage() {
           A label opens its own input with no script at all and cannot be blocked.
         */}
         {/*
-          THE CUT-OUT BUTTON. It is a LABEL bound to the file input, not a button that scripts
-          `input.click()`. That scripted click was the bug: the input was marked `hidden`, which is
-          display:none, and a programmatic click on a display:none file input is blocked in an
-          embedded webview. A label opens its own input with no script, so there is nothing to block.
+          THE CUT-OUT BUTTON — the file input IS the button, laid transparently over it.
+
+          Two earlier spellings did not work. A button calling `input.click()` fails because the input
+          was display:none and a scripted click on one of those is blocked in an embedded webview. A
+          <label htmlFor> fixed that for Chrome but Safari refuses to activate a file input that sits
+          off-screen, so it stayed dead there.
+
+          This spelling has nothing to activate remotely: the input covers the chip at full size with
+          opacity 0, so a press on the chip IS a press on the input. No script, no hidden element, no
+          browser-specific behaviour to depend on.
         */}
         {cutout ? (
           <button type="button" className={styles.chip} data-on onClick={clearCutout}>
             clear
           </button>
         ) : (
-          <label className={styles.chip} htmlFor="cutout-file">
+          <span className={styles.chipFile}>
             cut-out
-          </label>
+            <input
+              id="cutout-file"
+              ref={cutoutInput}
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) loadCutout(f)
+                e.target.value = ''
+              }}
+              aria-label="Load a cut-out"
+            />
+          </span>
         )}
-
-        <input
-          id="cutout-file"
-          ref={cutoutInput}
-          className={styles.fileInput}
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) loadCutout(f)
-            e.target.value = ''
-          }}
-          aria-label="Load a cut-out"
-        />
 
         {cutout && (
           <button

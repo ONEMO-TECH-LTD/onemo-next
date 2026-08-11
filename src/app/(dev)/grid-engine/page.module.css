@@ -490,3 +490,22 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* The cut-out control: the file input IS the chip, laid over it at full size and fully transparent.
+   Nothing is hidden and nothing is activated by script, so neither the webview block on scripted
+   clicks nor Safari's refusal to activate off-screen inputs can apply. */
+.chipFile {
+  composes: chip;
+  position: relative;
+  overflow: hidden;
+}
+
+.chipFile input[type='file'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
