@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Thirteen laws. The engine and its algorithm. Nothing else.
+### Fourteen laws. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -112,7 +112,7 @@ interval method.)*
 
 Four bindings, each live: **centred and symmetrical on every side** · **material-aware** — magnets go
 where material is · **gravity** — the top must be held, not only the bottom · **no flap** — no large
-asymmetric uncovered region.
+asymmetric uncovered region, now bounded by a real number in **L14**.
 
 **Tightness is the objective only after balance.** *Dan, 08-10 12:16 · 14:07 @lead:* "look how close
 the edges of shape to gug the grid 2x2 - so in that case close to optimal is 162mm size" · "it must
@@ -157,6 +157,36 @@ a proof that none exists within L9's ceiling.
 **No maximality.** *Dan, 08-11 charter, three separate lines:* “As many magnets as fit” is
 forbidden. · Magnet count is not the optimisation objective. · Interior magnets do not compensate for
 unsupported tips, sides or extremities.
+
+**L14 — THE SUCCESS TEST. Four conditions, all of them measurable.**
+*Dan, 08-11 12:34 @lead — the final formulation of the deliverable*
+> "the measureing success is to have minimum magnet pair (vertical/horizontal), in 48mm and 96mm
+> sparse layout to be fit to shape inside it , centered to the shape and have no flap zones greater
+> than 12-24mm on any side unless it is trivial limb especially at the bottom"
+
+A variant passes when **all four** hold:
+
+1. **A minimum magnet pair** — vertical or horizontal (**L4**).
+2. **In both populations** — 48mm **and** 96mm sparse. Not one or the other: a variant that holds
+   only at 48 is not a pass. *(This is stricter than anything previously written and it is the
+   condition most likely to fail — a pair that survives 48mm thinning to 96mm needs material
+   96mm apart.)*
+3. **Fitted inside the shape and centred on it** (**L2** for "inside", **L6** for what "centred" means
+   — parity, not choice).
+4. **No flap zone greater than 12–24mm on any side** — unless the uncovered region is a **trivial
+   limb**, and the bottom especially is where that exemption applies.
+
+**On the number.** Dan gave a **range, not a point**, and both ends are lattice quantities: 12mm is
+one padding, 24mm is one magnet spot. Treat the limit as a **switch between those two values, tested
+on the real corpus** — never a third number picked in between. This is the same treatment O-1 and O-2
+get, and it is Dan's own standing method: *"why do i need to rule if  i never tested the difference in
+the real life - why noit add all options and test?"*
+
+**On the limb exemption.** "Trivial" has no number and none may be invented. The engine **measures**
+every uncovered region — extent and side — and **reports** which ones the exemption was applied to.
+An exemption that is visible can be overruled; one applied silently cannot. **This closes the only
+previously unenforceable clause in the book:** the flap had no threshold and no author, so it was the
+one failure condition that could never fail. It now can.
 
 ---
 
@@ -226,6 +256,11 @@ crescent. **Settled by switch, not ruling** — *Dan, 08-11 10:33:* "why do i ne
 tested the difference in the real life - why noit add all options and test?"
 
 **O-2 — the bounding-box → band thresholds.** No numbers exist. Same treatment as O-1.
+
+**O-2a — the flap limit, 12mm or 24mm.** Ruled as a **range** in L14, so the two ends are switches to
+test, not a gap to fill. What is a *trivial limb* is measured and reported, never enforced.
+*(This was the book's only unenforceable failure condition until 08-11 12:34. It is now closed as a
+test, not left open as a question.)*
 
 **O-3 — coverage versus balance precedence.** Both measures are named by L11/L12; which wins when they
 disagree was never ruled, and two silent inventions of it have already been reversed. Reported

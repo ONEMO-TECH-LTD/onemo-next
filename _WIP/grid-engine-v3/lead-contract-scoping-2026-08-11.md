@@ -1,6 +1,11 @@
-# GRID ENGINE v3 — CONTRACT
+# LEAD — CONTRACT SCOPING INPUT
 
-### One deliverable. Twelve checkpoints. The logic and the algorithm, nothing else.
+### Twelve checkpoints against the deliverable. **Not the contract.**
+
+> **Status.** @s62-grid-pixel owns and is drafting the contract. This file is @s62-lead's scoping
+> pass, written on Dan's 12:21 instruction before that draft started — take from it, or discard it.
+> The authority both must cite is [`grid-laws.md`](./grid-laws.md), now **fourteen** laws: **L14**
+> is Dan's 12:34 success test and it closes the flap threshold, which had no author until then.
 
 > **What this contract is for.** *Dan, 2026-08-11:*
 >
