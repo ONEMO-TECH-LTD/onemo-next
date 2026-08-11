@@ -712,3 +712,13 @@ specification channel itself). Not maximal-vs-subset: within band-scoped windows
 subset is enumerated, which is why all 330 counts match pixel's independent derivation.
 Meta to rerun with the scoping clause; predicted direction split: every count difference
 theirs-higher. The seal's grammar is unchanged; the WRITTEN spec is now complete.
+
+## POST-SEAL RECONCILIATION REQUIRED (pixel — recorded as a build-authority action, not open math)
+engine-blueprint.md §6.2/§6.4 still rules "connected COMPONENTS only; arbitrary subsets are
+excluded" — in direct conflict with sealed C10 (every connected admissible subset; maximality
+forbidden). Both cannot be build authority: a builder following the blueprint as written will
+reproduce the whole-template/maximal-only defect this paper spent the night killing. Dan's
+all-options/manual-review directives and C10 are newer and govern. ACTION before any production
+build: amend blueprint §6.2/§6.4 to the C10 grammar (owner: pixel, who owns the blueprint), and
+tighten contract EC-04's wording to name admissible subsets explicitly. Until amended, THIS PAPER
+outranks the blueprint on arrangement grammar.
