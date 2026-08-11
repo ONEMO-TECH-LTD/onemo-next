@@ -627,7 +627,8 @@ Build in this order, with no build-ahead across a failed gate. The first milesto
 
 ## Closing gate
 
-Lead QA must attack law/contract fidelity, formulas, completeness boundaries and implementability. Meta must independently answer: could two builders, given only the contract, law book and this blueprint, produce the same canonical result? A `CLEAR` requires both:
+Lead QA must attack law/contract fidelity, formulas, completeness boundaries and implementability. Meta must independently answer: could two builders, given only the contract, law book and this blueprint, produce the same canonical result? A `CLEAR` requires all three:
 
 - **Necessity:** no element can be removed without losing a required answer or proof.
 - **Sufficiency:** every required size, layout, coordinate, support fact, side measurement and applied proof is computable without an unstated choice.
+- **Provenance (law L0):** no clause states a decision or interpretation Dan did not provide. Where a reading was required, it is marked as a reading and held for him — never written as settled. Measurement may prove a reading impossible; it may never make one ruled.
