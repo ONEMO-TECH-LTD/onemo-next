@@ -697,3 +697,18 @@ machinery disagrees with its own specification until two implementations diff it
    invisible to every gate by construction — the one place three-way agreement proves nothing.
 3. The corpus is seven shapes; the parity rule bit on exactly one. The fixture set is complete for
    these seven by measurement — untested shape classes remain, and that is where to attack first.
+
+## SEAL ADDENDUM 2 · Meta's spec-conformant check failed — because the transmitted spec was
+## incomplete, and the omission is now a written clause
+Meta implemented the hash format EXACTLY as I transmitted it and got 13 families at DUCK 36/65
+band 2 vs the seal's 2. Diagnosis from the raw survivors at that key: the seal's 2 = the only
+same-registration couplings available from ≤2×2 WINDOWS (base 2×2@48 pair {(−24,−24),(24,−24)}
+gap,gap × sparse 2×2@96 phase pairs #00/#10); 13 requires subsets of 3-extent windows (3×2@48
+carries a 5-survivor chain) entering band 2. THE CLAUSE I FAILED TO TRANSMIT: **a band-b
+arrangement is drawn only from windows with rows ≤ b and cols ≤ b (§6.1 — the band IS the window
+extent)** — C37 recorded it, my hash-format message omitted it, and a spec that does not state a
+clause gets implemented without it (the night's law, eighth instance, this time biting the
+specification channel itself). Not maximal-vs-subset: within band-scoped windows EVERY admissible
+subset is enumerated, which is why all 330 counts match pixel's independent derivation.
+Meta to rerun with the scoping clause; predicted direction split: every count difference
+theirs-higher. The seal's grammar is unchanged; the WRITTEN spec is now complete.
