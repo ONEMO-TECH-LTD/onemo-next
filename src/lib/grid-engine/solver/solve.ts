@@ -118,6 +118,94 @@ function isMaximalComponentAt(occ: ComponentOccurrence, centred: readonly PointM
   return componentsOf(occ.window, occ.edges, active).some((c) => c.id === occ.component.id)
 }
 
+/** Closest point on segment [a,b] to p, with the parameter t. */
+function closestOnSegment(p: PointMM, a: PointMM, b: PointMM): { q: PointMM; t: number } {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  const len2 = dx * dx + dy * dy
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2))
+  return { q: [a[0] + t * dx, a[1] + t * dy], t }
+}
+
+/** §8: distance from a point to the manufactured boundary, with the nearest edge + closest point. */
+function pointToOutline(p: PointMM, pts: readonly PointMM[]): { d: number; edge: number; q: PointMM } {
+  let best = { d: Infinity, edge: -1, q: p }
+  for (let i = 0; i < pts.length; i++) {
+    const { q } = closestOnSegment(p, pts[i], pts[(i + 1) % pts.length])
+    const d = Math.hypot(p[0] - q[0], p[1] - q[1])
+    if (d < best.d) best = { d, edge: i, q }
+  }
+  return best
+}
+
+const BOX_CORNER_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const
+const BOX_EDGE_NAMES = ['top', 'right', 'bottom', 'left'] as const
+
+/**
+ * §7.6: the minimum boundary separation between one pair box and the outline, with both features
+ * and closest points named. The box sits inside the outline (proven at publication), so the
+ * minimum is attained corner-against-edge or vertex-against-box-edge — both directions searched.
+ * Display approximation (float); the binding IDENTITY comes from the interval's own exact contact.
+ */
+function boxOutlineSeparation(
+  box: BoxMM,
+  pts: readonly PointMM[],
+): {
+  separationMM: number
+  regionFeature: { kind: 'edge' | 'corner'; which: (typeof BOX_CORNER_NAMES)[number] | (typeof BOX_EDGE_NAMES)[number] }
+  outlineFeature: { kind: 'edge' | 'vertex'; index: number }
+  onRegionMM: PointMM
+  onOutlineMM: PointMM
+} {
+  const corners: PointMM[] = [
+    [box.x0, box.y0],
+    [box.x1, box.y0],
+    [box.x1, box.y1],
+    [box.x0, box.y1],
+  ]
+  let best = {
+    separationMM: Infinity,
+    regionFeature: { kind: 'corner' as 'edge' | 'corner', which: BOX_CORNER_NAMES[0] as (typeof BOX_CORNER_NAMES)[number] | (typeof BOX_EDGE_NAMES)[number] },
+    outlineFeature: { kind: 'edge' as 'edge' | 'vertex', index: -1 },
+    onRegionMM: corners[0],
+    onOutlineMM: corners[0],
+  }
+  // box corner → outline edge
+  for (let c = 0; c < 4; c++) {
+    const hit = pointToOutline(corners[c], pts)
+    if (hit.d < best.separationMM) {
+      best = {
+        separationMM: hit.d,
+        regionFeature: { kind: 'corner', which: BOX_CORNER_NAMES[c] },
+        outlineFeature: { kind: 'edge', index: hit.edge },
+        onRegionMM: corners[c],
+        onOutlineMM: hit.q,
+      }
+    }
+  }
+  // outline vertex → box edge
+  for (let i = 0; i < pts.length; i++) {
+    const v = pts[i]
+    for (let e = 0; e < 4; e++) {
+      const { q, t } = closestOnSegment(v, corners[e], corners[(e + 1) % 4])
+      const d = Math.hypot(v[0] - q[0], v[1] - q[1])
+      if (d < best.separationMM) {
+        best = {
+          separationMM: d,
+          regionFeature:
+            t === 0 || t === 1
+              ? { kind: 'corner', which: BOX_CORNER_NAMES[t === 0 ? e : (e + 1) % 4] }
+              : { kind: 'edge', which: BOX_EDGE_NAMES[e] },
+          outlineFeature: { kind: 'vertex', index: i },
+          onRegionMM: q,
+          onOutlineMM: v,
+        }
+      }
+    }
+  }
+  return best
+}
+
 /** §7.5: every even integer inside [L·lo, L·hi], ascending. */
 function evenSizesIn(loMM: number, hiMM: number): number[] {
   const out: number[] = []
@@ -286,6 +374,8 @@ function buildFamily(args: {
 }): MeasuredCutoutVariantFamily {
   const { request, spec, method, centreMM, band, sigma, m, L, bo, so, bTarget, allCentres, shapeBounds } = args
 
+  const scaledPts = args.centred.map(([x, y]) => [x * sigma, y * sigma] as PointMM)
+
   const popEvidence = (occ: ComponentOccurrence, slot: PopulationSlot) => {
     // shape frame: q_shape = q − a (§2.2)
     const magnets = occ.component.vertices.map((vi) => {
@@ -295,21 +385,26 @@ function buildFamily(args: {
     const gridBox = gridBoxOf(magnets, spec)
     const over = overhangsOf(shapeBounds, gridBox)
     const outcomes = flapOutcomesOf(over, request.flapLimitsMM)
-    const extremities = extremitiesOf(
-      args.centred.map(([x, y]) => [x * sigma, y * sigma] as PointMM),
-      shapeBounds,
-      over,
-    )
+    const extremities = extremitiesOf(scaledPts, shapeBounds, over)
     const zones = overhangZonesOf(
       slot,
-      args.centred.map(([x, y]) => [x * sigma, y * sigma] as PointMM),
+      scaledPts,
       gridBox,
       over,
       extremities,
       request.flapLimitsMM,
     )
-    // §7.6: region binding — the interval's own closing contact is the feature that limits the fit
-    const contact = occ.interval.closeContact ?? occ.interval.openContact
+    // §7.6: region binding — the minimum boundary separation between the arrangement's region
+    // (its pair boxes) and the outline, measured at the published scale with features and closest
+    // points named. Zero when the published size sits exactly on its binding contact.
+    let binding: ReturnType<typeof boxOutlineSeparation> & { pairBoxIndex: number } = {
+      ...boxOutlineSeparation(occ.relBoxes[occ.component.edgeIndices[0]], scaledPts),
+      pairBoxIndex: 0,
+    }
+    for (let bi = 1; bi < occ.component.edgeIndices.length; bi++) {
+      const sep = boxOutlineSeparation(occ.relBoxes[occ.component.edgeIndices[bi]], scaledPts)
+      if (sep.separationMM < binding.separationMM) binding = { ...sep, pairBoxIndex: bi }
+    }
     // §7.7: twin-fix classification, size-only, derived at solve time
     const twinBase = (4 - 1) * spec.basePitchMM + 2 * spec.paddingMM
     const twinLimit = twinBase + Math.max(...request.flapLimitsMM)
@@ -330,11 +425,17 @@ function buildFamily(args: {
         windowRows: occ.window.rows,
         windowColumns: occ.window.columns,
         registration: registrationOf(occ.window),
-        magnets: magnets.map((coordinateMM) => ({
-          coordinateMM,
-          impliedDiscClearanceMM: 0, // filled by the evidence pass below when exact contacts land
-          discContact: { outlineEdgeIndex: -1, closestOutlinePointMM: coordinateMM },
-        })),
+        // §8: implied disc clearance = distance from the magnet centre to the manufactured
+        // boundary minus the padding disc — material beyond the 24mm spot. Display approximation;
+        // lawfulness never reads it (containment is the exact pair-box predicate).
+        magnets: magnets.map((coordinateMM) => {
+          const hit = pointToOutline(coordinateMM, scaledPts)
+          return {
+            coordinateMM,
+            impliedDiscClearanceMM: hit.d - spec.paddingMM,
+            discContact: { outlineEdgeIndex: hit.edge, closestOutlinePointMM: hit.q },
+          }
+        }),
         edges: occ.component.edgeIndices.map((ei) => {
           const e = occ.edges[ei]
           const vi = occ.component.vertices
@@ -351,18 +452,15 @@ function buildFamily(args: {
       overhangSpreadMM: over.spread,
       flapOutcomes: outcomes,
       regionBinding: {
-        separationMM: 0,
+        separationMM: binding.separationMM,
         population: slot,
         regionFeature: {
-          pairBoxIndex: 0,
-          kind: contact?.boxFeature.kind === 'corner' ? ('corner' as const) : ('edge' as const),
-          which: 'left' as const,
+          pairBoxIndex: binding.pairBoxIndex,
+          kind: binding.regionFeature.kind,
+          which: binding.regionFeature.which,
         },
-        outlineFeature: {
-          kind: contact?.outlineFeature.kind === 'vertex' ? ('vertex' as const) : ('edge' as const),
-          index: contact?.outlineFeature.index ?? -1,
-        },
-        closestPoints: { onRegionMM: [0, 0] as PointMM, onOutlineMM: [0, 0] as PointMM },
+        outlineFeature: binding.outlineFeature,
+        closestPoints: { onRegionMM: binding.onRegionMM, onOutlineMM: binding.onOutlineMM },
       },
       fix: { kind: isTwin ? ('twin-fix' as const) : ('multi-fix' as const), sizeEligible: !isTwin || m < twinLimit, limitMM: twinLimit },
       centreRelationships: centreRelationships(magnets, allCentres, centreMM, sigma),

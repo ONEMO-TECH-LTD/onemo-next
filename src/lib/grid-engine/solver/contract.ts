@@ -1,7 +1,7 @@
 // THE PUBLIC DATA CONTRACT — blueprint §2, and nothing besides.
 //
 // Blueprint §1: "contract.ts — request, result and failure types only." TYPES ONLY — no runtime
-// value lives here (QA B6: the centre registry is owned by centres.ts, which also owns §9's
+// value lives here (§4: the centre registry is owned by centres.ts, which also owns §9's
 // canonical registry order). Every number the solver uses arrives through SolveRequest.spec, the
 // guarded law input; a literal here would be a second door past the guard.
 //

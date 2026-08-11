@@ -99,6 +99,42 @@ describe('§3.1 refusal — degenerate input is refused, never repaired (G2)', (
       ] as PointMM[],
       'non-finite-coordinate',
     ],
+    [
+      // COLLINEAR OVERLAP — the boundary doubles back along its own segment. Not a proper
+      // crossing, so a crossings-only test accepts it; §3.1 demands one simple closed polygon.
+      [
+        [0, 0],
+        [10, 0],
+        [4, 0],
+        [4, 8],
+      ] as PointMM[],
+      'self-intersection',
+    ],
+    [
+      // T-TOUCH — a vertex lands ON a non-adjacent edge's interior and retreats. The boundary
+      // pinches without crossing; no edge properly intersects any other.
+      [
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [5, 0],
+        [0, 10],
+      ] as PointMM[],
+      'self-intersection',
+    ],
+    [
+      // REPEATED NON-ADJACENT VERTEX — an hourglass touching itself at one point. Every edge
+      // pair is crossing-free; the repeated vertex is the whole defect.
+      [
+        [0, 0],
+        [4, 4],
+        [8, 0],
+        [8, 8],
+        [4, 4],
+        [0, 8],
+      ] as PointMM[],
+      'self-intersection',
+    ],
   ])('case %# refuses with the stated reason', (pts, reason) => {
     const r = canonicaliseOutline(pts as PointMM[])
     expect(r.ok).toBe(false)
