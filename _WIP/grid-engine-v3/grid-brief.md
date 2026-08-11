@@ -1403,15 +1403,15 @@ also we need to make sure that current parts that we retain do n ot jit the perf
 
 there was a problem with computations of the centroid they froze the UI shel cause they were computing hundreds of variants for every ui change - it is no go
 
-**14:03:25**
+**14:02:54**
 
 between magnets? flap= outer edges not supported by magnet connection and hold
 
-**14:06:10**
+**14:06:10**  *(mid-turn to this lane; NOT captured by the collector — see grid-laws.md §F. Time approximate: after 13:56, before 14:02:54.)*
 
 the eventual mechanism in the interaction will be just selecting the band so under the hood we need to make sure that within selected band user gets the optimal size and we guarantee it - otherwise they can get surprises on the expected sizes
 
-**14:08:03**
+**14:07:16**
 
 admin dash must allow us to move and review every increment defined by the engine and if we can we need to build the engine that hits the bulls eye so we dont have to create mystery sizing and user knows the size and confirmed by the system and we do not to polish the mnagnetic grid matching the shape manually post purchase by eye - theis will become real bottleneck for the production and bad UX
 

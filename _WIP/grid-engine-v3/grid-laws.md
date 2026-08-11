@@ -293,7 +293,12 @@ pinch, resize, pan, drag, camera movement or variant browsing.** Browsing candid
 behind it — and because the first design to break it did so while satisfying every other law.)*
 
 **L17 — THE BULLS EYE. One guaranteed answer per band, good enough that nobody touches it after.**
-*Dan, 08-11 14:14 and 14:20 @lead*
+*Dan, 08-11 @lead — **provenance differs between the two quotes, and it matters***
+>
+> *The first arrived mid-turn to this lane and the collector did NOT capture it (§F). This lane is its
+> first-hand receiver rather than a relay, and it was quoted back to Dan in a reply he did not correct
+> — but it is not vault-verifiable and is booked as such. The second is a captured Dan turn at
+> **14:07:16**, verified. The flap ruling above it is a captured turn at **14:02:54**.*
 > "the eventual mechanism in the interaction will be just selecting the band so under the hood we need
 > to make sure that within selected band user gets the optimal size and we guarantee it - otherwise
 > they can get surprises on the expected sizes"
