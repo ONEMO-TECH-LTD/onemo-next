@@ -32,3 +32,31 @@ contract + blueprint, diffed against canon; QA deferred by Dan's "drop qa — bu
 - answerHash single-string > max string length (corpus caught it) → streaming canonical hash
 - per-family boundary-chain copies retained the scaled outline (corpus caught it) → index runs
 - sliver fixture wrong twice (engine right both times)
+
+## Corpus results (EC-12) — seven real cut-outs, six centres, bands 2/3, both populations, frozen head
+| shape | families | b2 / b3 | sizes | per-pop optima (48 / 96) | family optima | empty bands | solve |
+|---|---|---|---|---|---|---|---|
+| DUCK | 2,748 | 488 / 2,260 | 242–408 | 0 / 0 | 0 | 0 | 155s |
+| BAT-WOMAN | 6,401 | 1,144 / 5,257 | 170–408 | 11 / 0 | 0 | 0 | 247s |
+| BUTTERFLY | 5,319 | 1,093 / 4,226 | 186–408 | 3 / 8 | 0 | 0 | 259s |
+| POKE1 | 10,980 | 1,846 / 9,134 | 142–408 | 4 / 14 | 0 | 0 | 200s |
+| BOT | 8,944 | 1,585 / 7,359 | 170–408 | 6 / 12 | 0 | 0 | 380s |
+| PILL | 6,907 | 1,363 / 5,544 | 206–408 | 12 / 3 | 0 | 0 | 65s |
+| POKE2 | 9,017 | 1,602 / 7,415 | 126–408 | 8 / 4 | 0 | 0 | 208s |
+
+Total 50,316 families. EVERY centre construction answers EVERY shape; zero empty bands. The duck
+supports no four-corner arrangement at any size on any centre. FINDING FOR DAN (definition, not
+defect): per-population four-corner optima exist on six of seven shapes, but the 48 and 96
+populations never first-publish four corners at the SAME even size, so a family-level "optimum"
+(both populations at once — my conjunction) never fires corpus-wide. The engine reports both
+readings and gates nothing on either. Results: ~/.claude/jobs/98a4885e/tmp/corpus-out/ (one JSON
+per shape, complete families).
+
+## EC-12 final statement — proven / correction required / rejected
+- PROVEN: exact interval solve + §7.5 re-proof + §6.2 maximality (oracle agreement, analytic
+  fixtures, corpus); pair-box union containment; parity targets; coupling; publication; flap
+  model; twin-fix classification; applied proof surface with independent SVG re-measurement.
+- CORRECTION REQUIRED: ExactValue fields are precise floats, not algebraic identity (B5 open);
+  family-level optimum conjunction needs Dan's definition ruling (above).
+- REJECTED (already replaced during build): exclusive-boundary oracle; window-scoped family
+  identity; single-string canonical hashing; per-family boundary-chain copies.
