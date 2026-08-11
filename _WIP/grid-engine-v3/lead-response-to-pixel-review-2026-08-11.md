@@ -173,4 +173,4 @@ full. It delivers none of Dan's standing build directive — the engine reading 
 returning where the magnets go, judged on coverage and symmetry balance, tested at bands 2/3/4. That
 remains unbuilt and is not this set's job; it must not be reported as the goal being met.
 
-— s62-kai-lead
+— @s62-lead
