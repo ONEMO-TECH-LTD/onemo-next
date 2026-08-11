@@ -110,7 +110,7 @@ MeasuredCutoutVariantFamily {
 
 PopulationEvidence {
   pitchMM
-  sourceWindow
+  sourceWindows[]
   arrangementId
   magnets[]: { xMM, yMM, clearanceMM, bindingContact }
   gridBoxMM
@@ -240,19 +240,20 @@ This finite set is the whole solve domain. No scale between candidates is search
 
 ## 6. Exact full-disc support
 
-At one candidate scale, transform a lattice position into source space without deforming the
-outline. A magnet is supported exactly when its centre is inside or on the polygon and no boundary
-edge enters the open radius-`P` disc around it:
+At one candidate scale, a returned lattice coordinate `q` is relative to the selected centre.
+Let `M_sigma={sigma*(p-Ck) | p is on the source outline}` and `R=paddingMM`. Evaluate `q` against
+that uniformly scaled polygon. This preserves the aspect exactly. A magnet is supported exactly
+when `q` is inside or on `M_sigma` and no scaled boundary edge enters the open radius-`R` disc:
 
 ```text
-supported(q) iff inside(q,P) and minEdgeDistanceSquared(q,P) >= P^2
+supported(q) iff inside(q,M_sigma) and minEdgeDistanceSquared(q,M_sigma) >= R^2
 ```
 
 Equality is lawful. For edge `v -> w`, endpoint branches compare exact squared distance with
-`P^2`. When the perpendicular projection lies in the segment interior, compare:
+`R^2`. When the perpendicular projection lies in the segment interior, compare:
 
 ```text
-cross(w-v, q-v)^2 >= P^2 * |w-v|^2
+cross(w-v, q-v)^2 >= R^2 * |w-v|^2
 ```
 
 Ordinary Number arithmetic may reject or accept only outside a proved forward-error bound.
