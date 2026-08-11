@@ -429,3 +429,17 @@ rejected. Three lanes now aligned on this independently.
 SEAL CHECKLIST update: (1) overflow number — DONE (this clause). Remaining: (2) pixel's
 independent oracle run (exact verdicts + family sets, canonical traces); (3) meta's BOT rerun on
 the canonical trace.
+
+## C26 · Lead's exact-verdict artifact + one C21 amendment the emitter exposed
+C21 AMENDMENT (required, discovered by running): the archived canonical traces are UNIT-normalised
+— "integer-mm intake" is undefined without a source scale. Canonical intake for the verification
+phase: unit trace × 400, rounded to integer mm, consecutive duplicates removed. (Source scale is
+arbitrary — σ carries size; 400 preserves ~1mm trace fidelity.) All three implementations must
+use it or verdicts diverge at intake, before any mathematics.
+ARTIFACT: lead-exact-verdicts.json (jobs tmp) — 7 shapes × 20 canonical σ (reduced fractions) ×
+8 templates × both pitches = 19,180 exact-predicate verdicts; 123 BigInt fallbacks (0.64% — higher
+than meta's rate because the T-scaled frame carries larger magnitudes under the same loose bound);
+2.1s total unindexed. Reproduced under the EXACT authority: BOT 2×2@48 progression 1/4 → 2/4 →
+3/4 (the L, at multiple σ) → 4/4 from σ=12/25 (pub ≈ 192·?; values in artifact); BUTTERFLY 2×2@48
+4/4 throughout band-2 candidates — Dan's case under the final predicate. Gate = three-way
+agreement on these keys: lead (this artifact) · pixel's independent oracle · meta's rerun.
