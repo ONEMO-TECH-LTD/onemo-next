@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 79 directives
+## 2026-08-11 · @s62-lead · 80 directives
 
 **06:26:48**
 
@@ -1406,6 +1406,10 @@ there was a problem with computations of the centroid they froze the UI shel cau
 **14:03:25**
 
 between magnets? flap= outer edges not supported by magnet connection and hold
+
+**14:06:10**
+
+the eventual mechanism in the interaction will be just selecting the band so under the hood we need to make sure that within selected band user gets the optimal size and we guarantee it - otherwise they can get surprises on the expected sizes
 
 
 ---
