@@ -8,3 +8,6 @@
 - Corpus run in progress (bkvcv6w69). First two attempts died: (1) held 7 full outcomes + one stringify, (2) OOM inside solve from duplicate families. Now: identity dedup + per-shape streaming + compact persisted record (boundary chains → counts/bboxes).
 - Visual gate in progress: PILL loaded on 4200 (profiled Chrome), solve chip pressed, worker running with page responsive.
 - STUBS remaining: ExactValue carries plain-number wrappers (polynomial/isolating as stringified floats, not true algebraic identity — Pixel B5); widthMM/heightMM are float products.
+- VISUAL GATE (EC-11) PASSED on 4200, profiled Chrome, tree b7343eb8: PILL → solve (worker, page responsive throughout) → 6,937 families → stepper instant → applied overlay correct. Independent SVG re-measurement (page-context arithmetic on rendered geometry only) reproduced flap L70.4/R70.4/T72.0/B72.0 exactly and confirmed disc containment. Screenshot committed: evidence/applied-proof-pill-family4.jpg.
+- Memory fix proven: PILL headless at DEFAULT heap = 6,907 families / 67s / 330MB (was FATAL OOM past 4GB). Browser vs headless family delta (6,937 vs 6,907) is the live tracer producing a slightly different outline than the archived corpus trace — different input, not nondeterminism.
+- Definitive corpus rerunning on final code (index-run zones, streaming hash).

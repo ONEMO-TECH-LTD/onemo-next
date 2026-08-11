@@ -15,7 +15,7 @@ contract + blueprint, diffed against canon; QA deferred by Dan's "drop qa — bu
 | EC-08 centring/balance evidence | PASS | centreRelationships per tested centre; overhang per side + spread reported; no argmin/threshold/score/default anywhere; all six centre constructions visible options |
 | EC-09 flap-limit test | PASS | gridBox = extent ± padding; four clamped subtractions; per-population outcomes; family passes a switch only when both populations do; exactly two switch positions from flapLimitsMM (ordered tuple) |
 | EC-10 trivial-limb exception | PASS | overhang zones: limb-candidate iff chain contains a material extremity; over-limit ⇒ exception-pending, never approved; no numeric "trivial" invented |
-| EC-11 applied proof | PASS (visual gate at close) | page: worker solve, family stepper over the complete canonical list, applied overlay drawn from engine numbers only (outline at family σ, discs, pair boxes, grid box, binding contact), per-population evidence line |
+| EC-11 applied proof | PASS | live gate on 4200 (profiled Chrome, tree b7343eb8): PILL solved in the worker → 6,937 families; stepper instant (pure lookup); applied overlay drawn (evidence/applied-proof-pill-family4.jpg). INDEPENDENT SVG RE-MEASUREMENT: plain page-context arithmetic on the RENDERED polygon + drawn boxes reproduced the engine's per-side flap exactly — L70.4 R70.4 T72.0 B72.0 vs the engine's identical line — and confirmed all four base discs fully on material; rendered 212.8×216.0 vs published 216 |
 | EC-11b raw vs offerings | PASS | offerings.status = separation-policy-unresolved, rawFamilyIds complete, ladder empty; no guessing |
 | EC-12 responsive + complete delivery | PASS w/ notes | solver never in any interaction path (worker, one-shot); oracle agreement (square + L, closed-boundary test-side slack); synthetic: non-monotonic C (two exact disjoint intervals), C-as-single-ring, narrow sliver; seven real cutouts via corpus runner (in progress at audit time); applied visual evidence via the stepper |
 | EC-13 twin-fix | PASS | exactly-two ⇒ twin-fix else multi-fix, per population; limit = bandSpan(4)+max(flap) derived at solve time; over-limit REPORTED with sizeEligible:false (pinned by sliver test); no aspect condition; no garment input |
@@ -23,7 +23,6 @@ contract + blueprint, diffed against canon; QA deferred by Dan's "drop qa — bu
 ## Known residuals (stated, not hidden)
 1. ExactValue = pseudo-exact (stringified floats). True rational/algebraic identity unbuilt (B5).
 2. Oracle closed-boundary slack (1e-6) is TEST-SIDE only; production exact. Documented in oracle.ts.
-3. EC-11's "independently measured SVG geometry" is exercised by the visual gate + harnesses, not a shipped in-page re-measurer.
 4. Engine performance at corpus scale: minutes per shape (6 centres × 2 bands). EC-12's law (never solve on interaction) honoured; wall-clock is a bench cost, not a product one.
 
 ## Defect log of this build phase (all caught by own gates)
