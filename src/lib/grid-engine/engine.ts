@@ -208,9 +208,18 @@ export function scaleBoxFromHandle(
   const w = Math.max(minMM, Math.round(box.w * k))
   const h = w * (box.h / box.w) // the ratio it arrived with — never recomputed from the pointer
 
-  // Grow away from the anchor, in the direction the handle already lay.
-  const x = ax <= box.x + box.w / 2 ? ax : ax - w
-  const y = ay <= box.y + box.h / 2 ? ay : ay - h
+  // Grow away from the anchor, on each axis independently.
+  //
+  // An axis the handle does NOT drive stays CENTRED on the anchor — for a top or bottom grip the
+  // horizontal anchor is the box's own centre line, and pinning the left edge to it instead shifted
+  // the shape right by half its width on every frame. That is the jump-to-the-right defect.
+  const holdsLeft = handle === 'ne' || handle === 'e' || handle === 'se'
+  const holdsRight = handle === 'nw' || handle === 'w' || handle === 'sw'
+  const holdsTop = handle === 'sw' || handle === 's' || handle === 'se'
+  const holdsBottom = handle === 'nw' || handle === 'n' || handle === 'ne'
+
+  const x = holdsLeft ? ax : holdsRight ? ax - w : ax - w / 2
+  const y = holdsTop ? ay : holdsBottom ? ay - h : ay - h / 2
   return { x, y, w, h }
 }
 
