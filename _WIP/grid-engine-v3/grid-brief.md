@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 106 directives
+## 2026-08-11 · @s62-lead · 107 directives
 
 **06:26:48**
 
@@ -1514,6 +1514,10 @@ it does not - the non twin fix shapes can still be larger
 **14:57:57**
 
 system has bar not all shapes globally
+
+**15:01:28**
+
+what ? " twin fix is for elongated effects:" who determined that any effect below 192mm longest side can be twin   - the  shape perefernce allongated or not we dont care
 
 
 ---

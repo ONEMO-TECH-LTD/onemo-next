@@ -101,34 +101,36 @@ fix, exactly as he said.
 *Applying the cap changes no selected winner on the corpus — the winners are 3- to 5-magnet layouts —
 so this removes unusable options without disturbing the answer.*
 
-**THE OVERHANG ALLOWANCE — and the corpus explains why his number is right.**
-*Dan:* "the offset can be like 168+12-24mm space to stick out or accomodate shapes to 168 bounding box"
+**THE BAR IS A SIZE, AND ONLY A SIZE.**
+*Dan, 08-11 @lead, striking my invention:*
+> "what ? \" twin fix is for elongated effects:\" who determined that any effect below 192mm longest
+> side can be twin   - the  shape perefernce allongated or not we dont care"
 
-A twin fix's region is **72 × 24mm** — a 3:1 box. Measured, on rounded shapes of varying aspect:
+**Any effect whose longest side is under 192mm may be a twin fix. There is no shape condition.**
+Elongated, square, blobby — it does not matter. 192mm is 168 plus the 24mm stick-out.
 
-| shape aspect | published size | overhang L/R | overhang T/B | max | flap 12 | flap 24 |
-|---|---|---|---|---|---|---|
-| 1.0 : 1 | 76mm | 2 | 26 | 26 | fail | fail |
-| 1.5 : 1 | 82mm | 5 | 15 | 15 | fail | **pass** |
-| **2.0 : 1** | 88mm | 8 | 10 | **10** | **pass** | **pass** |
-| **2.5 : 1** | 94mm | 11 | 7 | **11** | **pass** | **pass** |
-| 3.0 : 1 | 102mm | 15 | 5 | 15 | fail | **pass** |
-| 3.5 : 1 | 112mm | 20 | 4 | 20 | fail | **pass** |
-| 4.0 : 1 | 122mm | 25 | 3 | 25 | fail | fail |
+> **STRUCK — my invention, and the second time today I did this.** I had written that "the twin fix is
+> for elongated effects", with a table showing its flap window sits at 1.5:1 to 3.5:1 aspect. The
+> *measurement* is real: a two-magnet region is 72 × 24mm, so a rounded shape near 2:1 overhangs it by
+> only 10mm while a square one overhangs by 26mm. But **a flap measurement cannot author a product
+> rule about which shapes are allowed a twin fix**, and I stated it as though it had. Same class as
+> the union-of-pair-boxes: measurement shows what *passes a limit*, never what the product *offers*.
 
-**His 12–24mm allowance is exactly the natural range**: the twin fix's working window is roughly
-**1.5:1 to 3.5:1**, and it is happiest at **2:1–2.5:1** where overhang is 10–11mm and it clears even
-the strict limit. Every one of those sizes is 76–122mm, comfortably inside the 168mm cap — so the cap
-and the allowance never fight.
+**Under the size-only bar, measured on the corpus** — smallest available twin fix per shape:
 
-*(Not 3:1 as the box's own ratio would suggest: a rounded outline's corners cut in, so the best match
-to a 3:1 box is a ~2:1 shape.)*
+| shape | smallest twin fix | under 192? |
+|---|---|---|
+| POKE2 | 122mm | **yes** |
+| POKE1 | 130mm | **yes** |
+| BOT | 132mm | **yes** |
+| BUTTERFLY | 176mm | **yes** |
+| PILL | 206mm | no |
 
-**Why no real cut-out takes a twin fix, measured:** the corpus is 1.0–1.4:1 — blobby, not elongated —
-and their best twin-fix overhangs run **49 to 100mm**. BUTTERFLY 79, POKE1 53, BOT 59, PILL 91,
-POKE2 49. All far outside any 12–24mm allowance. That is L5 working exactly as written: *"If shape is
-narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum"* — the corpus
-is "normal", so it gets four, and the twin fix is for the narrow effects the corpus does not contain.
+**Four of five, not two.** My aspect rule had wrongly excluded BUTTERFLY, and would have excluded any
+shape that is not long and thin.
+
+*(Their overhangs at those sizes run 49–100mm. That is a separate measurement, reported per L14/L14a —
+it is not a gate on the twin fix, and conflating the two is what produced the error above.)*
 
 **OPEN, and his:** the built-in-garment-grid case. He says larger sizes fit *"if tshirt has magnetic
 grid built in"*. Whether that is an engine input or a product rule outside the engine is unruled, and
