@@ -78,9 +78,15 @@ export function subtractShapePaper(subject: VShape, negative: VShape): VShape | 
   let result: paper.PathItem | null = null
   try {
     result = subjectItem.subtract(negativeItem, { insert: false }) as paper.PathItem
-    const paths = result instanceof paper.CompoundPath
-      ? result.children.map((child) => fromPaperPath(child as paper.Path))
-      : [fromPaperPath(result as paper.Path)]
+    const resultPaths = result instanceof paper.CompoundPath
+      ? result.children.map((child) => child as paper.Path)
+      : [result as paper.Path]
+    if (!resultPaths.length) return null
+    // One-shape protocol: retain the largest connected outer result and only paths contained by it
+    // (legitimate holes). An erase may cut a chunk away; it may never publish detached islands.
+    const main = resultPaths.reduce((largest, path) => Math.abs(path.area) > Math.abs(largest.area) ? path : largest)
+    const connected = resultPaths.filter((path) => path === main || main.contains(path.interiorPoint))
+    const paths = connected.map(fromPaperPath)
     if (!paths.length || paths.every((path) => path.anchors.length < 3)) return null
 
     // Boolean operations drop segment metadata. Restore stable ids only where an output anchor is

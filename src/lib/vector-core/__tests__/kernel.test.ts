@@ -349,8 +349,13 @@ describe('vector-core kernel', () => {
     ]))
     expect(result!.paths[0].anchors.find((anchor) => anchor.id === 'bottom-right')).toEqual(subject.paths[0].anchors[2])
     expect(result!.paths[0].anchors.find((anchor) => anchor.id === 'bottom-left')).toEqual(subject.paths[0].anchors[3])
-
     const untouched = subtractShapePaper(subject, rect(120, 120, 140, 140))
     expect(untouched).toEqual(subject)
+
+    const split = subtractShapePaper(rect(0, 0, 100, 100), rect(45, -10, 55, 110))
+    expect(split).not.toBeNull()
+    expect(split!.paths).toHaveLength(1)
+    const splitBox = shapeBBox(split!, 0.01)
+    expect(splitBox.maxX - splitBox.minX).toBeLessThanOrEqual(45)
   })
 })

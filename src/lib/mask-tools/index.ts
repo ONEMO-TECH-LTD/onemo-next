@@ -150,6 +150,14 @@ export function maskArea(mask: Mask): number {
   return a
 }
 
+export function shouldClosePaintStroke(stroke: { x: number; y: number }[], closeFrac: number): boolean {
+  if (closeFrac <= 0 || stroke.length < 2) return false
+  const first = stroke[0], last = stroke[stroke.length - 1]
+  let perimeter = 0
+  for (let i = 1; i < stroke.length; i++) perimeter += Math.hypot(stroke[i].x - stroke[i - 1].x, stroke[i].y - stroke[i - 1].y)
+  return perimeter > 0 && Math.hypot(first.x - last.x, first.y - last.y) < perimeter * closeFrac
+}
+
 /** Rasterize a painted brush gesture to a Mask: the thick swath along the stroke (round caps —
  *  WYSIWYG with the brush cursor), plus the enclosed interior when the gesture closes a loop
  *  (Dan's green-blob semantics: a loop means the whole region). */
@@ -178,10 +186,7 @@ export function swathMask(
     ctx.stroke()
   }
   // closed gesture → fill the interior too
-  const first = stroke[0], last = stroke[stroke.length - 1]
-  let perim = 0
-  for (let i = 1; i < stroke.length; i++) perim += Math.hypot(stroke[i].x - stroke[i - 1].x, stroke[i].y - stroke[i - 1].y)
-  if (perim > 0 && Math.hypot(first.x - last.x, first.y - last.y) < perim * cfg.closeFrac) {
+  if (shouldClosePaintStroke(stroke, cfg.closeFrac)) {
     ctx.closePath(); ctx.fill()
   }
   const px = ctx.getImageData(0, 0, w, h).data

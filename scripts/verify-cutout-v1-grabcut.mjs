@@ -308,7 +308,10 @@ async function runBrowser(browserType) {
     await routePage.getByRole('button', { name: /Paint erase/ }).click()
     await draw(routePage, [
       { x: box.x + box.width * 0.48, y: box.y + box.height * 0.44 },
-      { x: box.x + box.width * 0.78, y: box.y + box.height * 0.70 },
+      { x: box.x + box.width * 0.76, y: box.y + box.height * 0.46 },
+      { x: box.x + box.width * 0.76, y: box.y + box.height * 0.70 },
+      { x: box.x + box.width * 0.52, y: box.y + box.height * 0.70 },
+      { x: box.x + box.width * 0.50, y: box.y + box.height * 0.47 },
     ], 4)
     await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.waitForTimeout(1_500)

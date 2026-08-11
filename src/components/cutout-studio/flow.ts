@@ -423,11 +423,15 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (!source.erase || !source.base) return { mask: paintMask(source, cfg, w, h) }
     // The eraser is its own negative Paint shape: build and finish it with the same Paint + Vector
     // controls, then subtract that resolved geometry from the untouched accepted base.
-    const negativeRaster = polishMask(swathMask(source.stroke, source.brushPx, w, h, cfg), cfg.polishStrength)
+    // Erase is always an open round ribbon. Paint shape's loop-close/fill semantics must never turn
+    // a near-returning erase gesture into a giant closed negative region.
+    const negativeRaster = polishMask(swathMask(source.stroke, source.brushPx, w, h, { ...cfg, closeFrac: 0 }), cfg.polishStrength)
     if (!isCurrent()) return null
     const negative = finishMask(negativeRaster, vector)
     if (!negative) throw new Error('Paint eraser shape could not be resolved')
     if (!source.baseShape) throw new Error('Paint eraser has no accepted main shape')
+    // Autotune + Paint smoothing already shaped the negative ribbon, whose curve becomes the new
+    // boolean boundary. Existing main-shape anchors and handles remain untouched.
     const shape = subtractShapePaper(source.baseShape, negative.shape)
     if (!shape) throw new Error('Paint eraser removed the whole shape')
     return { mask: subtractMasks(source.base, maskFromShape(negative.shape, w, h)), shape }

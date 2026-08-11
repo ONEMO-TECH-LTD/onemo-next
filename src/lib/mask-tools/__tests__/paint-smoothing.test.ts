@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { grabCutBrushGeometry } from '@/lib/cutout-grabcut'
 import { finishMask, ZERO_SETTINGS } from '@/components/cutout-studio/finish'
-import { autoTunePaintStroke, paintSmoothingRadius, polishMask, subtractMasks } from '@/lib/mask-tools'
+import { autoTunePaintStroke, paintSmoothingRadius, polishMask, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
 import type { Mask } from '@/lib/mask-tools/types'
 
 function rectangle(w: number, h: number, x0: number, y0: number, x1: number, y1: number): Mask {
@@ -48,6 +48,14 @@ describe('Paint eraser coordinate parity', () => {
     for (let i = 0; i < base.data.length; i++) {
       if (!negative.data[i]) expect(result.data[i]).toBe(base.data[i])
     }
+  })
+
+  it('keeps a near-returning eraser gesture as an open ribbon instead of filling its loop', () => {
+    const stroke = [
+      { x: 8, y: 8 }, { x: 32, y: 8 }, { x: 32, y: 32 }, { x: 8, y: 32 }, { x: 10, y: 10 },
+    ]
+    expect(shouldClosePaintStroke(stroke, 0)).toBe(false)
+    expect(shouldClosePaintStroke(stroke, 0.35)).toBe(true)
   })
 })
 
