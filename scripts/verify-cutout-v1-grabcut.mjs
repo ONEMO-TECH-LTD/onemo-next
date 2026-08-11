@@ -383,6 +383,9 @@ async function runBrowser(browserType) {
     paintedCanvas = await tunePaint(loopClose, '0.2', paintedCanvas)
     paintedCanvas = await tunePaint(swath, '12', paintedCanvas)
     await tunePaint(smoothing, '100', paintedCanvas)
+    if (browserName === 'chromium') {
+      await routePage.screenshot({ path: 'output/playwright/KAI-10284-shape-relative-paint-smoothing.png', fullPage: true })
+    }
 
     // Blend stays explicitly zero even when Frame pushes the shape beyond the artwork.
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
