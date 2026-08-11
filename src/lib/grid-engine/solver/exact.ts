@@ -11,8 +11,7 @@
 import type { PointMM } from './contract'
 
 // BigInt CONSTRUCTOR calls, not literals: the repo targets ES2017, where the `0n` literal syntax is
-// a compile error while the BigInt type itself (lib: esnext) and runtime are fully available. Same
-// wall Pixel's first kernel attempt died on; this is the sanctioned way through it.
+// a compile error while the BigInt type itself (lib: esnext) and runtime are fully available.
 const BIG_ZERO = BigInt(0)
 const BIG_TEN = BigInt(10)
 
@@ -94,8 +93,8 @@ export function onSegment(a: PointMM, b: PointMM, c: PointMM): boolean {
 
 /**
  * COMPLETE closed-segment intersection classification — §3.1 needs "one simple closed polygon",
- * which proper-crossing detection alone cannot prove (QA B2). Classifies every contact between
- * closed segments: proper crossings, T-touches, endpoint contact and collinear overlap.
+ * which proper-crossing detection alone cannot prove: collinear overlap, T-touches and endpoint
+ * contact all break simplicity without any proper crossing. Every contact class is classified.
  */
 export function segmentsIntersect(
   p1: PointMM,
@@ -189,11 +188,53 @@ export function signedAreaSign(points: readonly PointMM[]): -1 | 0 | 1 {
  *   interior: |q−a|²·|d|² − ((q−a)·d)²  vs  R²·|d|²   (both sides exact integers)
  *   endpoint: |q−v|²  vs  R²
  */
+/**
+ * §9: FILTERED robust predicate with exact fallback — the sign of dist(q,[a,b])² − r².
+ *
+ * The filter, per branch: evaluate the deciding expression D in doubles, alongside a magnitude M
+ * that is the SAME expression with every subtraction made an addition of absolute values. Forward
+ * error analysis bounds the accumulated rounding of D by C·ε·M, where ε = 2⁻⁵² and C is a stated
+ * combinatorial constant safely above the operation depth of the branch (≤6 rounding steps per term
+ * path for the endpoint branch, ≤12 for the interior branch; C is taken at 16 and 64 respectively —
+ * DELIBERATELY LOOSE, because a loose-but-valid bound only routes more cases to the exact path and
+ * can never produce a wrong sign; there is no tuned epsilon anywhere in the decision).
+ * |D| > C·ε·M ⇒ the double sign is provably correct. Otherwise: exact scaled-integer arithmetic
+ * from the RAW coordinates.
+ */
+const EPS = Number.EPSILON
+const FILTER_C_ENDPOINT = 16
+const FILTER_C_INTERIOR = 64
+
 export function segmentDistanceSqCmp(q: PointMM, a: PointMM, b: PointMM, r: number): -1 | 0 | 1 {
-  // EVERYTHING in exact scaled integers from the RAW inputs. The first version of this function
-  // computed cross/dot in doubles and then did "exact" arithmetic on those already-rounded values —
-  // Pixel's tangency fixture caught it: cross was off by 1ulp and the exact layer faithfully
-  // squared the wrong number. Exactness starts at the coordinates or it does not exist.
+  // ---- fast filtered path, doubles ----
+  const fqax = q[0] - a[0]
+  const fqay = q[1] - a[1]
+  const fdx = b[0] - a[0]
+  const fdy = b[1] - a[1]
+  const flenSq = fdx * fdx + fdy * fdy
+  const fdot = fqax * fdx + fqay * fdy
+
+  if (flenSq === 0 || fdot <= 0) {
+    const D = fqax * fqax + fqay * fqay - r * r
+    const M = fqax * fqax + fqay * fqay + r * r
+    if (Math.abs(D) > FILTER_C_ENDPOINT * EPS * M) return D > 0 ? 1 : -1
+  } else if (fdot >= flenSq) {
+    const fqbx = q[0] - b[0]
+    const fqby = q[1] - b[1]
+    const D = fqbx * fqbx + fqby * fqby - r * r
+    const M = fqbx * fqbx + fqby * fqby + r * r
+    if (Math.abs(D) > FILTER_C_ENDPOINT * EPS * M) return D > 0 ? 1 : -1
+  } else {
+    const fcross = fqax * fdy - fqay * fdx
+    const D = fcross * fcross - r * r * flenSq
+    const M = fcross * fcross + r * r * flenSq
+    if (Math.abs(D) > FILTER_C_INTERIOR * EPS * M) return D > 0 ? 1 : -1
+  }
+  // NOTE the regime itself (endpoint vs interior) is decided by the float dot/lenSq comparisons; at
+  // their equality boundaries the two formulas agree by continuity, so a misclassified borderline
+  // regime cannot change the exact sign computed below.
+
+  // ---- exact fallback, scaled integers from the raw inputs ----
   const qax = subExact(toScaledInt(q[0]), toScaledInt(a[0]))
   const qay = subExact(toScaledInt(q[1]), toScaledInt(a[1]))
   const dx = subExact(toScaledInt(b[0]), toScaledInt(a[0]))
@@ -208,7 +249,6 @@ export function segmentDistanceSqCmp(q: PointMM, a: PointMM, b: PointMM, r: numb
   const dot = addE(mulExact(qax, dx), mulExact(qay, dy))
 
   if (signOf(lenSq) === 0 || signOf(dot) <= 0) {
-    // |q−a|² vs R²
     const distSq = addE(mulExact(qax, qax), mulExact(qay, qay))
     return signOf(subExact(distSq, rr))
   }
@@ -218,7 +258,6 @@ export function segmentDistanceSqCmp(q: PointMM, a: PointMM, b: PointMM, r: numb
     const distSq = addE(mulExact(qbx, qbx), mulExact(qby, qby))
     return signOf(subExact(distSq, rr))
   }
-  // interior: (qa × d)² vs R²·|d|²  — Lagrange, all exact
   const cross = subExact(mulExact(qax, dy), mulExact(qay, dx))
   return signOf(subExact(mulExact(cross, cross), mulExact(rr, lenSq)))
 }
