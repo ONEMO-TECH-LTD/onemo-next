@@ -17,20 +17,15 @@ export interface Box {
   h: number
 }
 
-/** 1 is fit: the whole padded field. There is nothing wider, so the view can never leave the field. */
+/**
+ * 1 is fit: the whole padded field, unscaled. It survives the zoom controls as the canvas's own
+ * default — a surface that passes no scale gets the whole field rather than nothing.
+ *
+ * The stepping API that used to sit here — zoomIn, zoomOut, a maximum and a step — died the moment
+ * Dan removed the zoom controls ("Zoom becomes obsolete cause image stays the same full canvas size
+ * and grid underneath moves and changes"). It was left behind by a restore and had no caller.
+ */
 export const ZOOM_FIT = 1
-export const ZOOM_MAX = 12
-
-/** One press. A plain factor — the ladder that used to live here was grid logic wearing a UI hat. */
-export const ZOOM_STEP = 1.5
-
-export function zoomIn(zoom: number): number {
-  return Math.min(ZOOM_MAX, zoom * ZOOM_STEP)
-}
-
-export function zoomOut(zoom: number): number {
-  return Math.max(ZOOM_FIT, zoom / ZOOM_STEP)
-}
 
 /**
  * How much pinch it takes to change the size by a factor of e. Screen feel, not law: it turns a
