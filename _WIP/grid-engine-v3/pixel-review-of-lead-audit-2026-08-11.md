@@ -134,6 +134,10 @@ The original alternative to replace `sizeMM → extentMM` with a new field-owned
 
 Dan has authorized Lead implementation. Clean and fix exactly this set.
 
+### 0. Correct the pinch task first
+
+0. Preserve fractional trackpad movement across wheel packets, publish only the whole-millimetre result through the existing `setSize` path, and keep one lifecycle-stable native listener. Equivalent total delta must produce the same final size regardless of packet count; ordinary scroll, bounds, direction and static-shape behavior stay unchanged. Add packetization regression coverage before continuing to the original cleanup set.
+
 ### A. Remove dead and stale scaffolding
 
 1. Delete the unused `zoomIn`, `zoomOut`, `ZOOM_MAX` and `ZOOM_STEP` camera exports.
@@ -192,6 +196,7 @@ Parent: `KAI-10265` — Sprint 2, inside Grid Engine epic `KAI-10260`.
 
 | Audit item | Task | Deliverable |
 |---|---|---|
+| P0 | `KAI-10283` | Make pinch cumulative and lifecycle-stable; runs first |
 | D6 | `KAI-10266` | Correct stale page-header claims |
 | D5 | `KAI-10267` | Delete only the false “1 is fit” line |
 | D3 | `KAI-10268` | Delete `syncSizeFromBox` |
@@ -226,7 +231,7 @@ Rejected D9/D10, retained D7, excluded ceiling/solver work and closed P7 have no
 
 Dan's latest instruction supersedes the earlier ownership recommendation: `@s62-lead` implements the full sprint end to end in an isolated worktree; `@s62-grid-pixel` performs adversarial completion review; Meta runs the closing independent gate.
 
-Current state: audit and 17-task sprint compiled; implementation dispatched to Lead. Unrelated in-flight page work in the shared checkout is outside this sprint and must not enter the cleanup diff.
+Current state: audit and 18-task sprint compiled; implementation assigned to Lead, with P0 first. Pixel is QA for the complete delivery.
 
 Necessity — no unnecessary elements: every included edit removes a confirmed defect, stale claim, dead path or guard escape; no new module, field-size control, spec atom or solver behavior is included.
 
