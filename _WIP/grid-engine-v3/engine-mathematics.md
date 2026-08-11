@@ -742,3 +742,25 @@ implementations agree, and a third agrees once given a clause the document did n
 gate fired on the SPEC CHANNEL: both agreeing implementations shared the clause as knowledge
 rather than as text, so nothing they could run would surface it — a missing clause survives every
 internal check by definition. That is the strongest single result of the night.
+
+## SEAL ADDENDUM 4 — CLOSURE: 249/249 hashes; the remaining 81 keys ARE the butterfly question,
+## now priced for Dan
+Meta: every key where counts agree hashes IDENTICALLY (249/249) — nothing left on format. The 81
+remaining count differences reduce ENTIRELY to one clause: meta's run admits DISCONNECTED unions
+of pairs (two pairs 96mm apart, nothing between); the sealed engine and pixel's oracle are
+connected-only. Arithmetic exact: dropping the disconnected extras reproduces the sealed counts
+to the unit (DUCK 36/65 b3: 15→13 base, 13→12 families).
+STATUS OF THE CLAUSE: C10 as written in THIS paper already says connected and parks disconnected
+unions in C6 — the sealed engine matches the paper. But the SHORT spec I transmitted to meta
+dropped the word "connected" (ninth spec-channel omission of the night), and meta's implementation
+of the transmitted sentence surfaced what the full paper had parked: **connected-only is the
+unruled BUTTERFLY QUESTION given effect** — whether a pair in each wing is one four-magnet product
+or two separate options. Dan has never ruled it.
+ADOPTED (meta's recommendation, as recommendation): the engine STAYS connected-only — a
+disconnected offer has never been shown to Dan and shipping one silently is worse than withholding
+it — and C10 is marked **DERIVED-AND-REPLACEABLE, butterfly named**: the day Dan rules the other
+way it is ONE predicate (drop the connectivity check), not archaeology. THE PRICE OF THE RULING,
+measured so he sees it before he makes it: **81 of 330 answer keys (~25% of the corpus product
+surface) change with this single word.**
+FINAL CONVERGENCE STATE: all 330 keys either match byte-identically across three implementations
+or are attributed, to the unit, to this one named open ruling. Nothing else is unexplained.
