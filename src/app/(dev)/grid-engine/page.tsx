@@ -247,6 +247,16 @@ export default function GridEnginePage() {
     ? fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / Math.max(box.w, box.h)
     : launchZoom
 
+  /**
+   * THE BIGGEST THE SHAPE MAY BE — the 9x9 grid itself, never a millimetre.
+   *
+   * Dan, 2026-08-11: "the biggest view must be 9x9 not 310mm", which is law 12.3 applied to this
+   * control: the ceiling is a GRID COUNT. So it is the span of a band as wide as the field has
+   * positions, computed by the unit — 408mm at nine positions and 12mm padding, and a different
+   * number the moment either changes, without a line here moving.
+   */
+  const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
+
   const lockedCount = ROWS.filter(
     (r) => isSealedInCode(r.key) || isOptionsOnly(r.key) || !unlocked.has(r.key),
   ).length
@@ -491,9 +501,9 @@ export default function GridEnginePage() {
             className={styles.slider}
             type="range"
             min={SHAPE_MIN_MM}
-            max={spec.grid.maxSizeMM}
+            max={maxSpanMM}
             step={SHAPE_STEP_MM}
-            value={Math.min(sizeMM, spec.grid.maxSizeMM)}
+            value={Math.min(sizeMM, maxSpanMM)}
             onChange={(e) => setSize(Number(e.target.value))}
             aria-label="Shape size"
           />

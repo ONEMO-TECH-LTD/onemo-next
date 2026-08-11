@@ -5,13 +5,16 @@
 
 ## Verdict
 
-The lead audit is directionally correct but cannot be executed verbatim.
+Lead, Pixel and Meta agree on the amended scaffolding-cleanup set compiled in section 3.
 
-- Confirmed: N1, N2, N3, D1, D2, D3, D6, D8.
-- Revised: D4.
-- Rejected as stated: D5, D9, D10.
-- Correctly retained: D7.
-- Independent review found six additional defects plus one product-law conflict that must be held.
+- Confirmed: N1, N2, N3, D1, D2, D3, D6, D8, P1–P6 and L1–L3.
+- Revised: D4 and D5.
+- Rejected: D9 and D10.
+- Retained: D7.
+- Ruled correct/no change: P7.
+- Excluded: the ceiling row and the intentionally unbuilt manufacturing solver.
+
+This is an approved audit scope, not authorization to implement it. Dan explicitly ruled that no code changes are authorized yet. No cleanup worktree, code edit or cleanup commit may be created until he authorizes implementation.
 
 ## 1. Lead findings — independently verified
 
@@ -53,9 +56,9 @@ Changing a live law input therefore causes the static shape to overflow the view
 
 The `CLASSIC band` block at `page.tsx:54-61` is duplicated/stale terminology, but its band-3 behavior still exists through `DEFAULT_SIZE_BAND = 3`. Consolidate it with the current default-load documentation rather than deleting the whole explanation.
 
-### __D5 — REJECTED: the “Plain view scale” comment is not orphaned__
+### D5 — REVISED: delete one false line; keep the live explanation
 
-The comment at `page.tsx:102-106` describes the still-live `launchZoom` calculation directly below it. N2 makes the calculation incorrect, but the comment is not dead merely because manual zoom controls were removed.
+`page.tsx:103-104` documents the still-live `launchZoom` calculation and stays. Line 102, “Plain view scale. 1 is fit,” describes deleted zoom state and is false about the calculation below it: `launchZoom` is 2.222, not 1. Delete line 102 only.
 
 ### D6 — CONFIRMED: stale header claims
 
@@ -91,9 +94,9 @@ Dan already ruled the millimetre ceiling row correct. Do not reopen it in this c
 
 `page.tsx:163-184` reads `spec` inside `loadCutout` but declares an empty dependency list. Loading after an admin law edit can size the cut-out against an old spec. ESLint reports the missing dependency.
 
-### P3 — registration write bypasses the one guard
+### P3 — registration has no guarded input
 
-`page.tsx:166` directly calls `setSpec` to mutate `registration`. This contradicts the page contract that every law-value write passes through the spec guard. Registration must be an explicit guarded input or a bridge/engine answer; the shell must not open a second write route.
+`page.tsx:166` directly calls `setSpec` to mutate `registration`. Registration is not a `GridKey` and is absent from `LIMITS`, `SEALED_IN_CODE` and `OPTIONS_ONLY`, so no guarded route currently exists. Add registration to the authoritative guarded input path. Its written value remains the parity consequence of the match count; do not promote the 6.5 gap value to a default.
 
 ### P4 — released 12mm grid atom is hardcoded in the canvas
 
@@ -103,38 +106,85 @@ Dan already ruled the millimetre ceiling row correct. Do not reopen it in this c
 
 `bridge.ts:70` derives `anchorMM` by adding offset and pan. That is a manufacturing coordinate. The engine should return it; the bridge should assemble calls and results only.
 
-### P6 — stylesheet residue
+### P6 — duplicated CSS changes the dark-mode rendering
 
-`page.module.css:421-431` duplicates `.spacer` and `.fieldReadout` inside the dark-theme block with malformed indentation. `.field`, `.label` and `.value` at lines 127-152 have no Grid shell consumers.
+`page.module.css:421-431` duplicates `.spacer` and `.fieldReadout` inside the dark-theme block. Braces balance, but the later duplicate wins at equal specificity: `.fieldReadout` renders `rgb(100,116,139)` instead of the intended dark-theme `rgb(148,163,184)`. Remove the duplicate rules. `.field`, `.label` and `.value` at lines 127-152 have no Grid shell consumers and should also be removed.
 
-### P7 — HOLD: 96mm thinning and even-registration symmetry conflict
+### P7 — CLOSED: 96mm thinning does not recenter the lattice
 
-The latest fix correctly makes the 96mm population a strict subset of the 48mm lattice. `engine.ts:58-64` also records that an even gap-registered match is then asymmetric and currently relies on manual pan. This conflicts with the standing even-population symmetry rule and the no-manual-fitting mission. It is a product/law decision, not a cleanup implementation choice. Do not silently resolve it in this fix set.
+Dan ruled this behavior correct in law 9.3a: “no need force centering - the view remains same just some points are hidden to show sparse grid no complication.” At 96mm the population is a strict subset of the 48mm lattice; registration, camera and lattice position remain unchanged. The even-match offset is accepted. P7 requires no code change and must not become a cleanup task.
 
-## 3. Consolidated accepted fix set
+### L1 — CONFIRMED: shell and engine enforce different minimum shape sizes
 
-If Lead and Meta agree, implement only this set:
+The shell accepts `SHAPE_MIN_MM = 20`, while the engine floors the shape to `cellDiameterMM = 24`. Live measurement with a cut-out loaded produced 20→24, 22→24, 24→24 and 30→30: below 24mm the number field retains a value the engine did not produce. One minimum must be owned and exposed by the unit.
 
-1. Remove dead zoom exports, the unused page import, `syncSizeFromBox`, dead bridge whitespace and unused/duplicated CSS.
-2. Remove the inert shape-size-to-field coupling or replace it with a truthful field-owned input; do not invent solver behavior.
-3. Derive camera framing entirely from the same live spec.
-4. Make separation traversal recursive and make import checks cover nested unit paths.
-5. Fix the React ref/render lint error and the stale `spec` closure.
-6. Route registration through one authoritative guarded/engine path.
-7. Move the 12mm atom out of the canvas into the guarded value path.
-8. Return `anchorMM` from engine computation rather than deriving it in the bridge.
-9. Consolidate only the genuinely stale comments named above.
+### L2 — CONFIRMED: the separation guards are pattern-shaped, not structural
 
-Do not include:
+N3, P3 and P4 share one root cause. The current checks anticipate particular spellings: one directory level, one import-path segment, a `grid` object write shape, or arithmetic involving a law value. They miss nested files/imports, sibling `GridSystemSpec` writes and bare released literals. The fix must close the structural classes, not only the three observed instances.
+
+### L3 — CONFIRMED: camera numerator and frame use different spans even under RELEASED
+
+`gridScale` divides `framedSpan(9) = 480mm`, while the rendered frame is `paddedField = 504mm`. A 310mm shape therefore occupies only 95% of the view even when every value is released. Camera scale and frame must use the same live-spec span.
+
+### L4 — ACCEPTED SCOPE AMENDMENT: delete the inert field feed; do not replace it
+
+The original alternative to replace `sizeMM → extentMM` with a new field-owned input would invent a control. `positionsPerAxis` already owns field extent. Remove the inert feed without substitution.
+
+## 3. Final agreed cleanup audit
+
+When Dan authorizes implementation, clean and fix exactly this set.
+
+### A. Remove dead and stale scaffolding
+
+1. Delete the unused `zoomIn`, `zoomOut`, `ZOOM_MAX` and `ZOOM_STEP` camera exports.
+2. Delete the unused `ZOOM_FIT` page import.
+3. Delete the unused `syncSizeFromBox` function.
+4. Delete the orphan bridge whitespace.
+5. Remove the duplicated `.spacer` and `.fieldReadout` CSS rules and the unconsumed `.field`, `.label` and `.value` selectors. Confirm the intended dark-mode field-readout colour wins afterward.
+6. Consolidate the duplicated `CLASSIC band` terminology while retaining the true band-3 behavior and frozen-120 reasoning.
+7. Delete only the false `page.tsx:102` “1 is fit” comment; retain lines 103-104.
+8. Correct the stale page header claims: the bridge is already imported, and the canvas is responsive rather than fixed at 402×402.
+
+### B. Restore one source of truth for field, camera and shape values
+
+9. Remove the inert `sizeMM → extentMM` field coupling. Do not replace it with another field-size input; `positionsPerAxis` already owns field extent.
+10. Make camera scale and the drawn frame use one identical span derived from the live spec. Do not mix `RELEASED`, `framedSpan` and `paddedField` denominators.
+11. Use one minimum shape-size floor owned by the Grid Engine unit. The shell field and rendered shape must not disagree below 24mm; do not introduce a second literal.
+12. Expose the existing 12mm padding atom from the unit through the bridge to the canvas. Do not create another released literal or a new spec entry.
+13. Return `anchorMM` from the engine computation. The bridge must stop deriving manufacturing geometry.
+
+### C. Close the guarded-write and module-separation classes
+
+14. Create a guarded registration input; there is no existing route to reuse. Preserve registration as a parity consequence, not a promoted default.
+15. Make separation-test file traversal recursive.
+16. Make separation import checks cover nested paths such as `grid-engine/ui/camera`.
+17. Add a structural check that fails any write to a `GridSystemSpec` field outside the authoritative guard.
+18. Add a structural check that fails a bare shell literal equal to a released law value. This must catch the class represented by the canvas-owned `12`, not only arithmetic expressions.
+
+### D. Fix current correctness and lint failures
+
+19. Stop reading `panGrabbedAt.current` during render. Represent render-affecting cursor state with React state or an equivalent render-safe source.
+20. Fix `loadCutout` so it cannot capture a stale `spec`; its callback dependencies and behavior must use the current specification.
+
+### E. Required verification after authorization and implementation
+
+21. Run focused Grid Engine ESLint with zero errors and zero warnings for the accepted set.
+22. Run typecheck, focused separation tests and the full relevant test suite, reporting every skip rather than calling skipped coverage a pass.
+23. Lead independently verifies the live instrument behavior: the shape stays static and fills the viewport; the lattice scales and pans beneath it; drag remains live over the shape in 1mm steps; cut-out load remains outline mode at band 3 with four centred points; 96mm hides points without moving them.
+24. Meta independently reruns the source, lint, typecheck, tests and live-surface gate on the implementation checkout.
+
+### Explicitly outside this cleanup
 
 - the unbuilt contour solver;
 - activation of its future acceptance suite;
-- a ruling on 96mm parity/registration;
+- any change to 96mm parity, registration, camera or lattice position;
 - deletion of 6/8mm magnet-body values;
 - deletion of camera `Box`;
 - renaming the intentional shell-owned `ui/` headers;
 - any ceiling change;
 - adjacent refactors or UI redesign.
+
+P7 is closed by Dan's law 9.3a ruling. Sparse mode hides points only; it does not recenter or correct the accepted even-match offset.
 
 ## 4. Verification evidence
 
@@ -146,12 +196,12 @@ Do not include:
 - Focused ESLint fails with one error and three warnings: P1, D2, D3 and P2.
 - Live port 4200 was proven to serve this worktree. A real RGBA cut-out loaded in outline mode; dragging over the shape moved magnet coordinates while polygon coordinates stayed identical. This validates the instrument interaction only.
 
-## 5. Recommended ownership and gate
+## 5. Ownership and authorization boundary
 
-Pixel should implement the accepted internal cleanup in a fresh worktree after Lead confirms intent and Meta agrees with this disposition. The independent reviewer found omissions and rejected false-positive deletions, so returning implementation to the original builder would weaken the adversarial gate.
+Lead and Meta agree that Pixel should implement in a fresh worktree, Lead should verify behavior preservation, and Meta should run the closing independent gate. That ownership agreement does not authorize implementation.
 
-After implementation:
+Current state: audit compiled; code untouched; Dan has now authorized filing and Lead implementation through the Grid Engine epic/sprint workflow.
 
-1. Lead verifies the intended instrument behavior was preserved.
-2. Meta independently reruns source, tests, lint and live-surface checks.
-3. The 96mm parity conflict remains separately held for Dan.
+Necessity — no unnecessary elements: every included edit removes a confirmed defect, stale claim, dead path or guard escape; no new module, field-size control, spec atom or solver behavior is included.
+
+Sufficiency — delivers the scaffolding cleanup in full, but none of the standing manufacturing-solver build directive. The cleanup must never be reported as completing the engine mission.
