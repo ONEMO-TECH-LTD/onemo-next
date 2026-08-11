@@ -20,8 +20,14 @@ export interface RegionMM {
 }
 
 /**
- * The spot each magnet occupies on the fabric. Law 2.1: "each magnet has a safe padding area of 10mm
- * calculated from the centre, means each magnet is occupying a 20mm spot on the fabric".
+ * The spot each magnet occupies on the fabric — two paddings across, whatever the padding is.
+ *
+ * The rule was stated at 10mm: "each magnet has a safe padding area of 10mm calculated from the
+ * centre, means each magnet is occupying a 20mm spot on the fabric". The padding was then locked at
+ * 12 (Dan, 2026-08-10: "decided for 12mm padding - locked decision change the logic in laws and
+ * briefs and in the code"), so the spot is 24mm today. The RULE never changed — only its input — and
+ * this function has always read the value rather than the example, which is why quoting the 10/20
+ * example as if it were current was a doc defect and not a behaviour one.
  */
 export function cellDiameterMM(grid: GridSpec): number {
   return 2 * grid.paddingMM
