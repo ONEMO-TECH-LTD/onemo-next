@@ -40,12 +40,20 @@ import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
-const ROWS: Array<{ key: GridKey; name: string; step: number; unit: string }> = [
-  { key: 'pitchMM', name: 'Spacing', step: 48, unit: 'mm' },
-  { key: 'paddingMM', name: 'Padding', step: 1, unit: 'mm' },
-  { key: 'positionsPerAxis', name: 'Rows & columns', step: 1, unit: '' },
-  { key: 'maxSizeMM', name: 'Ceiling', step: 2, unit: 'mm' },
+const ROWS: Array<{ key: GridKey; name: string; unit: string }> = [
+  { key: 'pitchMM', name: 'Spacing', unit: 'mm' },
+  { key: 'paddingMM', name: 'Padding', unit: 'mm' },
+  { key: 'positionsPerAxis', name: 'Rows & columns', unit: '' },
+  { key: 'maxSizeMM', name: 'Ceiling', unit: 'mm' },
 ]
+
+/**
+ * A stepper increment for a number field. The SPACING row steps by the lattice, so it comes from the
+ * spec rather than being written here — it was the literal 48, the last grid number left in the
+ * shell, and the structural guard now refuses it. The rest are plain counting steps.
+ */
+const stepFor = (key: GridKey, spec: GridSystemSpec): number =>
+  key === 'pitchMM' ? spec.grid.basePitchMM : key === 'maxSizeMM' ? 2 : 1
 
 /**
  * The slider's step — presentation only. Its FLOOR and CEILING are not here: the floor is the unit's
@@ -511,12 +519,13 @@ export default function GridEnginePage() {
           </summary>
 
           <div className={styles.lawBody}>
-              {ROWS.map(({ key, name, step, unit }) => {
+              {ROWS.map(({ key, name, unit }) => {
                 const sealed = isSealedInCode(key)
                 const optionsOnly = isOptionsOnly(key)
                 const fixed = sealed || optionsOnly
                 const editable = !fixed && unlocked.has(key)
                 const { min, max } = limitsFor(key)
+                const step = stepFor(key, spec)
                 return (
                   <div key={key} className={styles.row}>
                     <span className={styles.rowName}>{name}</span>
