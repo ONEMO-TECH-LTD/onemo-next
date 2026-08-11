@@ -14,7 +14,7 @@ Lead, Pixel and Meta agree on the amended scaffolding-cleanup set compiled in se
 - Ruled correct/no change: P7.
 - Excluded: the ceiling row and the intentionally unbuilt manufacturing solver.
 
-This is an approved audit scope, not authorization to implement it. Dan explicitly ruled that no code changes are authorized yet. No cleanup worktree, code edit or cleanup commit may be created until he authorizes implementation.
+Dan has now authorized `@s62-lead` to implement this audit end to end. Implementation must remain isolated from unrelated work and must not expand beyond the filed cleanup tasks.
 
 ## 1. Lead findings — independently verified
 
@@ -132,7 +132,7 @@ The original alternative to replace `sizeMM → extentMM` with a new field-owned
 
 ## 3. Final agreed cleanup audit
 
-When Dan authorizes implementation, clean and fix exactly this set.
+Dan has authorized Lead implementation. Clean and fix exactly this set.
 
 ### A. Remove dead and stale scaffolding
 
@@ -186,7 +186,33 @@ When Dan authorizes implementation, clean and fix exactly this set.
 
 P7 is closed by Dan's law 9.3a ruling. Sparse mode hides points only; it does not recenter or correct the accepted even-match offset.
 
-## 4. Verification evidence
+## 4. Linear execution map
+
+Parent: `KAI-10265` — Sprint 2, inside Grid Engine epic `KAI-10260`.
+
+| Audit item | Task | Deliverable |
+|---|---|---|
+| D6 | `KAI-10266` | Correct stale page-header claims |
+| D5 | `KAI-10267` | Delete only the false “1 is fit” line |
+| D3 | `KAI-10268` | Delete `syncSizeFromBox` |
+| D1 | `KAI-10269` | Delete dead camera zoom API |
+| D2 | `KAI-10270` | Delete unused `ZOOM_FIT` import |
+| D4 | `KAI-10271` | Consolidate CLASSIC-band documentation |
+| D8 | `KAI-10272` | Remove bridge whitespace |
+| N2/L3 | `KAI-10273` | Use one live-spec camera/frame span |
+| L1 | `KAI-10274` | Make the unit own one minimum shape size |
+| P5 | `KAI-10275` | Return `anchorMM` from the engine |
+| P4 | `KAI-10276` | Expose the existing padding atom |
+| N1 | `KAI-10277` | Remove inert shape-size/field coupling |
+| P2 | `KAI-10278` | Make cut-out load use current spec |
+| P3 | `KAI-10279` | Create the guarded registration input |
+| P1 | `KAI-10280` | Remove the render-time ref read |
+| P6 | `KAI-10281` | Remove CSS duplication and restore dark colour |
+| N3/L2 | `KAI-10282` | Replace pattern checks with structural guards |
+
+Rejected D9/D10, retained D7, excluded ceiling/solver work and closed P7 have no implementation task.
+
+## 5. Verification evidence
 
 - Worktree clean at review start; HEAD matched its task remote and preview branch.
 - Independent N1/N2 runtime-math probe reproduced the defects above.
@@ -196,11 +222,11 @@ P7 is closed by Dan's law 9.3a ruling. Sparse mode hides points only; it does no
 - Focused ESLint fails with one error and three warnings: P1, D2, D3 and P2.
 - Live port 4200 was proven to serve this worktree. A real RGBA cut-out loaded in outline mode; dragging over the shape moved magnet coordinates while polygon coordinates stayed identical. This validates the instrument interaction only.
 
-## 5. Ownership and authorization boundary
+## 6. Ownership and authorization boundary
 
-Lead and Meta agree that Pixel should implement in a fresh worktree, Lead should verify behavior preservation, and Meta should run the closing independent gate. That ownership agreement does not authorize implementation.
+Dan's latest instruction supersedes the earlier ownership recommendation: `@s62-lead` implements the full sprint end to end in an isolated worktree; `@s62-grid-pixel` performs adversarial completion review; Meta runs the closing independent gate.
 
-Current state: audit compiled; code untouched; Dan has now authorized filing and Lead implementation through the Grid Engine epic/sprint workflow.
+Current state: audit and 17-task sprint compiled; implementation dispatched to Lead. Unrelated in-flight page work in the shared checkout is outside this sprint and must not enter the cleanup diff.
 
 Necessity — no unnecessary elements: every included edit removes a confirmed defect, stale claim, dead path or guard escape; no new module, field-size control, spec atom or solver behavior is included.
 
