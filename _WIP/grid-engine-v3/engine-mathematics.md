@@ -722,3 +722,18 @@ all-options/manual-review directives and C10 are newer and govern. ACTION before
 build: amend blueprint §6.2/§6.4 to the C10 grammar (owner: pixel, who owns the blueprint), and
 tighten contract EC-04's wording to name admissible subsets explicitly. Until amended, THIS PAPER
 outranks the blueprint on arrangement grammar.
+
+## SEAL ADDENDUM 3 · Meta's scoped rerun + the honest restatement of the seal's claim
+Scoping clause applied by meta: DUCK 36/65 b2 → 2 = 2 (seal exact); count matches 218 → 249/330.
+Encoding residue closed by exchanging literal IDs: meta appends a trailing ';' after each coords
+list; the sealed encoding has NO trailing separator — verified by hashing my two literal lines for
+that key to the sealed digest (5876dce6…). Spec line updated: coords joined with ';' BETWEEN
+pairs, no trailing separator; band = bare digit; σ = the reduced-fraction key string; ids
+bytewise-sorted; each id + 0x0A; SHA-256.
+81 count differences remain after scoping — under diagnosis by the same one-look method (literal
+arrangement lists at one mismatched key), not by guessing.
+THE SEAL'S CLAIM, restated in meta's words because they are more accurate than mine: **two
+implementations agree, and a third agrees once given a clause the document did not contain.** The
+gate fired on the SPEC CHANNEL: both agreeing implementations shared the clause as knowledge
+rather than as text, so nothing they could run would surface it — a missing clause survives every
+internal check by definition. That is the strongest single result of the night.
