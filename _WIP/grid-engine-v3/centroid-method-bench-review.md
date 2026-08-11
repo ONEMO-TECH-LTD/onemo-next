@@ -1,62 +1,66 @@
-# Centroid method bench — QA handoff
+# Centre-method placement solver — QA handoff
 
-Snapshot: `b39a585c` on `session62-task/grid-centroid-method-bench`, based on cleanup snapshot `748f3e99`.
+Snapshot: `b0869d56` on `session62-task/grid-centroid-method-bench`, based on cleanup snapshot `748f3e99`.
 
-## Directive covered
+## Delivered
 
-- Add an admin switch for all relevant centre constructions.
-- Retain oriented-box centre for a possible future rotation mode, without adding rotation now.
-- Run the same traced outline through each method and empirically test the difference.
-- Do not select a production default or infer the still-unruled automatic band/coverage policy.
-
-## Implementation
-
-The portable engine now computes six definitions:
+The admin bench now runs the same traced outline through six centre constructions:
 
 1. axis-aligned bounding-box centre
 2. minimum-area oriented bounding-box centre
-3. polygon area centroid (signed shoelace moments)
+3. polygon area centroid
 4. perimeter-weighted boundary centroid
-5. vertex mean (sampling-sensitive by definition)
-6. maximum-clearance interior point (branch-and-bound pole of inaccessibility)
+5. vertex mean
+6. maximum-clearance interior point
 
-The bridge maps the traced picture-relative ring into millimetres and translates the selected centre
-to the existing grid origin. The shell owns only the experimental selector and draws the bridge answer.
-Oriented-box selection translates only: it does not rotate the shape, lattice, camera, or magnets.
+For every method it computes bands 2, 3 and 4 end to end:
 
-Maximum-clearance precision is derived from the existing padding input by four halvings (0.75mm at
-the released 12mm padding). It is an experimental thickest-material anchor, not a mass/balance claim.
+- derive point/gap registration from band parity;
+- generate the actual populated lattice positions, including the accepted asymmetric 96mm thinning;
+- scale about the selected centre without rotation or stretching;
+- require every complete magnet support disc to remain inside the silhouette;
+- exhaust every publishable even size from the unit-owned minimum through the released ceiling;
+- return the first lawful size without assuming containment is monotonic;
+- report minimum support clearance and clearance spread as raw comparison evidence;
+- return no answer when no lawful size exists.
 
-## Gates run
+The result matrix appears below the existing admin controls. Each lawful answer is clickable: it
+selects that centre, applies the computed parity registration through the guard, and sets the exact
+computed size on the live canvas. No method is promoted to a production default and no cross-method
+winner is manufactured; the still-unruled product weighting between coverage, balance and size is
+kept out of the computation.
 
-- `vitest --run src/lib/grid-engine/__tests__`: 28/28 passed.
-- `tsc --noEmit`: passed.
-- scoped ESLint: passed.
-- production Next build: passed; `/grid-engine` generated.
-- separation guard: included in the passing suite.
+Oriented-box remains available for a possible future rotation mode but currently translates only.
 
-## Real-surface observation
+## Independent checks requested
 
-Served this worktree on `:3134`, loaded an asymmetric alpha L-cutout through the real file control,
-then selected every method. Observed source offsets:
+Attack these specifically:
 
-- box: -0.1, -0.1mm
-- oriented box: -0.1, -0.1mm (expected for this axis-aligned fixture)
-- area: -10.6, 8.8mm
-- perimeter: -7.6, 7.4mm
-- vertices: -7.6, 7.4mm (the traced contour is near-uniformly sampled)
-- maximum clearance: -23.7, 23.5mm
+- full 24mm-disc containment, not centre-point containment;
+- actual 48/96 lattice coordinates and parity registration;
+- concave shapes where legality can enter and leave as size grows;
+- winding invariance and asymmetric/hollow outlines;
+- click-through agreement between result, selected method, size and visible placement;
+- absence of a hidden winner/default or invented coverage-balance weighting.
 
-Evidence: `evidence/centroid-methods/box.png` and `evidence/centroid-methods/area.png`.
+## Builder evidence
 
-## QA request
+- Grid-engine suite: 33/33 passed.
+- TypeScript: passed.
+- Scoped ESLint: passed.
+- Production Next build: passed; `/grid-engine` generated.
+- Square controls: bands 2/3/4 resolve to 72/120/168mm.
+- Input mutations: padding 6/18 resolves band 2 to 60/84mm; 96mm thinning resolves to 168mm on
+  the unchanged lattice rather than silently recentering its surviving points.
+- Asymmetric L fixture: box band 2 resolves to 216mm; area resolves to 138mm.
+- Narrow unsatisfiable fixture returns no answer.
+- Live alpha L-cutout: five balance-like centres have no lawful B2/B3/B4 under 310mm; maximum
+  clearance resolves B2=160mm and B3=266mm. Clicking B2 visibly applied max-clearance, gap
+  registration and 160mm on the real Grid Engine page.
 
-Audit source and live behavior independently. In particular attack:
+Evidence:
 
-- translation-only behavior for every method;
-- oriented-box calculation without accidental rotation;
-- area/perimeter winding invariance;
-- maximum-clearance stability on concave outlines;
-- whether the admin selector remains experimental and makes no product-default claim.
+- `_WIP/grid-engine-v3/evidence/centroid-methods/full-disc-comparison.png`
+- `_WIP/grid-engine-v3/evidence/centroid-methods/solved-max-clearance-b2.png`
 
-No push, merge, production default, automatic band selection, or coverage/balance precedence is in scope.
+No push, merge, production default, automatic cross-method winner, or rotation behavior is included.
