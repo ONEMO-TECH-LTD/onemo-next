@@ -216,3 +216,11 @@
   restore the 10-second acceptance threshold, then rerun the final oracle on an idle server.
 - Remember: a transient timing failure must not be hidden by permanently weakening the shipped gate;
   separate golden collection from the final performance verdict.
+
+## 2026-08-11 — Cutout closure generator path normalization
+
+- Failed: the first generator run resolved `@/` imports without the repository's `src/` prefix; the
+  second parsed escaped Next HTML asset paths with a trailing backslash.
+- Worked: map `@/x` to `src/x`, and exclude backslashes from the emitted-asset regex.
+- Remember: generated Next HTML escapes route strings; normalize aliases and reject escape characters
+  before resolving closure files.

@@ -1,0 +1,586 @@
+{
+  "schemaVersion": "cutout-studio-closure/v1",
+  "portablePackage": {
+    "productEntries": [
+      "src/components/cutout-studio/CutoutStudio.tsx",
+      "src/components/cutout-studio/EditorOverlay.tsx",
+      "src/components/cutout-studio/finish.ts",
+      "src/components/cutout-studio/flow.ts",
+      "src/components/cutout-studio/ui-config.ts",
+      "src/components/cutout-studio/v531seg.ts",
+      "src/lib/cutout-studio/history.ts",
+      "src/lib/cutout-studio/result.ts"
+    ],
+    "routeMount": "src/app/(dev)/cutout-lab/page.tsx",
+    "routeOnlyExcluded": [
+      "src/app/(dev)/cutout-lab/page.tsx",
+      "src/app/(dev)/cutout-lab/CutoutLabMount.tsx"
+    ],
+    "gridIntegration": "deferred-until-replacement-grid-contract-freezes"
+  },
+  "source": {
+    "files": [
+      {
+        "file": "src/components/cutout-studio/CutoutStudio.tsx",
+        "bytes": 27439,
+        "sha256": "1bff5ba1686d3c3a782b4198e21c7c0e22f6aa182ad3f2735290646b69ff3807",
+        "destination": "src/components/cutout-studio/CutoutStudio.tsx",
+        "layer": "browser-react"
+      },
+      {
+        "file": "src/components/cutout-studio/EditorOverlay.tsx",
+        "bytes": 10243,
+        "sha256": "771f085f72f1dde1c149ad2be3d730ecad0e5b9550f5e51b010fc68d22f417c9",
+        "destination": "src/components/cutout-studio/EditorOverlay.tsx",
+        "layer": "browser-react"
+      },
+      {
+        "file": "src/components/cutout-studio/finish.ts",
+        "bytes": 17753,
+        "sha256": "5ed3020d04cc752262d566ae73e93d78ce5606994a28ed140e165eb535fba1ba",
+        "destination": "src/components/cutout-studio/finish.ts",
+        "layer": "browser-react"
+      },
+      {
+        "file": "src/components/cutout-studio/flow.ts",
+        "bytes": 53953,
+        "sha256": "0796dc416fedcc2543d1a0e61e9609ff821f802936a66dd9ffc8aef8a229d2cd",
+        "destination": "src/components/cutout-studio/flow.ts",
+        "layer": "browser-react"
+      },
+      {
+        "file": "src/components/cutout-studio/ui-config.ts",
+        "bytes": 912,
+        "sha256": "fd5488ecdc5533cbea47c40fd016dfdddeba0791c431c36b6bdbbe4ec17198fa",
+        "destination": "src/components/cutout-studio/ui-config.ts",
+        "layer": "browser-react"
+      },
+      {
+        "file": "src/components/cutout-studio/v531seg.ts",
+        "bytes": 4547,
+        "sha256": "213c60f5e4ec8f07451a5b2900781d847bef3481e5996fcc8a6fe9c95f755696",
+        "destination": "src/components/cutout-studio/v531seg.ts",
+        "layer": "browser-react"
+      },
+      {
+        "file": "src/lib/cutout-grabcut/index.ts",
+        "bytes": 7823,
+        "sha256": "c43b5144407a0103b506e94949f57748645595fdd5d6d72f1d1ef239de55914d",
+        "destination": "src/lib/cutout-grabcut/index.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/cutout-studio/history.ts",
+        "bytes": 942,
+        "sha256": "c1b400bcc553ab581ed43a1c6762ffb3e8982f538a910ea8e6d8746f9b612385",
+        "destination": "src/lib/cutout-studio/history.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/cutout-studio/result.ts",
+        "bytes": 2033,
+        "sha256": "5791e7c6dd431d5c3baa7f59372ea473e8207ea9a01edbf3445d1ca6ff2c1061",
+        "destination": "src/lib/cutout-studio/result.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/ben-chain.ts",
+        "bytes": 1136,
+        "sha256": "d94fe0aad0333708e8e7c7bd6c888a23b7913a20fafd59dba658a46cd7686ecd",
+        "destination": "src/lib/effect/ben-chain.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/ben.worker.ts",
+        "bytes": 8598,
+        "sha256": "11e86d89a0b790531ff708f49eecbcd9dc9ce2a9c715b3f6131ad6978af598c8",
+        "destination": "src/lib/effect/ben.worker.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/effect/composite.ts",
+        "bytes": 17399,
+        "sha256": "3fbefc268c094077f03cb3dee32155cd1cd7d4620a2706c52ff0712b6b9dd0bd",
+        "destination": "src/lib/effect/composite.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/effect/contour.ts",
+        "bytes": 5709,
+        "sha256": "3d56fc40eb087b0be01f9b9eeeb57841c4e51c5f3f127426fe3beac676045d12",
+        "destination": "src/lib/effect/contour.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/cutout.ts",
+        "bytes": 782,
+        "sha256": "5c78341f5583aa017ad257058e18468e4090b7798b513407cdf1b0695b5d2e79",
+        "destination": "src/lib/effect/cutout.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/effect-calibration.ts",
+        "bytes": 507,
+        "sha256": "6e44027c72dadd0e7f351286b32de9a3b3197aadffd4885d11c09fba5daf05ea",
+        "destination": "src/lib/effect/effect-calibration.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/effect-types.ts",
+        "bytes": 694,
+        "sha256": "04a0dc13dfe016399aeba0f34ec182bc45409328ad1387d08cf48b4def3ede49",
+        "destination": "src/lib/effect/effect-types.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/geometry-truth.ts",
+        "bytes": 6212,
+        "sha256": "b81eeba9598a904de32791e5ad119aa6e903586f9e01ed62ac0d03ddca49480d",
+        "destination": "src/lib/effect/geometry-truth.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/mask.ts",
+        "bytes": 12644,
+        "sha256": "1cb890dbd3698fcdc717b1cc9ed593429d8480ca0f395c598b61e7c64b6046c5",
+        "destination": "src/lib/effect/mask.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/effect/offset.ts",
+        "bytes": 2487,
+        "sha256": "ec8c2bf205d3b33e903a20d29a4897c647040ce03cf3607e43386b30ec677b20",
+        "destination": "src/lib/effect/offset.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/outline-resolve.ts",
+        "bytes": 21757,
+        "sha256": "c662f5b8b749f0caead8cadb220975b2b6ef4e923dba31642b648f9e8d5d1d01",
+        "destination": "src/lib/effect/outline-resolve.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/prepare-effect.ts",
+        "bytes": 17711,
+        "sha256": "1165a93a2c29a10cd3824329b86dba5536c7e0137dbfba8fe146be408bf31543",
+        "destination": "src/lib/effect/prepare-effect.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/effect/rounded-square.ts",
+        "bytes": 2634,
+        "sha256": "40d8d1b7145e2e91705cdb3abc9ed2cccd6a370e4720a1e7e9f215b9179fa5d4",
+        "destination": "src/lib/effect/rounded-square.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/segment-ml.ts",
+        "bytes": 8609,
+        "sha256": "04a3d6b56a96204374775a8601e924b8867b87a55fd27b7b4bbe6d8f7c7335da",
+        "destination": "src/lib/effect/segment-ml.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/effect/trace-outline-controls.ts",
+        "bytes": 5539,
+        "sha256": "a164c2db363902d9c13be2701f52094797177a6af8ea9d0eb2a23e1e778a71d2",
+        "destination": "src/lib/effect/trace-outline-controls.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/effect/types.ts",
+        "bytes": 2822,
+        "sha256": "f1fba11d8317ceddbba265f485b0c4724042269f3d585d8584ae22a79d47d5f7",
+        "destination": "src/lib/effect/types.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/mask-tools/index.ts",
+        "bytes": 6564,
+        "sha256": "02795ce72fc338ad2a2d4e515ef65f9ef15d7cbf92779de9bd60ca474d2b62e1",
+        "destination": "src/lib/mask-tools/index.ts",
+        "layer": "browser-adapter"
+      },
+      {
+        "file": "src/lib/mask-tools/types.ts",
+        "bytes": 422,
+        "sha256": "288b4cf6115acd706b1a9db851bd4a0e6432fcfd188a8d304c5b5e7b69b5302b",
+        "destination": "src/lib/mask-tools/types.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/outline-core/hash.ts",
+        "bytes": 1735,
+        "sha256": "fed8acb0bdb22cfef4a23e1bf9c8046c3ffca1ba201f0e132076bbf640e3332e",
+        "destination": "src/lib/outline-core/hash.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/outline-core/index.ts",
+        "bytes": 922,
+        "sha256": "4b922c125e25b44be5f991f1803bdd43588a69f3608ca3825f9d705dd9e05cb7",
+        "destination": "src/lib/outline-core/index.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/outline-core/math.ts",
+        "bytes": 808,
+        "sha256": "469fa8cdc207d31418d828eed5c23a2f4f20437a686e5bbd28dc28e7289ce804",
+        "destination": "src/lib/outline-core/math.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/outline-core/resolver.ts",
+        "bytes": 23349,
+        "sha256": "4658d3ec0b80da7ffdf2859c34072f20eefccc4456786819bdda58f1374ef639",
+        "destination": "src/lib/outline-core/resolver.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/outline-core/types.ts",
+        "bytes": 3274,
+        "sha256": "d34cf567120caaed08b9b108ff0eebc4933dbfd8a504b285bb2023e5cf2c6f3e",
+        "destination": "src/lib/outline-core/types.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/clipper-kernel.ts",
+        "bytes": 6346,
+        "sha256": "dd8fd6bba1ff08c5c683511bebfbebb9c146e324c405f9b9aae71437dbd2d56c",
+        "destination": "src/lib/vector-core/clipper-kernel.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/fit.ts",
+        "bytes": 20049,
+        "sha256": "b2372eebc24975ce9578a02f0db83575afbf4069bf150d5df6b30d4478db5e07",
+        "destination": "src/lib/vector-core/fit.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/index.ts",
+        "bytes": 1323,
+        "sha256": "743d75b24b250ca925d1fb905d3ff78dac3d5036ad249d277ae6e56796efead6",
+        "destination": "src/lib/vector-core/index.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/ops.ts",
+        "bytes": 7289,
+        "sha256": "8290e8cddddd2d979740bc0268bf5d2de46b825cf3dffdf70b13c4ad4e40eb53",
+        "destination": "src/lib/vector-core/ops.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/paper-kernel.ts",
+        "bytes": 9119,
+        "sha256": "694af1aa8ddf84a80b3e720b8531d64729aa8cdbfd25669df74f9d2cb5e5513b",
+        "destination": "src/lib/vector-core/paper-kernel.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/path.ts",
+        "bytes": 5971,
+        "sha256": "0f60cc0e77646191840506f612b0ec2beac09d055712499010bf82acaf16c0a3",
+        "destination": "src/lib/vector-core/path.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-core/types.ts",
+        "bytes": 1945,
+        "sha256": "879645cdb9f4946afbfc9a69d0a146990a4c0af210f81b60d5837de77d36070b",
+        "destination": "src/lib/vector-core/types.ts",
+        "layer": "headless"
+      },
+      {
+        "file": "src/lib/vector-edit/index.ts",
+        "bytes": 8334,
+        "sha256": "3e3be98b3dceb62101943d114ab8d8fb91e0851a29040370440e875032ef0bac",
+        "destination": "src/lib/vector-edit/index.ts",
+        "layer": "headless"
+      }
+    ],
+    "totalBytes": 338335,
+    "closureSha256": "c8d083ab062a586d252635164d41019cd3510200b546c9f9f94c4d3d07a4f030"
+  },
+  "emitted": {
+    "route": "/cutout-lab",
+    "scope": "route-referenced shared and route assets; not Cutout-exclusive bytes",
+    "files": [
+      {
+        "file": ".next/static/chunks/2615-9e57f96e070b8009.js",
+        "rawBytes": 90065,
+        "gzipBytesEstimate": 22725,
+        "brotliBytesEstimate": 20031
+      },
+      {
+        "file": ".next/static/chunks/3794-3dbd06ff79d82322.js",
+        "rawBytes": 222524,
+        "gzipBytesEstimate": 60643,
+        "brotliBytesEstimate": 49636
+      },
+      {
+        "file": ".next/static/chunks/4454-247a9e21ec1fe83e.js",
+        "rawBytes": 20163,
+        "gzipBytesEstimate": 5369,
+        "brotliBytesEstimate": 4818
+      },
+      {
+        "file": ".next/static/chunks/4500-638f637d16a41042.js",
+        "rawBytes": 14280,
+        "gzipBytesEstimate": 5807,
+        "brotliBytesEstimate": 5130
+      },
+      {
+        "file": ".next/static/chunks/4bd1b696-df4c0fb946159b6a.js",
+        "rawBytes": 199870,
+        "gzipBytesEstimate": 62905,
+        "brotliBytesEstimate": 53670
+      },
+      {
+        "file": ".next/static/chunks/651-84fb6f360340732e.js",
+        "rawBytes": 33736,
+        "gzipBytesEstimate": 13426,
+        "brotliBytesEstimate": 12011
+      },
+      {
+        "file": ".next/static/chunks/9776-d8f9c7623946cb00.js",
+        "rawBytes": 6616,
+        "gzipBytesEstimate": 3034,
+        "brotliBytesEstimate": 2708
+      },
+      {
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-9e7dd5f47aa464cc.js",
+        "rawBytes": 62812,
+        "gzipBytesEstimate": 20804,
+        "brotliBytesEstimate": 18389
+      },
+      {
+        "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
+        "rawBytes": 209606,
+        "gzipBytesEstimate": 71020,
+        "brotliBytesEstimate": 60922
+      },
+      {
+        "file": ".next/static/chunks/main-app-9c10655514ac7871.js",
+        "rawBytes": 529,
+        "gzipBytesEstimate": 234,
+        "brotliBytesEstimate": 213
+      },
+      {
+        "file": ".next/static/chunks/polyfills-42372ed130431b0a.js",
+        "rawBytes": 112594,
+        "gzipBytesEstimate": 39473,
+        "brotliBytesEstimate": 35158
+      },
+      {
+        "file": ".next/static/chunks/webpack-b7c6b836ce69c591.js",
+        "rawBytes": 5770,
+        "gzipBytesEstimate": 2877,
+        "brotliBytesEstimate": 2528
+      },
+      {
+        "file": ".next/static/css/407a9bc1bf490e7e.css",
+        "rawBytes": 314,
+        "gzipBytesEstimate": 222,
+        "brotliBytesEstimate": 166
+      },
+      {
+        "file": ".next/static/css/b7361940da6be284.css",
+        "rawBytes": 319759,
+        "gzipBytesEstimate": 55214,
+        "brotliBytesEstimate": 31714
+      }
+    ],
+    "rawBytes": 1298638,
+    "gzipBytesEstimate": 363753,
+    "brotliBytesEstimate": 297094
+  },
+  "runtimeHeapEvidence": {
+    "status": "not-captured-by-static-build-analyzer"
+  },
+  "owners": {
+    "flow": {
+      "file": "src/components/cutout-studio/flow.ts",
+      "symbol": "useCutoutLabFlow"
+    },
+    "history": {
+      "file": "src/lib/cutout-studio/history.ts",
+      "symbol": "HistoryStack"
+    },
+    "toolQueue": {
+      "file": "src/components/cutout-studio/flow.ts",
+      "symbol": "toolQueueRef"
+    },
+    "scheduler": {
+      "file": "src/components/cutout-studio/flow.ts",
+      "symbol": "scheduleBake"
+    },
+    "compositor": {
+      "file": "src/lib/effect/composite.ts",
+      "symbol": "composeEffectArtwork"
+    },
+    "cutoutAdapter": {
+      "file": "src/components/cutout-studio/finish.ts",
+      "symbol": "bakeStickerEngine"
+    },
+    "detector": {
+      "file": "src/lib/effect/segment-ml.ts",
+      "symbol": "segmentML"
+    },
+    "grabCutProvider": {
+      "file": "src/lib/cutout-grabcut/index.ts",
+      "symbol": "grabCutRefine"
+    },
+    "result": {
+      "file": "src/lib/cutout-studio/result.ts",
+      "symbol": "buildCutoutResult"
+    }
+  },
+  "dependencies": [
+    {
+      "name": "@countertype/clipper2-ts",
+      "declared": "^1.5.4",
+      "installed": "1.5.4",
+      "license": "BSL-1.0"
+    },
+    {
+      "name": "@techstark/opencv-js",
+      "declared": "^5.0.0-release.1",
+      "installed": "5.0.0-release.1",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "paper",
+      "declared": "^0.12.18",
+      "installed": "0.12.18",
+      "license": "MIT"
+    },
+    {
+      "name": "paperjs-round-corners",
+      "declared": "^0.0.10",
+      "installed": "0.0.10",
+      "license": "UNKNOWN"
+    },
+    {
+      "name": "react",
+      "declared": "19.2.3",
+      "installed": "19.2.3",
+      "license": "MIT"
+    },
+    {
+      "name": "thinking-orbs",
+      "declared": "^0.2.0",
+      "installed": "0.2.0",
+      "license": "MIT"
+    }
+  ],
+  "assets": [
+    {
+      "file": "public/ort/ort.wasm.min.mjs",
+      "bytes": 46517,
+      "sha256": "5118f6b62b123b74a7af80dccd6dc96d3651a39d02b37edfc0d9831982f1f898",
+      "destination": "public/ort/ort.wasm.min.mjs"
+    },
+    {
+      "file": "public/ort/ort-wasm-simd-threaded.mjs",
+      "bytes": 26583,
+      "sha256": "e9ba2350c370278fc90108f1514fb9ce6a4051341ab977b5b0dca7eca9e78dfa",
+      "destination": "public/ort/ort-wasm-simd-threaded.mjs"
+    },
+    {
+      "file": "public/ort/ort-wasm-simd-threaded.wasm",
+      "bytes": 12666427,
+      "sha256": "06b3f98e5aa2fffec1e3ac57a48bf1073828c6624e14d210750bc596c2e35d65",
+      "destination": "public/ort/ort-wasm-simd-threaded.wasm"
+    },
+    {
+      "file": "public/seg-models/silueta.onnx",
+      "bytes": 44173029,
+      "sha256": "75da6c8d2f8096ec743d071951be73b4a8bc7b3e51d9a6625d63644f90ffeedb",
+      "destination": "public/seg-models/silueta.onnx"
+    },
+    {
+      "file": "public/seg-models/u2netp.onnx",
+      "bytes": 4574861,
+      "sha256": "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
+      "destination": "public/seg-models/u2netp.onnx"
+    }
+  ],
+  "tests": [
+    "scripts/cutout-lab-verify.mjs",
+    "scripts/verify-cutout-v1-detector.mjs",
+    "scripts/verify-cutout-v1-flow.mjs",
+    "scripts/verify-cutout-v1-grabcut.mjs",
+    "scripts/verify-cutout-v1-output.mjs",
+    "scripts/verify-cutout-v1-preservation.mjs",
+    "src/lib/cutout-studio/__tests__/result.test.ts",
+    "src/lib/effect/__tests__/cutout-v1-characterization.test.ts"
+  ],
+  "fixtures": [
+    {
+      "file": "public/assets/test-artwork.png",
+      "bytes": 4324970,
+      "sha256": "e4fd0ad70e96ae72986463ceeeda57554ca7e63f777a059f737907ef65961835"
+    }
+  ],
+  "publicApi": {
+    "state": [
+      "status",
+      "busy",
+      "hasCut",
+      "hasImage",
+      "ms",
+      "settings",
+      "blend",
+      "shapeTick",
+      "histTick",
+      "disp",
+      "paintCfg",
+      "edgeFinishPx",
+      "vectorPreset",
+      "outputOriginal",
+      "outputSourceSize",
+      "outputPrepareMs",
+      "canUndo",
+      "canRedo"
+    ],
+    "actions": [
+      "upload",
+      "detect",
+      "setTune",
+      "setBlendTune",
+      "setVectorPreset",
+      "grabCutStroke",
+      "paintStroke",
+      "canBrush",
+      "enterEdit",
+      "editLive",
+      "editCommit",
+      "nodeInsert",
+      "nodeDelete",
+      "nodeApply",
+      "undo",
+      "redo",
+      "clearAll",
+      "save",
+      "exportResult",
+      "setDragging",
+      "setPreview",
+      "warmup",
+      "setPaintCfg",
+      "setEdgeFinishPx",
+      "setOutputOriginal"
+    ],
+    "view": [
+      "imgCanvas",
+      "d",
+      "bounds",
+      "shape",
+      "mask",
+      "liveBake"
+    ],
+    "result": "CutoutResult@cutout-result/v1"
+  }
+}

@@ -1,9 +1,7 @@
 'use client'
 
-// cutout-lab — the NEUTRAL SHELL (Layer-3, I1 contract: ARCHITECTURE.md). Binds ONLY to
-// cutoutLabFlow's { state, actions } — render, gesture capture, coordinate mapping, ink/comet
-// drawing and route-only diagnostics. ZERO policy: no compose calls, no cadence,
-// no runtime engine imports. The Figma shell (I5) must mount on the same flow unchanged.
+// Product studio UI. Binds to cutoutLabFlow's { state, actions, view } surface and owns only
+// rendering, gesture capture, coordinate mapping, and ink/comet presentation.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PaintConfig } from '@/lib/mask-tools'
@@ -239,8 +237,7 @@ export default function CutoutStudio({ calibration }: {
   }, [render])
   const brushable = () => !previewRef.current && flow.actions.canBrush(toolRef.current)
   const onDown = (e: React.PointerEvent) => {
-    // NO tool is gated on busy (Dan device r5: gating silently swallowed taps — 'wand broken,
-    // paint not painting'). Every tool captures always; the FLOW's queue serializes execution.
+    // Every tool captures while prior work is busy; the flow queue serializes execution.
     if (!brushable()) return
     paintingRef.current = true; cursorRef.current = nrm(e); strokeRef.current = [nrm(e)]
     const t = toolRef.current

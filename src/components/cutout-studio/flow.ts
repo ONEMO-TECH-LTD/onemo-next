@@ -1,13 +1,8 @@
 'use client'
 
-// cutout-lab — cutoutLabFlow: the Layer-2 flow bridge (I1 · KAI-10196 · ARCHITECTURE.md contract).
-// ONE compose-function conforming to the flow-contract PATTERN ({ state, actions } — the shell
-// binds only to this surface; flows/flow-contract.ts is the reference, not an import: it is typed
-// against v5.3.1's DesignState/sceneStore). The flow OWNS ALL POLICY the shell used to carry
-// inline: compose cadence (Cadence Law: compositor NEVER called mid-drag; single-flight latched
-// bake with real cancellation), history semantics, the u2net
-// cut + GrabCut/paint tool orchestration. The shell only renders + captures
-// gestures + calls these actions.
+// Product flow. Owns compose cadence and cancellation, history, detection, and Paint/GrabCut
+// orchestration behind one { state, actions, view } boundary. The studio renders and captures
+// gestures without owning those policies.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Mask, Point } from '@/lib/mask-tools/types'

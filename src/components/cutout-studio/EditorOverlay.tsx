@@ -1,9 +1,8 @@
 'use client'
 
-// cutout-lab — vector edit overlay (Dan's Figma reference, s62 item 8). Two modes over the
-// selection canvas: NODES (drag individual anchors — handles ride along) and FRAME (pull sides/
-// corners; aspect lock ⇒ uniform scale). PRESENTATION + gesture wiring only: every edit calls
-// back with the mutated VShape — the page owns what it means (source update → re-finish).
+// Product vector edit overlay. Two modes over the selection canvas: NODES (drag individual
+// anchors) and FRAME (pull sides/corners with optional aspect lock). Presentation and gesture
+// wiring only; the flow owns the meaning of every committed VShape.
 
 import { useRef } from 'react'
 import type { VShape } from '@/lib/vector-core'

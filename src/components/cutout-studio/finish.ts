@@ -1,6 +1,5 @@
-// cutout-lab — finishing glue. PURE COMPOSITION of v5.3.1 engine calls (no own geometry math,
-// ARCHITECTURE.md law 1): AI mask → v5.3.1 mask hygiene → trace → outline-resolve → SVG path.
-// Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
+// Product browser adapter. Composes the existing engine mask, trace, outline, and artwork owners;
+// it adds no parallel geometry or compositor implementation.
 
 import type { Mask } from '@/lib/mask-tools/types'
 import { effectiveTextureDim } from '@/lib/effect/mask'
