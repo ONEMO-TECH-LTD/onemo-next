@@ -6,7 +6,7 @@ Success: every applicable checkpoint below is positively confirmed by calculatio
 
 ## The one deliverable
 
-The engine receives one locked-aspect cutout outline and produces its precisely measured grid-variant families. For bands 2, 3 and 4, each family proves the same cutout against both the 48mm population and its 96mm sparse population. It states each population's magnet layout, magnet quantity and exact coordinates, plus the corresponding proportional manufactured shape size.
+The engine receives one locked-aspect cutout outline and produces its precisely measured grid-variant families. For the operational bands 2 and 3, each family proves the same cutout against both the 48mm population and its 96mm sparse population. It states each population's magnet layout, magnet quantity and exact coordinates, plus the corresponding proportional manufactured shape size.
 
 The engine does not choose a product winner in this iteration. It returns the measured families so their fit can be proved and compared.
 
@@ -16,7 +16,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-02 · Fixed grid inputs.** Every solve uses the guarded 48mm base lattice, 12mm support radius around each magnet centre, the 96mm population as a thinning of the same unmoved lattice, and the released 9×9 ceiling expressed as a grid count.
 
-- [ ] **EC-03 · All required ranges.** The proof instrument assesses the cutout independently in bands 2, 3 and 4. Every returned family contains measured answers for both 48mm and 96mm. A successful earlier band does not remove later bands from the proof instrument.
+- [ ] **EC-03 · All required ranges.** The proof instrument assesses the cutout independently in the operational bands 2 and 3. **Bands 1 and 4 exist in the grid but are hidden and not operational** — Dan, 2026-08-11: "while we have bands 1/2/3/4 - 1and 4 are hidden and not operational we only use 2/3". Band 1 is below the pair floor; band 4 does not survive contact with real cut-outs, needing 420–606mm against a 408mm ceiling on all seven. Every returned family contains measured answers for both 48mm and 96mm. A successful earlier band does not remove later bands from the proof instrument.
 
 - [ ] **EC-04 · Population is measured, not assumed.** Inside each band the engine derives every distinct materially supported arrangement available to the locked shape. It must include a centred vertical pair, centred horizontal pair, rectangular arrangements and material-derived partial arrangements whenever lawful. The pair is the floor; each family reports whether four magnets at the outermost corners, fitted to the edge, are lawful and marks that named arrangement as `optimum` when they are. This label never ranks toward it, discards another arrangement or becomes a pass gate. Intermediate arrangements remain reported as intermediate. No score or ranking framework is introduced, and the engine must not assume that a band is always a complete 2×2, 3×3 or 4×4 square.
 
@@ -38,7 +38,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-11 · Applied proof.** Every distinct arrangement can be applied to the real cutout using the exact returned scale, registration and coordinates. The canvas draws the complete 24mm discs, every side's unsupported reach and the limiting disc/edge contacts. Independently measured SVG geometry must reproduce the engine's centring, balance, coverage and tightness evidence. A table saying `fits` is not proof.
 
-- [ ] **EC-12 · Responsive and complete delivery.** Solver work is never coupled to pinch, resize, pan, drag, camera movement or variant browsing. The frozen delivery includes: the portable engine answer; tests against an independent oracle; synthetic pair, concave, hollow, narrow and non-monotonic cases; all seven saved real cutouts; applied visual evidence for bands 2/3/4 at 48mm and 96mm; and a final statement of which algorithm parts are proven, require correction or must be rejected.
+- [ ] **EC-12 · Responsive and complete delivery.** Solver work is never coupled to pinch, resize, pan, drag, camera movement or variant browsing. The frozen delivery includes: the portable engine answer; tests against an independent oracle; synthetic pair, concave, hollow, narrow and non-monotonic cases; all seven saved real cutouts; applied visual evidence for the operational bands 2 and 3 at 48mm and 96mm; and a final statement of which algorithm parts are proven, require correction or must be rejected.
 
 ## Required answer shape
 

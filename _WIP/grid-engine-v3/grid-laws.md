@@ -85,6 +85,25 @@ not corrected.
 Size is the **output**. No cap, target, range or test size crosses into the unit. There are no fail
 sizes — a shape is never "too small"; it scales until it holds.
 
+**L8a — ONLY BANDS 2 AND 3 ARE OPERATIONAL. 1 and 4 exist and are hidden.**
+*Dan, 08-11 @lead — and he states he ruled it on 08-10*
+> "yeah band 4 was never realistic anyway for custom cutouts unless they are more like geometric
+> shapes - so i had defined it yesterday that while we have bands 1/2/3/4 - 1and 4 are hidden and not
+> operational we only use 2/3"
+
+**Band 1 is below the pair floor** (L4) and band 4 does not survive contact with real cut-outs.
+
+*Provenance note, stated rather than smoothed over: this is NOT in the captured record. Every band
+reference in the brief and in both law and contract reads "2/3/4", and the ruling appears in no lane's
+transcript. It reached us only when he restated it here. Either the collector dropped it (§F) or it
+was said somewhere unread — but the whole authority stack has been carrying 2/3/4 since, so this
+correction propagates to the contract, the blueprint and every test fixture.*
+
+**Measured consequence, and it is good news.** Band 4 was the band the real corpus could not reach —
+420 to 606mm against a 408mm ceiling on all seven cut-outs. Removing it removes that problem entirely.
+What remains live: BAT-WOMAN needs 434mm at band 3, still over the ceiling, and DUCK finds nothing at
+either band on the bounding-box centre.
+
 **L9 — THE CEILING IS A GRID COUNT, NEVER A MILLIMETRE.** *Dan, 08-10 16:13 @meta*
 > "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case
 > we create engine to match our 9x9 grid as max grid after we validate stable engine works we cap the

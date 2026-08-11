@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 88 directives
+## 2026-08-11 · @s62-lead · 89 directives
 
 **06:26:48**
 
@@ -1442,6 +1442,10 @@ yes in fact this is so sensible that it can be actually applied by analogy to ot
 **14:29:46**
 
 for triangle-like shapes  though we are using 2 options - 2 points top corner and mid bottom for smaller shapes especisally - or 3 points made out of two linked 48mm pairs inline horizontaly and perpendicular pair o nly in  this case for mediu band 2 shapes we dont need mid bottom point and it can be hidden to leave 3 points only m
+
+**14:31:19**
+
+yeah band 4 was never realistic anyway for custom cutouts unless they are more like geometric shapes - so i had defined it yesterday that while we have bands 1/2/3/4 - 1and 4 are hidden and not operational we only use 2/3
 
 
 ---
