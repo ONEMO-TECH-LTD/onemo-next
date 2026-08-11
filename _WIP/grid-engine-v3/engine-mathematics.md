@@ -573,3 +573,20 @@ run 168–216mm. (Whether non-colocated pair placements are one PRODUCT is a Dan
 in C6 with disconnected unions; the mathematics reports both layouts and hides nothing.)
 Meta's σ-keyed rerun must move to subset level before the seal; pixel's family hash at BOT 9/20
 compares against these bits once serialisation is shared.
+
+## C35 · Subset coupling agrees THREE-WAY at σ-key level; last delta is publication rounding
+Meta's subset rerun (own bits, artifact keyspace) lands on the IDENTICAL σ keys as lead's C34
+derivation for all seven shapes: 21/50, 72/169, 7/16, 33/74, 9/20, 12/25, 27/50 — including the
+duck at 9/20 and BOT at 33/74. The only column differing is PUBLISHED size (meta 178/175/170 vs
+lead 180/176/172): meta reported pre-rounding values; C17 already rules publication = ceil_even
+(EC-07, upward, never down) — applied uniformly: POKE2 168 · POKE1 172 · BAT-WOMAN 176 · BOT 180 ·
+DUCK 180 · PILL 192 · BUTTERFLY 216. The duck's four-corner impossibility (1,414mm demand) stands
+untouched — coupling and four-corners are separate questions.
+
+RECORDED AT META'S OWN REQUEST — why the independent gate exists, not an anecdote: three defects
+in one lane in one night (±48 sparse pairs; ladder-index coupling; whole-template coupling), each
+producing plausible, self-consistent, non-crashing numbers; each a NARROWER predicate than a rule
+that lane had already conceded IN WRITING; none caught by self-review; all three caught inside two
+hours by a three-lane diff. The gate is the method; agreement without independence is noise.
+
+SEAL: awaiting pixel's family-hash comparison only. All other layers verified three-way.
