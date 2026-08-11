@@ -17,10 +17,9 @@
 import {
   bandSpanMM,
   cellDiameterMM,
-  framedSpanMM,
+  fieldSpanMM,
   magnetsInRegion,
   paddedFieldMM,
-  paddedSpanMM,
   registrationOffsetMM,
   resizeBoxToLongest,
   summariseField,
@@ -94,12 +93,12 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
   return bandSpanMM(spec.grid, magnets)
 }
 
-/** The span a run of lattice positions occupies with its margin — for framing, never for layout. */
-export function fieldSpan(spec: GridSystemSpec, positions: number): number {
-  return framedSpanMM(spec.grid, positions)
-}
-
-/** The whole padded field across — what a camera frames, so it can scale against the real thing. */
-export function paddedSpan(spec: GridSystemSpec): number {
-  return paddedSpanMM(spec)
+/**
+ * The magnet block across, without its margin — what a camera scales against.
+ *
+ * Scaling against the PADDED field instead cancels the margin out: the same millimetres appear
+ * above and below the line and the shape ends up filling the view edge to edge.
+ */
+export function fieldBlockSpan(spec: GridSystemSpec): number {
+  return fieldSpanMM(spec)
 }

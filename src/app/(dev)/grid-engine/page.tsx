@@ -27,7 +27,7 @@ import {
 import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
-  paddedSpan,
+  fieldBlockSpan,
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
@@ -84,11 +84,6 @@ const DEFAULT_SIZE_BAND = 3
  */
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
-/**
- * Canvas space beyond the shape that reaches the outermost grid points, per side. Dan, 2026-08-11:
- * "add 24mm on each side". Two notepad atoms, so the rule still lands whole in the margin.
- */
-const CANVAS_MARGIN_MM = 24
 
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
@@ -267,18 +262,14 @@ export default function GridEnginePage() {
    * size covers both cases and one of them stops being special. With an empty field it is the size
    * the shape WOULD be, which is what makes the grid scale under a pinch with nothing loaded.
    *
-   * THE MARGIN IS A RATIO, NOT A LENGTH, and it has to be. Dan, 2026-08-11: "there is padding post
-   * 9x9 so that shape that needs to fit the outmost grid points has canvas space… add 24mm on each
-   * side" — measured at the shape that reaches the outermost points, which is the 9x9 ceiling.
-   *
-   * Held as a constant 24mm at every size it would break the model: the shape's share of the view
-   * would rise with its size, so the shape would grow on screen as the band changed, which is the
-   * one thing this camera exists to prevent. Fixed as the ratio it makes at the ceiling, the shape
-   * holds its screen size at every band AND the largest shape gets its 24mm.
-   *
-   * It divides by the REAL padded span from the live spec. Dividing by the framed span instead is
-   * off by 504/480 — the shape sat at 95% of the view while the code claimed it filled it.
+   * THE MARGIN IS NOT HERE. There is exactly one margin in the system and it lives in the engine as
+   * the field's own — one magnet spot, 24mm. This scales the magnet BLOCK against the shape, so that
+   * margin survives into the view instead of cancelling; a shape at the 9x9 ceiling therefore has
+   * 24mm of canvas beyond it, and every smaller shape has the same proportion, which is what keeps
+   * it a constant size on screen. No second margin is added on top of it here or anywhere.
    */
+  const gridScale = fieldBlockSpan(spec) / Math.max(sizeMM, 1)
+
   /**
    * THE BIGGEST THE SHAPE MAY BE — the 9x9 grid itself, never a millimetre.
    *
@@ -288,8 +279,6 @@ export default function GridEnginePage() {
    * number the moment either changes, without a line here moving.
    */
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
-  const canvasRatio = (maxSpanMM + 2 * CANVAS_MARGIN_MM) / maxSpanMM
-  const gridScale = paddedSpan(spec) / (Math.max(sizeMM, 1) * canvasRatio)
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the

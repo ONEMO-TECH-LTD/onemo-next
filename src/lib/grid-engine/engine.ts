@@ -70,18 +70,29 @@ export function registrationOffsetMM(grid: GridSpec, registration: Registration)
 /**
  * The empty millimetres beyond the outermost cells, so the field visibly ENDS.
  *
- * ONE FULL LATTICE STEP. Dan, 2026-08-10: "make padding beyond grid 48mm not 40mm".
+ * ONE MAGNET SPOT — 24mm at the locked 12mm padding. Dan, 2026-08-11: "there is padding post 9x9 so
+ * that shape that needs to fit the outmost grid points has canvas space… add 24mm on each side" and
+ * "it must be not 48 and not 72 I said 24".
  *
- * (It was the bare gap between two cells — pitch minus cell — which is 24mm at the locked 12mm
- * padding and read as cramped. A whole step is the ruling, and it still stops short of the next
- * position, so the field ends where the law says it ends.)
+ * It is the spot rather than the number, so it moves with the padding like everything else. This is
+ * the ONLY margin in the system: a shape reaching the outermost points has exactly this much canvas
+ * beyond it, and no surface adds a second one on top.
+ *
+ * (It was a full lattice step, 48mm, from an earlier ruling. That produced no visible margin at all
+ * once the camera scaled to the shape — the same 48 sat in the numerator and the denominator and
+ * cancelled — while an empty field had no margin either. One value, one behaviour.)
  */
 function fieldMarginMM(grid: GridSpec): number {
-  return grid.basePitchMM
+  return cellDiameterMM(grid)
 }
 
-/** The span the field occupies at the released row and column count, in millimetres. */
-function fieldSpanMM(spec: GridSystemSpec): number {
+/**
+ * The magnet block at the released row and column count — the field WITHOUT its margin.
+ *
+ * This is what a camera scales against: divide it by the shape's size and the margin around the
+ * block survives into the view instead of cancelling out.
+ */
+export function fieldSpanMM(spec: GridSystemSpec): number {
   return (spec.grid.positionsPerAxis - 1) * spec.grid.basePitchMM + cellDiameterMM(spec.grid)
 }
 
@@ -100,17 +111,6 @@ export function withMinimumSpan(spec: GridSystemSpec, region: RegionMM): RegionM
     out.h = floor
   }
   return out
-}
-
-/**
- * The whole padded field across, at the released count — the region a camera actually frames.
- *
- * Distinct from `framedSpanMM` below, and the difference is not cosmetic: this one includes the
- * magnets' own spots at the outer edge, that one does not. A camera dividing by the wrong one is
- * scaled by 504/480 and never quite frames what it thinks it does.
- */
-export function paddedSpanMM(spec: GridSystemSpec): number {
-  return fieldSpanMM(spec) + 2 * fieldMarginMM(spec.grid)
 }
 
 /** The field padded out, so its own edge is inside anything that frames it. */
@@ -207,14 +207,4 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
 /** What a run of magnets measures across, edge to edge, including their padding. Law 11.2. */
 export function bandSpanMM(grid: GridSpec, magnets: number): number {
   return Math.max(0, magnets - 1) * grid.pitchMM + 2 * grid.paddingMM
-}
-
-/**
- * What a run of lattice positions occupies WITH ITS MARGIN — the region a camera frames.
- *
- * Distinct from the private fieldSpanMM above, which is the magnet block at the released count and
- * is the field's floor. This one includes the margin, because framing has to show the field ending.
- */
-export function framedSpanMM(grid: GridSpec, positions: number): number {
-  return Math.max(0, positions - 1) * grid.basePitchMM + 2 * fieldMarginMM(grid)
 }
