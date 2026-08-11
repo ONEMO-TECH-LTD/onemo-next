@@ -612,3 +612,22 @@ the standing rationale: A NARROWER (or looser) PREDICATE DOES NOT ANNOUNCE ITSEL
 answers of the right magnitude, in the right format, passing every internal check; only a second
 independent implementation of the SAME rule exposes it. Four defects in one lane in one night,
 zero caught by self-review, all caught by the gate within minutes.
+
+## C37 · Family gate — all counts match on all 330 keys; hashes differ only by string encoding
+Lead's band-scoped family derivation (a band's arrangements come from ≤band-square windows —
+pixel's model; my cross-band assignment was the defect, 220 mismatches → 0) now agrees with
+pixel's independent family artifact on EVERY count on EVERY (shape, σ, band) key: base and sparse
+arrangement counts, family counts, pair-pair counts, published sizes — including BOT 9/20 band-2
+= 3 families / 2 pair-pair (pixel's original finding, from my bits). The 153 residual hash diffs
+carry IDENTICAL counts — serializer string-encoding only; one plaintext familyId reconciles it.
+Meta's independent parity-filtered table matches C36 exactly (their own rerun, their own bits):
+the final coupled table now has THREE independent implementations behind every number, and meta's
+fixture argument is adopted: the parity filter bites ONLY on the duck — a corpus check skipping
+one shape would pass six and ship one unlawful family. Fixture sets must be complete, not
+representative: DUCK-parity joins PILL-tangency, BOT-144, staggered-gaps.
+The generalisation next to the seal, final wording (meta's, both lanes' instances behind it): a
+looser predicate is invisible from inside the implementation that holds it, whoever wrote it —
+it does not crash, its numbers have the right magnitude and format, and it passes every internal
+check the same implementation can write. Only a second independent implementation of the same
+stated rule exposes it. Six such defects were caught tonight across two lanes in under three
+hours; zero were caught by self-review.
