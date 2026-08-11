@@ -18,10 +18,18 @@ import type { GridSystemSpec } from '@/lib/grid-engine/spec'
 import { viewBox, ZOOM_FIT } from '@/lib/grid-engine/ui/camera'
 import styles from './GridCanvas.module.css'
 
-/** The Figma cell, read from the file: 20mm grey disc · 8mm blue · 6mm white. */
-const CELL_FILL = '#808080'
-const MAGNET_LARGE_FILL = '#58C2FF'
-const MAGNET_SMALL_FILL = '#FFFFFF'
+/**
+ * ONE CIRCLE PER MAGNET — the 24mm spot, and nothing inside it.
+ *
+ * Dan, 2026-08-11: "the internal magnets need not be visible the outer 24mm circle is only one
+ * needed to be seeing and we can make fill colour milder with stroke".
+ *
+ * The Figma cell carries a blue and a white disc within the spot. They describe the part; what this
+ * canvas is for is judging a shape against WHERE THE SPOTS ARE, and at four magnets on a 120mm shape
+ * the inner discs are the loudest thing on screen. The spot is the whole of what matters here.
+ */
+const CELL_FILL = 'var(--magnet-fill)'
+const CELL_STROKE = 'var(--magnet-stroke)'
 
 /**
  * The millimetre notepad under everything. Dan, 2026-08-10: "the lattice must be sitting on the
@@ -139,11 +147,16 @@ export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, panMM, onView, chi
         ))}
 
         {layout.magnets.map(([x, y]) => (
-          <g key={`${x},${y}`}>
-            <circle cx={x} cy={y} r={layout.cellMM / 2} fill={CELL_FILL} />
-            <circle cx={x} cy={y} r={spec.magnet.largeMM / 2} fill={MAGNET_LARGE_FILL} />
-            <circle cx={x} cy={y} r={spec.magnet.smallMM / 2} fill={MAGNET_SMALL_FILL} />
-          </g>
+          <circle
+            key={`${x},${y}`}
+            cx={x}
+            cy={y}
+            r={layout.cellMM / 2}
+            fill={CELL_FILL}
+            stroke={CELL_STROKE}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
         ))}
 
         {children}
