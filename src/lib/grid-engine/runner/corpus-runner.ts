@@ -35,47 +35,14 @@ const spec = {
   centreMethods: [...CENTRE_METHODS],
 }
 
-// The persisted record keeps every manufactured number — size, layout, coordinates, clearances,
-// binding, flap — and drops only the raw boundary-chain point lists (overhang zones' boundaries,
-// extremity point runs), which are per-family copies of the traced outline: thousands of points ×
-// hundreds of families made one shape's JSON string big enough to kill the process even at an 8GB
-// heap. Counts and bboxes remain, so the record still says what was measured.
-const compactPopulation = (p: Record<string, unknown>) => ({
-  ...p,
-  extremities: (p.extremities as Array<Record<string, unknown>>).map(
-    ({ side, kind, sideOverhangMM }) => ({ side, kind, sideOverhangMM }),
-  ),
-  overhangZones: (p.overhangZones as Array<Record<string, unknown>>).map((z) => ({
-    population: z.population,
-    sidesCrossed: z.sidesCrossed,
-    bboxMM: z.bboxMM,
-    maxOverhangMM: z.maxOverhangMM,
-    classification: z.classification,
-    ...(z.exception !== undefined ? { exception: z.exception } : {}),
-    containedExtremityCount: (z.containedExtremities as unknown[]).length,
-    boundaryPointCount: (z.boundaryMM as unknown[]).length,
-  })),
-})
-
 for (const [name, outline] of Object.entries(corpus)) {
   const request: SolveRequest = { outline, spec, flapLimitsMM: [12, 24] }
   const t0 = Date.now()
   const outcome = solve(request)
   const secs = ((Date.now() - t0) / 1000).toFixed(1)
-  const persisted =
-    outcome.status !== 'solved'
-      ? outcome
-      : {
-          ...outcome,
-          families: outcome.families.map((f) => ({
-            ...f,
-            populations: {
-              base: compactPopulation(f.populations.base as unknown as Record<string, unknown>),
-              sparse: compactPopulation(f.populations.sparse as unknown as Record<string, unknown>),
-            },
-          })),
-        }
-  writeFileSync(join(outDir, `${name}.json`), JSON.stringify(persisted))
+  // zones carry index runs and extremities carry endpoints only, so the full outcome persists
+  // directly — the compaction step this file briefly carried is no longer needed
+  writeFileSync(join(outDir, `${name}.json`), JSON.stringify(outcome))
   if (outcome.status !== 'solved') {
     console.log(`${name}: ${outcome.status} (${secs}s)`)
     continue

@@ -155,29 +155,31 @@ export function overhangZonesOf(
   const outside = (p: PointMM) =>
     p[0] < gridBox.x0 || p[0] > gridBox.x1 || p[1] < gridBox.y0 || p[1] > gridBox.y1
   const n = shapePoints.length
-  // walk the ring; group maximal runs of outside points (chains). Exact box-edge crossings split
-  // runs by construction because an inside point terminates a run.
-  const chains: PointMM[][] = []
-  let current: PointMM[] = []
-  let startedInside = false
+  // walk the ring; group maximal runs of outside points (chains), kept as INDEX RUNS into the
+  // outline — a chain of copied points held a whole scaled outline alive per family. Exact
+  // box-edge crossings split runs by construction because an inside point terminates a run.
+  const chains: Array<{ startIndex: number; pointCount: number }> = []
+  let current: { startIndex: number; pointCount: number } | null = null
   for (let i = 0; i < n * 2; i++) {
     // walk twice so a chain wrapping the ring start is captured once, then stop after one loop past
     const p = shapePoints[i % n]
-    if (i >= n && current.length === 0) break
+    if (i >= n && current === null) break
     if (outside(p)) {
-      current.push(p)
+      if (current === null) current = { startIndex: i % n, pointCount: 0 }
+      current.pointCount++
     } else {
-      startedInside = startedInside || i < n
-      if (current.length && i >= 1) {
+      if (current && i >= 1) {
         chains.push(current)
-        current = []
+        current = null
       }
       if (i >= n) break
     }
   }
-  if (current.length && chains.length === 0) chains.push(current) // fully-outside ring
+  if (current && chains.length === 0) chains.push(current) // fully-outside ring
   const zones: OverhangZone[] = []
-  for (const chain of chains) {
+  for (const run of chains) {
+    const chain: PointMM[] = []
+    for (let k = 0; k < run.pointCount; k++) chain.push(shapePoints[(run.startIndex + k) % n])
     const xs = chain.map((p) => p[0])
     const ys = chain.map((p) => p[1])
     const bbox: BoxMM = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }
@@ -198,7 +200,7 @@ export function overhangZonesOf(
     zones.push({
       population: slot,
       sidesCrossed,
-      boundaryMM: chain,
+      boundaryRun: run,
       bboxMM: bbox,
       maxOverhangMM: maxOverhang,
       containedExtremities: contained,

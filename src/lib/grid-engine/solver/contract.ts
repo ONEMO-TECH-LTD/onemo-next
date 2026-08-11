@@ -210,8 +210,13 @@ export interface MaterialExtremity {
 export interface OverhangZone {
   readonly population: PopulationSlot
   readonly sidesCrossed: ReadonlyArray<'left' | 'right' | 'top' | 'bottom'>
-  /** Ordered boundary coordinates of the chain, shape frame. */
-  readonly boundaryMM: readonly PointMM[]
+  /**
+   * The chain as an index run into the applied outline (startIndex, wrapping, pointCount points).
+   * Coordinates are recovered as sigma-scaled centred outline points — kept as indices because a
+   * per-family copy of thousands of chain points held the whole scaled outline alive per family
+   * and exhausted the default heap on the real corpus.
+   */
+  readonly boundaryRun: { readonly startIndex: number; readonly pointCount: number }
   readonly bboxMM: BoxMM
   /** Maximum side overhang from §8.2 attained on this chain. */
   readonly maxOverhangMM: number
