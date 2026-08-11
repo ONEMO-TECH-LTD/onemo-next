@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Fourteen laws. The engine and its algorithm. Nothing else.
+### Fifteen laws. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -19,7 +19,7 @@
 
 ---
 
-## THE THIRTEEN
+## THE FIFTEEN
 
 **L1 — THE SHAPE IS UNTOUCHABLE. Scale is the only transform, aspect locked.**
 *Dan, 08-10 18:39 @meta ·  08-09 23:25 @lead*
@@ -183,7 +183,8 @@ get, and it is Dan's own standing method: *"why do i need to rule if  i never te
 the real life - why noit add all options and test?"*
 
 **L14a — CENTRED MEANS THE FLAP IS EVEN ON ALL SIDES AT ONCE.**
-*Dan, 08-11 ~12:39 @meta — **RELAYED, not yet vault-confirmed** (see provenance note below)*
+*Dan, 08-11 12:38 @meta — **CONFIRMED TWICE**: his input line in the meta lane's live pane, and his
+own captured turn "confirm" at 12:46:30 against a verbatim restatement*
 > "one thing to add the the mgnet assembly must be centered to prevent flap in the first place and
 > this is the yardstick for balanced measure i suppose having flap evened out on all sides at the
 > same time with all mag discs enveloped to the edge"
@@ -199,19 +200,45 @@ The three stop being rivals needing a precedence ruling and become **one measure
 materially narrows **O-3**. Centring is now falsifiable: a bunched arrangement has uneven side flaps
 by construction, so it fails without anyone defining "bunched".
 
-> **Provenance — this clause is the one thing in this book not yet vault-verified.** Both copies I
-> hold are @s62-meta's relay (to me, and to @s62-grid-pixel — identical wording). Dan's own turn had
-> not flushed to `claude/s62/meta/2026-08-11/_day.md` when this was written; the last Dan turn there
-> is 12:37:06 and Meta's reply *referencing* the ruling is present, so the lag is the collector, not
-> the ruling. **It is recorded here because both lanes are already building on it — and flagged
-> because a peer relay recorded as Dan's verbatim words is exactly the failure this book was rebuilt
-> to remove.** Promote to confirmed on the vault flush; strike it if it does not appear.
+> **Provenance — confirmed the hard way, and worth keeping as the record.** This clause and L15 are
+> absent from every transcript in the vault. Both were held out of the book for that reason, and Dan
+> directed the resolution: *"to verify read the tmux of the meta in case transcript in the vault is
+> missing"*. His own input lines are there in the meta lane's scrollback and match the relay exactly.
+> He then confirmed both in a vault-captured turn — `claude/s62/meta/2026-08-11/_day.md`, the
+> verbatim restatement at lines 828 and 833, his own `confirm` at line 840, 12:46:30.
+> **Two independent proofs. And the lesson: the vault is not the only evidence layer — a live pane is
+> stronger when the vault has a hole.** See §F, where the hole is characterised.
 
 **On the limb exemption.** "Trivial" has no number and none may be invented. The engine **measures**
 every uncovered region — extent and side — and **reports** which ones the exemption was applied to.
 An exemption that is visible can be overruled; one applied silently cannot. **This closes the only
 previously unenforceable clause in the book:** the flap had no threshold and no author, so it was the
 one failure condition that could never fail. It now can.
+
+**L15 — THE ORDERED SCALE: THE PAIR IS THE FLOOR, FOUR CORNERS AT THE EDGE IS THE OPTIMUM.**
+*Dan, 08-11 12:41 @meta — **CONFIRMED TWICE**, same two proofs as L14a*
+> "also minimum is pair but optimal is 4 magnets in each outmost corner fitting to the edge"
+
+This is the first time the book has had an **optimum**, and it is a named arrangement rather than a
+score: **four magnets, one at each outermost corner, fitted to the edge.** It makes L11's "perfect
+shape x grid match is 4 points balanced and symetrically centerd on the shape" concrete — the corners
+are named, and so is the edge-fit.
+
+It composes with L14a into one picture of the ideal: **four corner magnets · discs enveloped to the
+edge · flap evened on all sides.**
+
+**It is not a ranking and it does not conflict with L13's no-maximality.** Four-at-the-corners is a
+*shape*, not "as many as fit". The engine **reports whether that arrangement is lawful** for a given
+shape and marks it when it is; the pair stays the floor; everything in between is reported as what it
+is. Nothing is scored, nothing is discarded.
+
+**Every option across the range, restated by Dan the same minute:**
+*08-11 12:47 @meta — a normal turn, vault-verifiable*
+> "yeah i forgot to emphasise the pair is minimum but engine must caculate in the size band minimum
+> pair and other options mag quantity and layout using range between bands"
+
+That is **L13** confirmed in his own words a second time: inside each band's range, the minimum pair
+**and** every other quantity and layout, across the range between bands.
 
 ---
 
@@ -248,6 +275,31 @@ fundamental, because they are physical facts a project rename cannot change:
 
 Nothing else from v1 is law. It remains readable history at
 `onemo-ssot-global/.claude/worktrees/s59-grid-law-main/_ssot-workbench/_briefs/grid-laws.md`.
+
+
+## §F — THE COLLECTOR GAP (why two true rulings were nearly struck)
+
+**The transcript vault silently drops some of Dan's messages.** Characterised from this lane's own
+traffic on 08-11, where the arrival mode of each message is known:
+
+| Dan's message | how it arrived | in the day-file? |
+|---|---|---|
+| "pixel is drafting new contract" | interrupt | **yes** |
+| "pixel has this brief" | interrupt | **yes** |
+| "to verify read the tmux of the meta…" | interrupt | **yes** |
+| "i sent pixel and meta… *the final formulation*" | mid-turn, no interrupt | **NO** |
+| "We don't need irrelevant things listed in the contract…" | mid-turn, no interrupt | **NO** |
+
+**The rule: an interrupt becomes a captured turn; a message injected into a running turn does not.**
+Three captured, two dropped, in one lane in one hour — and one of the two dropped is the deliverable
+formulation this entire contract is built on.
+
+**Consequence for law-keeping.** "Not in the vault" is evidence of absence only for messages that
+arrived as interrupts. For anything else, **check the receiving lane's live pane before striking a
+clause** — that is what confirmed L14a and L15 after both failed the vault check. Until the collector
+is fixed, a lane that receives a mid-turn ruling should echo it verbatim in its next reply, which
+makes it vault-capturable.
+
 
 ---
 

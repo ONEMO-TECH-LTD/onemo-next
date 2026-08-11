@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 69 directives
+## 2026-08-11 · @s62-lead · 73 directives
 
 **06:26:48**
 
@@ -1362,9 +1362,25 @@ i sent pixel and meta to read your transcript and my briefs the final formulatio
   it , centered to the shape and have no flap zones greater than 12-24mm on any side unless it is
   trivial limb especially at the bottom"
 
-**12:39:00**  *(relayed by @s62-meta from Dan's turn in the meta lane — RELAYED, awaiting vault flush; see grid-laws.md L14a provenance note)*
+**12:39:00**  *(meta lane. Dropped by the collector — recovered from the live pane and confirmed by Dan at 12:46:30; see grid-laws.md §F)*
 
 one thing to add the the mgnet assembly must be centered to prevent flap in the first place and this is the yardstick for balanced measure i suppose having flap evened out on all sides at the same time with all mag discs enveloped to the edge
+
+**12:41:00**  *(meta lane. Same recovery route; confirmed 12:46:30)*
+
+also minimum is pair but optimal is 4 magnets in each outmost corner fitting to the edge
+
+**12:42:28**  *(meta lane)*
+
+ok we have enough to work with all is defined pretty much even flap safe to have is defined in case the shape is complex
+
+**12:46:13**  *(meta lane)*
+
+yeah i forgot to emphasise the pair is minimum but engine must caculate in the size band minimum pair and other options mag quantity and layout using range between bands
+
+**12:46:30**  *(meta lane)*
+
+confirm
 
 
 ---
