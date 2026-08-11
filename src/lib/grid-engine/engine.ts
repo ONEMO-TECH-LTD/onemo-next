@@ -45,12 +45,26 @@ function populationStride(grid: GridSpec): number {
  * A PROPERTY OF THE LAYOUT, NEVER OF A VIEW. It was briefly derived from the zoom stop, which made
  * the lattice physically move when you zoomed — a view concern in charge of the geometry.
  *
- * Half the POPULATED pitch, not half the base lattice: at 96mm the gap the shape must centre in lies
- * between two populated magnets, and half a base step lands back on one of them. What moves is where
- * the shape sits on the lattice, not the lattice — one spacing, one lattice (law 1.1).
+ * HALF THE BASE LATTICE, never half the populated pitch. Dan, 2026-08-11: "why switching to 96mm
+ * moves the grid? it must hide the points not move it."
+ *
+ * This offset anchors THE one lattice, and the lattice cannot depend on how much of itself is
+ * populated. Reading it off the populated pitch made the anchor 24mm at 48 and 48mm at 96, so
+ * choosing the thinned population dragged every remaining magnet 24mm sideways — measured on the
+ * page: 48mm gave columns at -166 -118 -70 -22 26 74 122 170, and 96mm gave -142 -46 50 146, which
+ * shares not one position with it. Law 1.2 says 96 is a THINNING of the 48 lattice; a set that
+ * shares no point with it is a second lattice, which is exactly what law 1.1 forbids.
+ *
+ * The superseded reasoning was that at 96 the shape should centre in the gap between two POPULATED
+ * magnets, which needs half a populated step. That is true as far as it goes, and it is why this was
+ * written that way — but it buys symmetry by moving the lattice, and the lattice is the thing that
+ * must hold still. The cost is stated rather than hidden: at 96 with gap registration the shape's
+ * centre sits half a base step from a populated magnet rather than midway between two, so the four
+ * are not symmetric about it. That is a registration question — answered by the match's parity and
+ * by the pan — not a licence for the population to relay the grid.
  */
 export function registrationOffsetMM(grid: GridSpec, registration: Registration): number {
-  return registration === 'gap' ? grid.pitchMM / 2 : 0
+  return registration === 'gap' ? grid.basePitchMM / 2 : 0
 }
 
 /**
