@@ -269,13 +269,30 @@ The square canon is preserved exactly. The circle grows by ten because a box cor
 fabric. *(Containment is CLOSED — the box boundary may touch the outline. A strict test rejects the
 square's own canon at 72.)*
 
-**WHICH REGION, for a layout that is not a rectangle — DERIVED BY ME, NOT RULED BY DAN. PROVISIONAL.**
+**THE REGION IS THE UNION OF THE ADJACENT PAIRS' BOXES — CONFIRMED BY DAN.**
+*Verified first-hand in @s62-grid-pixel's pane: the rule was put to him as a question and his answer
+was* **"yes"**. *He then generalised it himself:*
+> "yes in fact this is so sensible that it can be actually applied by analogy to other complex shapes
+> - measureing by joint pairs makes the model smarter"
 
-> **This is my inference and it must not be built against until Dan confirms it.** Both @s62-grid-pixel
-> and @s62-meta caught me promoting it into law and into the contract, and they are right: measurement
-> can show that a reading is *impossible*, never that another reading is *ruled*. That the axis-aligned
-> box makes his own L layout unbuildable proves ambiguity, not authorship. It is the same class as the
-> fold and the tolerance — both struck this morning for exactly this.
+**Every adjacent horizontal or vertical magnet pair contributes its own padded box; the layout's
+required region is their union.** Rectangles stay rectangles. A three-point L gives an L-shaped region
+with **no invented fourth corner**. The pair is already the unit of measure (L4) — now it is the unit
+of *geometry* too, which is what makes it generalise to any arrangement rather than needing a rule per
+shape of layout.
+
+**Why it is safe for rectangles, measured rather than argued.** For a 2×2 the union is a *ring* — the
+four pair boxes leave a 24×24 hole at the centre. It still gives the same answer as the full box on
+any solid outline, because a ring lying inside a simple closed curve encloses its own middle, so
+ring-inside implies box-inside. Verified on real traced cut-outs: BUTTERFLY 212 / 354, POKE1 180 / 300,
+PILL 212 / 352 at bands 2 / 3 — **identical both ways**. (Holes are excluded by Dan's 08-10 ruling, so
+every outline is solid and the implication always holds.)
+
+**How this was nearly got wrong, kept as the lesson.** I derived this reading from measurement and
+promoted it straight into the law book and the contract. Both peers caught it. Dan's own response is
+the rule to keep: *"i didnt but what is the problem for you guys to agree with it and ask me to
+confirm - even if i didnt choose i can still do that if you actually ask"* — **agree on the strongest
+reading, show it plainly, and ask. Do not silently promote it, and do not freeze everything either.**
 
 Dan
 names 3-point layouts (the L, the 1:2 pyramid) as first-class. On an L cut-out with a 3-point L

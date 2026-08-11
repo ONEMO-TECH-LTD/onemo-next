@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 84 directives
+## 2026-08-11 · @s62-lead · 87 directives
 
 **06:26:48**
 
@@ -1426,6 +1426,18 @@ and this correction also reminds us another rule that shape must encapsulate bou
 **14:18:58**
 
 so the engine computing is essentially whether the bounding box fits inside the shape in set variants of layouts based on the grid
+
+**14:26:12**  *(to @s62-grid-pixel's lane; verified first-hand in their pane)*
+
+i didnt but what is the problem for you guys to agree with it and ask me to confirm - even if i didnt choose i can still do that if you actually ask
+
+**14:26:12**  *(to @s62-grid-pixel's lane — "yes", confirming the union-of-pair-boxes rule)*
+
+yes
+
+**14:26:12**
+
+yes in fact this is so sensible that it can be actually applied by analogy to other complex shapes - measureing by joint pairs makes the model smarter
 
 
 ---
