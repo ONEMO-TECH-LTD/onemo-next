@@ -553,3 +553,23 @@ one σ. L14's "condition most likely to fail" doing exactly what Dan predicted; 
 of every ladder. (The earlier "butterfly cannot couple at all" was wrong in the specific, right in
 the shape of the effect.)
 SEAL: waits on pixel's family-set comparison only.
+
+## C34 · Pixel's family finding confirmed — whole-template coupling was under-inclusive, and the
+## duck product fact REVERSES
+Pixel's BOT-at-9/20 families verified in my bits (base 2×2@48 survivors carry two lawful subset
+pairs; sparse 2×2@96#00 carries a phase pair — 3 registration-compatible families at published
+180). My coupling probe and meta's rerun BOTH applied an extra condition beyond C9/C10: whole
+pair TEMPLATES instead of admissible SUBSETS. C33's coupled table is superseded.
+
+SUBSET-LEVEL COUPLING from the two-way-verified bits (first coupled, per shape):
+  DUCK 180 (σ=9/20) · POKE2 168 · POKE1 172 · BAT-WOMAN 176 · BOT 180 (σ=33/74) · PILL 192 ·
+  BUTTERFLY 216
+THE DUCK COUPLES. Its base pair {(−24,48),(24,48)} (a subset of the 3×2@48 window's survivors)
+and sparse pair {(0,−24),(0,72)} both hold at σ=9/20 — magnets in different places, which no
+agreed clause forbids: coupling requires an option in each population at ONE σ (EC-05), never
+colocation. Every "duck never couples" line reported tonight — including C33's — was the
+whole-template artefact. PRODUCT FACT, corrected: EVERY corpus shape couples; first coupled sizes
+run 168–216mm. (Whether non-colocated pair placements are one PRODUCT is a Dan question — parked
+in C6 with disconnected unions; the mathematics reports both layouts and hides nothing.)
+Meta's σ-keyed rerun must move to subset level before the seal; pixel's family hash at BOT 9/20
+compares against these bits once serialisation is shared.
