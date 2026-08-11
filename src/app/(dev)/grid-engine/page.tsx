@@ -68,7 +68,16 @@ const SHAPE_STEP_MM = 2
  * The registration is not chosen with it: two across is an EVEN count, and law 9.2 says an even
  * count puts the shape's centre in the gap between magnets — which is what makes the four symmetric.
  */
-const DEFAULT_BAND_MAGNETS = 2
+const DEFAULT_MATCH_MAGNETS = 2
+/**
+ * And it arrives at BAND 3 on its longest side. Dan, 2026-08-11: "the defaiult image cutout load
+ * must be in outline mode and centered to 4 squares in band 3".
+ *
+ * The band is the SIZE; the match above is the REGISTRATION. They are separate readings of the same
+ * load — a band-3 shape holding a four-point match — and law 9.2 is answered by the match's count,
+ * not by the band's, so the four stay symmetric about the centre.
+ */
+const DEFAULT_SIZE_BAND = 3
 /**
  * THE THREE BANDS, as counts (law 10.7 — the selector offers 2, 3 and 4; size 1 is coded, not shown).
  * Their millimetres are the SQUARE STANDARD and come from the unit, never from here.
@@ -154,14 +163,16 @@ export default function GridEnginePage() {
   const loadCutout = useCallback((file: File) => {
     // Even band -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
     // about it. This is the count's parity, not a default anyone picked (law 6.5).
-    setSpec((sp) => ({ ...sp, registration: DEFAULT_BAND_MAGNETS % 2 === 0 ? 'gap' : 'point' }))
+    setSpec((sp) => ({ ...sp, registration: DEFAULT_MATCH_MAGNETS % 2 === 0 ? 'gap' : 'point' }))
+    // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
+    setAsOutline(true)
     void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
       setCutout({ url, wPx: img.naturalWidth, hPx: img.naturalHeight })
-      // Laid on at the classic band, longest side, proportions untouched.
-      const k = bandSpan(spec, DEFAULT_BAND_MAGNETS) / Math.max(img.naturalWidth, img.naturalHeight)
+      // Laid on at the default band, longest side, proportions untouched.
+      const k = bandSpan(spec, DEFAULT_SIZE_BAND) / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * k
       const h = img.naturalHeight * k
       setBox({ x: -w / 2, y: -h / 2, w, h })
@@ -178,7 +189,15 @@ export default function GridEnginePage() {
    * themselves, so it is placement — the shape stays still and the grid comes to meet it.
    */
   const [pan, setPan] = useState<[number, number]>([0, 0])
-  const panGrabbedAt = useRef<[number, number] | null>(null)
+  /**
+   * The whole drag is measured from where it STARTED, never from the last frame.
+   *
+   * Measuring frame to frame and rounding each step threw away everything under half a millimetre —
+   * a slow, careful drag moved nothing at all, because each frame's fraction was rounded to zero and
+   * then discarded. Held against the grab point, every fraction survives and the lattice steps
+   * cleanly at 1mm (Dan, 2026-08-11: "make it move in 1mm increments").
+   */
+  const panGrabbedAt = useRef<{ atMM: [number, number]; panMM: [number, number] } | null>(null)
 
   const toMM = (e: React.PointerEvent<SVGElement>): [number, number] => {
     const svg = e.currentTarget.ownerSVGElement
@@ -326,14 +345,16 @@ export default function GridEnginePage() {
             style={{ cursor: panGrabbedAt.current ? 'grabbing' : 'grab' }}
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId)
-              panGrabbedAt.current = toMM(e)
+              panGrabbedAt.current = { atMM: toMM(e), panMM: pan }
             }}
             onPointerMove={(e) => {
-              const from = panGrabbedAt.current
-              if (!from) return
+              const grab = panGrabbedAt.current
+              if (!grab) return
               const [px, py] = toMM(e)
-              setPan(([x, y]) => [Math.round(x + px - from[0]), Math.round(y + py - from[1])])
-              panGrabbedAt.current = [px, py]
+              setPan([
+                Math.round(grab.panMM[0] + px - grab.atMM[0]),
+                Math.round(grab.panMM[1] + py - grab.atMM[1]),
+              ])
             }}
             onPointerUp={(e) => {
               panGrabbedAt.current = null
