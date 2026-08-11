@@ -8,7 +8,7 @@ Build gate: no engine implementation begins until Lead QA and Meta independently
 
 The contract defines what a valid answer means. This blueprint defines how that answer is produced. A builder must be able to implement the engine from this document without consulting a prototype or choosing missing mathematics.
 
-The prototype is research only. No prototype source is carried. The useful prior result is the independently rerun contact-event proof: support can enter and leave as a concave outline scales, analytic event intervals matched its brute-force oracle, and publication must intersect a lawful interval with the even-millimetre lattice. This blueprint retains that result and replaces the prototype's square-only population, first-fit return, 48-only solve, 310mm ceiling and UI-coupled execution.
+The prototype is research only. No prototype source is carried. The useful prior result is the independently rerun contact-event proof: support can enter and leave as a concave outline scales, analytic event intervals matched its brute-force oracle, and publication must intersect a lawful interval with the even-millimetre lattice. Intervals are settled rather than merely preferred: Lead's committed falsification harness, independently rerun by Meta, proved the old closed form publishes wholly unsupported deep-notch/C/crescent answers and over-constrains a lawful plus/cross answer; the scan path also returns only a first fit and caused the measured UI freeze. This blueprint retains the interval result and replaces the prototype's square-only population, first-fit return, 48-only solve, 310mm ceiling and UI-coupled execution.
 
 ### 0.1 Minimal complete mechanism
 
@@ -113,7 +113,7 @@ An unsuccessful band is an explicit result, not an empty array with ambiguous me
 The upstream Cutout Lab tracer supplies one solid outer outline and drops holes. Therefore the engine accepts exactly one simple closed polygon `P`. Hole semantics, multiple islands and self-intersections are not invented here.
 
 - fewer than three distinct vertices, zero signed area, a self-intersection, multiple rings or a hole ring returns `unsupported-outline`;
-- the EC-12 hollow fixture passes only when this refusal is explicit and deterministic;
+- the EC-12 concavity fixtures are single-ring open C/crescent shapes, not topological holes; donuts remain explicitly excluded by the upstream solid-tracer ruling;
 - transparent image margin is irrelevant because scale is derived from outline coordinates only.
 
 ### 3.2 Canonicalisation without changing geometry
@@ -318,7 +318,7 @@ m ∈ {m0, m0+2, ...} while m ≤ Lσ1
 σpublished = m/L
 ```
 
-Re-evaluate the complete predicates at `σpublished`; a numeric boundary accident fails loudly instead of being rounded into legality. Each published size is a distinct family record. This is upward publication inside a lawful interval, never blind ceiling and never first-fit termination.
+Re-evaluate the complete predicates at `σpublished` in the integer publication domain; a size ships because the exact full-disc predicate clears at that even integer, never because a floating comparison was near a boundary. Each published size is a distinct family record. This is upward publication inside a lawful interval, never blind ceiling and never first-fit termination.
 
 ### 7.5 Binding explanation
 
@@ -451,7 +451,8 @@ It compares the complete canonical family-ID set, coordinates, classification an
 - L/T/triangle-like solids: material-derived partial populations;
 - sliver: vertical or horizontal pair only;
 - diagonal-only two points: rejected as a pivoting/non-pair set;
-- hollow/multiple rings/self-intersection/degenerate outline: explicit deterministic refusal;
+- open concavity (C/crescent): lawful islands and explicit impossibility where applicable;
+- donut/multiple rings/self-intersection/degenerate outline: explicit deterministic refusal;
 - asymmetric protrusion and bottom limb: extremity/zone/limb reporting;
 - boundary tangency: complete disc accepted at exact contact;
 - spec mutations: padding, base pitch, sparse factor and count rederive every answer;
@@ -491,7 +492,7 @@ On the running current snapshot:
 | EC-11 | §11.3 |
 | EC-12 | §§9–11 |
 
-Build in this order, with no build-ahead across a failed gate:
+Build in this order, with no build-ahead across a failed gate. The first milestone is deliberately headless and is the minimum viable algorithm/engine Dan required: formula first, algorithm second, test third, verified portable answer fourth. It does not wait for a screen.
 
 1. public types, canonical outline and deterministic serialisation;
 2. independent oracle skeleton and analytic fixtures;
@@ -499,9 +500,9 @@ Build in this order, with no build-ahead across a failed gate:
 4. contact intervals, falsified against non-monotonic fixtures and oracle;
 5. arrangement derivation and 48/96 same-size coupling;
 6. clearance, binding contacts, side reach, extremities and zones;
-7. complete answer assembly and byte-determinism attacks;
+7. complete answer assembly and byte-determinism attacks — **freeze and independently verify the headless minimum viable engine here**;
 8. runner cache/cancellation and zero-interaction-call proof;
-9. applied proof surface and independent SVG probe;
+9. only after the headless gate passes, add the applied proof surface and independent SVG probe;
 10. seven-cutout, synthetic, performance and visual gates;
 11. Builder, QA and Meta each complete EC-01..EC-12 on one frozen snapshot.
 
