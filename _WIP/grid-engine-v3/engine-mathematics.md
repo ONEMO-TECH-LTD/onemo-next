@@ -362,3 +362,26 @@ per-position survivor masks for every canonical σ × both populations × all si
 canonical traces (C21 inputs), AND the derived family sets (meta's 8 flips prove a single-bit flip
 can change a family — family-level comparison is mandatory). Permanent attacks: 11.6/12/12.4 axis
 + diagonal, staggered-gap intersection, same-σ duplicate, BOT 2×2@144, butterfly four-disc.
+
+## C23 · Predicate authority REVERSED on family-level evidence; field demoted to prefilter
+Meta's retraction, measured: 1,324 candidates corpus-wide, survivor masks differ on 7 (0.53%),
+and on TWO of them a whole product offer appears/disappears (POKE1 & POKE2 1×3@96 T=216: exact
+NO OFFER vs field OFFER). A 0.44mm geometric artefact of the SAMPLING convention invents a
+three-magnet option on real cut-outs. "Below the floor" describes geometry — the support BIT is
+the product output and is fully expressible. Therefore:
+- AUTHORITY: the exact disc-vs-polygon predicate on the INTAKE-QUANTISED outline (integer
+  vertices — L19, Dan's ruling) decides support. No sampling convention exists in the decision
+  path, so C22's digital-object law is DEMOTED from truth to implementation detail of a filter.
+  The only convention left standing is "vertices are integers", which Dan ruled.
+- FILTER ARCHITECTURE (keeps the speed, kills the kernel sprawl): the 1mm DT field runs first;
+  any magnet whose |DT² − 144| is OUTSIDE a proven uncertainty band is decided by the field
+  (provably identical to exact); only magnets INSIDE the band — meta measured 7 of 5,784 — go to
+  the exact predicate. The exact interior branch needs either a stated forward-error filter with
+  exact fallback or a magnitude bound (cross² ≈ 2.7e21 > 2^53 at the ceiling) — meta is measuring
+  which; the fallback, if needed, is ~30 contained lines for ONE predicate, not a kernel.
+- ORACLE GATE REDIRECTED: implementations must agree on EXACT-predicate verdicts (and family
+  sets); mask-vs-mask agreement only certifies the filter tier. My emitted masks
+  (lead-survivor-masks.json, 7 shapes × 20 σ × 8 templates × both pitches) stand as the
+  filter-tier comparison artifact, not the authority gate.
+- C17/C19 status for the record: the band-union ladder is ALREADY adopted (C19, BOT-144 fixture);
+  meta's standing flag is answered, not open.
