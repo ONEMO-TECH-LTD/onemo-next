@@ -460,6 +460,8 @@ The oracle independently:
 
 It compares the complete canonical family-ID set, coordinates, classification and pass/fail facts. It does not share production geometry. The event solver separately proves interval boundaries on analytic fixtures because an even-size oracle cannot prove an interval containing no publishable integer.
 
+The oracle carries one model-identity assertion, not a sampled example: whenever a square outline's manufactured bounds equal an arrangement's padded grid box, all four overhangs are exactly zero at every band and population. Any non-zero result falsifies the flap implementation that Dan ruled.
+
 ### 11.2 Synthetic attacks
 
 - square/circle: arithmetic controls only;
