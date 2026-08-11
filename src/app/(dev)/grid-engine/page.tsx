@@ -149,13 +149,6 @@ export default function GridEnginePage() {
     setBox((b) => (b ? resizeShape(spec, b, next) : b))
   }
 
-  /** A drag changed the shape; the readout follows it rather than the other way round. */
-  const syncSizeFromBox = (b: { w: number; h: number }) => {
-    const longest = Math.round(Math.max(b.w, b.h))
-    setSizeMM(longest)
-    setSizeDraft(String(longest))
-  }
-
   const commitSize = () => {
     const next = Number(sizeDraft)
     if (Number.isFinite(next) && next > 0) setSize(next)
