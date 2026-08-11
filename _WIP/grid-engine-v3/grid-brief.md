@@ -1266,3 +1266,47 @@ ok now reminder the goal was completely ignored " ok now lets build the algorith
 
 among all the slop what precisely relating to the goal and specifically asked for based on the research - and not invented only - what remained in your work that can be reused - or it is not correct?
 
+
+---
+
+## 2026-08-11 · @s62-grid-pixel
+
+**11:18:42**
+
+make sure meta test and validates the work visually and in code using sinthetic shapes for edge cases and my provided cutout images
+
+**11:19:00**
+
+we can even add them to the library so they are not lost and can always be loaded and tested against
+
+**11:23:56**
+
+i am testing the build and it is slow and laggy
+
+**11:24:03**
+
+why?
+
+**11:25:14**
+
+even the engine is not operational in it - it is already laggy? or is it working and we have under the hood computation that is not optimised and l;oads the entire mac ? this can be detrimental to the entire thing if we have mac lgging what will happen to the mobile safari?
+
+**11:26:46**
+
+yes the ui behavior must not be hindered and coupled to instant calculations known error for optimisation we dont need to calculate anything in flight while i change the grid size or do can vas moves
+
+**11:28:10**
+
+what is the calculate fits do  anyway we need to make the size claculation and fit the grid precisely it is suggesting the calculations for precise size and coordinates
+
+**11:28:33**
+
+and thi smust be in steps like all variations of sizes and layouts in each band
+
+**11:29:34**
+
+capture the brief and make sure next engine iteration does that - otherwise test is not conclusive if you only show "fits" - visual proof must be provided by applying the algorithm to the cutout
+
+**11:30:08**
+
+save my briefs to grid-briefs.md
