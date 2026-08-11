@@ -66,6 +66,63 @@ export function canonicalHash(canonicalBytes: string): string {
 }
 
 /**
+ * The SAME hash over the SAME canonical bytes, computed by STREAMING the canonical walk — no
+ * string of the whole answer is ever assembled. A full corpus answer's canonical form exceeds
+ * the JS maximum string length (the duck died in Array.join before any hash existed), so the
+ * one-string path cannot hash a real answer. Identical walk order and identical refusals; the
+ * equality with canonicalHash(canonicalSerialise(v)) is pinned by test.
+ */
+export function canonicalHashOf(value: unknown): string {
+  let h = FNV_OFFSET
+  const feed = (s: string) => {
+    for (let i = 0; i < s.length; i++) {
+      h ^= BigInt(s.charCodeAt(i))
+      h = (h * FNV_PRIME) & U64_MASK
+    }
+  }
+  const walk = (v: unknown): void => {
+    if (v === null) return feed('null')
+    switch (typeof v) {
+      case 'number':
+        return feed(formatNumber(v))
+      case 'string':
+        return feed(JSON.stringify(v))
+      case 'boolean':
+        return feed(v ? 'true' : 'false')
+      case 'undefined':
+        throw new RangeError('canonical output cannot carry undefined — model absence explicitly')
+      case 'object': {
+        if (Array.isArray(v)) {
+          feed('[')
+          for (let i = 0; i < v.length; i++) {
+            if (i > 0) feed(',')
+            walk(v[i])
+          }
+          return feed(']')
+        }
+        const entries = Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        )
+        for (const [k, val] of entries) {
+          if (val === undefined) throw new RangeError(`canonical output cannot carry undefined (key ${k})`)
+        }
+        feed('{')
+        for (let i = 0; i < entries.length; i++) {
+          if (i > 0) feed(',')
+          feed(`${JSON.stringify(entries[i][0])}:`)
+          walk(entries[i][1])
+        }
+        return feed('}')
+      }
+      default:
+        throw new RangeError(`canonical output cannot carry a ${typeof v}`)
+    }
+  }
+  walk(value)
+  return h.toString(16).padStart(16, '0')
+}
+
+/**
  * §9: timing stays in diagnostics and OUTSIDE the canonical answer hash. The hash input is the
  * result with `diagnostics.solveDurationMS` removed; everything else — families, order, evidence,
  * pending questions — is identity.
@@ -83,7 +140,7 @@ export function answerHash(result: object): string {
     }
     return out
   }
-  return canonicalHash(canonicalSerialise(strip(result, '')))
+  return canonicalHashOf(strip(result, ''))
 }
 
 /**

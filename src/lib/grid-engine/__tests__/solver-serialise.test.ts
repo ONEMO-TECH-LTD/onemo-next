@@ -3,7 +3,7 @@
 // iteration order affects answer content. Timing stays in diagnostics and outside the hash."
 
 import { describe, expect, it } from 'vitest'
-import { answerHash, canonicalHash, canonicalSerialise, requestFingerprint } from '../solver/canonical-output'
+import { answerHash, canonicalHash, canonicalHashOf, canonicalSerialise, requestFingerprint } from '../solver/canonical-output'
 
 describe('§9 canonical serialisation', () => {
   it('object key insertion order cannot reach the bytes', () => {
@@ -77,5 +77,19 @@ describe('§9 canonical serialisation', () => {
     expect(
       requestFingerprint({ ...base, spec: { ...base.spec, positionsPerAxis: 11 } }),
     ).not.toBe(fp)
+  })
+})
+
+describe('the streaming hash is the one-string hash', () => {
+  it('canonicalHashOf(v) === canonicalHash(canonicalSerialise(v)) on a structured value', () => {
+    const v = {
+      z: [1, 2.5, -0, 'x', true, null],
+      a: { nested: { deep: [{ k: 'v' }, []] }, n: 1e-9 },
+    }
+    expect(canonicalHashOf(v)).toBe(canonicalHash(canonicalSerialise(v)))
+  })
+  it('refuses undefined and non-finite values exactly like the serialiser', () => {
+    expect(() => canonicalHashOf({ a: undefined })).toThrow(RangeError)
+    expect(() => canonicalHashOf([Number.NaN])).toThrow(RangeError)
   })
 })

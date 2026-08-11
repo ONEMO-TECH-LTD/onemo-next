@@ -66,6 +66,18 @@ function populationOccurrences(
       .map((vi) => `${w.points[vi][0]},${w.points[vi][1]}`)
       .sort()
       .join(';')
+  // identical target-relative boxes recur across windows (the same pair seen from every extent
+  // that contains it) — one exact interval solve per distinct box, not per window edge
+  const intervalCache = new Map<string, ScaleInterval[]>()
+  const intervalsFor = (b: BoxMM): ScaleInterval[] => {
+    const key = `${b.x0},${b.y0},${b.x1},${b.y1}`
+    let ivs = intervalCache.get(key)
+    if (!ivs) {
+      ivs = containmentIntervals(b, outlineCentred, sigmaMax)
+      intervalCache.set(key, ivs)
+    }
+    return ivs
+  }
   for (const w of windows) {
     const edges = adjacencyEdges(w, spec)
     if (edges.length === 0) continue
@@ -79,7 +91,7 @@ function populationOccurrences(
       x1: e.boxMM.x1 - target[0],
       y1: e.boxMM.y1 - target[1],
     }))
-    const perEdge = relBoxes.map((b) => containmentIntervals(b, outlineCentred, sigmaMax))
+    const perEdge = relBoxes.map(intervalsFor)
     // §7.3: sweep event scales; at each distinct boundary the active-edge set can change.
     const eventSigmas = new Set<number>()
     for (const list of perEdge) for (const iv of list) { eventSigmas.add(iv.lo); eventSigmas.add(iv.hi) }
