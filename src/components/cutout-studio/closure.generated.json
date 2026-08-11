@@ -43,8 +43,8 @@
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 54176,
-        "sha256": "0178585f985384c98fd87ce167024e77f30554ac2963a5cc345be32fadca1a57",
+        "bytes": 54302,
+        "sha256": "d356c59aaab41deed9bdcd5f0ff8d393cee555d1f4e62e2a30de5422da270e38",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -246,8 +246,8 @@
       },
       {
         "file": "src/lib/vector-core/clipper-kernel.ts",
-        "bytes": 7321,
-        "sha256": "970b4ccee079a5bde78037fcbbe059349a2f3add72b119fa24a87aaed346fad9",
+        "bytes": 6346,
+        "sha256": "dd8fd6bba1ff08c5c683511bebfbebb9c146e324c405f9b9aae71437dbd2d56c",
         "destination": "src/lib/vector-core/clipper-kernel.ts",
         "layer": "headless"
       },
@@ -274,8 +274,8 @@
       },
       {
         "file": "src/lib/vector-core/paper-kernel.ts",
-        "bytes": 9119,
-        "sha256": "694af1aa8ddf84a80b3e720b8531d64729aa8cdbfd25669df74f9d2cb5e5513b",
+        "bytes": 10776,
+        "sha256": "5aaa49b1739919f73dfcf5c8634e6139e3e81c17898681c44117c1e181b88bc1",
         "destination": "src/lib/vector-core/paper-kernel.ts",
         "layer": "headless"
       },
@@ -301,30 +301,30 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 343045,
-    "closureSha256": "7de14e5378c484c8b426d06bf1765e4c9a65902255c0bc7553521b25e71a6f7d"
+    "totalBytes": 343853,
+    "closureSha256": "4aa3a1b001b18a00e07c2421c3c449174ce77119f11a3ba19db07cab7e19b427"
   },
   "emitted": {
     "route": "/cutout-lab",
     "scope": "route-referenced shared and route assets; not Cutout-exclusive bytes",
     "files": [
       {
-        "file": ".next/static/chunks/1062-d5cc025d18d12a8d.js",
-        "rawBytes": 88354,
-        "gzipBytesEstimate": 22389,
-        "brotliBytesEstimate": 19719
-      },
-      {
-        "file": ".next/static/chunks/3212-489945569ddbf4b0.js",
-        "rawBytes": 21965,
-        "gzipBytesEstimate": 5796,
-        "brotliBytesEstimate": 5205
+        "file": ".next/static/chunks/2615-9e57f96e070b8009.js",
+        "rawBytes": 90065,
+        "gzipBytesEstimate": 22725,
+        "brotliBytesEstimate": 20031
       },
       {
         "file": ".next/static/chunks/3794-3dbd06ff79d82322.js",
         "rawBytes": 222524,
         "gzipBytesEstimate": 60643,
         "brotliBytesEstimate": 49636
+      },
+      {
+        "file": ".next/static/chunks/4454-247a9e21ec1fe83e.js",
+        "rawBytes": 20163,
+        "gzipBytesEstimate": 5369,
+        "brotliBytesEstimate": 4818
       },
       {
         "file": ".next/static/chunks/4500-638f637d16a41042.js",
@@ -339,10 +339,10 @@
         "brotliBytesEstimate": 53670
       },
       {
-        "file": ".next/static/chunks/651-936012f59a476598.js",
-        "rawBytes": 34219,
-        "gzipBytesEstimate": 13597,
-        "brotliBytesEstimate": 12138
+        "file": ".next/static/chunks/651-890b370e0d035ff3.js",
+        "rawBytes": 34334,
+        "gzipBytesEstimate": 13593,
+        "brotliBytesEstimate": 12144
       },
       {
         "file": ".next/static/chunks/9776-d8f9c7623946cb00.js",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-8e0aa93a5ab0a759.js",
-        "rawBytes": 64150,
-        "gzipBytesEstimate": 21251,
-        "brotliBytesEstimate": 18795
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-bc01c9287c926b26.js",
+        "rawBytes": 64108,
+        "gzipBytesEstimate": 21228,
+        "brotliBytesEstimate": 18778
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -375,10 +375,10 @@
         "brotliBytesEstimate": 35158
       },
       {
-        "file": ".next/static/chunks/webpack-2e2d499c8200c2e0.js",
+        "file": ".next/static/chunks/webpack-6bddca03a0574198.js",
         "rawBytes": 5770,
-        "gzipBytesEstimate": 2876,
-        "brotliBytesEstimate": 2530
+        "gzipBytesEstimate": 2877,
+        "brotliBytesEstimate": 2526
       },
       {
         "file": ".next/static/css/407a9bc1bf490e7e.css",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1300550,
-    "gzipBytesEstimate": 364461,
-    "brotliBytesEstimate": 297704
+    "rawBytes": 1300532,
+    "gzipBytesEstimate": 364344,
+    "brotliBytesEstimate": 297614
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Mask, Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
-import { subtractShape } from '@/lib/vector-core/clipper-kernel'
+import { subtractShapePaper } from '@/lib/vector-core/paper-kernel'
 import type { PreparedEffectBase } from '@/lib/effect/prepare-effect'
 import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
@@ -428,7 +428,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const negative = finishMask(negativeRaster, vector)
     if (!negative) throw new Error('Paint eraser shape could not be resolved')
     if (!source.baseShape) throw new Error('Paint eraser has no accepted main shape')
-    const shape = subtractShape(source.baseShape, negative.shape)
+    const shape = subtractShapePaper(source.baseShape, negative.shape)
     if (!shape) throw new Error('Paint eraser removed the whole shape')
     return { mask: subtractMasks(source.base, maskFromShape(negative.shape, w, h)), shape }
   }, [])
@@ -819,7 +819,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     try {
       const nextMask = s.mask ? { data: s.mask.data.slice(), w: s.mask.w, h: s.mask.h, soft: s.mask.soft?.slice() } : null
       const nextDrawn = s.drawn
-      const forMask = nextDrawn ? maskFromShape(nextDrawn.shape, img?.width ?? 1, img?.height ?? 1) : nextMask
+      // History owns the exact accepted mask. The drawn vector restores the outline/editor state;
+      // it must not be rasterized as a substitute matte or Undo/Redo will drift on every prepare.
+      const forMask = nextMask
       const nextPrepared = forMask && img && url
         ? await withTimeout(prepareAI(url, forMask, undefined, edgeFinishRef.current, true), T_COMPUTE_MS, 'restore prepare')
         : null

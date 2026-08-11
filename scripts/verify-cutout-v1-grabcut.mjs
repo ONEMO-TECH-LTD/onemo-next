@@ -299,16 +299,25 @@ async function runBrowser(browserType) {
     await routePage.waitForTimeout(1_000)
     const acceptedPreset = await vectorPreset.inputValue()
     const beforeErase = await canvasPixels()
+    const beforeEraseExact = await canvasData()
     if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-before-paint-erase.png', fullPage: true })
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
+    await routePage.getByRole('button', { name: /Nodes/ }).click()
+    const nodeTargets = routePage.locator('svg circle[fill="transparent"]')
+    const nodesBeforeErase = await nodeTargets.count()
     await routePage.getByRole('button', { name: /Paint erase/ }).click()
     await draw(routePage, [
       { x: box.x + box.width * 0.48, y: box.y + box.height * 0.44 },
       { x: box.x + box.width * 0.78, y: box.y + box.height * 0.70 },
     ], 4)
     await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
+    await routePage.waitForTimeout(1_500)
+    await routePage.getByRole('button', { name: /Nodes/ }).click()
+    const nodesAfterErase = await nodeTargets.count()
+    assert(nodesAfterErase <= nodesBeforeErase + 12, `${browserName}: Paint erase polygonized the accepted outline (${nodesBeforeErase} → ${nodesAfterErase} nodes)`)
     await routePage.getByRole('button', { name: /Vector/ }).click()
     await routePage.waitForTimeout(500)
+    const erasedExact = await canvasData()
     const afterErase = await canvasPixels()
     if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-after-paint-erase.png', fullPage: true })
     let changedInside = 0, changedOutside = 0, minChangedX = beforeErase.width, minChangedY = beforeErase.height, maxChangedX = -1, maxChangedY = -1
@@ -324,7 +333,17 @@ async function runBrowser(browserType) {
     assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: Paint erase replaced the accepted Cutout recipe`)
     await routePage.getByRole('button', { name: /Undo/ }).click()
     await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
+    await routePage.waitForTimeout(1_500)
+    const undoneExact = await canvasData()
+    assert.equal(undoneExact, beforeEraseExact, `${browserName}: Undo did not restore the exact accepted pre-erase canvas`)
     assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: Undo did not restore the accepted Cutout recipe`)
+    await routePage.getByRole('button', { name: /Redo/ }).click()
+    await status.filter({ hasText: /restored next cut/ }).waitFor({ timeout: 60_000 })
+    await routePage.waitForTimeout(1_500)
+    const redoneExact = await canvasData()
+    assert.equal(redoneExact, erasedExact, `${browserName}: Redo did not restore the exact accepted erased canvas`)
+    await routePage.getByRole('button', { name: /Undo/ }).click()
+    await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
 
     // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
     await routePage.getByRole('button', { name: /Vector/ }).click()
@@ -443,7 +462,7 @@ async function runBrowser(browserType) {
     await publicPage.close()
     assert.deepEqual(consoleProblems, [], `${browserName}: GrabCut route must have no console problems`)
     await context.close()
-    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, originalOutput, paintLiveCalibration: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
+    return { browserName, providerLoad, masks: masks.results, finished: masks.finished, routeElapsedMs, originalOutput, paintEraseNodes: [nodesBeforeErase, nodesAfterErase], exactPaintEraseHistory: true, paintLiveCalibration: true, sourceOwnedVectorRecipes: true, opencvRequests: opencvRequests.length }
   } finally {
     await browser.close()
   }

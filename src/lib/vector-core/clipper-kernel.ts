@@ -8,30 +8,12 @@
 //
 // (The same library also backs the manufacturing offset — see lib/effect/offset.ts. ONE engine.)
 
-import { Clipper, JoinType, EndType, FillRule } from '@countertype/clipper2-ts'
-import type { VPath, VShape } from './types'
-import { flattenPath, flattenShape } from './path'
+import { Clipper, JoinType, EndType } from '@countertype/clipper2-ts'
+import type { VPath } from './types'
+import { flattenPath } from './path'
 
 // px → centi-px integers for Clipper64 (integer-robust; 100 = 0.01px precision, far below display tol).
 const ROUND_SCALE = 100
-
-/** Boolean-subtract one finished shape from another through the existing Clipper2 kernel. */
-export function subtractShape(subject: VShape, negative: VShape): VShape | null {
-  const toClipper = (shape: VShape) => flattenShape(shape, 0.25)
-    .filter((ring) => ring.length >= 3)
-    .map((ring) => Clipper.makePathD(ring.flatMap((point) => [point.x, point.y])))
-  const subjectPaths = toClipper(subject)
-  const negativePaths = toClipper(negative)
-  if (!Clipper.intersectD(subjectPaths, negativePaths, FillRule.NonZero, 2).length) return subject
-  const result = Clipper.differenceD(subjectPaths, negativePaths, FillRule.NonZero, 2)
-  const paths = result
-    .filter((path) => path.length >= 3)
-    .map((path) => {
-      const points = path.map((point) => ({ x: point.x, y: point.y }))
-      return { anchors: points.map((point) => ({ p: point, hIn: null, hOut: null, corner: true })) }
-    })
-  return paths.length ? { paths } : null
-}
 
 /**
  * STRAIGHTEN — collapse near-collinear runs to true straight edges, via Clipper2 Ramer-Douglas-Peucker

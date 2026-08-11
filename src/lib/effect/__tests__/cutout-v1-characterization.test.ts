@@ -52,7 +52,7 @@ const dependencies: Record<string, { layer: string; destination: string | null }
   '@/lib/effect/contour': { layer: 'headless', destination: 'src/lib/effect/contour.ts' },
   '@/lib/effect/cutout': { layer: 'browser-adapter', destination: 'src/lib/effect/cutout.ts' },
   '@/lib/effect/geometry-truth': { layer: 'headless', destination: 'src/lib/effect/geometry-truth.ts' },
-  '@/lib/vector-core/clipper-kernel': { layer: 'headless', destination: 'src/lib/vector-core/clipper-kernel.ts' },
+  '@/lib/vector-core/paper-kernel': { layer: 'headless', destination: 'src/lib/vector-core/paper-kernel.ts' },
   '@/lib/effect/mask': { layer: 'browser-adapter', destination: 'src/lib/effect/mask.ts' },
   '@/lib/effect/prepare-effect': { layer: 'browser-adapter', destination: 'src/lib/effect/prepare-effect.ts' },
   '@/lib/effect/segment-ml': { layer: 'browser-adapter', destination: 'src/lib/effect/segment-ml.ts' },
