@@ -701,6 +701,125 @@ arbitrary size, which is how "band 2 holds nothing" appears — a fail size, for
 
 ---
 
+## 14 · THE CHARTER AND THE 08-11 RULINGS
+
+*Added 2026-08-11 on Dan's instruction: "make sure all missing briefs and laws verbatim are captured
+in the docs." Every clause below was given on 08-11 and was absent from this book. The full charter is
+recorded verbatim in `grid-brief.md` under `2026-08-11 · @s62-meta`; the clauses it adds to the law
+are stated here.*
+
+**14.1 — THE CORE MISSION.** *DAN, 08-11 08:26, verbatim, opening the charter:*
+> "Build one small, portable, shape-agnostic Grid Engine for Cutout Lab shapes: Any locked-aspect
+> outline in millimetres enters; the engine determines the lawful grid population, magnet placement,
+> and manufacturing size. No shape-specific rules, manual fitting, or UI-owned geometry."
+>
+> "The Grid Lab is only an admin testing instrument. It is not the product engine and must not become
+> another monolith."
+
+**14.2 — NO SIZE SCANNING. The grid is fixed first and the size only wraps it.** *DAN, 08-11, charter,
+verbatim — stated twice, once as a law and once as a prohibition:*
+> "Grid defines size; size never defines grid. Start from a grid population. Compute the smallest
+> locked-aspect shape scale that lawfully wraps it. **Never scan candidate millimetres to see what
+> grid happens to fit.**"
+>
+> Prohibited: "**Physical-size scanning.**"
+
+This is §11.6 stated as a prohibition. A walk over candidate sizes reaches an answer that cannot name
+the (edge, magnet) pair that set it, which 11.6 requires. *(Recorded because a solved-by-scanning
+implementation was live on 08-11 while a proven event solver sat unused.)*
+
+**14.3 — NO MAXIMALITY.** *DAN, 08-11, charter, verbatim:*
+> "'As many magnets as fit' is forbidden. Magnet count is not the optimisation objective. Coverage may
+> be measured, but the deleted hold-reach guard must not return under another name."
+
+*(This is why the cited placement research is not the engine: Agarwal/Mazo optimise maximum point
+containment, which is precisely this objective.)*
+
+**14.4 — CORNERS AND EDGES BEFORE INTERIOR.** *DAN, 08-11, charter, verbatim:*
+> "Spread and balanced support outrank clustered placement. Interior magnets do not compensate for
+> unsupported tips, sides or extremities."
+
+**14.5 — THE WHOLE DISC MUST FIND MATERIAL.** *DAN, 08-11 10:00, verbatim:*
+> "the magnets sit on the 12mm cell intersections = 24mm padding disc holds magnet in the center so
+> the whole disc must find material support to be integrated"
+
+The atom addresses lawful positions; the continuous contour decides support. Neither is a raster.
+
+**14.6 — INTERACTION IS NEVER COUPLED TO COMPUTATION.** *DAN, 08-11 11:26, verbatim:*
+> "yes the ui behavior must not be hindered and coupled to instant calculations known error for
+> optimisation we dont need to calculate anything in flight while i change the grid size or do can vas
+> moves"
+
+*Context, DAN 11:25:* "this can be detrimental to the entire thing if we have mac lgging what will
+happen to the mobile safari?" — the budget is the phone, not the workstation.
+
+**14.7 — THE SOLVER RETURNS EVERY VARIATION, NOT THE FIRST FIT.** *DAN, 08-11 11:28, verbatim:*
+> "and thi smust be in steps like all variations of sizes and layouts in each band"
+
+**14.8 — A TEST WITHOUT VISUAL PROOF IS INCONCLUSIVE.** *DAN, 08-11 11:29, verbatim:*
+> "capture the brief and make sure next engine iteration does that - otherwise test is not conclusive
+> if you only show "fits" - visual proof must be provided by applying the algorithm to the cutout"
+
+**14.9 — REAL CUT-OUTS, KEPT AS A LIBRARY.** *DAN, 08-11 11:00 and 11:19, verbatim:*
+> "use real images too to actually test"
+>
+> "we can even add them to the library so they are not lost and can always be loaded and tested
+> against"
+
+**14.10 — A CONTESTED DEFINITION BECOMES A SWITCH, NOT A RULING.** *DAN, 08-11 10:33, verbatim:*
+> "why do i need to rule if i never tested the difference in the real life - why noit add all options
+> and test?"
+
+This is how the three open definitions are settled: every candidate is offered on the instrument and
+judged on real shapes. Nothing becomes a product default by argument. *(It supersedes any request for
+a prose ruling on the centre, the band cut-offs or the coverage/balance precedence.)*
+
+**14.11 — NO ROTATION YET, BUT KEEP THE ROTATION-AWARE CENTRE.** *DAN, 08-11 10:18 and 10:36,
+verbatim:*
+> "rotation we have no rotation yet"
+>
+> "keep oriented box in case we want to allow rotation which can be the case"
+
+
+**14.12 — A BAND IS A RANGE TO BE SEARCHED, NOT A SQUARE TO BE TESTED.** *DAN, 08-11 11:38, verbatim
+— the clause that redefines the engine:*
+> "wait the algorithm must analise shape and bands in each band range it must provide answers what
+> combinations fit precisely grid+ shape proportions aspect ratio locked and scalled to fine tune the
+> fit in the band - if the band is not possible to apply minimum using a pair (2 vertical or
+> horizontal p[oints fittin and centering in the shape ) what is the next band and magnet quantity
+> fits ?"
+
+The question the engine answers is therefore **not** "does this band's square fit?" but: *within this
+band's size range, what is the smallest balanced magnet population this locked shape can support, at
+what exact scale and coordinates — and if none, what becomes possible in the next band?*
+
+Binding consequences, each already in Dan's sentence:
+
+- **The population is DISCOVERED, not assumed.** A band offers a range; what the material supports
+  inside it is found. A pair — two magnets, vertical or horizontal, centred in the shape — is the
+  minimum lawful arrangement (11.4), not a special case.
+- **Aspect stays locked and the shape is only scaled** to fine-tune the fit inside the band (2.1).
+- **Exhaustion, then escalation.** If no combination is lawful anywhere in a band's range, the engine
+  moves to the next band and repeats with its larger populations — it does not report "no answer"
+  while a band remains untried.
+- **The stop condition is a found-and-applied match, or a proof that none exists within the 9x9 limit
+  (12.3).**
+
+*Recorded because the implementation live on 08-11 tested three fixed square populations — 2x2, 3x3,
+4x4 — and therefore could not produce the answers this law requires. Dan, same turn: the current
+implementation "tests fixed square populations… so it cannot yet prove the intended algorithm."*
+
+**14.13 — THE MISSION IS TO PROVE THE ALGORITHM, KEEP IT OR FIX IT.** *DAN, 08-11 11:35, verbatim:*
+> "most importantly did you prove the algorithm - the mission was to proove it is keeper and build on
+> it or fix?"
+
+A physical-fit checker is not the engine. What must be proven is that the algorithm *chooses* a
+placement a human would accept, on the real corpus — otherwise the correct verdict is that the fit
+core is retained and the selection method is replaced.
+
+
+---
+
 # OPEN
 
 Nothing here may be decided by inference.

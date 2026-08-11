@@ -4,6 +4,18 @@ Status: authoritative checklist for the next engine iteration
 Authority: Dan's verbatim [`grid-brief.md`](./grid-brief.md) and [`grid-laws.md`](./grid-laws.md)  
 Use: this checklist validates conformance to Dan's original intent. Builder implements every applicable item. QA and Meta independently return a result against every ID. Unchecked, silent or inferred means undelivered.
 
+## Feature map
+
+| Feature | Contract checkpoints |
+|---|---|
+| F1 · Portable inputs and guarded laws | EC-2.*, EC-3.*, EC-4.*, EC-8.1–EC-8.3 |
+| F2 · Band and arrangement enumeration | EC-1.*, EC-5.*, EC-11.1–EC-11.4 |
+| F3 · Candidate measurements and answers | EC-6.*, EC-11.5, EC-12.*, EC-13.* |
+| F4 · Applied comparison instrument | EC-7.*, EC-11.6–EC-11.8 |
+| F5 · Responsive execution and caching | EC-8.4–EC-8.14 |
+| F6 · Real and synthetic proof corpus | EC-9.*, EC-10.*, EC-11.9–EC-11.10 |
+| F7 · Scope boundaries and closure | EC-0.*, EC-14.*, EC-15.* |
+
 ## 0. Checklist evidence protocol
 
 - [ ] **EC-0.1** Every applicable contract ID receives an explicit `PASS` or `FAIL`; no item is omitted.
@@ -37,12 +49,12 @@ Use: this checklist validates conformance to Dan's original intent. Builder impl
 
 - [ ] **EC-3.1** The cutout outline and aspect ratio remain locked.
 - [ ] **EC-3.2** Uniform scale is the only shape transform.
-- [ ] **EC-3.3** The engine never deforms, independently scales axes, rotates, redraws, smooths, erodes or offsets the outline.
+- [ ] **EC-3.3** The engine never deforms, independently scales axes, rotates, redraws, smooths, constructs an eroded/offset outline, exports one or hands one to a drawing library. Exact internal distance/clearance measurement of the guaranteed area remains lawful and never alters the contour.
 - [ ] **EC-3.4** One SVG unit equals one millimetre.
 - [ ] **EC-3.5** Every selected magnet requires its complete 24mm support disc to lie on material.
 - [ ] **EC-3.6** Magnet-centre containment without full-disc containment fails.
 - [ ] **EC-3.7** The smallest offered population is one centred pair. Silent size 1 exists internally but is never offered.
-- [ ] **EC-3.8** All answers publish at lawful even-millimetre steps.
+- [ ] **EC-3.8** Solve and publication remain separate: the solver returns exact lawful scale intervals and their binding edge/magnet events; publication selects the first even millimetre inside each interval, rounding upward only and never blindly rounding outside a narrow lawful interval.
 - [ ] **EC-3.9** No tolerance, epsilon, probe resolution or threshold without named authority may affect an answer.
 
 ## 4. Lattice and band laws
@@ -53,14 +65,14 @@ Use: this checklist validates conformance to Dan's original intent. Builder impl
 - [ ] **EC-4.4** Band 3 has three positions per axis and centres on a magnet.
 - [ ] **EC-4.5** Band 4 has four positions per axis and centres between magnets.
 - [ ] **EC-4.6** Law 9.3a's accepted 96mm asymmetry is preserved; no symmetry correction moves the surviving population.
-- [ ] **EC-4.7** The engine evaluates bands independently in order: 2, then 3, then 4.
+- [ ] **EC-4.7** A bbox-to-band option establishes the starting band; the engine evaluates that band first and escalates to the next band only when the current band yields no lawful match.
 - [ ] **EC-4.8** If one band has no lawful match, the engine continues to the next band and reports why the earlier band failed.
 
 ## 5. Required band search
 
-- [ ] **EC-5.1** The outline bounding box establishes the starting band and starting scale.
-- [ ] **EC-5.2** The engine evaluates every publishable even-millimetre scale inside each band's range.
-- [ ] **EC-5.3** At every scale, the engine evaluates every distinct lawful lattice placement permitted by the field and registration rules.
+- [ ] **EC-5.1** The outline bounding box establishes the starting band through an exposed test option. Every proposed bbox-to-band mapping remains comparable under EC-13.3; none becomes a hidden default.
+- [ ] **EC-5.2** The engine derives every exact lawful scale interval from edge/magnet contact events in one solve, retaining the binding pair. It finds every lawful size in the band without scanning candidate millimetres. Only after solving are the intervals intersected with the even-millimetre publication lattice.
+- [ ] **EC-5.3** For every exact scale interval, the engine evaluates the parity-registered point/gap option required by the band on the one unmoved lattice. Candidates vary by law-generated magnet set, published size, population and centre method—never by freely sliding the lattice.
 - [ ] **EC-5.4** The engine discovers arrangements from supported lattice points without classifying the outline by shape name.
 - [ ] **EC-5.5** The search includes a centred vertical 1×2 pair when supported.
 - [ ] **EC-5.6** The search includes a centred horizontal 2×1 pair when supported.
@@ -69,11 +81,13 @@ Use: this checklist validates conformance to Dan's original intent. Builder impl
 - [ ] **EC-5.9** The search includes material-derived partial populations, including three-point L arrangements, when supported.
 - [ ] **EC-5.10** The search includes larger populations made possible by later steps and bands.
 - [ ] **EC-5.11** A candidate fails when any selected magnet lacks its complete support disc.
-- [ ] **EC-5.12** A candidate fails when the top is unsupported.
-- [ ] **EC-5.13** A candidate fails when a materially significant side remains as an asymmetric flap.
+- [ ] **EC-5.12** Top support is measured and reported for every candidate; it becomes a rejection only after EC-13.5 is ruled.
+- [ ] **EC-5.13** Asymmetric flap/uncovered area is measured and reported for every candidate; it becomes a rejection only after EC-13.6 is ruled.
 - [ ] **EC-5.14** The engine records every lawful candidate and never stops at the first physical fit.
 - [ ] **EC-5.15** The engine never silently selects a winner.
 - [ ] **EC-5.16** A candidate is distinct when its magnet set, registration, centre method, population pitch or published size differs.
+- [ ] **EC-5.17** A physically lawful but bunched population is flagged and applied for per-cell symmetry-balance review. A visually bunched result such as the 130mm star cannot support a keeper verdict even when every disc fits.
+- [ ] **EC-5.18** Tight fit is measured after balance: for the same accepted arrangement, the binding outer cell must hug the outline; a looser size is lawful but not optimal.
 
 ## 6. Candidate output specification
 
@@ -92,7 +106,7 @@ Every returned candidate must contain:
 - [ ] **EC-6.11** Per-side and per-cell material coverage.
 - [ ] **EC-6.12** Top-support result.
 - [ ] **EC-6.13** Uncovered-area or flap measure.
-- [ ] **EC-6.14** Separate symmetry and balance measures.
+- [ ] **EC-6.14** One per-cell symmetry-balance measure about the horizontal and vertical centre lines.
 - [ ] **EC-6.15** Exact rejection reason for a rejected candidate or band.
 - [ ] **EC-6.16** Raw measures remain separate until visual testing settles precedence.
 - [ ] **EC-6.17** No combined score, default centre method or automatic winner is invented.
@@ -116,16 +130,16 @@ Every returned candidate must contain:
 - [ ] **EC-8.1** All computation lives in the engine.
 - [ ] **EC-8.2** The logic/bridge holds values and carries engine answers; it performs no mathematics.
 - [ ] **EC-8.3** The admin shell performs screen interaction and presentation only.
+- [ ] **EC-8.3a** Every write to a law value passes through the one structural guard; QA mutation tests every law key and equivalent write spelling.
 - [ ] **EC-8.4** Pinch performs no solver work.
 - [ ] **EC-8.5** Resize performs no solver work.
 - [ ] **EC-8.6** Pan and canvas drag perform no solver work.
 - [ ] **EC-8.7** Camera movement performs no solver work.
 - [ ] **EC-8.8** Solver work starts only when the outline or a governing grid input changes.
 - [ ] **EC-8.9** Results are cached by outline and complete grid specification.
-- [ ] **EC-8.10** Heavy computation runs outside the browser's main UI thread.
 - [ ] **EC-8.11** The interface remains responsive while a solve is running.
-- [ ] **EC-8.12** Mobile Safari is the performance gate; desktop success alone fails.
-- [ ] **EC-8.13** The iteration records solve duration, long tasks, peak memory and interaction latency on iPhone-class Safari.
+- [ ] **EC-8.12** The complete interaction and solve flow is measured on Mobile Safari; a desktop-only measurement set is incomplete.
+- [ ] **EC-8.13** The deliverable records solve duration, long tasks, peak memory and interaction latency on iPhone-class Safari without inventing a pass threshold.
 - [ ] **EC-8.14** No numeric performance budget is invented. Measurements are returned for Dan's ruling.
 
 ## 9. Required real-cutout deliverables
@@ -159,16 +173,17 @@ Each cutout must be traced, solved, applied and captured at 48mm and 96mm across
 
 ## 11. Algorithm-proof acceptance
 
-- [ ] **EC-11.1** An independent oracle finds no missing candidate defined by §5.
-- [ ] **EC-11.2** The independent oracle finds no invented candidate.
+- [ ] **EC-11.1** An independent oracle constrained to the fixed band, lawful parity registration, selected centre method, one unmoved lattice and no maximality objective finds no missing candidate defined by §5.
+- [ ] **EC-11.2** The same constrained oracle finds no invented candidate and never optimises magnet count.
 - [ ] **EC-11.3** Every accepted disc is fully supported at the published size.
 - [ ] **EC-11.4** Every rejection names the violated contract item.
 - [ ] **EC-11.5** Scaling and transparent margins cannot separate computed and applied geometry.
-- [ ] **EC-11.6** Every real cutout has an applied visual record for every returned candidate.
+- [ ] **EC-11.6** Every real cutout has browsable applied geometry for every candidate, plus a captured visual record for every distinct magnet arrangement and each band's binding/tight candidate; duplicate size steps with the same arrangement need not each produce a screenshot.
 - [ ] **EC-11.7** Visual records expose coverage and balance, not only containment.
 - [ ] **EC-11.8** Slim pair arrangements are visibly demonstrated.
 - [ ] **EC-11.9** An adversarial concave fixture proves legality may appear and later disappear as scale changes.
 - [ ] **EC-11.10** The final evidence names what survived, what failed and whether the complete algorithm is a keeper.
+- [ ] **EC-11.11** The keeper verdict is written only in coverage and per-cell symmetry-balance terms; manufactured millimetres may appear as candidate facts but never as the reason for the verdict.
 
 ## 12. Existing findings that must close
 
@@ -182,8 +197,10 @@ Each cutout must be traced, solved, applied and captured at 48mm and 96mm across
 
 - [ ] **EC-13.1** Centre methods remain comparable options until real evidence supports a product choice.
 - [ ] **EC-13.2** Coverage and symmetry/balance remain separate until their precedence is ruled.
-- [ ] **EC-13.3** Numeric bounding-box thresholds separating band ranges require evidence and Dan's ruling.
+- [ ] **EC-13.3** Bbox-to-band mappings are exposed as comparable test options under law 14.10; the iteration supplies applied evidence and promotes none to a hidden default.
 - [ ] **EC-13.4** The mobile performance budget requires measurements and Dan's ruling.
+- [ ] **EC-13.5** The mechanized definition of `top` and `supported` requires visual evidence and Dan's ruling before it rejects candidates.
+- [ ] **EC-13.6** The mechanized definition and threshold for an asymmetric flap requires visual evidence and Dan's ruling before it rejects candidates.
 
 ## 14. Explicit limitations and exclusions
 
@@ -193,6 +210,8 @@ Each cutout must be traced, solved, applied and captured at 48mm and 96mm across
 - [ ] **EC-14.4** No cutout-outline modification.
 - [ ] **EC-14.5** No manufacturing export.
 - [ ] **EC-14.6** No admin-shell redesign beyond applied visual comparison.
+- [ ] **EC-14.7** Standard/Light mask variation is excluded from this iteration.
+- [ ] **EC-14.8** Straight/dice/diamond pattern variation is excluded from this iteration.
 
 ## 15. Closing deliverables
 
