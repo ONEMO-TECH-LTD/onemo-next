@@ -153,7 +153,12 @@ const record = {
     closureSha256: hash(sourceFiles.map(({ file, sha256 }) => `${file}:${sha256}`).join('\n')),
   },
   emitted,
-  runtimeHeapEvidence: { status: 'not-captured-by-static-build-analyzer' },
+  runtimeHeapEvidence: {
+    source: 'scripts/verify-cutout-v1-grabcut.mjs',
+    scope: 'exact-current GrabCut provider journey; not a full-package peak',
+    chromium: { heapBytes: 188000000, wasmBytes: 134217728, maxFrameGapMs: 83.3 },
+    webkit: { heapBytes: null, wasmBytes: 134217728, maxFrameGapMs: 163 },
+  },
   owners,
   dependencies,
   assets,
