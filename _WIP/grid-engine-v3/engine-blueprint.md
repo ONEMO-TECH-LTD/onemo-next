@@ -95,7 +95,14 @@ SolveResult {
   outlineFacts
   families: MeasuredCutoutVariantFamily[]
   emptyBands: { band, centreMethod, reason }[]
-  diagnostics: { outlinePointCount, solveDurationMS }
+  diagnostics: {
+    outlinePointCount
+    solveDurationMS
+    pendingProductQuestions[]: {
+      id
+      affectedWindows[]: { windowId, componentCount }
+    }
+  }
   offerings: {
     status: complete | separation-policy-unresolved
     rawFamilyIds[]
@@ -104,6 +111,8 @@ SolveResult {
   }
 }
 ```
+
+`pendingProductQuestions` reports only unresolved rulings that would change this answer. It carries no family semantics and participates in no family identity or geometry predicate, but its deterministic order and contents remain serialised and testable. For the disconnected-pair question, one `{ id:'disconnected-union', affectedWindows }` entry lists every window with two or more active components and its component count. The engine still emits the components separately and never emits their union. When Dan rules the question, this diagnostic entry disappears and the ruled arrangement grammar replaces the holding behaviour.
 
 Each family contains every field required by EC-07 plus:
 
@@ -550,6 +559,7 @@ The oracle carries one model-identity assertion, not a sampled example: whenever
 - concave notch crossing a region edge while every region vertex is inside: rejected;
 - complete 2×2 pair-box ring and its filled outer rectangle: identical on solid outlines;
 - disconnected two-pair fixture: records the current two-family result and keeps the product question in §6.4 visible until Dan rules whether their union is one layout;
+- disconnected diagnostic: identifies every affected window deterministically without changing either pair family or emitting their union;
 - twin-fix boundary: 190mm is eligible, 192mm and 194mm are not; changing aspect ratio alone changes no classification;
 - ladder: raw IDs are complete and ordered while unresolved policy produces no fabricated ladder IDs;
 - spec mutations: padding, base pitch, sparse factor and count rederive every answer;
