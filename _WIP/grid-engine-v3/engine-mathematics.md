@@ -476,3 +476,20 @@ TIE ORDERS pinned as fixtures (two builders must not diverge on shapes neither g
 - bbox centre: (min+max)/2 rounds HALF-UP per axis (odd extents land on .5 — the fixture).
 - max clearance: integer argmax with canonical order smallest y, then smallest x (C27) — the
   tied-cells fixture asserts equal-clearance cells resolve identically in every implementation.
+
+## C29 · The thinned-96 phase fix (pixel's block) + the σ reconciliation (meta's option a)
+PHASE FIX — pixel caught my artifact minting a fresh centred 96 lattice (±48 offsets), the exact
+"second lattice" defect Dan killed at 08:13 and ruled in 9.3a: 96 HIDES points on the unmoved 48
+lattice; even 96 runs register in the fixed 24mm gap and are ASYMMETRIC about the centre, with TWO
+phases per axis: {−24,+72} and {−72,+24}; odd 96 runs register on-magnet: {−96,0,+96}. ALL phases
+are enumerated (the engine presents every option; phase selection is never invented) — record keys
+carry `#<phaseX><phaseY>`. Artifact REGENERATED: 26,852 verdicts, 171 fallbacks (0.64%), 2.8s.
+Every prior 96 verdict and coupling in my artifact was invalid; 48 verdicts unchanged.
+
+σ RECONCILIATION (meta's a/b question — answered with the tuple): my "4/4 at 12/25" was NOT the
+2×2@48 ladder key and NOT a binding-axis bug. 12/25 = 192/400 — T=192 enters the canonical union
+from a TALL @96 template (j=y, dim=400) — and per C22's union semantics EVERY template is
+evaluated at EVERY union σ, so the 2×2@48 was tested there and happened to hold. The 2×2@48's own
+ladder key T=144 → 144/296 = 18/37 is IN my artifact and holds 4/4 — identical to meta's two
+independent runs. No disagreement existed: meta compared per-template ladders, my citation was the
+first 4/4 in the sorted UNION. Both keys stand; the union evaluation is C22 doing what it says.
