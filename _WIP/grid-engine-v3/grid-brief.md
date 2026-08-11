@@ -1635,7 +1635,7 @@ what are these claude worktrees million of them marked as numbers?
 
 ---
 
-## 2026-08-11 · @s62-grid-pixel · 60 directives
+## 2026-08-11 · @s62-grid-pixel · 66 directives
 
 **07:44:35**
 
@@ -1855,6 +1855,30 @@ what is the calculate fits do  anyway we need to make the size claculation and f
 **11:28:33**
 
 and thi smust be in steps like all variations of sizes and layouts in each band
+
+**11:40:26**
+
+we must create algorithm deliverables doc - engine-contract so we build and test against it not against whatever you deem is correct
+
+**11:41:45**
+
+yes the contract must be numbered checklist of conditions/laws/limitations/ specs and deliverables
+
+**11:43:00**
+
+the checklist is validation for qa and conformance to original intent and final deliverable must positively confirm each checkpoint
+
+**11:44:35**
+
+send to lead as well to qa against my briefs and laws
+
+**11:46:38**
+
+does the contract provide technical design for implementation of the checklisted scope?
+
+**11:48:17**
+
+we need to design in such a way as to apply /o-necessity and /o-deslop to answer every checklisted item in design and eventually in code - potentially easier would be to group checklists in the contract by category so we can navigate it better and match to specific features
 
 **11:29:34**
 
