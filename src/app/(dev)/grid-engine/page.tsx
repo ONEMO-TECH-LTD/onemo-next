@@ -28,11 +28,8 @@ import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
   fieldSpan,
-  moveShape,
   resizeShape,
-  scaleShape,
   type FieldSummary,
-  type HandleId,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from '@/lib/grid-engine/ui/camera'
@@ -76,18 +73,6 @@ const DEFAULT_BAND_MAGNETS = 2
 const LAUNCH_POSITIONS = 5
 const CUTOUT_OPACITY = 0.55
 
-/** The eight grips, as fractions of the box. Presentation — the engine names them, this places them. */
-const HANDLES: Array<{ id: HandleId; fx: number; fy: number; cursor: string }> = [
-  { id: 'nw', fx: 0, fy: 0, cursor: 'nwse-resize' },
-  { id: 'n', fx: 0.5, fy: 0, cursor: 'ns-resize' },
-  { id: 'ne', fx: 1, fy: 0, cursor: 'nesw-resize' },
-  { id: 'w', fx: 0, fy: 0.5, cursor: 'ew-resize' },
-  { id: 'e', fx: 1, fy: 0.5, cursor: 'ew-resize' },
-  { id: 'sw', fx: 0, fy: 1, cursor: 'nesw-resize' },
-  { id: 's', fx: 0.5, fy: 1, cursor: 'ns-resize' },
-  { id: 'se', fx: 1, fy: 1, cursor: 'nwse-resize' },
-]
-const HANDLE_MM = 6
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
@@ -147,19 +132,10 @@ export default function GridEnginePage() {
   // to the unit. The engine is not involved and does not know a cut-out exists.
   const [cutout, setCutout] = useState<{ url: string; wPx: number; hPx: number } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const [dragging, setDragging] = useState<HandleId | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
-  /**
-   * The box AS IT WAS when the grip was taken. Scaling must be measured from that, never from the
-   * live box: the anchor is derived from the box, so feeding back the box being changed compounds
-   * every frame and the shape runs off the canvas — it reached y = 7404mm before this was caught.
-   */
-  const dragFrom = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
-  /** Where the pointer last was, in mm, while dragging the picture itself. */
-  const panFrom = useRef<[number, number] | null>(null)
   const cutoutInput = useRef<HTMLInputElement>(null)
 
   const loadCutout = useCallback((file: File) => {
@@ -332,37 +308,9 @@ export default function GridEnginePage() {
           onView={onView}
         >
           {cutout && box && (
-            <g
-              onPointerMove={(e) => {
-                if (dragging) {
-                  const origin = dragFrom.current
-                  if (origin) {
-                    const next = scaleShape(spec, origin, dragging, toMM(e))
-                    setBox(next)
-                    syncSizeFromBox(next)
-                  }
-                  return
-                }
-                const from = panFrom.current
-                if (!from) return
-                const [px, py] = toMM(e)
-                setBox(moveShape(box, [px - from[0], py - from[1]]))
-                panFrom.current = [px, py]
-              }}
-              onPointerUp={(e) => {
-                setDragging(null)
-                dragFrom.current = null
-                panFrom.current = null
-                e.currentTarget.releasePointerCapture?.(e.pointerId)
-              }}
-            >
+            <g>
               {asOutline && outline ? (
                 <polygon
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId)
-                    panFrom.current = toMM(e)
-                  }}
-                  style={{ cursor: 'move' }}
                   points={outline
                     .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
                     .join(' ')}
@@ -373,11 +321,6 @@ export default function GridEnginePage() {
                 />
               ) : (
                 <image
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId)
-                    panFrom.current = toMM(e)
-                  }}
-                  style={{ cursor: 'move' }}
                   href={cutout.url}
                   x={box.x}
                   y={box.y}
@@ -397,30 +340,6 @@ export default function GridEnginePage() {
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
-              {HANDLES.map(({ id, fx, fy, cursor }) => {
-                const cx = box.x + fx * box.w
-                const cy = box.y + fy * box.h
-                return (
-                  <rect
-                    key={id}
-                    x={cx - HANDLE_MM / 2}
-                    y={cy - HANDLE_MM / 2}
-                    width={HANDLE_MM}
-                    height={HANDLE_MM}
-                    rx={1}
-                    fill="#ffffff"
-                    stroke="#58c2ff"
-                    strokeWidth={1.5}
-                    vectorEffect="non-scaling-stroke"
-                    style={{ cursor }}
-                    onPointerDown={(e) => {
-                      e.currentTarget.setPointerCapture(e.pointerId)
-                      dragFrom.current = box
-                      setDragging(id)
-                    }}
-                  />
-                )
-              })}
             </g>
           )}
         </GridCanvas>

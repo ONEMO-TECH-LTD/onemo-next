@@ -19,15 +19,12 @@ import {
   cellDiameterMM,
   framedSpanMM,
   magnetsInRegion,
-  moveBoxBy,
   paddedFieldMM,
   registrationOffsetMM,
   resizeBoxToLongest,
-  scaleBoxFromHandle,
   summariseField,
   withMinimumSpan,
   type FieldSummary,
-  type HandleId,
   type PointMM,
   type RegionMM,
 } from './engine'
@@ -75,28 +72,10 @@ export function describeRegion(
   return summariseField(spec.grid, region, layout.magnets)
 }
 
-export type { HandleId } from './engine'
 
-/**
- * Drive a scale from the surface. The shell reports which grip moved and where the pointer is, in
- * millimetres; the engine decides the box. No arithmetic happens on this side of the door.
- */
-export function scaleShape(
-  spec: GridSystemSpec,
-  box: RegionMM,
-  handle: HandleId,
-  pointerMM: PointMM,
-): RegionMM {
-  // The floor is the magnet's own spot — a shape smaller than one cell can hold nothing (law 11.3).
-  return scaleBoxFromHandle(box, handle, pointerMM, cellDiameterMM(spec.grid))
-}
 
-/** Drag a placed shape. Scaffolding — see the engine's note; the product never does this. */
-export function moveShape(box: RegionMM, deltaMM: PointMM): RegionMM {
-  return moveBoxBy(box, deltaMM)
-}
 
-/** Drive the shape's longest side from a surface control. Scaffolding, like moveShape. */
+/** Drive the shape's longest side from a surface control. The shape itself is untouchable. */
 export function resizeShape(spec: GridSystemSpec, box: RegionMM, longestMM: number): RegionMM {
   return resizeBoxToLongest(box, longestMM, cellDiameterMM(spec.grid))
 }
