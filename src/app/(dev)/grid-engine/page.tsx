@@ -26,6 +26,7 @@ import {
 } from '@/lib/grid-engine/spec'
 import { GridCanvas } from './GridCanvas'
 import { moveShape, resizeShape, scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
+import { traceCutout, type OutlineUV } from './trace-cutout'
 import { ZOOM_DEFAULT, ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from './camera'
 import styles from './page.module.css'
 
@@ -121,6 +122,10 @@ export default function GridEnginePage() {
   const [cutout, setCutout] = useState<{ url: string; wPx: number; hPx: number } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [dragging, setDragging] = useState<HandleId | null>(null)
+  /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
+  const [outline, setOutline] = useState<OutlineUV | null>(null)
+  /** Which face of the cut-out is on: the picture, or its outline alone. */
+  const [asOutline, setAsOutline] = useState(false)
   /**
    * The box AS IT WAS when the grip was taken. Scaling must be measured from that, never from the
    * live box: the anchor is derived from the box, so feeding back the box being changed compounds
@@ -132,6 +137,7 @@ export default function GridEnginePage() {
   const cutoutInput = useRef<HTMLInputElement>(null)
 
   const loadCutout = useCallback((file: File) => {
+    void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
@@ -166,6 +172,7 @@ export default function GridEnginePage() {
       return null
     })
     setBox(null)
+    setOutline(null)
   }, [])
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -241,6 +248,19 @@ export default function GridEnginePage() {
           aria-label="Load a cut-out"
         />
 
+        {cutout && (
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={asOutline}
+            onClick={() => setAsOutline((v) => !v)}
+            disabled={!outline}
+            title={outline ? undefined : 'no silhouette in that file'}
+          >
+            outline
+          </button>
+        )}
+
         <span className={styles.spacer} />
 
         {view && (
@@ -307,20 +327,37 @@ export default function GridEnginePage() {
                 e.currentTarget.releasePointerCapture?.(e.pointerId)
               }}
             >
-              <image
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  panFrom.current = toMM(e)
-                }}
-                style={{ cursor: 'move' }}
-                href={cutout.url}
-                x={box.x}
-                y={box.y}
-                width={box.w}
-                height={box.h}
-                opacity={CUTOUT_OPACITY}
-                preserveAspectRatio="none"
-              />
+              {asOutline && outline ? (
+                <polygon
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId)
+                    panFrom.current = toMM(e)
+                  }}
+                  style={{ cursor: 'move' }}
+                  points={outline
+                    .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
+                    .join(' ')}
+                  fill="rgba(88,194,255,0.08)"
+                  stroke="#58c2ff"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : (
+                <image
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId)
+                    panFrom.current = toMM(e)
+                  }}
+                  style={{ cursor: 'move' }}
+                  href={cutout.url}
+                  x={box.x}
+                  y={box.y}
+                  width={box.w}
+                  height={box.h}
+                  opacity={CUTOUT_OPACITY}
+                  preserveAspectRatio="none"
+                />
+              )}
               <rect
                 x={box.x}
                 y={box.y}
