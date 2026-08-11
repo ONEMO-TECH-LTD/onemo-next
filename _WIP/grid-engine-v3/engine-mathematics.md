@@ -326,3 +326,39 @@ the SAME canonical trace inputs (the archived corpus real.json), the same raster
 cell-centre sampling), the same magnet cell rounding (round-half-up per axis), and the same centre
 (bbox) — then the mask-oracle gate compares survivor bitmasks. Tracer variance is a separate,
 later question (it is input fidelity, not engine math).
+
+## C22 · The digital-object law — the raster semantics, fully specified (closes pixel's block)
+L19 makes these DEFINITIONS, not approximations: the product exists at the 1mm floor, so the
+digital object IS the truth, and the continuous trace is analysis. There is no error bar to argue
+— only a convention to fix, identically, in every implementation.
+
+1. MATERIAL: the set of integer points (cell centres, coordinates ∈ Z²) that are inside the
+   manufactured outline by the even-odd rule, evaluated at the exact point (x+0.5, y+0.5) in
+   manufactured mm. On-edge ties resolve by the even-odd crossing test itself (half-open: an edge
+   counts iff it spans the sample's y half-open [y1,y2)); no secondary convention exists.
+2. MAGNET POINT: q̃ rounded half-up per axis to an integer point. Deterministic, stated, shared.
+3. SUPPORT: support(q) ⟺ min over NON-material integer points z of |q−z|² ≥ 144, i.e. the
+   exact integer DT² at q's cell. Distance is centre-to-centre BY DEFINITION — the digital law is
+   lattice arithmetic and has no continuous referent. Equality (nearest gap centre at exactly
+   12mm) PASSES — the digital analogue of Dan's tangency-is-lawful.
+4. Pixel's 11.6/12/12.4 boundary attacks are thereby reclassified: they are sub-floor distinctions
+   with no product meaning; the fixtures are KEPT as DETERMINISM tests — both implementations must
+   return the IDENTICAL verdict on them, whichever it is under rules 1–3.
+
+TEMPLATE naming (pixel's correction, adopted): R in C17/C19 is a PRE-SUPPORT template — a window
+extent/orientation, never a post-support arrangement. Candidates are generated from every
+permitted template, deduped on reduced σ; THEN every population is evaluated at every canonical σ;
+survivor subsets are formed last. (BOT: σ from the band-3 template admits a supported 2×2 subset
+that the 2×2's own extent never generated.)
+
+σ-UNION SCOPE (the one exact sentence pixel required): the canonical σ set is the deduped union
+over BOTH pitches' templates AND all operational bands; BOTH populations are evaluated at every
+member of that union. Coupling is membership of both populations' non-empty option sets at the
+same σ — never at a rounded size.
+
+ORACLE GATE (final form): implementation A = direct digital-disc containment on the 1mm mask
+(stencil of rule 3 expanded literally); implementation B = the EDT predicate. Required identical:
+per-position survivor masks for every canonical σ × both populations × all six centres × seven
+canonical traces (C21 inputs), AND the derived family sets (meta's 8 flips prove a single-bit flip
+can change a family — family-level comparison is mandatory). Permanent attacks: 11.6/12/12.4 axis
++ diagonal, staggered-gap intersection, same-σ duplicate, BOT 2×2@144, butterfly four-disc.
