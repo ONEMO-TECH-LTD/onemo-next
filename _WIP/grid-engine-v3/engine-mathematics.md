@@ -457,3 +457,22 @@ agreement on these keys: lead (this artifact) · pixel's independent oracle · m
    maximising exact clearance, canonical tie order (smallest y, then smallest x) — no continuous
    algebraic search exists to approximate, which is what makes L19 real for the one construction
    that had no rational form. Finite domain, exact comparisons, deterministic by construction.
+
+## C28 · BOT rerun (meta): sequence and ladder-key MATCH; intake now committed; snap is consequential
+Meta's second implementation on the canonical scaling rule reproduces the exact progression
+1/4 → 2/4 → 3/4(L at 120,132) → 4/4 first at T=144 — the C19 fixture doing its work from an
+independent codebase. σ differed (0.4865 vs 12/25) because the canonical TRACE FILE was not
+retrievable by other lanes — my error: it lived in this session's private tmp. FIXED: committed at
+_WIP/grid-engine-v3/evidence/canonical-traces.json — the gate input, one file, all lanes.
+
+SNAP DIFF (meta, measured — pixel's pre-seal demand): ideal vs half-up centres, six methods,
+1,324 candidates each: mask differs 9–30 per method, WHOLE OFFERS FLIP 2–8 per method — including
+the bbox centre (half-integer whenever an extent is odd). Recorded VERBATIM: snapping is
+CONSEQUENTIAL, not small; C24 stands on its actual ground (the snapped answer is exactly correct
+for the centre actually used — a representation rule with product-visible consequences, stated,
+never implied minor). Dan sees this line when centre policy (O-1) is ruled.
+
+TIE ORDERS pinned as fixtures (two builders must not diverge on shapes neither got wrong):
+- bbox centre: (min+max)/2 rounds HALF-UP per axis (odd extents land on .5 — the fixture).
+- max clearance: integer argmax with canonical order smallest y, then smallest x (C27) — the
+  tied-cells fixture asserts equal-clearance cells resolve identically in every implementation.
