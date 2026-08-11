@@ -5,24 +5,41 @@
 // drawing and route-only diagnostics. ZERO policy: no compose calls, no cadence,
 // no runtime engine imports. The Figma shell (I5) must mount on the same flow unchanged.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { PaintConfig } from '@/lib/mask-tools'
 import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
-import { maskOverlay, VECTOR_PRESETS, type VectorPresetName } from './finish'
+import { maskOverlay, VECTOR_PRESETS, type TraceOutlineSettings, type VectorPresetName } from './finish'
 import { useCutoutLabFlow } from './flow'
 import { ThinkingOrb } from 'thinking-orbs'
-import { BLEND_CHIPS, CHIP_RANGE, VEC_CHIPS, type Tab, type Tool } from './ui-config'
+import { BLEND_CHIPS, CHIP_RANGE, type Tab, type Tool } from './ui-config'
 
-export default function CutoutLab() {
-  useEffect(() => {
-    const u = new URL(location.href)
-    // ON-DEVICE CONSOLE (?debug=1): eruda surfaces real device errors (OOM, worker deaths) on the phone.
-    if (u.searchParams.get('debug') === '1') void import('eruda').then((e) => e.default.init())
-    if (u.searchParams.get('admin') === '1') setAdmin(true)
-    flow.actions.warmup() // surface a crash breadcrumb from the prior phone run, if one exists
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+export interface CutoutStudioCalibrationSurface {
+  settings: TraceOutlineSettings
+  setTune: (patch: Partial<TraceOutlineSettings>) => void
+  setDragging: (dragging: boolean) => void
+  hasCut: boolean
+  busy: boolean
+  outputOriginal: boolean
+  outputSourceSize: { w: number; h: number } | null
+  outputPrepareMs: number | null
+  edgeFinishPx: number
+  paintCfg: PaintConfig
+  setOutputOriginal: (enabled: boolean) => void
+  setEdgeFinishPx: (value: number) => void
+  setPaintCfg: (patch: Partial<PaintConfig>) => void
+}
+
+export interface CutoutStudioCalibrationSlots {
+  vectorChips: ReactNode
+  vectorKnob: ReactNode
+  panel: ReactNode
+}
+
+export default function CutoutStudio({ calibration }: {
+  calibration?: (surface: CutoutStudioCalibrationSurface) => CutoutStudioCalibrationSlots
+}) {
   const renderRef = useRef<() => void>(() => {})
   const requestRender = useCallback(() => renderRef.current(), [])
 
@@ -33,12 +50,11 @@ export default function CutoutLab() {
     paintCfg, edgeFinishPx, vectorPreset, outputOriginal, outputSourceSize, outputPrepareMs,
   } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
+  const warmup = flow.actions.warmup
 
   // ── shell-only UI state (presentation + gesture) ──
   const [tool, setTool] = useState<Tool>('add')
   const [tab, setTab] = useState<Tab>('ai')
-  const [admin, setAdmin] = useState(false) // ?admin=1 → route-only calibration panel; set post-mount (no hydration mismatch)
-  const [vecChip, setVecChip] = useState<(typeof VEC_CHIPS)[number]>('detail')
   const [blendChip, setBlendChip] = useState<(typeof BLEND_CHIPS)[number]>('blend')
   const [aspectLocked, setAspectLocked] = useState(true)
   // single-node vector editing (Dan 17:57): select an anchor → its radius/curve knobs
@@ -53,6 +69,7 @@ export default function CutoutLab() {
   const [overlayOn, setOverlayOn] = useState(false) // default OFF — the tint paints a frame-shaped edge over the live result (Dan 14:29)
   const COMET_LIFE_MS = 700 // ms a comet-trail point stays visible
   const overlayRef = useRef(false); overlayRef.current = overlayOn
+  useEffect(() => { warmup() }, [warmup])
   useEffect(() => {
     if (!hasCut && previewRef.current) { previewRef.current = false; setPreview(false) }
   }, [hasCut])
@@ -282,15 +299,18 @@ export default function CutoutLab() {
   }
 
   const { setTune, setBlendTune } = flow.actions
+  const calibrationSlots = calibration?.({
+    settings, setTune, setDragging: flow.actions.setDragging,
+    hasCut, busy, outputOriginal, outputSourceSize, outputPrepareMs,
+    edgeFinishPx, paintCfg,
+    setOutputOriginal: flow.actions.setOutputOriginal,
+    setEdgeFinishPx: flow.actions.setEdgeFinishPx,
+    setPaintCfg: flow.actions.setPaintCfg,
+  })
 
   // adaptive knob wiring (item 10): one knob, bound to the active tab's chip
   const knob = (() => {
-    if (tab === 'vector') {
-      const k = vecChip
-      const [lo, hi] = CHIP_RANGE[k]
-      const value = k === 'detail' ? hi - settings.detail : settings[k] // 'detail' knob is UI-inverted (0 = full)
-      return { label: k === 'detail' ? 'detail (0 = full)' : k, lo, hi, value, set: (v: number) => setTune(k === 'detail' ? { detail: hi - v } : { [k]: v }) }
-    }
+    if (tab === 'vector') return null
     if (tab === 'blend') {
       const k = blendChip
       const [lo, hi] = CHIP_RANGE[k]
@@ -355,7 +375,7 @@ export default function CutoutLab() {
             {vectorPreset == null && <option value="">CUSTOM</option>}
             {VECTOR_PRESETS.map(({ name }) => <option key={name} value={name}>{name}</option>)}
           </select>
-          {admin && VEC_CHIPS.map((k) => (<button key={k} onClick={() => setVecChip(k)} style={chipBtn(vecChip === k)}>{k}</button>))}
+          {calibrationSlots?.vectorChips}
         </>)}
         {tab === 'blend' && (<>
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}
@@ -385,7 +405,7 @@ export default function CutoutLab() {
       </div>
 
       {/* the ONE adaptive knob for the active tab */}
-      {(tab !== 'vector' || admin) && <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
+      {tab === 'vector' ? calibrationSlots?.vectorKnob : knob && <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10, fontSize: 12, color: '#475569' }}>
         <span style={{ fontWeight: 700, minWidth: 90 }}>{knob.label}</span>
         <input type="number" min={knob.lo} max={knob.hi} value={knob.value}
           onChange={(e) => knob.set(Math.max(knob.lo, Math.min(knob.hi, Math.round(+e.target.value))))}
@@ -436,40 +456,7 @@ export default function CutoutLab() {
       <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
         <Stat label="magic cut" value={ms.cut != null ? `${ms.cut}ms` : '—'} />
       </div>
-      {admin && (
-        <div style={{ marginTop: 16, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: '#64748b', marginBottom: 8 }}>⚙️ Cutout calibration (admin)</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: '#475569', width: 92 }}>output source</span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, flex: 1 }}>
-              <input aria-label="original resolution output" type="checkbox" checked={outputOriginal} disabled={!hasCut || busy}
-                onChange={(e) => flow.actions.setOutputOriginal(e.target.checked)} />
-              {outputOriginal ? 'original upload' : 'capped 1536px'}
-            </label>
-            <span style={{ fontSize: 11, fontWeight: 700, minWidth: 110, textAlign: 'right' }}>
-              {outputSourceSize ? `${outputSourceSize.w}×${outputSourceSize.h}` : '—'}
-              {outputPrepareMs != null ? ` · ${outputPrepareMs}ms` : ''}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: '#475569', width: 92 }}>edge finish</span>
-            <input aria-label="shared edge finish" type="range" min={0} max={12} step={1} value={edgeFinishPx} onChange={(e) => flow.actions.setEdgeFinishPx(Number(e.target.value))} style={{ flex: 1 }} />
-            <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{edgeFinishPx}px</span>
-          </div>
-          {[
-            { label: 'swath width', value: paintCfg.swathMult, lo: 0, hi: 12, step: 0.1, display: `${paintCfg.swathMult}×`, set: (value: number) => flow.actions.setPaintCfg({ swathMult: value }) },
-            { label: 'smoothing', value: Math.round(paintCfg.polishStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(paintCfg.polishStrength * 100)}%`, set: (value: number) => flow.actions.setPaintCfg({ polishStrength: value / 100 }) },
-            { label: 'loop-close', value: paintCfg.closeFrac, lo: 0, hi: 1, step: 0.01, display: paintCfg.closeFrac.toFixed(2), set: (value: number) => flow.actions.setPaintCfg({ closeFrac: value }) },
-          ].map(({ label, value, lo, hi, step, display, set }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: '#475569', width: 92 }}>{label}</span>
-              <input aria-label={`Paint ${label}`} type="range" min={lo} max={hi} step={step} value={value} onChange={(e) => set(Number(e.target.value))} style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{display}</span>
-            </div>
-          ))}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Original upload is the default Preview/Save source; the editor/mask stays at 1024px. Edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke.</div>
-        </div>
-      )}
+      {calibrationSlots?.panel}
       <p style={{ marginTop: 12, fontSize: 13, color: '#334155', textAlign: 'center' }}><b>Status:</b> {status}</p>
     </div>
   )
