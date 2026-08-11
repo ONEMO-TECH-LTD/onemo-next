@@ -53,3 +53,48 @@
 - Smallest rework: boolean-subtract at the accepted-shape owner while preserving every non-intersected path segment and its Bezier handles; create new geometry only across the cut boundary. Keep the exact accepted raster mask as the history/preparation truth after erase. Tighten the existing real-route oracle to freeze non-intersected handles/nodes and require exact pre-erase Undo plus exact erased-state Redo.
 - Necessity: shrink the global flatten-and-corner rebuild and the 10,000-pixel tolerance; no second geometry engine, GrabCut edit, UI, provider, or framework is justified.
 - Sufficiency: partial; local boundary removal and recipe preservation pass, but untouched-main geometry and exact history restoration remain missing.
+
+## Superseding review — `ad8af652…` — 2026-08-11
+
+- Exact local/upstream head is `ad8af65234ee460de21a91f5a4ef911596090e6b`, directly after the pushed QA record `e5e0f19e…`; Linear is In QA review.
+- Seven-file correction replaces Paint's Clipper whole-shape polygonization with the existing Paper curve kernel, changes history preparation to the stored exact mask, removes the Clipper Cutout dependency, and strengthens the existing real-route oracle.
+- QA acceptance remains exact: boundary-crossing erase must preserve non-intersected Bezier segments/handles and the accepted recipe, add only bounded cut-boundary nodes, keep the exact raster mask, and make Undo/Redo byte-identical in the same Vector view. Raw GrabCut and unrelated product owners remain unchanged.
+- Independent full changed-file read, same curved-route probe, focused/full static gates, closure regeneration, Chromium/WebKit oracle, and current visual observation are open. QA will edit only its durable record/evidence.
+
+## Source checkpoint — `ad8af652…`
+
+- Full-read all seven changed files and the exact `e5e0f19e…ad8af652…` diff. The replacement is bounded: Paper owns curve-preserving subtraction; Clipper's deleted Cutout subtraction has no surviving caller; `restore` prepares from the cloned stored mask while the stored vector restores editor geometry only.
+- The focused curved-kernel proof freezes retained source-anchor ids and handles, bounded new cut-boundary geometry, no-overlap identity, and cleanup. The browser oracle now bounds added nodes and requires exact Undo and Redo canvas bytes.
+- First independent real-route probe confirms the structural repair: the same curved GrabCut outline changes from 26 to 29 nodes, not the prior 269. CLASSIC stays selected and Redo reproduces the erased canvas exactly.
+- Open falsification: the QA raw-pixel capture still reports 455 pixels different after Undo. Fixed waits and same-view capture did not remove it. This is not yet classified; QA is replacing fixed-delay sampling with stable-state polling and both raw/PNG hashes before deciding whether the product or the harness is wrong.
+
+## Superseded — `ad8af652…`
+
+- Dan rejected this behavior before QA verdict: the newly created erase boundary must receive the active Paint Autotune/smoothing locally after subtraction while untouched receiving-shape geometry remains exact.
+- The stable independent CLASSIC-path record is retained only as historical evidence: 26→29 nodes, CLASSIC preserved, Redo exact, but Undo differed by 455 pixels after both raw and PNG state had settled.
+- QA stopped without CLEAR, commit, or product edit. The next review begins only from Builder's superseding pushed snapshot and includes the local-boundary finishing rule.
+
+## Superseding review — `d63a2a6c…` — 2026-08-11
+
+- Exact local/upstream candidate: `d63a2a6ccd31267b30b8fd96bb2fcced93233328`; Linear moved to In QA review.
+- Governing addition: Paint erase is always an open round ribbon, even when its endpoints nearly meet; it keeps Autotune 50%, Mask smoothing 20%, and the active Vector recipe on the negative before subtraction. Only the largest connected receiving result plus contained holes may publish.
+- Full-read all seven changed files and the complete candidate diff. The executable correction is bounded to `closeFrac: 0` for the erase raster, reuse of the existing Paper boolean owner, and its one-connected-result filter. Paint-shape loop fill is unchanged; raw GrabCut product source is untouched.
+- Source trace: Autotune and mask smoothing shape `negativeRaster`; `finishMask` applies the active Vector recipe to that negative; `subtractShapePaper` imports the resulting boundary while restoring ids only on surviving source anchors; `acceptMask` receives the exact subtracted raster and resolved vector with zero second-pass finishing.
+- Independent gates open: near-returning U/loop; separate ordinary boundary cut; exact untouched anchors/handles, one connected result, recipe/defaults, Undo/Redo, original output, raw GrabCut, full static gates, generated closure, and current-route visual proof.
+
+## Independent runtime finding — `d63a2a6c…`
+
+- Provenance: QA production build from exact local/upstream candidate, served by this worktree on port 4016. Chromium Playwright fallback exercised the real `/cutout-lab?admin=1` route.
+- Near-returning U/loop still removes the loop interior instead of behaving as an open ribbon. In the QA CLASSIC journey, 12,247 of 15,376 pixels (79.6%) in the loop's interior changed; the visible result retains only the car's front section. Builder's own committed PURE journey, rerun independently, produces the same product-visible loss while reporting nodes 30→15.
+- Source cause is exact: `closeFrac: 0` prevents `swathMask` from explicitly filling the gesture, but `finishMask` immediately calls `traceContourRaw`; that tracer intentionally keeps only the largest loop and drops holes. A near-closed ribbon has outer and inner contours, so its inner contour is discarded and the negative becomes a filled region before Paper subtraction.
+- The strengthened browser oracle misses the failure because its permitted local rectangle covers the entire loop interior and its node assertion only caps growth; a destructive 30→15 reduction passes.
+- Separate ordinary boundary journey stays one connected result with CLASSIC selected and bounded geometry (26→16 nodes); Redo reproduces the erased canvas exactly. The focused Paper proof retains untouched source anchors/handles and rejects detached output pieces.
+- Exact CLASSIC Undo remains independently false: after stable raw and PNG sampling in the same Vector view, Undo differs from the accepted pre-erase canvas by 455 pixels. Redo is exact. The committed journey switches to PURE before its history check, so it does not cover the default CLASSIC state.
+- Positive gates: focused 47/47; serialized 548 pass + 10 declared skip; typecheck; scoped lint; diff check; production build; byte-exact closure regeneration (`3d6eb740…`); preservation journey; Chromium/WebKit raw GrabCut, defaults, recipe, original-output and route journey all pass.
+
+### Verdict on `d63a2a6c…`
+
+- **REVISE.** The open-ribbon product correction is not delivered, and exact history fails on the default CLASSIC path.
+- Smallest correction: preserve both contours of the negative ribbon (or its equivalent open-stroke topology) through Vector finishing instead of routing it through the largest-loop-only subject tracer; then subtract that compound negative through the existing Paper owner. Add an interior-preservation assertion for the near-returning gesture and require the retained connected result to be the actual main remainder. Extend exact Undo/Redo proof to the default CLASSIC path.
+- Necessity: shrink the ineffective `closeFrac: 0`-only claim and the permissive node/local-diff oracle; no new geometry engine, UI, provider, GrabCut edit, or framework is justified.
+- Sufficiency: partial; ordinary boundary subtraction, one-result filtering, surviving-geometry handling, recipe/defaults, original output, and raw GrabCut pass, but near-returning ribbon topology and CLASSIC Undo exactness fail.

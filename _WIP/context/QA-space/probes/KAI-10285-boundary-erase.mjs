@@ -8,6 +8,8 @@ assert(baseUrl)
 const fixture = resolve('public/assets/test-artwork.png')
 const evidenceDir = new URL('../evidence/', import.meta.url).pathname
 const viewport = { width: 1280, height: 720 }
+const snapshot = 'd63a2a6ccd31267b30b8fd96bb2fcced93233328'
+const variant = process.env.KAI_10285_GESTURE === 'loop' ? 'loop' : 'boundary'
 
 const draw = async (page, points) => {
   await page.mouse.move(points[0].x, points[0].y)
@@ -31,12 +33,29 @@ try {
     window.__qaCanvas ??= {}
     window.__qaCanvas[key] = new Uint8Array(pixels)
     const digest = await crypto.subtle.digest('SHA-256', pixels)
+    const png = await new Promise((resolveBlob) => node.toBlob(resolveBlob, 'image/png'))
+    if (!png) throw new Error('canvas PNG encoding failed')
+    const pngDigest = await crypto.subtle.digest('SHA-256', await png.arrayBuffer())
     return {
       width: node.width,
       height: node.height,
       sha256: [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join(''),
+      pngSha256: [...new Uint8Array(pngDigest)].map((value) => value.toString(16).padStart(2, '0')).join(''),
     }
   }, name)
+  const stableCanvasState = async (name) => {
+    let previous = null
+    let stableReads = 0
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const current = await canvasState(name)
+      if (current.sha256 === previous?.sha256) stableReads++
+      else stableReads = 0
+      if (stableReads >= 2) return { ...current, settleReads: attempt + 1 }
+      previous = current
+      await page.waitForTimeout(250)
+    }
+    throw new Error(`canvas did not settle for ${name}`)
+  }
   const canvasDiff = async (left, right) => page.evaluate(([a, b]) => {
     const x = window.__qaCanvas[a], y = window.__qaCanvas[b]
     let changedPixels = 0
@@ -45,6 +64,17 @@ try {
     }
     return changedPixels
   }, [left, right])
+  const canvasRegionDiff = async (left, right, region) => page.evaluate(({ a, b, region: r }) => {
+    const x = window.__qaCanvas[a], y = window.__qaCanvas[b]
+    const canvas = document.querySelector('canvas')
+    const [x0, y0, x1, y1] = [Math.floor(canvas.width * r[0]), Math.floor(canvas.height * r[1]), Math.ceil(canvas.width * r[2]), Math.ceil(canvas.height * r[3])]
+    let changedPixels = 0
+    for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) {
+      const i = (py * canvas.width + px) * 4
+      if (x[i] !== y[i] || x[i + 1] !== y[i + 1] || x[i + 2] !== y[i + 2] || x[i + 3] !== y[i + 3]) changedPixels++
+    }
+    return { changedPixels, totalPixels: (x1 - x0) * (y1 - y0) }
+  }, { a: left, b: right, region })
 
   await page.locator('input[type=file]').first().setInputFiles(fixture)
   await status.filter({ hasText: /image ready/ }).waitFor()
@@ -61,44 +91,53 @@ try {
   await page.getByRole('button', { name: /Vector/ }).click()
   const preset = page.getByRole('combobox', { name: 'vector preset' })
   const acceptedPreset = await preset.inputValue()
+  const before = await stableCanvasState('before')
   await page.getByRole('button', { name: /^✋ Edit$/ }).click()
   await page.getByRole('button', { name: /Nodes/ }).click()
   const nodeTargets = page.locator('svg circle[fill="transparent"]')
   const nodesBefore = await nodeTargets.count()
-  const before = await canvasState('before')
-  await page.screenshot({ path: `${evidenceDir}/KAI-10285-boundary-base-current.png`, fullPage: true })
+  await page.screenshot({ path: `${evidenceDir}/KAI-10285-${variant}-base-d63a2a6c.png`, fullPage: true })
 
   await page.getByRole('button', { name: /Paint erase/ }).click()
-  await draw(page, [
-    { x: box.x + box.width * 0.48, y: box.y + box.height * 0.44 },
-    { x: box.x + box.width * 0.78, y: box.y + box.height * 0.70 },
-  ])
+  const erasePoints = variant === 'loop'
+    ? [
+        { x: box.x + box.width * 0.48, y: box.y + box.height * 0.44 },
+        { x: box.x + box.width * 0.76, y: box.y + box.height * 0.46 },
+        { x: box.x + box.width * 0.76, y: box.y + box.height * 0.70 },
+        { x: box.x + box.width * 0.52, y: box.y + box.height * 0.70 },
+        { x: box.x + box.width * 0.50, y: box.y + box.height * 0.47 },
+      ]
+    : [
+        { x: box.x + box.width * 0.48, y: box.y + box.height * 0.44 },
+        { x: box.x + box.width * 0.78, y: box.y + box.height * 0.70 },
+      ]
+  await draw(page, erasePoints)
   await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
   await page.waitForTimeout(750)
-  const erased = await canvasState('erased')
   await page.getByRole('button', { name: /Nodes/ }).click()
   const nodesAfter = await nodeTargets.count()
   await page.getByRole('button', { name: /Vector/ }).click()
+  const erased = await stableCanvasState('erased')
   const erasedPreset = await preset.inputValue()
-  await page.screenshot({ path: `${evidenceDir}/KAI-10285-boundary-erase-current.png`, fullPage: true })
+  await page.screenshot({ path: `${evidenceDir}/KAI-10285-${variant}-erase-d63a2a6c.png`, fullPage: true })
 
   await page.getByRole('button', { name: /Undo/ }).click()
   await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
-  await page.waitForTimeout(750)
-  const undone = await canvasState('undone')
+  const undone = await stableCanvasState('undone')
   await page.getByRole('button', { name: /Redo/ }).click()
   await status.filter({ hasText: /restored next cut/ }).waitFor({ timeout: 60_000 })
-  await page.waitForTimeout(750)
-  const redone = await canvasState('redone')
+  const redone = await stableCanvasState('redone')
 
   const result = {
+    snapshot, variant,
     acceptedPreset, erasedPreset, nodesBefore, nodesAfter,
     before, erased, undone, redone,
     changedAfterUndo: await canvasDiff('before', 'undone'),
     changedAfterRedo: await canvasDiff('erased', 'redone'),
+    loopInteriorDiff: variant === 'loop' ? await canvasRegionDiff('before', 'erased', [0.58, 0.52, 0.70, 0.64]) : null,
     consoleProblems,
   }
-  writeFileSync(`${evidenceDir}/KAI-10285-boundary-erase-current.json`, `${JSON.stringify(result, null, 2)}\n`)
+  writeFileSync(`${evidenceDir}/KAI-10285-${variant}-erase-d63a2a6c.json`, `${JSON.stringify(result, null, 2)}\n`)
   console.log(JSON.stringify(result))
 } finally {
   await browser.close()

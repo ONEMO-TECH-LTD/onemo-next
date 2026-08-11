@@ -274,3 +274,9 @@
 - Undo differs from the pre-erase canvas by 7,524 pixels; Redo differs from the accepted erased canvas by 448. Source confirms complete-subject flattening/corner reconstruction and history preparation from that reconstructed vector rather than the stored mask.
 - Focused 46 tests pass because the new unit case is rectangular and the route oracle permits 10,000 outside-edit pixels without checking handles or exact history.
 - Necessity: replace only the whole-subject rebuild/permissive proof. Sufficiency: partial; local cut and recipe pass, untouched geometry and exact history fail. QA record/evidence/probe are the authorised snapshot; no product source edited.
+
+# 2026-08-11 — KAI-10285 `d63a2a6c…` QA REVISE
+
+- Exact current production route proves `closeFrac: 0` is insufficient: the near-returning U changes 12,247/15,376 loop-interior pixels and visibly leaves only the car's front section. `finishMask → traceContourRaw` drops the ribbon's inner contour, turning it into a filled negative before Paper subtraction.
+- The committed oracle passes the destructive result because its local box covers the loop interior and its node assertion permits reduction. Default CLASSIC Undo also remains 455 pixels non-exact; Redo is exact.
+- Focused 47, serialized 548/10, typecheck/lint/diff/build, byte-exact closure, preservation, original output and raw Chromium/WebKit GrabCut pass. Necessity: no new owner. Sufficiency: partial on ribbon topology and CLASSIC history. QA returns KAI-10285 to Builder; no product source edit.
