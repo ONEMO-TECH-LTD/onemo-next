@@ -27,6 +27,7 @@ import { prepareAI, prepareNative } from './finish'
 import { segmentV531, crashStage, lastCrashStage } from './v531seg'
 import { cancelSegmentML, disposeSegmentML, type MLResult } from '@/lib/effect/segment-ml'
 import { HistoryStack } from '@/lib/cutout-studio/history'
+import { buildCutoutResult, type CutoutResult } from '@/lib/cutout-studio/result'
 import type { EditMode } from './EditorOverlay'
 
 const WORK_MAX = 1024
@@ -40,6 +41,10 @@ const HISTORY_DEPTH = 30          // undo/redo ring size
 const MAX_DPR = 3                 // display-res bake DPR cap (memory floor)
 const MIN_DROPPED_REGION_PX = 60  // shape-truth: >this many dropped px = a disconnected region, warn
 const MIN_ERASE_KEEP_RATIO = 0.1  // never-destroy: an erase leaving <this fraction of the shape reverts
+const sha256Hex = async (bytes: ArrayBuffer): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
 class ToolTimeout extends Error { constructor(what: string, ms: number) { super(`${what} timed out after ${Math.round(ms / 1000)}s`) } }
 function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   return new Promise<T>((res, rej) => {
@@ -117,6 +122,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const preparedRef = useRef<PreparedEffectBase | null>(null)
   const nativePresegRef = useRef<MLResult | null>(null)
   const urlRef = useRef<string | null>(null)
+  const artworkRef = useRef<{ file: File; widthPx: number; heightPx: number } | null>(null)
   const liveBakeRef = useRef<{ canvas: HTMLCanvasElement; bounds: OutlineBounds } | null>(null)
   const settingsRef = useRef(settings); settingsRef.current = settings
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
@@ -496,6 +502,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setOutputSourceSize(null); setOutputPrepareMs(null)
     hasCutRef.current = false
     urlRef.current = url
+    artworkRef.current = { file, widthPx: img.naturalWidth, heightPx: img.naturalHeight }
     imgCanvas.current = master
     histRef.current = new HistoryStack<Snap>(HISTORY_DEPTH)
     setHistTick((t) => t + 1)
@@ -960,6 +967,60 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     })
   }, [awaitFullBake, scheduleBake])
 
+  const exportResult = useCallback(async (): Promise<CutoutResult | null> => {
+    const generation = artworkGen.current
+    const artwork = artworkRef.current
+    const img = imgCanvas.current
+    const mask = maskRef.current ? cloneMask(maskRef.current) : null
+    const shape = shapeRef.current
+    const prepared = preparedRef.current
+    if (!artwork || !img || !mask || !shape || !prepared) return null
+
+    const artworkSha256 = await sha256Hex(await artwork.file.arrayBuffer())
+    if (generation !== artworkGen.current) return null
+    const softLength = mask.soft?.length ?? 0
+    const maskBytes = new Uint8Array(12 + mask.data.length + softLength)
+    const header = new DataView(maskBytes.buffer)
+    header.setUint32(0, mask.w)
+    header.setUint32(4, mask.h)
+    header.setUint32(8, softLength)
+    maskBytes.set(mask.data, 12)
+    if (mask.soft) maskBytes.set(mask.soft, 12 + mask.data.length)
+    const maskSha256 = await sha256Hex(maskBytes.buffer)
+    if (generation !== artworkGen.current) return null
+
+    return buildCutoutResult({
+      finalShape: shape,
+      maskWidthPx: img.width,
+      maskHeightPx: img.height,
+      mmPerPx: prepared.spec.mmPerPx * prepared.spec.maskWidthPx / img.width,
+      artwork: {
+        sha256: artworkSha256,
+        byteLength: artwork.file.size,
+        mediaType: artwork.file.type || 'application/octet-stream',
+        widthPx: artwork.widthPx,
+        heightPx: artwork.heightPx,
+      },
+      mask: {
+        sha256: maskSha256,
+        widthPx: mask.w,
+        heightPx: mask.h,
+        hasSoftAlpha: !!mask.soft,
+      },
+      inputs: {
+        version: 'cutout-inputs/v1',
+        source: outlineSourceRef.current,
+        sourceAdapter: prepared.spec.generator.adapter,
+        vectorPreset: vectorPresetRef.current,
+        vector: { ...settingsRef.current },
+        paint: { ...paintCfgRef.current },
+        edgeFinishPx: edgeFinishRef.current,
+        blend: { ...blendRef.current },
+        outputSource: outputOriginalRef.current ? 'original' : 'capped-1536',
+      },
+    })
+  }, [])
+
   const canBrush = useCallback((tool: string): boolean => {
     // every brush (paint draw/erase + GrabCut add/erase) needs only an image; node/frame edit do not
     return (tool === 'draw' || tool === 'draw-erase' || tool === 'add' || tool === 'erase') && !!imgCanvas.current
@@ -991,6 +1052,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     disposePrepareAICache()
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     urlRef.current = null
+    artworkRef.current = null
     imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
   }, [invalidatePaintCalibration, settleBakes, settleToolQueue])
@@ -1007,7 +1069,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       upload, detect, setTune, setBlendTune, setVectorPreset,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx, setOutputOriginal,
+      undo, redo, clearAll, save, exportResult, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx, setOutputOriginal,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */
