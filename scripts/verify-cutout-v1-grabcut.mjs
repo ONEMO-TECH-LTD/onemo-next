@@ -63,32 +63,32 @@ const providerUrl = `http://127.0.0.1:${server.address().port}/opencv.js`
 const viewport = { width: 1280, height: 720 }
 
 const rawExpected = [
-  ['standalone', 85_116, '24bbd40cf116cd5b1212a311272a1d6d02cb59926e44ce6f7a95268071a9b5ec'],
-  ['refine-add', 91_633, '626749d204cd55537f0a366076dfd379a9cc6881d62a634c120a2326fcd7a254'],
-  ['refine-erase', 85_116, '24bbd40cf116cd5b1212a311272a1d6d02cb59926e44ce6f7a95268071a9b5ec'],
-  ['standalone-repeat', 86_220, '715a7d76b01d7c6289fda9b677ab869ac415540cdeecaf172f2ec4f70def7980'],
+  ['standalone', 83_568, '25818a9ae16ba7c47944abb9bad8ff4061b3b553afa6039bf8724cfac466a768'],
+  ['refine-add', 84_341, '3e22e66044a3d0759d1fbd1971593bac43914f568c62d5b5592f0b2e074ff371'],
+  ['refine-erase', 83_568, '25818a9ae16ba7c47944abb9bad8ff4061b3b553afa6039bf8724cfac466a768'],
+  ['standalone-repeat', 84_300, 'cb8e95bf295df0cc2d217cf3cf466eab8f4bd7379e2519e22d29e34cb0fdb9ab'],
 ]
 const finishedExpected = {
   grabcut: {
-    sourceSha256: 'a8939efe687c90a18311925c4211dd68a8291877956f94485d072143ec47ff78',
-    sourceAfterSha256: 'a8939efe687c90a18311925c4211dd68a8291877956f94485d072143ec47ff78',
-    finishedSha256: '3449afa41c3f3086c08e43498e30897969f9049fe706d5a4fe0d4448ef1c6bbd',
-    intermediatePixels: 21_788,
+    sourceSha256: '1f073c5aabb484f19555bb18fe3f6787ee82fbe00684923abe470ea253896c50',
+    sourceAfterSha256: '1f073c5aabb484f19555bb18fe3f6787ee82fbe00684923abe470ea253896c50',
+    finishedSha256: '279b8b62da620be2d1390ec6e44acce50f61802cdccced775b79cd92338880ba',
+    intermediatePixels: 22_008,
   },
   u2net: {
-    sourceSha256: '4a72924c9c7e9b03c45314bf9b75230cb0d38fce5145e1008b31e2facd140fb7',
-    sourceAfterSha256: '4a72924c9c7e9b03c45314bf9b75230cb0d38fce5145e1008b31e2facd140fb7',
-    finishedSha256: 'f1d1785e1482f01582cdcadcbb935f1878dd4ae6f01a7d05806e49616d046dd4',
-    intermediatePixels: 28_852,
+    sourceSha256: '1edb78d96704cb584fa65b421eb9f017fb1cff7c2018b119392d46dfac62d1cb',
+    sourceAfterSha256: '1edb78d96704cb584fa65b421eb9f017fb1cff7c2018b119392d46dfac62d1cb',
+    finishedSha256: '928ed1f36987a676c16b16d353d8a735ca8583623f0fb5cdacca7560a2136b67',
+    intermediatePixels: 29_104,
   },
 }
 const routeExpected = {
-  chromium: { width: 1189, height: 381, colorType: 6, sha256: 'e75193693a0b61026266a8650edf32107357328a55a124c0b6e677daa6105271' },
-  webkit: { width: 1189, height: 381, colorType: 6, sha256: '8601035da228ed327432b55348a2969f5d2ba0bc9ce325a2600b3da82e6c70cd' },
+  chromium: { width: 1190, height: 347, colorType: 6, sha256: 'ae0ca592cb04228fabf270235d1fcb205440eb981d64ccd70dd573cbbf0d3b56' },
+  webkit: { width: 1189, height: 381, colorType: 6, sha256: 'f9046f77ba04d74df37a2f306d5f0fec77d6c6783a2a5a258404d1abeaeda8fa' },
 }
 const originalRouteExpected = {
-  chromium: { width: 1585, height: 508, colorType: 6, sha256: '436381757e752b143016e6e87ac6dd7be9feadf730a71d228eeb3de5bab0308f' },
-  webkit: { width: 1585, height: 508, colorType: 6, sha256: 'd7913ac6c2b7895a988b2f6a6c0278a18eefb217ada040df861cee117e87bd69' },
+  chromium: { width: 1587, height: 463, colorType: 6, sha256: '215dee3b2956cb6590850cdb7ed73e0f31d4fc3de1b7f1479f61094fab9ba120' },
+  webkit: { width: 1585, height: 507, colorType: 6, sha256: '018a58eaa03994d01c1d77b0fb7bb9aa46b950331d88fb0b4520f68e09191194' },
 }
 
 const pngInfo = (bytes) => ({
