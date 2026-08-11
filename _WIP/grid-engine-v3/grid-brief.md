@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 87 directives
+## 2026-08-11 · @s62-lead · 88 directives
 
 **06:26:48**
 
@@ -1438,6 +1438,10 @@ yes
 **14:26:12**
 
 yes in fact this is so sensible that it can be actually applied by analogy to other complex shapes - measureing by joint pairs makes the model smarter
+
+**14:29:46**
+
+for triangle-like shapes  though we are using 2 options - 2 points top corner and mid bottom for smaller shapes especisally - or 3 points made out of two linked 48mm pairs inline horizontaly and perpendicular pair o nly in  this case for mediu band 2 shapes we dont need mid bottom point and it can be hidden to leave 3 points only m
 
 
 ---
