@@ -470,3 +470,9 @@
 
 
 
+
+/* Copied from the bench build so the saved-corpus control is identical on both surfaces. */
+.librarySelect {
+  width: 132px;
+  text-align: left;
+}

@@ -71,6 +71,17 @@ const SHAPE_STEP_MM = 2
  * The registration is not chosen with it: two across is an EVEN count, and law 9.2 says an even
  * count puts the shape's centre in the gap between magnets — which is what makes the four symmetric.
  */
+/** Dan's real cut-outs, kept with the admin bench so the comparison corpus is repeatable. */
+const CUTOUT_LIBRARY = [
+  'BAT-WOMAN.png',
+  'BOT.png',
+  'BUTTERFLY.png',
+  'DUCK.png',
+  'PILL.png',
+  'POKE1.png',
+  'POKE2.png',
+] as const
+
 const DEFAULT_MATCH_MAGNETS = 2
 /**
  * And it arrives at BAND 3 on its longest side. Dan, 2026-08-11: "the defaiult image cutout load
@@ -208,6 +219,12 @@ export default function GridEnginePage() {
     }
     img.src = url
   })
+
+  const loadLibraryCutout = async (name: (typeof CUTOUT_LIBRARY)[number]) => {
+    const response = await fetch(`/grid-engine/cutouts/${encodeURIComponent(name)}`)
+    if (!response.ok) throw new Error(`Could not load cut-out fixture: ${name}`)
+    loadCutout(new File([await response.blob()], name, { type: 'image/png' }))
+  }
 
   /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
   /**
@@ -387,7 +404,7 @@ export default function GridEnginePage() {
           data-on={Boolean(cutout)}
           onClick={() => (cutout ? clearCutout() : cutoutInput.current?.click())}
         >
-          {cutout ? 'clear' : 'cut-out'}
+          {cutout ? 'clear' : 'upload'}
         </button>
         <input
           ref={cutoutInput}
@@ -401,6 +418,21 @@ export default function GridEnginePage() {
           }}
           aria-label="Load a cut-out"
         />
+
+        <select
+          className={`${styles.input} ${styles.librarySelect}`}
+          value=""
+          aria-label="Load a saved cut-out"
+          onChange={(event) => {
+            const name = event.target.value as (typeof CUTOUT_LIBRARY)[number]
+            if (name) void loadLibraryCutout(name)
+          }}
+        >
+          <option value="">library</option>
+          {CUTOUT_LIBRARY.map((name) => (
+            <option key={name} value={name}>{name.replace('.png', '')}</option>
+          ))}
+        </select>
 
         {cutout && (
           <button
