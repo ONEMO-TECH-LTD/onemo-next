@@ -21,7 +21,6 @@ import type {
   SolveRequest,
 } from './contract'
 import { canonicaliseOutline } from './canonical-outline'
-import type { CanonicalOutline } from './canonical-outline'
 import { CENTRE_METHODS, centreOf } from './centres'
 import { fieldSpanMM, parityTargetOf, pitchOf, registrationOf, windowsFor } from './lattice'
 import type { Window } from './lattice'
@@ -534,7 +533,6 @@ function buildFamily(args: {
   })) as [{ limitMM: number; passes: boolean }, { limitMM: number; passes: boolean }]
 
   const exact = (v: number) => ({ polynomial: [String(v)], isolating: [String(v), String(v)] as [string, string], approx: v })
-  const aspect = (outlineOther(args) / L)
   return {
     familyId,
     band,
@@ -562,8 +560,3 @@ function buildFamily(args: {
   }
 }
 
-function outlineOther(args: { shapeBounds: { x0: number; y0: number; x1: number; y1: number } }): number {
-  const w = args.shapeBounds.x1 - args.shapeBounds.x0
-  const h = args.shapeBounds.y1 - args.shapeBounds.y0
-  return Math.min(w, h)
-}
