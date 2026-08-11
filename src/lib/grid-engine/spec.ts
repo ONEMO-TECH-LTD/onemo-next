@@ -175,10 +175,17 @@ export function selectRegistration(spec: GridSystemSpec, registration: string): 
  * The current released values, frozen. Mutating them in place throws in strict mode rather than
  * corrupting the baseline every derived result is measured against.
  *
- * There is no tolerance here. Dan, 2026-08-10: "tolerance is not required, it affects nothing, we
- * have no tolerance — everything must sit on the exact sizing." The 0.05 that used to sit in this
- * list had no author: a literal read out of `geometry-truth.ts` and written into the law book as a
- * measured fact. It reached exactly one consumer — the panel row displaying it.
+ * There is no tolerance here, and the reason is provenance rather than a rule. Dan's actual words,
+ * 2026-08-10, were four: "tolerance 0.05mm - who invented this?" — a QUESTION. Nobody could answer
+ * it: the 0.05 was a literal read out of `geometry-truth.ts` and written into the law book as a
+ * measured fact, reaching exactly one consumer, the panel row that displayed it. A number with no
+ * author is not law, so it went.
+ *
+ * The sentence that used to stand here — "tolerance is not required, it affects nothing, we have no
+ * tolerance, everything must sit on the exact sizing", attributed to Dan — was NEVER SAID BY HIM. It
+ * exists in no transcript. It was his question rewritten as his ruling, and it was struck from the
+ * law book on 2026-08-11 along with two other fabrications. Quoting him is a claim about the record;
+ * make it only from the record.
  */
 export const RELEASED: GridSystemSpec = Object.freeze({
   grid: Object.freeze({
