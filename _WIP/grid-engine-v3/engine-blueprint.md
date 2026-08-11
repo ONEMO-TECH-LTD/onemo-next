@@ -1,6 +1,6 @@
-# Grid Engine Blueprint — Architecture, Mathematics and Pipeline
+# Grid Engine Blueprint v2 — Architecture, Mathematics and Pipeline
 
-Status: build specification for [`engine-contract.md`](./engine-contract.md)  
+Status: next-version build specification for [`engine-contract.md`](./engine-contract.md)
 Scope: one portable engine that produces measured cutout-variant families  
 Build gate: no engine implementation begins until Lead QA and Meta independently accept this document
 
@@ -8,7 +8,11 @@ Build gate: no engine implementation begins until Lead QA and Meta independently
 
 The contract defines what a valid answer means. This blueprint defines how that answer is produced. A builder must be able to implement the engine from this document without consulting a prototype or choosing missing mathematics.
 
-The prototype is research only. No prototype source is carried. The useful prior result is the independently rerun contact-event proof: support can enter and leave as a concave outline scales, analytic event intervals matched its brute-force oracle, and publication must intersect a lawful interval with the even-millimetre lattice. Intervals are settled rather than merely preferred: Lead's committed falsification harness, independently rerun by Meta, proved the old closed form publishes wholly unsupported deep-notch/C/crescent answers and over-constrains a lawful plus/cross answer; the scan path also returns only a first fit and caused the measured UI freeze. This blueprint retains the interval result and replaces the prototype's square-only population, first-fit return, 48-only solve, 310mm ceiling and UI-coupled execution.
+Provenance boundary: Dan's confirmed requirements define the predicates and outputs. Equations, event construction, graph composition, data structures and optimisations in this blueprint are `DERIVED` engineering mechanisms unless a Dan quotation is explicitly attached. They require independent falsification and may never be restated as his law.
+
+The prototype is research only. No prototype source is carried. The useful prior result is the independently rerun event-interval proof: legality can enter and leave as a concave outline scales, analytic event intervals matched an independent brute-force oracle, and publication must intersect a lawful interval with the even-millimetre lattice. Intervals are settled rather than merely preferred: Lead's committed falsification harness, independently rerun by Meta, proved the old closed form publishes wholly unsupported deep-notch/C/crescent answers and over-constrains a lawful plus/cross answer; the scan path also returns only a first fit and caused the measured UI freeze.
+
+Version 2 changes the solved predicate. Individual disc containment is not the manufacturing answer. Dan's later ruling makes the connected pair the geometric unit: every adjacent horizontal or vertical pair contributes its padding-grown box, those boxes form one union, and the scaled shape must encapsulate that complete union. Pair-box containment both discovers material-derived partial populations and determines lawful scale; the former disc-event pipeline is unnecessary.
 
 ### 0.1 Minimal complete mechanism
 
@@ -17,12 +21,13 @@ One deterministic pipeline is sufficient:
 1. validate and canonicalise one solid outline;
 2. compute the six centre options once;
 3. construct centred run windows on one unmoved lattice;
-4. derive every interval on which each lattice disc is supported;
-5. derive material-supported arrangements from those intervals;
-6. couple 48mm and 96mm arrangements at the same scale and published size;
-7. measure clearance, contacts, per-population grid-box overhangs, extremities and limb candidates;
-8. return every distinct family in canonical order and cache the immutable answer;
-9. apply returned geometry without invoking the solver.
+4. derive closed containment intervals for every adjacent pair's padded box;
+5. sweep those pair states to discover material-supported connected arrangements;
+6. intersect the active pair-box intervals to obtain every arrangement's lawful scale intervals;
+7. couple 48mm and 96mm arrangements at the same scale and published size;
+8. measure contacts, per-population grid-box overhangs, extremities and limb candidates;
+9. return every distinct family in canonical order and cache the immutable answer;
+10. apply returned geometry without invoking the solver.
 
 No shape classifier, free lattice translation, rotation, arbitrary ranking, physical-size input, render-loop calculation, or second production solver exists.
 
@@ -39,8 +44,8 @@ grid-engine/
   canonical-outline.ts validation, canonical ring and immutable edges
   centres.ts           six centre constructions
   lattice.ts           fixed 48 lattice, 96 thinning, parity targets, run windows
-  contacts.ts          analytic support events and lawful intervals per position
-  arrangements.ts      material-derived populations and canonical IDs
+  containment.ts       pair boxes, boundary events and lawful scale intervals
+  arrangements.ts      active-pair components, region unions and canonical IDs
   overhang.ts          grid boxes, flap overhangs, extremities and limb candidates
   solve.ts             deterministic M1–M4 composition only
   canonical-output.ts  stable ordering, fingerprints and byte-stable serialisation
@@ -71,7 +76,7 @@ SolveRequest {
     sparseFactor: 2
     paddingMM: 12
     positionsPerAxis: 9
-    bands: [2, 3, 4]
+    bands: [2, 3]
     centreMethods: [box, oriented-box, area, perimeter, vertices, maximum-clearance]
   }
   flapLimitsMM: [12, 24]
@@ -102,7 +107,7 @@ Each family contains every field required by EC-07 plus:
 - `centreRelationships` for every centre method and both populations, as defined in §8.0;
 - per-axis registration (`point | gap`) because row and column parity can differ;
 - the exact source interval and manufactured-size interval;
-- separate 48/96 topology, coordinates, clearances and binding contacts;
+- separate 48/96 active-pair topology, padded pair boxes, region union, coordinates, implied disc clearances and region binding contacts;
 - per-population padded grid boxes, four overhangs, spread, extremities and outside-box zone records;
 - `floor | intermediate | optimum` as a classification only;
 - a status derived only from the settled hard predicates.
@@ -215,7 +220,7 @@ No millimetre ceiling crosses the public boundary. Both manufactured dimensions 
 
 ### 6.1 Centred run windows
 
-For every band `n∈{2,3,4}` and every extent `1≤r,c≤n`, construct one centred `r×c` window in each population.
+For every operational band `n∈{2,3}` and every extent `1≤r,c≤n`, construct one centred `r×c` window in each population. Band 4 is not enumerated as an offered band; its 168mm span survives only in the separate twin-fix rule and does not create band-4 families.
 
 For pitch `s`, the one-dimensional run is:
 
@@ -233,17 +238,19 @@ There are only `n²` centred extent windows per band. Translated windows are exc
 
 ### 6.2 Material-derived population
 
-At scale `σ`, population `s` for a window is exactly:
+For each window, construct its fixed adjacency graph `G=(V,E)`: `V=W(s,r,c)` and `(q1,q2)∈E` exactly when the two points are horizontal or vertical neighbours one population pitch apart. Diagonals are never edges.
+
+At scale `σ`, an edge is active exactly when its padded pair box is contained:
 
 ```text
-A(s,r,c,σ) = { q ∈ W(s,r,c) : supported against Tκ,r,c,σ(P) }
+Eσ = { e ∈ E : B(e) ⊆ Tκ,r,c,σ(P) }
 ```
 
-Unsupported members drop automatically. Thus a rectangle stays rectangular when supported; an L, T or unequal partial arises only from material. No shape is named or classified.
+The material-derived arrangements are the connected components of `(V,Eσ)` that contain at least one edge. Vertices incident to no active edge disappear. Thus a full rectangle remains rectangular only while all of its connecting pair boxes fit; an L, T, run or unequal partial arises automatically when the material admits exactly those connections. No shape is named and no supported point is deliberately removed.
 
-An arrangement is admissible only when `A` contains at least one horizontal or vertical adjacent pair at that population's pitch. Two diagonal points or two separated points with no pitch-adjacent edge do not satisfy the non-pivoting pair floor.
+The 48mm three-position run and the 96mm sparse pair are generated independently by their own population graphs. `###` has two active 48mm edges; `#.#` has one active 96mm edge. Both occupy the same `120×24mm` padded region, so the sparse pair can be reported as the ruled preferred equivalent without mutating the 48mm arrangement.
 
-Deduplicate equal coordinate sets within the same `(band, centre, population, parity target)` by canonical coordinate-list identity. Retain the smallest canonical extent as provenance when two extents produce the same set; do not emit duplicate arrangements.
+Deduplicate equal components within the same `(band, centre, population, parity target)` by canonical vertex-and-edge identity. Retain the smallest canonical extent as provenance when two windows produce the same component; do not emit duplicates.
 
 ### 6.3 Classification
 
@@ -254,64 +261,92 @@ Deduplicate equal coordinate sets within the same `(band, centre, population, pa
 
 These labels do not sort, rank, discard or gate.
 
+`optimum` is not guaranteed to exist. If no lawful four-corner edge-fit exists for a shape, centre or band, no family receives that label; the result remains truthful and the available intermediate arrangements and pair floor remain present. A later selection stage must degrade through those existing families and may never manufacture an optimum classification.
+
 ### 6.4 Completeness boundary
 
-The generator exhausts every law-authorised centred rectangular extent up to its band and returns the full supported subset of each. It deliberately does not claim to enumerate every mathematical subset of lattice points. A subset requiring a translated run or deliberate omission of supported material is outside the ruled grammar and therefore outside the engine.
+The generator exhausts every law-authorised centred rectangular extent up to its band and returns every connected component produced by its active pair boxes. It deliberately does not enumerate arbitrary mathematical subsets. A layout requiring a translated window or deliberate removal of an active connection is outside the ruled grammar and therefore outside the engine.
 
-## 7. M4 — exact non-monotonic scale solve
+## 7. M4 — exact pair-region containment solve
 
-All calculations below use source coordinates relative to `Cκ` and lattice coordinates relative to target `a`; write these as source vertex `v` and fixed magnet point `q`.
+All calculations use source coordinates relative to `Cκ` and engine coordinates relative to parity target `a`. Write a source vertex as `v`, a fixed lattice point as `q`, and a fixed region point relative to `a` as `b`.
 
-### 7.1 Contact events for one lattice point
+### 7.1 The region being solved
 
-Support can change only when the radius-`R` disc at `q` is tangent to the scaled polygon boundary or its centre crosses that boundary.
-
-For every source vertex `v`, solve:
+For every adjacent horizontal or vertical pair `(q1,q2)` in arrangement `A`, define its closed padded box:
 
 ```text
-||σv - q||² = R²
+B(q1,q2) = [min(q1.x,q2.x)-P, max(q1.x,q2.x)+P]
+           × [min(q1.y,q2.y)-P, max(q1.y,q2.y)+P]
 ```
 
-This is a quadratic in `σ`. Keep every real root in `(0,σmax]`.
-
-For every non-zero edge from `v` to `w`, let `d=w-v`. Tangency to its supporting line satisfies:
+The arrangement region is the exact polygonal union:
 
 ```text
-|cross(d,q) - σ·cross(d,v)| = R·||d||
+Q(A) = union B(q1,q2) over every adjacent pair in A
 ```
 
-This yields at most two linear roots. Boundary crossing uses the same equation with right side `0`. It is safe to over-generate supporting-line roots, but every interval and event endpoint is labelled by the complete point-in-polygon plus clamped point-to-segment support predicate; irrelevant roots cannot create an answer.
+Every retained magnet belongs to at least one adjacent pair. Consequently `Q(A)` contains every complete radius-`P` magnet disc. The central predicate is:
 
-The sorted unique roots plus `0` and `σmax` partition the domain. Test each root and one exact interior witness per open interval. Merge adjacent lawful pieces. The result `I(q)` is the complete union of closed scale intervals on which the full disc at `q` is supported. **Tangency is lawful (`clearance ≥ R`), with no epsilon.** Disjoint intervals are preserved; no monotonicity assumption exists.
+```text
+lawful(A,κ,σ) ⇔ Q(A) ⊆ Tκ,σ(P)
+```
 
-### 7.2 Incremental event sweep
+Containment is closed: touching boundaries are lawful. Because union distributes over containment,
 
-Do not build one global interval partition and re-test every point on every interval.
+```text
+Q(A) ⊆ T(P) ⇔ B(e) ⊆ T(P) for every edge e in A
+```
 
-1. compute `I(q)` independently for every lattice point used by any band/window;
-2. create start/end events tagged by `(population,q)`;
-3. sort once by exact scale, with closed-boundary events before open-interval state changes;
-4. maintain one support bitset per population;
-5. maintain an inverse index from each position to the centred windows containing it;
-6. when a bit changes, recompute only affected windows and emit a new arrangement-state interval when its canonical set changes.
+the solver never needs a general polygon-union Boolean operation. It solves each rectangle exactly, then intersects the resulting intervals. For a complete 2×2, the four boxes form a ring with a `24×24mm` centre hole; testing the four constituent boxes is exact and gives the same containment answer as the union on every solid outline. Per-disc clearance is re-evaluated only as an invariant check.
 
-This makes the sweep proportional to actual contact events and affected windows rather than `all events × all points`.
+### 7.2 Complete containment events for one pair box
 
-### 7.3 Couple both populations at one manufactured size
+For a fixed pair box `B`, the truth of `B ⊆ Tκ,σ(P)` can change only when the rectangle boundary and outline boundary touch. The complete event set contains both vertex-edge directions.
 
-For each `(band, centreMethod, parityTarget)`, intersect arrangement-state intervals from 48 and 96. Form the cross-product of every distinct 48 arrangement and every distinct 96 arrangement whose row and column extents produce that same per-axis parity target. The extents may differ between populations; requiring the same `r,c` would silently discard lawful families. Retain a pair `(A48,A96)` only when both arrangements independently contain a lawful pair.
+For every box corner `b` and source outline edge `[v,w]`, with `d=w-v`, solve the linear collinearity equation:
 
-The two populations share:
+```text
+cross(d, b) - σ·cross(d, v) = 0
+```
 
-- the canonical source outline;
-- centre method;
-- parity target (with separate 48/96 extents);
-- uniform scale;
-- published manufactured size.
+For every source outline vertex `v` and box edge `[b,c]`, with `e=c-b`, solve:
 
-They do not have to contain identical coordinates or magnet counts.
+```text
+σ·cross(e, v) - cross(e, b) = 0
+```
 
-### 7.4 Publication
+Coordinates `b,c` are relative to target `a`. Each equation has form `A-σB=0`: if `B≠0`, retain `σ=A/B` when it is positive, within the count-derived ceiling and the contact lies on both finite closed segments. If `A=B=0`, the supporting lines are collinear for all scales; add the linear endpoint-coincidence scales on the dominant axis so every change in finite-segment overlap is still partitioned. It is safe to retain extra supporting-line roots because the full predicate labels every piece.
+
+The sorted exact roots plus `0` and `σmax` partition the domain. Evaluate every root and one exact witness in every open piece. At an evaluation scale, rectangle containment is exact when:
+
+1. all four box corners are inside or on the manufactured polygon;
+2. split every box edge at all exact intersections with the outline boundary and verify one point from every resulting open subsegment is inside or on the polygon;
+3. reject every proper boundary crossing into exterior material.
+
+The subsegment test is necessary: on a concave outline all four corners can be inside while a notch crosses the middle of a box edge. Since the accepted outline is one solid simple polygon with no holes, these boundary conditions are sufficient for the rectangle interior as well.
+
+Merge adjacent lawful pieces, preserving isolated lawful contact points and disjoint intervals. The result is `I(e)`, the complete closed scale set for one pair box. No monotonicity, bisection or millimetre walk is assumed. Every endpoint retains the exact `(box corner|edge, outline vertex|edge)` contact that opened or closed it.
+
+### 7.3 Arrangement sweep and interval composition
+
+1. compute `I(e)` once for every adjacent pair edge used by any operational window;
+2. create exact start/end events tagged by `(population,e)`;
+3. sort once, with closed-boundary membership evaluated at the event itself;
+4. maintain one active-edge bitset per population;
+5. maintain an inverse index from each edge to the centred windows containing it;
+6. when an edge changes state, recompute connected components only in affected windows;
+7. emit a new arrangement-state interval whenever a component's canonical vertex-and-edge identity changes.
+
+For a component `A`, its lawful scale set is exactly `intersection I(e)` over its active edges. This is also the containment interval of `Q(A)` by §7.1. The sweep therefore discovers the population and solves its manufacturing legality with the same predicate; no second geometry model can disagree.
+
+### 7.4 Couple both populations at one manufactured size
+
+For each `(band, centreMethod, parityTarget)`, intersect containment-lawful arrangement intervals from 48 and 96. Form the cross-product of every distinct 48 arrangement and every distinct 96 arrangement whose row and column extents produce that same per-axis parity target. The extents may differ between populations; requiring the same `r,c` would silently discard lawful families. Retain a pair `(A48,A96)` only when both complete pair-box unions are contained and both arrangements independently contain a lawful pair.
+
+The two populations share the canonical outline, centre method, parity target, uniform scale and published manufactured size. They do not have to contain identical coordinates, regions or magnet counts.
+
+### 7.5 Publication
 
 Let `L=max(sourceBBoxWidth, sourceBBoxHeight)`. A common lawful scale interval `[σ0,σ1]` maps to manufactured longest-side interval `[Lσ0,Lσ1]`.
 
@@ -323,19 +358,19 @@ m ∈ {m0, m0+2, ...} while m ≤ Lσ1
 σpublished = m/L
 ```
 
-Re-evaluate the complete predicates at `σpublished` in the integer publication domain; a size ships because the exact full-disc predicate clears at that even integer, never because a floating comparison was near a boundary. Each published size is a distinct family record. This is upward publication inside a lawful interval, never blind ceiling and never first-fit termination.
+Re-evaluate exact pair-region containment for both populations at `σpublished`. A size ships because both complete regions are contained at that exact even integer, never because a floating comparison was near a boundary. Each published size is a distinct family record. This is upward publication inside a lawful interval, never blind ceiling and never first-fit termination.
 
-Only the source outline's **longest side** publishes as the whole even millimetre `m`. The other manufactured dimension is `m` multiplied by the source bounding-box aspect ratio and is returned exactly; it is never independently rounded. Rounding both dimensions would deform the locked shape and is forbidden.
+Only the source outline's **longest side** publishes as the whole even millimetre `m`. The other manufactured dimension is `m` multiplied by the source bounding-box aspect ratio and is returned exactly; it is never independently rounded.
 
-### 7.5 Binding explanation
+### 7.6 Binding explanation
 
-At the published scale, evaluate every selected magnet against every outline edge and retain the lexicographically first exact minimum tuple:
+Each interval endpoint retains the exact region/outline feature contact that created it. At the published scale, compute the minimum exact boundary separation between `Q(A)` and the manufactured outline for each population and retain the lexicographically first tuple:
 
 ```text
-(clearance, population, magnetCoordinate, edgeIndex, closestOutlinePoint)
+(separation, population, regionFeature, outlineFeature, closestPoints)
 ```
 
-The interval boundary also retains the contact feature that created it. These records make the answer self-explaining and reproducible by the applied proof.
+Also re-evaluate every magnet disc and retain its minimum clearance as an invariant. The region contact explains the manufactured size; the disc clearance proves the implied magnet support. They are distinct fields and may not be renamed into one another.
 
 ## 8. M2 — centre relationship, grid-box flap and limbs
 
@@ -431,17 +466,17 @@ The portable engine is a pure `SolveRequest → SolveResult` function. The web p
 
 Pinch, resize, pan, drag, camera movement and browsing issue zero solve calls. Outline/spec change is the only invalidation trigger. First measure the decoupled cached runner. If a cache miss still creates a main-thread long task or visible input/animation stall, move the unchanged pure request/result boundary into one Web Worker. The worker is a measured execution escalation, never a second engine or a baseline mandate.
 
-Performance evidence records event count, window updates, canonical serialized-result bytes, peak memory, wall time and main-thread long tasks on the largest real trace. Result size is measured at the headless step-7 freeze, before proof-surface work. No unmeasured millisecond or memory budget is invented; any observed interaction stall fails EC-12.
+Performance evidence records event count, window updates, canonical serialized-result bytes, peak memory, wall time and main-thread long tasks on the largest real trace. Result size is measured at the headless step-8 freeze, before proof-surface work. No unmeasured millisecond or memory budget is invented; any observed interaction stall fails EC-12.
 
 ### 10.1 Answer cardinality and browsing
 
-The engine does not prune variants. Its maximum published-size count follows from the count-derived field: at most `fieldSpanMM/2 = 204` even longest-side values at the released spec. For band 4, each parity target has at most four `(r,c)` extents per population, therefore at most `4×4=16` cross-population families per target and `64` across four targets at one size. The released absolute bound is therefore:
+The engine does not prune variants. Its maximum published-size count follows from the count-derived field: at most `fieldSpanMM/2 = 204` even longest-side values at the released spec. A window with `k` vertices can have at most `floor(k/2)` connected components containing an edge. For band 3, summing that bound across the centred extents belonging to each parity target gives at most `6,4,4,2` arrangements per population. Cross-population coupling therefore gives at most `6²+4²+4²+2²=72` families at one size. The released absolute bound is:
 
 ```text
-6 centre methods × 3 bands × 204 even sizes × 64 families = 235,008 families per cutout
+6 centre methods × 2 bands × 204 even sizes × 72 families = 176,256 families per cutout
 ```
 
-Bands 2 and 3 have smaller actual extent counts; deduplication reduces this further, but no implementation may depend on that reduction.
+Band 2 and most band-3 targets have smaller actual extent counts; deduplication reduces this further, but no implementation may depend on that reduction. The headless freeze measures both actual family count and canonical bytes on every real cutout. No count is converted into pruning.
 
 The immutable canonical result remains the ordered family array specified in §2. The runner builds read-only secondary indices keyed by `(band, centreMethod, parityTarget, publishedEvenMM, familyId)` without changing or duplicating answer truth. It exposes filtered ID slices and one-family lookup. The proof UI renders only the current slice and selected family, using list virtualisation; changing a filter or page performs index lookup only. Every family remains addressable and applicable. No cardinality-based truncation, “top N”, implicit ranking or alternative result set is permitted.
 
@@ -453,7 +488,9 @@ The oracle independently:
 
 - constructs the fixed lattices and centred windows from the public request;
 - iterates every publishable even longest-side size derived from the 9-count ceiling;
-- directly transforms the outline and measures every complete disc against every edge;
+- directly transforms the outline and constructs every adjacent-pair-box union;
+- computes the exact polygon difference between each union and the manufactured shape;
+- independently measures every complete disc against every edge as the implied-support invariant;
 - derives material-supported arrangements by the grammar in §6;
 - couples both populations at the same size;
 - independently constructs each population's padded grid box and recomputes all four outline-bounding-box overhangs by direct subtraction.
@@ -464,7 +501,7 @@ The oracle carries one model-identity assertion, not a sampled example: whenever
 
 ### 11.2 Synthetic attacks
 
-- square/circle: arithmetic controls only;
+- square/circle: arithmetic controls only, including exact pair-region containment;
 - reversed winding and rotated start index: identical bytes;
 - transparent image margin: identical outline result;
 - concave C and stepped limb: legality enters then leaves;
@@ -474,15 +511,17 @@ The oracle carries one model-identity assertion, not a sampled example: whenever
 - open concavity (C/crescent): lawful islands and explicit impossibility where applicable;
 - donut/multiple rings/self-intersection/degenerate outline: explicit deterministic refusal;
 - asymmetric protrusion and bottom limb: extremity/zone/limb reporting;
-- boundary tangency: complete disc accepted at exact contact;
+- boundary tangency: pair-region boundary contact accepted exactly;
+- concave notch crossing a region edge while every region vertex is inside: rejected;
+- complete 2×2 pair-box ring and its filled outer rectangle: identical on solid outlines;
 - spec mutations: padding, base pitch, sparse factor and count rederive every answer;
 - unknown centre method: explicit refusal.
 
 ### 11.3 Real applied proof
 
-Run all seven saved cutouts through every centre method, bands 2/3/4, both populations and both flap switches. Every family must be selectable and steppable in canonical order. The SVG proof draws the transformed outline, full discs, coordinates, each population's padded grid box, four overhang segments, extremities, outside-box zones and binding contacts directly from the immutable answer.
+Run all seven saved cutouts through every centre method, operational bands 2/3, both populations and both flap switches. Every family must be selectable and steppable in canonical order. The SVG proof draws the transformed outline, each population's complete pair-box union, full discs, coordinates, padded grid box, four overhang segments, extremities, outside-box zones and binding contacts directly from the immutable answer.
 
-An independent browser probe reads the drawn SVG and recomputes coordinates, full-disc containment, grid boxes, overhangs and contacts without calling production geometry. Screenshot plus numeric probe are both required. A table saying `fits` is not evidence.
+An independent browser probe reads the drawn SVG and recomputes coordinates, pair-region containment, implied full-disc containment, grid boxes, overhangs and contacts without calling production geometry. Screenshot plus numeric probe are both required. A table saying `fits` is not evidence.
 
 ### 11.4 Performance proof
 
@@ -503,9 +542,9 @@ On the running current snapshot:
 | EC-02 | §§2, 5 |
 | EC-03 | §§6–7 |
 | EC-04 | §6 |
-| EC-05 | §§6.2, 7.3 |
-| EC-06 | §§3.3, 7.5 |
-| EC-07 | §§2.2, 5.2, 7.4–7.5 |
+| EC-05 | §§6.2, 7.3–7.4 |
+| EC-06 | §§3.3, 7.1–7.4, 7.6 |
+| EC-07 | §§2.2, 5.2, 7.4–7.6 |
 | EC-08 | §§4, 5.2, 8 |
 | EC-09 | §§8.1–8.4 |
 | EC-10 | §8.5 |
@@ -517,20 +556,22 @@ Build in this order, with no build-ahead across a failed gate. The first milesto
 1. public types, canonical outline and deterministic serialisation;
 2. independent oracle skeleton and analytic fixtures;
 3. centre constructions and fixed lattice/parity tests;
-4. contact intervals, falsified against non-monotonic fixtures and oracle;
-5. arrangement derivation and 48/96 same-size coupling;
-6. clearance, binding contacts, per-population grid boxes, overhangs, extremities and zones;
-7. complete answer assembly and byte-determinism attacks — **freeze and independently verify the headless minimum viable engine here**;
-8. runner cache/cancellation and zero-interaction-call proof;
-9. only after the headless gate passes, add the applied proof surface and independent SVG probe;
-10. seven-cutout, synthetic, performance and visual gates;
-11. Builder, QA and Meta each complete EC-01..EC-12 on one frozen snapshot.
+4. pair-box construction and exact containment intervals, including concave edge-crossing attacks;
+5. active-edge arrangement derivation and non-monotonic component-sweep attacks;
+6. 48/96 same-size coupling;
+7. region binding contacts, implied disc clearances, per-population grid boxes, overhangs, extremities and zones;
+8. complete answer assembly and byte-determinism attacks — **freeze and independently verify the headless minimum viable engine here**;
+9. runner cache/cancellation and zero-interaction-call proof;
+10. only after the headless gate passes, add the applied proof surface and independent SVG probe;
+11. seven-cutout, synthetic, performance and visual gates;
+12. Builder, QA and Meta each complete EC-01..EC-12 on one frozen snapshot.
 
 ## 13. Research disposition
 
 | Prior element | Disposition |
 |---|---|
-| analytic contact events and disjoint lawful intervals | retain as proven method; reimplement fresh |
+| analytic disc-contact events | reject; pair-box containment now discovers arrangements and solves size |
+| event intervals and disjoint lawful pieces | retain as proven method; apply to pair-region containment |
 | even-size interval intersection | retain; enumerate every even size, not first fit |
 | six centre comparison | retain as test options; define exact algorithms here |
 | square-only `centredBand` | reject |
