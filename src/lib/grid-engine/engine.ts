@@ -254,3 +254,18 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
   const cy = box.y + box.h / 2
   return { x: cx - w / 2, y: cy - h / 2, w, h }
 }
+
+/** What a run of magnets measures across, edge to edge, including their padding. Law 11.2. */
+export function bandSpanMM(grid: GridSpec, magnets: number): number {
+  return Math.max(0, magnets - 1) * grid.pitchMM + 2 * grid.paddingMM
+}
+
+/**
+ * What a run of lattice positions occupies WITH ITS MARGIN — the region a camera frames.
+ *
+ * Distinct from the private fieldSpanMM above, which is the magnet block at the released count and
+ * is the field's floor. This one includes the margin, because framing has to show the field ending.
+ */
+export function framedSpanMM(grid: GridSpec, positions: number): number {
+  return Math.max(0, positions - 1) * grid.basePitchMM + 2 * fieldMarginMM(grid)
+}

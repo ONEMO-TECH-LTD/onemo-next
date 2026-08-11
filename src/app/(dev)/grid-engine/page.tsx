@@ -25,9 +25,17 @@ import {
   type WriteRefusal,
 } from '@/lib/grid-engine/spec'
 import { GridCanvas } from './GridCanvas'
-import { moveShape, resizeShape, scaleShape, type FieldSummary, type HandleId } from '@/lib/grid-engine/bridge'
-import { traceCutout, type OutlineUV } from './trace-cutout'
-import { ZOOM_DEFAULT, ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from './camera'
+import {
+  bandSpan,
+  fieldSpan,
+  moveShape,
+  resizeShape,
+  scaleShape,
+  type FieldSummary,
+  type HandleId,
+} from '@/lib/grid-engine/bridge'
+import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -47,11 +55,16 @@ const SHAPE_MIN_MM = 20
 const SHAPE_STEP_MM = 2
 
 /**
- * A loaded cut-out is laid on the canvas at the CLASSIC band — its longest side, so its proportions
- * are untouched (law 2.1a). Presentation only: this places the picture under the magnets so the
- * match can be seen. It is not a size the unit is told, and nothing computes from it.
+ * A loaded cut-out is laid on the canvas at the CLASSIC band — three magnets — on its longest side,
+ * so its proportions are untouched (law 2.1a).
+ *
+ * The band is a COUNT here and its millimetres come from the unit. It used to be the literal 120,
+ * which is (3-1)x48 + 2x12 frozen into the shell: change the padding and the shell would have been
+ * silently wrong, against law 4.2 (change an input and everything re-derives).
  */
-const CLASSIC_BAND_MM = 120
+const CLASSIC_BAND_MAGNETS = 3
+/** Where the camera starts, as a COUNT of lattice positions. The millimetres come from the unit. */
+const LAUNCH_POSITIONS = 5
 const CUTOUT_OPACITY = 0.55
 
 /** The eight grips, as fractions of the box. Presentation — the engine names them, this places them. */
@@ -79,7 +92,11 @@ export default function GridEnginePage() {
   const [unlocked, setUnlocked] = useState<ReadonlySet<GridKey>>(new Set())
   const [refused, setRefused] = useState<WriteRefusal | null>(null)
   // Plain view scale. 1 is fit; it changes what is on screen and nothing about the field.
-  const [zoom, setZoom] = useState(ZOOM_DEFAULT)
+  // Framing, not layout: how much narrower the launch view is than the whole field. Both spans come
+  // from the unit; dividing two lengths to get a camera factor is screen maths, which is this side's.
+  const launchZoom =
+    fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / fieldSpan(RELEASED, LAUNCH_POSITIONS)
+  const [zoom, setZoom] = useState(launchZoom)
   const [view, setView] = useState<FieldSummary | null>(null)
   const onView = useCallback((r: FieldSummary) => setView(r), [])
   // UI-ONLY test fixture. A stand-in shape so the canvas can be driven before the engine lands —
@@ -143,7 +160,7 @@ export default function GridEnginePage() {
     img.onload = () => {
       setCutout({ url, wPx: img.naturalWidth, hPx: img.naturalHeight })
       // Laid on at the classic band, longest side, proportions untouched.
-      const k = CLASSIC_BAND_MM / Math.max(img.naturalWidth, img.naturalHeight)
+      const k = bandSpan(spec, CLASSIC_BAND_MAGNETS) / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * k
       const h = img.naturalHeight * k
       setBox({ x: -w / 2, y: -h / 2, w, h })
@@ -278,7 +295,7 @@ export default function GridEnginePage() {
         >
           −
         </button>
-        <button type="button" className={styles.chip} onClick={() => setZoom(ZOOM_DEFAULT)} aria-label="Fit">
+        <button type="button" className={styles.chip} onClick={() => setZoom(launchZoom)} aria-label="Fit">
           fit
         </button>
         <button

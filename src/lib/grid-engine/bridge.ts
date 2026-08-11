@@ -15,7 +15,9 @@
 // It reads values from Sub 2 and hands them to Sub 1. It holds no values and does no geometry.
 
 import {
+  bandSpanMM,
   cellDiameterMM,
+  framedSpanMM,
   magnetsInRegion,
   moveBoxBy,
   paddedFieldMM,
@@ -97,4 +99,14 @@ export function moveShape(box: RegionMM, deltaMM: PointMM): RegionMM {
 /** Drive the shape's longest side from a surface control. Scaffolding, like moveShape. */
 export function resizeShape(spec: GridSystemSpec, box: RegionMM, longestMM: number): RegionMM {
   return resizeBoxToLongest(box, longestMM, cellDiameterMM(spec.grid))
+}
+
+/** The span of a band, in millimetres — so a surface never has to compute one. */
+export function bandSpan(spec: GridSystemSpec, magnets: number): number {
+  return bandSpanMM(spec.grid, magnets)
+}
+
+/** The span a run of lattice positions occupies with its margin — for framing, never for layout. */
+export function fieldSpan(spec: GridSystemSpec, positions: number): number {
+  return framedSpanMM(spec.grid, positions)
 }

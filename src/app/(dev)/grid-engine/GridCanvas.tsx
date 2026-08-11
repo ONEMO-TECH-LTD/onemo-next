@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { describeRegion, layoutField, type FieldSummary, type RegionMM } from '@/lib/grid-engine/bridge'
 import type { GridSystemSpec } from '@/lib/grid-engine/spec'
-import { viewBox, ZOOM_FIT } from './camera'
+import { viewBox, ZOOM_FIT } from '@/lib/grid-engine/ui/camera'
 import styles from './GridCanvas.module.css'
 
 /** The Figma cell, read from the file: 20mm grey disc · 8mm blue · 6mm white. */
