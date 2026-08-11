@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Fifteen laws. The engine and its algorithm. Nothing else.
+### Sixteen laws. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -248,6 +248,35 @@ That is **L13** confirmed in his own words a second time: inside each band's ran
 **and** every other quantity and layout, across the range between bands.
 
 ---
+
+**L16 — SOLVING NEVER RUNS ON A UI EVENT. Measured, not asserted.**
+*Dan, 08-11 13:27 @lead — after hitting the freeze live on the bench*
+> "there was a problem with computations of the centroid they froze the UI shel cause they were
+> computing hundreds of variants for every ui change - it is no go"
+>
+> "also we need to make sure that current parts that we retain do n ot jit the performance and freeze
+> the build"
+
+**"No go" is a ruling, not a complaint** — the shape of that design may not come back, in any spelling.
+
+**What it cost, measured on a 1,440-point trace (a real cut-out):**
+
+| | |
+|---|---|
+| candidate sizes per method per band | **193** (24→408mm, even) |
+| × 6 centre methods × 3 bands | **3,474 solves per UI event** |
+| outline point re-scales | **5,002,560** |
+| magnet-against-edge distance tests | **48,358,080** |
+| wall time | **163.7ms** — against a 16.7ms frame. **~10 frames dropped per event.** |
+
+**And the second half of the ruling is the one that gets forgotten:** the parts that SURVIVE must not
+do it either. All six centre methods together cost **4.4ms** on the same outline — trivial once,
+ruinous at sixty times a second, where they would eat a quarter of the frame budget before any
+solving began. So: **computed once per frozen outline, cached by outline fingerprint, never during
+pinch, resize, pan, drag, camera movement or variant browsing.** Browsing candidates is a lookup.
+
+*(Contract EC-12 carries this. Recorded here because EC-12 is a checkbox and this is the reason
+behind it — and because the first design to break it did so while satisfying every other law.)*
 
 ## §B — ARCHITECTURE (true, but design — not law the algorithm obeys)
 

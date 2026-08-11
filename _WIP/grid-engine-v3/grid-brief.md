@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 73 directives
+## 2026-08-11 · @s62-lead · 78 directives
 
 **06:26:48**
 
@@ -1381,6 +1381,27 @@ yeah i forgot to emphasise the pair is minimum but engine must caculate in the s
 **12:46:30**  *(meta lane)*
 
 confirm
+
+
+**12:52:00**
+
+i tested 3134 port now and it is freezing the computation on every slider move and ui change was condemnd by me and was supposed to already fixed by pixel it was its design fault - does he work in a separate work tree with those changes applied or this worktree on that port where you work - if separate we need to make sure all the latest changes consolidated and we work in only one worktree yours
+
+**12:57:00**
+
+we need to make sure that we need to actually merge the engine work on centroid before we built the engine
+
+**13:14:00**
+
+i tasked pixel to clean up keep relevant parts and discard the parts we cannot cary into the consolidated build before we build engine based on the contract
+
+**13:20:00**
+
+also we need to make sure that current parts that we retain do n ot jit the performance and freeze the build
+
+**13:27:12**
+
+there was a problem with computations of the centroid they froze the UI shel cause they were computing hundreds of variants for every ui change - it is no go
 
 
 ---
