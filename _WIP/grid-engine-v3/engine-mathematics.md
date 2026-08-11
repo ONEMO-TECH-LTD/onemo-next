@@ -385,3 +385,26 @@ the product output and is fully expressible. Therefore:
   filter-tier comparison artifact, not the authority gate.
 - C17/C19 status for the record: the band-union ladder is ALREADY adopted (C19, BOT-144 fixture);
   meta's standing flag is answered, not open.
+
+## C24 · Final predicate form (pixel's formulation adopted) + the centre-identity rule
+PREDICATE (the only decision law, evaluated ONLY at C19 candidates — no events, roots, intervals):
+    support(q) ⟺ inside(q, P) ∧ min over edges of dist²(q, e) ≥ 144
+    interior-projection branch compared exactly as  cross²(d, q−v) ≥ 144·|d|²   (closed equality)
+Implementation: Number arithmetic with a PROVED forward-error bound; BigInt/rational fallback only
+inside the uncertainty band; fallback frequency and cost MEASURED and reported (meta owns the
+bound/number). Preprocessing at intake: exact duplicate + collinear vertex removal, spatial edge
+index. Per-(candidate, position) verdicts cached BEFORE subset enumeration, so ≤512 subsets per
+window share one predicate pass. The DT field may serve as a prefilter only where provably
+identical to this predicate; it decides nothing near the band.
+
+CENTRE IDENTITY (closes pixel's blocking detail): the six centre constructions are computed
+exactly, then QUANTISED TO INTEGER MILLIMETRES at intake (round-half-up per axis) — the same L19
+status as outline vertices: the product cannot manufacture a sub-millimetre registration, so a
+centre's product identity is its 1mm cell. All downstream quantities are then integer/rational
+(C integer, offsets integer, σ rational), and the predicate's exactness claim is closed. FLAGGED
+to Dan as an L19 derivation (not a new ruling): centre coordinates carry no sub-mm authority.
+
+SEAL STATUS: formula + domain + grammar + predicate agreed across three lanes. Outstanding before
+seal: (1) meta's overflow bound / filter number; (2) pixel's independent oracle run on the
+canonical traces (exact-predicate verdicts + family sets); (3) meta's BOT numbers rerun on the
+canonical trace (C21).
