@@ -33,6 +33,25 @@ export function zoomOut(zoom: number): number {
 }
 
 /**
+ * How much pinch it takes to change the size by a factor of e. Screen feel, not law: it turns a
+ * gesture into a plain factor and knows nothing about millimetres, pitch or padding.
+ */
+const PINCH_RESPONSE = 100
+
+/**
+ * One wheel packet's scale factor.
+ *
+ * MULTIPLICATIVE ON PURPOSE, so packets COMPOSE — exp(a/k)·exp(b/k) = exp((a+b)/k) — and the same
+ * physical gesture lands on the same factor however the browser chops it up. Rounding per packet
+ * cannot do that: it is what made a hundred 0.1s move nothing at all while a single 10 moved 13mm.
+ *
+ * The caller must accumulate this against an UNROUNDED size. Rounding is for what is shown.
+ */
+export function pinchFactor(deltaY: number): number {
+  return Math.exp(deltaY / PINCH_RESPONSE)
+}
+
+/**
  * The view box: the framed region, scaled about ITS OWN CENTRE, then widened — never cropped — to
  * the window's aspect so a millimetre is square on both axes.
  *

@@ -32,7 +32,7 @@ import {
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
-import { ZOOM_FIT } from '@/lib/grid-engine/ui/camera'
+import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -124,6 +124,19 @@ export default function GridEnginePage() {
   const DEFAULT_SIZE_MM = Math.round(bandSpan(RELEASED, DEFAULT_SIZE_BAND))
   const [sizeMM, setSizeMM] = useState(DEFAULT_SIZE_MM)
   const [sizeDraft, setSizeDraft] = useState(String(DEFAULT_SIZE_MM))
+  /**
+   * THE SAME SIZE, UNROUNDED — what a gesture accumulates against so nothing under a millimetre is
+   * lost between packets. It is not a second size: the shown size is always this one rounded, and
+   * any other route that sets the size resets it below.
+   */
+  const sizeExactMM = useRef(DEFAULT_SIZE_MM)
+  /** What a wheel packet does, kept current for a listener that is attached exactly once. */
+  const applyPinch = useRef<(factor: number) => void>(() => {})
+
+  /** Slider, chips, typed number, a load: whatever moved the size, the gesture continues from it. */
+  useEffect(() => {
+    if (Math.round(sizeExactMM.current) !== sizeMM) sizeExactMM.current = sizeMM
+  }, [sizeMM])
 
   /**
    * ONE number for the shape's longest side, and it is the precision instrument: type an exact size
@@ -301,17 +314,31 @@ export default function GridEnginePage() {
    * the gesture never arrives here at all.
    */
   useEffect(() => {
+    applyPinch.current = (factor: number) => {
+      // Accumulate against the UNROUNDED size. Rounding each packet threw the fraction away and then
+      // discarded it, so a hundred 0.1s moved nothing while one 10 moved thirteen millimetres — the
+      // same defect as the drag, in the other gesture.
+      const next = sizeExactMM.current * factor
+      const held = Math.min(maxSpanMM, Math.max(SHAPE_MIN_MM, next))
+      sizeExactMM.current = held
+      setSize(Math.round(held))
+    }
+  })
+
+  // ONE listener, attached once. It used to be re-attached on every render — including every render
+  // a pinch caused — because the effect had no dependency list. It reads through the ref above, so
+  // it needs no dependencies to stay current.
+  useEffect(() => {
     const el = panSurface.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return
       e.preventDefault()
-      const next = Math.round(sizeMM * Math.exp(e.deltaY / 100))
-      setSize(Math.min(maxSpanMM, Math.max(SHAPE_MIN_MM, next)))
+      applyPinch.current(pinchFactor(e.deltaY))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  })
+  }, [])
 
   const lockedCount = ROWS.filter(
     (r) => isSealedInCode(r.key) || isOptionsOnly(r.key) || !unlocked.has(r.key),
