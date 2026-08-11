@@ -82,19 +82,6 @@
 }
 
 .chip {
-  /* inline-flex so a LABEL renders identically to a BUTTON. A button is a flex-ish replaced element
-     with its own centring; a label is plain inline text, so height/padding alone left it a different
-     shape. The cut-out control is a label (a scripted click on a display:none input is blocked in
-     embedded webviews), so both spellings have to sit on this class and look the same. */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  white-space: nowrap;   /* 'cut-out' and 'bat-woman' were wrapping to two lines in the chip */
-  flex: none;
-  /* a <select> carries its own OS chrome; strip it so it reads as a chip like the rest */
-  appearance: none;
-  -webkit-appearance: none;
   height: 28px;
   padding: 0 12px;
   border: 1px solid #e2e8f0;
@@ -481,31 +468,5 @@
   cursor: grabbing;
 }
 
-/* The cut-out file input. NOT `hidden` / display:none — a label cannot open one of those in an
-   embedded webview, and that is where this surface is actually used. Off-screen but present. */
-.fileInput {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
 
-/* The cut-out control: the file input IS the chip, laid over it at full size and fully transparent.
-   Nothing is hidden and nothing is activated by script, so neither the webview block on scripted
-   clicks nor Safari's refusal to activate off-screen inputs can apply. */
-.chipFile {
-  composes: chip;
-  position: relative;
-  overflow: hidden;
-}
 
-.chipFile input[type='file'] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  font-size: 0;
-}
