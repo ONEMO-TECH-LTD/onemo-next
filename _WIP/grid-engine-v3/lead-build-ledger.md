@@ -27,3 +27,10 @@
   lead 0.64% T-scaled), centre quantisation (rational/irrational split), canonical intake unit×400.
 - Artifacts for the three-way gate: lead-exact-verdicts.json (19,180), pixel oracle in progress,
   meta rerun pending. Seal after three-way agreement.
+- Authority reconciliation CLEAR @ 77cde0ed: pixel's subtractive amendment (488 stale lines out,
+  no parallel solver) brought contract + blueprint into full conformance with the sealed
+  mathematics; my QA found 4 findings (intake reference length, duplicate tightnessContacts,
+  missing quadrant evidence, 2 wording lines), all fixed in one round; pixel also caught my wrong
+  ">= ceiling" arithmetic in my own replacement text. Chain consistent: math paper → contract →
+  blueprint. Awaiting Dan: butterfly ruling (~25% of answer keys), centre policy, ladder
+  separation, ordering — and build authorization.
