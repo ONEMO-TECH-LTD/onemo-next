@@ -13,7 +13,13 @@
 // bridge into the engine, and the unit has no idea it exists.
 
 import { useEffect, useRef, useState } from 'react'
-import { describeRegion, layoutField, type FieldSummary, type RegionMM } from '@/lib/grid-engine/bridge'
+import {
+  atomSpan,
+  describeRegion,
+  layoutField,
+  type FieldSummary,
+  type RegionMM,
+} from '@/lib/grid-engine/bridge'
 import type { GridSystemSpec } from '@/lib/grid-engine/spec'
 import { viewBox, ZOOM_FIT } from '@/lib/grid-engine/ui/camera'
 import styles from './GridCanvas.module.css'
@@ -41,9 +47,6 @@ const CELL_STROKE = 'var(--magnet-stroke)'
  * There is no 10mm level in the design; that one was mine, and it is the level that can never align
  * with a 48mm lattice.
  */
-/** The notepad's fine rule is the ATOM — 12mm (law 10.6b). Dan: "the canvas also must have notepad
- *  grid of 12mm not 24mm to match the atomic laws". */
-const RULE_FINE_MM = 12
 /** Ink follows the theme; the surface it is drawn on is not always white. */
 const RULE_FINE_STROKE = 'var(--rule-fine)'
 const PITCH_RULE_STROKE = 'var(--rule-pitch)'
@@ -105,8 +108,11 @@ export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, panMM, onView, chi
   const pxPerMM = box.w / view.w
   const hair = RULE_HAIRLINE_PX / pxPerMM
   const levels = [
-    // the notepad is the canvas's own base and sits at the origin
-    { id: 'fine', mm: RULE_FINE_MM, stroke: RULE_FINE_STROKE, anchor: [0, 0] as [number, number] },
+    // THE ATOM, from the unit — Dan: "notepad grid of 12mm not 24mm to match the atomic laws". It was
+    // the literal 12 in this file, a released law value owned by a drawing surface, so changing the
+    // padding moved the magnets and left the rule behind. This canvas owns PIXEL thresholds, never
+    // millimetres. The notepad is the canvas's own base and sits at the origin.
+    { id: 'fine', mm: atomSpan(spec), stroke: RULE_FINE_STROKE, anchor: [0, 0] as [number, number] },
     // the lattice rule is anchored where the unit says the lattice is, so its intersections are the
     // magnet centres — drawn at the origin instead, it misses them by exactly the registration
     { id: 'pitch', mm: spec.grid.basePitchMM, stroke: PITCH_RULE_STROKE, anchor: layout.anchorMM },

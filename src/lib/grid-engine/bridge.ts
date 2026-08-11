@@ -85,6 +85,15 @@ export function resizeShape(spec: GridSystemSpec, box: RegionMM, longestMM: numb
   return resizeBoxToLongest(box, longestMM, cellDiameterMM(spec.grid))
 }
 
+/**
+ * THE ATOM — the millimetre square the whole system is built on (law 10.6b: "the cell is actually
+ * 12x12 not really 24 - 24 is 4 x12mm"). It IS the padding, so it is read from the padding rather
+ * than restated: a surface drawing the notepad rule asks for it instead of knowing it is 12.
+ */
+export function atomSpan(spec: GridSystemSpec): number {
+  return spec.grid.paddingMM
+}
+
 /** The span of a band, in millimetres — so a surface never has to compute one. */
 export function bandSpan(spec: GridSystemSpec, magnets: number): number {
   return bandSpanMM(spec.grid, magnets)
