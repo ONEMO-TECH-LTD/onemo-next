@@ -48,18 +48,26 @@ interface FieldLayout {
    * miss the centres they are meant to run through.
    */
   registrationMM: number
+  /** The rule's anchor per axis — registration plus pan. A surface draws lines here or they drift. */
+  anchorMM: PointMM
 }
 
 /** Drive the unit: values out of the spec, geometry out of the engine, one call. */
-export function layoutField(spec: GridSystemSpec, contentMM: RegionMM): FieldLayout {
+export function layoutField(
+  spec: GridSystemSpec,
+  contentMM: RegionMM,
+  panMM: PointMM = [0, 0],
+): FieldLayout {
   const field = withMinimumSpan(spec, contentMM)
   const offset = registrationOffsetMM(spec.grid, spec.registration)
   return {
     field,
     padded: paddedFieldMM(spec.grid, field),
-    magnets: magnetsInRegion(spec.grid, field, offset),
+    magnets: magnetsInRegion(spec.grid, field, offset, panMM),
     cellMM: cellDiameterMM(spec.grid),
     registrationMM: offset,
+    /** Where the rule must anchor so its intersections stay ON the magnet centres (law 8.3). */
+    anchorMM: [offset + panMM[0], offset + panMM[1]],
   }
 }
 

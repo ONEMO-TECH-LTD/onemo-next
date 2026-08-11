@@ -53,13 +53,19 @@ export interface GridCanvasProps {
   extentMM?: RegionMM
   /** Plain view scale. 1 is fit. It changes what you look at and nothing about the field. */
   zoom?: number
+  /**
+   * Where the LATTICE sits against the shape, in millimetres. This is NOT a camera: it moves the
+   * magnets themselves, so it is placement — geometry with a manufacturing consequence — and it is
+   * computed in the engine, never here.
+   */
+  panMM?: [number, number]
   /** Told what is on screen, so the shell can label it without counting anything itself. */
   onView?: (summary: FieldSummary) => void
   /** Anything the unit produced, already in millimetres, drawn on top of the field. */
   children?: React.ReactNode
 }
 
-export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, onView, children }: GridCanvasProps) {
+export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, panMM, onView, children }: GridCanvasProps) {
   const frame = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 1, h: 1 })
 
@@ -77,7 +83,7 @@ export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, onView, children }
 
   // THE UNIT, through the bridge. This file knows nothing about where magnets go or why.
   const content: RegionMM = extentMM ?? { x: -180, y: -180, w: 360, h: 360 }
-  const layout = layoutField(spec, content)
+  const layout = layoutField(spec, content, panMM)
 
   // THE CAMERA. Screen maths, and the only thing zoom is allowed to touch.
   const view = viewBox(layout.padded, zoom, box.w / box.h)
@@ -92,10 +98,10 @@ export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, onView, children }
   const hair = RULE_HAIRLINE_PX / pxPerMM
   const levels = [
     // the notepad is the canvas's own base and sits at the origin
-    { id: 'fine', mm: RULE_FINE_MM, stroke: RULE_FINE_STROKE, anchor: 0 },
+    { id: 'fine', mm: RULE_FINE_MM, stroke: RULE_FINE_STROKE, anchor: [0, 0] as [number, number] },
     // the lattice rule is anchored where the unit says the lattice is, so its intersections are the
     // magnet centres — drawn at the origin instead, it misses them by exactly the registration
-    { id: 'pitch', mm: spec.grid.basePitchMM, stroke: PITCH_RULE_STROKE, anchor: layout.registrationMM },
+    { id: 'pitch', mm: spec.grid.basePitchMM, stroke: PITCH_RULE_STROKE, anchor: layout.anchorMM },
   ].filter((l) => l.mm * pxPerMM >= RULE_MIN_PX)
 
   return (
@@ -113,8 +119,8 @@ export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, onView, children }
               width={l.mm}
               height={l.mm}
               patternUnits="userSpaceOnUse"
-              x={l.anchor}
-              y={l.anchor}
+              x={l.anchor[0]}
+              y={l.anchor[1]}
             >
               <path d={`M ${l.mm} 0 L 0 0 0 ${l.mm}`} fill="none" stroke={l.stroke} strokeWidth={hair} />
             </pattern>

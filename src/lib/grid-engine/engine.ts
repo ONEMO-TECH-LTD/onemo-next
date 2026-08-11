@@ -102,19 +102,24 @@ export function magnetsInRegion(
   grid: GridSpec,
   region: RegionMM,
   offsetMM: number,
+  panMM: PointMM = [0, 0],
 ): PointMM[] {
   const { basePitchMM } = grid
   const stride = populationStride(grid)
-  const first = (lo: number) => Math.ceil((lo - offsetMM) / basePitchMM)
-  const last = (hi: number) => Math.floor((hi - offsetMM) / basePitchMM)
+  // The lattice is infinite; PAN slides it against the shape. Per axis, because the shape is held
+  // still and the grid is what moves to meet it.
+  const ox = offsetMM + panMM[0]
+  const oy = offsetMM + panMM[1]
+  const first = (lo: number, o: number) => Math.ceil((lo - o) / basePitchMM)
+  const last = (hi: number, o: number) => Math.floor((hi - o) / basePitchMM)
   const onStride = (i: number) => ((i % stride) + stride) % stride === 0
 
   const points: PointMM[] = []
-  for (let i = first(region.x); i <= last(region.x + region.w); i++) {
+  for (let i = first(region.x, ox); i <= last(region.x + region.w, ox); i++) {
     if (!onStride(i)) continue
-    for (let j = first(region.y); j <= last(region.y + region.h); j++) {
+    for (let j = first(region.y, oy); j <= last(region.y + region.h, oy); j++) {
       if (!onStride(j)) continue
-      points.push([offsetMM + i * basePitchMM, offsetMM + j * basePitchMM])
+      points.push([ox + i * basePitchMM, oy + j * basePitchMM])
     }
   }
   return points

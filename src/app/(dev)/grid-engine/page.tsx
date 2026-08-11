@@ -173,6 +173,13 @@ export default function GridEnginePage() {
   }, [])
 
   /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
+  /**
+   * WHERE THE LATTICE SITS against the shape, in millimetres. Not a camera: this moves the magnets
+   * themselves, so it is placement — the shape stays still and the grid comes to meet it.
+   */
+  const [pan, setPan] = useState<[number, number]>([0, 0])
+  const panGrabbedAt = useRef<[number, number] | null>(null)
+
   const toMM = (e: React.PointerEvent<SVGElement>): [number, number] => {
     const svg = e.currentTarget.ownerSVGElement
     const m = svg?.getScreenCTM()
@@ -300,6 +307,7 @@ export default function GridEnginePage() {
       <div className={styles.canvas}>
         <GridCanvas
           spec={spec}
+          panMM={pan}
           /* THE FIELD IS THE WORLD; the shape lands on it (law 5.1). It must never be framed from
              the shape — driving the extent off the cut-out's box made the whole lattice re-solve and
              the camera re-frame on every drag, so the grid appeared to move under the handles. */
@@ -307,6 +315,31 @@ export default function GridEnginePage() {
           zoom={gridScale}
           onView={onView}
         >
+          {/* Drag anywhere on the field to slide the LATTICE against the shape. Whole millimetres,
+              like every other move. Drawn first, so it sits beneath the cut-out. */}
+          <rect
+            x={-5000}
+            y={-5000}
+            width={10000}
+            height={10000}
+            fill="transparent"
+            style={{ cursor: panGrabbedAt.current ? 'grabbing' : 'grab' }}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              panGrabbedAt.current = toMM(e)
+            }}
+            onPointerMove={(e) => {
+              const from = panGrabbedAt.current
+              if (!from) return
+              const [px, py] = toMM(e)
+              setPan(([x, y]) => [Math.round(x + px - from[0]), Math.round(y + py - from[1])])
+              panGrabbedAt.current = [px, py]
+            }}
+            onPointerUp={(e) => {
+              panGrabbedAt.current = null
+              e.currentTarget.releasePointerCapture?.(e.pointerId)
+            }}
+          />
           {cutout && box && (
             <g>
               {asOutline && outline ? (
