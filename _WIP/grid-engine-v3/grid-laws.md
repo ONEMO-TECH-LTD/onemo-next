@@ -379,6 +379,16 @@ back on one of them. Measured: `basePitchMM/2` gives a run of 2 at `[-72, 24]`, 
 `pitchMM/2` gives `[-48, 48]`, centre 0. **Identical at 48mm, which is why the fault was invisible
 until the input changed** — the exact failure class §4.3 exists to catch.
 
+**9.3a — At 96mm NOTHING is re-centred. Points hide; the view and the lattice stay put.** *DAN, 08-11,
+verbatim, ruling on the parity-vs-one-lattice question:*
+> "no need force centering - the view remains same just some points are hidden to show sparse grid no
+> complication"
+
+Switching to 96mm only thins the population (1.2). No registration shift, no camera move, no symmetry
+correction. The consequence — an even match at 96mm sits nearer one visible magnet than the other —
+is accepted, not corrected. *(Closes the 9.2-vs-1.2 collision held on 08-11; the behavior at
+`033762fc` is correct as shipped.)*
+
 **9.4 — The shape hugs its points; the size is the engine's answer.** *DAN, 08-10*
 > "it must hug 48mm x4 points"
 
