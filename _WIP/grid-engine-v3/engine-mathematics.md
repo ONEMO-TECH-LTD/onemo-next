@@ -719,9 +719,14 @@ excluded" — in direct conflict with sealed C10 (every connected admissible sub
 forbidden). Both cannot be build authority: a builder following the blueprint as written will
 reproduce the whole-template/maximal-only defect this paper spent the night killing. Dan's
 all-options/manual-review directives and C10 are newer and govern. ACTION before any production
-build: amend blueprint §6.2/§6.4 to the C10 grammar (owner: pixel, who owns the blueprint), and
-tighten contract EC-04's wording to name admissible subsets explicitly. Until amended, THIS PAPER
-outranks the blueprint on arrangement grammar.
+build (owner: pixel, one necessity-bounded amendment after meta's rerun closes): amend blueprint
+§6.2/§6.4 to the C10 grammar; supersede blueprint §7's continuous event/interval solver and
+contract EC-06/EC-09's pair-box-interior material predicate — final authority is EXACT FULL-DISC
+support at finite grid-derived candidate scales, with pair/grid boxes retained only as layout
+extent and flap evidence; reconcile EC-07's continuous-interval publication language to
+candidate-in-set + upward-even; tighten EC-04 to name admissible subsets. Until amended, THIS
+PAPER outranks blueprint and contract wherever they conflict. No production build before the
+amendment lands.
 
 ## SEAL ADDENDUM 3 · Meta's scoped rerun + the honest restatement of the seal's claim
 Scoping clause applied by meta: DUCK 36/65 b2 → 2 = 2 (seal exact); count matches 218 → 249/330.
