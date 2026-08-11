@@ -18,7 +18,6 @@ import {
   describeRegion,
   layoutField,
   type FieldSummary,
-  type RegionMM,
 } from '@/lib/grid-engine/bridge'
 import type { GridSystemSpec } from '@/lib/grid-engine/spec'
 import { viewBox, ZOOM_FIT } from '@/lib/grid-engine/ui/camera'
@@ -60,8 +59,6 @@ const RULE_MIN_PX = 4
 
 export interface GridCanvasProps {
   spec: GridSystemSpec
-  /** The content's full extent in millimetres — the view covers it entirely. */
-  extentMM?: RegionMM
   /** Plain view scale. 1 is fit. It changes what you look at and nothing about the field. */
   zoom?: number
   /**
@@ -76,7 +73,7 @@ export interface GridCanvasProps {
   children?: React.ReactNode
 }
 
-export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, panMM, onView, children }: GridCanvasProps) {
+export function GridCanvas({ spec, zoom = ZOOM_FIT, panMM, onView, children }: GridCanvasProps) {
   const frame = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 1, h: 1 })
 
@@ -93,8 +90,13 @@ export function GridCanvas({ spec, extentMM, zoom = ZOOM_FIT, panMM, onView, chi
   }, [])
 
   // THE UNIT, through the bridge. This file knows nothing about where magnets go or why.
-  const content: RegionMM = extentMM ?? { x: -180, y: -180, w: 360, h: 360 }
-  const layout = layoutField(spec, content, panMM)
+  //
+  // THE FIELD FRAMES ITSELF (law 5.1). An empty region at the origin is all the unit needs: it grows
+  // every region to the released block, so the block IS the answer and nothing outside can shrink or
+  // stretch it. The shell used to hand in a region built from the SHAPE'S SIZE, which read as the
+  // shape defining the world -- and did nothing at all, since every reachable size is under the
+  // block's own floor. Inert and misleading at once.
+  const layout = layoutField(spec, { x: 0, y: 0, w: 0, h: 0 }, panMM)
 
   // THE CAMERA. Screen maths, and the only thing zoom is allowed to touch.
   const view = viewBox(layout.padded, zoom, box.w / box.h)

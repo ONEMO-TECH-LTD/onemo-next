@@ -413,10 +413,10 @@ export default function GridEnginePage() {
         <GridCanvas
           spec={spec}
           panMM={pan}
-          /* THE FIELD IS THE WORLD; the shape lands on it (law 5.1). It must never be framed from
-             the shape — driving the extent off the cut-out's box made the whole lattice re-solve and
-             the camera re-frame on every drag, so the grid appeared to move under the handles. */
-          extentMM={{ x: -sizeMM / 2, y: -sizeMM / 2, w: sizeMM, h: sizeMM }}
+          /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
+             lands on it. Handing in a region built from the shape's size read as the shape defining
+             the world, and did nothing besides — every reachable size is under the field's own floor.
+             That coupling is what once made the lattice re-solve on every drag. */
           zoom={gridScale}
           onView={onView}
         >
