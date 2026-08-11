@@ -514,3 +514,28 @@ the first case to trace. Also to state in the paper once meta confirms: the odd-
 (minimise |mean of positions| — meta's choice) and both-phases-as-options (L7 reading: hiding a
 different subset of the SAME lattice is not moving it) — both currently conventions, both must be
 written or two builders diverge.
+
+## C32 · Coupling law sharpened; window rule DERIVED not chosen; phases clause; tangency fixture
+1. COUPLING IS AT ONE PHYSICAL σ, NEVER AT ONE LADDER VALUE (generalises C9 — meta's BOT trace):
+   the same T under two binding axes is two different manufactured shapes (BOT: 48-pair at
+   σ=180/400 = 133×180 vs 96-pair at σ=180/296 = 180×243 — coupling them invents a family). My
+   artifact was right; meta's T-indexed coupling was the defect, and their earlier coupled lists
+   are DEMOTED to non-independent (same-axis luck) pending their σ-keyed rerun vs 4ba713f5.
+2. ODD-96 WINDOW — NO CONVENTION EXISTS (pixel's derivation, meta's own rule withdrawn by meta):
+   L6 centres an odd run ON a magnet, so a 96 3-run must contain the parity target — exactly
+   {−96, 0, +96}; the other colour class has no member at 0 and is not an odd-on-magnet run.
+   Nothing is left to choose. (Meta's |mean| rule was an invented convention over a closed law —
+   struck, recorded here as the failure mode caught in the act.)
+3. BOTH PHASES AS OPTIONS (meta's sentence, adopted verbatim): for an even sparse run both 1-D
+   colour classes are enumerated as separate lawful options. Neither is preferred — both are
+   subsets of the SAME unmoved 48mm lattice; hiding a different subset is not moving it (L7), and
+   offering only one would be the engine choosing where the lattice sits. 2-D extension (pixel):
+   the lattice is a Cartesian product; x and y phases are independent; even×even enumerates all
+   four products.
+4. THIRD-IMPLEMENTATION DIFF (meta vs artifact): 26,850/26,852 — the two misses are meta's own
+   plain-double refusals at PILL σ=12/25, position (−48,0), 1×3@48 and 3×3@48, clearance EXACTLY
+   12.000: the real-corpus tangency case. PINNED as a fixture beside the square canon — the square
+   proves tangency must be lawful in principle; PILL proves the corpus reaches it at a real ladder
+   value (the concrete case behind the 76/508,345 fallback count).
+SEAL STATUS: three implementations agree to 26,850–26,852/26,852 with every residual explained and
+owned. Remaining: pixel's family-set comparison; meta's σ-keyed coupling rerun.
