@@ -12,6 +12,7 @@ import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
   bakeStickerEngine, BLEND_DEFAULTS, ZERO_SETTINGS, BakeCancelled,
   disposePrepareAICache, EDGE_FINISH_DEFAULT, finishDrawn, finishSpec,
+  finishMask,
   settingsForVectorPreset,
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
   type VectorPresetName,
@@ -60,8 +61,9 @@ const cloneMask = (mask: Mask): Mask => ({ data: mask.data.slice(), w: mask.w, h
 
 function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, h: number): Mask {
   const painted = swathMask(source.stroke, source.brushPx, w, h, cfg)
+  if (source.base && source.erase) return subtractMasks(source.base, polishMask(painted, cfg.polishStrength))
   const combined = source.base
-    ? source.erase ? subtractMasks(source.base, painted) : unionMasks(source.base, painted)
+    ? unionMasks(source.base, painted)
     : painted
   return polishMask(combined, cfg.polishStrength)
 }
@@ -95,8 +97,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const [ms, setMs] = useState<{ cut?: number }>({})
-  const [settings, setSettings] = useState<TraceOutlineSettings>(() => settingsForVectorPreset('PURE'))
-  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('PURE')
+  const [settings, setSettings] = useState<TraceOutlineSettings>(() => settingsForVectorPreset('CLASSIC'))
+  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('CLASSIC')
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
@@ -122,9 +124,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const settingsRef = useRef(settings); settingsRef.current = settings
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
   const vectorPresetRef = useRef<VectorPresetName | null>(vectorPreset); vectorPresetRef.current = vectorPreset
-  const cutoutSettingsRef = useRef<TraceOutlineSettings>(settingsForVectorPreset('PURE'))
+  const cutoutSettingsRef = useRef<TraceOutlineSettings>(settingsForVectorPreset('CLASSIC'))
   const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS, simplify: 15 })
-  const cutoutPresetRef = useRef<VectorPresetName | null>('PURE')
+  const cutoutPresetRef = useRef<VectorPresetName | null>('CLASSIC')
   const paintPresetRef = useRef<VectorPresetName | null>(null)
   const activateOutlineSource = useCallback((source: OutlineSourceKind) => {
     if (outlineSourceRef.current === source) return
@@ -156,6 +158,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const paintTuneGen = useRef(0)
   const paintTuneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const paintCalibrationRef = useRef<PaintCalibrationSource | null>(null)
+  const finishResolvedRef = useRef(false)
   const invalidatePaintCalibration = useCallback(() => {
     paintTuneGen.current++
     if (paintTuneTimer.current) clearTimeout(paintTuneTimer.current)
@@ -164,14 +167,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [])
 
   // ── history (pure module, flow-driven) ──
-  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; outlineSource: OutlineSourceKind; settings: TraceOutlineSettings; preset: VectorPresetName | null; blendS: BlendSettings; paint: PaintConfig }
+  type Snap = { mask: Mask | null; drawn: { shape: VShape; ring: { x: number; y: number }[] } | null; outlineSource: OutlineSourceKind; settings: TraceOutlineSettings; preset: VectorPresetName | null; blendS: BlendSettings; paint: PaintConfig; finishResolved: boolean }
   const histRef = useRef(new HistoryStack<Snap>(HISTORY_DEPTH))
   const snapNow = useCallback((): Snap => ({
     mask: maskRef.current ? cloneMask(maskRef.current) : null,
     drawn: drawnRef.current,
     outlineSource: outlineSourceRef.current,
     settings: { ...settingsRef.current }, preset: vectorPresetRef.current,
-    blendS: { ...blendRef.current }, paint: { ...paintCfgRef.current }, // meta B3: knobs travel with the state
+    blendS: { ...blendRef.current }, paint: { ...paintCfgRef.current }, finishResolved: finishResolvedRef.current, // meta B3: knobs travel with the state
   }), [])
   const pushHistory = useCallback(() => { histRef.current.push(snapNow()); setHistTick((t) => t + 1) }, [snapNow])
   const replaceHistory = useCallback(() => { histRef.current.replaceCurrent(snapNow()); setHistTick((t) => t + 1) }, [snapNow])
@@ -261,10 +264,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [runBake])
 
   // ── outline resolve (vector-only — runs per tick, never composes) ──
-  const applyFinish = useCallback((bake = true) => {
+  const applyFinish = useCallback((bake = true, settingsOverride?: TraceOutlineSettings) => {
     const img = imgCanvas.current
     const drawn = drawnRef.current
-    const eff = settingsRef.current
+    const eff = settingsOverride ?? (finishResolvedRef.current ? ZERO_SETTINGS : settingsRef.current)
     const fin: FinishResult | null = drawn && img
       ? finishDrawn(drawn.shape, drawn.ring, img.width, img.height, eff)
       : preparedRef.current ? finishSpec(preparedRef.current, eff, img?.width) : null
@@ -324,7 +327,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const acceptMask = useCallback(async (
     mask: Mask,
     preseg?: MLResult,
-    opts?: { erase?: boolean; shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean },
+    opts?: { erase?: boolean; shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean; finishSettings?: TraceOutlineSettings },
   ) => {
     const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
     if (!isCurrent()) return false
@@ -362,9 +365,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     editPrepGen.current++
     drawnRef.current = null
     maskRef.current = mask
+    finishResolvedRef.current = !!opts?.finishSettings
     hasCutRef.current = true
     setHasCut(true)
-    applyFinish()
+    applyFinish(false, opts?.finishSettings)
     // SHAPE-IS-TRUTH (E6/E7/E8) — PAINT-DEPOSIT SOURCES ONLY (Dan device 2026-08-07): the outline
     // is a smoothed ENVELOPE and must never redefine a model's subject; only paint (which OWNS its
     // geometry) normalizes to the resolved outline — islands drop loudly, slivers go solid, the
@@ -374,7 +378,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // E8: the subject derives from the resolved geometry AT OFFSET 0 — the Offset knob is the
       // pillow band's outer ring, never part of the subject. Inner blend line = the same
       // auto-tuned smooth shape → the band is parallel by construction, every tool.
-      const finZ = preparedRef.current ? finishSpec(preparedRef.current, { ...settingsRef.current, offset: 0 }, img.width) : null
+      const activeSettings = opts?.finishSettings ?? settingsRef.current
+      const finZ = preparedRef.current ? finishSpec(preparedRef.current, { ...activeSettings, offset: 0 }, img.width) : null
       const zeroShape = finZ?.shape ?? shapeRef.current
       const norm = solidShapeMask(zeroShape, img.width, img.height)
       if (mask.w === norm.w && mask.h === norm.h) {
@@ -405,6 +410,50 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activateOutlineSource, applyFinish, installPrepared, scheduleBake])
 
+  const resolvePaintMask = useCallback((
+    source: PaintCalibrationSource,
+    cfg: PaintConfig,
+    vector: TraceOutlineSettings,
+    w: number,
+    h: number,
+    isCurrent: () => boolean,
+  ): Mask | null => {
+    if (!source.erase || !source.base) return paintMask(source, cfg, w, h)
+    // The eraser is its own negative Paint shape: build and finish it with the same Paint + Vector
+    // controls, then subtract that resolved geometry from the untouched accepted base.
+    const negativeRaster = polishMask(swathMask(source.stroke, source.brushPx, w, h, cfg), cfg.polishStrength)
+    if (!isCurrent()) return null
+    const negative = finishMask(negativeRaster, vector)
+    if (!negative) throw new Error('Paint eraser shape could not be resolved')
+    return subtractMasks(source.base, maskFromShape(negative.shape, w, h))
+  }, [])
+
+  const recalculatePaint = useCallback(async (
+    source: PaintCalibrationSource,
+    cfg: PaintConfig,
+    vector: TraceOutlineSettings,
+    isCurrent: () => boolean,
+  ): Promise<boolean> => {
+    const img = imgCanvas.current
+    if (!img || !isCurrent()) return false
+    const recalculated = await resolvePaintMask(source, cfg, vector, img.width, img.height, isCurrent)
+    if (!recalculated || !isCurrent()) return false
+    if (!maskArea(recalculated)) {
+      setStatus('⚠️ Paint calibration produced an empty shape — current shape kept')
+      return false
+    }
+    return acceptMask(recalculated, undefined, {
+      erase: source.erase,
+      shapeTruth: true,
+      source: 'paint',
+      isCurrent,
+      replaceHistory: true,
+      // The negative already received the Vector recipe. Do not apply that recipe again to the
+      // surviving main shape after subtraction.
+      finishSettings: source.erase ? ZERO_SETTINGS : undefined,
+    })
+  }, [acceptMask, resolvePaintMask])
+
   const setPaintCfg = useCallback((patch: Partial<PaintConfig>) => {
     const next = { ...paintCfgRef.current, ...patch }
     paintCfgRef.current = next
@@ -419,22 +468,40 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setStatus('⚙️ recalculating the latest Paint stroke…')
     paintTuneTimer.current = setTimeout(() => {
       paintTuneTimer.current = null
-      const img = imgCanvas.current
       const isCurrent = () => tune === paintTuneGen.current && source.artwork === artworkGen.current && paintCalibrationRef.current === source
-      if (!img || !isCurrent()) return
-      const recalculated = paintMask(source, paintCfgRef.current, img.width, img.height)
-      if (!maskArea(recalculated)) {
-        setStatus('⚠️ Paint calibration produced an empty shape — current shape kept')
-        return
-      }
+      if (!isCurrent()) return
       setBusy(true)
-      void acceptMask(recalculated, undefined, { erase: source.erase, shapeTruth: true, source: 'paint', isCurrent, replaceHistory: true })
+      void recalculatePaint(source, paintCfgRef.current, settingsRef.current, isCurrent)
         .then((ok) => {
           if (ok && isCurrent()) setStatus('⚙️ latest Paint stroke recalculated')
         })
+        .catch((error) => {
+          if (isCurrent()) setStatus('⚠️ Paint recalculation failed: ' + String((error as Error)?.message ?? error) + ' — current shape kept')
+        })
         .finally(() => { if (isCurrent()) setBusy(false) })
     }, 120)
-  }, [acceptMask])
+  }, [recalculatePaint])
+
+  const recalculateLatestErase = useCallback((vector: TraceOutlineSettings, success: string): boolean => {
+    const source = paintCalibrationRef.current
+    if (!source?.erase || source.artwork !== artworkGen.current) return false
+    const tune = ++paintTuneGen.current
+    if (paintTuneTimer.current) clearTimeout(paintTuneTimer.current)
+    setStatus('⚙️ recalculating the latest Paint eraser…')
+    paintTuneTimer.current = setTimeout(() => {
+      paintTuneTimer.current = null
+      const isCurrent = () => tune === paintTuneGen.current && source.artwork === artworkGen.current && paintCalibrationRef.current === source
+      if (!isCurrent()) return
+      setBusy(true)
+      void recalculatePaint(source, paintCfgRef.current, vector, isCurrent)
+        .then((ok) => { if (ok && isCurrent()) setStatus(success) })
+        .catch((error) => {
+          if (isCurrent()) setStatus('⚠️ Paint eraser recalculation failed: ' + String((error as Error)?.message ?? error) + ' — current shape kept')
+        })
+        .finally(() => { if (isCurrent()) setBusy(false) })
+    }, 120)
+    return true
+  }, [recalculatePaint])
 
   // ── actions ──────────────────────────────────────────────────────────────────────────────────
   const upload = useCallback(async (file: File) => {
@@ -469,6 +536,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     settleToolQueue()
     settleBakes('full-res bake cancelled: artwork replaced')
     invalidatePaintCalibration()
+    finishResolvedRef.current = false
     previewRef.current = false
     disposePrepareAICache()
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; nativePresegRef.current = null; liveBakeRef.current = null
@@ -532,9 +600,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       cutoutSettingsRef.current = n
       cutoutPresetRef.current = null
     }
+    if (recalculateLatestErase(n, '⚙️ latest Paint eraser recalculated')) return
     if (hasCutRef.current) replaceHistory()
     requestAnimationFrame(() => applyFinish())
-  }, [applyFinish, replaceHistory])
+  }, [applyFinish, recalculateLatestErase, replaceHistory])
   const setVectorPreset = useCallback((name: VectorPresetName) => {
     if (!hasCutRef.current) return
     const next = settingsForVectorPreset(name)
@@ -549,10 +618,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       cutoutSettingsRef.current = next
       cutoutPresetRef.current = name
     }
+    if (recalculateLatestErase(next, `⬡ ${name} vector preset applied to Paint eraser`)) return
     replaceHistory()
     setStatus(`⬡ ${name} vector preset`)
     requestAnimationFrame(() => applyFinish())
-  }, [applyFinish, replaceHistory])
+  }, [applyFinish, recalculateLatestErase, replaceHistory])
   const setBlendTune = useCallback((patch: Partial<BlendSettings>) => {
     const n = { ...blendRef.current, ...patch }; blendRef.current = n; setBlend(n)
     scheduleBake()
@@ -631,10 +701,17 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     invalidatePaintCalibration()
     const source: PaintCalibrationSource = { artwork: artworkGen.current, base, stroke: pts, brushPx, erase }
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too.
-    const combined = paintMask(source, paintCfgRef.current, img.width, img.height)
     setBusy(true)
     try {
-      const ok = await acceptMask(combined, undefined, { erase, shapeTruth: true, source: 'paint', isCurrent })
+      const combined = await resolvePaintMask(source, paintCfgRef.current, settingsRef.current, img.width, img.height, isCurrent)
+      if (!combined || !isCurrent()) return
+      const ok = await acceptMask(combined, undefined, {
+        erase,
+        shapeTruth: true,
+        source: 'paint',
+        isCurrent,
+        finishSettings: erase ? ZERO_SETTINGS : undefined,
+      })
       if (ok && isCurrent()) {
         paintCalibrationRef.current = source
         setStatus(base ? (erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned') : '✏️ painted shape created — keep painting, erase, or tune')
@@ -642,7 +719,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     } finally {
       if (isCurrent()) setBusy(false)
     }
-  }), [acceptMask, invalidatePaintCalibration, requestRender, runTool])
+  }), [acceptMask, invalidatePaintCalibration, requestRender, resolvePaintMask, runTool])
 
   // ── vector edit orchestration (nodes/frame) ──
   const isZero = (t: TraceOutlineSettings) => JSON.stringify(t) === JSON.stringify(ZERO_SETTINGS)
@@ -669,6 +746,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   }, [requestRender])
   const editCommit = useCallback((next: VShape) => {
     invalidatePaintCalibration()
+    finishResolvedRef.current = false
     const img = imgCanvas.current!
     const ring = shapeRing(next)
     drawnRef.current = { shape: next, ring }
@@ -765,6 +843,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       }
       blendRef.current = { ...s.blendS }; setBlend(blendRef.current)
       paintCfgRef.current = { ...s.paint }; setPaintCfgState(paintCfgRef.current)
+      finishResolvedRef.current = s.finishResolved
       hasCutRef.current = !!(nextMask || nextDrawn)
       setHasCut(hasCutRef.current)
       applyFinish(false)
@@ -802,6 +881,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     invalidatePaintCalibration()
     previewRef.current = false
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
+    finishResolvedRef.current = false
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
     setOutputSourceSize(null)
     hasCutRef.current = false
@@ -981,6 +1061,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     urlRef.current = null
     artworkRef.current = null
     imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
+    finishResolvedRef.current = false
     dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
   }, [invalidatePaintCalibration, settleBakes, settleToolQueue])
 

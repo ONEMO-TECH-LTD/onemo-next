@@ -9,9 +9,11 @@ import { shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/v
 import {
   detailToFloorMm,
   resolveTraceOutline,
+  traceSourceFromRaw,
   TRACE_OUTLINE_DEFAULTS,
   type TraceOutlineSettings,
 } from '@/lib/effect/trace-outline-controls'
+import { traceContourRaw } from '@/lib/effect/contour'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
 import type { PreparedEffectBase } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
@@ -98,6 +100,27 @@ export function finishDrawn(
     },
     settings,
   )
+  if (!resolved) return null
+  const bb = shapeBBox(resolved, 1)
+  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
+}
+
+/** Resolve a Paint mask through the same Vector controls without decoding or preparing artwork.
+ * Used by the negative eraser before its finished geometry is subtracted from the main shape. */
+export function finishMask(mask: Mask, settings: TraceOutlineSettings): FinishResult | null {
+  const raw = traceContourRaw(mask.data, mask.w, mask.h)
+  if (!raw) return null
+  const mmPerPx = MM_BASE / Math.max(mask.w, mask.h)
+  const vectorShape = traceSourceFromRaw(raw, mask.h, mmPerPx, 100, 0, 'sharp')
+  if (!vectorShape) return null
+  const resolved = resolveTraceOutline({
+    vectorShape,
+    rawTracePx: raw,
+    maskWidthPx: mask.w,
+    maskHeightPx: mask.h,
+    mmPerPx,
+    simplifyAfterDetail: settings.detail !== 100,
+  }, settings)
   if (!resolved) return null
   const bb = shapeBBox(resolved, 1)
   return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }

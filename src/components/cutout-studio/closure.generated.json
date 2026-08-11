@@ -36,15 +36,15 @@
       },
       {
         "file": "src/components/cutout-studio/finish.ts",
-        "bytes": 17753,
-        "sha256": "5ed3020d04cc752262d566ae73e93d78ce5606994a28ed140e165eb535fba1ba",
+        "bytes": 18775,
+        "sha256": "f02814dafd9f408c43a8fce9a519702166e7f46ec45a9f4dab4665b2b81321e3",
         "destination": "src/components/cutout-studio/finish.ts",
         "layer": "browser-react"
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 49604,
-        "sha256": "628a6a3a4ad8fb6759d6b1cf9161b37aeacad6605926db5947c7d3011f4631b3",
+        "bytes": 53573,
+        "sha256": "169e4732226c65de7770bb0af6fc1653cb47327715984e0bc4befb8f0ae3d420",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 336169,
-    "closureSha256": "7b39388dbad2949cb74d7247695c63df1fdec7677d12bd6f4ef4fd15fae5da8d"
+    "totalBytes": 341160,
+    "closureSha256": "9396b6ed79fe6326ffe60e90b3c0a9f92d87f579d1c0b589a0442cedf896d558"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-e994569707cc1d51.js",
-        "rawBytes": 61835,
-        "gzipBytesEstimate": 20643,
-        "brotliBytesEstimate": 18276
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-9eab161021ba3bc4.js",
+        "rawBytes": 63731,
+        "gzipBytesEstimate": 21084,
+        "brotliBytesEstimate": 18634
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1297661,
-    "gzipBytesEstimate": 363592,
-    "brotliBytesEstimate": 296981
+    "rawBytes": 1299557,
+    "gzipBytesEstimate": 364033,
+    "brotliBytesEstimate": 297339
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",

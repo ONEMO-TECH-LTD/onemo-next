@@ -252,7 +252,7 @@ async function runBrowser(browserType) {
       ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'],
       `${browserName}: named vector preset order changed`,
     )
-    assert.equal(await vectorPreset.inputValue(), 'PURE', `${browserName}: cutout vector preset must default to PURE`)
+    assert.equal(await vectorPreset.inputValue(), 'CLASSIC', `${browserName}: cutout vector preset must default to CLASSIC`)
     await routePage.getByRole('button', { name: 'offset', exact: true }).click()
     assert.deepEqual(
       [await vectorKnob.getAttribute('min'), await vectorKnob.getAttribute('max')],
@@ -357,9 +357,17 @@ async function runBrowser(browserType) {
     }
     let paintedCanvas = await canvasData()
     paintedCanvas = await tunePaint(autotune, '300', paintedCanvas)
-    await tunePaint(smoothing, '100', paintedCanvas)
+    paintedCanvas = await tunePaint(smoothing, '100', paintedCanvas)
+    await routePage.getByRole('button', { name: /Paint erase/ }).click()
+    await draw(routePage, [
+      { x: paintBox.x + paintBox.width * 0.48, y: paintBox.y + paintBox.height * 0.48 },
+      { x: paintBox.x + paintBox.width * 0.52, y: paintBox.y + paintBox.height * 0.52 },
+    ], 4)
+    await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
+    const erasedCanvas = await canvasData()
+    assert.notEqual(erasedCanvas, paintedCanvas, `${browserName}: finished negative Paint shape did not subtract from the accepted main shape`)
     if (browserName === 'chromium') {
-      await routePage.screenshot({ path: 'output/playwright/KAI-10284-shape-relative-paint-smoothing.png', fullPage: true })
+      await routePage.screenshot({ path: 'output/playwright/KAI-10285-negative-paint-eraser.png', fullPage: true })
     }
 
     // Blend stays explicitly zero even when Frame pushes the shape beyond the artwork.
@@ -393,7 +401,7 @@ async function runBrowser(browserType) {
     await publicPage.getByRole('button', { name: /Vector/ }).click()
     const publicPreset = publicPage.getByRole('combobox', { name: 'vector preset' })
     assert.deepEqual(await publicPreset.locator('option').allTextContents(), ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'], `${browserName}: normal users must receive the named presets`)
-    assert.equal(await publicPreset.inputValue(), 'PURE', `${browserName}: normal users must start on PURE`)
+    assert.equal(await publicPreset.inputValue(), 'CLASSIC', `${browserName}: normal users must start on CLASSIC`)
     assert.equal(await publicPage.getByRole('button', { name: 'detail', exact: true }).count(), 0, `${browserName}: raw vector calibration must stay admin-only`)
     assert.equal(await publicPage.locator('input[type=number]').count(), 0, `${browserName}: raw vector knob must stay admin-only on the Vector tab`)
     await publicPage.close()
