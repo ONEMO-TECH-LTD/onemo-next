@@ -382,7 +382,7 @@ sideReach(side) = max_{p∈Bside} ρ(p)
 spread = max(sideReach) - min(sideReach)
 ```
 
-Coverage passes for a selected switch value only when all four boundary reaches are `≤12` or all four are `≤24`. Spread is evidence only; it is not equality, argmin, ranking or a pass gate. The centre of a 48mm lattice cell therefore cannot fail flap coverage merely because it is `48/√2 - 12 ≈ 21.94mm` from the discs; it is not on the cutout edge.
+The two switch outcomes are computed and reported separately: `flapLimitMM=12` passes only when all four boundary reaches are `≤12`; `flapLimitMM=24` passes only when all four are `≤24`. Passing the 24mm outcome never implies that the selected 12mm outcome passed. Spread is evidence only; it is not equality, argmin, ranking or a pass gate. The centre of a 48mm lattice cell therefore cannot fail flap coverage merely because it is `48/√2 - 12 ≈ 21.94mm` from the discs; it is not on the cutout edge.
 
 ### 8.3 Exact maximum-reach computation
 
@@ -446,7 +446,7 @@ The portable engine is a pure `SolveRequest → SolveResult` function. The web p
 
 Pinch, resize, pan, drag, camera movement and browsing issue zero solve calls. Outline/spec change is the only invalidation trigger. First measure the decoupled cached runner. If a cache miss still creates a main-thread long task or visible input/animation stall, move the unchanged pure request/result boundary into one Web Worker. The worker is a measured execution escalation, never a second engine or a baseline mandate.
 
-Performance evidence records event count, window updates, peak memory, wall time and main-thread long tasks on the largest real trace. No unmeasured millisecond budget is invented; any observed interaction stall fails EC-12.
+Performance evidence records event count, window updates, canonical serialized-result bytes, peak memory, wall time and main-thread long tasks on the largest real trace. Result size is measured at the headless step-7 freeze, before proof-surface work. No unmeasured millisecond or memory budget is invented; any observed interaction stall fails EC-12.
 
 ### 10.1 Answer cardinality and browsing
 
