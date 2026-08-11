@@ -443,3 +443,17 @@ than meta's rate because the T-scaled frame carries larger magnitudes under the 
 3/4 (the L, at multiple σ) → 4/4 from σ=12/25 (pub ≈ 192·?; values in artifact); BUTTERFLY 2×2@48
 4/4 throughout band-2 candidates — Dan's case under the final predicate. Gate = three-way
 agreement on these keys: lead (this artifact) · pixel's independent oracle · meta's rerun.
+
+## C27 · Two C24 sharpenings (pixel, adopted)
+1. The support authority is the MINIMAL BOOLEAN, not a distance engine:
+       support(q) ⟺ inside(q,P) ∧ no edge enters the OPEN radius-12 disc about q
+   implemented by the same exact comparisons in refusal form (endpoint dist² < 144; interior
+   cross² < 144·|d|² with projection inside the segment) — any hit refuses, closed equality
+   passes. Spatial bins (edge bboxes within 12) are optimisation only. Nearest clearance/contact
+   is EVIDENCE, computed once per unique supported (position, candidate) and shared by every
+   subset — never repeated decision logic.
+2. Centre identities, corrected: the five analytic constructions compute their ideal point then
+   round half-up. MAXIMUM CLEARANCE is DEFINED DIRECTLY as the integer-millimetre interior point
+   maximising exact clearance, canonical tie order (smallest y, then smallest x) — no continuous
+   algebraic search exists to approximate, which is what makes L19 real for the one construction
+   that had no rational form. Finite domain, exact comparisons, deterministic by construction.
