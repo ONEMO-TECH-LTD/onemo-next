@@ -69,7 +69,7 @@ export function compareOutlineCentres(
   bands: ReadonlyArray<number>,
 ): CentreComparison[] {
   const points = outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h] as PointMM)
-  return compareCentres(spec.grid, points, methods, bands)
+  return compareCentres(spec.grid, points, Math.max(box.w, box.h), methods, bands)
 }
 
 /** One field, solved. Everything a surface may draw or say about it is in here. */

@@ -96,7 +96,7 @@ describe('centre-method comparison', () => {
 
 describe('published full-disc placement solver', () => {
   it('rederives the exact square standards for bands 2, 3 and 4', () => {
-    const [answer] = compareCentres(RELEASED.grid, square, ['box'], [2, 3, 4])
+    const [answer] = compareCentres(RELEASED.grid, square, 100, ['box'], [2, 3, 4])
     expect(answer.fits.map(({ sizeMM }) => sizeMM)).toEqual([72, 120, 168])
     expect(answer.fits.map(({ magnetCount }) => magnetCount)).toEqual([4, 9, 16])
     expect(answer.fits.every(({ minimumClearanceMM }) => minimumClearanceMM! >= 12)).toBe(true)
@@ -106,14 +106,14 @@ describe('published full-disc placement solver', () => {
     const padding6 = { ...RELEASED.grid, paddingMM: 6 }
     const padding18 = { ...RELEASED.grid, paddingMM: 18 }
     const pitch96 = { ...RELEASED.grid, pitchMM: 96 }
-    expect(compareCentres(padding6, square, ['box'], [2])[0].fits[0].sizeMM).toBe(60)
-    expect(compareCentres(padding18, square, ['box'], [2])[0].fits[0].sizeMM).toBe(84)
+    expect(compareCentres(padding6, square, 100, ['box'], [2])[0].fits[0].sizeMM).toBe(60)
+    expect(compareCentres(padding18, square, 100, ['box'], [2])[0].fits[0].sizeMM).toBe(84)
     // 96 thins the one anchored lattice; it does not recenter the surviving population.
-    expect(compareCentres(pitch96, square, ['box'], [2])[0].fits[0].sizeMM).toBe(168)
+    expect(compareCentres(pitch96, square, 100, ['box'], [2])[0].fits[0].sizeMM).toBe(168)
   })
 
   it('proves centre choice changes the lawful manufacturing answer', () => {
-    const answers = compareCentres(RELEASED.grid, lShape, ['box', 'area'], [2])
+    const answers = compareCentres(RELEASED.grid, lShape, 120, ['box', 'area'], [2])
     expect(answers[0].fits[0].sizeMM).toBe(216)
     expect(answers[1].fits[0].sizeMM).toBe(138)
   })
@@ -125,13 +125,33 @@ describe('published full-disc placement solver', () => {
       [60, 8],
       [-60, 8],
     ]
-    const [answer] = compareCentres(RELEASED.grid, narrow, ['box'], [2])
+    const [answer] = compareCentres(RELEASED.grid, narrow, 120, ['box'], [2])
     expect(answer.fits[0].sizeMM).toBeNull()
   })
 
   it('is winding-invariant', () => {
-    const forward = compareCentres(RELEASED.grid, lShape, ['area', 'perimeter'], [2])
-    const reverse = compareCentres(RELEASED.grid, [...lShape].reverse(), ['area', 'perimeter'], [2])
+    const forward = compareCentres(RELEASED.grid, lShape, 120, ['area', 'perimeter'], [2])
+    const reverse = compareCentres(RELEASED.grid, [...lShape].reverse(), 120, ['area', 'perimeter'], [2])
     expect(reverse).toEqual(forward)
+  })
+
+  it('uses the 9x9 field ceiling rather than the obsolete millimetre cap', () => {
+    const concaveL: PointMM[] = [[0, 0], [100, 0], [100, 40], [40, 40], [40, 100], [0, 100]]
+    const [answer] = compareCentres(RELEASED.grid, concaveL, 100, ['maximum-clearance'], [3])
+    expect(answer.fits[0].sizeMM).toBe(342)
+
+    const sparse = { ...RELEASED.grid, pitchMM: 96 }
+    expect(compareCentres(sparse, square, 100, ['box'], [4])[0].fits[0].sizeMM).toBe(360)
+  })
+
+  it('solves the published box size, including transparent margin around an outline', () => {
+    const [answer] = compareCentres(RELEASED.grid, square, 120, ['box'], [2])
+    expect(answer.fits[0].sizeMM).toBe(88)
+  })
+
+  it('fails loudly for an unknown method', () => {
+    expect(() => centreOfOutline(RELEASED.grid, square, 'AREA' as CentreMethod)).toThrow(
+      'Unknown centre method',
+    )
   })
 })

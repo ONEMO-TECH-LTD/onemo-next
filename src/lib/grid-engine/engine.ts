@@ -93,7 +93,12 @@ function fieldMarginMM(grid: GridSpec): number {
  * block survives into the view instead of cancelling out.
  */
 export function fieldSpanMM(spec: GridSystemSpec): number {
-  return (spec.grid.positionsPerAxis - 1) * spec.grid.basePitchMM + cellDiameterMM(spec.grid)
+  return gridFieldSpanMM(spec.grid)
+}
+
+/** The released field ceiling is a count on the base lattice, never the millimetre size cap. */
+export function gridFieldSpanMM(grid: GridSpec): number {
+  return (grid.positionsPerAxis - 1) * grid.basePitchMM + cellDiameterMM(grid)
 }
 
 /** Grow a region about its centre so it is never narrower than the field the law asks for. */
@@ -381,12 +386,17 @@ export function centreOfOutline(
   method: CentreMethod,
 ): PointMM {
   if (points.length <= 2) throw new RangeError('An outline needs at least three points.')
-  if (method === 'box') return boxCentre(points)
-  if (method === 'oriented-box') return orientedBoxCentre(points)
-  if (method === 'area') return areaCentre(points)
-  if (method === 'perimeter') return perimeterCentre(points)
-  if (method === 'vertices') return vertexCentre(points)
-  return maximumClearanceCentre(points, grid.paddingMM / 2 / 2 / 2 / 2)
+  switch (method) {
+    case 'box': return boxCentre(points)
+    case 'oriented-box': return orientedBoxCentre(points)
+    case 'area': return areaCentre(points)
+    case 'perimeter': return perimeterCentre(points)
+    case 'vertices': return vertexCentre(points)
+    case 'maximum-clearance':
+      return maximumClearanceCentre(points, grid.paddingMM / 2 / 2 / 2 / 2)
+    default:
+      throw new RangeError(`Unknown centre method: ${String(method)}`)
+  }
 }
 
 function clearanceAt(point: PointMM, polygon: ReadonlyArray<PointMM>): number {
@@ -434,23 +444,22 @@ export interface CentreComparison {
 export function compareCentres(
   grid: GridSpec,
   outline: ReadonlyArray<PointMM>,
+  sourceLongestMM: number,
   methods: ReadonlyArray<CentreMethod>,
   bands: ReadonlyArray<number>,
 ): CentreComparison[] {
   if (outline.length <= 2) throw new RangeError('An outline needs at least three points.')
-  const xs = outline.map(([x]) => x)
-  const ys = outline.map(([, y]) => y)
-  const longest = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
-  if (longest === 0) throw new RangeError('An outline must have a measurable span.')
+  if (sourceLongestMM <= 0) throw new RangeError('The source box must have a measurable span.')
   const floor = cellDiameterMM(grid)
+  const ceiling = gridFieldSpanMM(grid)
 
   return methods.map((method) => {
     const centreMM = centreOfOutline(grid, outline, method)
     const fits = bands.map((band): BandFit => {
       const registration: Registration = band % 2 === 0 ? 'gap' : 'point'
       const magnets = centredBand(grid, band, registration)
-      for (let sizeMM = Math.ceil(floor / 2) * 2; sizeMM <= grid.maxSizeMM; sizeMM += 2) {
-        const scale = sizeMM / longest
+      for (let sizeMM = Math.ceil(floor / 2) * 2; sizeMM <= ceiling; sizeMM += 2) {
+        const scale = sizeMM / sourceLongestMM
         const polygon = outline.map(
           ([x, y]) => [(x - centreMM[0]) * scale, (y - centreMM[1]) * scale] as PointMM,
         )
