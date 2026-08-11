@@ -204,3 +204,52 @@ unequal. Both measures stay, reported separately (no blending; precedence is Dan
 ## C12 · Verified this round
 Q1 holds (disc ⊆ P ⟺ inside ∧ full-boundary d ≥ r — off-ray notches included by min-over-edges).
 Lead/meta formula equivalence confirmed by pixel after t = |q−a|·L/E substitution.
+
+---
+# ROUND 3 — meta's AGREE + counterexample; the formula is sealed
+
+## C13 · Intersection-not-max, proven in code (meta's fixture — permanent regression property)
+Staggered-gaps fixture (100×100 frame, mouth from the right, notch off the top, deliberately
+asymmetric): per-magnet lawful sets UL 72–600 · UR 72–300,600 · LL 120–600 · LR 72,600.
+Intersection = {600} only. Max-of-minima = 120 — a size where LR has NO fabric under it, missing
+the truth by 480mm. CRITICAL FIXTURE PROPERTY: the gaps must be STAGGERED — the symmetric variant
+(sets 72–120 ∪ 360–600 aligned) passes a max-of-minima implementation and hides the defect. Any
+regression test for this clause must use staggered gaps.
+
+## C14 · The ladder steps the axis the LAYOUT binds (meta's correction, owed to Dan by meta)
+"136 for BOT" was a threshold, not a manufacturable size — 144 (band 3, third ladder value) is the
+answer; the stepper was right and four-per-band was never too narrow. What survives: the ladder
+steps the axis the LAYOUT's span constrains (BOT 1×2: step the height), never the shape's smaller
+side by default.
+
+## C15 · The ray form is analysis-only (meta withdraws it from the engine)
+A direct DT query already returns the binding magnet, binding edge and an integer margin.
+
+---
+# THE AGREED FORMULA — one page, three lanes signed
+INPUTS (all guarded): outline P at the 1mm floor, aspect locked; cell 12; pitch 48/96 (one lattice,
+thinned); disc radius 12; bands 2,3; ceiling 9×9 (=408); flap switch {12,24}; centre constructions
+(all six, policy open); parity target a per axis (odd run → 0, even → 24).
+KNOWNS: everything above + band ladders D(b,p) = G(b,p)+k·12 (4 values at 48, 8 at 96), generated
+before any shape exists; the ladder steps the LAYOUT-bound axis; published size = longest side via
+locked aspect, rounded UP to even — an output, never a candidate, never used for coupling.
+UNKNOWN SOLVED: which (layout, candidate σ) are lawful, with coordinates and evidence.
+METHOD:
+  per candidate σ (≈96 per centre):
+    1. rasterise the manufactured shape at 1mm (fixed deterministic rule)
+    2. exact integer squared distance transform DT²
+    3. survivor magnets: DT²(q) ≥ 144           ← THE formula; sign only, integers only
+    4. options = admissible connected subsets of survivors (every magnet has a pitch-adjacent
+       partner; ≤512 at 3×3); maximal components = default view
+    5. family ⟺ both pitches have an option at this σ (coupling by σ, never by rounding)
+    6. evidence: flap = 4 subtractions from the padded magnet extent (linear in σ); evenness =
+       flap spread; quadrant balance = spread of per-quadrant min margins (NOT redundant — C11);
+       binding contact = argmin DT² magnet + its nearest boundary cell; twin-fix cap 192
+UNKNOWNS HELD FOR DAN (labels, never computation): centre policy (incl. centre-as-output idea),
+ladder separation, joint-optimum definition, disconnected unions, presentation order.
+COST: ≈96 candidates × (1mm raster + DT + ≤13 lookups) ≈ tens of ms worst case, mobile-safe;
+library shapes precompute to a per-shape fingerprint of hundreds of bytes.
+VERIFICATION: pixel's independent 1mm brute-force disc oracle — identical survivor masks per
+candidate; meta's staggered-gaps fixture (C13); butterfly-from-130 and BOT L-at-120/132 as
+acceptance fixtures (Dan-named cases).
+Signed: @s62-lead (author) · @s62-kai-meta (AGREE, round 3) · @s62-grid-pixel (attacks folded C8–C12; final sign-off requested)
