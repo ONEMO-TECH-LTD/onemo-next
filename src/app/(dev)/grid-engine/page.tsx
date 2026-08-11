@@ -31,9 +31,13 @@ import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
   fieldBlockSpan,
+  flapLimits,
   minShapeSpan,
   resizeShape,
+  solveShape,
   type FieldSummary,
+  type SolveResult,
+  type Variant,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
@@ -219,6 +223,48 @@ export default function GridEnginePage() {
     }
     img.src = url
   })
+
+  // THE SOLVE — the shell asks the bridge and draws what came back. It computes nothing.
+  //
+  // The outline arrives here in the picture's own fractions, so the shell multiplies it by the box
+  // it currently occupies to get millimetres. That is screen-to-millimetre arithmetic on a shape the
+  // shell already owns, not grid maths: no pitch, padding, band or size is decided here.
+  const [solve, setSolve] = useState<SolveResult | null>(null)
+  const [variantIndex, setVariantIndex] = useState(0)
+  const held = solve ? solve.variants.filter((v) => v.holds) : []
+  const applied: Variant | null = held.length ? held[Math.min(variantIndex, held.length - 1)] : null
+
+  const runSolve = () => {
+    if (!outline || !box) return
+    const mm = outline.map(([u, v]) => [u * box.w, v * box.h] as [number, number])
+    setSolve(solveShape(spec, mm))
+    setVariantIndex(0)
+  }
+
+  /**
+   * APPLY one returned variant to the real cut-out — the shape resized to the answer's own size and
+   * the magnets drawn at the coordinates the engine returned. Nothing is recomputed for the picture.
+   *
+   * Registration follows the layout's parity through the guard, and the pan resets, so the drawn
+   * discs land ON the canvas lattice rather than near it. That coincidence is the proof: the shell
+   * draws the engine's coordinates and the canvas draws its own lattice, and they meet.
+   */
+  const applyVariant = (v: Variant) => {
+    const r = selectRegistration(spec, v.cols % 2 === 0 ? 'gap' : 'point')
+    setRefused(r.refused ?? null)
+    if (!r.refused) setSpec(r.spec)
+    setPan([0, 0])
+    setBox({ x: -v.widthMM / 2, y: -v.heightMM / 2, w: v.widthMM, h: v.heightMM })
+    const longest = Math.round(v.longestMM)
+    setSizeMM(longest)
+    setSizeDraft(String(longest))
+  }
+
+  useEffect(() => {
+    if (applied) applyVariant(applied)
+    // Applying is driven by which variant is selected, not by every spec or box change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applied])
 
   const loadLibraryCutout = async (name: (typeof CUTOUT_LIBRARY)[number]) => {
     const response = await fetch(`/grid-engine/cutouts/${encodeURIComponent(name)}`)
@@ -447,12 +493,59 @@ export default function GridEnginePage() {
           </button>
         )}
 
+        {cutout && (
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={Boolean(solve)}
+            onClick={runSolve}
+            disabled={!outline}
+            title={outline ? undefined : 'no silhouette in that file'}
+          >
+            solve
+          </button>
+        )}
+
+        {solve && (
+          <>
+            <button
+              type="button"
+              className={styles.chip}
+              onClick={() => setVariantIndex((i) => Math.max(0, i - 1))}
+              disabled={!held.length || variantIndex === 0}
+            >
+              ‹
+            </button>
+            <span className={styles.fieldReadout}>
+              {held.length ? `${Math.min(variantIndex, held.length - 1) + 1}/${held.length}` : '0'}{' '}
+              of {solve.candidatesTested}
+            </span>
+            <button
+              type="button"
+              className={styles.chip}
+              onClick={() => setVariantIndex((i) => Math.min(held.length - 1, i + 1))}
+              disabled={!held.length || variantIndex >= held.length - 1}
+            >
+              ›
+            </button>
+          </>
+        )}
+
         <span className={styles.spacer} />
 
-        {view && (
+        {applied ? (
           <span className={styles.fieldReadout}>
-            {view.cols}×{view.rows} · {Math.round(Math.max(view.spanXMM, view.spanYMM))}mm
+            {applied.cols}×{applied.rows} @{applied.pitchMM} · {applied.magnetCount} magnets ·{' '}
+            {applied.bindingMM}mm · flap {Math.round(applied.flapMM.left)}/
+            {Math.round(applied.flapMM.right)}/{Math.round(applied.flapMM.top)}/
+            {Math.round(applied.flapMM.bottom)} · spread {Math.round(applied.flapSpreadMM)}
           </span>
+        ) : (
+          view && (
+            <span className={styles.fieldReadout}>
+              {view.cols}×{view.rows} · {Math.round(Math.max(view.spanXMM, view.spanYMM))}mm
+            </span>
+          )
         )}
 
       </nav>
@@ -533,6 +626,38 @@ export default function GridEnginePage() {
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
+            </g>
+          )}
+
+          {/* THE APPLIED ANSWER, drawn from the engine's own numbers and nothing else: the discs at
+              the coordinates it returned, and the grid box the flap is measured from. If a disc were
+              to hang off the material, or the boundary were to cross a disc, it is visible here —
+              which is the point of drawing it on the real cut-out rather than tabulating "fits". */}
+          {applied && box && (
+            <g pointerEvents="none">
+              <rect
+                x={box.x + applied.gridBox.x}
+                y={box.y + applied.gridBox.y}
+                width={applied.gridBox.w}
+                height={applied.gridBox.h}
+                fill="none"
+                stroke="#ffd166"
+                strokeDasharray="4 3"
+                strokeWidth={1}
+                vectorEffect="non-scaling-stroke"
+              />
+              {applied.magnets.map(([mx, my], i) => (
+                <circle
+                  key={i}
+                  cx={box.x + mx}
+                  cy={box.y + my}
+                  r={spec.grid.paddingMM}
+                  fill="rgba(255,209,102,0.18)"
+                  stroke="#ffd166"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
             </g>
           )}
         </GridCanvas>
