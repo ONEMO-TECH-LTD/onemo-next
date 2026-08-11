@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Eighteen laws. The engine and its algorithm. Nothing else.
+### Nineteen laws, and one above them. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -16,6 +16,34 @@
 > and survives only where §E rescues it by name.
 >
 > Companion: [`grid-brief.md`](./grid-brief.md) — his directives verbatim, with timestamps.
+
+---
+
+## L0 — THE RULE ABOVE THE RULES
+
+**L0 — NO DECISION OR INTERPRETATION DAN DID NOT PROVIDE.**
+*Dan, 08-11 15:02:42 @lead*
+> "check you rrules against me - i forbid any decisions or interpretations taht i never provided"
+
+**A prohibition, not guidance.** It is the general form of every failure in this book's history, and
+each one was the same move — an inference written down in his voice:
+
+| what was invented | how it was caught |
+|---|---|
+| old 11.6, the computation method | he read it back and said it was not him |
+| old 3.1f, the fold as a ruling | machine-checked against the vault |
+| old 10.4, the tolerance sentence | machine-checked against the vault |
+| flap as distance-to-nearest-disc | he said *"this is nonesense… sanity fucking check on your interpretation"* |
+| the union-of-pair-boxes region | both peers caught it before he did |
+| "the twin fix is for elongated effects" | *"who determined that"* |
+
+**The standing test, before anything is written as law:** did he say this, in these words? If not, it
+is a reading — and a reading is shown to him and confirmed, never booked. His own instruction for how
+to proceed when a reading IS needed: *"what is the problem for you guys to agree with it and ask me to
+confirm - even if i didnt choose i can still do that if you actually ask."*
+
+**Measurement is not authorship.** It can prove a reading impossible; it can never make one ruled.
+That distinction is what failed in three of the six rows above.
 
 ---
 
@@ -213,6 +241,22 @@ it is **proven sufficient**.
 
 *(Preference bears on L17's still-unruled selection ordering: where both populations answer, this says
 the sparse one is preferred. It settles that pair, not the whole ordering.)*
+
+**L4b — THE CORPUS BAR: 2–3 FOUR-POINT SIZES PER SHAPE, OR THE ENGINE FAILS.**
+*Dan, 08-11 15:01:53 @lead*
+> "also you calculation smust be verified - each shape in the cutout library can have at leas 2-3 best
+> optimal sizes with 4 points"
+
+**An acceptance criterion, and the hardest one stated so far.** Every shape in the saved library must
+yield **at least two or three good sizes at FOUR points**. Not two at any count — four.
+
+**It is falsifiable today, and current measurement does not meet it.** On the traced corpus with a
+bounding-box centre, BAT-WOMAN reaches one band and DUCK finds nothing at all. An engine that passes
+every EC checkpoint and misses this bar has failed **his** test.
+
+**It reframes the centre question.** Maximum clearance is not merely "better on the duck" — it may be
+the only construction that can satisfy this bar, since it is the only one that gives the duck any
+answer. *(Raised by @s62-meta in the gap audit; the corpus numbers are mine.)*
 
 **L9 — THE CEILING IS A GRID COUNT, NEVER A MILLIMETRE.** *Dan, 08-10 16:13 @meta*
 > "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case

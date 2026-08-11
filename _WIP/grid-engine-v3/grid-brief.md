@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 107 directives
+## 2026-08-11 · @s62-lead · 110 directives
 
 **06:26:48**
 
@@ -1203,6 +1203,10 @@ every time you do something you must self verify /o-audit run /o-necessity laws 
 **10:35:24**
 
 mark the tasks ready for qa in the linear sprint
+
+**13:00:05**
+
+ok we need to make sure that we commit every change/task as a snapshot roll back tie machine sort of back up here so make sure everyone knows that and we do this. so in case something goes wrong, we can roll back plainly without any surgery or trying to remedy anything we can just restart from previous point
 
 **10:35:48**
 
@@ -1518,6 +1522,14 @@ system has bar not all shapes globally
 **15:01:28**
 
 what ? " twin fix is for elongated effects:" who determined that any effect below 192mm longest side can be twin   - the  shape perefernce allongated or not we dont care
+
+**15:01:53**
+
+also you calculation smust be verified - each shape in the cutout library can have at leas 2-3 best optimal sizes with 4 points
+
+**15:02:42**
+
+check you rrules against me - i forbid any decisions or interpretations taht i never provided
 
 
 ---
