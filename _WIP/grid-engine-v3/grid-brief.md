@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 81 directives
+## 2026-08-11 · @s62-lead · 82 directives
 
 **06:26:48**
 
@@ -1414,6 +1414,10 @@ the eventual mechanism in the interaction will be just selecting the band so und
 **14:07:16**
 
 admin dash must allow us to move and review every increment defined by the engine and if we can we need to build the engine that hits the bulls eye so we dont have to create mystery sizing and user knows the size and confirmed by the system and we do not to polish the mnagnetic grid matching the shape manually post purchase by eye - theis will become real bottleneck for the production and bad UX
+
+**14:13:59**
+
+" at 12mm nothing passes — not even a plain square, because a square's mid-edge sits 14.8mm from its nearest magnet by pure lattice geometry, at every band. " - this is nonesense the flap is calculated from the edge of the grid bounding box to the outer edges of the shape cutout - the 4x48mm grid points have 72mm square boiunding box inside of it no flap must be recognised - the pair has 72x24 bounding box so on and so forth so sanity fucking check on your interpretation
 
 
 ---

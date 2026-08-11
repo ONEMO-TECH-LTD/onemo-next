@@ -216,6 +216,39 @@ by construction, so it fails without anyone defining "bunched".
 > **Two independent proofs. And the lesson: the vault is not the only evidence layer — a live pane is
 > stronger when the vault has a hole.** See §F, where the hole is characterised.
 
+**HOW FLAP IS MEASURED — ruled, after BOTH the blueprint and I measured it wrong.**
+*Dan, 08-11 @lead*
+> "the flap is calculated from the edge of the grid bounding box to the outer edges of the shape
+> cutout - the 4x48mm grid points have 72mm square boiunding box inside of it no flap must be
+> recognised - the pair has 72x24 bounding box so on and so forth"
+
+**The grid bounding box is the arrangement's magnet extent grown by the padding on every side.**
+Nothing inside it is flap, ever. Flap is the shape's **overhang beyond that box**, per side.
+
+    box   = [min qx − P, max qx + P] × [min qy − P, max qy + P]
+    flap  = per side, how far the outline reaches past the box edge, clamped at 0
+
+Checked against his own two examples: two points 48mm apart plus 12mm each side = **72mm**; a pair is
+**72 × 24**. Both reproduce exactly.
+
+**What it gives, measured:**
+
+| shape | band | size | box | flap per side | 12mm | 24mm |
+|---|---|---|---|---|---|---|
+| square | 2 / 3 / 4 | 72 / 120 / 168 | 72 / 120 / 168 | **0 / 0 / 0** | pass | pass |
+| circle | 2 | 92 | 72 | 10 each side | pass | pass |
+| circle | 3 | 160 | 120 | 20 each side | fail | pass |
+| circle | 4 | 224 | 168 | 28 each side | fail | fail |
+
+The square has **zero flap** — it *is* the box — which is the obvious sanity check both earlier models
+failed. And L14a falls out for free: the four overhangs being equal **is** "flap evened out on all
+sides at the same time".
+
+**Struck: distance-to-the-nearest-disc.** I reported the square as 14.83mm and told Dan nothing could
+pass at 12mm. That measured the gap from the shape's edge to the nearest magnet, which is not flap and
+never was. His answer: *"this is nonesense… so sanity fucking check on your interpretation."* It also
+means the blueprint's Voronoi apparatus for reach is unnecessary — flap is four subtractions.
+
 **WHAT FLAP IS — ruled, after a blueprint measured it the other way.**
 *Dan, 08-11 @lead, on being shown that the blueprint counted the gap between magnets as flap:*
 > "between magnets? flap= outer edges not supported by magnet connection and hold"
