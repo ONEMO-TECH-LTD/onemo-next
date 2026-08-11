@@ -264,3 +264,26 @@ Signed: @s62-lead (author) · @s62-kai-meta (AGREE, round 3) · @s62-grid-pixel 
   squared distance < 333k). C1 agreed by all three lanes.
 - Status: meta AGREE (round 3) · pixel building the independent 1mm mask oracle before signing —
   the sign-off gate is identical survivor masks per candidate across both implementations.
+
+## C17 · The candidate-scale equation — exact, two-builder-deterministic (answers pixel's C3 gap)
+For layout R with grid spans (gx, gy) at pitch p, source bbox (W, H) integers at the 1mm floor:
+
+    binding axis  j  = argmax( gx/W , gy/H )        tie → x   (computed as gx·H ≥ gy·W, integers)
+    candidates    σ_k = ( span_j(R,p) + 12k ) / dim_j        k = 0 … p/12 − 1
+                        span_j = gx if j=x else gy;  dim_j = W if j=x else H
+
+The ladder starts from the LAYOUT's own span on its binding axis — not from the band's square span
+G(b,p); G is the special case where R is the full band square. The window is one pitch wide
+(k < p/12) because at span_j + p the next run-length takes over on that axis: 4 candidates at 48,
+8 at 96, per layout. The manufactured dimension on axis j is span_j + 12k EXACTLY (the grid
+number); the other dimension is σ_k × its source dimension (locked aspect); the published size is
+ceil_even(σ_k · L) — display/labelling only.
+
+σ_k is a ratio of two integers (span_j + 12k, dim_j) — the deduped union (C16) dedupes on the
+REDUCED FRACTION, exactly, no float keys. Butterfly falsifier resolved: wide shape (W > H),
+horizontal pair (72,24): 72·H vs 24·W with W ≈ 1.22H → 72H > 24W → j = x, manufactured WIDTH ∈
+{72,84,96,108}. Vertical pair (24,72): j = y, manufactured HEIGHT ∈ {72,84,96,108}, width follows
+the aspect. Two builders now generate identical dimension sets from these two lines.
+
+C4 authority (pixel's hold, accepted): the MASK DT² is the sole decision authority; any
+vector-geometry distance is display evidence only and never participates in a lawfulness decision.
