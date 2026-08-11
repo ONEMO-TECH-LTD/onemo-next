@@ -245,7 +245,8 @@ function areaCentre(points: ReadonlyArray<PointMM>): PointMM {
     yMoment += (a[1] + b[1]) * c
   }
   if (twiceArea === 0) return boxCentre(points)
-  return [xMoment / (twiceArea + twiceArea + twiceArea), yMoment / (twiceArea + twiceArea + twiceArea)]
+  const thirdMoment = twiceArea + twiceArea + twiceArea
+  return [xMoment / thirdMoment, yMoment / thirdMoment]
 }
 
 function perimeterCentre(points: ReadonlyArray<PointMM>): PointMM {
@@ -306,11 +307,20 @@ function signedDistance(point: PointMM, polygon: ReadonlyArray<PointMM>): number
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const a = polygon[i]
     const b = polygon[j]
-    if (a[1] > point[1] !== b[1] > point[1] && point[0] < ((b[0] - a[0]) * (point[1] - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside
+    if (
+      a[1] > point[1] !== b[1] > point[1] &&
+      point[0] < ((b[0] - a[0]) * (point[1] - a[1])) / (b[1] - a[1]) + a[0]
+    ) {
+      inside = !inside
+    }
     const dx = b[0] - a[0]
     const dy = b[1] - a[1]
     const lengthSquared = dx * dx + dy * dy
-    const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / lengthSquared))
+    const projection =
+      lengthSquared === 0
+        ? 0
+        : ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / lengthSquared
+    const t = Math.max(0, Math.min(1, projection))
     const x = a[0] + t * dx
     const y = a[1] + t * dy
     distanceSquared = Math.min(distanceSquared, (point[0] - x) ** 2 + (point[1] - y) ** 2)
@@ -334,7 +344,9 @@ function maximumClearanceCentre(points: ReadonlyArray<PointMM>, precisionMM: num
   }
   if (size === 0) return boxCentre(points)
   for (let x = minX; x < minX + width; x += size) {
-    for (let y = minY; y < minY + height; y += size) cells.push(makeCell(x + size / 2, y + size / 2, size / 2))
+    for (let y = minY; y < minY + height; y += size) {
+      cells.push(makeCell(x + size / 2, y + size / 2, size / 2))
+    }
   }
   const area = areaCentre(points)
   let best = makeCell(area[0], area[1], 0)
@@ -347,7 +359,12 @@ function maximumClearanceCentre(points: ReadonlyArray<PointMM>, precisionMM: num
     if (cell.d > best.d) best = cell
     if (cell.max - best.d <= precisionMM) continue
     const h = cell.h / 2
-    cells.push(makeCell(cell.x - h, cell.y - h, h), makeCell(cell.x + h, cell.y - h, h), makeCell(cell.x - h, cell.y + h, h), makeCell(cell.x + h, cell.y + h, h))
+    cells.push(
+      makeCell(cell.x - h, cell.y - h, h),
+      makeCell(cell.x + h, cell.y - h, h),
+      makeCell(cell.x - h, cell.y + h, h),
+      makeCell(cell.x + h, cell.y + h, h),
+    )
   }
   return [best.x, best.y]
 }

@@ -59,12 +59,17 @@ describe('centre-method comparison', () => {
     ]
     const before = diamond.map(([x, y], i) => {
       const next = diamond[(i + 1) % diamond.length]
-      return Math.hypot(next[0] - x, next[1] - y)
+      return [next[0] - x, next[1] - y]
     })
-    const centre = centreOfOutline(RELEASED.grid, diamond, 'oriented-box')
-    const after = diamond.map(([x, y], i) => {
-      const next = diamond[(i + 1) % diamond.length]
-      return Math.hypot(next[0] - centre[0] - (x - centre[0]), next[1] - centre[1] - (y - centre[1]))
+    const minX = Math.min(...diamond.map(([x]) => x))
+    const minY = Math.min(...diamond.map(([, y]) => y))
+    const width = Math.max(...diamond.map(([x]) => x)) - minX
+    const height = Math.max(...diamond.map(([, y]) => y)) - minY
+    const uv = diamond.map(([x, y]) => [(x - minX) / width, (y - minY) / height] as PointMM)
+    const placed = centreOutline(RELEASED, uv, { x: minX, y: minY, w: width, h: height }, 'oriented-box')
+    const after = placed.points.map(([x, y], i) => {
+      const next = placed.points[(i + 1) % placed.points.length]
+      return [next[0] - x, next[1] - y]
     })
     expect(after).toEqual(before)
   })

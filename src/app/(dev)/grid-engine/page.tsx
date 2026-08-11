@@ -174,8 +174,8 @@ export default function GridEnginePage() {
 
   // THE CUT-OUT — the picture, laid on the field so the magnets show through it.
   //
-  // Presentation only. The shell reads the file and draws it; nothing is traced, measured or handed
-  // to the unit. The engine is not involved and does not know a cut-out exists.
+  // Browser IO stays here. The traced outline crosses the bridge only after it exists, so the unit
+  // can compare centre constructions in millimetres; the image file and pixels never cross it.
   const [cutout, setCutout] = useState<{ url: string } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
