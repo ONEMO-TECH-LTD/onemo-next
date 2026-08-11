@@ -56,12 +56,17 @@ const LAW_KEYS = new Set([
   'registration',
 ])
 
-/** The released law values, read from the spec itself so this list cannot drift from it. */
+/**
+ * The released law values, read from the spec itself so this list cannot drift from it.
+ *
+ * EVERY law key, not a chosen few: the first cut omitted `positionsPerAxis`, so a bare 9 in the
+ * shell would have walked straight through the guard written to stop exactly that.
+ */
 const RELEASED_VALUES = (() => {
   const src = readFileSync(join(UNIT, 'spec.ts'), 'utf8')
   const block = src.slice(src.indexOf('export const RELEASED'))
   const found = new Set<number>()
-  for (const [, v] of block.matchAll(/(?:basePitchMM|pitchMM|paddingMM|maxSizeMM):\s*(\d+)/g)) {
+  for (const [, v] of block.matchAll(/(?:basePitchMM|pitchMM|paddingMM|maxSizeMM|positionsPerAxis):\s*(\d+)/g)) {
     found.add(Number(v))
   }
   return found

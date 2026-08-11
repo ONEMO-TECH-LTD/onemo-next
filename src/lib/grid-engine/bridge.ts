@@ -43,12 +43,6 @@ interface FieldLayout {
   magnets: PointMM[]
   /** The spot each magnet owns, in millimetres. */
   cellMM: number
-  /**
-   * Where the lattice sits against the shape's centre. A surface drawing the lattice as a rule must
-   * anchor it here, or the rule lands at zero while the magnets sit half a pitch off it — lines that
-   * miss the centres they are meant to run through.
-   */
-  registrationMM: number
   /** The rule's anchor per axis — registration plus pan. A surface draws lines here or they drift. */
   anchorMM: PointMM
 }
@@ -66,7 +60,6 @@ export function layoutField(
     padded: paddedFieldMM(spec.grid, field),
     magnets: magnetsInRegion(spec.grid, field, offset, panMM),
     cellMM: cellDiameterMM(spec.grid),
-    registrationMM: offset,
     /** Where the rule must anchor so its intersections stay ON the magnet centres (law 8.3). */
     anchorMM: latticeAnchorMM(offset, panMM),
   }

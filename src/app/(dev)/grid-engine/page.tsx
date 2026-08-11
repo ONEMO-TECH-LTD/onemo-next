@@ -165,7 +165,7 @@ export default function GridEnginePage() {
   //
   // Presentation only. The shell reads the file and draws it; nothing is traced, measured or handed
   // to the unit. The engine is not involved and does not know a cut-out exists.
-  const [cutout, setCutout] = useState<{ url: string; wPx: number; hPx: number } | null>(null)
+  const [cutout, setCutout] = useState<{ url: string } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
@@ -199,7 +199,7 @@ export default function GridEnginePage() {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
-      setCutout({ url, wPx: img.naturalWidth, hPx: img.naturalHeight })
+      setCutout({ url })
       // Fitted to the size already on screen, longest side, proportions untouched (law 2.1a).
       const k = sizeMM / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * k
@@ -317,10 +317,6 @@ export default function GridEnginePage() {
    *
    * Whole millimetres, like every other move, and bounded by the same floor and 9x9 ceiling the
    * slider carries.
-   *
-   * A trackpad pinch reaches the browser as a wheel event with ctrlKey set. The listener is native
-   * and non-passive because preventDefault is required — without it macOS zooms the whole page and
-   * the gesture never arrives here at all.
    */
   useEffect(() => {
     applyPinch.current = (factor: number) => {
@@ -337,6 +333,10 @@ export default function GridEnginePage() {
   // ONE listener, attached once. It used to be re-attached on every render — including every render
   // a pinch caused — because the effect had no dependency list. It reads through the ref above, so
   // it needs no dependencies to stay current.
+  //
+  // A trackpad pinch reaches the browser as a wheel event with ctrlKey set. The listener is NATIVE
+  // and NON-PASSIVE because preventDefault is required — without it macOS zooms the whole page and
+  // the gesture never arrives here at all.
   useEffect(() => {
     const el = panSurface.current
     if (!el) return

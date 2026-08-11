@@ -37,16 +37,17 @@ const CELL_FILL = 'var(--magnet-fill)'
 const CELL_STROKE = 'var(--magnet-stroke)'
 
 /**
- * The millimetre notepad under everything. Dan, 2026-08-10: "the lattice must be sitting on the
- * intersection of the notepad grid nodes — that is the point — and be faint almost invisible so it
- * gives geometric background and not invasive."
+ * THE NOTEPAD'S INK. Dan, 2026-08-10: "the lattice must be sitting on the intersection of the
+ * notepad grid nodes — that is the point — and be faint almost invisible so it gives geometric
+ * background and not invasive."
  *
- * Read out of the file, not chosen: the frame carries a GRID at sectionSize 10 units — ONE
- * MILLIMETRE — in #CFCFCF at 10% alpha, and COLUMNS + ROWS at 480 units — 48mm — in #858585 at 10%.
+ * Read out of the Figma file, not chosen: the frame carries a GRID at sectionSize 10 units — one
+ * millimetre — in #CFCFCF at 10% alpha, and COLUMNS + ROWS at 480 units — 48mm — in #858585 at 10%.
  * There is no 10mm level in the design; that one was mine, and it is the level that can never align
  * with a 48mm lattice.
+ *
+ * Ink follows the theme: the surface it is drawn on is not always white.
  */
-/** Ink follows the theme; the surface it is drawn on is not always white. */
 const RULE_FINE_STROKE = 'var(--rule-fine)'
 const PITCH_RULE_STROKE = 'var(--rule-pitch)'
 /** Hairline thickness in SCREEN pixels — Figma draws a layout grid at one device pixel, never scaled. */

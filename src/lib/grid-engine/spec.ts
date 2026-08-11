@@ -160,9 +160,15 @@ const RELEASED_REGISTRATIONS: readonly Registration[] = Object.freeze(['gap', 'p
  * It is a released OPTION, like the pitch: chosen between values the system has, never typed. What
  * it should BE for a given shape is the engine's answer (law 6.5); this only guards how it is set.
  */
-export function selectRegistration(spec: GridSystemSpec, registration: Registration): WriteResult {
-  if (!RELEASED_REGISTRATIONS.includes(registration)) return { spec, refused: 'options-only' }
-  return { spec: { ...spec, registration } }
+export function selectRegistration(spec: GridSystemSpec, registration: string): WriteResult {
+  // WIDE parameter, exactly like selectPitch takes `number` rather than a union of the two launch
+  // pitches. Typed as the union instead, the refusal below could only ever fire on a cast — the
+  // guard would be a compile-time promise wearing a runtime guard's clothes, and the acceptance
+  // criterion "invalid writes fail explicitly" would be satisfied vacuously.
+  if (!RELEASED_REGISTRATIONS.includes(registration as Registration)) {
+    return { spec, refused: 'options-only' }
+  }
+  return { spec: { ...spec, registration: registration as Registration } }
 }
 
 /**
