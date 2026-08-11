@@ -11,7 +11,7 @@
 // Built on the studio's own anatomy, measured from Figma "Prototypes / Control" (node 14209:26629)
 // at 402pt. Canvas is 402 x 402. The studio's visual design comes from Figma; this invents none.
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   applyGridValue,
   isOptionsOnly,
@@ -189,6 +189,8 @@ export default function GridEnginePage() {
    * themselves, so it is placement — the shape stays still and the grid comes to meet it.
    */
   const [pan, setPan] = useState<[number, number]>([0, 0])
+  /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
+  const panSurface = useRef<SVGRectElement>(null)
   /**
    * The whole drag is measured from where it STARTED, never from the last frame.
    *
@@ -256,6 +258,39 @@ export default function GridEnginePage() {
    * number the moment either changes, without a line here moving.
    */
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
+
+  /**
+   * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
+   * grid to the resizing same as slider would".
+   *
+   * It drives `setSize` and nothing else, so there is ONE size and three ways to reach it: the band
+   * chips, the slider, the pinch. A second scale living beside the first is how a surface ends up
+   * showing a number the shape does not have (law 5.3).
+   *
+   * The direction follows what the hand is doing to the GRID, not to the shape. Spread the fingers
+   * and the grid grows, which means the shape covers less of it — a smaller shape in millimetres.
+   * Pinch in and the grid shrinks under a shape that is therefore bigger. The shape itself never
+   * changes on screen; only its size in millimetres does, which is the inverted model.
+   *
+   * Whole millimetres, like every other move, and bounded by the same floor and 9x9 ceiling the
+   * slider carries.
+   *
+   * A trackpad pinch reaches the browser as a wheel event with ctrlKey set. The listener is native
+   * and non-passive because preventDefault is required — without it macOS zooms the whole page and
+   * the gesture never arrives here at all.
+   */
+  useEffect(() => {
+    const el = panSurface.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      const next = Math.round(sizeMM * Math.exp(e.deltaY / 100))
+      setSize(Math.min(maxSpanMM, Math.max(SHAPE_MIN_MM, next)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  })
 
   const lockedCount = ROWS.filter(
     (r) => isSealedInCode(r.key) || isOptionsOnly(r.key) || !unlocked.has(r.key),
@@ -347,6 +382,7 @@ export default function GridEnginePage() {
           {/* Drag anywhere on the field to slide the LATTICE against the shape. Whole millimetres,
               like every other move. Drawn first, so it sits beneath the cut-out. */}
           <rect
+            ref={panSurface}
             x={-5000}
             y={-5000}
             width={10000}
