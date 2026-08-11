@@ -80,9 +80,6 @@ export function describeRegion(
   return summariseField(spec.grid, region, layout.magnets)
 }
 
-
-
-
 /** Drive the shape's longest side from a surface control. The shape itself is untouchable. */
 export function resizeShape(spec: GridSystemSpec, box: RegionMM, longestMM: number): RegionMM {
   return resizeBoxToLongest(box, longestMM, cellDiameterMM(spec.grid))
