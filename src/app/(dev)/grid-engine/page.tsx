@@ -99,11 +99,6 @@ export default function GridEnginePage() {
   const [spec, setSpec] = useState<GridSystemSpec>(RELEASED)
   const [unlocked, setUnlocked] = useState<ReadonlySet<GridKey>>(new Set())
   const [refused, setRefused] = useState<WriteRefusal | null>(null)
-  // Plain view scale. 1 is fit; it changes what is on screen and nothing about the field.
-  // Framing, not layout: how much narrower the launch view is than the whole field. Both spans come
-  // from the unit; dividing two lengths to get a camera factor is screen maths, which is this side's.
-  const launchZoom =
-    fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / bandSpan(RELEASED, LARGEST_BAND + 1)
   // NO ZOOM. Dan, 2026-08-11: "the cutout is scaling incorrectly the grid must scale instead and pan
   // - no zoom - the object fits the viewport and static".
   //
@@ -121,8 +116,12 @@ export default function GridEnginePage() {
   // Two ways in, one value: drag the slider to sweep, type for an exact number. The field commits on
   // ENTER or on leaving it, never per keystroke — typing "88" used to land on 8 first and redraw the
   // whole canvas at a size nobody asked for.
-  const [sizeMM, setSizeMM] = useState(162)
-  const [sizeDraft, setSizeDraft] = useState('162')
+  //
+  // It is also what the camera reads, with or without a cut-out on the field — see below.
+  const [sizeMM, setSizeMM] = useState(() => Math.round(bandSpan(RELEASED, LARGEST_BAND + 1)))
+  const [sizeDraft, setSizeDraft] = useState(() =>
+    String(Math.round(bandSpan(RELEASED, LARGEST_BAND + 1))),
+  )
 
   /**
    * ONE number for the shape's longest side, and it is the precision instrument: type an exact size
@@ -242,12 +241,18 @@ export default function GridEnginePage() {
     })
 
   /**
-   * THE CAMERA, derived. The shape fills the viewport and never moves; the grid scales beneath it.
-   * With no shape loaded the view holds the largest band.
+   * THE CAMERA, derived from THE SIZE — one quantity, whether a cut-out is on the field or not.
+   *
+   * It used to branch: the shape's own box when one was loaded, a frozen launch factor otherwise. So
+   * with an empty field the camera was a constant, and Dan hit exactly that — "it is not changing
+   * with no cutout shown". The size moved and nothing on screen did.
+   *
+   * There is no branch now. `sizeMM` IS the shape's longest side whenever there is a shape — loading
+   * one sets it, and every route that changes it resizes the box through the unit — so reading the
+   * size covers both cases and one of them stops being special. With an empty field it is the size
+   * the shape WOULD be, which is what makes the grid scale under a pinch with nothing loaded.
    */
-  const gridScale = box
-    ? fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / Math.max(box.w, box.h)
-    : launchZoom
+  const gridScale = fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / Math.max(sizeMM, 1)
 
   /**
    * THE BIGGEST THE SHAPE MAY BE — the 9x9 grid itself, never a millimetre.
