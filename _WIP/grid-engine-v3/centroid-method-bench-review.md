@@ -1,6 +1,6 @@
 # Centroid method bench — QA handoff
 
-Snapshot: `eb32c046` on `session62-task/grid-centroid-method-bench`, based on cleanup snapshot `748f3e99`.
+Snapshot: `b39a585c` on `session62-task/grid-centroid-method-bench`, based on cleanup snapshot `748f3e99`.
 
 ## Directive covered
 
