@@ -269,7 +269,15 @@ The square canon is preserved exactly. The circle grows by ten because a box cor
 fabric. *(Containment is CLOSED — the box boundary may touch the outline. A strict test rejects the
 square's own canon at 72.)*
 
-**WHICH REGION, for a layout that is not a rectangle — resolved by measurement, not by choice.** Dan
+**WHICH REGION, for a layout that is not a rectangle — DERIVED BY ME, NOT RULED BY DAN. PROVISIONAL.**
+
+> **This is my inference and it must not be built against until Dan confirms it.** Both @s62-grid-pixel
+> and @s62-meta caught me promoting it into law and into the contract, and they are right: measurement
+> can show that a reading is *impossible*, never that another reading is *ruled*. That the axis-aligned
+> box makes his own L layout unbuildable proves ambiguity, not authorship. It is the same class as the
+> fold and the tolerance — both struck this morning for exactly this.
+
+Dan
 names 3-point layouts (the L, the 1:2 pyramid) as first-class. On an L cut-out with a 3-point L
 layout:
 
