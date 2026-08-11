@@ -103,6 +103,21 @@ function populationOccurrences(
   return out.map((o) => ({ ...o, firstLawfulSigma: firstSigmaById.get(o.component.id) ?? o.interval.lo }))
 }
 
+/**
+ * §6.2 at the published scale: the claimed component must equal a connected component of the
+ * edges actually active (exactly contained) at σ. Implies containment of its own boxes — an
+ * uncontained own edge changes the component id — and refuses a component that a newly active
+ * neighbouring edge has merged into a larger arrangement at this exact size.
+ */
+function isMaximalComponentAt(occ: ComponentOccurrence, centred: readonly PointMM[], sigma: number): boolean {
+  const active: number[] = []
+  for (let ei = 0; ei < occ.edges.length; ei++) {
+    if (boxContainedAt(occ.relBoxes[ei], centred, sigma)) active.push(ei)
+  }
+  if (!active.length) return false
+  return componentsOf(occ.window, occ.edges, active).some((c) => c.id === occ.component.id)
+}
+
 /** §7.5: every even integer inside [L·lo, L·hi], ascending. */
 function evenSizesIn(loMM: number, hiMM: number): number[] {
   const out: number[] = []
@@ -172,11 +187,13 @@ export function solve(request: SolveRequest): SolveOutcome {
           for (const m of evenSizesIn(L * lo, L * hi)) {
             const sigma = m / L
             // §7.5: a size ships because BOTH complete regions are contained at the exact even
-            // integer — re-proven here, never inferred from the interval arithmetic.
-            const containedBoth =
-              bo.component.edgeIndices.every((ei) => boxContainedAt(bo.relBoxes[ei], centred, sigma)) &&
-              so.component.edgeIndices.every((ei) => boxContainedAt(so.relBoxes[ei], centred, sigma))
-            if (!containedBoth) continue
+            // integer — re-proven here, never inferred from the interval arithmetic. And §6.2:
+            // an arrangement is a MAXIMAL connected component of the edges active at that exact
+            // σ. A piece interval closes at an event scale inclusively, so its component can be
+            // published at the very σ where a neighbouring edge becomes (tangentially) active
+            // and absorbs it — the L fixture caught exactly that at 360. Recomputing the active
+            // set at σ proves both containment and maximality in one pass.
+            if (!isMaximalComponentAt(bo, centred, sigma) || !isMaximalComponentAt(so, centred, sigma)) continue
             families.push(
               buildFamily({
                 request, spec, method, centreMM, band, sigma, m, L,
@@ -223,7 +240,7 @@ export function solve(request: SolveRequest): SolveOutcome {
     status: 'solved' as const,
     requestFingerprint: requestFingerprint({
       outlinePoints: outline.points,
-      spec: spec as unknown as object,
+      spec,
       flapLimitsMM: request.flapLimitsMM,
     }),
     outlineFacts: {

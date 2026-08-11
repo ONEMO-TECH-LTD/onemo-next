@@ -4,6 +4,8 @@
 //   "No randomness, wall-clock value, platform locale or iteration order affects answer content.
 //    Timing stays in diagnostics and outside the canonical answer hash."
 //
+import type { GridEngineSpec, PointMM } from './contract'
+
 // The mechanism: serialisation recurses with SORTED object keys, so runtime insertion order can
 // never reach the bytes; numbers are formatted through one locale-independent path; and the answer
 // hash is computed over the result WITH ITS TIMING FIELD REMOVED, so two identical solves at
@@ -32,9 +34,12 @@ export function canonicalSerialise(value: unknown): string {
       if (Array.isArray(value)) {
         return `[${value.map(canonicalSerialise).join(',')}]`
       }
-      const entries = Object.entries(value as Record<string, unknown>)
-        .filter(([, v]) => v !== undefined)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+        a < b ? -1 : a > b ? 1 : 0,
+      )
+      for (const [k, v] of entries) {
+        if (v === undefined) throw new RangeError(`canonical output cannot carry undefined (key ${k})`)
+      }
       return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalSerialise(v)}`).join(',')}}`
     }
     default:
@@ -66,10 +71,19 @@ export function canonicalHash(canonicalBytes: string): string {
  * pending questions — is identity.
  */
 export function answerHash(result: object): string {
-  const clone = JSON.parse(JSON.stringify(result)) as Record<string, unknown>
-  const diagnostics = clone['diagnostics'] as Record<string, unknown> | undefined
-  if (diagnostics) delete diagnostics['solveDurationMS']
-  return canonicalHash(canonicalSerialise(clone))
+  // STRUCTURAL strip of the one timing field — never a JSON round-trip, which coerces NaN and
+  // Infinity to null and silently drops undefined, letting invalid answers hash as valid.
+  const strip = (v: unknown, path: string): unknown => {
+    if (v === null || typeof v !== 'object') return v
+    if (Array.isArray(v)) return v.map((x, i) => strip(x, `${path}[${i}]`))
+    const out: Record<string, unknown> = {}
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (path === '.diagnostics' && k === 'solveDurationMS') continue
+      out[k] = strip(val, `${path}.${k}`)
+    }
+    return out
+  }
+  return canonicalHash(canonicalSerialise(strip(result, '')))
 }
 
 /**
@@ -78,9 +92,11 @@ export function answerHash(result: object): string {
  * the engine; anything less serves a stale answer after a law change).
  */
 export function requestFingerprint(input: {
-  readonly outlinePoints: ReadonlyArray<readonly [number, number]>
-  readonly spec: object
+  readonly outlinePoints: readonly PointMM[]
+  readonly spec: GridEngineSpec
   readonly flapLimitsMM: readonly [number, number]
 }): string {
+  // the compiler now REQUIRES every guarded law input — omitting bands or centreMethods is a type
+  // error, so the cache key cannot silently narrow (G11).
   return canonicalHash(canonicalSerialise(input))
 }

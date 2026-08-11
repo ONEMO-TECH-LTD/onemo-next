@@ -25,8 +25,16 @@ describe('§9 canonical serialisation', () => {
     expect(() => canonicalSerialise({ x: Infinity })).toThrow()
   })
 
-  it('undefined is refused — absence must be modelled explicitly', () => {
+  it('undefined is refused — absence must be modelled explicitly, in ARRAYS AND OBJECTS', () => {
     expect(() => canonicalSerialise([undefined])).toThrow()
+    expect(() => canonicalSerialise({ a: undefined })).toThrow()
+  })
+
+  it('answerHash refuses NaN/Infinity instead of coercing them equal through a JSON clone', () => {
+    const bad1 = { families: [{ x: Number.NaN }], diagnostics: { solveDurationMS: 1 } }
+    const bad2 = { families: [{ x: Infinity }], diagnostics: { solveDurationMS: 1 } }
+    expect(() => answerHash(bad1)).toThrow()
+    expect(() => answerHash(bad2)).toThrow()
   })
 
   it('the hash is stable and input-sensitive', () => {
@@ -43,10 +51,13 @@ describe('§9 canonical serialisation', () => {
     expect(answerHash(fast)).not.toBe(answerHash(different))
   })
 
-  it('the request fingerprint covers outline AND every law value (G11)', () => {
+  it('the request fingerprint covers outline AND every law value (G11) — omitting one is now a TYPE error', () => {
     const base = {
       outlinePoints: [[0, 0], [10, 0], [10, 10]] as ReadonlyArray<readonly [number, number]>,
-      spec: { basePitchMM: 48, sparseFactor: 2, paddingMM: 12, positionsPerAxis: 9 },
+      spec: {
+        basePitchMM: 48, sparseFactor: 2, paddingMM: 12, positionsPerAxis: 9,
+        bands: [2, 3] as const, centreMethods: ['box'] as const,
+      },
       flapLimitsMM: [12, 24] as const,
     }
     const fp = requestFingerprint(base)
@@ -56,6 +67,15 @@ describe('§9 canonical serialisation', () => {
     expect(requestFingerprint({ ...base, flapLimitsMM: [12, 26] as const })).not.toBe(fp)
     expect(
       requestFingerprint({ ...base, outlinePoints: [[0, 0], [10, 0], [10, 11]] }),
+    ).not.toBe(fp)
+    expect(requestFingerprint({ ...base, spec: { ...base.spec, bands: [2] as const } })).not.toBe(fp)
+    expect(
+      requestFingerprint({ ...base, spec: { ...base.spec, centreMethods: ['area'] as const } }),
+    ).not.toBe(fp)
+    expect(requestFingerprint({ ...base, spec: { ...base.spec, sparseFactor: 3 } })).not.toBe(fp)
+    expect(requestFingerprint({ ...base, spec: { ...base.spec, basePitchMM: 50 } })).not.toBe(fp)
+    expect(
+      requestFingerprint({ ...base, spec: { ...base.spec, positionsPerAxis: 11 } }),
     ).not.toBe(fp)
   })
 })
