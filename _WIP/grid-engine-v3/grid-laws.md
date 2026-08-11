@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Sixteen laws. The engine and its algorithm. Nothing else.
+### Seventeen laws. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -291,6 +291,42 @@ pinch, resize, pan, drag, camera movement or variant browsing.** Browsing candid
 
 *(Contract EC-12 carries this. Recorded here because EC-12 is a checkbox and this is the reason
 behind it — and because the first design to break it did so while satisfying every other law.)*
+
+**L17 — THE BULLS EYE. One guaranteed answer per band, good enough that nobody touches it after.**
+*Dan, 08-11 14:14 and 14:20 @lead*
+> "the eventual mechanism in the interaction will be just selecting the band so under the hood we need
+> to make sure that within selected band user gets the optimal size and we guarantee it - otherwise
+> they can get surprises on the expected sizes"
+>
+> "admin dash must allow us to move and review every increment defined by the engine and if we can we
+> need to build the engine that hits the bulls eye so we dont have to create mystery sizing and user
+> knows the size and confirmed by the system and we do not to polish the mnagnetic grid matching the
+> shape manually post purchase by eye - theis will become real bottleneck for the production and bad
+> UX"
+
+**The interaction is one control: the user picks a band.** They then get one size, it is the optimal
+one for that band, and it is guaranteed — same shape, same band, same answer, every time.
+
+**Selection is not discarding, and that is what reconciles this with L13.** The engine still computes
+and returns every lawful variation; it *marks* one as the guaranteed answer. Nothing is hidden, one
+thing is named. The admin dash steps through **every** increment the engine defines — that is the
+review surface, and it is why returning everything still matters.
+
+**THE ACCEPTANCE BAR, and it is harder than any checkpoint:** the marked answer must be the one a
+person would have chosen by eye, on real cut-outs. **If anyone has to nudge the placement after
+purchase, the engine has failed** — Dan names that as a production bottleneck and bad UX, not a
+tolerable finishing step. The seven real cut-outs stop being a test of whether the maths runs and
+become a test of whether the CHOICE is right.
+
+**UNRULED, and it must not be invented:** what "optimal" orders by. The recommendation on the table
+uses only ruled law — L15's ordered scale picks the arrangement class (four outermost corners fitted
+to the edge, down to the pair floor); L14a's evenness picks among sizes achieving it; L11's hug breaks
+the remaining tie by tightest. **Awaiting Dan.** *(Measured obstacle: at the 12mm flap switch nothing
+passes, not even a plain square — its mid-edge sits 14.83mm from support by pure lattice geometry at
+every band — so "optimal" cannot be defined by coverage alone.)*
+
+---
+
 
 ## §B — ARCHITECTURE (true, but design — not law the algorithm obeys)
 
