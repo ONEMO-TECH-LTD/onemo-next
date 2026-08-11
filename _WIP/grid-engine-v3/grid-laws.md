@@ -132,6 +132,13 @@ hug 48mm x4 points". A tighter size that is unbalanced is rejected.
 defines is law: judge each cell about the centre lines for material coverage. The averaging step is a
 proposal to be tested, not a rule to implement.
 
+*Relationship to L14a — recorded, not resolved by me.* On 08-11 Dan named a different yardstick for
+the same intent: flap **evened out on all sides**, measured per side rather than per cell. L14a is
+later, more specific, and he called it "the yardstick for balanced measure", so it is the operative
+one and the contract measures per side. **L12 is not struck** — it is his ruling and the per-cell
+question may yet catch something per-side evenness cannot (a cell hollowed out mid-side reads as even
+reach at the edge). Whether they are the same measure is his to settle, not mine to collapse.
+
 **L13 — A BAND IS A RANGE TO BE SEARCHED, NOT A SQUARE TO BE TESTED.**
 *Dan, 08-11 11:38 @grid-pixel · with 08-10 18:37 · 18:38 @meta · 08-11 11:28 @grid-pixel*
 > "wait the algorithm must analise shape and bands in each band range it must provide answers what
