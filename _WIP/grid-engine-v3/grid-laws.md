@@ -216,6 +216,20 @@ by construction, so it fails without anyone defining "bunched".
 > **Two independent proofs. And the lesson: the vault is not the only evidence layer — a live pane is
 > stronger when the vault has a hole.** See §F, where the hole is characterised.
 
+**WHAT FLAP IS — ruled, after a blueprint measured it the other way.**
+*Dan, 08-11 @lead, on being shown that the blueprint counted the gap between magnets as flap:*
+> "between magnets? flap= outer edges not supported by magnet connection and hold"
+
+**Flap is material at the OUTER EDGE that no magnet holds.** It is not the space between magnets.
+The unsupported run between two magnets is 48mm by construction (96mm sparse) — that is the lattice,
+not a defect, and grid-spec §9 already recorded it as *"a physical answer, not a computed one"*.
+
+The consequence is a hard one, and it is why this needed ruling: a measure that counts interior
+material reports 21.941mm of "reach" at the centre of any four magnets on the 48mm lattice —
+identical for bands 2, 3 and 4, because it is the cell and not the shape. That value exceeds the 12mm
+switch, so **coverage could never pass at 12mm for any shape**, and one of the two positions Dan ruled
+would be unselectable. A flap measure that cannot pass is not measuring flap.
+
 **On the limb exemption.** "Trivial" has no number and none may be invented. The engine **measures**
 every uncovered region — extent and side — and **reports** which ones the exemption was applied to.
 An exemption that is visible can be overruled; one applied silently cannot. **This closes the only

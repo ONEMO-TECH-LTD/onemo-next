@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 78 directives
+## 2026-08-11 · @s62-lead · 79 directives
 
 **06:26:48**
 
@@ -1402,6 +1402,10 @@ also we need to make sure that current parts that we retain do n ot jit the perf
 **13:27:12**
 
 there was a problem with computations of the centroid they froze the UI shel cause they were computing hundreds of variants for every ui change - it is no go
+
+**14:03:25**
+
+between magnets? flap= outer edges not supported by magnet connection and hold
 
 
 ---
