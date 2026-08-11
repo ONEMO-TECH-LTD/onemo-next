@@ -408,3 +408,24 @@ SEAL STATUS: formula + domain + grammar + predicate agreed across three lanes. O
 seal: (1) meta's overflow bound / filter number; (2) pixel's independent oracle run on the
 canonical traces (exact-predicate verdicts + family sets); (3) meta's BOT numbers rerun on the
 canonical trace (C21).
+
+## C25 · The overflow number (meta, measured) + the centre split — C24's rule confirmed
+Filter+fallback beats any magnitude bound, by measurement: 1,324 candidates, 508,345 predicate
+calls, **76 exact fallbacks (0.0150%)**, whole corpus **22ms = 3.2ms/shape UNOPTIMISED** (no edge
+index, no caches). Bounds C=16 endpoint / C=64 interior, deliberately loose — a loose bound only
+routes MORE cases to exact and can never produce a wrong sign. The predicate is not the cost.
+
+Centre constructions split on an integer outline (meta's derivation, marked as derivation):
+RATIONAL exact: bbox, vertex mean, area centroid, oriented box (min-area rect axis is an edge
+direction; normalisations cancel; no root survives). NOT rational: perimeter centroid (√ edge
+weights), maximum clearance (three-feature equidistance — and it is the one construction that
+gives the DUCK any four-point answer, so not academic). C24's rule stands with this sharpened
+rationale: all six centres quantised to integer mm at intake — a quantised CENTRE is a different
+INPUT evaluated exactly (offer set exactly correct for the centre used), unlike the quantised
+PREDICATE that made geometry wrong and invented offers. Cost stated: two constructions move ≤0.5mm.
+Alternative (algebraic-number centres) reintroduces deleted machinery for unruled constructions —
+rejected. Three lanes now aligned on this independently.
+
+SEAL CHECKLIST update: (1) overflow number — DONE (this clause). Remaining: (2) pixel's
+independent oracle run (exact verdicts + family sets, canonical traces); (3) meta's BOT rerun on
+the canonical trace.
