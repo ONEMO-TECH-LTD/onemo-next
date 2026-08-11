@@ -208,3 +208,15 @@ export const RELEASED: GridSystemSpec = Object.freeze({
 
 /** The launch pitches. 24 and 72 do not exist anywhere in the system (law 1.3). */
 export const LAUNCH_PITCHES_MM: readonly number[] = Object.freeze([48, 96])
+
+/**
+ * THE OPERATIONAL BANDS — how many magnets a run carries, per axis.
+ *
+ * Dan, 2026-08-11: "while we have bands 1/2/3/4 - 1 and 4 are hidden and not operational we only use
+ * 2/3". Band 1 is below the pair floor; band 4 does not survive contact with real cut-outs. A value,
+ * so it lives here rather than in the engine — the engine reads it and never knows which numbers
+ * these are.
+ *
+ * A count, never a millimetre: the span each implies is the engine's arithmetic.
+ */
+export const OPERATIONAL_BANDS: readonly number[] = Object.freeze([2, 3])

@@ -29,9 +29,17 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import type { GridSystemSpec } from './spec'
+import {
+  flapLimitsMM,
+  solveOutline,
+  type OutlineMM,
+  type SolveResult,
+  type Variant,
+} from './solver'
+import { LAUNCH_PITCHES_MM, OPERATIONAL_BANDS, type GridSystemSpec } from './spec'
 
 export type { FieldSummary, PointMM, RegionMM }
+export type { OutlineMM, SolveResult, Variant }
 
 /** One field, solved. Everything a surface may draw or say about it is in here. */
 interface FieldLayout {
@@ -113,4 +121,20 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
  */
 export function fieldBlockSpan(spec: GridSystemSpec): number {
   return fieldSpanMM(spec)
+}
+
+/**
+ * THE SOLVE — the shell's only route to it.
+ *
+ * The bands and the populations are read from the spec here and handed down; the engine is given
+ * them and never knows which numbers they are. The shell passes an outline and gets measured
+ * variants back — it assembles no call and holds no grid value of its own.
+ */
+export function solveShape(spec: GridSystemSpec, outline: OutlineMM): SolveResult {
+  return solveOutline(spec, outline, OPERATIONAL_BANDS, LAUNCH_PITCHES_MM)
+}
+
+/** The two flap positions a variant is read against — a switch between lattice quantities. */
+export function flapLimits(spec: GridSystemSpec): [number, number] {
+  return flapLimitsMM(spec.grid)
 }
