@@ -46,32 +46,6 @@ const read = (dir: string, filter: RegExp) =>
 const PORTABLE = ['engine.ts', 'spec.ts', 'bridge.ts'] as const
 const portable = () => PORTABLE.map((f) => ({ file: f, text: readFileSync(join(UNIT, f), 'utf8') }))
 
-/** Every law value name. A write to any of these outside the guard is a second door. */
-const LAW_KEYS = new Set([
-  'basePitchMM',
-  'pitchMM',
-  'paddingMM',
-  'maxSizeMM',
-  'positionsPerAxis',
-  'registration',
-])
-
-/**
- * The released law values, read from the spec itself so this list cannot drift from it.
- *
- * EVERY law key, not a chosen few: the first cut omitted `positionsPerAxis`, so a bare 9 in the
- * shell would have walked straight through the guard written to stop exactly that.
- */
-const RELEASED_VALUES = (() => {
-  const src = readFileSync(join(UNIT, 'spec.ts'), 'utf8')
-  const block = src.slice(src.indexOf('export const RELEASED'))
-  const found = new Set<number>()
-  for (const [, v] of block.matchAll(/(?:basePitchMM|pitchMM|paddingMM|maxSizeMM|positionsPerAxis):\s*(\d+)/g)) {
-    found.add(Number(v))
-  }
-  return found
-})()
-
 const walkAst = (src: string, visit: (n: ts.Node) => void) => {
   const parsed = ts.createSourceFile('x.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const go = (n: ts.Node) => {
@@ -79,6 +53,74 @@ const walkAst = (src: string, visit: (n: ts.Node) => void) => {
     ts.forEachChild(n, go)
   }
   go(parsed)
+}
+
+/**
+ * EVERY law name and EVERY released value, READ OUT OF THE SPEC'S OWN DECLARATION.
+ *
+ * Both were hand-written lists — six key names, and a regex that re-enumerated five of them. That is
+ * the same defect the guards below exist to catch, committed inside the guards themselves: add a law
+ * value to the spec tomorrow and neither list knows about it, so the new value is unguarded from the
+ * moment it exists and every test still passes. A guard that must be edited whenever the thing it
+ * guards changes will eventually not be edited.
+ *
+ * Walking `RELEASED` instead means the sets ARE the spec. It is also strictly wider than the lists
+ * it replaces — it picks up the `grid` and `magnet` containers and the magnet bodies 6 and 8, which
+ * nothing enumerated before — and the shell is clean under the wider set, so nothing is being
+ * excused here.
+ */
+const { LAW_KEYS, RELEASED_VALUES } = (() => {
+  const src = readFileSync(join(UNIT, 'spec.ts'), 'utf8')
+  const keys = new Set<string>()
+  const values = new Set<number>()
+  let declaration: ts.Node | undefined
+  walkAst(src, (n) => {
+    if (ts.isVariableDeclaration(n) && n.name.getText() === 'RELEASED') declaration = n
+  })
+  if (!declaration) throw new Error('spec.ts declares no RELEASED — the guards have no source')
+  const collect = (n: ts.Node) => {
+    if (ts.isPropertyAssignment(n)) {
+      keys.add(n.name.getText())
+      if (ts.isNumericLiteral(n.initializer)) values.add(Number(n.initializer.text))
+    }
+    ts.forEachChild(n, collect)
+  }
+  collect(declaration)
+  return { LAW_KEYS: keys, RELEASED_VALUES: values }
+})()
+
+/**
+ * THE GUARDS THEMSELVES, as pure functions over one file's text.
+ *
+ * Extracted so the mutation fixtures below run through the SAME code that reads the real tree. A
+ * fixture that exercises a re-implementation proves nothing about the guard that ships.
+ */
+const findFrameworkImport = (text: string) =>
+  [...text.matchAll(/from ['"](react|next|next\/[^'"]*)['"]|(\S+\.css)['"]/g)].map((m) => m[0])
+
+const findReachPastBridge = (text: string) =>
+  [...text.matchAll(/from ['"]@\/lib\/grid-engine\/([^'"]+)['"]/g)]
+    .map((m) => m[1])
+    .filter((i) => !/^(bridge|spec|ui\/[\w-]+)$/.test(i))
+
+const findLawWrite = (text: string) => {
+  const hits: string[] = []
+  walkAst(text, (n) => {
+    if (!ts.isPropertyAssignment(n)) return
+    const name = n.name.getText()
+    if (LAW_KEYS.has(name)) hits.push(`${name}: ${n.getText().slice(0, 40)}`)
+  })
+  return hits
+}
+
+const findBareLawValue = (text: string) => {
+  const hits: string[] = []
+  walkAst(text, (n) => {
+    if (ts.isNumericLiteral(n) && RELEASED_VALUES.has(Number(n.text))) {
+      hits.push(`${n.text} in \`${n.parent.getText().slice(0, 50)}\``)
+    }
+  })
+  return hits
 }
 
 const codeLines = (text: string) =>
@@ -89,10 +131,11 @@ const codeLines = (text: string) =>
 
 describe('1 — the unit is portable', () => {
   it('imports nothing from React, Next or a stylesheet — including under ui/', () => {
-    for (const { file, text } of readTree(UNIT, /\.ts$/)) {
-      expect(text, `${file} must not depend on a framework`).not.toMatch(
-        /from ['"](react|next|next\/.*)['"]|\.css['"]/,
-      )
+    const tree = readTree(UNIT, /\.ts$/)
+    expect(tree.length, 'unit traversal found nothing — this guard would pass vacuously').toBeGreaterThan(0)
+    for (const { file, text } of tree) {
+      const hits = findFrameworkImport(text)
+      expect(hits, `${file} depends on a framework: ${hits.join(' · ')}`).toEqual([])
     }
   })
 
@@ -152,8 +195,7 @@ describe('4 — traffic is one-way: shell → bridge → unit', () => {
     // shell actually makes, `ui/camera` and `ui/trace-cutout` — slipped past it entirely. It passed
     // because the path shape escaped the regex, not because the rule held.
     for (const { file, text } of read(SHELL, /\.tsx?$/)) {
-      const imports = [...text.matchAll(/from ['"]@\/lib\/grid-engine\/([^'"]+)['"]/g)].map((m) => m[1])
-      const past = imports.filter((i) => !/^(bridge|spec|ui\/[\w-]+)$/.test(i))
+      const past = findReachPastBridge(text)
       expect(past, `${file} reaches past the bridge: ${past.join(', ')}`).toEqual([])
     }
   })
@@ -180,12 +222,7 @@ describe('the class, not the instances', () => {
     // looked for the literal text `grid: { ...x.grid,` — registration is a SIBLING key and walked
     // straight past it, which is how P3 lived in the shell unseen.
     for (const { file, text } of read(SHELL, /\.tsx?$/)) {
-      const hits: string[] = []
-      walkAst(text, (n) => {
-        if (!ts.isPropertyAssignment(n)) return
-        const name = n.name.getText()
-        if (LAW_KEYS.has(name)) hits.push(`${name}: ${n.getText().slice(0, 40)}`)
-      })
+      const hits = findLawWrite(text)
       expect(hits, `${file} writes law values directly: ${hits.join(' · ')}`).toEqual([])
     }
   })
@@ -194,12 +231,7 @@ describe('the class, not the instances', () => {
     // P4 was `RULE_FINE_MM = 12` — the atom, in a drawing surface. No arithmetic, so the operator
     // regex above had nothing to catch. The values come from the spec, so this cannot drift from it.
     for (const { file, text } of read(SHELL, /\.tsx?$/)) {
-      const hits: string[] = []
-      walkAst(text, (n) => {
-        if (ts.isNumericLiteral(n) && RELEASED_VALUES.has(Number(n.text))) {
-          hits.push(`${n.text} in \`${n.parent.getText().slice(0, 50)}\``)
-        }
-      })
+      const hits = findBareLawValue(text)
       expect(hits, `${file} hardcodes a released law value: ${hits.join(' · ')}`).toEqual([])
     }
   })
@@ -225,6 +257,73 @@ describe('the class, not the instances', () => {
  * property. Formatting, destructuring, aliasing, a rename, a line break or Math.* all walked through.
  * An AST walk cannot be evaded that way: it sees the operation, not its spelling.
  */
+/**
+ * MUTATION FIXTURES — the four escape classes, each reintroduced on purpose.
+ *
+ * KAI-10282's acceptance asks that each escape class be PROVEN to fail. It was proven by hand: I
+ * reintroduced all five defects into the tree, watched four go red and caught the fifth guard passing
+ * vacuously. None of that was executable, so it protected exactly one afternoon. A falsification that
+ * lives in a ledger is a story about a test, not a test.
+ *
+ * These run the SAME functions the tree is read with — extracted above for that reason. A fixture
+ * against a re-implementation would prove nothing about the guard that ships.
+ *
+ * Each case asserts BOTH directions: the escape is caught, and the legal spelling next to it is not.
+ * Only the pair is meaningful — a guard that fires on everything is as useless as one that never does.
+ */
+describe('mutation fixtures — every escape class is caught, and legal code is not', () => {
+  it('CLASS 1 · a framework import in a NESTED unit file', () => {
+    // The traversal listed one directory level, so all of ui/ was unguarded. Two halves: the walk
+    // must actually reach nested files, and the check must fire on one.
+    const nested = readTree(UNIT, /\.ts$/).filter((f) => f.file.includes('/'))
+    expect(nested.length, 'traversal reaches no nested file — the guard would pass vacuously').toBeGreaterThan(0)
+
+    expect(findFrameworkImport(`import { useRef } from 'react'`)).not.toEqual([])
+    expect(findFrameworkImport(`import styles from './camera.css'`)).not.toEqual([])
+    expect(findFrameworkImport(`import { magnetsInRegion } from '../engine'`)).toEqual([])
+  })
+
+  it('CLASS 2 · a NESTED unit import path from the shell', () => {
+    // `grid-engine/<one-segment>` was the old pattern, so `ui/camera` — which the shell really does
+    // import — slipped past. Anything deeper than the adapter is reaching past the bridge.
+    expect(findReachPastBridge(`import { x } from '@/lib/grid-engine/engine'`)).toEqual(['engine'])
+    expect(findReachPastBridge(`import { x } from '@/lib/grid-engine/ui/deep/inner'`)).toEqual([
+      'ui/deep/inner',
+    ])
+    expect(findReachPastBridge(`import { bandSpan } from '@/lib/grid-engine/bridge'`)).toEqual([])
+    expect(findReachPastBridge(`import { pinchFactor } from '@/lib/grid-engine/ui/camera'`)).toEqual([])
+  })
+
+  it('CLASS 3 · a law-value write as a SIBLING key, not just under `grid`', () => {
+    // The old check looked for the literal text `grid: { ...x.grid,`. `registration` sits beside it,
+    // which is how the registration bypass lived in the shell unseen.
+    expect(findLawWrite(`const next = { ...spec, registration: 'gap' }`)).not.toEqual([])
+    expect(findLawWrite(`const next = { ...spec, grid: { ...spec.grid, pitchMM: 96 } }`)).not.toEqual([])
+    // reads are not writes, and a same-named local is not the spec
+    expect(findLawWrite(`const p = spec.grid.pitchMM`)).toEqual([])
+    expect(findLawWrite(`setSize(bandSpan(spec, 3))`)).toEqual([])
+  })
+
+  it('CLASS 4 · a bare released value with no arithmetic to notice it', () => {
+    // `RULE_FINE_MM = 12` — the atom, sitting in a drawing surface. No operator, so the arithmetic
+    // regex had nothing to catch.
+    expect(findBareLawValue(`const RULE_FINE_MM = 12`)).not.toEqual([])
+    expect(findBareLawValue(`const rows = 9`)).not.toEqual([])
+    expect(findBareLawValue(`const body = 6`)).not.toEqual([]) // magnet body — only the WIDER set sees this
+    expect(findBareLawValue(`const gap = 4`)).toEqual([])
+    expect(findBareLawValue(`const half = n / 2`)).toEqual([])
+  })
+
+  it('the derived sets ARE the spec, not a list beside it', () => {
+    // If someone adds a law value, these must grow on their own. Named here so the failure reads as
+    // "the spec changed" rather than as a mystery.
+    expect([...LAW_KEYS].sort()).toEqual(
+      ['basePitchMM', 'grid', 'largeMM', 'magnet', 'maxSizeMM', 'paddingMM', 'pitchMM', 'positionsPerAxis', 'registration', 'smallMM'],
+    )
+    expect([...RELEASED_VALUES].sort((a, b) => a - b)).toEqual([6, 8, 9, 12, 48, 310])
+  })
+})
+
 describe('the two subs stay apart', () => {
   const ARITHMETIC = new Set([
     ts.SyntaxKind.AsteriskToken,
