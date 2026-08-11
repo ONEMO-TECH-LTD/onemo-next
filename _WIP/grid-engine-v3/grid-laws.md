@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Seventeen laws. The engine and its algorithm. Nothing else.
+### Eighteen laws. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -238,11 +238,52 @@ Checked against his own two examples: two points 48mm apart plus 12mm each side 
 | square | 2 / 3 / 4 | 72 / 120 / 168 | 72 / 120 / 168 | **0 / 0 / 0** | pass | pass |
 | circle | 2 | 92 | 72 | 10 each side | pass | pass |
 | circle | 3 | 160 | 120 | 20 each side | fail | pass |
-| circle | 4 | 224 | 168 | 28 each side | fail | fail |
+| circle | 4 | 228 | 168 | 30 each side | fail | fail |
 
 The square has **zero flap** — it *is* the box — which is the obvious sanity check both earlier models
 failed. And L14a falls out for free: the four overhangs being equal **is** "flap evened out on all
 sides at the same time".
+
+**L18 — THE SHAPE MUST ENCAPSULATE THE GRID'S BOUNDING BOX. That containment IS the computation.**
+*Dan, 08-11 @lead, immediately after the flap correction*
+> "shape must encapsulate bounding box of the grid in whatever layout it is matching the shape - e.g.
+> 2 points, 3 points (L shape, triangle piramid 1:2 shape) and the rest of the options with 3x3 and
+> 4x4 and rectangular variations as well"
+>
+> "so the engine computing is essentially whether the bounding box fits inside the shape in set
+> variants of layouts based on the grid"
+
+**This is the algorithm, stated in one sentence.** Not per-magnet clearance solving — **scale the
+shape until the layout's grid region fits inside it, for each layout the grid offers.**
+
+**It is strictly stronger than per-magnet disc support**, because each magnet's disc lies inside its
+own cell and every cell lies inside the region. So it can only ever raise a size, never lower one.
+Measured:
+
+| shape | band | disc support | encapsulation | why |
+|---|---|---|---|---|
+| square | 2 / 3 / 4 | 72 / 120 / 168 | **72 / 120 / 168** | identical — the binding contact is an edge |
+| circle | 2 / 3 / 4 | 92 / 160 / 228 | **102 / 170 / 238** | +10 each — the binding contact is the box **corner** |
+
+The square canon is preserved exactly. The circle grows by ten because a box corner must now sit on
+fabric. *(Containment is CLOSED — the box boundary may touch the outline. A strict test rejects the
+square's own canon at 72.)*
+
+**WHICH REGION, for a layout that is not a rectangle — resolved by measurement, not by choice.** Dan
+names 3-point layouts (the L, the 1:2 pyramid) as first-class. On an L cut-out with a 3-point L
+layout:
+
+- the **axis-aligned box of all three magnets** (72 × 72) — **NEVER FITS, at any scale.** That reading
+  would make Dan's own named layout impossible on the shape it exists for.
+- the **union of the layout's pair boxes** (72 × 24 ∪ 24 × 72, an L-shaped region) — **publishes
+  72mm**, exactly matching per-magnet disc support.
+
+So the region is the **union of the boxes of the layout's adjacent pairs**, which is the axis-aligned
+box only when the layout is a full rectangle. That is the reading that makes his examples work.
+
+**Per population, not per family.** The 48 and 96 arrangements of one family have different extents,
+so different boxes and different overhangs. The evidence lives inside each population; the family
+passes a switch only when both do. *(Raised by @s62-grid-pixel.)*
 
 **Struck: distance-to-the-nearest-disc.** I reported the square as 14.83mm and told Dan nothing could
 pass at 12mm. That measured the gap from the shape's edge to the nearest magnet, which is not flap and

@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 82 directives
+## 2026-08-11 · @s62-lead · 84 directives
 
 **06:26:48**
 
@@ -1418,6 +1418,14 @@ admin dash must allow us to move and review every increment defined by the engin
 **14:13:59**
 
 " at 12mm nothing passes — not even a plain square, because a square's mid-edge sits 14.8mm from its nearest magnet by pure lattice geometry, at every band. " - this is nonesense the flap is calculated from the edge of the grid bounding box to the outer edges of the shape cutout - the 4x48mm grid points have 72mm square boiunding box inside of it no flap must be recognised - the pair has 72x24 bounding box so on and so forth so sanity fucking check on your interpretation
+
+**14:18:58**
+
+and this correction also reminds us another rule that shape must encapsulate bounding box of the grid in whatever layout it is matching the shape - e.g. 2 points, 3 points (L shape, triangle piramid 1:2 shape) and the rest of the options with 3x3 and 4x4 and rectangular variations as well .
+
+**14:18:58**
+
+so the engine computing is essentially whether the bounding box fits inside the shape in set variants of layouts based on the grid
 
 
 ---
