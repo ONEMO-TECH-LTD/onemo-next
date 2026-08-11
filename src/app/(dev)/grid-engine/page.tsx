@@ -341,7 +341,11 @@ export default function GridEnginePage() {
             }}
           />
           {cutout && box && (
-            <g>
+            /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
+               dragging even over the shape the canvas must continue to react". It is drawn above the
+               drag surface, so without this it swallows the press and the lattice stops following the
+               hand exactly where the shape is — the one place you are looking. */
+            <g pointerEvents="none">
               {asOutline && outline ? (
                 <polygon
                   points={outline
