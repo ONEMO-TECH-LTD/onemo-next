@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 95 directives
+## 2026-08-11 · @s62-lead · 99 directives
 
 **06:26:48**
 
@@ -1470,6 +1470,22 @@ or we cherry pick only sizes that are distanced between each other evenly not mi
 **14:45:19**
 
 but to n=be honest system must select theoptimal by how fewer flap it has - if it is harmonious and centered and how snug it fits the bounding box of set mag layout
+
+**14:50:57**
+
+also i would not make twin fix shapes larger than 160-180mm
+
+**14:50:57**
+
+especially closer to square
+
+**14:50:57**
+
+imagine 200mmx200mm used with 2 parts one on the surface of garment another under it to snadwithch with magnetic force the garment and create hold - if tshirt has magnetic grid built in larger sizes can be fit to it otherwise i woul limit sizes to smaller than 160
+
+**14:50:57**
+
+ok the 168mm band 4 is the max size for twinfix shaped effects hence we can calculate anything fitting that range
 
 
 ---

@@ -52,6 +52,43 @@ So the spot is 24mm, exactly half the 48mm pitch.
 Below a pair there is one magnet, and one magnet lets the shape pivot. Every product holds at least
 one pair.
 
+**L4a — A TWIN FIX CAPS AT 168mm. Two magnets cannot hold more.**
+*Dan, 08-11 @lead*
+> "ok the 168mm band 4 is the max size for twinfix shaped effects hence we can calculate anything
+> fitting that range"
+
+**The physical reason, in his words:** *"imagine 200mmx200mm used with 2 parts one on the surface of
+garment another under it to snadwithch with magnetic force the garment and create hold - if tshirt has
+magnetic grid built in larger sizes can be fit to it otherwise i woul limit sizes to smaller than
+160"*, and *"i would not make twin fix shapes larger than 160-180mm… especially closer to square"*.
+
+The fixing sandwiches the fabric between two parts. Two of them cannot hold a large panel — and a
+near-square shape is the worst case, because the most material sits furthest from the pair's axis.
+
+**The number is the lattice's own, not an invented threshold:** 168mm is band 4's span,
+`(4−1)·48 + 2·12`. The band is hidden and non-operational (L8a); its *span* survives as this cap.
+
+**Measured against the real corpus — which shapes can take a twin fix at all:**
+
+| shape | aspect | smallest twin-fix size | under 168? |
+|---|---|---|---|
+| BOT | 1.35 : 1 | 132 | **yes** (132, 142, 152) |
+| POKE1 | 1.18 : 1 | 130 | **yes** (130, 132, 164) |
+| BUTTERFLY | 1.22 : 1 | 176 | no |
+| PILL | **1.01 : 1** | 206 | no |
+
+**PILL is his point proved.** It is the one near-square shape in the corpus, and **every one of its 28
+twin-fix candidates exceeds the cap** — its smallest is 206mm. A near-square shape cannot take a twin
+fix, exactly as he said.
+
+*Applying the cap changes no selected winner on the corpus — the winners are 3- to 5-magnet layouts —
+so this removes unusable options without disturbing the answer.*
+
+**OPEN, and his:** the built-in-garment-grid case. He says larger sizes fit *"if tshirt has magnetic
+grid built in"*. Whether that is an engine input or a product rule outside the engine is unruled, and
+L8 forbids a size input crossing inward — a garment capability is not a size, but the boundary needs
+his word.
+
 **L5 — THE ARRANGEMENT FOLLOWS THE SHAPE'S OWN FORM.** *Dan, 08-10 16:00 @meta*
 > "If shape is narrow it uses minimum 1column of 2rows if normal closer to square or circle 4 minimum
 > L shape by definition will have 1 + 2 - as well as any triangle"
