@@ -641,8 +641,9 @@ GATE RESULTS, bottom to top:
   oracle; meta 26,850/26,852 with both residuals theirs, at the PILL tangency fixture).
 - COUPLING: identical σ keys, three implementations, parity-registration enforced.
 - FAMILIES: 330/330 (shape, σ, band) keys with identical counts AND byte-identical SHA-256
-  hashes (lead vs pixel, generation-order serialisation; lead's last defect was a re-sort of
-  pixel's generation order — caught by one plaintext line).
+  hashes (lead vs pixel, BYTEWISE-SORTED COMPLETE familyId serialisation — the written rule;
+  generation order is not canonical authority, §9 forbids iteration-order dependence). The two
+  committed artifacts are byte-identical whole files: sha256 221fd395… on both sides.
 - FINAL COUPLED TABLE (first published family per shape): POKE2 168 · POKE1 172 · BAT-WOMAN 176 ·
   BOT 180 · PILL 192 · DUCK 204 · BUTTERFLY 216. All seven shapes couple. The duck's four-corner
   impossibility stands separately.
@@ -684,3 +685,15 @@ regenerated (artifact sha256 221fd395…). Re-diff under the written rule: **330
 diffs, byte-identical hashes**. The seal stands — now on the rule as WRITTEN, not as first coded.
 Recorded because it is the seventh instance of tonight's law and the purest: even the agreement
 machinery disagrees with its own specification until two implementations diff it.
+
+
+## SEAL RESIDUALS (meta's, recorded verbatim in substance — a seal that hides residuals is worse
+## than one that names them)
+1. Meta's drift check compared pair-pair family EXISTENCE, not hash membership — identical
+   existence with different membership is untested from their side. (Hash format for the stronger
+   check: familyId = band|reducedσ|regX,regY|coords48|regX,regY|coords96, coords sorted (y,x) as
+   x,y;x,y, familyIds bytewise-sorted, each + newline, SHA-256.)
+2. All three implementations share ONE intake and ONE tracer: a defect in canonical-traces.json is
+   invisible to every gate by construction — the one place three-way agreement proves nothing.
+3. The corpus is seven shapes; the parity rule bit on exactly one. The fixture set is complete for
+   these seven by measurement — untested shape classes remain, and that is where to attack first.
