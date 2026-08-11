@@ -32,7 +32,7 @@ import {
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
-import { ZOOM_FIT, ZOOM_MAX, zoomIn, zoomOut } from '@/lib/grid-engine/ui/camera'
+import { ZOOM_FIT } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -95,7 +95,15 @@ export default function GridEnginePage() {
   // from the unit; dividing two lengths to get a camera factor is screen maths, which is this side's.
   const launchZoom =
     fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / bandSpan(RELEASED, LARGEST_BAND + 1)
-  const [zoom, setZoom] = useState(launchZoom)
+  // NO ZOOM. Dan, 2026-08-11: "the cutout is scaling incorrectly the grid must scale instead and pan
+  // - no zoom - the object fits the viewport and static".
+  //
+  // The shape is static and fills the viewport; the GRID scales underneath it. The camera is derived
+  // from the shape's own size, so a bigger band means a bigger shape in millimetres, a wider view,
+  // and therefore a finer-looking lattice — while the shape itself never moves on screen.
+  //
+  // Presentation only: the millimetres are real and shown in the header, the pitch is untouched, and
+  // the camera reaches no geometry (law 8.1).
   const [view, setView] = useState<FieldSummary | null>(null)
   const onView = useCallback((r: FieldSummary) => setView(r), [])
   // UI-ONLY test fixture. A stand-in shape so the canvas can be driven before the engine lands —
@@ -205,6 +213,14 @@ export default function GridEnginePage() {
       return next
     })
 
+  /**
+   * THE CAMERA, derived. The shape fills the viewport and never moves; the grid scales beneath it.
+   * With no shape loaded the view holds the largest band.
+   */
+  const gridScale = box
+    ? fieldSpan(RELEASED, RELEASED.grid.positionsPerAxis) / Math.max(box.w, box.h)
+    : launchZoom
+
   const lockedCount = ROWS.filter(
     (r) => isSealedInCode(r.key) || isOptionsOnly(r.key) || !unlocked.has(r.key),
   ).length
@@ -279,27 +295,6 @@ export default function GridEnginePage() {
           </span>
         )}
 
-        <button
-          type="button"
-          className={styles.chip}
-          disabled={zoom <= ZOOM_FIT}
-          onClick={() => setZoom(zoomOut)}
-          aria-label="Zoom out"
-        >
-          −
-        </button>
-        <button type="button" className={styles.chip} onClick={() => setZoom(launchZoom)} aria-label="Fit">
-          fit
-        </button>
-        <button
-          type="button"
-          className={styles.chip}
-          disabled={zoom >= ZOOM_MAX}
-          onClick={() => setZoom(zoomIn)}
-          aria-label="Zoom in"
-        >
-          +
-        </button>
       </nav>
 
       <div className={styles.canvas}>
@@ -309,7 +304,7 @@ export default function GridEnginePage() {
              the shape — driving the extent off the cut-out's box made the whole lattice re-solve and
              the camera re-frame on every drag, so the grid appeared to move under the handles. */
           extentMM={{ x: -sizeMM / 2, y: -sizeMM / 2, w: sizeMM, h: sizeMM }}
-          zoom={zoom}
+          zoom={gridScale}
           onView={onView}
         >
           {cutout && box && (
