@@ -144,15 +144,20 @@ multiple rings or holes. Open C/crescent concavity remains a valid single solid 
 
 Canonical intake:
 
-0. scale the traced ring so its longest side equals `referenceSourceLengthMM=400` (`DERIVED`:
-   source scale is arbitrary because answers use exact scale ratios; 400 is the sealed corpus
-   reference and a guarded internal value, never a product-size input);
+0. scale the traced ring so its longest side equals `referenceSourceLengthMM=400`. This guarded
+   `DERIVED` value is consequential: step 1 quantises at this reference, so changing it changes the
+   canonical outline and can change support verdicts. Changing 400 to 800 flips 38 of the sealed
+   26,852 verdicts (0.142%), all within 0.25mm of the support threshold, including one tangency.
+   It is fixed at 400 because the sealed baseline is defined at 400; it is never requested as a
+   product size, and changing it requires full evidence regeneration;
 1. quantise outline coordinates to the ruled integer-millimetre product floor;
 2. remove the repeated closing vertex and consecutive duplicates;
 3. remove exactly collinear intermediate vertices without changing the boundary;
 4. reject remaining zero-length edges and repeated non-adjacent vertices;
 5. orient counter-clockwise by exact signed-area sign;
-6. rotate to the lexicographically smallest vertex, breaking ties by the following sequence;
+6. rotate to the lexicographically smallest vertex; if that coordinate occurs more than once,
+   compare the next vertex in counter-clockwise order and continue pairwise until the sequences
+   differ;
 7. build immutable edges with endpoint, vector, squared length and bounding box.
 
 Transparent image margin never enters the outline, scale or answer.
