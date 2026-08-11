@@ -196,6 +196,12 @@ export default function GridEnginePage() {
   const [outline, setOutline] = useState<OutlineUV | null>(null)
   /** Admin experiment only. No method is promoted to the released product default by this switch. */
   const [centreMethod, setCentreMethod] = useState<CentreMethod>('box')
+  /**
+   * Expensive research output, produced only on explicit request. It must never be derived during
+   * render: pinch and slider updates resize `box`, and coupling this calculation to `box` made every
+   * interaction run the complete six-method, three-band size scan.
+   */
+  const [centreComparisons, setCentreComparisons] = useState<ReturnType<typeof compareOutlineCentres>>([])
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -212,6 +218,7 @@ export default function GridEnginePage() {
    * dependency list it used to carry meant it read whatever they were on first render.)
    */
   const loadCutout = ((file: File) => {
+    setCentreComparisons([])
     // Even match -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
     // about it. This is the count's parity, not a default anyone picked (law 6.5).
     //
@@ -281,6 +288,7 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    setCentreComparisons([])
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -334,16 +342,35 @@ export default function GridEnginePage() {
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
   /** The unit's own floor. The control offers exactly what the unit will produce, never less. */
   const minSpanMM = Math.round(minShapeSpan(spec))
-  const centredOutline = outline && box ? centreOutline(spec, outline, box, centreMethod) : null
+  const aspectW = box ? box.w / Math.max(box.w, box.h) : 0
+  const aspectH = box ? box.h / Math.max(box.w, box.h) : 0
+  const hasBox = Boolean(box)
+  /** Centre algorithms run once per outline/method/spec, never once per interaction-sized box. */
+  const canonicalOutline = useMemo(
+    () =>
+      outline && hasBox
+        ? centreOutline(
+            spec,
+            outline,
+            { x: -aspectW / 2, y: -aspectH / 2, w: aspectW, h: aspectH },
+            centreMethod,
+          )
+        : null,
+    [spec, outline, centreMethod, aspectW, aspectH, hasBox],
+  )
+  const currentScale = box ? Math.max(box.w, box.h) : 0
+  const centredOutline = canonicalOutline
+    ? {
+        centreMM: canonicalOutline.centreMM.map((v) => v * currentScale) as [number, number],
+        points: canonicalOutline.points.map(([x, y]) => [x * currentScale, y * currentScale] as [number, number]),
+      }
+    : null
   const centreShift = centredOutline?.centreMM ?? ([0, 0] as const)
   const placedGridPan = centredOutline ? gridPanForCentre(centreShift, pan) : pan
-  const centreComparisons = useMemo(
-    () =>
-      outline && box
-        ? compareOutlineCentres(spec, outline, box, CENTRE_METHODS, BANDS)
-        : [],
-    [spec, outline, box],
-  )
+  const calculateFits = () => {
+    if (!outline || !box) return
+    setCentreComparisons(compareOutlineCentres(spec, outline, box, CENTRE_METHODS, BANDS))
+  }
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
@@ -417,7 +444,10 @@ export default function GridEnginePage() {
             onClick={() => {
               const r = selectPitch(spec, p)
               setRefused(r.refused ?? null)
-              if (!r.refused) setSpec(r.spec)
+              if (!r.refused) {
+                setSpec(r.spec)
+                setCentreComparisons([])
+              }
             }}
           >
             {p}mm
@@ -684,6 +714,14 @@ export default function GridEnginePage() {
               <option key={value} value={value}>{CENTRE_LABELS[value]}</option>
             ))}
           </select>
+          <button
+            type="button"
+            className={styles.chip}
+            onClick={calculateFits}
+            disabled={!outline || !box}
+          >
+            Calculate fits
+          </button>
           {centredOutline && (
             <span className={styles.fieldReadout}>
               source offset {centreShift[0].toFixed(1)}, {centreShift[1].toFixed(1)}mm
