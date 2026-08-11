@@ -101,9 +101,12 @@
   color: #0284c7;
 }
 
-/* ── Canvas — 402 x 402, fixed and square (Dan, 2026-08-10) ───────────────── */
+/* ── Canvas — square, always; it grows with the column ────────────────────── */
 
-/* Square, always. It grows with the column rather than being pinned to 402. */
+/* It was specified 402 x 402 and fixed (Dan, 2026-08-10), then made responsive when the field had to
+   hold the 9x9 ceiling with its margin. The heading here still claimed "fixed and square" directly
+   above the rule that grows it — the file contradicted itself in three lines. Square is the part
+   that survived; 402 is the baseline it starts from, not a size it is pinned to. */
 .canvas {
   position: relative;
   flex: none;
