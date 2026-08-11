@@ -62,7 +62,16 @@ const SHAPE_STEP_MM = 2
  * which is (3-1)x48 + 2x12 frozen into the shell: change the padding and the shell would have been
  * silently wrong, against law 4.2 (change an input and everything re-derives).
  */
-const CLASSIC_BAND_MAGNETS = 3
+/**
+ * A loaded cut-out arrives at FOUR POINTS CENTRED — two magnets across, two down.
+ *
+ * Dan, 2026-08-11: "By default 4 points must be centerd with cutout", and law 3.1: "perfect shape x
+ * grid match is 4 points balanced and symetrically centerd on the shape".
+ *
+ * The registration is not chosen with it: two across is an EVEN count, and law 9.2 says an even
+ * count puts the shape's centre in the gap between magnets — which is what makes the four symmetric.
+ */
+const DEFAULT_BAND_MAGNETS = 2
 /** Where the camera starts, as a COUNT of lattice positions. The millimetres come from the unit. */
 const LAUNCH_POSITIONS = 5
 const CUTOUT_OPACITY = 0.55
@@ -154,13 +163,16 @@ export default function GridEnginePage() {
   const cutoutInput = useRef<HTMLInputElement>(null)
 
   const loadCutout = useCallback((file: File) => {
+    // Even band -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
+    // about it. This is the count's parity, not a default anyone picked (law 6.5).
+    setSpec((sp) => ({ ...sp, registration: DEFAULT_BAND_MAGNETS % 2 === 0 ? 'gap' : 'point' }))
     void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
       setCutout({ url, wPx: img.naturalWidth, hPx: img.naturalHeight })
       // Laid on at the classic band, longest side, proportions untouched.
-      const k = bandSpan(spec, CLASSIC_BAND_MAGNETS) / Math.max(img.naturalWidth, img.naturalHeight)
+      const k = bandSpan(spec, DEFAULT_BAND_MAGNETS) / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * k
       const h = img.naturalHeight * k
       setBox({ x: -w / 2, y: -h / 2, w, h })
