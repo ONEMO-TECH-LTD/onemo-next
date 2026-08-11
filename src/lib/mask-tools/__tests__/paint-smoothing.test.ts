@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { grabCutBrushGeometry } from '@/lib/cutout-grabcut'
-import { paintSmoothingRadius, polishMask } from '@/lib/mask-tools'
+import { autoTunePaintStroke, paintSmoothingRadius, polishMask } from '@/lib/mask-tools'
 import type { Mask } from '@/lib/mask-tools/types'
 
 function rectangle(w: number, h: number, x0: number, y0: number, x1: number, y1: number): Mask {
@@ -26,6 +26,27 @@ describe('Paint shape-relative smoothing', () => {
     expect(unchanged).not.toBe(mask)
     expect(unchanged.data).not.toBe(mask.data)
     expect(unchanged.data).toEqual(mask.data)
+  })
+})
+
+describe('Paint gesture Autotune', () => {
+  const jitteredLine = Array.from({ length: 21 }, (_, index) => ({ x: index * 5, y: index % 2 ? 2 : -2 }))
+
+  it('keeps zero exact and removes micro-jitter at full strength', () => {
+    expect(autoTunePaintStroke(jitteredLine, 0)).toEqual(jitteredLine)
+    expect(autoTunePaintStroke(jitteredLine, 1)).toEqual([jitteredLine[0], jitteredLine[jitteredLine.length - 1]])
+  })
+
+  it('preserves a deliberate curve while reducing its sampled nodes', () => {
+    const curve = Array.from({ length: 41 }, (_, index) => {
+      const angle = (Math.PI / 2) * index / 40
+      return { x: 100 * Math.cos(angle), y: 100 * Math.sin(angle) + (index % 2 ? 1 : -1) }
+    })
+    const tuned = autoTunePaintStroke(curve, 1)
+    expect(tuned.length).toBeGreaterThan(2)
+    expect(tuned.length).toBeLessThan(curve.length)
+    expect(tuned[0]).toEqual(curve[0])
+    expect(tuned[tuned.length - 1]).toEqual(curve[curve.length - 1])
   })
 })
 

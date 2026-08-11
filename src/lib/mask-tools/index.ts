@@ -10,10 +10,68 @@ import type { Mask } from '@/lib/mask-tools/types'
  *  formerly hardcoded — surfaced so an admin can calibrate the tool without a code change. */
 export interface PaintConfig {
   swathMult: number  // stroke swath width = brush × swathMult
+  autoTuneStrength: number  // 0..1; gesture wobble correction before the stroke becomes a shape
   polishStrength: number  // 0..1; outline smoothing radius = completed-shape scale × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { swathMult: 1, polishStrength: 1 / 3, closeFrac: 0.2 }
+export const PAINT_DEFAULTS: PaintConfig = { swathMult: 1, autoTuneStrength: 1, polishStrength: 1 / 3, closeFrac: 0.2 }
+
+type StrokePoint = { x: number; y: number }
+
+const pointLineDistance = (p: StrokePoint, a: StrokePoint, b: StrokePoint): number => {
+  const dx = b.x - a.x, dy = b.y - a.y
+  const l2 = dx * dx + dy * dy
+  if (!l2) return Math.hypot(p.x - a.x, p.y - a.y)
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2))
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+function rdpOpen(points: StrokePoint[], epsilon: number): StrokePoint[] {
+  if (points.length <= 2 || epsilon <= 0) return points.slice()
+  let farthest = 0, index = -1
+  const first = points[0], last = points[points.length - 1]
+  for (let i = 1; i < points.length - 1; i++) {
+    const distance = pointLineDistance(points[i], first, last)
+    if (distance > farthest) { farthest = distance; index = i }
+  }
+  if (farthest <= epsilon || index < 0) return [first, last]
+  const left = rdpOpen(points.slice(0, index + 1), epsilon)
+  const right = rdpOpen(points.slice(index), epsilon)
+  return left.slice(0, -1).concat(right)
+}
+
+/** Paint-only gesture Autotune. It removes sampling jitter before rasterization; brush diameter is
+ * deliberately absent. The tolerance scales with the gesture extent, so the same intended line or
+ * curve receives the same correction at different drawing sizes. Endpoints remain exact. */
+export function autoTunePaintStroke(stroke: StrokePoint[], strength = PAINT_DEFAULTS.autoTuneStrength): StrokePoint[] {
+  const amount = Math.max(0, Math.min(1, strength))
+  const points = stroke.filter((point, index) => !index || point.x !== stroke[index - 1].x || point.y !== stroke[index - 1].y)
+  if (amount <= 0 || points.length <= 2) return points.map((point) => ({ ...point }))
+
+  let filtered = points.map((point) => ({ ...point }))
+  const passes = Math.ceil(amount * 3)
+  for (let pass = 0; pass < passes; pass++) {
+    const prior = filtered
+    filtered = prior.map((point, index) => {
+      if (!index || index === prior.length - 1) return point
+      const average = {
+        x: (prior[index - 1].x + 2 * point.x + prior[index + 1].x) / 4,
+        y: (prior[index - 1].y + 2 * point.y + prior[index + 1].y) / 4,
+      }
+      return { x: point.x + (average.x - point.x) * amount, y: point.y + (average.y - point.y) * amount }
+    })
+  }
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const point of filtered) {
+    if (point.x < minX) minX = point.x
+    if (point.y < minY) minY = point.y
+    if (point.x > maxX) maxX = point.x
+    if (point.y > maxY) maxY = point.y
+  }
+  const extent = Math.hypot(maxX - minX, maxY - minY)
+  return rdpOpen(filtered, extent * 0.025 * amount)
+}
 
 /** Rasterize a drawn shape to a BINARY Mask (subject matte for the blend layer — inside = subject).
  *  Shares solidShapeMask's rasterizer; drops the soft channel (the paint-edit mask is binary). */
@@ -95,20 +153,26 @@ export function maskArea(mask: Mask): number {
  *  (Dan's green-blob semantics: a loop means the whole region). */
 export function swathMask(
   stroke: { x: number; y: number }[], brushPx: number, w: number, h: number,
-  cfg: Pick<PaintConfig, 'swathMult' | 'closeFrac'> = PAINT_DEFAULTS,
+  cfg: Pick<PaintConfig, 'swathMult' | 'autoTuneStrength' | 'closeFrac'> = PAINT_DEFAULTS,
 ): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })!
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
   ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult)
-  if (cfg.swathMult > 0 && stroke.length === 1) {
+  const tunedStroke = autoTunePaintStroke(stroke, cfg.autoTuneStrength)
+  if (cfg.swathMult > 0 && tunedStroke.length === 1) {
     ctx.beginPath()
-    ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
+    ctx.arc(tunedStroke[0].x, tunedStroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
     ctx.fill()
-  } else if (cfg.swathMult > 0 && stroke.length > 1) {
+  } else if (cfg.swathMult > 0 && tunedStroke.length > 1) {
     ctx.beginPath()
-    stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+    ctx.moveTo(tunedStroke[0].x, tunedStroke[0].y)
+    for (let i = 1; i < tunedStroke.length - 1; i++) {
+      const point = tunedStroke[i], next = tunedStroke[i + 1]
+      ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) / 2, (point.y + next.y) / 2)
+    }
+    ctx.lineTo(tunedStroke[tunedStroke.length - 1].x, tunedStroke[tunedStroke.length - 1].y)
     ctx.stroke()
   }
   // closed gesture → fill the interior too

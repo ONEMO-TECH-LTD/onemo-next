@@ -197,8 +197,8 @@
       },
       {
         "file": "src/lib/mask-tools/index.ts",
-        "bytes": 6564,
-        "sha256": "02795ce72fc338ad2a2d4e515ef65f9ef15d7cbf92779de9bd60ca474d2b62e1",
+        "bytes": 9727,
+        "sha256": "8548392e5a11306800b1cac60fb86d6401dc6edf02ce0444d3f295b85e5709e0",
         "destination": "src/lib/mask-tools/index.ts",
         "layer": "browser-adapter"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 337511,
-    "closureSha256": "f3ebf6d8fdcd2d8e14cac17e3053f08051247a707ce35d14e90694d8c8a6dc34"
+    "totalBytes": 340674,
+    "closureSha256": "93b2ce657b03435e11a4e7d157e83fbbc10559fff530d9a05dbbd51bb309928c"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-c42289c905387cd6.js",
-        "rawBytes": 63032,
-        "gzipBytesEstimate": 20863,
-        "brotliBytesEstimate": 18413
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-520502fd46d5a847.js",
+        "rawBytes": 64384,
+        "gzipBytesEstimate": 21343,
+        "brotliBytesEstimate": 18890
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1298858,
-    "gzipBytesEstimate": 363812,
-    "brotliBytesEstimate": 297118
+    "rawBytes": 1300210,
+    "gzipBytesEstimate": 364292,
+    "brotliBytesEstimate": 297595
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",

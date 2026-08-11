@@ -51,7 +51,8 @@ export function CutoutLabMount({ admin }: { admin: boolean }) {
 function CalibrationPanel({ surface }: { surface: CutoutStudioCalibrationSurface }) {
   const rows = [
     { label: 'swath width', value: surface.paintCfg.swathMult, lo: 0, hi: 12, step: 0.1, display: `${surface.paintCfg.swathMult}×`, set: (value: number) => surface.setPaintCfg({ swathMult: value }) },
-    { label: 'smoothing', value: Math.round(surface.paintCfg.polishStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(surface.paintCfg.polishStrength * 100)}%`, set: (value: number) => surface.setPaintCfg({ polishStrength: value / 100 }) },
+    { label: 'autotune', value: Math.round(surface.paintCfg.autoTuneStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(surface.paintCfg.autoTuneStrength * 100)}%`, set: (value: number) => surface.setPaintCfg({ autoTuneStrength: value / 100 }) },
+    { label: 'mask smoothing', value: Math.round(surface.paintCfg.polishStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(surface.paintCfg.polishStrength * 100)}%`, set: (value: number) => surface.setPaintCfg({ polishStrength: value / 100 }) },
     { label: 'loop-close', value: surface.paintCfg.closeFrac, lo: 0, hi: 1, step: 0.01, display: surface.paintCfg.closeFrac.toFixed(2), set: (value: number) => surface.setPaintCfg({ closeFrac: value }) },
   ]
 
