@@ -24,15 +24,15 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-06 · Complete material support.** Every selected magnet centre lies on the one lattice and its complete 24mm support disc lies inside cutout material. Centre-point containment alone fails. Unsupported lattice positions are not included in that material-derived family.
 
-- [ ] **EC-07 · Precise measured answer.** Every family returns: band; centre method; registration; uniform scale; manufactured width and height; and, separately for 48mm and 96mm, magnet quantity, complete magnet coordinate list, minimum disc clearance and the binding magnet/outline location that limits the fit.
+- [ ] **EC-07 · Precise measured answer.** Every family returns: band; centre method; registration; uniform scale; manufactured width and height; and, separately for 48mm and 96mm, magnet quantity, complete magnet coordinate list, minimum disc clearance and the binding magnet/outline location that limits the fit. It also returns every side's unsupported reach, their exact spread and the disc/edge contacts that determine tightness.
 
-- [ ] **EC-08 · Centred fit.** Every family reports its displacement from the tested shape centre and its left/right and top/bottom support. The arrangement must be centred to the shape rather than bunched into whichever lobe contains the most material. Contested centre definitions remain visible test options; none becomes a hidden default.
+- [ ] **EC-08 · Centring and balance yardstick.** A family is centred and balanced when unsupported reach is evened out across all sides simultaneously: `max(sideReach) - min(sideReach) = 0` under exact geometry. It is tight when the supported assembly reaches its limiting outline contacts and no uniformly smaller lawful size preserves the same layout, coverage and balance. The engine reports the individual side reaches, their spread and the limiting contacts; it invents no displacement threshold, tolerance or combined score. Centre constructions remain visible test options, but they are judged by this same yardstick and none becomes a hidden default.
 
-- [ ] **EC-09 · Flap-limit test.** For every side and material extremity, the engine measures unsupported reach to the nearest supporting magnet disc. The flap limit is an explicit test switch with exactly two positions: 12mm and 24mm. At either position, reach beyond the selected limit fails that test unless EC-10 applies. No intermediate threshold or hidden default is permitted.
+- [ ] **EC-09 · Flap-limit test.** For every side and material extremity, the engine measures unsupported reach to the nearest supporting magnet disc. The flap limit is an explicit test switch with exactly two positions: 12mm and 24mm. Coverage passes only when every side is within the selected limit; centring passes only when the side reaches satisfy EC-08's evenness yardstick. Reach beyond the selected limit fails that test unless EC-10 applies. No intermediate threshold or hidden default is permitted.
 
 - [ ] **EC-10 · Trivial-limb exception is explicit.** A reach beyond the tested flap limit may be presented only as an exception candidate for a trivial narrow limb, especially a bottom limb. The engine measures and reports the region, side and reach; it does not invent a numeric definition of `trivial`, silently approve the exception or hide it inside a score. Applied visual proof exposes every exception for confirmation.
 
-- [ ] **EC-11 · Applied proof.** Every distinct arrangement can be applied to the real cutout using the exact returned scale, registration and coordinates. The canvas draws the complete 24mm discs and shows the measured unsupported zones. Independently measured SVG geometry must reproduce the engine answer. A table saying `fits` is not proof.
+- [ ] **EC-11 · Applied proof.** Every distinct arrangement can be applied to the real cutout using the exact returned scale, registration and coordinates. The canvas draws the complete 24mm discs, every side's unsupported reach and the limiting disc/edge contacts. Independently measured SVG geometry must reproduce the engine's evenness, coverage and tightness measurements. A table saying `fits` is not proof.
 
 - [ ] **EC-12 · Responsive and complete delivery.** Solver work is never coupled to pinch, resize, pan, drag, camera movement or variant browsing. The frozen delivery includes: the portable engine answer; tests against an independent oracle; synthetic pair, concave, hollow, narrow and non-monotonic cases; all seven saved real cutouts; applied visual evidence for bands 2/3/4 at 48mm and 96mm; and a final statement of which algorithm parts are proven, require correction or must be rejected.
 
@@ -51,8 +51,9 @@ populations: {
   48: { magnets[]: { xMM, yMM, clearanceMM }, bindingContact },
   96: { magnets[]: { xMM, yMM, clearanceMM }, bindingContact }
 }
-centreDisplacementMM
-sideSupport: { left, right, top, bottom }
+sideReachMM: { left, right, top, bottom }
+sideReachSpreadMM
+tightnessContacts[]: { magnet, outlineLocation, clearanceMM }
 unsupportedZones[]: { side, reachMM, classification }
 flapLimitMM: 12 | 24
 status: lawful | failed | exception-pending
