@@ -224,3 +224,9 @@
 - Worked: map `@/x` to `src/x`, and exclude backslashes from the emitted-asset regex.
 - Remember: generated Next HTML escapes route strings; normalize aliases and reject escape characters
   before resolving closure files.
+
+## 2026-08-11 — KAI-10285 QA browser probe result was hidden behind yielded sessions
+
+- Failed: the first probe used a URL object where Playwright required a string; the next run yielded through nested exec sessions and appeared to return no output.
+- Worked: pass `.href`, preserve failures to a QA evidence file, and keep polling the returned exec session until its real exit. The completed probe then reported the exact canvas-difference counts.
+- Remember: a yielded exec cell completing does not mean the nested PTY process completed; follow the returned session id to its exit before treating empty output as failure or success.
