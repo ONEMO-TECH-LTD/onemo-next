@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { centreOutline } from '../bridge'
+import { centreOutline, gridPanForCentre } from '../bridge'
 import { centreOfOutline, compareCentres, type PointMM } from '../engine'
 import { RELEASED, type CentreMethod } from '../spec'
 
@@ -74,14 +74,16 @@ describe('centre-method comparison', () => {
     expect(after).toEqual(before)
   })
 
-  it('registers every chosen centre at the grid origin through the bridge', () => {
+  it('keeps the shape fixed and moves the grid to every chosen centre', () => {
     const uv = lShape.map(([x, y]) => [(x + 60) / 120, (y + 60) / 120] as PointMM)
     const box = { x: -60, y: -60, w: 120, h: 120 }
     for (const method of METHODS) {
       const placed = centreOutline(RELEASED, uv, box, method)
-      const recentered = centreOfOutline(RELEASED.grid, placed.points, method)
-      expect(recentered[0], method).toBeCloseTo(0, method === 'maximum-clearance' ? 0 : 6)
-      expect(recentered[1], method).toBeCloseTo(0, method === 'maximum-clearance' ? 0 : 6)
+      expect(placed.points, method).toEqual(lShape)
+      expect(gridPanForCentre(placed.centreMM, [3, -2])).toEqual([
+        placed.centreMM[0] + 3,
+        placed.centreMM[1] - 2,
+      ])
     }
   })
 

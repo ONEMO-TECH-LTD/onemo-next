@@ -34,6 +34,7 @@ import {
   centreOutline,
   compareOutlineCentres,
   fieldBlockSpan,
+  gridPanForCentre,
   minShapeSpan,
   resizeShape,
   type CentreMethod,
@@ -318,6 +319,7 @@ export default function GridEnginePage() {
   const minSpanMM = Math.round(minShapeSpan(spec))
   const centredOutline = outline && box ? centreOutline(spec, outline, box, centreMethod) : null
   const centreShift = centredOutline?.centreMM ?? ([0, 0] as const)
+  const placedGridPan = centredOutline ? gridPanForCentre(centreShift, pan) : pan
   const centreComparisons = useMemo(
     () =>
       outline && box
@@ -452,7 +454,7 @@ export default function GridEnginePage() {
       <div className={styles.canvas}>
         <GridCanvas
           spec={spec}
-          panMM={pan}
+          panMM={placedGridPan}
           /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
              lands on it. Handing in a region built from the shape's size read as the shape defining
              the world, and did nothing besides — every reachable size is under the field's own floor.
@@ -505,8 +507,8 @@ export default function GridEnginePage() {
               ) : (
                 <image
                   href={cutout.url}
-                  x={box.x - centreShift[0]}
-                  y={box.y - centreShift[1]}
+                  x={box.x}
+                  y={box.y}
                   width={box.w}
                   height={box.h}
                   opacity={CUTOUT_OPACITY}
@@ -514,8 +516,8 @@ export default function GridEnginePage() {
                 />
               )}
               <rect
-                x={box.x - centreShift[0]}
-                y={box.y - centreShift[1]}
+                x={box.x}
+                y={box.y}
                 width={box.w}
                 height={box.h}
                 fill="none"
@@ -683,6 +685,7 @@ export default function GridEnginePage() {
                               setRefused(registration.refused ?? null)
                               if (!registration.refused) setSpec(registration.spec)
                               setCentreMethod(comparison.method)
+                              setPan([0, 0])
                               setSize(fit.sizeMM!)
                             }}
                             title={`Show ${CENTRE_LABELS[comparison.method]} at band ${fit.band}; minimum support ${fit.minimumClearanceMM?.toFixed(1)}mm; spread ${fit.clearanceSpreadMM?.toFixed(1)}mm`}

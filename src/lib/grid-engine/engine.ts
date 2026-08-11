@@ -131,6 +131,11 @@ export function latticeAnchorMM(offsetMM: number, panMM: PointMM): PointMM {
   return [offsetMM + panMM[0], offsetMM + panMM[1]]
 }
 
+/** Add two manufacturing translations. Used when centre registration and hand-pan share the grid. */
+export function translatePointMM(point: PointMM, by: PointMM): PointMM {
+  return [point[0] + by[0], point[1] + by[1]]
+}
+
 /**
  * Every populated magnet centre inside a region — and NOT one beyond it. Indices walk THE one
  * lattice from its registration; only every stride-th one carries a magnet (law 1.2).

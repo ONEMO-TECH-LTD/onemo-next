@@ -26,6 +26,7 @@ import {
   registrationOffsetMM,
   resizeBoxToLongest,
   summariseField,
+  translatePointMM,
   withMinimumSpan,
   type FieldSummary,
   type CentreComparison,
@@ -51,10 +52,12 @@ export function centreOutline(
 ): CentredOutline {
   const points = outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h] as PointMM)
   const centreMM = centreOfOutline(spec.grid, points, method)
-  return {
-    points: points.map(([x, y]) => [x - centreMM[0], y - centreMM[1]]),
-    centreMM,
-  }
+  return { points, centreMM }
+}
+
+/** Keep the shape fixed and move the lattice to its selected centre, plus the user's manual pan. */
+export function gridPanForCentre(centreMM: PointMM, panMM: PointMM): PointMM {
+  return translatePointMM(centreMM, panMM)
 }
 
 /** Compare every requested centre and band against complete magnet-disc support. */
