@@ -24,7 +24,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-06 · Complete material support.** Every selected magnet centre lies on the one lattice and its complete 24mm support disc lies inside cutout material. Centre-point containment alone fails. Unsupported lattice positions are not included in that material-derived family.
 
-- [ ] **EC-07 · Precise measured answer.** Every family returns: band; centre method; registration; uniform scale; manufactured width and height; and, separately for 48mm and 96mm, magnet quantity, complete magnet coordinate list, minimum disc clearance and the binding magnet/outline location that limits the fit. It also returns every side's unsupported reach, their exact spread and the disc/edge contacts that determine tightness.
+- [ ] **EC-07 · Precise manufactured answer.** Every family returns: band; centre method; parity-derived registration; uniform scale; manufactured width and height; and, separately for 48mm and 96mm, magnet quantity, complete magnet coordinate list, minimum disc clearance and the binding magnet/outline location that limits the fit. An even run registers in the gap and an odd run on a magnet; registration is never selected independently. Manufactured size publishes in whole even millimetres, upward and never downward: it is the first even value inside a lawful scale interval, never a blind ceiling outside one. The family also returns every side's unsupported reach, their exact spread and the disc/edge contacts that determine tightness.
 
 - [ ] **EC-08 · Centring and balance yardstick.** A family is centred and balanced when unsupported reach is evened out across all sides simultaneously: `max(sideReach) - min(sideReach) = 0` under exact geometry. It is tight when the supported assembly reaches its limiting outline contacts and no uniformly smaller lawful size preserves the same layout, coverage and balance. The engine reports the individual side reaches, their spread and the limiting contacts; it invents no displacement threshold, tolerance or combined score. Centre constructions remain visible test options, but they are judged by this same yardstick and none becomes a hidden default.
 
@@ -43,10 +43,11 @@ Each `MeasuredCutoutVariantFamily` contains:
 ```text
 band
 centreMethod
-registration
+registration: derived from run parity
 scale
 widthMM
 heightMM
+publication: { lawfulScaleInterval, publishedEvenMM }
 populations: {
   48: { magnets[]: { xMM, yMM, clearanceMM }, bindingContact },
   96: { magnets[]: { xMM, yMM, clearanceMM }, bindingContact }
