@@ -17,6 +17,7 @@
 import {
   bandSpanMM,
   centreOfOutline,
+  compareCentres,
   cellDiameterMM,
   fieldSpanMM,
   latticeAnchorMM,
@@ -27,12 +28,13 @@ import {
   summariseField,
   withMinimumSpan,
   type FieldSummary,
+  type CentreComparison,
   type PointMM,
   type RegionMM,
 } from './engine'
 import type { CentreMethod, GridSystemSpec } from './spec'
 
-export type { FieldSummary, PointMM, RegionMM }
+export type { CentreComparison, FieldSummary, PointMM, RegionMM }
 export type { CentreMethod }
 
 export interface CentredOutline {
@@ -53,6 +55,18 @@ export function centreOutline(
     points: points.map(([x, y]) => [x - centreMM[0], y - centreMM[1]]),
     centreMM,
   }
+}
+
+/** Compare every requested centre and band against complete magnet-disc support. */
+export function compareOutlineCentres(
+  spec: GridSystemSpec,
+  outline: ReadonlyArray<PointMM>,
+  box: RegionMM,
+  methods: ReadonlyArray<CentreMethod>,
+  bands: ReadonlyArray<number>,
+): CentreComparison[] {
+  const points = outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h] as PointMM)
+  return compareCentres(spec.grid, points, methods, bands)
 }
 
 /** One field, solved. Everything a surface may draw or say about it is in here. */

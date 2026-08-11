@@ -383,3 +383,94 @@ export function centreOfOutline(
   if (method === 'vertices') return vertexCentre(points)
   return maximumClearanceCentre(points, grid.paddingMM / 2 / 2 / 2 / 2)
 }
+
+function clearanceAt(point: PointMM, polygon: ReadonlyArray<PointMM>): number {
+  return signedDistance(point, polygon)
+}
+
+function centredBand(grid: GridSpec, count: number, registration: Registration): PointMM[] {
+  const offset = registrationOffsetMM(grid, registration)
+  const firstIndex = Math.round(-offset / grid.pitchMM - (count - 1) / 2)
+  const points: PointMM[] = []
+  for (let x = 0; x < count; x++) {
+    for (let y = 0; y < count; y++) {
+      points.push([
+        offset + (firstIndex + x) * grid.pitchMM,
+        offset + (firstIndex + y) * grid.pitchMM,
+      ])
+    }
+  }
+  return points
+}
+
+export interface BandFit {
+  band: number
+  registration: Registration
+  sizeMM: number | null
+  magnetCount: number
+  /** Lowest material radius beneath any magnet at the published size. */
+  minimumClearanceMM: number | null
+  /** Difference between the most- and least-supported magnets; lower is more balanced. */
+  clearanceSpreadMM: number | null
+}
+
+export interface CentreComparison {
+  method: CentreMethod
+  centreMM: PointMM
+  fits: BandFit[]
+}
+
+/**
+ * Exhaust the actual published size lattice. This is deliberately discrete: the engine publishes
+ * whole even millimetres, so testing every publishable answer is simpler and stronger than finding
+ * continuous roots and rounding them. Concave legality may enter and leave as size grows; therefore
+ * the scan never assumes monotonicity and returns the first lawful published size it observes.
+ */
+export function compareCentres(
+  grid: GridSpec,
+  outline: ReadonlyArray<PointMM>,
+  methods: ReadonlyArray<CentreMethod>,
+  bands: ReadonlyArray<number>,
+): CentreComparison[] {
+  if (outline.length <= 2) throw new RangeError('An outline needs at least three points.')
+  const xs = outline.map(([x]) => x)
+  const ys = outline.map(([, y]) => y)
+  const longest = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
+  if (longest === 0) throw new RangeError('An outline must have a measurable span.')
+  const floor = cellDiameterMM(grid)
+
+  return methods.map((method) => {
+    const centreMM = centreOfOutline(grid, outline, method)
+    const fits = bands.map((band): BandFit => {
+      const registration: Registration = band % 2 === 0 ? 'gap' : 'point'
+      const magnets = centredBand(grid, band, registration)
+      for (let sizeMM = Math.ceil(floor / 2) * 2; sizeMM <= grid.maxSizeMM; sizeMM += 2) {
+        const scale = sizeMM / longest
+        const polygon = outline.map(
+          ([x, y]) => [(x - centreMM[0]) * scale, (y - centreMM[1]) * scale] as PointMM,
+        )
+        const clearances = magnets.map((point) => clearanceAt(point, polygon))
+        const minimum = Math.min(...clearances)
+        if (minimum < grid.paddingMM) continue
+        const maximum = Math.max(...clearances)
+        return {
+          band,
+          registration,
+          sizeMM,
+          magnetCount: magnets.length,
+          minimumClearanceMM: minimum,
+          clearanceSpreadMM: maximum - minimum,
+        }
+      }
+      return {
+        band,
+        registration,
+        sizeMM: null,
+        magnetCount: magnets.length,
+        minimumClearanceMM: null,
+        clearanceSpreadMM: null,
+      }
+    })
+    return { method, centreMM, fits }
+  })
+}

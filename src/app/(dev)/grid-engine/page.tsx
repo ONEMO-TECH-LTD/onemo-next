@@ -13,9 +13,10 @@
 // from, "Prototypes / Control" node 14209:26629 at 402pt; that measurement is the design's, never
 // the implementation's.) The studio's visual design comes from Figma; this invents none.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyGridValue,
+  CENTRE_METHODS,
   isOptionsOnly,
   isSealedInCode,
   LAUNCH_PITCHES_MM,
@@ -31,6 +32,7 @@ import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
   centreOutline,
+  compareOutlineCentres,
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
@@ -94,14 +96,14 @@ const DEFAULT_SIZE_BAND = 3
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
-const CENTRE_METHODS: Array<{ value: CentreMethod; label: string }> = [
-  { value: 'box', label: 'box' },
-  { value: 'oriented-box', label: 'oriented box' },
-  { value: 'area', label: 'area' },
-  { value: 'perimeter', label: 'perimeter' },
-  { value: 'vertices', label: 'vertices' },
-  { value: 'maximum-clearance', label: 'max clearance' },
-]
+const CENTRE_LABELS: Record<CentreMethod, string> = {
+  box: 'box',
+  'oriented-box': 'oriented box',
+  area: 'area',
+  perimeter: 'perimeter',
+  vertices: 'vertices',
+  'maximum-clearance': 'max clearance',
+}
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
@@ -316,6 +318,13 @@ export default function GridEnginePage() {
   const minSpanMM = Math.round(minShapeSpan(spec))
   const centredOutline = outline && box ? centreOutline(spec, outline, box, centreMethod) : null
   const centreShift = centredOutline?.centreMM ?? ([0, 0] as const)
+  const centreComparisons = useMemo(
+    () =>
+      outline && box
+        ? compareOutlineCentres(spec, outline, box, CENTRE_METHODS, BANDS)
+        : [],
+    [spec, outline, box],
+  )
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
@@ -637,8 +646,8 @@ export default function GridEnginePage() {
             value={centreMethod}
             onChange={(event) => setCentreMethod(event.target.value as CentreMethod)}
           >
-            {CENTRE_METHODS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
+            {CENTRE_METHODS.map((value) => (
+              <option key={value} value={value}>{CENTRE_LABELS[value]}</option>
             ))}
           </select>
           {centredOutline && (
@@ -647,6 +656,48 @@ export default function GridEnginePage() {
             </span>
           )}
         </div>
+        {centreComparisons.length > 0 && (
+          <div className={`${styles.fixture} ${styles.comparison}`} aria-label="Centre comparison results">
+            <span className={styles.fixtureName}>Full-disc fit</span>
+            <table className={styles.comparisonTable}>
+              <thead>
+                <tr>
+                  <th>method</th>
+                  {BANDS.map((band) => <th key={band}>B{band}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {centreComparisons.map((comparison) => (
+                  <tr key={comparison.method} data-on={comparison.method === centreMethod}>
+                    <th>{CENTRE_LABELS[comparison.method]}</th>
+                    {comparison.fits.map((fit) => (
+                      <td key={fit.band}>
+                        {fit.sizeMM === null ? (
+                          '—'
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles.fitAnswer}
+                            onClick={() => {
+                              const registration = selectRegistration(spec, fit.registration)
+                              setRefused(registration.refused ?? null)
+                              if (!registration.refused) setSpec(registration.spec)
+                              setCentreMethod(comparison.method)
+                              setSize(fit.sizeMM!)
+                            }}
+                            title={`Show ${CENTRE_LABELS[comparison.method]} at band ${fit.band}; minimum support ${fit.minimumClearanceMM?.toFixed(1)}mm; spread ${fit.clearanceSpreadMM?.toFixed(1)}mm`}
+                          >
+                            {fit.sizeMM}mm
+                          </button>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   )

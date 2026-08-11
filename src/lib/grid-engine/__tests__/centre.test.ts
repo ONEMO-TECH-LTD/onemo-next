@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { centreOutline } from '../bridge'
-import { centreOfOutline, type PointMM } from '../engine'
+import { centreOfOutline, compareCentres, type PointMM } from '../engine'
 import { RELEASED, type CentreMethod } from '../spec'
 
 const METHODS: CentreMethod[] = [
@@ -89,5 +89,47 @@ describe('centre-method comparison', () => {
     expect(() => centreOfOutline(RELEASED.grid, [[0, 0], [1, 1]], 'box')).toThrow(
       'at least three points',
     )
+  })
+})
+
+describe('published full-disc placement solver', () => {
+  it('rederives the exact square standards for bands 2, 3 and 4', () => {
+    const [answer] = compareCentres(RELEASED.grid, square, ['box'], [2, 3, 4])
+    expect(answer.fits.map(({ sizeMM }) => sizeMM)).toEqual([72, 120, 168])
+    expect(answer.fits.map(({ magnetCount }) => magnetCount)).toEqual([4, 9, 16])
+    expect(answer.fits.every(({ minimumClearanceMM }) => minimumClearanceMM! >= 12)).toBe(true)
+  })
+
+  it('rederives from padding and pitch instead of retaining released answers', () => {
+    const padding6 = { ...RELEASED.grid, paddingMM: 6 }
+    const padding18 = { ...RELEASED.grid, paddingMM: 18 }
+    const pitch96 = { ...RELEASED.grid, pitchMM: 96 }
+    expect(compareCentres(padding6, square, ['box'], [2])[0].fits[0].sizeMM).toBe(60)
+    expect(compareCentres(padding18, square, ['box'], [2])[0].fits[0].sizeMM).toBe(84)
+    // 96 thins the one anchored lattice; it does not recenter the surviving population.
+    expect(compareCentres(pitch96, square, ['box'], [2])[0].fits[0].sizeMM).toBe(168)
+  })
+
+  it('proves centre choice changes the lawful manufacturing answer', () => {
+    const answers = compareCentres(RELEASED.grid, lShape, ['box', 'area'], [2])
+    expect(answers[0].fits[0].sizeMM).toBe(216)
+    expect(answers[1].fits[0].sizeMM).toBe(138)
+  })
+
+  it('does not manufacture a solution beyond the released ceiling', () => {
+    const narrow: PointMM[] = [
+      [-60, -8],
+      [60, -8],
+      [60, 8],
+      [-60, 8],
+    ]
+    const [answer] = compareCentres(RELEASED.grid, narrow, ['box'], [2])
+    expect(answer.fits[0].sizeMM).toBeNull()
+  })
+
+  it('is winding-invariant', () => {
+    const forward = compareCentres(RELEASED.grid, lShape, ['area', 'perimeter'], [2])
+    const reverse = compareCentres(RELEASED.grid, [...lShape].reverse(), ['area', 'perimeter'], [2])
+    expect(reverse).toEqual(forward)
   })
 })

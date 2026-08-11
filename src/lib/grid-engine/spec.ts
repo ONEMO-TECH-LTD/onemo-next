@@ -68,6 +68,15 @@ export type CentreMethod =
   | 'vertices'
   | 'maximum-clearance'
 
+export const CENTRE_METHODS: readonly CentreMethod[] = Object.freeze([
+  'box',
+  'oriented-box',
+  'area',
+  'perimeter',
+  'vertices',
+  'maximum-clearance',
+])
+
 export interface GridSystemSpec {
   grid: GridSpec
   magnet: MagnetSpec

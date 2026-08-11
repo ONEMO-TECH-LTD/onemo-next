@@ -307,6 +307,50 @@
   white-space: nowrap;
 }
 
+.comparison {
+  align-items: flex-start;
+  padding-block: 10px;
+}
+
+.comparisonTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.comparisonTable th,
+.comparisonTable td {
+  padding: 3px 8px;
+  text-align: right;
+  font-weight: 400;
+}
+
+.comparisonTable th:first-child {
+  text-align: left;
+}
+
+.comparisonTable thead th {
+  color: #94a3b8;
+}
+
+.comparisonTable tbody tr[data-on='true'] {
+  color: #0284c7;
+  background: rgba(88, 194, 255, 0.08);
+}
+
+.fitAnswer {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 /* drag for the sweep, type for the exact number — the same value, two ways in */
 .slider {
   flex: 1;
