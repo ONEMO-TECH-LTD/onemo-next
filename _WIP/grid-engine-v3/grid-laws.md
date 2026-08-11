@@ -172,7 +172,7 @@ A variant passes when **all four** hold:
    condition most likely to fail — a pair that survives 48mm thinning to 96mm needs material
    96mm apart.)*
 3. **Fitted inside the shape and centred on it** (**L2** for "inside", **L6** for what "centred" means
-   — parity, not choice).
+   — parity, not choice). **Centred has a measurable definition** — see L14a.
 4. **No flap zone greater than 12–24mm on any side** — unless the uncovered region is a **trivial
    limb**, and the bottom especially is where that exemption applies.
 
@@ -181,6 +181,31 @@ one padding, 24mm is one magnet spot. Treat the limit as a **switch between thos
 on the real corpus** — never a third number picked in between. This is the same treatment O-1 and O-2
 get, and it is Dan's own standing method: *"why do i need to rule if  i never tested the difference in
 the real life - why noit add all options and test?"*
+
+**L14a — CENTRED MEANS THE FLAP IS EVEN ON ALL SIDES AT ONCE.**
+*Dan, 08-11 ~12:39 @meta — **RELAYED, not yet vault-confirmed** (see provenance note below)*
+> "one thing to add the the mgnet assembly must be centered to prevent flap in the first place and
+> this is the yardstick for balanced measure i suppose having flap evened out on all sides at the
+> same time with all mag discs enveloped to the edge"
+
+This is the criterion **L11 and L12 never had a number for, and it needs no invented threshold**:
+
+- **Balance** = the unsupported reach is **evened out across all sides simultaneously**. Not a
+  displacement bound, not a centroid distance — an evenness comparison between the sides themselves.
+- **Coverage** = each side's reach sits within the active **L14** switch (12 or 24).
+- **Tightness** = the discs are **enveloped out to the edge**.
+
+The three stop being rivals needing a precedence ruling and become **one measurement family**, which
+materially narrows **O-3**. Centring is now falsifiable: a bunched arrangement has uneven side flaps
+by construction, so it fails without anyone defining "bunched".
+
+> **Provenance — this clause is the one thing in this book not yet vault-verified.** Both copies I
+> hold are @s62-meta's relay (to me, and to @s62-grid-pixel — identical wording). Dan's own turn had
+> not flushed to `claude/s62/meta/2026-08-11/_day.md` when this was written; the last Dan turn there
+> is 12:37:06 and Meta's reply *referencing* the ruling is present, so the lag is the collector, not
+> the ruling. **It is recorded here because both lanes are already building on it — and flagged
+> because a peer relay recorded as Dan's verbatim words is exactly the failure this book was rebuilt
+> to remove.** Promote to confirmed on the vault flush; strike it if it does not appear.
 
 **On the limb exemption.** "Trivial" has no number and none may be invented. The engine **measures**
 every uncovered region — extent and side — and **reports** which ones the exemption was applied to.
@@ -261,6 +286,11 @@ tested the difference in the real life - why noit add all options and test?"
 test, not a gap to fill. What is a *trivial limb* is measured and reported, never enforced.
 *(This was the book's only unenforceable failure condition until 08-11 12:34. It is now closed as a
 test, not left open as a question.)*
+
+*Reconciled with the contract's EC-09 (@s62-grid-pixel `ca5ee2c6`, agreed by @s62-meta): the engine
+reports each zone's **measured reach**, which reads against both switch positions at once — ≤12 passes
+either, 12–24 passes only the lenient one, >24 fails both. That is the two-switch comparison expressed
+as one measurement, not a third threshold. Book and contract say the same thing.*
 
 **O-3 — coverage versus balance precedence.** Both measures are named by L11/L12; which wins when they
 disagree was never ruled, and two silent inventions of it have already been reversed. Reported

@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 68 directives
+## 2026-08-11 · @s62-lead · 69 directives
 
 **06:26:48**
 
@@ -1361,6 +1361,10 @@ i sent pixel and meta to read your transcript and my briefs the final formulatio
   minimum magnet pair (vertical/horizontal), in 48mm and 96mm sparse layout to be fit to shape inside
   it , centered to the shape and have no flap zones greater than 12-24mm on any side unless it is
   trivial limb especially at the bottom"
+
+**12:39:00**  *(relayed by @s62-meta from Dan's turn in the meta lane — RELAYED, awaiting vault flush; see grid-laws.md L14a provenance note)*
+
+one thing to add the the mgnet assembly must be centered to prevent flap in the first place and this is the yardstick for balanced measure i suppose having flap evened out on all sides at the same time with all mag discs enveloped to the edge
 
 
 ---
