@@ -253,3 +253,14 @@ VERIFICATION: pixel's independent 1mm brute-force disc oracle — identical surv
 candidate; meta's staggered-gaps fixture (C13); butterfly-from-130 and BOT L-at-120/132 as
 acceptance fixtures (Dan-named cases).
 Signed: @s62-lead (author) · @s62-kai-meta (AGREE, round 3) · @s62-grid-pixel (attacks folded C8–C12; final sign-off requested)
+
+## C16 · Pixel's clause verdict — two sharpenings adopted, rest already folded
+- C3 definition (adopted verbatim): the canonical candidate set is the DEDUPED UNION of every
+  grid/template/binding-axis ladder value, expressed as physical scales; both populations are
+  tested at each identical scale. Rounded E never couples (restates C9).
+- C5 correction (adopted): flap is linear in σ only WITHIN a fixed arrangement; across survivor
+  changes it is piecewise — evidence is computed per (arrangement, candidate), never extrapolated.
+- C2/C4 verdicts were already C10/C8 (subsets ≥2 with induced degree ≥1; DT² int32-exact, max
+  squared distance < 333k). C1 agreed by all three lanes.
+- Status: meta AGREE (round 3) · pixel building the independent 1mm mask oracle before signing —
+  the sign-off gate is identical survivor masks per candidate across both implementations.
