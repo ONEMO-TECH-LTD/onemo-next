@@ -67,6 +67,7 @@ SolveRequest {
     sparseFactor: 2
     paddingMM: 12
     atomMM: 12
+    referenceSourceLengthMM: 400
     positionsPerAxis: 9
     bands: [2, 3]
     centreMethods: [box, oriented-box, area, perimeter, vertices, maximum-clearance]
@@ -116,6 +117,13 @@ PopulationEvidence {
   gridBoxMM
   overhangMM: { left, right, top, bottom }
   overhangSpreadMM
+  quadrantMinClearanceMM: {
+    topLeft: number | null
+    topRight: number | null
+    bottomLeft: number | null
+    bottomRight: number | null
+  }
+  quadrantMarginSpreadMM
   extremities[]
   outsideBoxZones[]
   fixing: { kind: twin-fix | multi-fix, sizeEligible }
@@ -136,6 +144,9 @@ multiple rings or holes. Open C/crescent concavity remains a valid single solid 
 
 Canonical intake:
 
+0. scale the traced ring so its longest side equals `referenceSourceLengthMM=400` (`DERIVED`:
+   source scale is arbitrary because answers use exact scale ratios; 400 is the sealed corpus
+   reference and a guarded internal value, never a product-size input);
 1. quantise outline coordinates to the ruled integer-millimetre product floor;
 2. remove the repeated closing vertex and consecutive duplicates;
 3. remove exactly collinear intermediate vertices without changing the boundary;
@@ -294,7 +305,7 @@ windows as provenance on the one canonical arrangement.
 
 ### 7.2 Classification
 
-- `floor`: exactly one lawful pair;
+- `floor`: exactly two magnets — one pair;
 - `four-corner`: exactly four magnets at the corners of their own outermost rectangle;
 - `intermediate`: every other lawful occurrence.
 
@@ -381,6 +392,13 @@ side extremity is a `limb-candidate`; others are `unsupported-zone`. No numeric 
 
 Flap is intentionally a bounding-box measure: equal outline extrema yield equal flap evidence;
 concavity inside the box is invisible to it. Exact full-disc support remains the material test.
+
+For each population also return the four per-quadrant minimum magnet clearances and their spread.
+The manufactured shape bounding box is split at the tested centre. Quadrants use a deterministic
+half-open ownership rule: `x<0` is left and otherwise right; `y<0` is top and otherwise bottom.
+An empty quadrant reports `null` and is excluded from the numeric spread; one non-empty quadrant
+therefore has spread `0`. Flap spread and quadrant-margin spread are distinct measures (sealed
+C11); neither is a gate.
 
 ## 9. Canonical identity and determinism
 

@@ -12,7 +12,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 ## Contract checklist
 
-- [ ] **EC-01 · Locked shape.** The input is one traced cutout outline in millimetres. Its geometry and aspect ratio never change. Uniform scale is the only permitted shape transform; there is no stretch, deformation or rotation.
+- [ ] **EC-01 · Locked shape.** The input is one traced cutout outline. Intake maps its unitless trace to one guarded internal reference length before integer-millimetre canonicalisation; that reference is not a requested product size. Its geometry and aspect ratio never change. Uniform scale is the only permitted shape transform; there is no stretch, deformation or rotation.
 
 - [ ] **EC-02 · Fixed grid inputs.** Every solve uses the guarded 48mm base lattice, 12mm support radius around each magnet centre, the 96mm population as a thinning of the same unmoved lattice, and the released 9×9 ceiling expressed as a grid count.
 
@@ -26,7 +26,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-07 · Precise manufactured answer.** Every family returns: band; centre method; parity-derived per-axis registration; exact reduced candidate scale; manufactured width and height; and, separately for 48mm and 96mm, magnet quantity, complete magnet coordinate list, minimum disc clearance and the binding magnet/outline location that limits the fit. An even run registers in the gap and an odd run on a magnet; the sparse population is a thinning of that same placement and both populations of one family share the same x/y registration. A family couples only at one identical physical scale, never by ladder index or rounded size. The longest side publishes as the smallest whole even millimetre not below its exact value; the other dimension follows the locked aspect and is never independently rounded. Publication labels an already-lawful grid candidate and never creates or searches for another scale. Each population also returns its four overhangs, spread, extremities and disc/edge contacts.
 
-- [ ] **EC-08 · Centring and balance evidence.** Every family follows EC-07's parity-derived registration and reports its relationship to each tested shape centre, both populations' four overhangs and spreads, and the limiting disc/edge contacts. The applied proof shows whether flap is evened out across the sides at the same time and the discs are enveloped towards the edge — evenness is the agreement of EC-09's four overhangs, so a square reading 0/0/0/0 and a circle reading 10/10/10/10 are both perfectly even. These are comparison evidence for the real-cutout corpus, never an equality, argmin or pass gate: a variant does not fail because another has a smaller spread. The engine invents no displacement threshold, tolerance, combined score or hidden default. Contested centre constructions remain visible test options.
+- [ ] **EC-08 · Centring and balance evidence.** Every family follows EC-07's parity-derived registration and reports its relationship to each tested shape centre, both populations' four overhangs and spreads, the four per-quadrant minimum clearances and their spread, and the limiting disc/edge contacts. The applied proof shows whether flap is evened out across the sides at the same time and the discs are enveloped towards the edge — evenness is the agreement of EC-09's four overhangs, so a square reading 0/0/0/0 and a circle reading 10/10/10/10 are both perfectly even. Flap spread and quadrant-margin spread are distinct evidence and neither is a gate. These are comparison evidence for the real-cutout corpus, never an equality, argmin or pass gate: a variant does not fail because another has a smaller spread. The engine invents no displacement threshold, tolerance, combined score or hidden default. Contested centre constructions remain visible test options.
 
 - [ ] **EC-09 · Flap-limit test.** Flap is the shape's **overhang beyond the grid bounding box**, per side. The grid bounding box is the arrangement's magnet extent grown by the padding on every side — `[min qx − P, max qx + P] × [min qy − P, max qy + P]`. **Nothing inside that box is flap.** For each of the four sides the engine measures how far the outline reaches past the box edge, clamped at zero, and reports every material extremity with its side and overhang. **The 48mm and 96mm arrangements of one family have different extents and therefore different boxes and different overhangs, so this evidence lives inside each population; the family passes a switch only when both populations do.** Pair boxes may describe the arrangement's extent or topology, but neither a pair box nor their union is required to lie inside material; EC-06 alone decides support. The flap limit is an explicit test switch with exactly two positions: 12mm and 24mm. Coverage passes for the selected switch only when all four overhangs are within it. An overhang beyond the selected limit fails that test unless EC-10 applies. No intermediate threshold or hidden default is permitted.
 
@@ -38,7 +38,7 @@ The engine does not choose a product winner in this iteration. It returns the me
 
 - [ ] **EC-11b · Raw families for manual review.** The canonical answer contains every lawful family in canonical order, and the admin surface steps through that order without omission. This engine builds no selector, auto-picker, winner or thinned user ladder. Optimal choices are made manually from the complete applied evidence. Any later auto-picker or offering ladder is a separate product step and may only index these immutable families; it may never rewrite engine truth.
 
-- [ ] **EC-12 · Responsive and complete delivery.** Solver work is never coupled to pinch, resize, pan, drag, camera movement or variant browsing. The frozen delivery includes: the portable engine answer; tests against an independent oracle; synthetic pair, concave, hollow, narrow and non-monotonic cases; all seven saved real cutouts; applied visual evidence for the operational bands 2 and 3 at 48mm and 96mm; and a final statement of which algorithm parts are proven, require correction or must be rejected.
+- [ ] **EC-12 · Responsive and complete delivery.** Solver work is never coupled to pinch, resize, pan, drag, camera movement or variant browsing. The frozen delivery includes: the portable engine answer; tests against an independent oracle; synthetic pair, open-concavity (C/crescent), narrow and non-monotonic cases; all seven saved real cutouts; applied visual evidence for the operational bands 2 and 3 at 48mm and 96mm; and a final statement of which algorithm parts are proven, require correction or must be rejected.
 
 - [ ] **EC-13 · Twin-fix classification and its size limit.** For each population independently, an arrangement of exactly two retained magnets is `twin-fix`; three or more is `multi-fix`. At published longest side `m`, a twin fix is size-eligible exactly when `m < bandSpan(4) + max(flapLimitsMM)` — 192mm under the released spec — derived from guarded values at solve time and never stored as an engine literal. No aspect-ratio, elongation or shape-name condition may qualify or disqualify a twin fix. The limit does not bound `multi-fix`, which remains bounded by the count-derived field. The built-in-garment-grid regime is outside this engine: it takes no garment input and may not infer one. **A twin fix at or above the limit is REPORTED as `twin-fix` with `sizeEligible: false` and its measured longest side — never silently dropped** — because on the real corpus 23 to 28 twin-fix candidates per shape exceed it, and an answer that omits them cannot be audited against the ones it kept.
 
@@ -61,6 +61,8 @@ populations: {
     gridBoxMM,
     overhangMM: { left, right, top, bottom },
     overhangSpreadMM,
+    quadrantMinClearanceMM: { topLeft, topRight, bottomLeft, bottomRight }, // number | null each
+    quadrantMarginSpreadMM,
     extremities[],
     unsupportedZones[]
   },
@@ -69,11 +71,12 @@ populations: {
     gridBoxMM,
     overhangMM: { left, right, top, bottom },
     overhangSpreadMM,
+    quadrantMinClearanceMM: { topLeft, topRight, bottomLeft, bottomRight }, // number | null each
+    quadrantMarginSpreadMM,
     extremities[],
     unsupportedZones[]
   }
 }
-tightnessContacts[]: { magnet, outlineLocation, clearanceMM }
 flapOutcomes[]: { limitMM: 12 | 24, passed }
 classification: floor | intermediate | four-corner
 status: lawful | exception-pending
