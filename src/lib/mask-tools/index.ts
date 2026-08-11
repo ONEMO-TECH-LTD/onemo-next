@@ -10,7 +10,7 @@ import type { Mask } from '@/lib/mask-tools/types'
  *  formerly hardcoded — surfaced so an admin can calibrate the tool without a code change. */
 export interface PaintConfig {
   swathMult: number  // stroke swath width = brush × swathMult
-  polishStrength: number  // 0..1; outline smoothing radius = brush × strength
+  polishStrength: number  // 0..1; outline smoothing radius = completed-shape scale × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
 export const PAINT_DEFAULTS: PaintConfig = { swathMult: 1, polishStrength: 1 / 3, closeFrac: 0.2 }
@@ -29,12 +29,32 @@ export function unionMasks(base: Mask, add: Mask): Mask {
   for (let i = 0; i < data.length; i++) if (add.data[i]) data[i] = 1
   return { data, w: base.w, h: base.h }
 }
+/** Shape-relative smoothing radius. Area supplies the shape's characteristic scale; the shorter
+ *  occupied bound prevents a long thin mark from receiving a radius wider than the shape itself. */
+export function paintSmoothingRadius(mask: Mask, strength = PAINT_DEFAULTS.polishStrength): number {
+  if (strength <= 0) return 0
+  let area = 0, minX = mask.w, minY = mask.h, maxX = -1, maxY = -1
+  for (let y = 0; y < mask.h; y++) for (let x = 0; x < mask.w; x++) {
+    if (!mask.data[y * mask.w + x]) continue
+    area++
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  if (!area) return 0
+  const equivalentRadius = Math.sqrt(area / Math.PI)
+  const boundsRadius = Math.min(maxX - minX + 1, maxY - minY + 1) / 2
+  return Math.max(1, Math.round(Math.min(equivalentRadius, boundsRadius) * Math.min(1, strength)))
+}
+
 /** Normalize a painted combination with the ENGINE'S own mask smoothing (box-blur + re-threshold):
  *  fills concave bites and shaves nubs smaller than the radius — the 'insect bites' where strokes
- *  meet the mask (Dan 2026-08-06). Radius rides the brush size (bold brush = bolder polish). */
-export function polishMask(mask: Mask, brushPx: number, strength = PAINT_DEFAULTS.polishStrength): Mask {
+ *  meet the mask (Dan 2026-08-06). The completed shape, never the brush, owns the radius. */
+export function polishMask(mask: Mask, strength = PAINT_DEFAULTS.polishStrength): Mask {
   if (strength <= 0) return { data: mask.data.slice(), w: mask.w, h: mask.h }
-  const r = Math.max(2, Math.round(brushPx * strength))
+  const r = paintSmoothingRadius(mask, strength)
+  if (!r) return { data: mask.data.slice(), w: mask.w, h: mask.h }
   return { data: smoothMask(mask.data, mask.w, mask.h, r), w: mask.w, h: mask.h }
 }
 

@@ -182,7 +182,7 @@ export default function CutoutLab() {
       if (t !== 'nodes' && t !== 'frame') {
         const radius = t === 'draw' || t === 'draw-erase'
           ? brushRef.current * paintCfg.swathMult / 2
-          : brushRef.current
+          : brushRef.current / 2
         ctx.beginPath()
         ctx.arc(cur.x * img.width, cur.y * img.height, radius * (viewBoxRef.current.w / disp.w), 0, 6.29)
         ctx.lineWidth = Math.max(2, img.width * 0.003)

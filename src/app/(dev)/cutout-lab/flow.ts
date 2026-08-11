@@ -64,7 +64,7 @@ function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, 
   const combined = source.base
     ? source.erase ? subtractMasks(source.base, painted) : unionMasks(source.base, painted)
     : painted
-  return polishMask(combined, source.brushPx, cfg.polishStrength)
+  return polishMask(combined, cfg.polishStrength)
 }
 
 /** The adapters the flow needs injected (CreatorAdapters precedent — the flow never touches
