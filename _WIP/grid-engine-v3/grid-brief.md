@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 92 directives
+## 2026-08-11 · @s62-lead · 94 directives
 
 **06:26:48**
 
@@ -1458,6 +1458,14 @@ i meant medium is band 3 not band 2 on the above L and triangle shapes
 **14:35:07**
 
 it cannot not be as it is 2 linked lawful pairs in line - = lawful sparse  ahahahaha
+
+**14:40:22**
+
+this depends on how far is each size apart - for users we can calculate and make them choose based on the calculated sizes in each band if those create in a way sufficient space apart to consider its own size - so for us we simplify by band but for users we dont need to remove options we can format each as size band option the set bands are ranges yeah but if the size variations can be evenly spread we dont have to have user facing technical band ranges we can show them sizes based on the shape they upload within our cumulative range
+
+**14:42:31**
+
+or we cherry pick only sizes that are distanced between each other evenly not micro sizes
 
 
 ---
