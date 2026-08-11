@@ -781,6 +781,43 @@ verbatim:*
 > "keep oriented box in case we want to allow rotation which can be the case"
 
 
+**14.12 — A BAND IS A RANGE TO BE SEARCHED, NOT A SQUARE TO BE TESTED.** *DAN, 08-11 11:38, verbatim
+— the clause that redefines the engine:*
+> "wait the algorithm must analise shape and bands in each band range it must provide answers what
+> combinations fit precisely grid+ shape proportions aspect ratio locked and scalled to fine tune the
+> fit in the band - if the band is not possible to apply minimum using a pair (2 vertical or
+> horizontal p[oints fittin and centering in the shape ) what is the next band and magnet quantity
+> fits ?"
+
+The question the engine answers is therefore **not** "does this band's square fit?" but: *within this
+band's size range, what is the smallest balanced magnet population this locked shape can support, at
+what exact scale and coordinates — and if none, what becomes possible in the next band?*
+
+Binding consequences, each already in Dan's sentence:
+
+- **The population is DISCOVERED, not assumed.** A band offers a range; what the material supports
+  inside it is found. A pair — two magnets, vertical or horizontal, centred in the shape — is the
+  minimum lawful arrangement (11.4), not a special case.
+- **Aspect stays locked and the shape is only scaled** to fine-tune the fit inside the band (2.1).
+- **Exhaustion, then escalation.** If no combination is lawful anywhere in a band's range, the engine
+  moves to the next band and repeats with its larger populations — it does not report "no answer"
+  while a band remains untried.
+- **The stop condition is a found-and-applied match, or a proof that none exists within the 9x9 limit
+  (12.3).**
+
+*Recorded because the implementation live on 08-11 tested three fixed square populations — 2x2, 3x3,
+4x4 — and therefore could not produce the answers this law requires. Dan, same turn: the current
+implementation "tests fixed square populations… so it cannot yet prove the intended algorithm."*
+
+**14.13 — THE MISSION IS TO PROVE THE ALGORITHM, KEEP IT OR FIX IT.** *DAN, 08-11 11:35, verbatim:*
+> "most importantly did you prove the algorithm - the mission was to proove it is keeper and build on
+> it or fix?"
+
+A physical-fit checker is not the engine. What must be proven is that the algorithm *chooses* a
+placement a human would accept, on the real corpus — otherwise the correct verdict is that the fit
+core is retained and the selection method is replaced.
+
+
 ---
 
 # OPEN
