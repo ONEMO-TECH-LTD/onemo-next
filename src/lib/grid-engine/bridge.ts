@@ -16,6 +16,7 @@
 
 import {
   bandSpanMM,
+  centreOfOutline,
   cellDiameterMM,
   fieldSpanMM,
   latticeAnchorMM,
@@ -29,9 +30,30 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import type { GridSystemSpec } from './spec'
+import type { CentreMethod, GridSystemSpec } from './spec'
 
 export type { FieldSummary, PointMM, RegionMM }
+export type { CentreMethod }
+
+export interface CentredOutline {
+  points: PointMM[]
+  centreMM: PointMM
+}
+
+/** Map a picture-relative outline into millimetres, then register the selected centre at the origin. */
+export function centreOutline(
+  spec: GridSystemSpec,
+  outline: ReadonlyArray<PointMM>,
+  box: RegionMM,
+  method: CentreMethod,
+): CentredOutline {
+  const points = outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h] as PointMM)
+  const centreMM = centreOfOutline(spec.grid, points, method)
+  return {
+    points: points.map(([x, y]) => [x - centreMM[0], y - centreMM[1]]),
+    centreMM,
+  }
+}
 
 /** One field, solved. Everything a surface may draw or say about it is in here. */
 interface FieldLayout {

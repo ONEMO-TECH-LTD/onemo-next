@@ -30,9 +30,11 @@ import {
 import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
+  centreOutline,
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
+  type CentreMethod,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
@@ -91,6 +93,15 @@ const DEFAULT_SIZE_BAND = 3
  */
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
+
+const CENTRE_METHODS: Array<{ value: CentreMethod; label: string }> = [
+  { value: 'box', label: 'box' },
+  { value: 'oriented-box', label: 'oriented box' },
+  { value: 'area', label: 'area' },
+  { value: 'perimeter', label: 'perimeter' },
+  { value: 'vertices', label: 'vertices' },
+  { value: 'maximum-clearance', label: 'max clearance' },
+]
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
@@ -169,6 +180,8 @@ export default function GridEnginePage() {
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
+  /** Admin experiment only. No method is promoted to the released product default by this switch. */
+  const [centreMethod, setCentreMethod] = useState<CentreMethod>('box')
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -301,6 +314,8 @@ export default function GridEnginePage() {
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
   /** The unit's own floor. The control offers exactly what the unit will produce, never less. */
   const minSpanMM = Math.round(minShapeSpan(spec))
+  const centredOutline = outline && box ? centreOutline(spec, outline, box, centreMethod) : null
+  const centreShift = centredOutline?.centreMM ?? ([0, 0] as const)
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
@@ -472,9 +487,7 @@ export default function GridEnginePage() {
             <g pointerEvents="none">
               {asOutline && outline ? (
                 <polygon
-                  points={outline
-                    .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
-                    .join(' ')}
+                  points={centredOutline?.points.map(([x, y]) => `${x},${y}`).join(' ')}
                   fill="rgba(88,194,255,0.08)"
                   stroke="#58c2ff"
                   strokeWidth={1.5}
@@ -483,8 +496,8 @@ export default function GridEnginePage() {
               ) : (
                 <image
                   href={cutout.url}
-                  x={box.x}
-                  y={box.y}
+                  x={box.x - centreShift[0]}
+                  y={box.y - centreShift[1]}
                   width={box.w}
                   height={box.h}
                   opacity={CUTOUT_OPACITY}
@@ -492,8 +505,8 @@ export default function GridEnginePage() {
                 />
               )}
               <rect
-                x={box.x}
-                y={box.y}
+                x={box.x - centreShift[0]}
+                y={box.y - centreShift[1]}
                 width={box.w}
                 height={box.h}
                 fill="none"
@@ -615,6 +628,24 @@ export default function GridEnginePage() {
             onBlur={commitSize}
           />
           <span className={styles.rowUnit}>mm</span>
+        </div>
+        <div className={styles.fixture}>
+          <label className={styles.fixtureName} htmlFor="centre-method">Centre</label>
+          <select
+            id="centre-method"
+            className={styles.input}
+            value={centreMethod}
+            onChange={(event) => setCentreMethod(event.target.value as CentreMethod)}
+          >
+            {CENTRE_METHODS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          {centredOutline && (
+            <span className={styles.fieldReadout}>
+              source offset {centreShift[0].toFixed(1)}, {centreShift[1].toFixed(1)}mm
+            </span>
+          )}
         </div>
       </section>
     </div>

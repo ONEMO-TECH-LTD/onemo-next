@@ -7,7 +7,7 @@
 // read off the spec it was handed or produced by arithmetic on those. Pure millimetres — it has
 // never heard of a screen, a pixel, a zoom or a framework.
 
-import type { GridSpec, GridSystemSpec, Registration } from './spec'
+import type { CentreMethod, GridSpec, GridSystemSpec, Registration } from './spec'
 
 export type PointMM = [number, number]
 
@@ -218,4 +218,151 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
 /** What a run of magnets measures across, edge to edge, including their padding. Law 11.2. */
 export function bandSpanMM(grid: GridSpec, magnets: number): number {
   return Math.max(0, magnets - 1) * grid.pitchMM + 2 * grid.paddingMM
+}
+
+const cross = (a: PointMM, b: PointMM): number => a[0] * b[1] - a[1] * b[0]
+const rotate = ([x, y]: PointMM, angle: number): PointMM => [
+  x * Math.cos(angle) - y * Math.sin(angle),
+  x * Math.sin(angle) + y * Math.cos(angle),
+]
+
+function boxCentre(points: ReadonlyArray<PointMM>): PointMM {
+  const xs = points.map(([x]) => x)
+  const ys = points.map(([, y]) => y)
+  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+}
+
+function areaCentre(points: ReadonlyArray<PointMM>): PointMM {
+  let twiceArea = 0
+  let xMoment = 0
+  let yMoment = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const c = cross(a, b)
+    twiceArea += c
+    xMoment += (a[0] + b[0]) * c
+    yMoment += (a[1] + b[1]) * c
+  }
+  if (twiceArea === 0) return boxCentre(points)
+  return [xMoment / (twiceArea + twiceArea + twiceArea), yMoment / (twiceArea + twiceArea + twiceArea)]
+}
+
+function perimeterCentre(points: ReadonlyArray<PointMM>): PointMM {
+  let length = 0
+  let xMoment = 0
+  let yMoment = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const edge = Math.hypot(b[0] - a[0], b[1] - a[1])
+    length += edge
+    xMoment += ((a[0] + b[0]) / 2) * edge
+    yMoment += ((a[1] + b[1]) / 2) * edge
+  }
+  return length === 0 ? boxCentre(points) : [xMoment / length, yMoment / length]
+}
+
+function vertexCentre(points: ReadonlyArray<PointMM>): PointMM {
+  const sum = points.reduce<PointMM>((out, point) => [out[0] + point[0], out[1] + point[1]], [0, 0])
+  return [sum[0] / points.length, sum[1] / points.length]
+}
+
+function convexHull(points: ReadonlyArray<PointMM>): PointMM[] {
+  const sorted = [...points].sort(([ax, ay], [bx, by]) => ax - bx || ay - by)
+  const turn = (a: PointMM, b: PointMM, c: PointMM) =>
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+  const half = (input: PointMM[]) => {
+    const out: PointMM[] = []
+    for (const point of input) {
+      while (out.length >= 2 && turn(out[out.length - 2], out[out.length - 1], point) <= 0) out.pop()
+      out.push(point)
+    }
+    return out
+  }
+  return [...half(sorted).slice(0, -1), ...half(sorted.reverse()).slice(0, -1)]
+}
+
+function orientedBoxCentre(points: ReadonlyArray<PointMM>): PointMM {
+  const hull = convexHull(points)
+  let best: { area: number; centre: PointMM } | undefined
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i]
+    const b = hull[(i + 1) % hull.length]
+    const angle = -Math.atan2(b[1] - a[1], b[0] - a[0])
+    const local = hull.map((point) => rotate(point, angle))
+    const centre = boxCentre(local)
+    const xs = local.map(([x]) => x)
+    const ys = local.map(([, y]) => y)
+    const area = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys))
+    if (!best || area < best.area) best = { area, centre: rotate(centre, -angle) }
+  }
+  return best?.centre ?? boxCentre(points)
+}
+
+function signedDistance(point: PointMM, polygon: ReadonlyArray<PointMM>): number {
+  let inside = false
+  let distanceSquared = Number.POSITIVE_INFINITY
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i]
+    const b = polygon[j]
+    if (a[1] > point[1] !== b[1] > point[1] && point[0] < ((b[0] - a[0]) * (point[1] - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside
+    const dx = b[0] - a[0]
+    const dy = b[1] - a[1]
+    const lengthSquared = dx * dx + dy * dy
+    const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / lengthSquared))
+    const x = a[0] + t * dx
+    const y = a[1] + t * dy
+    distanceSquared = Math.min(distanceSquared, (point[0] - x) ** 2 + (point[1] - y) ** 2)
+  }
+  const distance = Math.sqrt(distanceSquared)
+  return inside ? distance : -distance
+}
+
+function maximumClearanceCentre(points: ReadonlyArray<PointMM>, precisionMM: number): PointMM {
+  const xs = points.map(([x]) => x)
+  const ys = points.map(([, y]) => y)
+  const minX = Math.min(...xs)
+  const minY = Math.min(...ys)
+  const width = Math.max(...xs) - minX
+  const height = Math.max(...ys) - minY
+  const size = Math.min(width, height)
+  const cells: Array<{ x: number; y: number; h: number; d: number; max: number }> = []
+  const makeCell = (x: number, y: number, h: number) => {
+    const d = signedDistance([x, y], points)
+    return { x, y, h, d, max: d + h * Math.SQRT2 }
+  }
+  if (size === 0) return boxCentre(points)
+  for (let x = minX; x < minX + width; x += size) {
+    for (let y = minY; y < minY + height; y += size) cells.push(makeCell(x + size / 2, y + size / 2, size / 2))
+  }
+  const area = areaCentre(points)
+  let best = makeCell(area[0], area[1], 0)
+  const box = boxCentre(points)
+  const boxCell = makeCell(box[0], box[1], 0)
+  if (boxCell.d > best.d) best = boxCell
+  while (cells.length) {
+    cells.sort((a, b) => b.max - a.max)
+    const cell = cells.shift()!
+    if (cell.d > best.d) best = cell
+    if (cell.max - best.d <= precisionMM) continue
+    const h = cell.h / 2
+    cells.push(makeCell(cell.x - h, cell.y - h, h), makeCell(cell.x + h, cell.y - h, h), makeCell(cell.x - h, cell.y + h, h), makeCell(cell.x + h, cell.y + h, h))
+  }
+  return [best.x, best.y]
+}
+
+/** Compare centre definitions without changing the outline, its scale, or its orientation. */
+export function centreOfOutline(
+  grid: GridSpec,
+  points: ReadonlyArray<PointMM>,
+  method: CentreMethod,
+): PointMM {
+  if (points.length <= 2) throw new RangeError('An outline needs at least three points.')
+  if (method === 'box') return boxCentre(points)
+  if (method === 'oriented-box') return orientedBoxCentre(points)
+  if (method === 'area') return areaCentre(points)
+  if (method === 'perimeter') return perimeterCentre(points)
+  if (method === 'vertices') return vertexCentre(points)
+  return maximumClearanceCentre(points, grid.paddingMM / 2 / 2 / 2 / 2)
 }

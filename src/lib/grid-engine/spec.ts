@@ -59,6 +59,15 @@ interface MagnetSpec {
  */
 export type Registration = 'gap' | 'point'
 
+/** Experimental shape-centre definitions exposed by the admin comparison bench. */
+export type CentreMethod =
+  | 'box'
+  | 'oriented-box'
+  | 'area'
+  | 'perimeter'
+  | 'vertices'
+  | 'maximum-clearance'
+
 export interface GridSystemSpec {
   grid: GridSpec
   magnet: MagnetSpec
