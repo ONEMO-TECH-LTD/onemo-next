@@ -80,6 +80,8 @@ SolveRequest {
 
 There is no size, cap in millimetres, target, shape name, rotation, lattice offset, chosen registration, ranking weight or tolerance input. The 9-position ceiling is converted internally to a derived field span.
 
+Every spec field above, including `sparseFactor`, is a guarded law input. No module may supply it as a local default or literal.
+
 ### 2.2 Result
 
 ```text
@@ -97,12 +99,15 @@ Each family contains every field required by EC-07 plus:
 - `familyId` and `arrangementId48/96`;
 - the independent 48/96 run extents that produced those arrangements;
 - the tested centre coordinate and parity target;
+- `centreRelationships` for every centre method and both populations, as defined in §8.0;
 - per-axis registration (`point | gap`) because row and column parity can differ;
 - the exact source interval and manufactured-size interval;
 - separate 48/96 topology, coordinates, clearances and binding contacts;
 - side territories, reaches, spread, extremities and unsupported-zone records;
 - `floor | intermediate | optimum` as a classification only;
 - a status derived only from the settled hard predicates.
+
+All manufactured geometry is returned in the selected shape frame: origin at the tested centre `Cκ`, `+x` right, `+y` down. Thus returned magnet coordinate is `qshape=q-a`, returned outline coordinate is `σ(p-Cκ)`, and no consumer needs the engine's lattice target. Engine-frame coordinates may appear only as labelled diagnostics.
 
 An unsuccessful band is an explicit result, not an empty array with ambiguous meaning.
 
@@ -218,7 +223,7 @@ For pitch `s`, the one-dimensional run is:
 run(s,k) = { s·(i - floor((k-1)/2)) : i=0..k-1 }
 ```
 
-At 48 this is centred on the parity target: odd runs around `0`, even runs around `24`. At 96 it is the corresponding fixed thinning around the unchanged target, so even runs are intentionally asymmetric about `24`.
+At 48 this is centred on the parity target: odd runs around `0`, even runs around `24`. At 96 it is a fresh run on the fixed subset `Λ96` about the unchanged 48-derived target; it is not a subset of the finite 48 run. Even runs are therefore intentionally asymmetric about `24`.
 
 ```text
 W(s,r,c) = run(s,c) × run(s,r)
@@ -243,7 +248,7 @@ Deduplicate equal coordinate sets within the same `(band, centre, population, pa
 ### 6.3 Classification
 
 - population `floor`: exactly two magnets forming an admissible pair;
-- population `optimum`: exactly four magnets occupy the four corners of their outermost rectangular extent and are reported with their edge contacts;
+- population `optimum`: exactly four magnets occupy the four corners of their outermost rectangular extent **and this is the first lawful published size in that arrangement's interval**, so it is the published edge-fit for that interval; later/looser sizes with the same four-corner topology are `intermediate`;
 - population `intermediate`: every other admissible material-derived arrangement;
 - family `optimum`: both populations are `optimum`; family `floor`: both are `floor`; every mixed or other case is `intermediate`.
 
@@ -320,6 +325,8 @@ m ∈ {m0, m0+2, ...} while m ≤ Lσ1
 
 Re-evaluate the complete predicates at `σpublished` in the integer publication domain; a size ships because the exact full-disc predicate clears at that even integer, never because a floating comparison was near a boundary. Each published size is a distinct family record. This is upward publication inside a lawful interval, never blind ceiling and never first-fit termination.
 
+Only the source outline's **longest side** publishes as the whole even millimetre `m`. The other manufactured dimension is `m` multiplied by the source bounding-box aspect ratio and is returned exactly; it is never independently rounded. Rounding both dimensions would deform the locked shape and is forbidden.
+
 ### 7.5 Binding explanation
 
 At the published scale, evaluate every selected magnet against every outline edge and retain the lexicographically first exact minimum tuple:
@@ -330,9 +337,21 @@ At the published scale, evaluate every selected magnet against every outline edg
 
 The interval boundary also retains the contact feature that created it. These records make the answer self-explaining and reproducible by the applied proof.
 
-## 8. M2 — flap, sides, extremities and limbs
+## 8. M2 — centre relationship, flap, sides, extremities and limbs
 
-### 8.1 Coverage field
+### 8.0 Centre relationship
+
+For a family placed using centre method `κ`, express the source coordinate of every tested centre method `λ` and each magnet population in the returned shape frame:
+
+```text
+zλ = σ(Cλ - Cκ)                            tested centre in shape frame
+μs = (1 / |As|) · Σq∈As (q-a)             magnet-population centroid in shape frame
+Δs,λ = μs - zλ                            centre displacement vector
+```
+
+For every `λ` and population, return `{ shapeCentreMM:zλ, magnetCentroidMM:μs, displacementMM:Δs, distanceMM:||Δs,λ|| }`. This is the normative EC-08 relationship: the actual material-supported magnet population relative to each tested shape centre. It is not the rectangular window midpoint and not a selected winner.
+
+### 8.1 Unsupported-distance field
 
 For arrangement `A`, let its support discs be `D(q,R)` and define:
 
@@ -341,11 +360,11 @@ For arrangement `A`, let its support discs be `D(q,R)` and define:
      = max(0, min_q ||p-q|| - R)
 ```
 
-`ρ(p)` is the unsupported reach of material point `p` to the nearest supporting disc.
+`ρ(p)` is the unsupported distance of material point `p` to the nearest supporting disc. The field exists over all material for diagnostics, but **flap reach is evaluated on the cutout boundary only**. Interior gaps between lattice discs are not fabric flaps.
 
-### 8.2 Four non-overlapping side territories
+### 8.2 Four non-overlapping side boundary territories
 
-Relative to the tested centre `a`, assign every material point to one of four 90-degree cones:
+Relative to the tested centre at the shape-frame origin, assign every outline-boundary point to one of four 90-degree cones:
 
 ```text
 left:   dx < 0  and |dx| ≥ |dy|
@@ -354,61 +373,63 @@ top:    dy < 0  and |dy| > |dx|
 bottom: otherwise
 ```
 
-The strict/non-strict tie rule above is normative. The four territories partition all material, rather than measuring only material beyond the outermost magnets.
+The strict/non-strict tie rule above is normative. The four territories partition the complete outline boundary.
 
-For side territory `Mside`:
+For side boundary territory `Bside = ∂P ∩ sideCone`:
 
 ```text
-sideReach(side) = max_{p∈Mside} ρ(p)
+sideReach(side) = max_{p∈Bside} ρ(p)
 spread = max(sideReach) - min(sideReach)
 ```
 
-Coverage passes for a selected switch value only when all four reaches are `≤12` or all four are `≤24`. Spread is evidence only; it is not equality, argmin, ranking or a pass gate.
+Coverage passes for a selected switch value only when all four boundary reaches are `≤12` or all four are `≤24`. Spread is evidence only; it is not equality, argmin, ranking or a pass gate. The centre of a 48mm lattice cell therefore cannot fail flap coverage merely because it is `48/√2 - 12 ≈ 21.94mm` from the discs; it is not on the cutout edge.
 
 ### 8.3 Exact maximum-reach computation
 
-Because `ρ` uses distance to the **nearest** magnet, construct the ordinary nearest-site Voronoi diagram of magnet centres, not a farthest-site diagram. Clip each Voronoi cell against the polygon and its side cone. Within a clipped cell the nearest centre is fixed and squared distance to it is convex, so its maximum over each polygonal component occurs at a component vertex. Evaluate:
+Because `ρ` uses distance to the **nearest** magnet, construct the ordinary nearest-site Voronoi diagram of magnet centres, not a farthest-site diagram. Intersect its edges with each outline segment and side-cone boundary. Along an outline portion inside one Voronoi cell the nearest centre is fixed and squared distance to it is convex, so its maximum occurs at an interval endpoint. Evaluate:
 
 - canonical polygon vertices;
-- side-cone/boundary intersections;
-- ordinary Voronoi vertices inside the territory;
-- ordinary Voronoi-edge intersections with polygon or side-cone boundaries.
+- side-cone/outline intersections;
+- ordinary Voronoi-edge/outline intersections.
 
-Take the exact maximum and retain every tied material point plus its nearest disc contact. Chew and Drysdale's [constrained largest-empty-circle result](https://digitalcommons.dartmouth.edu/cs_tr/29/) derives the same ordinary nearest-site Voronoi structure for maximising distance to the nearest site inside a polygon.
+Take the exact boundary maximum and retain every tied outline point plus its nearest disc contact. Chew and Drysdale's [constrained largest-empty-circle result](https://digitalcommons.dartmouth.edu/cs_tr/29/) validates the ordinary nearest-site Voronoi structure; this engine uses its boundary-restricted case for flap.
 
 ### 8.4 Material extremity
 
 A `materialExtremity` is a boundary vertex that is a non-strict local maximum of squared radial distance from `a` against its two canonical boundary neighbours. Collinear equal-radius runs collapse to their lexicographically first endpoint. Additionally retain the four global directional extrema `(min x,max x,min y,max y)`. Deduplicate by coordinate.
 
+A radial local minimum used to delimit a limb arc is equally exact: on boundary edge `p(t)=v+t(w-v)`, evaluate the interior stationary point `t*=-(v·(w-v))/||w-v||²` only when `0<t*<1`, plus canonical vertices that are no farther radially than both neighbours. Deduplicate equal points canonically.
+
 Every extremity is assigned to its normative side territory and reports `ρ`, nearest disc and whether it exceeds each flap switch. This exposes protruding tips even when the side-wide maximum occurs elsewhere.
 
-### 8.5 Unsupported zones and limb candidates
+### 8.5 Unsupported boundary zones, interior gaps and limb candidates
 
-Define unsupported material exactly:
+Define the unsupported boundary exactly:
 
 ```text
-U = { p∈P : ρ(p) > 0 } = P \ ⋃q D(q,R)
+B = { p∈∂P : ρ(p) > 0 }
 ```
 
-Construct its connected components using the arrangement of polygon segments and analytic disc arcs. For each component report area, bounding box, sides touched, extremities contained, maximum reach and limiting point/contact.
+Construct the maximal connected boundary arcs of `B` using analytic segment/circle intersections. Split an arc additionally at side-cone boundaries and radial local minima so a protruding extremity is not merged with the whole perimeter. For each arc report outline-length, bounding box, sides touched, extremities contained, maximum reach and limiting point/contact. These arcs are `unsupportedZones` and are the only zones entering EC-09 flap coverage.
 
-A component is labelled `limb-candidate` exactly when:
+A boundary arc is labelled `limb-candidate` exactly when:
 
 1. it contains at least one material extremity; and
-2. its closure meets the supported region through one connected attachment set.
+2. it is bounded in both boundary directions by the nearest radial local minima or by a disc/outline contact.
 
 Otherwise it is `unsupported-zone`. `trivial` is never computed or approved: every limb candidate remains `exception-pending` for applied visual confirmation. This defines limb geometry without inventing a triviality threshold.
+
+Interior local maxima of `ρ` obtained from ordinary Voronoi vertices are returned separately as `interiorGaps`. They never contribute to `sideReach`, spread, flap coverage or the limb exception. This keeps lattice-cell voids visible without mislabelling them as edge flap.
 
 ## 9. Determinism and numerical kernel
 
 Same canonical outline bytes plus same guarded spec must produce byte-identical families.
 
-- Parse finite decimal input coordinates into exact rationals for predicates and event ordering.
-- Use robust/exact orientation, intersection and comparison predicates.
-- Algebraic roots are represented by defining polynomial plus isolating interval; compare without locale-formatted decimals.
+- Preserve the canonical finite-decimal input representation and use filtered robust predicates with exact fallback for orientation, intersection, tangency and equality. Exact fallback is necessary because the canonical square answer is tangency at clearance exactly `12mm`; an epsilon would change a lawful answer.
+- Algebraic contact roots are represented by defining polynomial plus isolating interval only where exact event ordering/equality requires it. Ordinary non-boundary arithmetic need not be promoted to a general rational-number architecture.
 - Deduplicate equal events algebraically, not by rounded strings.
 - Every tie uses the canonical order: band, centre-method registry order, rows, columns, population, coordinate `(y,x)`, scale interval, published size, edge index.
-- IDs hash canonical integer/rational encodings, never runtime object order.
+- IDs hash canonical exact numeric encodings, never runtime object order.
 - Output serialisation has fixed field and array order and locale-independent decimal formatting.
 - No randomness, wall-clock value, platform locale or iteration order affects answer content. Timing stays in diagnostics and outside the canonical answer hash.
 
@@ -423,9 +444,21 @@ The portable engine is a pure `SolveRequest → SolveResult` function. The web p
 5. cache a bounded number of complete results;
 6. candidate browsing is an indexed lookup.
 
-For the web instrument the miss runs in one Web Worker because L16 forbids solver or centre work from blocking the UI. This is execution isolation, not a second engine or architecture. Pinch, resize, pan, drag, camera movement and browsing issue zero solve calls. Outline/spec change is the only invalidation trigger.
+Pinch, resize, pan, drag, camera movement and browsing issue zero solve calls. Outline/spec change is the only invalidation trigger. First measure the decoupled cached runner. If a cache miss still creates a main-thread long task or visible input/animation stall, move the unchanged pure request/result boundary into one Web Worker. The worker is a measured execution escalation, never a second engine or a baseline mandate.
 
 Performance evidence records event count, window updates, peak memory, wall time and main-thread long tasks on the largest real trace. No unmeasured millisecond budget is invented; any observed interaction stall fails EC-12.
+
+### 10.1 Answer cardinality and browsing
+
+The engine does not prune variants. Its maximum published-size count follows from the count-derived field: at most `fieldSpanMM/2 = 204` even longest-side values at the released spec. For band 4, each parity target has at most four `(r,c)` extents per population, therefore at most `4×4=16` cross-population families per target and `64` across four targets at one size. The released absolute bound is therefore:
+
+```text
+6 centre methods × 3 bands × 204 even sizes × 64 families = 235,008 families per cutout
+```
+
+Bands 2 and 3 have smaller actual extent counts; deduplication reduces this further, but no implementation may depend on that reduction.
+
+The immutable canonical result remains the ordered family array specified in §2. The runner builds read-only secondary indices keyed by `(band, centreMethod, parityTarget, publishedEvenMM, familyId)` without changing or duplicating answer truth. It exposes filtered ID slices and one-family lookup. The proof UI renders only the current slice and selected family, using list virtualisation; changing a filter or page performs index lookup only. Every family remains addressable and applicable. No cardinality-based truncation, “top N”, implicit ranking or alternative result set is permitted.
 
 ## 11. Independent verification
 
