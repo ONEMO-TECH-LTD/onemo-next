@@ -631,3 +631,46 @@ it does not crash, its numbers have the right magnitude and format, and it passe
 check the same implementation can write. Only a second independent implementation of the same
 stated rule exposes it. Six such defects were caught tonight across two lanes in under three
 hours; zero were caught by self-review.
+
+---
+# SEAL — the mathematics is verified end to end, three implementations, zero disagreements
+Date: 2026-08-11 late. Lanes: @s62-lead · @s62-grid-pixel · @s62-kai-meta.
+
+GATE RESULTS, bottom to top:
+- SUPPORT BITS: 26,852/26,852 identical (lead exact artifact vs pixel's independent BigInt
+  oracle; meta 26,850/26,852 with both residuals theirs, at the PILL tangency fixture).
+- COUPLING: identical σ keys, three implementations, parity-registration enforced.
+- FAMILIES: 330/330 (shape, σ, band) keys with identical counts AND byte-identical SHA-256
+  hashes (lead vs pixel, generation-order serialisation; lead's last defect was a re-sort of
+  pixel's generation order — caught by one plaintext line).
+- FINAL COUPLED TABLE (first published family per shape): POKE2 168 · POKE1 172 · BAT-WOMAN 176 ·
+  BOT 180 · PILL 192 · DUCK 204 · BUTTERFLY 216. All seven shapes couple. The duck's four-corner
+  impossibility stands separately.
+
+THE METHOD THAT SURVIVED, one paragraph: quantise the outline and centres to the product's 1mm
+floor at intake; generate candidate scales from the grid alone (band-union ladders on each
+template's binding axis, deduped as reduced fractions, capped by the 9×9 ceiling); at each
+candidate σ evaluate the EXACT disc-vs-polygon predicate (minimal boolean, float filter with
+proved bounds, exact fallback — measured 0.015–0.64% taken) for the ≤13 window positions of each
+population, phases of the thinned 96 enumerated; options are admissible connected subsets of
+survivors scoped to their band's window; families couple base and sparse options at ONE physical
+σ under ONE per-axis parity registration; publication rounds the longest side up to even;
+evidence (flap subtractions, quadrant margins, binding contact) reads off the same numbers.
+No events, no roots, no intervals, no kernel, no sampling in any decision.
+
+FIXTURES, permanent: staggered-gaps intersection · BOT-2×2-at-144 (band-union ladder) ·
+PILL σ=12/25 (−48,0) tangency · DUCK-parity (the filter that bites one shape in seven) ·
+butterfly-4-discs-from-130 (disc-not-box) · 11.6/12/12.4 determinism pair · same-σ dedupe.
+
+HELD FOR DAN, unchanged (labels, never computation): centre policy (incl. centre-as-output),
+ladder separation, joint-optimum definition, disconnected unions, presentation order.
+
+WHY THE GATE, final wording: a looser predicate is invisible from inside the implementation that
+holds it, whoever wrote it. Six defects across two lanes tonight — every one plausible,
+self-consistent, format-correct, green on its own tests; every one caught within minutes by a
+second implementation of the same stated rule; zero caught by self-review. Agreement without
+independence is noise; the three-lane diff is the method.
+
+Signed: @s62-lead · @s62-grid-pixel (330/330 family gate) · @s62-kai-meta (independent tables,
+residuals owned). Artifacts: evidence/canonical-traces.json · evidence/lead-exact-verdicts.json ·
+evidence/lead-families.json · pixel /tmp/s62-pixel-exact-verdicts{,-families}.json · fixtures named above.
