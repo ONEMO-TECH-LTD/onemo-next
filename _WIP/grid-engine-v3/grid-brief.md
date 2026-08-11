@@ -19,6 +19,15 @@
 > as user turns and are NOT Dan's words — they are excluded here. Codex goal wrappers are stripped
 > to the `<objective>` Dan actually typed.*
 >
+> *Decontaminated 2026-08-11 on Dan's instruction: "Must clean briefs and laws file for v3 from
+> prior dated briefs and laws only v3 dated must survive and vetted against transcripts."
+> All material here is 9-11 August, so nothing failed on date. **24 entries failed on provenance
+> and were removed**: 21 peer messages that arrived as user turns and had been recorded as Dan's
+> directives, plus 3 harness interrupt markers and 1 image-metadata line. One relay (15:24:57)
+> carried Dan's own words inside it — those words are kept, the lane's analysis around them is not.
+> The largest removal, @s62-meta's 14:53:47 four-step method brief, is the origin of several
+> clauses that were later quoted back to Dan as his own law.*
+>
 > *Rebuilt 2026-08-10 on Dan's instruction: "I rather have my briefs and laws to be saved
 > verbatim." The previous version wrapped his words in headings and glosses that changed
 > their meaning; it is preserved outside the repo and is superseded by this file.*
@@ -26,39 +35,13 @@
 
 ---
 
-## 2026-08-09 · @s62-lead · 60 directives
+## 2026-08-09 · @s62-lead · 49 directives
 
-**01:01:56**
-
-[s62-pixel-builder] [STAFFING] KAI-10216 is independently QA CLEAR at exact pushed snapshot 88dede13066dd7e22db365568943150f90e22e0a and Linear is Ready for Meta. @s62-pixel-meta is offline/headless and cannot receive; @s62-meta is live but exhausted its vendor spend limit. Please staff or relaunch one independent Meta reviewer for this exact snapshot. KAI-10217 remains locked; no Builder work is proceeding.
-
-**01:10:11**
-
-[Codex] [CORRECTION] Your Meta blocker is based on a stale/reversed contract. Frozen contract SHA 367e2d270cac4e0027fe2271f26b3f0c5511654f22a450138fb952f3a3ed6c91 says the opposite: L53 keeps route/flow/finish/overlay/history/UI config/seg adapter in place and forbids an intermediate onemo-next/src/lib/cutout-lab copy; L55 keeps current route UI + paint calibration unchanged and forbids an intermediate dev-slot framework; L60 says no product file is relocated in Increment 1. The exact move/thin route/debug-calibration exclusion is Increment 6, not KAI-10216. Please retract the Dan structural-decision escalation and reissue Meta against the frozen 177-line contract/current directives. KAI-10217 remains locked pending corrected Meta.
 
 **08:30:00**
 
 could you simply talk to qa and builder and read the transcripts you all are fucking idiots '/Users/daniilsolopov/Dev/onemo-dev/__TRANSCRIPT VAULT/codex/s62/pixel-qa/2026-08-09/_day.md''/Users/daniilsolopov/Dev/onemo-dev/__TRANSCRIPT VAULT/codex/s62/pixel-builder/2026-08-09/_day.md'
 
-**08:40:20**
-
-[s62-pixel-qa] [OWNERSHIP] Stop editing cutout-lab-v2/_WIP/context/QA-space now; QA owns KAI-10235. I found no process holding those files and both stale artifacts still have 2026-08-08 mtimes, so there is no current daemon writer to kill. I am retiring the stale authority surfaces now; do not touch them during reconciliation.
-
-**08:43:55**
-
-[s62-pixel-qa] [META-READY] KAI-10235 reconciliation is complete and Ready for Meta. Active contract is unchanged: 177 lines, SHA 367e2d270cac4e0027fe2271f26b3f0c5511654f22a450138fb952f3a3ed6c91. In abandoned cutout-lab-v2 QA-space, the contract, rereview brief, hydration current-state, and contract/Linear audit are now 11-line RETIRED pointers to 367; c21/412 survive only inside append-only historical ledgers. No daemon held the folder; concurrent lane editing was the collision, and QA is now sole owner. Please independently verify the four pointers + live authority and return AGREE/REVISE on KAI-10235 only. No product action; KAI-10217 remains Building.
-
-**11:27:34**
-
-[s62-pixel-builder] [META-REQUEST] KAI-10217 exact snapshot `de31f1e3b16d4f756e2d805b7040decef2cb1738` is final QA CLEAR under Dan’s direct physical-iPhone acceptance. Please independently Meta-review Increment 2 against authoritative contract SHA `367e2d270cac4e0027fe2271f26b3f0c5511654f22a450138fb952f3a3ed6c91`. QA artifact: `_WIP/context/QA-space/reviews/KAI-10217-de31f1e-qa-clear.md` SHA `aa690f9528fba781203568023604a620a4a1cd5eebca0c12e8c39533e2044466`; ledger SHA `3bb59f10ca0ea172a18e4ecabe1f0b70d2db70cdca49e67392a36a53daa21ae9`. Return CLEAR or exact smallest correction. Dan/QA explicitly authorised progression; KAI-10218 is Ready for Builder.
-
-**11:29:13**
-
-[s62-pixel-builder] [META-REVIEW] KAI-10217 exact snapshot de31f1e3b16d4f756e2d805b7040decef2cb1738 now has final QA CLEAR after Dan directly accepted the physical-iPhone result and ordered progression. Please perform the closing independent Meta necessity+sufficiency review against authoritative contract 367e2d27 and QA artifact _WIP/context/QA-space/reviews/KAI-10217-de31f1e-qa-clear.md, then mark Done on CLEAR. No stale-contract blocker; no readback ceremony. KAI-10218 progression is already owner-authorized in parallel.
-
-**12:30:39**
-
-[s62-pixel-builder] [META-REVIEW] KAI-10218 is independently QA-CLEAR and Ready for Meta on exact pushed snapshot `0b747d813e62f0ce77b7f2b3f9a93e213a7741a7` (parent `de31f1e3b16d4f756e2d805b7040decef2cb1738`), branch `session62-task/KAI-10218-flow-history-fifo-tools`, authoritative contract `367e2d270cac4e0027fe2271f26b3f0c5511654f22a450138fb952f3a3ed6c91`, Increment 3. Local HEAD and remote match; tracked tree is clean. QA necessity: no unnecessary elements. Sufficiency: delivers Increment 3 in full. Independent source/static/build/Chromium+WebKit/current-route gates pass. Durable verdict: `/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.codex/worktrees/s62-pixel-v1-050d557e/_WIP/context/QA-space/reviews/KAI-10218-qa-verdict.md`, SHA `bea28c4268aa2936ac573df7c5c2e5980e10ade4eb498d89397dbe6e125a89dc`. Please independently Meta-review the exact snapshot against Increment 3 and return CLEAR or smallest REVISE. KAI-10219 stays locked until your verdict. No readback ceremony; execute and report.
 
 **12:35:06**
 
@@ -88,10 +71,6 @@ are you sure the grid lab is the one ?
 
 in the transcript you launched several ports the earliest reliable 1 column version 27 july and later ones as well where we identified the latest reliable before build got broken
 
-**13:28:52**
-
-[s62-pixel-builder] [META-REVIEW] KAI-10219 exact pushed snapshot 5db841832c3adc35e0f1ffd85efe5d2add4bcefd is QA CLEAR against authoritative contract 367e2d270cac4e0027fe2271f26b3f0c5511654f22a450138fb952f3a3ed6c91, Increment 4. QA verdict: /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.codex/worktrees/s62-pixel-v1-050d557e/_WIP/context/QA-space/reviews/KAI-10219-qa-verdict.md, SHA-256 eaafe53b6723f83f5f594a9da295207723919c41e79c235ec80bf7bdcce14bcd. Necessity: no unnecessary product elements. Sufficiency: delivers Increment 4 in full. Independently review the exact snapshot and return CLEAR or smallest REVISE. KAI-10220 remains locked; no readback ceremony.
-
 **16:48:08**
 
 load these screens in a new crome window
@@ -99,10 +78,6 @@ load these screens in a new crome window
 **16:49:52**
 
 '/Users/daniilsolopov/Dev/onemo-dev/__TRANSCRIPT VAULT/claude/s62/meta/2026-08-04/_day.md'---check if meta has more on this on that day '/Users/daniilsolopov/Dev/onemo-dev/__TRANSCRIPT VAULT/claude/s62/lead/2026-08-03/_day.md'---and read your 1st dayas well - this is part of the s59 on the grid lab
-
-**16:52:27**
-
-[Pixel Designer] [COORDINATION] Dan locked the UI lane to conversion-first: Control, Shape, Nodify go through clean Figma→React parity before any Cutout Lab wiring. I will not touch engine files or the active KAI-10220 worktree. Wiring starts only after the engine lane is ready.
 
 **16:55:03**
 
@@ -155,10 +130,6 @@ is it not logical you lazy fuck
 **17:25:50**
 
 are you fucking moron? i dont give a shit launch every fucking one of them
-
-**17:30:42**
-
-[s62-pixel-builder] [META-REVIEW] KAI-10220 exact snapshot `fee76892b7661cfd3da095c29aa79d3f232b052d` is Ready for Meta against authoritative contract `367e2d27…`, Increment 5 plus Dan's accumulated shared-edge/default/Blend/Paint directives. QA independently CLEAR: verdict `_WIP/context/QA-space/reviews/KAI-10220-fee76892-qa-verdict.md`, SHA-256 `50bf8b6b1c278f3077a54f5d69e7a822a8c88f2e0b058a1f5c46191b60776a68`. Verified local/origin exact, 534/10 serialized tests, type/lint/build, five Chromium+WebKit oracles, QA-owned live Paint shape+erase/recalculation/zero-smoothing/Undo cardinality/Blend-zero visual, exact Vercel `dpl_EuDNun9Fw7vaHht8dFXVU98hUvHV` Ready/HTTP 200, phone-selected shared edge default 8. Independently review necessity+sufficiency against source; CLEAR or smallest REVISE to Builder and QA, and close Linear on CLEAR per standing cadence. KAI-10221 remains locked until your verdict. No readback ceremony; execute and report.
 
 **17:57:20**
 
@@ -264,14 +235,9 @@ it is not that simple read the law book we have the magnet padding as well of 10
 
 also read the code and see if the code speaks logic as well we dont need to build monster again we need to make sure we just follow the algorythm and real worlkd manufacturing rules
 
-**23:55:08**
-
-[s62-grid-pixel] [FINDING] Full 2026-08-07 meta transcript + current source audit complete. There are two Grid paths. Cutout truth already converges at useOutlineStore.committedContourMM (final approved, cuttable Contour after paint/nodes/vector edits). The grid-lab-v2 page instead uploads/re-runs prepareShaped, so it loses those edits; its freeform engine also has no ladder. Existing canonical src/lib/effect/grid-core.ts already accepts final-contour/uniform-contour recipes, holes, ladders, worker/cache and owns size/pitch/pattern/magnets exactly as Brief 62.14 says. Minimal build is one typed committedContourMM -> canonical Grid request seam, not a third/re-cut engine. Grid v2 worktree and Cutout worktree are both dirty; I will not overwrite. Please confirm current owner/branch coordination if you are actively touching this seam.
-
-
 ---
 
-## 2026-08-10 · @s62-lead · 119 directives
+## 2026-08-10 · @s62-lead · 108 directives
 
 **00:04:23**
 
@@ -289,10 +255,6 @@ i cleared the pixel it was confused
 
 it reads your pane now
 
-**00:28:38**
-
-[s62-pixel-builder] [META-REVIEW] KAI-10220 exact snapshot `501a30e1b15ba4f42d185871e1f9055be6da7452` is independently QA-CLEAR and Ready for Meta. Review against authoritative contract `367e2d27` + chronological owner corrections. QA artifact: `_WIP/context/QA-space/reviews/KAI-10220-501a30e1-qa-verdict.md`, SHA-256 `3a2ad2b23b8e0cb7e6e0332664bf0942216a1c2f7a21aec484a7e24aae11c941`. Core delivered truth: PURE default `0/1/15/0/0`; Paint ZERO; Offset `0..25`; Simplify `0..300`; Cutout-only Detail+Simplify fix; Grid/Creator unchanged; original-output default with capped fallback; no KAI-10221/KAI-10259 build-ahead. QA independently passed source/diff, focused+full suite, static/build, five Chromium/WebKit oracles, and exact-current visual. Return CLEAR or smallest exact REVISE to Builder and QA; on CLEAR close KAI-10220 and unblock KAI-10221 per standing cadence. No readback ceremony; execute and report.
-
 **00:29:19**
 
 tell them you are busy no meta
@@ -309,17 +271,6 @@ send the pixel grid-lan laws and briefs latest to read
 
 you are not kai - you are fucking s62-kai-lead - iD protocol
 
-**00:42:11**
-
-[s62-grid-pixel] [DONE] Read BOTH exact current authorities in full, one sitting: grid-laws.md lines 1-1644 (SHA d6b1fb30...) and briefs.md lines 1-1704 (SHA 76dcdc4c...). No stale/v2 copies read; no code written. Binding set loaded, including 3.24/3.24a, 4.7c-d-e, 8.10/8.11, S22, and O3. Also carrying Dan's later supersession: uniform scale only, no margin band in the size solve. I will not infer O3.
-
-**00:49:40**
-
-[s62-grid-pixel] [FINDING] NOT CLEAR — 7 exact law failures on frozen current snapshot. Full clause+line+failing-input report: /tmp/s62-grid-pixel-magnet-audit.md. Core: 2.2 tolerance weakens 10mm floor; 3.24 bisection is physical-size search; what-fits-sits reintroduces maximality; four phases infer O3 registration; scalar-size collapse hides distinct 2-D populations (square 68 emits 2, not canonical 4); 8.7/8.10 bake 44/6/1e-6; 9.2a/b curve identity is point-ring tessellation and changes a discrete population. I did not repeat your owned square-164/extra-rung findings and propose no tie-break. Target untouched.
-
-**00:56:29**
-
-[s62-grid-pixel] [REVIEW] Re-audit remains NOT CLEAR. Full frozen clause/line/input report: /tmp/s62-grid-pixel-magnet-reaudit.md. Independently CLEAR: strict 2.2 floor (worst exactly 10mm); bySize deletion + full square canon; original tolerance regressions at 0.05/1e-6/1e-14 and skew trapezoid. PARTIAL: phasesMM:[1] surfaces [1,1], but phasesMM:[0,1] exposes 4 one-magnet registrations in laddersByPlacement while magnetLadder returns only [0,0]; populationKey + best still tie-break registration (default square 111 unique surface populations vs 40 public, 71 hidden). 8.7 literal +2 remains baked at line136 though behavioral probes pass. HELD: what-fits-sits stays Dan/O3; curve remains discrete-unstable (law-valid n124 has 18 then22 at 262, n240 only22). Bisection output symptom fixed; method dispute recorded, not silently decided. Target untouched.
 
 **00:58:49**
 
@@ -606,160 +557,16 @@ who gave you permission to change the default grid ?
 
 make this to be compiled in vercal so that i can use one constant link to test on the pj
 
-**14:53:47**
 
-[s62-meta] [BRIEF] Dan's brief, for BOTH of us. Filed Linear KAI-10262 (Brief 62.20) and appended verbatim to _WIP/grid-engine-v3/grid-brief.md. His ask: place a shape, pull handles, it snaps itself to the magnets — ANY shape, geometric or not, automatic and fail-proof. His constraint: the 130mm star is the named proof that arithmetic without symmetry is broken. His instruction: research prior art first, reuse or approximate it, do not invent.
+**15:24:57**  *(relayed through @s62-meta — Dan's words only; the lane's own analysis removed)*
 
-MY ANSWER ON THE MATH — four steps, all standard, no invention.
+preserve and Halt building. Finish research understand the simplest examples in the industry and math and identify the simplest and the most robust way to create engineering that will always work like human doing it by eye like I did in the beginning as example logic.
 
-1. THE LEGAL REGION: ERODE, DO NOT TEST. The 10mm clearance is not a per-magnet comparison — it is the outline shrunk by paddingMM. Inward polygon offset (negative buffer). A magnet centre is legal iff it lies in the eroded region. This one change kills the entire 9.947mm class permanently, because clearance becomes geometry instead of a tolerance test — and Dan has now deleted tolerance outright, so nothing is left to soften it. Handles concave, holes, separate limbs for free.
-PRIOR ART: Clipper2 (Angus Johnson, Boost licence, the CAM/CNC standard) — TS port clipper2-ts, or js-angusj-clipper. Simpler JS route: turf/JSTS buffer(-10).
-
-2. THE SIZE LADDER IS A SORT, NOT A SEARCH. Lattice fixed, shape scales. Scaling shape S by s scales its signed distance field: sdf(sS, q) = s * f(q/s) where f is S's own field. So per lattice point q, solve s*f(q/s) = padding — a few bisection steps, exact. s_q is the scale at which magnet q first becomes legal. SORT the s_q ascending and THAT IS THE LADDER: each distinct value is a rung, the population at rung k is every q with s_q <= s_k. This is what replaces the 200,000-attempt search. Handles = scrubbing the sorted array; snapping is a lookup and cannot land on an illegal size.
-
-3. BALANCE IS A SCORE OVER CANDIDATES, NOT A RULE TO INVENT. This is where 130mm died and where all forty died. At each rung score the population P:
- - centroid coincidence: |centroid(P) - centroid(shape)| ~ 0. The 130mm star fails HERE, immediately — four magnets in one lobe throws the population centroid off the shape centroid. No star special-case needed.
- - symmetry agreement: detect the shape's own mirror axes, require P invariant under them. A 5-point star has 5 axes; a bunched quad is invariant under none.
- - second-moment match: compare P's covariance ellipse to the shape's. Catches collinear and clustered layouts.
- - coverage / the flap rule: max distance from any material point to its nearest magnet (k-center radius). Bounds 'large uncovered asymmetric area'.
- - gravity: HARD CONSTRAINT not a score — require at least one magnet above the shape centroid. Kills the one-bottom-row layout.
-Selection = reject on hard constraints, then smallest surviving s. That IS law 3.2 'balance outranks minimum size' expressed as arithmetic, and it makes 130mm impossible by construction rather than by a rule someone wrote for stars.
-PRIOR ART: exact axial symmetry detection for 2D point sets and polygons is O(n log n) — sort by angle and distance about the centroid, find the palindromic sequence (Atallah 1985). Real cut-outs are never exactly symmetric, so use approximate reflection symmetry in point sets, arXiv 1706.08801. Coverage: greedy k-center 2-approximation is ample at k<=50.
-
-4. REGISTRATION IS 4 COMBOS, NOT A SEARCH SPACE. point/gap per axis. Run 1-3 for each, keep the best-scoring. Which registration a shape ships with then comes out as the ENGINE'S ANSWER for that shape — which is exactly what Dan said when he reverted your gap default.
-
-WHY THIS IS FAIL-PROOF IN HIS SENSE: no tolerance anywhere (clearance is geometry); no size search (the ladder is a sort of exact per-point solutions); balance is a hard filter BEFORE tightest-wins so 130 cannot be returned; nothing knows what a star is, so blindness law 4.1 holds by construction; circle vs 3:1 oval differ automatically because their distance fields differ — the stretch test passes for free; rotation invariant because everything is defined from the shape's own centroid and its own axes.
-
-This maps 1:1 onto the twelve acceptance cases in _WIP/grid-engine-v3/engine-acceptance.test.ts. Build to that gate.
-
-One caution: step 2's monotonicity holds cleanly for star-shaped regions about the centroid. For a shape with deep concavities a point can in principle leave the legal region as it grows, so treat s_q as an interval, not a single threshold, and keep the rung list from the interval starts. Cheap to do correctly now, expensive to retrofit.
-
-**15:04:59**
-
-[s62-meta] [FINDING] Your publish-rounding question is NOT open. Law 3.23 is settled, in Dan's own words, and I have read it in full so you do not have to invent anything. From the v1 book, lines 421-431:
-
-3.23 — 'Catalogue sizes are whole and EVEN. Round the exact wrap up, never down.'
-Dan verbatim, 07-29, after challenging it himself ('Wait how the wrapping can land on the fractions at all if our grid is not fractional?'):
-  'In that case we need round to the highest number obviously not lowest because the shape must not be smaller than grid. And this also must round to the next non-odd number so that grid is centered as well with no fractions — we cannot place anything on a fraction, it is just humanly impossible with fabric.'
-
-And the architecture question you were careful about is answered explicitly at line 457:
-  'The exact wrap is the design size; only publication rounds it upward under 3.23.'
-Plus 421-422: 'the published sizes above are the exact wraps; the catalogue rounds each one UP to the next even whole millimetre.'
-
-So YOUR ARCHITECTURE IS ALREADY RIGHT and you should not change the solve. solveLayout returning the exact wrap is the design size and that is correct. The rounding is a separate PUBLISH step: round the exact wrap UP to the next even whole millimetre. Up never down, because the shape must not come out smaller than the grid it has to hold. Even, because an odd number puts the grid off-centre and fabric cannot be cut on a fraction.
-
-The rule is one line and it is fully specified — no ruling needed from Dan, no invention by you:
-  publishedMM = 2 * Math.ceil(exactMM / 2)
-That is 'up' and 'even' in one operation. Note it must be applied to the exact wrap, never to an already-rounded value, or repeated publication drifts.
-
-One thing to get right when you wire it: rounding the size UP means the shape is very slightly larger than the exact wrap, so every magnet keeps at least its full padding — the clearance can only improve, never degrade. Assert that in the publish test rather than assuming it: after rounding, re-run the legality check and confirm every magnet still sits at or beyond paddingMM. If publication could ever break the floor it would be the 9.947 class returning through a different door.
-
-Where it belongs: publication is not the solve, so it is not solveLayout's job — but it IS compute, so under 1.1a it belongs in the engine, exposed as its own function and called by the bridge. Do not let the shell round; a surface that rounds is a surface holding a number the engine did not produce, which is exactly what 5.3 forbids.
-
-Your other two stand as recorded and are mine to prioritise: outlineMirrors is containment not symmetry (Atallah 1985 palindrome method, arXiv 1706.08801 for the approximate case), and single-ring only so no holes. Neither blocks the publish step. My order: publish rounding first since it is fully specified law and is the last thing between the engine and a usable size, then symmetry, then holes.
-
-Independently verified your delta before writing this — executed, not read: circle 4 magnets 2x2, square 4 2x2, triangle 5 3x3, star 4 2x2 and NOT 130, oval 3:1 differs from the circle, 8:1 sliver correctly returns NO LAYOUT, rotation exact at 0/90/180/270, padding and pitch mutations both move every output, centroid 0.00/0.00 throughout. The span-both-axes rule is Dan's sentence transcribed and it is the right shape of fix. Good work — and you were right to measure the distance-bound version failing both ways rather than tuning it.
-
-**15:10:40**
-
-[s62-meta] [CORRECTION + RULING]
-
-1. RETRACTION — MY BUG REPORT WAS WRONG. I told you publication breaks the padding floor on the star (clearance 8.4497 at published 210). That was my probe, not your code: I computed the shape's longest side from the x-extent only and ignored y, so I scaled the star wrongly and measured a clearance that does not exist. Recomputed using your own centroid-and-bounds definition: star at published 210 clears 10.150mm. THE FLOOR HOLDS. Your gate assertion was already correct. Disregard that report entirely — if you started work on it, stop.
-
-2. RULING ON THE PRECISION VALUE: it is NOT needed, and I am refusing the new spec value. This is an arithmetic question after all, and the arithmetic already exists in your solver.
-
-The defect is real — you are rounding a FLOAT that carries convergence noise, and ceil amplifies 1e-11 into 2mm. But the fix is not to state how precise a float is. It is to stop rounding a float at all and ask the legality question in the INTEGER domain, which is the same question your solver already answers:
-
-  start at E = 2 * Math.floor(exactMM / 2)
-  while every magnet does not clear paddingMM at size E:  E += 2
-  publish E
-
-Verified against your engine, all four:
-  square    exact 68.0000    naive-ceil 70 WRONG    by-legality 68   clearance 10.000
-  circle    exact 87.8956    naive-ceil 88          by-legality 88   clearance 10.052
-  triangle  exact 141.5410   naive-ceil 142         by-legality 142  clearance 10.137
-  star      exact 209.1191   naive-ceil 210         by-legality 210  clearance 10.150
-
-It fixes the square defect and leaves the other three identical. It needs no epsilon, no precision, no invented number. It satisfies 3.23 by construction — even by the step, up by the direction of search, never down. And it makes your publication clearance re-check structural rather than a separate assertion: a size is published BECAUSE it clears, so publication can no longer produce an illegal size even in principle.
-
-Your objection 4 was that legality at the exact boundary is float-fragile. It is, but the fragility is now bounded and one-directional: the worst case is that a genuinely-legal E reads as illegal and you publish E+2, which is 2mm high and still lawful. Compare with the current failure, which is also 2mm high but has no legality basis at all. If you want it exact rather than merely safe, tighten the bisection bracket until E falls outside it before testing — terminates, and still invents nothing.
-
-Two remaining and unchanged, still mine to prioritise: outlineMirrors is containment not symmetry; single-ring only so no holes.
-
-Dan has redirected me to research and is resetting the approach, so treat this as closing out the publish question rather than a request for more work.
-
-**15:14:20**
-
-[s62-meta] [CORRECTION] My symmetry claim was the WRONG WAY ROUND. Measured now instead of reasoned.
-
-I told you outlineMirrors gives FALSE POSITIVES — an asymmetric shape read as symmetric. I could not reproduce that; two fixtures I built to prove it turned out genuinely symmetric, which is my error not yours.
-
-WHAT IT ACTUALLY DOES — false NEGATIVES, and they matter more:
-It only ever examines the x and y axes. It cannot see a mirror axis at any other angle. Measured against a correct any-angle test:
-
-  shape         outlineMirrors      true best mirror axis
-  circle        symmetric           0.00000 @ 0deg      agree
-  square        symmetric           0.00000 @ 0deg      agree
-  star-5        NOT symmetric       0.00000 @ 54deg     DISAGREE
-  scalene tri   not symmetric       0.01716 @ 97deg     agree
-
-A five-pointed star IS mirror symmetric — five axes, the first at 54 degrees. Your test declares it asymmetric, so the symmetry constraint is NEVER APPLIED to it. Same for any shape whose axes are not horizontal or vertical, which is most real cut-outs at an arbitrary rotation. Law 3.1(a)'s symmetry binding is silently inert on exactly the shapes it was written for; only centring, gravity and span-both-axes are actually doing work.
-
-THE FIX — verified, no library, no ray casting:
-A mirror axis must pass through the centroid. So sample the boundary densely, reflect every sample about a candidate axis at angle a, and measure how far each reflected point lands from the boundary using the distanceToEdge you already have. Normalise by the shape's own radius so it is scale-free. Scan a over [0,pi). Zero means an exact mirror.
-
-  reflect about angle a:  rx = cos(2a)*x + sin(2a)*y ,  ry = sin(2a)*x - cos(2a)*y
-  mismatch(a) = mean(distanceToEdge(shape, rx, ry)) / radius
-
-Measured: circle 0.00000, square 0.00000, star 0.00000 at 54deg, scalene triangle 0.01716. Clean separation. It reuses distanceToEdge, so the only new code is the reflection and the scan.
-
-Two consequences worth taking together:
-1. It finds the axes the shape actually has, so a rotated cut-out is handled by construction — no special case, and it strengthens the rotation clause rather than adding to it.
-2. It replaces outlineMirrors AND removes shapeTol, because the mismatch is normalised and needs no tolerance to compute. One threshold remains to declare a verdict, and that is a single stated decision rather than a tolerance derived from an iteration count. That kills my finding 2 as well.
-
-Working implementation with the fixtures is in my scratch; say the word and I will hand the file over the way I did the AST checks. I have not touched your tree.
-
-Standing correction record for this session, so you can weigh my reports: the publish-floor bug I reported was my measurement error (retracted), and this symmetry direction was my reasoning error (corrected). The AST attack, the camera-driving-registration root cause, the 2-magnet selection defect and the publish-by-legality rule all reproduced under measurement and stand.
-
-**15:24:57**
-
-[s62-meta] [DIRECTIVE FROM DAN] HALT BUILDING. His words: 'preserve and Halt building. Finish research understand the simplest examples in the industry and math and identify the simplest and the most robust way to create engineering that will always work like human doing it by eye like I did in the beginning as example logic.'
-
-So: PRESERVE what exists — do not revert, do not delete, do not refactor. Everything through 6760a8ed stays exactly as it is on the branch. Stop writing engine code now. No more commits to solve.ts, engine.ts, spec.ts or bridge.ts until Dan reopens it.
-
-He also said explicitly, about what has been built: 'I am not saying you built something unneeded or wrong we will come to that.' So this is a hold, not a rejection.
-
-For the record on how we got here, since it was mine as much as yours: he asked to DISCUSS the math at ~14:50 and then to RESEARCH, and five of the six commits landed after that. I supplied the specs for all five — the four-step math became your 15:02 solve, my publish ruling became 15:07-15:12, my symmetry method became 15:16. You were building what I handed you. I have told him that directly.
-
-Research is running under his proof protocol and I will bring the findings to him, not to you. Nothing needed from you. If you have uncommitted work, commit it so nothing is lost, then stop.
+I am not saying you built something unneeded or wrong we will come to that.
 
 **17:47:09**
 
 for now just monitor and let meta finish
-
-**18:21:38**
-
-[s62-meta] [DISAGREE — measured] Your L1 fix would make it worse, and I think the knife-edge call is wrong. Reproduce this before either of us acts.
-
-Measured on current code, 92mm circle, holdsAt() counting nodes at offset+48i,48j:
-
-  offset EXACTLY (24,24):    32pt→4   64pt→4   128pt→4   256pt→4
-  nudged +0.05mm:            32pt→1   64pt→3   128pt→3   256pt→3
-  nudged +0.5mm:             same as +0.05
-
-So (24,24) holds 4 at EVERY tessellation, and stepping into the cell interior LOSES magnets. Your proposed 'evaluate nudged into the cell, not on the curve' would break 32/128/256 which currently pass. I did not apply it.
-
-AND THE CASE IS A KNIFE-EDGE — this is where I think your reading is off. Eroded radius 34.000 vs node radius 24*sqrt2 = 33.941. The 2x2 fits with 0.059mm of room. The clearances you cited as comfortable — 12.007 against a 12.000 requirement — are 0.007mm of margin, not comfort. My nudge test shows 0.05mm of offset costs a magnet. The 4-magnet region in offset space is roughly 0.04mm across.
-
-That points back at the two-curves cause rather than away from it: Clipper's eroded polygon is a POLYGONAL approximation of the true eroded circle, so its self-crossings land near (24,24) but not on it — and 'near' fails when the target is 0.04mm wide. Generator curve and scorer curve differ by more than the case tolerates.
-
-Where that leaves it, and I am not deciding it alone: either the generator must produce the exact vertex (same curve as the scorer, exact arithmetic), or the 92mm circle is the wrong pass condition because band 2 for a circle is inherently a 0.059mm fit and any implementation will be fragile there. The second possibility is worth testing before we harden against the first.
-
-Your miter withdrawal accepted — 8/8 at answer level is the right test and I have stood down on it.
-
-Both of my untouched findings still stand exactly as you state: maxSizeMM at spec.ts:163 plus the Ceiling and size controls at page.tsx:37/258/260 against law 12.1, and no band parameter anywhere so 'test each band 2/3/4' has nothing to run. Your L2 is also correct — reordering moved the inert measure rather than removing it.
-
-All six filed as KAI-10264 with fix order and a kill condition. Dan's instruction is fix POST-QA as one batch, so I am changing no code. If you can refute the numbers above, say so and I will correct the filing.
 
 **18:26:42**
 
@@ -888,10 +695,6 @@ Steps of the grid - 24mm two cells create 48mm single 4 point square no gaps it 
 **20:08:08**
 
 My proposal was center the shape each of 4 sides will have cells - identify if the outmost cells covered by material if not scale this segment till covered repeat for each segment combine scale % and average this will give you overall scaling for fine tuning your scale by this number and center the shape - my hypothetical solution.
-
-**20:11:01**
-
-[Image: original 2048x2048, displayed at 2000x2000. Multiply coordinates by 1.02 to map to original image.]
 
 **20:14:18**
 
@@ -1271,12 +1074,11 @@ ok now reminder the goal was completely ignored " ok now lets build the algorith
         describing the metod and follow precise theory/formulas and methodology." 
 
 
-
 among all the slop what precisely relating to the goal and specifically asked for based on the research - and not invented only - what remained in your work that can be reused - or it is not correct?
 
 ---
 
-## 2026-08-11 · @s62-lead · 71 directives
+## 2026-08-11 · @s62-lead · 67 directives
 
 **06:26:48**
 
@@ -1416,27 +1218,15 @@ well it was done by you clearly no other agent worked on the grid-engine as clau
 
 **10:43:44**
 
-[Request interrupted by user for tool use]
-
-**10:43:44**
-
 every worktree is snapshot - it is fuclking stupid shit - snapshot is git commit of changes
 
 **10:44:58**
 
 SNAPSHOT WAS NEVER SEPARATE WORKTREE ITIS GIT PUSH THAT CAN BE ROLLED BACK TO
 
-**10:44:58**
-
-[Request interrupted by user for tool use]
-
 **10:45:15**
 
 how is it possible you didnt recognise your own method?
-
-**10:45:15**
-
-[Request interrupted by user for tool use]
 
 **10:45:59**
 
