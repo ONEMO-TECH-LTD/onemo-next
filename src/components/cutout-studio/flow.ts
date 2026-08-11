@@ -33,7 +33,6 @@ const BAKE_IDLE_MS = 250 // Cadence Law: compose on release/idle — never per k
 const T_COMPUTE_MS = 30_000
 const T_DOWNLOAD_MS = 180_000
 const HISTORY_DEPTH = 30          // undo/redo ring size
-const MAX_DPR = 3                 // display-res bake DPR cap (memory floor)
 const MIN_DROPPED_REGION_PX = 60  // shape-truth: >this many dropped px = a disconnected region, warn
 const MIN_ERASE_KEEP_RATIO = 0.1  // never-destroy: an erase leaving <this fraction of the shape reverts
 const sha256Hex = async (bytes: ArrayBuffer): Promise<string> => {
@@ -104,12 +103,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [disp, setDisp] = useState({ w: 480, h: 360 })
   const [paintCfg, setPaintCfgState] = useState<PaintConfig>(PAINT_DEFAULTS) // Dan: admin-changeable paint-shaper config
   const [edgeFinishPx, setEdgeFinishState] = useState(EDGE_FINISH_DEFAULT)
-  const [outputOriginal, setOutputOriginalState] = useState(true)
   const [outputSourceSize, setOutputSourceSize] = useState<{ w: number; h: number } | null>(null)
-  const [outputPrepareMs, setOutputPrepareMs] = useState<number | null>(null)
   const paintCfgRef = useRef(paintCfg); paintCfgRef.current = paintCfg
   const edgeFinishRef = useRef(edgeFinishPx); edgeFinishRef.current = edgeFinishPx
-  const outputOriginalRef = useRef(outputOriginal); outputOriginalRef.current = outputOriginal
 
   // ── flow-owned refs (policy + view) ──
   const imgCanvas = useRef<HTMLCanvasElement | null>(null)
@@ -127,9 +123,9 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
   const vectorPresetRef = useRef<VectorPresetName | null>(vectorPreset); vectorPresetRef.current = vectorPreset
   const cutoutSettingsRef = useRef<TraceOutlineSettings>(settingsForVectorPreset('PURE'))
-  const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS })
+  const paintSettingsRef = useRef<TraceOutlineSettings>({ ...ZERO_SETTINGS, simplify: 15 })
   const cutoutPresetRef = useRef<VectorPresetName | null>('PURE')
-  const paintPresetRef = useRef<VectorPresetName | null>('ZERO')
+  const paintPresetRef = useRef<VectorPresetName | null>(null)
   const activateOutlineSource = useCallback((source: OutlineSourceKind) => {
     if (outlineSourceRef.current === source) return
     const current = { ...settingsRef.current }
@@ -191,16 +187,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const bakePending = useRef(false)
   const bakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const draggingRef = useRef(false) // knob gesture in progress — bakes DEFER to release (Cadence Law)
-  // ── I2: EDIT-TIME MEMORY FLOOR ── live bakes compose at DISPLAY resolution by feeding a cached
-  // display-res frontSrc pair to the SAME bakeStickerEngine (its k-scaling + width-relative blur
-  // make it resolution-agnostic — contract §I2; no engine change, no second pipeline). Full res
-  // exists only on Save and 👁 Preview, through this ONE scheduler + gen token.
-  const bakeModeRef = useRef<'display' | 'full'>('display')
+  // Every editor, Preview, and Save bake uses the original upload source. The mode distinguishes
+  // an ordinary live bake from one a caller is awaiting; it never changes source resolution.
+  const bakeModeRef = useRef<'live' | 'awaited'>('live')
   const previewRef = useRef(false)
-  const displayFrontRef = useRef<{ src: PreparedEffectBase; shim: PreparedEffectBase } | null>(null)
   const installPrepared = useCallback((prepared: PreparedEffectBase) => {
     preparedRef.current = prepared
-    displayFrontRef.current = null
     setOutputSourceSize({ w: prepared.frontSrc.origCanvas.width, h: prepared.frontSrc.origCanvas.height })
   }, [])
   type FullBakeWaiter = { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
@@ -217,27 +209,10 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     bakeTimer.current = null
     bakePending.current = false
     draggingRef.current = false
-    bakeModeRef.current = 'display'
+    bakeModeRef.current = 'live'
     bakeGen.current++
     settleFullBakeWaiters(new Error(reason))
   }, [settleFullBakeWaiters])
-  const displayPrepared = (p: PreparedEffectBase): PreparedEffectBase => {
-    if (displayFrontRef.current?.src === p) return displayFrontRef.current.shim
-    const { origCanvas, subjCanvas } = p.frontSrc
-    const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, MAX_DPR) : 1
-    const scale = Math.min(1, (dispWRef.current * dpr) / origCanvas.width)
-    let shim = p
-    if (scale < 1) {
-      const dw = Math.max(1, Math.round(origCanvas.width * scale)), dh = Math.max(1, Math.round(origCanvas.height * scale))
-      const so = document.createElement('canvas'); so.width = dw; so.height = dh
-      so.getContext('2d')!.drawImage(origCanvas, 0, 0, dw, dh)
-      const ss = document.createElement('canvas'); ss.width = dw; ss.height = dh
-      ss.getContext('2d')!.drawImage(subjCanvas, 0, 0, dw, dh)
-      shim = { ...p, frontSrc: { ...p.frontSrc, origCanvas: so, subjCanvas: ss } }
-    }
-    displayFrontRef.current = { src: p, shim } // built ONCE per prepare (cache keyed on the prepared ref)
-    return shim
-  }
   const runBake = useCallback(async () => {
     if (bakeInFlight.current) { bakePending.current = true; return }
     if (!preparedRef.current || !dRef.current || !boundsRef.current) {
@@ -251,20 +226,19 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const mode = bakeModeRef.current
     const [d, bounds] = [dRef.current, boundsRef.current]
     try {
-      const src = mode === 'full' ? preparedRef.current : displayPrepared(preparedRef.current)
       const r = await bakeStickerEngine(
-        src, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height,
+        preparedRef.current, d, bounds, imgCanvas.current!.width, imgCanvas.current!.height,
         blendRef.current, () => gen !== bakeGen.current,
       )
       if (gen === bakeGen.current) {
         liveBakeRef.current = { canvas: r.canvas, bounds }
         requestRender()
-        if (mode === 'full') settleFullBakeWaiters()
+        if (mode === 'awaited') settleFullBakeWaiters()
       }
     } catch (e) {
       if (!(e instanceof BakeCancelled)) {
         const error = e instanceof Error ? e : new Error(String(e))
-        if (mode === 'full' && gen === bakeGen.current) settleFullBakeWaiters(error)
+        if (mode === 'awaited' && gen === bakeGen.current) settleFullBakeWaiters(error)
         if (gen === bakeGen.current) setStatus('⚠️ compose failed: ' + error.message) // fail LOUD
       }
     }
@@ -370,8 +344,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         // found') leaves the last good selection + outline fully live.
         const nextPrepared = await withTimeout(
           preseg
-            ? prepareNative(url, preseg, loud, edgeFinishRef.current, outputOriginalRef.current)
-            : prepareAI(url, mask, loud, edgeFinishRef.current, outputOriginalRef.current),
+            ? prepareNative(url, preseg, loud, edgeFinishRef.current, true)
+            : prepareAI(url, mask, loud, edgeFinishRef.current, true),
           T_COMPUTE_MS,
           'engine prepare',
         )
@@ -410,7 +384,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const gen = ++editPrepGen.current
       const artwork = artworkGen.current
       nativePresegRef.current = null
-      withTimeout(prepareAI(url, norm, undefined, edgeFinishRef.current, outputOriginalRef.current), T_COMPUTE_MS, 'shape-truth re-prepare')
+      withTimeout(prepareAI(url, norm, undefined, edgeFinishRef.current, true), T_COMPUTE_MS, 'shape-truth re-prepare')
         .then((p) => {
           if (gen === editPrepGen.current && artwork === artworkGen.current && isCurrent()) {
             installPrepared(p)
@@ -498,8 +472,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     previewRef.current = false
     disposePrepareAICache()
     maskRef.current = null; dRef.current = null; drawnRef.current = null; shapeRef.current = null; preparedRef.current = null; nativePresegRef.current = null; liveBakeRef.current = null
-    boundsRef.current = null; displayFrontRef.current = null
-    setOutputSourceSize(null); setOutputPrepareMs(null)
+    boundsRef.current = null
+    setOutputSourceSize(null)
     hasCutRef.current = false
     urlRef.current = url
     artworkRef.current = { file, widthPx: img.naturalWidth, heightPx: img.naturalHeight }
@@ -596,8 +570,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     setBusy(true)
     setStatus(`⚙️ calibrating shared edge finish (${next}px)…`)
     const prepared = source
-      ? prepareNative(url, source, undefined, next, outputOriginalRef.current)
-      : prepareAI(url, mask, undefined, next, outputOriginalRef.current)
+      ? prepareNative(url, source, undefined, next, true)
+      : prepareAI(url, mask, undefined, next, true)
     withTimeout(prepared, T_COMPUTE_MS, 'edge calibration')
       .then((result) => {
         if (gen !== editPrepGen.current || artwork !== artworkGen.current) return
@@ -613,50 +587,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         setStatus('⚠️ edge calibration failed: ' + String((error as Error)?.message ?? error))
       })
   }, [applyFinish, installPrepared, scheduleBake])
-
-  const setOutputOriginal = useCallback((next: boolean) => {
-    if (next === outputOriginalRef.current) return
-    const url = urlRef.current, mask = maskRef.current
-    if (!url || !mask || !hasCutRef.current) return
-    const artwork = artworkGen.current
-    const gen = ++editPrepGen.current
-    const source = nativePresegRef.current
-    const started = performance.now()
-    bakeGen.current++
-    setBusy(true)
-    setStatus(next ? '⚙️ preparing original upload resolution…' : '⚙️ restoring capped 1536px output…')
-    if (next) diagnostics?.setStage('5·original-output-prepare')
-    const prepared = source
-      ? prepareNative(url, source, undefined, edgeFinishRef.current, next)
-      : prepareAI(url, mask, undefined, edgeFinishRef.current, next)
-    withTimeout(prepared, T_DOWNLOAD_MS, 'output resolution prepare')
-      .then((result) => {
-        if (gen !== editPrepGen.current || artwork !== artworkGen.current) {
-          if (next) diagnostics?.setStage(null)
-          return
-        }
-        installPrepared(result)
-        outputOriginalRef.current = next
-        setOutputOriginalState(next)
-        const elapsed = Math.round(performance.now() - started)
-        setOutputPrepareMs(elapsed)
-        diagnostics?.setStage(null)
-        applyFinish(false)
-        if (previewRef.current) bakeModeRef.current = 'full'
-        scheduleBake(true)
-        setBusy(false)
-        setStatus(`⚙️ ${next ? 'original upload' : 'capped'} output source: ${result.frontSrc.origCanvas.width}×${result.frontSrc.origCanvas.height} (${elapsed}ms)`)
-      })
-      .catch((error) => {
-        if (gen !== editPrepGen.current || artwork !== artworkGen.current) {
-          if (next) diagnostics?.setStage(null)
-          return
-        }
-        diagnostics?.setStage(null)
-        setBusy(false)
-        setStatus('⚠️ output resolution change failed: ' + String((error as Error)?.message ?? error) + ' — prior output kept')
-      })
-  }, [applyFinish, diagnostics, installPrepared, scheduleBake])
 
   // ── tool strokes (gesture capture stays in the shell; orchestration lives here) ──
   // ── THE BRUSH — GrabCut. Paint roughly → OpenCV graph-cut snaps to the real edge and adds it (erase
@@ -762,7 +692,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (urlRef.current) {
       const artwork = artworkGen.current
       const gen = ++editPrepGen.current
-      withTimeout(prepareAI(urlRef.current, maskRef.current, undefined, edgeFinishRef.current, outputOriginalRef.current), T_COMPUTE_MS, 'edit re-prepare')
+      withTimeout(prepareAI(urlRef.current, maskRef.current, undefined, edgeFinishRef.current, true), T_COMPUTE_MS, 'edit re-prepare')
         .then((p) => {
           if (gen === editPrepGen.current && artwork === artworkGen.current) { installPrepared(p); scheduleBake() }
         })
@@ -806,7 +736,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       const nextDrawn = s.drawn
       const forMask = nextDrawn ? maskFromShape(nextDrawn.shape, img?.width ?? 1, img?.height ?? 1) : nextMask
       const nextPrepared = forMask && img && url
-        ? await withTimeout(prepareAI(url, forMask, undefined, edgeFinishRef.current, outputOriginalRef.current), T_COMPUTE_MS, 'restore prepare')
+        ? await withTimeout(prepareAI(url, forMask, undefined, edgeFinishRef.current, true), T_COMPUTE_MS, 'restore prepare')
         : null
       if (generation !== artworkGen.current) return false
 
@@ -821,7 +751,6 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       drawnRef.current = nextDrawn
       preparedRef.current = nextPrepared
       nativePresegRef.current = null
-      displayFrontRef.current = null
       setOutputSourceSize(nextPrepared ? { w: nextPrepared.frontSrc.origCanvas.width, h: nextPrepared.frontSrc.origCanvas.height } : null)
       liveBakeRef.current = null
       outlineSourceRef.current = s.outlineSource
@@ -873,8 +802,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     invalidatePaintCalibration()
     previewRef.current = false
     maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
-    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
-    setOutputSourceSize(null); setOutputPrepareMs(null)
+    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
+    setOutputSourceSize(null)
     hasCutRef.current = false
     setBusy(false); setHasCut(false); pushHistory(); requestRender()
     setStatus('🗑 cleared — paint a new shape, or Detect')
@@ -891,23 +820,22 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         if (i >= 0) fullBakeWaiters.current.splice(i, 1)
         bakeGen.current++
         bakePending.current = false
-        bakeModeRef.current = 'display'
+        bakeModeRef.current = 'live'
         reject(new ToolTimeout('full-res bake', T_COMPUTE_MS))
       }, T_COMPUTE_MS),
     }
     fullBakeWaiters.current.push(waiter)
-    bakeModeRef.current = 'full'
+    bakeModeRef.current = 'awaited'
     scheduleBake(true)
   }), [scheduleBake])
 
-  /** 👁 Preview enter/exit — a FLOW policy: enter publishes only after the full-res compose settles;
-   *  exit returns to the display-res live bake. */
+  /** 👁 Preview enter/exit — enter publishes only after the original-resolution compose settles. */
   const setPreview = useCallback(async (on: boolean): Promise<boolean> => {
     if (!preparedRef.current) return false
     if (!on) {
       previewRef.current = false
       if (fullBakeWaiters.current.length) settleFullBakeWaiters(new Error('full-res bake cancelled: preview closed'))
-      bakeModeRef.current = 'display'
+      bakeModeRef.current = 'live'
       scheduleBake(true)
       return true
     }
@@ -915,13 +843,12 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const generation = artworkGen.current
     previewRef.current = true
     setBusy(true)
-    const outputLabel = outputOriginalRef.current ? 'original-resolution' : 'capped'
-    setStatus(`👁 preparing ${outputLabel} preview…`)
+    setStatus('👁 preparing original-resolution preview…')
     try {
       await awaitFullBake()
     } catch (error) {
       previewRef.current = false
-      bakeModeRef.current = 'display'
+      bakeModeRef.current = 'live'
       if (generation === artworkGen.current) {
         setBusy(false)
         setStatus('⚠️ preview failed: ' + String((error as Error)?.message ?? error))
@@ -931,13 +858,13 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (generation !== artworkGen.current) { previewRef.current = false; return false }
     if (!liveBakeRef.current) {
       previewRef.current = false
-      bakeModeRef.current = 'display'
+      bakeModeRef.current = 'live'
       setBusy(false)
       setStatus('⚠️ preview failed: output unavailable')
       return false
     }
     setBusy(false)
-    setStatus(`👁 preview ready — same ${outputLabel} pixels as Save`)
+    setStatus('👁 preview ready — same original-resolution pixels as Save')
     return true
   }, [awaitFullBake, scheduleBake, settleFullBakeWaiters])
 
@@ -949,14 +876,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     catch (e) {
       if (generation === artworkGen.current) {
         setStatus('⚠️ ' + String((e as Error).message))
-        if (!previewRef.current) bakeModeRef.current = 'display'
+        if (!previewRef.current) bakeModeRef.current = 'live'
       }
       return
     }
     if (generation !== artworkGen.current) return
     const baked = liveBakeRef.current
     if (!baked) { setStatus('⚠️ Save failed: output unavailable'); return }
-    if (!previewRef.current) { bakeModeRef.current = 'display'; scheduleBake() } // return to edit-res
+    if (!previewRef.current) { bakeModeRef.current = 'live'; scheduleBake() }
     baked.canvas.toBlob((b) => {
       if (!b) {
         if (generation === artworkGen.current) setStatus('⚠️ Save failed: PNG encoding failed')
@@ -1016,7 +943,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         paint: { ...paintCfgRef.current },
         edgeFinishPx: edgeFinishRef.current,
         blend: { ...blendRef.current },
-        outputSource: outputOriginalRef.current ? 'original' : 'capped-1536',
+        outputSource: 'original',
       },
     })
   }, [])
@@ -1054,7 +981,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     urlRef.current = null
     artworkRef.current = null
     imgCanvas.current = null; maskRef.current = null; drawnRef.current = null; preparedRef.current = null; nativePresegRef.current = null
-    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null; displayFrontRef.current = null
+    dRef.current = null; boundsRef.current = null; shapeRef.current = null; liveBakeRef.current = null
   }, [invalidatePaintCalibration, settleBakes, settleToolQueue])
 
   const view: LabView = { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, mask: maskRef, liveBake: liveBakeRef }
@@ -1062,14 +989,14 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   return {
     state: {
       status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, paintCfg, edgeFinishPx,
-      vectorPreset, outputOriginal, outputSourceSize, outputPrepareMs,
+      vectorPreset, outputSourceSize,
       canUndo: histRef.current.canUndo(), canRedo: histRef.current.canRedo(),
     },
     actions: {
       upload, detect, setTune, setBlendTune, setVectorPreset,
       grabCutStroke, paintStroke, canBrush,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
-      undo, redo, clearAll, save, exportResult, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx, setOutputOriginal,
+      undo, redo, clearAll, save, exportResult, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx,
     },
     view,
     /** node measurement passthrough for the shell's knob display (pure read, no policy) */

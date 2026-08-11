@@ -29,7 +29,7 @@ describe('Cutout result boundary', () => {
         sourceAdapter: 'u2netp',
         vectorPreset: 'PURE',
         vector: { detail: 100, offset: 1, offsetJoin: 'sharp', simplify: 15, smooth: 0, radius: 0, curve: 0, straighten: 0 },
-        paint: { swathMult: 1, autoTuneStrength: 1, polishStrength: 1 / 3, closeFrac: 0.2 },
+        paint: { autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.35 },
         edgeFinishPx: 8,
         blend: { blend: 0 },
         outputSource: 'original',
@@ -59,8 +59,8 @@ describe('Cutout result boundary', () => {
       inputs: {
         version: 'cutout-inputs/v1', source: 'paint', sourceAdapter: 'brushed', vectorPreset: 'ZERO',
         vector: { detail: 100, offset: 0, offsetJoin: 'sharp', simplify: 0, smooth: 0, radius: 0, curve: 0, straighten: 0 },
-        paint: { swathMult: 1, autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.2 },
-        edgeFinishPx: 8, blend: { blend: 0 }, outputSource: 'capped-1536',
+        paint: { autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.35 },
+        edgeFinishPx: 8, blend: { blend: 0 }, outputSource: 'original',
       },
     })).toThrow('final Cutout shape is degenerate')
   })

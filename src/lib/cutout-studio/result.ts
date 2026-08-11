@@ -28,7 +28,7 @@ export interface CutoutResultInputs {
   paint: PaintConfig
   edgeFinishPx: number
   blend: { blend: number }
-  outputSource: 'original' | 'capped-1536'
+  outputSource: 'original'
 }
 
 export interface CutoutResult {

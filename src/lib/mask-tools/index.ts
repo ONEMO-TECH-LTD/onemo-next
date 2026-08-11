@@ -9,12 +9,11 @@ import type { Mask } from '@/lib/mask-tools/types'
 /** PAINT-SHAPER config (Dan 2026-08-07: admin-changeable). The paint tool's internal factors,
  *  formerly hardcoded — surfaced so an admin can calibrate the tool without a code change. */
 export interface PaintConfig {
-  swathMult: number  // stroke swath width = brush × swathMult
-  autoTuneStrength: number  // 0..1; gesture wobble correction before the stroke becomes a shape
+  autoTuneStrength: number  // 0..3; gesture wobble correction before the stroke becomes a shape
   polishStrength: number  // 0..1; outline smoothing radius = completed-shape scale × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { swathMult: 1, autoTuneStrength: 1, polishStrength: 1 / 3, closeFrac: 0.2 }
+export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.35 }
 
 type StrokePoint = { x: number; y: number }
 
@@ -44,12 +43,13 @@ function rdpOpen(points: StrokePoint[], epsilon: number): StrokePoint[] {
  * deliberately absent. The tolerance scales with the gesture extent, so the same intended line or
  * curve receives the same correction at different drawing sizes. Endpoints remain exact. */
 export function autoTunePaintStroke(stroke: StrokePoint[], strength = PAINT_DEFAULTS.autoTuneStrength): StrokePoint[] {
-  const amount = Math.max(0, Math.min(1, strength))
+  const intensity = Math.max(0, Math.min(3, strength))
+  const amount = Math.min(1, intensity)
   const points = stroke.filter((point, index) => !index || point.x !== stroke[index - 1].x || point.y !== stroke[index - 1].y)
-  if (amount <= 0 || points.length <= 2) return points.map((point) => ({ ...point }))
+  if (intensity <= 0 || points.length <= 2) return points.map((point) => ({ ...point }))
 
   let filtered = points.map((point) => ({ ...point }))
-  const passes = Math.ceil(amount * 3)
+  const passes = Math.ceil(intensity * 3)
   for (let pass = 0; pass < passes; pass++) {
     const prior = filtered
     filtered = prior.map((point, index) => {
@@ -70,7 +70,7 @@ export function autoTunePaintStroke(stroke: StrokePoint[], strength = PAINT_DEFA
     if (point.y > maxY) maxY = point.y
   }
   const extent = Math.hypot(maxX - minX, maxY - minY)
-  return rdpOpen(filtered, extent * 0.025 * amount)
+  return rdpOpen(filtered, extent * 0.025 * intensity)
 }
 
 /** Rasterize a drawn shape to a BINARY Mask (subject matte for the blend layer — inside = subject).
@@ -153,19 +153,19 @@ export function maskArea(mask: Mask): number {
  *  (Dan's green-blob semantics: a loop means the whole region). */
 export function swathMask(
   stroke: { x: number; y: number }[], brushPx: number, w: number, h: number,
-  cfg: Pick<PaintConfig, 'swathMult' | 'autoTuneStrength' | 'closeFrac'> = PAINT_DEFAULTS,
+  cfg: Pick<PaintConfig, 'autoTuneStrength' | 'closeFrac'> = PAINT_DEFAULTS,
 ): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })!
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'
   ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'
-  ctx.lineWidth = Math.max(1, brushPx * cfg.swathMult)
+  ctx.lineWidth = Math.max(1, brushPx)
   const tunedStroke = autoTunePaintStroke(stroke, cfg.autoTuneStrength)
-  if (cfg.swathMult > 0 && tunedStroke.length === 1) {
+  if (tunedStroke.length === 1) {
     ctx.beginPath()
     ctx.arc(tunedStroke[0].x, tunedStroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
     ctx.fill()
-  } else if (cfg.swathMult > 0 && tunedStroke.length > 1) {
+  } else if (tunedStroke.length > 1) {
     ctx.beginPath()
     ctx.moveTo(tunedStroke[0].x, tunedStroke[0].y)
     for (let i = 1; i < tunedStroke.length - 1; i++) {

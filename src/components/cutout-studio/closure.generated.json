@@ -22,8 +22,8 @@
     "files": [
       {
         "file": "src/components/cutout-studio/CutoutStudio.tsx",
-        "bytes": 27526,
-        "sha256": "e152449eddcb9404f7718d667d633136611dc3166ab46a23bb510c52c771d4b4",
+        "bytes": 27520,
+        "sha256": "36b08c6c9f874861910a4c9f3b6b41fd4bc649f156f57437bbdd2891f104e6c3",
         "destination": "src/components/cutout-studio/CutoutStudio.tsx",
         "layer": "browser-react"
       },
@@ -43,8 +43,8 @@
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 53986,
-        "sha256": "77e5b5ee71adb307be7d843d10382955a65c13cc7a3f805b0a2ed4ec13a0184e",
+        "bytes": 49604,
+        "sha256": "628a6a3a4ad8fb6759d6b1cf9161b37aeacad6605926db5947c7d3011f4631b3",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -78,8 +78,8 @@
       },
       {
         "file": "src/lib/cutout-studio/result.ts",
-        "bytes": 2033,
-        "sha256": "5791e7c6dd431d5c3baa7f59372ea473e8207ea9a01edbf3445d1ca6ff2c1061",
+        "bytes": 2017,
+        "sha256": "a30e7e57eb64b312d4ef94deb5d6c973dbf78f95cd1c1ba140200cffb6de7911",
         "destination": "src/lib/cutout-studio/result.ts",
         "layer": "headless"
       },
@@ -197,8 +197,8 @@
       },
       {
         "file": "src/lib/mask-tools/index.ts",
-        "bytes": 9727,
-        "sha256": "8548392e5a11306800b1cac60fb86d6401dc6edf02ce0444d3f295b85e5709e0",
+        "bytes": 9626,
+        "sha256": "167ec35eb34f9bb20fa5b66c728c25e0ec59d2d8bf077e45f0dddb252ad8c58b",
         "destination": "src/lib/mask-tools/index.ts",
         "layer": "browser-adapter"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 340674,
-    "closureSha256": "93b2ce657b03435e11a4e7d157e83fbbc10559fff530d9a05dbbd51bb309928c"
+    "totalBytes": 336169,
+    "closureSha256": "7b39388dbad2949cb74d7247695c63df1fdec7677d12bd6f4ef4fd15fae5da8d"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-520502fd46d5a847.js",
-        "rawBytes": 64384,
-        "gzipBytesEstimate": 21343,
-        "brotliBytesEstimate": 18890
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-e994569707cc1d51.js",
+        "rawBytes": 61835,
+        "gzipBytesEstimate": 20643,
+        "brotliBytesEstimate": 18276
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1300210,
-    "gzipBytesEstimate": 364292,
-    "brotliBytesEstimate": 297595
+    "rawBytes": 1297661,
+    "gzipBytesEstimate": 363592,
+    "brotliBytesEstimate": 296981
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",
@@ -551,9 +551,7 @@
       "paintCfg",
       "edgeFinishPx",
       "vectorPreset",
-      "outputOriginal",
       "outputSourceSize",
-      "outputPrepareMs",
       "canUndo",
       "canRedo"
     ],
@@ -581,8 +579,7 @@
       "setPreview",
       "warmup",
       "setPaintCfg",
-      "setEdgeFinishPx",
-      "setOutputOriginal"
+      "setEdgeFinishPx"
     ],
     "view": [
       "imgCanvas",

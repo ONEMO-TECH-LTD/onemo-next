@@ -50,10 +50,8 @@ export function CutoutLabMount({ admin }: { admin: boolean }) {
 
 function CalibrationPanel({ surface }: { surface: CutoutStudioCalibrationSurface }) {
   const rows = [
-    { label: 'swath width', value: surface.paintCfg.swathMult, lo: 0, hi: 12, step: 0.1, display: `${surface.paintCfg.swathMult}×`, set: (value: number) => surface.setPaintCfg({ swathMult: value }) },
-    { label: 'autotune', value: Math.round(surface.paintCfg.autoTuneStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(surface.paintCfg.autoTuneStrength * 100)}%`, set: (value: number) => surface.setPaintCfg({ autoTuneStrength: value / 100 }) },
+    { label: 'autotune', value: Math.round(surface.paintCfg.autoTuneStrength * 100), lo: 0, hi: 300, step: 1, display: `${Math.round(surface.paintCfg.autoTuneStrength * 100)}%`, set: (value: number) => surface.setPaintCfg({ autoTuneStrength: value / 100 }) },
     { label: 'mask smoothing', value: Math.round(surface.paintCfg.polishStrength * 100), lo: 0, hi: 100, step: 1, display: `${Math.round(surface.paintCfg.polishStrength * 100)}%`, set: (value: number) => surface.setPaintCfg({ polishStrength: value / 100 }) },
-    { label: 'loop-close', value: surface.paintCfg.closeFrac, lo: 0, hi: 1, step: 0.01, display: surface.paintCfg.closeFrac.toFixed(2), set: (value: number) => surface.setPaintCfg({ closeFrac: value }) },
   ]
 
   return (
@@ -61,14 +59,9 @@ function CalibrationPanel({ surface }: { surface: CutoutStudioCalibrationSurface
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: '#64748b', marginBottom: 8 }}>⚙️ Cutout calibration (admin)</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <span style={labelStyle}>output source</span>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, flex: 1 }}>
-          <input aria-label="original resolution output" type="checkbox" checked={surface.outputOriginal} disabled={!surface.hasCut || surface.busy}
-            onChange={(event) => surface.setOutputOriginal(event.target.checked)} />
-          {surface.outputOriginal ? 'original upload' : 'capped 1536px'}
-        </label>
+        <span style={{ fontSize: 12, flex: 1 }}>original upload</span>
         <span style={{ fontSize: 11, fontWeight: 700, minWidth: 110, textAlign: 'right' }}>
           {surface.outputSourceSize ? `${surface.outputSourceSize.w}×${surface.outputSourceSize.h}` : '—'}
-          {surface.outputPrepareMs != null ? ` · ${surface.outputPrepareMs}ms` : ''}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -85,7 +78,7 @@ function CalibrationPanel({ surface }: { surface: CutoutStudioCalibrationSurface
           <span style={{ fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' }}>{display}</span>
         </div>
       ))}
-      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Original upload is the default Preview/Save source; the editor/mask stays at 1024px. Edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke.</div>
+      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Original upload pixels drive the live result, Preview, and Save; the editor mask stays at 1024px. Edge finish is shared by Detect/u2net and GrabCut; Paint controls recalculate the latest Paint shape / erase stroke live, otherwise they apply to the next stroke.</div>
     </div>
   )
 }

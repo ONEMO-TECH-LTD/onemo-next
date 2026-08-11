@@ -48,6 +48,10 @@ describe('Paint gesture Autotune', () => {
     expect(tuned[0]).toEqual(curve[0])
     expect(tuned[tuned.length - 1]).toEqual(curve[curve.length - 1])
   })
+
+  it('provides stronger calibration headroom through 300%', () => {
+    expect(autoTunePaintStroke(jitteredLine, 3).length).toBeLessThanOrEqual(autoTunePaintStroke(jitteredLine, 1).length)
+  })
 })
 
 describe('one visible brush diameter', () => {

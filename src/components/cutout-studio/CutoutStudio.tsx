@@ -19,12 +19,9 @@ export interface CutoutStudioCalibrationSurface {
   setDragging: (dragging: boolean) => void
   hasCut: boolean
   busy: boolean
-  outputOriginal: boolean
   outputSourceSize: { w: number; h: number } | null
-  outputPrepareMs: number | null
   edgeFinishPx: number
   paintCfg: PaintConfig
-  setOutputOriginal: (enabled: boolean) => void
   setEdgeFinishPx: (value: number) => void
   setPaintCfg: (patch: Partial<PaintConfig>) => void
 }
@@ -46,7 +43,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
   const flow = useCutoutLabFlow({ requestRender, diagnostics })
   const {
     status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo,
-    paintCfg, edgeFinishPx, vectorPreset, outputOriginal, outputSourceSize, outputPrepareMs,
+    paintCfg, edgeFinishPx, vectorPreset, outputSourceSize,
   } = flow.state
   const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
   const warmup = flow.actions.warmup
@@ -158,7 +155,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
         // the area that lands. Violet = add, red = erase.
         const ink = t === 'draw' ? 'rgba(124,58,237,0.45)' : 'rgba(239,68,68,0.45)'
         ctx.strokeStyle = ink; ctx.fillStyle = ink
-        ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w) * paintCfg.swathMult)
+        ctx.lineWidth = Math.max(2, brushRef.current * (viewBoxRef.current.w / disp.w))
         ctx.beginPath()
         if (st.length === 1) {
           ctx.arc(st[0].x * img.width, st[0].y * img.height, ctx.lineWidth / 2, 0, Math.PI * 2)
@@ -197,7 +194,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
       const t = toolRef.current
       if (t !== 'nodes' && t !== 'frame') {
         const radius = t === 'draw' || t === 'draw-erase'
-          ? brushRef.current * paintCfg.swathMult / 2
+          ? brushRef.current / 2
           : brushRef.current / 2
         ctx.beginPath()
         ctx.arc(cur.x * img.width, cur.y * img.height, radius * (viewBoxRef.current.w / disp.w), 0, 6.29)
@@ -207,7 +204,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
       }
     }
     ctx.restore() // view-box translate
-  }, [disp.w, paintCfg.swathMult, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
+  }, [disp.w, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
   useEffect(() => { renderRef.current = render }, [render])
   useEffect(() => { requestAnimationFrame(() => renderRef.current()) }, [tool]) // mask tint follows the tool mode instantly
 
@@ -299,9 +296,8 @@ export default function CutoutStudio({ calibration, diagnostics }: {
   const { setTune, setBlendTune } = flow.actions
   const calibrationSlots = calibration?.({
     settings, setTune, setDragging: flow.actions.setDragging,
-    hasCut, busy, outputOriginal, outputSourceSize, outputPrepareMs,
+    hasCut, busy, outputSourceSize,
     edgeFinishPx, paintCfg,
-    setOutputOriginal: flow.actions.setOutputOriginal,
     setEdgeFinishPx: flow.actions.setEdgeFinishPx,
     setPaintCfg: flow.actions.setPaintCfg,
   })
@@ -381,6 +377,10 @@ export default function CutoutStudio({ calibration, diagnostics }: {
         {tab === 'edit' && (<>
           <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
           <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
+          {(tool === 'draw' || tool === 'draw-erase') && (<>
+            <span style={{ color: '#94a3b8' }}>vector:</span>
+            {calibrationSlots?.vectorChips}
+          </>)}
           {tool === 'nodes' && (<>
             <span style={{ color: '#94a3b8' }}>nodes:</span>
             {([['move', '✥ Drag'], ['add', '➕ Add'], ['delete', '➖ Delete']] as [NodeMode, string][]).map(([m, label]) => (
@@ -413,6 +413,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
           onPointerDown={() => flow.actions.setDragging(true)} onPointerUp={() => flow.actions.setDragging(false)}
           onPointerCancel={() => flow.actions.setDragging(false)} />
       </div>}
+      {tab === 'edit' && (tool === 'draw' || tool === 'draw-erase') && calibrationSlots?.vectorKnob}
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div>

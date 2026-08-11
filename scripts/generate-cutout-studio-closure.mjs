@@ -98,8 +98,8 @@ const sourceFiles = [...files].sort().map((file) => {
   }
 })
 const api = {
-  state: ['status', 'busy', 'hasCut', 'hasImage', 'ms', 'settings', 'blend', 'shapeTick', 'histTick', 'disp', 'paintCfg', 'edgeFinishPx', 'vectorPreset', 'outputOriginal', 'outputSourceSize', 'outputPrepareMs', 'canUndo', 'canRedo'],
-  actions: ['upload', 'detect', 'setTune', 'setBlendTune', 'setVectorPreset', 'grabCutStroke', 'paintStroke', 'canBrush', 'enterEdit', 'editLive', 'editCommit', 'nodeInsert', 'nodeDelete', 'nodeApply', 'undo', 'redo', 'clearAll', 'save', 'exportResult', 'setDragging', 'setPreview', 'warmup', 'setPaintCfg', 'setEdgeFinishPx', 'setOutputOriginal'],
+  state: ['status', 'busy', 'hasCut', 'hasImage', 'ms', 'settings', 'blend', 'shapeTick', 'histTick', 'disp', 'paintCfg', 'edgeFinishPx', 'vectorPreset', 'outputSourceSize', 'canUndo', 'canRedo'],
+  actions: ['upload', 'detect', 'setTune', 'setBlendTune', 'setVectorPreset', 'grabCutStroke', 'paintStroke', 'canBrush', 'enterEdit', 'editLive', 'editCommit', 'nodeInsert', 'nodeDelete', 'nodeApply', 'undo', 'redo', 'clearAll', 'save', 'exportResult', 'setDragging', 'setPreview', 'warmup', 'setPaintCfg', 'setEdgeFinishPx'],
   view: ['imgCanvas', 'd', 'bounds', 'shape', 'mask', 'liveBake'],
   result: 'CutoutResult@cutout-result/v1',
 }
