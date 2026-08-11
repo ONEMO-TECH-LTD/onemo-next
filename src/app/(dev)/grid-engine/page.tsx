@@ -52,14 +52,6 @@ const SHAPE_MIN_MM = 20
 const SHAPE_STEP_MM = 2
 
 /**
- * A loaded cut-out is laid on the canvas at the CLASSIC band — three magnets — on its longest side,
- * so its proportions are untouched (law 2.1a).
- *
- * The band is a COUNT here and its millimetres come from the unit. It used to be the literal 120,
- * which is (3-1)x48 + 2x12 frozen into the shell: change the padding and the shell would have been
- * silently wrong, against law 4.2 (change an input and everything re-derives).
- */
-/**
  * A loaded cut-out arrives at FOUR POINTS CENTRED — two magnets across, two down.
  *
  * Dan, 2026-08-11: "By default 4 points must be centerd with cutout", and law 3.1: "perfect shape x
@@ -76,6 +68,10 @@ const DEFAULT_MATCH_MAGNETS = 2
  * The band is the SIZE; the match above is the REGISTRATION. They are separate readings of the same
  * load — a band-3 shape holding a four-point match — and law 9.2 is answered by the match's count,
  * not by the band's, so the four stay symmetric about the centre.
+ *
+ * It is a COUNT and its millimetres come from the unit. Frozen as the literal 120 — which is
+ * (3-1)x48 + 2x12 — the shell would go silently wrong the moment the padding changed, against law
+ * 4.2: change an input and everything re-derives.
  */
 const DEFAULT_SIZE_BAND = 3
 /**
