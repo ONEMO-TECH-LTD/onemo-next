@@ -71,15 +71,6 @@ const SHAPE_STEP_MM = 2
  * The registration is not chosen with it: two across is an EVEN count, and law 9.2 says an even
  * count puts the shape's centre in the gap between magnets — which is what makes the four symmetric.
  */
-/**
- * THE SAVED CUT-OUT LIBRARY — the seven real shapes, served from the build.
- *
- * They are in `public/grid-engine/cutouts/`, so loading one needs no operating-system file dialog.
- * That matters: the file-picker route depends on a native dialog, and a native dialog does not
- * always appear in an embedded webview. These load over HTTP and cannot be suppressed.
- */
-const LIBRARY = ['DUCK', 'BAT-WOMAN', 'BUTTERFLY', 'BOT', 'PILL', 'POKE1', 'POKE2'] as const
-
 const DEFAULT_MATCH_MAGNETS = 2
 /**
  * And it arrives at BAND 3 on its longest side. Dan, 2026-08-11: "the defaiult image cutout load
@@ -193,12 +184,6 @@ export default function GridEnginePage() {
    * (Plain function, not a memoised one. It reads the live spec and the live size, and the empty
    * dependency list it used to carry meant it read whatever they were on first render.)
    */
-  /** Load a saved cut-out by name — same path as a picked file, no dialog involved. */
-  const loadSaved = async (name: string) => {
-    const res = await fetch(`/grid-engine/cutouts/${name}.png`)
-    loadCutout(new File([await res.blob()], `${name}.png`, { type: 'image/png' }))
-  }
-
   const loadCutout = ((file: File) => {
     // Even match -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
     // about it. This is the count's parity, not a default anyone picked (law 6.5).
@@ -404,6 +389,12 @@ export default function GridEnginePage() {
           Dan, which is exactly the class of defect the visual-verification law exists to catch.
           A label opens its own input with no script at all and cannot be blocked.
         */}
+        {/*
+          THE CUT-OUT BUTTON. It is a LABEL bound to the file input, not a button that scripts
+          `input.click()`. That scripted click was the bug: the input was marked `hidden`, which is
+          display:none, and a programmatic click on a display:none file input is blocked in an
+          embedded webview. A label opens its own input with no script, so there is nothing to block.
+        */}
         {cutout ? (
           <button type="button" className={styles.chip} data-on onClick={clearCutout}>
             clear
@@ -414,18 +405,6 @@ export default function GridEnginePage() {
           </label>
         )}
 
-        {/* The saved corpus, one chip each. No file dialog, so nothing can suppress it. */}
-        {LIBRARY.map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={styles.chip}
-            onClick={() => void loadSaved(name)}
-            title={`Load ${name}`}
-          >
-            {name.toLowerCase()}
-          </button>
-        ))}
         <input
           id="cutout-file"
           ref={cutoutInput}

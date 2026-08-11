@@ -92,6 +92,9 @@
   box-sizing: border-box;
   white-space: nowrap;   /* 'cut-out' and 'bat-woman' were wrapping to two lines in the chip */
   flex: none;
+  /* a <select> carries its own OS chrome; strip it so it reads as a chip like the rest */
+  appearance: none;
+  -webkit-appearance: none;
   height: 28px;
   padding: 0 12px;
   border: 1px solid #e2e8f0;
