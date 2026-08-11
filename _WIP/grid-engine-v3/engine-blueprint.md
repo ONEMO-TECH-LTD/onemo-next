@@ -20,7 +20,7 @@ One deterministic pipeline is sufficient:
 4. derive every interval on which each lattice disc is supported;
 5. derive material-supported arrangements from those intervals;
 6. couple 48mm and 96mm arrangements at the same scale and published size;
-7. measure clearance, contacts, side reach, extremities and limb candidates;
+7. measure clearance, contacts, per-population grid-box overhangs, extremities and limb candidates;
 8. return every distinct family in canonical order and cache the immutable answer;
 9. apply returned geometry without invoking the solver.
 
@@ -41,7 +41,7 @@ grid-engine/
   lattice.ts           fixed 48 lattice, 96 thinning, parity targets, run windows
   contacts.ts          analytic support events and lawful intervals per position
   arrangements.ts      material-derived populations and canonical IDs
-  coverage.ts          side territories, reach, extremities, zones and contacts
+  overhang.ts          grid boxes, flap overhangs, extremities and limb candidates
   solve.ts             deterministic M1–M4 composition only
   canonical-output.ts  stable ordering, fingerprints and byte-stable serialisation
 grid-engine-runner/
@@ -103,7 +103,7 @@ Each family contains every field required by EC-07 plus:
 - per-axis registration (`point | gap`) because row and column parity can differ;
 - the exact source interval and manufactured-size interval;
 - separate 48/96 topology, coordinates, clearances and binding contacts;
-- side territories, reaches, spread, extremities and unsupported-zone records;
+- per-population padded grid boxes, four overhangs, spread, extremities and outside-box zone records;
 - `floor | intermediate | optimum` as a classification only;
 - a status derived only from the settled hard predicates.
 
@@ -337,7 +337,7 @@ At the published scale, evaluate every selected magnet against every outline edg
 
 The interval boundary also retains the contact feature that created it. These records make the answer self-explaining and reproducible by the applied proof.
 
-## 8. M2 — centre relationship, flap, sides, extremities and limbs
+## 8. M2 — centre relationship, grid-box flap and limbs
 
 ### 8.0 Centre relationship
 
@@ -351,75 +351,60 @@ zλ = σ(Cλ - Cκ)                            tested centre in shape frame
 
 For every `λ` and population, return `{ shapeCentreMM:zλ, magnetCentroidMM:μs, displacementMM:Δs, distanceMM:||Δs,λ|| }`. This is the normative EC-08 relationship: the actual material-supported magnet population relative to each tested shape centre. It is not the rectangular window midpoint and not a selected winner.
 
-### 8.1 Unsupported-distance field
+### 8.1 Padded grid bounding box
 
-For arrangement `A`, let its support discs be `D(q,R)` and define:
-
-```text
-ρ(p) = distance(p, ⋃q D(q,R))
-     = max(0, min_q ||p-q|| - R)
-```
-
-`ρ(p)` is the unsupported distance of material point `p` to the nearest supporting disc. The field exists over all material for diagnostics, but **flap reach is evaluated on the cutout boundary only**. Interior gaps between lattice discs are not fabric flaps.
-
-### 8.2 Four non-overlapping side boundary territories
-
-Relative to the tested centre at the shape-frame origin, assign every outline-boundary point to one of four 90-degree cones:
+Flap is computed separately for each population because the 48mm and 96mm arrangements can have different coordinates and extents. For population arrangement `As`, expressed in the returned shape frame, define:
 
 ```text
-left:   dx < 0  and |dx| ≥ |dy|
-right:  dx > 0  and |dx| ≥ |dy|
-top:    dy < 0  and |dy| > |dx|
-bottom: otherwise
+gridBoxs = {
+  left:   min(q.x for q in As) - P,
+  right:  max(q.x for q in As) + P,
+  top:    min(q.y for q in As) - P,
+  bottom: max(q.y for q in As) + P
+}
 ```
 
-The strict/non-strict tie rule above is normative. The four territories partition the complete outline boundary.
+This reproduces Dan's canonical examples exactly: a horizontal pair 48mm apart produces a `72×24mm` box; four `2×2` 48mm points produce a `72×72mm` box. Nothing inside this box is flap.
 
-For side boundary territory `Bside = ∂P ∩ sideCone`:
+### 8.2 Four exact overhangs
+
+Let the manufactured outline bounding extents in the same shape frame be `(shapeLeft, shapeRight, shapeTop, shapeBottom)`. For each population:
 
 ```text
-sideReach(side) = max_{p∈Bside} ρ(p)
-spread = max(sideReach) - min(sideReach)
+overhang.left   = max(0, gridBox.left   - shapeLeft)
+overhang.right  = max(0, shapeRight    - gridBox.right)
+overhang.top    = max(0, gridBox.top    - shapeTop)
+overhang.bottom = max(0, shapeBottom   - gridBox.bottom)
+spread          = max(overhang) - min(overhang)
 ```
 
-The two switch outcomes are computed and reported separately: `flapLimitMM=12` passes only when all four boundary reaches are `≤12`; `flapLimitMM=24` passes only when all four are `≤24`. Passing the 24mm outcome never implies that the selected 12mm outcome passed. Spread is evidence only; it is not equality, argmin, ranking or a pass gate. The centre of a 48mm lattice cell therefore cannot fail flap coverage merely because it is `48/√2 - 12 ≈ 21.94mm` from the discs; it is not on the cutout edge.
+These four subtractions are the complete flap measure. A square whose manufactured bounds equal its padded grid box reads `0/0/0/0`; a circle 10mm larger in radius than the box reads `10/10/10/10`. Equal overhangs are Dan's “flap evened out on all sides”; spread is evidence, never an argmin or pass gate.
 
-### 8.3 Exact maximum-reach computation
+The two switch outcomes are computed and reported separately for each population: `flapLimitMM=12` passes only when all four overhangs are `≤12`; `flapLimitMM=24` passes only when all four are `≤24`. A family passes a switch only when **both** its 48mm and 96mm population outcomes pass it. Passing 24 never implies passing 12.
 
-Because `ρ` uses distance to the **nearest** magnet, construct the ordinary nearest-site Voronoi diagram of magnet centres, not a farthest-site diagram. Intersect its edges with each outline segment and side-cone boundary. Along an outline portion inside one Voronoi cell the nearest centre is fixed and squared distance to it is convex, so its maximum occurs at an interval endpoint. Evaluate:
+The canonical family output therefore carries `gridBoxMM`, `overhangMM` and `overhangSpreadMM` inside each population record. There is no singular family-level reach because the two population boxes can differ. The contract's answer sketch must use these per-population fields before build; no compatibility alias may create a second meaning.
 
-- canonical polygon vertices;
-- side-cone/outline intersections;
-- ordinary Voronoi-edge/outline intersections.
+**Declared limitation.** Flap is now a bounding-box function. Two different outlines with identical four extrema and the same arrangement box produce identical flap evidence; concave voids and unsupported material that remains inside the box are invisible to this measure. Full-disc support still rejects magnets that lack material, and the applied outline remains visible, but the engine does not silently promote another uncovered-surface metric into flap.
 
-Take the exact boundary maximum and retain every tied outline point plus its nearest disc contact. Chew and Drysdale's [constrained largest-empty-circle result](https://digitalcommons.dartmouth.edu/cs_tr/29/) validates the ordinary nearest-site Voronoi structure; this engine uses its boundary-restricted case for flap.
+### 8.3 Material extremities
 
-### 8.4 Material extremity
+For each side, retain every outline point attaining the corresponding manufactured bound: all points at `shapeLeft`, `shapeRight`, `shapeTop` or `shapeBottom`. On a polygon these are vertices or collinear boundary segments; canonicalise a segment by its ordered endpoints. Each extremity reports its side, coordinate and that side's population-specific overhang.
 
-A `materialExtremity` is a boundary vertex that is a non-strict local maximum of squared radial distance from `a` against its two canonical boundary neighbours. Collinear equal-radius runs collapse to their lexicographically first endpoint. Additionally retain the four global directional extrema `(min x,max x,min y,max y)`. Deduplicate by coordinate.
+No radial extremity, angular cone or nearest-disc distance is part of flap. A diagonal protrusion that remains inside the grid box is not flap under the ruled definition and the engine does not create a second hidden measure for it.
 
-A radial local minimum used to delimit a limb arc is equally exact: on boundary edge `p(t)=v+t(w-v)`, evaluate the interior stationary point `t*=-(v·(w-v))/||w-v||²` only when `0<t*<1`, plus canonical vertices that are no farther radially than both neighbours. Deduplicate equal points canonically.
+### 8.4 Overhang zones and limb candidates
 
-Every extremity is assigned to its normative side territory and reports `ρ`, nearest disc and whether it exceeds each flap switch. This exposes protruding tips even when the side-wide maximum occurs elsewhere.
+For population `s`, intersect the manufactured polygon boundary with the complement of `gridBoxs`. The exact segment/axis-aligned-box intersections partition it into maximal connected outside-box boundary chains. Each chain reports:
 
-### 8.5 Unsupported boundary zones, interior gaps and limb candidates
+- population and side or sides crossed;
+- ordered boundary coordinates and bounding box;
+- maximum side overhang from §8.2;
+- contained material extremities;
+- `unsupported-zone | limb-candidate`.
 
-Define the unsupported boundary exactly:
+A chain is a `limb-candidate` exactly when it contains a material extremity; otherwise it is `unsupported-zone`. This is deliberately broad because neither `narrow` nor `trivial` has a ruled numeric definition. The engine never silently approves the exception: any over-limit limb remains `exception-pending` for applied visual confirmation.
 
-```text
-B = { p∈∂P : ρ(p) > 0 }
-```
-
-Construct the maximal connected boundary arcs of `B` using analytic segment/circle intersections. Split an arc additionally at side-cone boundaries and radial local minima so a protruding extremity is not merged with the whole perimeter. For each arc report outline-length, bounding box, sides touched, extremities contained, maximum reach and limiting point/contact. These arcs are `unsupportedZones` and are the only zones entering EC-09 flap coverage.
-
-A boundary arc is labelled `limb-candidate` exactly when:
-
-1. it contains at least one material extremity; and
-2. it is bounded in both boundary directions by the nearest radial local minima or by a disc/outline contact.
-
-Otherwise it is `unsupported-zone`. `trivial` is never computed or approved: every limb candidate remains `exception-pending` for applied visual confirmation. This defines limb geometry without inventing a triviality threshold.
-
-Interior local maxima of `ρ` obtained from ordinary Voronoi vertices are returned separately as `interiorGaps`. They never contribute to `sideReach`, spread, flap coverage or the limb exception. This keeps lattice-cell voids visible without mislabelling them as edge flap.
+There is no interior-gap diagnostic in the engine. Dan ruled that space between magnets is not flap and its fabric behaviour is a physical question, so computing or scoring it here would be unnecessary scope.
 
 ## 9. Determinism and numerical kernel
 
@@ -471,7 +456,7 @@ The oracle independently:
 - directly transforms the outline and measures every complete disc against every edge;
 - derives material-supported arrangements by the grammar in §6;
 - couples both populations at the same size;
-- computes reach by dense subdivision followed by certified upper bounds until it can prove the production maximum lies inside its reported isolating interval.
+- independently constructs each population's padded grid box and recomputes all four outline-bounding-box overhangs by direct subtraction.
 
 It compares the complete canonical family-ID set, coordinates, classification and pass/fail facts. It does not share production geometry. The event solver separately proves interval boundaries on analytic fixtures because an even-size oracle cannot prove an interval containing no publishable integer.
 
@@ -493,9 +478,9 @@ It compares the complete canonical family-ID set, coordinates, classification an
 
 ### 11.3 Real applied proof
 
-Run all seven saved cutouts through every centre method, bands 2/3/4, both populations and both flap switches. Every family must be selectable. The SVG proof draws the transformed outline, full discs, coordinates, side territories, reach segments, extremities, unsupported zones and binding contacts directly from the immutable answer.
+Run all seven saved cutouts through every centre method, bands 2/3/4, both populations and both flap switches. Every family must be selectable and steppable in canonical order. The SVG proof draws the transformed outline, full discs, coordinates, each population's padded grid box, four overhang segments, extremities, outside-box zones and binding contacts directly from the immutable answer.
 
-An independent browser probe reads the drawn SVG and recomputes coordinates, full-disc containment, reach and contacts without calling production geometry. Screenshot plus numeric probe are both required. A table saying `fits` is not evidence.
+An independent browser probe reads the drawn SVG and recomputes coordinates, full-disc containment, grid boxes, overhangs and contacts without calling production geometry. Screenshot plus numeric probe are both required. A table saying `fits` is not evidence.
 
 ### 11.4 Performance proof
 
@@ -532,7 +517,7 @@ Build in this order, with no build-ahead across a failed gate. The first milesto
 3. centre constructions and fixed lattice/parity tests;
 4. contact intervals, falsified against non-monotonic fixtures and oracle;
 5. arrangement derivation and 48/96 same-size coupling;
-6. clearance, binding contacts, side reach, extremities and zones;
+6. clearance, binding contacts, per-population grid boxes, overhangs, extremities and zones;
 7. complete answer assembly and byte-determinism attacks — **freeze and independently verify the headless minimum viable engine here**;
 8. runner cache/cancellation and zero-interaction-call proof;
 9. only after the headless gate passes, add the applied proof surface and independent SVG probe;
@@ -551,7 +536,7 @@ Build in this order, with no build-ahead across a failed gate. The first milesto
 | 48-only `BandFit` answer | reject |
 | grid pan to a chosen centre | reject; lattice is fixed |
 | global event partition with full relabelling | reject; incremental affected-window sweep |
-| farthest-point Voronoi for flap reach | reject; nearest-site Voronoi is mathematically correct |
+| nearest/farthest Voronoi flap models | reject; Dan ruled four grid-box overhang subtractions |
 | sampled/unexplained maximum-clearance epsilon | reject; finite segment-Voronoi construction |
 | old UI matrix and stale evidence images | reject; final evidence is regenerated |
 
