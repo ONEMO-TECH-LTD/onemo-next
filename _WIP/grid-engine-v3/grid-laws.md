@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Nineteen laws, and one above them. The engine and its algorithm. Nothing else.
+### Eighteen laws, and one above them. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -242,21 +242,10 @@ it is **proven sufficient**.
 *(Preference bears on L17's still-unruled selection ordering: where both populations answer, this says
 the sparse one is preferred. It settles that pair, not the whole ordering.)*
 
-**L4b — THE CORPUS BAR: 2–3 FOUR-POINT SIZES PER SHAPE, OR THE ENGINE FAILS.**
-*Dan, 08-11 15:01:53 @lead*
-> "also you calculation smust be verified - each shape in the cutout library can have at leas 2-3 best
-> optimal sizes with 4 points"
-
-**An acceptance criterion, and the hardest one stated so far.** Every shape in the saved library must
-yield **at least two or three good sizes at FOUR points**. Not two at any count — four.
-
-**It is falsifiable today, and current measurement does not meet it.** On the traced corpus with a
-bounding-box centre, BAT-WOMAN reaches one band and DUCK finds nothing at all. An engine that passes
-every EC checkpoint and misses this bar has failed **his** test.
-
-**It reframes the centre question.** Maximum clearance is not merely "better on the duck" — it may be
-the only construction that can satisfy this bar, since it is the only one that gives the duck any
-answer. *(Raised by @s62-meta in the gap audit; the corpus numbers are mine.)*
+*(An earlier draft booked a **L4b corpus bar** here — "each shape in the cutout library can have at
+leas 2-3 best optimal sizes with 4 points". **Struck.** Dan: "this cn be wrong cause i assumed". It is
+his HYPOTHESIS, not a ruling, and booking it broke L0 in the same commit that added L0. It is being
+measured and shown to him instead.)*
 
 **L9 — THE CEILING IS A GRID COUNT, NEVER A MILLIMETRE.** *Dan, 08-10 16:13 @meta*
 > "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case

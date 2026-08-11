@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 110 directives
+## 2026-08-11 · @s62-lead · 112 directives
 
 **06:26:48**
 
@@ -1530,6 +1530,14 @@ also you calculation smust be verified - each shape in the cutout library can ha
 **15:02:42**
 
 check you rrules against me - i forbid any decisions or interpretations taht i never provided
+
+**15:44:53**  *(to @s62-meta's lane, retracting the line above it)*
+
+this cn be wrong cause i assumed
+
+**15:44:53**  *(to @s62-meta's lane)*
+
+4 points may not be guaranteed in 2-3 cases - 1-2 maybe
 
 
 ---
