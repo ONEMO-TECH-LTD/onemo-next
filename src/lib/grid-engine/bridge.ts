@@ -29,7 +29,31 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import type { GridSystemSpec } from './spec'
+import { LAUNCH_PITCHES_MM, type GridSystemSpec } from './spec'
+import type { SolveRequest, PointMM as SolverPointMM } from './solver/contract'
+
+/**
+ * The complete SolveRequest from the guarded live spec — the bridge's job, so no surface ever
+ * assembles an engine call or holds law arithmetic. Every number is read from the spec or derived
+ * from released values: the sparse factor is the released pitch ladder's own ratio, the flap
+ * switch positions are the padding and twice it (12/24 under the released spec), and the
+ * operational bands are 2 and 3 (bands 1 and 4 are ruled non-operational). Empty centreMethods =
+ * the solver's full registry — every contested construction stays a visible test option.
+ */
+export function engineRequestOf(spec: GridSystemSpec, outline: readonly SolverPointMM[]): SolveRequest {
+  return {
+    outline,
+    spec: {
+      basePitchMM: spec.grid.basePitchMM,
+      sparseFactor: LAUNCH_PITCHES_MM[1] / LAUNCH_PITCHES_MM[0],
+      paddingMM: spec.grid.paddingMM,
+      positionsPerAxis: spec.grid.positionsPerAxis,
+      bands: [2, 3],
+      centreMethods: [],
+    },
+    flapLimitsMM: [spec.grid.paddingMM, spec.grid.paddingMM * 2],
+  }
+}
 
 export type { FieldSummary, PointMM, RegionMM }
 

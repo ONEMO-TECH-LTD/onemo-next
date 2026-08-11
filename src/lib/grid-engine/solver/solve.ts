@@ -39,8 +39,10 @@ interface ComponentOccurrence {
   /** §7.2: each edge's pair box RELATIVE TO THE TARGET a — the frame containment is solved in. */
   readonly relBoxes: readonly BoxMM[]
   readonly interval: ScaleInterval
-  /** first lawful σ of this component id across ALL its intervals — §6.3's occurrence rule */
+  /** first lawful σ of this ARRANGEMENT (coordinate identity) across all intervals — §6.3 */
   readonly firstLawfulSigma: number
+  /** §6.2 identity: parity target + sorted magnet coordinates — window-independent. */
+  readonly identity: string
 }
 
 /** All lawful (component, interval) occurrences for one population at one parity target. */
@@ -52,6 +54,18 @@ function populationOccurrences(
 ): ComponentOccurrence[] {
   const out: ComponentOccurrence[] = []
   const firstSigmaById = new Map<string, number>()
+  // §6.2: an arrangement's IDENTITY is its magnet set under its parity target — not the window
+  // that discovered it. Overlapping extents rediscover the same component (the centred pair
+  // appears in r1c2, r2c2, r2c3, …); without coordinate-level identity every rediscovery became
+  // its own family and the duck's corpus solve exhausted an 8GB heap. The occurrences themselves
+  // are all kept — the same magnets can be maximal in one window and absorbed in a wider one, and
+  // an arrangement is lawful at σ if ANY window yields it as a component (the oracle's own
+  // union-over-windows semantics). The dedup happens at publication, on the identity.
+  const identityOf = (w: Window, comp: Component): string =>
+    comp.vertices
+      .map((vi) => `${w.points[vi][0]},${w.points[vi][1]}`)
+      .sort()
+      .join(';')
   for (const w of windows) {
     const edges = adjacencyEdges(w, spec)
     if (edges.length === 0) continue
@@ -86,6 +100,9 @@ function populationOccurrences(
       }
       if (!active.length) continue
       for (const comp of componentsOf(w, edges, active)) {
+        // coordinate-level identity, scoped by parity target — the same magnets under a different
+        // target are a different placement, but the same magnets found by a wider window are not
+        const identity = `${target[0]},${target[1]}|${identityOf(w, comp)}`
         // the component's exact lawful set on this piece: ∩ I(e) over its edges, clipped to piece
         let intervals: ScaleInterval[] = [{ lo, hi }]
         for (const ei of comp.edgeIndices) intervals = intersectIntervals(intervals, perEdge[ei])
@@ -93,14 +110,14 @@ function populationOccurrences(
           const pieceKey = `${comp.id}|${iv.lo}`
           if (seenPiece.has(pieceKey)) continue
           seenPiece.add(pieceKey)
-          const first = firstSigmaById.get(comp.id)
-          if (first === undefined || iv.lo < first) firstSigmaById.set(comp.id, iv.lo)
-          out.push({ window: w, component: comp, edges, relBoxes, interval: iv, firstLawfulSigma: 0 })
+          const first = firstSigmaById.get(identity)
+          if (first === undefined || iv.lo < first) firstSigmaById.set(identity, iv.lo)
+          out.push({ window: w, component: comp, edges, relBoxes, interval: iv, firstLawfulSigma: 0, identity })
         }
       }
     }
   }
-  return out.map((o) => ({ ...o, firstLawfulSigma: firstSigmaById.get(o.component.id) ?? o.interval.lo }))
+  return out.map((o) => ({ ...o, firstLawfulSigma: firstSigmaById.get(o.identity) ?? o.interval.lo }))
 }
 
 /**
@@ -109,13 +126,23 @@ function populationOccurrences(
  * uncontained own edge changes the component id — and refuses a component that a newly active
  * neighbouring edge has merged into a larger arrangement at this exact size.
  */
-function isMaximalComponentAt(occ: ComponentOccurrence, centred: readonly PointMM[], sigma: number): boolean {
-  const active: number[] = []
-  for (let ei = 0; ei < occ.edges.length; ei++) {
-    if (boxContainedAt(occ.relBoxes[ei], centred, sigma)) active.push(ei)
+function isMaximalComponentAt(
+  occ: ComponentOccurrence,
+  centred: readonly PointMM[],
+  sigma: number,
+  cache: Map<string, Set<string>>,
+): boolean {
+  const key = `${occ.window.windowId}|${sigma}`
+  let ids = cache.get(key)
+  if (!ids) {
+    const active: number[] = []
+    for (let ei = 0; ei < occ.edges.length; ei++) {
+      if (boxContainedAt(occ.relBoxes[ei], centred, sigma)) active.push(ei)
+    }
+    ids = new Set(active.length ? componentsOf(occ.window, occ.edges, active).map((c) => c.id) : [])
+    cache.set(key, ids)
   }
-  if (!active.length) return false
-  return componentsOf(occ.window, occ.edges, active).some((c) => c.id === occ.component.id)
+  return ids.has(occ.component.id)
 }
 
 /** Closest point on segment [a,b] to p, with the parameter t. */
@@ -263,6 +290,11 @@ export function solve(request: SolveRequest): SolveOutcome {
       }
 
       let bandProduced = false
+      // one family per (size, base identity, sparse identity) — every window that rediscovers the
+      // same magnets maps onto it, and each occurrence pair gets its chance at the sizes earlier
+      // pairs could not prove (∃-window semantics; matches the oracle's union over windows)
+      const published = new Set<string>()
+      const maximalityCache = new Map<string, Set<string>>()
       // §7.4: cross-product over parity-compatible extents; both populations at one size
       for (const bo of baseOcc) {
         const bTarget = parityTargetOf(bo.window, spec)
@@ -273,15 +305,21 @@ export function solve(request: SolveRequest): SolveOutcome {
           const hi = Math.min(bo.interval.hi, so.interval.hi)
           if (lo > hi) continue
           for (const m of evenSizesIn(L * lo, L * hi)) {
+            const familyKey = `${m}|${bo.identity}|${so.identity}`
+            if (published.has(familyKey)) continue
             const sigma = m / L
             // §7.5: a size ships because BOTH complete regions are contained at the exact even
             // integer — re-proven here, never inferred from the interval arithmetic. And §6.2:
             // an arrangement is a MAXIMAL connected component of the edges active at that exact
-            // σ. A piece interval closes at an event scale inclusively, so its component can be
-            // published at the very σ where a neighbouring edge becomes (tangentially) active
-            // and absorbs it — the L fixture caught exactly that at 360. Recomputing the active
-            // set at σ proves both containment and maximality in one pass.
-            if (!isMaximalComponentAt(bo, centred, sigma) || !isMaximalComponentAt(so, centred, sigma)) continue
+            // σ in its own window. A piece interval closes at an event scale inclusively, so its
+            // component can be published at the very σ where a neighbouring edge becomes
+            // (tangentially) active and absorbs it — the L fixture caught exactly that at 360.
+            if (
+              !isMaximalComponentAt(bo, centred, sigma, maximalityCache) ||
+              !isMaximalComponentAt(so, centred, sigma, maximalityCache)
+            )
+              continue
+            published.add(familyKey)
             families.push(
               buildFamily({
                 request, spec, method, centreMM, band, sigma, m, L,

@@ -30,6 +30,7 @@ import {
 import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
+  engineRequestOf,
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
@@ -37,6 +38,12 @@ import {
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
+import {
+  familyFrameOffset,
+  solveOffThread,
+  type EnginePoint,
+  type EngineSolved,
+} from '@/lib/grid-engine/ui/engine-client'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -206,6 +213,7 @@ export default function GridEnginePage() {
     if (!r.refused) setSpec(r.spec)
     // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
     setAsOutline(true)
+    setEngine({ status: 'idle' })
     void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -219,6 +227,51 @@ export default function GridEnginePage() {
     }
     img.src = url
   })
+
+  // THE APPLIED PROOF (EC-11). One solve per press, off-thread (EC-12 — never coupled to any
+  // interaction); the families come back and browsing them is a pure lookup. The engine returns
+  // EVERY lawful family (Dan: the engine presents ALL options; optimal is decided manually) and
+  // the stepper walks that canonical order without omission (EC-11b).
+  //
+  // Everything drawn is the engine's own answer: the outline captured AT solve time, the family's
+  // scale, its magnets, pair boxes, grid box and binding contact. The shell computes nothing but
+  // the one frame translation the ui adapter provides.
+  const [engine, setEngine] = useState<
+    | { status: 'idle' }
+    | { status: 'solving' }
+    | {
+        status: 'solved'
+        outcome: EngineSolved
+        srcOutline: EnginePoint[]
+        bboxCentre: EnginePoint
+      }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' })
+  const [familyIx, setFamilyIx] = useState(0)
+
+  const runSolve = () => {
+    if (!outline || !box) return
+    // the traced silhouette, in canvas millimetres at its on-screen size — solve() derives its own
+    // longest side from these points, so the published sizes are true manufactured millimetres
+    const srcOutline: EnginePoint[] = outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h])
+    const xs = srcOutline.map((p) => p[0])
+    const ys = srcOutline.map((p) => p[1])
+    const bboxCentre: EnginePoint = [
+      (Math.min(...xs) + Math.max(...xs)) / 2,
+      (Math.min(...ys) + Math.max(...ys)) / 2,
+    ]
+    setEngine({ status: 'solving' })
+    setFamilyIx(0)
+    // the adapter builds the complete request from the guarded live spec — no law arithmetic here
+    solveOffThread(engineRequestOf(spec, srcOutline))
+      .then((outcome) => {
+        if (outcome.status === 'solved') setEngine({ status: 'solved', outcome, srcOutline, bboxCentre })
+        else setEngine({ status: 'error', message: outcome.status })
+      })
+      .catch((error: Error) => setEngine({ status: 'error', message: error.message }))
+  }
+
+  const solvedFamily = engine.status === 'solved' ? engine.outcome.families[familyIx] : null
 
   const loadLibraryCutout = async (name: (typeof CUTOUT_LIBRARY)[number]) => {
     const response = await fetch(`/grid-engine/cutouts/${encodeURIComponent(name)}`)
@@ -265,6 +318,7 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    setEngine({ status: 'idle' })
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -305,7 +359,10 @@ export default function GridEnginePage() {
    * 24mm of canvas beyond it, and every smaller shape has the same proportion, which is what keeps
    * it a constant size on screen. No second margin is added on top of it here or anywhere.
    */
-  const gridScale = fieldBlockSpan(spec) / Math.max(sizeMM, 1)
+  // When a family is applied, the view frames the FAMILY's manufactured size — the applied shape
+  // is drawn at the engine's own scale, and the camera must follow it or the answer overflows.
+  const framedMM = solvedFamily ? Math.max(solvedFamily.widthMM, solvedFamily.heightMM) : sizeMM
+  const gridScale = fieldBlockSpan(spec) / Math.max(framedMM, 1)
 
   /**
    * THE BIGGEST THE SHAPE MAY BE — the 9x9 grid itself, never a millimetre.
@@ -376,7 +433,11 @@ export default function GridEnginePage() {
         <div className={styles.titleRow}>
           <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build 0963303f</span></span>
           <span className={styles.readout}>
-            {box ? `${Math.round(box.w)} × ${Math.round(box.h)}mm` : `${sizeMM}mm`}
+            {solvedFamily
+              ? `${Math.round(solvedFamily.widthMM)} × ${Math.round(solvedFamily.heightMM)}mm · published ${solvedFamily.publishedEvenMM}`
+              : box
+                ? `${Math.round(box.w)} × ${Math.round(box.h)}mm`
+                : `${sizeMM}mm`}
           </span>
         </div>
       </header>
@@ -447,6 +508,55 @@ export default function GridEnginePage() {
           </button>
         )}
 
+        {outline && (
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={engine.status === 'solved'}
+            disabled={engine.status === 'solving'}
+            onClick={runSolve}
+            title="run the engine on this outline — every lawful family, both populations"
+          >
+            {engine.status === 'solving' ? 'solving…' : 'solve'}
+          </button>
+        )}
+
+        {engine.status === 'error' && <span className={styles.fieldReadout}>{engine.message}</span>}
+
+        {engine.status === 'solved' && engine.outcome.families.length > 0 && solvedFamily && (
+          <>
+            <button
+              type="button"
+              className={styles.chip}
+              onClick={() => setFamilyIx((i) => Math.max(0, i - 1))}
+              disabled={familyIx === 0}
+              aria-label="previous family"
+            >
+              ‹
+            </button>
+            <span className={styles.fieldReadout}>
+              {familyIx + 1}/{engine.outcome.families.length} · b{solvedFamily.band} ·{' '}
+              {solvedFamily.centreMethod} · {solvedFamily.publishedEvenMM}mm ·{' '}
+              {solvedFamily.populations.base.arrangement.magnets.length}+
+              {solvedFamily.populations.sparse.arrangement.magnets.length} mag ·{' '}
+              {solvedFamily.classification}
+            </span>
+            <button
+              type="button"
+              className={styles.chip}
+              onClick={() => setFamilyIx((i) => Math.min(engine.outcome.families.length - 1, i + 1))}
+              disabled={familyIx >= engine.outcome.families.length - 1}
+              aria-label="next family"
+            >
+              ›
+            </button>
+          </>
+        )}
+
+        {engine.status === 'solved' && engine.outcome.families.length === 0 && (
+          <span className={styles.fieldReadout}>no lawful family — {engine.outcome.emptyBands.length} empty bands</span>
+        )}
+
         <span className={styles.spacer} />
 
         {view && (
@@ -456,6 +566,25 @@ export default function GridEnginePage() {
         )}
 
       </nav>
+
+      {solvedFamily && (
+        <div className={styles.familyEvidence}>
+          {(['base', 'sparse'] as const).map((slot) => {
+            const p = solvedFamily.populations[slot]
+            const o = p.overhangMM
+            return (
+              <span key={slot} className={styles.fieldReadout}>
+                {slot === 'base' ? '48' : '96'}: flap L{o.left.toFixed(1)} R{o.right.toFixed(1)} T
+                {o.top.toFixed(1)} B{o.bottom.toFixed(1)} · spread {p.overhangSpreadMM.toFixed(1)} ·
+                sep {p.regionBinding.separationMM.toFixed(2)} ·{' '}
+                {p.flapOutcomes.map((f) => `${f.limitMM}:${f.passes ? '✓' : '✗'}`).join(' ')} ·{' '}
+                {p.fix.kind}
+                {p.fix.kind === 'twin-fix' && !p.fix.sizeEligible ? ' (over limit)' : ''}
+              </span>
+            )
+          })}
+        </div>
+      )}
 
       <div className={styles.canvas}>
         <GridCanvas
@@ -496,7 +625,93 @@ export default function GridEnginePage() {
               e.currentTarget.releasePointerCapture?.(e.pointerId)
             }}
           />
-          {cutout && box && (
+          {engine.status === 'solved' && solvedFamily && (
+            /* THE APPLIED FAMILY (EC-11) — drawn entirely from the engine's answer: the solve-time
+               outline at the family's own scale, the magnets with their complete padding discs, the
+               pair boxes whose union is the required region, the grid box the flap measures from,
+               and the binding contact. The shell adds one translation (ui adapter) and no geometry. */
+            <g pointerEvents="none">
+              {(() => {
+                const sigma = solvedFamily.scale
+                const bc = engine.bboxCentre
+                const applied = engine.srcOutline.map(
+                  ([x, y]) => [bc[0] + sigma * (x - bc[0]), bc[1] + sigma * (y - bc[1])] as const,
+                )
+                const off = familyFrameOffset(solvedFamily.centreMM, bc, sigma)
+                const tx = off[0] + bc[0]
+                const ty = off[1] + bc[1]
+                return (
+                  <>
+                    <polygon
+                      points={applied.map(([x, y]) => `${x},${y}`).join(' ')}
+                      fill="rgba(88,194,255,0.08)"
+                      stroke="#58c2ff"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    <g transform={`translate(${tx} ${ty})`}>
+                      {(['base', 'sparse'] as const).map((slot) => {
+                        const p = solvedFamily.populations[slot]
+                        const colour = slot === 'base' ? '#ffb648' : '#c792ea'
+                        return (
+                          <g key={slot}>
+                            <rect
+                              x={p.gridBoxMM.x0}
+                              y={p.gridBoxMM.y0}
+                              width={p.gridBoxMM.x1 - p.gridBoxMM.x0}
+                              height={p.gridBoxMM.y1 - p.gridBoxMM.y0}
+                              fill="none"
+                              stroke={colour}
+                              strokeDasharray="4 3"
+                              strokeWidth={1}
+                              vectorEffect="non-scaling-stroke"
+                              opacity={0.7}
+                            />
+                            {p.arrangement.pairBoxesMM.map((b, i) => (
+                              <rect
+                                key={i}
+                                x={b.x0}
+                                y={b.y0}
+                                width={b.x1 - b.x0}
+                                height={b.y1 - b.y0}
+                                fill={`${colour}14`}
+                                stroke={colour}
+                                strokeWidth={0.75}
+                                vectorEffect="non-scaling-stroke"
+                                opacity={0.8}
+                              />
+                            ))}
+                            {p.arrangement.magnets.map((m, i) => (
+                              <circle
+                                key={i}
+                                cx={m.coordinateMM[0]}
+                                cy={m.coordinateMM[1]}
+                                r={spec.grid.paddingMM}
+                                fill={`${colour}33`}
+                                stroke={colour}
+                                strokeWidth={1.25}
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            ))}
+                            <line
+                              x1={p.regionBinding.closestPoints.onRegionMM[0]}
+                              y1={p.regionBinding.closestPoints.onRegionMM[1]}
+                              x2={p.regionBinding.closestPoints.onOutlineMM[0]}
+                              y2={p.regionBinding.closestPoints.onOutlineMM[1]}
+                              stroke="#ff5c7a"
+                              strokeWidth={1.5}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          </g>
+                        )
+                      })}
+                    </g>
+                  </>
+                )
+              })()}
+            </g>
+          )}
+          {cutout && box && !solvedFamily && (
             /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
                dragging even over the shape the canvas must continue to react". It is drawn above the
                drag surface, so without this it swallows the press and the lattice stops following the

@@ -73,6 +73,14 @@
   flex: 1;
 }
 
+/* the applied family's per-population evidence line (EC-11) */
+.familyEvidence {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 2px 16px 6px;
+}
+
 .fieldReadout {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
