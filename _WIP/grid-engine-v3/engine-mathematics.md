@@ -299,3 +299,30 @@ Mask + exact integer DT² + C17 candidates, seven real traces (~/.claude/jobs/�
   production shares one mask per σ across all layouts → the ~tens-of-ms budget stands).
 Survivor bitmasks per candidate are exactly pixel's runtime form; this output is the format the
 mask-oracle sign-off compares against.
+
+## C19 · C17 corrected — the ladder is the BAND union, layout-independent (meta's BOT fixture)
+C17's "ladder from the layout's span" was a DEFECT, not a wording nuance: it caps a 2×2 at
+72–108 forever, making BOT's four-corner answer at 144 unreachable — exactly Dan's "the easiest
+shape to fit and you couldn't" failure, reinstated. Corrected: the candidate values on the binding
+axis are the UNION over operational bands of the band ladders,
+    T ∈ ⋃_b { G(b,p) + 12k : k = 0 … p/12−1 }      = {72…108} ∪ {120…156} at 48 (8 values)
+                                                      = {120…204} ∪ {216…300} at 96 (16 values)
+and EVERY layout is tested at every value; the layout's spans serve ONLY to pick the binding axis
+(integer cross-compare, unchanged). BOT-2×2-at-144 is the permanent fixture for this clause.
+
+## C20 · Predicate adjudicated on measurement (meta): the 1mm field IS the predicate
+Exact vector distance vs 1mm clearance field, whole corpus, every candidate: 5,784 verdicts,
+8 disagreements (0.14%), largest true margin at any disagreement 0.44mm — all inside the floor
+Dan ruled does not exist, none outside. The field decides; the exact vector form is retained as
+the ORACLE that proves the bound. "Integer-exact by clearing the division" is struck (interior
+branch overflows doubles, cross² ≈ 2.7e21 ≫ 2^53); the only integer-exact claims that stand are
+the mask DT² (< 333k, int32) and the binding-axis cross-compare (small integers).
+
+## C21 · OPEN — tracer reconciliation before the oracle gate can mean anything
+Lead's C18 (corpus real.json trace) and meta's own tracer disagree by one candidate on BOT's L
+(3/4 at pub 146 vs 2/4 at 108×146, 3/4 first at 120×162). An oracle agreeing with a builder one
+candidate off agrees confidently and falsely. RULE for the verification phase: all three lanes run
+the SAME canonical trace inputs (the archived corpus real.json), the same raster rule (even-odd,
+cell-centre sampling), the same magnet cell rounding (round-half-up per axis), and the same centre
+(bbox) — then the mask-oracle gate compares survivor bitmasks. Tracer variance is a separate,
+later question (it is input fidelity, not engine math).
