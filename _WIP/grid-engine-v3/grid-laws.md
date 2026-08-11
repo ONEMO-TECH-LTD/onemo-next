@@ -573,6 +573,24 @@ behind it — and because the first design to break it did so while satisfying e
 **The interaction is one control: the user picks a band.** They then get one size, it is the optimal
 one for that band, and it is guaranteed — same shape, same band, same answer, every time.
 
+**L19 — THE OPERATING FLOOR IS 1MM. Fit or not, at product scale — nothing below a millimetre exists anywhere.**
+*Dan, 08-11 evening @lead — captured Dan turns in this lane's session, first-hand:*
+> "there is no dimensions below 1mm anywhere hence my reaction to 0.05 mm originally we do n ot operate
+> on the level that small we habounding box and shape size we match it or not - similar to placing
+> image into the container fit or fill - we need to fit the grid vs shape and we can do that by
+> centering and scaling proportionally the shape"
+
+And, same exchange, on where the meaningful resolution comes from — asked what fidelity has to do
+with outline vs grid, Dan's model is that the GRID is the ruler: sizes publish in whole even
+millimetres, so no distinction below the product scale can change an answer the product can express.
+
+**What this binds:** the engine's question is container-fit — centre the shape, scale it
+proportionally, does the grid layout's region fit or not — decided at millimetre granularity. Inputs
+enter at the product's operating floor: a traced outline carries no sub-millimetre authority, so
+pixel-resolution stair-steps are noise, not geometry, and no computation may be priced by them. This
+is the general form of the 0.05mm strike: not "compute more exactly" — "that scale does not exist."
+
+
 **Selection is not discarding, and that is what reconciles this with L13.** The engine still computes
 and returns every lawful variation; it *marks* one as the guaranteed answer. Nothing is hidden, one
 thing is named. The admin dash steps through **every** increment the engine defines — that is the
