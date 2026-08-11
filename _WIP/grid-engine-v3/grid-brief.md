@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 100 directives
+## 2026-08-11 · @s62-lead · 106 directives
 
 **06:26:48**
 
@@ -1490,6 +1490,30 @@ ok the 168mm band 4 is the max size for twinfix shaped effects hence we can calc
 **14:54:26**
 
 the offset can be like 168+12-24mm space to stick out or accomodate shapes to 168 bounding box
+
+**14:57:57**
+
+no the band 4 survives only with added spacer max stick out offset for shape odd shapes as i said 168 is the ceiling we accomodate bounding box of the shape in theis range up to 168 + margin of 12-24mm
+
+**14:57:57**
+
+so the largest size we can provide is bounding box of 192mm
+
+**14:57:57**
+
+better 180
+
+**14:57:57**
+
+even better 168
+
+**14:57:57**
+
+it does not - the non twin fix shapes can still be larger
+
+**14:57:57**
+
+system has bar not all shapes globally
 
 
 ---

@@ -52,7 +52,24 @@ So the spot is 24mm, exactly half the 48mm pitch.
 Below a pair there is one magnet, and one magnet lets the shape pivot. Every product holds at least
 one pair.
 
-**L4a — A TWIN FIX CAPS AT 168mm. Two magnets cannot hold more.**
+**L4a — A TWIN FIX CAPS AT 168mm. THE BAR IS ON THE FIXING, NOT ON SHAPES.**
+
+> **Scope, ruled explicitly after I applied it globally and killed half the corpus:**
+> *Dan: "it does not - the non twin fix shapes can still be larger"* and *"system has bar not all
+> shapes globally"*. **The 168mm ceiling binds TWO-MAGNET layouts only.** Three or more magnets are
+> bounded by the grid count (L9) and nothing else. Applied globally it removes BUTTERFLY and PILL
+> entirely and drops POKE1's winner from 174mm to 130mm — measured, and wrong.
+
+**Band 4 survives as the twin fix's ceiling even though the band is hidden (L8a).**
+*Dan: "the band 4 survives only with added spacer max stick out offset for shape odd shapes as i said
+168 is the ceiling we accomodate bounding box of the shape in theis range up to 168 + margin of
+12-24mm"* — so the shape's bounding box may reach 168 plus a 12–24mm stick-out.
+
+**Effect of the cap on the real corpus, measured:** it drops **23 to 28** oversized twin-fix
+candidates per shape and **changes no winner**, because every winner is a 3- to 5-magnet layout.
+It removes what was never buildable without touching the answer.
+
+
 *Dan, 08-11 @lead*
 > "ok the 168mm band 4 is the max size for twinfix shaped effects hence we can calculate anything
 > fitting that range"
