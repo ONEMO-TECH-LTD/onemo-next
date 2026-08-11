@@ -15,7 +15,7 @@
 //   an inside-or-on witness;  3. no proper crossing into exterior.
 
 import type { BoxMM, PointMM } from './contract'
-import { pointInPolygon } from './exact'
+import { orientation, pointInPolygon, segmentsIntersect } from './exact'
 
 export interface ScaleInterval {
   readonly lo: number
@@ -182,19 +182,108 @@ export function containmentIntervals(
     }
   }
 
-  // partition and label
+  // partition
   const sigmas = [...new Set(events.map((e) => e.sigma))].sort((a, b) => a - b)
-  const contactAt = (s: number): ContactRef | undefined => events.find((e) => e.sigma === s)?.contact
+  const eventsAt = new Map<number, Array<{ sigma: number; contact: ContactRef }>>()
+  for (const e of events) {
+    const list = eventsAt.get(e.sigma)
+    if (list) list.push(e)
+    else eventsAt.set(e.sigma, [e])
+  }
+  const contactAt = (s: number): ContactRef | undefined => eventsAt.get(s)?.[0]?.contact
 
-  const lawfulAt = (s: number) => s > 0 && boxContainedAt(box, centred, s)
-  const pieces: Array<{ lo: number; hi: number; lawful: boolean }> = []
+  const pieceBounds: Array<{ lo: number; hi: number }> = []
   let prev = 0
   for (const s of [...sigmas, sigmaMax]) {
-    if (s > prev) {
-      const witness = prev === 0 ? s / 2 : (prev + s) / 2
-      pieces.push({ lo: prev, hi: s, lawful: lawfulAt(witness) })
-    }
+    if (s > prev) pieceBounds.push({ lo: prev, hi: s })
     prev = s
+  }
+
+  // INCREMENTAL STATUS WALK. Containment of the box in σ·P′ is equivalent (for one simple solid
+  // ring, no holes — §3.1) to: all four corners inside-or-on, AND no outline edge PROPERLY
+  // crossing a box edge. Between events neither can change, and an event names exactly the
+  // features it touches — so the status is seeded once with the full predicate and then updated
+  // in O(1) per event, instead of re-running an O(n) containment test on every piece (that was
+  // 6,000 candidate events × a 6,000-point predicate = the minutes Dan refused). Degenerate
+  // contacts (vertex coincidences, collinear events) fall back to the full predicate for that
+  // piece. §7.5 still re-proves every PUBLISHED size with the complete exact predicate, and the
+  // oracle re-derives the whole family set independently — an error here can only lose a
+  // candidate, which the oracle reports as a miss; it cannot publish a false answer.
+  const n4 = 4
+  const boxEdges: Array<[PointMM, PointMM]> = []
+  for (let e = 0; e < n4; e++) boxEdges.push([corners[e], corners[(e + 1) % 4]])
+  const scaledV = (i: number, s: number): PointMM => [centred[i][0] * s, centred[i][1] * s]
+
+  const cornerIn: boolean[] = [false, false, false, false]
+  const crossSet = new Set<number>() // key = outlineEdge * 4 + boxEdge, PROPER crossings only
+
+  const seedAt = (s: number) => {
+    const poly = centred.map(([x, y]) => [x * s, y * s] as PointMM)
+    for (let c = 0; c < 4; c++) cornerIn[c] = pointInPolygon(corners[c], poly) !== 'outside'
+    crossSet.clear()
+    for (let i = 0; i < n; i++) {
+      const a = poly[i]
+      const b2 = poly[(i + 1) % n]
+      for (let e = 0; e < n4; e++) {
+        if (segmentsIntersect(a, b2, boxEdges[e][0], boxEdges[e][1]) === 'proper') crossSet.add(i * 4 + e)
+      }
+    }
+  }
+
+  /** Re-test one outline edge against all four box edges at witness σ, updating the cross set. */
+  const refreshOutlineEdge = (i: number, s: number) => {
+    const a = scaledV(i, s)
+    const b2 = scaledV((i + 1) % n, s)
+    for (let e = 0; e < n4; e++) {
+      const key = i * 4 + e
+      if (segmentsIntersect(a, b2, boxEdges[e][0], boxEdges[e][1]) === 'proper') crossSet.add(key)
+      else crossSet.delete(key)
+    }
+  }
+
+  const lawfulAt = (s: number) => s > 0 && boxContainedAt(box, centred, s)
+
+  const pieces: Array<{ lo: number; hi: number; lawful: boolean }> = []
+  for (let pi = 0; pi < pieceBounds.length; pi++) {
+    const { lo, hi } = pieceBounds[pi]
+    const witness = lo === 0 ? hi / 2 : (lo + hi) / 2
+    if (pi === 0) {
+      seedAt(witness)
+    } else {
+      // apply every event at this piece's opening boundary, evaluated at THIS piece's witness.
+      // A corner hit by TWO events at one σ is an outline VERTEX sweeping over it — the per-edge
+      // side test is undefined there (each incident edge gives a different answer), so the piece
+      // reseeds with the full predicate instead.
+      const evs = eventsAt.get(lo) ?? []
+      const cornerHits = [0, 0, 0, 0]
+      for (const ev of evs) if (ev.contact.boxFeature.kind === 'corner') cornerHits[ev.contact.boxFeature.index]++
+      let degenerate = cornerHits.some((h) => h >= 2)
+      for (const ev of evs) {
+        if (ev.contact.boxFeature.kind === 'corner') {
+          const ci = ev.contact.boxFeature.index
+          const j = ev.contact.outlineFeature.index
+          // the corner's containment may flip as edge j sweeps past it — recompute the corner
+          // against the local boundary via the two edges incident to the contact; a full PIP is
+          // only needed when the contact degenerates onto an outline vertex
+          const vj = scaledV(j, witness)
+          const wj = scaledV((j + 1) % n, witness)
+          const side = orientation(vj, wj, corners[ci])
+          // transversal pass: edge j swept THROUGH the corner at this event, so the corner's
+          // containment after it is exactly which side of edge j it landed on — the canonical
+          // ring is positively oriented, material to the left. A zero side (contact degenerate
+          // onto the supporting line at the witness) falls back to the full predicate.
+          if (side === 0) degenerate = true
+          else cornerIn[ci] = side > 0
+          refreshOutlineEdge(j, witness)
+        } else {
+          const vi = ev.contact.outlineFeature.index
+          refreshOutlineEdge((vi - 1 + n) % n, witness)
+          refreshOutlineEdge(vi, witness)
+        }
+      }
+      if (degenerate) seedAt(witness)
+    }
+    pieces.push({ lo, hi, lawful: cornerIn.every(Boolean) && crossSet.size === 0 })
   }
 
   // merge adjacent lawful pieces; keep isolated lawful contact points; attach opening/closing contacts
@@ -202,11 +291,9 @@ export function containmentIntervals(
   let openLo: number | null = null
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i]
-    const boundaryLawful = lawfulAt(piece.hi)
     if (piece.lawful && openLo === null) openLo = piece.lo
     const nextLawful = i + 1 < pieces.length ? pieces[i + 1].lawful : false
     if (openLo !== null && !nextLawful) {
-      // closes at piece.hi if the boundary itself is lawful, else at piece.hi (open piece ends there)
       out.push({
         lo: openLo,
         hi: piece.hi,
@@ -215,8 +302,9 @@ export function containmentIntervals(
       })
       openLo = null
     }
-    // isolated lawful contact point between two unlawful pieces
-    if (!piece.lawful && boundaryLawful && !nextLawful && piece.hi < sigmaMax) {
+    // isolated lawful contact point between two unlawful pieces — the ONLY remaining use of the
+    // full predicate per piece, evaluated lazily on unlawful/unlawful boundaries alone
+    if (!piece.lawful && !nextLawful && piece.hi < sigmaMax && lawfulAt(piece.hi)) {
       out.push({ lo: piece.hi, hi: piece.hi, openContact: contactAt(piece.hi), closeContact: contactAt(piece.hi) })
     }
   }
