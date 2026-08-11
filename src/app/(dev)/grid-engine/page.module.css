@@ -90,6 +90,8 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  white-space: nowrap;   /* 'cut-out' and 'bat-woman' were wrapping to two lines in the chip */
+  flex: none;
   height: 28px;
   padding: 0 12px;
   border: 1px solid #e2e8f0;
