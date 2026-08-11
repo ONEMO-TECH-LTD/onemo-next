@@ -5,8 +5,7 @@
 // canonical registry order). Every number the solver uses arrives through SolveRequest.spec, the
 // guarded law input; a literal here would be a second door past the guard.
 //
-// Reworked against the canon at Pixel's QA block B1–B7 on 259e12c5, with §7.6, §8.3 and §8.4
-// re-opened and read at rework time, not recalled.
+// Every construct cites the canon clause it implements (blueprint §§2, 3, 6.3, 7.1–7.8, 8.0–8.4, 9).
 
 /** One point, millimetres. x right, y down — the tracer's own frame. */
 export type PointMM = readonly [number, number]
@@ -41,10 +40,14 @@ export type PopulationSlot = 'base' | 'sparse'
  * ordering/equality requires it. Ordinary non-boundary arithmetic need not be promoted."
  */
 export interface ExactValue {
-  /** Coefficients of the defining polynomial, constant term first, exact integers. */
-  readonly polynomial: readonly number[]
-  /** Isolating interval containing exactly this root. */
-  readonly isolating: readonly [number, number]
+  /**
+   * Coefficients of the defining polynomial, constant term first — CANONICAL DECIMAL STRINGS
+   * (§9: "IDs hash canonical exact numeric encodings, never runtime object order"; a JS number
+   * cannot carry general exact integer/rational identity).
+   */
+  readonly polynomial: readonly string[]
+  /** Isolating interval containing exactly this root, endpoints as canonical decimal strings. */
+  readonly isolating: readonly [string, string]
   /** A double approximation for display and non-identity arithmetic. Never the identity. */
   readonly approx: number
 }
@@ -166,16 +169,11 @@ export interface ArrangementRecord {
   /** §7.1: each edge's padded box… */
   readonly pairBoxesMM: readonly BoxMM[]
   /**
-   * …and their EXACT UNION as a polygon (B3: "exact region union" is a named §2.2 field). This is
-   * Q(A), the region the shape must encapsulate (L18). Ordered boundary vertices, shape frame.
+   * §7.1: Q(A) — the exact region union — is CANONICALLY REPRESENTED by its ordered constituent
+   * pair boxes above. A single polygon ring cannot encode it: the 2×2 union is a RING with a 24×24
+   * centre hole, so publishing one ring would be a false polygon. Union geometry is always derived
+   * from pairBoxesMM; no second representation exists to drift from it.
    */
-  readonly regionUnionMM: readonly PointMM[]
-  /**
-   * DESCRIPTION, not selection (Dan: the engine presents all options; optimal is decided manually).
-   * floor = exactly one adjacent pair · optimum = four corners of the outermost rectangular extent
-   * at the first lawful published size in this component's own interval (§6.3) · intermediate = rest.
-   */
-  readonly classification: 'floor' | 'intermediate' | 'optimum'
 }
 
 /** §8.0: the population's relationship to every tested centre — evidence, never a gate (EC-08). */
@@ -241,6 +239,13 @@ export interface FixClassification {
  */
 export interface PopulationEvidence {
   readonly arrangement: ArrangementRecord
+  /**
+   * §6.3 — classification is a property of THIS PUBLISHED OCCURRENCE, not of the geometry record:
+   * four-corner `optimum` requires being the FIRST lawful published size in the arrangement's own
+   * interval, so the same arrangement id is `intermediate` at every later size. DESCRIPTION, never
+   * selection — Dan: the engine presents all options; optimal is decided manually.
+   */
+  readonly classification: 'floor' | 'intermediate' | 'optimum'
   /** §8.1: the padded grid bounding box — nothing inside it is flap. */
   readonly gridBoxMM: BoxMM
   /** §8.2: the four exact overhangs — the complete flap measure. */
@@ -251,8 +256,12 @@ export interface PopulationEvidence {
     readonly bottom: number
   }
   readonly overhangSpreadMM: number
-  /** §8.2: both switch outcomes, keyed by the switch value; passing 24 never implies passing 12. */
-  readonly flapPass: Readonly<Record<string, boolean>>
+  /**
+   * §8.2: the switch outcomes, ORDERED one-for-one from SolveRequest.flapLimitsMM — exactly the two
+   * guarded values, no extra or missing keys, no runtime object-order drift. Passing the larger
+   * never implies passing the smaller.
+   */
+  readonly flapOutcomes: ReadonlyArray<{ readonly limitMM: number; readonly passes: boolean }>
   /** §7.6: the region binding contact — what set the size (B1). */
   readonly regionBinding: RegionBindingContact
   /** §7.7: per-population fix classification (canon §2.2 lists it per population). */
@@ -293,10 +302,10 @@ export interface MeasuredCutoutVariantFamily {
   readonly arrangementIdBase: string
   readonly arrangementIdSparse: string
   readonly populations: Readonly<Record<PopulationSlot, PopulationEvidence>>
-  /** §8.2 / B3: the combined switch outcomes — a family passes a switch only when BOTH populations
-   *  pass it. Keyed by the switch value. */
-  readonly familyFlapPass: Readonly<Record<string, boolean>>
-  /** Family-level description derived from the two populations' classifications (§6.3). */
+  /** §8.2: the combined outcomes, same ordered form — a family passes a switch only when BOTH
+   *  populations pass it. */
+  readonly familyFlapOutcomes: ReadonlyArray<{ readonly limitMM: number; readonly passes: boolean }>
+  /** Family-level description derived from the two populations' OCCURRENCE classifications (§6.3). */
   readonly classification: 'floor' | 'intermediate' | 'optimum'
   /**
    * B3 / canon §2.2: "a status derived only from the settled hard predicates" — containment held,

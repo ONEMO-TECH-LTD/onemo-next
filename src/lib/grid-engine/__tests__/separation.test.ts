@@ -236,10 +236,22 @@ describe('the class, not the instances', () => {
     }
   })
 
+  it('the ui scope selects ui/ and only ui/ — solver/ is not falsely subjected to it', () => {
+    const files = readTree(UNIT, /\.ts$/)
+    const uiScoped = files.filter((f) => f.file.startsWith('ui/'))
+    expect(uiScoped.length, 'no ui/ files found — scope check would pass vacuously').toBeGreaterThan(0)
+    expect(uiScoped.every((f) => f.file.startsWith('ui/'))).toBe(true)
+    const solverScoped = files.filter((f) => f.file.startsWith('solver/'))
+    expect(solverScoped.length, 'no solver/ files found').toBeGreaterThan(0)
+    expect(solverScoped.some((f) => uiScoped.includes(f))).toBe(false)
+  })
+
   it('the ui submodule does no lattice arithmetic', () => {
     // ui/ may reach outward — it is the adapter — but it may not compute the grid. Nothing checked
     // this before, because nothing read the directory at all.
-    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.includes('/'))
+    // Structurally scoped to ui/ — file.includes('/') labelled EVERY nested module "ui", which
+    // falsely subjected the approved solver/ directory to the ui-only no-law-value rule (QA find).
+    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.startsWith('ui/'))
     expect(submodule.length, 'no submodule files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of submodule) {
       expect(text, `${file} touches a law value`).not.toMatch(

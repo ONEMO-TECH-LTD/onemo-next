@@ -12,6 +12,7 @@
 //   Tangency is lawful: the square's own canon publishes at clearance exactly 12.000.
 
 import type { BoxMM, PointMM, UnsupportedOutlineReason } from './contract'
+import { pointInPolygon, segmentDistanceSqCmp, segmentsIntersect, signedAreaSign } from './exact'
 
 export interface OutlineEdge {
   readonly a: PointMM
@@ -34,29 +35,11 @@ export type CanonicalisationOutcome =
   | { readonly ok: true; readonly outline: CanonicalOutline }
   | { readonly ok: false; readonly reason: UnsupportedOutlineReason }
 
-/** §3.2 step 3: the exact shoelace-area sign. Twice the signed area; sign is all we need. */
-function signedAreaTwice(points: readonly PointMM[]): number {
-  let sum = 0
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    sum += points[j][0] * points[i][1] - points[i][0] * points[j][1]
-  }
-  return sum
-}
+
 
 /** §3.2 step 4's comparator: lexicographic (x, y). */
 function lexLess(a: PointMM, b: PointMM): boolean {
   return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])
-}
-
-/** Proper segment intersection for the §3.1 self-intersection refusal. Shared endpoints excluded. */
-function segmentsCross(p1: PointMM, p2: PointMM, p3: PointMM, p4: PointMM): boolean {
-  const d = (o: PointMM, a: PointMM, b: PointMM) =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-  const d1 = d(p3, p4, p1)
-  const d2 = d(p3, p4, p2)
-  const d3 = d(p1, p2, p3)
-  const d4 = d(p1, p2, p4)
-  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
 }
 
 /**
@@ -88,27 +71,37 @@ export function canonicaliseOutline(input: readonly PointMM[]): Canonicalisation
   // §3.1: fewer than three DISTINCT vertices is not a polygon.
   if (stripped.length < 3) return { ok: false, reason: 'fewer-than-three-vertices' }
 
-  // §3.1: zero signed area is a line, not material.
-  const area2 = signedAreaTwice(stripped)
-  if (area2 === 0) return { ok: false, reason: 'zero-area' }
+  // §3.1: zero signed area is a line, not material — decided on the EXACT sign (§9): float
+  // shoelace cancellation near zero is precisely where this answer matters.
+  const areaSign = signedAreaSign(stripped)
+  if (areaSign === 0) return { ok: false, reason: 'zero-area' }
 
   // §3.2 step 3: orient counter-clockwise. Screen frame is y-down, where CCW area is negative in
   // the usual shoelace convention; the blueprint's own harness treats positive area as CCW in the
   // abstract plane, so we normalise on the SIGN and record the convention once, here: after this
   // block, signedAreaTwice(points) > 0.
-  const ccw = area2 > 0 ? [...stripped] : [...stripped].reverse()
+  const ccw = areaSign > 0 ? [...stripped] : [...stripped].reverse()
 
-  // §3.1: self-intersection is refused. O(n²) over edges, shared endpoints excluded — exactness
-  // over speed; this runs once per frozen outline (L16), never on interaction.
+  // §3.1: self-intersection is refused — COMPLETE classification (B2): proper crossings,
+  // T-touches, collinear overlap and repeated non-adjacent vertices all break "one simple closed
+  // polygon". Adjacent edges legitimately share one endpoint and are skipped; everything else may
+  // touch nothing. Exact predicates throughout (§9) — no float determinant makes this call.
   const n = ccw.length
   for (let i = 0; i < n; i++) {
-    const a1 = ccw[i]
-    const a2 = ccw[(i + 1) % n]
-    for (let j = i + 2; j < n; j++) {
-      if (i === 0 && j === n - 1) continue // adjacent through the wrap
-      const b1 = ccw[j]
-      const b2 = ccw[(j + 1) % n]
-      if (segmentsCross(a1, a2, b1, b2)) return { ok: false, reason: 'self-intersection' }
+    for (let j = 0; j < n; j++) {
+      if (j === i || j === (i + 1) % n || (j + 1) % n === i) continue
+      if (j < i) continue // unordered pairs once
+      const kind = segmentsIntersect(ccw[i], ccw[(i + 1) % n], ccw[j], ccw[(j + 1) % n])
+      if (kind !== 'none') return { ok: false, reason: 'self-intersection' }
+    }
+  }
+  // A repeated non-adjacent vertex pinches the ring even when no edges cross.
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue
+      if (ccw[i][0] === ccw[j][0] && ccw[i][1] === ccw[j][1]) {
+        return { ok: false, reason: 'self-intersection' }
+      }
     }
   }
 
@@ -183,16 +176,10 @@ export function distanceToEdge(x: PointMM, e: OutlineEdge): number {
   return Math.hypot(x[0] - px, x[1] - py)
 }
 
-/** §3.3: exact even-odd point-in-polygon against P. */
+/** §3.3: point-in-polygon with EXACT boundary decisions — 'boundary' counts as inside material,
+ *  because the closed support predicate must hold at tangency (§9). */
 export function insideOutline(x: PointMM, outline: CanonicalOutline): boolean {
-  let c = false
-  const pts = outline.points
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const [xi, yi] = pts[i]
-    const [xj, yj] = pts[j]
-    if (yi > x[1] !== yj > x[1] && x[0] < ((xj - xi) * (x[1] - yi)) / (yj - yi) + xi) c = !c
-  }
-  return c
+  return pointInPolygon(x, outline.points) !== 'outside'
 }
 
 /**
@@ -209,9 +196,15 @@ export function clearanceMM(x: PointMM, outline: CanonicalOutline): number {
 }
 
 /**
- * §3.3: supported(q) ⇔ clearanceP(q) ≥ R. CLOSED comparison, no epsilon — tangency is lawful,
- * which is what lets the square publish at exactly 72/120 with clearance exactly the padding.
+ * §3.3: supported(q) ⇔ clearanceP(q) ≥ R. CLOSED comparison, no epsilon — tangency is lawful.
+ * §9: the DECISION rides on the exact squared comparison dist² vs R² per edge (segmentDistanceSqCmp),
+ * never on Math.hypot — clearanceMM above remains a report-only approximation for display fields.
+ * A point outside the material cannot be supported regardless of boundary distance.
  */
 export function supported(q: PointMM, outline: CanonicalOutline, paddingMM: number): boolean {
-  return clearanceMM(q, outline) >= paddingMM
+  if (pointInPolygon(q, outline.points) === 'outside') return false
+  for (const e of outline.edges) {
+    if (segmentDistanceSqCmp(q, e.a, e.b, paddingMM) < 0) return false
+  }
+  return true
 }

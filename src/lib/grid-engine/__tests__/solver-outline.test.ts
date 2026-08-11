@@ -135,3 +135,33 @@ describe('§3.3 the support predicate — closed boundary, no epsilon', () => {
     expect(o.bboxMM).toEqual({ x0: -50, y0: -50, x1: 50, y1: 50 })
   })
 })
+
+describe('§9 exact predicates — Pixel falsification fixtures: the float path must FAIL these', () => {
+  it('orientation: collinear-looking triple where the double determinant is 0 and truth is +1', async () => {
+    const { orientation } = await import('../solver/exact')
+    const a: PointMM = [0, 0]
+    const b: PointMM = [100000000, 99999999]
+    const c: PointMM = [100000001, 100000000]
+    // the naive double determinant of these is exactly 0 — proven below — so a float-only
+    // implementation misclassifies. The filtered-exact path must say +1.
+    const naive = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    expect(naive).toBe(0) // the trap is real
+    expect(orientation(a, b, c)).toBe(1) // the exact layer is not fooled
+  })
+
+  it('tangency: exact distance² = R² is LAWFUL where Math.hypot under-reports', () => {
+    // polygon and point chosen so the perpendicular offset is (0.5, 1.2): distance² = 1.69 = 1.3²
+    // exactly, but Math.hypot(0.5, 1.2) = 1.2999999999999998 < 1.3 — a float clearance gate
+    // falsely rejects a lawful tangency.
+    const poly: PointMM[] = [
+      [0, 0],
+      [12, -5],
+      [17, 7],
+      [5, 12],
+    ]
+    const o = ok(poly)
+    const q: PointMM = [6.5, -1.3]
+    expect(Math.hypot(0.5, 1.2)).toBeLessThan(1.3) // the trap is real
+    expect(supported(q, o, 1.3)).toBe(true) // the exact squared comparison is not fooled
+  })
+})
