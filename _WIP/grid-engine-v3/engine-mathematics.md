@@ -539,3 +539,17 @@ written or two builders diverge.
    value (the concrete case behind the 76/508,345 fallback count).
 SEAL STATUS: three implementations agree to 26,850–26,852/26,852 with every residual explained and
 owned. Remaining: pixel's family-set comparison; meta's σ-keyed coupling rerun.
+
+## C33 · Coupling layer verified three-way; demotion lifted; the product fact
+Meta's σ-keyed rerun (own predicate, own bits, artifact keyspace) matches the exact artifact on
+every overlapping shape — BOT 204 (the 180 died with index-coupling), DUCK NONE, POKE2 168,
+POKE1 170, PILL 252, BUTTERFLY 263, and BAT-WOMAN 175 (σ=7/16, 2×1@48 + 2×1@96#00 — now verified
+in the lead artifact too: both pairs hold). The C32 demotion is LIFTED: coupling-layer agreement
+now carries the same third-implementation independence as the 26,850/26,852 bit diff.
+PRODUCT FACT (for Dan when he returns, meta's correction of their own earlier claim): every corpus
+shape except the DUCK couples, but the first coupled size is LATE — 168 to 263mm — because a
+sparse pair needs ~96mm of material between magnets plus padding before both populations hold at
+one σ. L14's "condition most likely to fail" doing exactly what Dan predicted; it sets the bottom
+of every ladder. (The earlier "butterfly cannot couple at all" was wrong in the specific, right in
+the shape of the effect.)
+SEAL: waits on pixel's family-set comparison only.
