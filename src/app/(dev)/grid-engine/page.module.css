@@ -124,33 +124,6 @@
   gap: var(--gap);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.label {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: #64748b;
-}
-
-.value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  color: #0f172a;
-}
-
 /* ── the sealed law menu ──────────────────────────────────────────────────── */
 
 .law {
@@ -409,28 +382,11 @@
   }
 
   .readout,
-  .fieldReadout,
-  .label {
+  .fieldReadout {
     color: #94a3b8;
   }
 
-  .value {
-    color: #f1f5f9;
-  }
-
-  .spacer {
-  flex: 1;
-}
-
-.fieldReadout {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-  white-space: nowrap;
-  color: #64748b;
-}
-
-.chip {
+  .chip {
     border-color: #334155;
     background: transparent;
     color: #cbd5e1;
