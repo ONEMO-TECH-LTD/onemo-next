@@ -104,6 +104,31 @@ correction propagates to the contract, the blueprint and every test fixture.*
 What remains live: BAT-WOMAN needs 434mm at band 3, still over the ceiling, and DUCK finds nothing at
 either band on the bounding-box centre.
 
+**L8b — THREE IN A ROW IS TWO LINKED PAIRS, SO ITS OUTER TWO ARE A LAWFUL SPARSE PAIR.**
+*Dan, 08-11 @lead*
+> "96mm is lawfull sparse pair and actually prefered and proven sufficient"
+>
+> "it cannot not be as it is 2 linked lawful pairs in line - = lawful sparse  ahahahaha"
+
+I had raised the outer two magnets of `###` being 96mm apart as an arithmetic problem — not a lawful
+48mm pair. It is not a problem. **Three in a row at 48mm is two overlapping lawful pairs, and its
+outer two are 96mm apart, which is the sparse pitch.** The middle magnet can be hidden and what
+remains is lawful *by construction*, on the population the lattice already offers (L7).
+
+**The middle magnet is FREE TO REMOVE — measured, not argued.** Both layouts occupy the same
+`120 × 24` region, so they publish at the same size:
+
+| layout | pitch | region | tall triangle | wide triangle |
+|---|---|---|---|---|
+| three in a row `###` | 48 | 120 × 24 | 458mm | 218mm |
+| sparse pair `#.#` | 96 | 120 × 24 | **458mm** | **218mm** |
+
+Identical. Same size, one fewer magnet — which is why the sparse pair is **preferred**, and Dan states
+it is **proven sufficient**.
+
+*(Preference bears on L17's still-unruled selection ordering: where both populations answer, this says
+the sparse one is preferred. It settles that pair, not the whole ordering.)*
+
 **L9 — THE CEILING IS A GRID COUNT, NEVER A MILLIMETRE.** *Dan, 08-10 16:13 @meta*
 > "Sizes in terms of max can be defined by max grid columns and rows covered by a shape in our case
 > we create engine to match our 9x9 grid as max grid after we validate stable engine works we cap the

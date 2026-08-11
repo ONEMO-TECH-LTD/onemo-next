@@ -1078,7 +1078,7 @@ among all the slop what precisely relating to the goal and specifically asked fo
 
 ---
 
-## 2026-08-11 · @s62-lead · 89 directives
+## 2026-08-11 · @s62-lead · 92 directives
 
 **06:26:48**
 
@@ -1446,6 +1446,18 @@ for triangle-like shapes  though we are using 2 options - 2 points top corner an
 **14:31:19**
 
 yeah band 4 was never realistic anyway for custom cutouts unless they are more like geometric shapes - so i had defined it yesterday that while we have bands 1/2/3/4 - 1and 4 are hidden and not operational we only use 2/3
+
+**14:32:03**
+
+i meant medium is band 3 not band 2 on the above L and triangle shapes
+
+**14:35:07**
+
+96mm is lawfull sparse pair and actually prefered and proven sufficient
+
+**14:35:07**
+
+it cannot not be as it is 2 linked lawful pairs in line - = lawful sparse  ahahahaha
 
 
 ---
