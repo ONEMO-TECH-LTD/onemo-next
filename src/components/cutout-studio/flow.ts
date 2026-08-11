@@ -26,7 +26,7 @@ import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTap
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531, crashStage, lastCrashStage } from './v531seg'
 import { cancelSegmentML, disposeSegmentML, type MLResult } from '@/lib/effect/segment-ml'
-import { HistoryStack } from './history'
+import { HistoryStack } from '@/lib/cutout-studio/history'
 import type { EditMode } from './EditorOverlay'
 
 const WORK_MAX = 1024

@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { HistoryStack } from '@/app/(dev)/cutout-lab/history'
-import { settingsForVectorPreset, VECTOR_PRESETS } from '@/app/(dev)/cutout-lab/finish'
+import { settingsForVectorPreset, VECTOR_PRESETS } from '@/components/cutout-studio/finish'
+import { HistoryStack } from '@/lib/cutout-studio/history'
 import { runCutout as legacyRunCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { maskArea, subtractMasks, unionMasks } from '@/lib/mask-tools'
 import { adapterIdFor, featherMask, segment, smoothMask } from '../mask'
 import { runCutout } from '../cutout'
 
-const cutoutDir = 'src/app/(dev)/cutout-lab'
+const cutoutDir = 'src/components/cutout-studio'
 const read = (path: string) => readFileSync(path, 'utf8')
 const cutout = (file: string) => read(`${cutoutDir}/${file}`)
 
