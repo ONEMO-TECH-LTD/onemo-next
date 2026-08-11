@@ -381,17 +381,27 @@ export default function GridEnginePage() {
           </button>
         ))}
 
-        <button
-          type="button"
-          className={styles.chip}
-          data-on={Boolean(cutout)}
-          onClick={() => (cutout ? clearCutout() : cutoutInput.current?.click())}
-        >
-          {cutout ? 'clear' : 'cut-out'}
-        </button>
+        {/*
+          LOADING IS A LABEL, NOT A SCRIPTED CLICK. The button used to call
+          `cutoutInput.current?.click()` on an input marked `hidden`. That is display:none, and a
+          programmatic click on a display:none file input is blocked in embedded webviews — which is
+          where this surface is actually used. It worked in a standalone browser and did nothing for
+          Dan, which is exactly the class of defect the visual-verification law exists to catch.
+          A label opens its own input with no script at all and cannot be blocked.
+        */}
+        {cutout ? (
+          <button type="button" className={styles.chip} data-on onClick={clearCutout}>
+            clear
+          </button>
+        ) : (
+          <label className={styles.chip} htmlFor="cutout-file">
+            cut-out
+          </label>
+        )}
         <input
+          id="cutout-file"
           ref={cutoutInput}
-          hidden
+          className={styles.fileInput}
           type="file"
           accept="image/*"
           onChange={(e) => {
