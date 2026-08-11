@@ -598,9 +598,11 @@ returns ONE parity-derived registration per family. Registration derives from th
 themselves (axis value ≡24 mod 48 = gap; ≡0 mod 48 = point). DUCK-180's base pair is (gap,point),
 its sparse pair (point,gap) — different on both axes — NOT a family. Verified in my bits: duck's
 first SAME-registration family is σ=33/65 → published 204 (base top pair from 2×2@48, sparse
-phase pair 2×2@96#00 or #10 — all gap,gap). The cross-registration duck-180 remains RECORDED as a
-parked product question for Dan (physically manufacturable, unlawful as one family under current
-law — promoting it requires his explicit overturn of same-parity coupling).
+phase pair 2×2@96#00 or #10 — all gap,gap). The cross-registration duck-180 is
+FORBIDDEN OUTRIGHT, not parked (pixel's correction of my parking): the parity target is the
+placement of the SHAPE against the one unmoved lattice — base at a=(gap,point) and sparse at
+a=(point,gap) are two DIFFERENT placements of the shape, i.e. two different manufactured objects
+masquerading as one family. Nothing to rule; placement uniqueness already decides it.
 FINAL COUPLED TABLE (three-way, upward-even publication): POKE2 168 · POKE1 172 · BAT-WOMAN 176 ·
 BOT 180 · PILL 192 · DUCK 204 · BUTTERFLY 216.
 
