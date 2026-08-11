@@ -7,6 +7,7 @@ import { cubicPoint, flattenPath, toSVGPathD, transformShape, segments, shapeBBo
 import { insertAnchorAt } from '../ops' // live-internal, not a public barrel export
 import { filletPath } from './fillet-fixtures' // test fixture (moved out of production path.ts)
 import { roundCornersPaper } from '../paper-kernel' // L6: corner-round is the Paper kernel
+import { subtractShape } from '../clipper-kernel'
 import { unitShape, getShape } from '@/lib/shape-library'
 
 describe('vector-core kernel', () => {
@@ -322,5 +323,28 @@ describe('vector-core kernel', () => {
     const sb = shapeBBox(stretched, 0.01)
     expect(sb.maxX - sb.minX).toBeCloseTo(2 * S, 1)
     expect(sb.maxY - sb.minY).toBeCloseTo(S, 1)
+  })
+
+  test('difference — a crossing negative cuts a local notch instead of becoming a fragmented hole', () => {
+    const rect = (x0: number, y0: number, x1: number, y1: number) => ({ paths: [{ anchors: [
+      { p: { x: x0, y: y0 }, hIn: null, hOut: null, corner: true },
+      { p: { x: x1, y: y0 }, hIn: null, hOut: null, corner: true },
+      { p: { x: x1, y: y1 }, hIn: null, hOut: null, corner: true },
+      { p: { x: x0, y: y1 }, hIn: null, hOut: null, corner: true },
+    ] }] })
+    const result = subtractShape(rect(0, 0, 100, 100), rect(40, -10, 60, 40))
+
+    expect(result).not.toBeNull()
+    expect(shapeBBox(result!, 0.01)).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 100 })
+    expect(result!.paths).toHaveLength(1)
+    const points = result!.paths[0].anchors.map((anchor) => anchor.p)
+    expect(points).toEqual(expect.arrayContaining([
+      { x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 40 },
+      { x: 60, y: 40 }, { x: 60, y: 0 }, { x: 100, y: 0 },
+      { x: 100, y: 100 }, { x: 0, y: 100 },
+    ]))
+
+    const untouched = rect(0, 0, 100, 100)
+    expect(subtractShape(untouched, rect(120, 120, 140, 140))).toBe(untouched)
   })
 })

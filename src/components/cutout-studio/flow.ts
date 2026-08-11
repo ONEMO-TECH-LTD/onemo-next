@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Mask, Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
+import { subtractShape } from '@/lib/vector-core/clipper-kernel'
 import type { PreparedEffectBase } from '@/lib/effect/prepare-effect'
 import { grabCutRefine } from '@/lib/cutout-grabcut'
 import {
@@ -51,17 +52,18 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
 type PaintCalibrationSource = {
   artwork: number
   base: Mask | null
+  baseShape: VShape | null
   stroke: { x: number; y: number }[]
   brushPx: number
   erase: boolean
 }
+type ResolvedPaintMask = { mask: Mask; shape?: VShape }
 type OutlineSourceKind = 'cutout' | 'paint'
 
 const cloneMask = (mask: Mask): Mask => ({ data: mask.data.slice(), w: mask.w, h: mask.h, soft: mask.soft?.slice() })
 
 function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, h: number): Mask {
   const painted = swathMask(source.stroke, source.brushPx, w, h, cfg)
-  if (source.base && source.erase) return subtractMasks(source.base, polishMask(painted, cfg.polishStrength))
   const combined = source.base
     ? unionMasks(source.base, painted)
     : painted
@@ -327,7 +329,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const acceptMask = useCallback(async (
     mask: Mask,
     preseg?: MLResult,
-    opts?: { erase?: boolean; shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean; finishSettings?: TraceOutlineSettings },
+    opts?: { erase?: boolean; shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean; finishSettings?: TraceOutlineSettings; resolvedShape?: VShape },
   ) => {
     const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
     if (!isCurrent()) return false
@@ -361,11 +363,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       }
     }
     if (!isCurrent()) return false
-    activateOutlineSource(opts?.source ?? 'cutout')
+    if (!opts?.resolvedShape) activateOutlineSource(opts?.source ?? 'cutout')
     editPrepGen.current++
-    drawnRef.current = null
+    drawnRef.current = opts?.resolvedShape ? { shape: opts.resolvedShape, ring: shapeRing(opts.resolvedShape) } : null
     maskRef.current = mask
-    finishResolvedRef.current = !!opts?.finishSettings
+    finishResolvedRef.current = !!(opts?.finishSettings || opts?.resolvedShape)
     hasCutRef.current = true
     setHasCut(true)
     applyFinish(false, opts?.finishSettings)
@@ -417,15 +419,18 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     w: number,
     h: number,
     isCurrent: () => boolean,
-  ): Mask | null => {
-    if (!source.erase || !source.base) return paintMask(source, cfg, w, h)
+  ): ResolvedPaintMask | null => {
+    if (!source.erase || !source.base) return { mask: paintMask(source, cfg, w, h) }
     // The eraser is its own negative Paint shape: build and finish it with the same Paint + Vector
     // controls, then subtract that resolved geometry from the untouched accepted base.
     const negativeRaster = polishMask(swathMask(source.stroke, source.brushPx, w, h, cfg), cfg.polishStrength)
     if (!isCurrent()) return null
     const negative = finishMask(negativeRaster, vector)
     if (!negative) throw new Error('Paint eraser shape could not be resolved')
-    return subtractMasks(source.base, maskFromShape(negative.shape, w, h))
+    if (!source.baseShape) throw new Error('Paint eraser has no accepted main shape')
+    const shape = subtractShape(source.baseShape, negative.shape)
+    if (!shape) throw new Error('Paint eraser removed the whole shape')
+    return { mask: subtractMasks(source.base, maskFromShape(negative.shape, w, h)), shape }
   }, [])
 
   const recalculatePaint = useCallback(async (
@@ -436,21 +441,22 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   ): Promise<boolean> => {
     const img = imgCanvas.current
     if (!img || !isCurrent()) return false
-    const recalculated = await resolvePaintMask(source, cfg, vector, img.width, img.height, isCurrent)
-    if (!recalculated || !isCurrent()) return false
-    if (!maskArea(recalculated)) {
+    const resolved = await resolvePaintMask(source, cfg, vector, img.width, img.height, isCurrent)
+    if (!resolved || !isCurrent()) return false
+    if (!maskArea(resolved.mask)) {
       setStatus('⚠️ Paint calibration produced an empty shape — current shape kept')
       return false
     }
-    return acceptMask(recalculated, undefined, {
+    return acceptMask(resolved.mask, undefined, {
       erase: source.erase,
-      shapeTruth: true,
+      shapeTruth: !source.erase,
       source: 'paint',
       isCurrent,
       replaceHistory: true,
       // The negative already received the Vector recipe. Do not apply that recipe again to the
       // surviving main shape after subtraction.
       finishSettings: source.erase ? ZERO_SETTINGS : undefined,
+      resolvedShape: resolved.shape,
     })
   }, [acceptMask, resolvePaintMask])
 
@@ -699,18 +705,19 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     const base = maskRef.current && hasCutRef.current ? cloneMask(maskRef.current) : null
     if (erase && !base) { setStatus('✂️ nothing to erase yet — paint a shape first or Detect'); requestRender(); return }
     invalidatePaintCalibration()
-    const source: PaintCalibrationSource = { artwork: artworkGen.current, base, stroke: pts, brushPx, erase }
+    const source: PaintCalibrationSource = { artwork: artworkGen.current, base, baseShape: shapeRef.current, stroke: pts, brushPx, erase }
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too.
     setBusy(true)
     try {
-      const combined = await resolvePaintMask(source, paintCfgRef.current, settingsRef.current, img.width, img.height, isCurrent)
-      if (!combined || !isCurrent()) return
-      const ok = await acceptMask(combined, undefined, {
+      const resolved = await resolvePaintMask(source, paintCfgRef.current, settingsRef.current, img.width, img.height, isCurrent)
+      if (!resolved || !isCurrent()) return
+      const ok = await acceptMask(resolved.mask, undefined, {
         erase,
-        shapeTruth: true,
-        source: 'paint',
+        shapeTruth: !erase,
+        source: erase ? undefined : 'paint',
         isCurrent,
         finishSettings: erase ? ZERO_SETTINGS : undefined,
+        resolvedShape: resolved.shape,
       })
       if (ok && isCurrent()) {
         paintCalibrationRef.current = source

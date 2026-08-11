@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { grabCutBrushGeometry } from '@/lib/cutout-grabcut'
-import { autoTunePaintStroke, paintSmoothingRadius, polishMask } from '@/lib/mask-tools'
+import { finishMask, ZERO_SETTINGS } from '@/components/cutout-studio/finish'
+import { autoTunePaintStroke, paintSmoothingRadius, polishMask, subtractMasks } from '@/lib/mask-tools'
 import type { Mask } from '@/lib/mask-tools/types'
 
 function rectangle(w: number, h: number, x0: number, y0: number, x1: number, y1: number): Mask {
@@ -26,6 +27,27 @@ describe('Paint shape-relative smoothing', () => {
     expect(unchanged).not.toBe(mask)
     expect(unchanged.data).not.toBe(mask.data)
     expect(unchanged.data).toEqual(mask.data)
+  })
+})
+
+describe('Paint eraser coordinate parity', () => {
+  it('returns the resolved negative shape where the mask stroke was drawn, not vertically mirrored', () => {
+    const negative = rectangle(40, 40, 8, 4, 24, 10)
+    const finished = finishMask(negative, ZERO_SETTINGS)
+
+    expect(finished).not.toBeNull()
+    expect(finished!.bounds.minY).toBeLessThan(6)
+    expect(finished!.bounds.maxY).toBeLessThan(12)
+  })
+
+  it('changes no accepted-main mask pixel outside the negative shape', () => {
+    const base = rectangle(40, 40, 4, 4, 36, 36)
+    const negative = rectangle(40, 40, 16, 12, 24, 28)
+    const result = subtractMasks(base, negative)
+
+    for (let i = 0; i < base.data.length; i++) {
+      if (!negative.data[i]) expect(result.data[i]).toBe(base.data[i])
+    }
   })
 })
 

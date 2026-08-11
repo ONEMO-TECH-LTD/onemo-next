@@ -13,7 +13,7 @@ export interface PaintConfig {
   polishStrength: number  // 0..1; outline smoothing radius = completed-shape scale × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.35 }
+export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 0.5, polishStrength: 0.2, closeFrac: 0.35 }
 
 type StrokePoint = { x: number; y: number }
 
@@ -130,10 +130,12 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
 export function solidShapeMask(shape: VShape, w: number, h: number): Mask {
   const c = document.createElement('canvas'); c.width = w; c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })!
-  const ring = flattenShape(shape, 0.5)[0] ?? []
   ctx.beginPath()
-  ring.forEach((p: { x: number; y: number }, i: number) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-  ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill()
+  for (const ring of flattenShape(shape, 0.5)) {
+    ring.forEach((p: { x: number; y: number }, i: number) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+    ctx.closePath()
+  }
+  ctx.fillStyle = '#fff'; ctx.fill('nonzero')
   const px = ctx.getImageData(0, 0, w, h).data
   const data = new Uint8Array(w * h)
   const soft = new Uint8Array(w * h)

@@ -122,8 +122,11 @@ export function finishMask(mask: Mask, settings: TraceOutlineSettings): FinishRe
     simplifyAfterDetail: settings.detail !== 100,
   }, settings)
   if (!resolved) return null
-  const bb = shapeBBox(resolved, 1)
-  return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
+  // The shared outline resolver uses the engine's vertically-flipped vector space. This result is
+  // immediately rasterized against the Paint mask, so return it to mask/canvas coordinates first.
+  const maskShape = transformShape(resolved, (p) => ({ x: p.x, y: mask.h - p.y }))
+  const bb = shapeBBox(maskShape, 1)
+  return { d: shapeToSVGPathD(maskShape, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: maskShape }
 }
 
 
@@ -192,7 +195,7 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
  *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
  *  Offset knob's job, reflected truthfully). */
-const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 8 }
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 12 }
 export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 
 /** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:

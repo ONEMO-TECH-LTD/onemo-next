@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { chromium, webkit } from 'playwright'
+import sharp from 'sharp'
 
 const baseUrl = process.env.CUTOUT_V1_BASE_URL
 assert(baseUrl, 'CUTOUT_V1_BASE_URL must name the already-running current-code server')
@@ -83,8 +84,8 @@ const finishedExpected = {
   },
 }
 const originalRouteExpected = {
-  chromium: { width: 1587, height: 463, colorType: 6, sha256: '215dee3b2956cb6590850cdb7ed73e0f31d4fc3de1b7f1479f61094fab9ba120' },
-  webkit: { width: 1585, height: 507, colorType: 6, sha256: '018a58eaa03994d01c1d77b0fb7bb9aa46b950331d88fb0b4520f68e09191194' },
+  chromium: { width: 1583, height: 464, colorType: 6, sha256: 'd88c102a0c1a3a573afcc327658f8a70819191c645c44bd288d02a7453da091c' },
+  webkit: { width: 1584, height: 508, colorType: 6, sha256: '654e1bd3da54edd0b0cb67dd3266c9b1a5a8c8052f9c2621e2970e95c6793b0d' },
 }
 
 const pngInfo = (bytes) => ({
@@ -237,7 +238,7 @@ async function runBrowser(browserType) {
     assert.equal(opencvRequests.length, 1, `${browserName}: first real GrabCut must load exactly one provider`)
     assert(routeElapsedMs < 10_000, `${browserName}: real-route GrabCut left the current practical envelope`)
     const edgeFinish = routePage.getByRole('slider', { name: 'shared edge finish' })
-    assert.equal(await edgeFinish.inputValue(), '8', `${browserName}: shared edge finish default changed`)
+    assert.equal(await edgeFinish.inputValue(), '12', `${browserName}: shared edge finish must default to 12px`)
     await routePage.getByRole('button', { name: /Vector/ }).click()
     const vectorPreset = routePage.getByRole('combobox', { name: 'vector preset' })
     const vectorKnob = routePage.locator('input[type=number]').last()
@@ -247,6 +248,12 @@ async function runBrowser(browserType) {
       return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
         .map((value) => value.toString(16).padStart(2, '0')).join('')
     })
+    const canvasPixels = async () => {
+      const clip = await routePage.locator('canvas').first().boundingBox()
+      assert(clip, `${browserName}: visible canvas screenshot bounds unavailable`)
+      const { data, info } = await sharp(await routePage.screenshot({ clip })).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      return { width: info.width, height: info.height, data }
+    }
     assert.deepEqual(
       await vectorPreset.locator('option').allTextContents(),
       ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'],
@@ -285,8 +292,41 @@ async function runBrowser(browserType) {
     assert.equal(await routePage.getByRole('checkbox', { name: 'original resolution output' }).count(), 0, `${browserName}: lossy output switch must stay removed`)
     await routePage.getByText('2048×2048', { exact: false }).waitFor()
 
-    // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
+    // A Paint eraser on a GrabCut base must cut only where drawn and keep the accepted recipe.
+    // Cross the accepted outline: this catches the former fragmented-hole failure, not merely an
+    // easy interior puncture.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
+    await routePage.waitForTimeout(1_000)
+    const acceptedPreset = await vectorPreset.inputValue()
+    const beforeErase = await canvasPixels()
+    if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-before-paint-erase.png', fullPage: true })
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
+    await routePage.getByRole('button', { name: /Paint erase/ }).click()
+    await draw(routePage, [
+      { x: box.x + box.width * 0.48, y: box.y + box.height * 0.44 },
+      { x: box.x + box.width * 0.78, y: box.y + box.height * 0.70 },
+    ], 4)
+    await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    await routePage.waitForTimeout(500)
+    const afterErase = await canvasPixels()
+    if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-after-paint-erase.png', fullPage: true })
+    let changedInside = 0, changedOutside = 0, minChangedX = beforeErase.width, minChangedY = beforeErase.height, maxChangedX = -1, maxChangedY = -1
+    for (let y = 0; y < beforeErase.height; y++) for (let x = 0; x < beforeErase.width; x++) {
+      const i = (y * beforeErase.width + x) * 4
+      if (beforeErase.data[i] === afterErase.data[i] && beforeErase.data[i + 1] === afterErase.data[i + 1] && beforeErase.data[i + 2] === afterErase.data[i + 2] && beforeErase.data[i + 3] === afterErase.data[i + 3]) continue
+      const local = x >= beforeErase.width * 0.38 && x <= beforeErase.width * 0.86 && y >= beforeErase.height * 0.34 && y <= beforeErase.height * 0.78
+      minChangedX = Math.min(minChangedX, x); minChangedY = Math.min(minChangedY, y); maxChangedX = Math.max(maxChangedX, x); maxChangedY = Math.max(maxChangedY, y)
+      if (local) changedInside++; else changedOutside++
+    }
+    assert(changedInside > 0, `${browserName}: Paint eraser did not change pixels around its negative stroke`)
+    assert(changedOutside < 10_000, `${browserName}: Paint eraser caused global visible drift (${changedOutside} pixels; diff bounds ${minChangedX},${minChangedY}..${maxChangedX},${maxChangedY})`)
+    assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: Paint erase replaced the accepted Cutout recipe`)
+    await routePage.getByRole('button', { name: /Undo/ }).click()
+    await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
+    assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: Undo did not restore the accepted Cutout recipe`)
+
+    // Paint owns a freehand vector recipe; it must not inherit the sticker-cutout recipe.
     await routePage.getByRole('button', { name: /Vector/ }).click()
     await vectorPreset.selectOption('TECHNO')
     await status.filter({ hasText: /TECHNO vector preset/ }).waitFor()
@@ -329,6 +369,8 @@ async function runBrowser(browserType) {
       [['0', '300'], ['0', '100']],
       `${browserName}: Paint must expose only the two agreed calibration ranges`,
     )
+    assert.equal(await autotune.inputValue(), '50', `${browserName}: Paint autotune must default to 50%`)
+    assert.equal(await smoothing.inputValue(), '20', `${browserName}: Paint mask smoothing must default to 20%`)
     const paintBox = await routePage.locator('canvas').first().boundingBox()
     assert(paintBox, `${browserName}: Paint canvas must be visible`)
     await draw(routePage, [
@@ -358,14 +400,8 @@ async function runBrowser(browserType) {
     let paintedCanvas = await canvasData()
     paintedCanvas = await tunePaint(autotune, '300', paintedCanvas)
     paintedCanvas = await tunePaint(smoothing, '100', paintedCanvas)
-    await routePage.getByRole('button', { name: /Paint erase/ }).click()
-    await draw(routePage, [
-      { x: paintBox.x + paintBox.width * 0.48, y: paintBox.y + paintBox.height * 0.48 },
-      { x: paintBox.x + paintBox.width * 0.52, y: paintBox.y + paintBox.height * 0.52 },
-    ], 4)
-    await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
-    const erasedCanvas = await canvasData()
-    assert.notEqual(erasedCanvas, paintedCanvas, `${browserName}: finished negative Paint shape did not subtract from the accepted main shape`)
+    paintedCanvas = await tunePaint(autotune, '50', paintedCanvas)
+    await tunePaint(smoothing, '20', paintedCanvas)
     if (browserName === 'chromium') {
       await routePage.screenshot({ path: 'output/playwright/KAI-10285-negative-paint-eraser.png', fullPage: true })
     }
