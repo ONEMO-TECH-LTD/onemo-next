@@ -287,3 +287,15 @@ the aspect. Two builders now generate identical dimension sets from these two li
 
 C4 authority (pixel's hold, accepted): the MASK DT² is the sole decision authority; any
 vector-geometry distance is display evidence only and never participates in a lawfulness decision.
+
+## C18 · Execution evidence — the sealed method run as a 40-line scratch script (lead)
+Mask + exact integer DT² + C17 candidates, seven real traces (~/.claude/jobs/…/method-probe.mjs):
+- BUTTERFLY 2×2@48: 0/4, 0/4, 1/4, **4/4 at published 132** — Dan's case: all four discs on the
+  wings at the size the box-interior rule rejected until 212.
+- BOT: survivor masks SHOW the partials — 2/4 (pair) at 130, **3/4 (the L) at 146**; the pair 2×1
+  first holds at **108**, meta's corrected binding-axis number exactly.
+- DUCK 2×2@48: at most 1/4 at any candidate — the no-four-corners fact reproduced.
+- Whole corpus, 2×2 both pitches: **752ms unoptimised scratch** (mask rebuilt per layout;
+  production shares one mask per σ across all layouts → the ~tens-of-ms budget stands).
+Survivor bitmasks per candidate are exactly pixel's runtime form; this output is the format the
+mask-oracle sign-off compares against.
