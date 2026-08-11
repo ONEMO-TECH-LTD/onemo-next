@@ -4,12 +4,14 @@
 // ui separate bridge that wires in the logic unit to drive the engine - ui is for admin testing".
 //
 // SEPARATION (Dan's law, §1 of _WIP/grid-engine-v3/grid-laws.md):
-//   • it imports the SPEC — values — and will import the BRIDGE. Never the engine directly.
+//   • it imports the SPEC — values — and the BRIDGE. Never the engine directly.
 //   • it holds no geometry, no maths, no policy. Every write goes through the spec's guard.
 //   • the only state it owns is presentation: which rows are unlocked, and a test fixture.
 //
-// Built on the studio's own anatomy, measured from Figma "Prototypes / Control" (node 14209:26629)
-// at 402pt. Canvas is 402 x 402. The studio's visual design comes from Figma; this invents none.
+// The canvas is a responsive square inside the page's gutters — it takes its size from the window,
+// not from a fixed number. (It was described here as 402 x 402 after the Figma frame it was built
+// from, "Prototypes / Control" node 14209:26629 at 402pt; that measurement is the design's, never
+// the implementation's.) The studio's visual design comes from Figma; this invents none.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
