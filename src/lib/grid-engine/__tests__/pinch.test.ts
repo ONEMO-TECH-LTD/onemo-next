@@ -13,6 +13,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { pinchFactor } from '../ui/camera'
+import { bandSpan, minShapeSpan } from '../bridge'
+import { RELEASED } from '../spec'
 
 /** What the shell does with a stream of packets: accumulate exact, publish rounded. */
 const applyPackets = (startMM: number, packets: number[], floor: number, ceiling: number) => {
@@ -27,8 +29,19 @@ const applyPackets = (startMM: number, packets: number[], floor: number, ceiling
 
 const split = (total: number, count: number) => Array.from({ length: count }, () => total / count)
 
-const FLOOR = 20
-const CEILING = 408 // the 9x9 grid: (9-1) x 48 + 2 x 12
+/**
+ * THE BOUNDS COME FROM THE UNIT, through the same two functions the shell clamps with.
+ *
+ * They were `20` and `408`, typed in. Both were wrong the moment a law moved: the floor had already
+ * become 24 when the unit took ownership of one minimum shape size, and the ceiling is a derived
+ * quantity — change the padding, the pitch or the row count and 408 is simply a stale number that
+ * the test would keep asserting. A test that hardcodes what it is meant to protect cannot fail when
+ * the law it protects changes, which is the whole defect class this suite exists to catch.
+ *
+ * Mirrored exactly on `page.tsx`: `minShapeSpan(spec)` and `bandSpan(spec, positionsPerAxis)`.
+ */
+const FLOOR = Math.round(minShapeSpan(RELEASED))
+const CEILING = Math.round(bandSpan(RELEASED, RELEASED.grid.positionsPerAxis))
 
 describe('a pinch is the same gesture however it is packetized', () => {
   it('lands on one size for 1x10, 10x1 and 100x0.1', () => {
@@ -41,7 +54,7 @@ describe('a pinch is the same gesture however it is packetized', () => {
   })
 
   it('holds across packetizations in both directions and from several sizes', () => {
-    for (const from of [20, 72, 120, 168, 300, 408]) {
+    for (const from of [FLOOR, 72, 120, 168, 300, CEILING]) {
       for (const total of [-40, -10, -1, 1, 10, 40]) {
         const sizes = [1, 2, 5, 10, 100, 1000].map(
           (n) => applyPackets(from, split(total, n), FLOOR, CEILING).final,
@@ -62,7 +75,7 @@ describe('a pinch is the same gesture however it is packetized', () => {
 
 describe('bounds hold at the exact size, not just the shown one', () => {
   it('stops at the 9x9 ceiling however hard it is squeezed', () => {
-    const { exact, final } = applyPackets(408, split(500, 50), FLOOR, CEILING)
+    const { exact, final } = applyPackets(CEILING, split(500, 50), FLOOR, CEILING)
     expect(final).toBe(CEILING)
     // clamped EXACT, so one spread leaves the ceiling immediately instead of unwinding an overshoot
     expect(exact).toBe(CEILING)
@@ -74,6 +87,34 @@ describe('bounds hold at the exact size, not just the shown one', () => {
     expect(final).toBe(FLOOR)
     expect(exact).toBe(FLOOR)
     expect(applyPackets(exact, [10], FLOOR, CEILING).final).toBeGreaterThan(FLOOR)
+  })
+})
+
+describe('the bounds track the law rather than a literal', () => {
+  // The point of deriving them. Move a law value and both bounds move with it; a hardcoded 20/408
+  // would sail through every assertion above while the shell clamped somewhere else entirely.
+  const at = (grid: Partial<typeof RELEASED.grid>) => {
+    const spec = { ...RELEASED, grid: { ...RELEASED.grid, ...grid } }
+    return {
+      floor: Math.round(minShapeSpan(spec)),
+      ceiling: Math.round(bandSpan(spec, spec.grid.positionsPerAxis)),
+    }
+  }
+
+  it('is the released 9x9 lattice today', () => {
+    // Stated once, here, as the current answer — not spread through the file as magic numbers.
+    expect(at({})).toEqual({ floor: 24, ceiling: 408 })
+  })
+
+  it('follows the padding: the floor IS the magnet spot', () => {
+    expect(at({ paddingMM: 10 }).floor).toBe(20)
+    expect(at({ paddingMM: 15 }).floor).toBe(30)
+  })
+
+  it('follows the row count and the pitch', () => {
+    expect(at({ positionsPerAxis: 5 }).ceiling).toBe(4 * 48 + 24)
+    expect(at({ positionsPerAxis: 11 }).ceiling).toBe(10 * 48 + 24)
+    expect(at({ pitchMM: 96, basePitchMM: 96 }).ceiling).toBe(8 * 96 + 24)
   })
 })
 
