@@ -674,3 +674,13 @@ independence is noise; the three-lane diff is the method.
 Signed: @s62-lead · @s62-grid-pixel (330/330 family gate) · @s62-kai-meta (independent tables,
 residuals owned). Artifacts: evidence/canonical-traces.json · evidence/lead-exact-verdicts.json ·
 evidence/lead-families.json · pixel /tmp/s62-pixel-exact-verdicts{,-families}.json · fixtures named above.
+
+## SEAL ADDENDUM · the serialisation rule itself needed the gate
+The C37→seal hash agreement was achieved in NESTED GENERATION ORDER — which was pixel's CODE
+violating pixel's own WRITTEN spec (sort complete familyIds), while my first implementation had
+followed the spec and I "fixed" it to match their defect. Pixel found their own cause, corrected
+to the stated rule (raw code-unit sort of complete familyIds, newline-terminated, SHA-256), and
+regenerated (artifact sha256 221fd395…). Re-diff under the written rule: **330/330 keys, zero
+diffs, byte-identical hashes**. The seal stands — now on the rule as WRITTEN, not as first coded.
+Recorded because it is the seventh instance of tonight's law and the purest: even the agreement
+machinery disagrees with its own specification until two implementations diff it.
