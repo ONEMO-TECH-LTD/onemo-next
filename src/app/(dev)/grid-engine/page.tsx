@@ -552,7 +552,7 @@ export default function GridEnginePage() {
             }}
             aria-label="Saved shapes"
           >
-            <option value="">shapes…</option>
+            <option value="">shapes</option>
             {Object.keys(corpus).map((name) => (
               <option key={name} value={name}>
                 {name}
