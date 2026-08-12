@@ -509,3 +509,108 @@
   cursor: pointer;
   font-size: 0;
 }
+
+/* ── THE FIT BAR — the engine's answers as proper tabs, not a chip soup ─────── */
+
+.fitBar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fitTabs {
+  flex: 1 1 320px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.fitTab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fitTab:disabled {
+  cursor: default;
+  background: transparent;
+  border-style: dashed;
+}
+
+.fitTab[data-on='true'] {
+  border-color: #58c2ff;
+  background: rgba(88, 194, 255, 0.1);
+}
+
+.fitTabBand {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.fitTab[data-on='true'] .fitTabBand {
+  color: #0284c7;
+}
+
+.fitTabValue {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fitTab:disabled .fitTabValue {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.fitTab[data-on='true'] .fitTabValue {
+  color: #0284c7;
+}
+
+.fitOpts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fitTab {
+    border-color: #334155;
+    background: transparent;
+  }
+
+  .fitTab[data-on='true'] {
+    border-color: #58c2ff;
+    background: rgba(88, 194, 255, 0.14);
+  }
+
+  .fitTabValue {
+    color: #e2e8f0;
+  }
+
+  .fitTab:disabled .fitTabValue,
+  .fitTabBand {
+    color: #64748b;
+  }
+
+  .fitTab[data-on='true'] .fitTabBand,
+  .fitTab[data-on='true'] .fitTabValue {
+    color: #7dd3fc;
+  }
+}

@@ -179,6 +179,15 @@ export default function GridEnginePage() {
   // Presentation only. The shell reads the file and draws it; nothing is traced, measured or handed
   // to the unit. The engine is not involved and does not know a cut-out exists.
   const [cutout, setCutout] = useState<{ url: string; w: number; h: number } | null>(null)
+  /** The seven saved cut-out traces, served by the corpus route — pick without an upload. */
+  const [corpus, setCorpus] = useState<Record<string, Array<[number, number]>>>({})
+  const [corpusName, setCorpusName] = useState('')
+  useEffect(() => {
+    fetch('/api/magfit/corpus')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((data) => setCorpus(data as Record<string, Array<[number, number]>>))
+      .catch(() => setCorpus({}))
+  }, [])
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
@@ -220,7 +229,38 @@ export default function GridEnginePage() {
       setBox({ x: -w / 2, y: -h / 2, w, h })
     }
     img.src = url
+    setCorpusName('')
   })
+
+  /** A saved trace behaves exactly like a loaded cut-out: same registration, same solve. */
+  const loadCorpusShape = (name: string) => {
+    const trace = corpus[name]
+    if (!trace) return
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const [x, y] of trace) {
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+    const w = maxX - minX || 1
+    const h = maxY - minY || 1
+    const r = selectRegistration(spec, DEFAULT_MATCH_MAGNETS % 2 === 0 ? 'gap' : 'point')
+    setRefused(r.refused ?? null)
+    if (!r.refused) setSpec(r.spec)
+    setCorpusName(name)
+    setAsOutline(true)
+    setOutline(trace.map(([x, y]) => [(x - minX) / w, (y - minY) / h] as [number, number]))
+    setCutout((c) => {
+      if (c && c.url.startsWith('blob:')) URL.revokeObjectURL(c.url)
+      return { url: `corpus:${name}`, w, h }
+    })
+    const k = sizeMM / Math.max(w, h)
+    setBox({ x: (-w * k) / 2, y: (-h * k) / 2, w: w * k, h: h * k })
+  }
 
   // ── THE FIT COMPUTE ─────────────────────────────────────────────────────────
   //
@@ -319,13 +359,14 @@ export default function GridEnginePage() {
   // was hidden behind the ref-in-render error until that was fixed. The compiler memoises this.
   const clearCutout = () => {
     setCutout((c) => {
-      if (c) URL.revokeObjectURL(c.url)
+      if (c && c.url.startsWith('blob:')) URL.revokeObjectURL(c.url)
       return null
     })
     setBox(null)
     setOutline(null)
     setSolveResult(null)
     setActiveSolveBand(null)
+    setCorpusName('')
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -501,6 +542,25 @@ export default function GridEnginePage() {
           </span>
         )}
 
+        {/* The seven saved shapes, one pick away — the same traces the corpus run sealed. */}
+        {Object.keys(corpus).length > 0 && (
+          <select
+            className={styles.chip}
+            value={corpusName}
+            onChange={(e) => {
+              if (e.target.value) loadCorpusShape(e.target.value)
+            }}
+            aria-label="Saved shapes"
+          >
+            <option value="">shapes…</option>
+            {Object.keys(corpus).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+
         {cutout && (
           <button
             type="button"
@@ -524,61 +584,68 @@ export default function GridEnginePage() {
 
       </nav>
 
-      {/* THE ENGINE'S ANSWERS — one size per band, computed by the magfit core. Chips show the
-          engine's own numbers; picking one puts the shape at that size and lays the computed
-          magnets on the field. The selection-law toggle is the one ruled range kept testable. */}
+      {/* THE FIT BAR — the engine's answers as tabs. One card per band, the engine's own
+          numbers; picking one puts the shape at that size and lays the computed magnets on
+          the field. The strict filters and the selection law live to the right, visually
+          separate from the results they modify. */}
       {cutout && (
-        <nav className={styles.toolbox} aria-label="Computed fit">
-          <span className={styles.fixtureName} style={{ fontSize: 12, opacity: 0.7 }}>
-            Fit
-          </span>
-          {[2, 3, 4].map((n) => {
-            const b = solveResult?.bands?.find((x) => x.band === n)
-            const label = b?.fit ? `B${n} · ${b.sizeMm}mm · ${b.magnets?.length}⚈` : `B${n} —`
-            return (
-              <button
-                key={n}
-                type="button"
-                className={styles.chip}
-                data-on={activeSolveBand === n}
-                disabled={!b?.fit}
-                onClick={() => b && showSolvedBand(b)}
-                title={b?.reason}
-              >
-                {solveResult ? label : `B${n} …`}
-              </button>
-            )
-          })}
-          <span className={styles.spacer} />
-          <button
-            type="button"
-            className={styles.chip}
-            data-on={laws.bandSpan}
-            onClick={() => setLaws((l) => ({ ...l, bandSpan: !l.bandSpan }))}
-            title="Optional strict filter (not law): require a band-N layout to stretch across the band's own width. Off by default."
-          >
-            span filter
-          </button>
-          <button
-            type="button"
-            className={styles.chip}
-            data-on={laws.sparsePair}
-            onClick={() => setLaws((l) => ({ ...l, sparsePair: !l.sparsePair }))}
-            title="Optional strict filter (not law): require bands 3+ to couple to the 96mm garment as a connected pair. Off by default — engagement is always reported and preferred in ranking."
-          >
-            96 strict
-          </button>
-          <button
-            type="button"
-            className={styles.chip}
-            data-on={selection === 'LAYOUT_FIRST'}
-            onClick={() =>
-              setSelection((s) => (s === 'LAYOUT_FIRST' ? 'SIZE_FIRST' : 'LAYOUT_FIRST'))
-            }
-            title="LAYOUT FIRST: the strongest layout the material carries governs (a circle publishes 96/four-disc). SIZE FIRST: smallest passing size wins (the same circle reads 72/pair)."
-          >
-            {selection === 'LAYOUT_FIRST' ? 'layout first' : 'size first'}
-          </button>
+        <nav className={styles.fitBar} aria-label="Computed fit">
+          <div className={styles.fitTabs}>
+            {[2, 3, 4].map((n) => {
+              const b = solveResult?.bands?.find((x) => x.band === n)
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  className={styles.fitTab}
+                  data-on={activeSolveBand === n}
+                  disabled={!b?.fit}
+                  onClick={() => b && showSolvedBand(b)}
+                  title={b?.reason}
+                >
+                  <span className={styles.fitTabBand}>band {n}</span>
+                  <span className={styles.fitTabValue}>
+                    {!solveResult
+                      ? 'computing…'
+                      : b?.fit
+                        ? `${b.sizeMm} mm · ${b.magnets?.length} mag`
+                        : 'no fit'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div className={styles.fitOpts}>
+            <button
+              type="button"
+              className={styles.chip}
+              data-on={laws.bandSpan}
+              onClick={() => setLaws((l) => ({ ...l, bandSpan: !l.bandSpan }))}
+              title="Optional strict filter (not law): require a band-N layout to stretch across the band's own width. Off by default."
+            >
+              span filter
+            </button>
+            <button
+              type="button"
+              className={styles.chip}
+              data-on={laws.sparsePair}
+              onClick={() => setLaws((l) => ({ ...l, sparsePair: !l.sparsePair }))}
+              title="Optional strict filter (not law): require bands 3+ to couple to the 96mm garment as a connected pair. Off by default — engagement is always reported and preferred in ranking."
+            >
+              96 strict
+            </button>
+            <button
+              type="button"
+              className={styles.chip}
+              data-on={selection === 'LAYOUT_FIRST'}
+              onClick={() =>
+                setSelection((s) => (s === 'LAYOUT_FIRST' ? 'SIZE_FIRST' : 'LAYOUT_FIRST'))
+              }
+              title="LAYOUT FIRST: the strongest, most balanced layout the material carries governs. SIZE FIRST: smallest passing size wins."
+            >
+              {selection === 'LAYOUT_FIRST' ? 'layout first' : 'size first'}
+            </button>
+          </div>
           {solveResult && !solveResult.ok && (
             <span style={{ fontSize: 11, color: '#b91c1c' }}>{solveResult.error}</span>
           )}
@@ -691,7 +758,7 @@ export default function GridEnginePage() {
                drag surface, so without this it swallows the press and the lattice stops following the
                hand exactly where the shape is — the one place you are looking. */
             <g pointerEvents="none">
-              {asOutline && outline ? (
+              {(asOutline || !cutout.url.startsWith('blob:')) && outline ? (
                 <polygon
                   points={outline
                     .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
@@ -890,7 +957,12 @@ export default function GridEnginePage() {
                 <div>
                   96mm garment: phase ({activeBandOut.sparse.xResidue},
                   {activeBandOut.sparse.yResidue}) · {activeBandOut.sparse.activeNodes.length}{' '}
-                  engaging · {activeBandOut.sparse.connected ? 'coupled pair verified' : 'not coupled'}
+                  engaging ·{' '}
+                  {activeBandOut.sparse.activeNodes.length >= 2
+                    ? activeBandOut.sparse.connected
+                      ? 'coupled pair verified'
+                      : 'pair not coupled'
+                    : 'single contact'}
                 </div>
               )
             ) : (
