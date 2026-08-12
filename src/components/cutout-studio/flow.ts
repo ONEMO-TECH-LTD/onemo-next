@@ -62,9 +62,8 @@ const masksEqual = (a: Mask, b: Mask): boolean => a.w === b.w && a.h === b.h
 
 function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, h: number): Mask {
   const painted = swathMask(source.stroke, source.brushPx, w, h, cfg)
-  const combined = source.base
-    ? source.erase ? subtractMasks(source.base, painted) : unionMasks(source.base, painted)
-    : painted
+  if (source.base && source.erase) return subtractMasks(source.base, painted)
+  const combined = source.base ? unionMasks(source.base, painted) : painted
   return polishMask(combined, cfg.polishStrength)
 }
 
