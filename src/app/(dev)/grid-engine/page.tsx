@@ -526,7 +526,7 @@ export default function GridEnginePage() {
           </button>
         ) : (
           <span className={styles.chipFile}>
-            cut-out
+            upload
             <input
               id="cutout-file"
               ref={cutoutInput}
