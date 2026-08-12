@@ -729,33 +729,6 @@ bool component_spans_band(const std::vector<GridPoint>& nodes, int band) {
     return std::max(max_x - min_x, max_y - min_y) == required;
 }
 
-std::vector<std::vector<int>> connected_components(
-    const std::vector<bool>& supported,
-    const std::vector<std::vector<int>>& adjacency) {
-    const int n = static_cast<int>(supported.size());
-    std::vector<bool> seen(n, false);
-    std::vector<std::vector<int>> components;
-    for (int start = 0; start < n; ++start) {
-        if (!supported[start] || seen[start]) continue;
-        std::vector<int> component;
-        std::queue<int> q;
-        q.push(start);
-        seen[start] = true;
-        while (!q.empty()) {
-            const int cur = q.front();
-            q.pop();
-            component.push_back(cur);
-            for (int next : adjacency[cur]) {
-                if (supported[next] && !seen[next]) {
-                    seen[next] = true;
-                    q.push(next);
-                }
-            }
-        }
-        components.push_back(std::move(component));
-    }
-    return components;
-}
 
 
 // §B9 — approximate the fit. The square's precise wrap at the band anchor is the perfect
@@ -821,7 +794,10 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
             supported[i] = disc_supported(centres[i], scaled, policy);
             if (supported[i]) ++supported_count;
         }
-        if (supported_count < band.min_nodes) continue;
+        // Pure mathematics, no floors (Dan 2026-08-12): a single holding spot is a fact
+        // the engine reports. Product minimums are a later policy layer, never the
+        // kernel's business.
+        if (supported_count < 1) continue;
 
         std::vector<std::vector<int>> adjacency(n);
         for (int i = 0; i < n; ++i) {
@@ -836,16 +812,6 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
                 adjacency[j].push_back(i);
             }
         }
-
-        // The pair floor: the assembly stands only when some island carries the band
-        // minimum. Every supported point then belongs to the fit — including extra
-        // single-point islands beside a lawful pair (the duck's head).
-        std::size_t largest_island = 0;
-        for (const std::vector<int>& component :
-             connected_components(supported, adjacency)) {
-            largest_island = std::max(largest_island, component.size());
-        }
-        if (static_cast<int>(largest_island) < band.min_nodes) continue;
 
         std::vector<GridPoint> nodes;
         nodes.reserve(supported_count);
@@ -1331,6 +1297,56 @@ SolveResult solve(const PolygonInput& input,
                   const std::vector<BandSpec>& bands,
                   const EnginePolicy& policy) {
     return solve_canonical(canonicalize_and_validate(input, policy), bands, policy);
+}
+
+ProbeFacts probe_placement(const CanonicalPolygon& polygon, int size_mm,
+                           int offset_x_mm, int offset_y_mm,
+                           const EnginePolicy& policy) {
+    validate_policy(policy);
+    if (size_mm <= 0) fail("probe size must be positive");
+    const ScaledPolygon scaled = scale_polygon(polygon, size_mm);
+    const std::vector<GridPoint> grid_nodes =
+        field_nodes(polygon, size_mm, offset_x_mm, offset_y_mm, policy);
+    const i128 radius =
+        static_cast<i128>(policy.disc_radius_mm) * scaled.coordinate_denominator;
+
+    ProbeFacts out;
+    std::vector<bool> holds(grid_nodes.size(), false);
+    std::vector<P128> centres(grid_nodes.size());
+    for (std::size_t i = 0; i < grid_nodes.size(); ++i) {
+        const GridPoint& node = grid_nodes[i];
+        centres[i] = grid_to_internal(node, offset_x_mm, offset_y_mm, scaled, policy);
+        ProbeNode fact;
+        fact.x_mm = offset_x_mm + node.x24 * policy.dense_pitch_mm;
+        fact.y_mm = offset_y_mm + node.y24 * policy.dense_pitch_mm;
+        fact.inside = locate_point(centres[i], scaled) != PointLocation::Outside;
+        // Exact minimum boundary distance — the full scan, because the probe reports
+        // the clearance NUMBER, near-misses included.
+        std::optional<DistanceSquared> best;
+        const std::size_t n = scaled.vertices.size();
+        for (std::size_t e = 0; e < n; ++e) {
+            const DistanceSquared d = point_segment_distance2(
+                centres[i], scaled.vertices[e], scaled.vertices[(e + 1) % n]);
+            if (!best || compare_distance2(d, *best) < 0) best = d;
+        }
+        fact.clearance_mm = best ? distance_mm(*best, scaled.coordinate_denominator) : 0.0;
+        fact.holds = fact.inside && best && distance_ge_radius(*best, radius);
+        holds[i] = fact.holds;
+        out.nodes.push_back(fact);
+    }
+    for (std::size_t i = 0; i < grid_nodes.size(); ++i) {
+        if (!holds[i]) continue;
+        for (std::size_t j = i + 1; j < grid_nodes.size(); ++j) {
+            if (!holds[j] || !adjacent_48(grid_nodes[i], grid_nodes[j])) continue;
+            if (policy.require_24mm_links &&
+                !capsule_supported(centres[i], centres[j], scaled, policy)) {
+                continue;
+            }
+            out.links.push_back({out.nodes[i].x_mm, out.nodes[i].y_mm,
+                                 out.nodes[j].x_mm, out.nodes[j].y_mm});
+        }
+    }
+    return out;
 }
 
 }  // namespace magfit

@@ -186,6 +186,43 @@ int main() {
         // Off by default — Dan disavowed the band-span gate as law (addendum §B7).
         policy.require_band_span = number_field(request, "requireBandSpan").value_or(0.0L) != 0.0L;
 
+        // §B11 PROBE — pure facts at one size and placement, no selection at all:
+        // every lattice point inside the shape's box, its clearance, whether the spot
+        // holds (clearance >= 12, touching lawful), links among holders, near-miss
+        // deficits for the rest. This is how the engine PROVES itself against the eye.
+        const auto probe_size = number_field(request, "probeSizeMm");
+        if (probe_size) {
+            const int size_mm = static_cast<int>(*probe_size);
+            const int off_x = static_cast<int>(number_field(request, "offsetX").value_or(0.0L));
+            const int off_y = static_cast<int>(number_field(request, "offsetY").value_or(0.0L));
+            const auto polygon = magfit::canonicalize_and_validate(
+                magfit::PolygonInput{vertices}, policy);
+            const auto facts = magfit::probe_placement(polygon, size_mm, off_x, off_y, policy);
+            std::ostringstream os;
+            os << "{\"ok\":true,\"engine\":\"" << magfit::kEngineVersionTag
+               << "\",\"probe\":{\"sizeMm\":" << size_mm
+               << ",\"offsetX\":" << off_x << ",\"offsetY\":" << off_y
+               << ",\"nodes\":[";
+            for (std::size_t i = 0; i < facts.nodes.size(); ++i) {
+                const auto& node = facts.nodes[i];
+                if (i) os << ',';
+                os << "{\"xMm\":" << node.x_mm << ",\"yMm\":" << node.y_mm
+                   << ",\"inside\":" << (node.inside ? "true" : "false")
+                   << ",\"clearanceMm\":" << node.clearance_mm
+                   << ",\"holds\":" << (node.holds ? "true" : "false") << '}';
+            }
+            os << "],\"links\":[";
+            for (std::size_t i = 0; i < facts.links.size(); ++i) {
+                const auto& link = facts.links[i];
+                if (i) os << ',';
+                os << "{\"ax\":" << link.ax_mm << ",\"ay\":" << link.ay_mm
+                   << ",\"bx\":" << link.bx_mm << ",\"by\":" << link.by_mm << '}';
+            }
+            os << "]}}";
+            std::cout << os.str() << std::endl;
+            return EXIT_SUCCESS;
+        }
+
         std::vector<magfit::BandSpec> bands;
         for (int band : read_bands(request)) bands.push_back(magfit::default_band_spec(band, policy));
 

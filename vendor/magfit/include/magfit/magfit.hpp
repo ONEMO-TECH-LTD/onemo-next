@@ -197,6 +197,36 @@ struct SolveResult {
     std::vector<BandResult> bands;
 };
 
+inline constexpr const char* kEngineVersionTag = "magfit-core/0.2.0";
+
+// §B11 — the probe: pure facts at ONE size and placement, no selection, no floors.
+// Every lattice point inside the shape's box with its exact clearance; holds means the
+// full 24mm spot is backed (clearance ≥ 12, touching lawful); links are the verified
+// corridors among holders. The instrument the engine proves itself with.
+struct ProbeNode {
+    int x_mm{};
+    int y_mm{};
+    bool inside{};
+    double clearance_mm{};
+    bool holds{};
+};
+
+struct ProbeLink {
+    int ax_mm{};
+    int ay_mm{};
+    int bx_mm{};
+    int by_mm{};
+};
+
+struct ProbeFacts {
+    std::vector<ProbeNode> nodes;
+    std::vector<ProbeLink> links;
+};
+
+ProbeFacts probe_placement(const CanonicalPolygon& polygon, int size_mm,
+                           int offset_x_mm, int offset_y_mm,
+                           const EnginePolicy& policy = {});
+
 CanonicalPolygon canonicalize_and_validate(const PolygonInput& input,
                                            const EnginePolicy& policy = {});
 
