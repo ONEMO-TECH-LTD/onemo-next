@@ -118,3 +118,7 @@ Icon\r
 browsertime-results/
 
 bin/
+
+# engine build outputs — compiled from source by the normal build, never checked in
+vendor/magfit/wasm/
+vendor/magfit/bin/

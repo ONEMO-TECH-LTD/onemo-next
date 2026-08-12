@@ -6,8 +6,8 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-int main() {
-    std::ostringstream in; in << std::cin.rdbuf(); const std::string t = in.str();
+/** The whole measurement as a function: JSON request in, JSON measurement out. */
+std::string measure_to_json(const std::string& t) {
     try {
         double scale = 20000.0;
         if (auto k = t.find("\"scale\""); k != std::string::npos)
@@ -70,8 +70,18 @@ int main() {
             o << '}';
         }
         o << "]}";
-        std::cout << o.str() << std::endl;
+        return o.str();
     } catch (const std::exception& e) {
-        std::cout << "{\"ok\":false,\"error\":\"" << e.what() << "\"}" << std::endl;
+        std::ostringstream err;
+        err << "{\"ok\":false,\"error\":\"" << e.what() << "\"}";
+        return err.str();
     }
 }
+
+#ifndef MEASURE_CLI_NO_MAIN
+int main() {
+    std::ostringstream in;
+    in << std::cin.rdbuf();
+    std::cout << measure_to_json(in.str()) << std::endl;
+}
+#endif

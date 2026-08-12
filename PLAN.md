@@ -13,10 +13,15 @@ Nothing is ever removed from output. Bands measured: 1–4 (minimum measure is o
 **A — local, now.** Native engine through a dev-only door to the existing shell. Dan drives the seven
 real cut-outs, steps every size 24→204mm, flips policy switches, sees discs appear and disappear.
 **Exit gate: visual conformance in Chrome, then Dan's judgement as product founder.**
-**B — after A passes.** WebAssembly compiled by the normal Vercel build — no shortcuts: emscripten
-provisioned in the build step, the engine compiled from source on every deploy, the `.wasm` gitignored,
-a deploy that cannot compile fails. *Verify:* deploy log shows the compile; artifact hash matches a
-clean local build of the same commit; the seven cut-outs match the native CLI byte for byte.
+**B — BUILT (2026-08-12 evening), deploy-log verification pending an actual deploy.** WebAssembly
+compiled by the normal build — no shortcuts: `prebuild` runs `vendor/magfit/build-wasm.sh`, which
+provisions emscripten when the machine lacks it (`bootstrap-emsdk.sh`, pinned 4.0.15, cached under
+`.next/cache`) and compiles the engine from source; outputs gitignored; a build that cannot compile
+fails. The measurement door serves the wasm engine when built, the native binary otherwise — same
+JSON. *Verified locally:* `npm run build` compiles the engine then the app; the seven cut-outs are
+byte-identical native-vs-wasm at module level AND through the live door (7/7); the error path
+refuses (bow-tie → refusal JSON) instead of crashing. *Still owed at first deploy:* the Vercel
+deploy log showing the compile, and the artifact hash matching a clean local build.
 **C — after B.** Phone via the Vercel URL. *Verify:* p95 measured on the device.
 **D — after C.** Decide TypeScript migration, C++ kept permanently as the oracle. (Deferred with it:
 auto-selection — "after that complicate logic to make auto selection", Dan.)
