@@ -57,10 +57,10 @@ The former behaviour (first passing size regardless of layout) remains available
 testable ("why do I need to rule if I never tested — add all options and test", the same
 treatment the 12/24 flap switch gets). **Default: `LAYOUT_FIRST`.**
 
-Worked consequences (all verified by running the corrected engine):
-- circle/octagon → band 2: **96mm, 4 magnets** (was 72/pair); band 3: 132mm, 6 magnets
-  (the 3×3 square needs ~163mm which exceeds the band; the six-node 3×2 block is the
-  strongest in-band tier and first holds at 132)
+Worked consequences (all verified by running the corrected engine; numbers as amended by
+§B6's freed sizes — see §B9 for the final selection order):
+- circle/octagon → band 2: **94mm, 4 magnets** (was 72/pair); band 3: **164mm, full
+  nine-disc square** — which the 12mm ladder had wrongly pushed out of the band
 - 72×24 ribbon → band 2: 72mm pair (unchanged — nothing stronger than a pair ever fits)
 - L-shape → band 2: 72mm, 3 nodes, 2 links (its own natural tier at its first size)
 
@@ -130,9 +130,9 @@ re-validation note stands for future mobile work only.
 
 | Fixture | Required result |
 |---|---|
-| chamfered octagon (integer circle stand-in), band 2, LAYOUT_FIRST | 96mm, 4 magnets, 4 links |
+| chamfered octagon (integer circle stand-in), band 2, LAYOUT_FIRST | 94mm, 4 magnets, 4 links |
 | same octagon, band 2, SIZE_FIRST | 72mm, pair (policy switch works) |
-| same octagon, band 3 | 132mm, 6 magnets (3×2 tier), sparse pair on a phase |
+| same octagon, band 3 | 164mm, full 3×3 square, four corners engaging the 96 phase |
 | 72mm square flap | flap 0/side, within12 = within24 = **true** |
 | circle at forced 96 (band-2 four-disc) | flap ≈ 12/side… within12 true at exactly 12 (closed) |
 | 72×24 ribbon, band 2, sparse defaults | still 72mm pair (band 2 carries no sparse gate) |

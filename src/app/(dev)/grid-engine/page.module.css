@@ -66,6 +66,7 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  flex-wrap: wrap; /* seven shape chips join this row; overflow must wrap, never clip */
   gap: 8px;
 }
 

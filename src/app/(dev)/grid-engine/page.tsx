@@ -476,7 +476,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build 0963303f</span></span>
+          <span className={styles.title}>Grid engine</span>
           <span className={styles.readout}>
             {box ? `${Math.round(box.w)} × ${Math.round(box.h)}mm` : `${sizeMM}mm`}
           </span>
@@ -542,24 +542,20 @@ export default function GridEnginePage() {
           </span>
         )}
 
-        {/* The seven saved shapes, one pick away — the same traces the corpus run sealed. */}
-        {Object.keys(corpus).length > 0 && (
-          <select
+        {/* The seven saved shapes, one tap away — the same traces the corpus run sealed.
+            Chips, not a native select: the OS menu drags in its own checkmark and layout
+            that no stylesheet can reach. */}
+        {Object.keys(corpus).map((name) => (
+          <button
+            key={name}
+            type="button"
             className={styles.chip}
-            value={corpusName}
-            onChange={(e) => {
-              if (e.target.value) loadCorpusShape(e.target.value)
-            }}
-            aria-label="Saved shapes"
+            data-on={corpusName === name}
+            onClick={() => loadCorpusShape(name)}
           >
-            <option value="">shapes</option>
-            {Object.keys(corpus).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        )}
+            {name.toLowerCase()}
+          </button>
+        ))}
 
         {cutout && (
           <button
@@ -606,7 +602,7 @@ export default function GridEnginePage() {
                   <span className={styles.fitTabBand}>band {n}</span>
                   <span className={styles.fitTabValue}>
                     {!solveResult
-                      ? 'computing…'
+                      ? '—'
                       : b?.fit
                         ? `${b.sizeMm} mm · ${b.magnets?.length} mag`
                         : 'no fit'}
