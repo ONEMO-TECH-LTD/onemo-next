@@ -237,11 +237,10 @@ export default function GridEnginePage() {
    */
   const [selection, setSelection] = useState<SelectionMode>('LAYOUT_FIRST')
   /**
-   * The two chartered gates, liftable for comparison against manual placement: the
-   * band-span law (a band-N answer must stretch across the band) and the L14 sparse-pair
-   * law (bands 3+ must couple to the 96 garment as a pair). Defaults are the law.
+   * Two optional STRICT filters, both OFF by default — neither is Dan's law (§B7/§B8):
+   * the band-span filter and the strict 96-pair gate. On by choice, for comparison.
    */
-  const [laws, setLaws] = useState<SolveLaws>({ bandSpan: true, sparsePair: true })
+  const [laws, setLaws] = useState<SolveLaws>({ bandSpan: false, sparsePair: false })
   /** The outline in its own bbox frame, longest side 1 — what the engine was shown. */
   const solveOutline =
     outline && cutout
@@ -556,18 +555,18 @@ export default function GridEnginePage() {
             className={styles.chip}
             data-on={laws.bandSpan}
             onClick={() => setLaws((l) => ({ ...l, bandSpan: !l.bandSpan }))}
-            title="Band-span law: a band-N answer must stretch across the band — off, a larger cut may carry a smaller-band layout (e.g. BOT band 4 becomes 180mm/6)."
+            title="Optional strict filter (not law): require a band-N layout to stretch across the band's own width. Off by default."
           >
-            span law
+            span filter
           </button>
           <button
             type="button"
             className={styles.chip}
             data-on={laws.sparsePair}
             onClick={() => setLaws((l) => ({ ...l, sparsePair: !l.sparsePair }))}
-            title="L14 sparse-pair law: from band 3 up the layout must couple to the 96mm garment as a pair — off, dense-only answers publish (e.g. BOT band 3 becomes 156mm/3)."
+            title="Optional strict filter (not law): require bands 3+ to couple to the 96mm garment as a connected pair. Off by default — engagement is always reported and preferred in ranking."
           >
-            96 law
+            96 strict
           </button>
           <button
             type="button"

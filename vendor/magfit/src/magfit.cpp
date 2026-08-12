@@ -50,6 +50,12 @@ struct Candidate {
     std::optional<SparsePhaseResult> sparse_phase;
     int sparse_active_count{};
     i64 centre_bias{};
+    // Balance evidence for selection (§B9): exact numerators over the polygon's common
+    // denominator 2·max_span — comparable across sizes of the same solve. worst_flap is
+    // the largest side overhang; imbalance the larger of the two axis unevennesses
+    // (L14a's "flap evened out on all sides").
+    i64 worst_flap_num{};
+    i64 imbalance_num{};
 };
 
 [[noreturn]] void fail(const std::string& message) {
@@ -685,6 +691,13 @@ std::vector<std::pair<GridPoint, GridPoint>> links_for_component(
     return links;
 }
 
+// §B9 — approximate the fit. The square's precise wrap at the band anchor is the perfect
+// case; a free shape can never be perfect, so it scales within the band range to create
+// more placement options and the assembly is centred and balanced inside it. Order:
+// strongest support first (nodes, links, full square, 96 engagement), then Dan's draft
+// made law — most even (imbalance), fewest flap (worst side), snuggest (smallest size) —
+// then the deterministic tail. One total order used both within a size and across the
+// band's whole range.
 bool better_candidate(const Candidate& a, const Candidate& b) {
     if (a.nodes.size() != b.nodes.size()) return a.nodes.size() > b.nodes.size();
     if (a.links.size() != b.links.size()) return a.links.size() > b.links.size();
@@ -696,6 +709,9 @@ bool better_candidate(const Candidate& a, const Candidate& b) {
     if (a.sparse_active_count != b.sparse_active_count) {
         return a.sparse_active_count > b.sparse_active_count;
     }
+    if (a.imbalance_num != b.imbalance_num) return a.imbalance_num < b.imbalance_num;
+    if (a.worst_flap_num != b.worst_flap_num) return a.worst_flap_num < b.worst_flap_num;
+    if (a.size_mm != b.size_mm) return a.size_mm < b.size_mm;
     if (a.centre_bias != b.centre_bias) return a.centre_bias < b.centre_bias;
     const int area_a = a.runs_x * a.runs_y;
     const int area_b = b.runs_x * b.runs_y;
@@ -717,6 +733,19 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
     std::optional<Candidate> best;
 
     for (const TemplateGrid& grid : templates_for_band(band.band)) {
+        // Exact bbox pre-filter (GPT's bounding-geometry bound, integer form): a
+        // template whose padded envelope exceeds the shape's own dimensions at this
+        // size cannot hold — envelope_w ≤ s·span_w/max_span, cross-multiplied. A
+        // necessary condition only; the disc law still decides everything it admits.
+        const i128 env_w = static_cast<i128>(grid.runs_x - 1) * policy.dense_pitch_mm +
+                           2 * policy.disc_radius_mm;
+        const i128 env_h = static_cast<i128>(grid.runs_y - 1) * policy.dense_pitch_mm +
+                           2 * policy.disc_radius_mm;
+        const i128 width_num = static_cast<i128>(size_mm) * (polygon.max_x - polygon.min_x);
+        const i128 height_num = static_cast<i128>(size_mm) * (polygon.max_y - polygon.min_y);
+        if (env_w * polygon.max_span > width_num || env_h * polygon.max_span > height_num) {
+            continue;
+        }
         const int n = static_cast<int>(grid.nodes.size());
         std::vector<bool> supported(n, false);
         std::vector<P128> centres(n);
@@ -771,6 +800,37 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
             candidate.centre_bias = sum_x * sum_x + sum_y * sum_y;
             if (sparse_gate) {
                 candidate.sparse_phase = sparse.representative;
+            }
+            // Balance evidence (§B9): the four side flaps of this component's padded
+            // box, as exact numerators over 2·max_span — the same arithmetic the flap
+            // report uses, computed here so selection can centre and balance.
+            {
+                int min_x24 = candidate.nodes.front().x24;
+                int max_x24 = min_x24;
+                int min_y24 = candidate.nodes.front().y24;
+                int max_y24 = min_y24;
+                for (const GridPoint& node : candidate.nodes) {
+                    min_x24 = std::min(min_x24, node.x24);
+                    max_x24 = std::max(max_x24, node.x24);
+                    min_y24 = std::min(min_y24, node.y24);
+                    max_y24 = std::max(max_y24, node.y24);
+                }
+                const i128 den = static_cast<i128>(2) * polygon.max_span;
+                const i128 half_w = static_cast<i128>(size_mm) * (polygon.max_x - polygon.min_x);
+                const i128 half_h = static_cast<i128>(size_mm) * (polygon.max_y - polygon.min_y);
+                const i128 left = half_w + (static_cast<i128>(min_x24) * policy.half_pitch_mm -
+                                            policy.disc_radius_mm) * den;
+                const i128 right = half_w - (static_cast<i128>(max_x24) * policy.half_pitch_mm +
+                                             policy.disc_radius_mm) * den;
+                const i128 bottom = half_h + (static_cast<i128>(min_y24) * policy.half_pitch_mm -
+                                              policy.disc_radius_mm) * den;
+                const i128 top = half_h - (static_cast<i128>(max_y24) * policy.half_pitch_mm +
+                                           policy.disc_radius_mm) * den;
+                const i128 worst = std::max(std::max(left, right), std::max(bottom, top));
+                const i128 imb_x = left >= right ? left - right : right - left;
+                const i128 imb_y = bottom >= top ? bottom - top : top - bottom;
+                candidate.worst_flap_num = static_cast<i64>(worst);
+                candidate.imbalance_num = static_cast<i64>(std::max(imb_x, imb_y));
             }
             if (!best || better_candidate(candidate, *best)) best = std::move(candidate);
         }
@@ -995,14 +1055,15 @@ std::optional<Candidate> select_candidate(const CanonicalPolygon& polygon,
                                           const BandSpec& band,
                                           const EnginePolicy& policy) {
     if (policy.selection == Selection::LayoutFirst) {
+        // §B9: one total order across the band's whole range — strongest support, then
+        // most even, fewest flap, snuggest. The per-size winner feeds the same
+        // comparator, so the global winner is the band's best approximate fit.
         std::optional<Candidate> best;
         for (int size_mm : band.legal_sizes_mm) {
             std::optional<Candidate> at_size =
                 best_candidate_at_size(polygon, band, size_mm, policy);
             if (!at_size) continue;
-            // A later (larger) size only wins by carrying a strictly stronger tier —
-            // equal strength keeps the earlier, smaller size.
-            if (!best || at_size->nodes.size() > best->nodes.size()) {
+            if (!best || better_candidate(*at_size, *best)) {
                 best = std::move(at_size);
             }
         }

@@ -89,11 +89,14 @@ export function normaliseOutline(outline: OutlinePoint[]): OutlinePoint[] {
   return outline.map(([x, y]) => [(x - cx) / span, (y - cy) / span])
 }
 
-/** The two chartered gates the admin may lift to compare against manual placement. */
+/**
+ * Two optional STRICT filters, off by default (§B7/§B8 — neither is Dan's law): the
+ * band-span filter (a band-N layout must stretch across the band) and the strict 96
+ * gate (bands 3+ must couple to the sparse garment as a connected pair). By default the
+ * engine reports 96 engagement as evidence and prefers it in ranking, without gating.
+ */
 export interface SolveLaws {
-  /** Contract §6: a band-N layout must stretch across the band. */
   bandSpan: boolean
-  /** L14: from band 3 up the layout must couple to the 96mm garment as a pair. */
   sparsePair: boolean
 }
 
@@ -106,7 +109,7 @@ export interface SolveLaws {
 export async function solveMagfit(
   outline: OutlinePoint[],
   selection: SelectionMode,
-  laws: SolveLaws = { bandSpan: true, sparsePair: true },
+  laws: SolveLaws = { bandSpan: false, sparsePair: false },
 ): Promise<MagfitResult> {
   try {
     const response = await fetch('/api/magfit', {
@@ -117,10 +120,10 @@ export async function solveMagfit(
         bands: [2, 3, 4],
         scale: 20000,
         selection,
-        sparseMode: laws.sparsePair ? 'ANY' : 'DISABLED',
+        sparseMode: 'ANY',
         sparseMinBand: 3,
-        sparseMinActive: 2,
-        require96Connected: true,
+        sparseMinActive: laws.sparsePair ? 2 : 1,
+        require96Connected: laws.sparsePair,
         requireLinks: true,
         requireBandSpan: laws.bandSpan,
       }),

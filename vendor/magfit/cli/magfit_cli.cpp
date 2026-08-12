@@ -164,16 +164,18 @@ int main() {
         // selection is layout-first (full square calibration). All overridable per call.
         policy.sparse.min_band =
             static_cast<int>(number_field(request, "sparseMinBand").value_or(3.0L));
+        // Advisory by default (§B8): engagement is reported and preferred, not gated.
         policy.sparse.min_active_nodes =
-            static_cast<int>(number_field(request, "sparseMinActive").value_or(2.0L));
+            static_cast<int>(number_field(request, "sparseMinActive").value_or(1.0L));
         policy.sparse.require_96mm_connected =
-            number_field(request, "require96Connected").value_or(1.0L) != 0.0L;
+            number_field(request, "require96Connected").value_or(0.0L) != 0.0L;
         const std::string selection =
             string_field(request, "selection").value_or("LAYOUT_FIRST");
         policy.selection = selection == "SIZE_FIRST" ? magfit::Selection::SizeFirst
                                                      : magfit::Selection::LayoutFirst;
         policy.require_24mm_links = number_field(request, "requireLinks").value_or(1.0L) != 0.0L;
-        policy.require_band_span = number_field(request, "requireBandSpan").value_or(1.0L) != 0.0L;
+        // Off by default — Dan disavowed the band-span gate as law (addendum §B7).
+        policy.require_band_span = number_field(request, "requireBandSpan").value_or(0.0L) != 0.0L;
 
         std::vector<magfit::BandSpec> bands;
         for (int band : read_bands(request)) bands.push_back(magfit::default_band_spec(band, policy));

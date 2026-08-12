@@ -49,14 +49,17 @@ enum class Selection {
 
 struct SparsePolicy {
     PhaseMode mode{PhaseMode::Any};
-    // Addendum v1.1 §B2: the 96mm lattice engages from this band up (Dan 2026-08-12:
+    // Addendum §B2/§B8: the 96mm lattice engages from this band up (Dan 2026-08-12:
     // "band 2 = 48mm grid only. 96 participates from band 3 up"). Below it no sparse
-    // gate is applied.
+    // evaluation at all. From it up, participation is MEASURED AND PREFERRED, not a
+    // hard gate: the best phase's engagement is reported with every answer and ranks
+    // candidates (more engaging nodes win ties). The strict pair gate — two active
+    // nodes 96mm apart with a supported corridor — is an optional mode
+    // (min_active_nodes=2 + require_96mm_connected), never the default; a band answer
+    // is not refused for lacking 96 coupling.
     int min_band{3};
-    // L14: the minimum pair must hold on the sparse population too — two active nodes,
-    // 96mm apart, joined by a supported capsule.
-    int min_active_nodes{2};
-    bool require_96mm_connected{true};
+    int min_active_nodes{1};
+    bool require_96mm_connected{false};
     int fixed_x_residue_mod4{0};
     int fixed_y_residue_mod4{0};
 };
@@ -65,10 +68,19 @@ struct EnginePolicy {
     int dense_pitch_mm{48};
     int half_pitch_mm{24};
     int disc_radius_mm{12};
-    int size_step_mm{12};
+    // Addendum §B6 — Dan's ruling: the size is ANY; nothing restricts it to a grid
+    // ladder. Sizes publish as whole even millimetres, so the candidate step is 2mm.
+    // The shape normalises to its own touch-point and FALLS INTO the band whose range
+    // that size lands in. (The 12mm ladder was the admin instrument's discretisation,
+    // wrongly hardened into law by the reference package — the law book's own circle
+    // row, band 2 at 92mm, is the witness.)
+    int size_step_mm{2};
     int max_field_positions{9};
     int max_trace_span_units{65'536};
-    bool require_band_span{true};
+    // Addendum §B7 — Dan, 2026-08-12: the band-span requirement was the reference
+    // package's invention, "never said and never locked as law or limitation." Retired
+    // as a default; retained only as an optional diagnostic filter.
+    bool require_band_span{false};
     bool require_24mm_links{true};
     Selection selection{Selection::LayoutFirst};
     SparsePolicy sparse{};

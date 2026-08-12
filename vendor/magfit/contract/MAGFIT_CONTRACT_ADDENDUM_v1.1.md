@@ -145,6 +145,59 @@ and selection law change expected values.
 
 ---
 
+## B6. Sizes are free — Dan's ruling, 2026-08-12 ~14:5x (supersedes contract §3.2's 12mm ladder)
+
+> "no one restricts the sizes — it is nowhere limited ever — the size is any — the grid is
+> fixed — shapes by default will not fall into the specific size, they fall into grid band"
+
+The manufactured size is ANY whole even millimetre (publication law: whole even mm;
+nothing below 1mm exists). The 12mm candidate ladder was the admin instrument's
+discretisation which the reference package wrongly hardened into "legal sizes". A shape
+normalises to its own touch-point; the band is simply the range that size falls into
+(`[span(b), span(b+1))`). **The law book's own circle row — band 2 at 92mm, not 96 — is
+the confirming witness this addendum originally missed.** Candidate step is now 2mm;
+measured cost on the heaviest real trace: 119ms end-to-end.
+
+## B7. The band-span gate is retired — never Dan's law
+
+> "I never said it and never locked as law or limitation."
+
+Contract §6's "layout MUST span the band" was the reference package's invention. Retired
+as a default everywhere; kept only as an off-by-default diagnostic filter on the admin
+surface.
+
+## B8. 96mm participation is evidence, not a gate (refines §B2)
+
+Dan's word was 96 "participates" from band 3 up — participation is MEASURED AND
+PREFERRED, never a reason to refuse a band its answer. Default: the engine reports the
+best phase's engagement with every band-3+ result and ranks candidates by it; the strict
+pair gate (two active nodes, 96mm apart, connected corridor) is an explicit optional mode
+only. L14's dual-density clause was the 08-11 band-2-era success test; the 08-12 rulings
+govern. Consequence: every shape now receives one size per band wherever the geometry
+itself allows — the only no-fits left are genuine material impossibilities.
+
+## B9. Selection: approximate the fit — Dan's ruling, 2026-08-12 ~15:0x (supersedes §B1's tie-breaks)
+
+> "the logic must approximate the fit — perfect is square precise wrap of each band
+> 24/72/120… freeshapes cannot be that perfect by definition — we scale them to create
+> more placement options and center and balance it inside the shape"
+
+The square's precise wrap at the band anchor is the perfect case. A free shape scales
+within the band range to create more placement options, and the assembly is centred and
+balanced inside it. The selection order across each band's whole range (one total order,
+Dan's fewest-flap→most-even→snuggest draft made active under the tier principle):
+
+1. strongest support — node count, then verified links, then full square;
+2. 96 engagement (more engaging nodes preferred);
+3. most even — smallest axis imbalance (L14a's yardstick, exact rationals);
+4. fewest flap — smallest worst-side overhang;
+5. snuggest — smallest size;
+6. deterministic tail (centre bias, template, lexicographic).
+
+Verified: the square canon stays perfect (72/120/168, zero flap, zero imbalance); the
+octagon publishes 94/164/198 all perfectly balanced — the full 3×3 square now fits
+INSIDE band 3 at 164mm, which the 12mm ladder had pushed out of the band.
+
 ## E. Reconciliation with GPT's own review response ("corrected and defended", 14:13)
 
 GPT independently validated pixel's review and produced `MAGFIT_TEAM_REVIEW_VALIDATION.md`

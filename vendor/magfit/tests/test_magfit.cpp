@@ -44,9 +44,9 @@ PolygonInput square(i64_t min, i64_t max) {
 
 // Octagon with axis-aligned flats: 144 units across flats, corners chamfered back to
 // |x|+|y| <= 100. Integer coordinates, so the band-2 pair at 72mm sits at EXACT closed
-// tangency against the flats while the 2x2 square first holds at 96mm (needs
-// 100·s/144 ≥ 48+24√2 ≈ 64.97 → s ≥ 93.6) — the addendum's circle-calibration case in
-// deterministic integer form.
+// tangency against the flats while the 2x2 square first holds at 94mm (needs
+// 100·s/144 ≥ 48+24√2 ≈ 64.97 → s ≥ 93.6, first even size 94) — the circle-calibration
+// case in deterministic integer form, at the freed any-even-mm sizes of §B6.
 PolygonInput octagon() {
     return {{{-72, -28}, {-28, -72}, {28, -72}, {72, -28},
              {72, 28}, {28, 72}, {-28, 72}, {-72, 28}}};
@@ -113,12 +113,15 @@ void test_band2_l_three_nodes_two_links() {
 }
 
 void test_first_legal_size_not_continuous_rounding() {
+    // §B6: sizes are any whole even mm. The 23:72 aspect needs 24mm of height for the
+    // pair: 23·s/72 ≥ 24 → s ≥ 75.13 → first even size 76 (the 12mm ladder would have
+    // said 84 — the freed law finds the honest touch-point).
     PolygonInput rectangle{{{0, 0}, {72, 0}, {72, 23}, {0, 23}}};
     const BandResult band = only_band(
         magfit::solve(rectangle, {magfit::default_band_spec(2)}));
     require(band.fit, "23:72 rectangle should eventually fit band 2 pair");
-    require(band.manufactured_size_mm == 84,
-            "72 mm must fail and the first legal passing size must be 84 mm");
+    require(band.manufactured_size_mm == 76,
+            "72 must fail and the first even passing size must be 76 mm");
 }
 
 void test_band3_narrow_three_node_run() {
@@ -166,21 +169,26 @@ void test_band2_carries_no_sparse_gate() {
             "band 2 reports no sparse phase — 96 engages from band 3");
 }
 
-void test_band3_requires_a_sparse_pair() {
-    // L14: from band 3 up the layout must hold on the sparse population too — two active
-    // nodes 96 mm apart with a supported capsule. A FIXED phase that keeps no nodes
-    // rejects; the compatible phase passes.
+void test_band3_strict_sparse_mode() {
+    // §B8: 96 engagement is advisory by default — the STRICT pair gate (two active
+    // nodes, connected) is an explicit mode. Under it, a FIXED phase that keeps no
+    // nodes rejects; the compatible phase passes with a connected pair.
     PolygonInput rectangle{{{-60, -12}, {60, -12}, {60, 12}, {-60, 12}}};
     EnginePolicy wrong_phase;
     wrong_phase.sparse.mode = PhaseMode::Fixed;
+    wrong_phase.sparse.min_active_nodes = 2;
+    wrong_phase.sparse.require_96mm_connected = true;
     wrong_phase.sparse.fixed_x_residue_mod4 = 0;
     wrong_phase.sparse.fixed_y_residue_mod4 = 2;
     const BandResult rejected = only_band(magfit::solve(
         rectangle, {magfit::default_band_spec(3, wrong_phase)}, wrong_phase));
-    require(!rejected.fit, "a fixed phase keeping no active nodes must reject band 3");
+    require(!rejected.fit,
+            "strict mode: a fixed phase keeping no active nodes rejects band 3");
 
     EnginePolicy right_phase;
     right_phase.sparse.mode = PhaseMode::Fixed;
+    right_phase.sparse.min_active_nodes = 2;
+    right_phase.sparse.require_96mm_connected = true;
     right_phase.sparse.fixed_x_residue_mod4 = 2;
     right_phase.sparse.fixed_y_residue_mod4 = 0;
     const BandResult accepted = only_band(magfit::solve(
@@ -190,18 +198,19 @@ void test_band3_requires_a_sparse_pair() {
     require(accepted.sparse_phase.has_value() &&
                 accepted.sparse_phase->active_nodes.size() == 2 &&
                 accepted.sparse_phase->connected,
-            "band 3 must expose a connected 96 mm pair");
+            "strict band 3 exposes a connected 96 mm pair");
 }
 
 void test_layout_first_calibration_octagon() {
-    // The addendum's circle case in integer form: the pair fits at 72, but the full
-    // square is the band's calibration and first holds at 96 — LayoutFirst answers
-    // 96/four-disc, SizeFirst answers 72/pair.
+    // The circle case in integer form: the pair fits at 72, but the full square is the
+    // band's calibration and first holds at 94 (the law book's own circle row says 92
+    // for a true circle — same law, this chamfer). LayoutFirst answers the square,
+    // SizeFirst answers 72/pair.
     const BandResult calibrated = only_band(
         magfit::solve(octagon(), {magfit::default_band_spec(2)}));
     require(calibrated.fit, "octagon should fit band 2");
-    require(calibrated.manufactured_size_mm == 96,
-            "layout-first must pick the smallest size holding the full square");
+    require(calibrated.manufactured_size_mm == 94,
+            "layout-first must pick the smallest even size holding the full square");
     require(calibrated.magnets.size() == 4 && calibrated.verified_links.size() == 4,
             "layout-first band 2 answer is the complete 2x2 square");
 
@@ -210,22 +219,22 @@ void test_layout_first_calibration_octagon() {
     const BandResult snug = only_band(magfit::solve(
         octagon(), {magfit::default_band_spec(2, size_first)}, size_first));
     require(snug.fit && snug.manufactured_size_mm == 72 && snug.magnets.size() == 2,
-            "size-first must keep the base contract's 72 mm pair");
+            "size-first must keep the 72 mm pair");
 }
 
 void test_layout_first_band3_octagon_tier() {
-    // No size in band 3 holds the full 3x3 square for the octagon (needs ~163 mm). The
-    // strongest tier the material carries in-band is six nodes (a 3x2 block, first at
-    // 132 mm) — it outranks the five-node plus available at 120 mm, and its sparse phase
-    // keeps a connected 96 mm pair.
+    // §B6 frees the sizes, so the full 3x3 square (needs 100·s/144 ≥ 96+24√2·... →
+    // s ≥ 162.7) fits INSIDE band 3 at 164 mm — the 12mm ladder would have pushed it
+    // past the band to 168. Strongest tier anywhere in the range wins: 164/nine-disc,
+    // perfectly balanced, with four nodes engaging the 96 garment on its best phase.
     const BandResult band = only_band(
         magfit::solve(octagon(), {magfit::default_band_spec(3)}));
-    require(band.fit && band.manufactured_size_mm == 132,
-            "octagon band 3 should publish the strongest tier at 132 mm");
-    require(band.magnets.size() == 6, "octagon band 3 layout is the six-node 3x2 block");
+    require(band.fit && band.manufactured_size_mm == 164,
+            "octagon band 3 should hold the full 3x3 square at 164 mm");
+    require(band.magnets.size() == 9, "octagon band 3 layout is the full square");
     require(band.sparse_phase.has_value() &&
-                band.sparse_phase->active_nodes.size() == 2,
-            "the 3x2 block keeps a 96 mm sparse pair");
+                band.sparse_phase->active_nodes.size() == 4,
+            "the best 96 phase keeps the four corners");
 }
 
 void test_band4_square_regression() {
@@ -337,15 +346,33 @@ void test_flap_switches_use_exact_rationals() {
 
 
 void test_illegal_custom_band_size_rejected() {
-    magfit::BandSpec band = magfit::default_band_spec(2);
-    band.legal_sizes_mm = {74};
+    // §B6: the size is any whole EVEN millimetre inside the band range. 74 is legal;
+    // an odd size and an out-of-band size are not.
+    magfit::BandSpec even_size = magfit::default_band_spec(2);
+    even_size.legal_sizes_mm = {74};
+    const BandResult ok = only_band(magfit::solve(square(-36, 36), {even_size}));
+    require(ok.fit && ok.manufactured_size_mm == 74,
+            "any even size inside the band is manufacturable");
+
+    magfit::BandSpec odd_size = magfit::default_band_spec(2);
+    odd_size.legal_sizes_mm = {75};
     bool threw = false;
     try {
-        (void)magfit::solve(square(-36, 36), {band});
+        (void)magfit::solve(square(-36, 36), {odd_size});
     } catch (const std::invalid_argument&) {
         threw = true;
     }
-    require(threw, "custom sizes must remain inside the band and on the 12 mm step");
+    require(threw, "odd sizes are off the even-mm publication step");
+
+    magfit::BandSpec outside = magfit::default_band_spec(2);
+    outside.legal_sizes_mm = {130};
+    threw = false;
+    try {
+        (void)magfit::solve(square(-36, 36), {outside});
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    require(threw, "a size outside the band interval is not that band's size");
 }
 
 void test_duplicate_legal_sizes_rejected() {
@@ -436,7 +463,7 @@ int main() {
         test_band3_narrow_three_node_run();
         test_source_scale_and_vertex_order_invariance();
         test_band2_carries_no_sparse_gate();
-        test_band3_requires_a_sparse_pair();
+        test_band3_strict_sparse_mode();
         test_layout_first_calibration_octagon();
         test_layout_first_band3_octagon_tier();
         test_band4_square_regression();
