@@ -28,6 +28,9 @@ import {
   type WriteRefusal,
 } from '@/lib/grid-engine/spec'
 import { GridCanvas } from './GridCanvas'
+import { MeasurementOverlay } from './MeasurementOverlay'
+import { MeasurementPanel } from './MeasurementPanel'
+import { useMeasurement } from './useMeasurement'
 import {
   bandSpan,
   fieldBlockSpan,
@@ -101,6 +104,8 @@ const REFUSAL_TEXT: Record<WriteRefusal, string> = {
 
 export default function GridEnginePage() {
   const [spec, setSpec] = useState<GridSystemSpec>(RELEASED)
+  // THE INSTRUMENT. Everything it holds came back through the bridge; the shell computes none of it.
+  const measurement = useMeasurement()
   const [unlocked, setUnlocked] = useState<ReadonlySet<GridKey>>(new Set())
   const [refused, setRefused] = useState<WriteRefusal | null>(null)
   // NO ZOOM. Dan, 2026-08-11: "the cutout is scaling incorrectly the grid must scale instead and pan
@@ -524,8 +529,15 @@ export default function GridEnginePage() {
               />
             </g>
           )}
+          <MeasurementOverlay
+            outline={measurement.outline}
+            measured={measurement.current}
+            discRadiusMM={spec.grid.paddingMM}
+          />
         </GridCanvas>
       </div>
+
+      <MeasurementPanel measurement={measurement} />
 
       <section className={styles.bottom}>
         <details className={styles.law}>

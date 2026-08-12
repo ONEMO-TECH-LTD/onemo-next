@@ -114,3 +114,55 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
 export function fieldBlockSpan(spec: GridSystemSpec): number {
   return fieldSpanMM(spec)
 }
+
+// ---------------------------------------------------------------------------
+// MEASUREMENT — the shell asks HERE, never at the engine or the logic layer.
+// One composition: engine facts → policy annotations → one object the canvas
+// draws. The bridge adds no geometry of its own; every number below is the
+// engine's, and every mark is the logic layer's.
+// ---------------------------------------------------------------------------
+
+import { loadCorpus, measureOutline, type Measurement, type OutlinePoints } from './engine/measure'
+import {
+  ALL_OFF,
+  annotate,
+  POLICIES,
+  type AnnotatedSize,
+  type PolicyId,
+  type PolicySettings,
+  type PolicyState,
+} from './logic/policies'
+
+// Re-exported so the shell can render the catalogue and hold switch state while importing ONLY
+// the bridge — the separation guard forbids it reaching into logic/ itself.
+export type { AnnotatedSize, OutlinePoints, PolicyId, PolicySettings, PolicyState }
+export { ALL_OFF, loadCorpus, POLICIES }
+
+/**
+ * Bands the instrument measures. 1 is included because the minimum measure is one disc
+ * (Dan, 2026-08-12 — a triangle's top corner takes exactly one), 4 because Dan added it
+ * back the same day. Sizes therefore run 24mm to 204mm.
+ */
+export const REVIEW_BANDS: readonly number[] = Object.freeze([1, 2, 3, 4])
+
+export interface MeasuredCutout {
+  readonly ok: boolean
+  readonly error?: string
+  readonly vertexCount?: number
+  readonly sizes: readonly AnnotatedSize[]
+}
+
+/** Measure an outline across the review bands, with the current policy switches applied as marks. */
+export async function measureCutout(
+  outline: OutlinePoints,
+  settings: PolicySettings,
+  bands: readonly number[] = REVIEW_BANDS,
+): Promise<MeasuredCutout> {
+  const measured: Measurement = await measureOutline(outline, bands)
+  if (!measured.ok) return { ok: false, error: measured.error, sizes: [] }
+  return {
+    ok: true,
+    vertexCount: measured.vertexCount,
+    sizes: annotate(measured.sizes, settings),
+  }
+}
