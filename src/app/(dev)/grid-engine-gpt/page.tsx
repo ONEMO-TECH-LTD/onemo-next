@@ -297,14 +297,14 @@ function Stage({ outline, band }: { outline: Outline | null; band: BandOut | und
 
   return (
     <svg width={size} height={size} style={styles.stage}>
-      <rect x={0} y={0} width={size} height={size} fill="#0d0f12" />
+      <rect x={0} y={0} width={size} height={size} fill="#ffffff" />
       {gridLines.map((mm) => (
         <g key={mm}>
-          <line x1={toPx(mm)} y1={0} x2={toPx(mm)} y2={size} stroke="#1d2126" strokeWidth={1} />
-          <line x1={0} y1={toPx(mm)} x2={size} y2={toPx(mm)} stroke="#1d2126" strokeWidth={1} />
+          <line x1={toPx(mm)} y1={0} x2={toPx(mm)} y2={size} stroke="#e3e8ef" strokeWidth={1} />
+          <line x1={0} y1={toPx(mm)} x2={size} y2={toPx(mm)} stroke="#e3e8ef" strokeWidth={1} />
         </g>
       ))}
-      <path d={path} fill="rgba(120,160,255,0.16)" stroke="#7aa2ff" strokeWidth={1.5} />
+      <path d={path} fill="rgba(29,92,255,0.10)" stroke="#1d5cff" strokeWidth={1.5} />
 
       {band?.fit &&
         band.links?.map((link, index) => (
@@ -314,7 +314,7 @@ function Stage({ outline, band }: { outline: Outline | null; band: BandOut | und
             y1={toPx(link.ay)}
             x2={toPx(link.bx)}
             y2={toPx(link.by)}
-            stroke="rgba(96,220,150,0.35)"
+            stroke="rgba(16,160,110,0.22)"
             strokeWidth={lenPx(DISC_RADIUS_MM * 2)}
             strokeLinecap="round"
           />
@@ -332,11 +332,11 @@ function Stage({ outline, band }: { outline: Outline | null; band: BandOut | und
                 cx={toPx(magnet.xMm)}
                 cy={toPx(magnet.yMm)}
                 r={lenPx(DISC_RADIUS_MM)}
-                fill={limiting ? 'rgba(255,140,90,0.30)' : 'rgba(255,255,255,0.14)'}
-                stroke={limiting ? '#ff8c5a' : '#e6ebf2'}
+                fill={limiting ? 'rgba(234,88,12,0.18)' : 'rgba(18,22,28,0.06)'}
+                stroke={limiting ? '#ea580c' : '#3b4654'}
                 strokeWidth={1.5}
               />
-              <circle cx={toPx(magnet.xMm)} cy={toPx(magnet.yMm)} r={2.5} fill="#e6ebf2" />
+              <circle cx={toPx(magnet.xMm)} cy={toPx(magnet.yMm)} r={2.5} fill="#12161c" />
             </g>
           )
         })}
@@ -349,7 +349,7 @@ function Stage({ outline, band }: { outline: Outline | null; band: BandOut | und
             cy={toPx(node.yMm)}
             r={lenPx(DISC_RADIUS_MM) + 4}
             fill="none"
-            stroke="#ffd166"
+            stroke="#b45309"
             strokeWidth={1.5}
             strokeDasharray="4 4"
           />
@@ -437,14 +437,14 @@ function Readout({ band, vertexCount }: { band: BandOut; vertexCount?: number })
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
-    background: '#08090b',
-    color: '#e6ebf2',
+    background: '#ffffff',
+    color: '#12161c',
     padding: '24px 28px',
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
   },
   header: { display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' },
   title: { fontSize: 20, fontWeight: 600, margin: 0 },
-  subtitle: { fontSize: 13, color: '#8b95a3', margin: '4px 0 0' },
+  subtitle: { fontSize: 13, color: '#5f6b7a', margin: '4px 0 0' },
   controls: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
   policyRow: {
     display: 'flex',
@@ -453,13 +453,13 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     margin: '18px 0',
     padding: '12px 14px',
-    background: '#0d0f12',
+    background: '#f4f6f9',
     borderRadius: 10,
     fontSize: 13,
   },
-  label: { display: 'flex', alignItems: 'center', gap: 8, color: '#b6c0cc' },
-  select: { background: '#14181d', color: '#e6ebf2', border: '1px solid #232a32', borderRadius: 6, padding: '4px 8px' },
-  number: { width: 56, background: '#14181d', color: '#e6ebf2', border: '1px solid #232a32', borderRadius: 6, padding: '4px 8px' },
+  label: { display: 'flex', alignItems: 'center', gap: 8, color: '#3b4654' },
+  select: { background: '#ffffff', color: '#12161c', border: '1px solid #ccd4de', borderRadius: 6, padding: '4px 8px' },
+  number: { width: 56, background: '#ffffff', color: '#12161c', border: '1px solid #ccd4de', borderRadius: 6, padding: '4px 8px' },
   bandToggle: { display: 'flex', gap: 8, marginLeft: 'auto' },
   button: {
     background: '#1d5cff',
@@ -471,11 +471,11 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   chip: {
-    background: '#14181d',
-    color: '#b6c0cc',
+    background: '#ffffff',
+    color: '#3b4654',
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#232a32',
+    borderColor: '#ccd4de',
     borderRadius: 999,
     padding: '6px 12px',
     fontSize: 12,
@@ -483,11 +483,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chipActive: { background: '#1d5cff', color: '#fff', borderColor: '#1d5cff' },
   body: { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' },
-  stage: { borderRadius: 12, background: '#0d0f12', border: '1px solid #1b2027' },
+  stage: { borderRadius: 12, background: '#ffffff', border: '1px solid #dfe5ec' },
   panel: { flex: '1 1 320px', minWidth: 300, fontSize: 13, lineHeight: 1.6 },
   h2: { fontSize: 17, margin: '0 0 6px' },
-  h3: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: '#8b95a3', margin: '18px 0 6px' },
-  list: { margin: 0, paddingLeft: 18, color: '#b6c0cc' },
-  muted: { color: '#8b95a3', margin: '4px 0' },
-  error: { color: '#ff8c5a' },
+  h3: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: '#5f6b7a', margin: '18px 0 6px' },
+  list: { margin: 0, paddingLeft: 18, color: '#3b4654' },
+  muted: { color: '#5f6b7a', margin: '4px 0' },
+  error: { color: '#c2410c' },
 }
