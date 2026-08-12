@@ -13,7 +13,7 @@ export interface PaintConfig {
   polishStrength: number  // 0..1; outline smoothing radius = completed-shape scale × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 0.5, polishStrength: 0.2, closeFrac: 0.35 }
+export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.35 }
 
 type StrokePoint = { x: number; y: number }
 
@@ -122,95 +122,109 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   return { data, w: base.w, h: base.h }
 }
 
-/** Paint shapes are solid blobs. Empty pixels reachable from the canvas edge remain the exterior;
- * every other empty region is an enclosed hole and is filled. This is intentionally Paint-only:
- * AI and GrabCut masks stay verbatim. */
-export function fillEnclosedHoles(mask: Mask): Mask {
-  const { w, h } = mask
-  const reach = new Uint8Array(w * h)
-  const stack: number[] = []
-  for (let x = 0; x < w; x++) {
-    if (!mask.data[x]) stack.push(x)
-    const bottom = (h - 1) * w + x
-    if (!mask.data[bottom]) stack.push(bottom)
-  }
+function expandedDeltaBand(delta: Uint8Array, w: number, h: number, radius: number): Uint8Array {
+  const horizontal = new Uint8Array(delta.length)
+  const band = new Uint8Array(delta.length)
   for (let y = 0; y < h; y++) {
-    const left = y * w
-    if (!mask.data[left]) stack.push(left)
-    const right = left + w - 1
-    if (!mask.data[right]) stack.push(right)
-  }
-  while (stack.length) {
-    const index = stack.pop()!
-    if (reach[index] || mask.data[index]) continue
-    reach[index] = 1
-    const x = index % w
-    if (x > 0) stack.push(index - 1)
-    if (x < w - 1) stack.push(index + 1)
-    if (index >= w) stack.push(index - w)
-    if (index < w * (h - 1)) stack.push(index + w)
-  }
-  let data: Uint8Array | null = null
-  let soft: Uint8Array | undefined
-  for (let index = 0; index < mask.data.length; index++) {
-    if (mask.data[index] || reach[index]) continue
-    if (!data) {
-      data = mask.data.slice()
-      soft = mask.soft?.slice()
+    let count = 0
+    for (let x = -radius; x <= radius; x++) if (x >= 0 && x < w) count += delta[y * w + x]
+    for (let x = 0; x < w; x++) {
+      horizontal[y * w + x] = count ? 1 : 0
+      const remove = x - radius
+      const add = x + radius + 1
+      if (remove >= 0) count -= delta[y * w + remove]
+      if (add < w) count += delta[y * w + add]
     }
-    data[index] = 1
-    if (soft) soft[index] = 255
   }
-  if (!data) return mask
-  return { data, w, h, ...(soft ? { soft } : {}) }
+  for (let x = 0; x < w; x++) {
+    let count = 0
+    for (let y = -radius; y <= radius; y++) if (y >= 0 && y < h) count += horizontal[y * w + x]
+    for (let y = 0; y < h; y++) {
+      band[y * w + x] = count ? 1 : 0
+      const remove = y - radius
+      const add = y + radius + 1
+      if (remove >= 0) count -= horizontal[remove * w + x]
+      if (add < h) count += horizontal[add * w + x]
+    }
+  }
+  return band
 }
 
-/** Keep Paint's main receiving blob only when every detached residual fits inside the eraser's own
- * area. A larger split is destructive and returns null instead of guessing which shape to keep. */
-export function retainPrimaryMaskBlob(mask: Mask, maxDiscardArea: number): Mask | null {
+function exteriorBackground(mask: Mask): Uint8Array {
+  const exterior = new Uint8Array(mask.data.length)
+  const stack: number[] = []
+  for (let x = 0; x < mask.w; x++) stack.push(x, (mask.h - 1) * mask.w + x)
+  for (let y = 0; y < mask.h; y++) stack.push(y * mask.w, y * mask.w + mask.w - 1)
+  while (stack.length) {
+    const index = stack.pop()!
+    if (index < 0 || index >= mask.data.length || exterior[index] || mask.data[index]) continue
+    exterior[index] = 1
+    const x = index % mask.w
+    if (x > 0) stack.push(index - 1)
+    if (x < mask.w - 1) stack.push(index + 1)
+    if (index >= mask.w) stack.push(index - mask.w)
+    if (index < mask.w * (mask.h - 1)) stack.push(index + mask.w)
+  }
+  return exterior
+}
+
+function foregroundComponentCount(mask: Mask): number {
   const seen = new Uint8Array(mask.data.length)
-  const components: number[][] = []
+  const stack: number[] = []
+  let components = 0
   for (let seed = 0; seed < mask.data.length; seed++) {
     if (seen[seed] || !mask.data[seed]) continue
-    const component: number[] = []
-    const stack = [seed]
+    components++
+    stack.push(seed)
     while (stack.length) {
       const index = stack.pop()!
       if (seen[index] || !mask.data[index]) continue
       seen[index] = 1
-      component.push(index)
       const x = index % mask.w
       if (x > 0) stack.push(index - 1)
       if (x < mask.w - 1) stack.push(index + 1)
       if (index >= mask.w) stack.push(index - mask.w)
       if (index < mask.w * (mask.h - 1)) stack.push(index + mask.w)
     }
-    components.push(component)
   }
-  if (!components.length) return null
-  components.sort((a, b) => b.length - a.length)
-  const discardedArea = components.slice(1).reduce((sum, component) => sum + component.length, 0)
-  if (discardedArea > maxDiscardArea) return null
-  if (!discardedArea) return { data: mask.data.slice(), w: mask.w, h: mask.h, ...(mask.soft ? { soft: mask.soft.slice() } : {}) }
-  const data = new Uint8Array(mask.data.length)
-  const soft = mask.soft ? new Uint8Array(mask.soft.length) : undefined
-  for (const index of components[0]) {
-    data[index] = mask.data[index]
-    if (soft) soft[index] = mask.soft![index]
-  }
-  return { data, w: mask.w, h: mask.h, ...(soft ? { soft } : {}) }
+  return components
 }
 
-/** Preserve an accepted mask's exact pixels only inside the already-approved one-blob topology. */
-export function maskWithinTopology(mask: Mask, topology: Mask): Mask {
-  const data = new Uint8Array(mask.data.length)
-  const soft = mask.soft ? new Uint8Array(mask.soft.length) : undefined
-  for (let index = 0; index < data.length; index++) {
-    if (!topology.data[index]) continue
-    data[index] = mask.data[index]
-    if (soft) soft[index] = mask.soft![index]
+/** Paint erase is an open negative swath. Only its newly cut boundary receives Paint's existing
+ * mask smoothing; accepted mask bytes outside that filter-influence band remain exact. */
+export function erasePaintMask(base: Mask, negative: Mask, strength = PAINT_DEFAULTS.polishStrength): Mask | null {
+  if (base.w !== negative.w || base.h !== negative.h) return null
+  const raw = subtractMasks(base, negative)
+  const delta = new Uint8Array(base.data.length)
+  let removed = 0
+  for (let index = 0; index < delta.length; index++) {
+    if (base.data[index] && !raw.data[index]) { delta[index] = 1; removed++ }
   }
-  return { data, w: mask.w, h: mask.h, ...(soft ? { soft } : {}) }
+  if (!removed) return null
+  const beforeArea = maskArea(base), rawArea = maskArea(raw)
+  if (!rawArea || rawArea <= beforeArea * 0.1 || foregroundComponentCount(raw) !== foregroundComponentCount(base)) return null
+  const rawExterior = exteriorBackground(raw)
+  for (let index = 0; index < delta.length; index++) if (delta[index] && !rawExterior[index]) return null
+
+  const radius = paintSmoothingRadius(raw, strength)
+  const polished = radius ? polishMask(raw, strength) : raw
+  const band = expandedDeltaBand(delta, base.w, base.h, radius)
+  const data = base.data.slice()
+  const soft = base.soft?.slice()
+  for (let index = 0; index < data.length; index++) {
+    if (!band[index]) continue
+    data[index] = polished.data[index]
+    if (soft) soft[index] = data[index] ? 255 : 0
+  }
+  const result: Mask = { data, w: base.w, h: base.h, ...(soft ? { soft } : {}) }
+  const afterArea = maskArea(result)
+  if (!afterArea || afterArea <= beforeArea * 0.1 || afterArea >= beforeArea) return null
+  if (foregroundComponentCount(result) !== foregroundComponentCount(base)) return null
+  const exterior = exteriorBackground(result)
+  for (let index = 0; index < result.data.length; index++) {
+    if (base.data[index] && !result.data[index] && !exterior[index]) return null
+  }
+  return result
 }
 
 /** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize
@@ -243,7 +257,7 @@ export function shouldClosePaintStroke(stroke: { x: number; y: number }[], close
   if (closeFrac <= 0 || stroke.length < 2) return false
   const first = stroke[0], last = stroke[stroke.length - 1]
   let perimeter = 0
-  for (let i = 1; i < stroke.length; i++) perimeter += Math.hypot(stroke[i].x - stroke[i - 1].x, stroke[i].y - stroke[i - 1].y)
+  for (let index = 1; index < stroke.length; index++) perimeter += Math.hypot(stroke[index].x - stroke[index - 1].x, stroke[index].y - stroke[index - 1].y)
   return perimeter > 0 && Math.hypot(first.x - last.x, first.y - last.y) < perimeter * closeFrac
 }
 

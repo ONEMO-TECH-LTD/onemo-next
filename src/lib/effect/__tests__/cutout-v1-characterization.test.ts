@@ -49,7 +49,6 @@ const dependencies: Record<string, { layer: string; destination: string | null }
   '@/lib/cutout-studio/result': { layer: 'headless', destination: 'src/lib/cutout-studio/result.ts' },
   '@/lib/cutout-grabcut': { layer: 'browser-adapter', destination: 'src/lib/cutout-grabcut/index.ts' },
   '@/lib/effect/composite': { layer: 'browser-adapter', destination: 'src/lib/effect/composite.ts' },
-  '@/lib/effect/contour': { layer: 'headless', destination: 'src/lib/effect/contour.ts' },
   '@/lib/effect/cutout': { layer: 'browser-adapter', destination: 'src/lib/effect/cutout.ts' },
   '@/lib/effect/geometry-truth': { layer: 'headless', destination: 'src/lib/effect/geometry-truth.ts' },
   '@/lib/effect/mask': { layer: 'browser-adapter', destination: 'src/lib/effect/mask.ts' },
@@ -60,7 +59,6 @@ const dependencies: Record<string, { layer: string; destination: string | null }
   '@/lib/mask-tools': { layer: 'browser-adapter', destination: 'src/lib/mask-tools/index.ts' },
   '@/lib/mask-tools/types': { layer: 'headless', destination: 'src/lib/mask-tools/types.ts' },
   '@/lib/vector-core': { layer: 'headless', destination: 'src/lib/vector-core/index.ts' },
-  '@/lib/vector-core/paper-kernel': { layer: 'headless', destination: 'src/lib/vector-core/paper-kernel.ts' },
   '@/lib/vector-edit': { layer: 'headless', destination: 'src/lib/vector-edit/index.ts' },
   react: { layer: 'react-studio', destination: 'src/components/cutout-studio' },
   'thinking-orbs': { layer: 'studio-shell', destination: 'src/components/cutout-studio' },
@@ -260,7 +258,7 @@ describe('later increment defect reproductions', () => {
     expect(finish.match(/return prepareCut\(/g)).toHaveLength(2)
     expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('smoothMask(')
     expect(route('CutoutLabMount.tsx')).toContain('aria-label="shared edge finish"')
-    expect(owner('src/components/cutout-studio/finish.ts')).toContain('edgeFinishPx: 12')
+    expect(owner('src/components/cutout-studio/finish.ts')).toContain('edgeFinishPx: 8')
     expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('wasOutgrownRef')
   })
 })

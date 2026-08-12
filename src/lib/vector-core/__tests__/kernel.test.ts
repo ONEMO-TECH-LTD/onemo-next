@@ -323,5 +323,4 @@ describe('vector-core kernel', () => {
     expect(sb.maxX - sb.minX).toBeCloseTo(2 * S, 1)
     expect(sb.maxY - sb.minY).toBeCloseTo(S, 1)
   })
-
 })

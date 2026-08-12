@@ -30,7 +30,6 @@ const historyTick = async () => Number(await historyHeading.getAttribute('data-h
 const waitForHistory = async (tick) => page.waitForFunction(
   (value) => Number(document.querySelector('h1[data-hist]')?.getAttribute('data-hist')) === value,
   tick,
-  { timeout: 60_000 },
 )
 const upload = async (file = fixturePath) => {
   await page.locator('input[type=file]').first().setInputFiles(file)
@@ -80,11 +79,7 @@ try {
   assert.deepEqual(afterCorrupt, beforeCorrupt, 'corrupt replacement must retain exact output bytes')
 
   // Three rapidly accepted Paint gestures settle once each in capture order.
-  // Establish a broad base, then use a smaller brush at its boundary so the erase is legitimate.
-  await page.locator('input[type=number]').first().fill('40')
-  const broadBaseTick = await historyTick()
-  await tap(point(0.50, 0.52))
-  await waitForHistory(broadBaseTick + 1)
+  // Use a smaller brush than the standalone seed so the erase cannot legitimately empty it.
   await page.locator('input[type=number]').first().fill('5')
   await page.evaluate(() => {
     window.__cutoutStatuses = []
@@ -92,17 +87,17 @@ try {
     new MutationObserver(() => window.__cutoutStatuses.push(line?.textContent ?? '')).observe(line, { childList: true, subtree: true, characterData: true })
   })
   const burstTick = await historyTick()
-  await tap(point(0.54, 0.52))
+  await tap(point(0.48, 0.52))
   await page.getByRole('button', { name: /Paint erase/ }).click()
-  await tap(point(0.54, 0.52))
+  await tap(point(0.48, 0.52))
   await page.getByRole('button', { name: /Paint shape/ }).click()
-  await tap(point(0.54, 0.52))
+  await tap(point(0.56, 0.52))
   await waitForHistory(burstTick + 3)
   const terminals = await page.evaluate(() => window.__cutoutStatuses.filter((entry) => /added — auto-tuned|erased — auto-tuned/.test(entry)))
   assert.deepEqual(
-    terminals.slice(-2).map((entry) => entry.includes('erased') ? 'erase' : 'add'),
-    ['erase', 'add'],
-    'burst Paint terminal statuses must retain the captured erase→add order',
+    terminals.slice(-3).map((entry) => entry.includes('erased') ? 'erase' : 'add'),
+    ['add', 'erase', 'add'],
+    'burst Paint gestures must complete once each in capture order',
   )
 
   // Pointer cancellation routes through the existing commit path exactly once.
@@ -234,7 +229,7 @@ try {
     await page.mouse.down()
     for (const point of stroke.slice(1)) await page.mouse.move(point.x, point.y)
     await page.mouse.up()
-    await status.filter({ hasText: /painted shape created|accepted shape kept/ }).waitFor({ timeout: 60_000 })
+    await status.filter({ hasText: /painted shape created/ }).waitFor({ timeout: 60_000 })
     await page.getByRole('button', { name: /Nodes/ }).click()
     return page.locator('svg circle:not([fill="transparent"])').count()
   }

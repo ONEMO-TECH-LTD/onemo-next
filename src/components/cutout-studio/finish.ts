@@ -9,11 +9,9 @@ import { shapeBBox, shapeToSVGPathD, transformShape, type VShape } from '@/lib/v
 import {
   detailToFloorMm,
   resolveTraceOutline,
-  traceSourceFromRaw,
   TRACE_OUTLINE_DEFAULTS,
   type TraceOutlineSettings,
 } from '@/lib/effect/trace-outline-controls'
-import { traceContourRaw } from '@/lib/effect/contour'
 import { prepareEffect, EFFECT_BUILD_CONFIG } from '@/lib/effect/prepare-effect'
 import type { PreparedEffectBase } from '@/lib/effect/prepare-effect'
 import type { MLResult } from '@/lib/effect/segment-ml'
@@ -105,27 +103,7 @@ export function finishDrawn(
   return { d: shapeToSVGPathD(resolved, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: resolved }
 }
 
-/** Resolve the already-smoothed Paint eraser mask with the active shared Vector recipe. The
- * shape-splitting guard runs before this outer contour is used, so a near-loop can never publish. */
-export function finishMask(mask: Mask, settings: TraceOutlineSettings): FinishResult | null {
-  const raw = traceContourRaw(mask.data, mask.w, mask.h)
-  if (!raw) return null
-  const mmPerPx = MM_BASE / Math.max(mask.w, mask.h)
-  const vectorShape = traceSourceFromRaw(raw, mask.h, mmPerPx, 100, 0, 'sharp')
-  if (!vectorShape) return null
-  const resolved = resolveTraceOutline({
-    vectorShape,
-    rawTracePx: raw,
-    maskWidthPx: mask.w,
-    maskHeightPx: mask.h,
-    mmPerPx,
-    simplifyAfterDetail: settings.detail !== 100,
-  }, settings)
-  if (!resolved) return null
-  const maskShape = transformShape(resolved, (point) => ({ x: point.x, y: mask.h - point.y }))
-  const bb = shapeBBox(maskShape, 1)
-  return { d: shapeToSVGPathD(maskShape, 2), bounds: { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY }, shape: maskShape }
-}
+
 
 // ── ENGINE-NATIVE AI path (Dan's root-cause call, s62): STOP approximating the compositing —
 // build the engine's own preseg (MLResult) from the model's SOFT matte and run prepareShaped:
@@ -191,7 +169,7 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
  *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
  *  Offset knob's job, reflected truthfully). */
-const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 12 }
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 8 }
 export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 
 /** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:
