@@ -213,18 +213,19 @@ void test_layout_first_calibration_octagon() {
             "size-first must keep the base contract's 72 mm pair");
 }
 
-void test_layout_first_band3_octagon_plus() {
-    // No size in band 3 holds the full 3x3 square for the octagon (needs ~163 mm), so
-    // the fallback applies: smallest size with a valid layout — the five-node plus at
-    // 120 mm, whose sparse phase keeps a connected 96 mm pair.
+void test_layout_first_band3_octagon_tier() {
+    // No size in band 3 holds the full 3x3 square for the octagon (needs ~163 mm). The
+    // strongest tier the material carries in-band is six nodes (a 3x2 block, first at
+    // 132 mm) — it outranks the five-node plus available at 120 mm, and its sparse phase
+    // keeps a connected 96 mm pair.
     const BandResult band = only_band(
         magfit::solve(octagon(), {magfit::default_band_spec(3)}));
-    require(band.fit && band.manufactured_size_mm == 120,
-            "octagon band 3 should fall back to 120 mm");
-    require(band.magnets.size() == 5, "octagon band 3 layout is the five-node plus");
+    require(band.fit && band.manufactured_size_mm == 132,
+            "octagon band 3 should publish the strongest tier at 132 mm");
+    require(band.magnets.size() == 6, "octagon band 3 layout is the six-node 3x2 block");
     require(band.sparse_phase.has_value() &&
                 band.sparse_phase->active_nodes.size() == 2,
-            "the plus keeps a 96 mm sparse pair");
+            "the 3x2 block keeps a 96 mm sparse pair");
 }
 
 void test_band4_square_regression() {
@@ -395,7 +396,7 @@ int main() {
         test_band2_carries_no_sparse_gate();
         test_band3_requires_a_sparse_pair();
         test_layout_first_calibration_octagon();
-        test_layout_first_band3_octagon_plus();
+        test_layout_first_band3_octagon_tier();
         test_band4_square_regression();
         test_cross_trivial_limb_reported();
         test_collinear_backtracking_rejected();

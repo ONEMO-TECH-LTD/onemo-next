@@ -43,26 +43,26 @@ four-disc, ChatGPT round 6 §6, consistent with the law-book flap table row "cir
 accommodate narrow shapes less than 72mm**" — the pair is an accommodation for shapes that
 *cannot* carry the square, not a cheaper early exit for shapes that can.
 
-**Law:**
+**Law (layout-TIER-first, as sharpened by GPT's own v2 correction spec):**
 
-1. If the full b×b square layout (all b² discs supported, capsule-connected, sparse rule
-   satisfied) holds at any legal size of the band, the answer is the **smallest such size**
-   with the **full square**.
-2. Otherwise the answer is the **smallest legal size** at which any valid layout exists,
-   with the **best layout at that size** (existing deterministic candidate order: nodes,
-   links, square bonus, sparse count, centre bias, template, lexicographic).
-3. `NO_FIT` when neither exists.
+1. The **strongest layout tier the material carries anywhere in the band governs** —
+   tier strength is the supported node count: full b×b square > linked L / partial
+   blocks > pair. Within the winning tier, the **smallest legal size** wins; at that
+   size the existing deterministic candidate order decides ties.
+2. `NO_FIT` when no size carries at least a pair.
+3. A single magnet never satisfies a public band.
 
 The former behaviour (first passing size regardless of layout) remains available as
 `selection = SIZE_FIRST` — Dan's standing method is to keep both ends of a ruled range
 testable ("why do I need to rule if I never tested — add all options and test", the same
 treatment the 12/24 flap switch gets). **Default: `LAYOUT_FIRST`.**
 
-Worked consequences (both verified by running the corrected engine):
-- circle → band 2: **96mm, 4 magnets** (was 72/pair); band 3: 120mm, 5 magnets (plus-shape;
-  the 3×3 square needs 159.8mm which exceeds the band, so rule 2 applies)
-- 72×24 ribbon → band 2: 72mm pair (unchanged — no square ever fits a 1:3 aspect)
-- L-shape → band 2: 72mm, 3 nodes, 2 links (unchanged — best layout at first size)
+Worked consequences (all verified by running the corrected engine):
+- circle/octagon → band 2: **96mm, 4 magnets** (was 72/pair); band 3: 132mm, 6 magnets
+  (the 3×3 square needs ~163mm which exceeds the band; the six-node 3×2 block is the
+  strongest in-band tier and first holds at 132)
+- 72×24 ribbon → band 2: 72mm pair (unchanged — nothing stronger than a pair ever fits)
+- L-shape → band 2: 72mm, 3 nodes, 2 links (its own natural tier at its first size)
 
 ### B2. Sparse (96mm) law: engages at band 3, requires a pair (supersedes contract §10.1)
 
@@ -130,9 +130,9 @@ re-validation note stands for future mobile work only.
 
 | Fixture | Required result |
 |---|---|
-| 720-gon circle, band 2, LAYOUT_FIRST | 96mm, 4 magnets, 4 links |
-| 720-gon circle, band 2, SIZE_FIRST | 72mm, pair (policy switch works) |
-| 720-gon circle, band 3 | 120mm, 5 magnets (plus), sparse pair on a phase |
+| chamfered octagon (integer circle stand-in), band 2, LAYOUT_FIRST | 96mm, 4 magnets, 4 links |
+| same octagon, band 2, SIZE_FIRST | 72mm, pair (policy switch works) |
+| same octagon, band 3 | 132mm, 6 magnets (3×2 tier), sparse pair on a phase |
 | 72mm square flap | flap 0/side, within12 = within24 = **true** |
 | circle at forced 96 (band-2 four-disc) | flap ≈ 12/side… within12 true at exactly 12 (closed) |
 | 72×24 ribbon, band 2, sparse defaults | still 72mm pair (band 2 carries no sparse gate) |
@@ -144,6 +144,28 @@ Determinism corpus and all existing fixtures stand, updated only where the flap 
 and selection law change expected values.
 
 ---
+
+## E. Reconciliation with GPT's own review response ("corrected and defended", 14:13)
+
+GPT independently validated pixel's review and produced `MAGFIT_TEAM_REVIEW_VALIDATION.md`
+and `MAGFIT_V2_CORRECTION_SPEC.md`. Alignment with this addendum:
+
+- **Agrees, adopted here:** layout-tier-first selection (its circle proof matches §A3);
+  band-2 sparse `NOT_ENGAGED` and the vacuity proof (§A4); local flap tongue witnesses
+  anchored at outer magnets (§B3's broad-tongue construction is its `C(q,n,h)` capsule);
+  the straight capsule kept as explicit conservative v1 law under an honest name (§B4);
+  its U-shaped curved-corridor counterexample confirms why the naming matters.
+- **One dispute, overruled by evidence GPT did not have:** GPT marks "12/24 was settled
+  as a maximum" as *unproven from its record* — its record was only the brief. The law
+  book (`_WIP/grid-engine-v3/grid-laws.md`, Dan 08-11 verbatim: "no flap zone **greater
+  than** 12–24mm on any side", with a worked table where a 20mm circle flap FAILS the 12
+  switch and the zero-flap square passes) settles the direction. The within-limit
+  semantics stand; the fields stay factual (`within_12`, `broad_beyond_12`), never a bare
+  `pass`, which also satisfies GPT's neutral-naming concern.
+- **Noted for later, correctly rejected as blocking now:** its prepared C/Wasm API and
+  sweep-line validation requirements target phone embedding; this build's integration
+  uses the C++ solve-all-bands path (validates once) and the measured 94ms full-pipeline
+  cost at 8,105 vertices (§A7).
 
 ## D. Held for Dan (not blocking this build — defaults follow standing rulings)
 

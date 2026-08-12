@@ -37,6 +37,14 @@ import {
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
+import {
+  normaliseOutline,
+  solveMagfit,
+  type BandOut,
+  type FlapSideOut,
+  type MagfitResult,
+  type SelectionMode,
+} from '@/lib/grid-engine/magfit-client'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -153,6 +161,10 @@ export default function GridEnginePage() {
     setSizeMM(next)
     setSizeDraft(String(next))
     setBox((b) => (b ? resizeShape(spec, b, next) : b))
+    // A hand-driven size is no longer the engine's answer — the solved overlay drops so
+    // the canvas can never show discs for a size the shape does not have (law 5.3).
+    // Selecting a solved band re-sets it after this call in the same handler.
+    setActiveSolveBand(null)
   }
 
   const commitSize = () => {
@@ -165,7 +177,7 @@ export default function GridEnginePage() {
   //
   // Presentation only. The shell reads the file and draws it; nothing is traced, measured or handed
   // to the unit. The engine is not involved and does not know a cut-out exists.
-  const [cutout, setCutout] = useState<{ url: string } | null>(null)
+  const [cutout, setCutout] = useState<{ url: string; w: number; h: number } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
@@ -199,7 +211,7 @@ export default function GridEnginePage() {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
-      setCutout({ url })
+      setCutout({ url, w: img.naturalWidth, h: img.naturalHeight })
       // Fitted to the size already on screen, longest side, proportions untouched (law 2.1a).
       const k = sizeMM / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * k
@@ -208,6 +220,62 @@ export default function GridEnginePage() {
     }
     img.src = url
   })
+
+  // ── THE FIT COMPUTE ─────────────────────────────────────────────────────────
+  //
+  // The engine (magfit-core/0.2.0, vendor/magfit — the corrected core per
+  // MAGFIT_CONTRACT_ADDENDUM_v1.1) answers: one size per band, the magnet layout, the
+  // verified fabric links, the limiting contact and the lawful flap verdicts. The shell
+  // sends the traced outline and draws the answer — it computes no geometry (law §1).
+  const [solveResult, setSolveResult] = useState<MagfitResult | null>(null)
+  const [activeSolveBand, setActiveSolveBand] = useState<number | null>(null)
+  /**
+   * The one ruled range kept testable (Dan's method — add both options and test):
+   * LAYOUT_FIRST = the full square is the band's calibration (a circle publishes 96/4);
+   * SIZE_FIRST = the smallest passing size wins (the same circle reads 72/pair).
+   */
+  const [selection, setSelection] = useState<SelectionMode>('LAYOUT_FIRST')
+  /** The outline in its own bbox frame, longest side 1 — what the engine was shown. */
+  const solveOutline =
+    outline && cutout
+      ? normaliseOutline(outline.map(([u, v]) => [u * cutout.w, v * cutout.h]))
+      : null
+  const solveKey = solveOutline ? `${solveOutline.length}:${cutout?.url}:${selection}` : ''
+
+  useEffect(() => {
+    if (!solveOutline) {
+      setSolveResult(null)
+      setActiveSolveBand(null)
+      return
+    }
+    let stale = false
+    void solveMagfit(solveOutline, selection).then((result) => {
+      if (!stale) setSolveResult(result)
+    })
+    return () => {
+      stale = true
+    }
+    // solveKey covers outline identity + policy; the outline array is derived per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solveKey])
+
+  const activeBandOut: BandOut | undefined = solveResult?.bands?.find(
+    (b) => b.band === activeSolveBand && b.fit,
+  )
+
+  /** Show a solved band: the shape takes the engine's size and the lattice meets the layout. */
+  const showSolvedBand = (band: BandOut) => {
+    if (!band.fit || !band.sizeMm) return
+    setSize(band.sizeMm)
+    // The engine registers by run parity: an even run centres in a gap (magnets at odd
+    // multiples of 24), an odd run on a magnet. The lattice slides to meet the layout via
+    // PAN — placement, exactly what pan is for. Registration stays 'point'; the per-axis
+    // pan carries the parity.
+    const r = selectRegistration(spec, 'point')
+    if (!r.refused) setSpec(r.spec)
+    setPan([(band.templateRunsX ?? 1) % 2 === 0 ? 24 : 0, (band.templateRunsY ?? 1) % 2 === 0 ? 24 : 0])
+    setActiveSolveBand(band.band)
+  }
 
   /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
   /**
@@ -248,6 +316,8 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    setSolveResult(null)
+    setActiveSolveBand(null)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -446,6 +516,49 @@ export default function GridEnginePage() {
 
       </nav>
 
+      {/* THE ENGINE'S ANSWERS — one size per band, computed by the magfit core. Chips show the
+          engine's own numbers; picking one puts the shape at that size and lays the computed
+          magnets on the field. The selection-law toggle is the one ruled range kept testable. */}
+      {cutout && (
+        <nav className={styles.toolbox} aria-label="Computed fit">
+          <span className={styles.fixtureName} style={{ fontSize: 12, opacity: 0.7 }}>
+            Fit
+          </span>
+          {[2, 3, 4].map((n) => {
+            const b = solveResult?.bands?.find((x) => x.band === n)
+            const label = b?.fit ? `B${n} · ${b.sizeMm}mm · ${b.magnets?.length}⚈` : `B${n} —`
+            return (
+              <button
+                key={n}
+                type="button"
+                className={styles.chip}
+                data-on={activeSolveBand === n}
+                disabled={!b?.fit}
+                onClick={() => b && showSolvedBand(b)}
+                title={b?.reason}
+              >
+                {solveResult ? label : `B${n} …`}
+              </button>
+            )
+          })}
+          <span className={styles.spacer} />
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={selection === 'LAYOUT_FIRST'}
+            onClick={() =>
+              setSelection((s) => (s === 'LAYOUT_FIRST' ? 'SIZE_FIRST' : 'LAYOUT_FIRST'))
+            }
+            title="LAYOUT FIRST: the strongest layout the material carries governs (a circle publishes 96/four-disc). SIZE FIRST: smallest passing size wins (the same circle reads 72/pair)."
+          >
+            {selection === 'LAYOUT_FIRST' ? 'layout first' : 'size first'}
+          </button>
+          {solveResult && !solveResult.ok && (
+            <span style={{ fontSize: 11, color: '#b91c1c' }}>{solveResult.error}</span>
+          )}
+        </nav>
+      )}
+
       <div className={styles.canvas}>
         <GridCanvas
           spec={spec}
@@ -485,7 +598,68 @@ export default function GridEnginePage() {
               e.currentTarget.releasePointerCapture?.(e.pointerId)
             }}
           />
-          {cutout && box && (
+          {/* THE SOLVED FIT — every element below is the engine's own answer, drawn in the
+              millimetres it returned: the outline at the solved size, the verified fabric
+              corridors, every 24mm disc, the limiting magnet in orange, the 96mm-engaging
+              nodes ringed. Nothing here is recomputed (one source of truth). */}
+          {activeBandOut && solveOutline && activeBandOut.sizeMm && (
+            <g pointerEvents="none">
+              <polygon
+                points={solveOutline
+                  .map(([x, y]) => `${x * activeBandOut.sizeMm!},${y * activeBandOut.sizeMm!}`)
+                  .join(' ')}
+                fill="rgba(29,92,255,0.08)"
+                stroke="#1d5cff"
+                strokeWidth={1.5}
+                vectorEffect="non-scaling-stroke"
+              />
+              {activeBandOut.links?.map((link, i) => (
+                <line
+                  key={`solved-link-${i}`}
+                  x1={link.ax}
+                  y1={link.ay}
+                  x2={link.bx}
+                  y2={link.by}
+                  stroke="rgba(16,160,110,0.20)"
+                  strokeWidth={24}
+                  strokeLinecap="round"
+                />
+              ))}
+              {activeBandOut.magnets?.map((m) => {
+                const limiting =
+                  activeBandOut.binding?.nodeXMm === m.xMm &&
+                  activeBandOut.binding?.nodeYMm === m.yMm
+                return (
+                  <g key={`solved-${m.x24}:${m.y24}`}>
+                    <circle
+                      cx={m.xMm}
+                      cy={m.yMm}
+                      r={12}
+                      fill={limiting ? 'rgba(234,88,12,0.18)' : 'rgba(18,22,28,0.08)'}
+                      stroke={limiting ? '#ea580c' : '#3b4654'}
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    <circle cx={m.xMm} cy={m.yMm} r={1.2} fill="#12161c" />
+                  </g>
+                )
+              })}
+              {activeBandOut.sparse?.activeNodes.map((n) => (
+                <circle
+                  key={`solved-sparse-${n.x24}:${n.y24}`}
+                  cx={n.xMm}
+                  cy={n.yMm}
+                  r={16}
+                  fill="none"
+                  stroke="#b45309"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+          )}
+          {cutout && box && !activeBandOut && (
             /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
                dragging even over the shape the canvas must continue to react". It is drawn above the
                drag surface, so without this it swallows the press and the lattice stops following the
@@ -637,6 +811,67 @@ export default function GridEnginePage() {
           />
           <span className={styles.rowUnit}>mm</span>
         </div>
+
+        {/* THE SOLVED READOUT — the engine's witnesses in product terms: layout, the limiting
+            contact, and the lawful flap verdicts (L14: 12/24 are maxima; an excess with no
+            broad tongue is the reported trivial-limb exception, never auto-approved). */}
+        {activeBandOut && (
+          <div style={{ fontSize: 12, lineHeight: 1.7, color: '#334155' }}>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>
+              Band {activeBandOut.band}: {activeBandOut.sizeMm}mm ·{' '}
+              {activeBandOut.widthMm?.toFixed(1)}×{activeBandOut.heightMm?.toFixed(1)}mm ·{' '}
+              {activeBandOut.magnets?.length} magnets · {activeBandOut.links?.length} verified
+              links · {activeBandOut.templateRunsX}×{activeBandOut.templateRunsY} template
+            </div>
+            {activeBandOut.binding && (
+              <div>
+                Limiting contact:{' '}
+                {activeBandOut.binding.kind === 'MAGNET_DISC' ? 'magnet disc' : 'link corridor'} at
+                ({activeBandOut.binding.nodeXMm}, {activeBandOut.binding.nodeYMm})mm — clearance{' '}
+                {activeBandOut.binding.clearanceMm.toFixed(2)}mm, slack{' '}
+                {activeBandOut.binding.slackMm.toFixed(2)}mm
+              </div>
+            )}
+            {activeBandOut.flap && (
+              <div>
+                Flap (max 12/24):{' '}
+                {(
+                  [
+                    ['left', activeBandOut.flap.left],
+                    ['right', activeBandOut.flap.right],
+                    ['top', activeBandOut.flap.top],
+                    ['bottom', activeBandOut.flap.bottom],
+                  ] as Array<[string, FlapSideOut]>
+                ).map(([name, s]) => {
+                  const badge = s.within12
+                    ? '≤12'
+                    : s.within24
+                      ? s.trivialLimb12
+                        ? '≤24 · limb@12'
+                        : '≤24'
+                      : s.trivialLimb24
+                        ? 'limb exception'
+                        : 'EXCEEDS'
+                  return `${name} ${s.mm.toFixed(1)}mm (${badge})`
+                }).join(' · ')}
+                {' — imbalance H '}
+                {activeBandOut.flap.horizontalImbalanceMm.toFixed(1)}mm / V{' '}
+                {activeBandOut.flap.verticalImbalanceMm.toFixed(1)}mm
+              </div>
+            )}
+            {activeBandOut.band >= 3 ? (
+              activeBandOut.sparse && (
+                <div>
+                  96mm garment: phase ({activeBandOut.sparse.xResidue},
+                  {activeBandOut.sparse.yResidue}) · {activeBandOut.sparse.activeNodes.length}{' '}
+                  engaging · {activeBandOut.sparse.connected ? 'coupled pair verified' : 'not coupled'}
+                </div>
+              )
+            ) : (
+              <div>96mm garment: not engaged at band 2 — 96 participates from band 3 up.</div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   )

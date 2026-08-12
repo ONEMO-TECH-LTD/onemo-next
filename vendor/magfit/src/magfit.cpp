@@ -708,8 +708,7 @@ bool better_candidate(const Candidate& a, const Candidate& b) {
 std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
                                                 const BandSpec& band,
                                                 int size_mm,
-                                                const EnginePolicy& policy,
-                                                bool require_full_square) {
+                                                const EnginePolicy& policy) {
     // Addendum v1.1 §B2: the 96mm lattice only engages from sparse.min_band up. Below it
     // the sparse gate is not applied at all — band 2 is a 48mm-only product.
     const bool sparse_gate =
@@ -718,9 +717,6 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
     std::optional<Candidate> best;
 
     for (const TemplateGrid& grid : templates_for_band(band.band)) {
-        if (require_full_square && (grid.runs_x != band.band || grid.runs_y != band.band)) {
-            continue;
-        }
         const int n = static_cast<int>(grid.nodes.size());
         std::vector<bool> supported(n, false);
         std::vector<P128> centres(n);
@@ -745,10 +741,6 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
 
         for (const std::vector<int>& component : connected_components(supported, adjacency)) {
             if (static_cast<int>(component.size()) < band.min_nodes) continue;
-            if (require_full_square &&
-                static_cast<int>(component.size()) != band.band * band.band) {
-                continue;
-            }
             std::vector<GridPoint> nodes;
             nodes.reserve(component.size());
             i64 sum_x = 0;
@@ -991,24 +983,34 @@ FlapMetrics flap_metrics(const CanonicalPolygon& polygon,
     return out;
 }
 
-// Addendum v1.1 §B1 — LayoutFirst selection. The full b×b square is the band's
-// calibration layout (Dan's quadrant method; the circle publishes at 96, not 72). Pass 1
-// looks for the smallest legal size holding the complete square; only when no size in the
-// band can hold it does pass 2 take the smallest size with any valid layout. SizeFirst
-// preserves the base contract's single ascending scan for corpus comparison.
+// Addendum v1.1 §B1 (as sharpened by the MAGFIT v2 correction spec) — LayoutFirst is
+// layout-TIER-first: the strongest support the material can carry anywhere in the band
+// governs, and within that tier the smallest legal size wins. The full b×b square is the
+// top tier (Dan's quadrant calibration — a circle publishes 96/four-disc, not 72/pair);
+// a linked L outranks a pair; nothing below a pair is public. Tier strength is the
+// supported node count, which is exactly the better_candidate leading key, so the winner
+// at each size already carries that size's strongest tier. SizeFirst preserves the base
+// contract's single ascending scan for corpus comparison.
 std::optional<Candidate> select_candidate(const CanonicalPolygon& polygon,
                                           const BandSpec& band,
                                           const EnginePolicy& policy) {
     if (policy.selection == Selection::LayoutFirst) {
+        std::optional<Candidate> best;
         for (int size_mm : band.legal_sizes_mm) {
-            std::optional<Candidate> full =
-                best_candidate_at_size(polygon, band, size_mm, policy, true);
-            if (full) return full;
+            std::optional<Candidate> at_size =
+                best_candidate_at_size(polygon, band, size_mm, policy);
+            if (!at_size) continue;
+            // A later (larger) size only wins by carrying a strictly stronger tier —
+            // equal strength keeps the earlier, smaller size.
+            if (!best || at_size->nodes.size() > best->nodes.size()) {
+                best = std::move(at_size);
+            }
         }
+        return best;
     }
     for (int size_mm : band.legal_sizes_mm) {
         std::optional<Candidate> any =
-            best_candidate_at_size(polygon, band, size_mm, policy, false);
+            best_candidate_at_size(polygon, band, size_mm, policy);
         if (any) return any;
     }
     return std::nullopt;
@@ -1054,7 +1056,7 @@ BandResult solve_band(const CanonicalPolygon& polygon,
         result.reason = policy.selection == Selection::LayoutFirst
                             ? (full_square
                                    ? "smallest legal size holding the full square calibration layout"
-                                   : "no size holds the full square; smallest legal size with a valid layout")
+                                   : "strongest layout tier in the band, smallest size within it")
                             : "first legal size with a band-spanning, capsule-connected layout";
         return result;
     }
