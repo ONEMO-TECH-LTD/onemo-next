@@ -201,6 +201,18 @@ export function retainPrimaryMaskBlob(mask: Mask, maxDiscardArea: number): Mask 
   return { data, w: mask.w, h: mask.h, ...(soft ? { soft } : {}) }
 }
 
+/** Preserve an accepted mask's exact pixels only inside the already-approved one-blob topology. */
+export function maskWithinTopology(mask: Mask, topology: Mask): Mask {
+  const data = new Uint8Array(mask.data.length)
+  const soft = mask.soft ? new Uint8Array(mask.soft.length) : undefined
+  for (let index = 0; index < data.length; index++) {
+    if (!topology.data[index]) continue
+    data[index] = mask.data[index]
+    if (soft) soft[index] = mask.soft![index]
+  }
+  return { data, w: mask.w, h: mask.h, ...(soft ? { soft } : {}) }
+}
+
 /** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize
  *  the RESOLVED outline as the one truth — inside solid (data 1, soft 255), the outer edge band
  *  soft from the rasterizer's own anti-aliasing, outside dropped for real. After this, tint ≡

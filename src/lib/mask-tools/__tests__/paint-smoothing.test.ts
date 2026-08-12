@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { grabCutBrushGeometry } from '@/lib/cutout-grabcut'
-import { autoTunePaintStroke, fillEnclosedHoles, paintSmoothingRadius, polishMask, retainPrimaryMaskBlob, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
+import { autoTunePaintStroke, fillEnclosedHoles, maskWithinTopology, paintSmoothingRadius, polishMask, retainPrimaryMaskBlob, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
 import type { Mask } from '@/lib/mask-tools/types'
 
 function rectangle(w: number, h: number, x0: number, y0: number, x1: number, y1: number): Mask {
@@ -72,6 +72,22 @@ describe('Paint eraser solid-blob law', () => {
     expect(retainPrimaryMaskBlob(split, splittingRibbon.data.reduce((sum, value) => sum + value, 0))).toBeNull()
     expect(retainPrimaryMaskBlob(localCarve, 0)).not.toBeNull()
     expect(retainPrimaryMaskBlob(smallResidual, 12)?.data[6 * 12 + 10]).toBe(0)
+  })
+
+  it('stores and exports only accepted pixels inside the retained primary topology', () => {
+    const accepted = rectangle(12, 12, 1, 1, 11, 11)
+    accepted.soft = Uint8Array.from(accepted.data, (value) => value * 255)
+    const negative = rectangle(12, 12, 9, 0, 10, 12)
+    const carved = fillEnclosedHoles(subtractMasks(accepted, negative))
+    const topology = retainPrimaryMaskBlob(carved, 12)
+
+    expect(topology).not.toBeNull()
+    const stored = maskWithinTopology(accepted, topology!)
+    expect(stored.data[6 * 12 + 10]).toBe(0)
+    expect(stored.soft?.[6 * 12 + 10]).toBe(0)
+    expect(stored.data[6 * 12 + 4]).toBe(accepted.data[6 * 12 + 4])
+    expect(stored.soft?.[6 * 12 + 4]).toBe(accepted.soft[6 * 12 + 4])
+    expect(retainPrimaryMaskBlob(stored, 0)?.data).toEqual(stored.data)
   })
 })
 

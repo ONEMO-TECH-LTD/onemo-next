@@ -43,8 +43,8 @@
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 56970,
-        "sha256": "fd11308dcb937b01b3d72e2cfcc29eb60fb7bd673883922076bc96371e030414",
+        "bytes": 57000,
+        "sha256": "abdd17a704ea4986b20b4a880210ef56a3ef3c901fa075668d3ba4af9b85c124",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -197,8 +197,8 @@
       },
       {
         "file": "src/lib/mask-tools/index.ts",
-        "bytes": 12968,
-        "sha256": "b031d73470f11db8b23af343f2dd80e95f647095794936ca468a248403ce5a81",
+        "bytes": 13508,
+        "sha256": "3dbf97d2375b5b566679841e9888b82a4345f228af9614541d1ad3f0da1a3401",
         "destination": "src/lib/mask-tools/index.ts",
         "layer": "browser-adapter"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 350114,
-    "closureSha256": "dc61c2115b970f5c9b75e5a9ca4fdfd39109648b5b16e654724fb07139fa30bb"
+    "totalBytes": 350684,
+    "closureSha256": "f89cf266138a675e32a98cd76ddf63a2e9e59d2b6c7acd13bc0336e0ed486e72"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-20309dc540f07ea2.js",
-        "rawBytes": 65909,
-        "gzipBytesEstimate": 21855,
-        "brotliBytesEstimate": 19334
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-c697d7ac13d2265b.js",
+        "rawBytes": 66114,
+        "gzipBytesEstimate": 21918,
+        "brotliBytesEstimate": 19356
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1302533,
-    "gzipBytesEstimate": 365035,
-    "brotliBytesEstimate": 298211
+    "rawBytes": 1302738,
+    "gzipBytesEstimate": 365098,
+    "brotliBytesEstimate": 298233
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",

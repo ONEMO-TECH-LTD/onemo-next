@@ -18,7 +18,7 @@ import {
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
   type VectorPresetName,
 } from './finish'
-import { fillEnclosedHoles, maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, retainPrimaryMaskBlob, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
+import { fillEnclosedHoles, maskArea, maskFromShape, maskWithinTopology, PAINT_DEFAULTS, polishMask, retainPrimaryMaskBlob, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
@@ -80,7 +80,7 @@ function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, 
     if (!primaryCarved || masksEqual(primaryCarved, solidBase)) return cloneMask(source.base)
     // The solid proxy decides whether the gesture is lawful. The accepted mask remains the output
     // truth so every untouched pixel and soft edge survives byte-for-byte outside the cut ribbon.
-    return subtractMasks(source.base, negative)
+    return maskWithinTopology(source.base, primaryCarved)
   }
   const combined = source.base ? unionMasks(source.base, painted) : painted
   return fillEnclosedHoles(polishMask(combined, cfg.polishStrength))
