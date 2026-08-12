@@ -1,0 +1,10 @@
+band ranges
+legal size sequence
+ordered layout tiers
+public/internal layout status
+density applicability by band
+phase selection
+link mode
+flap threshold interpretation
+one-result selection
+fulfilment specification

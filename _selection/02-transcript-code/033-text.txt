@@ -1,0 +1,2 @@
+nominalPass = clearance >= 12
+releasePass = clearance >= 12.8

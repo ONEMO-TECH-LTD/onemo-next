@@ -1,0 +1,8 @@
+top
+top-right protrusion
+right
+bottom-right
+bottom
+left-bottom
+left
+top-left

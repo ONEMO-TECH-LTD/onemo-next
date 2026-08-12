@@ -1,0 +1,13 @@
+for size in legalSizes ascending:
+    scale polygon to that exact manufactured size
+
+    determine which permitted layout masks fit
+
+    if preferred layout fits:
+        return it
+
+    if fallback layout fits:
+        remember it
+
+after evaluating band:
+    return according to layout-ranking policy

@@ -1,0 +1,8 @@
+for layoutTier in strongestToWeakest:
+    for size in legalSizesAscending:
+        evaluate all layouts belonging to this tier
+
+        if one or more pass:
+            return deterministic best at this size
+
+return NO_FIT

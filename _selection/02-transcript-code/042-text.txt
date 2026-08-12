@@ -1,0 +1,20 @@
+magfit/
+    constants.ts
+    types.ts
+    polygon.ts
+    exact.ts
+    layouts.ts
+    scale.ts
+    magnet-support.ts
+    solve-band.ts
+    flap.ts
+    engine.ts
+
+    __tests__/
+        fixtures/
+        polygon.test.ts
+        support.test.ts
+        band2.test.ts
+        band3.test.ts
+        determinism.test.ts
+        regression.test.ts

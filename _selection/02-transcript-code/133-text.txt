@@ -1,0 +1,8 @@
+canonical polygon
+exact rational scaling
+disc containment
+direct-capsule evidence
+optional erosion-component evidence
+local flap tongues
+limiting contacts
+prepared caches

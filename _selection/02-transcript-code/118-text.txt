@@ -1,0 +1,4 @@
+Tier 0  FULL_2X2
+Tier 1  LINKED_L3         when product-approved
+Tier 2  ADJACENT_PAIR
+Tier 3  SINGLE            internal only; never public band 2

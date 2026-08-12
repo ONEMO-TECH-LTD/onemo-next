@@ -1,0 +1,8 @@
+finite sizes
+finite templates
+exact discs
+exact links
+fixed registration
+explicit sparse phase
+one total ranking order
+one result per band

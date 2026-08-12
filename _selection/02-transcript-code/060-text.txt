@@ -1,0 +1,11 @@
+bbox / aspect
+→ eliminate impossible layouts
+
+extreme nodes
+→ describe overall shape
+
+concavity / neck nodes
+→ explain risky regions
+
+exact polygon
+→ final fit and flap authority

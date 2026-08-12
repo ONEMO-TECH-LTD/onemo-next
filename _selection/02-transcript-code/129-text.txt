@@ -1,0 +1,4 @@
+native C++ preparation architecture: present
+stable C / Wasm preparation architecture: missing
+support-query caching: missing
+large-polygon validation optimisation: missing

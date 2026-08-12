@@ -1,0 +1,4 @@
+left extent:                   36 mm
+left extent reaches 24:        true
+left local tongue at 24:       false
+narrow-limb exception at 24:   true

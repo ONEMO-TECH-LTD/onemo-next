@@ -1,0 +1,2 @@
+from the padded magnet boundary,
+how far does usable material continue outward?

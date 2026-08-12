@@ -1,0 +1,2 @@
+requiredClearance =
+12 + manufacturingTolerance

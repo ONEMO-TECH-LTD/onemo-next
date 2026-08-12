@@ -1,0 +1,23 @@
+Genetic algorithm
+NFP / no-fit polygons
+SVGnest
+libnest2d
+Shapely running server-side
+GEOS WASM
+CGAL
+general constraint solver
+linear programming
+MILP
+recursive subset discovery
+pixel masks
+raster dilation/erosion
+continuous binary search
+Monte Carlo sampling
+iterative random translations
+machine learning
+generic plugin architecture
+"strategy pattern" for five algorithms
+event bus
+database
+worker queue
+microservice

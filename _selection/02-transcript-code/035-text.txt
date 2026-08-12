@@ -1,0 +1,7 @@
+PNG
+JPEG
+SVG document
+image
+mask
+Bezier path
+AI trace

@@ -1,0 +1,6 @@
+Band 2
+Size: 84 mm
+Layout: horizontal pair
+Limiting magnet: left
+Limiting contour edge: 173
+Clearance: 12.38 mm

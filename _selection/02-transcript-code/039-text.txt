@@ -1,0 +1,4 @@
+frontend estimates magnet coordinates
+backend recalculates
+SVG generator rounds again
+production script guesses phase

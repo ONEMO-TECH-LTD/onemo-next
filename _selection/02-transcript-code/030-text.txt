@@ -1,0 +1,2 @@
+same artwork polygon bytes
+→ same integer polygon

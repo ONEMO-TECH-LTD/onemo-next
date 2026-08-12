@@ -1,0 +1,9 @@
+pinned GCC image
+pinned Clang image
+Release tests
+ASan/UBSan tests
+WebAssembly build
+source commit SHA
+manifest SHA
+published logs
+target-device performance runs

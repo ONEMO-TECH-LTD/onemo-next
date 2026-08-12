@@ -1,0 +1,11 @@
+image
+ ↓
+segmentation / tracing
+ ↓
+canonical polygon
+ ↓
+MAGFIT
+ ↓
+size + magnets
+ ↓
+production renderer

@@ -1,0 +1,4 @@
+search full layout across the entire band first
+then linked three-node layout
+then pair
+within the winning tier choose the smallest size

@@ -1,0 +1,11 @@
+hidden band 1:
+24 ≤ size < 72
+single magnet
+
+public band 2:
+72 ≤ size < 120
+pair minimum / 2×2 preferred
+
+band 3:
+120 ≤ size < 168
+band-3 layouts

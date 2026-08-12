@@ -1,0 +1,4 @@
+MAGFIT computes magnet geometry.
+Renderer draws it.
+Manufacturing consumes it.
+Neither recomputes it.

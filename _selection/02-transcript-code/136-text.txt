@@ -1,0 +1,14 @@
+full_layout_beats_earlier_pair
+circle calibration or exact circle oracle
+band2_sparse_not_engaged
+band3_fixed_phase_sparse_pair
+thin_antenna_local_flap_exception
+cove_local_flap_exception
+butterfly_wings_not_reduced_to_waist
+curved_corridor_direct_vs_component
+band4_full_4x4_at_168
+prepared_equals_one_shot
+multi_band_validates_once
+8100_vertex performance gate
+flap threshold policy is not hard-coded
+layout-tier identity included in output

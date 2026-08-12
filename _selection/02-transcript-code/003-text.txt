@@ -1,0 +1,1 @@
+publicBand2Pass = FULL_2X2 || PAIR_H || PAIR_V

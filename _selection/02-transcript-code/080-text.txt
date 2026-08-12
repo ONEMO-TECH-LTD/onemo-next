@@ -1,0 +1,6 @@
+Selected size: 96 mm
+Scale from base band span: +33.333333%
+Limiting quadrant: lower-right
+Limiting magnet clearance: 13.41 mm
+Previous legal size: 84 mm
+Previous failure: lower-right disc short by 1.26 mm

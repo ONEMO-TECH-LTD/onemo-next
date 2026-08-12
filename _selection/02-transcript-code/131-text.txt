@@ -1,0 +1,5 @@
+scaled exact polygon
+disc result and witness per lattice node
+direct-link result and witness per adjacent edge
+local-flap tongue result per side/node/threshold
+sparse phase evidence

@@ -1,0 +1,13 @@
+raw extent in millimetres
+extent reaches 12
+extent reaches 24
+
+local 24 mm-wide tongue exists for 12 mm
+local 24 mm-wide tongue exists for 24 mm
+
+whether any outer magnet passes
+whether every outer magnet passes
+
+continuous side-strip evidence, when required
+narrow-limb exception
+limiting contour contact

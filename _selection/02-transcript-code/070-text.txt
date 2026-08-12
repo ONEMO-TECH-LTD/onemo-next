@@ -1,0 +1,7 @@
+         ●──●            ← valid top pair
+
+            |
+            +
+         shape centre
+
+         ●──●            ← valid bottom pair

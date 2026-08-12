@@ -1,0 +1,5 @@
+magnet centre
+nearest boundary point
+nearest edge
+clearance
+local outward direction

@@ -1,0 +1,3 @@
+scaled shape bbox
+minus
+padded selected-magnet bbox

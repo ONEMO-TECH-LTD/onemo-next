@@ -1,0 +1,2 @@
+PAIR_H rejected:
+right magnet overlaps concavity C2.

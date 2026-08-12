@@ -1,0 +1,22 @@
+72×72 square
+72×24 rectangle
+71×24 rectangle
+72×23 rectangle
+120×120 square
+circle tangent to magnets
+L shape
+triangle
+butterfly
+hourglass
+C shape
+U shape
+very thin limb
+near-tangent +0.001
+near-tangent -0.001
+duplicate vertices
+collinear vertices
+clockwise polygon
+counter-clockwise polygon
+translated input polygon
+huge source-coordinate polygon
+tiny source-coordinate polygon

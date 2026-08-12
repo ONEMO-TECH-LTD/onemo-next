@@ -1,0 +1,8 @@
+band
+size
+layout
+magnet coordinates
+binding magnet
+binding edge
+clearance class
+flap

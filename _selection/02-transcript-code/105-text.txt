@@ -1,0 +1,12 @@
+for legal size ascending:
+    evaluate every parent template
+    test all magnet discs
+    test all possible 48 mm links
+    form verified connected components
+    reject components below minimum
+    reject components that do not span the band
+    reject components that fail sparse policy
+
+    if any candidates remain:
+        select one by total deterministic order
+        return immediately

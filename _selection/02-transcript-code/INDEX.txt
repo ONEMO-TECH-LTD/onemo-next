@@ -1,0 +1,253 @@
+Verbatim code blocks written by GPT Pro, extracted from the transcripts.
+Files are byte-for-byte as written between the fences. Provenance below.
+
+001-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:533  lang=text  26 lines  sha256=6a7557119b320c4e
+002-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1404  lang=text  2 lines  sha256=f11ecc521dbf0220
+003-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1470  lang=text  1 lines  sha256=49cae816e2c2d6ca
+004-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1543  lang=text  13 lines  sha256=4ff684f8c54a540e
+005-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1563  lang=text  3 lines  sha256=f520734c15df0905
+006-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1655  lang=text  2 lines  sha256=d9f860b060d9aad0
+007-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1664  lang=ts  3 lines  sha256=5f2c93227d29f3cd
+008-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1694  lang=ts  2 lines  sha256=ae482742620de157
+009-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1719  lang=ts  59 lines  sha256=a7f010f5aa834060
+010-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1783  lang=ts  10 lines  sha256=3114a5893f3d5e3a
+011-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1802  lang=ts  25 lines  sha256=b869ab03430cf0df
+012-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1844  lang=ts  30 lines  sha256=d3bbb1d5ca82583d
+013-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1887  lang=ts  44 lines  sha256=909d395beb915151
+014-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:1954  lang=ts  45 lines  sha256=031cd732515df002
+015-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2008  lang=text  7 lines  sha256=6153fd7472ddcb81
+016-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2024  lang=ts  18 lines  sha256=ddc61ff41bad5f41
+017-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2055  lang=ts  50 lines  sha256=20d3dd5d88f05ba9
+018-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2118  lang=ts  60 lines  sha256=7c975c2a4b57c315
+019-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2191  lang=ts  23 lines  sha256=2a154d672c080b88
+020-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2236  lang=ts  21 lines  sha256=e7c38be55e13a4a3
+021-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2262  lang=text  6 lines  sha256=50402e66b62bfa31
+022-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2279  lang=ts  17 lines  sha256=08b33b6aac92de51
+023-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2301  lang=ts  11 lines  sha256=7153bfdbcf71eaa1
+024-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2317  lang=ts  2 lines  sha256=472be425cb4d22a5
+025-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2324  lang=ts  5 lines  sha256=b8fccd59e3e549c6
+026-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2387  lang=text  3 lines  sha256=f47dc1069f842914
+027-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2397  lang=ts  11 lines  sha256=e7b4e5d40dd82366
+028-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2433  lang=ts  3 lines  sha256=bb09445a02092310
+029-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2538  lang=text  1 lines  sha256=b59540aaffb1d926
+030-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2546  lang=text  2 lines  sha256=f4b99db9da5f9b23
+031-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2561  lang=text  8 lines  sha256=c7f6870dbc98f388
+032-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2602  lang=text  2 lines  sha256=0a9e89dd95cf975d
+033-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2620  lang=text  2 lines  sha256=cec15d76601f4cd4
+034-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2635  lang=ts  8 lines  sha256=5d5d72eacca04953
+035-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2648  lang=text  7 lines  sha256=09411f5ac07bd97a
+036-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2662  lang=text  11 lines  sha256=8c2041bcc07624b3
+037-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2686  lang=ts  71 lines  sha256=d4df94d801221de7
+038-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2770  lang=text  4 lines  sha256=941caaf2740093c4
+039-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2779  lang=text  4 lines  sha256=dde9668c1f9ab915
+040-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2796  lang=text  22 lines  sha256=8ba12e03aaf2074f
+041-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2823  lang=text  8 lines  sha256=d0893593b75f105d
+042-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2938  lang=text  20 lines  sha256=12b2edb3ed81fd95
+043-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:2983  lang=text  23 lines  sha256=6d73c99b3ca84bff
+044-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3035  lang=text  11 lines  sha256=6ae793a6ebffe304
+045-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3156  lang=text  8 lines  sha256=54b74e91c16b371c
+046-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3173  lang=text  4 lines  sha256=6b668110b0194fc3
+047-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3182  lang=text  3 lines  sha256=cae47ecda95ea928
+048-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3216  lang=text  8 lines  sha256=4d656961d2612392
+049-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3395  lang=ts  24 lines  sha256=93d8adbfc4971296
+050-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3442  lang=text  8 lines  sha256=03ae61f17fda5934
+051-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3533  lang=ts  33 lines  sha256=5e1ddd52695d86eb
+052-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3587  lang=text  6 lines  sha256=593fcafd40020110
+053-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3629  lang=text  8 lines  sha256=b1ef9aad155b65d7
+054-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3691  lang=text  6 lines  sha256=dea85756d50b7cd2
+055-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3711  lang=text  2 lines  sha256=d691a2e07235f657
+056-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3734  lang=text  32 lines  sha256=45aaa16a91c02743
+057-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3955  lang=text  4 lines  sha256=c2991b179d543faa
+058-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3979  lang=text  8 lines  sha256=d252ca945a484d0c
+059-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:3996  lang=text  5 lines  sha256=7fcc3dc5a74c193c
+060-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4008  lang=text  11 lines  sha256=4096fe862557162f
+061-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4024  lang=text  2 lines  sha256=0578e7d9315a12da
+062-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4053  lang=text  11 lines  sha256=874280192c0acfaf
+063-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4069  lang=text  4 lines  sha256=4ca3f3c4891a8143
+064-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4102  lang=text  6 lines  sha256=0d1952e14c9bb666
+065-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4137  lang=text  3 lines  sha256=2750df92029334cc
+066-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4145  lang=text  5 lines  sha256=48117d5bafa98902
+    duplicate of 066-text.txt  <- ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4180
+067-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4230  lang=text  2 lines  sha256=525b119f75591122
+068-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4247  lang=text  8 lines  sha256=2da8f2f35002a53f
+069-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4291  lang=text  5 lines  sha256=db142fe1a302d823
+070-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4353  lang=text  7 lines  sha256=80434e984c7fd280
+071-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4379  lang=text  2 lines  sha256=e8ad2a2b55c08ad0
+072-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4467  lang=text  7 lines  sha256=491f769d426b81dd
+073-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4491  lang=text  3 lines  sha256=72d1e1a87927342c
+074-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4499  lang=text  3 lines  sha256=05e569ef44a6b8a4
+075-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4521  lang=text  6 lines  sha256=5f14098c532375c3
+076-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4540  lang=ts  5 lines  sha256=8cd7ca3e926e4ac8
+077-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4550  lang=text  2 lines  sha256=1e2507871440eaeb
+078-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4557  lang=text  1 lines  sha256=7e729e86bb4cbdf3
+079-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4687  lang=text  9 lines  sha256=c5fda4e61e4b74be
+080-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4883  lang=text  6 lines  sha256=b239018595a69ee5
+081-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4946  lang=text  7 lines  sha256=236483e2b3071a96
+082-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4962  lang=text  4 lines  sha256=5d45e92b02e0e830
+083-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4981  lang=text  8 lines  sha256=74d68c6db5b75b40
+084-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:4994  lang=text  4 lines  sha256=9387deff71c76780
+085-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5100  lang=text  8 lines  sha256=8ac07e6dfed71fdc
+086-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5125  lang=text  6 lines  sha256=de544daecfdd486a
+087-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5213  lang=text  1 lines  sha256=d5c8f67dd9e4ae42
+088-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5229  lang=text  4 lines  sha256=15a0a8d51836c15d
+089-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5302  lang=text  3 lines  sha256=4e306f8cdc429549
+090-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5330  lang=ts  48 lines  sha256=4bc603ce6807f6eb
+091-ts.ts            ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5383  lang=ts  20 lines  sha256=0cbd1fd354deffb5
+092-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5408  lang=text  4 lines  sha256=333183cbe77e6ee4
+093-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5419  lang=text  17 lines  sha256=81de3964916e4420
+094-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5441  lang=text  3 lines  sha256=5981a7a50bc87820
+095-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5570  lang=text  9 lines  sha256=9586142afb85c730
+096-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5630  lang=text  9 lines  sha256=fbbcbb4b87972f02
+097-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5654  lang=text  5 lines  sha256=930f8aa691ec7017
+098-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5717  lang=text  3 lines  sha256=383e697dd73b5566
+099-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5729  lang=text  2 lines  sha256=6fa15b2aa8b5460b
+100-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5742  lang=text  3 lines  sha256=aac316409410ca88
+101-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5760  lang=text  3 lines  sha256=bf5aadff939fa613
+102-cpp.cpp          ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5800  lang=cpp  3 lines  sha256=634b3f777cd64e61
+103-cpp.cpp          ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5812  lang=cpp  22 lines  sha256=3450c254d6e1eaff
+104-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5847  lang=text  3 lines  sha256=ee7f20657ad24bfd
+105-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5886  lang=text  12 lines  sha256=d3fbf76d70260178
+106-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5929  lang=text  3 lines  sha256=dfaad47243acbdbf
+107-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:5983  lang=text  8 lines  sha256=a428c08022db03ce
+108-bash.sh          ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:6000  lang=bash  12 lines  sha256=ea49b3b36add65f8
+109-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:6048  lang=text  2 lines  sha256=7e1f40bbc4d18fe0
+110-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:6077  lang=text  3 lines  sha256=d359f6ed072bec9c
+111-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:6097  lang=text  3 lines  sha256=3696df75b8eabc9f
+112-text.txt         ChatGPT-Magnetic-Grid Fitting Algorithm-20260812-1305.md:6105  lang=text  8 lines  sha256=a5edac677d16e762
+    duplicate of 001-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:517
+    duplicate of 002-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1375
+    duplicate of 003-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1441
+    duplicate of 004-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1514
+    duplicate of 005-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1534
+    duplicate of 006-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1626
+    duplicate of 007-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1635
+    duplicate of 008-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1665
+    duplicate of 009-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1690
+    duplicate of 010-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1754
+    duplicate of 011-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1773
+    duplicate of 012-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1815
+    duplicate of 013-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1858
+    duplicate of 014-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1925
+    duplicate of 015-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1979
+    duplicate of 016-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:1995
+    duplicate of 017-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2026
+    duplicate of 018-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2089
+    duplicate of 019-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2162
+    duplicate of 020-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2207
+    duplicate of 021-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2233
+    duplicate of 022-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2250
+    duplicate of 023-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2272
+    duplicate of 024-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2288
+    duplicate of 025-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2295
+    duplicate of 026-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2358
+    duplicate of 027-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2368
+    duplicate of 028-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2404
+    duplicate of 029-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2509
+    duplicate of 030-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2517
+    duplicate of 031-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2532
+    duplicate of 032-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2573
+    duplicate of 033-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2591
+    duplicate of 034-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2606
+    duplicate of 035-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2619
+    duplicate of 036-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2633
+    duplicate of 037-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2657
+    duplicate of 038-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2741
+    duplicate of 039-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2750
+    duplicate of 040-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2767
+    duplicate of 041-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2794
+    duplicate of 042-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2909
+    duplicate of 043-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:2954
+    duplicate of 044-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3006
+    duplicate of 045-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3127
+    duplicate of 046-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3144
+    duplicate of 047-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3153
+    duplicate of 048-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3187
+    duplicate of 049-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3366
+    duplicate of 050-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3413
+    duplicate of 051-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3504
+    duplicate of 052-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3558
+    duplicate of 053-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3600
+    duplicate of 054-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3662
+    duplicate of 055-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3682
+    duplicate of 056-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3705
+    duplicate of 057-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3926
+    duplicate of 058-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3950
+    duplicate of 059-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3967
+    duplicate of 060-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3979
+    duplicate of 061-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:3995
+    duplicate of 062-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4024
+    duplicate of 063-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4040
+    duplicate of 064-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4073
+    duplicate of 065-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4108
+    duplicate of 066-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4116
+    duplicate of 066-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4151
+    duplicate of 067-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4201
+    duplicate of 068-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4218
+    duplicate of 069-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4262
+    duplicate of 070-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4324
+    duplicate of 071-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4350
+    duplicate of 072-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4438
+    duplicate of 073-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4462
+    duplicate of 074-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4470
+    duplicate of 075-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4492
+    duplicate of 076-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4511
+    duplicate of 077-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4521
+    duplicate of 078-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4528
+    duplicate of 079-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4658
+    duplicate of 080-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4854
+    duplicate of 081-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4917
+    duplicate of 082-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4933
+    duplicate of 083-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4952
+    duplicate of 084-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:4965
+    duplicate of 085-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5071
+    duplicate of 086-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5096
+    duplicate of 087-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5184
+    duplicate of 088-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5200
+    duplicate of 089-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5273
+    duplicate of 090-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5301
+    duplicate of 091-ts.ts  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5354
+    duplicate of 092-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5379
+    duplicate of 093-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5390
+    duplicate of 094-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5412
+    duplicate of 095-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5540
+    duplicate of 096-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5600
+    duplicate of 097-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5624
+    duplicate of 098-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5687
+    duplicate of 099-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5699
+    duplicate of 100-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5712
+    duplicate of 101-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5730
+    duplicate of 102-cpp.cpp  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5770
+    duplicate of 103-cpp.cpp  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5782
+    duplicate of 104-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5817
+    duplicate of 105-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5856
+    duplicate of 106-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5899
+    duplicate of 107-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5953
+    duplicate of 108-bash.sh  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:5970
+    duplicate of 109-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6018
+    duplicate of 110-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6047
+    duplicate of 111-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6067
+    duplicate of 112-text.txt  <- ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6075
+113-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6487  lang=text  2 lines  sha256=ba81d807b41dda78
+114-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6498  lang=text  6 lines  sha256=db9069e507cc2850
+115-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6511  lang=text  4 lines  sha256=9e4302eb8d6e43da
+116-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6520  lang=text  4 lines  sha256=c2ae42dd9314132c
+117-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6598  lang=text  8 lines  sha256=d5ec38da9c91a5d0
+118-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6611  lang=text  4 lines  sha256=ef7a46e139857a01
+119-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6626  lang=text  3 lines  sha256=c58d1444d67e5117
+120-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6662  lang=text  8 lines  sha256=2140b47839c3d3e9
+121-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6675  lang=text  3 lines  sha256=4b883f5ac6733167
+122-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6697  lang=text  3 lines  sha256=070ba7b080c1a5f4
+123-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6747  lang=text  13 lines  sha256=e98de57f6a39b8ba
+124-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6783  lang=text  3 lines  sha256=0ceb5a797afcb27d
+125-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6791  lang=text  4 lines  sha256=20111ffd4a87f1df
+126-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6827  lang=text  6 lines  sha256=1c044ed036116534
+127-cpp.cpp          ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6892  lang=cpp  4 lines  sha256=79648793d8100cc5
+128-cpp.cpp          ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6952  lang=cpp  2 lines  sha256=e8a9754926fac91a
+129-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6961  lang=text  4 lines  sha256=aa1fb1077adfe4b5
+130-c.c              ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:6990  lang=c  13 lines  sha256=426bae52825f1e1e
+131-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:7008  lang=text  5 lines  sha256=8bcf4588d6328036
+132-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:7030  lang=text  9 lines  sha256=7c93c63590e795e5
+133-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:7058  lang=text  8 lines  sha256=1ab8c41c170903af
+134-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:7073  lang=text  10 lines  sha256=d42c6a381108cb13
+135-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:7088  lang=text  3 lines  sha256=fe05e1957043e74d
+136-text.txt         ChatGPT-Branch · Magnetic-Grid Fitting Algorithm-20260812-1413.md:7106  lang=text  14 lines  sha256=d64a2b478361bac4

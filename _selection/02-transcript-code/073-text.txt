@@ -1,0 +1,3 @@
+polygon + scale + lattice
+        ↓
+support mask

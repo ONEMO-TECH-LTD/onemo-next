@@ -1,0 +1,3 @@
+72 mm -> pair fits
+84 mm -> pair fits
+96 mm -> 4-square fits

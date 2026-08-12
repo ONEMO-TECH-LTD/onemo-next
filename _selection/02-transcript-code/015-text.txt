@@ -1,0 +1,7 @@
+fast double path
+       ↓
+clearly pass/fail?
+       ↓ yes
+return
+       ↓ uncertain
+exact integer/rational fallback

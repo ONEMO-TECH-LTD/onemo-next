@@ -1,0 +1,3 @@
+each active disc supplies an exact local constraint
+all active constraints are tested at the same global size
+the limiting constraint names the result

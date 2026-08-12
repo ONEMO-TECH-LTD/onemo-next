@@ -1,0 +1,9 @@
+arbitrary customer polygon
+→ grid-led band normalisation
+→ finite manufactured size
+→ parity-registered magnet layout
+→ full 24 mm disc containment
+→ linked-pair verification
+→ 48/96 mm phase compatibility
+→ one deterministic result per band
+→ binding-contact explanation

@@ -1,0 +1,3 @@
+both magnet centres survive
++ coordinates are lattice neighbours
+= linked pair

@@ -1,0 +1,4 @@
+discFit: PASS
+structuralBridge: WARNING
+waistMinimumWidth: 9.4 mm
+requiredBridgeWidth: 24 mm

@@ -1,0 +1,3 @@
+phase mode                    ANY
+minimum active sparse nodes   1
+96 mm connectivity required   false

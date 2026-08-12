@@ -1,0 +1,4 @@
+standard band template
+→ local cell constraints
+→ shared uniform scaling
+→ one manufactured size

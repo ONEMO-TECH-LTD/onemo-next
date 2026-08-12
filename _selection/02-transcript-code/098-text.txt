@@ -1,0 +1,3 @@
+two nodes + one verified link       pair
+three nodes + two verified links    L / two pairs sharing one node
+four nodes + four verified links    complete square

@@ -1,0 +1,3 @@
+strongest layout tier first
+smallest passing size within that tier
+deterministic template tie-break

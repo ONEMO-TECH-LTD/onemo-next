@@ -1,0 +1,2 @@
+PAIR_H = any approved adjacent horizontal pair
+         within the band's registered lattice window

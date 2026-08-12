@@ -1,0 +1,8 @@
+include/magfit/magfit.hpp      native C++ API
+include/magfit/magfit_c.h      stable C / WebAssembly ABI
+src/magfit.cpp                 exact fitting core
+src/magfit_c.cpp               exception-safe ABI adapter
+tests/test_magfit.cpp          geometry and determinism suite
+tests/test_magfit_c.c          C boundary suite
+bench/bench_magfit.cpp         local benchmark
+contract/                      full normative specification

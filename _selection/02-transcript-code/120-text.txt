@@ -1,0 +1,8 @@
+Band 2
+    sparse status = NOT_ENGAGED
+    no sparse pass/fail calculation
+    no claim of dual-density compatibility
+
+Band 3+
+    phase-aware sparse calculation
+    only when that density is applicable to the SKU

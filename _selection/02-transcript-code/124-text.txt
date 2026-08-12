@@ -1,0 +1,3 @@
+bbox extent reaches threshold
+but
+required local tongue or continuous strip does not fit

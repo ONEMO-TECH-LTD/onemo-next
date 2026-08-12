@@ -1,0 +1,4 @@
+upper-left disc:  pass/fail
+upper-right disc: pass/fail
+lower-left disc:  pass/fail
+lower-right disc: pass/fail

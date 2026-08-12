@@ -1,0 +1,4 @@
+72 mm → pair
+96 mm → four discs
+
+selected result → 96 mm / four discs

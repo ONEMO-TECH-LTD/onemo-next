@@ -1,0 +1,8 @@
+distance < 12
+=> FAIL
+
+distance == 12
+=> PASS
+
+distance > 12
+=> PASS

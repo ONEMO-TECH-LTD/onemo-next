@@ -1,0 +1,6 @@
+72 → evaluate all layouts
+84 → evaluate all layouts
+96 → evaluate all layouts
+108 → evaluate all layouts
+
+return immediately at the first size with any valid candidate

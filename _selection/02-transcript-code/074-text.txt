@@ -1,0 +1,3 @@
+support mask + band rules
+        ↓
+selected magnetic layout

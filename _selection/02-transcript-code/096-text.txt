@@ -1,0 +1,9 @@
+image/SVG trace pipeline
+        ↓
+one canonical simple integer polygon
+        ↓
+MagFit exact core
+        ↓
+one size + one magnetic layout per band
+        ↓
+UI rendering / manufacturing / pricing

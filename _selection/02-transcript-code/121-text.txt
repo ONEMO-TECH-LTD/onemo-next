@@ -1,0 +1,3 @@
+at least two active sparse nodes
+96 mm orthogonal adjacency
+connection under the selected link policy

@@ -1,0 +1,3 @@
+custom exact MagFit core
++ optional Clipper2 at the SVG/trace ingestion boundary
++ optional CGAL/GeometryFactory review as an independent oracle

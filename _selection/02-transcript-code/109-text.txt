@@ -1,0 +1,2 @@
+already-canonicalised solve     approximately 3.3 ms
+validation plus solve           approximately 8.9 ms

@@ -1,0 +1,4 @@
+72 mm → exact test
+84 mm → exact test
+96 mm → exact test
+108 mm → exact test

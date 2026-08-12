@@ -1,0 +1,8 @@
+SAFE:
+clearance from real boundary >= threshold
+
+BOUNDARY ZONE:
+must inspect exact contour
+
+OUTSIDE:
+provably outside polygon

@@ -1,0 +1,17 @@
+Do not convert quadrants into rectangles.
+
+Do not compute area-coverage percentages.
+
+Do not average quadrant scale requirements.
+
+Do not scale quadrants independently.
+
+Do not use a global maximum inner rectangle.
+
+Do not use a convex hull for certification.
+
+Do not assume that a larger size automatically passes.
+
+Do not let simplified extreme-node geometry override the exact contour.
+
+Do not allow the renderer to recompute scale or magnet positions.

@@ -1,0 +1,26 @@
+for band b in {2, 3}:
+    records = []
+
+    for size s in legalSizes[b]:
+        for placement t in allowedPlacements(P, b, s):
+            supportMask, contactData = exactSupportMask(P, s, t)
+
+            for layout L in layouts[b]:
+                if physicalMask(L) is not contained in supportMask:
+                    continue
+
+                for permitted sparse phase π:
+                    if not denseAttachmentValid(L):
+                        continue
+                    if not sparseAttachmentValid(L, π):
+                        continue
+                    if not structuralConnectivityValid(P, s, t, L):
+                        continue
+
+                    metrics = computeClearanceFlapAndContacts(...)
+                    records.append(s, t, L, π, metrics)
+
+    if records is empty:
+        output "no size"
+    else:
+        output lexicographically best record under policy version
