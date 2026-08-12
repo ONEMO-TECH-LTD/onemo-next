@@ -16,7 +16,7 @@ import {
   type BlendSettings, type FinishResult, type OutlineBounds, type TraceOutlineSettings,
   type VectorPresetName,
 } from './finish'
-import { erasePaintMask, maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
+import { maskArea, maskFromShape, PAINT_DEFAULTS, polishMask, solidShapeMask, subtractMasks, swathMask, unionMasks, type PaintConfig } from '@/lib/mask-tools'
 import { deleteNode, editableShape, insertNode, measureNode, nodeAdjust, nodeTapTol, shapePathD, shapeRing } from '@/lib/vector-edit'
 import { prepareAI, prepareNative } from './finish'
 import { segmentV531 } from './v531seg'
@@ -61,9 +61,10 @@ const masksEqual = (a: Mask, b: Mask): boolean => a.w === b.w && a.h === b.h
   && a.data.every((value, index) => value === b.data[index])
 
 function paintMask(source: PaintCalibrationSource, cfg: PaintConfig, w: number, h: number): Mask {
-  const painted = swathMask(source.stroke, source.brushPx, w, h, source.erase ? { ...cfg, closeFrac: 0 } : cfg)
-  if (source.base && source.erase) return erasePaintMask(source.base, painted, cfg.polishStrength) ?? cloneMask(source.base)
-  const combined = source.base ? unionMasks(source.base, painted) : painted
+  const painted = swathMask(source.stroke, source.brushPx, w, h, cfg)
+  const combined = source.base
+    ? source.erase ? subtractMasks(source.base, painted) : unionMasks(source.base, painted)
+    : painted
   return polishMask(combined, cfg.polishStrength)
 }
 
@@ -96,8 +97,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const [hasCut, setHasCut] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const [ms, setMs] = useState<{ cut?: number }>({})
-  const [settings, setSettings] = useState<TraceOutlineSettings>(() => settingsForVectorPreset('PURE'))
-  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('PURE')
+  const [settings, setSettings] = useState<TraceOutlineSettings>(() => settingsForVectorPreset('CLASSIC'))
+  const [vectorPreset, setVectorPresetState] = useState<VectorPresetName | null>('CLASSIC')
   const [blend, setBlend] = useState<BlendSettings>(BLEND_DEFAULTS)
   const [shapeTick, setShapeTick] = useState(0)
   const [histTick, setHistTick] = useState(0)
@@ -123,8 +124,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const settingsRef = useRef(settings); settingsRef.current = settings
   const outlineSourceRef = useRef<OutlineSourceKind>('cutout')
   const vectorPresetRef = useRef<VectorPresetName | null>(vectorPreset); vectorPresetRef.current = vectorPreset
-  const cutoutSettingsRef = useRef<TraceOutlineSettings>(settingsForVectorPreset('PURE'))
-  const cutoutPresetRef = useRef<VectorPresetName | null>('PURE')
+  const cutoutSettingsRef = useRef<TraceOutlineSettings>(settingsForVectorPreset('CLASSIC'))
+  const cutoutPresetRef = useRef<VectorPresetName | null>('CLASSIC')
   const activateOutlineSource = useCallback((source: OutlineSourceKind) => {
     if (outlineSourceRef.current === source) return
     if (outlineSourceRef.current === 'cutout') {
@@ -132,8 +133,8 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       cutoutPresetRef.current = vectorPresetRef.current
     }
     outlineSourceRef.current = source
-    const next = source === 'paint' ? { ...ZERO_SETTINGS } : { ...cutoutSettingsRef.current }
-    const nextPreset = source === 'paint' ? 'ZERO' : cutoutPresetRef.current
+    const next = source === 'paint' ? { ...ZERO_SETTINGS, simplify: 15 } : { ...cutoutSettingsRef.current }
+    const nextPreset = source === 'paint' ? null : cutoutPresetRef.current
     settingsRef.current = next
     setSettings(next)
     vectorPresetRef.current = nextPreset
@@ -325,7 +326,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     if (!isCurrent()) return false
     // Every source's raw mask/matte remains unchanged (Dan 2026-08-07: no speculative hole/opacity
     // fixes on the pure path); the shared preparation seam applies only the calibrated edge finish. Paint add/create
-    // may still normalize to its resolved owned geometry below; boundary-local erase keeps its accepted mask exact.
+    // may still normalize to its resolved owned geometry below.
     const img = imgCanvas.current, url = urlRef.current
     if (img && url) {
       try {
@@ -420,7 +421,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       if (!img || !isCurrent()) return
       const recalculated = paintMask(source, paintCfgRef.current, img.width, img.height)
       if (source.base && source.erase && masksEqual(recalculated, source.base)) {
-        setStatus('🔒 inside stays solid — erase from the boundary inward')
+        setStatus('✂️ nothing under the Paint eraser stroke')
         return
       }
       if (!maskArea(recalculated)) {
@@ -628,7 +629,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     // PAINT semantics (Dan): the brush deposits AREA; a closed gesture fills its interior too.
     const combined = paintMask(source, paintCfgRef.current, img.width, img.height)
     if (base && erase && masksEqual(combined, base)) {
-      setStatus('🔒 inside stays solid — erase from the boundary inward')
+      setStatus('✂️ nothing under the Paint eraser stroke')
       requestRender()
       return
     }
@@ -948,6 +949,11 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     return (tool === 'draw' || tool === 'draw-erase' || tool === 'add' || tool === 'erase') && !!imgCanvas.current
   }, [])
 
+  const selectOutlineSource = useCallback((source: OutlineSourceKind) => {
+    activateOutlineSource(source)
+    applyFinish()
+  }, [activateOutlineSource, applyFinish])
+
   // Mount diagnostics. Model warm-up is deliberately absent: no measured first-Detect/device-memory
   // evidence justifies keeping an eager worker/session owner.
   const warmup = useCallback(() => {
@@ -989,7 +995,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     },
     actions: {
       upload, detect, setTune, setBlendTune, setVectorPreset,
-      grabCutStroke, paintStroke, canBrush,
+      grabCutStroke, paintStroke, canBrush, selectOutlineSource,
       enterEdit, editLive, editCommit, nodeInsert, nodeDelete, nodeApply,
       undo, redo, clearAll, save, exportResult, setDragging, setPreview, warmup, setPaintCfg, setEdgeFinishPx,
     },

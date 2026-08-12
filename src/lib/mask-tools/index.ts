@@ -13,7 +13,7 @@ export interface PaintConfig {
   polishStrength: number  // 0..1; outline smoothing radius = completed-shape scale × strength
   closeFrac: number  // a gesture closes into a filled loop when its endpoints are < perimeter × closeFrac apart
 }
-export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 1, polishStrength: 0, closeFrac: 0.35 }
+export const PAINT_DEFAULTS: PaintConfig = { autoTuneStrength: 0.5, polishStrength: 0.2, closeFrac: 0.5 }
 
 type StrokePoint = { x: number; y: number }
 
@@ -120,111 +120,6 @@ export function subtractMasks(base: Mask, sub: Mask): Mask {
   const data = new Uint8Array(base.data)
   for (let i = 0; i < data.length; i++) if (sub.data[i]) data[i] = 0
   return { data, w: base.w, h: base.h }
-}
-
-function expandedDeltaBand(delta: Uint8Array, w: number, h: number, radius: number): Uint8Array {
-  const horizontal = new Uint8Array(delta.length)
-  const band = new Uint8Array(delta.length)
-  for (let y = 0; y < h; y++) {
-    let count = 0
-    for (let x = -radius; x <= radius; x++) if (x >= 0 && x < w) count += delta[y * w + x]
-    for (let x = 0; x < w; x++) {
-      horizontal[y * w + x] = count ? 1 : 0
-      const remove = x - radius
-      const add = x + radius + 1
-      if (remove >= 0) count -= delta[y * w + remove]
-      if (add < w) count += delta[y * w + add]
-    }
-  }
-  for (let x = 0; x < w; x++) {
-    let count = 0
-    for (let y = -radius; y <= radius; y++) if (y >= 0 && y < h) count += horizontal[y * w + x]
-    for (let y = 0; y < h; y++) {
-      band[y * w + x] = count ? 1 : 0
-      const remove = y - radius
-      const add = y + radius + 1
-      if (remove >= 0) count -= horizontal[remove * w + x]
-      if (add < h) count += horizontal[add * w + x]
-    }
-  }
-  return band
-}
-
-function exteriorBackground(mask: Mask): Uint8Array {
-  const exterior = new Uint8Array(mask.data.length)
-  const stack: number[] = []
-  for (let x = 0; x < mask.w; x++) stack.push(x, (mask.h - 1) * mask.w + x)
-  for (let y = 0; y < mask.h; y++) stack.push(y * mask.w, y * mask.w + mask.w - 1)
-  while (stack.length) {
-    const index = stack.pop()!
-    if (index < 0 || index >= mask.data.length || exterior[index] || mask.data[index]) continue
-    exterior[index] = 1
-    const x = index % mask.w
-    if (x > 0) stack.push(index - 1)
-    if (x < mask.w - 1) stack.push(index + 1)
-    if (index >= mask.w) stack.push(index - mask.w)
-    if (index < mask.w * (mask.h - 1)) stack.push(index + mask.w)
-  }
-  return exterior
-}
-
-function foregroundComponentCount(mask: Mask): number {
-  const seen = new Uint8Array(mask.data.length)
-  const stack: number[] = []
-  let components = 0
-  for (let seed = 0; seed < mask.data.length; seed++) {
-    if (seen[seed] || !mask.data[seed]) continue
-    components++
-    stack.push(seed)
-    while (stack.length) {
-      const index = stack.pop()!
-      if (seen[index] || !mask.data[index]) continue
-      seen[index] = 1
-      const x = index % mask.w
-      if (x > 0) stack.push(index - 1)
-      if (x < mask.w - 1) stack.push(index + 1)
-      if (index >= mask.w) stack.push(index - mask.w)
-      if (index < mask.w * (mask.h - 1)) stack.push(index + mask.w)
-    }
-  }
-  return components
-}
-
-/** Paint erase is an open negative swath. Only its newly cut boundary receives Paint's existing
- * mask smoothing; accepted mask bytes outside that filter-influence band remain exact. */
-export function erasePaintMask(base: Mask, negative: Mask, strength = PAINT_DEFAULTS.polishStrength): Mask | null {
-  if (base.w !== negative.w || base.h !== negative.h) return null
-  const raw = subtractMasks(base, negative)
-  const delta = new Uint8Array(base.data.length)
-  let removed = 0
-  for (let index = 0; index < delta.length; index++) {
-    if (base.data[index] && !raw.data[index]) { delta[index] = 1; removed++ }
-  }
-  if (!removed) return null
-  const beforeArea = maskArea(base), rawArea = maskArea(raw)
-  if (!rawArea || rawArea <= beforeArea * 0.1 || foregroundComponentCount(raw) !== foregroundComponentCount(base)) return null
-  const rawExterior = exteriorBackground(raw)
-  for (let index = 0; index < delta.length; index++) if (delta[index] && !rawExterior[index]) return null
-
-  const radius = paintSmoothingRadius(raw, strength)
-  const polished = radius ? polishMask(raw, strength) : raw
-  const band = expandedDeltaBand(delta, base.w, base.h, radius)
-  const data = base.data.slice()
-  const soft = base.soft?.slice()
-  for (let index = 0; index < data.length; index++) {
-    if (!band[index]) continue
-    data[index] = polished.data[index]
-    if (soft) soft[index] = data[index] ? 255 : 0
-  }
-  const result: Mask = { data, w: base.w, h: base.h, ...(soft ? { soft } : {}) }
-  const afterArea = maskArea(result)
-  if (!afterArea || afterArea <= beforeArea * 0.1 || afterArea >= beforeArea) return null
-  if (foregroundComponentCount(result) !== foregroundComponentCount(base)) return null
-  const exterior = exteriorBackground(result)
-  for (let index = 0; index < result.data.length; index++) {
-    if (base.data[index] && !result.data[index] && !exterior[index]) return null
-  }
-  return result
 }
 
 /** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize

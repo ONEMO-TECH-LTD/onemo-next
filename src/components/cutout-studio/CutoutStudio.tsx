@@ -264,7 +264,11 @@ export default function CutoutStudio({ calibration, diagnostics }: {
   }
 
   // ── vector edit (shell = selection/tool state; orchestration = flow) ──
-  const exitEdit = () => { setSelNode(null); setTool('draw') }
+  const selectBrushTool = (next: 'add' | 'erase' | 'draw' | 'draw-erase') => {
+    flow.actions.selectOutlineSource(next === 'draw' || next === 'draw-erase' ? 'paint' : 'cutout')
+    setTool(next)
+  }
+  const exitEdit = () => { setSelNode(null); selectBrushTool('draw') }
   const enterEdit = (m: EditMode) => {
     if (tool === m) { exitEdit(); return } // active chip toggles OUT of edit mode
     if (!flow.actions.enterEdit()) return
@@ -321,7 +325,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
       if (nodeChip === 'radius') return { label: 'node radius', lo: rLo, hi: rHi, value: nodeAdj.radius, set: (v: number) => apply({ ...nodeAdj, radius: v }) }
       return { label: 'node curve', lo: cLo, hi: cHi, value: nodeAdj.curve, set: (v: number) => apply({ ...nodeAdj, curve: v }) }
     }
-    return { label: 'brush size', lo: 1, hi: 120, value: brushR, set: setBrushR } // min 1 (Dan 2026-08-06)
+    return { label: 'brush size', lo: 2, hi: 50, value: brushR, set: setBrushR }
   })()
 
   const chipBtn = (active: boolean): React.CSSProperties => ({ ...btn, padding: '4px 10px', fontSize: 12, background: active ? '#0f172a' : '#f1f5f9', color: active ? '#fff' : '#0f172a' })
@@ -347,7 +351,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
       {/* TABS (item 10) — chips within, ONE adaptive knob below */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, justifyContent: 'center' }}>
         {(['ai', 'vector', 'blend', 'edit'] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setTab(t)} style={{ ...btn, background: tab === t ? '#7c3aed' : '#f1f5f9', color: tab === t ? '#fff' : '#0f172a' }}>
+          <button key={t} onClick={() => { if (t === 'ai') flow.actions.selectOutlineSource('cutout'); setTab(t) }} style={{ ...btn, background: tab === t ? '#7c3aed' : '#f1f5f9', color: tab === t ? '#fff' : '#0f172a' }}>
             {t === 'ai' ? '🤖 AI' : t === 'vector' ? '⬡ Vector' : t === 'blend' ? '🎨 Blend' : '✋ Edit'}
           </button>
         ))}
@@ -357,8 +361,8 @@ export default function CutoutStudio({ calibration, diagnostics }: {
         {tab === 'ai' && (<>
           <button onClick={() => flow.actions.detect()} disabled={!hasImage || busy} style={{ ...btn, fontSize: 12, background: '#7c3aed', color: '#fff', fontWeight: 700 }}>🤖 Detect</button>
           <span style={{ color: '#94a3b8' }}>· brush:</span>
-          {(['add', 'erase'] as Tool[]).map((t) => (
-            <button key={t} onClick={() => setTool(t)} disabled={!hasImage} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
+          {(['add', 'erase'] as const).map((t) => (
+            <button key={t} onClick={() => selectBrushTool(t)} disabled={!hasImage} style={chipBtn(tool === t)}>{t === 'add' ? '🟢 Add' : '🔴 Erase'}</button>
           ))}
           {hasImage && !hasCut && <span style={{ color: '#94a3b8' }}>push Detect, or brush Add over the object</span>}
         </>)}
@@ -375,8 +379,8 @@ export default function CutoutStudio({ calibration, diagnostics }: {
           {BLEND_CHIPS.map((k) => (<button key={k} onClick={() => setBlendChip(k)} style={chipBtn(blendChip === k)}>{k}</button>))}
         </>)}
         {tab === 'edit' && (<>
-          <button onClick={() => setTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
-          <button onClick={() => setTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
+          <button onClick={() => selectBrushTool('draw')} style={chipBtn(tool === 'draw')}>🖌 Paint shape</button>
+          <button onClick={() => selectBrushTool('draw-erase')} style={chipBtn(tool === 'draw-erase')}>🩹 Paint erase</button>
           {(tool === 'draw' || tool === 'draw-erase') && (<>
             <span style={{ color: '#94a3b8' }}>vector:</span>
             {calibrationSlots?.vectorChips}

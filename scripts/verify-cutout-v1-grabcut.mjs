@@ -298,8 +298,8 @@ async function runBrowser(browserType) {
       assert.deepEqual(await vectorValues(), values, `${browserName}: ${label} values`)
     }
 
-    // The first successful Paint operation owns the source at named ZERO. Destructive/internal
-    // erases are exact no-ops and do not take ownership or history.
+    // Selecting Paint owns the source at named ZERO. Paint erase is the current Paint swath
+    // subtracted from the accepted mask; it is not restricted to boundary-only cuts.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
     await routePage.getByRole('button', { name: /Vector/ }).click()
     await vectorPreset.selectOption('TECHNO')
@@ -320,10 +320,13 @@ async function runBrowser(browserType) {
       { x: historyPaintBox.x + historyPaintBox.width * 0.52, y: historyPaintBox.y + historyPaintBox.height * 0.70 },
       { x: historyPaintBox.x + historyPaintBox.width * 0.50, y: historyPaintBox.y + historyPaintBox.height * 0.47 },
     ], 4)
-    await status.filter({ hasText: /inside stays solid/ }).waitFor({ timeout: 60_000 })
+    await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('TECHNO', { detail: '10', offset: '3', simplify: '0', smooth: '20', radius: '2' }, 'rejected near-loop retained Cutout')
-    assert.equal(await undo.isDisabled(), true, `${browserName}: rejected near-loop added history`)
+    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'first Paint erase')
+    assert.equal(await undo.isDisabled(), false, `${browserName}: accepted Paint erase did not add history`)
+    await undo.click()
+    await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
+    await assertVectorRecipe('TECHNO', { detail: '10', offset: '3', simplify: '0', smooth: '20', radius: '2' }, 'first Paint erase Undo restored Cutout')
 
     const beforeFirstPaint = await canvasData()
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()

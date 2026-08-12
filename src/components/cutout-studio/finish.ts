@@ -169,7 +169,7 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
  *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
  *  Offset knob's job, reflected truthfully). */
-const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 8 }
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 12 }
 export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 
 /** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:
