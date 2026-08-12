@@ -46,6 +46,7 @@ struct Candidate {
     std::vector<TemplateWindow> source_windows;
     std::vector<GridPoint> nodes;
     std::vector<std::pair<GridPoint, GridPoint>> links;
+    SparseStatus sparse_status{SparseStatus::NotEngaged};
     std::vector<SparsePhaseResult> sparse_phases;
 };
 
@@ -530,7 +531,6 @@ std::vector<std::pair<int, int>> possible_sparse_phases(const std::vector<GridPo
 
 struct SparseEvaluation {
     bool pass{};
-    bool engaged{};
     SparsePhaseResult representative;
     int active_count{};
 };
@@ -589,17 +589,23 @@ SparseEvaluation evaluate_one_sparse_phase(const std::vector<GridPoint>& nodes,
     }
     out.representative.connected = reached == n;
     out.pass = out.representative.connected;
+    out.representative.compatible = out.pass;
     return out;
 }
 
-std::vector<std::vector<SparsePhaseResult>> sparse_variants(
+struct SparseEvidence {
+    SparseStatus status{SparseStatus::NotEngaged};
+    std::vector<SparsePhaseResult> phases;
+};
+
+SparseEvidence sparse_evidence(
     const std::vector<GridPoint>& nodes,
     const ScaledPolygon& polygon,
     int band,
     const EnginePolicy& policy) {
     if (policy.sparse.mode == PhaseMode::Disabled ||
         band < policy.sparse.engage_from_band) {
-        return {{}};
+        return {};
     }
 
     std::vector<std::pair<int, int>> phases;
@@ -615,39 +621,27 @@ std::vector<std::vector<SparsePhaseResult>> sparse_variants(
     for (const auto& [rx, ry] : phases) {
         SparseEvaluation evaluation =
             evaluate_one_sparse_phase(nodes, rx, ry, polygon, policy);
-        evaluation.engaged = true;
         evaluations.push_back(std::move(evaluation));
     }
 
-    if (policy.sparse.mode == PhaseMode::All) {
-        for (const auto& evaluation : evaluations) {
-            if (!evaluation.pass) return {};
-        }
-        std::vector<SparsePhaseResult> all;
-        all.reserve(evaluations.size());
-        for (const auto& evaluation : evaluations) {
-            all.push_back(evaluation.representative);
-        }
-        std::sort(all.begin(), all.end(), [](const SparsePhaseResult& a,
-                                             const SparsePhaseResult& b) {
-            return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.active_nodes) <
-                   std::tie(b.x_residue_mod4, b.y_residue_mod4, b.active_nodes);
-        });
-        return {std::move(all)};
-    }
-
-    std::vector<SparsePhaseResult> passing;
+    SparseEvidence out;
+    out.phases.reserve(evaluations.size());
+    bool any_pass = false;
+    bool all_pass = !evaluations.empty();
     for (const auto& evaluation : evaluations) {
-        if (!evaluation.pass) continue;
-        passing.push_back(evaluation.representative);
+        SparsePhaseResult phase = evaluation.representative;
+        phase.compatible = evaluation.pass;
+        any_pass = any_pass || evaluation.pass;
+        all_pass = all_pass && evaluation.pass;
+        out.phases.push_back(std::move(phase));
     }
-    std::sort(passing.begin(), passing.end(), [](const auto& a, const auto& b) {
+    std::sort(out.phases.begin(), out.phases.end(), [](const auto& a, const auto& b) {
         return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.active_nodes) <
                std::tie(b.x_residue_mod4, b.y_residue_mod4, b.active_nodes);
     });
-    return passing.empty()
-               ? std::vector<std::vector<SparsePhaseResult>>{}
-               : std::vector<std::vector<SparsePhaseResult>>{std::move(passing)};
+    const bool compatible = policy.sparse.mode == PhaseMode::All ? all_pass : any_pass;
+    out.status = compatible ? SparseStatus::Compatible : SparseStatus::Incompatible;
+    return out;
 }
 
 bool component_spans_band(const std::vector<GridPoint>& nodes, int band) {
@@ -720,21 +714,24 @@ LayoutKind layout_kind(const Candidate& candidate) {
 }
 
 bool sparse_phase_less(const SparsePhaseResult& a, const SparsePhaseResult& b) {
-    return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.connected, a.active_nodes) <
-           std::tie(b.x_residue_mod4, b.y_residue_mod4, b.connected, b.active_nodes);
+    return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.connected,
+                    a.compatible, a.active_nodes) <
+           std::tie(b.x_residue_mod4, b.y_residue_mod4, b.connected,
+                    b.compatible, b.active_nodes);
 }
 
 bool candidate_identity_less(const Candidate& a, const Candidate& b) {
     if (a.size_mm != b.size_mm) return a.size_mm < b.size_mm;
     if (a.nodes != b.nodes) return a.nodes < b.nodes;
     if (a.links != b.links) return a.links < b.links;
+    if (a.sparse_status != b.sparse_status) return a.sparse_status < b.sparse_status;
     return std::lexicographical_compare(a.sparse_phases.begin(), a.sparse_phases.end(),
                                         b.sparse_phases.begin(), b.sparse_phases.end(),
                                         sparse_phase_less);
 }
 
-bool same_candidate_identity(const Candidate& a, const Candidate& b) {
-    return !candidate_identity_less(a, b) && !candidate_identity_less(b, a);
+bool same_physical_candidate(const Candidate& a, const Candidate& b) {
+    return a.size_mm == b.size_mm && a.nodes == b.nodes && a.links == b.links;
 }
 
 std::vector<int> selected_indices(std::uint64_t mask, int count) {
@@ -837,23 +834,26 @@ std::vector<Candidate> candidates_at_size(const CanonicalPolygon& polygon,
             std::sort(nodes.begin(), nodes.end());
             if (policy.require_band_span && !component_spans_band(nodes, band.band)) continue;
 
-            const auto variants = sparse_variants(nodes, scaled, band.band, policy);
-            for (const auto& phases : variants) {
-                Candidate candidate;
-                candidate.size_mm = size_mm;
-                candidate.source_windows.push_back({grid.runs_x, grid.runs_y});
-                candidate.nodes = nodes;
-                candidate.links = links_for_component(grid.nodes, component, adjacency);
-                candidate.sparse_phases = phases;
-                candidates.push_back(std::move(candidate));
-            }
+            const SparseEvidence sparse = sparse_evidence(nodes, scaled, band.band, policy);
+            Candidate candidate;
+            candidate.size_mm = size_mm;
+            candidate.source_windows.push_back({grid.runs_x, grid.runs_y});
+            candidate.nodes = nodes;
+            candidate.links = links_for_component(grid.nodes, component, adjacency);
+            candidate.sparse_status = sparse.status;
+            candidate.sparse_phases = sparse.phases;
+            candidates.push_back(std::move(candidate));
         }
     }
     std::sort(candidates.begin(), candidates.end(), candidate_identity_less);
     std::vector<Candidate> deduplicated;
     for (Candidate& candidate : candidates) {
         if (!deduplicated.empty() &&
-            same_candidate_identity(deduplicated.back(), candidate)) {
+            same_physical_candidate(deduplicated.back(), candidate)) {
+            if (deduplicated.back().sparse_status != candidate.sparse_status ||
+                deduplicated.back().sparse_phases != candidate.sparse_phases) {
+                fail("internal error: sparse evidence differs for one physical option");
+            }
             deduplicated.back().source_windows.insert(
                 deduplicated.back().source_windows.end(),
                 candidate.source_windows.begin(), candidate.source_windows.end());
@@ -1152,6 +1152,7 @@ LayoutOption build_option(const CanonicalPolygon& polygon,
     option.source_windows = candidate.source_windows;
     option.magnets = candidate.nodes;
     option.verified_links = candidate.links;
+    option.sparse_status = candidate.sparse_status;
     option.sparse_phases = candidate.sparse_phases;
     option.binding = binding_contact(polygon, candidate, policy);
     option.flap = flap_metrics(polygon, candidate, policy);

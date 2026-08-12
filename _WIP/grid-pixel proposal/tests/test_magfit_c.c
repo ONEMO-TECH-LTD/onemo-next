@@ -17,6 +17,7 @@ typedef struct Collected {
     int saw_band2_full_72;
     int saw_band2_pair_72;
     int saw_band3;
+    int saw_sparse_incompatible;
 } Collected;
 
 static int32_t collect_option(const MagfitLayoutOptionC* option, void* user_data) {
@@ -32,6 +33,10 @@ static int32_t collect_option(const MagfitLayoutOptionC* option, void* user_data
         collected->saw_band2_pair_72 = 1;
     }
     if (option->band == 3) collected->saw_band3 = 1;
+    if (option->band == 3 &&
+        option->sparse_status == MAGFIT_SPARSE_INCOMPATIBLE) {
+        collected->saw_sparse_incompatible = 1;
+    }
     return 1;
 }
 
@@ -52,7 +57,7 @@ int main(void) {
             "review must visit every option and report its count");
     require(single.saw_band2_full_72 && single.saw_band2_pair_72,
             "C ABI must expose full and pair variants at the same size");
-    require(strcmp(magfit_engine_version(), "magfit-core/0.3.0-grid-pixel-review") == 0,
+    require(strcmp(magfit_engine_version(), "magfit-core/0.3.1-grid-pixel-review") == 0,
             "review engine version must be stable");
 
     {
@@ -67,6 +72,10 @@ int main(void) {
                 "multi-band review must preserve the band-2 option set");
         require(multi.saw_band3 && multi.band_counts[3] > 0,
                 "multi-band review must expose band-3 options");
+        require(multi.band_counts[3] == 844,
+                "C ABI must expose all dense band-3 layouts regardless of sparse status");
+        require(multi.saw_sparse_incompatible,
+                "C ABI must expose sparse incompatibility without hiding the option");
         observed_band3_count = multi.band_counts[3];
     }
 

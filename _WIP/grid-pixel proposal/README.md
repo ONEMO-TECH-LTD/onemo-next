@@ -13,8 +13,8 @@ It provides:
 - full 24 mm-wide direct-capsule containment between adjacent magnets;
 - every connected supported subset meeting the band floor and span;
 - generated band templates through the 9x9 field ceiling;
-- 48 mm dense and phase-coupled 96 mm sparse evaluation;
-- no sparse engagement in band 2; connected 96 mm support from band 3 onward;
+- 48 mm dense layouts with independent 96 mm sparse-compatibility evidence;
+- no sparse engagement in band 2; compatible and incompatible status from band 3 onward;
 - deterministic option identity, topology labels, contacts, flap and tongue evidence;
 - a callback-based C ABI suitable for WebAssembly without a fixed result cap;
 - single-canonicalisation multi-band evaluation;
@@ -98,7 +98,7 @@ All decisions that can add or remove an option use integer arithmetic:
 - disc and direct-capsule containment;
 - legal size membership;
 - connected-subset membership;
-- sparse phase eligibility;
+- sparse phase compatibility evidence;
 - flap threshold facts;
 - canonical option ordering.
 
@@ -113,7 +113,7 @@ Implemented here:
 - topology labels (`Full`, `Connected`, `LinkedThree`, `Pair`) as descriptions only;
 - shape overhang beyond the padded grid box, clamped at zero;
 - neutral 12/24 extent and local-tongue evidence plus EC-09 coverage outcomes;
-- 96 mm engagement from band 3 with every compatible phase reported;
+- 96 mm compatibility from band 3 without filtering the dense option set;
 - thin antenna/cove evidence through exact outward tongue capsules;
 - band 4 and multi-band C ABI regression coverage.
 
@@ -125,13 +125,13 @@ Not added:
 
 ## Measured reference run
 
-Apple Clang Release, 1,000-vertex canonical polygon, bands 2 and 3, 135 returned options:
+Apple Clang Release, 1,000-vertex canonical polygon, bands 2 and 3, 147 returned options:
 
-- already-canonical shape: 122.14 ms mean;
-- validation plus enumeration: 113.61 ms mean;
-- 8,100-point canonicalisation: 1.37 ms, retaining 5,872 vertices.
+- already-canonical shape: 126.24 ms mean;
+- validation plus enumeration: 130.89 ms mean;
+- 8,100-point canonicalisation: 1.52 ms, retaining 5,872 vertices.
 
-The square reference exposes 44 band-2 options and 780 band-3 options. At 72 mm, the full four-disc layout and pair layouts coexist in the same returned review set.
+The square reference exposes 44 band-2 options and 844 band-3 options. At 72 mm, the full four-disc layout and pair layouts coexist in the same returned review set. Band 3 retains 64 sparse-incompatible dense layouts that the previous snapshot hid.
 
 The complete review set is currently slower than the old winner-only path because evidence is built for every option. These are local prototype measurements, not target-device certification. Performance optimisation must preserve the exact option set.
 

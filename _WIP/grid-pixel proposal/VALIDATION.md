@@ -27,15 +27,15 @@ Result: PASS.
 Apple Clang Release, 1,000-vertex polygon, bands 2 and 3, 100 hot iterations and 20 cold iterations:
 
 ```text
-returned options per solve          135
-hot enumeration mean                122.14 ms
-validation + enumeration mean       113.61 ms
-8,100-point preparation               1.37 ms (5,872 canonical vertices)
+returned options per solve          147
+hot enumeration mean                126.24 ms
+validation + enumeration mean       130.89 ms
+8,100-point preparation               1.52 ms (5,872 canonical vertices)
 ```
 
 The prototype now builds evidence for every option; these numbers are therefore not comparable to the old winner-only solve as the same workload. Target iOS, Android, Safari Wasm, and Chrome Wasm measurements remain outstanding.
 
-The C ABI surface independently reports 44 band-2 options and 780 band-3 options for the square fixture, including both the full four-disc layout and pair layouts at 72 mm.
+The C ABI surface reports 44 band-2 options and 844 band-3 options for the square fixture, including both the full four-disc layout and pair layouts at 72 mm. With sparse mode disabled, band 3 still reports the same 844 dense options. The default sparse policy labels 64 of them incompatible instead of hiding them.
 
 ## Covered fixtures
 
@@ -45,8 +45,10 @@ all passing legal sizes remain present
 band-3 circle at 120 exposes cross, linked-three and four-node L variants
 overlapping parent windows deduplicate physical variants and retain provenance
 band 2 does not engage sparse phases
-band 3 reports every passing sparse phase under ANY
-sparse ALL requires every phase
+band 3 retains every dense option and labels sparse compatibility under ANY
+sparse ALL labels incompatibility without deleting the dense option
+sparse-disabled and sparse-enabled runs have identical dense option sets
+sparse-incompatible staircase remains reviewable
 flap coverage is computed per option
 U corridor retains a lawful non-full connected four-node option
 168 mm band-4 square exposes the complete 4x4 option

@@ -31,6 +31,12 @@ typedef enum MagfitLayoutKindC {
     MAGFIT_LAYOUT_PAIR = 3
 } MagfitLayoutKindC;
 
+typedef enum MagfitSparseStatusC {
+    MAGFIT_SPARSE_NOT_ENGAGED = 0,
+    MAGFIT_SPARSE_COMPATIBLE = 1,
+    MAGFIT_SPARSE_INCOMPATIBLE = 2
+} MagfitSparseStatusC;
+
 typedef enum MagfitBindingKindC {
     MAGFIT_BINDING_MAGNET_DISC = 0,
     MAGFIT_BINDING_DIRECT_CAPSULE = 1
@@ -128,10 +134,12 @@ typedef struct MagfitLayoutOptionC {
     uint32_t verified_link_count;
     MagfitLinkC verified_links[MAGFIT_MAX_LINKS];
 
+    MagfitSparseStatusC sparse_status;
     uint32_t sparse_phase_count;
     int32_t sparse_x_residue_mod4[4];
     int32_t sparse_y_residue_mod4[4];
     int32_t sparse_connected[4];
+    int32_t sparse_compatible[4];
     uint32_t sparse_active_count[4];
     MagfitGridPointC sparse_active_nodes[4][MAGFIT_MAX_NODES];
 

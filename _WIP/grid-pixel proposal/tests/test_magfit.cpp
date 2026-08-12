@@ -17,6 +17,7 @@ using magfit::LayoutOption;
 using magfit::PhaseMode;
 using magfit::PointI;
 using magfit::PolygonInput;
+using magfit::SparseStatus;
 
 namespace {
 
@@ -114,35 +115,70 @@ void test_overlapping_parent_windows_deduplicate_physical_options() {
     }) == 1, "identical physical options must appear exactly once");
 }
 
-void test_band2_sparse_is_disengaged_and_band3_lists_phases() {
+void test_sparse_is_evidence_and_never_filters_dense_options() {
     EnginePolicy policy;
     const BandReview band2 = only_band(magfit::solve(
         square(-36, 36), {magfit::default_band_spec(2, policy)}, policy));
     require(std::all_of(band2.options.begin(), band2.options.end(),
-                        [](const auto& option) { return option.sparse_phases.empty(); }),
+                        [](const auto& option) {
+        return option.sparse_status == SparseStatus::NotEngaged &&
+               option.sparse_phases.empty();
+    }),
             "band 2 must not invent sparse engagement");
 
-    PolygonInput rectangle{{{-60, -12}, {60, -12}, {60, 12}, {-60, 12}}};
+    magfit::BandSpec band = magfit::default_band_spec(3, policy);
+    band.legal_sizes_mm = {120};
     const BandReview band3 = only_band(magfit::solve(
-        rectangle, {magfit::default_band_spec(3, policy)}, policy));
-    require(!band3.options.empty(), "band 3 must expose sparse-compatible options");
-    require(std::all_of(band3.options.begin(), band3.options.end(), [](const auto& option) {
-        return !option.sparse_phases.empty() &&
-               std::all_of(option.sparse_phases.begin(), option.sparse_phases.end(),
-                           [](const auto& phase) {
-            return phase.active_nodes.size() >= 2 && phase.connected;
-        });
-    }), "ANY mode must report every passing phase on each physical option");
+        square(-60, 60), {band}, policy));
+    require(band3.options.size() == 211,
+            "band 3 must retain all 211 dense layouts at one size");
+    require(std::count_if(band3.options.begin(), band3.options.end(),
+                          [](const auto& option) {
+        return option.sparse_status == SparseStatus::Incompatible;
+    }) == 16, "exactly 16 one-size dense layouts must carry incompatible sparse evidence");
+    const LayoutOption* staircase = find_option(
+        band3, 120, {{-2, -2}, {-2, 0}, {0, 0}, {0, 2}});
+    require(staircase != nullptr,
+            "sparse-incompatible staircase must remain a dense review option");
+    require(staircase->sparse_status == SparseStatus::Incompatible &&
+            staircase->sparse_phases.size() == 4 &&
+            std::none_of(staircase->sparse_phases.begin(),
+                         staircase->sparse_phases.end(),
+                         [](const auto& phase) { return phase.compatible; }),
+            "staircase must report why no sparse phase is compatible");
+    require(std::any_of(band3.options.begin(), band3.options.end(), [](const auto& option) {
+        return option.sparse_status == SparseStatus::Compatible;
+    }), "band 3 must also retain sparse-compatible layouts");
+
+    EnginePolicy disabled = policy;
+    disabled.sparse.mode = PhaseMode::Disabled;
+    const BandReview without_sparse = only_band(magfit::solve(
+        square(-60, 60), {band}, disabled));
+    require(without_sparse.options.size() == band3.options.size(),
+            "sparse evidence must not change the dense option count");
+    for (std::size_t i = 0; i < band3.options.size(); ++i) {
+        require(band3.options[i].manufactured_size_mm ==
+                    without_sparse.options[i].manufactured_size_mm &&
+                band3.options[i].magnets == without_sparse.options[i].magnets &&
+                band3.options[i].verified_links ==
+                    without_sparse.options[i].verified_links,
+                "sparse evidence must not change dense option identity or order");
+    }
 }
 
-void test_sparse_all_requires_every_phase() {
-    PolygonInput rectangle{{{-60, -12}, {60, -12}, {60, 12}, {-60, 12}}};
+void test_sparse_all_labels_without_rejecting_options() {
     EnginePolicy policy;
     policy.sparse.mode = PhaseMode::All;
+    magfit::BandSpec spec = magfit::default_band_spec(3, policy);
+    spec.legal_sizes_mm = {120};
     const BandReview band = only_band(magfit::solve(
-        rectangle, {magfit::default_band_spec(3, policy)}, policy));
-    require(band.options.empty(),
-            "ALL mode must expose no option when one phase lacks a connected pair");
+        square(-60, 60), {spec}, policy));
+    require(band.options.size() == 211,
+            "ALL mode must not delete any lawful dense layout");
+    require(std::all_of(band.options.begin(), band.options.end(), [](const auto& option) {
+        return option.sparse_status == SparseStatus::Incompatible &&
+               option.sparse_phases.size() == 4;
+    }), "ALL mode must label failure when any required phase is incompatible");
 }
 
 void test_flap_evidence_is_per_option() {
@@ -239,7 +275,9 @@ void test_deterministic_retrace_invariance_corpus() {
                 const auto& y = b.bands[i].options[j];
                 require(x.manufactured_size_mm == y.manufactured_size_mm &&
                         x.magnets == y.magnets && x.verified_links == y.verified_links &&
-                        x.source_windows == y.source_windows,
+                        x.source_windows == y.source_windows &&
+                        x.sparse_status == y.sparse_status &&
+                        x.sparse_phases == y.sparse_phases,
                         "retrace changed canonical option order or identity");
                 require(x.binding.slack_um_floor >= 0,
                         "lawful option must have non-negative exact slack");
@@ -276,8 +314,8 @@ int main() {
         test_square_exposes_all_band2_sizes_and_layouts();
         test_connected_subsets_are_not_collapsed_to_maximal_component();
         test_overlapping_parent_windows_deduplicate_physical_options();
-        test_band2_sparse_is_disengaged_and_band3_lists_phases();
-        test_sparse_all_requires_every_phase();
+        test_sparse_is_evidence_and_never_filters_dense_options();
+        test_sparse_all_labels_without_rejecting_options();
         test_flap_evidence_is_per_option();
         test_u_corridor_retains_nonfull_four_node_option();
         test_exact_threshold_narrow_limb_is_reported();

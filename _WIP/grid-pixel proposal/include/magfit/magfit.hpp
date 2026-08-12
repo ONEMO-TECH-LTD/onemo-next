@@ -46,6 +46,12 @@ enum class LayoutKind {
     Pair,
 };
 
+enum class SparseStatus {
+    NotEngaged,
+    Compatible,
+    Incompatible,
+};
+
 struct TemplateWindow {
     int runs_x{};
     int runs_y{};
@@ -102,6 +108,9 @@ struct SparsePhaseResult {
     int y_residue_mod4{};
     std::vector<GridPoint> active_nodes;
     bool connected{};
+    bool compatible{};
+
+    friend bool operator==(const SparsePhaseResult&, const SparsePhaseResult&) = default;
 };
 
 struct BindingContact {
@@ -172,9 +181,9 @@ struct LayoutOption {
     std::vector<TemplateWindow> source_windows;
     std::vector<GridPoint> magnets;
     std::vector<std::pair<GridPoint, GridPoint>> verified_links;
-    // Empty means sparse is not engaged. ANY reports every compatible phase,
-    // FIXED reports its one configured phase, and ALL reports every required
-    // passing phase in canonical order.
+    SparseStatus sparse_status{SparseStatus::NotEngaged};
+    // Empty means sparse is not engaged. Otherwise every evaluated phase is
+    // reported, including incompatible phases; sparse policy is evidence only.
     std::vector<SparsePhaseResult> sparse_phases;
     BindingContact binding;
     FlapMetrics flap;

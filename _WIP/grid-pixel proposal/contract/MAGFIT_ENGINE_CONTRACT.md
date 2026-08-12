@@ -1,8 +1,8 @@
 # Magnetic-Grid Review Engine — Prototype Contract
 
-**Contract version:** 0.3-grid-pixel-review
+**Contract version:** 0.3.1-grid-pixel-review
 
-**Reference engine:** `magfit-core/0.3.0-grid-pixel-review`
+**Reference engine:** `magfit-core/0.3.1-grid-pixel-review`
 
 **Scope:** enumerate exact lawful size/layout options for manual review
 **Not a release claim:** this prototype does not select a product or guarantee physical tolerance
@@ -17,7 +17,7 @@ For each requested band, the engine MUST return every distinct lawful option pro
 4. the band's finite 12 mm manufactured-size candidates;
 5. the band's finite centred lattice windows;
 6. every connected supported subset meeting the node floor and band span;
-7. every compatible sparse phase under the declared sparse policy;
+7. sparse compatibility status and phase evidence under the declared sparse policy;
 8. exact support, link, contact, size and flap evidence per option.
 
 The engine MUST NOT rank options, mark a winner, hide a lawful subset, or stop at the first passing size. Topology names are descriptions only. A later one-result-per-band rule may be introduced only after applied review proves it returns the physically correct answer.
@@ -188,7 +188,7 @@ At each legal size and parent window:
 5. reject a subset unless every selected node is supported;
 6. reject it unless the selected graph is connected by verified links;
 7. reject it unless it spans the band;
-8. apply sparse policy;
+8. compute sparse compatibility evidence without filtering the dense option;
 9. emit the option with evidence.
 
 Band 3 has at most nine parent nodes, hence at most `2^9=512` raw subsets per window. Band 4 is exercised by the prototype but its `2^16` raw subsets make it a review/benchmark case, not evidence of a production performance target.
@@ -196,7 +196,7 @@ Band 3 has at most nine parent nodes, hence at most `2^9=512` raw subsets per wi
 Identical physical options found through overlapping parent windows MUST appear once. Identity is:
 
 ```text
-band + size + sorted magnets + sorted verified links + sparse evidence
+band + size + sorted magnets + sorted verified links
 ```
 
 Every contributing parent window remains in `source_windows` as provenance.
@@ -225,12 +225,14 @@ require 96 mm connectivity   true
 
 Band 2 has no sparse engagement because a 96 mm pair plus two 12 mm radii needs 120 mm projected extent.
 
-Modes:
+Modes label an option; none suppresses a lawful dense layout:
 
 - `DISABLED`: no sparse evidence;
-- `FIXED`: the configured phase must pass and is reported;
-- `ANY`: the physical option passes when at least one phase passes; every passing phase is reported on that option;
-- `ALL`: every possible phase must pass; all are reported in canonical order.
+- `FIXED`: `Compatible` when the configured phase passes, otherwise `Incompatible`;
+- `ANY`: `Compatible` when at least one phase passes, otherwise `Incompatible`;
+- `ALL`: `Compatible` only when every possible phase passes, otherwise `Incompatible`.
+
+Every evaluated phase is reported in canonical order with its active nodes, connectivity and compatibility verdict. Sparse status is an attribute for manual review, never a gate on the dense option set.
 
 A single sparse node never satisfies the default. Active sparse nodes must form the declared 96 mm-connected set using the same direct-capsule predicate.
 
@@ -243,7 +245,7 @@ Every emitted option contains:
 - contributing source windows;
 - sorted magnet coordinates;
 - sorted verified links;
-- all passing/required sparse phases;
+- sparse status and every evaluated sparse phase;
 - one deterministic most-limiting disc or link contact;
 - bbox overhang and coverage evidence for 12 mm and 24 mm;
 - sampled tongue and narrow-limb diagnostics.
@@ -276,7 +278,7 @@ Options are ordered only for stable browsing and serialization:
 1. legal size ascending;
 2. sorted magnet coordinates;
 3. sorted verified links;
-4. sparse phase evidence;
+4. sparse status and phase evidence;
 5. source-window provenance.
 
 This is not a quality order. The engine exposes no winner, optimum, default option, or fallback. Manual review is the current product decision.
@@ -318,8 +320,10 @@ Required fixtures:
 - exact disc tangency passes;
 - a missing direct capsule removes that link without deleting another connected option;
 - band 2 contains no sparse phase;
-- band 3 reports every passing phase under `ANY`;
-- `ALL` rejects when any required phase fails;
+- band 3 retains every dense option and reports sparse status under `ANY`;
+- sparse-incompatible staircase remains visible;
+- enabling, disabling, or changing sparse policy never changes the dense option set;
+- `ALL` labels incompatibility without rejecting the dense option;
 - exact-threshold narrow limb evidence is reported;
 - 18 mm overhang fails coverage 12 and passes coverage 24;
 - band 4 full-square fixture is exercised;
@@ -339,12 +343,12 @@ Release gaps that remain explicit:
 
 ## 14. Measured prototype performance
 
-Apple Clang Release, 1,000-vertex polygon, bands 2 and 3, 135 returned options:
+Apple Clang Release, 1,000-vertex polygon, bands 2 and 3, 147 returned options:
 
 ```text
-already-canonical enumeration     122.14 ms mean
-validation plus enumeration       113.61 ms mean
-8,100-point canonicalisation        1.37 ms, 5,872 retained vertices
+already-canonical enumeration     126.24 ms mean
+validation plus enumeration       130.89 ms mean
+8,100-point canonicalisation        1.52 ms, 5,872 retained vertices
 ```
 
 The review workload is larger than the former winner-only solve because evidence is built for every option. These figures do not meet a one-frame interaction target and are not phone/Wasm certification.
@@ -369,6 +373,7 @@ Optimisation must preserve the exact option set. If required, proceed in this or
 - first-fit or first-size return;
 - ranking/topology labels that suppress variants;
 - arbitrary UI filtering presented as engine truth;
+- sparse compatibility used to suppress a lawful dense option;
 - independent dense and sparse transforms;
 - recomputation during pan, zoom, option navigation, or other interaction;
 - silent contour repair;

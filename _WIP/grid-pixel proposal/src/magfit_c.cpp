@@ -12,7 +12,7 @@
 
 namespace {
 
-constexpr const char* kEngineVersion = "magfit-core/0.3.0-grid-pixel-review";
+constexpr const char* kEngineVersion = "magfit-core/0.3.1-grid-pixel-review";
 
 void copy_text(char* destination, std::size_t capacity, const std::string& text) {
     if (destination == nullptr || capacity == 0) return;
@@ -127,6 +127,17 @@ void copy_option(const magfit::LayoutOption& source, MagfitLayoutOptionC& out) {
         };
     }
 
+    switch (source.sparse_status) {
+        case magfit::SparseStatus::NotEngaged:
+            out.sparse_status = MAGFIT_SPARSE_NOT_ENGAGED;
+            break;
+        case magfit::SparseStatus::Compatible:
+            out.sparse_status = MAGFIT_SPARSE_COMPATIBLE;
+            break;
+        case magfit::SparseStatus::Incompatible:
+            out.sparse_status = MAGFIT_SPARSE_INCOMPATIBLE;
+            break;
+    }
     if (source.sparse_phases.size() > 4) {
         throw std::runtime_error("internal error: sparse phase count exceeds C ABI capacity");
     }
@@ -140,6 +151,7 @@ void copy_option(const magfit::LayoutOption& source, MagfitLayoutOptionC& out) {
         out.sparse_x_residue_mod4[phase_index] = phase.x_residue_mod4;
         out.sparse_y_residue_mod4[phase_index] = phase.y_residue_mod4;
         out.sparse_connected[phase_index] = phase.connected ? 1 : 0;
+        out.sparse_compatible[phase_index] = phase.compatible ? 1 : 0;
         out.sparse_active_count[phase_index] =
             static_cast<uint32_t>(phase.active_nodes.size());
         for (std::size_t i = 0; i < phase.active_nodes.size(); ++i) {
