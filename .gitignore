@@ -116,3 +116,5 @@ Icon\r
 .DS_Store
 **/.DS_Store
 browsertime-results/
+
+bin/
