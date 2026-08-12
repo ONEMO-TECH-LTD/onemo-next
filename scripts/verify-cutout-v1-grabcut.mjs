@@ -83,8 +83,8 @@ const finishedExpected = {
   },
 }
 const originalRouteExpected = {
-  chromium: { width: 1587, height: 463, colorType: 6, sha256: '215dee3b2956cb6590850cdb7ed73e0f31d4fc3de1b7f1479f61094fab9ba120' },
-  webkit: { width: 1585, height: 507, colorType: 6, sha256: '018a58eaa03994d01c1d77b0fb7bb9aa46b950331d88fb0b4520f68e09191194' },
+  chromium: { width: 1583, height: 464, colorType: 6, sha256: 'd88c102a0c1a3a573afcc327658f8a70819191c645c44bd288d02a7453da091c' },
+  webkit: { width: 1584, height: 508, colorType: 6, sha256: '654e1bd3da54edd0b0cb67dd3266c9b1a5a8c8052f9c2621e2970e95c6793b0d' },
 }
 
 const pngInfo = (bytes) => ({
@@ -237,7 +237,7 @@ async function runBrowser(browserType) {
     assert.equal(opencvRequests.length, 1, `${browserName}: first real GrabCut must load exactly one provider`)
     assert(routeElapsedMs < 10_000, `${browserName}: real-route GrabCut left the current practical envelope`)
     const edgeFinish = routePage.getByRole('slider', { name: 'shared edge finish' })
-    assert.equal(await edgeFinish.inputValue(), '8', `${browserName}: shared edge finish default changed`)
+    assert.equal(await edgeFinish.inputValue(), '12', `${browserName}: shared edge finish default changed`)
     await routePage.getByRole('button', { name: /Vector/ }).click()
     const vectorPreset = routePage.getByRole('combobox', { name: 'vector preset' })
     const vectorKnob = routePage.locator('input[type=number]').last()
@@ -252,7 +252,7 @@ async function runBrowser(browserType) {
       ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'],
       `${browserName}: named vector preset order changed`,
     )
-    assert.equal(await vectorPreset.inputValue(), 'PURE', `${browserName}: cutout vector preset must default to PURE`)
+    assert.equal(await vectorPreset.inputValue(), 'CLASSIC', `${browserName}: cutout vector preset must default to CLASSIC`)
     await routePage.getByRole('button', { name: 'offset', exact: true }).click()
     assert.deepEqual(
       [await vectorKnob.getAttribute('min'), await vectorKnob.getAttribute('max')],
@@ -298,7 +298,7 @@ async function runBrowser(browserType) {
       assert.deepEqual(await vectorValues(), values, `${browserName}: ${label} values`)
     }
 
-    // Selecting Paint owns the source at named ZERO. Paint erase is the current Paint swath
+    // Selecting Paint owns the source at the current CUSTOM 0/0/15/0/0 recipe. Paint erase is the current Paint swath
     // subtracted from the accepted mask; it is not restricted to boundary-only cuts.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
     await routePage.getByRole('button', { name: /Vector/ }).click()
@@ -322,7 +322,7 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'first Paint erase')
+    await assertVectorRecipe('', { detail: '0', offset: '0', simplify: '15', smooth: '0', radius: '0' }, 'first Paint erase')
     assert.equal(await undo.isDisabled(), false, `${browserName}: accepted Paint erase did not add history`)
     await undo.click()
     await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
@@ -337,7 +337,7 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /added — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'first Paint add')
+    await assertVectorRecipe('', { detail: '0', offset: '0', simplify: '15', smooth: '0', radius: '0' }, 'first Paint add')
     await undo.click()
     await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
     await assertVectorRecipe('TECHNO', { detail: '10', offset: '3', simplify: '0', smooth: '20', radius: '2' }, 'first Paint add Undo restored Cutout')
@@ -351,7 +351,7 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /added — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'Paint before CUSTOM history transition')
+    await assertVectorRecipe('', { detail: '0', offset: '0', simplify: '15', smooth: '0', radius: '0' }, 'Paint before CUSTOM history transition')
     await routePage.getByRole('button', { name: 'smooth', exact: true }).click()
     await vectorKnob.fill('37'); await routePage.waitForTimeout(500)
     assert.equal(await vectorPreset.inputValue(), '', `${browserName}: Paint raw tuning must mark CUSTOM`)
@@ -367,7 +367,7 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /added — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'Paint after history Cutout transition')
+    await assertVectorRecipe('', { detail: '0', offset: '0', simplify: '15', smooth: '0', radius: '0' }, 'Paint after history Cutout transition')
 
     // Paint calibration: the full useful ranges must re-run the latest real Paint stroke live.
     await routePage.getByRole('button', { name: /Clear/ }).click()
@@ -390,7 +390,7 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /painted shape created/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'fresh Paint')
+    await assertVectorRecipe('', { detail: '0', offset: '0', simplify: '15', smooth: '0', radius: '0' }, 'fresh Paint')
     let vectorCanvas = await canvasData()
     for (const [control, value] of Object.entries({ detail: '70', offset: '3', simplify: '30', smooth: '40', radius: '20' })) {
       await routePage.getByRole('button', { name: control, exact: true }).click()
@@ -433,7 +433,9 @@ async function runBrowser(browserType) {
     }
     let paintedCanvas = await canvasData()
     paintedCanvas = await tunePaint(autotune, '300', paintedCanvas)
-    await tunePaint(smoothing, '100', paintedCanvas)
+    await smoothing.fill('100')
+    await status.filter({ hasText: /latest Paint stroke recalculated/ }).waitFor({ timeout: 60_000 })
+    assert.equal(await canvasData(), paintedCanvas, `${browserName}: direct-inverse Paint erase must ignore mask smoothing`)
     await routePage.getByRole('button', { name: /Vector/ }).click()
     assert.equal(await vectorPreset.inputValue(), '', `${browserName}: CUSTOM did not persist through Paint replay`)
     await vectorPreset.selectOption('TECHNO')
@@ -487,14 +489,14 @@ async function runBrowser(browserType) {
     ], 4)
     await status.filter({ hasText: /added — auto-tuned/ }).waitFor({ timeout: 60_000 })
     await routePage.getByRole('button', { name: /Vector/ }).click()
-    await assertVectorRecipe('ZERO', { detail: '0', offset: '0', simplify: '0', smooth: '0', radius: '0' }, 'Paint after new GrabCut')
+    await assertVectorRecipe('', { detail: '0', offset: '0', simplify: '15', smooth: '0', radius: '0' }, 'Paint after new GrabCut')
 
     const publicPage = await context.newPage()
     await publicPage.goto(new URL('/cutout-lab', baseUrl).href, { waitUntil: 'networkidle' })
     await publicPage.getByRole('button', { name: /Vector/ }).click()
     const publicPreset = publicPage.getByRole('combobox', { name: 'vector preset' })
     assert.deepEqual(await publicPreset.locator('option').allTextContents(), ['ZERO', 'PURE', 'CLASSIC', 'TECHNO', 'EDGY', 'FLUID', 'SPACE'], `${browserName}: normal users must receive the named presets`)
-    assert.equal(await publicPreset.inputValue(), 'PURE', `${browserName}: normal users must start on PURE`)
+    assert.equal(await publicPreset.inputValue(), 'CLASSIC', `${browserName}: normal users must start on CLASSIC`)
     assert.equal(await publicPage.getByRole('button', { name: 'detail', exact: true }).count(), 0, `${browserName}: raw vector calibration must stay admin-only`)
     assert.equal(await publicPage.locator('input[type=number]').count(), 0, `${browserName}: raw vector knob must stay admin-only on the Vector tab`)
     await publicPage.close()

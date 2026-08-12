@@ -319,7 +319,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
   const acceptMask = useCallback(async (
     mask: Mask,
     preseg?: MLResult,
-    opts?: { erase?: boolean; shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean },
+    opts?: { shapeTruth?: boolean; source?: OutlineSourceKind; isCurrent?: () => boolean; replaceHistory?: boolean },
   ) => {
     const isCurrent = () => !opts?.isCurrent || opts.isCurrent()
     if (!isCurrent()) return false
@@ -428,7 +428,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
         return
       }
       setBusy(true)
-      void acceptMask(recalculated, undefined, { erase: source.erase, shapeTruth: !source.erase, source: 'paint', isCurrent, replaceHistory: true })
+      void acceptMask(recalculated, undefined, { shapeTruth: !source.erase, source: 'paint', isCurrent, replaceHistory: true })
         .then((ok) => {
           if (ok && isCurrent()) setStatus('⚙️ latest Paint stroke recalculated')
         })
@@ -606,7 +606,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
       // NEVER-DESTROY (meta R12-1): an erase that would gut the shape reverts loudly.
       if (erase && after <= before * MIN_ERASE_KEEP_RATIO) { setStatus('✂️ that would erase almost the whole shape — carve a smaller area'); requestRender(); return }
       if (base && before === after) { setStatus(erase ? '✂️ nothing under the stroke to erase — brush over the edge' : '✅ nothing new under the stroke — brush over the missed area'); requestRender(); return }
-      const ok = await acceptMask(refined, undefined, { erase, source: 'cutout', isCurrent })
+      const ok = await acceptMask(refined, undefined, { source: 'cutout', isCurrent })
       if (ok && isCurrent()) invalidatePaintCalibration()
       if (ok && isCurrent()) setStatus(base ? (erase ? '✂️ carved to the edge' : '✅ added — snapped to the edge') : '✅ shape recognised — refine, tune, or Save')
     } catch (e) {
@@ -634,7 +634,7 @@ export function useCutoutLabFlow(adapters: LabAdapters) {
     }
     setBusy(true)
     try {
-      const ok = await acceptMask(combined, undefined, { erase, shapeTruth: !erase, source: 'paint', isCurrent })
+      const ok = await acceptMask(combined, undefined, { shapeTruth: !erase, source: 'paint', isCurrent })
       if (ok && isCurrent()) {
         paintCalibrationRef.current = source
         setStatus(base ? (erase ? '✂️ erased — auto-tuned' : '✏️ added — auto-tuned') : '✏️ painted shape created — keep painting, erase, or tune')

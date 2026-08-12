@@ -22,8 +22,8 @@
     "files": [
       {
         "file": "src/components/cutout-studio/CutoutStudio.tsx",
-        "bytes": 27520,
-        "sha256": "36b08c6c9f874861910a4c9f3b6b41fd4bc649f156f57437bbdd2891f104e6c3",
+        "bytes": 27709,
+        "sha256": "fbf98066607e14b2c0b8462017f0dd26559afd348cbb82b93c58af9ac91f1f55",
         "destination": "src/components/cutout-studio/CutoutStudio.tsx",
         "layer": "browser-react"
       },
@@ -36,15 +36,15 @@
       },
       {
         "file": "src/components/cutout-studio/finish.ts",
-        "bytes": 17753,
-        "sha256": "5ed3020d04cc752262d566ae73e93d78ce5606994a28ed140e165eb535fba1ba",
+        "bytes": 17754,
+        "sha256": "e620b806cbf92d750ad66d85e17c60ed2267909b6cc8e7814a9f92e5d6fe6f1c",
         "destination": "src/components/cutout-studio/finish.ts",
         "layer": "browser-react"
       },
       {
         "file": "src/components/cutout-studio/flow.ts",
-        "bytes": 49604,
-        "sha256": "628a6a3a4ad8fb6759d6b1cf9161b37aeacad6605926db5947c7d3011f4631b3",
+        "bytes": 49682,
+        "sha256": "9c4ed96bb5e755ac0738aba23f5743df36f33884244cfc1e11685134aac83c72",
         "destination": "src/components/cutout-studio/flow.ts",
         "layer": "browser-react"
       },
@@ -155,8 +155,8 @@
       },
       {
         "file": "src/lib/effect/outline-resolve.ts",
-        "bytes": 21757,
-        "sha256": "c662f5b8b749f0caead8cadb220975b2b6ef4e923dba31642b648f9e8d5d1d01",
+        "bytes": 21742,
+        "sha256": "e2828f7cf8ac6355c58b4ad48c334f456948cacf7d7d56e53293b3218880644a",
         "destination": "src/lib/effect/outline-resolve.ts",
         "layer": "headless"
       },
@@ -197,8 +197,8 @@
       },
       {
         "file": "src/lib/mask-tools/index.ts",
-        "bytes": 9626,
-        "sha256": "167ec35eb34f9bb20fa5b66c728c25e0ec59d2d8bf077e45f0dddb252ad8c58b",
+        "bytes": 9889,
+        "sha256": "5f6e8b890956e795ac6c6bb4f722c9bdc3c7031f4b6a0e38d5270527067e162a",
         "destination": "src/lib/mask-tools/index.ts",
         "layer": "browser-adapter"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 336169,
-    "closureSha256": "7b39388dbad2949cb74d7247695c63df1fdec7677d12bd6f4ef4fd15fae5da8d"
+    "totalBytes": 336685,
+    "closureSha256": "751e5bfa3424566ea41de86a672ab00b12f408a704458fc497d8e5ae1a483699"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-e994569707cc1d51.js",
-        "rawBytes": 61835,
-        "gzipBytesEstimate": 20643,
-        "brotliBytesEstimate": 18276
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-8877c6319761e744.js",
+        "rawBytes": 62132,
+        "gzipBytesEstimate": 20777,
+        "brotliBytesEstimate": 18380
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1297661,
-    "gzipBytesEstimate": 363592,
-    "brotliBytesEstimate": 296981
+    "rawBytes": 1297958,
+    "gzipBytesEstimate": 363726,
+    "brotliBytesEstimate": 297085
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",
@@ -520,7 +520,6 @@
     }
   ],
   "tests": [
-    "scripts/cutout-lab-verify.mjs",
     "scripts/verify-cutout-v1-detector.mjs",
     "scripts/verify-cutout-v1-flow.mjs",
     "scripts/verify-cutout-v1-grabcut.mjs",

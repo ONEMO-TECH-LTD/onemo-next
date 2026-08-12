@@ -258,7 +258,7 @@ describe('later increment defect reproductions', () => {
     expect(finish.match(/return prepareCut\(/g)).toHaveLength(2)
     expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('smoothMask(')
     expect(route('CutoutLabMount.tsx')).toContain('aria-label="shared edge finish"')
-    expect(owner('src/components/cutout-studio/finish.ts')).toContain('edgeFinishPx: 8')
+    expect(owner('src/components/cutout-studio/finish.ts')).toContain('edgeFinishPx: 12')
     expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('wasOutgrownRef')
   })
 })

@@ -193,9 +193,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
     if (cur && imgCanvas.current) { // ring for EVERY brush tool once an image exists (post-Clear too)
       const t = toolRef.current
       if (t !== 'nodes' && t !== 'frame') {
-        const radius = t === 'draw' || t === 'draw-erase'
-          ? brushRef.current / 2
-          : brushRef.current / 2
+        const radius = brushRef.current / 2
         ctx.beginPath()
         ctx.arc(cur.x * img.width, cur.y * img.height, radius * (viewBoxRef.current.w / disp.w), 0, 6.29)
         ctx.lineWidth = Math.max(2, img.width * 0.003)

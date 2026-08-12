@@ -80,8 +80,8 @@ export function maskFromShape(shape: VShape, w: number, h: number): Mask {
 }
 
 /** Mask booleans for the DRAW add/erase combination (Dan's two examples: a drawn loop unions into
- *  or subtracts from the current selection GEOMETRICALLY — no AI). The result re-enters
- *  finishOutline, so padding + smoothing give the elegant joins. */
+ *  or subtracts from the current selection GEOMETRICALLY — no AI). Paint add may polish the combined
+ *  mask; Paint erase remains the direct subtraction. */
 export function unionMasks(base: Mask, add: Mask): Mask {
   const data = new Uint8Array(base.data)
   for (let i = 0; i < data.length; i++) if (add.data[i]) data[i] = 1

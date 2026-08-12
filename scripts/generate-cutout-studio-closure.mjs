@@ -74,7 +74,7 @@ const assets = [
     return { file, bytes: bytes.length, sha256: hash(bytes), destination: file }
   })
 const tests = [...tracked]
-  .filter((file) => file.includes('cutout') && (file.includes('/__tests__/') || file.startsWith('scripts/verify-cutout-v1') || file === 'scripts/cutout-lab-verify.mjs'))
+  .filter((file) => file.includes('cutout') && (file.includes('/__tests__/') || file.startsWith('scripts/verify-cutout-v1')))
   .sort()
 const fixtures = ['public/assets/test-artwork.png'].map((file) => {
   const bytes = readFileSync(resolve(root, file))
