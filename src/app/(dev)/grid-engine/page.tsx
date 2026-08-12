@@ -43,8 +43,7 @@ import {
   type BandOut,
   type FlapSideOut,
   type MagfitResult,
-  type SelectionMode,
-  type SolveLaws,
+  type SolveOffset,
 } from '@/lib/grid-engine/magfit-client'
 import styles from './page.module.css'
 
@@ -182,6 +181,7 @@ export default function GridEnginePage() {
   /** The seven saved cut-out traces, served by the corpus route — pick without an upload. */
   const [corpus, setCorpus] = useState<Record<string, Array<[number, number]>>>({})
   const [corpusName, setCorpusName] = useState('')
+  const [shapesOpen, setShapesOpen] = useState(false)
   useEffect(() => {
     fetch('/api/magfit/corpus')
       .then((r) => (r.ok ? r.json() : {}))
@@ -230,6 +230,8 @@ export default function GridEnginePage() {
     }
     img.src = url
     setCorpusName('')
+    setPlacement(null)
+    setPan([0, 0])
   })
 
   /** A saved trace behaves exactly like a loaded cut-out: same registration, same solve. */
@@ -260,6 +262,8 @@ export default function GridEnginePage() {
     })
     const k = sizeMM / Math.max(w, h)
     setBox({ x: (-w * k) / 2, y: (-h * k) / 2, w: w * k, h: h * k })
+    setPlacement(null)
+    setPan([0, 0])
   }
 
   // ── THE FIT COMPUTE ─────────────────────────────────────────────────────────
@@ -271,23 +275,19 @@ export default function GridEnginePage() {
   const [solveResult, setSolveResult] = useState<MagfitResult | null>(null)
   const [activeSolveBand, setActiveSolveBand] = useState<number | null>(null)
   /**
-   * The one ruled range kept testable (Dan's method — add both options and test):
-   * LAYOUT_FIRST = the full square is the band's calibration (a circle publishes 96/4);
-   * SIZE_FIRST = the smallest passing size wins (the same circle reads 72/pair).
+   * §B10 placement. null = the engine SEARCHES every placement of the shape against the
+   * fixed lattice and answers with the best one. Dragging the lattice pins a placement:
+   * the engine then solves exactly the position on screen — the manual duck workflow as
+   * engine output.
    */
-  const [selection, setSelection] = useState<SelectionMode>('LAYOUT_FIRST')
-  /**
-   * Two optional STRICT filters, both OFF by default — neither is Dan's law (§B7/§B8):
-   * the band-span filter and the strict 96-pair gate. On by choice, for comparison.
-   */
-  const [laws, setLaws] = useState<SolveLaws>({ bandSpan: false, sparsePair: false })
+  const [placement, setPlacement] = useState<SolveOffset | null>(null)
   /** The outline in its own bbox frame, longest side 1 — what the engine was shown. */
   const solveOutline =
     outline && cutout
       ? normaliseOutline(outline.map(([u, v]) => [u * cutout.w, v * cutout.h]))
       : null
   const solveKey = solveOutline
-    ? `${solveOutline.length}:${cutout?.url}:${selection}:${laws.bandSpan}:${laws.sparsePair}`
+    ? `${solveOutline.length}:${cutout?.url}:${placement ? `${placement.x}:${placement.y}` : 'auto'}`
     : ''
 
   useEffect(() => {
@@ -297,13 +297,13 @@ export default function GridEnginePage() {
       return
     }
     let stale = false
-    void solveMagfit(solveOutline, selection, laws).then((result) => {
+    void solveMagfit(solveOutline, placement).then((result) => {
       if (!stale) setSolveResult(result)
     })
     return () => {
       stale = true
     }
-    // solveKey covers outline identity + policy; the outline array is derived per render.
+    // solveKey covers outline identity + placement; the outline array is derived per render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [solveKey])
 
@@ -311,18 +311,28 @@ export default function GridEnginePage() {
     (b) => b.band === activeSolveBand && b.fit,
   )
 
-  /** Show a solved band: the shape takes the engine's size and the lattice meets the layout. */
+  /** Show a solved band: the shape takes the engine's size and the lattice shows the
+      engine's PLACEMENT — pan is placement, and the answer carries its own (§B10). */
   const showSolvedBand = (band: BandOut) => {
     if (!band.fit || !band.sizeMm) return
     setSize(band.sizeMm)
-    // The engine registers by run parity: an even run centres in a gap (magnets at odd
-    // multiples of 24), an odd run on a magnet. The lattice slides to meet the layout via
-    // PAN — placement, exactly what pan is for. Registration stays 'point'; the per-axis
-    // pan carries the parity.
     const r = selectRegistration(spec, 'point')
     if (!r.refused) setSpec(r.spec)
-    setPan([(band.templateRunsX ?? 1) % 2 === 0 ? 24 : 0, (band.templateRunsY ?? 1) % 2 === 0 ? 24 : 0])
+    setPan([band.offsetX ?? 0, band.offsetY ?? 0])
     setActiveSolveBand(band.band)
+  }
+
+  /** Dragging the lattice pins the placement: the engine solves the position on screen. */
+  const pinPlacementFromPan = (panNow: [number, number]) => {
+    if (!cutout) return
+    // Canvas anchor = registration offset + pan; normalise into the engine's (-24, 24]
+    // placement window (the lattice is 48-periodic).
+    const reg = spec.registration === 'gap' ? 24 : 0
+    const norm = (v: number) => {
+      const m = (((v + reg + 24) % 48) + 48) % 48
+      return m - 24 === -24 ? 24 : m - 24
+    }
+    setPlacement({ x: norm(panNow[0]), y: norm(panNow[1]) })
   }
 
   /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
@@ -367,6 +377,8 @@ export default function GridEnginePage() {
     setSolveResult(null)
     setActiveSolveBand(null)
     setCorpusName('')
+    setPlacement(null)
+    setPan([0, 0])
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -542,20 +554,39 @@ export default function GridEnginePage() {
           </span>
         )}
 
-        {/* The seven saved shapes, one tap away — the same traces the corpus run sealed.
-            Chips, not a native select: the OS menu drags in its own checkmark and layout
-            that no stylesheet can reach. */}
-        {Object.keys(corpus).map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={styles.chip}
-            data-on={corpusName === name}
-            onClick={() => loadCorpusShape(name)}
-          >
-            {name.toLowerCase()}
-          </button>
-        ))}
+        {/* The saved shapes as a real dropdown (scales to any number of presets) — own
+            popover, no native select chrome. */}
+        {Object.keys(corpus).length > 0 && (
+          <span className={styles.shapePicker}>
+            <button
+              type="button"
+              className={styles.chip}
+              data-on={shapesOpen || !!corpusName}
+              onClick={() => setShapesOpen((v) => !v)}
+            >
+              {corpusName ? corpusName.toLowerCase() : 'shapes'} ▾
+            </button>
+            {shapesOpen && (
+              <span className={styles.shapeMenu} role="menu">
+                {Object.keys(corpus).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    role="menuitem"
+                    className={styles.shapeItem}
+                    data-on={corpusName === name}
+                    onClick={() => {
+                      setShapesOpen(false)
+                      loadCorpusShape(name)
+                    }}
+                  >
+                    {name.toLowerCase()}
+                  </button>
+                ))}
+              </span>
+            )}
+          </span>
+        )}
 
         {cutout && (
           <button
@@ -612,35 +643,21 @@ export default function GridEnginePage() {
             })}
           </div>
           <div className={styles.fitOpts}>
-            <button
-              type="button"
-              className={styles.chip}
-              data-on={laws.bandSpan}
-              onClick={() => setLaws((l) => ({ ...l, bandSpan: !l.bandSpan }))}
-              title="Optional strict filter (not law): require a band-N layout to stretch across the band's own width. Off by default."
-            >
-              span filter
-            </button>
-            <button
-              type="button"
-              className={styles.chip}
-              data-on={laws.sparsePair}
-              onClick={() => setLaws((l) => ({ ...l, sparsePair: !l.sparsePair }))}
-              title="Optional strict filter (not law): require bands 3+ to couple to the 96mm garment as a connected pair. Off by default — engagement is always reported and preferred in ranking."
-            >
-              96 strict
-            </button>
-            <button
-              type="button"
-              className={styles.chip}
-              data-on={selection === 'LAYOUT_FIRST'}
-              onClick={() =>
-                setSelection((s) => (s === 'LAYOUT_FIRST' ? 'SIZE_FIRST' : 'LAYOUT_FIRST'))
-              }
-              title="LAYOUT FIRST: the strongest, most balanced layout the material carries governs. SIZE FIRST: smallest passing size wins."
-            >
-              {selection === 'LAYOUT_FIRST' ? 'layout first' : 'size first'}
-            </button>
+            {placement ? (
+              <button
+                type="button"
+                className={styles.chip}
+                data-on
+                onClick={() => setPlacement(null)}
+                title={`Solving the placement you dragged to (${placement.x}, ${placement.y})mm. Tap to let the engine search every placement again.`}
+              >
+                pinned ({placement.x},{placement.y}) — release
+              </button>
+            ) : (
+              <span className={styles.fieldReadout} title="The engine searches every placement of the shape against the fixed lattice and answers with the best one. Drag the grid to pin a placement of your own.">
+                best placement
+              </span>
+            )}
           </div>
           {solveResult && !solveResult.ok && (
             <span style={{ fontSize: 11, color: '#b91c1c' }}>{solveResult.error}</span>
@@ -683,6 +700,7 @@ export default function GridEnginePage() {
               ])
             }}
             onPointerUp={(e) => {
+              if (panGrabbedAt.current) pinPlacementFromPan(pan)
               panGrabbedAt.current = null
               e.currentTarget.releasePointerCapture?.(e.pointerId)
             }}

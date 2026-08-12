@@ -125,13 +125,14 @@ std::string json_escape(const std::string& text) {
     return out;
 }
 
-void print_points(std::ostream& os, const std::vector<magfit::GridPoint>& points, int half_pitch) {
+void print_points(std::ostream& os, const std::vector<magfit::GridPoint>& points,
+                  int off_x, int off_y, int pitch) {
     os << '[';
     for (std::size_t i = 0; i < points.size(); ++i) {
         if (i) os << ',';
         os << "{\"x24\":" << points[i].x24 << ",\"y24\":" << points[i].y24
-           << ",\"xMm\":" << points[i].x24 * half_pitch
-           << ",\"yMm\":" << points[i].y24 * half_pitch << '}';
+           << ",\"xMm\":" << off_x + points[i].x24 * pitch
+           << ",\"yMm\":" << off_y + points[i].y24 * pitch << '}';
     }
     os << ']';
 }
@@ -174,6 +175,14 @@ int main() {
         policy.selection = selection == "SIZE_FIRST" ? magfit::Selection::SizeFirst
                                                      : magfit::Selection::LayoutFirst;
         policy.require_24mm_links = number_field(request, "requireLinks").value_or(1.0L) != 0.0L;
+        // §B10: the canvas pan — solve the placement the admin is looking at.
+        const auto off_x = number_field(request, "offsetX");
+        const auto off_y = number_field(request, "offsetY");
+        if (off_x || off_y) {
+            policy.explicit_offset = true;
+            policy.offset_x_mm = static_cast<int>(off_x.value_or(0.0L));
+            policy.offset_y_mm = static_cast<int>(off_y.value_or(0.0L));
+        }
         // Off by default — Dan disavowed the band-span gate as law (addendum §B7).
         policy.require_band_span = number_field(request, "requireBandSpan").value_or(0.0L) != 0.0L;
 
@@ -197,6 +206,8 @@ int main() {
                 // v2 result contract: the link law and tier identity travel with the
                 // answer so no consumer has to infer them.
                 os << ",\"linkMode\":\"DIRECT_CAPSULE\""
+                   << ",\"offsetX\":" << band.offset_x_mm
+                   << ",\"offsetY\":" << band.offset_y_mm
                    << ",\"tierNodes\":" << band.magnets.size()
                    << ",\"sizeMm\":" << band.manufactured_size_mm
                    << ",\"widthMm\":" << band.manufactured_width_mm
@@ -204,23 +215,26 @@ int main() {
                    << ",\"templateRunsX\":" << band.template_runs_x
                    << ",\"templateRunsY\":" << band.template_runs_y
                    << ",\"magnets\":";
-                print_points(os, band.magnets, policy.half_pitch_mm);
+                print_points(os, band.magnets, band.offset_x_mm, band.offset_y_mm,
+                             policy.dense_pitch_mm);
                 os << ",\"links\":[";
                 for (std::size_t k = 0; k < band.verified_links.size(); ++k) {
                     if (k) os << ',';
                     const auto& [a, b] = band.verified_links[k];
-                    os << "{\"ax\":" << a.x24 * policy.half_pitch_mm
-                       << ",\"ay\":" << a.y24 * policy.half_pitch_mm
-                       << ",\"bx\":" << b.x24 * policy.half_pitch_mm
-                       << ",\"by\":" << b.y24 * policy.half_pitch_mm << '}';
+                    os << "{\"ax\":" << band.offset_x_mm + a.x24 * policy.dense_pitch_mm
+                       << ",\"ay\":" << band.offset_y_mm + a.y24 * policy.dense_pitch_mm
+                       << ",\"bx\":" << band.offset_x_mm + b.x24 * policy.dense_pitch_mm
+                       << ",\"by\":" << band.offset_y_mm + b.y24 * policy.dense_pitch_mm << '}';
                 }
                 os << ']';
                 os << ",\"binding\":{\"kind\":\""
                    << (band.binding.kind == magfit::BindingContact::Kind::MagnetDisc
                            ? "MAGNET_DISC"
                            : "LINK_CAPSULE")
-                   << "\",\"nodeXMm\":" << band.binding.node_a.x24 * policy.half_pitch_mm
-                   << ",\"nodeYMm\":" << band.binding.node_a.y24 * policy.half_pitch_mm
+                   << "\",\"nodeXMm\":"
+                   << band.offset_x_mm + band.binding.node_a.x24 * policy.dense_pitch_mm
+                   << ",\"nodeYMm\":"
+                   << band.offset_y_mm + band.binding.node_a.y24 * policy.dense_pitch_mm
                    << ",\"edgeIndex\":" << band.binding.polygon_edge_index
                    << ",\"clearanceMm\":" << band.binding.clearance_mm
                    << ",\"slackMm\":" << band.binding.slack_mm
@@ -250,7 +264,8 @@ int main() {
                        << ",\"yResidue\":" << band.sparse_phase->y_residue_mod4
                        << ",\"connected\":" << (band.sparse_phase->connected ? "true" : "false")
                        << ",\"activeNodes\":";
-                    print_points(os, band.sparse_phase->active_nodes, policy.half_pitch_mm);
+                    print_points(os, band.sparse_phase->active_nodes, band.offset_x_mm,
+                                 band.offset_y_mm, policy.dense_pitch_mm);
                     os << '}';
                 }
             }

@@ -30,6 +30,8 @@ export interface BandOut {
   band: number
   fit: boolean
   reason: string
+  offsetX?: number
+  offsetY?: number
   sizeMm?: number
   widthMm?: number
   heightMm?: number
@@ -65,8 +67,6 @@ export interface MagfitResult {
   error?: string
 }
 
-export type SelectionMode = 'LAYOUT_FIRST' | 'SIZE_FIRST'
-
 /**
  * The engine centres the shape's bbox on the lattice origin and scales its longest side to
  * each candidate size. Handing it the outline normalised the same way (bbox centred, longest
@@ -89,27 +89,21 @@ export function normaliseOutline(outline: OutlinePoint[]): OutlinePoint[] {
   return outline.map(([x, y]) => [(x - cx) / span, (y - cy) / span])
 }
 
-/**
- * Two optional STRICT filters, off by default (§B7/§B8 — neither is Dan's law): the
- * band-span filter (a band-N layout must stretch across the band) and the strict 96
- * gate (bands 3+ must couple to the sparse garment as a connected pair). By default the
- * engine reports 96 engagement as evidence and prefers it in ranking, without gating.
- */
-export interface SolveLaws {
-  bandSpan: boolean
-  sparsePair: boolean
+/** §B10: an explicit placement of the shape against the fixed lattice (the canvas pan). */
+export interface SolveOffset {
+  x: number
+  y: number
 }
 
 /**
- * One solve, all bands. Policy defaults are the addendum's law: layout-first calibration,
- * 96mm engaging from band 3 with a connected pair, band-span required. The selection mode
- * and the two law gates are the ruled ranges kept testable (Dan's method: add all options
- * and test).
+ * One solve, all bands, under the settled law (§B6–§B10): free even-mm sizes, no
+ * invented gates, 96 engagement reported and preferred, balanced selection. With no
+ * offset the engine SEARCHES every placement and returns the best; with an offset (the
+ * canvas pan) it solves exactly the placement the admin is looking at.
  */
 export async function solveMagfit(
   outline: OutlinePoint[],
-  selection: SelectionMode,
-  laws: SolveLaws = { bandSpan: false, sparsePair: false },
+  offset: SolveOffset | null = null,
 ): Promise<MagfitResult> {
   try {
     const response = await fetch('/api/magfit', {
@@ -119,13 +113,7 @@ export async function solveMagfit(
         vertices: normaliseOutline(outline),
         bands: [2, 3, 4],
         scale: 20000,
-        selection,
-        sparseMode: 'ANY',
-        sparseMinBand: 3,
-        sparseMinActive: laws.sparsePair ? 2 : 1,
-        require96Connected: laws.sparsePair,
-        requireLinks: true,
-        requireBandSpan: laws.bandSpan,
+        ...(offset ? { offsetX: offset.x, offsetY: offset.y } : {}),
       }),
     })
     return (await response.json()) as MagfitResult

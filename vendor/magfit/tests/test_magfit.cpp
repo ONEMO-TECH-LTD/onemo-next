@@ -173,13 +173,16 @@ void test_band3_strict_sparse_mode() {
     // §B8: 96 engagement is advisory by default — the STRICT pair gate (two active
     // nodes, connected) is an explicit mode. Under it, a FIXED phase that keeps no
     // nodes rejects; the compatible phase passes with a connected pair.
+    // Residues are mod 2 on lattice indices (§B10): the ribbon's single row sits at
+    // index 0, so a fixed phase demanding odd rows keeps nothing; odd columns keep the
+    // two outer nodes of a three-run — the 96mm pair.
     PolygonInput rectangle{{{-60, -12}, {60, -12}, {60, 12}, {-60, 12}}};
     EnginePolicy wrong_phase;
     wrong_phase.sparse.mode = PhaseMode::Fixed;
     wrong_phase.sparse.min_active_nodes = 2;
     wrong_phase.sparse.require_96mm_connected = true;
     wrong_phase.sparse.fixed_x_residue_mod4 = 0;
-    wrong_phase.sparse.fixed_y_residue_mod4 = 2;
+    wrong_phase.sparse.fixed_y_residue_mod4 = 1;
     const BandResult rejected = only_band(magfit::solve(
         rectangle, {magfit::default_band_spec(3, wrong_phase)}, wrong_phase));
     require(!rejected.fit,
@@ -189,7 +192,7 @@ void test_band3_strict_sparse_mode() {
     right_phase.sparse.mode = PhaseMode::Fixed;
     right_phase.sparse.min_active_nodes = 2;
     right_phase.sparse.require_96mm_connected = true;
-    right_phase.sparse.fixed_x_residue_mod4 = 2;
+    right_phase.sparse.fixed_x_residue_mod4 = 1;
     right_phase.sparse.fixed_y_residue_mod4 = 0;
     const BandResult accepted = only_band(magfit::solve(
         rectangle, {magfit::default_band_spec(3, right_phase)}, right_phase));
@@ -288,23 +291,21 @@ void test_prepared_equals_one_shot() {
     }
 }
 
-void test_cross_trivial_limb_reported() {
-    // The cross fits a pair at 72; the perpendicular flaps measure exactly 24 mm. Under
-    // L14 they pass the 24 limit, fail the 12 limit — and no 24 mm-wide tongue passes
-    // through an outer magnet, so the 12-limit excess is the reported trivial-limb
-    // exception, not a broad flap.
+void test_cross_l_support_and_flap_facts() {
+    // §B10: the placement search finds the strongest support the material carries — for
+    // the cross that is a three-magnet L through its arms at 108 mm (one node per arm
+    // reach), outranking the centred 72 mm pair by tier. The far arms then read as
+    // genuine broad overhangs (the 36 mm-wide arm carries a full 24 mm tongue past the
+    // limit), while the covered sides sit at zero.
     const BandResult band = only_band(
         magfit::solve(cross_shape(), {magfit::default_band_spec(2)}));
-    require(band.fit && band.manufactured_size_mm == 72 && band.magnets.size() == 2,
-            "cross should hold a 72 mm pair");
-    const bool horizontal = band.template_runs_x == 2;
-    const magfit::FlapSide& far_a = horizontal ? band.flap.top : band.flap.right;
-    const magfit::FlapSide& far_b = horizontal ? band.flap.bottom : band.flap.left;
-    require_near(far_a.mm, 24.0, 1e-9, "perpendicular flap measures 24 mm");
-    require(far_a.within_24 && far_b.within_24, "24 mm overhang passes the 24 limit");
-    require(!far_a.within_12 && !far_b.within_12, "24 mm overhang exceeds the 12 limit");
-    require(!far_a.broad_beyond_12 && !far_b.broad_beyond_12,
-            "no broad tongue through an outer magnet — trivial-limb exception reported");
+    require(band.fit && band.manufactured_size_mm == 108 && band.magnets.size() == 3,
+            "cross should hold the three-node L at 108 mm");
+    require(band.verified_links.size() == 2, "the L is two linked pairs sharing a node");
+    require_near(band.flap.right.mm, 0.0, 1e-9, "covered side has zero flap");
+    require(band.flap.right.within_12, "zero flap passes the 12 limit");
+    require(!band.flap.left.within_24 && band.flap.left.broad_beyond_24,
+            "the far arm is a genuine broad overhang, not a trivial limb");
 }
 
 
@@ -469,7 +470,7 @@ int main() {
         test_band4_square_regression();
         test_u_shape_curved_connection_via_adjacent_links();
         test_prepared_equals_one_shot();
-        test_cross_trivial_limb_reported();
+        test_cross_l_support_and_flap_facts();
         test_collinear_backtracking_rejected();
         test_large_coordinate_origin_is_safe();
         test_flap_switches_use_exact_rationals();

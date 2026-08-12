@@ -26,6 +26,19 @@ struct P128 {
 struct ScaledPolygon {
     std::vector<P128> vertices;
     i128 coordinate_denominator{};  // Divide internal coordinates by this to obtain mm.
+    // Exact pruning index (§B10 performance): 24mm cells over the scaled bbox. An edge
+    // is registered in every cell its own bbox overlaps. Any geometry in a cell at
+    // Chebyshev distance ≥ 2 from a query's cell is provably ≥ 24mm away, so 12mm
+    // queries only visit the 3×3 ring; point-in-polygon only needs edges whose
+    // y-interval straddles the query row. Pruning by proven bound — the predicates on
+    // the surviving edges are the same exact routines.
+    i128 cell_size{};
+    i128 grid_min_x{};
+    i128 grid_min_y{};
+    int cols{};
+    int rows{};
+    std::vector<std::vector<int>> cell_edges;
+    std::vector<std::vector<int>> row_edges;
 };
 
 struct DistanceSquared {
@@ -33,12 +46,6 @@ struct DistanceSquared {
     // Actual squared mm distance is (num / den) / coordinate_denominator^2.
     i128 num{};
     i128 den{1};
-};
-
-struct TemplateGrid {
-    int runs_x{};
-    int runs_y{};
-    std::vector<GridPoint> nodes;
 };
 
 struct Candidate {
@@ -56,6 +63,8 @@ struct Candidate {
     // (L14a's "flap evened out on all sides").
     i64 worst_flap_num{};
     i64 imbalance_num{};
+    int off_x{};
+    int off_y{};
 };
 
 [[noreturn]] void fail(const std::string& message) {
@@ -285,6 +294,12 @@ void validate_no_collinear_backtracking(const std::vector<PointI>& v) {
     }
 }
 
+i128 floor_div(i128 a, i128 b) {
+    i128 q = a / b;
+    if ((a % b != 0) && ((a < 0) != (b < 0))) --q;
+    return q;
+}
+
 ScaledPolygon scale_polygon(const CanonicalPolygon& polygon, int size_mm) {
     ScaledPolygon out;
     out.coordinate_denominator = static_cast<i128>(2) * polygon.max_span;
@@ -298,24 +313,70 @@ ScaledPolygon scale_polygon(const CanonicalPolygon& polygon, int size_mm) {
         out.vertices.push_back({static_cast<i128>(size_mm) * relative2_x,
                                 static_cast<i128>(size_mm) * relative2_y});
     }
+
+    // Build the exact pruning index: 24mm cells in internal units.
+    const std::size_t n = out.vertices.size();
+    out.cell_size = static_cast<i128>(24) * out.coordinate_denominator;
+    i128 min_x = out.vertices.front().x;
+    i128 max_x = min_x;
+    i128 min_y = out.vertices.front().y;
+    i128 max_y = min_y;
+    for (const P128& v : out.vertices) {
+        min_x = std::min(min_x, v.x);
+        max_x = std::max(max_x, v.x);
+        min_y = std::min(min_y, v.y);
+        max_y = std::max(max_y, v.y);
+    }
+    out.grid_min_x = min_x;
+    out.grid_min_y = min_y;
+    out.cols = static_cast<int>(floor_div(max_x - min_x, out.cell_size)) + 1;
+    out.rows = static_cast<int>(floor_div(max_y - min_y, out.cell_size)) + 1;
+    out.cell_edges.assign(static_cast<std::size_t>(out.cols) * out.rows, {});
+    out.row_edges.assign(out.rows, {});
+    for (std::size_t i = 0; i < n; ++i) {
+        const P128& a = out.vertices[i];
+        const P128& b = out.vertices[(i + 1) % n];
+        const i128 lo_x = std::min(a.x, b.x);
+        const i128 hi_x = std::max(a.x, b.x);
+        const i128 lo_y = std::min(a.y, b.y);
+        const i128 hi_y = std::max(a.y, b.y);
+        const int c0 = static_cast<int>(floor_div(lo_x - min_x, out.cell_size));
+        const int c1 = static_cast<int>(floor_div(hi_x - min_x, out.cell_size));
+        const int r0 = static_cast<int>(floor_div(lo_y - min_y, out.cell_size));
+        const int r1 = static_cast<int>(floor_div(hi_y - min_y, out.cell_size));
+        for (int r = r0; r <= r1; ++r) {
+            out.row_edges[r].push_back(static_cast<int>(i));
+            for (int c = c0; c <= c1; ++c) {
+                out.cell_edges[static_cast<std::size_t>(r) * out.cols + c].push_back(
+                    static_cast<int>(i));
+            }
+        }
+    }
     return out;
 }
 
-P128 grid_to_internal(const GridPoint& grid, const ScaledPolygon& polygon,
-                      const EnginePolicy& policy) {
-    const i128 x_mm = static_cast<i128>(grid.x24) * policy.half_pitch_mm;
-    const i128 y_mm = static_cast<i128>(grid.y24) * policy.half_pitch_mm;
+P128 grid_to_internal(const GridPoint& grid, int off_x, int off_y,
+                      const ScaledPolygon& polygon, const EnginePolicy& policy) {
+    const i128 x_mm = static_cast<i128>(off_x) +
+                      static_cast<i128>(grid.x24) * policy.dense_pitch_mm;
+    const i128 y_mm = static_cast<i128>(off_y) +
+                      static_cast<i128>(grid.y24) * policy.dense_pitch_mm;
     return {x_mm * polygon.coordinate_denominator,
             y_mm * polygon.coordinate_denominator};
 }
 
 enum class PointLocation { Outside, Inside, Boundary };
 
-PointLocation locate_point(const P128& p, const std::vector<P128>& polygon) {
+PointLocation locate_point(const P128& p, const ScaledPolygon& polygon) {
+    // Only edges whose y-interval straddles p.y can cross the winding ray or carry p;
+    // the row index lists exactly those (plus row-mates, harmless to re-test).
+    int row = static_cast<int>(floor_div(p.y - polygon.grid_min_y, polygon.cell_size));
+    if (row < 0 || row >= polygon.rows) return PointLocation::Outside;
     int winding = 0;
-    for (std::size_t i = 0; i < polygon.size(); ++i) {
-        const P128& a = polygon[i];
-        const P128& b = polygon[(i + 1) % polygon.size()];
+    const std::size_t n = polygon.vertices.size();
+    for (int index : polygon.row_edges[static_cast<std::size_t>(row)]) {
+        const P128& a = polygon.vertices[static_cast<std::size_t>(index)];
+        const P128& b = polygon.vertices[(static_cast<std::size_t>(index) + 1) % n];
         if (on_segment(p, a, b)) return PointLocation::Boundary;
 
         if (a.y <= p.y) {
@@ -396,19 +457,49 @@ bool distance_ge_radius(const DistanceSquared& distance2, i128 radius) {
     return distance2.num >= square128(radius) * distance2.den;
 }
 
-bool disc_supported(const P128& centre, const ScaledPolygon& polygon,
-                    const EnginePolicy& policy) {
-    if (locate_point(centre, polygon.vertices) == PointLocation::Outside) return false;
-    const i128 radius = static_cast<i128>(policy.disc_radius_mm) *
-                        polygon.coordinate_denominator;
-    for (std::size_t i = 0; i < polygon.vertices.size(); ++i) {
-        const P128& a = polygon.vertices[i];
-        const P128& b = polygon.vertices[(i + 1) % polygon.vertices.size()];
-        if (!distance_ge_radius(point_segment_distance2(centre, a, b), radius)) {
-            return false;
+// The 3×3 cell ring around a query cell contains every edge that can lie within one
+// cell size (24mm) of the query — anything outside is provably ≥ 24mm > 12mm away.
+template <typename Visit>
+void for_ring_edges(const ScaledPolygon& polygon, const P128& lo, const P128& hi,
+                    Visit&& visit) {
+    const int c0 = std::max<int>(
+        0, static_cast<int>(floor_div(lo.x - polygon.grid_min_x, polygon.cell_size)) - 1);
+    const int c1 = std::min<int>(
+        polygon.cols - 1,
+        static_cast<int>(floor_div(hi.x - polygon.grid_min_x, polygon.cell_size)) + 1);
+    const int r0 = std::max<int>(
+        0, static_cast<int>(floor_div(lo.y - polygon.grid_min_y, polygon.cell_size)) - 1);
+    const int r1 = std::min<int>(
+        polygon.rows - 1,
+        static_cast<int>(floor_div(hi.y - polygon.grid_min_y, polygon.cell_size)) + 1);
+    // Stamp-free dedupe: rings are ≤ 4×4 cells; edges may repeat across cells, and the
+    // predicates tolerate re-testing. Correctness needs coverage, not uniqueness.
+    for (int r = r0; r <= r1; ++r) {
+        for (int c = c0; c <= c1; ++c) {
+            for (int index :
+                 polygon.cell_edges[static_cast<std::size_t>(r) * polygon.cols + c]) {
+                visit(index);
+            }
         }
     }
-    return true;
+}
+
+bool disc_supported(const P128& centre, const ScaledPolygon& polygon,
+                    const EnginePolicy& policy) {
+    const i128 radius = static_cast<i128>(policy.disc_radius_mm) *
+                        polygon.coordinate_denominator;
+    const std::size_t n = polygon.vertices.size();
+    bool clear = true;
+    for_ring_edges(polygon, centre, centre, [&](int index) {
+        if (!clear) return;
+        const P128& a = polygon.vertices[static_cast<std::size_t>(index)];
+        const P128& b = polygon.vertices[(static_cast<std::size_t>(index) + 1) % n];
+        if (!distance_ge_radius(point_segment_distance2(centre, a, b), radius)) {
+            clear = false;
+        }
+    });
+    if (!clear) return false;
+    return locate_point(centre, polygon) != PointLocation::Outside;
 }
 
 DistanceSquared segment_segment_distance2(const P128& a, const P128& b,
@@ -429,82 +520,73 @@ DistanceSquared segment_segment_distance2(const P128& a, const P128& b,
 
 bool capsule_supported(const P128& a, const P128& b, const ScaledPolygon& polygon,
                        const EnginePolicy& policy) {
-    if (locate_point(a, polygon.vertices) == PointLocation::Outside ||
-        locate_point(b, polygon.vertices) == PointLocation::Outside) {
+    if (locate_point(a, polygon) == PointLocation::Outside ||
+        locate_point(b, polygon) == PointLocation::Outside) {
         return false;
     }
     const i128 radius = static_cast<i128>(policy.disc_radius_mm) *
                         polygon.coordinate_denominator;
-    for (std::size_t i = 0; i < polygon.vertices.size(); ++i) {
-        const P128& c = polygon.vertices[i];
-        const P128& d = polygon.vertices[(i + 1) % polygon.vertices.size()];
+    const P128 lo{std::min(a.x, b.x), std::min(a.y, b.y)};
+    const P128 hi{std::max(a.x, b.x), std::max(a.y, b.y)};
+    const std::size_t n = polygon.vertices.size();
+    bool clear = true;
+    for_ring_edges(polygon, lo, hi, [&](int index) {
+        if (!clear) return;
+        const P128& c = polygon.vertices[static_cast<std::size_t>(index)];
+        const P128& d = polygon.vertices[(static_cast<std::size_t>(index) + 1) % n];
         if (!distance_ge_radius(segment_segment_distance2(a, b, c, d), radius)) {
-            return false;
+            clear = false;
         }
-    }
-    return true;
+    });
+    return clear;
 }
 
-std::vector<int> run_coordinates(int count) {
-    std::vector<int> out;
-    out.reserve(count);
-    for (int i = 0; i < count; ++i) out.push_back(-(count - 1) + 2 * i);
+// §B10 — the FIELD SCAN. Dan's law, demonstrated on the duck: the garment lattice is
+// FIXED and the shape sits against it at a placement offset; the fit is every lattice
+// point the material backs, wherever it falls. A node's position in the shape frame is
+// offset + 48·index per axis; the scan covers every such point inside the shape's own
+// bbox, up to the 9-positions-per-axis field ceiling.
+std::vector<GridPoint> field_nodes(const CanonicalPolygon& polygon, int size_mm,
+                                   int off_x, int off_y,
+                                   const EnginePolicy& policy) {
+    std::vector<GridPoint> out;
+    const i128 den2 = static_cast<i128>(2) * polygon.max_span;
+    const i128 half_w_rhs = static_cast<i128>(size_mm) * (polygon.max_x - polygon.min_x);
+    const i128 half_h_rhs = static_cast<i128>(size_mm) * (polygon.max_y - polygon.min_y);
+    for (int iy = -4; iy <= 4; ++iy) {
+        const i128 y_mm = static_cast<i128>(off_y) +
+                          static_cast<i128>(iy) * policy.dense_pitch_mm;
+        const i128 y_lhs = (y_mm < 0 ? -y_mm : y_mm) * den2;
+        if (y_lhs > half_h_rhs) continue;
+        for (int ix = -4; ix <= 4; ++ix) {
+            const i128 x_mm = static_cast<i128>(off_x) +
+                              static_cast<i128>(ix) * policy.dense_pitch_mm;
+            const i128 x_lhs = (x_mm < 0 ? -x_mm : x_mm) * den2;
+            if (x_lhs > half_w_rhs) continue;
+            out.push_back({ix, iy});
+        }
+    }
     return out;
 }
 
-std::vector<TemplateGrid> templates_for_band(int band) {
-    std::vector<TemplateGrid> templates;
-    for (int runs_x = 1; runs_x <= band; ++runs_x) {
-        for (int runs_y = 1; runs_y <= band; ++runs_y) {
-            if (std::max(runs_x, runs_y) != band) continue;
-            TemplateGrid grid;
-            grid.runs_x = runs_x;
-            grid.runs_y = runs_y;
-            const auto xs = run_coordinates(runs_x);
-            const auto ys = run_coordinates(runs_y);
-            for (int y : ys) {
-                for (int x : xs) grid.nodes.push_back({x, y});
-            }
-            templates.push_back(std::move(grid));
-        }
-    }
-    std::sort(templates.begin(), templates.end(), [](const TemplateGrid& a,
-                                                      const TemplateGrid& b) {
-        const int count_a = a.runs_x * a.runs_y;
-        const int count_b = b.runs_x * b.runs_y;
-        if (count_a != count_b) return count_a > count_b;
-        const int imbalance_a = std::abs(a.runs_x - a.runs_y);
-        const int imbalance_b = std::abs(b.runs_x - b.runs_y);
-        if (imbalance_a != imbalance_b) return imbalance_a < imbalance_b;
-        if (a.runs_x != b.runs_x) return a.runs_x > b.runs_x;
-        return a.runs_y > b.runs_y;
-    });
-    return templates;
-}
-
 bool adjacent_48(const GridPoint& a, const GridPoint& b) {
-    return std::abs(a.x24 - b.x24) + std::abs(a.y24 - b.y24) == 2;
+    return std::abs(a.x24 - b.x24) + std::abs(a.y24 - b.y24) == 1;
 }
 
 bool adjacent_96(const GridPoint& a, const GridPoint& b) {
-    return std::abs(a.x24 - b.x24) + std::abs(a.y24 - b.y24) == 4;
+    return std::abs(a.x24 - b.x24) + std::abs(a.y24 - b.y24) == 2;
 }
 
 int mod4(int value) {
-    int r = value % 4;
-    return r < 0 ? r + 4 : r;
+    // Historic name; residues are mod 2 on lattice indices — the 96 garment keeps
+    // every second lattice point per axis.
+    int r = value % 2;
+    return r < 0 ? r + 2 : r;
 }
 
 std::vector<std::pair<int, int>> possible_sparse_phases(const std::vector<GridPoint>& nodes) {
     if (nodes.empty()) return {};
-    const int parity_x = mod4(nodes.front().x24) % 2;
-    const int parity_y = mod4(nodes.front().y24) % 2;
-    return {
-        {parity_x, parity_y},
-        {parity_x, parity_y + 2},
-        {parity_x + 2, parity_y},
-        {parity_x + 2, parity_y + 2},
-    };
+    return {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
 }
 
 struct SparseEvaluation {
@@ -514,7 +596,7 @@ struct SparseEvaluation {
 };
 
 SparseEvaluation evaluate_one_sparse_phase(const std::vector<GridPoint>& nodes,
-                                            int rx, int ry,
+                                            int rx, int ry, int off_x, int off_y,
                                             const ScaledPolygon& polygon,
                                             const EnginePolicy& policy) {
     SparseEvaluation out;
@@ -542,8 +624,10 @@ SparseEvaluation evaluate_one_sparse_phase(const std::vector<GridPoint>& nodes,
                              out.representative.active_nodes[j])) {
                 continue;
             }
-            const P128 a = grid_to_internal(out.representative.active_nodes[i], polygon, policy);
-            const P128 b = grid_to_internal(out.representative.active_nodes[j], polygon, policy);
+            const P128 a = grid_to_internal(out.representative.active_nodes[i], off_x, off_y,
+                                            polygon, policy);
+            const P128 b = grid_to_internal(out.representative.active_nodes[j], off_x, off_y,
+                                            polygon, policy);
             if (!capsule_supported(a, b, polygon, policy)) continue;
             adjacency[i].push_back(j);
             adjacency[j].push_back(i);
@@ -571,6 +655,7 @@ SparseEvaluation evaluate_one_sparse_phase(const std::vector<GridPoint>& nodes,
 }
 
 SparseEvaluation evaluate_sparse(const std::vector<GridPoint>& nodes,
+                                 int off_x, int off_y,
                                  const ScaledPolygon& polygon,
                                  const EnginePolicy& policy) {
     if (policy.sparse.mode == PhaseMode::Disabled) {
@@ -590,7 +675,8 @@ SparseEvaluation evaluate_sparse(const std::vector<GridPoint>& nodes,
     std::vector<SparseEvaluation> evaluations;
     evaluations.reserve(phases.size());
     for (const auto& [rx, ry] : phases) {
-        evaluations.push_back(evaluate_one_sparse_phase(nodes, rx, ry, polygon, policy));
+        evaluations.push_back(
+            evaluate_one_sparse_phase(nodes, rx, ry, off_x, off_y, polygon, policy));
     }
 
     if (policy.sparse.mode == PhaseMode::All) {
@@ -639,7 +725,7 @@ bool component_spans_band(const std::vector<GridPoint>& nodes, int band) {
         min_y = std::min(min_y, p.y24);
         max_y = std::max(max_y, p.y24);
     }
-    const int required = 2 * (band - 1);
+    const int required = band - 1;
     return std::max(max_x - min_x, max_y - min_y) == required;
 }
 
@@ -671,25 +757,6 @@ std::vector<std::vector<int>> connected_components(
     return components;
 }
 
-std::vector<std::pair<GridPoint, GridPoint>> links_for_component(
-    const std::vector<GridPoint>& template_nodes,
-    const std::vector<int>& component,
-    const std::vector<std::vector<int>>& adjacency) {
-    std::set<int> in_component(component.begin(), component.end());
-    std::vector<std::pair<GridPoint, GridPoint>> links;
-    for (int i : component) {
-        for (int j : adjacency[i]) {
-            if (i < j && in_component.count(j)) {
-                GridPoint a = template_nodes[i];
-                GridPoint b = template_nodes[j];
-                if (b < a) std::swap(a, b);
-                links.push_back({a, b});
-            }
-        }
-    }
-    std::sort(links.begin(), links.end());
-    return links;
-}
 
 // §B9 — approximate the fit. The square's precise wrap at the band anchor is the perfect
 // case; a free shape can never be perfect, so it scales within the band range to create
@@ -701,11 +768,6 @@ std::vector<std::pair<GridPoint, GridPoint>> links_for_component(
 bool better_candidate(const Candidate& a, const Candidate& b) {
     if (a.nodes.size() != b.nodes.size()) return a.nodes.size() > b.nodes.size();
     if (a.links.size() != b.links.size()) return a.links.size() > b.links.size();
-    const bool a_full_square = a.runs_x == a.runs_y &&
-                               static_cast<int>(a.nodes.size()) == a.runs_x * a.runs_y;
-    const bool b_full_square = b.runs_x == b.runs_y &&
-                               static_cast<int>(b.nodes.size()) == b.runs_x * b.runs_y;
-    if (a_full_square != b_full_square) return a_full_square;
     if (a.sparse_active_count != b.sparse_active_count) {
         return a.sparse_active_count > b.sparse_active_count;
     }
@@ -713,11 +775,8 @@ bool better_candidate(const Candidate& a, const Candidate& b) {
     if (a.worst_flap_num != b.worst_flap_num) return a.worst_flap_num < b.worst_flap_num;
     if (a.size_mm != b.size_mm) return a.size_mm < b.size_mm;
     if (a.centre_bias != b.centre_bias) return a.centre_bias < b.centre_bias;
-    const int area_a = a.runs_x * a.runs_y;
-    const int area_b = b.runs_x * b.runs_y;
-    if (area_a != area_b) return area_a < area_b;
-    if (a.runs_x != b.runs_x) return a.runs_x > b.runs_x;
-    if (a.runs_y != b.runs_y) return a.runs_y > b.runs_y;
+    if (a.off_x != b.off_x) return a.off_x < b.off_x;
+    if (a.off_y != b.off_y) return a.off_y < b.off_y;
     return a.nodes < b.nodes;
 }
 
@@ -725,40 +784,50 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
                                                 const BandSpec& band,
                                                 int size_mm,
                                                 const EnginePolicy& policy) {
-    // Addendum v1.1 §B2: the 96mm lattice only engages from sparse.min_band up. Below it
-    // the sparse gate is not applied at all — band 2 is a 48mm-only product.
+    // Addendum §B2: the 96mm lattice only engages from sparse.min_band up.
     const bool sparse_gate =
         policy.sparse.mode != PhaseMode::Disabled && band.band >= policy.sparse.min_band;
     const ScaledPolygon scaled = scale_polygon(polygon, size_mm);
     std::optional<Candidate> best;
 
-    for (const TemplateGrid& grid : templates_for_band(band.band)) {
-        // Exact bbox pre-filter (GPT's bounding-geometry bound, integer form): a
-        // template whose padded envelope exceeds the shape's own dimensions at this
-        // size cannot hold — envelope_w ≤ s·span_w/max_span, cross-multiplied. A
-        // necessary condition only; the disc law still decides everything it admits.
-        const i128 env_w = static_cast<i128>(grid.runs_x - 1) * policy.dense_pitch_mm +
-                           2 * policy.disc_radius_mm;
-        const i128 env_h = static_cast<i128>(grid.runs_y - 1) * policy.dense_pitch_mm +
-                           2 * policy.disc_radius_mm;
-        const i128 width_num = static_cast<i128>(size_mm) * (polygon.max_x - polygon.min_x);
-        const i128 height_num = static_cast<i128>(size_mm) * (polygon.max_y - polygon.min_y);
-        if (env_w * polygon.max_span > width_num || env_h * polygon.max_span > height_num) {
-            continue;
+    // §B10: solve the actual placement. An explicit offset (the canvas pan) is solved
+    // as-is; otherwise the BEST PLACEMENT is searched — every even-mm position of the
+    // shape against the fixed lattice, one period per axis. (The duck proved four
+    // canonical registrations are not enough: its band-2 pair lives at (24,−12).)
+    std::vector<std::pair<int, int>> offsets;
+    if (policy.explicit_offset) {
+        offsets.push_back({policy.offset_x_mm, policy.offset_y_mm});
+    } else {
+        for (int ox = -policy.half_pitch_mm + policy.size_step_mm;
+             ox <= policy.half_pitch_mm; ox += policy.size_step_mm) {
+            for (int oy = -policy.half_pitch_mm + policy.size_step_mm;
+                 oy <= policy.half_pitch_mm; oy += policy.size_step_mm) {
+                offsets.push_back({ox, oy});
+            }
         }
-        const int n = static_cast<int>(grid.nodes.size());
+    }
+
+    for (const auto& [off_x, off_y] : offsets) {
+        const std::vector<GridPoint> grid_nodes =
+            field_nodes(polygon, size_mm, off_x, off_y, policy);
+        const int n = static_cast<int>(grid_nodes.size());
+        if (n < band.min_nodes) continue;
+
         std::vector<bool> supported(n, false);
         std::vector<P128> centres(n);
+        int supported_count = 0;
         for (int i = 0; i < n; ++i) {
-            centres[i] = grid_to_internal(grid.nodes[i], scaled, policy);
+            centres[i] = grid_to_internal(grid_nodes[i], off_x, off_y, scaled, policy);
             supported[i] = disc_supported(centres[i], scaled, policy);
+            if (supported[i]) ++supported_count;
         }
+        if (supported_count < band.min_nodes) continue;
 
         std::vector<std::vector<int>> adjacency(n);
         for (int i = 0; i < n; ++i) {
             if (!supported[i]) continue;
             for (int j = i + 1; j < n; ++j) {
-                if (!supported[j] || !adjacent_48(grid.nodes[i], grid.nodes[j])) continue;
+                if (!supported[j] || !adjacent_48(grid_nodes[i], grid_nodes[j])) continue;
                 if (policy.require_24mm_links &&
                     !capsule_supported(centres[i], centres[j], scaled, policy)) {
                     continue;
@@ -768,72 +837,98 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
             }
         }
 
-        for (const std::vector<int>& component : connected_components(supported, adjacency)) {
-            if (static_cast<int>(component.size()) < band.min_nodes) continue;
-            std::vector<GridPoint> nodes;
-            nodes.reserve(component.size());
-            i64 sum_x = 0;
-            i64 sum_y = 0;
-            for (int index : component) {
-                nodes.push_back(grid.nodes[index]);
-                sum_x += grid.nodes[index].x24;
-                sum_y += grid.nodes[index].y24;
-            }
-            std::sort(nodes.begin(), nodes.end());
-            if (policy.require_band_span && !component_spans_band(nodes, band.band)) continue;
-
-            SparseEvaluation sparse;
-            if (sparse_gate) {
-                sparse = evaluate_sparse(nodes, scaled, policy);
-                if (!sparse.pass) continue;
-            } else {
-                sparse.pass = true;
-            }
-
-            Candidate candidate;
-            candidate.size_mm = size_mm;
-            candidate.runs_x = grid.runs_x;
-            candidate.runs_y = grid.runs_y;
-            candidate.nodes = std::move(nodes);
-            candidate.links = links_for_component(grid.nodes, component, adjacency);
-            candidate.sparse_active_count = sparse.active_count;
-            candidate.centre_bias = sum_x * sum_x + sum_y * sum_y;
-            if (sparse_gate) {
-                candidate.sparse_phase = sparse.representative;
-            }
-            // Balance evidence (§B9): the four side flaps of this component's padded
-            // box, as exact numerators over 2·max_span — the same arithmetic the flap
-            // report uses, computed here so selection can centre and balance.
-            {
-                int min_x24 = candidate.nodes.front().x24;
-                int max_x24 = min_x24;
-                int min_y24 = candidate.nodes.front().y24;
-                int max_y24 = min_y24;
-                for (const GridPoint& node : candidate.nodes) {
-                    min_x24 = std::min(min_x24, node.x24);
-                    max_x24 = std::max(max_x24, node.x24);
-                    min_y24 = std::min(min_y24, node.y24);
-                    max_y24 = std::max(max_y24, node.y24);
-                }
-                const i128 den = static_cast<i128>(2) * polygon.max_span;
-                const i128 half_w = static_cast<i128>(size_mm) * (polygon.max_x - polygon.min_x);
-                const i128 half_h = static_cast<i128>(size_mm) * (polygon.max_y - polygon.min_y);
-                const i128 left = half_w + (static_cast<i128>(min_x24) * policy.half_pitch_mm -
-                                            policy.disc_radius_mm) * den;
-                const i128 right = half_w - (static_cast<i128>(max_x24) * policy.half_pitch_mm +
-                                             policy.disc_radius_mm) * den;
-                const i128 bottom = half_h + (static_cast<i128>(min_y24) * policy.half_pitch_mm -
-                                              policy.disc_radius_mm) * den;
-                const i128 top = half_h - (static_cast<i128>(max_y24) * policy.half_pitch_mm +
-                                           policy.disc_radius_mm) * den;
-                const i128 worst = std::max(std::max(left, right), std::max(bottom, top));
-                const i128 imb_x = left >= right ? left - right : right - left;
-                const i128 imb_y = bottom >= top ? bottom - top : top - bottom;
-                candidate.worst_flap_num = static_cast<i64>(worst);
-                candidate.imbalance_num = static_cast<i64>(std::max(imb_x, imb_y));
-            }
-            if (!best || better_candidate(candidate, *best)) best = std::move(candidate);
+        // The pair floor: the assembly stands only when some island carries the band
+        // minimum. Every supported point then belongs to the fit — including extra
+        // single-point islands beside a lawful pair (the duck's head).
+        std::size_t largest_island = 0;
+        for (const std::vector<int>& component :
+             connected_components(supported, adjacency)) {
+            largest_island = std::max(largest_island, component.size());
         }
+        if (static_cast<int>(largest_island) < band.min_nodes) continue;
+
+        std::vector<GridPoint> nodes;
+        nodes.reserve(supported_count);
+        i64 sum_x = 0;
+        i64 sum_y = 0;
+        for (int i = 0; i < n; ++i) {
+            if (!supported[i]) continue;
+            nodes.push_back(grid_nodes[i]);
+            sum_x += 2 * (off_x + grid_nodes[i].x24 * policy.dense_pitch_mm);
+            sum_y += 2 * (off_y + grid_nodes[i].y24 * policy.dense_pitch_mm);
+        }
+        std::sort(nodes.begin(), nodes.end());
+        if (policy.require_band_span && !component_spans_band(nodes, band.band)) continue;
+
+        SparseEvaluation sparse;
+        if (sparse_gate) {
+            sparse = evaluate_sparse(nodes, off_x, off_y, scaled, policy);
+            if (!sparse.pass) continue;
+        } else {
+            sparse.pass = true;
+        }
+
+        std::vector<std::pair<GridPoint, GridPoint>> links;
+        for (int i = 0; i < n; ++i) {
+            for (int j : adjacency[i]) {
+                if (i < j) {
+                    GridPoint a = grid_nodes[i];
+                    GridPoint b = grid_nodes[j];
+                    if (b < a) std::swap(a, b);
+                    links.push_back({a, b});
+                }
+            }
+        }
+        std::sort(links.begin(), links.end());
+
+        Candidate candidate;
+        candidate.size_mm = size_mm;
+        candidate.nodes = std::move(nodes);
+        candidate.links = std::move(links);
+        candidate.sparse_active_count = sparse.active_count;
+        candidate.centre_bias = sum_x * sum_x + sum_y * sum_y;
+        candidate.off_x = off_x;
+        candidate.off_y = off_y;
+        if (sparse_gate) {
+            candidate.sparse_phase = sparse.representative;
+        }
+        {
+            int min_ix = candidate.nodes.front().x24;
+            int max_ix = min_ix;
+            int min_iy = candidate.nodes.front().y24;
+            int max_iy = min_iy;
+            for (const GridPoint& node : candidate.nodes) {
+                min_ix = std::min(min_ix, node.x24);
+                max_ix = std::max(max_ix, node.x24);
+                min_iy = std::min(min_iy, node.y24);
+                max_iy = std::max(max_iy, node.y24);
+            }
+            candidate.runs_x = max_ix - min_ix + 1;
+            candidate.runs_y = max_iy - min_iy + 1;
+            // Balance evidence (§B9): side flaps of the assembly's padded box, exact
+            // numerators over 2·max_span.
+            const i128 den = static_cast<i128>(2) * polygon.max_span;
+            const i128 half_w = static_cast<i128>(size_mm) * (polygon.max_x - polygon.min_x);
+            const i128 half_h = static_cast<i128>(size_mm) * (polygon.max_y - polygon.min_y);
+            const i128 left =
+                half_w + (static_cast<i128>(off_x) + static_cast<i128>(min_ix) * policy.dense_pitch_mm -
+                          policy.disc_radius_mm) * den;
+            const i128 right =
+                half_w - (static_cast<i128>(off_x) + static_cast<i128>(max_ix) * policy.dense_pitch_mm +
+                          policy.disc_radius_mm) * den;
+            const i128 bottom =
+                half_h + (static_cast<i128>(off_y) + static_cast<i128>(min_iy) * policy.dense_pitch_mm -
+                          policy.disc_radius_mm) * den;
+            const i128 top =
+                half_h - (static_cast<i128>(off_y) + static_cast<i128>(max_iy) * policy.dense_pitch_mm +
+                          policy.disc_radius_mm) * den;
+            const i128 worst = std::max(std::max(left, right), std::max(bottom, top));
+            const i128 imb_x = left >= right ? left - right : right - left;
+            const i128 imb_y = bottom >= top ? bottom - top : top - bottom;
+            candidate.worst_flap_num = static_cast<i64>(worst);
+            candidate.imbalance_num = static_cast<i64>(std::max(imb_x, imb_y));
+        }
+        if (!best || better_candidate(candidate, *best)) best = std::move(candidate);
     }
     return best;
 }
@@ -894,7 +989,7 @@ BindingContact binding_contact(const CanonicalPolygon& polygon,
     std::optional<ContactCandidate> best;
 
     for (const GridPoint& node : candidate.nodes) {
-        const P128 p = grid_to_internal(node, scaled, policy);
+        const P128 p = grid_to_internal(node, candidate.off_x, candidate.off_y, scaled, policy);
         for (std::size_t edge = 0; edge < scaled.vertices.size(); ++edge) {
             ContactCandidate contact;
             contact.kind = BindingContact::Kind::MagnetDisc;
@@ -907,8 +1002,10 @@ BindingContact binding_contact(const CanonicalPolygon& polygon,
     }
 
     for (const auto& link : candidate.links) {
-        const P128 a = grid_to_internal(link.first, scaled, policy);
-        const P128 b = grid_to_internal(link.second, scaled, policy);
+        const P128 a = grid_to_internal(link.first, candidate.off_x, candidate.off_y,
+                                        scaled, policy);
+        const P128 b = grid_to_internal(link.second, candidate.off_x, candidate.off_y,
+                                        scaled, policy);
         for (std::size_t edge = 0; edge < scaled.vertices.size(); ++edge) {
             ContactCandidate contact;
             contact.kind = BindingContact::Kind::LinkCapsule;
@@ -942,7 +1039,7 @@ BindingContact binding_contact(const CanonicalPolygon& polygon,
 // supported by fabric. A capsule segment of length h reaches exactly h beyond the box
 // edge (the box edge sits one radius past the magnet centre, and the capsule cap adds
 // the same radius back). Witness only — it never auto-approves an exception.
-bool broad_tongue_on_side(const std::vector<GridPoint>& nodes,
+bool broad_tongue_on_side(const std::vector<GridPoint>& nodes, int off_x, int off_y,
                           int outward_x, int outward_y, int depth_mm,
                           const ScaledPolygon& scaled, const EnginePolicy& policy) {
     // Outer row = nodes with the extreme coordinate on the outward axis.
@@ -959,7 +1056,7 @@ bool broad_tongue_on_side(const std::vector<GridPoint>& nodes,
     for (const GridPoint& node : nodes) {
         const int along = outward_x != 0 ? node.x24 * outward_x : node.y24 * outward_y;
         if (along != extreme) continue;
-        const P128 a = grid_to_internal(node, scaled, policy);
+        const P128 a = grid_to_internal(node, off_x, off_y, scaled, policy);
         const P128 b{a.x + reach * outward_x, a.y + reach * outward_y};
         if (capsule_supported(a, b, scaled, policy)) return true;
     }
@@ -969,15 +1066,15 @@ bool broad_tongue_on_side(const std::vector<GridPoint>& nodes,
 FlapMetrics flap_metrics(const CanonicalPolygon& polygon,
                          const Candidate& candidate,
                          const EnginePolicy& policy) {
-    int min_x24 = candidate.nodes.front().x24;
-    int max_x24 = min_x24;
-    int min_y24 = candidate.nodes.front().y24;
-    int max_y24 = min_y24;
+    int min_ix = candidate.nodes.front().x24;
+    int max_ix = min_ix;
+    int min_iy = candidate.nodes.front().y24;
+    int max_iy = min_iy;
     for (const GridPoint& node : candidate.nodes) {
-        min_x24 = std::min(min_x24, node.x24);
-        max_x24 = std::max(max_x24, node.x24);
-        min_y24 = std::min(min_y24, node.y24);
-        max_y24 = std::max(max_y24, node.y24);
+        min_ix = std::min(min_ix, node.x24);
+        max_ix = std::max(max_ix, node.x24);
+        min_iy = std::min(min_iy, node.y24);
+        max_iy = std::max(max_iy, node.y24);
     }
 
     const i128 den = static_cast<i128>(2) * polygon.max_span;
@@ -986,14 +1083,14 @@ FlapMetrics flap_metrics(const CanonicalPolygon& polygon,
     const i128 shape_half_height_num =
         static_cast<i128>(candidate.size_mm) * (polygon.max_y - polygon.min_y);
 
-    const i128 padded_min_x_mm =
-        static_cast<i128>(min_x24) * policy.half_pitch_mm - policy.disc_radius_mm;
-    const i128 padded_max_x_mm =
-        static_cast<i128>(max_x24) * policy.half_pitch_mm + policy.disc_radius_mm;
-    const i128 padded_min_y_mm =
-        static_cast<i128>(min_y24) * policy.half_pitch_mm - policy.disc_radius_mm;
-    const i128 padded_max_y_mm =
-        static_cast<i128>(max_y24) * policy.half_pitch_mm + policy.disc_radius_mm;
+    const i128 padded_min_x_mm = static_cast<i128>(candidate.off_x) +
+        static_cast<i128>(min_ix) * policy.dense_pitch_mm - policy.disc_radius_mm;
+    const i128 padded_max_x_mm = static_cast<i128>(candidate.off_x) +
+        static_cast<i128>(max_ix) * policy.dense_pitch_mm + policy.disc_radius_mm;
+    const i128 padded_min_y_mm = static_cast<i128>(candidate.off_y) +
+        static_cast<i128>(min_iy) * policy.dense_pitch_mm - policy.disc_radius_mm;
+    const i128 padded_max_y_mm = static_cast<i128>(candidate.off_y) +
+        static_cast<i128>(max_iy) * policy.dense_pitch_mm + policy.disc_radius_mm;
 
     // Shape bbox is centred on the lattice origin. Each flap is represented over
     // the common exact denominator 2*max_span.
@@ -1023,10 +1120,12 @@ FlapMetrics flap_metrics(const CanonicalPolygon& polygon,
         // already passes and no exception is in play.
         out.broad_beyond_12 =
             !out.within_12 &&
-            broad_tongue_on_side(candidate.nodes, ox, oy, 12, scaled, policy);
+            broad_tongue_on_side(candidate.nodes, candidate.off_x, candidate.off_y,
+                                 ox, oy, 12, scaled, policy);
         out.broad_beyond_24 =
             !out.within_24 &&
-            broad_tongue_on_side(candidate.nodes, ox, oy, 24, scaled, policy);
+            broad_tongue_on_side(candidate.nodes, candidate.off_x, candidate.off_y,
+                                 ox, oy, 24, scaled, policy);
         return out;
     };
 
@@ -1092,6 +1191,8 @@ BandResult solve_band(const CanonicalPolygon& polygon,
         const int size_mm = candidate->size_mm;
 
         result.fit = true;
+        result.offset_x_mm = candidate->off_x;
+        result.offset_y_mm = candidate->off_y;
         result.manufactured_size_mm = size_mm;
         result.manufactured_width_num =
             static_cast<i64>(size_mm) * (polygon.max_x - polygon.min_x);
@@ -1111,14 +1212,9 @@ BandResult solve_band(const CanonicalPolygon& polygon,
         result.sparse_phase = candidate->sparse_phase;
         result.binding = binding_contact(polygon, *candidate, policy);
         result.flap = flap_metrics(polygon, *candidate, policy);
-        const bool full_square =
-            candidate->runs_x == band.band && candidate->runs_y == band.band &&
-            static_cast<int>(candidate->nodes.size()) == band.band * band.band;
         result.reason = policy.selection == Selection::LayoutFirst
-                            ? (full_square
-                                   ? "smallest legal size holding the full square calibration layout"
-                                   : "strongest layout tier in the band, smallest size within it")
-                            : "first legal size with a band-spanning, capsule-connected layout";
+                            ? "strongest, most balanced support in the band range (field scan)"
+                            : "first size in the band range with a valid assembly";
         return result;
     }
 }

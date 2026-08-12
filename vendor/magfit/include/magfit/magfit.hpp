@@ -21,7 +21,10 @@ struct PointI {
 };
 
 struct GridPoint {
-    // Coordinates in 24 mm half-pitch units. Adjacent 48 mm nodes differ by 2.
+    // LATTICE INDICES (§B10): the garment lattice is fixed; a node's physical position
+    // is offset + 48·index per axis, where the offset is the shape's placement against
+    // the lattice. Adjacent nodes differ by 1 in one index. (Field names keep their
+    // historic spelling for ABI stability; they are indices, not 24mm units.)
     int x24{};
     int y24{};
 
@@ -49,6 +52,8 @@ enum class Selection {
 
 struct SparsePolicy {
     PhaseMode mode{PhaseMode::Any};
+    // The 96 garment keeps every second lattice point per axis: residues are MOD 2 on
+    // the lattice index. (Field names keep the historic mod4 spelling; values are 0/1.)
     // Addendum §B2/§B8: the 96mm lattice engages from this band up (Dan 2026-08-12:
     // "band 2 = 48mm grid only. 96 participates from band 3 up"). Below it no sparse
     // evaluation at all. From it up, participation is MEASURED AND PREFERRED, not a
@@ -83,6 +88,12 @@ struct EnginePolicy {
     bool require_band_span{false};
     bool require_24mm_links{true};
     Selection selection{Selection::LayoutFirst};
+    // §B10 placement: the shape's position against the fixed garment lattice, in whole
+    // millimetres per axis, range (-24, 24]. When unset (auto), the engine scans the
+    // four canonical registrations (offsets 0/24 per axis) and reports the best.
+    bool explicit_offset{false};
+    int offset_x_mm{0};
+    int offset_y_mm{0};
     SparsePolicy sparse{};
 };
 
@@ -160,6 +171,10 @@ struct FlapMetrics {
 struct BandResult {
     int band{};
     bool fit{};
+    // The placement this answer was computed at (§B10) — mm offsets of the lattice
+    // against the shape's bbox centre.
+    int offset_x_mm{};
+    int offset_y_mm{};
     int manufactured_size_mm{};
     // Exact dimensions are numerator / manufactured_dimension_den millimetres.
     i64 manufactured_width_num{};
