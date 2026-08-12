@@ -237,6 +237,48 @@ void test_band4_square_regression() {
     require(band.magnets.size() == 16, "band 4 full square carries 16 magnets");
 }
 
+void test_u_shape_curved_connection_via_adjacent_links() {
+    // GPT's own U counterexample (team-review validation §4), run against the real
+    // lattice: outer square [-60,60]^2 with an open top notch (-18,18)x[-20,60]. The
+    // straight span across the notch is not a link — but the layout graph connects the
+    // two legs AROUND the notch through adjacent supported nodes, so the engine
+    // represents the curved corridor at lattice resolution. The notch node (0,48) is
+    // honestly absent.
+    PolygonInput u_shape{{{-60, -60}, {60, -60}, {60, 60}, {18, 60},
+                          {18, -20}, {-18, -20}, {-18, 60}, {-60, 60}}};
+    const BandResult band = only_band(
+        magfit::solve(u_shape, {magfit::default_band_spec(3)}));
+    require(band.fit && band.manufactured_size_mm == 120, "U shape fits band 3 at 120 mm");
+    // The notch cavity spans (-18,18)x(-20,60): it swallows (0,0) and (0,48); the seven
+    // remaining nodes survive as ONE component joined around the bottom.
+    require(band.magnets.size() == 7, "U keeps seven nodes — both cavity nodes are out");
+    for (const GridPoint& m : band.magnets) {
+        require(!(m.x24 == 0 && (m.y24 == 0 || m.y24 == 2)),
+                "no magnet may sit in the open notch cavity");
+    }
+    require(band.verified_links.size() == 6,
+            "the two legs connect around the bottom through six adjacent links");
+}
+
+void test_prepared_equals_one_shot() {
+    // v2 acceptance gate: canonicalise-once + solve_canonical must equal the one-shot
+    // solve on every decision field.
+    const PolygonInput shape = octagon();
+    const std::vector<magfit::BandSpec> bands{
+        magfit::default_band_spec(2), magfit::default_band_spec(3)};
+    const auto one_shot = magfit::solve(shape, bands);
+    const auto canonical = magfit::canonicalize_and_validate(shape, {});
+    const auto prepared = magfit::solve_canonical(canonical, bands, {});
+    require(one_shot.bands.size() == prepared.bands.size(), "band count must match");
+    for (std::size_t i = 0; i < one_shot.bands.size(); ++i) {
+        const BandResult& a = one_shot.bands[i];
+        const BandResult& b = prepared.bands[i];
+        require(a.fit == b.fit && a.manufactured_size_mm == b.manufactured_size_mm &&
+                    a.magnets == b.magnets && a.verified_links == b.verified_links,
+                "prepared and one-shot answers must be identical");
+    }
+}
+
 void test_cross_trivial_limb_reported() {
     // The cross fits a pair at 72; the perpendicular flaps measure exactly 24 mm. Under
     // L14 they pass the 24 limit, fail the 12 limit — and no 24 mm-wide tongue passes
@@ -398,6 +440,8 @@ int main() {
         test_layout_first_calibration_octagon();
         test_layout_first_band3_octagon_tier();
         test_band4_square_regression();
+        test_u_shape_curved_connection_via_adjacent_links();
+        test_prepared_equals_one_shot();
         test_cross_trivial_limb_reported();
         test_collinear_backtracking_rejected();
         test_large_coordinate_origin_is_safe();

@@ -192,7 +192,11 @@ int main() {
             os << "{\"band\":" << band.band << ",\"fit\":" << (band.fit ? "true" : "false")
                << ",\"reason\":\"" << json_escape(band.reason) << '"';
             if (band.fit) {
-                os << ",\"sizeMm\":" << band.manufactured_size_mm
+                // v2 result contract: the link law and tier identity travel with the
+                // answer so no consumer has to infer them.
+                os << ",\"linkMode\":\"DIRECT_CAPSULE\""
+                   << ",\"tierNodes\":" << band.magnets.size()
+                   << ",\"sizeMm\":" << band.manufactured_size_mm
                    << ",\"widthMm\":" << band.manufactured_width_mm
                    << ",\"heightMm\":" << band.manufactured_height_mm
                    << ",\"templateRunsX\":" << band.template_runs_x
