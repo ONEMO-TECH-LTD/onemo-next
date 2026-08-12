@@ -89,14 +89,24 @@ export function normaliseOutline(outline: OutlinePoint[]): OutlinePoint[] {
   return outline.map(([x, y]) => [(x - cx) / span, (y - cy) / span])
 }
 
+/** The two chartered gates the admin may lift to compare against manual placement. */
+export interface SolveLaws {
+  /** Contract §6: a band-N layout must stretch across the band. */
+  bandSpan: boolean
+  /** L14: from band 3 up the layout must couple to the 96mm garment as a pair. */
+  sparsePair: boolean
+}
+
 /**
  * One solve, all bands. Policy defaults are the addendum's law: layout-first calibration,
- * 96mm engaging from band 3 with a connected pair. The selection mode is the one ruled
- * range kept testable (Dan's method: add both options and test).
+ * 96mm engaging from band 3 with a connected pair, band-span required. The selection mode
+ * and the two law gates are the ruled ranges kept testable (Dan's method: add all options
+ * and test).
  */
 export async function solveMagfit(
   outline: OutlinePoint[],
   selection: SelectionMode,
+  laws: SolveLaws = { bandSpan: true, sparsePair: true },
 ): Promise<MagfitResult> {
   try {
     const response = await fetch('/api/magfit', {
@@ -107,12 +117,12 @@ export async function solveMagfit(
         bands: [2, 3, 4],
         scale: 20000,
         selection,
-        sparseMode: 'ANY',
+        sparseMode: laws.sparsePair ? 'ANY' : 'DISABLED',
         sparseMinBand: 3,
         sparseMinActive: 2,
         require96Connected: true,
         requireLinks: true,
-        requireBandSpan: true,
+        requireBandSpan: laws.bandSpan,
       }),
     })
     return (await response.json()) as MagfitResult

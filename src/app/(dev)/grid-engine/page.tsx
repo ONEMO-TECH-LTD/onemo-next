@@ -44,6 +44,7 @@ import {
   type FlapSideOut,
   type MagfitResult,
   type SelectionMode,
+  type SolveLaws,
 } from '@/lib/grid-engine/magfit-client'
 import styles from './page.module.css'
 
@@ -235,12 +236,20 @@ export default function GridEnginePage() {
    * SIZE_FIRST = the smallest passing size wins (the same circle reads 72/pair).
    */
   const [selection, setSelection] = useState<SelectionMode>('LAYOUT_FIRST')
+  /**
+   * The two chartered gates, liftable for comparison against manual placement: the
+   * band-span law (a band-N answer must stretch across the band) and the L14 sparse-pair
+   * law (bands 3+ must couple to the 96 garment as a pair). Defaults are the law.
+   */
+  const [laws, setLaws] = useState<SolveLaws>({ bandSpan: true, sparsePair: true })
   /** The outline in its own bbox frame, longest side 1 — what the engine was shown. */
   const solveOutline =
     outline && cutout
       ? normaliseOutline(outline.map(([u, v]) => [u * cutout.w, v * cutout.h]))
       : null
-  const solveKey = solveOutline ? `${solveOutline.length}:${cutout?.url}:${selection}` : ''
+  const solveKey = solveOutline
+    ? `${solveOutline.length}:${cutout?.url}:${selection}:${laws.bandSpan}:${laws.sparsePair}`
+    : ''
 
   useEffect(() => {
     if (!solveOutline) {
@@ -249,7 +258,7 @@ export default function GridEnginePage() {
       return
     }
     let stale = false
-    void solveMagfit(solveOutline, selection).then((result) => {
+    void solveMagfit(solveOutline, selection, laws).then((result) => {
       if (!stale) setSolveResult(result)
     })
     return () => {
@@ -542,6 +551,24 @@ export default function GridEnginePage() {
             )
           })}
           <span className={styles.spacer} />
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={laws.bandSpan}
+            onClick={() => setLaws((l) => ({ ...l, bandSpan: !l.bandSpan }))}
+            title="Band-span law: a band-N answer must stretch across the band — off, a larger cut may carry a smaller-band layout (e.g. BOT band 4 becomes 180mm/6)."
+          >
+            span law
+          </button>
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={laws.sparsePair}
+            onClick={() => setLaws((l) => ({ ...l, sparsePair: !l.sparsePair }))}
+            title="L14 sparse-pair law: from band 3 up the layout must couple to the 96mm garment as a pair — off, dense-only answers publish (e.g. BOT band 3 becomes 156mm/3)."
+          >
+            96 law
+          </button>
           <button
             type="button"
             className={styles.chip}
