@@ -5,13 +5,14 @@
 #include <algorithm>
 #include <cstring>
 #include <exception>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace {
 
-constexpr const char* kEngineVersion = "magfit-core/0.2.0-grid-pixel";
+constexpr const char* kEngineVersion = "magfit-core/0.3.0-grid-pixel-review";
 
 void copy_text(char* destination, std::size_t capacity, const std::string& text) {
     if (destination == nullptr || capacity == 0) return;
@@ -57,10 +58,10 @@ void copy_side_flap(const magfit::SideFlapEvidence& source,
     out = {};
     out.extent_reaches_12 = source.extent_reaches_12;
     out.extent_reaches_24 = source.extent_reaches_24;
-    out.local_tongue_any_12 = source.local_tongue_any_12;
-    out.local_tongue_all_12 = source.local_tongue_all_12;
-    out.local_tongue_any_24 = source.local_tongue_any_24;
-    out.local_tongue_all_24 = source.local_tongue_all_24;
+    out.sampled_tongue_any_12 = source.sampled_tongue_any_12;
+    out.sampled_tongue_all_12 = source.sampled_tongue_all_12;
+    out.sampled_tongue_any_24 = source.sampled_tongue_any_24;
+    out.sampled_tongue_all_24 = source.sampled_tongue_all_24;
     out.narrow_limb_exception_12 = source.narrow_limb_exception_12;
     out.narrow_limb_exception_24 = source.narrow_limb_exception_24;
     if (source.failing_side_points_12.size() > MAGFIT_MAX_NODES ||
@@ -79,28 +80,33 @@ void copy_side_flap(const magfit::SideFlapEvidence& source,
     }
 }
 
-void copy_result(const magfit::BandResult& source, MagfitBandResultC& out) {
+void copy_option(const magfit::LayoutOption& source, MagfitLayoutOptionC& out) {
     out = {};
     out.band = source.band;
-    switch (source.layout_tier) {
-        case magfit::LayoutTier::Full: out.layout_tier = MAGFIT_LAYOUT_FULL; break;
-        case magfit::LayoutTier::ConnectedFallback:
-            out.layout_tier = MAGFIT_LAYOUT_CONNECTED_FALLBACK;
+    switch (source.layout_kind) {
+        case magfit::LayoutKind::Full: out.layout_kind = MAGFIT_LAYOUT_FULL; break;
+        case magfit::LayoutKind::Connected:
+            out.layout_kind = MAGFIT_LAYOUT_CONNECTED;
             break;
-        case magfit::LayoutTier::LinkedThree:
-            out.layout_tier = MAGFIT_LAYOUT_LINKED_THREE;
+        case magfit::LayoutKind::LinkedThree:
+            out.layout_kind = MAGFIT_LAYOUT_LINKED_THREE;
             break;
-        case magfit::LayoutTier::Pair: out.layout_tier = MAGFIT_LAYOUT_PAIR; break;
+        case magfit::LayoutKind::Pair: out.layout_kind = MAGFIT_LAYOUT_PAIR; break;
     }
-    out.fit = source.fit ? 1 : 0;
     out.manufactured_size_mm = source.manufactured_size_mm;
     out.manufactured_width_num = source.manufactured_width_num;
     out.manufactured_height_num = source.manufactured_height_num;
     out.manufactured_dimension_den = source.manufactured_dimension_den;
     out.manufactured_width_mm = source.manufactured_width_mm;
     out.manufactured_height_mm = source.manufactured_height_mm;
-    out.template_runs_x = source.template_runs_x;
-    out.template_runs_y = source.template_runs_y;
+    if (source.source_windows.size() > MAGFIT_MAX_NODES) {
+        throw std::runtime_error("internal error: source-window result exceeds C ABI capacity");
+    }
+    out.source_window_count = static_cast<uint32_t>(source.source_windows.size());
+    for (std::size_t i = 0; i < source.source_windows.size(); ++i) {
+        out.source_windows[i] = {source.source_windows[i].runs_x,
+                                 source.source_windows[i].runs_y};
+    }
 
     if (source.magnets.size() > MAGFIT_MAX_NODES) {
         throw std::runtime_error("internal error: magnet result exceeds C ABI capacity");
@@ -121,55 +127,55 @@ void copy_result(const magfit::BandResult& source, MagfitBandResultC& out) {
         };
     }
 
-    if (source.sparse_phase) {
-        if (source.sparse_phase->active_nodes.size() > MAGFIT_MAX_NODES) {
+    if (source.sparse_phases.size() > 4) {
+        throw std::runtime_error("internal error: sparse phase count exceeds C ABI capacity");
+    }
+    out.sparse_phase_count = static_cast<uint32_t>(source.sparse_phases.size());
+    for (std::size_t phase_index = 0;
+         phase_index < source.sparse_phases.size(); ++phase_index) {
+        const auto& phase = source.sparse_phases[phase_index];
+        if (phase.active_nodes.size() > MAGFIT_MAX_NODES) {
             throw std::runtime_error("internal error: sparse result exceeds C ABI capacity");
         }
-        out.sparse_phase_present = 1;
-        out.sparse_x_residue_mod4 = source.sparse_phase->x_residue_mod4;
-        out.sparse_y_residue_mod4 = source.sparse_phase->y_residue_mod4;
-        out.sparse_connected = source.sparse_phase->connected ? 1 : 0;
-        out.sparse_active_count =
-            static_cast<uint32_t>(source.sparse_phase->active_nodes.size());
-        for (std::size_t i = 0; i < source.sparse_phase->active_nodes.size(); ++i) {
-            out.sparse_active_nodes[i] = to_c_point(source.sparse_phase->active_nodes[i]);
+        out.sparse_x_residue_mod4[phase_index] = phase.x_residue_mod4;
+        out.sparse_y_residue_mod4[phase_index] = phase.y_residue_mod4;
+        out.sparse_connected[phase_index] = phase.connected ? 1 : 0;
+        out.sparse_active_count[phase_index] =
+            static_cast<uint32_t>(phase.active_nodes.size());
+        for (std::size_t i = 0; i < phase.active_nodes.size(); ++i) {
+            out.sparse_active_nodes[phase_index][i] = to_c_point(phase.active_nodes[i]);
         }
     }
 
-    if (source.fit) {
-        out.binding.kind = source.binding.kind == magfit::BindingContact::Kind::MagnetDisc
-                               ? MAGFIT_BINDING_MAGNET_DISC
-                               : MAGFIT_BINDING_DIRECT_CAPSULE;
-        out.binding.node_a = to_c_point(source.binding.node_a);
-        out.binding.node_b_present = source.binding.node_b.has_value() ? 1 : 0;
-        if (source.binding.node_b) out.binding.node_b = to_c_point(*source.binding.node_b);
-        out.binding.polygon_edge_index =
-            static_cast<uint32_t>(source.binding.polygon_edge_index);
-        out.binding.clearance_mm = source.binding.clearance_mm;
-        out.binding.slack_mm = source.binding.slack_mm;
-        out.binding.clearance_um_floor = source.binding.clearance_um_floor;
-        out.binding.slack_um_floor = source.binding.slack_um_floor;
+    out.binding.kind = source.binding.kind == magfit::BindingContact::Kind::MagnetDisc
+                           ? MAGFIT_BINDING_MAGNET_DISC
+                           : MAGFIT_BINDING_DIRECT_CAPSULE;
+    out.binding.node_a = to_c_point(source.binding.node_a);
+    out.binding.node_b_present = source.binding.node_b.has_value() ? 1 : 0;
+    if (source.binding.node_b) out.binding.node_b = to_c_point(*source.binding.node_b);
+    out.binding.polygon_edge_index = static_cast<uint32_t>(source.binding.polygon_edge_index);
+    out.binding.clearance_mm = source.binding.clearance_mm;
+    out.binding.slack_mm = source.binding.slack_mm;
+    out.binding.clearance_um_floor = source.binding.clearance_um_floor;
+    out.binding.slack_um_floor = source.binding.slack_um_floor;
 
-        out.flap.exact_den = source.flap.exact_den;
-        out.flap.left_num = source.flap.left_num;
-        out.flap.right_num = source.flap.right_num;
-        out.flap.bottom_num = source.flap.bottom_num;
-        out.flap.top_num = source.flap.top_num;
-        out.flap.left_mm = source.flap.left_mm;
-        out.flap.right_mm = source.flap.right_mm;
-        out.flap.bottom_mm = source.flap.bottom_mm;
-        out.flap.top_mm = source.flap.top_mm;
-        out.flap.horizontal_imbalance_mm = source.flap.horizontal_imbalance_mm;
-        out.flap.vertical_imbalance_mm = source.flap.vertical_imbalance_mm;
-        out.flap.coverage_within_12 = source.flap.coverage_within_12;
-        out.flap.coverage_within_24 = source.flap.coverage_within_24;
-        copy_side_flap(source.flap.left, out.flap_left);
-        copy_side_flap(source.flap.right, out.flap_right);
-        copy_side_flap(source.flap.bottom, out.flap_bottom);
-        copy_side_flap(source.flap.top, out.flap_top);
-    }
-
-    copy_text(out.reason, sizeof(out.reason), source.reason);
+    out.flap.exact_den = source.flap.exact_den;
+    out.flap.left_num = source.flap.left_num;
+    out.flap.right_num = source.flap.right_num;
+    out.flap.bottom_num = source.flap.bottom_num;
+    out.flap.top_num = source.flap.top_num;
+    out.flap.left_mm = source.flap.left_mm;
+    out.flap.right_mm = source.flap.right_mm;
+    out.flap.bottom_mm = source.flap.bottom_mm;
+    out.flap.top_mm = source.flap.top_mm;
+    out.flap.horizontal_imbalance_mm = source.flap.horizontal_imbalance_mm;
+    out.flap.vertical_imbalance_mm = source.flap.vertical_imbalance_mm;
+    out.flap.coverage_within_12 = source.flap.coverage_within_12;
+    out.flap.coverage_within_24 = source.flap.coverage_within_24;
+    copy_side_flap(source.flap.left, out.flap_left);
+    copy_side_flap(source.flap.right, out.flap_right);
+    copy_side_flap(source.flap.bottom, out.flap_bottom);
+    copy_side_flap(source.flap.top, out.flap_top);
 }
 
 }  // namespace
@@ -202,28 +208,32 @@ extern "C" void magfit_default_policy(MagfitPolicyC* out_policy) {
     out_policy->sparse_fixed_y_residue_mod4 = source.sparse.fixed_y_residue_mod4;
 }
 
-extern "C" MagfitStatusC magfit_solve_bands_i32(
+extern "C" MagfitStatusC magfit_review_bands_i32(
     const int32_t* xy,
     size_t vertex_count,
     const int32_t* bands,
     size_t band_count,
     const MagfitPolicyC* policy,
-    MagfitBandResultC* out_results,
-    size_t out_result_capacity,
+    MagfitOptionVisitorC visitor,
+    void* user_data,
+    size_t* out_option_count,
     char* error_message,
     size_t error_message_capacity) {
     if (error_message != nullptr && error_message_capacity > 0) error_message[0] = '\0';
+    if (out_option_count != nullptr) *out_option_count = 0;
 
     try {
         if (xy == nullptr) throw std::invalid_argument("xy must not be null");
         if (vertex_count < 3) throw std::invalid_argument("vertex_count must be at least three");
+        if (vertex_count > std::numeric_limits<std::size_t>::max() / 2) {
+            throw std::invalid_argument("vertex_count is too large");
+        }
         if (bands == nullptr) throw std::invalid_argument("bands must not be null");
         if (band_count == 0) throw std::invalid_argument("band_count must be positive");
-        if (out_results == nullptr) throw std::invalid_argument("out_results must not be null");
-        if (out_result_capacity < band_count) {
-            throw std::invalid_argument("out_result_capacity is smaller than band_count");
+        if (visitor == nullptr) throw std::invalid_argument("visitor must not be null");
+        if (out_option_count == nullptr) {
+            throw std::invalid_argument("out_option_count must not be null");
         }
-        for (std::size_t i = 0; i < band_count; ++i) out_results[i] = {};
 
         magfit::EnginePolicy cpp_policy;
         if (policy != nullptr) cpp_policy = to_cpp_policy(*policy);
@@ -240,8 +250,15 @@ extern "C" MagfitStatusC magfit_solve_bands_i32(
             specs.push_back(magfit::default_band_spec(bands[i], cpp_policy));
         }
         const magfit::SolveResult solved = magfit::solve(polygon, specs, cpp_policy);
-        for (std::size_t i = 0; i < solved.bands.size(); ++i) {
-            copy_result(solved.bands[i], out_results[i]);
+        for (const auto& reviewed_band : solved.bands) {
+            for (const auto& option : reviewed_band.options) {
+                MagfitLayoutOptionC c_option{};
+                copy_option(option, c_option);
+                if (visitor(&c_option, user_data) == 0) {
+                    throw std::invalid_argument("option visitor stopped enumeration");
+                }
+                ++*out_option_count;
+            }
         }
         return MAGFIT_STATUS_OK;
     } catch (const std::invalid_argument& e) {
@@ -256,7 +273,7 @@ extern "C" MagfitStatusC magfit_solve_bands_i32(
     }
 }
 
-extern "C" MagfitStatusC magfit_solve_band_i32(
+extern "C" MagfitStatusC magfit_review_band_i32(
     const int32_t* xy,
     size_t vertex_count,
     int32_t band,
@@ -264,16 +281,24 @@ extern "C" MagfitStatusC magfit_solve_band_i32(
     size_t legal_size_count,
     int32_t min_nodes,
     const MagfitPolicyC* policy,
-    MagfitBandResultC* out_result,
+    MagfitOptionVisitorC visitor,
+    void* user_data,
+    size_t* out_option_count,
     char* error_message,
     size_t error_message_capacity) {
-    if (out_result != nullptr) *out_result = {};
     if (error_message != nullptr && error_message_capacity > 0) error_message[0] = '\0';
+    if (out_option_count != nullptr) *out_option_count = 0;
 
     try {
         if (xy == nullptr) throw std::invalid_argument("xy must not be null");
         if (vertex_count < 3) throw std::invalid_argument("vertex_count must be at least three");
-        if (out_result == nullptr) throw std::invalid_argument("out_result must not be null");
+        if (vertex_count > std::numeric_limits<std::size_t>::max() / 2) {
+            throw std::invalid_argument("vertex_count is too large");
+        }
+        if (visitor == nullptr) throw std::invalid_argument("visitor must not be null");
+        if (out_option_count == nullptr) {
+            throw std::invalid_argument("out_option_count must not be null");
+        }
         if (legal_size_count > 0 && legal_sizes_mm == nullptr) {
             throw std::invalid_argument("legal_sizes_mm is null but legal_size_count is non-zero");
         }
@@ -302,7 +327,14 @@ extern "C" MagfitStatusC magfit_solve_band_i32(
         if (min_nodes > 0) spec.min_nodes = min_nodes;
 
         const magfit::SolveResult solved = magfit::solve(polygon, {spec}, cpp_policy);
-        copy_result(solved.bands.front(), *out_result);
+        for (const auto& option : solved.bands.front().options) {
+            MagfitLayoutOptionC c_option{};
+            copy_option(option, c_option);
+            if (visitor(&c_option, user_data) == 0) {
+                throw std::invalid_argument("option visitor stopped enumeration");
+            }
+            ++*out_option_count;
+        }
         return MAGFIT_STATUS_OK;
     } catch (const std::invalid_argument& e) {
         copy_text(error_message, error_message_capacity, e.what());

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -38,11 +39,21 @@ enum class PhaseMode {
     Fixed,
 };
 
-enum class LayoutTier {
+enum class LayoutKind {
     Full,
-    ConnectedFallback,
+    Connected,
     LinkedThree,
     Pair,
+};
+
+struct TemplateWindow {
+    int runs_x{};
+    int runs_y{};
+
+    friend bool operator==(const TemplateWindow&, const TemplateWindow&) = default;
+    friend bool operator<(const TemplateWindow& a, const TemplateWindow& b) {
+        return std::tie(a.runs_x, a.runs_y) < std::tie(b.runs_x, b.runs_y);
+    }
 };
 
 struct SparsePolicy {
@@ -112,10 +123,11 @@ struct BindingContact {
 struct SideFlapEvidence {
     bool extent_reaches_12{};
     bool extent_reaches_24{};
-    bool local_tongue_any_12{};
-    bool local_tongue_all_12{};
-    bool local_tongue_any_24{};
-    bool local_tongue_all_24{};
+    // Finite outer-node and gap-midpoint witnesses, not a continuous side proof.
+    bool sampled_tongue_any_12{};
+    bool sampled_tongue_all_12{};
+    bool sampled_tongue_any_24{};
+    bool sampled_tongue_all_24{};
     bool narrow_limb_exception_12{};
     bool narrow_limb_exception_24{};
     // Outer magnets plus the midpoint of each adjacent side gap, all in the
@@ -145,10 +157,9 @@ struct FlapMetrics {
     SideFlapEvidence top;
 };
 
-struct BandResult {
+struct LayoutOption {
     int band{};
-    LayoutTier layout_tier{LayoutTier::ConnectedFallback};
-    bool fit{};
+    LayoutKind layout_kind{LayoutKind::Connected};
     int manufactured_size_mm{};
     // Exact dimensions are numerator / manufactured_dimension_den millimetres.
     i64 manufactured_width_num{};
@@ -156,19 +167,28 @@ struct BandResult {
     i64 manufactured_dimension_den{1};
     double manufactured_width_mm{};
     double manufactured_height_mm{};
-    int template_runs_x{};
-    int template_runs_y{};
+    // A physical option may be discovered through overlapping parent windows.
+    // They are provenance only and do not create duplicate options.
+    std::vector<TemplateWindow> source_windows;
     std::vector<GridPoint> magnets;
     std::vector<std::pair<GridPoint, GridPoint>> verified_links;
-    std::optional<SparsePhaseResult> sparse_phase;
+    // Empty means sparse is not engaged. ANY reports every compatible phase,
+    // FIXED reports its one configured phase, and ALL reports every required
+    // passing phase in canonical order.
+    std::vector<SparsePhaseResult> sparse_phases;
     BindingContact binding;
     FlapMetrics flap;
+};
+
+struct BandReview {
+    int band{};
+    std::vector<LayoutOption> options;
     std::string reason;
 };
 
 struct SolveResult {
     CanonicalPolygon polygon;
-    std::vector<BandResult> bands;
+    std::vector<BandReview> bands;
 };
 
 CanonicalPolygon canonicalize_and_validate(const PolygonInput& input,

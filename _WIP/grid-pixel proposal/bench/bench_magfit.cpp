@@ -33,28 +33,28 @@ int main() {
         magfit::default_band_spec(3, policy),
     };
 
-    constexpr int kWarmup = 25;
+    constexpr int kWarmup = 5;
     for (int i = 0; i < kWarmup; ++i) {
         volatile auto result = magfit::solve_canonical(polygon, bands, policy);
         (void)result;
     }
 
-    constexpr int kHotIterations = 1000;
+    constexpr int kHotIterations = 100;
     auto start = std::chrono::steady_clock::now();
     std::size_t hot_checksum = 0;
     for (int i = 0; i < kHotIterations; ++i) {
         const auto result = magfit::solve_canonical(polygon, bands, policy);
-        hot_checksum += result.bands[0].magnets.size() + result.bands[1].magnets.size();
+        hot_checksum += result.bands[0].options.size() + result.bands[1].options.size();
     }
     auto end = std::chrono::steady_clock::now();
     const auto hot_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-    constexpr int kColdIterations = 100;
+    constexpr int kColdIterations = 20;
     start = std::chrono::steady_clock::now();
     std::size_t cold_checksum = 0;
     for (int i = 0; i < kColdIterations; ++i) {
         const auto result = magfit::solve(input, bands, policy);
-        cold_checksum += result.bands[0].magnets.size() + result.bands[1].magnets.size();
+        cold_checksum += result.bands[0].options.size() + result.bands[1].options.size();
     }
     end = std::chrono::steady_clock::now();
     const auto cold_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();

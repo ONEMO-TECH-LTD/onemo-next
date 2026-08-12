@@ -43,13 +43,10 @@ struct TemplateGrid {
 
 struct Candidate {
     int size_mm{};
-    int runs_x{};
-    int runs_y{};
+    std::vector<TemplateWindow> source_windows;
     std::vector<GridPoint> nodes;
     std::vector<std::pair<GridPoint, GridPoint>> links;
-    std::optional<SparsePhaseResult> sparse_phase;
-    int sparse_active_count{};
-    i64 centre_bias{};
+    std::vector<SparsePhaseResult> sparse_phases;
 };
 
 [[noreturn]] void fail(const std::string& message) {
@@ -595,15 +592,14 @@ SparseEvaluation evaluate_one_sparse_phase(const std::vector<GridPoint>& nodes,
     return out;
 }
 
-SparseEvaluation evaluate_sparse(const std::vector<GridPoint>& nodes,
-                                 const ScaledPolygon& polygon,
-                                 int band,
-                                 const EnginePolicy& policy) {
+std::vector<std::vector<SparsePhaseResult>> sparse_variants(
+    const std::vector<GridPoint>& nodes,
+    const ScaledPolygon& polygon,
+    int band,
+    const EnginePolicy& policy) {
     if (policy.sparse.mode == PhaseMode::Disabled ||
         band < policy.sparse.engage_from_band) {
-        SparseEvaluation out;
-        out.pass = true;
-        return out;
+        return {{}};
     }
 
     std::vector<std::pair<int, int>> phases;
@@ -627,34 +623,31 @@ SparseEvaluation evaluate_sparse(const std::vector<GridPoint>& nodes,
         for (const auto& evaluation : evaluations) {
             if (!evaluation.pass) return {};
         }
-        // Return the weakest passing phase so the explanation is conservative.
-        auto worst = std::min_element(evaluations.begin(), evaluations.end(),
-                                      [](const SparseEvaluation& a, const SparseEvaluation& b) {
-            if (a.active_count != b.active_count) return a.active_count < b.active_count;
-            return std::tie(a.representative.x_residue_mod4,
-                            a.representative.y_residue_mod4) <
-                   std::tie(b.representative.x_residue_mod4,
-                            b.representative.y_residue_mod4);
+        std::vector<SparsePhaseResult> all;
+        all.reserve(evaluations.size());
+        for (const auto& evaluation : evaluations) {
+            all.push_back(evaluation.representative);
+        }
+        std::sort(all.begin(), all.end(), [](const SparsePhaseResult& a,
+                                             const SparsePhaseResult& b) {
+            return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.active_nodes) <
+                   std::tie(b.x_residue_mod4, b.y_residue_mod4, b.active_nodes);
         });
-        return *worst;
+        return {std::move(all)};
     }
 
-    SparseEvaluation best;
-    bool found = false;
+    std::vector<SparsePhaseResult> passing;
     for (const auto& evaluation : evaluations) {
         if (!evaluation.pass) continue;
-        if (!found || evaluation.active_count > best.active_count ||
-            (evaluation.active_count == best.active_count &&
-             std::tie(evaluation.representative.x_residue_mod4,
-                      evaluation.representative.y_residue_mod4) <
-                 std::tie(best.representative.x_residue_mod4,
-                          best.representative.y_residue_mod4))) {
-            best = evaluation;
-            found = true;
-        }
+        passing.push_back(evaluation.representative);
     }
-    if (!found) return {};
-    return best;
+    std::sort(passing.begin(), passing.end(), [](const auto& a, const auto& b) {
+        return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.active_nodes) <
+               std::tie(b.x_residue_mod4, b.y_residue_mod4, b.active_nodes);
+    });
+    return passing.empty()
+               ? std::vector<std::vector<SparsePhaseResult>>{}
+               : std::vector<std::vector<SparsePhaseResult>>{std::move(passing)};
 }
 
 bool component_spans_band(const std::vector<GridPoint>& nodes, int band) {
@@ -671,34 +664,6 @@ bool component_spans_band(const std::vector<GridPoint>& nodes, int band) {
     }
     const int required = 2 * (band - 1);
     return std::max(max_x - min_x, max_y - min_y) == required;
-}
-
-std::vector<std::vector<int>> connected_components(
-    const std::vector<bool>& supported,
-    const std::vector<std::vector<int>>& adjacency) {
-    const int n = static_cast<int>(supported.size());
-    std::vector<bool> seen(n, false);
-    std::vector<std::vector<int>> components;
-    for (int start = 0; start < n; ++start) {
-        if (!supported[start] || seen[start]) continue;
-        std::vector<int> component;
-        std::queue<int> q;
-        q.push(start);
-        seen[start] = true;
-        while (!q.empty()) {
-            const int cur = q.front();
-            q.pop();
-            component.push_back(cur);
-            for (int next : adjacency[cur]) {
-                if (supported[next] && !seen[next]) {
-                    seen[next] = true;
-                    q.push(next);
-                }
-            }
-        }
-        components.push_back(std::move(component));
-    }
-    return components;
 }
 
 std::vector<std::pair<GridPoint, GridPoint>> links_for_component(
@@ -722,59 +687,90 @@ std::vector<std::pair<GridPoint, GridPoint>> links_for_component(
 }
 
 bool is_complete_full_layout(const Candidate& candidate) {
-    if (candidate.runs_x != candidate.runs_y ||
-        static_cast<int>(candidate.nodes.size()) !=
-            candidate.runs_x * candidate.runs_y) {
+    if (candidate.nodes.empty()) return false;
+    int min_x = candidate.nodes.front().x24;
+    int max_x = min_x;
+    int min_y = candidate.nodes.front().y24;
+    int max_y = min_y;
+    for (const GridPoint& node : candidate.nodes) {
+        min_x = std::min(min_x, node.x24);
+        max_x = std::max(max_x, node.x24);
+        min_y = std::min(min_y, node.y24);
+        max_y = std::max(max_y, node.y24);
+    }
+    const int runs_x = (max_x - min_x) / 2 + 1;
+    const int runs_y = (max_y - min_y) / 2 + 1;
+    if (runs_x != runs_y ||
+        static_cast<int>(candidate.nodes.size()) != runs_x * runs_y) {
         return false;
     }
-    const int required_links =
-        2 * candidate.runs_x * candidate.runs_y - candidate.runs_x - candidate.runs_y;
+    const int required_links = 2 * runs_x * runs_y - runs_x - runs_y;
     return static_cast<int>(candidate.links.size()) == required_links;
 }
 
-bool better_candidate(const Candidate& a, const Candidate& b) {
-    if (a.nodes.size() != b.nodes.size()) return a.nodes.size() > b.nodes.size();
-    if (a.links.size() != b.links.size()) return a.links.size() > b.links.size();
-    const bool a_full_square = is_complete_full_layout(a);
-    const bool b_full_square = is_complete_full_layout(b);
-    if (a_full_square != b_full_square) return a_full_square;
-    if (a.sparse_active_count != b.sparse_active_count) {
-        return a.sparse_active_count > b.sparse_active_count;
-    }
-    if (a.centre_bias != b.centre_bias) return a.centre_bias < b.centre_bias;
-    const int area_a = a.runs_x * a.runs_y;
-    const int area_b = b.runs_x * b.runs_y;
-    if (area_a != area_b) return area_a < area_b;
-    if (a.runs_x != b.runs_x) return a.runs_x > b.runs_x;
-    if (a.runs_y != b.runs_y) return a.runs_y > b.runs_y;
-    return a.nodes < b.nodes;
-}
-
-LayoutTier layout_tier(const Candidate& candidate) {
-    if (is_complete_full_layout(candidate)) return LayoutTier::Full;
+LayoutKind layout_kind(const Candidate& candidate) {
+    if (is_complete_full_layout(candidate)) return LayoutKind::Full;
     if (candidate.nodes.size() == 2 && candidate.links.size() == 1) {
-        return LayoutTier::Pair;
+        return LayoutKind::Pair;
     }
     if (candidate.nodes.size() == 3 && candidate.links.size() >= 2) {
-        return LayoutTier::LinkedThree;
+        return LayoutKind::LinkedThree;
     }
-    return LayoutTier::ConnectedFallback;
+    return LayoutKind::Connected;
 }
 
-bool better_across_sizes(const Candidate& a, const Candidate& b) {
-    const LayoutTier tier_a = layout_tier(a);
-    const LayoutTier tier_b = layout_tier(b);
-    if (tier_a != tier_b) return tier_a < tier_b;
+bool sparse_phase_less(const SparsePhaseResult& a, const SparsePhaseResult& b) {
+    return std::tie(a.x_residue_mod4, a.y_residue_mod4, a.connected, a.active_nodes) <
+           std::tie(b.x_residue_mod4, b.y_residue_mod4, b.connected, b.active_nodes);
+}
+
+bool candidate_identity_less(const Candidate& a, const Candidate& b) {
     if (a.size_mm != b.size_mm) return a.size_mm < b.size_mm;
-    return better_candidate(a, b);
+    if (a.nodes != b.nodes) return a.nodes < b.nodes;
+    if (a.links != b.links) return a.links < b.links;
+    return std::lexicographical_compare(a.sparse_phases.begin(), a.sparse_phases.end(),
+                                        b.sparse_phases.begin(), b.sparse_phases.end(),
+                                        sparse_phase_less);
 }
 
-std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
-                                                const BandSpec& band,
-                                                int size_mm,
-                                                const EnginePolicy& policy) {
+bool same_candidate_identity(const Candidate& a, const Candidate& b) {
+    return !candidate_identity_less(a, b) && !candidate_identity_less(b, a);
+}
+
+std::vector<int> selected_indices(std::uint64_t mask, int count) {
+    std::vector<int> indices;
+    for (int i = 0; i < count; ++i) {
+        if ((mask & (std::uint64_t{1} << i)) != 0) indices.push_back(i);
+    }
+    return indices;
+}
+
+bool subset_is_connected(const std::vector<int>& subset,
+                         const std::vector<std::vector<int>>& adjacency) {
+    if (subset.empty()) return false;
+    std::set<int> selected(subset.begin(), subset.end());
+    std::set<int> reached;
+    std::queue<int> pending;
+    pending.push(subset.front());
+    reached.insert(subset.front());
+    while (!pending.empty()) {
+        const int current = pending.front();
+        pending.pop();
+        for (int next : adjacency[current]) {
+            if (selected.count(next) == 0 || reached.count(next) != 0) continue;
+            reached.insert(next);
+            pending.push(next);
+        }
+    }
+    return reached.size() == subset.size();
+}
+
+std::vector<Candidate> candidates_at_size(const CanonicalPolygon& polygon,
+                                          const BandSpec& band,
+                                          int size_mm,
+                                          const EnginePolicy& policy) {
     const ScaledPolygon scaled = scale_polygon(polygon, size_mm);
-    std::optional<Candidate> best;
+    std::vector<Candidate> candidates;
     std::map<GridPoint, P128> centre_cache;
     std::map<GridPoint, bool> disc_cache;
     std::map<std::pair<GridPoint, GridPoint>, bool> link_cache;
@@ -825,38 +821,53 @@ std::optional<Candidate> best_candidate_at_size(const CanonicalPolygon& polygon,
             }
         }
 
-        for (const std::vector<int>& component : connected_components(supported, adjacency)) {
+        if (n > 63) fail("review subset enumeration exceeds 63-node mask bound");
+        const std::uint64_t subset_limit = std::uint64_t{1} << n;
+        for (std::uint64_t mask = 1; mask < subset_limit; ++mask) {
+            const std::vector<int> component = selected_indices(mask, n);
             if (static_cast<int>(component.size()) < band.min_nodes) continue;
+            bool all_supported = true;
+            for (int index : component) all_supported = all_supported && supported[index];
+            if (!all_supported || !subset_is_connected(component, adjacency)) continue;
             std::vector<GridPoint> nodes;
             nodes.reserve(component.size());
-            i64 sum_x = 0;
-            i64 sum_y = 0;
             for (int index : component) {
                 nodes.push_back(grid.nodes[index]);
-                sum_x += grid.nodes[index].x24;
-                sum_y += grid.nodes[index].y24;
             }
             std::sort(nodes.begin(), nodes.end());
             if (policy.require_band_span && !component_spans_band(nodes, band.band)) continue;
 
-            const SparseEvaluation sparse = evaluate_sparse(nodes, scaled, band.band, policy);
-            if (!sparse.pass) continue;
-
-            Candidate candidate;
-            candidate.size_mm = size_mm;
-            candidate.runs_x = grid.runs_x;
-            candidate.runs_y = grid.runs_y;
-            candidate.nodes = std::move(nodes);
-            candidate.links = links_for_component(grid.nodes, component, adjacency);
-            candidate.sparse_active_count = sparse.active_count;
-            candidate.centre_bias = sum_x * sum_x + sum_y * sum_y;
-            if (sparse.engaged) {
-                candidate.sparse_phase = sparse.representative;
+            const auto variants = sparse_variants(nodes, scaled, band.band, policy);
+            for (const auto& phases : variants) {
+                Candidate candidate;
+                candidate.size_mm = size_mm;
+                candidate.source_windows.push_back({grid.runs_x, grid.runs_y});
+                candidate.nodes = nodes;
+                candidate.links = links_for_component(grid.nodes, component, adjacency);
+                candidate.sparse_phases = phases;
+                candidates.push_back(std::move(candidate));
             }
-            if (!best || better_candidate(candidate, *best)) best = std::move(candidate);
         }
     }
-    return best;
+    std::sort(candidates.begin(), candidates.end(), candidate_identity_less);
+    std::vector<Candidate> deduplicated;
+    for (Candidate& candidate : candidates) {
+        if (!deduplicated.empty() &&
+            same_candidate_identity(deduplicated.back(), candidate)) {
+            deduplicated.back().source_windows.insert(
+                deduplicated.back().source_windows.end(),
+                candidate.source_windows.begin(), candidate.source_windows.end());
+            continue;
+        }
+        deduplicated.push_back(std::move(candidate));
+    }
+    for (Candidate& candidate : deduplicated) {
+        std::sort(candidate.source_windows.begin(), candidate.source_windows.end());
+        candidate.source_windows.erase(
+            std::unique(candidate.source_windows.begin(), candidate.source_windows.end()),
+            candidate.source_windows.end());
+    }
+    return deduplicated;
 }
 
 long double to_long_double(i128 value) {
@@ -977,14 +988,14 @@ SideFlapEvidence side_flap_evidence(const Candidate& candidate,
             all = all && supported;
             if (!supported) failing.push_back(witness);
         }
-        exception = extent_num > static_cast<i128>(threshold_mm) * extent_den && !any;
+        exception = extent_num >= static_cast<i128>(threshold_mm) * extent_den && !any;
     };
 
-    evaluate(12, out.local_tongue_any_12,
-             out.local_tongue_all_12, out.narrow_limb_exception_12,
+    evaluate(12, out.sampled_tongue_any_12,
+             out.sampled_tongue_all_12, out.narrow_limb_exception_12,
              out.failing_side_points_12);
-    evaluate(24, out.local_tongue_any_24,
-             out.local_tongue_all_24, out.narrow_limb_exception_24,
+    evaluate(24, out.sampled_tongue_any_24,
+             out.sampled_tongue_all_24, out.narrow_limb_exception_24,
              out.failing_side_points_24);
     return out;
 }
@@ -1119,50 +1130,48 @@ FlapMetrics flap_metrics(const CanonicalPolygon& polygon,
     return out;
 }
 
-BandResult solve_band(const CanonicalPolygon& polygon,
-                      const BandSpec& band,
-                      const EnginePolicy& policy) {
-    BandResult result;
-    result.band = band.band;
-    std::optional<Candidate> selected;
-    for (int size_mm : band.legal_sizes_mm) {
-        std::optional<Candidate> candidate =
-            best_candidate_at_size(polygon, band, size_mm, policy);
-        if (!candidate) continue;
+LayoutOption build_option(const CanonicalPolygon& polygon,
+                          int band,
+                          const Candidate& candidate,
+                          const EnginePolicy& policy) {
+    LayoutOption option;
+    option.band = band;
+    option.layout_kind = layout_kind(candidate);
+    option.manufactured_size_mm = candidate.size_mm;
+    option.manufactured_width_num =
+        static_cast<i64>(candidate.size_mm) * (polygon.max_x - polygon.min_x);
+    option.manufactured_height_num =
+        static_cast<i64>(candidate.size_mm) * (polygon.max_y - polygon.min_y);
+    option.manufactured_dimension_den = polygon.max_span;
+    option.manufactured_width_mm =
+        static_cast<double>(option.manufactured_width_num) /
+        static_cast<double>(option.manufactured_dimension_den);
+    option.manufactured_height_mm =
+        static_cast<double>(option.manufactured_height_num) /
+        static_cast<double>(option.manufactured_dimension_den);
+    option.source_windows = candidate.source_windows;
+    option.magnets = candidate.nodes;
+    option.verified_links = candidate.links;
+    option.sparse_phases = candidate.sparse_phases;
+    option.binding = binding_contact(polygon, candidate, policy);
+    option.flap = flap_metrics(polygon, candidate, policy);
+    return option;
+}
 
-        if (!selected || better_across_sizes(*candidate, *selected)) {
-            selected = std::move(candidate);
+BandReview review_band(const CanonicalPolygon& polygon,
+                       const BandSpec& band,
+                       const EnginePolicy& policy) {
+    BandReview result;
+    result.band = band.band;
+    for (int size_mm : band.legal_sizes_mm) {
+        for (const Candidate& candidate :
+             candidates_at_size(polygon, band, size_mm, policy)) {
+            result.options.push_back(build_option(polygon, band.band, candidate, policy));
         }
     }
-    if (selected) {
-        const Candidate& candidate = *selected;
-        result.fit = true;
-        result.layout_tier = layout_tier(candidate);
-        result.manufactured_size_mm = candidate.size_mm;
-        result.manufactured_width_num =
-            static_cast<i64>(candidate.size_mm) * (polygon.max_x - polygon.min_x);
-        result.manufactured_height_num =
-            static_cast<i64>(candidate.size_mm) * (polygon.max_y - polygon.min_y);
-        result.manufactured_dimension_den = polygon.max_span;
-        result.manufactured_width_mm =
-            static_cast<double>(result.manufactured_width_num) /
-            static_cast<double>(result.manufactured_dimension_den);
-        result.manufactured_height_mm =
-            static_cast<double>(result.manufactured_height_num) /
-            static_cast<double>(result.manufactured_dimension_den);
-        result.template_runs_x = candidate.runs_x;
-        result.template_runs_y = candidate.runs_y;
-        result.magnets = candidate.nodes;
-        result.verified_links = candidate.links;
-        result.sparse_phase = candidate.sparse_phase;
-        result.binding = binding_contact(polygon, candidate, policy);
-        result.flap = flap_metrics(polygon, candidate, policy);
-        result.reason =
-            "highest-quality band-spanning, capsule-connected layout; smallest size on ties";
-        return result;
-    }
-    result.fit = false;
-    result.reason = "no legal size supports the minimum band-spanning layout";
+    result.reason = result.options.empty()
+                        ? "no legal size supports a lawful connected layout"
+                        : "complete lawful option set in canonical review order; no selector applied";
     return result;
 }
 
@@ -1269,7 +1278,7 @@ SolveResult solve_canonical(const CanonicalPolygon& polygon,
     out.bands.reserve(bands.size());
     for (const BandSpec& band : bands) {
         validate_band_spec(band, policy);
-        out.bands.push_back(solve_band(out.polygon, band, policy));
+        out.bands.push_back(review_band(out.polygon, band, policy));
     }
     return out;
 }

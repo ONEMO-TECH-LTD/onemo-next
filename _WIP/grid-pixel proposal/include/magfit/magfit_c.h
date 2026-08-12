@@ -10,7 +10,6 @@ extern "C" {
 
 #define MAGFIT_MAX_NODES 81
 #define MAGFIT_MAX_LINKS 144
-#define MAGFIT_REASON_CAPACITY 192
 
 typedef enum MagfitStatusC {
     MAGFIT_STATUS_OK = 0,
@@ -25,12 +24,12 @@ typedef enum MagfitPhaseModeC {
     MAGFIT_PHASE_FIXED = 3
 } MagfitPhaseModeC;
 
-typedef enum MagfitLayoutTierC {
+typedef enum MagfitLayoutKindC {
     MAGFIT_LAYOUT_FULL = 0,
-    MAGFIT_LAYOUT_CONNECTED_FALLBACK = 1,
+    MAGFIT_LAYOUT_CONNECTED = 1,
     MAGFIT_LAYOUT_LINKED_THREE = 2,
     MAGFIT_LAYOUT_PAIR = 3
-} MagfitLayoutTierC;
+} MagfitLayoutKindC;
 
 typedef enum MagfitBindingKindC {
     MAGFIT_BINDING_MAGNET_DISC = 0,
@@ -82,10 +81,10 @@ typedef struct MagfitFlapMetricsC {
 typedef struct MagfitSideFlapEvidenceC {
     int32_t extent_reaches_12;
     int32_t extent_reaches_24;
-    int32_t local_tongue_any_12;
-    int32_t local_tongue_all_12;
-    int32_t local_tongue_any_24;
-    int32_t local_tongue_all_24;
+    int32_t sampled_tongue_any_12;
+    int32_t sampled_tongue_all_12;
+    int32_t sampled_tongue_any_24;
+    int32_t sampled_tongue_all_24;
     int32_t narrow_limb_exception_12;
     int32_t narrow_limb_exception_24;
     uint32_t failing_side_count_12;
@@ -106,18 +105,22 @@ typedef struct MagfitBindingContactC {
     int64_t slack_um_floor;
 } MagfitBindingContactC;
 
-typedef struct MagfitBandResultC {
+typedef struct MagfitTemplateWindowC {
+    int32_t runs_x;
+    int32_t runs_y;
+} MagfitTemplateWindowC;
+
+typedef struct MagfitLayoutOptionC {
     int32_t band;
-    MagfitLayoutTierC layout_tier;
-    int32_t fit;
+    MagfitLayoutKindC layout_kind;
     int32_t manufactured_size_mm;
     int64_t manufactured_width_num;
     int64_t manufactured_height_num;
     int64_t manufactured_dimension_den;
     double manufactured_width_mm;
     double manufactured_height_mm;
-    int32_t template_runs_x;
-    int32_t template_runs_y;
+    uint32_t source_window_count;
+    MagfitTemplateWindowC source_windows[MAGFIT_MAX_NODES];
 
     uint32_t magnet_count;
     MagfitGridPointC magnets[MAGFIT_MAX_NODES];
@@ -125,12 +128,12 @@ typedef struct MagfitBandResultC {
     uint32_t verified_link_count;
     MagfitLinkC verified_links[MAGFIT_MAX_LINKS];
 
-    int32_t sparse_phase_present;
-    int32_t sparse_x_residue_mod4;
-    int32_t sparse_y_residue_mod4;
-    int32_t sparse_connected;
-    uint32_t sparse_active_count;
-    MagfitGridPointC sparse_active_nodes[MAGFIT_MAX_NODES];
+    uint32_t sparse_phase_count;
+    int32_t sparse_x_residue_mod4[4];
+    int32_t sparse_y_residue_mod4[4];
+    int32_t sparse_connected[4];
+    uint32_t sparse_active_count[4];
+    MagfitGridPointC sparse_active_nodes[4][MAGFIT_MAX_NODES];
 
     MagfitBindingContactC binding;
     MagfitFlapMetricsC flap;
@@ -138,8 +141,10 @@ typedef struct MagfitBandResultC {
     MagfitSideFlapEvidenceC flap_right;
     MagfitSideFlapEvidenceC flap_bottom;
     MagfitSideFlapEvidenceC flap_top;
-    char reason[MAGFIT_REASON_CAPACITY];
-} MagfitBandResultC;
+} MagfitLayoutOptionC;
+
+typedef int32_t (*MagfitOptionVisitorC)(const MagfitLayoutOptionC* option,
+                                       void* user_data);
 
 /* Stable textual version for logs, cache keys, and result provenance. */
 const char* magfit_engine_version(void);
@@ -148,7 +153,7 @@ const char* magfit_engine_version(void);
 void magfit_default_policy(MagfitPolicyC* out_policy);
 
 /*
- * Solve exactly one band.
+ * Enumerate every lawful option for exactly one band in canonical order.
  *
  * xy contains vertex_count pairs [x0,y0,x1,y1,...] in arbitrary integer trace
  * units. The final repeated closing vertex is optional. The engine centres the
@@ -158,11 +163,12 @@ void magfit_default_policy(MagfitPolicyC* out_policy);
  * legal_sizes_mm may be NULL with legal_size_count == 0 to use the default band
  * interval. Otherwise it must be strictly ascending.
  *
- * Returns MAGFIT_STATUS_OK even when no layout fits; inspect out_result->fit.
+ * The visitor is called once per option. Returning zero stops enumeration and
+ * reports an invalid argument. Zero options is a successful NO_FIT review.
  * Exceptions never cross this C boundary. On non-OK status, error_message is
  * populated when a non-null buffer is supplied.
  */
-MagfitStatusC magfit_solve_band_i32(
+MagfitStatusC magfit_review_band_i32(
     const int32_t* xy,
     size_t vertex_count,
     int32_t band,
@@ -170,22 +176,26 @@ MagfitStatusC magfit_solve_band_i32(
     size_t legal_size_count,
     int32_t min_nodes,
     const MagfitPolicyC* policy,
-    MagfitBandResultC* out_result,
+    MagfitOptionVisitorC visitor,
+    void* user_data,
+    size_t* out_option_count,
     char* error_message,
     size_t error_message_capacity);
 
 /*
- * Solve default specifications for several bands after canonicalising the
- * polygon once. out_results must have at least band_count elements.
+ * Review default specifications for several bands after canonicalising the
+ * polygon once. Options remain band-scoped and are visited in requested-band
+ * order, then canonical option order.
  */
-MagfitStatusC magfit_solve_bands_i32(
+MagfitStatusC magfit_review_bands_i32(
     const int32_t* xy,
     size_t vertex_count,
     const int32_t* bands,
     size_t band_count,
     const MagfitPolicyC* policy,
-    MagfitBandResultC* out_results,
-    size_t out_result_capacity,
+    MagfitOptionVisitorC visitor,
+    void* user_data,
+    size_t* out_option_count,
     char* error_message,
     size_t error_message_capacity);
 

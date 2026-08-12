@@ -1,679 +1,289 @@
-# Magnetic-Grid Fitting Engine — Normative Build Contract
+# Magnetic-Grid Review Engine — Prototype Contract
 
-**Contract version:** 1.1-grid-pixel-proposal
-**Reference engine:** `magfit-core/0.2.0-grid-pixel`
-**Scope:** cut-out shape normalisation, manufactured size selection, magnetic layout selection, sparse-grid compatibility, contact explanation, and flap reporting
-**Normative language:** MUST, MUST NOT, SHOULD, and MAY have their ordinary requirements meaning
+**Contract version:** 0.3-grid-pixel-review
 
----
+**Reference engine:** `magfit-core/0.3.0-grid-pixel-review`
 
-## 1. Executive decision
+**Scope:** enumerate exact lawful size/layout options for manual review
+**Not a release claim:** this prototype does not select a product or guarantee physical tolerance
 
-Build a small exact finite solver. Do not build a CAD application, a generic nesting engine, a continuous optimiser, a raster tracer, or a polygon-offset platform inside this module.
+## 1. Deliverable
 
-For every requested band, the engine MUST:
+For each requested band, the engine MUST return every distinct lawful option produced by the declared finite model:
 
-1. receive one already-traced simple solid polygon;
-2. canonicalise and validate it;
-3. centre its axis-aligned bounding box on the lattice origin;
-4. preserve aspect ratio and orientation;
-5. test the band’s finite legal manufactured sizes;
-6. at each size, test only the finite parity-correct lattice templates for that band;
-7. regard a magnet as supported only when its entire radius-12 mm disc lies in the cut-out;
-8. regard adjacent magnets as linked only when the entire radius-12 mm capsule around their centre segment lies in the cut-out;
-9. form connected supported layouts from those verified links;
-10. require the layout to span the requested band;
-11. apply the declared 96 mm thinning-phase policy only from its engagement band;
-12. select the strongest available layout tier, then the smallest legal size in that tier;
-13. choose exactly one layout by a total deterministic order;
-14. return one result or `NO_FIT` for that band.
+1. one already-traced simple solid polygon;
+2. locked aspect ratio and orientation;
+3. axis-aligned bbox centre fixed at the lattice origin;
+4. the band's finite 12 mm manufactured-size candidates;
+5. the band's finite centred lattice windows;
+6. every connected supported subset meeting the node floor and band span;
+7. every compatible sparse phase under the declared sparse policy;
+8. exact support, link, contact, size and flap evidence per option.
 
-The unknown is the polygon. The hardware, band sizes, legal steps, lattice registration, magnet footprint, and ranking policy are constants or versioned product policy. No heuristic search is necessary.
+The engine MUST NOT rank options, mark a winner, hide a lawful subset, or stop at the first passing size. Topology names are descriptions only. A later one-result-per-band rule may be introduced only after applied review proves it returns the physically correct answer.
 
----
+The UI MUST compute the fixed cut-out once, retain the returned option set, and browse it without rerunning geometry on pan, zoom, option navigation, or other interaction.
 
-## 2. Research verdict: reuse geometry primitives, not somebody else’s product
+## 2. Boundary
 
-### 2.1 No turnkey engine was found
+The prototype owns:
 
-The researched open-source and commercial offerings provide pieces of the geometry problem, but none provides the product computation described here: band-constrained uniform scaling, parity-centred lattice templates, full-disc support, verified fabric links, 48/96 thinning phases, one size per band, and product-specific ranking.
+- polygon canonicalisation and validation;
+- exact uniform scaling;
+- lattice-window generation;
+- full-disc and direct-link support;
+- connected-subset enumeration and deduplication;
+- sparse-phase evidence;
+- exact manufactured dimensions;
+- limiting-contact and flap evidence;
+- deterministic review order.
 
-The result should therefore be a custom product solver of roughly this reference implementation’s size, optionally using a third-party polygon library only at the trace-ingestion boundary.
+It does not own:
 
-### 2.2 Dependency decision
+- raster segmentation or tracing;
+- SVG flattening, fill resolution, or Boolean repair;
+- rotation, mirroring, or translation search;
+- automatic product selection;
+- final cutter-path quantisation;
+- physical tolerance calibration;
+- UI rendering, pricing, or fulfilment.
 
-| Candidate | What it supplies | Decision |
-|---|---|---|
-| **Clipper2** | Integer-backed polygon clipping, union, offsetting, point-in-polygon, C++/C#/Delphi and exported C functions; permissive Boost licence | **Optional upstream utility.** Suitable for flattening/unioning incoming SVG paths or implementing a separate trace-cleaning service. Do not use its round offsets as the legal magnet test because circular arcs are approximated by line segments. |
-| **CGAL 2D Minkowski Sums** | Exact or guaranteed polygon/disc offsets and insets | **Reference/consultancy option, not default runtime.** Mathematically strong but much larger than the finite query problem; the relevant package is GPL unless commercially licensed. |
-| **GeometryFactory** | Commercial CGAL licensing, consulting, customer-specific geometry development | **Credible external specialist** if independent formal review or supported exact-offset work is desired. It would still build custom band policy. |
-| **GEOS/JTS** | Broad polygon predicates, distances, buffers, prepared geometry, spatial indexes | **Prototype/reference only.** General GIS geometry is heavier than required; double and polygonal buffer paths are unnecessary for the exact finite decisions. |
-| **libnest2d / SVGNest / Deepnest / no-fit-polygon libraries** | Irregular bin packing and part placement | **Reject for this module.** They optimise many movable parts in a bin. Here the lattice is fixed, the shape is centred, scale candidates are finite, and there is no packing objective. |
-| **3D CAD kernels / mesh SDKs** | General modelling, constraints, mesh repair, booleans | **Reject.** Wrong dimensionality and several orders of magnitude more machinery than the problem requires. |
+Any later geometry change to the manufactured contour requires a new review.
 
-### 2.3 Recommended source strategy
-
-The hot fitting core SHOULD have no third-party geometry dependency. This makes the legal pass/fail predicates reviewable, keeps the WebAssembly payload small, and prevents an upstream library’s tolerance or approximation setting from becoming hidden product law.
-
-Clipper2 MAY be used in a separate adapter before this engine when raw customer SVG paths must be unioned, self-intersections must be resolved under a declared fill rule, or multiple contours must be collapsed. The fitting core itself MUST still receive one valid simple polygon and MUST reject, rather than silently repair, invalid input.
-
-CGAL MAY be used in an offline oracle test suite to compare erosion/component topology on difficult fixtures. It is not required to answer the finite magnet queries.
-
----
-
-## 3. Product law fixed by this contract
-
-### 3.1 Hardware constants
+## 3. Guarded values
 
 ```text
 dense lattice pitch             48 mm
 half-pitch coordinate unit       24 mm
-sparse lattice pitch             96 mm (phase thinning of dense lattice)
-required magnet footprint        closed disc, radius 12 mm
-boundary tangency                passes nominal law
+sparse lattice pitch             96 mm, obtained by thinning the dense lattice
+magnet footprint                 closed disc, radius 12 mm
+direct link                      radius-12 capsule around a 48 mm centre segment
+boundary tangency                lawful
 manufactured size step           12 mm
 maximum lattice positions/axis   9
-orientation                      fixed; no rotation or mirroring
+orientation                      fixed
 scale                            uniform only
 shape topology                   one simple closed solid polygon, no holes
 ```
 
-### 3.2 Band span and legal sizes
-
-The standard span of band `b` is:
+The default band span is:
 
 ```text
-span(b) = 24 + 48·(b − 1) millimetres
+span(b) = 24 + 48*(b-1) mm
 ```
 
-The legal manufactured sizes for band `b` are:
+Default candidate sizes are:
 
 ```text
-S(b) = { span(b), span(b)+12, span(b)+24, span(b)+36 }
+S(b) = {span(b), span(b)+12, span(b)+24, span(b)+36}
+
+band 2: 72, 84, 96, 108 mm
+band 3: 120, 132, 144, 156 mm
+band 4: 168, 180, 192, 204 mm
 ```
 
-Equivalently, they occupy `[span(b), span(b+1))` on a 12 mm step.
+The manufactured scalar size is the polygon's maximum axis-aligned bbox dimension. The other dimension follows from the locked aspect ratio and is never independently rounded.
 
-Therefore:
+## 4. Input and canonical transform
+
+Input is one integer-coordinate contour. A repeated closing vertex is optional. The engine MUST reject:
+
+- fewer than three distinct vertices;
+- non-adjacent repeated vertices;
+- zero area;
+- self-intersection or self-touching;
+- overlapping adjacent edges or collinear backtracking;
+- a bbox span beyond the configured exact-arithmetic bound.
+
+It MUST NOT silently repair invalid input.
+
+For canonical polygon `P`:
 
 ```text
-band 1 (internal)  24, 36, 48, 60 mm
-band 2             72, 84, 96, 108 mm
-band 3             120, 132, 144, 156 mm
-```
-
-The scalar manufactured size is the scaled polygon’s **maximum axis-aligned bounding-box dimension**. The other dimension is aspect-derived and MAY be fractional. It is returned as an exact rational.
-
-### 3.3 Important clarification about “between band 1 and band 2”
-
-A horizontal or vertical pair has centres 48 mm apart. Adding a 12 mm radius at both ends gives a padded footprint of exactly:
-
-```text
-72 × 24 mm
-```
-
-Consequently, when manufactured size means maximum bbox dimension, an adjacent pair cannot fit below 72 mm. If “band 2” were instead defined as `(24,72]`, the only band-2 value capable of supporting a pair would be 72 mm itself. This contract retains the original non-overlapping band intervals: band 1 ends below 72; band 2 begins at 72.
-
-### 3.4 One result per band
-
-For a requested band, the engine returns exactly one of:
-
-```text
-FIT(size, layout, witnesses, metrics)
-NO_FIT(reason)
-```
-
-It MUST NOT return a menu of sizes. It MAY expose diagnostic records in test builds, but the production result is singular.
-
-### 3.5 Selection is layout-tier-first
-
-Selection is strongest layout tier first, then smallest legal size within the winning tier. Band 2 orders `FULL_2X2`, then an enabled `LINKED_L3`, then `ADJACENT_PAIR`. Candidate tie-breaking within one tier and size remains deterministic.
-
-A circle-equivalent band-2 fixture is permanent: the pair passes at 72 mm, but the full four-disc layout passes at 96 mm and MUST be selected. The superseded size-first path MUST NOT remain as an alternate runtime policy.
-
-### 3.6 User-facing and internal minimums
-
-```text
-band 1 internal minimum       one supported disc
-band 2+ production minimum    two supported adjacent nodes joined by a verified link
-```
-
-Band 2 can yield:
-
-- a two-node horizontal or vertical pair;
-- a three-node L, meaning two verified pairs sharing one node;
-- a four-node square.
-
-A diagonal pair without a horizontal/vertical 48 mm link is invalid.
-
----
-
-## 4. Module boundary
-
-### 4.1 The fitting engine owns
-
-- polygon canonicalisation after tracing;
-- simple-polygon validation;
-- exact scale transforms;
-- lattice/template generation;
-- disc and link containment;
-- connected layout extraction;
-- band and sparse-phase policy;
-- deterministic ranking;
-- exact manufactured dimensions;
-- contact and flap reporting.
-
-### 4.2 The fitting engine does not own
-
-- raster segmentation;
-- background removal;
-- SVG parsing;
-- Bézier flattening;
-- fill-rule resolution;
-- unioning multiple source paths;
-- artistic simplification;
-- cut-path kerf compensation;
-- physical tolerance calibration;
-- UI rendering or pricing.
-
-These operations MUST occur before or after the core through explicit adapters. They MUST NOT be smuggled into the solver as tolerances or “helpful” geometry repairs.
-
-### 4.3 Required input
-
-Conceptual input:
-
-```json
-{
-  "enginePolicyVersion": "magfit-policy/1.0",
-  "polygon": {
-    "units": "canonical_integer_trace_units",
-    "vertices": [[0,0], [7200,0], [7200,2400], [0,2400]]
-  },
-  "bands": [2, 3],
-  "sparsePolicy": {
-    "mode": "ANY",
-    "engageFromBand": 3,
-    "minimumActiveNodes": 2,
-    "require96mmConnected": true
-  }
-}
-```
-
-Input rules:
-
-- one contour only;
-- at least three distinct vertices;
-- last repeated closing vertex optional;
-- integer coordinates;
-- no holes;
-- no self-intersection or self-touching;
-- no overlapping adjacent edges;
-- maximum bbox span at most 65,536 trace units;
-- upstream SHOULD translate the contour near the origin, although translation does not change the result;
-- upstream MUST preserve the exact polygon sent to manufacturing, or the fit MUST be rerun after any later geometry change.
-
-### 4.4 Required output
-
-Conceptual output for each band:
-
-```json
-{
-  "engineVersion": "magfit-core/0.2.0-grid-pixel",
-  "band": 2,
-  "fit": true,
-  "manufactured": {
-    "nominalSizeMm": 72,
-    "widthMm": {"numerator": 5184, "denominator": 72},
-    "heightMm": {"numerator": 1728, "denominator": 72}
-  },
-  "registration": {
-    "anchor": "AXIS_ALIGNED_BBOX_CENTER",
-    "templateRuns": [2,1]
-  },
-  "magnets": [
-    {"x24": -1, "y24": 0, "xMm": -24, "yMm": 0},
-    {"x24": 1, "y24": 0, "xMm": 24, "yMm": 0}
-  ],
-  "links": [
-    {"a": [-1,0], "b": [1,0], "widthMm": 24}
-  ],
-  "sparsePhase": null,
-  "binding": {
-    "kind": "MAGNET_DISC",
-    "nodeA": [-1,0],
-    "polygonEdgeIndex": 0,
-    "clearanceUmFloor": 12000,
-    "slackUmFloor": 0
-  },
-  "flap": {
-    "exactDenominator": 144,
-    "leftNumerator": 0,
-    "rightNumerator": 0,
-    "bottomNumerator": 0,
-    "topNumerator": 0,
-    "switch12": {"perSide": [true,true,true,true], "passes": true},
-    "switch24": {"perSide": [true,true,true,true], "passes": true}
-  }
-}
-```
-
-The JSON adapter is illustrative; the reference source exposes C++ structures and a fixed-layout C ABI.
-
----
-
-## 5. Canonical geometry and transform
-
-Let the canonical polygon be `P` with bbox:
-
-```text
-[minX,maxX] × [minY,maxY]
-```
-
-Define:
-
-```text
-widthSpan  = maxX − minX
-heightSpan = maxY − minY
+widthSpan  = maxX-minX
+heightSpan = maxY-minY
 D          = max(widthSpan,heightSpan)
 centre2    = (minX+maxX, minY+maxY)
 ```
 
-`centre2` stores twice the bbox centre and avoids halves.
-
-At manufactured size `s`, a source vertex `(x,y)` is mapped to millimetres by:
+At manufactured size `s`, source point `(x,y)` maps to:
 
 ```text
-X = s·(2x − centre2.x) / (2D)
-Y = s·(2y − centre2.y) / (2D)
+X = s*(2x-centre2.x)/(2D)
+Y = s*(2y-centre2.y)/(2D)
 ```
 
-The reference implementation stores every transformed vertex numerator and the common denominator `2D`. It does not round transformed vertices before fit decisions.
-
-Exact manufactured dimensions are:
+No transformed vertex is rounded for a fit decision. Exact dimensions are:
 
 ```text
-widthMm  = s·widthSpan / D
-heightMm = s·heightSpan / D
+widthMm  = s*widthSpan/D
+heightMm = s*heightSpan/D
 ```
 
-### 5.1 Why bbox centre is fixed in v1
+Canonicalisation removes consecutive duplicates and in-between collinear vertices, normalises counter-clockwise winding, then rotates to the lexicographically smallest vertex. Equivalent translation, uniform source scaling, reversed winding, changed starting vertex, and optional closing duplicate MUST produce the same ordered option set.
 
-A fixed bbox centre is:
+## 5. Lattice windows and band identity
 
-- deterministic;
-- scale-equivariant;
-- cheap;
-- independent of triangulation or raster sampling;
-- stable under translation, winding reversal, and vertex-start changes;
-- easy to explain visually.
-
-The engine MUST NOT continuously slide the grid inside the artwork in v1. Such an optimiser can place all magnets in one butterfly wing, can jump between disconnected feasible regions, and makes “centred” a hidden objective rather than a law.
-
-A bounded integer-mm translation search MAY be introduced later as a versioned policy, but it is not part of this contract.
-
----
-
-## 6. Lattice and parity templates
-
-All lattice coordinates use 24 mm units.
-
-A centred run of `n` positions is:
+Coordinates use 24 mm units. A centred run of `n` dense positions is:
 
 ```text
-R(n) = { −(n−1), −(n−3), …, n−3, n−1 }
+R(n) = {-(n-1), -(n-3), ..., n-3, n-1}
 ```
 
-Examples:
+For band `b`, enumerate every rectangular parent window `(runsX,runsY)` where:
 
 ```text
-R(1) = {0}             -> magnet-centred
-R(2) = {-1,+1}         -> {-24,+24} mm, gap-centred
-R(3) = {-2,0,+2}       -> {-48,0,+48} mm, magnet-centred
-```
-
-This encodes parity registration directly. The engine MUST NOT recalculate registration after unsupported nodes are removed.
-
-For band `b`, generate all rectangular parent templates `(runsX,runsY)` such that:
-
-```text
-1 ≤ runsX ≤ b
-1 ≤ runsY ≤ b
+1 <= runsX <= b
+1 <= runsY <= b
 max(runsX,runsY) = b
 ```
 
-Band 2 parents are:
+Each option inherits the parent registration. Removing unsupported nodes MUST NOT recenter the lattice.
+
+An option spans band `b` when:
 
 ```text
-2×2, 2×1, 1×2
+max(maxX24-minX24, maxY24-minY24) = 2*(b-1)
 ```
 
-Band 3 parents are:
+This prevents the same small arrangement from being relabelled as a larger band.
 
-```text
-3×3, 3×2, 2×3, 3×1, 1×3
-```
+## 6. Exact support predicates
 
-A final layout may be a connected supported subset of a parent, but it inherits the parent’s registration. It MUST span the band:
+### 6.1 Magnet disc
 
-```text
-max(maxX24−minX24, maxY24−minY24) = 2·(b−1)
-```
-
-This prevents an ordinary band-2 pair from being mislabeled as band 3 simply because the cut-out was made larger.
-
----
-
-## 7. Exact magnet-disc predicate
-
-For magnet centre `q`, radius `r=12 mm`, the legal requirement is:
-
-```text
-closedDisc(q,r) ⊆ scaledPolygon
-```
-
-For a closed simple polygon this is equivalent to:
+A centre `q` is supported only when its complete closed radius-12 disc lies in the polygon. For a closed simple polygon this is:
 
 1. `q` is inside or on the polygon; and
-2. the minimum Euclidean distance from `q` to every polygon boundary segment is at least `r`.
+2. the minimum squared distance from `q` to every boundary segment is at least `12^2`.
 
-For edge `[a,b]`, with `v=b−a`, `w=q−a`, `L=v·v`, and `h=w·v`:
-
-```text
-if h ≤ 0:    distance² = |w|²
-if h ≥ L:    distance² = |q−b|²
-otherwise:   distance² = (v×w)² / L
-```
-
-The comparison against `r²` MUST be performed after cross-multiplication, without square roots and without floating tolerance.
-
-Boundary tangency passes because the predicate is `distance² ≥ r²`.
-
----
-
-## 8. Exact linked-pair predicate
-
-Grid adjacency alone is not enough. Two supported discs can sit in separate lobes of a concave polygon or across a notch.
-
-For adjacent 48 mm nodes `q1,q2`, the fabric link is valid only when the complete capsule is inside:
+For edge `[a,b]`, `v=b-a`, `w=q-a`, `L=v dot v`, `h=w dot v`:
 
 ```text
-[q1,q2] ⊕ closedDisc(0,12) ⊆ scaledPolygon
+h <= 0    distance^2 = |w|^2
+h >= L    distance^2 = |q-b|^2
+otherwise distance^2 = (v cross w)^2/L
 ```
 
-Equivalently:
+All comparisons are cross-multiplied integers. Equality passes. No epsilon is permitted.
 
-1. both segment endpoints are in the polygon;
-2. the centre segment does not leave the polygon; and
-3. the minimum distance from the centre segment to every polygon boundary segment is at least 12 mm.
+### 6.2 Direct link
 
-The reference checks exact segment-to-segment distance. If two segments intersect, distance is zero. Otherwise the minimum is the least of the four endpoint-to-opposite-segment distances.
-
-This predicate gives the intended interpretation of an L-shaped layout:
+Two supported orthogonal 48 mm neighbours are linked only when the complete radius-12 capsule around their centre segment lies inside the polygon:
 
 ```text
-three supported nodes
-+ two 48 mm adjacencies
-+ two complete 24 mm-wide fabric corridors
-= two linked pairs sharing one node
+[q1,q2] + closedDisc(0,12) subset of P
 ```
 
-A narrow visual limb that touches two discs but does not provide the complete capsule does not create a link.
+The reference checks segment location plus exact minimum segment-to-boundary distance. This proves one direct 24 mm-wide fabric connection. It does not claim that every possible curved corridor has been recognised.
 
----
+## 7. Every lawful connected subset
 
-## 9. Layout graph and candidate extraction
+At each legal size and parent window:
 
-For each parent template and legal size:
-
-1. create one graph vertex per template node;
-2. mark a vertex supported when its disc predicate passes;
-3. consider only horizontal/vertical 48 mm neighbours;
-4. add an edge only when its link-capsule predicate passes;
-5. compute connected components over supported vertices and verified edges;
-6. reject components below the band minimum-node count;
-7. reject components that do not span the band;
+1. compute support for every node;
+2. compute verified links for supported 48 mm neighbours;
+3. enumerate every node subset;
+4. reject subsets below the band's node floor;
+5. reject a subset unless every selected node is supported;
+6. reject it unless the selected graph is connected by verified links;
+7. reject it unless it spans the band;
 8. apply sparse policy;
-9. rank surviving components.
+9. emit the option with evidence.
 
-This is not an open-ended graph search. Bands 2 and 3 contain at most four and nine parent nodes respectively. The full 9×9 field contains 81 nodes and 144 possible dense orthogonal links.
+Band 3 has at most nine parent nodes, hence at most `2^9=512` raw subsets per window. Band 4 is exercised by the prototype but its `2^16` raw subsets make it a review/benchmark case, not evidence of a production performance target.
 
-### 9.1 Candidate ranking at one size
-
-Use this total order:
-
-1. magnet count descending;
-2. verified-link count descending;
-3. complete square parent/component preferred;
-4. selected sparse active-node count descending;
-5. squared component centroid bias from origin ascending;
-6. parent-template area ascending, to prefer the smallest parent that explains an identical component;
-7. `runsX` descending;
-8. `runsY` descending;
-9. sorted node list lexicographically ascending.
-
-This order MUST be encoded once and covered by tie fixtures. Object-map iteration order, pointer order, hash order, or platform-specific sort stability MUST NOT influence a result.
-
----
-
-## 10. Sparse 96 mm compatibility
-
-The 96 mm garment lattice is a phase thinning of the same dense lattice. A sparse phase retains one residue class modulo 4 on each 24 mm coordinate axis.
-
-For phase `(rx,ry)`, a physical layout node `(x24,y24)` is active when:
+Identical physical options found through overlapping parent windows MUST appear once. Identity is:
 
 ```text
-x24 mod 4 = rx
-and
-y24 mod 4 = ry
+band + size + sorted magnets + sorted verified links + sparse evidence
 ```
 
-There are two valid residue choices per axis within a dense parity class, hence four 2D phase combinations.
+Every contributing parent window remains in `source_windows` as provenance.
 
-The same polygon scale, anchor, orientation, and physical magnet layout MUST be used for dense and sparse evaluation. No independent recentring is allowed.
+Topology labels are evidence, never precedence:
 
-### 10.1 Calibrated default
+- `Full`: a complete square lattice block;
+- `Pair`: two nodes and one verified link;
+- `LinkedThree`: three nodes connected by verified links;
+- `Connected`: any other lawful connected subset.
 
-The reference default is:
+No label selects or suppresses another option.
+
+## 8. Sparse 96 mm evidence
+
+Sparse nodes are residue-class thinnings of the same dense lattice. The polygon transform and physical layout do not move.
+
+The calibrated prototype default is:
 
 ```text
-phase mode                    ANY
-engage from band              3
-minimum sparse active nodes   2
-require 96 mm connectivity    true
+mode                         ANY
+engage from band             3
+minimum active nodes         2
+require 96 mm connectivity   true
 ```
 
-Band 2 does not engage the 96 mm population: its 72–108 mm range precedes the 120 mm projected extent needed by a 96 mm pair plus two 12 mm radii. From band 3 onward the engine selects and reports a compatible sparse thinning phase holding at least one verified 96 mm pair. A single active sparse node is not engagement and MUST NOT make a layout pass.
+Band 2 has no sparse engagement because a 96 mm pair plus two 12 mm radii needs 120 mm projected extent.
 
-### 10.2 Production modes
+Modes:
 
-- `FIXED`: use when a garment/SKU has a known phase. This is the strongest real-world production mode.
-- `ANY`: use when manufacturing or placement may select the compatible phase and record it with the SKU.
-- `ALL`: require every phase combination to satisfy the active-node rule. This is often too strict for narrow layouts.
-- `DISABLED`: diagnostic only when dual-density compatibility is not part of that product.
+- `DISABLED`: no sparse evidence;
+- `FIXED`: the configured phase must pass and is reported;
+- `ANY`: the physical option passes when at least one phase passes; every passing phase is reported on that option;
+- `ALL`: every possible phase must pass; all are reported in canonical order.
 
-Two 96 mm-separated centres plus two 12 mm radii require at least 120 mm projected extent. This is why sparse engagement begins at band 3 rather than rejecting otherwise-lawful band-2 layouts.
+A single sparse node never satisfies the default. Active sparse nodes must form the declared 96 mm-connected set using the same direct-capsule predicate.
 
----
+## 9. Per-option evidence
 
-## 11. One size per band algorithm
+Every emitted option contains:
+
+- band and manufactured size;
+- exact and display dimensions;
+- contributing source windows;
+- sorted magnet coordinates;
+- sorted verified links;
+- all passing/required sparse phases;
+- one deterministic most-limiting disc or link contact;
+- bbox overhang and coverage evidence for 12 mm and 24 mm;
+- sampled tongue and narrow-limb diagnostics.
+
+Contact ties resolve by contact kind, grid coordinates, then canonical boundary-edge index. Floating clearances are display-only; discrete identity and integer micrometre fields drive comparison and serialization.
+
+## 10. Flap evidence and its limit
+
+The padded grid box is the selected magnet bbox enlarged by 12 mm on every side. Per-side shape overhang beyond that box is clamped to zero:
 
 ```text
-solveBand(P, band, policy):
-    validate policy and exact bounds
-    canonicalise P once
-
-    for size in legalSizes(band), ascending:
-        scaled = exactUniformScaleAboutBboxCentre(P, size)
-        candidates = []
-
-        for parentTemplate in templates(band):
-            supported[node] = exactDiscInside(scaled, node, radius=12)
-            linked[a,b] = supported[a] && supported[b]
-                          && adjacent48(a,b)
-                          && exactCapsuleInside(scaled, a, b, radius=12)
-
-            for component in connectedComponents(supported, linked):
-                if nodeCount(component) < minimum: continue
-                if !spansBand(component, band): continue
-                sparse = band < sparse.engageFromBand
-                         ? NOT_ENGAGED
-                         : evaluateSparse(component, policy)
-                if !sparse.pass: continue
-                candidates.add(component + witnesses + sparse)
-
-        record every candidate by layout tier and size
-
-    for tier in orderedLayoutTiers(band), strongest first:
-        for size in legalSizes(band), ascending:
-            candidates = recorded candidates in tier at size
-            if candidates is not empty:
-                return buildExactResult(size,
-                    maximum(candidates, totalCandidateOrder))
-
-    return NO_FIT
+left   = max(0, paddedMinX-shapeMinX)
+right  = max(0, shapeMaxX-paddedMaxX)
+bottom = max(0, paddedMinY-shapeMinY)
+top    = max(0, shapeMaxY-paddedMaxY)
 ```
 
-The solver MUST evaluate legal sizes directly. It MUST NOT:
+Coverage at 12 or 24 passes only when all four overhangs are within that selected limit. Passing 24 does not imply that 12 passed.
 
-- derive a floating “critical scale” and round it;
-- binary-search scale;
-- assume that passing at one scale implies passing at every larger scale;
-- publish an untested rounded size.
+The prototype additionally tests exact outward tongue capsules at outer magnet nodes and gap midpoints. These fields are named `sampled_tongue_*` because they do not prove continuous support across a whole side. A cove between witness positions can remain invisible. This is a known sufficiency gap, not a hidden guarantee.
 
-Concave shapes can produce non-monotone support as the scale changes about a centre outside the polygon kernel. Exhaustive evaluation of four legal sizes per band is cheaper and correct.
+`narrow_limb_exception_h` is reported when the bbox extent reaches `h` and no sampled full-width tongue passes. Equality at exactly 12 or 24 is included.
 
----
+A production continuous-side or material-region measure remains required before sampled tongue evidence can be used as a complete flap/limb decision.
 
-## 12. Binding contact
+## 11. Deterministic order and no selector
 
-For every selected magnet disc and verified link capsule, compare its minimum boundary clearance. The limiting contact is the exact minimum, with ties resolved by:
+Options are ordered only for stable browsing and serialization:
 
-1. magnet-disc before link-capsule;
-2. first grid node lexicographically;
-3. optional second node lexicographically;
-4. canonical polygon edge index ascending.
+1. legal size ascending;
+2. sorted magnet coordinates;
+3. sorted verified links;
+4. sparse phase evidence;
+5. source-window provenance.
 
-Return:
+This is not a quality order. The engine exposes no winner, optimum, default option, or fallback. Manual review is the current product decision.
 
-- contact kind;
-- node or link identity;
-- canonical boundary edge index;
-- explanatory clearance in millimetres;
-- exact deterministic `clearanceUmFloor`;
-- exact deterministic `slackUmFloor = clearanceUmFloor − 12000`.
+## 12. C++ and C/Wasm interfaces
 
-The floating millimetre value MAY be used for display. Cache keys, equality tests, and cross-device snapshots MUST use the integer micrometre fields and discrete witness identity.
-
-At a stepped size the limiting contact may have positive slack. The term “binding” should be read as “most limiting selected contact,” not as a claim that exact tangency occurred.
-
----
-
-## 13. Flap reporting
-
-Let the padded magnet bbox be the bbox of all selected centres enlarged by 12 mm on every side. Let the scaled shape bbox be centred at the origin.
-
-Raw side overhangs are clamped at zero:
-
-```text
-left   = max(0, paddedMinX − shapeMinX)
-right  = max(0, shapeMaxX − paddedMaxX)
-bottom = max(0, paddedMinY − shapeMinY)
-top    = max(0, shapeMaxY − paddedMaxY)
-```
-
-The engine returns each value as an exact rational over a common denominator. Geometry also returns neutral `extent_reaches_12` and `extent_reaches_24` facts. Band logic applies EC-09 and returns `coverage_within_12` and `coverage_within_24`: an outcome is true only when all four overhangs are within that limit. This classification remains separate from the neutral geometry fields.
-
-Evenness is:
-
-```text
-horizontal imbalance = |left − right|
-vertical imbalance   = |bottom − top|
-```
-
-### 13.1 Local tongue and narrow-limb evidence
-
-A bbox flap is an extent measurement, not proof of a useful broad fabric flap. A 1 mm antenna can create a large bbox overhang.
-
-For each outermost magnet node and each midpoint between adjacent outer magnets, side direction `n`, and threshold `h` in `{12,24}`, test the exact local tongue from witness `q`:
-
-```text
-[q, q + h*n] ⊕ closedDisc(12) ⊆ scaled polygon
-```
-
-Return `local_tongue_any_h`, `local_tongue_all_h`, and the failing side witnesses. A partial side (`any=true`, `all=false`) exposes a cove or waist without calling the whole shape a narrow limb. Report `narrow_limb_exception_h` only when the bbox exceeds `h` and no full-width local tongue passes anywhere on that side. This is a `DERIVED` diagnostic implementation of EC-10, not a product definition of "trivial"; the engine exposes it for applied review and never auto-approves it.
-
----
-
-## 14. Canonicalisation and deterministic trace handling
-
-The core MUST perform these operations in this order:
-
-1. remove an optional final closing duplicate;
-2. remove consecutive duplicate vertices;
-3. reject any other repeated vertex;
-4. remove collinear vertices that lie between their neighbours;
-5. reject remaining collinear reversal/backtracking, which indicates overlapping adjacent edges;
-6. reject any non-adjacent edge intersection or touch;
-7. reject zero area;
-8. normalise winding to counter-clockwise;
-9. rotate vertex order so the lexicographically smallest vertex is first;
-10. record the canonical edge indices after this order is fixed.
-
-The engine MUST NOT silently choose a fill rule or repair a bow-tie polygon. Such a repair changes product geometry and belongs in a separate, versioned ingestion step.
-
-### 14.1 Stability under retracing
-
-Exact code gives the same answer for the same canonical polygon. It cannot make materially different traces identical without an explicit trace-normalisation law.
-
-The upstream tracing contract therefore MUST pin:
-
-- tracer name/version;
-- raster pre-processing version;
-- threshold and fill rule;
-- curve flattening tolerance;
-- integer quantisation scale and rounding mode;
-- simplification rule;
-- final contour hash.
-
-The fit MUST run on the final manufactured contour after any cutter-path simplification or snapping.
-
----
-
-## 15. Physical tolerance and nominal law
-
-The supplied core implements the stated nominal legal radius of exactly 12 mm with inclusive tangency.
-
-A zero-adjustment physical guarantee requires a separate calibrated release radius:
-
-```text
-releaseRadius = 12 mm
-              + cut error
-              + effect magnet-placement error
-              + garment lattice error
-              + registration error
-              + material change allowance
-```
-
-The safe implementation pattern is to run the identical exact engine with a versioned effective radius, preferably represented in an integer subunit such as micrometres once tolerances below 1 mm become legitimate product inputs.
-
-Do not hide a physical tolerance in `epsilon` comparisons. Return distinct statuses such as:
-
-```text
-NOMINAL_PASS
-PRODUCTION_PASS
-NOMINAL_ONLY_BORDERLINE
-FAIL
-```
-
-The current reference is the nominal integer-millimetre core; tolerance calibration remains a manufacturing input rather than a geometry-library choice.
-
----
-
-## 16. APIs and integration
-
-### 16.1 C++ API
-
-Primary functions:
+C++:
 
 ```cpp
 CanonicalPolygon canonicalize_and_validate(...);
@@ -682,266 +292,91 @@ SolveResult solve_canonical(...);
 SolveResult solve(...);
 ```
 
-Use `solve` for a one-off uploaded shape. Use `canonicalize_and_validate` once and `solve_canonical` when the same contour is evaluated repeatedly under several policies.
+`solve_canonical` avoids retracing validation when a caller already owns a validated contour. A complete multi-band review should be computed once and cached by the flow layer.
 
-### 16.2 Stable C ABI
-
-`magfit_solve_band_i32`:
-
-- accepts a flat `int32` vertex array;
-- solves exactly one band;
-- uses caller-owned fixed-capacity result memory;
-- never throws through the ABI;
-- returns an error code separately from `fit=false`;
-- is suitable for iOS/Android FFI and Emscripten export.
-
-`magfit_solve_bands_i32` accepts several default bands, canonicalises the polygon once, and solves them in one call. UI adapters SHOULD use it for a stable shape instead of repeating trace validation for every band or interaction.
-
-The maximum arrays are fixed by the 9×9 hardware ceiling:
+C/Wasm:
 
 ```text
-81 nodes
-144 orthogonal dense links
+magfit_review_band_i32
+magfit_review_bands_i32
 ```
 
-### 16.3 WebAssembly
+Both stream options through a caller callback. This prevents an ABI array cap from silently truncating a lawful review set. A callback that refuses an option makes the call fail rather than report a partial successful result.
 
-Compile the C ABI rather than exposing C++ containers directly. Emscripten exports C functions predictably and eliminates unexported code at optimisation levels.
+The C boundary MUST initialise counts on entry, reject invalid pointers/counts before indexing, and never allow C++ exceptions to escape.
 
-Representative build shape:
+A persistent prepared-shape handle, engine/policy hashes, exact cutter transform, and final manufactured contour are not in this prototype. Therefore this interface is review-capable but not yet a self-contained fulfilment API.
 
-```bash
-em++ -O3 -flto -std=c++20 \
-  -Iinclude src/magfit.cpp src/magfit_c.cpp \
-  -sMODULARIZE=1 -sEXPORT_ES6=1 \
-  -sENVIRONMENT=web,worker \
-  -sEXPORTED_FUNCTIONS='["_magfit_engine_version","_magfit_default_policy","_magfit_solve_band_i32","_malloc","_free"]' \
-  -o magfit.js
-```
+## 13. Acceptance suite
 
-The production TypeScript adapter SHOULD:
+Required fixtures:
 
-1. normalise trace coordinates to signed 32-bit local coordinates;
-2. allocate/copy the flat vertex array into Wasm memory;
-3. allocate policy, result, and error buffers;
-4. call `magfit_solve_bands_i32` once for the requested bands;
-5. copy only the result’s declared counts;
-6. convert `x24,y24` to millimetres for rendering;
-7. serialise exact rational and integer witness fields;
-8. release all allocations in `finally`.
+- 72 mm square exposes the full square and lawful pair subsets;
+- every passing legal size remains present;
+- a maximal cross does not hide its run and L subsets;
+- overlapping parent windows deduplicate physical options and retain provenance;
+- exact disc tangency passes;
+- a missing direct capsule removes that link without deleting another connected option;
+- band 2 contains no sparse phase;
+- band 3 reports every passing phase under `ANY`;
+- `ALL` rejects when any required phase fails;
+- exact-threshold narrow limb evidence is reported;
+- 18 mm overhang fails coverage 12 and passes coverage 24;
+- band 4 full-square fixture is exercised;
+- C ABI streams every option from single- and multi-band calls;
+- translation, source scale, winding and start-index invariance;
+- invalid input and C ABI errors fail loudly.
 
-The adapter MUST NOT redo geometry decisions in JavaScript.
+Release gaps that remain explicit:
 
----
+- hidden-cove fixture proving the sampled-side limitation;
+- persistent prepared C/Wasm lifecycle;
+- self-contained fulfilment transform/provenance;
+- Wasm round trip;
+- sanitizers and cross-compiler matrix;
+- real cut-out library applied review;
+- target-device time and memory.
 
-## 17. Required acceptance suite
+## 14. Measured prototype performance
 
-A release is not accepted because it “looks right” in a canvas. It must pass fixture and invariant tests.
-
-### 17.1 Core fixtures
-
-| Fixture | Required result |
-|---|---|
-| 72×72 square, band 2 | size 72; four magnets; four verified links; zero nominal slack |
-| 72×24 rectangle, band 2 | size 72; horizontal pair; one verified link |
-| rotated-equivalent vertical 24×72 rectangle | size 72; vertical pair |
-| 72 mm L shape with 24 mm arms | size 72; three magnets; exactly two links |
-| 72×23 aspect rectangle, band 2 | 72 fails; 84 is selected |
-| 120×24 rectangle, band 3 | size 120; three-node run; two verified links |
-| diagonal-only supported corners | invalid layout; no diagonal link |
-| two discs across a concavity without full capsule | discs may pass; link MUST fail |
-| exact disc tangency | passes |
-| distance smaller than radius by one exact rational unit | fails |
-| exact 12 mm bbox flap | neutral `extent_reaches_12` is true exactly |
-| sparse policy, band-2 pair | dense result passes; sparse phase is absent because 96 mm is not engaged |
-| sparse `ANY`, band-3 run | passes only with at least two 96 mm-connected active nodes |
-| sparse `ALL`, band-3 run | fails when any phase lacks a connected pair |
-| round band-2 shape | full four-disc tier at 96 wins over the earlier 72 mm pair |
-| 168×168 square, band 4 | size 168; sixteen magnets |
-| self-intersecting bow tie | invalid input, not repaired |
-| adjacent collinear backtracking | invalid input |
-
-### 17.2 Determinism invariants
-
-For the same shape under:
-
-- arbitrary source translation;
-- uniform source-coordinate multiplication;
-- reversed winding;
-- rotated starting vertex;
-- optional repeated closing point;
-
-these fields MUST remain identical:
-
-- fit/no-fit;
-- manufactured size;
-- parent template;
-- sorted magnets;
-- verified links;
-- sparse phase under the same policy;
-- binding witness identity;
-- exact rational dimensions and flap switches.
-
-### 17.3 Cross-build gate
-
-Run the same golden corpus through:
-
-- Apple Clang native;
-- Android NDK Clang native;
-- Linux Clang/GCC CI;
-- Emscripten WebAssembly.
-
-Discrete and exact-integer fields MUST be byte-identical after canonical serialization. Floating explanatory values are excluded from equality snapshots.
-
-### 17.4 Property/fuzz gate
-
-The release pipeline SHOULD generate valid radial and concave simple polygons, then verify:
-
-- no crash or undefined behaviour;
-- selected contacts have non-negative exact nominal slack;
-- every selected node independently passes the disc predicate;
-- every reported link independently passes the capsule predicate;
-- selected component is connected by reported links;
-- layout spans its band;
-- rerunning produces identical bytes;
-- translation/winding/start invariance holds.
-
-Sanitizer builds MUST run with AddressSanitizer and UndefinedBehaviorSanitizer on the corpus.
-
----
-
-## 18. Performance contract
-
-The complexity for a fixed legal band is bounded by:
+Apple Clang Release, 1,000-vertex polygon, bands 2 and 3, 135 returned options:
 
 ```text
-legal sizes × parent templates × nodes/links × polygon edges
+already-canonical enumeration     122.14 ms mean
+validation plus enumeration       113.61 ms mean
+8,100-point canonicalisation        1.37 ms, 5,872 retained vertices
 ```
 
-For bands 2 and 3 this is tiny and deterministic. The reference implementation deliberately uses a simple boundary scan rather than an R-tree because 100–1,000 edges and at most nine nodes per band are already inexpensive.
+The review workload is larger than the former winner-only solve because evidence is built for every option. These figures do not meet a one-frame interaction target and are not phone/Wasm certification.
 
-Measured Apple Clang Release benchmark on the proposal machine, 1,000 vertices, bands 2 and 3:
+The correct runtime shape is: compute after the cut-out changes, cache the complete answer, and perform zero geometry during review interaction.
 
-```text
-canonical polygon already validated   6.88 ms/solve
-validation plus solve                 7.33 ms/solve
-8,100-point preparation               1.21 ms (5,872 canonical vertices)
-```
+Optimisation must preserve the exact option set. If required, proceed in this order:
 
-These are not mobile certification numbers.
+1. cache scaled edges per size;
+2. cache node/link/tongue queries across windows and subsets;
+3. build evidence once per physical option primitive;
+4. add exact broad-phase edge indexing;
+5. benchmark 1,000 and 8,100-point real traces on target devices.
 
-Shipping gates:
+## 15. Prohibited implementation patterns
 
-- benchmark the lowest-supported iOS and Android hardware;
-- benchmark the actual WebAssembly bundle in Safari and Chrome;
-- report median, p95, and maximum over the production trace corpus;
-- no network call or worker round-trip is required for correctness;
-- target p95 SHOULD remain within one 16.7 ms frame for the already-canonicalised solve;
-- one-time trace validation MAY exceed one frame but SHOULD remain below 50 ms for 1,000 vertices.
+- stretching or independently rounding the cut-out dimensions;
+- moving/recentring the lattice after nodes disappear;
+- float epsilon for legal decisions;
+- approximate circle buffers as exact support law;
+- maximal-component-only extraction;
+- first-fit or first-size return;
+- ranking/topology labels that suppress variants;
+- arbitrary UI filtering presented as engine truth;
+- independent dense and sparse transforms;
+- recomputation during pan, zoom, option navigation, or other interaction;
+- silent contour repair;
+- claiming sampled tongue evidence is continuous side proof;
+- claiming nominal 12 mm CAD clearance is a calibrated production tolerance.
 
-If optimisation becomes necessary, apply it in this order:
+## 16. Prototype status
 
-1. cache canonical polygons;
-2. cache scaled edge data per legal size;
-3. deduplicate repeated node queries across parent templates;
-4. add edge AABB rejection;
-5. add a deterministic segment AABB tree.
+The package is an executable review prototype. Its exact geometry, finite-size evaluation, connected-subset enumeration, sparse evidence, C ABI streaming, and deterministic option order are testable now.
 
-Do not replace exact predicates with floats to meet a performance target.
-
----
-
-## 19. Security and failure behaviour
-
-The engine MUST validate all caller-controlled counts and ranges before multiplication or allocation.
-
-The reference exact arithmetic proof assumes:
-
-```text
-trace bbox span ≤ 65,536 units
-field positions ≤ 9 per axis
-legal sizes remain in the declared band interval
-```
-
-Custom legal sizes MUST be strictly ascending, on the 12 mm step, and inside the requested band. Invalid policy or geometry returns an input error, not `NO_FIT`.
-
-Distinguish:
-
-```text
-INVALID_INPUT    polygon or policy is not legal
-NO_FIT           legal input, but no size/layout passes
-INTERNAL_ERROR   invariant or capacity failure
-FIT              complete result
-```
-
-The production boundary MUST not expose C++ exceptions or uninitialised output memory.
-
----
-
-## 20. Prohibited implementation patterns
-
-The following are contract violations:
-
-- using canvas pixels as geometry truth;
-- floating point plus an arbitrary epsilon for legal pass/fail;
-- buffering a polygon with an approximated circle and treating the result as exact law;
-- moving the grid until “something looks good”;
-- deriving layout from unordered surviving-node maps;
-- treating grid adjacency as proof of a 24 mm fabric connection;
-- accepting diagonal pairs;
-- recentering after nodes disappear;
-- binary searching scale;
-- rounding a continuous answer up without retesting final geometry;
-- silently simplifying or repairing the contour;
-- letting sparse and dense modes choose different transforms;
-- returning several sizes when the contract requires one;
-- using a nesting/genetic algorithm;
-- introducing a full CAD kernel for bands 2 and 3;
-- recomputing geometry differently in UI code.
-
----
-
-## 21. Reference implementation status
-
-The supplied source currently includes:
-
-- approximately 1,100 lines of exact C++ core;
-- a C/Wasm ABI adapter;
-- zero third-party runtime geometry dependencies;
-- exact 128-bit predicates and fixed 256-bit rational comparison;
-- canonical validation;
-- band-template generation through 9×9;
-- disc and capsule tests;
-- dense/sparse policy;
-- deterministic layout-tier-first selection;
-- exact dimensions, neutral flap/local-tongue evidence, and integer contact serialization;
-- GCC and Clang builds;
-- fixture tests, C ABI tests, and a deterministic 100-shape invariance corpus.
-
-It is a tested reference core, not a substitute for physical tolerance calibration, target-phone benchmarking, upstream tracer locking, or independent production code review.
-
----
-
-## 22. Product decisions locked for v1
-
-To prevent another implementation from inventing its own problem, v1 is locked as follows:
-
-```text
-size measure                 maximum axis-aligned bbox dimension
-orientation                  fixed as uploaded
-centre                       axis-aligned bbox centre
-translation search           none
-scale candidates             legal 12 mm values only
-selection                    strongest layout tier, then smallest passing size
-band identity                selected component must span band
-band 2 layouts               pair, linked three-node L, or four-node square
-single node                  internal band 1 only for dense product logic
-link                         exact radius-12 capsule, not graph adjacency alone
-sparse default               disengaged in band 2; ANY connected pair from band 3
-sparse/dense transform       identical
-flap                         neutral bbox/tongue facts plus EC-09 12/24 coverage outcomes
-invalid polygon              reject; never silently repair
-result                       one size/layout or no fit per band
-```
-
-Any change to this table requires a policy version change, new golden fixtures, and migration rules for previously manufactured products.
+It is not yet the final production engine. Production requires applied manual review plus closure of the declared continuous-flap, prepared-runtime, fulfilment-output, and target-performance gaps. No selector is to be implemented until that evidence exists.

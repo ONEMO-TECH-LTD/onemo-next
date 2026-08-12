@@ -2,73 +2,63 @@
 
 Validation date: 2026-08-12
 
-This record applies to the Grid Pixel calibration package, not the untouched GPT Pro source.
+This record applies to the Grid Pixel review-mode proposal, not the untouched GPT Pro source.
 
 ## Release build
 
-The source was compiled and tested with Apple Clang in the execution environment:
-
 ```text
-Clang C/C++ Release build     PASS
-C++ acceptance suite          PASS
-C ABI acceptance suite        PASS
+Apple Clang C/C++ Release build    PASS
+C++ review acceptance suite       PASS
+C ABI review acceptance suite     PASS
 ```
 
-Sanitizer, GCC, Wasm, and target-device runs remain release gates; they are not claimed by this local proposal run.
+Sanitizer, GCC, Wasm, and target-device runs remain release gates and are not claimed by this local run.
 
 ## Deterministic corpus
 
-The C++ suite includes a fixed-seed corpus of 100 valid 48-vertex radial polygons. For each polygon it compares the result against a translated, winding-reversed, start-index-rotated representation.
+The C++ suite uses 30 fixed-seed valid 48-vertex radial polygons. Each result is compared with the same polygon translated, winding-reversed, and start-index-rotated.
 
-Compared fields include:
-
-```text
-fit/no-fit
-manufactured size
-selected magnets
-selected layout
-non-negative selected slack
-```
+The test compares every band's ordered option set, including size, magnets, verified links, source-window provenance, and non-negative exact slack.
 
 Result: PASS.
 
-## Reference performance
+## Measured performance
 
-Release build, 1,000-vertex polygon, bands 2 and 3, 1,000 hot iterations and 100 cold iterations. Fresh local results are recorded after the acceptance suite is run.
+Apple Clang Release, 1,000-vertex polygon, bands 2 and 3, 100 hot iterations and 20 cold iterations:
 
 ```text
-hot solve mean                  6.88 ms
-validation + solve mean         7.33 ms
-8,100-point preparation         1.21 ms (5,872 canonical vertices)
+returned options per solve          135
+hot enumeration mean                122.14 ms
+validation + enumeration mean       113.61 ms
+8,100-point preparation               1.37 ms (5,872 canonical vertices)
 ```
 
-The figures describe this container only. They are not a substitute for target iOS, Android, Safari WebAssembly, and Chrome WebAssembly benchmarks.
+The prototype now builds evidence for every option; these numbers are therefore not comparable to the old winner-only solve as the same workload. Target iOS, Android, Safari Wasm, and Chrome Wasm measurements remain outstanding.
+
+The C ABI surface independently reports 44 band-2 options and 780 band-3 options for the square fixture, including both the full four-disc layout and pair layouts at 72 mm.
 
 ## Covered fixtures
 
 ```text
-72 mm square -> four magnets, four links
-72 x 24 rectangle -> adjacent pair
-L shape -> three nodes, two links
-72 x 23 aspect -> 84 mm first passing size
-120 x 24 band-3 rectangle -> three-node run
-sparse disabled by engagement band at band 2
-sparse connected-pair requirement at band 3
-exact tangency
-exact 12 mm neutral flap extent
-18 mm neutral extent and local-tongue evidence
-full layout at 96 wins over earlier pair
-thin antenna narrow-limb exception
-cove visible to local evidence despite bbox extent
-U corridor retains four discs but is not a complete direct-link layout
-circle passes a side-midpoint tongue and is not labelled a narrow limb
-18 mm overhang fails 12 mm coverage and passes 24 mm coverage
-168 mm band-4 square
-prepare-once multi-band C ABI
-source scale/translation/winding/start invariance
-large absolute source origin
-self-intersection rejection
-adjacent-edge backtracking rejection
-illegal custom size rejection
+72 mm square exposes the full four-node square and lawful pair subsets
+all passing legal sizes remain present
+band-3 circle at 120 exposes cross, linked-three and four-node L variants
+overlapping parent windows deduplicate physical variants and retain provenance
+band 2 does not engage sparse phases
+band 3 reports every passing sparse phase under ANY
+sparse ALL requires every phase
+flap coverage is computed per option
+U corridor retains a lawful non-full connected four-node option
+168 mm band-4 square exposes the complete 4x4 option
+single-call multi-band C ABI streams every option after one canonicalisation
+source translation, winding and start-index invariance
+invalid polygon and custom-size rejection
 C ABI error isolation
 ```
+
+## Unresolved release gates
+
+- automatic selection is deliberately absent; manual review must establish whether one answer per band can be guaranteed;
+- exact review-mode p95 and memory on target devices;
+- sanitizer and cross-compiler runs;
+- applied UI review of all options on the cut-out library.

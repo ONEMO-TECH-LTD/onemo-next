@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(magfit_grid_pixel_proposal VERSION 0.2.0 LANGUAGES C CXX)
+project(magfit_grid_pixel_proposal VERSION 0.3.0 LANGUAGES C CXX)
 
 option(MAGFIT_BUILD_C_API "Build the stable C/Wasm boundary" ON)
 option(MAGFIT_BUILD_TESTS "Build acceptance tests" ON)
