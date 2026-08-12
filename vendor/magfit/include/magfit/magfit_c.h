@@ -25,6 +25,11 @@ typedef enum MagfitPhaseModeC {
     MAGFIT_PHASE_FIXED = 3
 } MagfitPhaseModeC;
 
+typedef enum MagfitSelectionC {
+    MAGFIT_SELECTION_LAYOUT_FIRST = 0,
+    MAGFIT_SELECTION_SIZE_FIRST = 1
+} MagfitSelectionC;
+
 typedef enum MagfitBindingKindC {
     MAGFIT_BINDING_MAGNET_DISC = 0,
     MAGFIT_BINDING_LINK_CAPSULE = 1
@@ -49,34 +54,39 @@ typedef struct MagfitPolicyC {
     int32_t max_trace_span_units;
     int32_t require_band_span;
     int32_t require_24mm_links;
+    MagfitSelectionC selection;
 
     MagfitPhaseModeC sparse_mode;
+    int32_t sparse_min_band;
     int32_t sparse_min_active_nodes;
     int32_t sparse_require_96mm_connected;
     int32_t sparse_fixed_x_residue_mod4;
     int32_t sparse_fixed_y_residue_mod4;
 } MagfitPolicyC;
 
+/*
+ * Flap limits are MAXIMA (L14): within_* means the side's overhang is at most that many
+ * millimetres. broad_beyond_* reports whether a full 24mm-wide fabric tongue anchored at
+ * an outer-row magnet reaches past the limit — the trivial-limb witness. Evidence for a
+ * reported exception, never an automatic approval.
+ */
+typedef struct MagfitFlapSideC {
+    int64_t num;
+    double mm;
+    int32_t within_12;
+    int32_t within_24;
+    int32_t broad_beyond_12;
+    int32_t broad_beyond_24;
+} MagfitFlapSideC;
+
 typedef struct MagfitFlapMetricsC {
     int64_t exact_den;
-    int64_t left_num;
-    int64_t right_num;
-    int64_t bottom_num;
-    int64_t top_num;
-    double left_mm;
-    double right_mm;
-    double bottom_mm;
-    double top_mm;
+    MagfitFlapSideC left;
+    MagfitFlapSideC right;
+    MagfitFlapSideC bottom;
+    MagfitFlapSideC top;
     double horizontal_imbalance_mm;
     double vertical_imbalance_mm;
-    int32_t left_ge_12;
-    int32_t right_ge_12;
-    int32_t bottom_ge_12;
-    int32_t top_ge_12;
-    int32_t left_ge_24;
-    int32_t right_ge_24;
-    int32_t bottom_ge_24;
-    int32_t top_ge_24;
 } MagfitFlapMetricsC;
 
 typedef struct MagfitBindingContactC {

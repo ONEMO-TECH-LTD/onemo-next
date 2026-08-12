@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr const char* kEngineVersion = "magfit-core/0.1.0";
+constexpr const char* kEngineVersion = "magfit-core/0.2.0";
 
 void copy_text(char* destination, std::size_t capacity, const std::string& text) {
     if (destination == nullptr || capacity == 0) return;
@@ -40,7 +40,11 @@ magfit::EnginePolicy to_cpp_policy(const MagfitPolicyC& value) {
     out.max_trace_span_units = value.max_trace_span_units;
     out.require_band_span = value.require_band_span != 0;
     out.require_24mm_links = value.require_24mm_links != 0;
+    out.selection = value.selection == MAGFIT_SELECTION_SIZE_FIRST
+                        ? magfit::Selection::SizeFirst
+                        : magfit::Selection::LayoutFirst;
     out.sparse.mode = phase_mode(value.sparse_mode);
+    out.sparse.min_band = value.sparse_min_band;
     out.sparse.min_active_nodes = value.sparse_min_active_nodes;
     out.sparse.require_96mm_connected = value.sparse_require_96mm_connected != 0;
     out.sparse.fixed_x_residue_mod4 = value.sparse_fixed_x_residue_mod4;
@@ -114,24 +118,22 @@ void copy_result(const magfit::BandResult& source, MagfitBandResultC& out) {
         out.binding.slack_um_floor = source.binding.slack_um_floor;
 
         out.flap.exact_den = source.flap.exact_den;
-        out.flap.left_num = source.flap.left_num;
-        out.flap.right_num = source.flap.right_num;
-        out.flap.bottom_num = source.flap.bottom_num;
-        out.flap.top_num = source.flap.top_num;
-        out.flap.left_mm = source.flap.left_mm;
-        out.flap.right_mm = source.flap.right_mm;
-        out.flap.bottom_mm = source.flap.bottom_mm;
-        out.flap.top_mm = source.flap.top_mm;
+        const auto copy_side = [](const magfit::FlapSide& side) {
+            MagfitFlapSideC out_side{};
+            out_side.num = side.num;
+            out_side.mm = side.mm;
+            out_side.within_12 = side.within_12;
+            out_side.within_24 = side.within_24;
+            out_side.broad_beyond_12 = side.broad_beyond_12;
+            out_side.broad_beyond_24 = side.broad_beyond_24;
+            return out_side;
+        };
+        out.flap.left = copy_side(source.flap.left);
+        out.flap.right = copy_side(source.flap.right);
+        out.flap.bottom = copy_side(source.flap.bottom);
+        out.flap.top = copy_side(source.flap.top);
         out.flap.horizontal_imbalance_mm = source.flap.horizontal_imbalance_mm;
         out.flap.vertical_imbalance_mm = source.flap.vertical_imbalance_mm;
-        out.flap.left_ge_12 = source.flap.left_ge_12;
-        out.flap.right_ge_12 = source.flap.right_ge_12;
-        out.flap.bottom_ge_12 = source.flap.bottom_ge_12;
-        out.flap.top_ge_12 = source.flap.top_ge_12;
-        out.flap.left_ge_24 = source.flap.left_ge_24;
-        out.flap.right_ge_24 = source.flap.right_ge_24;
-        out.flap.bottom_ge_24 = source.flap.bottom_ge_24;
-        out.flap.top_ge_24 = source.flap.top_ge_24;
     }
 
     copy_text(out.reason, sizeof(out.reason), source.reason);
@@ -155,12 +157,16 @@ extern "C" void magfit_default_policy(MagfitPolicyC* out_policy) {
     out_policy->max_trace_span_units = source.max_trace_span_units;
     out_policy->require_band_span = source.require_band_span;
     out_policy->require_24mm_links = source.require_24mm_links;
+    out_policy->selection = source.selection == magfit::Selection::SizeFirst
+                                ? MAGFIT_SELECTION_SIZE_FIRST
+                                : MAGFIT_SELECTION_LAYOUT_FIRST;
     switch (source.sparse.mode) {
         case magfit::PhaseMode::Disabled: out_policy->sparse_mode = MAGFIT_PHASE_DISABLED; break;
         case magfit::PhaseMode::Any: out_policy->sparse_mode = MAGFIT_PHASE_ANY; break;
         case magfit::PhaseMode::All: out_policy->sparse_mode = MAGFIT_PHASE_ALL; break;
         case magfit::PhaseMode::Fixed: out_policy->sparse_mode = MAGFIT_PHASE_FIXED; break;
     }
+    out_policy->sparse_min_band = source.sparse.min_band;
     out_policy->sparse_min_active_nodes = source.sparse.min_active_nodes;
     out_policy->sparse_require_96mm_connected = source.sparse.require_96mm_connected;
     out_policy->sparse_fixed_x_residue_mod4 = source.sparse.fixed_x_residue_mod4;

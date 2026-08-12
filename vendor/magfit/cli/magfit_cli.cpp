@@ -160,8 +160,18 @@ int main() {
         else if (mode == "FIXED") policy.sparse.mode = magfit::PhaseMode::Fixed;
         else if (mode == "DISABLED") policy.sparse.mode = magfit::PhaseMode::Disabled;
         else policy.sparse.mode = magfit::PhaseMode::Any;
+        // Addendum v1.1 defaults: sparse engages at band 3 with a verified 96mm pair;
+        // selection is layout-first (full square calibration). All overridable per call.
+        policy.sparse.min_band =
+            static_cast<int>(number_field(request, "sparseMinBand").value_or(3.0L));
         policy.sparse.min_active_nodes =
-            static_cast<int>(number_field(request, "sparseMinActive").value_or(1.0L));
+            static_cast<int>(number_field(request, "sparseMinActive").value_or(2.0L));
+        policy.sparse.require_96mm_connected =
+            number_field(request, "require96Connected").value_or(1.0L) != 0.0L;
+        const std::string selection =
+            string_field(request, "selection").value_or("LAYOUT_FIRST");
+        policy.selection = selection == "SIZE_FIRST" ? magfit::Selection::SizeFirst
+                                                     : magfit::Selection::LayoutFirst;
         policy.require_24mm_links = number_field(request, "requireLinks").value_or(1.0L) != 0.0L;
         policy.require_band_span = number_field(request, "requireBandSpan").value_or(1.0L) != 0.0L;
 
@@ -172,8 +182,10 @@ int main() {
             magfit::solve(magfit::PolygonInput{vertices}, bands, policy);
 
         std::ostringstream os;
-        os << "{\"ok\":true,\"engine\":\"magfit-core/0.1.0\",\"vertexCount\":" << vertices.size()
-           << ",\"bands\":[";
+        os << "{\"ok\":true,\"engine\":\"magfit-core/0.2.0\",\"vertexCount\":" << vertices.size()
+           << ",\"selection\":\""
+           << (policy.selection == magfit::Selection::SizeFirst ? "SIZE_FIRST" : "LAYOUT_FIRST")
+           << "\",\"bands\":[";
         for (std::size_t i = 0; i < solved.bands.size(); ++i) {
             const magfit::BandResult& band = solved.bands[i];
             if (i) os << ',';
@@ -207,18 +219,26 @@ int main() {
                    << ",\"clearanceMm\":" << band.binding.clearance_mm
                    << ",\"slackMm\":" << band.binding.slack_mm
                    << ",\"clearanceUm\":" << band.binding.clearance_um_floor << '}';
-                os << ",\"flap\":{\"leftMm\":" << band.flap.left_mm
-                   << ",\"rightMm\":" << band.flap.right_mm
-                   << ",\"bottomMm\":" << band.flap.bottom_mm
-                   << ",\"topMm\":" << band.flap.top_mm
-                   << ",\"left12\":" << (band.flap.left_ge_12 ? "true" : "false")
-                   << ",\"right12\":" << (band.flap.right_ge_12 ? "true" : "false")
-                   << ",\"bottom12\":" << (band.flap.bottom_ge_12 ? "true" : "false")
-                   << ",\"top12\":" << (band.flap.top_ge_12 ? "true" : "false")
-                   << ",\"left24\":" << (band.flap.left_ge_24 ? "true" : "false")
-                   << ",\"right24\":" << (band.flap.right_ge_24 ? "true" : "false")
-                   << ",\"bottom24\":" << (band.flap.bottom_ge_24 ? "true" : "false")
-                   << ",\"top24\":" << (band.flap.top_ge_24 ? "true" : "false") << '}';
+                const auto flap_side = [&os](const char* name, const magfit::FlapSide& s,
+                                             bool trailing_comma) {
+                    os << '"' << name << "\":{\"mm\":" << s.mm
+                       << ",\"within12\":" << (s.within_12 ? "true" : "false")
+                       << ",\"within24\":" << (s.within_24 ? "true" : "false")
+                       << ",\"broadBeyond12\":" << (s.broad_beyond_12 ? "true" : "false")
+                       << ",\"broadBeyond24\":" << (s.broad_beyond_24 ? "true" : "false")
+                       << ",\"trivialLimb12\":"
+                       << (!s.within_12 && !s.broad_beyond_12 ? "true" : "false")
+                       << ",\"trivialLimb24\":"
+                       << (!s.within_24 && !s.broad_beyond_24 ? "true" : "false") << '}';
+                    if (trailing_comma) os << ',';
+                };
+                os << ",\"flap\":{";
+                flap_side("left", band.flap.left, true);
+                flap_side("right", band.flap.right, true);
+                flap_side("bottom", band.flap.bottom, true);
+                flap_side("top", band.flap.top, true);
+                os << "\"horizontalImbalanceMm\":" << band.flap.horizontal_imbalance_mm
+                   << ",\"verticalImbalanceMm\":" << band.flap.vertical_imbalance_mm << '}';
                 if (band.sparse_phase) {
                     os << ",\"sparse\":{\"xResidue\":" << band.sparse_phase->x_residue_mod4
                        << ",\"yResidue\":" << band.sparse_phase->y_residue_mod4

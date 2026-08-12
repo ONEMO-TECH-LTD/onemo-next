@@ -27,7 +27,7 @@ int main(void) {
     require(result.manufactured_size_mm == 72, "default band 2 size must be 72 mm");
     require(result.magnet_count == 4, "square must expose four magnets");
     require(result.verified_link_count == 4, "square must expose four verified links");
-    require(strcmp(magfit_engine_version(), "magfit-core/0.1.0") == 0,
+    require(strcmp(magfit_engine_version(), "magfit-core/0.2.0") == 0,
             "version must be stable");
 
     {

@@ -38,10 +38,25 @@ enum class PhaseMode {
     Fixed,
 };
 
+// Addendum v1.1 §B1: LayoutFirst = the full b×b square is the band's calibration; the
+// smallest legal size holding it wins. Only when no size in the band holds the square does
+// the engine fall back to the smallest size with any valid layout. SizeFirst = the base
+// contract's first-passing-size behaviour, kept selectable for corpus comparison.
+enum class Selection {
+    LayoutFirst,
+    SizeFirst,
+};
+
 struct SparsePolicy {
     PhaseMode mode{PhaseMode::Any};
-    int min_active_nodes{1};
-    bool require_96mm_connected{false};
+    // Addendum v1.1 §B2: the 96mm lattice engages from this band up (Dan 2026-08-12:
+    // "band 2 = 48mm grid only. 96 participates from band 3 up"). Below it no sparse
+    // gate is applied.
+    int min_band{3};
+    // L14: the minimum pair must hold on the sparse population too — two active nodes,
+    // 96mm apart, joined by a supported capsule.
+    int min_active_nodes{2};
+    bool require_96mm_connected{true};
     int fixed_x_residue_mod4{0};
     int fixed_y_residue_mod4{0};
 };
@@ -55,6 +70,7 @@ struct EnginePolicy {
     int max_trace_span_units{65'536};
     bool require_band_span{true};
     bool require_24mm_links{true};
+    Selection selection{Selection::LayoutFirst};
     SparsePolicy sparse{};
 };
 
@@ -102,27 +118,31 @@ struct BindingContact {
     std::int64_t slack_um_floor{};
 };
 
+// Addendum v1.1 §B3. Flap = the shape's overhang beyond the padded magnet box, per side —
+// Dan's ruled measure. The 12/24 values are MAXIMA (L14: "no flap zone greater than
+// 12–24mm on any side"): a side passes a limit when its flap is AT MOST that limit.
+// When a side exceeds a limit, `broad_beyond_*` says whether a full 24mm-wide tongue of
+// fabric (capsule anchored at an outer-row magnet) actually reaches past that limit:
+// true → genuine oversized flap; false → the overhang is a thin feature — the ruled
+// trivial-limb exception, reported and never auto-approved.
+struct FlapSide {
+    i64 num{};
+    double mm{};
+    bool within_12{};
+    bool within_24{};
+    bool broad_beyond_12{};
+    bool broad_beyond_24{};
+};
+
 struct FlapMetrics {
     // Exact flap values are numerator / exact_den millimetres.
     i64 exact_den{1};
-    i64 left_num{};
-    i64 right_num{};
-    i64 bottom_num{};
-    i64 top_num{};
-    double left_mm{};
-    double right_mm{};
-    double bottom_mm{};
-    double top_mm{};
+    FlapSide left;
+    FlapSide right;
+    FlapSide bottom;
+    FlapSide top;
     double horizontal_imbalance_mm{};
     double vertical_imbalance_mm{};
-    bool left_ge_12{};
-    bool right_ge_12{};
-    bool bottom_ge_12{};
-    bool top_ge_12{};
-    bool left_ge_24{};
-    bool right_ge_24{};
-    bool bottom_ge_24{};
-    bool top_ge_24{};
 };
 
 struct BandResult {
