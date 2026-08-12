@@ -65,6 +65,46 @@ function fromPaperPath(p: paper.Path): VPath {
   return { anchors }
 }
 
+/** Boolean-subtract a finished local negative while retaining untouched curve segments. The mask
+ * gate rejects destructive splits first; this kernel drops only residuals bounded by the eraser's
+ * own area so the published shape remains one blob across browser boolean implementations. */
+export function subtractShapePaper(subject: VShape, negative: VShape): VShape | null {
+  const toItem = (shape: VShape): paper.PathItem => {
+    const paths = shape.paths.map(toPaperPath)
+    return paths.length === 1 ? paths[0] : new paper.CompoundPath({ children: paths })
+  }
+  const subjectItem = toItem(subject)
+  const negativeItem = toItem(negative)
+  let result: paper.PathItem | null = null
+  try {
+    result = subjectItem.subtract(negativeItem, { insert: false }) as paper.PathItem
+    const resultPaths = result instanceof paper.CompoundPath
+      ? result.children.map((child) => child as paper.Path)
+      : [result as paper.Path]
+    const ordered = [...resultPaths].sort((a, b) => Math.abs(b.area) - Math.abs(a.area))
+    const discardedArea = ordered.slice(1).reduce((sum, path) => sum + Math.abs(path.area), 0)
+    const negativeArea = negativeItem instanceof paper.CompoundPath
+      ? negativeItem.children.reduce((sum, child) => sum + Math.abs((child as paper.Path).area), 0)
+      : Math.abs((negativeItem as paper.Path).area)
+    // A boundary shave may detach a residual no larger than the eraser itself; discard that
+    // residual so Paint still publishes one blob. A larger split is destructive and is rejected.
+    if (!ordered[0] || discardedArea > negativeArea + 1e-6) return null
+    const path = fromPaperPath(ordered[0])
+    if (path.anchors.length < 3) return null
+
+    const sourceAnchors = subject.paths.flatMap((candidate) => candidate.anchors)
+    for (const anchor of path.anchors) {
+      const source = sourceAnchors.find((candidate) => Math.hypot(candidate.p.x - anchor.p.x, candidate.p.y - anchor.p.y) < 1e-6)
+      if (source?.id) anchor.id = source.id
+    }
+    return { paths: [path] }
+  } finally {
+    result?.remove()
+    subjectItem.remove()
+    negativeItem.remove()
+  }
+}
+
 /**
  * L1 — TRUE-ARC corner round (replaces the hand-rolled, leg-skewing `filletPathSmart`). Rounds every
  * anchor index for which `pick(i)` is true with `radiusPx`, via paperjs-round-corners — a single

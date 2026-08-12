@@ -165,6 +165,42 @@ export function fillEnclosedHoles(mask: Mask): Mask {
   return { data, w, h, ...(soft ? { soft } : {}) }
 }
 
+/** Keep Paint's main receiving blob only when every detached residual fits inside the eraser's own
+ * area. A larger split is destructive and returns null instead of guessing which shape to keep. */
+export function retainPrimaryMaskBlob(mask: Mask, maxDiscardArea: number): Mask | null {
+  const seen = new Uint8Array(mask.data.length)
+  const components: number[][] = []
+  for (let seed = 0; seed < mask.data.length; seed++) {
+    if (seen[seed] || !mask.data[seed]) continue
+    const component: number[] = []
+    const stack = [seed]
+    while (stack.length) {
+      const index = stack.pop()!
+      if (seen[index] || !mask.data[index]) continue
+      seen[index] = 1
+      component.push(index)
+      const x = index % mask.w
+      if (x > 0) stack.push(index - 1)
+      if (x < mask.w - 1) stack.push(index + 1)
+      if (index >= mask.w) stack.push(index - mask.w)
+      if (index < mask.w * (mask.h - 1)) stack.push(index + mask.w)
+    }
+    components.push(component)
+  }
+  if (!components.length) return null
+  components.sort((a, b) => b.length - a.length)
+  const discardedArea = components.slice(1).reduce((sum, component) => sum + component.length, 0)
+  if (discardedArea > maxDiscardArea) return null
+  if (!discardedArea) return { data: mask.data.slice(), w: mask.w, h: mask.h, ...(mask.soft ? { soft: mask.soft.slice() } : {}) }
+  const data = new Uint8Array(mask.data.length)
+  const soft = mask.soft ? new Uint8Array(mask.soft.length) : undefined
+  for (const index of components[0]) {
+    data[index] = mask.data[index]
+    if (soft) soft[index] = mask.soft![index]
+  }
+  return { data, w: mask.w, h: mask.h, ...(soft ? { soft } : {}) }
+}
+
 /** SHAPE-IS-TRUTH normalization (E6/E7, Dan's ruling: "outlined shape is solid fill"): rasterize
  *  the RESOLVED outline as the one truth — inside solid (data 1, soft 255), the outer edge band
  *  soft from the rasterizer's own anti-aliasing, outside dropped for real. After this, tint ≡

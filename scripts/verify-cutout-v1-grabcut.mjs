@@ -311,18 +311,16 @@ async function runBrowser(browserType) {
     assert.equal(await routePage.getByRole('checkbox', { name: 'original resolution output' }).count(), 0, `${browserName}: lossy output switch must stay removed`)
     await routePage.getByText('2048×2048', { exact: false }).waitFor()
 
-    // Paint is a one-solid-blob tool. An internal erase is an exact no-op; a stroke crossing the
-    // accepted outline may carve one boundary-connected chunk and then enters Paint's own recipe.
+    // Paint is a one-solid-blob tool. Internal or shape-splitting erase gestures are exact no-ops;
+    // only a local boundary carve lands, without replacing the accepted Cutout recipe.
     await routePage.getByRole('button', { name: /Editing view/ }).click()
     await routePage.waitForTimeout(1_000)
-    // Match the accepted Cutout recipe to Paint's 0/0/15/0/0 recipe first, so the pixel-diff below
-    // measures the erase itself rather than the intentional Cutout→Paint recipe reset.
-    await routePage.getByRole('button', { name: 'offset', exact: true }).click()
-    await vectorKnob.fill('0')
-    await routePage.waitForTimeout(500)
+    // Earlier calibration/output checks intentionally select PURE. Restore the product default;
+    // unlike the rejected proof, no knob or Paint-side recipe preconditions the erase result.
+    await vectorPreset.selectOption('CLASSIC')
+    await status.filter({ hasText: /CLASSIC vector preset/ }).waitFor()
     const acceptedPreset = await vectorPreset.inputValue()
-    const beforeErase = await canvasPixels()
-    if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-before-paint-erase.png', fullPage: true })
+    assert.equal(acceptedPreset, 'CLASSIC', `${browserName}: Paint erase proof must start from default CLASSIC`)
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     await routePage.getByRole('button', { name: /Paint erase/ }).click()
     const eraseBox = await routePage.locator('canvas').first().boundingBox()
@@ -345,15 +343,48 @@ async function runBrowser(browserType) {
     assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: rejected internal Paint erase changed the accepted recipe`)
     assert.equal(await routePage.getByRole('button', { name: /Undo/ }).isDisabled(), true, `${browserName}: rejected internal Paint erase added history`)
 
+    // Dan's rejected screenshot case: a near-returning ribbon that touches the boundary would
+    // divide the subject. It must keep the complete accepted blob instead of publishing a fragment.
+    await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
+    await routePage.getByRole('button', { name: /Paint erase/ }).click()
+    const loopEraseBox = await routePage.locator('canvas').first().boundingBox()
+    assert(loopEraseBox, `${browserName}: near-loop Paint erase canvas must be visible`)
+    const nearLoopStroke = [
+      { x: loopEraseBox.x + loopEraseBox.width * 0.48, y: loopEraseBox.y + loopEraseBox.height * 0.44 },
+      { x: loopEraseBox.x + loopEraseBox.width * 0.76, y: loopEraseBox.y + loopEraseBox.height * 0.46 },
+      { x: loopEraseBox.x + loopEraseBox.width * 0.76, y: loopEraseBox.y + loopEraseBox.height * 0.70 },
+      { x: loopEraseBox.x + loopEraseBox.width * 0.52, y: loopEraseBox.y + loopEraseBox.height * 0.70 },
+      { x: loopEraseBox.x + loopEraseBox.width * 0.50, y: loopEraseBox.y + loopEraseBox.height * 0.47 },
+    ]
+    // Hold the cursor at the gesture endpoint on both samples so the canvas's presentation ring
+    // cannot masquerade as a product-mask change.
+    await routePage.mouse.move(nearLoopStroke.at(-1).x, nearLoopStroke.at(-1).y)
+    await stableCanvasPixels()
+    const nearLoopBaselineData = await canvasData()
+    await draw(routePage, nearLoopStroke, 8)
+    await routePage.waitForTimeout(1_000)
+    assert.match(await status.textContent(), /inside stays solid/, `${browserName}: shape-splitting near-loop Paint erase was not rejected`)
+    await stableCanvasPixels()
+    assert.equal(await canvasData(), nearLoopBaselineData, `${browserName}: rejected near-loop Paint erase changed the accepted canvas`)
+    await routePage.getByRole('button', { name: /Vector/ }).click()
+    assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: rejected near-loop Paint erase changed CLASSIC`)
+    assert.equal(await routePage.getByRole('button', { name: /Undo/ }).isDisabled(), true, `${browserName}: rejected near-loop Paint erase added history`)
+
     await routePage.getByRole('button', { name: /^✋ Edit$/ }).click()
     await routePage.getByRole('button', { name: /Paint erase/ }).click()
     const boundaryEraseBox = await routePage.locator('canvas').first().boundingBox()
     assert(boundaryEraseBox, `${browserName}: boundary Paint erase canvas must be visible`)
-    await draw(routePage, [
+    const boundaryStroke = [
       { x: boundaryEraseBox.x + boundaryEraseBox.width * 0.74, y: boundaryEraseBox.y + boundaryEraseBox.height * 0.45 },
-      { x: boundaryEraseBox.x + boundaryEraseBox.width * 0.94, y: boundaryEraseBox.y + boundaryEraseBox.height * 0.45 },
-    ], 8)
-    await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 })
+      { x: boundaryEraseBox.x + boundaryEraseBox.width * 0.985, y: boundaryEraseBox.y + boundaryEraseBox.height * 0.45 },
+    ]
+    await routePage.mouse.move(boundaryStroke.at(-1).x, boundaryStroke.at(-1).y)
+    const beforeErase = await stableCanvasPixels()
+    await routePage.screenshot({ path: `output/playwright/KAI-10285-${browserName}-grabcut-base-before-paint-erase.png`, fullPage: true })
+    await draw(routePage, boundaryStroke, 8)
+    await status.filter({ hasText: /erased — auto-tuned/ }).waitFor({ timeout: 60_000 }).catch(async (error) => {
+      throw new Error(`${browserName}: boundary Paint erase did not settle: ${await status.textContent()}`, { cause: error })
+    })
     await routePage.getByRole('button', { name: /Vector/ }).click()
     const afterErase = await stableCanvasPixels()
     if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-after-paint-erase.png', fullPage: true })
@@ -361,18 +392,18 @@ async function runBrowser(browserType) {
     for (let y = 0; y < beforeErase.height; y++) for (let x = 0; x < beforeErase.width; x++) {
       const i = (y * beforeErase.width + x) * 4
       if (beforeErase.data[i] === afterErase.data[i] && beforeErase.data[i + 1] === afterErase.data[i + 1] && beforeErase.data[i + 2] === afterErase.data[i + 2] && beforeErase.data[i + 3] === afterErase.data[i + 3]) continue
-      const local = x >= beforeErase.width * 0.64 && x <= beforeErase.width && y >= beforeErase.height * 0.30 && y <= beforeErase.height * 0.60
+      const local = x >= beforeErase.width * 0.70 && x <= beforeErase.width && y >= beforeErase.height * 0.32 && y <= beforeErase.height * 0.58
       minChangedX = Math.min(minChangedX, x); minChangedY = Math.min(minChangedY, y); maxChangedX = Math.max(maxChangedX, x); maxChangedY = Math.max(maxChangedY, y)
       if (local) changedInside++; else changedOutside++
     }
     assert(changedInside > 0, `${browserName}: Paint eraser did not change pixels around its negative stroke`)
-    assert(changedOutside < 10_000, `${browserName}: Paint eraser caused global visible drift (${changedOutside} pixels; diff bounds ${minChangedX},${minChangedY}..${maxChangedX},${maxChangedY})`)
-    assert.equal(await vectorPreset.inputValue(), '', `${browserName}: accepted Paint erase did not enter Paint's dedicated vector recipe`)
+    assert(changedOutside <= 128, `${browserName}: Paint eraser changed pixels outside its narrow boundary (${changedOutside} pixels; diff bounds ${minChangedX},${minChangedY}..${maxChangedX},${maxChangedY})`)
+    assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: accepted Paint erase replaced the Cutout recipe`)
     await routePage.getByRole('button', { name: /Undo/ }).click()
     await status.filter({ hasText: /restored previous cut/ }).waitFor({ timeout: 60_000 })
     const undonePixels = await stableCanvasPixels()
     if (browserName === 'chromium') await routePage.screenshot({ path: 'output/playwright/KAI-10285-grabcut-base-undone-paint-erase.png', fullPage: true })
-    const undoChangedPixels = changedPixels(internalBaselinePixels, undonePixels)
+    const undoChangedPixels = changedPixels(beforeErase, undonePixels)
     assert(undoChangedPixels <= 128, `${browserName}: Undo did not restore the accepted pre-erase canvas within raster tolerance (${undoChangedPixels} pixels)`)
     assert.equal(await vectorPreset.inputValue(), acceptedPreset, `${browserName}: Undo did not restore the accepted Cutout recipe`)
     await routePage.getByRole('button', { name: /Redo/ }).click()

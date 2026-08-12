@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { grabCutBrushGeometry } from '@/lib/cutout-grabcut'
-import { autoTunePaintStroke, fillEnclosedHoles, paintSmoothingRadius, polishMask, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
+import { autoTunePaintStroke, fillEnclosedHoles, paintSmoothingRadius, polishMask, retainPrimaryMaskBlob, shouldClosePaintStroke, subtractMasks } from '@/lib/mask-tools'
 import type { Mask } from '@/lib/mask-tools/types'
 
 function rectangle(w: number, h: number, x0: number, y0: number, x1: number, y1: number): Mask {
@@ -60,6 +60,18 @@ describe('Paint eraser solid-blob law', () => {
     const carved = fillEnclosedHoles(subtractMasks(base, boundary))
     expect(carved.data).not.toEqual(base.data)
     expect(carved.data[6 * 12 + 2]).toBe(0)
+  })
+
+  it('rejects an eraser result that splits the accepted Paint blob', () => {
+    const base = rectangle(12, 12, 1, 1, 11, 11)
+    const splittingRibbon = rectangle(12, 12, 0, 5, 12, 7)
+    const split = fillEnclosedHoles(subtractMasks(base, splittingRibbon))
+    const localCarve = fillEnclosedHoles(subtractMasks(base, rectangle(12, 12, 0, 5, 5, 7)))
+    const smallResidual = fillEnclosedHoles(subtractMasks(base, rectangle(12, 12, 9, 0, 10, 12)))
+
+    expect(retainPrimaryMaskBlob(split, splittingRibbon.data.reduce((sum, value) => sum + value, 0))).toBeNull()
+    expect(retainPrimaryMaskBlob(localCarve, 0)).not.toBeNull()
+    expect(retainPrimaryMaskBlob(smallResidual, 12)?.data[6 * 12 + 10]).toBe(0)
   })
 })
 
