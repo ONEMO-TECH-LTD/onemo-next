@@ -15,12 +15,16 @@ The shell holds no geometry. Policies live only in the logic layer. Nothing is d
 - **CLI** — `vendor/magfit/cli/measure_cli.cpp`, stdin outline → stdout every size and node. Converts
   and prints; decides nothing.
 
-## P1 — WebAssembly build  *(needs emscripten installed — the one infrastructure item)*
+## P1 — WebAssembly, compiled by the normal Vercel build  *(no committed artifact, no shortcut)*
 
-Compile the pure entry points to `.wasm` and **commit the artifact**, so Vercel serves a static file and
-its build pipeline is untouched. GPT's own build command, narrowed to the pure exports.
+The `.wasm` is a **build output, never checked in** — it is gitignored like any other artifact. Emscripten
+is provisioned in the build step and the engine is compiled from source on every deploy, using GPT's own
+build command narrowed to the pure exports. A deploy that cannot compile the engine fails, rather than
+silently serving a stale binary somebody built by hand months earlier.
 
-*Verify:* the same seven cut-outs produce byte-identical numbers through WASM and through the native CLI.
+*Verify:* the Vercel deploy log shows the compile; the deployed artifact's hash matches a clean local
+build of the same commit; and the same seven cut-outs produce byte-identical numbers through WASM and
+through the native CLI.
 
 ## P2 — Engine loader  ·  `src/lib/grid-engine/engine/`
 
@@ -64,6 +68,6 @@ Deploy the branch, open the Vercel URL on the phone, run the corpus, record real
 
 ## Open decisions (Dan's)
 
-- Install emscripten here — the only toolchain change. Blocks P1.
+- Provision emscripten in the Vercel build (and locally for parity). The only toolchain change. Blocks P1.
 - `npm install` in this worktree — nothing renders until dependencies exist.
 - Whether the corridor, sparse and selection policies are ever promoted from annotation to rule.
