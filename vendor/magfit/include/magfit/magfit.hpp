@@ -176,6 +176,19 @@ struct NodeMeasurement {
     std::int64_t clearance_um_floor{};
 };
 
+/** One adjacent pair of HELD magnets, with GPT Pro's capsule verdict reported as a fact. */
+struct LinkMeasurement {
+    GridPoint a{};
+    GridPoint b{};
+    int ax_mm{};
+    int ay_mm{};
+    int bx_mm{};
+    int by_mm{};
+    /** capsule_supported: a straight full-width fabric strip joins the two centres. A fact,
+        not a gate — a crescent joins its horns along the arc and reports false here. */
+    bool direct{};
+};
+
 struct SizeMeasurement {
     int band{};
     int size_mm{};
@@ -183,6 +196,15 @@ struct SizeMeasurement {
     double height_mm{};
     std::vector<NodeMeasurement> nodes;
     int supported_count{};
+    /** Every 48mm-adjacent pair of held magnets, with its direct-strip fact. */
+    std::vector<LinkMeasurement> links;
+    /** Raw shape overhang beyond the padded box of the held magnets. Numbers, no thresholds.
+        Meaningless (false) when nothing is held. */
+    bool has_overhang{};
+    double overhang_left_mm{};
+    double overhang_right_mm{};
+    double overhang_bottom_mm{};
+    double overhang_top_mm{};
 };
 
 std::vector<SizeMeasurement> measure_all(const CanonicalPolygon& polygon,

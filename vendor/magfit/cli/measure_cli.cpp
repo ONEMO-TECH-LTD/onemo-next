@@ -52,7 +52,22 @@ int main() {
                   << ",\"held\":" << (n.supported ? "true" : "false")
                   << ",\"clearanceMm\":" << n.clearance_mm << '}';
             }
-            o << "]}";
+            o << "],\"links\":[";
+            bool f3 = true;
+            for (const auto& l : m.links) {
+                if (!f3) o << ','; f3 = false;
+                o << "{\"axMm\":" << l.ax_mm << ",\"ayMm\":" << l.ay_mm
+                  << ",\"bxMm\":" << l.bx_mm << ",\"byMm\":" << l.by_mm
+                  << ",\"direct\":" << (l.direct ? "true" : "false") << '}';
+            }
+            o << ']';
+            if (m.has_overhang) {
+                o << ",\"overhangMm\":{\"left\":" << m.overhang_left_mm
+                  << ",\"right\":" << m.overhang_right_mm
+                  << ",\"bottom\":" << m.overhang_bottom_mm
+                  << ",\"top\":" << m.overhang_top_mm << '}';
+            }
+            o << '}';
         }
         o << "]}";
         std::cout << o.str() << std::endl;

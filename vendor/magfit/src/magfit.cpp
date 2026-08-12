@@ -1140,6 +1140,58 @@ std::vector<SizeMeasurement> measure_all(const CanonicalPolygon& polygon,
                 if (nm.supported) ++m.supported_count;
                 m.nodes.push_back(nm);
             }
+
+            // LINK FACTS — every 48mm-adjacent pair of held magnets, judged by GPT Pro's own
+            // capsule predicate and REPORTED, never used to filter anything.
+            std::vector<const NodeMeasurement*> held;
+            for (const NodeMeasurement& nm : m.nodes) {
+                if (nm.supported) held.push_back(&nm);
+            }
+            for (std::size_t i = 0; i < held.size(); ++i) {
+                for (std::size_t j = i + 1; j < held.size(); ++j) {
+                    // Strictly ORTHOGONAL 48mm neighbours. GPT's adjacent_48 (manhattan 2 in
+                    // half-pitch units) is exact within one template window, where all
+                    // coordinates share parity — but this union lattice mixes windows, and
+                    // there a (1,1) diagonal at 24*sqrt(2) mm also sums to 2. A diagonal is
+                    // not a lattice link and must not be reported as one.
+                    const int dx = std::abs(held[i]->node.x24 - held[j]->node.x24);
+                    const int dy = std::abs(held[i]->node.y24 - held[j]->node.y24);
+                    if (!((dx == 2 && dy == 0) || (dx == 0 && dy == 2))) continue;
+                    LinkMeasurement link;
+                    link.a = held[i]->node;
+                    link.b = held[j]->node;
+                    link.ax_mm = held[i]->x_mm;
+                    link.ay_mm = held[i]->y_mm;
+                    link.bx_mm = held[j]->x_mm;
+                    link.by_mm = held[j]->y_mm;
+                    link.direct = capsule_supported(grid_to_internal(link.a, scaled, policy),
+                                                    grid_to_internal(link.b, scaled, policy),
+                                                    scaled, policy);
+                    m.links.push_back(link);
+                }
+            }
+
+            // OVERHANG FACTS — how far the shape reaches past the padded box of the held
+            // magnets, per side. The shape's bbox is centred on the lattice origin by
+            // construction, so its edges sit at +-width/2 and +-height/2.
+            if (!held.empty()) {
+                int min_x = held.front()->x_mm;
+                int max_x = min_x;
+                int min_y = held.front()->y_mm;
+                int max_y = min_y;
+                for (const NodeMeasurement* nm : held) {
+                    min_x = std::min(min_x, nm->x_mm);
+                    max_x = std::max(max_x, nm->x_mm);
+                    min_y = std::min(min_y, nm->y_mm);
+                    max_y = std::max(max_y, nm->y_mm);
+                }
+                const int pad = policy.disc_radius_mm;
+                m.has_overhang = true;
+                m.overhang_left_mm = m.width_mm / 2.0 + (min_x - pad);
+                m.overhang_right_mm = m.width_mm / 2.0 - (max_x + pad);
+                m.overhang_bottom_mm = m.height_mm / 2.0 + (min_y - pad);
+                m.overhang_top_mm = m.height_mm / 2.0 - (max_y + pad);
+            }
             out.push_back(std::move(m));
         }
     }
