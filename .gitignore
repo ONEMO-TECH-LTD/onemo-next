@@ -116,3 +116,6 @@ Icon\r
 .DS_Store
 **/.DS_Store
 browsertime-results/
+
+# magfit compiled binary (built locally by vendor/magfit/build.sh)
+vendor/magfit/bin/
