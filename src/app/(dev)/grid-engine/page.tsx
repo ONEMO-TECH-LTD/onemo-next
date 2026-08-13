@@ -36,6 +36,7 @@ import {
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
+  variantRegistration,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
@@ -105,7 +106,7 @@ const REFUSAL_TEXT: Record<WriteRefusal, string> = {
 export default function GridEnginePage() {
   const [spec, setSpec] = useState<GridSystemSpec>(RELEASED)
   // THE INSTRUMENT. Everything it holds came back through the bridge; the shell computes none of it.
-  const measurement = useMeasurement()
+  const measurement = useMeasurement(spec)
   const [unlocked, setUnlocked] = useState<ReadonlySet<GridKey>>(new Set())
   const [refused, setRefused] = useState<WriteRefusal | null>(null)
   // NO ZOOM. Dan, 2026-08-11: "the cutout is scaling incorrectly the grid must scale instead and pan
@@ -455,6 +456,12 @@ export default function GridEnginePage() {
         <GridCanvas
           spec={spec}
           panMM={pan}
+          /* When a measured variant is on screen, the field aligns to ITS derived registration
+             (run parity, Dan's law) so the grey lattice and the measured discs are ONE grid. The
+             derivation happens in the bridge; the shell only forwards it. */
+          registrationOverride={
+            measurement.current ? variantRegistration(measurement.current.variant) : undefined
+          }
           /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
              lands on it. Handing in a region built from the shape's size read as the shape defining
              the world, and did nothing besides — every reachable size is under the field's own floor.

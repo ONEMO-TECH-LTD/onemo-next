@@ -10,8 +10,8 @@ import styles from './MeasurementPanel.module.css'
 
 export function MeasurementPanel({ measurement }: { measurement: MeasurementState }) {
   const { shapes, shapeName, result, busy, sizeIndex, current, settings } = measurement
-  const sizes = result?.sizes ?? []
-  const activeIndex = Math.min(sizeIndex, Math.max(sizes.length - 1, 0))
+  const variants = result?.variants ?? []
+  const activeIndex = Math.min(sizeIndex, Math.max(variants.length - 1, 0))
 
   return (
     <section className={styles.panel}>
@@ -33,14 +33,14 @@ export function MeasurementPanel({ measurement }: { measurement: MeasurementStat
         {result?.error && <span className={styles.error}>{result.error}</span>}
       </div>
 
-      {sizes.length > 0 && (
+      {variants.length > 0 && (
         <div className={styles.row}>
           <span className={styles.label}>Size</span>
           <input
             className={styles.slider}
             type="range"
             min={0}
-            max={sizes.length - 1}
+            max={variants.length - 1}
             step={1}
             value={activeIndex}
             onChange={(event) => measurement.setSizeIndex(Number(event.target.value))}
@@ -48,11 +48,12 @@ export function MeasurementPanel({ measurement }: { measurement: MeasurementStat
           />
           {current && (
             <span className={styles.readout}>
-              <strong>{current.size.sizeMm}mm</strong> · band {current.size.band} ·{' '}
-              {current.size.heldCount} magnet{current.size.heldCount === 1 ? '' : 's'} held ·{' '}
-              {current.size.widthMm.toFixed(1)} × {current.size.heightMm.toFixed(1)}mm
-              {current.size.overhangMm &&
-                ` · overhang ${current.size.overhangMm.left.toFixed(0)}/${current.size.overhangMm.right.toFixed(0)}/${current.size.overhangMm.bottom.toFixed(0)}/${current.size.overhangMm.top.toFixed(0)}`}
+              <strong>{current.variant.sizeMm}mm</strong> · band {current.variant.band} ·{' '}
+              {current.variant.runsX}×{current.variant.runsY} ·{' '}
+              {current.variant.heldCount} magnet{current.variant.heldCount === 1 ? '' : 's'} held ·{' '}
+              {current.variant.widthMm.toFixed(1)} × {current.variant.heightMm.toFixed(1)}mm
+              {current.variant.overhangMm &&
+                ` · overhang ${current.variant.overhangMm.left.toFixed(0)}/${current.variant.overhangMm.right.toFixed(0)}/${current.variant.overhangMm.bottom.toFixed(0)}/${current.variant.overhangMm.top.toFixed(0)}`}
             </span>
           )}
         </div>
@@ -106,21 +107,21 @@ export function MeasurementPanel({ measurement }: { measurement: MeasurementStat
         })}
       </div>
 
-      {sizes.length > 0 && (
+      {variants.length > 0 && (
         <div className={styles.strip}>
-          {sizes.map((entry, index) => (
+          {variants.map((entry, index) => (
             <button
-              key={`${entry.size.band}-${entry.size.sizeMm}`}
+              key={`${entry.variant.band}-${entry.variant.sizeMm}-${entry.variant.runsX}x${entry.variant.runsY}`}
               type="button"
               className={styles.tick}
               data-on={index === activeIndex || undefined}
-              data-held={entry.size.heldCount > 0 || undefined}
+              data-held={entry.variant.heldCount > 0 || undefined}
               data-excluded={entry.excludedBy.length > 0 || undefined}
               onClick={() => measurement.setSizeIndex(index)}
-              title={`${entry.size.sizeMm}mm · band ${entry.size.band} · ${entry.size.heldCount} held${entry.excludedBy.length ? ` · marked by ${entry.excludedBy.map((m) => m.id).join(', ')}` : ''}`}
+              title={`${entry.variant.sizeMm}mm · band ${entry.variant.band} · ${entry.variant.runsX}×${entry.variant.runsY} · ${entry.variant.heldCount} held${entry.excludedBy.length ? ` · marked by ${entry.excludedBy.map((m) => m.id).join(', ')}` : ''}`}
             >
-              {entry.size.sizeMm}
-              <em>{entry.size.heldCount}</em>
+              {entry.variant.sizeMm}
+              <em>{entry.variant.runsX}×{entry.variant.runsY}·{entry.variant.heldCount}</em>
             </button>
           ))}
         </div>

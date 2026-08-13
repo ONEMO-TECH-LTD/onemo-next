@@ -133,8 +133,9 @@ export function paddedFieldMM(grid: GridSpec, field: RegionMM): RegionMM {
  * (law 8.3). It is produced HERE because adding two millimetre quantities is geometry, and the
  * bridge does none — it was briefly assembled there, which put a coordinate in the wiring.
  */
-export function latticeAnchorMM(offsetMM: number, panMM: PointMM): PointMM {
-  return [offsetMM + panMM[0], offsetMM + panMM[1]]
+export function latticeAnchorMM(offsetMM: number | PointMM, panMM: PointMM): PointMM {
+  const [ox, oy] = typeof offsetMM === 'number' ? [offsetMM, offsetMM] : offsetMM
+  return [ox + panMM[0], oy + panMM[1]]
 }
 
 /**
@@ -144,7 +145,7 @@ export function latticeAnchorMM(offsetMM: number, panMM: PointMM): PointMM {
 export function magnetsInRegion(
   grid: GridSpec,
   region: RegionMM,
-  offsetMM: number,
+  offsetMM: number | PointMM,
   panMM: PointMM = [0, 0],
 ): PointMM[] {
   const { basePitchMM } = grid
@@ -222,6 +223,24 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
 }
 
 /** What a run of magnets measures across, edge to edge, including their padding. Law 11.2. */
+/**
+ * A CENTRED RUN of magnet positions along one axis, in millimetres. GPT Pro's run formula:
+ * count n occupies -(n-1), -(n-3), ..., n-1 in half-pitch units. The parity law (Dan, EC-07)
+ * falls out of it: an even count straddles the centre (registers in the GAP), an odd count puts
+ * a magnet ON it. Registration is therefore DERIVED per axis, never chosen.
+ */
+export function centredRunMM(grid: GridSpec, count: number): number[] {
+  const half = grid.basePitchMM / 2
+  const out: number[] = []
+  for (let i = 0; i < count; i++) out.push((-(count - 1) + 2 * i) * half)
+  return out
+}
+
+/** The registration a run of this count derives — even in the gap, odd on a magnet (EC-07). */
+export function registrationForRun(count: number): Registration {
+  return count % 2 === 0 ? 'gap' : 'point'
+}
+
 export function bandSpanMM(grid: GridSpec, magnets: number): number {
   return Math.max(0, magnets - 1) * grid.pitchMM + 2 * grid.paddingMM
 }

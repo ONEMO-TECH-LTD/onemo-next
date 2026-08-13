@@ -17,10 +17,12 @@
 import {
   bandSpanMM,
   cellDiameterMM,
+  centredRunMM,
   fieldSpanMM,
   latticeAnchorMM,
   magnetsInRegion,
   paddedFieldMM,
+  registrationForRun,
   registrationOffsetMM,
   resizeBoxToLongest,
   summariseField,
@@ -29,7 +31,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import type { GridSystemSpec } from './spec'
+import type { GridSystemSpec, Registration } from './spec'
 
 export type { FieldSummary, PointMM, RegionMM }
 
@@ -52,9 +54,21 @@ export function layoutField(
   spec: GridSystemSpec,
   contentMM: RegionMM,
   panMM: PointMM = [0, 0],
+  /**
+   * PER-AXIS registration override, for aligning the field to a measured variant. Registration
+   * is DERIVED from run parity (Dan's law: an even run registers in the gap, an odd run on a
+   * magnet), so a 3x2 template is point-on-x, gap-on-y -- one scalar cannot express it. Absent,
+   * the spec's released registration applies to both axes exactly as before.
+   */
+  registrationOverride?: readonly [Registration, Registration],
 ): FieldLayout {
   const field = withMinimumSpan(spec, contentMM)
-  const offset = registrationOffsetMM(spec.grid, spec.registration)
+  const offset: number | PointMM = registrationOverride
+    ? [
+        registrationOffsetMM(spec.grid, registrationOverride[0]),
+        registrationOffsetMM(spec.grid, registrationOverride[1]),
+      ]
+    : registrationOffsetMM(spec.grid, spec.registration)
   return {
     field,
     padded: paddedFieldMM(spec.grid, field),
@@ -117,17 +131,25 @@ export function fieldBlockSpan(spec: GridSystemSpec): number {
 
 // ---------------------------------------------------------------------------
 // MEASUREMENT — the shell asks HERE, never at the engine or the logic layer.
-// One composition: engine facts → policy annotations → one object the canvas
-// draws. The bridge adds no geometry of its own; every number below is the
-// engine's, and every mark is the logic layer's.
+// This is where the ONE lattice authority feeds the kernel: positions come from
+// the unit's centred runs, registration DERIVES from run parity (Dan's law),
+// and the law values come from the guarded spec. The kernel generates nothing;
+// it measures what it is handed, and the logic layer marks the results.
 // ---------------------------------------------------------------------------
 
-import { loadCorpus, measureOutline, type Measurement, type OutlinePoints } from './engine/measure'
+import {
+  loadCorpus,
+  measureRequest,
+  type MeasureJob,
+  type MeasuredVariant,
+  type Measurement,
+  type OutlinePoints,
+} from './engine/measure'
 import {
   ALL_OFF,
   annotate,
   POLICIES,
-  type AnnotatedSize,
+  type AnnotatedVariant,
   type PolicyId,
   type PolicySettings,
   type PolicyState,
@@ -135,34 +157,82 @@ import {
 
 // Re-exported so the shell can render the catalogue and hold switch state while importing ONLY
 // the bridge — the separation guard forbids it reaching into logic/ itself.
-export type { AnnotatedSize, OutlinePoints, PolicyId, PolicySettings, PolicyState }
+export type { AnnotatedVariant, MeasuredVariant, OutlinePoints, PolicyId, PolicySettings, PolicyState }
 export { ALL_OFF, loadCorpus, POLICIES }
 
 /**
  * Bands the instrument measures. 1 is included because the minimum measure is one disc
  * (Dan, 2026-08-12 — a triangle's top corner takes exactly one), 4 because Dan added it
- * back the same day. Sizes therefore run 24mm to 204mm.
+ * back the same day.
  */
 export const REVIEW_BANDS: readonly number[] = Object.freeze([1, 2, 3, 4])
+
+/**
+ * The registration variants of one band: the full square and — where a shorter run exists — the
+ * two mixed-axis rectangles. Each is ONE template with ONE derived registration per axis. They
+ * are never merged: merging on-magnet with in-gap is what invented phantom half-pitch positions.
+ */
+function variantRuns(band: number): ReadonlyArray<readonly [number, number]> {
+  if (band <= 1) return [[1, 1]]
+  return [
+    [band, band],
+    [band, band - 1],
+    [band - 1, band],
+  ]
+}
+
+/** Every job for one shape: per band, per legal size, per registration variant. All from the spec. */
+function reviewJobs(spec: GridSystemSpec, bands: readonly number[]): MeasureJob[] {
+  const stepMM = spec.grid.paddingMM
+  const jobs: MeasureJob[] = []
+  for (const band of bands) {
+    const from = Math.round(bandSpanMM(spec.grid, band))
+    const to = Math.round(bandSpanMM(spec.grid, band + 1))
+    for (let sizeMm = from; sizeMm < to; sizeMm += stepMM) {
+      for (const [runsX, runsY] of variantRuns(band)) {
+        const xs = centredRunMM(spec.grid, runsX)
+        const ys = centredRunMM(spec.grid, runsY)
+        const positions: Array<[number, number]> = []
+        for (const y of ys) for (const x of xs) positions.push([x, y])
+        jobs.push({ band, sizeMm, runsX, runsY, positions })
+      }
+    }
+  }
+  return jobs
+}
+
+/** The variant's derived per-axis registration, for aligning the canvas lattice to it. */
+export function variantRegistration(
+  variant: Pick<MeasuredVariant, 'runsX' | 'runsY'>,
+): readonly [Registration, Registration] {
+  return [registrationForRun(variant.runsX), registrationForRun(variant.runsY)]
+}
 
 export interface MeasuredCutout {
   readonly ok: boolean
   readonly error?: string
   readonly vertexCount?: number
-  readonly sizes: readonly AnnotatedSize[]
+  readonly variants: readonly AnnotatedVariant[]
 }
 
 /** Measure an outline across the review bands, with the current policy switches applied as marks. */
 export async function measureCutout(
+  spec: GridSystemSpec,
   outline: OutlinePoints,
   settings: PolicySettings,
   bands: readonly number[] = REVIEW_BANDS,
 ): Promise<MeasuredCutout> {
-  const measured: Measurement = await measureOutline(outline, bands)
-  if (!measured.ok) return { ok: false, error: measured.error, sizes: [] }
+  const measured: Measurement = await measureRequest({
+    vertices: outline,
+    scale: 20000,
+    pitchMm: spec.grid.basePitchMM,
+    radiusMm: spec.grid.paddingMM,
+    jobs: reviewJobs(spec, bands),
+  })
+  if (!measured.ok) return { ok: false, error: measured.error, variants: [] }
   return {
     ok: true,
     vertexCount: measured.vertexCount,
-    sizes: annotate(measured.sizes, settings),
+    variants: annotate(measured.sizes, settings, spec.grid.basePitchMM),
   }
 }

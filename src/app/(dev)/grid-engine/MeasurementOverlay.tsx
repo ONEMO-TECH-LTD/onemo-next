@@ -6,7 +6,7 @@
 // outline at the measured size — a drawing transform, the same one the canvas applies to the
 // cut-out picture itself.
 
-import type { AnnotatedSize, OutlinePoints } from '@/lib/grid-engine/bridge'
+import type { AnnotatedVariant, OutlinePoints } from '@/lib/grid-engine/bridge'
 
 const SHAPE_FILL = 'rgba(88, 194, 255, 0.08)'
 const SHAPE_STROKE = '#58c2ff'
@@ -20,7 +20,7 @@ export interface MeasurementOverlayProps {
   /** The traced outline in the picture's own fractions, exactly as the tracer produced it. */
   outline: OutlinePoints | null
   /** The size being looked at, already measured by the engine and marked by the logic layer. */
-  measured: AnnotatedSize | null
+  measured: AnnotatedVariant | null
   /** Disc radius in millimetres, handed in from the guarded spec — never a literal here. */
   discRadiusMM: number
 }
@@ -49,13 +49,13 @@ function outlinePath(outline: OutlinePoints, sizeMM: number): string {
 
 export function MeasurementOverlay({ outline, measured, discRadiusMM }: MeasurementOverlayProps) {
   if (!outline || !measured) return null
-  const { size } = measured
+  const { variant } = measured
   const labelOffset = discRadiusMM + 7
 
   return (
     <g pointerEvents="none">
       <path
-        d={outlinePath(outline, size.sizeMm)}
+        d={outlinePath(outline, variant.sizeMm)}
         fill={SHAPE_FILL}
         stroke={SHAPE_STROKE}
         strokeWidth={1.5}
@@ -64,7 +64,7 @@ export function MeasurementOverlay({ outline, measured, discRadiusMM }: Measurem
 
       {/* Link facts between held neighbours: solid when the engine found a straight full-width
           strip, dashed amber when it did not — the crescent evidence, drawn not argued. */}
-      {size.links.map((link) => (
+      {variant.links.map((link) => (
         <line
           key={`${link.axMm},${link.ayMm}-${link.bxMm},${link.byMm}`}
           x1={link.axMm}
@@ -80,7 +80,7 @@ export function MeasurementOverlay({ outline, measured, discRadiusMM }: Measurem
 
       {/* Every lattice position the engine reported — held ones filled, the rest as empty rings.
           Seeing what does NOT hold is the point of the instrument. */}
-      {size.nodes.map((node) => (
+      {variant.nodes.map((node) => (
         <circle
           key={`${node.xMm},${node.yMm}`}
           cx={node.xMm}
@@ -94,7 +94,7 @@ export function MeasurementOverlay({ outline, measured, discRadiusMM }: Measurem
         />
       ))}
 
-      {size.nodes
+      {variant.nodes
         .filter((node) => node.held)
         .map((node) => (
           <text

@@ -1087,121 +1087,104 @@ SolveResult solve(const PolygonInput& input,
 }
 
 
-// PURE MEASUREMENT — no policy path is entered below. It walks the same lattice the templates
-// generate, calls the same exact disc predicate, and reports what it finds.
+// PURE MEASUREMENT over SUPPLIED positions — no policy path is entered, and nothing is
+// generated: every position, the pitch and the radius arrive from the caller (the TypeScript
+// spec/engine unit — the single lattice authority). GPT Pro's exact predicates, unchanged.
 
-std::vector<SizeMeasurement> measure_all(const CanonicalPolygon& polygon,
-                                         const std::vector<BandSpec>& bands,
-                                         const EnginePolicy& policy) {
+std::vector<SizeMeasurement> measure_jobs(const CanonicalPolygon& polygon,
+                                          const std::vector<MeasureJob>& jobs,
+                                          const EnginePolicy& policy) {
     validate_policy(policy);
     std::vector<SizeMeasurement> out;
-    for (const BandSpec& band : bands) {
-        validate_band_spec(band, policy);
-        const auto grids = templates_for_band(band.band);
-        std::set<GridPoint> lattice;
-        for (const TemplateGrid& g : grids) {
-            for (const GridPoint& n : g.nodes) lattice.insert(n);
-        }
-        for (int size_mm : band.legal_sizes_mm) {
-            const ScaledPolygon scaled = scale_polygon(polygon, size_mm);
-            SizeMeasurement m;
-            m.band = band.band;
-            m.size_mm = size_mm;
-            m.width_mm = static_cast<double>(size_mm) *
-                         static_cast<double>(polygon.max_x - polygon.min_x) /
-                         static_cast<double>(polygon.max_span);
-            m.height_mm = static_cast<double>(size_mm) *
-                          static_cast<double>(polygon.max_y - polygon.min_y) /
-                          static_cast<double>(polygon.max_span);
-            for (const GridPoint& node : lattice) {
-                const P128 centre = grid_to_internal(node, scaled, policy);
-                NodeMeasurement nm;
-                nm.node = node;
-                nm.x_mm = node.x24 * policy.half_pitch_mm;
-                nm.y_mm = node.y24 * policy.half_pitch_mm;
-                nm.supported = disc_supported(centre, scaled, policy);
-                DistanceSquared best{0, 1};
-                bool first = true;
-                for (std::size_t i = 0; i < scaled.vertices.size(); ++i) {
-                    const P128& a = scaled.vertices[i];
-                    const P128& b = scaled.vertices[(i + 1) % scaled.vertices.size()];
-                    const DistanceSquared d = point_segment_distance2(centre, a, b);
-                    if (first || compare_distance2(d, best) < 0) {
-                        best = d;
-                        first = false;
-                    }
-                }
-                const bool inside =
-                    locate_point(centre, scaled.vertices) != PointLocation::Outside;
-                const double magnitude = distance_mm(best, scaled.coordinate_denominator);
-                nm.clearance_mm = inside ? magnitude : -magnitude;
-                nm.clearance_um_floor =
-                    inside ? distance_um_floor(best, scaled.coordinate_denominator, size_mm) : 0;
-                if (nm.supported) ++m.supported_count;
-                m.nodes.push_back(nm);
-            }
+    out.reserve(jobs.size());
+    for (const MeasureJob& job : jobs) {
+        const ScaledPolygon scaled = scale_polygon(polygon, job.size_mm);
+        SizeMeasurement m;
+        m.band = job.band;
+        m.size_mm = job.size_mm;
+        m.runs_x = job.runs_x;
+        m.runs_y = job.runs_y;
+        m.width_mm = static_cast<double>(job.size_mm) *
+                     static_cast<double>(polygon.max_x - polygon.min_x) /
+                     static_cast<double>(polygon.max_span);
+        m.height_mm = static_cast<double>(job.size_mm) *
+                      static_cast<double>(polygon.max_y - polygon.min_y) /
+                      static_cast<double>(polygon.max_span);
 
-            // LINK FACTS — every 48mm-adjacent pair of held magnets, judged by GPT Pro's own
-            // capsule predicate and REPORTED, never used to filter anything.
-            std::vector<const NodeMeasurement*> held;
-            for (const NodeMeasurement& nm : m.nodes) {
-                if (nm.supported) held.push_back(&nm);
-            }
-            for (std::size_t i = 0; i < held.size(); ++i) {
-                for (std::size_t j = i + 1; j < held.size(); ++j) {
-                    // Strictly ORTHOGONAL 48mm neighbours. GPT's adjacent_48 (manhattan 2 in
-                    // half-pitch units) is exact within one template window, where all
-                    // coordinates share parity — but this union lattice mixes windows, and
-                    // there a (1,1) diagonal at 24*sqrt(2) mm also sums to 2. A diagonal is
-                    // not a lattice link and must not be reported as one.
-                    const int dx = std::abs(held[i]->node.x24 - held[j]->node.x24);
-                    const int dy = std::abs(held[i]->node.y24 - held[j]->node.y24);
-                    if (!((dx == 2 && dy == 0) || (dx == 0 && dy == 2))) continue;
-                    LinkMeasurement link;
-                    link.a = held[i]->node;
-                    link.b = held[j]->node;
-                    link.ax_mm = held[i]->x_mm;
-                    link.ay_mm = held[i]->y_mm;
-                    link.bx_mm = held[j]->x_mm;
-                    link.by_mm = held[j]->y_mm;
-                    link.direct = capsule_supported(grid_to_internal(link.a, scaled, policy),
-                                                    grid_to_internal(link.b, scaled, policy),
-                                                    scaled, policy);
-                    m.links.push_back(link);
+        std::vector<P128> centres;
+        centres.reserve(job.positions_mm.size());
+        for (const auto& [x_mm, y_mm] : job.positions_mm) {
+            const i128 den = scaled.coordinate_denominator;
+            const P128 centre{static_cast<i128>(x_mm) * den, static_cast<i128>(y_mm) * den};
+            centres.push_back(centre);
+            NodeMeasurement nm;
+            nm.x_mm = x_mm;
+            nm.y_mm = y_mm;
+            nm.supported = disc_supported(centre, scaled, policy);
+            DistanceSquared best{0, 1};
+            bool first = true;
+            for (std::size_t i = 0; i < scaled.vertices.size(); ++i) {
+                const P128& a = scaled.vertices[i];
+                const P128& b = scaled.vertices[(i + 1) % scaled.vertices.size()];
+                const DistanceSquared d = point_segment_distance2(centre, a, b);
+                if (first || compare_distance2(d, best) < 0) {
+                    best = d;
+                    first = false;
                 }
             }
-
-            // OVERHANG FACTS — how far the shape reaches past the padded box of the held
-            // magnets, per side. The shape's bbox is centred on the lattice origin by
-            // construction, so its edges sit at +-width/2 and +-height/2.
-            if (!held.empty()) {
-                int min_x = held.front()->x_mm;
-                int max_x = min_x;
-                int min_y = held.front()->y_mm;
-                int max_y = min_y;
-                for (const NodeMeasurement* nm : held) {
-                    min_x = std::min(min_x, nm->x_mm);
-                    max_x = std::max(max_x, nm->x_mm);
-                    min_y = std::min(min_y, nm->y_mm);
-                    max_y = std::max(max_y, nm->y_mm);
-                }
-                const int pad = policy.disc_radius_mm;
-                m.has_overhang = true;
-                m.overhang_left_mm = m.width_mm / 2.0 + (min_x - pad);
-                m.overhang_right_mm = m.width_mm / 2.0 - (max_x + pad);
-                m.overhang_bottom_mm = m.height_mm / 2.0 + (min_y - pad);
-                m.overhang_top_mm = m.height_mm / 2.0 - (max_y + pad);
-            }
-            out.push_back(std::move(m));
+            const bool inside = locate_point(centre, scaled.vertices) != PointLocation::Outside;
+            const double magnitude = distance_mm(best, scaled.coordinate_denominator);
+            nm.clearance_mm = inside ? magnitude : -magnitude;
+            nm.clearance_um_floor =
+                inside ? distance_um_floor(best, scaled.coordinate_denominator, job.size_mm) : 0;
+            if (nm.supported) ++m.supported_count;
+            m.nodes.push_back(nm);
         }
+
+        // LINK FACTS — orthogonal pitch-spaced pairs of HELD positions, judged by GPT Pro's own
+        // capsule predicate and REPORTED, never used to filter anything.
+        for (std::size_t i = 0; i < m.nodes.size(); ++i) {
+            if (!m.nodes[i].supported) continue;
+            for (std::size_t j = i + 1; j < m.nodes.size(); ++j) {
+                if (!m.nodes[j].supported) continue;
+                const int dx = std::abs(m.nodes[i].x_mm - m.nodes[j].x_mm);
+                const int dy = std::abs(m.nodes[i].y_mm - m.nodes[j].y_mm);
+                const bool orthogonal = (dx == policy.dense_pitch_mm && dy == 0) ||
+                                        (dx == 0 && dy == policy.dense_pitch_mm);
+                if (!orthogonal) continue;
+                LinkMeasurement link;
+                link.ax_mm = m.nodes[i].x_mm;
+                link.ay_mm = m.nodes[i].y_mm;
+                link.bx_mm = m.nodes[j].x_mm;
+                link.by_mm = m.nodes[j].y_mm;
+                link.direct = capsule_supported(centres[i], centres[j], scaled, policy);
+                m.links.push_back(link);
+            }
+        }
+
+        // OVERHANG FACTS — shape reach past the padded box of the held positions, per side.
+        // The shape's bbox is centred on the lattice origin by construction.
+        bool any = false;
+        int min_x = 0, max_x = 0, min_y = 0, max_y = 0;
+        for (const NodeMeasurement& nm : m.nodes) {
+            if (!nm.supported) continue;
+            if (!any) { min_x = max_x = nm.x_mm; min_y = max_y = nm.y_mm; any = true; continue; }
+            min_x = std::min(min_x, nm.x_mm);
+            max_x = std::max(max_x, nm.x_mm);
+            min_y = std::min(min_y, nm.y_mm);
+            max_y = std::max(max_y, nm.y_mm);
+        }
+        if (any) {
+            const int pad = policy.disc_radius_mm;
+            m.has_overhang = true;
+            m.overhang_left_mm = m.width_mm / 2.0 + (min_x - pad);
+            m.overhang_right_mm = m.width_mm / 2.0 - (max_x + pad);
+            m.overhang_bottom_mm = m.height_mm / 2.0 + (min_y - pad);
+            m.overhang_top_mm = m.height_mm / 2.0 - (max_y + pad);
+        }
+        out.push_back(std::move(m));
     }
     return out;
-}
-
-std::vector<SizeMeasurement> measure_all(const PolygonInput& input,
-                                         const std::vector<BandSpec>& bands,
-                                         const EnginePolicy& policy) {
-    return measure_all(canonicalize_and_validate(input, policy), bands, policy);
 }
 
 }  // namespace magfit

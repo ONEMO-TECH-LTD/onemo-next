@@ -1,36 +1,33 @@
-// ENGINE LOADER — carries an outline to GPT Pro's exact core and carries the numbers back.
+// ENGINE LOADER — carries a fully-built request to GPT Pro's exact kernel and the numbers back.
 //
-// It computes NOTHING. No geometry, no default, no threshold, no interpretation lives here; if
-// arithmetic on millimetres ever appears in this file it is in the wrong place. Every value below
-// was decided by `measure_all()` in vendor/magfit, which enters no policy path: no selection, no
-// corridor, no band-span rule, no sparse gate, no flap threshold.
+// It computes NOTHING and decides NOTHING. The kernel generates nothing either: lattice positions,
+// registration and law values are all supplied by the bridge from the spec/engine unit — the one
+// lattice authority. The kernel answers only: held / clearance / link facts / overhang.
 //
-// The door is `/api/grid-engine/measure`. In phase A it runs the native binary (dev only); in
-// phase B the same door serves the WebAssembly build. The loader cannot tell the difference —
-// that is the point of the door.
+// The door is `/api/grid-engine/measure`: the wasm build when compiled, the native binary in dev.
+// Proven byte-identical on the whole corpus.
 
 /** A lattice position measured against the shape at one size. */
 export interface MeasuredNode {
   readonly xMm: number
   readonly yMm: number
-  /** The complete 24mm disc is on fabric. Exact touching counts as held. */
+  /** The complete disc is on fabric. Exact touching counts as held. */
   readonly held: boolean
   /** Distance to the nearest outline edge; negative when the centre is outside the shape. */
   readonly clearanceMm: number
 }
 
-/** One orthogonal 48mm pair of held magnets, with the engine's straight-strip fact. */
+/** One orthogonal pitch-spaced pair of held positions, with the engine's straight-strip fact. */
 export interface MeasuredLink {
   readonly axMm: number
   readonly ayMm: number
   readonly bxMm: number
   readonly byMm: number
-  /** A straight full-width fabric strip joins the two centres. A fact, never a gate —
-      a crescent joins its horns along the arc and reads false here. */
+  /** A straight full-width fabric strip joins the two centres — a fact, never a gate. */
   readonly direct: boolean
 }
 
-/** Raw shape overhang beyond the padded box of the held magnets. Numbers, no thresholds. */
+/** Raw shape overhang beyond the padded box of the held positions. Numbers, no thresholds. */
 export interface MeasuredOverhang {
   readonly left: number
   readonly right: number
@@ -38,10 +35,12 @@ export interface MeasuredOverhang {
   readonly top: number
 }
 
-/** One manufactured size, every lattice position reported — held or not. */
-export interface MeasuredSize {
+/** One measured variant: one size, one template's supplied positions, everything reported. */
+export interface MeasuredVariant {
   readonly band: number
   readonly sizeMm: number
+  readonly runsX: number
+  readonly runsY: number
   readonly widthMm: number
   readonly heightMm: number
   readonly heldCount: number
@@ -53,26 +52,36 @@ export interface MeasuredSize {
 export interface Measurement {
   readonly ok: boolean
   readonly vertexCount?: number
-  readonly sizes: readonly MeasuredSize[]
+  readonly sizes: readonly MeasuredVariant[]
   readonly error?: string
 }
 
 /** An outline as coordinate pairs in any consistent units — the tracer's own fractions work. */
 export type OutlinePoints = ReadonlyArray<readonly [number, number]>
 
-/**
- * Measure one outline across the requested bands. `scale` is the whole-number trace resolution
- * the core canonicalises against — a transport detail, never a product size.
- */
-export async function measureOutline(
-  outline: OutlinePoints,
-  bands: readonly number[],
-  scale = 20000,
-): Promise<Measurement> {
+/** One job the bridge built: one size, one template's positions, in millimetres. */
+export interface MeasureJob {
+  readonly band: number
+  readonly sizeMm: number
+  readonly runsX: number
+  readonly runsY: number
+  readonly positions: ReadonlyArray<readonly [number, number]>
+}
+
+export interface MeasureRequest {
+  readonly vertices: OutlinePoints
+  readonly scale: number
+  readonly pitchMm: number
+  readonly radiusMm: number
+  readonly jobs: readonly MeasureJob[]
+}
+
+/** Transport only. The request arrives complete; the response returns verbatim. */
+export async function measureRequest(request: MeasureRequest): Promise<Measurement> {
   const response = await fetch('/api/grid-engine/measure', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ vertices: outline, bands, scale }),
+    body: JSON.stringify(request),
   })
   const parsed = (await response.json()) as Measurement
   if (!parsed.ok && parsed.error === undefined) {

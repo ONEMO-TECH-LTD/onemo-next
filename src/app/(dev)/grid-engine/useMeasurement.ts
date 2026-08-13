@@ -9,12 +9,13 @@ import {
   ALL_OFF,
   loadCorpus,
   measureCutout,
-  type AnnotatedSize,
+  type AnnotatedVariant,
   type MeasuredCutout,
   type OutlinePoints,
   type PolicyId,
   type PolicySettings,
 } from '@/lib/grid-engine/bridge'
+import type { GridSystemSpec } from '@/lib/grid-engine/spec'
 
 export interface MeasurementState {
   readonly shapes: readonly string[]
@@ -23,7 +24,7 @@ export interface MeasurementState {
   readonly result: MeasuredCutout | null
   readonly busy: boolean
   readonly sizeIndex: number
-  readonly current: AnnotatedSize | null
+  readonly current: AnnotatedVariant | null
   readonly settings: PolicySettings
   selectShape(name: string): void
   setSizeIndex(index: number): void
@@ -31,7 +32,7 @@ export interface MeasurementState {
   setPolicyValue(id: PolicyId, value: number): void
 }
 
-export function useMeasurement(): MeasurementState {
+export function useMeasurement(spec: GridSystemSpec): MeasurementState {
   const [corpus, setCorpus] = useState<Record<string, OutlinePoints>>({})
   const [shapeName, setShapeName] = useState<string | null>(null)
   const [outline, setOutline] = useState<OutlinePoints | null>(null)
@@ -50,11 +51,11 @@ export function useMeasurement(): MeasurementState {
     if (!outline) return
     let live = true
     setBusy(true)
-    measureCutout(outline, settings)
+    measureCutout(spec, outline, settings)
       .then((measured) => {
         if (!live) return
         setResult(measured)
-        setSizeIndex((index) => (index < measured.sizes.length ? index : 0))
+        setSizeIndex((index) => (index < measured.variants.length ? index : 0))
       })
       .finally(() => {
         if (live) setBusy(false)
@@ -62,7 +63,7 @@ export function useMeasurement(): MeasurementState {
     return () => {
       live = false
     }
-  }, [outline, settings])
+  }, [outline, settings, spec])
 
   const selectShape = useCallback(
     (name: string) => {
@@ -84,8 +85,8 @@ export function useMeasurement(): MeasurementState {
 
   const current = useMemo(
     () =>
-      result && result.sizes.length > 0
-        ? result.sizes[Math.min(sizeIndex, result.sizes.length - 1)]
+      result && result.variants.length > 0
+        ? result.variants[Math.min(sizeIndex, result.variants.length - 1)]
         : null,
     [result, sizeIndex],
   )

@@ -15,7 +15,7 @@
 // residues of published coordinates). No policy performs geometry: if a rule needs a geometric
 // fact the engine does not report, the engine grows the fact — the rule never computes it.
 
-import type { MeasuredSize } from '../engine/measure'
+import type { MeasuredVariant } from '../engine/measure'
 
 export type PolicyId =
   | 'minimumMagnets'
@@ -87,25 +87,28 @@ export const ALL_OFF: PolicySettings = Object.freeze({
   flapLimit: { enabled: false, value: 12 },
 })
 
-/** One size, with whatever the enabled policies had to say about it. */
-export interface AnnotatedSize {
-  readonly size: MeasuredSize
+/** One variant, with whatever the enabled policies had to say about it. */
+export interface AnnotatedVariant {
+  readonly variant: MeasuredVariant
   /** Empty when nothing objected. Each entry names the policy that WOULD have excluded this
-      size and why — the size itself is never dropped. */
+      variant and why — the variant itself is never dropped. */
   readonly excludedBy: readonly { readonly id: PolicyId; readonly because: string }[]
 }
 
 /**
  * Apply the enabled policies as annotations. The returned array always has exactly the same
- * length and order as the input — a policy may mark a size, never remove one.
+ * length and order as the input — a policy may mark a variant, never remove one. `pitchMm`
+ * arrives from the guarded spec: this layer holds no law values of its own.
  */
 export function annotate(
-  sizes: readonly MeasuredSize[],
+  variants: readonly MeasuredVariant[],
   settings: PolicySettings,
-): AnnotatedSize[] {
-  return sizes.map((size) => {
+  pitchMm: number,
+): AnnotatedVariant[] {
+  const halfPitch = pitchMm / 2
+  return variants.map((variant) => {
     const excludedBy: { id: PolicyId; because: string }[] = []
-    const held = size.nodes.filter((node) => node.held)
+    const held = variant.nodes.filter((node) => node.held)
 
     const minimum = settings.minimumMagnets
     if (minimum.enabled && held.length < (minimum.value ?? 1)) {
@@ -116,40 +119,37 @@ export function annotate(
     }
 
     if (settings.bandSpan.enabled && held.length > 0) {
-      // Reach of the held set versus the band's full width — both straight off reported
-      // coordinates; 48 is the pitch the band definition itself is written in.
       const xs = held.map((node) => node.xMm)
       const ys = held.map((node) => node.yMm)
       const reach = Math.max(
         Math.max(...xs) - Math.min(...xs),
         Math.max(...ys) - Math.min(...ys),
       )
-      const required = (size.band - 1) * 48
+      const required = (variant.band - 1) * pitchMm
       if (reach !== required) {
         excludedBy.push({
           id: 'bandSpan',
-          because: `held set reaches ${reach}mm, band ${size.band} spans ${required}mm`,
+          because: `held set reaches ${reach}mm, band ${variant.band} spans ${required}mm`,
         })
       }
     }
 
     if (settings.corridor.enabled) {
-      const broken = size.links.filter((link) => !link.direct)
+      const broken = variant.links.filter((link) => !link.direct)
       if (broken.length > 0) {
         excludedBy.push({
           id: 'corridor',
-          because: `${broken.length} of ${size.links.length} adjacent pairs have no straight strip`,
+          because: `${broken.length} of ${variant.links.length} adjacent pairs have no straight strip`,
         })
       }
     }
 
     const sparse = settings.sparseEngagement
-    if (sparse.enabled && size.band >= (sparse.value ?? 3) && held.length > 0) {
-      // A 96mm garment keeps one residue class per axis: in 24mm units, the retained points
-      // share one (x mod 4, y mod 4) pair. Count the best of all sixteen phases over the held
-      // set — residue arithmetic on published coordinates, no geometry. (Coordinates are
-      // multiples of 24, so x/24 is exact; the +4 keeps negatives in range.)
-      const residue = (mm: number) => ((mm / 24) % 4 + 4) % 4
+    if (sparse.enabled && variant.band >= (sparse.value ?? 3) && held.length > 0) {
+      // A 96mm garment keeps one residue class per axis: in half-pitch units, the retained
+      // points share one (x mod 4, y mod 4) pair. Count the best of all sixteen phases over
+      // the held set — residue arithmetic on supplied coordinates, no geometry.
+      const residue = (mm: number) => ((mm / halfPitch) % 4 + 4) % 4
       let best = 0
       for (let rx = 0; rx < 4; rx++) {
         for (let ry = 0; ry < 4; ry++) {
@@ -165,10 +165,10 @@ export function annotate(
     }
 
     const flap = settings.flapLimit
-    if (flap.enabled && size.overhangMm) {
+    if (flap.enabled && variant.overhangMm) {
       const limit = flap.value ?? 12
       const over = (['left', 'right', 'bottom', 'top'] as const).filter(
-        (side) => size.overhangMm![side] > limit,
+        (side) => variant.overhangMm![side] > limit,
       )
       if (over.length > 0) {
         excludedBy.push({
@@ -178,6 +178,6 @@ export function annotate(
       }
     }
 
-    return { size, excludedBy }
+    return { variant, excludedBy }
   })
 }

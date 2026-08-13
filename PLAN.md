@@ -80,7 +80,19 @@ Dev server up; drive the real page in Chrome. Evidence captured: BUTTERFLY at 16
 discs; DUCK at 204mm shows 14 held; a policy toggle marks sizes excluded without removing them;
 zero console errors; typecheck and test run clean. Then Dan drives it.
 
-## FAILED-AUDIT record (o-audit, 2026-08-13) — the build is NOT CLEAR
+## FIXED (2026-08-13 midday) — single lattice authority restored
+
+The kernel now GENERATES NOTHING: positions come from the unit's centred runs (`engine.ts
+centredRunMM`, GPT's run formula), registration DERIVES per axis from run parity (Dan's law,
+EC-07), and pitch/radius arrive from the guarded spec. Variants are measured one registration at
+a time — never merged. The canvas realigns per axis to the selected variant, so the scaffold
+lattice and the measured discs are ONE grid on screen. Verified: GPT suite untouched; 38/38 unit
+tests; live door wasm==native byte-identical on the new schema; and a LAW-conformance Chrome gate
+(min disc spacing >= 48mm, single residue per axis) — the gate the failed audit demanded — PASSED
+with screenshots. Conformance to GPT Pro's proposal restored: one deliberate deviation recorded
+(position generation lives in the TS unit, the single authority; the run/parity math is GPT's).
+
+## FAILED-AUDIT record (o-audit, 2026-08-13 morning) — evidence, since fixed
 
 Dan's eye caught what the entire pipeline below missed: phantom magnet positions 24mm apart on a
 48mm lattice. Three-way confirmed (Dan's screenshot · lead source trace · grid-pixel live gate).

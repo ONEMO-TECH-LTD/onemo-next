@@ -72,9 +72,11 @@ export interface GridCanvasProps {
   onView?: (summary: FieldSummary) => void
   /** Anything the unit produced, already in millimetres, drawn on top of the field. */
   children?: React.ReactNode
+  /** Per-axis registration from the bridge (derived from run parity, Dan's law); optional. */
+  registrationOverride?: Parameters<typeof layoutField>[3]
 }
 
-export function GridCanvas({ spec, zoom = ZOOM_FIT, panMM, onView, children }: GridCanvasProps) {
+export function GridCanvas({ spec, zoom = ZOOM_FIT, panMM, onView, children, registrationOverride }: GridCanvasProps) {
   const frame = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 1, h: 1 })
 
@@ -97,7 +99,7 @@ export function GridCanvas({ spec, zoom = ZOOM_FIT, panMM, onView, children }: G
   // stretch it. The shell used to hand in a region built from the SHAPE'S SIZE, which read as the
   // shape defining the world -- and did nothing at all, since every reachable size is under the
   // block's own floor. Inert and misleading at once.
-  const layout = layoutField(spec, { x: 0, y: 0, w: 0, h: 0 }, panMM)
+  const layout = layoutField(spec, { x: 0, y: 0, w: 0, h: 0 }, panMM, registrationOverride)
 
   // THE CAMERA. Screen maths, and the only thing zoom is allowed to touch.
   const view = viewBox(layout.padded, zoom, box.w / box.h)
