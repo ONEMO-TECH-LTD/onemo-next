@@ -80,7 +80,44 @@ Dev server up; drive the real page in Chrome. Evidence captured: BUTTERFLY at 16
 discs; DUCK at 204mm shows 14 held; a policy toggle marks sizes excluded without removing them;
 zero console errors; typecheck and test run clean. Then Dan drives it.
 
-## Audit record (o-necessity + o-deslop, 2026-08-12 evening)
+## FAILED-AUDIT record (o-audit, 2026-08-13) — the build is NOT CLEAR
+
+Dan's eye caught what the entire pipeline below missed: phantom magnet positions 24mm apart on a
+48mm lattice. Three-way confirmed (Dan's screenshot · lead source trace · grid-pixel live gate).
+
+**Verdict on the goal's question: the PLAN was wrong, and the build followed it faithfully.** This
+was not mid-flight improvisation — it was a planning-audit failure, plus one pre-goal assumption
+that the audit then exempted:
+
+1. **The defect predates the goal.** `measure_all()` — with its union of all template windows into
+   one position set (`magfit.cpp` ~1101) — was written at 18:02, before this plan. The union was an
+   ASSUMPTION (that merging registrations is harmless) never checked against the physics. That was
+   the vibe-coded moment.
+2. **The plan then laundered it.** The rewritten plan placed measure_all under "Done" and the
+   necessity/deslop audit swept only the phases AHEAD. Auditing the delta while exempting inherited
+   work is how a defect becomes load-bearing: A5 then INSTRUCTED the overlay to draw "every lattice
+   position" from the engine — the duplication was in the plan's own words (line 73).
+3. **The deslop pass never swept the tree it claimed to.** o-deslop is a whole-tree duplicate hunt.
+   Run honestly, it collides `measure_all`'s position generation with `engine.ts magnetsInRegion`
+   (the scaffold's lattice authority), `Registration` in `spec.ts` (guarded, released options), and
+   the C++'s hardcoded 48/24/12/9 against the spec's guarded values. Three duplications of
+   authority, all missed because the sweep audited a DOCUMENT, not the tree.
+4. **The A6 visual gate verified the wrong property.** It checked screen == engine (counts,
+   clearances) — self-consistency — never screen == grid law. The phantom 24mm-spaced rings are
+   VISIBLE in the A6 butterfly screenshot that was called PASS. Conformance means conformance to
+   the law, not to the thing under test.
+
+**What did conform:** module separation (engine/logic/spec/bridge/UI, guards green) · policies
+annotate-never-remove with non-vacuous tests · verbatim GPT core, suite untouched · UI added-to,
+not rebuilt · B's wasm byte-identity. The layering held; the AUTHORITY did not — the engine was
+allowed to invent lattice, registration and law values that the scaffold already owned.
+
+**Standing violations to fix (design agreed with grid-pixel, decision pending Dan):** one lattice
+authority in TS engine/spec · registration is per-axis (scalar 'gap'|'point' cannot express 3×2 —
+Dan to rule option A: per-axis law, vs B: bridge-enumerated pairs) · C++ kernel receives
+coordinates + law values, returns facts only, generates nothing, hardcodes nothing.
+
+## Superseded audit record (o-necessity + o-deslop, 2026-08-12 evening) — kept as evidence
 
 Kill-list applied: Vercel-first sequencing (contradicted Dan's local-first ruling) · winner-selection
 switch (auto-selection explicitly deferred by Dan) · stale "Open decisions" (npm authorised by the
@@ -88,6 +125,6 @@ active goal; emscripten belongs to B).
 Gap-list applied: dev-door phase missing · corpus loading missing · link/overhang facts missing
 (two switches would have been dead controls) · identity test promoted to deliverable · bands 1–4 and
 the Chrome gate made explicit.
-Verdict: necessity — no unnecessary elements. Sufficiency — delivers the directive set in full
-(pure engine · switchable annotating policies · min-1 · bands to 204 · existing UI added-to · local
-proof before compile · visual Chrome gate).
+Verdict AS WRITTEN THEN: necessity — no unnecessary elements. Sufficiency — full. **Both lines
+were wrong**: the sweep exempted pre-goal work, so the duplicate lattice/registration/law-value
+authorities passed unexamined. See the failed-audit record above.
