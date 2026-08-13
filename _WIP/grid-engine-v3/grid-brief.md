@@ -2063,3 +2063,7 @@ B2-3MAG [duck at 131mm] --- this is not optimal to be honest the 4 ddoes not fit
 **12:52**
 
 [duck at 152mm, band 3, four magnets] ----skipping mid row
+
+**12:53**
+
+[bat-woman at 144mm, band 3] ----same story with batman shape it is more triangular and needs essetntially 3 magnets utmost corners onlymid 2 rows are optional

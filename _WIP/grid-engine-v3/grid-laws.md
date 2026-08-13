@@ -765,6 +765,10 @@ candidate set; they are three of its members.
   rows/columns where the material narrows — the duck's band-3 answer is head pair + body pair, the
   four corners of a 48×96mm rectangle, middle row unused. Same lattice, no new grid — the same
   principle as the diagonal pair.
+- **CORNER HOLDS (ruled on bat-woman, 12:53):** a triangular shape takes a TRIANGULAR hold — three
+  magnets at the shape's utmost corners (top for gravity, the two base corners for stability);
+  the middle rows are OPTIONAL, not required. The arrangement follows the shape's extreme
+  geometry, not the window's fill — the general form of L15's "four corners at the edge".
 - **Bands 3–4:** the same preferences over the enumerated placements, with L15's ordered scale
   (four corners at the edge as optimum, pair as floor) picking the arrangement class. Rows are
   being ruled by Dan on the live walkthrough (2026-08-13) and are booked as each lands — do not
