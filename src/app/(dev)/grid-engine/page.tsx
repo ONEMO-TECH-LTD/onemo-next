@@ -183,9 +183,13 @@ export default function GridEnginePage() {
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
   const [candIdx, setCandIdx] = useState(0)
-  const candDoc = useMemo(() => {
-    if (!outline) return { candidates: [] }
-    return listCandidates(spec, outline)
+  const [candDoc, setCandDoc] = useState({ candidates: [] as ReturnType<typeof listCandidates>['candidates'] })
+  useEffect(() => {
+    if (!outline) {
+      setCandDoc({ candidates: [] })
+      return
+    }
+    setCandDoc(listCandidates(spec, outline))
   }, [outline, spec])
   const visibleCands = useMemo(
     () => candDoc.candidates.filter((c) => c.sizeMM === sizeMM),

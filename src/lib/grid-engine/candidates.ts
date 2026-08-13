@@ -103,11 +103,20 @@ function thin(sites: IndexedSite[]): IndexedSite[] {
   return sites.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
 }
 
+function coarsen(verts: ReadonlyArray<PointMM>): PointMM[] {
+  if (verts.length <= 400) return verts.map(([x, y]) => [x, y])
+  const step = Math.ceil(verts.length / 400)
+  const out: PointMM[] = []
+  for (let i = 0; i < verts.length; i += step) out.push([verts[i][0], verts[i][1]])
+  return out.length >= 3 ? out : verts.map(([x, y]) => [x, y])
+}
+
 export function collectCandidates(
   spec: GridSystemSpec,
   outline: ReadonlyArray<PointMM>,
 ): CandidateDocument {
   if (outline.length < 3) return { candidates: [] }
+  outline = coarsen(outline)
   const offset = registrationOffsetMM(spec.grid, spec.registration)
   const origin: PointMM = [offset, offset]
   const dense = { ...spec.grid, pitchMM: spec.grid.basePitchMM }
