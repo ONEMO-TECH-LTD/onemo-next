@@ -529,6 +529,7 @@ export default function GridEnginePage() {
           {marks.map(([x, y]) => (
             <circle
               key={`c-${x},${y}`}
+              data-candidate-mark="true"
               cx={x}
               cy={y}
               r={minSpanMM / 2}
@@ -544,9 +545,10 @@ export default function GridEnginePage() {
                dragging even over the shape the canvas must continue to react". It is drawn above the
                drag surface, so without this it swallows the press and the lattice stops following the
                hand exactly where the shape is — the one place you are looking. */
-            <g pointerEvents="none">
+            <g pointerEvents="none" data-silhouette="cutout">
               {asOutline && outline ? (
                 <polygon
+                  data-silhouette="outline"
                   points={outline
                     .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
                     .join(' ')}
@@ -557,6 +559,7 @@ export default function GridEnginePage() {
                 />
               ) : (
                 <image
+                  data-silhouette="picture"
                   href={cutout.url}
                   x={box.x}
                   y={box.y}
@@ -567,6 +570,7 @@ export default function GridEnginePage() {
                 />
               )}
               <rect
+                data-silhouette="cutout-box"
                 x={box.x}
                 y={box.y}
                 width={box.w}

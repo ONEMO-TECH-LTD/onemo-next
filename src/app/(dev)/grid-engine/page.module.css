@@ -20,6 +20,7 @@
   max-width: var(--al-breakpoints-lg, 768px);
   min-height: 100dvh;
   margin: 0 auto;
+  overflow-x: hidden;
   padding: var(--gutter) var(--gutter) calc(var(--gutter) + env(safe-area-inset-bottom));
   font-family: ui-sans-serif, system-ui, sans-serif;
   color: #0f172a;
