@@ -250,7 +250,7 @@ export default function GridEnginePage() {
    */
   const [pan, setPan] = useState<[number, number]>([0, 0])
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
-  const panSurface = useRef<SVGRectElement>(null)
+  const panSurface = useRef<HTMLDivElement>(null)
   /**
    * The whole drag is measured from where it STARTED, never from the last frame.
    *
@@ -261,8 +261,8 @@ export default function GridEnginePage() {
    */
   const panGrabbedAt = useRef<{ atMM: [number, number]; panMM: [number, number] } | null>(null)
 
-  const toMM = (e: React.PointerEvent<SVGElement>): [number, number] => {
-    const svg = e.currentTarget.ownerSVGElement
+  const toMM = (e: React.PointerEvent<HTMLElement>): [number, number] => {
+    const svg = e.currentTarget.parentElement?.querySelector('svg')
     const m = svg?.getScreenCTM()
     if (!svg || !m) return [0, 0]
     const p = svg.createSVGPoint()
@@ -487,7 +487,28 @@ export default function GridEnginePage() {
 
       </nav>
 
-      <div className={styles.canvas}>
+      <div className={styles.canvas} data-field="grid-canvas">
+        <div
+          ref={panSurface}
+          className={styles.panSurface}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            panGrabbedAt.current = { atMM: toMM(e), panMM: pan }
+          }}
+          onPointerMove={(e) => {
+            const grab = panGrabbedAt.current
+            if (!grab) return
+            const [px, py] = toMM(e)
+            setPan([
+              Math.round(grab.panMM[0] + px - grab.atMM[0]),
+              Math.round(grab.panMM[1] + py - grab.atMM[1]),
+            ])
+          }}
+          onPointerUp={(e) => {
+            panGrabbedAt.current = null
+            e.currentTarget.releasePointerCapture?.(e.pointerId)
+          }}
+        />
         <GridCanvas
           spec={spec}
           panMM={pan}
@@ -498,34 +519,6 @@ export default function GridEnginePage() {
           zoom={gridScale}
           onView={onView}
         >
-          {/* Drag anywhere on the field to slide the LATTICE against the shape. Whole millimetres,
-              like every other move. Drawn first, so it sits beneath the cut-out. */}
-          <rect
-            ref={panSurface}
-            x={-5000}
-            y={-5000}
-            width={10000}
-            height={10000}
-            fill="transparent"
-            className={styles.panSurface}
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId)
-              panGrabbedAt.current = { atMM: toMM(e), panMM: pan }
-            }}
-            onPointerMove={(e) => {
-              const grab = panGrabbedAt.current
-              if (!grab) return
-              const [px, py] = toMM(e)
-              setPan([
-                Math.round(grab.panMM[0] + px - grab.atMM[0]),
-                Math.round(grab.panMM[1] + py - grab.atMM[1]),
-              ])
-            }}
-            onPointerUp={(e) => {
-              panGrabbedAt.current = null
-              e.currentTarget.releasePointerCapture?.(e.pointerId)
-            }}
-          />
           {marks.map(([x, y]) => (
             <circle
               key={`c-${x},${y}`}

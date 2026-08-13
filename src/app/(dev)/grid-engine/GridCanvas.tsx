@@ -121,14 +121,24 @@ export function GridCanvas({ spec, zoom = ZOOM_FIT, panMM, onView, children }: G
     { id: 'pitch', mm: spec.grid.basePitchMM, stroke: PITCH_RULE_STROKE, anchor: layout.anchorMM },
   ].filter((l) => l.mm * pxPerMM >= RULE_MIN_PX)
 
+  const r = layout.cellMM / 2
+  const visibleMagnets = layout.magnets.filter(
+    ([x, y]) =>
+      x + r >= view.x && x - r <= view.x + view.w && y + r >= view.y && y - r <= view.y + view.h,
+  )
+
   return (
     <div ref={frame} className={styles.frame}>
       <svg
         className={styles.svg}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+        overflow="hidden"
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
+          <clipPath id="field-clip">
+            <rect x={view.x} y={view.y} width={view.w} height={view.h} />
+          </clipPath>
           {levels.map((l) => (
             <pattern
               key={l.id}
@@ -144,31 +154,33 @@ export function GridCanvas({ spec, zoom = ZOOM_FIT, panMM, onView, children }: G
           ))}
         </defs>
 
-        {levels.map((l) => (
-          <rect
-            key={l.id}
-            x={view.x}
-            y={view.y}
-            width={view.w}
-            height={view.h}
-            fill={`url(#rule-${l.id})`}
-          />
-        ))}
+        <g clipPath="url(#field-clip)">
+          {levels.map((l) => (
+            <rect
+              key={l.id}
+              x={view.x}
+              y={view.y}
+              width={view.w}
+              height={view.h}
+              fill={`url(#rule-${l.id})`}
+            />
+          ))}
 
-        {layout.magnets.map(([x, y]) => (
-          <circle
-            key={`${x},${y}`}
-            cx={x}
-            cy={y}
-            r={layout.cellMM / 2}
-            fill={CELL_FILL}
-            stroke={CELL_STROKE}
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
+          {visibleMagnets.map(([x, y]) => (
+            <circle
+              key={`${x},${y}`}
+              cx={x}
+              cy={y}
+              r={r}
+              fill={CELL_FILL}
+              stroke={CELL_STROKE}
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
 
-        {children}
+          {children}
+        </g>
       </svg>
     </div>
   )

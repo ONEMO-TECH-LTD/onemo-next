@@ -20,7 +20,7 @@
   max-width: var(--al-breakpoints-lg, 768px);
   min-height: 100dvh;
   margin: 0 auto;
-  overflow-x: hidden;
+  overflow-x: clip;
   padding: var(--gutter) var(--gutter) calc(var(--gutter) + env(safe-area-inset-bottom));
   font-family: ui-sans-serif, system-ui, sans-serif;
   color: #0f172a;
@@ -67,6 +67,7 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -112,6 +113,8 @@
   position: relative;
   flex: none;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid #e2e8f0;
@@ -462,7 +465,11 @@
    :active says it without a render. It was an inline style reading a ref during render — which
    lints as an error AND never worked, because changing a ref renders nothing. */
 .panSurface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   cursor: grab;
+  touch-action: none;
 }
 
 .panSurface:active {
