@@ -36,4 +36,36 @@ ways, the centre row and column unused because the body is narrow and the LIMBS 
 band's own window does not constrain which lattice steps the corners land on — a band-3 shape may
 be held by a band-2-shaped corner square on wider spacing. Same lattice throughout.
 
+## POKE1 · 123mm · 4 magnets · CORNER SQUARE 96×96 — SAME LOGIC AS BUTTERFLY
+
+`expected-poke1-123mm-4mag-corner-square-96x96.png` — Dan verbatim: "same logic as butterfly".
+
+**The expected result:** four discs at the corners of a 96 × 96mm square, centre row and column
+skipped — the same corner-square arrangement as the butterfly. Poke1's mass sits in its rounded
+lobes; the four corners land where the material is fullest, and the narrow middle carries nothing.
+
+## BOT · ACCEPTABLE 133mm WIDE SQUARE, EXPECTED 144mm NARROW 4 (96×48)
+
+`acceptable-bot-133mm-4mag-corner-square-96x96.png` +
+`expected-bot-144mm-4mag-narrow-96x48.png` — Dan verbatim: "this one can do but better to do
+96mmx48mm narrow 4".
+
+**The ruling:** the wide 96×96 corner square DOES hold the bot ("this one can do") — it is
+acceptable, not wrong. But the BETTER answer is the NARROW 4: four discs at the corners of a
+tall 96 × 48mm rectangle — 96mm vertically (shoulders to hips), one 48mm step horizontally —
+because the bot's torso is a narrow standing mass and the tighter column wraps it with less flap.
+First case where TWO lawful arrangements exist and tight wrap ranks between them: the narrower
+rectangle that still covers the mass regions wins.
+
+## PILL · 122mm · BAND-2 GEOMETRY — THE BAND LABEL IS A TECHNICALITY
+
+`expected-pill-122mm-diagonal-band2-geometry.png` — Dan verbatim: "pill gets band 3-3 but is
+basically band 2 --- technicality".
+
+**The ruling:** the pill at 122mm falls in band 3 by SIZE, but its correct hold is band 2's
+geometry — the diagonal pair along the capsule's axis (see band-2 pill ruling), on wider lattice
+steps. The band names the size range only; it never dictates the arrangement. Same principle as
+the butterfly's "band 2 grid in a band 3 shape", stated at its sharpest: a band assignment that
+disagrees with the shape's natural arrangement is a technicality, and the arrangement wins.
+
 Further band-3 shapes land as Dan walks them — do not invent the unwalked rows.

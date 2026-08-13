@@ -2071,3 +2071,23 @@ B2-3MAG [duck at 131mm] --- this is not optimal to be honest the 4 ddoes not fit
 **12:54**
 
 B3-4 - perfect example of band 2 grid in the band 3 shape - cause of the limbs sticking out [butterfly at 130mm, four discs in the four wings, 96x96 corners]
+
+**12:56**
+
+[poke1 at 123mm, four discs at 96×96 corners] ----same logic as butterfly
+
+**12:57**
+
+[bot at 133mm, wide 96×96 corner square] --- this one can do but better to do 96mmx48mm narrow 4 [bot at 144mm, four discs at the corners of a tall 96×48mm rectangle]
+
+**12:58**
+
+[pill at 122mm, band 3] pill gets band 3-3 but is basically band 2 --- technicality
+
+**12:59**
+
+B4 - 4 (96mm) [butterfly at 214mm] - - -this is again shows size in b4 but essentially b3 based on the 96mm grid with 4 points ultimately needed
+
+**13:01**
+
+[poke1 at 217mm, band 4, four discs on the 96mm grid] same

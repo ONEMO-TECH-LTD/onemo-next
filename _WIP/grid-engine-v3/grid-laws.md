@@ -769,7 +769,20 @@ candidate set; they are three of its members.
   magnets at the shape's utmost corners (top for gravity, the two base corners for stability);
   the middle rows are OPTIONAL, not required. The arrangement follows the shape's extreme
   geometry, not the window's fill — the general form of L15's "four corners at the edge".
-- **Bands 3–4:** the same preferences over the enumerated placements, with L15's ordered scale
-  (four corners at the edge as optimum, pair as floor) picking the arrangement class. Rows are
-  being ruled by Dan on the live walkthrough (2026-08-13) and are booked as each lands — do not
-  invent the unwalked rows.
+- **ARRANGEMENT RANKING (ruled on the bot, 12:57):** when two lawful arrangements both hold the
+  shape, TIGHT WRAP ranks between them — the bot's wide 96×96 corner square "can do", but the
+  narrow 96×48 four is BETTER because the tighter column wraps the standing torso with less flap.
+  Acceptable and optimal are both booked; the engine proposes the optimal first.
+- **THE BAND IS A SIZE LABEL, NOT AN ARRANGEMENT (ruled on pill 12:58, butterfly 12:59, poke1
+  13:01):** a shape keeps its NATURAL arrangement class across bands — the pill in band 3 is
+  "basically band 2" (its diagonal pair, a technicality of the size label); the butterfly and
+  poke1 in band 4 are "essentially b3": still four points, now on the 96mm grid. The band names
+  the size range; the shape's extremes name the arrangement; the lattice step the corners land on
+  grows with size (48 → 96), the arrangement class does not change.
+- **Band 3 (120–168mm):** RULED BY EXAMPLE (selection-examples/band-3) — duck 152mm (4, skip mid
+  row), bat-woman 144mm (3, utmost corners), butterfly 130mm (4, corner square 96×96), poke1
+  123mm (same), bot 144mm (narrow 4 at 96×48; wide square acceptable), pill 122mm (band-2
+  diagonal geometry — technicality).
+- **Band 4 (168–216mm):** RULED BY EXAMPLE (selection-examples/band-4) — butterfly 214mm and
+  poke1 217mm: four points on the 96mm grid, the band-3 corner square scaled to the sparse
+  lattice. Remaining rows land as Dan walks them — do not invent the unwalked rows.
