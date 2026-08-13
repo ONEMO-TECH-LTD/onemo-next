@@ -56,7 +56,7 @@ Attached are decided examples: for a given shape and size, the arrangement we ac
 - A low cluster ranks below a candidate holding the top, on a fixture where both are lawful.
 - A narrower arrangement covering the same masses ranks above a wider one.
 - A candidate whose positions all sit in one mass ranks below one spread across the shape's masses, on a fixture where both contain every disc.
-- A fuller arrangement in the next band outranks every candidate in a band whose members all leave a mass unsupported.
+- Under a supplied escalation policy, a stronger arrangement in the next band outranks every candidate in a band that policy judges insufficient.
 - Two candidates the supplied precedence cannot separate share a tier, and no rule silently orders them.
 - Identical inputs produce identical bytes; changed rule inputs produce a different, explained ordering.
 - A candidate document is consumed without mutation.
