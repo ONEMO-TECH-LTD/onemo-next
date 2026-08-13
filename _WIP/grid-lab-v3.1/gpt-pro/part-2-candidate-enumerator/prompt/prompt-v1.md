@@ -2,65 +2,46 @@ The measurement kernel you delivered is accepted as-is. Do not rewrite it, do no
 
 Now build the layer directly above it: a neutral candidate enumerator.
 
-## What it is
-
-The kernel says which individual lattice positions hold a disc at a given size. That is not yet an answer. A product answer is an *arrangement*: a specific set of lattice positions, at a specific size and registration, that a magnet layout could actually use.
-
-The enumerator turns kernel facts into every lawful arrangement. It measures nothing itself and it decides nothing. It scores nothing, ranks nothing, prunes nothing, and never returns a winner. If two arrangements both exist, both come back.
+The kernel reports which individual lattice positions hold a disc at a given size. An arrangement is a *set* of those positions that a magnet layout could use. The enumerator turns kernel facts into every lawful arrangement. It measures nothing and decides nothing: it scores nothing, ranks nothing, prunes nothing, and never returns a winner. If two arrangements both exist, both come back.
 
 ## Input
 
-- The kernel's measurement document, unchanged, as its only source of geometric truth (positions, held/not, clearances, witnesses; straight-corridor facts where a pattern needs them).
-- The arrangement grammar below, supplied as explicit data.
-- The released field: 9 × 9 base-lattice positions.
+- The kernel's measurement document, unchanged — its only source of geometric truth, including the field it covers.
+- The arrangement grammar below, as explicit data.
 
-The enumerator performs no geometry of its own. If a pattern needs a geometric fact the kernel does not publish, name the missing fact and stop — do not compute it here and do not infer it.
+It performs no geometry of its own. If a pattern needs a fact the kernel does not publish, name the missing fact and stop. Do not compute it here and do not infer it.
 
-## The grammar — authoritative, do not extend or substitute
+## Grammar — authoritative, not to be extended or substituted
 
-These are product rules, not derivable mathematics. Implement exactly these families, as explicit lattice-index patterns, at **every valid translation and registration inside the field**:
+Expressed purely in lattice indices, where a step of 1 is the base lattice and a step of 2 is every second position. Enumerate each family at every placement within the supplied field:
 
 - **single** — one held position.
-- **pair** — two held positions that are neighbours on the same lattice: horizontal, vertical, **or diagonal**. A diagonal pair is lawful and introduces no second grid.
-- **rectangle corners** — the four corner positions of an axis-aligned rectangle. Its axis steps may be one base step (48 mm) or the sparse step (96 mm), independently per axis. Intermediate rows and columns are simply unused — skipping them is lawful, not a defect.
-- **corner triangle** — three of those four corners. The fourth position and any interior positions are optional; their existence never makes them required.
-- **full window** — every position of an r × c window.
+- **pair** — two held positions adjacent on the same lattice: one step apart along an axis, or one step on both axes (diagonal). Diagonal is lawful and introduces no second lattice.
+- **rectangle corners** — the four corners of an axis-aligned rectangle whose side step is 1 or 2, chosen independently per axis. Positions inside it are simply unused; skipping them is lawful.
+- **corner triangle** — three of those four corners. The fourth, and any interior position, is optional; existing does not make it required.
+- **full window** — every position of an r × c block.
 
-Rules that apply across all families:
-
-- The 96 mm population is every second position of the same base lattice. It never moves the origin and is never a second grid.
-- A band is a size label. It does not constrain which family or which lattice step an arrangement may use: a large size may legitimately be held by a four-corner rectangle on 96 mm steps.
-- Never drop an arrangement because another arrangement holds more positions. Magnet count is not an objective here.
-- Deduplicate only records that are geometrically identical, under an explicit canonical rule you state.
-- If any sentence above admits two materially different formal readings, expose the ambiguity and ask, rather than settling it by preference.
+Across all families: never drop an arrangement because another holds more positions; deduplicate only geometrically identical records, under a canonical rule you state; if any sentence here admits two materially different formal readings, expose the ambiguity instead of settling it by preference.
 
 ## Output
 
-For every candidate:
+Per candidate: stable canonical ID; the size and registration it belongs to; family and its per-axis steps; exact lattice indices and exact coordinates; the supporting kernel facts by reference, never recomputed.
 
-- stable canonical ID;
-- size and registration it belongs to;
-- family (single / pair / rectangle-corners / corner-triangle / full-window) and its lattice steps;
-- exact lattice indices and exact millimetre coordinates;
-- the kernel facts and witnesses that support it, by reference — never recomputed.
-
-The complete candidate set is returned. Ordering is canonical and deterministic; canonical ordering is not ranking, and nothing may be marked preferred, best, or default.
+The complete set is returned in a canonical deterministic order. Canonical order is not ranking; nothing may be marked preferred, best or default.
 
 ## Implementation
 
-Same discipline as the kernel: TypeScript, zero dependencies, exact integer/rational arithmetic, no floating point in any identity or validity path, canonical serialization with explicit BigInt handling, byte-identical output for identical input. Enumeration is bounded by the field and the grammar — no arbitrary-subset search, no heuristics, no caching of decisions, only of facts.
+Match the kernel's discipline exactly: TypeScript, zero dependencies, exact arithmetic, no floating point in any identity or validity path, canonical serialization, byte-identical output for identical input. Enumeration is bounded by the supplied field and this grammar — no arbitrary-subset search.
 
 ## Tests
 
-- Every grammar family produced, on a fixture where it is the correct family.
-- Diagonal pairs present; row- and column-skipped rectangle corners present; a corner triangle present without its fourth corner.
-- Completeness: on a small hand-computable fixture, the returned set equals the full hand-enumerated set — nothing missing, nothing extra.
-- The same held-position set at 48 mm and at 96 mm steps yields the arrangements each step permits, on one origin.
-- Determinism: identical input bytes give identical output bytes.
+- Each family produced on a fixture where it applies.
+- Diagonal pairs present; rectangle corners with a skipped interior present; a corner triangle present without its fourth corner.
+- Completeness: on a small hand-computable fixture, the returned set equals the hand-enumerated set exactly — nothing missing, nothing extra.
+- The same held positions enumerated at step 1 and step 2 yield what each permits, on one origin.
+- Identical input bytes produce identical output bytes.
 - The kernel's 18 goldens still pass, unchanged.
 
 ## Deliverable
 
-One downloadable ZIP attached to this chat, self-contained and buildable on its own, containing the kernel unchanged plus this enumerator, its tests, and a short contract describing the candidate record. Complete files, not fragments.
-
-Nothing about gravity, coverage, tight wrap, escalation, preference or selection belongs in this layer. That is the next layer, and it comes after this one is accepted.
+One downloadable ZIP attached to this chat, self-contained and buildable on its own: the kernel unchanged, this enumerator, its tests, and a short contract describing the candidate record. Complete files, not fragments.
