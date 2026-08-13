@@ -2,7 +2,13 @@
 
 **Author:** @s62-kai-lead · **Date:** 2026-08-13 · **Branch:** `session62-task/s62-kai-lead-grid-engine-v3.1`
 **Scope:** the three-part engine built in the forked GPT Pro chat, its assembly here, and everything
-this lane has and has not proved about it. Independent audit requested from @s62-pixel-grid-pixel.
+this lane has and has not proved about it.
+
+**Independently audited by @s62-pixel-grid-pixel**, which formed its verdict before reading this
+report and then refuted two of its claims: the integrity claim (now F7) and the scale load figure
+(F3). Both were reproduced here and corrected in place rather than footnoted. Its remaining verdict:
+mechanism complete, canon acceptance unproved, integrity sufficient only under an explicit
+trusted-upstream contract.
 
 Every claim below is a check run in this lane. Where a thing is unproven it says so.
 
@@ -41,10 +47,15 @@ false claim in my own patch notes was caught by that audit and corrected.
 
 **Part 3 —** 43/43 manifest; 15/15 tests; zero preference vocabulary in source; no float in any
 decision path (the four `Number()` calls are bounds-checked array indices); no upstream
-implementation bundled. It verifies the layer below it — a candidate position that does not resolve
-to a kernel fact with `fits: true`, or whose copied index/centre differs from that fact, is rejected
-— and it throws `NonTierableOrderingError` rather than inventing a tier when supplied rulings
-contradict each other. Full detail: `gpt-pro/part-3-product-logic/VERIFICATION.md`.
+implementation bundled. It authenticates the **geometry provenance** of every candidate position — a
+position that does not resolve to a kernel fact with `fits: true`, or whose copied index/centre
+differs from that fact, is rejected — and it throws `NonTierableOrderingError` rather than inventing
+a tier when supplied rulings contradict each other. Full detail:
+`gpt-pro/part-3-product-logic/VERIFICATION.md`.
+
+> **Correction (independent audit, @s62-pixel-grid-pixel).** An earlier draft of this report said a
+> fabricated or drifted candidate "cannot pass through this layer silently". **That was false and is
+> withdrawn** — see F7. Geometry provenance is authenticated; grammar and identity are not.
 
 ## 3. Findings
 
@@ -60,11 +71,29 @@ throws. Nothing can be ordered until "upper material", "wraps most closely" and 
 shape" are concrete enough to emit one value per candidate. That is correct under the brief and it
 is now the whole remaining product problem, in one place.
 
-### F3 — Ordering is quadratic and real candidate sets are large *(owner: this lane)*
-Measured here: 100 candidates 12 ms · 300 → 41–71 ms · 600 → 139–281 ms · 1000 → 394–739 ms. The
-canon harness produced **1,346 candidates for BOT at 236 mm at one anchor and one origin**, and real
-use multiplies that by sizes and registrations. Ordering cannot sit on an interaction path; it must
-be precomputed off the main thread or the set scoped per size and registration first.
+### F3 — Ordering is quadratic, but the real load is small *(owner: this lane)* — **CORRECTED**
+Ordering cost, measured: 100 candidates 12 ms · 300 → 41–71 ms · 600 → 139–281 ms · 1000 →
+394–739 ms. The all-pairs structure is real and confirmed independently.
+
+**The load figure in the first draft was wrong.** I reported "1,346 candidates for BOT at 236 mm at
+one anchor and one origin". The independent audit caught that `canon-membership.mjs` initialises
+`candidateTotal` once per case and then sums `doc.candidates.length` across 3 anchors × 4 origins —
+so 1,346 is **twelve enumerations aggregated**, never a single product-logic input. I re-measured
+the true per-document boundary:
+
+| shape / size | largest single enumeration document | mean across the four origins |
+|---|---|---|
+| POKE1 @217 | **136** | 119 |
+| BOT @236 | 130 | 94 |
+| BUTTERFLY @214 | 59 | 46 |
+| PILL @138 | 20 | 14 |
+| DUCK @152 | 10 | 5 |
+
+**Largest single document measured: 136 candidates**, which orders in roughly 15–20 ms. So the
+quadratic cost is structural but not currently binding, and the earlier "cannot sit on an
+interaction path" was an overstatement built on a bad number. Scoping per size and registration
+already happens by construction — one measurement document is one size at one origin. Revisit only
+if a real integration document approaches four figures.
 
 ### F4 — The canon descriptions contain false geometry *(owner: this lane)*
 `selection-examples/band-3/description.md` and `grid-laws.md` L20 both state the butterfly at 130 mm
@@ -82,6 +111,20 @@ half-pitch origins of a bbox / centroid / refined-sample anchor. L6 rules regist
 O-1 makes the centre construction a switch to test, but neither settles the origin domain the engine
 should sweep. Three of the ten canon cases are currently not found within the tested anchors.
 
+### F7 — Candidate-document integrity is provenance only *(owner: this lane)* — from the independent audit
+Product logic authenticates each candidate **position** against a held kernel fact. It does **not**
+authenticate the enumerator's grammar or identity: family cardinality, step/position consistency,
+population membership and canonical candidate identity are unchecked.
+
+Reproduced here rather than accepted on report: taking the package's own fixture and rewriting
+candidate 0 to `family: "run"` with **one** position and `steps: (999, 999)` — a record the grammar
+cannot produce — `applyProductLogic` **accepts it and returns it unchanged**.
+
+Consequence for the wiring: the enumerator document must be treated as a **trusted upstream** whose
+validity is established before this layer, or the seam must re-run the enumerator's own validator.
+Layer 3 proves geometry provenance and nothing more. This does not affect any ordering result from a
+genuine enumerator document; it affects what we may claim about the seam.
+
 ### F6 — Escalation is globally binding *(owner: this lane)*
 A promotion means its target outranks **every** candidate in the source band and is applied before
 all other rules; any conflict raises `NonTierableOrderingError`. Escalation inputs must be globally
@@ -94,7 +137,9 @@ consistent, not locally reasonable.
   "not found" is never a proven engine failure while the anchor domain is non-exhaustive (F5) and
   the claims are unreconciled (F4).
 - That part 3 orders as Dan would (F1).
-- That the assembled pipeline runs fast enough on a phone (F3 measures the ordering layer only).
+- That the assembled pipeline runs fast enough on a phone (F3 measures the ordering layer only, and
+  its load figure was corrected downward after independent audit).
+- That a candidate document is well-formed: part 3 checks geometry provenance, not grammar (F7).
 - Anything about track 2 (C++/Boost) or the grok MVP beyond code review; neither has faced the
   shapes either.
 
@@ -113,7 +158,8 @@ consistent, not locally reasonable.
    part 3 with judgements from step 4.
 6. **Wire the raw candidates to the page** — Dan's visual gate on the running surface, which is the
    acceptance that five previous builds never got.
-7. **Scope for performance** (F3) — precompute off the interaction path.
+7. **Decide the seam contract** (F7) — either declare the enumerator document trusted at the bridge,
+   or re-run its validator there. Small, but it decides what we may claim about the seam.
 
 ## 6. Verdict
 
