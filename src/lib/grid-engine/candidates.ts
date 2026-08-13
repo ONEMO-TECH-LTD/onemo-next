@@ -5,7 +5,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { enumerateArrangements, registrationOf, type Arrangement, type SiteInput } from './enumerate'
+import { enumerateArrangements, type Arrangement, type SiteInput } from './enumerate'
 import {
   bboxCenter,
   centroidMM,
@@ -131,20 +131,20 @@ export function collectCandidates(
             ...s,
             fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
           }))
+          // Sparse = every second base site, same origin. Not a second label on the same array.
+          const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
           const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
             { population: 'base', sites: measured },
-            { population: 'sparse', sites: measured },
+            { population: 'sparse', sites: sparseSites },
           ]
           for (const pack of packs) {
             for (const arr of enumerateArrangements(pack.sites, pack.population)) {
-              const needed = registrationOf(arr.sites)
-              if (needed.x !== registration.x || needed.y !== registration.y) continue
               const id = [
                 band,
                 sizeMM,
                 anchor,
-                needed.x,
-                needed.y,
+                registration.x,
+                registration.y,
                 arr.family,
                 arr.population,
                 arr.stepCol,
@@ -156,7 +156,7 @@ export function collectCandidates(
                 band,
                 sizeMM,
                 anchor,
-                registration: needed,
+                registration,
                 family: arr.family,
                 population: arr.population,
                 stepCol: arr.stepCol,

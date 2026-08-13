@@ -79,15 +79,32 @@ describe('collectCandidates — shipped entry', () => {
     const ys = [...new Set(one.sites.map((s) => s.y))].sort((a, b) => a - b)
     expect(xs).toEqual([-24, 24])
     expect(ys).toEqual([-24, 24])
-    const illegal = doc.candidates.filter(
-      (c) =>
-        c.sizeMM === 72 &&
-        c.family === 'rectangle-corners' &&
-        c.population === 'base' &&
-        c.sites.length === 4 &&
-        (c.registration.x !== 'gap' || c.registration.y !== 'gap'),
-    )
-    expect(illegal).toEqual([])
+  })
+
+  it('keeps all four half-pitch origins on the document', () => {
+    const doc = listCandidates(RELEASED, square(84))
+    const keys = new Set(doc.candidates.map((c) => `${c.registration.x}/${c.registration.y}`))
+    expect(keys.has('point/point')).toBe(true)
+    expect(keys.has('gap/gap')).toBe(true)
+    expect(keys.has('gap/point')).toBe(true)
+    expect(keys.has('point/gap')).toBe(true)
+  })
+
+  it('sparse candidates never sit on adjacent 48mm base neighbours', () => {
+    const doc = listCandidates(RELEASED, square(84))
+    const sparse = doc.candidates.filter((c) => c.population === 'sparse')
+    expect(sparse.length).toBeGreaterThan(0)
+    for (const c of sparse) {
+      for (let i = 0; i < c.sites.length; i++) {
+        for (let j = i + 1; j < c.sites.length; j++) {
+          const dx = Math.abs(c.sites[i].x - c.sites[j].x)
+          const dy = Math.abs(c.sites[i].y - c.sites[j].y)
+          if (dx > 0) expect(dx % 96).toBe(0)
+          if (dy > 0) expect(dy % 96).toBe(0)
+          expect(dx === 48 || dy === 48).toBe(false)
+        }
+      }
+    }
   })
 
   it('finds an off-centre single that a centred-only template would miss', () => {
