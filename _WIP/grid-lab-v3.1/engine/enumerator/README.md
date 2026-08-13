@@ -20,4 +20,4 @@ npm test
 npm run golden:update
 ```
 
-See `CONTRACT.md` for the exact population grammar, the four family definitions, candidate identity, source-fact references, ambiguity switches, and canonical order.
+See `CONTRACT.md` for the exact population grammar, the five family definitions, candidate identity, source-fact references, ambiguity switches, and canonical order.

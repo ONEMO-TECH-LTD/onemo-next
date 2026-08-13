@@ -89,11 +89,19 @@ The brief explicitly confirms a `1 × 2` full window but does not state whether 
 oneByOne: "include" | "exclude"
 ```
 
-This changes only whether a single held population point is also emitted as a full-window candidate.
+This changes only whether a held population point is ALSO emitted as a 1 x 1 full-window candidate. It never affects the `single` candidate, which exists for every held position regardless.
 
 ## 4. Authoritative families
 
-The grammar contains exactly these four family keys. Missing keys, unknown family keys, or family extensions are rejected.
+The grammar contains exactly these five family keys. Missing keys, unknown family keys, or family extensions are rejected.
+
+### 4.0 `single`
+
+One candidate per held population position, containing exactly that position, with steps
+`0,0`. It is emitted for every held position of every supplied population, independently
+of the `full-window` `oneByOne` rule: a lone held position is always a `single`, and is
+additionally a `1 x 1` full window when that rule includes them. The two records share a
+position set but differ in family, so candidate identity keeps them distinct.
 
 ### 4.1 `run`
 
@@ -161,7 +169,7 @@ Enumeration is bounded by:
 
 - the exact finite field published in each kernel size entry;
 - the supplied regular populations; and
-- the four algorithms above.
+- the five algorithms above.
 
 The implementation never iterates the powerset of held positions.
 

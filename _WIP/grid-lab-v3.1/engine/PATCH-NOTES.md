@@ -32,3 +32,25 @@ Applied:
   `full-window[0,0]` as distinct records.
 
 Nothing else was changed: no family algorithm, no population handling, no product logic.
+
+## Self-QA after the patch (s62-kai-lead)
+
+Documentation drift found and fixed: the enumerator's CONTRACT.md still declared "exactly
+these four family keys", described `oneByOne` as controlling whether a lone position is
+emitted at all, and counted "the four algorithms"; README pointed at "four family
+definitions". All corrected, and `single` is now specified in the contract as section 4.0.
+
+Adversarial probes against the patch itself, beyond the suite:
+
+- no held positions anywhere: 0 candidates, no phantom single;
+- two held positions under base AND sparse populations: exactly four singles, one per
+  held position per population, correctly attributed (base:0 base:2 sparse:0 sparse:2);
+- a measurement whose only held position is at column 1: exactly one single, at column 1
+  — unheld positions never produce one;
+- repeated runs byte-identical;
+- a single's position carries the kernel fact pointer `/sizes/0/positions/2` and the
+  centre copied from that fact (96), not a value reconstructed from indices.
+
+Remaining known deltas from the delivered package, deliberate: the package-level
+PACKAGE-SHA256SUMS is not carried into this assembly (the assembly is ours and its files
+have legitimately changed); the kernel keeps its own SHA256SUMS and still verifies 59/59.
