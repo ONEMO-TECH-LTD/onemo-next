@@ -1,15 +1,23 @@
 // Grammar → arrangements. Held mask in. No scores.
-// Sparse sites are remeshed to population coordinates (0,1,2…) so loops use unit stride.
+// Traverse in population coordinates; publish base-lattice col/row.
 
 export type Family = 'single' | 'run' | 'rectangle-corners' | 'corner-triangle' | 'full-window'
 export type Population = 'base' | 'sparse'
+export type AxisParity = 'gap' | 'point'
 
 export interface IndexedSite {
   col: number
   row: number
+  popCol: number
+  popRow: number
   x: number
   y: number
   fits: boolean
+}
+
+export type SiteInput = Omit<IndexedSite, 'popCol' | 'popRow'> & {
+  popCol?: number
+  popRow?: number
 }
 
 export interface Arrangement {
@@ -27,27 +35,40 @@ function keyOf(sites: IndexedSite[]): string {
     .join(';')
 }
 
-function heldAt(map: Map<string, IndexedSite>, col: number, row: number): IndexedSite | undefined {
-  const s = map.get(`${col},${row}`)
+function heldAt(map: Map<string, IndexedSite>, popCol: number, popRow: number): IndexedSite | undefined {
+  const s = map.get(`${popCol},${popRow}`)
   return s?.fits ? s : undefined
 }
 
-/** Base lattice indices → one step = one populated neighbour on this population. */
-export function toPopulationCoords(sites: IndexedSite[], population: Population): IndexedSite[] {
-  if (population === 'base') return sites
+/** Keep base col/row; add population coords for grammar walks. */
+export function toPopulationCoords(sites: readonly SiteInput[], population: Population): IndexedSite[] {
   const out: IndexedSite[] = []
   for (const s of sites) {
-    if (s.col % 2 !== 0 || s.row % 2 !== 0) continue
-    out.push({ ...s, col: s.col / 2, row: s.row / 2 })
+    if (population === 'sparse') {
+      if (s.col % 2 !== 0 || s.row % 2 !== 0) continue
+      out.push({ ...s, popCol: s.col / 2, popRow: s.row / 2 })
+    } else {
+      out.push({ ...s, popCol: s.col, popRow: s.row })
+    }
   }
   return out
 }
 
-export function enumerateArrangements(sites: IndexedSite[], population: Population): Arrangement[] {
+/** L6: even count on an axis → gap; odd → point. */
+export function registrationOf(sites: readonly IndexedSite[]): { x: AxisParity; y: AxisParity } {
+  const cols = new Set(sites.map((s) => s.popCol))
+  const rows = new Set(sites.map((s) => s.popRow))
+  return {
+    x: cols.size % 2 === 0 ? 'gap' : 'point',
+    y: rows.size % 2 === 0 ? 'gap' : 'point',
+  }
+}
+
+export function enumerateArrangements(sites: readonly SiteInput[], population: Population): Arrangement[] {
   const mesh = toPopulationCoords(sites, population)
   const held = mesh.filter((s) => s.fits)
   if (held.length === 0) return []
-  const map = new Map(mesh.map((s) => [`${s.col},${s.row}`, s] as const))
+  const map = new Map(mesh.map((s) => [`${s.popCol},${s.popRow}`, s] as const))
   const out: Arrangement[] = []
   const seen = new Set<string>()
 
@@ -73,7 +94,7 @@ export function enumerateArrangements(sites: IndexedSite[], population: Populati
       for (let step = 1; step <= 8; step++) {
         const run: IndexedSite[] = [start]
         for (let k = 1; k <= 8; k++) {
-          const n = heldAt(map, start.col + dc * step * k, start.row + dr * step * k)
+          const n = heldAt(map, start.popCol + dc * step * k, start.popRow + dr * step * k)
           if (!n) break
           run.push(n)
         }
@@ -90,8 +111,8 @@ export function enumerateArrangements(sites: IndexedSite[], population: Populati
     }
   }
 
-  const cols = [...new Set(held.map((s) => s.col))].sort((a, b) => a - b)
-  const rows = [...new Set(held.map((s) => s.row))].sort((a, b) => a - b)
+  const cols = [...new Set(held.map((s) => s.popCol))].sort((a, b) => a - b)
+  const rows = [...new Set(held.map((s) => s.popRow))].sort((a, b) => a - b)
   for (const c0 of cols) {
     for (const c1 of cols) {
       if (c1 <= c0) continue

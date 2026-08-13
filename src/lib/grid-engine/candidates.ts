@@ -5,7 +5,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { enumerateArrangements, type Arrangement, type IndexedSite } from './enumerate'
+import { enumerateArrangements, registrationOf, type Arrangement, type IndexedSite } from './enumerate'
 import {
   bboxCenter,
   centroidMM,
@@ -137,12 +137,14 @@ export function collectCandidates(
           ]
           for (const pack of packs) {
             for (const arr of enumerateArrangements(pack.sites, pack.population)) {
+              const needed = registrationOf(arr.sites)
+              if (needed.x !== registration.x || needed.y !== registration.y) continue
               const id = [
                 band,
                 sizeMM,
                 anchor,
-                registration.x,
-                registration.y,
+                needed.x,
+                needed.y,
                 arr.family,
                 arr.population,
                 arr.stepCol,
@@ -154,7 +156,7 @@ export function collectCandidates(
                 band,
                 sizeMM,
                 anchor,
-                registration,
+                registration: needed,
                 family: arr.family,
                 population: arr.population,
                 stepCol: arr.stepCol,

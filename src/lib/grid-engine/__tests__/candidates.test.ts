@@ -51,7 +51,12 @@ describe('enumerateArrangements', () => {
       }
     }
     const wins = enumerateArrangements(sites, 'sparse').filter((a) => a.family === 'full-window')
-    expect(wins.some((a) => a.sites.length === 4 && a.stepCol === 1 && a.stepRow === 1)).toBe(true)
+    const four = wins.find((a) => a.sites.length === 4 && a.stepCol === 1 && a.stepRow === 1)
+    expect(four).toBeTruthy()
+    const cols = [...new Set(four!.sites.map((s) => s.col))].sort((a, b) => a - b)
+    const rows = [...new Set(four!.sites.map((s) => s.row))].sort((a, b) => a - b)
+    expect(cols).toEqual([0, 2])
+    expect(rows).toEqual([0, 2])
   })
 })
 
@@ -74,6 +79,15 @@ describe('collectCandidates — shipped entry', () => {
     const ys = [...new Set(one.sites.map((s) => s.y))].sort((a, b) => a - b)
     expect(xs).toEqual([-24, 24])
     expect(ys).toEqual([-24, 24])
+    const illegal = doc.candidates.filter(
+      (c) =>
+        c.sizeMM === 72 &&
+        c.family === 'rectangle-corners' &&
+        c.population === 'base' &&
+        c.sites.length === 4 &&
+        (c.registration.x !== 'gap' || c.registration.y !== 'gap'),
+    )
+    expect(illegal).toEqual([])
   })
 
   it('finds an off-centre single that a centred-only template would miss', () => {
