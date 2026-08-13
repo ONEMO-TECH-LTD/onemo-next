@@ -333,9 +333,9 @@ for (const testCase of CASES) {
 
   const confirmed = hits.filter((h) => h.startsWith("CONFIRMED"));
   const eyed = hits.filter((h) => h.startsWith("NEEDS-EYE"));
-  let status = confirmed.length ? "PRESENT" : eyed.length ? "NEEDS-EYE" : "ABSENT";
+  let status = confirmed.length ? "PRESENT" : eyed.length ? "NEEDS-EYE" : "NOT-FOUND";
   // an unverified claim that finds nothing proves nothing about an engine
-  if (status === "ABSENT" && testCase.source === "description") status = "UNTESTABLE";
+  if (status === "NOT-FOUND" && testCase.source === "description") status = "UNTESTABLE";
   if (status === "PRESENT") present += 1;
   else if (status === "NEEDS-EYE") needsEye += 1;
   else if (status === "UNTESTABLE") untestable += 1;
@@ -346,9 +346,10 @@ for (const testCase of CASES) {
   console.log(`   region claim: ${testCase.region.label}  [${testCase.region.kind}]`);
   console.log(`   candidates examined: ${candidateTotal}${structuralOnly ? `   structural-match-but-region-failed: ${structuralOnly}` : ""}`);
   for (const line of hits.slice(0, 6)) console.log(`   ${line}`);
-  if (!hits.length) console.log(`   no candidate matching the canon structure at any anchor or origin`
+  if (!hits.length) console.log(`   no candidate matching the canon structure within the tested anchors and origins`
     + (status === "UNTESTABLE" ? " — but the claim itself is unverified, so this is not an engine finding" : ""));
 }
 
-console.log(`\n${present} confirmed · ${needsEye} structurally present, region needs the eye · ${absent} absent · ${untestable} untestable (unverified claim) · of ${CASES.length}`);
+console.log(`\n${present} confirmed · ${needsEye} structurally present, region needs the eye · ${absent} NOT FOUND within the tested anchors · ${untestable} untestable (unverified claim) · of ${CASES.length}`);
+console.log("NOT-FOUND is never a proven engine failure: the refined-sample anchor is non-exhaustive and the\nlawful origin domain is unsettled, so absence here is absence WITHIN what was tested.");
 console.log("NOT A VERDICT until QA'd. NEEDS-EYE closes by rendering the candidate on the page against Dan's screenshot.");
