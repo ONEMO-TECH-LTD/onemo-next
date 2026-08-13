@@ -21,7 +21,7 @@ Read this file plus the latest transcript segment after every compaction before 
 
 ### Next action
 
-Read the clean scaffold engine/spec/bridge/canvas path and GPT donor predicates in full. Implement T1.1 only: Band 1 raw single-disc candidates visible on the real scaffold. Stop at Lead QA.
+HELD — do not build. Execution starts only on Dan's explicit go relayed by `@s62-lead`; when unlocked, implement T1.1 only: Band 1 raw single-disc candidates visible on the real scaffold, then stop at Lead QA.
 
 ## 2026-08-13 — T2.1 Band 1 fixture increment
 

@@ -1,6 +1,6 @@
 # Grid Lab v3.1 — execution plan
 
-Status: active. Current increment: T1.1 Band 1 raw single-disc enumeration, minimally wired to the scaffold.
+Status: HELD — no build authorised. Execution starts ONLY on Dan's explicit go relayed by @s62-lead. Next increment when unlocked: T1.1.
 
 ## Governing scope
 
