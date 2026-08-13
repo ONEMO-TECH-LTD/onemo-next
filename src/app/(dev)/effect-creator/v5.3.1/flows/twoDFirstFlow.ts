@@ -32,7 +32,7 @@ import { useHistoryTransaction, useGenerationTask, useSessions, liteSpec } from 
 import type { CreatorAdapters, CreatorFlowState, CreatorFlowActions } from './flow-contract'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import type { MLResult } from '@/lib/effect/segment-ml'
+import { cancelSegmentML, disposeSegmentML, type MLResult } from '@/lib/effect/segment-ml'
 
 /** The 2D-first flow's surface — the SAME { state, actions } envelope as CreatorFlow, extended IN-envelope
  *  (never top-level extras, so the UI's single binding surface holds): previewing3D in state; previewIn3D /
@@ -43,7 +43,7 @@ export interface TwoDFirstFlow {
 }
 
 export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
-  const { notify, segPresent } = adapters
+  const { notify } = adapters
   // Layer-2a viewer adapter (inv 26): the real publishToViewer is the SOLE 3D publish, driven ONLY by
   // previewIn3D below. prepared-for-3D is split from prepared-for-editing (the `prepared` state).
   const { preparedFor3D, publishToViewer, handleStatus } = useViewerAdapter(notify)
@@ -67,10 +67,11 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
 
   const sourceShaRef = useRef<string | null>(null)
   const firstBlurRunningRef = useRef(false) // in-flight guard for the deferred matte cut-out
+  const detectorGenRef = useRef(0)
 
   // Layer-2b history transaction. 2D-first injects a NO-OP publisher (restoreSnap:202 → no-op): 3D is NOT
   // history-driven; undo/redo/reset never mount 3D. (publishToViewer above stays the SOLE preview publish.)
-  const noopPublish = useCallback((_p: PreparedEffect | null) => {}, [])
+  const noopPublish = useCallback(() => {}, [])
   const {
     canUndo, canRedo, dirty, undo, redo, reset,
     snapNow, pushHistory, setBaseline, registerGeneration, cacheSeg, getCachedSeg, patchGenMatte,
@@ -102,8 +103,10 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
     setAutoOutline(false)
     const st = useOutlineStore.getState()
     st.commitGeometry(null); st.setBgBlur(null); st.setSubjMatteUrl(null)
+    detectorGenRef.current++
     firstBlurRunningRef.current = false
     cancelGeneration()
+    cancelSegmentML()
     setGenerating(false)
     // 2D-first: leaving a stale preview must not survive a new upload.
     if (previewing3D) { publishToViewer(null); setPreviewing3D(false) }
@@ -133,13 +136,14 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
   // on the first non-zero blur with NO matte yet, run the cut-out for the MATTE ONLY (shape preserved). Latch
   // on subjMatteUrl. genId is derived LIVE from snapNow() (correct through undo/reset — no drifting ref).
   useEffect(() => {
-    if (segPresent || !artworkUrl || !prepared) return
+    if (!artworkUrl || !prepared) return
     if (bgBlur == null || bgBlur <= 0) return // first non-zero blur only
     if (subjMatteUrl) return                   // latch: a matte already exists (Magic or a prior first-blur)
     if (firstBlurRunningRef.current) return
     const snap = snapNow()
     if (snap.genId < 0) return // no generation yet (pixel impl-watch: gate on snapNow().genId, not a flow ref)
     const genId = snap.genId
+    const detectorGen = ++detectorGenRef.current
     const std = prepared
     firstBlurRunningRef.current = true
     ;(async () => {
@@ -155,7 +159,7 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
         const matteUrl = subjectMatteFromSeg(std.frontSrc.origCanvas, seg).toDataURL()
         const cur = snapNow()
         const st = useOutlineStore.getState()
-        if (cur.genId !== genId || st.subjMatteUrl || st.bgBlur == null || st.bgBlur <= 0) return // superseded — drop
+        if (detectorGenRef.current !== detectorGen || cur.genId !== genId || st.subjMatteUrl || st.bgBlur == null || st.bgBlur <= 0) return // superseded — drop
         st.setSubjMatteUrl(matteUrl)   // matte ONLY — shape/spec/source untouched (ADR-S58-CREATE-BLEND-01)
         patchGenMatte(genId, matteUrl) // patch onto the (still-current) generation's LRU so undo restores it
       } catch (e) {
@@ -168,14 +172,14 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
         // only warn/reset if THIS run is still the current, matte-less, blur-on generation. No await before setBgBlur.
         const cur = snapNow()
         const st = useOutlineStore.getState()
-        if (cur.genId !== genId || st.subjMatteUrl || st.bgBlur == null || st.bgBlur <= 0) return // superseded — stay silent
+        if (detectorGenRef.current !== detectorGen || cur.genId !== genId || st.subjMatteUrl || st.bgBlur == null || st.bgBlur <= 0) return // superseded — stay silent
         notify('warn', 'No clear subject found — turn blur off, or try an image with a clearer subject.')
         st.setBgBlur(0)
       } finally {
-        firstBlurRunningRef.current = false
+        if (detectorGenRef.current === detectorGen) firstBlurRunningRef.current = false
       }
     })()
-  }, [bgBlur, subjMatteUrl, artworkUrl, prepared, segPresent, snapNow, cacheSeg, patchGenMatte, notify])
+  }, [bgBlur, subjMatteUrl, artworkUrl, prepared, snapNow, cacheSeg, patchGenMatte, notify])
 
   // Magic — re-prepare as a SHAPED subject cut-out (reshape + drops edits). Same as v53 MINUS publishToViewer
   // (Magic reshapes the 2D; it never mounts 3D in 2D-first).
@@ -216,7 +220,20 @@ export function useTwoDFirstFlow(adapters: CreatorAdapters): TwoDFirstFlow {
       })
   }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, getCachedSeg, beginRun, isCurrent, notify])
 
-  const cancelMagic = useCallback(() => { cancelGeneration(); setGenerating(false) }, [cancelGeneration])
+  const cancelMagic = useCallback(() => {
+    cancelGeneration()
+    detectorGenRef.current++
+    firstBlurRunningRef.current = false
+    cancelSegmentML()
+    setGenerating(false)
+  }, [cancelGeneration])
+
+  useEffect(() => () => {
+    cancelGeneration()
+    detectorGenRef.current++
+    firstBlurRunningRef.current = false
+    disposeSegmentML()
+  }, [cancelGeneration])
 
   // previewIn3D() — the SOLE 3D publish (ADR-S58-CREATE-3D-02). Assembles the 3D from the CURRENT spec on
   // demand (the viewer reads the edited committedContourMM from the store via ShapedModelBridge), the user

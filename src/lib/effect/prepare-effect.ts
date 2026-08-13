@@ -30,6 +30,7 @@ export interface ShapeBuildConfig {
   maxImageDim: number     // mask/contour downscale cap
   textureDim: number      // front-texture cap (high res so the projected image stays sharp)
   paddingMM: number       // flat image margin around the subject
+  edgeFinishPx?: number   // optional caller-owned contour edge radius; legacy engine default stays 3
   minCornerAngleDeg: number // unused (outline-core owns rounding) — kept for API compat
   cornerRadiusMM: number    // unused (outline-core owns rounding) — kept for API compat
   squareCornerMM: number    // corner radius of the standard square
@@ -80,17 +81,27 @@ export const EFFECT_BUILD_CONFIG: ShapeBuildConfig = {
   squareCornerMM: DEFAULT_ROUNDED_SQUARE_CALIBRATION.radiusMM,
 }
 
-export interface PreparedEffect {
+export interface PreparedEffectBase {
   /** mm draft spec — carries the vector truth (`spec.vectorShape`) + its derived contour. */
   spec: EffectSpecDraft
-  /** the ONE magic-blend front composite (Phase-A hero face = 3D front texture = print artwork). */
-  composite: HTMLCanvasElement
-  /** strongly-blurred edge-lip composite (smooth rim colour, no banding). */
-  edgeComposite: HTMLCanvasElement
   /** source layers for live re-blend (toggle / intensity) without re-segmentation. */
   frontSrc: { origCanvas: HTMLCanvasElement; subjCanvas: HTMLCanvasElement; defaultBlurPx: number; defaultBlendPercent: number }
   widthMM: number
   heightMM: number
+}
+
+export interface PreparedEffect extends PreparedEffectBase {
+  /** the ONE magic-blend front composite (Phase-A hero face = 3D front texture = print artwork). */
+  composite: HTMLCanvasElement
+  /** strongly-blurred edge-lip composite (smooth rim colour, no banding). */
+  edgeComposite: HTMLCanvasElement
+}
+
+export interface PrepareEffectOptions {
+  /** Preserve the shared full-output default; bounded callers that consume only spec/frontSrc may opt out. */
+  buildOutputs?: boolean
+  /** Cutout output only: decode the artwork at its uploaded pixel dimensions instead of the display cap. */
+  originalTexture?: boolean
 }
 
 /**
@@ -155,18 +166,32 @@ export function subjectMatteFromSeg(origCanvas: HTMLCanvasElement, seg: MLResult
  * v5.3·P1: `preseg` reuses a segmentation already computed in the background at upload (no AI re-run →
  * instant Magic); when absent the shaped path runs `segmentML` inline exactly as before.
  */
+export function prepareEffect(
+  url: string,
+  type: EffectType,
+  cfg?: ShapeBuildConfig,
+  onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
+  preseg?: MLResult,
+): Promise<PreparedEffect>
+export function prepareEffect(
+  url: string,
+  type: EffectType,
+  cfg: ShapeBuildConfig | undefined,
+  onProgress: ((s: 'downloading-model' | 'cutting' | 'fallback') => void) | undefined,
+  preseg: MLResult | undefined,
+  options: { buildOutputs: false; originalTexture?: boolean },
+): Promise<PreparedEffectBase>
 export async function prepareEffect(
   url: string,
   type: EffectType,
   cfg: ShapeBuildConfig = EFFECT_BUILD_CONFIG,
   onProgress?: (s: 'downloading-model' | 'cutting' | 'fallback') => void,
   preseg?: MLResult,
-): Promise<PreparedEffect> {
-  // Full photo (texture res), y-up, for the composite + edge-lip source. F25 (mobile OOM): the
-  // working/decode resolution is capped to a mobile memory budget via effectiveTextureDim — never the
-  // raw device GPU max, which let a 48-MP photo allocate multi-GB canvases (blueprint invariant 19).
-  // The upload-time background cut-out (page.tsx) resolves texDim through the SAME helper.
-  const texDim = effectiveTextureDim()
+  options?: PrepareEffectOptions,
+): Promise<PreparedEffect | PreparedEffectBase> {
+  // Shared callers remain capped. Cutout may deliberately decode the uploaded dimensions for its
+  // lossless Preview/Save output while keeping segmentation and editor geometry at working size.
+  const texDim = options?.originalTexture ? Number.POSITIVE_INFINITY : effectiveTextureDim()
   const orig = await loadImageData(url, texDim)
   const fw = orig.width, fh = orig.height
   const origCanvas = imageDataToCanvas(orig)
@@ -188,7 +213,7 @@ export async function prepareEffect(
       // Magic is instant. `preseg` is the cached segmentML result (same mask/tex dims as this cfg);
       // when absent (direct call / cache miss) we run segmentML inline exactly as before.
       const r = preseg ?? await segmentML(url, cfg.maxImageDim, texDim, onProgress)
-      // R1: record the model that ACTUALLY ran (u2netp/silueta/…), not a hard-coded 'ben2-onnx'.
+      // Record the model that actually ran (u2netp/silueta/…), not a hard-coded detector name.
       seg = r; adapterId = r.adapterId; texImage = r.texImage; mlMatte = true
     } catch (e) {
       console.warn('[shaped] ML segmentation unavailable — falling back to flood-fill:', e)
@@ -206,7 +231,7 @@ export async function prepareEffect(
     // padding (flat image margin) + symmetric denoise, then the raw tracer
     const padPx = Math.max(0, Math.round(cfg.paddingMM / mmPerPx))
     const dilated = padPx > 0 ? dilateMask(mask, width, height, padPx) : mask
-    const workMask = smoothMask(dilated, width, height, 3)
+    const workMask = smoothMask(dilated, width, height, cfg.edgeFinishPx ?? 3)
     const raw = traceContourRaw(workMask, width, height)
     if (!raw) throw new Error('Contour build failed after segmentation.')
     ringPx = raw
@@ -252,20 +277,7 @@ export async function prepareEffect(
   const bb = bbox(geometryMM.outer.pts)
   const widthMM = bb.w, heightMM = bb.h
 
-  // ── composite (the ONE magic-blend) + edge-lip source (strong blur). Reused, never re-composed per surface.
-  // v5.3·P2 (KAI-9147): composeFront / blurCanvas now bake through the cross-browser SVG-filter engine
-  // (async — SVG Image onload). Run both in parallel.
   const defaultBlendPercent = blendPixelsToPercent(defaultBlurPx, fw)
-  const [initialArtwork, edgeComposite] = await Promise.all([
-    composeEffectArtwork({
-      originalCanvas: origCanvas,
-      subjectCanvas: subjCanvas,
-      blendPercent: defaultBlendPercent,
-      fillMode: 'clamp',
-    }),
-    blurCanvas(origCanvas, Math.max(16, Math.round(fw / 22))),
-  ])
-
   const spec: EffectSpecDraft = {
     sourceRef: url,
     maskWidthPx: W,
@@ -286,12 +298,25 @@ export async function prepareEffect(
     },
   }
 
-  return {
+  const base: PreparedEffectBase = {
     spec,
-    composite: initialArtwork.canvas,
-    edgeComposite,
     frontSrc: { origCanvas, subjCanvas, defaultBlurPx, defaultBlendPercent },
     widthMM,
     heightMM,
   }
+  if (options?.buildOutputs === false) return base
+
+  // ── composite (the ONE magic-blend) + edge-lip source (strong blur). Reused, never re-composed per surface.
+  // v5.3·P2 (KAI-9147): composeFront / blurCanvas now bake through the cross-browser SVG-filter engine
+  // (async — SVG Image onload). Run both in parallel. The default remains full for every shared caller.
+  const [initialArtwork, edgeComposite] = await Promise.all([
+    composeEffectArtwork({
+      originalCanvas: origCanvas,
+      subjectCanvas: subjCanvas,
+      blendPercent: defaultBlendPercent,
+      fillMode: 'clamp',
+    }),
+    blurCanvas(origCanvas, Math.max(16, Math.round(fw / 22))),
+  ])
+  return { ...base, composite: initialArtwork.canvas, edgeComposite }
 }

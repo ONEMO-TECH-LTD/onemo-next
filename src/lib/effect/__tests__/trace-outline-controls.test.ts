@@ -4,7 +4,8 @@ import {
   resolveTraceOutline,
   type TraceOutlineInput,
   type TraceOutlineSettings,
-} from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
+} from '../trace-outline-controls'
+import { resolveTraceOutline as legacyResolveTraceOutline } from '@/app/(dev)/effect-creator/v5.3.1/user/editor/producers'
 import type { VShape } from '@/lib/vector-core'
 
 const vectorShape: VShape = {
@@ -61,6 +62,10 @@ function bounds(shape: VShape) {
 }
 
 describe('grid-lab v5.3.1 outline-control binding', () => {
+  it('keeps the v5.3.1 producer import as an identity re-export', () => {
+    expect(legacyResolveTraceOutline).toBe(resolveTraceOutline)
+  })
+
   it('preserves the born vector exactly while every control is at its reflected default', () => {
     const resolved = resolveTraceOutline(input, OFF)
 
@@ -86,5 +91,16 @@ describe('grid-lab v5.3.1 outline-control binding', () => {
       expect(shape, `${control} must return an outline`).not.toBeNull()
       expect(JSON.stringify(shape), `${control} must change the outline`).not.toBe(baseline)
     }
+  })
+
+  it('keeps Simplify effective after Detail has coarsened a generated trace', () => {
+    const cutoutInput = { ...input, simplifyAfterDetail: true }
+    const detailOnly = resolveTraceOutline(cutoutInput, { ...OFF, detail: 0 })
+    const detailAndSimplify = resolveTraceOutline(cutoutInput, { ...OFF, detail: 0, simplify: 300 })
+
+    expect(detailOnly).not.toBeNull()
+    expect(detailAndSimplify).not.toBeNull()
+    expect(JSON.stringify(detailAndSimplify)).not.toBe(JSON.stringify(detailOnly))
+    expect(detailAndSimplify!.paths[0].anchors.some((anchor) => anchor.hIn || anchor.hOut)).toBe(true)
   })
 })

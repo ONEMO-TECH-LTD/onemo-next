@@ -29,13 +29,9 @@ export type SessionId = 'editor' | 'trim' | 'filter'
 /** UI-side notification sink — the flow emits, the UI binds it to toast() (blueprint §4 adapter). */
 export type Notify = (kind: 'warn' | 'error' | 'info', message: string) => void
 
-/** The adapters a flow needs injected — the concerns that straddle the Layer-2/3 seam (blueprint §4):
- *  the flow never imports toast, and never reads URL/route params itself. */
+/** The adapters a flow needs injected — the concerns that straddle the Layer-2/3 seam. */
 export interface CreatorAdapters {
   notify: Notify
-  /** Injected URL/route param: ?seg present → skip the upload-time background cut-out (harness override).
-   *  Product URLs carry no ?seg. Read by the UI from window.location, never inside the flow. */
-  segPresent: boolean
 }
 
 type SceneColors = ReturnType<typeof useSceneStore.getState>['colors']

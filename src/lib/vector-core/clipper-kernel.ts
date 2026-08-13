@@ -57,17 +57,36 @@ export function roundWholeShapePx(path: VPath, radiusPx: number): VPath {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const p of ring) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y }
   const shortSide = Math.min(maxX - minX, maxY - minY)
-  const r = Math.min(radiusPx, 0.499 * shortSide) // < ½ short side → erosion leaves a (tiny) core to round
-  if (r <= 0) return path
+  const rMax = Math.min(radiusPx, 0.499 * shortSide) // < ½ short side → erosion leaves a (tiny) core to round
+  if (rMax <= 0) return path
   const flat: number[] = []
   for (const p of ring) flat.push(Math.round(p.x * ROUND_SCALE), Math.round(p.y * ROUND_SCALE))
   const subj = [Clipper.makePath(flat)]
-  const eroded = Clipper.inflatePaths(subj, -r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
-  if (!eroded || eroded.length === 0) return path // over-eroded at this r — no round possible
-  const dilated = Clipper.inflatePaths(eroded, r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
-  if (!dilated || dilated.length === 0) return path
-  let best = dilated[0]
-  for (const rg of dilated) if (Math.abs(Clipper.area(rg)) > Math.abs(Clipper.area(best))) best = rg
-  if (!best || best.length < 3) return path
+  const srcArea = Math.abs(Clipper.area(subj[0]))
+  // BOTH polarities (Dan 2026-08-06 'radius does not attack every corner'): erode→dilate (opening)
+  // rounds CONVEX corners only — concave notches passed through sharp; the mirror dilate→erode
+  // (closing) rounds the concave ones — together every corner rounds uniformly.
+  // FEATURE-PRESERVATION back-off (Dan 16:30 'above 70 it goes into smaller shape'): erosion at
+  // large r swallows whole features (spikes) that the grow-back cannot resurrect — the shape
+  // collapses to its core. If the result loses >18% of the source area, retreat r and retry: the
+  // knob saturates at the largest radius that keeps the shape's features instead of eating them.
+  const attempt = (r: number) => {
+    const eroded = Clipper.inflatePaths(subj, -r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
+    if (!eroded || eroded.length === 0) return null
+    const opened = Clipper.inflatePaths(eroded, r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
+    if (!opened || opened.length === 0) return null
+    const grown = Clipper.inflatePaths(opened, r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
+    if (!grown || grown.length === 0) return null
+    const dilated = Clipper.inflatePaths(grown, -r * ROUND_SCALE, JoinType.Round, EndType.Polygon)
+    if (!dilated || dilated.length === 0) return null
+    let bestRg = dilated[0]
+    for (const rg of dilated) if (Math.abs(Clipper.area(rg)) > Math.abs(Clipper.area(bestRg))) bestRg = rg
+    if (!bestRg || bestRg.length < 3) return null
+    if (Math.abs(Clipper.area(bestRg)) < srcArea * 0.75) return null // features eaten — below the square→circle legal loss (π/4 ≈ 0.785), above spike-collapse
+    return bestRg
+  }
+  let best = null
+  for (let r = rMax, n = 0; r > rMax * 0.1 && n < 8; r *= 0.72, n++) { best = attempt(r); if (best) break }
+  if (!best) return path
   return { anchors: best.map((p) => ({ p: { x: p.x / ROUND_SCALE, y: p.y / ROUND_SCALE }, hIn: null, hOut: null, corner: false })) }
 }

@@ -12,7 +12,6 @@
 // THE SPLIT (not a clean lift) — the concerns that straddle the seam are INJECTED by the UI, never
 // reached from inside the flow (blueprint §4, the five injected adapters):
 //   • notifications     → `adapters.notify` (the socket never imports toast)
-//   • URL/route params  → injected (`adapters.segPresent`; ?scene / ?internal stay UI-side config)
 //   • export download   → the socket RETURNS the SVG string; the UI writes the file
 //   • editor-entry gesture → the socket exposes `beginSession('editor')`; the UI owns the double-tap
 //   • first-paint resize nudge → the viewer adapter's concern, kept out of orchestration
@@ -26,7 +25,7 @@
 // geometry truth is the lightweight source/adjustments — unchanged; re-derive only rebuilds canvases.
 // (The F25 texture cap, leg 1, already landed in the engine via effectiveTextureDim — 262963a.)
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSceneStore } from '../admin/sceneStore'
 import { INITIAL_ARTWORK, useOutlineStore } from '../user/outlineStore'
 import { loadImage, prepareStandard, runCutout, prepareShaped, exportCutlineSvg } from '../core/primitives'
@@ -35,12 +34,12 @@ import { useHistoryTransaction, useGenerationTask, useUploadPublish, useSessions
 import type { CreatorAdapters, CreatorFlow } from './flow-contract'
 import type { DesignState } from '../types'
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import type { MLResult } from '@/lib/effect/segment-ml'
+import { cancelSegmentML, disposeSegmentML, SegmentMLCancelled, type MLResult } from '@/lib/effect/segment-ml'
 
 // Notify + CreatorAdapters now live in flow-contract.ts (the named seam); the page imports them there.
 
 export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
-  const { notify, segPresent } = adapters
+  const { notify } = adapters
   // Layer-2a viewer adapter (inv 26): prepared-for-3D + publishToViewer + handleStatus live here, SPLIT
   // from prepared-for-editing (the `prepared` state below — drives the 2D editor + hasArtwork, never the 3D).
   const { preparedFor3D, publishToViewer, handleStatus } = useViewerAdapter(notify)
@@ -93,12 +92,10 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
   }, [notify])
 
   // v5.3·P1 (KAI-9146): subject cut-out in the BACKGROUND once the instant square is up — cached per
-  // image so Magic reuses it (instant), and the matte lights up Blend on any shape. `segPresent` (an
-  // injected ?seg) selects the harness WebGPU path, so we SKIP the background run (Magic cuts on demand).
+  // image so Magic reuses it (instant), and the matte lights up Blend on any shape.
   // F25: the resolved seg is cached per url (segCacheRef) so a later shaped RE-DERIVE skips the ML step,
   // and the published matte is patched onto the standard generation's LRU entry (so undo restores it).
   const startBackgroundCutout = useCallback((url: string, standard: PreparedEffect, seq: number, genId: number) => {
-    if (segPresent) return
     const segPromise = (async () => {
       const seg = await runCutout(url) // Layer-2a primitive: segmentation at the working-res cap (inv 19)
       cacheSeg(url, seg) // F25: cache for instant shaped re-derive on undo (history transaction owns the cache)
@@ -107,10 +104,10 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
     })()
     cutCacheRef.current = { url, promise: segPromise }
     segPromise.catch((e) => {
-      console.warn('[effect] background cut-out failed (Magic re-runs on demand):', e)
+      if (!(e instanceof SegmentMLCancelled)) console.warn('[effect] background cut-out failed (Magic re-runs on demand):', e)
       if (cutCacheRef.current?.url === url) cutCacheRef.current = null
     })
-  }, [segPresent, cacheSeg, publishCutoutResult])
+  }, [cacheSeg, publishCutoutResult])
 
   const upload = useCallback((file: File) => {
     // Layer-2a `loadImage` = validate + blob lifecycle ONLY (flow-blind). The app-state new-image reset
@@ -127,6 +124,7 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
     const seq = nextUploadSeq()
     cutCacheRef.current = null
     cancelGeneration() // KAI-9083: a new image supersedes any in-flight Magic
+    cancelSegmentML()
     setGenerating(false)
     prepareStandard(url) // Layer-2a primitive: the instant square at the display cap (no 3D, no cut-out)
       .then((p) => {
@@ -150,7 +148,7 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
 
   // handleStatus now lives in the viewer-adapter (the 3D status/error channel — inv 26 split).
 
-  // Magic — re-prepare as a SHAPED subject cut-out (BEN in the worker; morphs in place, no jump).
+  // Magic — re-prepare as a SHAPED subject cut-out (worker inference; morphs in place, no jump).
   const magic = useCallback(() => {
     if (!artworkUrl || generating) return
     const preMagic = snapNow() // #23: one Magic = one global undo step (pushed only on success)
@@ -195,7 +193,17 @@ export function useV53Flow(adapters: CreatorAdapters): CreatorFlow {
   }, [artworkUrl, generating, snapNow, pushHistory, registerGeneration, getCachedSeg, beginRun, isCurrent, notify, publishToViewer])
 
   /** Cancel an in-flight Magic (UX-5): bump the generation token so a stale result/error is a no-op. */
-  const cancelMagic = useCallback(() => { cancelGeneration(); setGenerating(false) }, [cancelGeneration])
+  const cancelMagic = useCallback(() => {
+    cancelGeneration()
+    cancelSegmentML()
+    setGenerating(false)
+  }, [cancelGeneration])
+
+  useEffect(() => () => {
+    cancelGeneration()
+    cutCacheRef.current = null
+    disposeSegmentML()
+  }, [cancelGeneration])
 
   // Editor / Trim / Filter SESSIONS (generic begin/commit/revert by id, DEC-v5-09) are owned
   // by the sessions transaction (useSessions, above) — destructured into { state, actions } below.

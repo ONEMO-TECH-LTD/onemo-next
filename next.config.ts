@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // This repository carries required webpack aliases below, so development and production must run
   // the same bundler. Allow the loopback hostname used by local browser probes to hydrate normally.
-  allowedDevOrigins: ["127.0.0.1"],
+  // LAN IPs are allowed too so mobile devices on the same Wi-Fi can hydrate the dev probes.
+  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.*", "10.*"],
   outputFileTracingRoot: process.cwd(),
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
@@ -13,6 +14,15 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/effect-creator/:path*",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+      {
+        // cutout-lab runs the same self-hosted onnxruntime WASM as the effect-creator routes —
+        // same isolation headers (the proven mobile-Safari setup for these artifacts).
+        source: "/cutout-lab",
         headers: [
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
@@ -36,6 +46,11 @@ const nextConfig: NextConfig = {
     // match, so the 'paper/dist/paper-core' specifier itself is untouched.
     config.resolve = config.resolve || {};
     config.resolve.alias = { ...(config.resolve.alias || {}), paper$: "paper/dist/paper-core" };
+    // opencv.js (Cutout GrabCut) is an Emscripten UMD that probes node's fs/path/crypto at runtime;
+    // in the browser bundle those must resolve to empty stubs (standard Emscripten-on-webpack shim).
+    if (!isServer) {
+      config.resolve.fallback = { ...(config.resolve.fallback || {}), fs: false, path: false, crypto: false };
+    }
     if (isServer) {
       // paper is CLIENT-ONLY: the editor + geometry kernel run in the browser, and the page SSRs to
       // null (open=false) without ever calling resolve()'s radius path. paper-core still STATICALLY

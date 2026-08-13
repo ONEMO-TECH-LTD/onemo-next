@@ -40,23 +40,20 @@ const PerfHUD = dynamic(() => import('./dev/PerfHUD'), { ssr: false })
 function PrototypePageInner() {
   const searchParams = useSearchParams()
   const sceneName = searchParams.get('scene')
-  // Injected URL/route param (§4): ?seg present → the socket skips the upload-time background cut-out.
-  const segPresent = !!searchParams.get('seg')
   const shaped = true // the golden scene renders the generated effect mesh (not a GLB)
   const templateUrl = sceneName
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
     : '/api/dev/scenes/golden'
 
   // KAI-9010: ?internal=1 arms the internal Export tool (dev-only, never product chrome). Derived from
-  // the SAME Suspense-coordinated searchParams as ?scene / ?seg — PrototypePageInner renders client-only
+  // the SAME Suspense-coordinated searchParams as ?scene — PrototypePageInner renders client-only
   // (the Suspense fallback is what prerenders), so there is no server/client hydration mismatch to guard
   // (the original useEffect+window dance was for that; unnecessary under this Suspense boundary).
   const internalTools = searchParams.get('internal') === '1'
 
-  // ── THE v53 flow — { state, actions } (CreatorFlow). Notifications + URL params are the injected
-  //    UI-side adapters (blueprint §4); the flow never reaches toast/window itself.
+  // ── THE v53 flow — { state, actions } (CreatorFlow). Notifications are injected UI-side.
   const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
-  const { state, actions } = useV53Flow({ notify, segPresent })
+  const { state, actions } = useV53Flow({ notify })
   const {
     artworkUrl, prepared, preparedFor3D, sessions, editorMode, autoOutline, generating,
     designState, colors,
