@@ -16,13 +16,19 @@ These are rulings, not derivations. Implement exactly these, and no others.
 
 **Regional support.** A candidate may contain every disc correctly and still be wrong: valid positions can cluster in one mass of the shape and leave another unsupported. Regional support is its own judgement and must never be reduced to how many discs are contained, or how far apart they are. Its precedence against gravity and tight wrap is NOT settled: report it separately for every candidate, and let it affect the order only through an explicitly supplied precedence. Never merge it into another measure to force a single sequence.
 
-**Escalation is per band, not per size.** Bands group sizes; the candidate document does not carry them, so the band of each size and the order of bands are explicit inputs. When no candidate within a band supports the shape's masses without leaving one badly unsupported, a fuller arrangement in the next band may rank above every candidate in that band. A larger size is not itself a preference.
+**Escalation is per band, not per size.** Bands group sizes; the candidate document does not carry them, so the band of each size and the order of bands are explicit inputs. When no candidate within a band supports the shape's masses well enough, a stronger arrangement in the next band may rank above every candidate in that band. A larger size is not itself a preference. Both halves of that rule — what makes support insufficient, and what makes one arrangement stronger than another — are undefined here and must be supplied; see below.
 
 **Arrangement class carries across sizes.** The same shape may keep its arrangement class as size grows, with its positions landing on wider steps. A larger size does not imply a larger or denser arrangement.
 
 ## The gaps you must name, not fill
 
-Some terms above are product concepts the supplied documents cannot compute: "the shape's upper material", "wraps most closely", "a mass of the shape", and the boundary between a candidate that is preferred, one that is merely acceptable, and one we refuse. Between them the two documents give positions, families, step structure, exact clearances and limiting boundary witnesses — and nothing else.
+Some terms above are product concepts the supplied documents cannot compute:
+
+- "the shape's upper material", "wraps most closely" and "a mass of the shape";
+- the boundary between a candidate that is preferred, one that is merely acceptable, and one we refuse;
+- escalation's trigger — what makes a band's support insufficient — and its target — what makes one arrangement stronger than another, whether that is more positions, wider coverage of the masses, a different family, or something else.
+
+Between them the two documents give positions, families, step structure, exact clearances and limiting boundary witnesses — and nothing else.
 
 For each such term: do not invent a threshold, a decomposition, a proxy or a classification rule. Name precisely what is missing, state the smallest additional input that would make it computable, and implement the rule as accepting that input explicitly. Where more than one definition is defensible, compare the smallest candidates, attack each with a counterexample, and leave the choice to us.
 
