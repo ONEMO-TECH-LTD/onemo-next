@@ -96,19 +96,23 @@ const clearance2At = (v, x, y) => {
   return best;
 };
 
-// O-1 maximum-clearance anchor, as a DEFINED construction rather than a sample:
-// exact refined grid search — COARSE divisions over the bbox, then REFINEMENTS passes each
-// subdividing the surviving cell by SUBDIV, every comparison exact, ties broken by smallest x
-// then smallest y. Deterministic and reproducible from these three constants alone.
+// O-1's third anchor switch, named for what it is: a DETERMINISTIC REFINED SAMPLE, **not** a
+// solved maximum. Each sampled point's clearance is compared exactly, but greedy refinement can
+// lock onto the basin the coarse pass happened to find and miss a narrower basin with a higher
+// true maximum. A miss under this anchor therefore never establishes absence. Replacing it with a
+// real largest-inscribed-circle solver is the only way to claim "maximum clearance" truthfully.
+// (QA finding 3, @s62-pixel-grid-pixel.) Reproducible from the three constants below.
 const COARSE = 64n, SUBDIV = 8n, REFINEMENTS = 8;
-const maxClearanceOf = (v) => {
+const refinedSampleAnchor = (v) => {
   const b = bboxOf(v);
   let loX = b.minX, hiX = b.maxX, loY = b.minY, hiY = b.maxY;
   let best = null, bestD = null;
   for (let pass = 0; pass <= REFINEMENTS; pass++) {
     const divisions = pass === 0 ? COARSE : SUBDIV;
-    const stepX = (hiX - loX) / divisions, stepY = (hiY - loY) / divisions;
-    let passBest = null, passBestD = null;
+    let stepX = (hiX - loX) / divisions, stepY = (hiY - loY) / divisions;
+    // the surviving best is always re-sampled, so a pass can never regress and truncation to a
+    // zero step ends the search instead of stalling on a grid that cannot reach `hi`
+    let passBest = best, passBestD = bestD;
     for (let i = 0n; i <= divisions; i++) {
       for (let j = 0n; j <= divisions; j++) {
         const x = loX + stepX * i, y = loY + stepY * j;
@@ -117,9 +121,8 @@ const maxClearanceOf = (v) => {
         if (passBestD === null || ratLess(passBestD, d)) { passBestD = d; passBest = { x, y }; }
       }
     }
-    if (passBest && (bestD === null || ratLess(bestD, passBestD))) { bestD = passBestD; best = passBest; }
-    if (!best) break;
-    if (stepX === 0n && stepY === 0n) break;
+    best = passBest; bestD = passBestD;
+    if (!best || (stepX === 0n && stepY === 0n)) break;
     loX = best.x - stepX; hiX = best.x + stepX; loY = best.y - stepY; hiY = best.y + stepY;
   }
   return best ?? centroidOf(v);
@@ -181,20 +184,27 @@ const heldExtent = (measurement) => {
   return { minC: Math.min(...cs), maxC: Math.max(...cs), minR: Math.min(...rs), maxR: Math.max(...rs) };
 };
 
+// `source` records WHERE each geometric claim comes from, because the descriptions were written by
+// this lane from Dan's screenshots and at least two of them were wrong (QA, @s62-pixel-grid-pixel):
+//   dan-words   — the numbers are Dan's own, quoted
+//   screenshot  — measured off his frame here, with the measurement recorded
+//   description — my prose only, NOT yet checked against the frame
+// A case whose source is `description` cannot report ABSENT: an unverified predicate failing proves
+// nothing about an engine. It reports UNTESTABLE until its claim is reconciled.
 const CASES = [
-  { shape: "DUCK", size: 60, band: 1,
-    canon: '"the single disc sits fully inside the TOP half of the shape … the magnet in the HEAD"',
+  { shape: "DUCK", size: 60, band: 1, source: "dan-words",
+    canon: 'Dan: "1 magnet fits fully in the top half … gravity must not place magnets in the bottom and leave top unprotected"',
     structure: (c) => c.family === "single",
     region: { kind: "computable", label: "centre in the shape's top half", test: (c, ctx) => ctx.isTopHalf(c.positions[0]) } },
 
-  { shape: "PILL", size: 79, band: 2,
-    canon: '"DIAGONAL pair — the two held discs are diagonal lattice neighbours (48mm across, 48mm down)"',
+  { shape: "PILL", size: 79, band: 2, source: "description",
+    canon: 'Dan ruled the diagonal pair lawful; "48mm across, 48mm down" is description prose, unverified',
     structure: (c) => c.family === "run" && c.positions.length === 2
       && Math.abs(cols(c)[0] - cols(c)[1]) === 1 && Math.abs(rows(c)[0] - rows(c)[1]) === 1,
     region: { kind: "structural", label: "adjacency is the whole ruling" } },
 
-  { shape: "PILL", size: 138, band: 3,
-    canon: '"for diagonals better to use diagonal" — discs running diagonally along the capsule axis',
+  { shape: "PILL", size: 138, band: 3, source: "description",
+    canon: 'Dan: "for diagonals better to use diagonal"; chain length and step are description prose',
     structure: (c) => {
       if (c.family !== "run" || c.positions.length < 3) return false;
       const [w, h] = baseSpans(c);
@@ -202,76 +212,78 @@ const CASES = [
     },
     region: { kind: "needs-eye", label: "chain lies along the capsule's own axis" } },
 
-  { shape: "DUCK", size: 152, band: 3,
-    canon: '"four held discs form the corners of a 48 × 96mm rectangle" — head pair + body pair, mid row skipped',
+  { shape: "DUCK", size: 152, band: 3, source: "description",
+    canon: 'Dan: "skipping mid row"; the 48 × 96mm rectangle is description prose, unverified',
     structure: (c) => isRect(c, 1, 2),
     region: { kind: "needs-eye", label: "upper pair in the head, lower pair in the body" } },
 
-  { shape: "BAT-WOMAN", size: 144, band: 3,
-    canon: '"3 magnets utmost corners only" — one at the top, two at the base corners',
+  { shape: "BAT-WOMAN", size: 144, band: 3, source: "dan-words",
+    canon: 'Dan: "needs essentially 3 magnets utmost corners only mid 2 rows are optional"',
     structure: (c) => c.family === "corner-triangle",
-    region: { kind: "computable", label: "spans the full held extent (utmost)", test: (c, ctx) => {
-      const e = ctx.extent; if (!e) return false;
-      return Math.min(...cols(c)) === e.minC && Math.max(...cols(c)) === e.maxC
-          && Math.min(...rows(c)) === e.minR && Math.max(...rows(c)) === e.maxR;
-    } } },
+    region: { kind: "computable", label: "one site on the top extreme, two on the base at both horizontal extremes",
+      test: (c, ctx) => {
+        const e = ctx.extent; if (!e) return false;
+        const cc = cols(c), rr = rows(c);
+        if (Math.min(...cc) !== e.minC || Math.max(...cc) !== e.maxC) return false;   // utmost horizontally
+        if (Math.min(...rr) !== e.minR || Math.max(...rr) !== e.maxR) return false;   // utmost vertically
+        const topRow = TOP_IS_MIN_ROW ? Math.min(...rr) : Math.max(...rr);
+        const baseRow = TOP_IS_MIN_ROW ? Math.max(...rr) : Math.min(...rr);
+        const top = c.positions.filter((p) => Number(p.row) === topRow);
+        const base = c.positions.filter((p) => Number(p.row) === baseRow);
+        if (top.length !== 1 || base.length !== 2) return false;                       // one up, two down
+        const baseCols = base.map((p) => Number(p.column));
+        return Math.min(...baseCols) === e.minC && Math.max(...baseCols) === e.maxC;
+      } } },
 
-  { shape: "BUTTERFLY", size: 130, band: 3,
-    canon: '"the held corners sit 96mm apart both ways, the centre row and column unused"',
-    structure: (c) => isRect(c, 2, 2),
+  { shape: "BUTTERFLY", size: 130, band: 3, source: "screenshot",
+    canon: 'Dan: "band 2 grid in the band 3 shape". Frame measured 2026-08-13: shape 130 × 107mm at '
+      + '4.8 px/mm, the four discs 215–230px apart = 48mm — an ADJACENT square, spans (1,1). '
+      + 'The description\'s "96mm apart both ways" was this lane\'s error, and impossible (96+24 > 107).',
+    structure: (c) => isRect(c, 1, 1),
     region: { kind: "needs-eye", label: "one disc in each of the four wings" } },
 
-  { shape: "POKE1", size: 123, band: 3,
-    canon: '"four discs at the corners of a 96 × 96mm square, centre row and column skipped"',
-    structure: (c) => isRect(c, 2, 2),
+  { shape: "POKE1", size: 123, band: 3, source: "screenshot",
+    canon: 'Dan: "same logic as butterfly". Frame measured 2026-08-13: shape 104 × 123mm at '
+      + '5.07 px/mm, discs 244px apart = 48mm — adjacent square, spans (1,1), not 96 × 96.',
+    structure: (c) => isRect(c, 1, 1),
     region: { kind: "needs-eye", label: "corners land in the full lobes" } },
 
-  { shape: "BOT", size: 144, band: 3,
-    canon: '"96mm vertically (shoulders to hips), one 48mm step horizontally"',
+  { shape: "BOT", size: 144, band: 3, source: "dan-words",
+    canon: 'Dan: "this one can do but better to do 96mmx48mm narow 4" — 96mm tall, 48mm wide, spans (1,2)',
     structure: (c) => isRect(c, 1, 2),
     region: { kind: "needs-eye", label: "the column wraps the torso" } },
 
-  { shape: "BOT", size: 236, band: 4,
-    canon: '"the column staying one 96mm step wide while the vertical span grows"',
+  { shape: "BOT", size: 236, band: 4, source: "description",
+    canon: 'Dan: "similar longer rectangle"; "column one 96mm step wide" is description prose, unverified',
     structure: (c) => { const [w, h] = baseSpans(c); return c.family === "rectangle-corners" && w === 2 && h > 2; },
     region: { kind: "needs-eye", label: "shoulders pair on top, hips pair below" } },
 
-  { shape: "BUTTERFLY", size: 214, band: 4,
-    canon: '"FOUR points on the 96mm grid — one per wing, the corner-square arrangement"',
+  { shape: "BUTTERFLY", size: 214, band: 4, source: "dan-words",
+    canon: 'Dan: "B4 - 4 (96mm) … essentially b3 based on the 96mm grid with 4 points ultimately needed"',
     structure: (c) => isRect(c, 2, 2),
     region: { kind: "needs-eye", label: "one per wing at the larger size" } },
 ];
 
-// ---------------------------------------------------------------- orientation, measured not assumed
-
-const orientationOf = (v) => {
-  const b = bboxOf(v), h = b.maxY - b.minY;
-  const widthIn = (lo, hi) => {
-    let mn = null, mx = null;
-    for (const p of v) if (p.y >= lo && p.y <= hi) { if (mn === null || p.x < mn) mn = p.x; if (mx === null || p.x > mx) mx = p.x; }
-    return mn === null ? 0n : mx - mn;
-  };
-  const nearMinY = widthIn(b.minY, b.minY + h / 5n);
-  const nearMaxY = widthIn(b.maxY - h / 5n, b.maxY);
-  return { nearMinY, nearMaxY, narrowEnd: nearMinY < nearMaxY ? "min-y" : "max-y" };
-};
+// Top direction is an explicit oracle, not a heuristic. Every trace comes from the scaffold's own
+// cutout tracer in image coordinates, which the SVG canvas renders y-down (one unit = 1mm), so the
+// visual top is minimum y — confirmed against Dan's frames, where each shape's head sits at the top
+// of the screen. Kernel rows increase with y, so the top row is the minimum row index.
+// (The earlier "narrowest end is the top" heuristic was unsound — it read the butterfly upside
+// down, since its narrow end is the tails. QA finding 4, @s62-pixel-grid-pixel.)
+const TOP_IS_MIN_Y = true, TOP_IS_MIN_ROW = true;
 
 // ---------------------------------------------------------------- run
 
-let present = 0, needsEye = 0, absent = 0;
+let present = 0, needsEye = 0, absent = 0, untestable = 0;
 for (const testCase of CASES) {
   const vertices = toIntegerPolygon(TRACES[testCase.shape]);
   const b = bboxOf(vertices);
   const sourceSize = (b.maxX - b.minX) > (b.maxY - b.minY) ? b.maxX - b.minX : b.maxY - b.minY;
-  const orientation = orientationOf(vertices);
-  // top = the narrow end for these shapes (head/antenna); verified per shape and printed
-  const topIsMinY = orientation.narrowEnd === "min-y";
-  const midTargetY = 0n; // targetAnchor is the origin; the anchor's own y is the split for a bbox anchor
 
   const anchors = {
     "bbox-centre": { x: (b.minX + b.maxX) / 2n, y: (b.minY + b.maxY) / 2n },
     centroid: centroidOf(vertices),
-    "max-clearance": maxClearanceOf(vertices),
+    "refined-sample": refinedSampleAnchor(vertices),
   };
 
   const hits = [];
@@ -285,7 +297,7 @@ for (const testCase of CASES) {
     const ctxBase = {
       isTopHalf: (p) => {
         const y = BigInt(p.center.y.numerator) / BigInt(p.center.y.denominator);
-        return topIsMinY ? y < halfY : y > halfY;
+        return TOP_IS_MIN_Y ? y < halfY : y > halfY;
       },
     };
 
@@ -298,35 +310,45 @@ for (const testCase of CASES) {
       candidateTotal += doc.candidates.length;
       const ctx = { ...ctxBase, extent: heldExtent(measurement) };
 
+      // EVERY structural match is examined. Stopping at the first one let a candidate that failed
+      // a computable region test hide a later one that would have passed — a false absence.
+      // (QA finding 1, @s62-pixel-grid-pixel.)
+      let reportedHere = false;
       for (const candidate of doc.candidates) {
         if (!testCase.structure(candidate)) continue;
         const where = candidate.positions.map((p) => `${p.column},${p.row}`).join(" ");
         if (testCase.region.kind === "computable") {
-          if (testCase.region.test(candidate, ctx)) hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`);
-          else structuralOnly += 1;
-        } else if (testCase.region.kind === "structural") {
-          hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`);
-        } else {
-          hits.push(`NEEDS-EYE  ${anchorName}/${originName} [${where}]`);
+          if (testCase.region.test(candidate, ctx)) { hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`); reportedHere = true; break; }
+          structuralOnly += 1;
+          continue;                                   // keep looking in this measurement
         }
-        break; // one report per measurement is enough
+        if (testCase.region.kind === "structural") hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`);
+        else hits.push(`NEEDS-EYE  ${anchorName}/${originName} [${where}]`);
+        reportedHere = true;
+        break;
       }
+      void reportedHere;
     }
   }
 
   const confirmed = hits.filter((h) => h.startsWith("CONFIRMED"));
   const eyed = hits.filter((h) => h.startsWith("NEEDS-EYE"));
-  const status = confirmed.length ? "PRESENT" : eyed.length ? "NEEDS-EYE" : "ABSENT";
-  if (status === "PRESENT") present += 1; else if (status === "NEEDS-EYE") needsEye += 1; else absent += 1;
+  let status = confirmed.length ? "PRESENT" : eyed.length ? "NEEDS-EYE" : "ABSENT";
+  // an unverified claim that finds nothing proves nothing about an engine
+  if (status === "ABSENT" && testCase.source === "description") status = "UNTESTABLE";
+  if (status === "PRESENT") present += 1;
+  else if (status === "NEEDS-EYE") needsEye += 1;
+  else if (status === "UNTESTABLE") untestable += 1;
+  else absent += 1;
 
-  console.log(`\n${status}  ${testCase.shape} @${testCase.size}mm  (band ${testCase.band})`);
+  console.log(`\n${status}  ${testCase.shape} @${testCase.size}mm  (band ${testCase.band})  [claim source: ${testCase.source}]`);
   console.log(`   canon: ${testCase.canon}`);
   console.log(`   region claim: ${testCase.region.label}  [${testCase.region.kind}]`);
-  console.log(`   narrow end of trace: ${orientation.narrowEnd} → top`);
   console.log(`   candidates examined: ${candidateTotal}${structuralOnly ? `   structural-match-but-region-failed: ${structuralOnly}` : ""}`);
   for (const line of hits.slice(0, 6)) console.log(`   ${line}`);
-  if (!hits.length) console.log("   no candidate matching the canon structure at any anchor or origin");
+  if (!hits.length) console.log(`   no candidate matching the canon structure at any anchor or origin`
+    + (status === "UNTESTABLE" ? " — but the claim itself is unverified, so this is not an engine finding" : ""));
 }
 
-console.log(`\n${present} confirmed · ${needsEye} structurally present, region needs the visual gate · ${absent} absent · of ${CASES.length}`);
-console.log("NOT A VERDICT until QA'd. NEEDS-EYE is closed by rendering the candidate on the page against Dan's screenshot.");
+console.log(`\n${present} confirmed · ${needsEye} structurally present, region needs the eye · ${absent} absent · ${untestable} untestable (unverified claim) · of ${CASES.length}`);
+console.log("NOT A VERDICT until QA'd. NEEDS-EYE closes by rendering the candidate on the page against Dan's screenshot.");
