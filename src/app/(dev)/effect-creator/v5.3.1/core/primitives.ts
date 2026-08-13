@@ -18,14 +18,15 @@
 // flow-timing state and live in their own modules.
 
 import type { PreparedEffect } from '@/lib/effect/prepare-effect'
-import type { MLResult, SegmentProgress } from '@/lib/effect/segment-ml'
+import type { MLResult } from '@/lib/effect/segment-ml'
 import type { Contour } from '@/lib/effect/types'
 import type { GridPlanOptions, ResolvedGridPlan } from '@/lib/effect/grid'
 import type { VShape } from '@/lib/vector-core'
-import { detailToFloorMm } from '../user/editor/producers'
+import { detailToFloorMm } from '@/lib/effect/trace-outline-controls'
 
 export { composeEffectArtwork } from '@/lib/effect/composite'
 export type { ArtworkBounds, ArtworkFillMode, ComposedEffectArtwork } from '@/lib/effect/composite'
+export { runCutout } from '@/lib/effect/cutout'
 
 /** loadImage(file) → { url } — decode + the new-image blob lifecycle ONLY (validate type, revoke the
  *  prior blob, mint a fresh object URL). Flow-BLIND: NO store/state reset, NO downstream prepare/cut-out
@@ -42,20 +43,6 @@ export function loadImage(file: File, prevBlobUrl?: string): { url: string } | n
 export async function prepareStandard(url: string): Promise<PreparedEffect> {
   const { prepareEffect } = await import('@/lib/effect/prepare-effect')
   return prepareEffect(url, 'standard')
-}
-
-/** runCutout(url) → seg — the AI cut. Owns the working-res cap (passes effectiveTextureDim() to
- *  segmentML — inv 19; the cut-out WORKER self-caps separately inside ben.worker.runRembg). Returns the
- *  segmentation DATA only: it does NOT publish, cache, seq-guard, or build a matte — the flow's
- *  publishCutoutResult / history transactions own those. segPresent (the ?seg harness skip) is a FLOW
- *  decision (inv 25), checked by the caller, never here. */
-export async function runCutout(url: string, onProgress?: (s: SegmentProgress) => void): Promise<MLResult> {
-  const [{ segmentML }, { effectiveTextureDim }, { EFFECT_BUILD_CONFIG }] = await Promise.all([
-    import('@/lib/effect/segment-ml'),
-    import('@/lib/effect/mask'),
-    import('@/lib/effect/prepare-effect'),
-  ])
-  return segmentML(url, EFFECT_BUILD_CONFIG.maxImageDim, effectiveTextureDim(), onProgress)
 }
 
 /** prepareShaped(url, preseg?) → prepared — Magic's shaped subject. preseg is OPTIONAL pass-through

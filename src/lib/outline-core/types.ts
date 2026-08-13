@@ -36,13 +36,6 @@ export interface SegmentConfidence {
   weakRanges: ArcLengthRangePx[]
 }
 
-/** Provenance for a segment produced by projecting onto the BEN2 boundary — AMEND-C13. */
-export interface Ben2BoundaryProjection {
-  type: 'ben2_boundary_projection'
-  maskHash: string
-  sourceRange?: ArcLengthRangePx
-}
-
 export type OutlineSegment =
   | { type: 'line' }
   | { type: 'cubic'; c1: Vec2Px; c2: Vec2Px }
@@ -52,7 +45,6 @@ export type OutlineSegment =
       rawPolyline: Vec2Px[]
       fitted?: Vec2Px[]
       confidence?: SegmentConfidence
-      generator?: Ben2BoundaryProjection
     }
 
 /**
@@ -64,7 +56,7 @@ export interface OutlineNode {
   p: Vec2Px
   role: 'corner' | 'smooth' | 'manual_anchor' | 'livewire_anchor'
   corner: CornerSpec
-  snap?: { source: 'ben2_boundary' | 'image_edge' | 'manual'; confidence: number }
+  snap?: { source: 'image_edge' | 'manual'; confidence: number }
   segmentToNext?: OutlineSegment
 }
 

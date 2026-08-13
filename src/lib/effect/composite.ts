@@ -74,6 +74,8 @@ export interface ComposeEffectArtworkInput {
   fxFilter?: string
   vignette?: number
   tint?: string | null
+  /** Optional caller-owned cancellation check; shared callers retain the current uncancelled default. */
+  cancelled?: () => boolean
 }
 
 export interface ComposedEffectArtwork {
@@ -216,11 +218,37 @@ export function cssColorFilterToSvg(filter?: string | null): string {
   return out.join('')
 }
 
-function loadImg(url: string): Promise<HTMLImageElement> {
+const SVG_IMAGE_TIMEOUT_MS = 30_000
+const SVG_CANCEL_POLL_MS = 16
+
+function loadImg(url: string, cancelled?: () => boolean): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const im = new Image()
-    im.onload = () => resolve(im)
-    im.onerror = () => reject(new Error('[composite] SVG-filter image failed to load'))
+    let settled = false
+    let cancelPoll: ReturnType<typeof setInterval> | null = null
+    const timeout = setTimeout(() => fail(new Error('[composite] SVG-filter image timed out')), SVG_IMAGE_TIMEOUT_MS)
+    const cleanup = () => {
+      clearTimeout(timeout)
+      if (cancelPoll) clearInterval(cancelPoll)
+      im.onload = null
+      im.onerror = null
+    }
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      im.src = ''
+      reject(error)
+    }
+    im.onload = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(im)
+    }
+    im.onerror = () => fail(new Error('[composite] SVG-filter image failed to load'))
+    if (cancelled?.()) { fail(new Error('[composite] SVG-filter image cancelled')); return }
+    if (cancelled) cancelPoll = setInterval(() => { if (cancelled()) fail(new Error('[composite] SVG-filter image cancelled')) }, SVG_CANCEL_POLL_MS)
     im.src = url
   })
 }
@@ -231,7 +259,12 @@ function loadImg(url: string): Promise<HTMLImageElement> {
  * color-interpolation-filters (sRGB for colour to match CSS filter; linearRGB for blur to match the
  * editor's <feGaussianBlur>). Returns a NEW canvas the size of `src`. Async (Image onload).
  */
-async function svgFilterBake(src: HTMLCanvasElement, filterBody: string, colorSpace: 'sRGB' | 'linearRGB'): Promise<HTMLCanvasElement> {
+async function svgFilterBake(
+  src: HTMLCanvasElement,
+  filterBody: string,
+  colorSpace: 'sRGB' | 'linearRGB',
+  cancelled?: () => boolean,
+): Promise<HTMLCanvasElement> {
   const w = src.width, h = src.height
   const out = document.createElement('canvas'); out.width = w; out.height = h
   const octx = out.getContext('2d')!
@@ -244,7 +277,7 @@ async function svgFilterBake(src: HTMLCanvasElement, filterBody: string, colorSp
     `</svg>`
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
   try {
-    octx.drawImage(await loadImg(url), 0, 0, w, h)
+    octx.drawImage(await loadImg(url, cancelled), 0, 0, w, h)
   } finally {
     URL.revokeObjectURL(url)
   }
@@ -301,6 +334,7 @@ export async function composeEffectArtwork({
   fxFilter,
   vignette = 0,
   tint = null,
+  cancelled,
 }: ComposeEffectArtworkInput): Promise<ComposedEffectArtwork> {
   const frame = resolveArtworkFrame(originalCanvas.width, originalCanvas.height, outputBoundsPx)
   const fw = frame.width, fh = frame.height
@@ -313,7 +347,7 @@ export async function composeEffectArtwork({
   // BACKGROUND: the blur is the CORE effect (magic-blend + offset-fill). Bake it with the SVG engine
   // (feGaussianBlur, linearRGB — matches the editor preview), cross-browser incl. Safari.
   const bgBlurPx = blendPercentToPixels(blendPercent, originalCanvas.width)
-  const bg = bgBlurPx > 0 ? await svgFilterBake(filled, `<feGaussianBlur stdDeviation="${bgBlurPx}" />`, 'linearRGB') : filled
+  const bg = bgBlurPx > 0 ? await svgFilterBake(filled, `<feGaussianBlur stdDeviation="${bgBlurPx}" />`, 'linearRGB', cancelled) : filled
   // composite: blurred bg + the sharp subject on top
   let composed = document.createElement('canvas')
   composed.width = fw; composed.height = fh
@@ -322,7 +356,7 @@ export async function composeEffectArtwork({
   composed.getContext('2d')!.drawImage(subjectCanvas, subjectDraw.dx, subjectDraw.dy, subjectDraw.dw, subjectDraw.dh)
   // COLOUR fx over the finished composite — spec-exact SVG primitives (sRGB → matches CSS filter).
   const colourBody = cssColorFilterToSvg(fxFilter)
-  if (colourBody) composed = await svgFilterBake(composed, colourBody, 'sRGB')
+  if (colourBody) composed = await svgFilterBake(composed, colourBody, 'sRGB', cancelled)
   // Filters v2 composite effects (applied over the finished composite):
   const ctx = composed.getContext('2d')!
   if (tint) { ctx.save(); ctx.globalAlpha = 0.22; ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint; ctx.fillRect(0, 0, fw, fh); ctx.restore() }

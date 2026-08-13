@@ -161,12 +161,12 @@ its matte feeds the editor's Blend preview on any shape.
 | `polygon.ts` | Neutral polygon/contour containment shared by the grid engine and the dormant legacy validator. | Prevents the replacement grid engine from depending on `attachment.ts`. |
 | `mesh.ts` (212) | `buildShapedGeometry(contour, opts)` — custom BufferGeometry: front cap + rounded edge lip + back cap. 3 material groups (0 front / 1 edge / 2 back). UV0=image, UV1=world-XY suede. Canonical winding (outer CCW / holes CW). | Edge = same front image rolled over the lip. |
 | `build-mesh.ts` (46) | `buildMeshFromSpec(geometryMM, opts, composite, edgeComposite)` → geometry + 2 CanvasTextures. | The only three.js touch besides mesh.ts. |
-| `mask.ts` (293) | Image load (`loadImageData`, y-up), `deviceMaxTextureDim`, the **fallback** segmentation (`segment` = alpha-channel else border flood-fill), `postProcessMask`/`smoothMask`/`dilateMask`. | Header corrected post-de-slop (BEN2 retired; default = the trio). |
+| `mask.ts` (293) | Image load (`loadImageData`, y-up), `deviceMaxTextureDim`, the **fallback** segmentation (`segment` = alpha-channel else border flood-fill), `postProcessMask`/`smoothMask`/`dilateMask`. | Visible fallback behind the production worker chain. |
 | `image-shape.ts` (53) | `maskFromImageData` (Otsu) for image-upload-as-shape. | |
 | `contour.ts` (151) | `traceContourRaw`: marching-squares → stitch → largest loop → CCW raw ring. No RDP/fillet/smoothing (those route through outline-core). | |
-| `ben.worker.ts` (271) | Cut-out worker. Default = rembg trio (`resolveChain`) on **WASM EP** (no WebGPU). `?seg=ben2` = transformers/WebGPU (opt-in). Degenerate-matte guard. | Posts RGBA matte (alpha=subject). |
-| `ben-chain.ts` (37) | `resolveChain(seg)`: no seg → `[u2netp, silueta]` (production trio); single rembg model; else null→transformers. `REMBG` specs (self-hosted `/seg-models`). `isDegenerateMatte`. | The truth of which model runs. |
-| `segment-ml.ts` (174) | Main-thread worker wrapper. `segmentML(url, maskDim, texDim)` → low-res mask + hi-res texture + `adapterId`. 120s watchdog. `preloadBen` (disabled at boot). | Header corrected; residual BEN2 NAMING remains lower (segParam comment, the downscale/run comments, `ML_ADAPTER_ID='ben2-onnx'`) — naming-only; the router runs the trio (§10). |
+| `ben.worker.ts` | Production cut-out worker. Runs u2netp then lazy Silueta on the pinned same-origin WASM runtime; closes every decoded bitmap. | Posts RGBA matte (alpha=subject) with exact adapter identity. |
+| `ben-chain.ts` | Fixed `[u2netp, silueta]` production order, self-hosted model specs, and the degenerate-matte guard. | The only detector roster. |
+| `segment-ml.ts` | Main-thread worker owner. `segmentML(url, maskDim, texDim)` → low-res mask + hi-res texture + `adapterId`; 120s watchdog plus explicit cancellation/disposal. | Settles pending work and terminates the worker when its mounted owner exits. |
 | `payload.ts` (306) | **DORMANT** manufacturing contract. `buildApprovedEffectPayload` (content-addressed, int-micron). Not wired to an active save/order flow (§7). | |
 | `persistence.ts` (167) | **DORMANT** saved-effect model (EditableRecipe + LockedPayload, F1 bond). No save surface. | |
 | `attachment.ts` (149) | **DORMANT** `validateAttachment` (magnet 54mm grid / velcro). Invented defaults. | |
@@ -232,7 +232,10 @@ Two preview paths, by design:
 Custom geometry from the display-tolerance contour: front cap (golden suede + image), rounded edge lip (matte copy, same image rolled by arc-length), back cap (solid colour). Suede normal/roughness/bump on UV channel 1 (world-XY → never stretches). Pan/zoom is matrix-only.
 
 ### 5.4 Cut-out — `ben.worker`
-Product default = lightweight trio **u2netp (4MB) → silueta (44MB, lazy) → flood-fill**, WASM EP, self-hosted `/seg-models`, no WebGPU → Safari-safe. BEN2 is opt-in only (`?seg=ben2`). Runs at upload in the background (P1), cached so Magic reuses it (no AI re-run) and the matte lights up Blend on any shape.
+The fixed chain is **u2netp (4MB) → Silueta (44MB, lazy) → visible flood-fill**, WASM EP,
+self-hosted under `/seg-models`, with no comparison/query route or eager preload. Creator runs it at
+upload in the background and caches the result so Magic reuses it. Replacement/cancel ends active
+inference; unmount terminates the worker and its warm ORT sessions.
 
 ## 6. Surfaces & UI
 
@@ -287,7 +290,6 @@ Still present (clarified, NOT dead):
 ## 10. Known drift / debt
 
 - **Editor Image-mode entry — Phase 6, NOT drift.** Phase 4 unified the image-fx LOGIC: the 9 image tools are descriptors driven by BOTH the editor's Image mode AND the hero `FiltersSurface` (one descriptor set, two store-free clients). The editor dock still doesn't expose Image (page never passes `openMode='image'`), so today the live entry is FiltersSurface; re-exposing the editor's Image entry (deferred bake via the version-bridge) is a Phase-6 UI-client decision (blueprint §9), **zero logic change** then. The deferral is deliberate, not debt.
-- **Residual BEN2 naming** (cosmetic, not behaviour). The `mask.ts` + `segment-ml.ts` HEADERS are corrected (BEN2 retired; default = the trio). Residual BEN2 wording remains LOWER in `segment-ml.ts` only — the `segParam` default comment, the downscale/run comments, and `ML_ADAPTER_ID = 'ben2-onnx'`. The router (`ben-chain.ts`) runs the trio by default; the names are naming debt.
 - **AUTO_TUNE dormant.** `seed-defaults.ts` `AUTO_TUNE` (T6) is built but paused (Dan, 2026-06-17) — Magic seeds raw + tools OFF for manual calibration.
 - **`edgeRadiusMM` re-pin TODO.** `prepare-effect.ts:66` notes 0.15 was tuned for a 0.5mm body; current 0.2 on the 1mm body is the accepted straight-wall value but flagged as a §9 follow-up.
 - **Multi-ring drop.** `geometry-truth.contourFromShape` keeps only the outer ring while the SVG exporter serializes all paths — a silent divergence the moment holes/multi-piece shapes ship (KAI-9086 guard logs it).

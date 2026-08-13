@@ -15,12 +15,12 @@
 | `squareCornerMM` | calibrated input (brand default 10) | standard-square corner radius |
 
 ## Segmentation (DEC-v5-01 — self-hosted free trio)
-- Cut-out engine: **u2netp** (4.6 MB, primary, preloaded) → **silueta** (44 MB, LAZY — fetched only
-  when u2netp errors) → **flood-fill** (no-AI last resort). BEN2 retired (219 MB → iPhone OOM).
+- Cut-out engine: **u2netp** (4.6 MB, primary) → **Silueta** (44 MB, lazy — fetched only when
+  u2netp errors) → **flood-fill** (visible no-AI last resort). No eager preload.
 - Self-hosted SAME-ORIGIN (no third-party fetch, offline-capable): models in `public/seg-models/`
   (`u2netp.onnx`, `silueta.onnx`); ONNX runtime in `public/ort/` (`ort.wasm.min.mjs` +
   `ort-wasm-simd-threaded.{mjs,wasm}`). Runtime = onnxruntime-web, **WASM EP, `numThreads=1`**
-  (threaded WASM deadlocks inside the worker). `?seg=<model>` switches a single model (test harness).
+  (threaded WASM deadlocks inside the worker).
 - Inference watchdog: 120 s (`segment-ml.ts INFERENCE_WATCHDOG_MS`).
 - COOP/COEP headers on `/effect-creator/*` (next.config.ts) → threaded-wasm fallback.
 

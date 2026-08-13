@@ -41,7 +41,6 @@ const PerfHUD = dynamic(() => import('../dev/PerfHUD'), { ssr: false })
 function TwoDFirstPageInner() {
   const searchParams = useSearchParams()
   const sceneName = searchParams.get('scene')
-  const segPresent = !!searchParams.get('seg')
   const shaped = true
   const templateUrl = sceneName
     ? `/api/dev/scenes/${encodeURIComponent(sceneName)}`
@@ -49,7 +48,7 @@ function TwoDFirstPageInner() {
   const internalTools = searchParams.get('internal') === '1'
 
   const notify = useCallback((kind: 'warn' | 'error' | 'info', message: string) => { toast(kind, message) }, [])
-  const { state, actions } = useTwoDFirstFlow({ notify, segPresent })
+  const { state, actions } = useTwoDFirstFlow({ notify })
   const {
     artworkUrl, prepared, preparedFor3D, sessions, editorMode, autoOutline, generating,
     designState, colors, previewing3D,

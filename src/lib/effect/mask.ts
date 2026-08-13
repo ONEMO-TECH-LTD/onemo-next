@@ -1,7 +1,7 @@
 // Segmentation → binary mask (Lane A / Kai)
 //
-// The production default is the self-hosted trio (u2netp -> silueta -> flood-fill) in the
-// cut-out worker (ben.worker.ts / ben-chain.ts); BEN2 was retired (iPhone OOM). The ML worker
+// The production chain is self-hosted u2netp -> lazy Silueta in the cut-out worker
+// (ben.worker.ts / ben-chain.ts), followed by the explicit caller-owned flood-fill fallback. The ML worker
 // (segment-ml.ts) is the active default; the fast built-in adapter here (alpha-channel when present, else border
 // flood-fill background removal) is the FALLBACK behind the same interface, used only when
 // the model can't load. Segmentation is one pluggable stage.
@@ -21,7 +21,8 @@ export interface SegmentationAdapter {
 /** Load an image URL into ImageData, downscaled so max dimension ≤ maxDim (speed). */
 // deviceMaxTextureDim probes the device's physical GPU maximum (fallback 4096 for no-WebGL —
 // tests/SSR). NOTE: v5.5 adds a separate working-res cap (~1536, worker + display) for the
-// iPhone upload OOM (MOBILE_TEXTURE_DIM_CAP below); full-res original kept for manufacturing.
+// iPhone upload OOM (MOBILE_TEXTURE_DIM_CAP below). Manufacturing must separately retain the
+// uploaded original and replay the final recipe; this browser display path is not that authority.
 let cachedMaxTextureDim: number | null = null
 export function deviceMaxTextureDim(): number {
   if (cachedMaxTextureDim) return cachedMaxTextureDim
@@ -40,8 +41,8 @@ export function deviceMaxTextureDim(): number {
  *  allocate multi-GB canvases, and never above the device's GPU max. This caps the DISPLAY side
  *  (prepareEffect's texDim + the segment-ml rasterize); the cut-out WORKER's own full-res post-process is
  *  capped SEPARATELY inside `ben.worker.runRembg` (texDim does NOT reach the worker — it rasterizes only
- *  AFTER the worker returns, the expert's must-fix). The full-resolution original is re-baked for
- *  manufacturing at save/order, so this cap never touches print quality. */
+ *  AFTER the worker returns, the expert's must-fix). Manufacturing regeneration remains required
+ *  downstream and must never consume this capped raster. */
 export const MOBILE_TEXTURE_DIM_CAP = 1536
 export function effectiveTextureDim(): number {
   return Math.min(deviceMaxTextureDim(), MOBILE_TEXTURE_DIM_CAP)
@@ -176,35 +177,61 @@ function cleanup(mask: Uint8Array, w: number, h: number): Uint8Array {
   return erode(dilate(dilate(erode(mask)))) // open then close
 }
 
-/**
- * Uniform mask smoothing: separable box-blur of the binary mask + 0.5 re-threshold. Rounds small
- * sharp protrusions/notches (e.g. the marching-squares stair-steps at thin spike tips) the SAME way
- * everywhere — symmetric, position-independent, any image. radius is in mask pixels (small → only
- * sub-feature noise is rounded; major shape preserved).
- */
-export function smoothMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
-  const r = Math.max(1, Math.round(radius))
+/** One uniform separable box filter for both continuous subject alpha and the binary contour. */
+function blurMask(mask: Uint8Array, w: number, h: number, radius: number): Float32Array {
+  const r = Math.max(0, Math.round(radius))
+  const out = new Float32Array(w * h)
+  if (r === 0) {
+    for (let i = 0; i < out.length; i++) out[i] = mask[i] > 1 ? mask[i] / 255 : mask[i]
+    return out
+  }
   const win = 2 * r + 1
   const cl = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v)
   const tmp = new Float32Array(w * h)
   for (let y = 0; y < h; y++) {
     const row = y * w
     let sum = 0
-    for (let k = -r; k <= r; k++) sum += mask[row + cl(k, w - 1)]
+    for (let k = -r; k <= r; k++) {
+      const value = mask[row + cl(k, w - 1)]
+      sum += value > 1 ? value / 255 : value
+    }
     for (let x = 0; x < w; x++) {
       tmp[row + x] = sum / win
-      sum += mask[row + cl(x + r + 1, w - 1)] - mask[row + cl(x - r, w - 1)]
+      const add = mask[row + cl(x + r + 1, w - 1)]
+      const drop = mask[row + cl(x - r, w - 1)]
+      sum += (add > 1 ? add / 255 : add) - (drop > 1 ? drop / 255 : drop)
     }
   }
-  const out = new Uint8Array(w * h)
   for (let x = 0; x < w; x++) {
     let sum = 0
     for (let k = -r; k <= r; k++) sum += tmp[cl(k, h - 1) * w + x]
     for (let y = 0; y < h; y++) {
-      out[y * w + x] = sum / win >= 0.5 ? 1 : 0
+      out[y * w + x] = sum / win
       sum += tmp[cl(y + r + 1, h - 1) * w + x] - tmp[cl(y - r, h - 1) * w + x]
     }
   }
+  return out
+}
+
+/**
+ * Continuous 0–255 alpha from the same uniform mask filter used by `smoothMask`. This is the one
+ * post-segmentation edge owner for every matte source; it never changes the source's raw mask.
+ */
+export function featherMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
+  const blurred = blurMask(mask, w, h, radius)
+  const out = new Uint8Array(blurred.length)
+  for (let i = 0; i < out.length; i++) out[i] = Math.max(0, Math.min(255, Math.round(blurred[i] * 255)))
+  return out
+}
+
+/**
+ * Uniform contour smoothing: the shared edge filter followed by a 0.5 threshold. Rounds small
+ * sharp protrusions/notches while preserving a binary mask for marching squares.
+ */
+export function smoothMask(mask: Uint8Array, w: number, h: number, radius = 3): Uint8Array {
+  const blurred = blurMask(mask, w, h, radius)
+  const out = new Uint8Array(blurred.length)
+  for (let i = 0; i < out.length; i++) out[i] = blurred[i] >= 0.5 ? 1 : 0
   return out
 }
 
