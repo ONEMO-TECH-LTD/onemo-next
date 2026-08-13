@@ -51,6 +51,15 @@ Adversarial probes against the patch itself, beyond the suite:
 - a single's position carries the kernel fact pointer `/sizes/0/positions/2` and the
   centre copied from that fact (96), not a value reconstructed from indices.
 
+Peer QA (pixel) then found what my own pass had missed: the fixture manifest still
+declared the hand-enumerated families as run + full-window with a count of 2, and two
+comments in `types.ts` (and their generated `.d.ts`) still said "four authoritative
+families" and "the other three families". Corrected: the manifest now records
+single, single, run, full-window with a count of 4, and the comments read five families
+and name the zero step for singles. My earlier claim that all four-family drift was
+fixed was therefore false when written; it is true now, verified by grep across src,
+dist, contract, readme and fixtures.
+
 Remaining known deltas from the delivered package, deliberate: the package-level
 PACKAGE-SHA256SUMS is not carried into this assembly (the assembly is ours and its files
 have legitimately changed); the kernel keeps its own SHA256SUMS and still verifies 59/59.

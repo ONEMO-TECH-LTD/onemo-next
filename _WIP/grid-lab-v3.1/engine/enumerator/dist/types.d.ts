@@ -29,7 +29,7 @@ export interface PopulationInput {
 export interface ArrangementGrammarInput {
     readonly schema: "magnetic-grid-candidate-enumerator/grammar/v1";
     readonly populations: readonly PopulationInput[];
-    /** The four authoritative families. Unknown or missing family keys are rejected. */
+    /** The five authoritative families. Unknown or missing family keys are rejected. */
     readonly families: {
         readonly single: Record<string, never>;
         readonly run: {
@@ -50,7 +50,7 @@ export interface EnumerateCandidatesInput {
     readonly grammar: ArrangementGrammarInput;
 }
 export interface CandidateStepJson {
-    /** Signed for runs; non-negative span for the other three families. */
+    /** Signed for runs; zero for singles; non-negative span for the remaining families. */
     readonly column: DecimalInteger;
     readonly row: DecimalInteger;
 }

@@ -5,10 +5,12 @@
       "input": "inputs/completeness-two-held.json",
       "expected": "expected/completeness-two-held.canonical.json",
       "handEnumeratedFamilies": [
+        "single",
+        "single",
         "run",
         "full-window"
       ],
-      "handEnumeratedCandidateCount": "2"
+      "handEnumeratedCandidateCount": "4"
     }
   ]
 }
