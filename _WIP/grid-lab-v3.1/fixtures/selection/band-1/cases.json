@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "band": {
+    "id": 1,
+    "sizeRangeMm": [24, 72],
+    "populationPitchMm": 48,
+    "expectedHeldCount": 1
+  },
+  "canonSource": "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-grid-canvas/_WIP/grid-engine-v3/selection-examples/band-1-24-72mm/description.md",
+  "membershipSemantics": "An expected case passes when at least one neutral raw candidate satisfies every requiredCandidate field. The counterexample remains lawful raw evidence but must not outrank the smaller expected duck placement in the selection layer.",
+  "cases": [
+    {
+      "id": "band1-duck-60-head-top-tight",
+      "role": "expected",
+      "shape": "DUCK",
+      "outlineSource": "../../../../grid-engine-v3/image cutouts/DUCK.png",
+      "manufacturedSizeMm": 60,
+      "screenshot": "images/expected-60mm-head-top-tight.png",
+      "screenshotSha256": "e9fe60a126e4c09c3afc153aebadc82ef8e1f5dbddf545ead3021c41e58bd03e",
+      "requiredCandidate": {
+        "populationPitchMm": 48,
+        "heldCount": 1,
+        "allDiscsContained": true,
+        "siteConstraint": { "kind": "top-half" }
+      },
+      "selectionFacts": ["gravity-top-held", "tight-wrap"]
+    },
+    {
+      "id": "band1-batwoman-60-head-top",
+      "role": "expected",
+      "shape": "BAT-WOMAN",
+      "outlineSource": "../../../../grid-engine-v3/image cutouts/BAT-WOMAN.png",
+      "manufacturedSizeMm": 60,
+      "screenshot": "images/expected-batwoman-60mm-head-top.png",
+      "screenshotSha256": "dcc50d615fb35c98c107adf9e0981e275624c07d0337c93bde17d323acb0c490",
+      "requiredCandidate": {
+        "populationPitchMm": 48,
+        "heldCount": 1,
+        "allDiscsContained": true,
+        "siteConstraint": { "kind": "top-half" }
+      },
+      "selectionFacts": ["gravity-top-held"]
+    },
+    {
+      "id": "band1-butterfly-60-body",
+      "role": "expected",
+      "shape": "BUTTERFLY",
+      "outlineSource": "../../../../grid-engine-v3/image cutouts/BUTTERFLY.png",
+      "manufacturedSizeMm": 60,
+      "screenshot": "images/expected-butterfly-60mm-body.png",
+      "screenshotSha256": "d4621f1f3bce65951209c2897733b89dfa67b7d816df0e8a04b0d9e7e92ab523",
+      "requiredCandidate": {
+        "populationPitchMm": 48,
+        "heldCount": 1,
+        "allDiscsContained": true,
+        "siteConstraint": { "kind": "maximum-clearance-region" }
+      },
+      "selectionFacts": ["availability-overrides-top-preference", "widest-contained-region"]
+    },
+    {
+      "id": "band1-pill-60-centre",
+      "role": "expected",
+      "shape": "PILL",
+      "outlineSource": "../../../../grid-engine-v3/image cutouts/PILL.png",
+      "manufacturedSizeMm": 60,
+      "screenshot": "images/expected-pill-60mm-centre.png",
+      "screenshotSha256": "86846fe2ece619ebd910579917b9542377dc8ad1a0a439e15e1dfd9fec66ad0b",
+      "requiredCandidate": {
+        "populationPitchMm": 48,
+        "heldCount": 1,
+        "allDiscsContained": true,
+        "siteConstraint": { "kind": "shape-centre-region" }
+      },
+      "selectionFacts": ["widest-contained-region", "tight-wrap"]
+    },
+    {
+      "id": "band1-poke1-60-head-centre",
+      "role": "expected",
+      "shape": "POKE1",
+      "outlineSource": "../../../../grid-engine-v3/image cutouts/POKE1.png",
+      "manufacturedSizeMm": 60,
+      "screenshot": "images/expected-poke1-60mm-head-centre.png",
+      "screenshotSha256": "35af8cd5ca593272f29eca0db21bf0cd046e0612189d7c006cb8575f106756c9",
+      "requiredCandidate": {
+        "populationPitchMm": 48,
+        "heldCount": 1,
+        "allDiscsContained": true,
+        "siteConstraint": { "kind": "top-half", "tieBreak": "maximum-clearance-region" }
+      },
+      "selectionFacts": ["widest-contained-region", "head-centre"]
+    },
+    {
+      "id": "band1-duck-96-centred-counterexample",
+      "role": "counterexample",
+      "shape": "DUCK",
+      "outlineSource": "../../../../grid-engine-v3/image cutouts/DUCK.png",
+      "manufacturedSizeMm": 96,
+      "screenshot": "images/engine-wrong-96mm-centred-head.png",
+      "screenshotSha256": "b27958f51b8b54e1c2be0079756ee178536e439c6a2e45d5424a85f300e5d0d4",
+      "rawCandidateAllowed": true,
+      "selectionConstraint": {
+        "mustNotOutrankCaseId": "band1-duck-60-head-top-tight",
+        "reason": "The smaller 60 mm top-held tight-wrap placement exists; centred-only enumeration incorrectly made 96 mm the first answer."
+      }
+    }
+  ]
+}
