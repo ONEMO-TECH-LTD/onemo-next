@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { listCandidates } from '../bridge'
-import { selectRegistration, RELEASED } from '../spec'
+import { enumerateArrangements, type IndexedSite } from '../enumerate'
+import { RELEASED } from '../spec'
 
 const square = (half: number): Array<[number, number]> => [
   [-half, -half],
@@ -9,21 +10,47 @@ const square = (half: number): Array<[number, number]> => [
   [-half, half],
 ]
 
-function specGap() {
-  const r = selectRegistration(RELEASED, 'gap')
-  if (r.refused) throw new Error('gap refused')
-  return r.spec
-}
+describe('enumerateArrangements', () => {
+  it('emits every run length ≥ 2 on four consecutive held sites', () => {
+    const sites: IndexedSite[] = [0, 1, 2, 3].map((col) => ({
+      col,
+      row: 0,
+      x: col * 48,
+      y: 0,
+      fits: true,
+    }))
+    const runs = enumerateArrangements(sites, 'base').filter((a) => a.family === 'run' && a.stepCol === 1 && a.stepRow === 0)
+    const lens = new Set(runs.map((a) => a.sites.length))
+    expect(lens.has(2)).toBe(true)
+    expect(lens.has(3)).toBe(true)
+    expect(lens.has(4)).toBe(true)
+    expect(runs.some((a) => a.sites.map((s) => s.col).join(',') === '0,1')).toBe(true)
+    expect(runs.some((a) => a.sites.map((s) => s.col).join(',') === '0,1,2')).toBe(true)
+  })
+
+  it('builds a sparse full window on even base indices', () => {
+    const sites: IndexedSite[] = []
+    for (const col of [0, 2]) {
+      for (const row of [0, 2]) {
+        sites.push({ col, row, x: col * 48, y: row * 48, fits: true })
+      }
+    }
+    const wins = enumerateArrangements(sites, 'sparse').filter((a) => a.family === 'full-window')
+    expect(wins.some((a) => a.sites.length === 4 && a.stepCol === 1 && a.stepRow === 1)).toBe(true)
+  })
+})
 
 describe('collectCandidates — shipped entry', () => {
-  it('flush-fits a 2×2 on a 72mm square (gap registration)', () => {
-    const doc = listCandidates(specGap(), square(36))
+  it('flush-fits a 2×2 on a 72mm square under gap parity even if the spec is point', () => {
+    const doc = listCandidates(RELEASED, square(36))
     const corners = doc.candidates.filter(
       (c) =>
         c.sizeMM === 72 &&
         c.family === 'rectangle-corners' &&
         c.population === 'base' &&
-        c.sites.length === 4,
+        c.sites.length === 4 &&
+        c.registration.x === 'gap' &&
+        c.registration.y === 'gap',
     )
     expect(corners.length).toBeGreaterThan(0)
     const one = corners[0]
@@ -54,7 +81,7 @@ describe('collectCandidates — shipped entry', () => {
   })
 
   it('emits a diagonal run and a skipped-row rectangle on a large square', () => {
-    const doc = listCandidates(specGap(), square(84))
+    const doc = listCandidates(RELEASED, square(84))
     const diagonal = doc.candidates.filter(
       (c) => c.family === 'run' && c.stepCol >= 1 && c.stepRow >= 1 && c.sites.length >= 2,
     )

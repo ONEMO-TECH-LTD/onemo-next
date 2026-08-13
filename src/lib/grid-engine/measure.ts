@@ -1,7 +1,12 @@
 // Disc-fit only. Sites arrive from magnetsInRegion. No lattice of our own.
+// BigInt via constructor — repo tsc target is ES2017, which rejects 0n literals.
 
 import type { PointMM } from './engine'
 import type { GridSpec } from './spec'
+
+const ZERO = BigInt(0)
+const THREE = BigInt(3)
+const SAMPLE = BigInt(16)
 
 export interface PreparedOutline {
   verts: Array<{ x: bigint; y: bigint }>
@@ -53,10 +58,9 @@ function interior(p: PreparedOutline, qx: bigint, qy: bigint): boolean {
     const cross = (yi > qy) !== (yj > qy)
     if (!cross) continue
     const den = yj - yi
-    // x < (xj-xi)*(qy-yi)/den + xi
     const lhs = (qx - xi) * den
     const rhs = (xj - xi) * (qy - yi)
-    if (den > 0n ? lhs < rhs : lhs > rhs) inside = !inside
+    if (den > ZERO ? lhs < rhs : lhs > rhs) inside = !inside
   }
   return inside
 }
@@ -67,9 +71,9 @@ function dist2Seg(qx: bigint, qy: bigint, ax: bigint, ay: bigint, bx: bigint, by
   const wx = qx - ax
   const wy = qy - ay
   const L = vx * vx + vy * vy
-  if (L === 0n) return wx * wx + wy * wy
+  if (L === ZERO) return wx * wx + wy * wy
   const h = wx * vx + wy * vy
-  if (h <= 0n) return wx * wx + wy * wy
+  if (h <= ZERO) return wx * wx + wy * wy
   if (h >= L) {
     const dx = qx - bx
     const dy = qy - by
@@ -89,7 +93,7 @@ function minDist2(p: PreparedOutline, qx: bigint, qy: bigint): bigint {
     const d = dist2Seg(qx, qy, a.x, a.y, b.x, b.y)
     if (best === null || d < best) best = d
   }
-  return best ?? 0n
+  return best ?? ZERO
 }
 
 /** Full disc fits: centre interior and boundary distance ≥ radius. Equality passes. */
@@ -110,9 +114,9 @@ export function bboxCenter(prep: PreparedOutline): PointMM {
 }
 
 export function centroidMM(prep: PreparedOutline): PointMM {
-  let twice = 0n
-  let cx6 = 0n
-  let cy6 = 0n
+  let twice = ZERO
+  let cx6 = ZERO
+  let cy6 = ZERO
   const vs = prep.verts
   const n = vs.length
   for (let i = 0; i < n; i++) {
@@ -123,8 +127,8 @@ export function centroidMM(prep: PreparedOutline): PointMM {
     cx6 += (a.x + b.x) * cross
     cy6 += (a.y + b.y) * cross
   }
-  if (twice === 0n) return bboxCenter(prep)
-  const den = 3n * twice
+  if (twice === ZERO) return bboxCenter(prep)
+  const den = THREE * twice
   return [Number(cx6) / Number(den) / 1000, Number(cy6) / Number(den) / 1000]
 }
 
@@ -132,12 +136,11 @@ export function centroidMM(prep: PreparedOutline): PointMM {
 export function maxClearanceMM(prep: PreparedOutline): PointMM {
   const w = prep.maxX - prep.minX
   const h = prep.maxY - prep.minY
-  const N = 16n
   let best: { x: bigint; y: bigint; d2: bigint } | null = null
-  for (let i = 0n; i <= N; i++) {
-    for (let j = 0n; j <= N; j++) {
-      const x = prep.minX + (w * i) / N
-      const y = prep.minY + (h * j) / N
+  for (let i = ZERO; i <= SAMPLE; i++) {
+    for (let j = ZERO; j <= SAMPLE; j++) {
+      const x = prep.minX + (w * i) / SAMPLE
+      const y = prep.minY + (h * j) / SAMPLE
       if (!interior(prep, x, y)) continue
       const d2 = minDist2(prep, x, y)
       if (!best || d2 > best.d2) best = { x, y, d2 }

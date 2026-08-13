@@ -1,4 +1,5 @@
 // Grammar → arrangements. Held mask in. No scores.
+// Sparse sites are remeshed to population coordinates (0,1,2…) so loops use unit stride.
 
 export type Family = 'single' | 'run' | 'rectangle-corners' | 'corner-triangle' | 'full-window'
 export type Population = 'base' | 'sparse'
@@ -31,10 +32,22 @@ function heldAt(map: Map<string, IndexedSite>, col: number, row: number): Indexe
   return s?.fits ? s : undefined
 }
 
+/** Base lattice indices → one step = one populated neighbour on this population. */
+export function toPopulationCoords(sites: IndexedSite[], population: Population): IndexedSite[] {
+  if (population === 'base') return sites
+  const out: IndexedSite[] = []
+  for (const s of sites) {
+    if (s.col % 2 !== 0 || s.row % 2 !== 0) continue
+    out.push({ ...s, col: s.col / 2, row: s.row / 2 })
+  }
+  return out
+}
+
 export function enumerateArrangements(sites: IndexedSite[], population: Population): Arrangement[] {
-  const held = sites.filter((s) => s.fits)
+  const mesh = toPopulationCoords(sites, population)
+  const held = mesh.filter((s) => s.fits)
   if (held.length === 0) return []
-  const map = new Map(sites.map((s) => [`${s.col},${s.row}`, s] as const))
+  const map = new Map(mesh.map((s) => [`${s.col},${s.row}`, s] as const))
   const out: Arrangement[] = []
   const seen = new Set<string>()
 
@@ -64,13 +77,13 @@ export function enumerateArrangements(sites: IndexedSite[], population: Populati
           if (!n) break
           run.push(n)
         }
-        if (run.length >= 2) {
+        for (let len = 2; len <= run.length; len++) {
           push({
             family: 'run',
             population,
             stepCol: Math.abs(dc * step),
             stepRow: Math.abs(dr * step),
-            sites: run,
+            sites: run.slice(0, len),
           })
         }
       }

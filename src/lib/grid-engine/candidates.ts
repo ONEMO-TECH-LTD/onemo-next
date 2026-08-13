@@ -2,7 +2,6 @@
 
 import {
   magnetsInRegion,
-  registrationOffsetMM,
   type PointMM,
   type RegionMM,
 } from './engine'
@@ -21,13 +20,17 @@ import {
   type AnchorKind,
   type BandId,
   type GridSystemSpec,
+  type Registration,
 } from './spec'
+
+export type AxisRegistration = { x: Registration; y: Registration }
 
 export interface Candidate {
   id: string
   band: BandId
   sizeMM: number
   anchor: AnchorKind
+  registration: AxisRegistration
   family: Arrangement['family']
   population: Arrangement['population']
   stepCol: number
@@ -38,6 +41,13 @@ export interface Candidate {
 export interface CandidateDocument {
   candidates: Candidate[]
 }
+
+const HALF_PITCH_ORIGINS: readonly AxisRegistration[] = [
+  { x: 'point', y: 'point' },
+  { x: 'gap', y: 'gap' },
+  { x: 'gap', y: 'point' },
+  { x: 'point', y: 'gap' },
+]
 
 function fieldOf(spec: GridSystemSpec): RegionMM {
   const half = ((spec.grid.positionsPerAxis - 1) * spec.grid.basePitchMM) / 2
@@ -60,22 +70,12 @@ function formBbox(verts: ReadonlyArray<PointMM>): { cx: number; cy: number; long
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, longest: Math.max(w, h) }
 }
 
-/** Scale the locked form so its longest side is sizeMM. Aspect locked. 1mm floor. */
+/** Uniform scale about the form centre. No rounding, no vertex drop. */
 export function scaleToSize(verts: ReadonlyArray<PointMM>, sizeMM: number): PointMM[] {
   const { cx, cy, longest } = formBbox(verts)
   if (longest <= 0) return verts.map(([x, y]) => [x, y])
   const k = sizeMM / longest
-  const out: PointMM[] = []
-  for (const [x, y] of verts) {
-    const p: PointMM = [Math.round((x - cx) * k), Math.round((y - cy) * k)]
-    const last = out[out.length - 1]
-    if (last && last[0] === p[0] && last[1] === p[1]) continue
-    out.push(p)
-  }
-  if (out.length > 1 && out[0][0] === out[out.length - 1][0] && out[0][1] === out[out.length - 1][1]) {
-    out.pop()
-  }
-  return out.length >= 3 ? out : verts.map(([x, y]) => [(x - cx) * k, (y - cy) * k])
+  return verts.map(([x, y]) => [(x - cx) * k, (y - cy) * k])
 }
 
 function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[] {
@@ -84,13 +84,16 @@ function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[]
 
 function placeOnAnchor(scaled: PointMM[], kind: AnchorKind): PointMM[] {
   const prep = prepareOutline(scaled)
-  const target: PointMM = [0, 0]
   const src =
     kind === 'bbox' ? bboxCenter(prep) : kind === 'centroid' ? centroidMM(prep) : maxClearanceMM(prep)
-  return shift(scaled, target[0] - src[0], target[1] - src[1])
+  return shift(scaled, -src[0], -src[1])
 }
 
-function indexSites(points: PointMM[], origin: PointMM, pitch: number): Array<{ col: number; row: number; x: number; y: number }> {
+function indexSites(
+  points: PointMM[],
+  origin: PointMM,
+  pitch: number,
+): Array<{ col: number; row: number; x: number; y: number }> {
   return points.map(([x, y]) => ({
     col: Math.round((x - origin[0]) / pitch),
     row: Math.round((y - origin[1]) / pitch),
@@ -99,16 +102,8 @@ function indexSites(points: PointMM[], origin: PointMM, pitch: number): Array<{ 
   }))
 }
 
-function thin(sites: IndexedSite[]): IndexedSite[] {
-  return sites.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
-}
-
-function coarsen(verts: ReadonlyArray<PointMM>): PointMM[] {
-  if (verts.length <= 400) return verts.map(([x, y]) => [x, y])
-  const step = Math.ceil(verts.length / 400)
-  const out: PointMM[] = []
-  for (let i = 0; i < verts.length; i += step) out.push([verts[i][0], verts[i][1]])
-  return out.length >= 3 ? out : verts.map(([x, y]) => [x, y])
+function originOf(reg: AxisRegistration, half: number): PointMM {
+  return [reg.x === 'gap' ? half : 0, reg.y === 'gap' ? half : 0]
 }
 
 export function collectCandidates(
@@ -116,9 +111,7 @@ export function collectCandidates(
   outline: ReadonlyArray<PointMM>,
 ): CandidateDocument {
   if (outline.length < 3) return { candidates: [] }
-  outline = coarsen(outline)
-  const offset = registrationOffsetMM(spec.grid, spec.registration)
-  const origin: PointMM = [offset, offset]
+  const half = spec.grid.basePitchMM / 2
   const dense = { ...spec.grid, pitchMM: spec.grid.basePitchMM }
   const field = fieldOf(spec)
   const candidates: Candidate[] = []
@@ -130,39 +123,45 @@ export function collectCandidates(
       for (const anchor of ANCHORS) {
         const placed = placeOnAnchor(scaled, anchor)
         const prep: PreparedOutline = prepareOutline(placed)
-        const raw = magnetsInRegion(dense, field, offset, [0, 0])
-        const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
-        const base: IndexedSite[] = indexed.map((s) => ({
-          ...s,
-          fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
-        }))
-        const packs: Array<{ population: 'base' | 'sparse'; sites: IndexedSite[] }> = [
-          { population: 'base', sites: base },
-          { population: 'sparse', sites: thin(base) },
-        ]
-        for (const pack of packs) {
-          for (const arr of enumerateArrangements(pack.sites, pack.population)) {
-            const id = [
-              band,
-              sizeMM,
-              anchor,
-              arr.family,
-              arr.population,
-              arr.stepCol,
-              arr.stepRow,
-              arr.sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
-            ].join(':')
-            candidates.push({
-              id,
-              band,
-              sizeMM,
-              anchor,
-              family: arr.family,
-              population: arr.population,
-              stepCol: arr.stepCol,
-              stepRow: arr.stepRow,
-              sites: arr.sites.map((s) => ({ col: s.col, row: s.row, x: s.x, y: s.y })),
-            })
+        for (const registration of HALF_PITCH_ORIGINS) {
+          const origin = originOf(registration, half)
+          const raw = magnetsInRegion(dense, field, 0, origin)
+          const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
+          const measured: IndexedSite[] = indexed.map((s) => ({
+            ...s,
+            fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
+          }))
+          const packs: Array<{ population: 'base' | 'sparse'; sites: IndexedSite[] }> = [
+            { population: 'base', sites: measured },
+            { population: 'sparse', sites: measured },
+          ]
+          for (const pack of packs) {
+            for (const arr of enumerateArrangements(pack.sites, pack.population)) {
+              const id = [
+                band,
+                sizeMM,
+                anchor,
+                registration.x,
+                registration.y,
+                arr.family,
+                arr.population,
+                arr.stepCol,
+                arr.stepRow,
+                arr.sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
+              ].join(':')
+              candidates.push({
+                id,
+                band,
+                sizeMM,
+                anchor,
+                registration,
+                family: arr.family,
+                population: arr.population,
+                stepCol: arr.stepCol,
+                stepRow: arr.stepRow,
+                sites: arr.sites.map((s) => ({ col: s.col, row: s.row, x: s.x, y: s.y })),
+              })
+            }
           }
         }
       }
