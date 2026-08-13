@@ -13,9 +13,10 @@
 //                nothing headless can decide it: the case reports NEEDS-EYE and the visual arm
 //                (render the candidate on the page, compare with Dan's screenshot) closes it.
 //
-// A case only reports PRESENT when structure matches AND every region claim it makes is confirmed.
-// No case ever passes on structure alone. Output of this file is a finding, not a verdict, until
-// it has been through QA.
+// A reconciled case only reports PRESENT when structure matches AND every region claim it makes is
+// confirmed. A description-sourced case is UNTESTABLE in both directions until reconciled and
+// promoted to `dan-words` or `screenshot`. Output of this file is a finding, not a verdict, until it
+// has been through QA.
 
 import { readFileSync } from "node:fs";
 import { measureLattice } from "../engine/magnetic-grid-measurement-kernel/dist/index.js";
@@ -313,29 +314,29 @@ for (const testCase of CASES) {
       // EVERY structural match is examined. Stopping at the first one let a candidate that failed
       // a computable region test hide a later one that would have passed — a false absence.
       // (QA finding 1, @s62-pixel-grid-pixel.)
-      let reportedHere = false;
       for (const candidate of doc.candidates) {
         if (!testCase.structure(candidate)) continue;
         const where = candidate.positions.map((p) => `${p.column},${p.row}`).join(" ");
         if (testCase.region.kind === "computable") {
-          if (testCase.region.test(candidate, ctx)) { hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`); reportedHere = true; break; }
+          if (testCase.region.test(candidate, ctx)) { hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`); break; }
           structuralOnly += 1;
           continue;                                   // keep looking in this measurement
         }
         if (testCase.region.kind === "structural") hits.push(`CONFIRMED ${anchorName}/${originName} [${where}]`);
         else hits.push(`NEEDS-EYE  ${anchorName}/${originName} [${where}]`);
-        reportedHere = true;
         break;
       }
-      void reportedHere;
     }
   }
 
   const confirmed = hits.filter((h) => h.startsWith("CONFIRMED"));
   const eyed = hits.filter((h) => h.startsWith("NEEDS-EYE"));
   let status = confirmed.length ? "PRESENT" : eyed.length ? "NEEDS-EYE" : "NOT-FOUND";
-  // an unverified claim that finds nothing proves nothing about an engine
-  if (status === "NOT-FOUND" && testCase.source === "description") status = "UNTESTABLE";
+  // The claim source governs BOTH directions. An unverified claim proves nothing about an engine
+  // whether it misses OR hits: a match would merely mean the engine agrees with unchecked prose.
+  // Such a case stays UNTESTABLE until its geometry is reconciled and promoted to dan-words or
+  // screenshot. (QA, @s62-pixel-grid-pixel — the earlier version guarded only misses.)
+  if (testCase.source === "description") status = "UNTESTABLE";
   if (status === "PRESENT") present += 1;
   else if (status === "NEEDS-EYE") needsEye += 1;
   else if (status === "UNTESTABLE") untestable += 1;
