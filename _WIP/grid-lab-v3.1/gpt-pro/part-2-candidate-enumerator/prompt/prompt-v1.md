@@ -29,7 +29,7 @@ If any sentence here admits two materially different formal readings, expose the
 
 ## Output
 
-Per candidate: stable canonical ID; the size and registration it belongs to; family and its per-axis steps; exact lattice indices and exact coordinates; the supporting kernel facts by reference, never recomputed.
+Per candidate: stable canonical ID; the size it belongs to, as that size is identified in the kernel document; family, population and per-axis steps; exact lattice indices and exact coordinates; the supporting kernel facts by reference, never recomputed. Nothing beyond what the kernel document carries — anchoring and registration semantics belong to the caller and are not this layer's to report or infer.
 
 The complete set is returned in a canonical deterministic order. Canonical order is not ranking; nothing may be marked preferred, best or default.
 
