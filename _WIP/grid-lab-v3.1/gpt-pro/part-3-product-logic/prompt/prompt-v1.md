@@ -4,7 +4,7 @@ Now build the third and final layer: product logic. It consumes the candidate se
 
 ## What it does
 
-Input: the enumerator's candidate document, unchanged and immutable, plus the explicit product rules below. It never recomputes geometry, never creates a candidate, never removes one from the raw set, and never hides the raw set. It returns the complete set with an ordering over it, and a reason trace for every judgement it makes.
+Inputs, all immutable: the enumerator's candidate document; the kernel measurement document its candidates reference by pointer, so the exact clearances and limiting witnesses behind each position are readable rather than reconstructed; and the explicit product rules and rule inputs below. It never recomputes geometry, never creates a candidate, never removes one, and never hides the raw set.
 
 ## The product rules
 
@@ -14,9 +14,9 @@ These are rulings, not derivations. Implement exactly these, and no others.
 
 **Tight wrap, second.** Among candidates that satisfy gravity, prefer the one whose material wraps its held positions most closely — least unsupported material extending beyond them. A narrower arrangement that still covers the shape's masses outranks a wider one.
 
-**Regional support.** A candidate may contain every disc correctly and still be wrong: valid positions can cluster in one mass of the shape and leave another unsupported. Regional support is therefore its own judgement and must never be reduced to how many discs are contained, or to how far apart they are.
+**Regional support.** A candidate may contain every disc correctly and still be wrong: valid positions can cluster in one mass of the shape and leave another unsupported. Regional support is its own judgement and must never be reduced to how many discs are contained, or how far apart they are. Its precedence against gravity and tight wrap is NOT settled: report it separately for every candidate, and let it affect the order only through an explicitly supplied precedence. Never merge it into another measure to obtain a total order.
 
-**Escalation.** When no candidate at a given size supports the shape's masses without leaving one badly unsupported, a fuller arrangement at a larger size may rank above every candidate at the smaller size. Size alone is not a preference in either direction.
+**Escalation is per band, not per size.** Bands group sizes; the candidate document does not carry them, so the band of each size and the order of bands are explicit inputs. When no candidate within a band supports the shape's masses without leaving one badly unsupported, a fuller arrangement in the next band may rank above every candidate in that band. A larger size is not itself a preference.
 
 **Arrangement class carries across sizes.** The same shape may keep its arrangement class as size grows, with its positions landing on wider steps. A larger size does not imply a larger or denser arrangement.
 
@@ -30,9 +30,10 @@ Where a rule above cannot be computed from the supplied facts, do not invent a t
 
 The complete candidate set, unchanged, plus:
 
-- a total order over it, deterministic and reproducible from the same inputs;
-- for every candidate, the judgements applied to it with the exact values they used;
-- for every ordering decision, which rule decided it and why.
+- an order over it, deterministic and reproducible from the same inputs, using only the rules whose precedence is supplied;
+- for every candidate, its status — preferred, acceptable, or rejected — because an order alone loses the distinction between a lower-ranked lawful answer and one we refuse;
+- for every candidate, the judgements applied to it with the exact values they used, including regional support reported on its own;
+- for every ordering decision, which rule decided it and why; and for any pair the supplied precedence cannot separate, that fact stated rather than broken by an invented tie-break.
 
 No candidate is marked as the answer. Ordering is the output; choosing is ours.
 
@@ -49,7 +50,8 @@ Attached are decided examples: for a given shape and size, the arrangement we ac
 - A low cluster loses to a candidate holding the top, on a fixture where both are lawful.
 - A narrower arrangement covering the same masses outranks a wider one.
 - A candidate whose positions all sit in one mass ranks below one spread across the shape's masses, on a fixture where both contain every disc.
-- A fuller arrangement at a larger size outranks every candidate at a smaller size when the smaller ones leave a mass unsupported.
+- A fuller arrangement in the next band outranks every candidate in a band whose members all leave a mass unsupported.
+- A lawful lower-ranked candidate is marked acceptable, not rejected; a refused one is marked rejected and stays in the set.
 - Identical inputs produce identical bytes; supplied rule inputs changed produce a different, explained order.
 - The kernel's 18 and the enumerator's 13 tests still pass, unchanged.
 
