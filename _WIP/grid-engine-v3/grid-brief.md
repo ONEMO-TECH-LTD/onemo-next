@@ -2039,3 +2039,15 @@ decode
 **11:38:32**
 
 wait the algorithm must analise shape and bands in each band range it must provide answers what combinations fit precisely grid+ shape proportions aspect ratio locked and scalled to fine tune the fit in the band - if the band is not possible to apply minimum using a pair (2 vertical or horizontal p[oints fittin and centering in the shape ) what is the next band and magnet quantity fits ?
+
+**2026-08-13 12:16:47**
+
+ok lets analyse current state of proposed placements i consider only green ones and will be sending 1 by 1
+
+**12:18:31**
+
+what it was supposed to be instead is this [60mm, one magnet panned into the duck's head] - 1 magnet fits fully in the top half - because the law says gravity must not place magnets in the bottom and leave top unprotected - if only one magnet can be placed top is preference it will hold and not unstick- also the tight fit law - is the preference to select sizes with minimal flap around magnets - you can see shape in this position is tightly wrapped by the duck head shape
+
+**12:35**
+
+so this was band 1 24mm-72mm trange and 1 magnet ----- add the brief and laws if not in the grid-laws and briefs - we need to makee sure we document the clear guidance on how the engine selection must work in each band

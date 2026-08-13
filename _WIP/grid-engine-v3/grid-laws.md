@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Eighteen laws, and one above them. The engine and its algorithm. Nothing else.
+### Twenty laws, and one above them. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -720,3 +720,37 @@ separately, never merged into a score.
 
 **O-4 — curve identity.** Tessellation changes a discrete outcome (a 124- vs 240-point circle). Carried
 from v1, unresolved, and affects generated shapes only — not traced cut-outs.
+
+**L20 — SELECTION: GRAVITY FIRST, THEN THE TIGHT WRAP. Per band, over ENUMERATED placements.**
+*Dan, 2026-08-13 12:18 @lead, on the duck walkthrough — this closes the ordering L19's tail left
+open ("what 'optimal' orders by — awaiting Dan").*
+
+> "the law says gravity must not place magnets in the bottom and leave top unprotected - if only one
+> magnet can be placed top is preference it will hold and not unstick" · "the tight fit law - is the
+> preference to select sizes with minimal flap around magnets - you can see shape in this position is
+> tightly wrapped by the duck head shape" · "so this was band 1 24mm-72mm range and 1 magnet" · "we
+> need to make sure we document the clear guidance on how the engine selection must work in each band"
+
+**GRAVITY.** A hanging effect peels from the top: an unheld top unsticks. Selection therefore prefers
+placements that hold the TOP of the shape; magnets never cluster low leaving the top unprotected.
+With a single magnet, it holds the top half. (Gravity was already one of L11's balance components;
+this names it FIRST among the selection preferences.)
+
+**TIGHT WRAP.** Among placements that satisfy gravity, prefer the size whose material wraps the held
+discs with minimal flap around them — the duck's head enclosing the disc nearly edge to edge at 60mm
+is the canon picture. (This is L11's "hug", now explicitly the size selector after gravity.)
+
+**ENUMERATION IS THE PRECONDITION — measured, not argued.** At 60mm the centred 1×1 candidate sits in
+the duck's neck and reports ZERO held, while a full disc fits cleanly in the head at that same size.
+The right answer existed and was never proposed. So candidates are EVERY window placement on the
+lattice — every sub-window size at every offset inside the field, deduped by held set (spec §3:
+enumerate, never search) — and gravity + tight-wrap order them. Centred templates alone are not the
+candidate set; they are three of its members.
+
+**PER BAND — the guidance table this law owes:**
+- **Band 1 (24–72mm, one magnet):** RULED, above — single disc, top half, tight-wrapped. Duck: head
+  placement at 60mm, not "0 held" at the neck.
+- **Bands 2–4:** the same two preferences over the enumerated placements, with L15's ordered scale
+  (four corners at the edge as optimum, pair as floor) picking the arrangement class. Per-band rows
+  are being ruled by Dan on the live walkthrough (2026-08-13) and are booked here as each lands —
+  do not invent the unwalked rows.
