@@ -1,42 +1,60 @@
-# The canon membership test — attempted, failed QA, deleted. Why it cannot exist yet.
+# The canon membership test — v1 failed QA, v2 rebuilt, and what v2 found
 
-**2026-08-13.** @s62-kai-lead wrote a headless harness to ask, per placement Dan decided in the
-walkthrough: is a candidate of that shape present in the raw set produced by kernel → enumerator?
-It was written **without prior report or QA** — Dan's correction: *"why are you buildijg harness on
-your own volition - vibe coding is foebidden - at least fucking report what it is and run by pixel
-for qa?"* Reported, submitted to @s62-pixel-grid-pixel, verdict **FAIL** on both axes. Its run —
-"5 of 10 present" — is withdrawn: it decided nothing about track 1, track 2 or the grok MVP.
+## v1 — failed, withdrawn
 
-Code deleted rather than kept behind a warning header (a test that proves nothing, preserved by a
-document explaining why it proves nothing, is the cemetery this repo deletes). Recoverable from
-git history at `6b1e9567` under `_WIP/grid-lab-v3.1/harness/`.
+Written 2026-08-13 ~19:24 **without prior report or QA** (Dan's correction: *"why are you buildijg
+harness on your own volition - vibe coding is foebidden - at least fucking report what it is and run
+by pixel for qa?"*). Submitted to @s62-pixel-grid-pixel; verdict **FAIL** on both axes. Its result —
+"5 of 10 present" — is withdrawn. Findings:
 
-## The three findings
+1. Predicates tested arrangement *structure* only, never the ruled location, so passes could be
+   false and failures were not engine findings.
+2. Predicates were loose where the canon states exact millimetres.
+3. The max-clearance anchor was a 49 × 49 float sample, not O-1's construction.
 
-1. **The claim was unsupported.** Every predicate tested arrangement *structure*, never the ruled
-   location. duck60 accepted any single, belly included; bat-woman accepted any three corners
-   rather than the top plus the two utmost base corners; pill accepted any diagonal. All passes
-   were possible false passes; no failure was an engine finding.
-2. **Predicates were loose where the canon is exact.** duck 152mm is 48 × 96mm → base spans (1,2),
-   not "unequal with one > 1"; butterfly 130mm and poke1 123mm are 96 × 96 → (2,2), not ">= 2";
-   bot 144mm is (1,2), not any h > w; bot 236mm is column span 2 with a larger vertical span;
-   pill 79mm is diagonal *base neighbours*, per-axis step 1. Requiring `population === "sparse"`
-   for butterfly 214mm is itself wrong — the same four positions are lawfully reachable on the
-   base population at step 2.
-3. **The max-clearance anchor was a sampled proxy** (best of a 49 × 49 bbox sample), not O-1's
-   construction. A miss under it establishes nothing about the lawful anchor domain.
+## v2 — rebuilt (harness/canon-membership.mjs)
 
-## The blocking reason — this is the part that outlives the harness
+- **Structure per case is quoted from the canon** and measured in BASE lattice indices, so a
+  four-corner square 96mm on a side is spans (2,2) whether emitted on the base or sparse population.
+- **Max-clearance is now a defined construction**: exact refined grid search, COARSE=64 divisions
+  then REFINEMENTS=8 passes subdividing by SUBDIV=8, every comparison an exact rational
+  cross-multiplication, ties to smallest x then y. Reproducible from those three constants.
+- **Region claims are reported, never assumed.** Computable ones ("the TOP half", "utmost corners")
+  are checked; the rest report NEEDS-EYE and are closed by the visual arm. No case passes on
+  structure alone.
+- **Trace orientation is measured, not assumed** — the narrow end of each outline is computed and
+  printed, so "top" is evidence rather than a convention.
 
-Findings 2 and 3 are fixable: the canon states exact millimetres, and max-clearance can be defined
-concretely. **Finding 1 is not fixable yet.** The canon names regions in words — "the head", "one
-per wing", "the top half", "utmost corners" — and a shape's masses have no computable definition.
-That is precisely the concept the part-3 prompt requires GPT to **name and not fill**. A membership
-test that proves Dan's placement rather than its silhouette therefore cannot exist ahead of part 3.
+## What v2 found — 3 confirmed · 2 needs-eye · 5 absent
 
-## Standing consequence
+**And the first absence checked turned out to be a defect in MY canon description, not the engine.**
 
-Headless membership testing is a smoke test here, never the decider. The decider between engines is
-Dan's eye on the raw candidate set on the running page — his ruling, 2026-08-13 13:32: headless
-proof kept certifying wrong engines through five attempts, and the only gate that ever caught a real
-defect was him looking at the running surface.
+`band-3/description.md` states butterfly 130mm as *"the held corners sit 96mm apart both ways"*.
+Dan's own words for that frame were only *"perfect example of band 2 grid in the band 3 shape"*.
+Reading his screenshot: shape 130 × 107mm at 4.8 px/mm, the four discs he selects are **215–230px
+apart ≈ 48mm** — an adjacent 2 × 2 square, which is exactly what "band 2 grid" means. The engine
+produces precisely that: 4 held at (-1,-1) (0,-1) (-1,0) (0,0), spans (1,1), at origin 24,24.
+The "96mm apart" is my transcription error, and it made a correct engine look wrong.
+
+96mm spacing was also *geometrically impossible* there — 96 + 24 = 120mm of vertical material
+needed against a 107mm-tall shape — which the test should have made me check before I wrote it.
+
+**Second reading, bot 144mm:** Dan's own numbers ("96mmx48mm narow 4") are correct — spans (1,2),
+shoulders and legs with the belly row skipped. The screenshot shows a lattice pitch of 48mm against
+a 107 × 144mm shape and three usable rows. The engine's best across the four half-pitch origins
+holds only two adjacent rows, spans (1,1). The screenshots show Dan's placements came from a
+**panned** lattice, so his accepted registrations are not necessarily reachable from the four
+half-pitch offsets of a bbox/centroid/max-clearance anchor. That is a live question about the lawful
+origin domain, not a proven engine defect.
+
+## Consequence — the descriptions are a lossy layer and must be verified before any engine is judged
+
+Between Dan's rulings and this test sits `selection-examples/*/description.md`, written by
+@s62-kai-lead from his screenshots. At least one of its geometric claims is false. **No engine may
+be judged against these descriptions until every geometric claim in them has been checked against
+the screenshot it describes** — pitch, which sites, exact spans — and corrected where it fails.
+
+The region claims that remain (`one per wing`, `head pair + body pair`) are closed the way Dan
+named: render the engine's candidate on the real page with Playwright and compare with his
+screenshot. No computable definition of a shape's masses is required for that, which is why the
+earlier claim that this test is blocked on part 3's region definition was wrong.
