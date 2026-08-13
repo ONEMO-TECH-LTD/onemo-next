@@ -107,6 +107,18 @@ export default function GridEnginePage() {
   const [spec, setSpec] = useState<GridSystemSpec>(RELEASED)
   // THE INSTRUMENT. Everything it holds came back through the bridge; the shell computes none of it.
   const measurement = useMeasurement(spec)
+  /**
+   * ONE SIZE, ONE CAMERA — the page law ("the shape is static and fills the viewport; the GRID
+   * scales underneath") applies to measured variants exactly as to the slider and the pinch.
+   * Selecting a variant sets THE size; the camera derives from it; the shape never moves on
+   * screen. Without this the instrument rescaled the shape against a fixed grid — backwards.
+   */
+  const measuredSizeMM = measurement.current ? Math.round(measurement.current.variant.sizeMm) : null
+  useEffect(() => {
+    if (measuredSizeMM !== null) setSize(measuredSizeMM)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSize is stable in behaviour; the
+    // size is the only input that may retrigger the camera.
+  }, [measuredSizeMM])
   const [unlocked, setUnlocked] = useState<ReadonlySet<GridKey>>(new Set())
   const [refused, setRefused] = useState<WriteRefusal | null>(null)
   // NO ZOOM. Dan, 2026-08-11: "the cutout is scaling incorrectly the grid must scale instead and pan
