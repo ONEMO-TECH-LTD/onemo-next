@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { listCandidates } from '../bridge'
-import { enumerateArrangements, type IndexedSite } from '../enumerate'
+import { enumerateArrangements, type SiteInput } from '../enumerate'
 import { RELEASED } from '../spec'
 
 const square = (half: number): Array<[number, number]> => [
@@ -12,7 +12,7 @@ const square = (half: number): Array<[number, number]> => [
 
 describe('enumerateArrangements', () => {
   it('emits every run length ≥ 2 on four consecutive held sites', () => {
-    const sites: IndexedSite[] = [0, 1, 2, 3].map((col) => ({
+    const sites: SiteInput[] = [0, 1, 2, 3].map((col) => ({
       col,
       row: 0,
       x: col * 48,
@@ -29,7 +29,7 @@ describe('enumerateArrangements', () => {
   })
 
   it('does not let a three-site run hide the pair 0-1', () => {
-    const sites: IndexedSite[] = [0, 1, 2].map((col) => ({
+    const sites: SiteInput[] = [0, 1, 2].map((col) => ({
       col,
       row: 0,
       x: col * 48,
@@ -44,7 +44,7 @@ describe('enumerateArrangements', () => {
   })
 
   it('builds a sparse full window on even base indices', () => {
-    const sites: IndexedSite[] = []
+    const sites: SiteInput[] = []
     for (const col of [0, 2]) {
       for (const row of [0, 2]) {
         sites.push({ col, row, x: col * 48, y: row * 48, fits: true })

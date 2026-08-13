@@ -5,7 +5,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { enumerateArrangements, registrationOf, type Arrangement, type IndexedSite } from './enumerate'
+import { enumerateArrangements, registrationOf, type Arrangement, type SiteInput } from './enumerate'
 import {
   bboxCenter,
   centroidMM,
@@ -127,11 +127,11 @@ export function collectCandidates(
           const origin = originOf(registration, half)
           const raw = magnetsInRegion(dense, field, 0, origin)
           const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
-          const measured: IndexedSite[] = indexed.map((s) => ({
+          const measured: SiteInput[] = indexed.map((s) => ({
             ...s,
             fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
           }))
-          const packs: Array<{ population: 'base' | 'sparse'; sites: IndexedSite[] }> = [
+          const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
             { population: 'base', sites: measured },
             { population: 'sparse', sites: measured },
           ]
