@@ -2039,3 +2039,65 @@ decode
 **11:38:32**
 
 wait the algorithm must analise shape and bands in each band range it must provide answers what combinations fit precisely grid+ shape proportions aspect ratio locked and scalled to fine tune the fit in the band - if the band is not possible to apply minimum using a pair (2 vertical or horizontal p[oints fittin and centering in the shape ) what is the next band and magnet quantity fits ?
+
+**2026-08-13 12:16:47**
+
+ok lets analyse current state of proposed placements i consider only green ones and will be sending 1 by 1
+
+**12:18:31**
+
+what it was supposed to be instead is this [60mm, one magnet panned into the duck's head] - 1 magnet fits fully in the top half - because the law says gravity must not place magnets in the bottom and leave top unprotected - if only one magnet can be placed top is preference it will hold and not unstick- also the tight fit law - is the preference to select sizes with minimal flap around magnets - you can see shape in this position is tightly wrapped by the duck head shape
+
+**12:35**
+
+so this was band 1 24mm-72mm trange and 1 magnet ----- add the brief and laws if not in the grid-laws and briefs - we need to makee sure we document the clear guidance on how the engine selection must work in each band
+
+**12:59**
+
+diagonal is also correct it does not introduce separate grid it is the same one
+
+**12:51**
+
+B2-3MAG [duck at 131mm] --- this is not optimal to be honest the 4 ddoes not fit and 3 leaves flap in the head so better to scale to band 3 with 4 magnets
+
+**12:52**
+
+[duck at 152mm, band 3, four magnets] ----skipping mid row
+
+**12:53**
+
+[bat-woman at 144mm, band 3] ----same story with batman shape it is more triangular and needs essetntially 3 magnets utmost corners onlymid 2 rows are optional
+
+**12:54**
+
+B3-4 - perfect example of band 2 grid in the band 3 shape - cause of the limbs sticking out [butterfly at 130mm, four discs in the four wings, 96x96 corners]
+
+**12:56**
+
+[poke1 at 123mm, four discs at 96×96 corners] ----same logic as butterfly
+
+**12:57**
+
+[bot at 133mm, wide 96×96 corner square] --- this one can do but better to do 96mmx48mm narrow 4 [bot at 144mm, four discs at the corners of a tall 96×48mm rectangle]
+
+**12:58**
+
+[pill at 122mm, band 3] pill gets band 3-3 but is basically band 2 --- technicality
+
+**12:59**
+
+B4 - 4 (96mm) [butterfly at 214mm] - - -this is again shows size in b4 but essentially b3 based on the 96mm grid with 4 points ultimately needed
+
+**13:01**
+
+[poke1 at 217mm, band 4, four discs on the 96mm grid] same
+
+**13:02**
+
+[bot at 236mm, band 4, four discs as a tall narrow rectangle] ----similar longer rectangle
+
+i think these examples cover it
+
+**13:03**
+
+[pill at 138mm, discs diagonal along the capsule axis] ----for diagonals better to use diagonal - --- but squares can also be strong [pill at 133mm, staggered square hold] - alternate rows ----

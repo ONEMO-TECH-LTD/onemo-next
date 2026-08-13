@@ -1,6 +1,6 @@
 # GRID ENGINE v3 — LAW
 
-### Eighteen laws, and one above them. The engine and its algorithm. Nothing else.
+### Twenty laws, and one above them. The engine and its algorithm. Nothing else.
 
 > **Scope.** *Dan, 2026-08-11:* "the contract is about engine and its algorithm - and how it must be
 > applied in practice and deliverables. It is not about entire v3 UI and the rest. The logic + engine
@@ -573,6 +573,24 @@ behind it — and because the first design to break it did so while satisfying e
 **The interaction is one control: the user picks a band.** They then get one size, it is the optimal
 one for that band, and it is guaranteed — same shape, same band, same answer, every time.
 
+**L19 — THE OPERATING FLOOR IS 1MM. Fit or not, at product scale — nothing below a millimetre exists anywhere.**
+*Dan, 08-11 evening @lead — captured Dan turns in this lane's session, first-hand:*
+> "there is no dimensions below 1mm anywhere hence my reaction to 0.05 mm originally we do n ot operate
+> on the level that small we habounding box and shape size we match it or not - similar to placing
+> image into the container fit or fill - we need to fit the grid vs shape and we can do that by
+> centering and scaling proportionally the shape"
+
+And, same exchange, on where the meaningful resolution comes from — asked what fidelity has to do
+with outline vs grid, Dan's model is that the GRID is the ruler: sizes publish in whole even
+millimetres, so no distinction below the product scale can change an answer the product can express.
+
+**What this binds:** the engine's question is container-fit — centre the shape, scale it
+proportionally, does the grid layout's region fit or not — decided at millimetre granularity. Inputs
+enter at the product's operating floor: a traced outline carries no sub-millimetre authority, so
+pixel-resolution stair-steps are noise, not geometry, and no computation may be priced by them. This
+is the general form of the 0.05mm strike: not "compute more exactly" — "that scale does not exist."
+
+
 **Selection is not discarding, and that is what reconciles this with L13.** The engine still computes
 and returns every lawful variation; it *marks* one as the guaranteed answer. Nothing is hidden, one
 thing is named. The admin dash steps through **every** increment the engine defines — that is the
@@ -702,3 +720,69 @@ separately, never merged into a score.
 
 **O-4 — curve identity.** Tessellation changes a discrete outcome (a 124- vs 240-point circle). Carried
 from v1, unresolved, and affects generated shapes only — not traced cut-outs.
+
+**L20 — SELECTION: GRAVITY FIRST, THEN THE TIGHT WRAP. Per band, over ENUMERATED placements.**
+*Dan, 2026-08-13 12:18 @lead, on the duck walkthrough — this closes the ordering L19's tail left
+open ("what 'optimal' orders by — awaiting Dan").*
+
+> "the law says gravity must not place magnets in the bottom and leave top unprotected - if only one
+> magnet can be placed top is preference it will hold and not unstick" · "the tight fit law - is the
+> preference to select sizes with minimal flap around magnets - you can see shape in this position is
+> tightly wrapped by the duck head shape" · "so this was band 1 24mm-72mm range and 1 magnet" · "we
+> need to make sure we document the clear guidance on how the engine selection must work in each band"
+
+**GRAVITY.** A hanging effect peels from the top: an unheld top unsticks. Selection therefore prefers
+placements that hold the TOP of the shape; magnets never cluster low leaving the top unprotected.
+With a single magnet, it holds the top half. (Gravity was already one of L11's balance components;
+this names it FIRST among the selection preferences.)
+
+**TIGHT WRAP.** Among placements that satisfy gravity, prefer the size whose material wraps the held
+discs with minimal flap around them — the duck's head enclosing the disc nearly edge to edge at 60mm
+is the canon picture. (This is L11's "hug", now explicitly the size selector after gravity.)
+
+**ENUMERATION IS THE PRECONDITION — measured, not argued.** At 60mm the centred 1×1 candidate sits in
+the duck's neck and reports ZERO held, while a full disc fits cleanly in the head at that same size.
+The right answer existed and was never proposed. So candidates are EVERY window placement on the
+lattice — every sub-window size at every offset inside the field, deduped by held set (spec §3:
+enumerate, never search) — and gravity + tight-wrap order them. Centred templates alone are not the
+candidate set; they are three of its members.
+
+**PER BAND — the guidance table this law owes:**
+- **Band 1 (24–72mm, one magnet):** RULED, above — single disc, top half, tight-wrapped. Duck: head
+  placement at 60mm, not "0 held" at the neck.
+- **Band 2 (72–120mm, two magnets):** RULED BY EXAMPLE (six shapes, selection-examples/band-2).
+  The pair spans the shape's two dominant regions, top included where the material offers it, and
+  its ORIENTATION FOLLOWS THE SHAPE'S OWN AXIS — vertical for standing shapes, horizontal across
+  wings, and DIAGONAL for diagonal shapes. *Dan, 2026-08-13 12:59: "diagonal is also correct it
+  does not introduce separate grid it is the same one."* A diagonal pair is two diagonal neighbours
+  of the SAME lattice (centres 48mm across and 48mm down) — the earlier vertical-or-horizontal
+  wording in the brief is extended by this ruling, not contradicted: no new grid exists.
+- **ESCALATION (ruled on the duck, 12:51):** when a band's count cannot hold every major region —
+  "the 4 does not fit and 3 leaves flap in the head" — that band has no optimal answer for the
+  shape; the answer is the NEXT band with the fuller arrangement ("better to scale to band 3 with
+  4 magnets"). An honest better-size-above beats a compromised in-band placement.
+- **ROW SKIPPING (ruled on the duck, 12:52 — "skipping mid row"):** an arrangement may skip lattice
+  rows/columns where the material narrows — the duck's band-3 answer is head pair + body pair, the
+  four corners of a 48×96mm rectangle, middle row unused. Same lattice, no new grid — the same
+  principle as the diagonal pair.
+- **CORNER HOLDS (ruled on bat-woman, 12:53):** a triangular shape takes a TRIANGULAR hold — three
+  magnets at the shape's utmost corners (top for gravity, the two base corners for stability);
+  the middle rows are OPTIONAL, not required. The arrangement follows the shape's extreme
+  geometry, not the window's fill — the general form of L15's "four corners at the edge".
+- **ARRANGEMENT RANKING (ruled on the bot, 12:57):** when two lawful arrangements both hold the
+  shape, TIGHT WRAP ranks between them — the bot's wide 96×96 corner square "can do", but the
+  narrow 96×48 four is BETTER because the tighter column wraps the standing torso with less flap.
+  Acceptable and optimal are both booked; the engine proposes the optimal first.
+- **THE BAND IS A SIZE LABEL, NOT AN ARRANGEMENT (ruled on pill 12:58, butterfly 12:59, poke1
+  13:01):** a shape keeps its NATURAL arrangement class across bands — the pill in band 3 is
+  "basically band 2" (its diagonal pair, a technicality of the size label); the butterfly and
+  poke1 in band 4 are "essentially b3": still four points, now on the 96mm grid. The band names
+  the size range; the shape's extremes name the arrangement; the lattice step the corners land on
+  grows with size (48 → 96), the arrangement class does not change.
+- **Band 3 (120–168mm):** RULED BY EXAMPLE (selection-examples/band-3) — duck 152mm (4, skip mid
+  row), bat-woman 144mm (3, utmost corners), butterfly 130mm (4, corner square 96×96), poke1
+  123mm (same), bot 144mm (narrow 4 at 96×48; wide square acceptable), pill 122mm (band-2
+  diagonal geometry — technicality).
+- **Band 4 (168–216mm):** RULED BY EXAMPLE (selection-examples/band-4) — butterfly 214mm and
+  poke1 217mm: four points on the 96mm grid, the band-3 corner square scaled to the sparse
+  lattice. Remaining rows land as Dan walks them — do not invent the unwalked rows.
