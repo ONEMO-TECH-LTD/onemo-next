@@ -1,12 +1,12 @@
 # Grid Lab v3.1 — execution plan
 
-Status: active. Current increment: T2.1 Band 1 fixture encoding.
+Status: active. Current increment: T1.1 Band 1 raw single-disc enumeration, minimally wired to the scaffold.
 
 ## Governing scope
 
 Build fresh in this clean-scaffold worktree. The archived Lead branch is donor-only. Reuse GPT's existing exact predicates unchanged; add complete neutral enumeration; prove it from Dan's canon; connect it through one bridge without changing the scaffold protocol.
 
-## T1 — Engine
+## T1 — Engine + raw visual surface
 
 Compose one pure C++ engine from GPT's verbatim predicates. Exclude the old solver, ranking, and selector from the production compile.
 
@@ -20,23 +20,29 @@ Acceptance criteria:
 - GPT predicate suite remains green.
 - Output is byte-stable.
 - No selector or ranking path is compiled.
+- Raw candidates are browsable through the thinnest bridge on the untouched scaffold.
 
-## T2 — Proof
+## T2 — Dan visual acceptance
 
-Encode the complete `selection-examples/` canon as machine-readable set-membership fixtures, then run the seven-shape regression and native/Wasm identity gate.
+Dan checks the running raw candidate set against every `selection-examples/` placement. No headless fixture substitutes for this gate.
 
 Acceptance criteria:
 
-- Each expected placement appears among raw engine candidates.
-- Each acceptable alternative remains available.
-- Each rejected placement is not the sole/best available product answer; rejection semantics stay in the selection layer, not the neutral engine.
-- Fixture provenance points to the exact screenshot and canon description.
-- Seven-shape corpus passes.
-- Native and Wasm canonical bytes are identical.
+- Duck 60 mm head placement appears naturally in Band 1 raw candidates.
+- Band 2 diagonal and axis-following pairs appear naturally.
+- Band 3 corner, row-skipping, diagonal, and lawful alternatives appear naturally.
+- Band 4 arrangements appear naturally on the 96 mm population.
+- Missing canon placements fail the engine; they are not patched in the UI.
 
-Execution order: T2 fixtures freeze the target before T1 implementation. Runtime assertions complete after T1 exists.
+## T3 — Steering
 
-## T3 — Integration
+Add gravity and tight-wrap ranking above the visually accepted neutral engine. No steering logic enters C++ candidate generation.
+
+## T4 — Regression fixtures
+
+Only after Dan accepts the raw set and steering behavior, encode the accepted state as permanent fixtures, then run the seven-shape regression and native/Wasm byte-identity gate.
+
+## Integration constraint
 
 Add one bridge into the untouched scaffold.
 
@@ -64,20 +70,18 @@ One small increment at a time. Every increment ends with:
 
 After every compaction, read the latest transcript segment and `LEDGER.md` before touching code.
 
-## Current increment — T2.1
+## Current increment — T1.1
 
-Encode Band 1 only:
+Build Band 1 only:
 
-- expected duck 60 mm head/top/tight placement;
-- expected bat-woman 60 mm head/top placement;
-- expected butterfly 60 mm body placement;
-- expected pill 60 mm centre placement;
-- expected poke1 60 mm head-centre placement;
-- centred duck 96 mm result preserved as the rejected/counter-example provenance case;
-- fixture-integrity check reports exact counts and validates every source image/path.
+- pure engine enumerates every lawful single-disc placement for the selected outline and manufactured size;
+- thin bridge exposes immutable raw candidates;
+- scaffold page browses those candidates and draws returned positions through its existing lattice/canvas protocol;
+- no ranking, steering, fixture assertion, or solve-on-pan;
+- first visual falsifier is duck at 60 mm: the head candidate must be visible in the raw set.
 
-Stop after evidence, ledger, commit, push, and Lead QA dispatch.
+Stop after running evidence, ledger, commit, push, and Lead QA dispatch.
 
 ## Rejected decomposition
 
-The prior 25-task plan is superseded as overbuilt. Its exact text remains in transcript segment `6-s62-pixel-grid-pixel--12-13.md`; it is not an execution authority.
+The prior 25-task plan is superseded as overbuilt. The proof-first ordering is also superseded: five prior builds were disproved only by Dan's eye on the running surface. The exact history remains in the transcript; it is not execution authority.

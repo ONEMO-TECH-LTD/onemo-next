@@ -21,7 +21,7 @@ Read this file plus the latest transcript segment after every compaction before 
 
 ### Next action
 
-Stop at the T2.1 gate and wait for `@s62-lead` QA. Do not encode Band 2 until QA clears this increment.
+Read the clean scaffold engine/spec/bridge/canvas path and GPT donor predicates in full. Implement T1.1 only: Band 1 raw single-disc candidates visible on the real scaffold. Stop at Lead QA.
 
 ## 2026-08-13 — T2.1 Band 1 fixture increment
 
@@ -66,3 +66,10 @@ Band 1 fixture integrity: PASS
 - No scaffold/UI code.
 - No archived Lead branch changes.
 - No Band 2–4 fixtures.
+
+## 2026-08-13 — Dan reordered proof behind the running surface
+
+- Reason: five prior attempts failed; Dan's visual inspection caught the real defects. Headless fixtures first repeats the failed "trust my word" pattern.
+- New order: raw engine + minimal visual wiring → Dan visual acceptance → steering logic → regression fixtures.
+- The pushed Band 1 fixture package is an unapproved draft only. It must not gate or shape engine output and will be replaced after Dan accepts the running raw set.
+- Current increment: T1.1 Band 1 single-disc enumeration end to end, with duck 60 mm head placement as the first live falsifier.
