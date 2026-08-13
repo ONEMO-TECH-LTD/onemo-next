@@ -22,7 +22,7 @@ These are rulings, not derivations. Implement exactly these, and no others.
 
 ## The gap you must name, not fill
 
-"The shape's upper material", "wraps most closely" and "a mass of the shape" are product concepts. The candidate document gives you positions, exact clearances, limiting boundary witnesses and step structure — it does not give you a decomposition of the shape into masses, a definition of top, or a wrap measure.
+"The shape's upper material", "wraps most closely" and "a mass of the shape" are product concepts. Between them the two supplied documents give you positions, families, step structure, and — through each position's pointer into the measurement document — exact clearances and limiting boundary witnesses. They do not give you a decomposition of the shape into masses, a definition of top, or a wrap measure.
 
 Where a rule above cannot be computed from the supplied facts, do not invent a threshold, a decomposition, or a proxy. Name precisely what is missing, state the smallest additional input that would make the rule computable, and implement the rule as accepting that input explicitly. Compare the smallest defensible candidate definitions if more than one is defensible, attack each with a counterexample, and leave the choice to us.
 
