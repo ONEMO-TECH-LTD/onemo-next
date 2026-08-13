@@ -32,14 +32,17 @@ The complete candidate set, unchanged, plus:
 
 - a total order over it, deterministic and reproducible from the same inputs;
 - for every candidate, the judgements applied to it with the exact values they used;
-- for every ordering decision, which rule decided it and why;
-- for every candidate ranked below another, the reason.
+- for every ordering decision, which rule decided it and why.
 
-Nothing is deleted, and no candidate is marked as the answer. Ordering is the output; choosing is ours.
+No candidate is marked as the answer. Ordering is the output; choosing is ours.
 
 ## Implementation
 
 Same discipline as the two accepted layers: TypeScript, zero dependencies, exact arithmetic on the exact values the candidate document carries, no floating point in any comparison that decides an order, canonical serialization, byte-identical output for identical input.
+
+## Acceptance evidence
+
+Attached are decided examples: for a given shape and size, the arrangement we accept, sometimes with one we consider acceptable-but-lower and one we reject. They are acceptance oracles for ordering only. They do not define the rules, they do not define regions, and they are not inputs to any measurement. Use them to check that a proposed rule set orders as we do, and to falsify one that does not.
 
 ## Tests
 
