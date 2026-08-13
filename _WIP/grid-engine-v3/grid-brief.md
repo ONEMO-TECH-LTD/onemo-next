@@ -2091,3 +2091,9 @@ B4 - 4 (96mm) [butterfly at 214mm] - - -this is again shows size in b4 but essen
 **13:01**
 
 [poke1 at 217mm, band 4, four discs on the 96mm grid] same
+
+**13:02**
+
+[bot at 236mm, band 4, four discs as a tall narrow rectangle] ----similar longer rectangle
+
+i think these examples cover it

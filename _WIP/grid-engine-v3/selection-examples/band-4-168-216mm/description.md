@@ -23,4 +23,15 @@ grid, the corner square landing in poke1's full lobes with the narrow middle ski
 natural arrangement (four corners, established in band 3 at 48mm steps) carries up unchanged; only
 the lattice step grows.
 
-Further band-4 shapes land as Dan walks them — do not invent the unwalked rows.
+## BOT · 236mm · 4 magnets · SIMILAR — THE NARROW RECTANGLE, LONGER
+
+`expected-bot-236mm-4mag-longer-rectangle.png` — Dan verbatim: "similar longer rectangle".
+
+**The ruling:** the bot keeps its band-3 arrangement — four discs at the corners of a narrow tall
+rectangle — stretched longer for the larger size: shoulders pair on top, hips pair below, the
+column staying one 96mm step wide while the vertical span grows. Same principle as the butterfly
+and poke1 rows: the arrangement class carries across bands, only the rectangle's proportions grow
+with the size.
+
+This closes Dan's walkthrough (13:02: "i think these examples cover it") — the four bands are
+ruled by example end to end.
