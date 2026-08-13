@@ -96,13 +96,46 @@ function minDist2(p: PreparedOutline, qx: bigint, qy: bigint): bigint {
   return best ?? ZERO
 }
 
+/** True iff every boundary segment is at least r away. Interior projection uses cross² ≥ r²L — no divide. */
+function clearsRadius(p: PreparedOutline, qx: bigint, qy: bigint, r: bigint): boolean {
+  const r2 = r * r
+  const vs = p.verts
+  const n = vs.length
+  for (let i = 0; i < n; i++) {
+    const a = vs[i]
+    const b = vs[(i + 1) % n]
+    const vx = b.x - a.x
+    const vy = b.y - a.y
+    const wx = qx - a.x
+    const wy = qy - a.y
+    const L = vx * vx + vy * vy
+    if (L === ZERO) {
+      if (wx * wx + wy * wy < r2) return false
+      continue
+    }
+    const h = wx * vx + wy * vy
+    if (h <= ZERO) {
+      if (wx * wx + wy * wy < r2) return false
+      continue
+    }
+    if (h >= L) {
+      const dx = qx - b.x
+      const dy = qy - b.y
+      if (dx * dx + dy * dy < r2) return false
+      continue
+    }
+    const cross = vx * wy - vy * wx
+    if (cross * cross < r2 * L) return false
+  }
+  return true
+}
+
 /** Full disc fits: centre interior and boundary distance ≥ radius. Equality passes. */
 export function discFits(prep: PreparedOutline, center: PointMM, radiusMM: number): boolean {
   const qx = toUm(center[0])
   const qy = toUm(center[1])
   if (!interior(prep, qx, qy)) return false
-  const r = toUm(radiusMM)
-  return minDist2(prep, qx, qy) >= r * r
+  return clearsRadius(prep, qx, qy, toUm(radiusMM))
 }
 
 export function discFitsGrid(prep: PreparedOutline, center: PointMM, grid: GridSpec): boolean {

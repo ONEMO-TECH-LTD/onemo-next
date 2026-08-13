@@ -59,7 +59,7 @@ export function enumerateArrangements(sites: IndexedSite[], population: Populati
   }
 
   for (const s of held) {
-    push({ family: 'single', population, stepCol: 1, stepRow: 1, sites: [s] })
+    push({ family: 'single', population, stepCol: 0, stepRow: 0, sites: [s] })
   }
 
   const dirs: Array<[number, number]> = [

@@ -28,6 +28,21 @@ describe('enumerateArrangements', () => {
     expect(runs.some((a) => a.sites.map((s) => s.col).join(',') === '0,1,2')).toBe(true)
   })
 
+  it('does not let a three-site run hide the pair 0-1', () => {
+    const sites: IndexedSite[] = [0, 1, 2].map((col) => ({
+      col,
+      row: 0,
+      x: col * 48,
+      y: 0,
+      fits: true,
+    }))
+    const runs = enumerateArrangements(sites, 'base').filter((a) => a.family === 'run')
+    expect(runs.some((a) => a.sites.map((s) => s.col).join(',') === '0,1')).toBe(true)
+    expect(runs.some((a) => a.sites.map((s) => s.col).join(',') === '0,1,2')).toBe(true)
+    const singles = enumerateArrangements(sites, 'base').filter((a) => a.family === 'single')
+    expect(singles.every((a) => a.stepCol === 0 && a.stepRow === 0)).toBe(true)
+  })
+
   it('builds a sparse full window on even base indices', () => {
     const sites: IndexedSite[] = []
     for (const col of [0, 2]) {
