@@ -68,4 +68,12 @@ steps. The band names the size range only; it never dictates the arrangement. Sa
 the butterfly's "band 2 grid in a band 3 shape", stated at its sharpest: a band assignment that
 disagrees with the shape's natural arrangement is a technicality, and the arrangement wins.
 
+**Amendment (Dan 13:03):** two placements booked for the pill at band-3 sizes —
+`expected-pill-138mm-diagonal-chain.png`: "for diagonals better to use diagonal" — the PREFERRED
+answer runs discs diagonally along the capsule's own axis, the natural arrangement.
+`acceptable-pill-133mm-alternate-rows-square.png`: "but squares can also be strong - alternate
+rows" — a square/staggered hold on alternate rows is ALSO strong: lawful and acceptable, ranked
+behind the diagonal. Same ranking rule as the bot: when several arrangements hold, the one
+following the shape's axis (tighter wrap) is proposed first, the strong alternative kept.
+
 Further band-3 shapes land as Dan walks them — do not invent the unwalked rows.

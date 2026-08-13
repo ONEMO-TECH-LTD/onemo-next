@@ -2097,3 +2097,7 @@ B4 - 4 (96mm) [butterfly at 214mm] - - -this is again shows size in b4 but essen
 [bot at 236mm, band 4, four discs as a tall narrow rectangle] ----similar longer rectangle
 
 i think these examples cover it
+
+**13:03**
+
+[pill at 138mm, discs diagonal along the capsule axis] ----for diagonals better to use diagonal - --- but squares can also be strong [pill at 133mm, staggered square hold] - alternate rows ----
