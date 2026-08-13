@@ -60,12 +60,22 @@ function formBbox(verts: ReadonlyArray<PointMM>): { cx: number; cy: number; long
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, longest: Math.max(w, h) }
 }
 
-/** Scale the locked form so its longest side is sizeMM. Aspect locked. */
+/** Scale the locked form so its longest side is sizeMM. Aspect locked. 1mm floor. */
 export function scaleToSize(verts: ReadonlyArray<PointMM>, sizeMM: number): PointMM[] {
   const { cx, cy, longest } = formBbox(verts)
   if (longest <= 0) return verts.map(([x, y]) => [x, y])
   const k = sizeMM / longest
-  return verts.map(([x, y]) => [(x - cx) * k, (y - cy) * k])
+  const out: PointMM[] = []
+  for (const [x, y] of verts) {
+    const p: PointMM = [Math.round((x - cx) * k), Math.round((y - cy) * k)]
+    const last = out[out.length - 1]
+    if (last && last[0] === p[0] && last[1] === p[1]) continue
+    out.push(p)
+  }
+  if (out.length > 1 && out[0][0] === out[out.length - 1][0] && out[0][1] === out[out.length - 1][1]) {
+    out.pop()
+  }
+  return out.length >= 3 ? out : verts.map(([x, y]) => [(x - cx) * k, (y - cy) * k])
 }
 
 function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[] {
