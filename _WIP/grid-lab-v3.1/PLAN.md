@@ -56,14 +56,19 @@ This layer ships no code. It supersedes the v1 contract on these points:
 Authority:
 
 - `_WIP/grid-engine-v3/grid-laws.md` L20;
-- `_WIP/grid-engine-v3/selection-examples/` on `session62-task/KAI-10261-grid-canvas`;
-- `_WIP/grid-engine-v3/engine-mathematics.md` at the clean scaffold head.
+- `_WIP/grid-engine-v3/selection-examples/` (present in this tree);
+- `_WIP/grid-engine-v3/grid-brief.md` — Dan's verbatim rulings.
+
+The former sealed engine documents (`engine-blueprint.md`, `engine-mathematics.md`,
+`engine-contract.md`, `engine-acceptance.test.ts`) and every dated 08-10/08-11 review
+document were DELETED from this tree on Dan's ruling (2026-08-13): failed work, not
+authority. The arrangement grammar comes from the canon above, from nowhere else.
 
 Layer 3 supersedes Layer 2 where they conflict:
 
 1. V2 tier-first `deterministicBest` and all single-winner selection are dead. The pure engine returns every lawful candidate neutrally.
 2. V2's “single magnet cannot satisfy band 2” is logic-layer product policy, not engine truth. Single-magnet holds are lawful facts, proven by the Band 1 canon.
-3. The sealed grammar's enumeration of every `r×c` window at every placement replaces v1 `templates_for_band` entirely.
+3. The canon's arrangement grammar — every family at every placement — replaces v1 `templates_for_band` entirely.
 4. Gravity, tight wrap, axis following, arrangement preference, and escalation remain above the neutral geometry engine and are added only after Dan accepts the raw candidate set visually.
 
 ### Clone verbatim — function boundary
