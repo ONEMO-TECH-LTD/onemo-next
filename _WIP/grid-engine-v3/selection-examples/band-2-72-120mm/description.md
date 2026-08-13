@@ -15,12 +15,11 @@ Dan's hand-tuned slider values, i.e. the tight-fit target the 12mm ladder should
 - `expected-pill-79mm-DIAGONAL-pair.png` — PILL 79mm: **DIAGONAL pair** — the two held discs are
   diagonal lattice neighbours (48mm across, 48mm down), following the capsule's axis.
 
-**NEW RULING CANDIDATE — flagged for Dan's explicit confirmation:** the pill example shows a
-DIAGONAL pair as the expected band-2 answer for a diagonal shape. The earlier brief defined the
-pair as "2 vertical or horizontal points"; the diagonal pair extends that. Booked as shown, not yet
-promoted into L15/L20 until Dan confirms the diagonal pair is lawful product (and whether its
-centre spacing 48*sqrt(2) ≈ 67.9mm changes anything downstream — e.g. corridor width, 96mm
-engagement arithmetic).
+**RULED (Dan, 2026-08-13 12:59): the diagonal pair is lawful.** "diagonal is also correct it does
+not introduce separate grid it is the same one" — two diagonal neighbours of the SAME lattice.
+The earlier vertical-or-horizontal wording is extended by this ruling. Downstream consequence to
+carry: diagonal centres sit 48√2 ≈ 67.9mm apart (link facts and any corridor/engagement arithmetic
+must treat diagonal adjacency as first-class, same grid).
 
 **The reading across all six:** the pair spans the shape's two dominant regions (head/body, the two
 wings, the capsule's two ends-of-middle), always includes the top where the material offers it,

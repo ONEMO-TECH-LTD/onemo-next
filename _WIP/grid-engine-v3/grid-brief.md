@@ -2051,3 +2051,7 @@ what it was supposed to be instead is this [60mm, one magnet panned into the duc
 **12:35**
 
 so this was band 1 24mm-72mm trange and 1 magnet ----- add the brief and laws if not in the grid-laws and briefs - we need to makee sure we document the clear guidance on how the engine selection must work in each band
+
+**12:59**
+
+diagonal is also correct it does not introduce separate grid it is the same one

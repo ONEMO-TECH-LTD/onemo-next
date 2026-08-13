@@ -750,7 +750,14 @@ candidate set; they are three of its members.
 **PER BAND — the guidance table this law owes:**
 - **Band 1 (24–72mm, one magnet):** RULED, above — single disc, top half, tight-wrapped. Duck: head
   placement at 60mm, not "0 held" at the neck.
-- **Bands 2–4:** the same two preferences over the enumerated placements, with L15's ordered scale
-  (four corners at the edge as optimum, pair as floor) picking the arrangement class. Per-band rows
-  are being ruled by Dan on the live walkthrough (2026-08-13) and are booked here as each lands —
-  do not invent the unwalked rows.
+- **Band 2 (72–120mm, two magnets):** RULED BY EXAMPLE (six shapes, selection-examples/band-2).
+  The pair spans the shape's two dominant regions, top included where the material offers it, and
+  its ORIENTATION FOLLOWS THE SHAPE'S OWN AXIS — vertical for standing shapes, horizontal across
+  wings, and DIAGONAL for diagonal shapes. *Dan, 2026-08-13 12:59: "diagonal is also correct it
+  does not introduce separate grid it is the same one."* A diagonal pair is two diagonal neighbours
+  of the SAME lattice (centres 48mm across and 48mm down) — the earlier vertical-or-horizontal
+  wording in the brief is extended by this ruling, not contradicted: no new grid exists.
+- **Bands 3–4:** the same preferences over the enumerated placements, with L15's ordered scale
+  (four corners at the edge as optimum, pair as floor) picking the arrangement class. Rows are
+  being ruled by Dan on the live walkthrough (2026-08-13) and are booked as each lands — do not
+  invent the unwalked rows.
