@@ -20,3 +20,23 @@ nearly edge to edge.
 
 **Engine consequence:** candidates are EVERY window placement on the lattice (every sub-window at
 every offset, deduped by held set) — enumeration precedes selection.
+
+## The full B1-1MAG set (Dan, 2026-08-13 12:36–12:37, all at 60mm, all panned placements)
+
+Every shape gets its one-magnet answer at 60mm. The engine's centred candidate (dashed ring) fails
+on every one of them; the correct placement (solid disc, panned by Dan) exists on the same lattice:
+
+- `expected-60mm-head-top-tight.png` — **DUCK**: the head, top half, tightly wrapped.
+- `expected-batwoman-60mm-head-top.png` — **BAT-WOMAN**: the head/upper body, top half — gravity's
+  preference where the material allows it.
+- `expected-poke1-60mm-head-centre.png` — **POKE1**: the round head-centre — the disc sits fully
+  wrapped where the shape is widest.
+- `expected-butterfly-60mm-body.png` — **BUTTERFLY**: the body between the wings — the only region
+  that takes a full disc; availability overrides the top preference when the top cannot hold one.
+- `expected-pill-60mm-centre.png` — **PILL**: the centre of the diagonal capsule — fully inside,
+  wrapped by the width.
+
+**The reading across all five:** the single magnet sits FULLY INSIDE the material, top-biased where
+the shape offers a top hold (duck, bat-woman), and at the widest full-disc region otherwise
+(butterfly body, pill centre, poke head). Gravity is the preference, availability is the constraint,
+tight wrap picks the size.
