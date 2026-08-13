@@ -1,0 +1,14 @@
+{
+  "candidateEnumeration": [
+    {
+      "name": "completeness-two-held",
+      "input": "inputs/completeness-two-held.json",
+      "expected": "expected/completeness-two-held.canonical.json",
+      "handEnumeratedFamilies": [
+        "run",
+        "full-window"
+      ],
+      "handEnumeratedCandidateCount": "2"
+    }
+  ]
+}

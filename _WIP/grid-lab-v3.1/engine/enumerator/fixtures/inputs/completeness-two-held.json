@@ -1,0 +1,88 @@
+{
+  "measurement": {
+    "schema": "magnetic-grid-measurement-kernel/lattice/v1",
+    "sizes": [
+      {
+        "size": "100",
+        "scale": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "positions": [
+          {
+            "column": "0",
+            "row": "0",
+            "center": {
+              "x": {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              "y": {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            },
+            "centerLocation": "inside",
+            "clearance": {
+              "kind": "sqrt-rational",
+              "radicand": {
+                "numerator": "100",
+                "denominator": "1"
+              }
+            },
+            "fits": true,
+            "limitingContacts": []
+          },
+          {
+            "column": "1",
+            "row": "0",
+            "center": {
+              "x": {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              "y": {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            },
+            "centerLocation": "inside",
+            "clearance": {
+              "kind": "sqrt-rational",
+              "radicand": {
+                "numerator": "100",
+                "denominator": "1"
+              }
+            },
+            "fits": true,
+            "limitingContacts": []
+          }
+        ]
+      }
+    ]
+  },
+  "grammar": {
+    "schema": "magnetic-grid-candidate-enumerator/grammar/v1",
+    "populations": [
+      {
+        "id": "base",
+        "origin": {
+          "column": "0",
+          "row": "0"
+        },
+        "indexStep": "1"
+      }
+    ],
+    "families": {
+      "single": {},
+      "run": {
+        "stepDomain": "any-positive-whole-population-step"
+      },
+      "rectangle-corners": {},
+      "corner-triangle": {},
+      "full-window": {
+        "oneByOne": "exclude"
+      }
+    }
+  }
+}
