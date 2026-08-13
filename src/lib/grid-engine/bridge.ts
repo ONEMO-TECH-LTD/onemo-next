@@ -14,6 +14,7 @@
 //
 // It reads values from Sub 2 and hands them to Sub 1. It holds no values and does no geometry.
 
+import { collectCandidates, type Candidate, type CandidateDocument } from './candidates'
 import {
   bandSpanMM,
   cellDiameterMM,
@@ -30,6 +31,8 @@ import {
   type RegionMM,
 } from './engine'
 import type { GridSystemSpec } from './spec'
+
+export type { Candidate, CandidateDocument }
 
 export type { FieldSummary, PointMM, RegionMM }
 
@@ -113,4 +116,17 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
  */
 export function fieldBlockSpan(spec: GridSystemSpec): number {
   return fieldSpanMM(spec)
+}
+
+/** One collect. Caller caches. Pan and step must not call this. */
+export function listCandidates(
+  spec: GridSystemSpec,
+  outline: ReadonlyArray<PointMM>,
+): CandidateDocument {
+  return collectCandidates(spec, outline)
+}
+
+export function candidateSites(doc: CandidateDocument, id: string): PointMM[] {
+  const hit = doc.candidates.find((c: Candidate) => c.id === id)
+  return hit ? hit.sites.map((s) => [s.x, s.y] as PointMM) : []
 }

@@ -13,7 +13,7 @@
 // from, "Prototypes / Control" node 14209:26629 at 402pt; that measurement is the design's, never
 // the implementation's.) The studio's visual design comes from Figma; this invents none.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyGridValue,
   isOptionsOnly,
@@ -30,7 +30,9 @@ import {
 import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
+  candidateSites,
   fieldBlockSpan,
+  listCandidates,
   minShapeSpan,
   resizeShape,
   type FieldSummary,
@@ -100,7 +102,7 @@ const DEFAULT_SIZE_BAND = 3
  * THE THREE BANDS, as counts (law 10.7 — the selector offers 2, 3 and 4; size 1 is coded, not shown).
  * Their millimetres are the SQUARE STANDARD and come from the unit, never from here.
  */
-const BANDS = [2, 3, 4] as const
+const BANDS = [1, 2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
@@ -180,6 +182,17 @@ export default function GridEnginePage() {
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
+  const [candIdx, setCandIdx] = useState(0)
+  const candDoc = useMemo(() => {
+    if (!outline) return { candidates: [] }
+    return listCandidates(spec, outline)
+  }, [outline, spec])
+  const visibleCands = useMemo(
+    () => candDoc.candidates.filter((c) => c.sizeMM === sizeMM),
+    [candDoc, sizeMM],
+  )
+  const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
+  const marks = shownCand ? candidateSites(candDoc, shownCand.id) : []
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -449,6 +462,19 @@ export default function GridEnginePage() {
 
         <span className={styles.spacer} />
 
+        {outline && (
+          <button
+            type="button"
+            className={styles.chip}
+            disabled={visibleCands.length === 0}
+            onClick={() =>
+              setCandIdx((i) => (visibleCands.length ? (i + 1) % visibleCands.length : 0))
+            }
+          >
+            {visibleCands.length ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length}` : '0'}
+          </button>
+        )}
+
         {view && (
           <span className={styles.fieldReadout}>
             {view.cols}×{view.rows} · {Math.round(Math.max(view.spanXMM, view.spanYMM))}mm
@@ -496,6 +522,19 @@ export default function GridEnginePage() {
               e.currentTarget.releasePointerCapture?.(e.pointerId)
             }}
           />
+          {marks.map(([x, y]) => (
+            <circle
+              key={`c-${x},${y}`}
+              cx={x}
+              cy={y}
+              r={minSpanMM / 2}
+              fill="none"
+              stroke="#3dd68c"
+              strokeWidth={2}
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+          ))}
           {cutout && box && (
             /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
                dragging even over the shape the canvas must continue to react". It is drawn above the

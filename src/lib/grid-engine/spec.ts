@@ -208,3 +208,18 @@ export const RELEASED: GridSystemSpec = Object.freeze({
 
 /** The launch pitches. 24 and 72 do not exist anywhere in the system (law 1.3). */
 export const LAUNCH_PITCHES_MM: readonly number[] = Object.freeze([48, 96])
+
+/** Size labels. Values only — the engine does not invent a ladder. */
+export type BandId = 1 | 2 | 3 | 4
+
+export const BAND_SIZES_MM: Readonly<Record<BandId, readonly number[]>> = Object.freeze({
+  1: Object.freeze([24, 36, 48, 60, 72]),
+  2: Object.freeze([72, 84, 96, 108, 120]),
+  3: Object.freeze([120, 132, 144, 156, 168]),
+  4: Object.freeze([168, 180, 192, 204, 216]),
+})
+
+/** O-1 centre constructions. Switches to exercise, not a ranking. */
+export type AnchorKind = 'bbox' | 'centroid' | 'max-clearance'
+
+export const ANCHORS: readonly AnchorKind[] = Object.freeze(['bbox', 'centroid', 'max-clearance'])
