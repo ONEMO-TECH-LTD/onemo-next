@@ -2067,3 +2067,7 @@ B2-3MAG [duck at 131mm] --- this is not optimal to be honest the 4 ddoes not fit
 **12:53**
 
 [bat-woman at 144mm, band 3] ----same story with batman shape it is more triangular and needs essetntially 3 magnets utmost corners onlymid 2 rows are optional
+
+**12:54**
+
+B3-4 - perfect example of band 2 grid in the band 3 shape - cause of the limbs sticking out [butterfly at 130mm, four discs in the four wings, 96x96 corners]

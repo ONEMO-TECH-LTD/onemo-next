@@ -23,4 +23,17 @@ utmost corners: one at the top (head — gravity), two at the base corners (the 
 middle rows are OPTIONAL: their sites may hold but are not required for the answer. The essential
 set is the extreme-corner triangle.
 
+## BUTTERFLY · 130mm · 4 magnets · THE BAND-2 GRID INSIDE A BAND-3 SHAPE
+
+`expected-butterfly-130mm-4mag-wings-96x96.png` — Dan verbatim: "B3-4 - perfect example of band 2
+grid in the band 3 shape - cause of the limbs sticking out".
+
+**The expected result:** one disc in each of the four wings — the four-corner SQUARE arrangement
+(band 2's geometry) stretched onto skipped rows and columns: the held corners sit 96mm apart both
+ways, the centre row and column unused because the body is narrow and the LIMBS carry the hold.
+
+**The reading:** the arrangement class follows the shape's extremes (the four wings), and the
+band's own window does not constrain which lattice steps the corners land on — a band-3 shape may
+be held by a band-2-shaped corner square on wider spacing. Same lattice throughout.
+
 Further band-3 shapes land as Dan walks them — do not invent the unwalked rows.
