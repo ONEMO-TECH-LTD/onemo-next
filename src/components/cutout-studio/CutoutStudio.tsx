@@ -8,7 +8,7 @@ import type { PaintConfig } from '@/lib/mask-tools'
 import type { Point } from '@/lib/mask-tools/types'
 import type { VShape } from '@/lib/vector-core'
 import { EditorOverlay, type EditMode, type NodeMode } from './EditorOverlay'
-import { maskOverlay, VECTOR_PRESETS, type TraceOutlineSettings, type VectorPresetName } from './finish'
+import { VECTOR_PRESETS, type TraceOutlineSettings, type VectorPresetName } from './finish'
 import { useCutoutLabFlow, type LabAdapters } from './flow'
 import { ThinkingOrb } from 'thinking-orbs'
 import { BLEND_CHIPS, CHIP_RANGE, type Tab, type Tool } from './ui-config'
@@ -45,7 +45,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
     status, busy, hasCut, hasImage, ms, settings, blend, shapeTick, histTick, disp, canUndo, canRedo,
     paintCfg, edgeFinishPx, vectorPreset, outputSourceSize,
   } = flow.state
-  const { imgCanvas, mask: maskRef, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
+  const { imgCanvas, d: dRef, bounds: boundsRef, shape: shapeRef, liveBake: liveBakeRef } = flow.view
   const warmup = flow.actions.warmup
 
   // ── shell-only UI state (presentation + gesture) ──
@@ -135,16 +135,19 @@ export default function CutoutStudio({ calibration, diagnostics }: {
       ctx.save(); ctx.fillStyle = 'rgba(6,8,14,0.55)'; ctx.fill(scrim, 'evenodd'); ctx.restore()
       ctx.strokeStyle = '#2563eb'; ctx.lineWidth = Math.max(2, img.width / 400); ctx.stroke(new Path2D(dRef.current))
     }
-    // MASK VIEW ON TOP (Dan device r7: the old under-layer draw left stale green scraps peeking
-    // out from beneath the bake — never the current selection). One color by tool mode: green =
-    // the selection in add modes, red = the selection in erase modes.
-    const mask = maskRef.current
-    if (mask && overlayRef.current) {
-      const t0 = toolRef.current
-      const mode = t0 === 'erase' || t0 === 'draw-erase' ? 'erase' as const : 'add' as const
-      const tmp = document.createElement('canvas'); tmp.width = mask.w; tmp.height = mask.h
-      tmp.getContext('2d')!.putImageData(maskOverlay(mask, mode), 0, 0)
-      ctx.drawImage(tmp, 0, 0, img.width, img.height)
+    // MASK VIEW ON TOP: the resolved outline is the visible/save selection authority. Painting the
+    // raw 1024px detector mask here diverged after Vector processing and leaked colors across it.
+    if (dRef.current && overlayRef.current) {
+      const selection = new Path2D(dRef.current)
+      const excluded = new Path2D()
+      excluded.rect(vb.x, vb.y, vb.w, vb.h)
+      excluded.addPath(selection)
+      ctx.save()
+      ctx.fillStyle = 'rgba(239,68,68,0.43)'
+      ctx.fill(excluded, 'evenodd')
+      ctx.fillStyle = 'rgba(34,197,94,0.43)'
+      ctx.fill(selection, 'evenodd')
+      ctx.restore()
     }
     const st = strokeRef.current
     if (st.length > 0) {
@@ -202,7 +205,7 @@ export default function CutoutStudio({ calibration, diagnostics }: {
       }
     }
     ctx.restore() // view-box translate
-  }, [disp.w, boundsRef, dRef, imgCanvas, liveBakeRef, maskRef]) // refs are stable — listed for lint truth
+  }, [disp.w, boundsRef, dRef, imgCanvas, liveBakeRef]) // refs are stable — listed for lint truth
   useEffect(() => { renderRef.current = render }, [render])
   useEffect(() => { requestAnimationFrame(() => renderRef.current()) }, [tool]) // mask tint follows the tool mode instantly
 

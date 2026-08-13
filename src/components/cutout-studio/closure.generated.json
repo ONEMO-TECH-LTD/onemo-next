@@ -22,8 +22,8 @@
     "files": [
       {
         "file": "src/components/cutout-studio/CutoutStudio.tsx",
-        "bytes": 27709,
-        "sha256": "fbf98066607e14b2c0b8462017f0dd26559afd348cbb82b93c58af9ac91f1f55",
+        "bytes": 27598,
+        "sha256": "8e2b9b76dc62c5b2d7fb286b5a71cd9c0c16d62f7f17cd66f8d2cc6df008b2c8",
         "destination": "src/components/cutout-studio/CutoutStudio.tsx",
         "layer": "browser-react"
       },
@@ -36,8 +36,8 @@
       },
       {
         "file": "src/components/cutout-studio/finish.ts",
-        "bytes": 17754,
-        "sha256": "e620b806cbf92d750ad66d85e17c60ed2267909b6cc8e7814a9f92e5d6fe6f1c",
+        "bytes": 17010,
+        "sha256": "8711c633d670aea66d2e996b920c6cac12b661a5f2c9aea3b7977f69d40aa318",
         "destination": "src/components/cutout-studio/finish.ts",
         "layer": "browser-react"
       },
@@ -301,8 +301,8 @@
         "layer": "headless"
       }
     ],
-    "totalBytes": 336685,
-    "closureSha256": "751e5bfa3424566ea41de86a672ab00b12f408a704458fc497d8e5ae1a483699"
+    "totalBytes": 335830,
+    "closureSha256": "a6fde6e237bac18c1856984ec2bcbb44e1aebd23bcd20b04e07bbb9129e4b06b"
   },
   "emitted": {
     "route": "/cutout-lab",
@@ -351,10 +351,10 @@
         "brotliBytesEstimate": 2708
       },
       {
-        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-8877c6319761e744.js",
-        "rawBytes": 62132,
-        "gzipBytesEstimate": 20777,
-        "brotliBytesEstimate": 18380
+        "file": ".next/static/chunks/app/(dev)/cutout-lab/page-6e7336e9b34deaf2.js",
+        "rawBytes": 61891,
+        "gzipBytesEstimate": 20640,
+        "brotliBytesEstimate": 18265
       },
       {
         "file": ".next/static/chunks/c99821ae-37ad0746140c3d06.js",
@@ -393,9 +393,9 @@
         "brotliBytesEstimate": 31714
       }
     ],
-    "rawBytes": 1297958,
-    "gzipBytesEstimate": 363726,
-    "brotliBytesEstimate": 297085
+    "rawBytes": 1297717,
+    "gzipBytesEstimate": 363589,
+    "brotliBytesEstimate": 296970
   },
   "runtimeHeapEvidence": {
     "source": "scripts/verify-cutout-v1-grabcut.mjs",

@@ -54,22 +54,6 @@ export function settingsForVectorPreset(name: VectorPresetName): TraceOutlineSet
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
 
-/** Green-kept / red-removed overlay pixels for the mask. */
-export function maskOverlay(mask: Mask, mode: 'add' | 'erase' = 'add'): ImageData {
-  // ONE color at a time (Dan device r7): ADD tints the SELECTION green (what's included);
-  // ERASE tints the OUTSIDE red (what's excluded/erasable) — the selection itself stays clean.
-  const { data, w, h } = mask
-  const ov = new ImageData(w, h)
-  const erase = mode === 'erase'
-  const [r, g, b] = erase ? [239, 68, 68] : [34, 197, 94]
-  for (let i = 0; i < w * h; i++) {
-    if (erase ? data[i] : !data[i]) continue // erase marks OUTSIDE the selection; add marks inside
-    const o = i * 4
-    ov.data[o] = r; ov.data[o + 1] = g; ov.data[o + 2] = b; ov.data[o + 3] = 110
-  }
-  return ov
-}
-
 // ── blend layer (the s59-decoupled v5.3.1 2D artwork operation, verified by its own test gates) ──
 
 export interface BlendSettings {
