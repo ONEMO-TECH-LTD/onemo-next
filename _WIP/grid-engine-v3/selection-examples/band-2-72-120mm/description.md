@@ -25,3 +25,13 @@ must treat diagonal adjacency as first-class, same grid).
 wings, the capsule's two ends-of-middle), always includes the top where the material offers it,
 and the size is tuned until the discs are wrapped tight. Orientation follows the shape's own axis —
 vertical for standing shapes, horizontal for winged, diagonal for diagonal.
+
+## B2-3MAG — the duck REJECTS three magnets: ESCALATE to band 3 (Dan, 2026-08-13 12:51)
+
+`rejected-duck-131mm-3mag-head-flap.png` — Dan verbatim: "this is not optimal to be honest the 4
+does not fit and 3 leaves flap in the head so better to scale to band 3 with 4 magnets".
+
+**The escalation rule this books:** when a band's arrangement cannot hold every major region — three
+magnets leave the duck's head flapping, four don't fit in band 2 — the band has NO optimal answer
+for this shape; the right answer is the NEXT band with the fuller arrangement. An honest "better
+size exists above" beats a compromised in-band placement.

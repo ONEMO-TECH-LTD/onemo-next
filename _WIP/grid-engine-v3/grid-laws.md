@@ -757,6 +757,14 @@ candidate set; they are three of its members.
   does not introduce separate grid it is the same one."* A diagonal pair is two diagonal neighbours
   of the SAME lattice (centres 48mm across and 48mm down) — the earlier vertical-or-horizontal
   wording in the brief is extended by this ruling, not contradicted: no new grid exists.
+- **ESCALATION (ruled on the duck, 12:51):** when a band's count cannot hold every major region —
+  "the 4 does not fit and 3 leaves flap in the head" — that band has no optimal answer for the
+  shape; the answer is the NEXT band with the fuller arrangement ("better to scale to band 3 with
+  4 magnets"). An honest better-size-above beats a compromised in-band placement.
+- **ROW SKIPPING (ruled on the duck, 12:52 — "skipping mid row"):** an arrangement may skip lattice
+  rows/columns where the material narrows — the duck's band-3 answer is head pair + body pair, the
+  four corners of a 48×96mm rectangle, middle row unused. Same lattice, no new grid — the same
+  principle as the diagonal pair.
 - **Bands 3–4:** the same preferences over the enumerated placements, with L15's ordered scale
   (four corners at the edge as optimum, pair as floor) picking the arrangement class. Rows are
   being ruled by Dan on the live walkthrough (2026-08-13) and are booked as each lands — do not

@@ -2055,3 +2055,11 @@ so this was band 1 24mm-72mm trange and 1 magnet ----- add the brief and laws if
 **12:59**
 
 diagonal is also correct it does not introduce separate grid it is the same one
+
+**12:51**
+
+B2-3MAG [duck at 131mm] --- this is not optimal to be honest the 4 ddoes not fit and 3 leaves flap in the head so better to scale to band 3 with 4 magnets
+
+**12:52**
+
+[duck at 152mm, band 3, four magnets] ----skipping mid row
