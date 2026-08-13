@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# cmake is not installed on the target machines; this is the whole build.
+# Build AND GATE the native engine: acceptance suite must compile and pass, CLI must build.
+# No suppressed stderr, no `|| true` — a failure here is a failure (auditor R12).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out="${1:-$here/bin}"; mkdir -p "$out"
@@ -9,6 +10,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
   flags+=(-nostdinc++ -isystem "$sdk/usr/include/c++/v1" -isysroot "$sdk")
 fi
 cd "$here"
-c++ "${flags[@]}" src/magfit.cpp tests/test_magfit.cpp -o "$out/test_magfit" 2>/dev/null || true
-c++ "${flags[@]}" -c src/magfit.cpp -o "$out/magfit.o"
-echo "built $out/magfit.o"
+c++ "${flags[@]}" src/magfit.cpp tests/test_magfit.cpp -o "$out/test_magfit"
+"$out/test_magfit"
+c++ "${flags[@]}" src/magfit.cpp cli/measure_cli.cpp -o "$out/measure_cli"
+echo "built and gated: $out/measure_cli"

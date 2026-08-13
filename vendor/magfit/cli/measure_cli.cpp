@@ -75,10 +75,20 @@ std::vector<std::pair<double, double>> read_pairs(const std::string& body) {
 std::string measure_to_json(const std::string& t) {
     try {
         const double scale = number_field(t, "scale").value_or(20000.0);
+        // FAIL LOUD on fractional law values (auditor R9): silently truncating 12.5mm to 12mm is
+        // an approximation the law forbids. Whole millimetres or a refusal.
+        const auto whole = [](double value, const char* name) {
+            if (value != static_cast<int>(value)) {
+                throw std::invalid_argument(std::string(name) + " must be a whole millimetre value");
+            }
+            return static_cast<int>(value);
+        };
         magfit::EnginePolicy policy;
-        policy.dense_pitch_mm = static_cast<int>(number_field(t, "pitchMm").value_or(48.0));
+        policy.dense_pitch_mm = whole(number_field(t, "pitchMm").value_or(48.0), "pitchMm");
         policy.half_pitch_mm = policy.dense_pitch_mm / 2;
-        policy.disc_radius_mm = static_cast<int>(number_field(t, "radiusMm").value_or(12.0));
+        policy.disc_radius_mm = whole(number_field(t, "radiusMm").value_or(12.0), "radiusMm");
+        const int link_radius_mm =
+            whole(number_field(t, "linkRadiusMm").value_or(0.0), "linkRadiusMm");
 
         const auto vspan = array_span(t, "vertices");
         if (!vspan) throw std::invalid_argument("request has no vertices");
@@ -105,15 +115,14 @@ std::string measure_to_json(const std::string& t) {
             const auto pspan = array_span(t, "positions", obj);
             if (!pspan) throw std::invalid_argument("job has no positions");
             for (const auto& [x, y] : read_pairs(t.substr(pspan->first, pspan->second - pspan->first + 1))) {
-                job.positions_mm.push_back({static_cast<int>(std::llround(x)),
-                                            static_cast<int>(std::llround(y))});
+                job.positions_mm.push_back({whole(x, "position x"), whole(y, "position y")});
             }
             jobs.push_back(std::move(job));
             cursor = pspan->second + 1;
         }
 
         const auto polygon = magfit::canonicalize_and_validate(magfit::PolygonInput{vertices}, policy);
-        const auto measured = magfit::measure_jobs(polygon, jobs, policy);
+        const auto measured = magfit::measure_jobs(polygon, jobs, policy, link_radius_mm);
 
         std::ostringstream o;
         o << "{\"ok\":true,\"vertexCount\":" << vertices.size() << ",\"sizes\":[";

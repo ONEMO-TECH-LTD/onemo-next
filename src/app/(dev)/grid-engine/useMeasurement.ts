@@ -17,9 +17,14 @@ import {
 } from '@/lib/grid-engine/bridge'
 import type { GridSystemSpec } from '@/lib/grid-engine/spec'
 
+type PanMM = readonly [number, number]
+
 export interface MeasurementState {
   readonly shapes: readonly string[]
   readonly shapeName: string | null
+  /** Feed a freshly traced upload — THE one outline; corpus selection and upload share it. */
+  selectUpload(name: string, outline: OutlinePoints): void
+  clearOutline(): void
   readonly outline: OutlinePoints | null
   readonly result: MeasuredCutout | null
   readonly busy: boolean
@@ -32,7 +37,7 @@ export interface MeasurementState {
   setPolicyValue(id: PolicyId, value: number): void
 }
 
-export function useMeasurement(spec: GridSystemSpec): MeasurementState {
+export function useMeasurement(spec: GridSystemSpec, panMM: PanMM): MeasurementState {
   const [corpus, setCorpus] = useState<Record<string, OutlinePoints>>({})
   const [shapeName, setShapeName] = useState<string | null>(null)
   const [outline, setOutline] = useState<OutlinePoints | null>(null)
@@ -51,11 +56,17 @@ export function useMeasurement(spec: GridSystemSpec): MeasurementState {
     if (!outline) return
     let live = true
     setBusy(true)
-    measureCutout(spec, outline, settings)
+    measureCutout(spec, outline, settings, [panMM[0], panMM[1]])
       .then((measured) => {
         if (!live) return
         setResult(measured)
-        setSizeIndex((index) => (index < measured.variants.length ? index : 0))
+        setSizeIndex((index) => {
+          if (index > 0 && index < measured.variants.length) return index
+          // Fresh load lands at BAND 3 — the scaffold's own default ("the default image cutout
+          // load must be ... centered to 4 squares in band 3", Dan 2026-08-11).
+          const band3 = measured.variants.findIndex((v) => v.variant.band === 3)
+          return band3 >= 0 ? band3 : 0
+        })
       })
       .finally(() => {
         if (live) setBusy(false)
@@ -63,7 +74,19 @@ export function useMeasurement(spec: GridSystemSpec): MeasurementState {
     return () => {
       live = false
     }
-  }, [outline, settings, spec])
+  }, [outline, settings, spec, panMM])
+
+  const selectUpload = useCallback((name: string, traced: OutlinePoints) => {
+    setShapeName(name)
+    setOutline(traced)
+    setSizeIndex(0)
+  }, [])
+
+  const clearOutline = useCallback(() => {
+    setShapeName(null)
+    setOutline(null)
+    setResult(null)
+  }, [])
 
   const selectShape = useCallback(
     (name: string) => {
@@ -94,6 +117,8 @@ export function useMeasurement(spec: GridSystemSpec): MeasurementState {
   return {
     shapes: Object.keys(corpus),
     shapeName,
+    selectUpload,
+    clearOutline,
     outline,
     result,
     busy,

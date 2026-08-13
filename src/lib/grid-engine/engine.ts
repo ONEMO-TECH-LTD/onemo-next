@@ -230,7 +230,10 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
  * a magnet ON it. Registration is therefore DERIVED per axis, never chosen.
  */
 export function centredRunMM(grid: GridSpec, count: number): number[] {
-  const half = grid.basePitchMM / 2
+  // POPULATED pitch, not the base lattice: in the 96mm population only every second base site
+  // carries a magnet, and a measured position must be a site that exists. (Auditor finding R3:
+  // measuring 48mm-spaced sites under a 96mm population put a held disc on an empty site.)
+  const half = grid.pitchMM / 2
   const out: number[] = []
   for (let i = 0; i < count; i++) out.push((-(count - 1) + 2 * i) * half)
   return out

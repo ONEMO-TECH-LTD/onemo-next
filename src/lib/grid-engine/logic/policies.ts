@@ -52,8 +52,9 @@ export const POLICIES: readonly PolicyDefinition[] = [
   {
     id: 'corridor',
     label: 'Direct corridor',
-    says: 'Adjacent magnets must be joined by a straight full-width fabric strip.',
+    says: 'Adjacent magnets must be joined by a straight fabric strip of this width.',
     note: 'Wrong as a rule — a crescent joins its horns along the arc. Kept as evidence.',
+    value: { label: 'mm wide', options: [12, 24] },
   },
   {
     id: 'sparseEngagement',
@@ -82,7 +83,7 @@ export type PolicySettings = Readonly<Record<PolicyId, PolicyState>>
 export const ALL_OFF: PolicySettings = Object.freeze({
   minimumMagnets: { enabled: false, value: 1 },
   bandSpan: { enabled: false },
-  corridor: { enabled: false },
+  corridor: { enabled: false, value: 24 },
   sparseEngagement: { enabled: false, value: 3 },
   flapLimit: { enabled: false, value: 12 },
 })

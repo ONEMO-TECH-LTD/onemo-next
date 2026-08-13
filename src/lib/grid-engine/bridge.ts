@@ -174,6 +174,10 @@ export const REVIEW_BANDS: readonly number[] = Object.freeze([1, 2, 3, 4])
  */
 function variantRuns(band: number): ReadonlyArray<readonly [number, number]> {
   if (band <= 1) return [[1, 1]]
+  // These three are the band's REGISTRATION CLASSES, and they are complete: a same-parity
+  // sub-template (3x1, 1x3, 4x2...) occupies a subset of its class's square positions, so its
+  // node facts are already measured by the class job — enumerating it adds no information,
+  // only duplicate rows. (Contested auditor finding R5, held on this argument.)
   return [
     [band, band],
     [band, band - 1],
@@ -181,8 +185,18 @@ function variantRuns(band: number): ReadonlyArray<readonly [number, number]> {
   ]
 }
 
-/** Every job for one shape: per band, per legal size, per registration variant. All from the spec. */
-function reviewJobs(spec: GridSystemSpec, bands: readonly number[]): MeasureJob[] {
+/**
+ * Every job for one shape: per band, per legal size, per registration variant — all from the
+ * spec, all on POPULATED sites, all displaced by the pan. The pan is the scaffold's own placement
+ * gesture ("this moves the magnets themselves, so it is placement"): sliding the lattice against
+ * the fixed shape IS choosing a placement, so the measurement follows the same displaced sites
+ * the canvas draws. One lattice, in every interaction.
+ */
+function reviewJobs(
+  spec: GridSystemSpec,
+  bands: readonly number[],
+  panMM: PointMM,
+): MeasureJob[] {
   const stepMM = spec.grid.paddingMM
   const jobs: MeasureJob[] = []
   for (const band of bands) {
@@ -193,7 +207,7 @@ function reviewJobs(spec: GridSystemSpec, bands: readonly number[]): MeasureJob[
         const xs = centredRunMM(spec.grid, runsX)
         const ys = centredRunMM(spec.grid, runsY)
         const positions: Array<[number, number]> = []
-        for (const y of ys) for (const x of xs) positions.push([x, y])
+        for (const y of ys) for (const x of xs) positions.push([x + panMM[0], y + panMM[1]])
         jobs.push({ band, sizeMm, runsX, runsY, positions })
       }
     }
@@ -220,14 +234,19 @@ export async function measureCutout(
   spec: GridSystemSpec,
   outline: OutlinePoints,
   settings: PolicySettings,
+  panMM: PointMM = [0, 0],
   bands: readonly number[] = REVIEW_BANDS,
 ): Promise<MeasuredCutout> {
+  const corridorWidth = settings.corridor.value
   const measured: Measurement = await measureRequest({
     vertices: outline,
     scale: 20000,
-    pitchMm: spec.grid.basePitchMM,
+    pitchMm: spec.grid.pitchMM,
     radiusMm: spec.grid.paddingMM,
-    jobs: reviewJobs(spec, bands),
+    // Corridor width is a POLICY VALUE (12/24, Dan's switches); the kernel needs its radius to
+    // judge the strip. Absent, the kernel falls back to the disc radius.
+    ...(corridorWidth ? { linkRadiusMm: corridorWidth / 2 } : {}),
+    jobs: reviewJobs(spec, bands, panMM),
   })
   if (!measured.ok) return { ok: false, error: measured.error, variants: [] }
   return {

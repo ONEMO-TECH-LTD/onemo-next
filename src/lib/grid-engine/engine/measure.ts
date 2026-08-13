@@ -73,6 +73,8 @@ export interface MeasureRequest {
   readonly scale: number
   readonly pitchMm: number
   readonly radiusMm: number
+  /** Corridor strip radius for link facts; the kernel uses the disc radius when absent. */
+  readonly linkRadiusMm?: number
   readonly jobs: readonly MeasureJob[]
 }
 

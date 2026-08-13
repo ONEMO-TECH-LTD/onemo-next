@@ -1093,8 +1093,13 @@ SolveResult solve(const PolygonInput& input,
 
 std::vector<SizeMeasurement> measure_jobs(const CanonicalPolygon& polygon,
                                           const std::vector<MeasureJob>& jobs,
-                                          const EnginePolicy& policy) {
+                                          const EnginePolicy& policy,
+                                          int link_radius_mm) {
     validate_policy(policy);
+    // The corridor width is a POLICY VALUE; its radius arrives here so link facts can be judged
+    // at 12 or 24mm width. Zero means "the disc radius", the original behaviour.
+    EnginePolicy link_policy = policy;
+    if (link_radius_mm > 0) link_policy.disc_radius_mm = link_radius_mm;
     std::vector<SizeMeasurement> out;
     out.reserve(jobs.size());
     for (const MeasureJob& job : jobs) {
@@ -1157,7 +1162,7 @@ std::vector<SizeMeasurement> measure_jobs(const CanonicalPolygon& polygon,
                 link.ay_mm = m.nodes[i].y_mm;
                 link.bx_mm = m.nodes[j].x_mm;
                 link.by_mm = m.nodes[j].y_mm;
-                link.direct = capsule_supported(centres[i], centres[j], scaled, policy);
+                link.direct = capsule_supported(centres[i], centres[j], scaled, link_policy);
                 m.links.push_back(link);
             }
         }

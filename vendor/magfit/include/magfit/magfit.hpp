@@ -213,7 +213,8 @@ struct SizeMeasurement {
 
 std::vector<SizeMeasurement> measure_jobs(const CanonicalPolygon& polygon,
                                           const std::vector<MeasureJob>& jobs,
-                                          const EnginePolicy& policy = {});
+                                          const EnginePolicy& policy = {},
+                                          int link_radius_mm = 0 /* 0 = disc radius */);
 
 SolveResult solve(const PolygonInput& input,
                   const std::vector<BandSpec>& bands,

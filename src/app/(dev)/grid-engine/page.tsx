@@ -106,7 +106,8 @@ const REFUSAL_TEXT: Record<WriteRefusal, string> = {
 export default function GridEnginePage() {
   const [spec, setSpec] = useState<GridSystemSpec>(RELEASED)
   // THE INSTRUMENT. Everything it holds came back through the bridge; the shell computes none of it.
-  const measurement = useMeasurement(spec)
+  const [pan, setPan] = useState<[number, number]>([0, 0])
+  const measurement = useMeasurement(spec, pan)
   /**
    * ONE SIZE, ONE CAMERA — the page law ("the shape is static and fills the viewport; the GRID
    * scales underneath") applies to measured variants exactly as to the slider and the pinch.
@@ -114,6 +115,33 @@ export default function GridEnginePage() {
    * screen. Without this the instrument rescaled the shape against a fixed grid — backwards.
    */
   const measuredSizeMM = measurement.current ? Math.round(measurement.current.variant.sizeMm) : null
+  /**
+   * THE SHAPE BEHAVES AS BEFORE (Dan): one renderer, the scaffold's own. A measured outline —
+   * corpus pick or upload — lands in the same page outline/box the file loader fills: fractions
+   * of its own bounds, and a centred box fitted to THE size. No second shape path exists.
+   */
+  useEffect(() => {
+    const traced = measurement.outline
+    if (!traced || traced.length === 0) return
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const [x, y] of traced) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    const w = maxX - minX || 1
+    const h = maxY - minY || 1
+    setOutline(traced.map(([x, y]) => [(x - minX) / w, (y - minY) / h] as [number, number]))
+    setAsOutline(true)
+    const k = sizeMM / Math.max(w, h)
+    setBox({ x: (-w * k) / 2, y: (-h * k) / 2, w: w * k, h: h * k })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the outline is the trigger; the size
+    // route keeps the box in step afterwards through resizeShape, as it always has.
+  }, [measurement.outline])
   useEffect(() => {
     if (measuredSizeMM !== null) setSize(measuredSizeMM)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setSize is stable in behaviour; the
@@ -213,7 +241,11 @@ export default function GridEnginePage() {
     if (!r.refused) setSpec(r.spec)
     // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
     setAsOutline(true)
-    void traceCutout(file).then(setOutline)
+    // ONE OUTLINE (auditor R4): the traced upload IS the measured shape. Feeding it only into a
+    // page-local state left two shapes on screen with the measurement pointing at the old one.
+    void traceCutout(file).then((traced) => {
+      if (traced) measurement.selectUpload(file.name, traced)
+    })
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
@@ -232,7 +264,6 @@ export default function GridEnginePage() {
    * WHERE THE LATTICE SITS against the shape, in millimetres. Not a camera: this moves the magnets
    * themselves, so it is placement — the shape stays still and the grid comes to meet it.
    */
-  const [pan, setPan] = useState<[number, number]>([0, 0])
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
   const panSurface = useRef<SVGRectElement>(null)
   /**
@@ -266,6 +297,7 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    measurement.clearOutline()
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -509,7 +541,7 @@ export default function GridEnginePage() {
               e.currentTarget.releasePointerCapture?.(e.pointerId)
             }}
           />
-          {cutout && box && (
+          {box && (
             /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
                dragging even over the shape the canvas must continue to react". It is drawn above the
                drag surface, so without this it swallows the press and the lattice stops following the
@@ -525,7 +557,7 @@ export default function GridEnginePage() {
                   strokeWidth={1.5}
                   vectorEffect="non-scaling-stroke"
                 />
-              ) : (
+              ) : cutout ? (
                 <image
                   href={cutout.url}
                   x={box.x}
@@ -535,7 +567,7 @@ export default function GridEnginePage() {
                   opacity={CUTOUT_OPACITY}
                   preserveAspectRatio="none"
                 />
-              )}
+              ) : null}
               <rect
                 x={box.x}
                 y={box.y}
@@ -548,11 +580,7 @@ export default function GridEnginePage() {
               />
             </g>
           )}
-          <MeasurementOverlay
-            outline={measurement.outline}
-            measured={measurement.current}
-            discRadiusMM={spec.grid.paddingMM}
-          />
+          <MeasurementOverlay measured={measurement.current} discRadiusMM={spec.grid.paddingMM} />
         </GridCanvas>
       </div>
 
