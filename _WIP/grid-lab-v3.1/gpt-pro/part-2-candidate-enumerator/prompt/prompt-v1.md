@@ -13,15 +13,19 @@ It performs no geometry of its own. If a pattern needs a fact the kernel does no
 
 ## Grammar — authoritative, not to be extended or substituted
 
-Expressed purely in lattice indices, where a step of 1 is the base lattice and a step of 2 is every second position. Enumerate each family at every placement within the supplied field:
+Expressed purely in lattice indices. Enumerate on two populations of the one lattice, sharing its origin: the base population (every position) and the sparse population (every second position). Enumerate each family at every placement within the supplied field:
 
 - **single** — one held position.
-- **pair** — two held positions adjacent on the same lattice: one step apart along an axis, or one step on both axes (diagonal). Diagonal is lawful and introduces no second lattice.
-- **rectangle corners** — the four corners of an axis-aligned rectangle whose side step is 1 or 2, chosen independently per axis. Positions inside it are simply unused; skipping them is lawful.
-- **corner triangle** — three of those four corners. The fourth, and any interior position, is optional; existing does not make it required.
+- **run** — two or more held positions in a straight evenly-spaced line: along an axis, or diagonal with equal step on both axes. Diagonal is lawful and introduces no second lattice.
+- **rectangle corners** — the four corners of an axis-aligned rectangle. Each side spans any whole number of population steps, the two sides independently. Positions inside it are simply unused; skipping them is lawful.
+- **corner triangle** — exactly three of those four corners. The fourth corner and any interior position are not members of the candidate, and their being held never makes them required.
 - **full window** — every position of an r × c block.
 
-Across all families: never drop an arrangement because another holds more positions; deduplicate only geometrically identical records, under a canonical rule you state; if any sentence here admits two materially different formal readings, expose the ambiguity instead of settling it by preference.
+Across all families: never drop an arrangement because another holds more positions.
+
+A candidate's identity is its family, its population and steps, and its position set. The same position set may legitimately arise under more than one family — a 1 × 2 full window occupies the same positions as a two-position run, a 2 × 2 full window the same as rectangle corners. Keep every such record; deduplicate only records identical in all three respects.
+
+If any sentence here admits two materially different formal readings, expose the ambiguity instead of settling it by preference.
 
 ## Output
 
@@ -36,9 +40,10 @@ Match the kernel's discipline exactly: TypeScript, zero dependencies, exact arit
 ## Tests
 
 - Each family produced on a fixture where it applies.
-- Diagonal pairs present; rectangle corners with a skipped interior present; a corner triangle present without its fourth corner.
+- A diagonal run of three or more present; rectangle corners whose sides span more than one step present, including a tall narrow one; a corner triangle present while its fourth corner is held.
 - Completeness: on a small hand-computable fixture, the returned set equals the hand-enumerated set exactly — nothing missing, nothing extra.
-- The same held positions enumerated at step 1 and step 2 yield what each permits, on one origin.
+- The same held positions enumerated on the base and sparse populations yield what each permits, on one origin.
+- A position set reachable by two families returns both records, distinct by family.
 - Identical input bytes produce identical output bytes.
 - The kernel's 18 goldens still pass, unchanged.
 
