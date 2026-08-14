@@ -231,16 +231,8 @@ describe('4 — a kernel rejection propagates. No fallback, no repair.', () => {
 })
 
 /**
- * The packages here are real; THE RING IS SYNTHETIC — a rectangle, not a traced silhouette. Calling
- * this "a real run" without that qualifier overstated it.
- *
- * The TRACER is not what stops a real ring appearing here: `traceContourRaw` is pure — it takes a
- * mask, a width and a height, and touches no browser API. What needs a browser is `traceCutout`,
- * the adapter that decodes a file into that mask via `createImageBitmap` and a canvas. Producing
- * the mask another way in this suite would mean adding a PNG decoder, and none is present.
- *
- * So a real trace HAS been run end-to-end against DUCK.png — decoded outside this suite, through
- * `traceContourRaw` into `measureField` — rather than being impossible.
+ * The packages here are real; THE RING IS SYNTHETIC — a rectangle, not a traced silhouette. The
+ * real DUCK.png trace was exercised end-to-end separately.
  */
 describe('5 — a run through both delivered packages, on a synthetic ring', () => {
   const input = request()
