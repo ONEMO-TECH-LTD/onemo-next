@@ -23,6 +23,7 @@ import {
 import {
   bandSpanMM,
   cellDiameterMM,
+  magnetsAcrossCount,
   fieldSpanMM,
   latticeAnchorMM,
   magnetsInRegion,
@@ -35,7 +36,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { selectPitch, type GridSystemSpec } from './spec'
+import { selectPitch, type BandId, type GridSystemSpec } from './spec'
 
 export type { Candidate, CandidateDocument }
 export { placedOutline }
@@ -112,6 +113,57 @@ export function atomSpan(spec: GridSystemSpec): number {
 /** The span of a band, in millimetres — so a surface never has to compute one. */
 export function bandSpan(spec: GridSystemSpec, magnets: number): number {
   return bandSpanMM(spec.grid, magnets)
+}
+
+function pitchGrid(spec: GridSystemSpec, population: Candidate['population']): GridSystemSpec['grid'] {
+  const pitched = selectPitch(
+    spec,
+    population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
+  )
+  return pitched.spec.grid
+}
+
+/** Square-standard layouts for the bench: 4-point and the native filled window. Not singles. */
+export function benchCandidates(
+  spec: GridSystemSpec,
+  doc: CandidateDocument,
+  band: BandId,
+): Candidate[] {
+  const raw = doc.candidates.filter((c) => {
+    if (c.band !== band) return false
+    if (c.stepCol !== c.stepRow || c.stepCol < 1) return false
+    const k = magnetsAcrossCount(pitchGrid(spec, c.population), c.sizeMM)
+    if (k < 2) return false
+    if (c.family === 'rectangle-corners' && c.sites.length === 4) {
+      return c.stepCol === 1 || c.stepCol === k - 1
+    }
+    if (c.family === 'full-window' && c.sites.length === k * k) {
+      return c.stepCol === k - 1
+    }
+    return false
+  })
+  raw.sort((a, b) => {
+    if (a.sizeMM !== b.sizeMM) return a.sizeMM - b.sizeMM
+    if (a.family !== b.family) return a.family === 'rectangle-corners' ? -1 : 1
+    return a.id.localeCompare(b.id)
+  })
+  const seen = new Set<string>()
+  const out: Candidate[] = []
+  for (const c of raw) {
+    const key = [
+      c.sizeMM,
+      c.family,
+      c.population,
+      c.sites
+        .map((s) => `${s.col},${s.row}`)
+        .sort()
+        .join('_'),
+    ].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(c)
+  }
+  return out
 }
 
 /**

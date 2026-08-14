@@ -30,6 +30,7 @@ import {
 import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
+  benchCandidates,
   fieldBlockSpan,
   listCandidates,
   minShapeSpan,
@@ -189,8 +190,8 @@ export default function GridEnginePage() {
     setCandDoc(listCandidates(spec, outline))
   }, [outline, spec])
   const visibleCands = useMemo(
-    () => candDoc.candidates.filter((c) => c.band === activeBand),
-    [candDoc, activeBand],
+    () => benchCandidates(spec, candDoc, activeBand),
+    [candDoc, activeBand, spec],
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
   const shownView = shownCand && outline ? standingView(spec, shownCand, outline) : null
@@ -477,7 +478,7 @@ export default function GridEnginePage() {
             }
           >
             {shownCand
-              ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length} · ${shownCand.sizeMM} · ${shownCand.family} · ${shownCand.population} · ${shownCand.registration.x}/${shownCand.registration.y}`
+              ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length} · ${shownCand.sizeMM} · ${shownCand.sites.length}pt · ${shownCand.family} · ${shownCand.population}`
               : '0'}
           </button>
         )}

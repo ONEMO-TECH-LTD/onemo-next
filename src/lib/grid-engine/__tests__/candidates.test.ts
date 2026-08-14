@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listCandidates, standingView } from '../bridge'
+import { benchCandidates, listCandidates, standingView } from '../bridge'
 import { enumerateArrangements, type SiteInput } from '../enumerate'
 import { RELEASED } from '../spec'
 
@@ -124,6 +124,17 @@ describe('collectCandidates — shipped entry', () => {
     expect(singles.length).toBeGreaterThan(0)
     expect(singles.some((c) => c.sites[0].x !== 0 || c.sites[0].y !== 0)).toBe(true)
     expect(singles.every((c) => !('preferred' in c))).toBe(true)
+  })
+
+  it('bench face of each band is a square, never a single', () => {
+    const doc = listCandidates(RELEASED, square(36))
+    for (const band of [1, 2, 3, 4] as const) {
+      const face = benchCandidates(RELEASED, doc, band)
+      expect(face.length).toBeGreaterThan(0)
+      expect(face[0].family === 'rectangle-corners' || face[0].family === 'full-window').toBe(true)
+      expect(face[0].sites.length).toBeGreaterThanOrEqual(4)
+      expect(face.every((c) => c.family !== 'single')).toBe(true)
+    }
   })
 
   it('standing view lands every mark on the frozen lattice', () => {

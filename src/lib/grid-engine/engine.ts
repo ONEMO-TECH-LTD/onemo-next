@@ -225,3 +225,10 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
 export function bandSpanMM(grid: GridSpec, magnets: number): number {
   return Math.max(0, magnets - 1) * grid.pitchMM + 2 * grid.paddingMM
 }
+
+/** Inverse of bandSpanMM — how many magnets the square standard holds at this size. */
+export function magnetsAcrossCount(grid: GridSpec, sizeMM: number): number {
+  const spot = cellDiameterMM(grid)
+  if (sizeMM < spot || grid.pitchMM <= 0) return 0
+  return Math.floor((sizeMM - spot) / grid.pitchMM) + 1
+}
