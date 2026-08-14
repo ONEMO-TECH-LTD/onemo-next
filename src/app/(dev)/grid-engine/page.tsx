@@ -307,9 +307,11 @@ export default function GridEnginePage() {
         }
         const answer = solveCutout(spec, RELEASED_CALIBRATION, contourMM)
         setJudged(answer)
+        // The auto-pick takes THE SAME door as a chip press — picking is one path, so the lattice
+        // realigns here too. A second route skipped the pan and put magnets beside the grid.
         const first = answer?.bands.find((b) => b.band.released && b.variants.length)?.variants[0]
-        setPicked(first ?? null)
-        if (first) setSize(first.sizeMM)
+        if (first) pickVariant(first)
+        else setPicked(null)
       } finally {
         setSolving(false)
       }
