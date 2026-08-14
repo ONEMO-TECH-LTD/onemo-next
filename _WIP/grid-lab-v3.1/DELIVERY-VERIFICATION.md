@@ -37,6 +37,32 @@ is not.
 One redundancy in the archive: part 1's `delivery/CONTRACT.md` is a byte-identical copy of
 `kernel-v1.0.0/CONTRACT.md`.
 
+## 2a. CORRECTION — the archived PROMPTS are not what was sent
+
+Verified against the fresh transcript. The *deliveries* match; two of the three *prompts* in the
+archive do not.
+
+| prompt | archived vs the transcript's sent text |
+|---|---|
+| part 1 | matches on every sampled marker |
+| **part 2** | archive contains a **`single` family** and a two-population sentence **never sent** — `single` occurs 0× in the sent text, 1× in the archive |
+| **part 3** | archive is **missing** *"single now exists as a fifth candidate family"*, which **was** sent |
+
+**What this reverses.** The story carried all week was that GPT delivered four families, omitting
+`single`, and that our patch corrected their delivery. The transcript shows the opposite: the
+grammar we actually sent listed **four** families. GPT implemented exactly four, and said so. The
+`single` line existed in our draft and never reached the paste. **Our patch repaired our own
+commission gap, not a GPT omission.**
+
+Consequence for provenance: part 2's installed artifact is GPT's delivery plus a local patch that
+restores something we intended to ask for and didn't. That is still a local modification and must
+still be declared — but it is not a correction of GPT's work.
+
+The archived prompt files are therefore **drafts, not the record**. Anything quoted as "what we
+asked" must come from the transcript. The quotes used in this report do: `per size, per lattice
+position…` is transcript line 1109, `anchoring and registration semantics belong to the caller` is
+line 1349.
+
 ## 3. What was asked vs what came back — three real gaps
 
 The files match. The **commission** does not, in three places.
@@ -56,7 +82,15 @@ falsification step missing. That is not a defect in the delivered code — it do
 brief asked — but the layer whose entire job is "order as Dan orders" was never once tested against
 how Dan orders.
 
-### 3.2 The placement domain was never commissioned to anyone
+### 3.2 The placement domain was never commissioned **in this fork**
+
+**Scope correction.** The claim below is true of the three-part fork in this transcript. It is not
+true of the GPT Pro work overall: a separate track-2 chat — not present in `_WIP/GPT PRO`, so this
+folder is not the complete GPT history — reportedly commissioned exactly this orchestration and
+delivered an engine that prepares the outline once and then loops finitely over sizes,
+registrations, populations, patterns and translations. That package was removed from the repo on
+2026-08-14 as not part of the installation slice; it survives in Dan's Downloads. **Unverified by
+me** — recorded here as a peer finding to check, not as established fact.
 
 The original algorithm answer had placement inside the loop:
 
