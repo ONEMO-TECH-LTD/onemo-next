@@ -290,11 +290,14 @@ export function propose(
 ): Candidate[] {
   const raw = doc.candidates.filter((c) => c.band === band)
   const want = targetClass(doc.candidates, band, outline)
+  const pad = spec.grid.paddingMM
   const scored = raw.map((c) => {
     const verts = scaleToSize(outline, c.sizeMM)
     const shape = bbox(verts)
     const gravity = holdsTop(c, shape)
     const offset2 = balance(c, shape)
+    const span = shape.maxY - shape.minY || 1
+    const top = Math.min(...c.sites.map((s) => s.y)) - shape.minY
     return {
       c,
       n: c.sites.length,
@@ -304,21 +307,29 @@ export function propose(
       score: rankScore(c.sizeMM, offset2, gravity, band, shape),
       hit: matchesTarget(c, want),
       sizeDist: want.size === null ? 0 : Math.abs(c.sizeMM - want.size),
-      top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
+      top,
+      topFrac: top / span,
+      flush: want.n === 1 ? Math.abs(clearance(c, verts) - pad) : 0,
     }
   })
 
   scored.sort((a, b) => {
     if (a.hit !== b.hit) return a.hit ? -1 : 1
-    if (a.hit && b.hit && (want.n === 1 || want.n === 2)) {
+    if (a.hit && b.hit && want.n === 1) {
       if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
-      if (a.top !== b.top) return a.top - b.top
+      if (a.flush !== b.flush) return a.flush - b.flush
+    }
+    if (a.hit && b.hit && want.n === 2) {
+      if (a.size !== b.size) return a.size - b.size
+      const head = 1 / 3
+      const ad = Math.abs(a.topFrac - head)
+      const bd = Math.abs(b.topFrac - head)
+      if (ad !== bd) return ad - bd
     }
     if (a.hit && b.hit && want.size !== null && a.sizeDist !== b.sizeDist) {
       return a.sizeDist - b.sizeDist
     }
     if (a.hit && b.hit && a.balance !== b.balance) return a.balance - b.balance
-    if (a.hit && b.hit && a.gravity !== b.gravity) return a.gravity ? -1 : 1
     if (a.score !== b.score) return a.score - b.score
     if (a.size !== b.size) return a.size - b.size
     if (a.n !== b.n) return b.n - a.n
