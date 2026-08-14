@@ -83,19 +83,30 @@ own QA — never smuggled into this seam.
 |---|---|
 | `polygon.vertices` | the native integer pixel ring, deduped for `preparePolygon`'s strictness |
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
-| `sizeTransform.sourceAnchor` | that ring's exact rational bbox centre, in pixels |
-| `sizeTransform.targetAnchor` | the centre construction under test (§3.3) — **must be supplied**, or the kernel translates the shape out from under the drawing |
+| `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
+| `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
 | `sizes` | the whole-millimetre sizes wanted — **many in one call**, one `preparePolygon` for all |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
-float enters. The seam's test asserts the returned centres coincide with the drawn outline.
+float enters.
+
+**What the seam's test can and cannot assert.** The shape does not move between placements — the
+LATTICE does — so "held centres sit on `layout.magnets`" is only true **per (centre construction,
+registration) pair**, never across all twelve at once. The test therefore asserts, for each of the
+twelve solves independently: the transformed ring coincides with the ring drawn under that same
+centre construction, and every held position coincides with the lattice generated at that same
+registration. A global assertion over the twelve would be unsatisfiable, and claiming it would be
+the kind of test that can only pass by meaning nothing.
 
 ### 3.3 The placement domain — 3 centre constructions × 4 axis registrations
 
 Drafts 1–2 conflated two separate laws:
 
-- **O-1 — the centre construction** decides `targetAnchor`: bbox centre, material centroid,
-  maximum-clearance. Settled *by switch, not ruling* — Dan: *"why not add all options and test?"*
+- **O-1 — the centre construction** decides **`sourceAnchor`**: *which point of the shape* is
+  anchored — bbox centre, material centroid, or maximum-clearance point. It is a property of the
+  shape, so it varies the SOURCE point; it does not rename the target. (Draft 3 had this backwards,
+  caught in QA.) `targetAnchor` is separately where that anchor sits on the field. Settled *by
+  switch, not ruling* — Dan: *"why not add all options and test?"*
 - **L6 — registration** decides the lattice origin and is **per axis**: an even span registers in
   the gap, an odd on a magnet. The lawful set is four origins — point/point, gap/point, point/gap,
   gap/gap — not the single scalar `registrationOffsetMM` returns.
