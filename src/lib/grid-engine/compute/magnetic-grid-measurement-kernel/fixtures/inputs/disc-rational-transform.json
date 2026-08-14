@@ -1,0 +1,70 @@
+{
+  "polygon": {
+    "vertices": [
+      {
+        "x": "-10",
+        "y": "-10"
+      },
+      {
+        "x": "10",
+        "y": "-10"
+      },
+      {
+        "x": "10",
+        "y": "10"
+      },
+      {
+        "x": "-10",
+        "y": "10"
+      }
+    ]
+  },
+  "parameters": {
+    "lattice": {
+      "pitch": "7",
+      "origin": {
+        "x": {
+          "numerator": "319",
+          "denominator": "40"
+        },
+        "y": {
+          "numerator": "-5",
+          "denominator": "2"
+        }
+      },
+      "fieldExtent": {
+        "minColumn": "0",
+        "maxColumn": "0",
+        "minRow": "0",
+        "maxRow": "0"
+      }
+    },
+    "discDiameter": "7",
+    "sizeTransform": {
+      "sourceSize": "20",
+      "sourceAnchor": {
+        "x": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "y": {
+          "numerator": "-1",
+          "denominator": "2"
+        }
+      },
+      "targetAnchor": {
+        "x": {
+          "numerator": "3",
+          "denominator": "2"
+        },
+        "y": {
+          "numerator": "-5",
+          "denominator": "2"
+        }
+      }
+    }
+  },
+  "sizes": [
+    "21"
+  ]
+}

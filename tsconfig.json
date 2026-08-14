@@ -44,6 +44,12 @@
     "studio-v2",
     "storybook",
     "_prototypes",
-    "_WIP"
+    "_WIP",
+    "src/lib/grid-engine/compute/*/src",
+    "src/lib/grid-engine/compute/*/test",
+    "src/lib/grid-engine/compute/*/scripts",
+    "src/lib/grid-engine/logic/*/src",
+    "src/lib/grid-engine/logic/*/test",
+    "src/lib/grid-engine/logic/*/scripts"
   ]
 }
