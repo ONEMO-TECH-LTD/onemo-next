@@ -59,8 +59,11 @@ alternative to it.
 site**, the complete exact partition of positive scale into intervals where that site's held state
 is constant (equivalently, the lawful whole-even size intervals), for the finite field and a given
 anchor. Then the **unchanged** enumerator runs at each distinct measurement state, arrangements
-emerge from **real held facts** rather than predeclared sets, and the seam only dedupes existing
-candidate ids across equivalent states and marks the first lawful occurrence. Minimal, and it keeps
+emerge from **real held facts** rather than predeclared sets, and the seam dedupes only **repeated
+measurement STATES**, as a computation saving. **Every lawful size occurrence is retained in the
+output** — L13 requires every variation to survive — with the first lawful even publication marked
+separately. Candidate id excludes size by contract, so identity must never be used to collapse size
+occurrences away. Minimal, and it keeps
 Part 2 verbatim and authoritative.
 
 **(B) — fallback, only if (A) is not finitely representable.** Part 2 gains a deterministic,
@@ -114,7 +117,8 @@ two-construction diagnostic surface is a scope cut Dan may authorise; this lane 
 ## 6. Order of work
 
 1. ✅ Placement, isolation, typecheck.
-2. Draft the additive request (Parts 1 + 2), QA it, Dan sends it.
+2. Draft the **additive audit request**, QA it, Dan sends it. It asks the author to prove which
+   architecture is minimal — under the preferred (A) only Part 1 changes.
 3. On delivery: verify verbatim, then write `compute/candidates.ts`, `logic/registration-law.ts`,
    the bridge door, the shell controls.
 4. **Activate Part 3 — named, not assumed.** The additive request also asks the author for Part 3's
