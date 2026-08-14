@@ -1,188 +1,168 @@
 # Assembly plan — the three GPT modules into the scaffold
 
-**For Dan's confirmation before any code moves.** Written after reading, in full: the scaffold
+**Third draft.** Drafts 1 and 2 were blocked by QA (@s62-pixel-grid-pixel); every finding is applied
+below, including two that overturned my own decisions. Read in full before writing: the scaffold
 (`spec.ts` 210, `engine.ts` 227, `bridge.ts` 116, `ui/camera.ts` 73, `ui/trace-cutout.ts` 46,
 `GridCanvas.tsx` 175, `page.tsx` 654) and all three deliveries (kernel src 1,927 + contract 590;
-enumerator src 1,229 + contract; product logic src + contract + tests, read earlier).
+enumerator src 1,229 + contract; product logic src + contract + tests).
 
-**Rules this plan is bound by:** clone the delivered modules **verbatim** — rebuilding or
-approximating what GPT already delivered is forbidden; keep the scaffold's separation of compute /
-logic / shell; the **shell holds nothing but shell**; no module's code leaks into another.
+**Bound by:** clone the delivered modules **verbatim** — rebuilding or approximating is forbidden;
+keep the scaffold's compute / logic / shell separation; the **shell holds nothing but shell**.
 
 ---
 
-## 1. What the scaffold already is
+## 1. The scaffold as it is
 
 | module | file | owns | may never |
 |---|---|---|---|
-| **Sub 2 — spec** | `spec.ts` | law VALUES + the one write guard. Zero arithmetic. | compute anything |
-| **Sub 1 — engine** | `engine.ts` | pure mm compute: the lattice, spans, registration offset, scaling | know about a screen, hold a value |
-| **Bridge** | `bridge.ts` | the ONLY door shell→engine; drives the unit | hold values, do geometry |
-| **Shell** | `page.tsx`, `GridCanvas.tsx` | presentation state and drawing | compute, decide policy, import the engine |
-| **Shell's own logic, by necessity** | `ui/camera.ts`, `ui/trace-cutout.ts` | screen maths; browser IO + tracing | touch mm law, hand anything to the unit |
+| **Sub 2 — spec** | `spec.ts` | law VALUES + the one write guard. No arithmetic. | compute |
+| **Sub 1 — engine** | `engine.ts` | pure mm compute: lattice, spans, registration offset, scaling | know a screen, hold a value |
+| **Bridge** | `bridge.ts` | the ONLY door shell→unit | hold values, do geometry |
+| **Shell** | `page.tsx`, `GridCanvas.tsx` | presentation state, drawing | compute, decide policy, import compute/ |
+| **Shell logic, by necessity** | `ui/camera.ts`, `ui/trace-cutout.ts` | screen maths; browser IO + tracing | touch mm law |
 
-Verified by reading: the shell imports **only** `spec`, `bridge`, `ui/*`. `GridCanvas` draws the
-rule, one circle per magnet from `layout.magnets`, then `children`. It computes nothing.
-
-## 2. Where the three modules go — and why the layout is not a choice
-
-`enumerator/dist/types.d.ts:1` reads:
-
-```ts
-import type { … } from "../../magnetic-grid-measurement-kernel/dist/index.js";
-```
-
-The enumerator resolves the kernel **by relative sibling path**, with the delivered directory names
-and the `dist/` level intact. Runtime JS is unaffected (a type-only import is erased — the vendored
-copy imports and runs), but TypeScript needs that exact shape. **So renaming the folders, or
-flattening `dist/`, would force an edit to delivered code — which is forbidden.** The layout below
-is therefore dictated by the delivery, not by preference:
+## 2. Placement — all three, verbatim. Placement is not activation. ✅ LANDED
 
 ```
 src/lib/grid-engine/
-  spec.ts                                  UNCHANGED
-  engine.ts                                UNCHANGED
-  bridge.ts                                + ONE new door (§3)
-  compute/                                 ← the measurement + candidate modules
-    magnetic-grid-measurement-kernel/dist/   VERBATIM, byte-identical
-    enumerator/dist/                         VERBATIM (carries our single-family patch)
-    candidates.ts                            OURS — the seam (§3), the only file we write here
-  (no logic/ in this build — product logic is deferred, §6)
-  ui/                                      UNCHANGED — camera, trace-cutout
+  spec.ts / engine.ts / ui/            UNCHANGED
+  bridge.ts                            + ONE door (§4)
+  compute/
+    magnetic-grid-measurement-kernel/  VERBATIM, complete package   ← ACTIVATED
+    enumerator/                        VERBATIM, complete package   ← ACTIVATED
+    candidates.ts                      the seam — the only file written here (§3)
+  logic/
+    magnetic-grid-product-logic/       VERBATIM, complete package   ← PLACED, NOT WIRED (§6)
 ```
 
-From `compute/enumerator/dist/types.d.ts`, `../../` resolves to `compute/` → finds
-`compute/magnetic-grid-measurement-kernel/dist/index.js`. Exact.
+Committed at `52c91380`: 138 files, all three `diff -r` byte-identical to their accepted deliveries,
+nothing edited, all three import at runtime, own suites 18/18 · 13/13 · 15/15.
 
-The current `src/lib/grid-engine/vendor/{kernel,enumerator}` is **wrong and gets replaced**: it
-flattened `dist/` and renamed the kernel, which breaks that import. Byte-identity is proven by
-`diff -r` against `_WIP/grid-lab-v3.1/engine/`, re-runnable at any time.
+**Why the names are forced:** `enumerator/dist/types.d.ts` imports
+`"../../magnetic-grid-measurement-kernel/dist/index.js"` — the packages must stay siblings under
+their delivered names with `dist/` depth intact, or delivered code would need editing.
 
-## 3. The seam — one file, one door
+**Isolation, measured not assumed.** The app targets ES2017; the deliveries use BigInt literals
+(ES2020). Each package's `src/`, `test/`, `scripts/` are excluded from the app's TypeScript project
+(with `_WIP`); each package keeps building itself under its own tsconfig; the seam imports only
+`dist/`, whose `.d.ts` is covered by `skipLibCheck`. Removing those exclusions produces **101
+TS2737 errors** — measured, not inferred. The app's target is **not** raised and no delivered file
+is touched. `npx tsc --noEmit`: clean.
 
-`compute/candidates.ts` is the only code we write in the compute module. It drives the two delivered
-packages and converts units. It re-implements nothing.
+*(Recorded: landing the deliveries in `_WIP` had put 51 delivery `.ts` files in the typechecked tree
+and left the repo typecheck red. Mine; fixed by the same exclusion.)*
 
-```ts
-enumerateCandidatesForField(spec, layout, outlineMM, opts) → RawCandidate[]
-```
+## 3. The seam — `compute/candidates.ts`, the only code written in compute
 
-**Every lattice value is READ, never written:**
+### 3.1 The canonical polygon is the tracer's own integer ring — no invented precision
+
+Two of my earlier attempts were wrong and are struck:
+
+- **1e6-per-UV quantisation** claimed sub-millimetre authority that **L19** explicitly refuses:
+  *"a traced outline carries no sub-millimetre authority, so pixel-resolution stair-steps are noise,
+  not geometry."*
+- **Whole-millimetre quantisation of the contour** was worse: L19 binds *product decisions and
+  published sizes* to whole millimetres; it does not authorise a topology-changing contour
+  simplifier. And a ring quantised in physical millimetres is **size-dependent**, which destroys the
+  one-canonical-polygon model.
+
+`traceContourRaw` already yields an authoritative discrete contour: **integer source-image pixel
+coordinates**, with the image width and height. That native ring is the canonical kernel polygon.
+UV is derived from it for drawing only — the same ring, two views, so the shell and the kernel can
+never be measuring different shapes.
+
+`ui/trace-cutout.ts` therefore returns the native ring and the image dimensions alongside the UV it
+already produces. It discards nothing it computes today and gains no new maths.
+
+If contour simplification is ever wanted, it is a separately ruled input-preparation module with its
+own QA — never smuggled into this seam.
+
+### 3.2 The transform, stated once
+
+| kernel input | value |
+|---|---|
+| `polygon.vertices` | the native integer pixel ring, deduped for `preparePolygon`'s strictness |
+| `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
+| `sizeTransform.sourceAnchor` | that ring's exact rational bbox centre, in pixels |
+| `sizeTransform.targetAnchor` | the centre construction under test (§3.3) — **must be supplied**, or the kernel translates the shape out from under the drawing |
+| `sizes` | the whole-millimetre sizes wanted — **many in one call**, one `preparePolygon` for all |
+
+`scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
+float enters. The seam's test asserts the returned centres coincide with the drawn outline.
+
+### 3.3 The placement domain — 3 centre constructions × 4 axis registrations
+
+Drafts 1–2 conflated two separate laws:
+
+- **O-1 — the centre construction** decides `targetAnchor`: bbox centre, material centroid,
+  maximum-clearance. Settled *by switch, not ruling* — Dan: *"why not add all options and test?"*
+- **L6 — registration** decides the lattice origin and is **per axis**: an even span registers in
+  the gap, an odd on a magnet. The lawful set is four origins — point/point, gap/point, point/gap,
+  gap/gap — not the single scalar `registrationOffsetMM` returns.
+
+**12 solves per size.** Each candidate is tagged with its centre construction and its x/y
+registration. Free pan is not a lawful placement domain under L6, so excluding it costs no lawful
+candidate; omitting the 3×4 domain would.
+
+### 3.4 Everything read, nothing written
 
 | kernel input | source |
 |---|---|
 | `lattice.pitch` | `spec.grid.basePitchMM` |
-| `lattice.origin` | the lawful registration offset from `spec` via `registrationOffsetMM` — **not** `layout.anchorMM`, which carries the live pan (see the solve contract below) |
-| `lattice.fieldExtent` | integer bounds from `spec.grid.positionsPerAxis` (see below) |
+| `lattice.origin` | the L6 registration under test, from `spec` via `registrationOffsetMM` |
+| `lattice.fieldExtent` | `minIndex = −floor(N/2)`, `maxIndex = minIndex + N − 1`, `N = positionsPerAxis` — integer for every permitted value (9 → [−4,4], 8 → [−4,3]) |
 | `discDiameter` | `layout.cellMM` |
 | population `indexStep` | `spec.grid.pitchMM / spec.grid.basePitchMM` |
 
-**A literal 48, 24, 12 or 9 anywhere in this file is a defect** — that duplication is exactly what
-produced the impossible 24mm-spaced discs, and it is the one failure this seam exists to prevent.
+**A literal 48, 24, 12 or 9 in this file is a defect.** Grammar: `run.stepDomain =
+any-positive-whole-population-step`, `full-window.oneByOne = include`, populations base (step 1) and
+sparse (step 2) at origin 0,0 — complete on a 9×9 field, so no `MissingKernelFactError`.
 
-**Field extent — integer bounds, and my first formula was wrong.** `±(positionsPerAxis − 1)/2`
-produces **half-integer indices whenever the count is even**, and the guard allows any count from 1
-to 99, so an even count is reachable and the kernel takes integers only. Correct construction:
+**Cache key**: outline identity, `basePitchMM`, `pitchMM`, `paddingMM`, `positionsPerAxis`, centre
+construction, registration, requested sizes, grammar. Anything outside the key clears it.
 
-    minIndex = −floor(N / 2)        maxIndex = minIndex + N − 1
-
-N=9 → [−4, 4] (the released case) · N=8 → [−4, 3] · N=1 → [0, 0]. Exactly N positions per axis, for
-every value the guard permits.
-
-**Transform model — ONE model, stated exactly.** The first draft carried two incompatible ones
-("requested size is 1000" *and* "one call with the whole sizes array"). The kernel is used as
-designed: **a canonical unscaled polygon plus real requested sizes**, so one `preparePolygon` serves
-every size.
-
-| kernel input | value |
-|---|---|
-| `polygon.vertices` | the traced ring in its own space, quantised: `round(u × 1e6)`, `round(v × 1e6)` |
-| `sizeTransform.sourceSize` | the longest bbox span of that quantised ring, in the same units |
-| `sizeTransform.sourceAnchor` | that ring's bbox centre, same units |
-| `sizeTransform.targetAnchor` | the millimetre point where that centre currently sits on the field |
-| `sizes` | the millimetre sizes wanted — the displayed size, or a ladder, in one call |
-
-`sourceAnchor` and `targetAnchor` are what pin the shape where the shell has already drawn it; the
-first draft left both unassigned, which would have let the kernel translate the shape out from under
-the picture. Both must be supplied, and the seam's test asserts the returned centres coincide with
-the drawn outline.
-
-**The quantised polygon is the authoritative input**, not the float outline it came from. At 1e6 per
-unit the step is far below a micrometre on any real shape, but it is a quantisation and can in
-principle flip a fit that is tangent to within it — so the plan claims fidelity to the quantised
-ring, never equivalence to the float one.
-
-**Input normalisation is required and belongs here.** `preparePolygon` rejects — never repairs —
-duplicate vertices, zero-length edges, a repeated closing vertex, zero area and self-touching edges.
-A raw traced ring contains duplicates. So this file dedupes consecutive points and drops a repeated
-closing vertex **after quantisation and before calling** — rounding itself can create duplicates, so
-cleaning before it would miss them. That prepares input; it re-implements no kernel behaviour.
-
-**Cost and the solve contract — the first draft contradicted itself.** `preparePolygon` runs on every
-`measureLattice` call and its `validateNonAdjacentEdges` is O(n²) over edges; per-position queries
-are cheap (the kernel builds an AABB tree). So the seam calls **once per outline, carrying every size
-it needs**.
-
-But the draft also keyed the cache on `layout.anchorMM` — **which contains the pan**. Every pan
-therefore changes every physical lattice site, so that cache misses on each new pan and solves during
-a drag, breaking the scaffold's own zero-solve-on-interaction contract. Both could not hold. The
-resolution follows the scaffold and the law rather than inventing a third thing:
-
-- **Candidates are solved for the lawful registrations, not for the live pan.** L6 rules registration
-  by parity and O-1 makes the centre construction a switch, so the origins the seam measures are
-  those — a small, fixed, law-derived set, computed from `spec` via `registrationOffsetMM`.
-- **Pan does not re-solve.** During this raw-set build it is presentation only; selecting a candidate
-  realigns the drawn grid to that candidate's registration, which is the behaviour the scaffold
-  already describes.
-- **The cache key is everything the result depends on**: outline identity, `basePitchMM`, `pitchMM`
-  (population stride), `paddingMM` (disc), `positionsPerAxis` (extent), registration, the requested
-  sizes, and the grammar. Anything outside that key must clear the cache rather than be assumed
-  irrelevant.
-
-**Grammar** — the two ambiguities the enumerator makes mandatory are supplied here, as already
-settled in QA: `run.stepDomain = any-positive-whole-population-step`, `full-window.oneByOne =
-include`. Populations: base (`indexStep 1`) and sparse (`indexStep 2`) sharing origin `0,0`.
-
-**Return shape** — positions already in mm on the scaffold's lattice, plus family, population, steps
-and the kernel fact references. No ranking, no preference, no filtering.
-
-## 4. The bridge gains one function, and nothing else changes
+## 4. The bridge gains one door
 
 ```ts
-export function candidatesForField(spec, layout, outlineMM, opts): RawCandidate[]
+candidatesForField(spec, tracedRing, sizesMM, opts) → RawCandidate[]
 ```
-It reads values off `spec`, calls `compute/candidates.ts`, returns. It does no geometry itself — the
-same discipline `layoutField` already follows.
+`RawCandidate` carries positions in mm, family, population, per-axis steps, kernel fact references,
+**the size occurrence, the centre construction, and the x/y registration** — the last three because
+selecting a candidate must realign the drawn lattice to the placement it was measured under.
 
-## 5. What the shell is allowed to gain
+## 5. The shell — and the pan contradiction, resolved honestly
 
-Presentation only:
-- an index of which candidate is being viewed, and controls to step it;
-- the outline in mm, which it **already computes** to draw the silhouette
-  (`box.x + u·box.w`, `box.y + v·box.h`) — handed to the bridge, not recomputed;
-- highlight elements passed as `children` to `GridCanvas`, drawn from coordinates the bridge
-  returned on this render.
+**"Pan is presentation only" was false as written.** `GridCanvas` passes `panMM` into `layoutField`,
+which adds it to `anchorMM` and `magnetsInRegion` — dragging physically moves the lattice today.
+Leaving that while candidates stay frozen would let the drawn magnets drift off the candidate
+coordinates.
 
-The shell must not import `compute/`, must hold no lattice number, and must not decide which
-candidate is better — there is no "better" in this build.
+**For this build the lattice-pan interaction is disabled**, and selecting a candidate sets the drawn
+lattice from that candidate's recorded registration and centre construction. It cannot reuse the
+free-pan state. A camera-only pan may return later; it is not needed for this gate and is not in
+this plan.
 
-## 6. Product logic is deliberately not wired yet
+Otherwise the shell gains only: the index of the candidate being viewed, controls to step it, and
+highlight elements passed as `children` to `GridCanvas` from bridge-returned coordinates. No compute,
+no lattice number, no notion of "better".
 
-It cannot run without a gravity boolean, a wrap value and a regional value **per candidate**, and
-those three are ruled but not yet implemented (`judgements.ts`). Wiring the ranker before Dan has
-accepted the raw candidate set is what killed the previous attempts. It lands after §7 passes.
+## 6. Product logic — placed, deliberately not wired
 
-## 7. Order of work, each step verifiable
+Cloned verbatim under `logic/`. It requires a gravity boolean, a wrap value and a regional value
+**per candidate**; those are ruled but not implemented. Placement and activation are separate, and
+this plan's authorised deliverable ends at the raw-candidate surface.
 
-1. Replace `vendor/` with `compute/` in the delivered layout; prove byte-identity by `diff -r`;
-   `tsc` resolves the enumerator's kernel import.
-2. Write `compute/candidates.ts` + a unit test against a real trace: assert the returned positions
-   sit exactly on `layout.magnets`, and that no literal law value appears in the file.
-3. Bridge door + the shell's stepping control and highlight.
-4. Chrome check on the running page: candidates visible, no solve fires on pan, screenshot captured.
-5. Dan tests it. Only then: judgements + product logic.
+## 7. Order of work
 
-## 8. What this plan explicitly does not do
+1. ✅ All three packages placed verbatim, committed, isolated, typecheck clean.
+2. `ui/trace-cutout.ts` returns the native ring + image dimensions (no new maths).
+3. `compute/candidates.ts` + unit test on a real trace: returned centres coincide with the drawn
+   ring and sit on `layout.magnets`; the 3×4 domain is exercised; no literal law value in the file.
+4. Bridge door; shell stepping control and highlight; lattice-pan disabled.
+5. Chrome check on the running page; screenshot; no solve on interaction.
+6. Dan tests the raw set. Only then: judgements, then product logic.
 
-No rewrite or re-implementation of any delivered algorithm. No second lattice. No geometry in the
-shell. No ranking anywhere. No new module beyond the one seam file and, later, `judgements.ts`.
+## 8. Out of scope
+
+No rewrite of any delivered algorithm. No contour simplifier. No second lattice. No geometry or
+policy in the shell. No ranking anywhere. No global compiler change. No new module beyond the seam.
