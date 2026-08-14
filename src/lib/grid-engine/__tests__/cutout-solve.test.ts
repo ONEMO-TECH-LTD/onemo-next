@@ -56,13 +56,10 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
         expect(variant.sizeMM % 2).toBe(0)
         // NO COUNT GATE — any count that fits is lawful
         expect(variant.anchors.length).toBeGreaterThanOrEqual(1)
-        // THE FLAP LAW, proportional: sides bounded by the padded block's own span (capped by
-        // the limb allowance); vertical carries the limb allowance
-        expect(Math.max(variant.wrap.left, variant.wrap.right)).toBeLessThanOrEqual(
-          Math.min(RELEASED_CALIBRATION.flapLimbMM, variant.wrap.gridExtentXMM),
-        )
-        expect(Math.max(variant.wrap.top, variant.wrap.bottom)).toBeLessThanOrEqual(
-          RELEASED_CALIBRATION.flapLimbMM,
+        // THE YARDSTICK LAW: flap never refuses — it is reported. Centering is enforced.
+        expect(variant.wrap).toBeDefined()
+        expect(Math.abs(variant.wrap.left - variant.wrap.right) / 2).toBeLessThanOrEqual(
+          RELEASED_CALIBRATION.centerToleranceMM,
         )
         // no two magnets closer than two paddings — application rings never overlap
         const padFloor = 2 * RELEASED.grid.paddingMM - 1e-6
@@ -76,8 +73,11 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
           expect([RELEASED.magnet.smallMM, RELEASED.magnet.largeMM]).toContain(anchor.dia)
         }
       }
-      // the band's ANSWER (first variant) hits the tight tier on a plain square
-      expect(answer.variants[0].tier).toBe('tight')
+      // the band's ANSWER aims the yardstick count when any variant carries it
+      const counts = answer.variants.map((v) => v.anchors.length)
+      if (counts.includes(answer.band.targetMagnets)) {
+        expect(answer.variants[0].anchors.length).toBe(answer.band.targetMagnets)
+      }
     }
   })
 

@@ -119,8 +119,7 @@ function variantFrom(
   grid: GridResult,
   layout?: string,
 ): SizeVariant | null {
-  // NO COUNT GATE (Dan 2026-08-14: "any 1/2/3/4/5/6/7 — whatever fits; don't cut the
-  // engine's legs prematurely"). The physics laws below are the only judges.
+  // NO COUNT GATE (Dan 2026-08-14): any count that fits stays an option.
   if (grid.anchors.length < 1) return null
   const wrap = measureWrap(
     contour,
@@ -128,15 +127,12 @@ function variantFrom(
     spec.grid.paddingMM,
   )
   if (!wrap) return null
-  // THE FLAP LAW (Dan 2026-08-14): LEFT and RIGHT hold the strict outer bound — a side flap
-  // peels off the surface and is refused. TOP and BOTTOM carry the limb allowance: mass above
-  // a held row presses flat under gravity (the duck's crown), and the bottom is Dan's stated
-  // limb case — neither dangles the way a side does. ENFORCED CENTERING: an assembly whose
-  // horizontal centre drifts past the tolerance is refused, never merely ranked lower.
-  const sideMax = Math.max(wrap.left, wrap.right)
-  if (sideMax > calibration.flapMaxMM) return null
-  if (Math.max(wrap.top, wrap.bottom) > calibration.flapLimbMM) return null
+  // THE YARDSTICK LAW (Dan's four bat-woman canon frames, 2026-08-14 22:40): flap NEVER
+  // refuses a placement — the canon B3/B4 central pair carries 57-86mm sides lawfully; the
+  // brains hold the spine and the material hangs. Flap bounds survive only as the TIER
+  // report. The gates are the engine's own clearance and ENFORCED CENTERING.
   if (Math.abs(wrap.left - wrap.right) / 2 > calibration.centerToleranceMM) return null
+  const sideMax = Math.max(wrap.left, wrap.right)
   const verticalMax = Math.max(wrap.top, wrap.bottom)
   const tier: SizeVariant['tier'] =
     sideMax <= calibration.flapTightMM && verticalMax <= calibration.flapMaxMM
@@ -161,12 +157,22 @@ function variantFrom(
 }
 
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
-function better(a: SizeVariant, b: SizeVariant, calibration: CalibrationSpec): boolean {
-  // 1. tight beats allowed beats limb (the flap law's preference order)
-  if (a.tier !== b.tier) {
-    const order = { tight: 0, allowed: 1, limb: 2 }
-    return order[a.tier] < order[b.tier]
-  }
+function better(
+  a: SizeVariant,
+  b: SizeVariant,
+  band: BandSpec,
+  calibration: CalibrationSpec,
+): boolean {
+  // 1. THE BAND'S COUNT (the yardstick: 1 brain through band 2, the spine pair from band 3).
+  //    Closeness to the band's target ranks first; every other count stays an option.
+  const countA = Math.abs(a.anchors.length - band.targetMagnets)
+  const countB = Math.abs(b.anchors.length - band.targetMagnets)
+  if (countA !== countB) return countA < countB
+  // 1b. SPARSE SPREAD PREFERRED (Dan, verbatim: "96mm is lawful sparse pair and actually
+  //     preferred and proven sufficient") — at equal count, the wider-spaced arrangement wins.
+  const spreadA = a.nearestAnchorMM ?? 0
+  const spreadB = b.nearestAnchorMM ?? 0
+  if (spreadA !== spreadB) return spreadA > spreadB
   // 2. GRAVITY AS A GUARD, not a climb (Dan, 2026-08-14: the pill single drifted off-centre
   //    because "least top overhang" walked every layout as high as clearance allowed). The law —
   //    "gravity must not place magnets in the bottom and leave top unprotected" — is a constraint:
@@ -203,7 +209,7 @@ function judgeBand(
     const identity = layoutIdentity(variant, halfPitchMM)
     const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
-      if (better(variant, kept[twin], calibration)) kept[twin] = variant
+      if (better(variant, kept[twin], band, calibration)) kept[twin] = variant
       return
     }
     kept.push(variant)
@@ -284,7 +290,7 @@ function judgeBand(
     }
   }
 
-  kept.sort((a, b) => (better(a, b, calibration) ? -1 : 1))
+  kept.sort((a, b) => (better(a, b, band, calibration) ? -1 : 1))
   return { band, variants: kept.slice(0, VARIANTS_PER_BAND) }
 }
 

@@ -298,9 +298,9 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   sizeStepMM: 2,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
-    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),
-    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 4, released: true }),
-    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 6, released: false }),
+    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 1, released: true }),
+    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 2, released: true }),
+    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 2, released: false }),
   ]) as readonly BandSpec[],
   // Dan's canon arrangements (2026-08-13 walkthrough): pair either way; the 48 square; the
   // 48-wide x 96-tall rectangle and its transpose; the 96 square; the six-point 48x96 blocks.
@@ -308,6 +308,8 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
     Object.freeze({ name: 'single', steps: [[0, 0]] }),
     Object.freeze({ name: 'pair-v', steps: [[0, 0], [0, 1]] }),
     Object.freeze({ name: 'pair-h', steps: [[0, 0], [1, 0]] }),
+    Object.freeze({ name: 'pair-v-96', steps: [[0, 0], [0, 2]] }),
+    Object.freeze({ name: 'pair-h-96', steps: [[0, 0], [2, 0]] }),
     Object.freeze({ name: 'pair-diag', steps: [[0, 0], [1, 1]] }),
     Object.freeze({ name: 'pair-antidiag', steps: [[0, 1], [1, 0]] }),
     Object.freeze({ name: 'run-diag-3', steps: [[0, 0], [1, 1], [2, 2]] }),
