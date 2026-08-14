@@ -253,7 +253,10 @@ export interface CalibrationSpec {
   center: 'centroid' | 'bbox'
   /** Flap law (Dan 2026-08-11): preferred per-side overhang bound, millimetres. */
   flapTightMM: number
-  /** Flap law: the outer acceptance bound — a side beyond this refuses the placement. */
+  /** Flap law: the outer acceptance bound — a side beyond this refuses the placement.
+   *  28, measured off Dan's own approved duck frames (2026-08-14): the lawful band-3 seat
+   *  carries a 26-28mm crown above the held top row; the side placements he refused (30+)
+   *  stay refused. */
   flapMaxMM: number
   /** Flap law's limb exception (Dan: "unless it is trivial limb especially at the bottom"):
    *  any side may overhang up to this before the placement is refused outright — hanging legs,
@@ -288,7 +291,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   plan: 'auto',
   center: 'centroid',
   flapTightMM: 12,
-  flapMaxMM: 24,
+  flapMaxMM: 28,
   flapLimbMM: 40,
   sweepStepMM: 2,
   centerToleranceMM: 12,
