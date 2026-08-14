@@ -23,7 +23,6 @@ import {
 import {
   bandSpanMM,
   cellDiameterMM,
-  magnetsAcrossCount,
   fieldSpanMM,
   latticeAnchorMM,
   magnetsInRegion,
@@ -36,7 +35,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { selectPitch, type BandId, type GridSystemSpec } from './spec'
+import { BAND_SIZES_MM, selectPitch, type BandId, type GridSystemSpec } from './spec'
 
 export type { Candidate, CandidateDocument }
 export { placedOutline }
@@ -115,36 +114,39 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
   return bandSpanMM(spec.grid, magnets)
 }
 
-function pitchGrid(spec: GridSystemSpec, population: Candidate['population']): GridSystemSpec['grid'] {
-  const pitched = selectPitch(
-    spec,
-    population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
-  )
-  return pitched.spec.grid
+/** Ladder step the selection examples sit on, per band. */
+const EXAMPLE_SIZE_INDEX: Record<BandId, number> = { 1: 3, 2: 1, 3: 2, 4: 4 }
+
+function isExampleClass(c: Candidate, band: BandId): boolean {
+  const n = c.sites.length
+  if (band === 1) return c.family === 'single' && n === 1
+  if (band === 2) return n === 2 && (c.family === 'run' || c.family === 'full-window')
+  if (band === 3) {
+    if (n === 3 && c.family === 'corner-triangle') return true
+    if (n === 4 && (c.family === 'rectangle-corners' || c.family === 'run')) return true
+    return false
+  }
+  return n === 4 && (c.family === 'rectangle-corners' || c.population === 'sparse')
 }
 
-/** Square-standard layouts for the bench: 4-point and the native filled window. Not singles. */
+function siteTop(c: Candidate): number {
+  return Math.min(...c.sites.map((s) => s.y))
+}
+
+/** Bench face = the example class for that band. Engine still holds the full document. */
 export function benchCandidates(
   spec: GridSystemSpec,
   doc: CandidateDocument,
   band: BandId,
 ): Candidate[] {
-  const raw = doc.candidates.filter((c) => {
-    if (c.band !== band) return false
-    if (c.stepCol !== c.stepRow || c.stepCol < 1) return false
-    const k = magnetsAcrossCount(pitchGrid(spec, c.population), c.sizeMM)
-    if (k < 2) return false
-    if (c.family === 'rectangle-corners' && c.sites.length === 4) {
-      return c.stepCol === 1 || c.stepCol === k - 1
-    }
-    if (c.family === 'full-window' && c.sites.length === k * k) {
-      return c.stepCol === k - 1
-    }
-    return false
-  })
+  const home = BAND_SIZES_MM[band][EXAMPLE_SIZE_INDEX[band]]
+  const raw = doc.candidates.filter((c) => c.band === band && isExampleClass(c, band))
   raw.sort((a, b) => {
-    if (a.sizeMM !== b.sizeMM) return a.sizeMM - b.sizeMM
-    if (a.family !== b.family) return a.family === 'rectangle-corners' ? -1 : 1
+    const da = Math.abs(a.sizeMM - home)
+    const db = Math.abs(b.sizeMM - home)
+    if (da !== db) return da - db
+    if (band === 1 && siteTop(a) !== siteTop(b)) return siteTop(a) - siteTop(b)
+    if (b.sites.length !== a.sites.length) return b.sites.length - a.sites.length
     return a.id.localeCompare(b.id)
   })
   const seen = new Set<string>()

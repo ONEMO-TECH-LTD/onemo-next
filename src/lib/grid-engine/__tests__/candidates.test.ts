@@ -126,15 +126,17 @@ describe('collectCandidates — shipped entry', () => {
     expect(singles.every((c) => !('preferred' in c))).toBe(true)
   })
 
-  it('bench face of each band is a square, never a single', () => {
+  it('bench face follows the selection-example class per band', () => {
     const doc = listCandidates(RELEASED, square(36))
-    for (const band of [1, 2, 3, 4] as const) {
-      const face = benchCandidates(RELEASED, doc, band)
-      expect(face.length).toBeGreaterThan(0)
-      expect(face[0].family === 'rectangle-corners' || face[0].family === 'full-window').toBe(true)
-      expect(face[0].sites.length).toBeGreaterThanOrEqual(4)
-      expect(face.every((c) => c.family !== 'single')).toBe(true)
-    }
+    const b1 = benchCandidates(RELEASED, doc, 1)
+    const b2 = benchCandidates(RELEASED, doc, 2)
+    const b3 = benchCandidates(RELEASED, doc, 3)
+    const b4 = benchCandidates(RELEASED, doc, 4)
+    expect(b1[0]?.family).toBe('single')
+    expect(b1[0]?.sites.length).toBe(1)
+    expect(b2[0]?.sites.length).toBe(2)
+    expect(b3[0]?.sites.length === 3 || b3[0]?.sites.length === 4).toBe(true)
+    expect(b4[0]?.sites.length).toBe(4)
   })
 
   it('standing view lands every mark on the frozen lattice', () => {
