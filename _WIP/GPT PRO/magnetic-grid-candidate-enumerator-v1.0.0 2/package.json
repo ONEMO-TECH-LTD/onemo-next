@@ -1,0 +1,19 @@
+{
+  "name": "magnetic-grid-candidate-enumerator-complete",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:kernel": "node scripts/verify-kernel.mjs",
+    "verify:package": "node scripts/verify-package.mjs",
+    "build:kernel": "npm --prefix magnetic-grid-measurement-kernel run build",
+    "build:enumerator": "npm --prefix enumerator run build",
+    "build": "npm run verify:kernel && npm run build:kernel && npm run verify:kernel && npm run build:enumerator",
+    "test:kernel": "npm --prefix magnetic-grid-measurement-kernel test",
+    "test:enumerator": "npm --prefix enumerator test",
+    "test": "npm run verify:package && npm run verify:kernel && npm run test:kernel && npm run verify:kernel && npm run test:enumerator && npm run verify:kernel && npm run verify:package",
+    "clean": "npm --prefix enumerator run clean"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
