@@ -636,6 +636,31 @@ export default function GridEnginePage() {
               />
             </g>
           )}
+          {picked && (
+            /* THE SEATED SPOTS, highlighted the canon way (Dan's yardstick bench): a green ring
+               on the lattice's OWN disc at each seated anchor — same disc, same lattice, no
+               second geometry. Without it seated and empty cells are indistinguishable and no
+               visual gate against the canon is possible. */
+            (() => {
+              const { dx, dy } = engineFrame(picked)
+              return (
+                <g pointerEvents="none" transform={`translate(${dx} ${dy})`}>
+                  {picked.anchors.map((anchor, i) => (
+                    <circle
+                      key={`s${i}`}
+                      cx={anchor.p[0]}
+                      cy={anchor.p[1]}
+                      r={spec.grid.paddingMM}
+                      fill="none"
+                      stroke="#6fdc8c"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                </g>
+              )
+            })()
+          )}
         </GridCanvas>
       </div>
 
