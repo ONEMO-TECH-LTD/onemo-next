@@ -234,6 +234,40 @@ export function collectCandidates(
           }
         }
       }
+      // Band 1 is one disc. The 12mm seats miss a pocket 1–2mm off the grid
+      // (duck head at 60). Walk every millimetre the disc actually fits.
+      if (band === 1) {
+        const pitch = spec.grid.basePitchMM
+        const x0 = Math.ceil(Number(prep.minX) / 1000)
+        const x1 = Math.floor(Number(prep.maxX) / 1000)
+        const y0 = Math.ceil(Number(prep.minY) / 1000)
+        const y1 = Math.floor(Number(prep.maxY) / 1000)
+        for (let x = x0; x <= x1; x++) {
+          for (let y = y0; y <= y1; y++) {
+            if (!discFitsGrid(prep, [x, y], spec.grid)) continue
+            const ox = ((x % pitch) + pitch) % pitch
+            const oy = ((y % pitch) + pitch) % pitch
+            const col = Math.round((x - ox) / pitch)
+            const row = Math.round((y - oy) / pitch)
+            candidates.push({
+              id: [band, sizeMM, ox, oy, 'single', 'base', 0, 0, `${col},${row}`].join(':'),
+              band,
+              sizeMM,
+              anchor: 'bbox',
+              registration: {
+                x: namedOrigin(ox, half),
+                y: namedOrigin(oy, half),
+              },
+              origin: [ox, oy],
+              family: 'single',
+              population: 'base',
+              stepCol: 0,
+              stepRow: 0,
+              sites: [{ col, row, x, y }],
+            })
+          }
+        }
+      }
     }
   }
 

@@ -89,6 +89,14 @@ describe('enumerateArrangements', () => {
 })
 
 describe('collectCandidates — shipped entry', () => {
+  it('band-1 singles include millimetre seats, not only 12mm pans', () => {
+    const doc = listCandidates(RELEASED, square(36))
+    const ones = doc.candidates.filter(
+      (c) => c.band === 1 && c.family === 'single' && c.sizeMM === 72,
+    )
+    expect(ones.some((c) => c.origin[0] % 12 !== 0 || c.origin[1] % 12 !== 0)).toBe(true)
+  })
+
   it('a pixel-dense outline still collects in millimetre time', () => {
     const ring: Array<[number, number]> = []
     for (let i = 0; i < 4000; i++) {
@@ -256,9 +264,6 @@ describe('collectCandidates — shipped entry', () => {
     const pitch = RELEASED.grid.basePitchMM
     for (const c of doc.candidates) {
       const view = standingView(RELEASED, c, outline)
-      const atom = RELEASED.grid.paddingMM
-      expect(view.panMM[0] % atom === 0).toBe(true)
-      expect(view.panMM[1] % atom === 0).toBe(true)
       for (const [x, y] of view.sites) {
         expect((x - view.panMM[0]) % pitch === 0).toBe(true)
         expect((y - view.panMM[1]) % pitch === 0).toBe(true)
