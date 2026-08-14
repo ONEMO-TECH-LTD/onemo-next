@@ -200,7 +200,10 @@ export default function GridEnginePage() {
     [candDoc, activeBand, spec, metric],
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
-  const shownView = shownCand && metric ? standingView(spec, shownCand, metric, picture ?? undefined) : null
+  const stickerMM = Math.round(bandSpan(spec, 3))
+  const shownView =
+    shownCand && metric ? standingView(spec, shownCand, metric, picture ?? undefined, stickerMM) : null
+  const displayK = shownCand ? stickerMM / shownCand.sizeMM : 1
   const shownScore = shownCand && metric ? measureProposal(spec, shownCand, metric) : null
   const marks = shownView ? shownView.sites : []
   const demoVerts = shownView ? shownView.shape : null
@@ -527,8 +530,8 @@ export default function GridEnginePage() {
             if (!grab) return
             const [px, py] = toMM(e)
             setPan([
-              Math.round(grab.panMM[0] + px - grab.atMM[0]),
-              Math.round(grab.panMM[1] + py - grab.atMM[1]),
+              Math.round(grab.panMM[0] + (px - grab.atMM[0]) / displayK),
+              Math.round(grab.panMM[1] + (py - grab.atMM[1]) / displayK),
             ])
           }}
           onPointerUp={(e) => {
@@ -539,11 +542,9 @@ export default function GridEnginePage() {
         <GridCanvas
           spec={shownField.spec}
           panMM={shownField.panMM}
-          /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
-             lands on it. Handing in a region built from the shape's size read as the shape defining
-             the world, and did nothing besides — every reachable size is under the field's own floor.
-             That coupling is what once made the lattice re-solve on every drag. */
-          zoom={gridScale}
+          displayK={displayK}
+          frameMM={shownCand ? stickerMM * 1.15 : undefined}
+          zoom={shownCand ? 1 : gridScale}
           onView={onView}
         >
           {marks.map(([x, y]) => (
@@ -552,7 +553,7 @@ export default function GridEnginePage() {
               data-candidate-mark="true"
               cx={x}
               cy={y}
-              r={minSpanMM / 2}
+              r={(minSpanMM / 2) * displayK}
               fill="none"
               stroke="#3dd68c"
               strokeWidth={2}

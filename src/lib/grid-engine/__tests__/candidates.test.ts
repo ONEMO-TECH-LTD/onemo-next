@@ -205,6 +205,23 @@ describe('collectCandidates — shipped entry', () => {
     expect(face[0]?.sites.length).toBe(2)
   })
 
+  it('standing view keeps the sticker size when the law size changes', () => {
+    const outline = square(36)
+    const doc = listCandidates(RELEASED, outline)
+    const a = doc.candidates.find((c) => c.sizeMM === 72 && c.sites.length >= 1)
+    const b = doc.candidates.find((c) => c.sizeMM === 168 && c.sites.length >= 1)
+    expect(a && b).toBeTruthy()
+    const sticker = 120
+    const va = standingView(RELEASED, a!, outline, undefined, sticker)
+    const vb = standingView(RELEASED, b!, outline, undefined, sticker)
+    const box = (verts: Array<[number, number]>) => {
+      const xs = verts.map((p) => p[0])
+      const ys = verts.map((p) => p[1])
+      return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+    }
+    expect(box(va.shape)).toEqual(box(vb.shape))
+  })
+
   it('standing view keeps the shape bbox-centred across origins', () => {
     const outline = square(36)
     const doc = listCandidates(RELEASED, outline)

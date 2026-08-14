@@ -61,7 +61,20 @@ interface FieldLayout {
   anchorMM: PointMM
 }
 
-/** Drive the unit: values out of the spec, geometry out of the engine, one call. */
+export function scaleField(
+  spec: GridSystemSpec,
+  layout: FieldLayout,
+  k: number,
+) {
+  return {
+    magnets: layout.magnets.map(([x, y]) => [x * k, y * k] as PointMM),
+    cellMM: layout.cellMM * k,
+    pitchMM: spec.grid.basePitchMM * k,
+    atomMM: spec.grid.paddingMM * k,
+    anchorMM: [layout.anchorMM[0] * k, layout.anchorMM[1] * k] as PointMM,
+  }
+}
+
 export function layoutField(
   spec: GridSystemSpec,
   contentMM: RegionMM,
@@ -157,6 +170,7 @@ export function standingView(
   candidate: Candidate,
   outline: ReadonlyArray<PointMM>,
   picture?: { w: number; h: number },
+  stickerMM?: number,
 ): {
   spec: GridSystemSpec
   panMM: PointMM
@@ -168,11 +182,13 @@ export function standingView(
     spec,
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
+  const draw = stickerMM && stickerMM > 0 ? stickerMM : candidate.sizeMM
+  const k = draw / candidate.sizeMM
   return {
     spec: pitched.spec,
     panMM: candidate.origin,
-    shape: scaleToSize(outline, candidate.sizeMM),
-    sites: candidate.sites.map((s) => [s.x, s.y]),
-    picture: picture ? placedPicture(outline, picture, candidate.sizeMM, 'bbox') : null,
+    shape: scaleToSize(outline, draw),
+    sites: candidate.sites.map((s) => [s.x * k, s.y * k]),
+    picture: picture ? placedPicture(outline, picture, draw, 'bbox') : null,
   }
 }
