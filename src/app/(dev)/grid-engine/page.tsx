@@ -380,7 +380,7 @@ export default function GridEnginePage() {
   useEffect(() => {
     applyPinch.current = (factor: number) => {
       if (cutout) {
-        setViewZoom((z) => Math.min(4, Math.max(0.4, z * factor)))
+        setViewZoom((z) => z * factor)
         return
       }
       const next = sizeExactMM.current * factor
