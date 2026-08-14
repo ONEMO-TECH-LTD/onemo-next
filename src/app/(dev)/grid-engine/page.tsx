@@ -105,6 +105,14 @@ const DEFAULT_SIZE_BAND = 3
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
+/**
+ * THE SELECTED CANDIDATE'S MAGNETS — solid, not an outline. Dan: "the candidates coloured in full
+ * green to be seen properly". A ring read as decoration near a disc; a filled spot reads as THIS
+ * disc, which is the whole point of stepping through candidates.
+ */
+const SELECTED_FILL = '#22c55e'
+const SELECTED_STROKE = '#15803d'
+
 /** Step through the candidate set, wrapping. Index arithmetic, nothing else. */
 const step = (index: number | null, total: number, delta: number): number | null =>
   index === null || total <= 0 ? index : (((index + delta) % total) + total) % total
@@ -590,8 +598,8 @@ export default function GridEnginePage() {
                   cx={cx}
                   cy={cy}
                   r={selectionRadiusMM}
-                  fill="none"
-                  stroke="#ffd166"
+                  fill={SELECTED_FILL}
+                  stroke={SELECTED_STROKE}
                   strokeWidth={2}
                   vectorEffect="non-scaling-stroke"
                 />
