@@ -109,8 +109,10 @@ the shape from the dimension, which is precisely what L8 forbids. An even-millim
 them naturally, because each arrangement reports the first size at which *this shape* holds it.
 
 **The lawful model is Dan's own sentence:** *"a shape is never too small; it scales until it
-holds."* The output is therefore, **per arrangement, the smallest whole-millimetre size at which
-that arrangement holds** — a value derived from this shape against this lattice, different for every
+holds."* The output is therefore, **per arrangement, the first lawful whole EVEN millimetre at which
+that arrangement holds** (L10 — publication rounds upward to an even value and the result is
+re-checked for legality, because concave feasibility comes in windows and a rounded value can fall
+outside one) — a value derived from this shape against this lattice, different for every
 outline. That is the inverse L8 asks for, and it needs no solver: sizes publish in whole millimetres
 (L19), so the domain is the **whole EVEN millimetres across the field's reach** (the brief: manufactured sizes publish as whole even mm), every one evaluated
 **independently** in a single call. Every one is evaluated **independently**, which is exactly what
@@ -273,7 +275,9 @@ measurement surface exists but not removed from it.
    independently, the transformed ring coincides with the ring drawn under that construction and
    every held position coincides with the lattice generated at that registration — never against a
    single `layout.magnets`. The domain exercised is whatever §3.3 is authorised to be. No literal
-   law value in the file.
+   law value in the file. **Goldens locked from the canon: square 2×2 → 72, circle 2×2 → 92,
+   square 3×3 → 120, circle 3×3 → 160, plus a concave case whose first fit is odd, proving the
+   published value is even AND re-checked rather than merely rounded.**
 4. Bridge door; shell stepping control and highlight; lattice-pan disabled.
 5. Chrome check on the running page; screenshot; no solve on interaction.
 6. Judgement producers, then Part 3 activated through the bridge; Dan tests the assembled three.
