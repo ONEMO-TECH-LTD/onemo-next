@@ -180,11 +180,13 @@ function better(
   const holdsTopA = a.wrap.top <= calibration.flapMaxMM
   const holdsTopB = b.wrap.top <= calibration.flapMaxMM
   if (holdsTopA !== holdsTopB) return holdsTopA
-  // 4. tight wrap — least total overhang
-  if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
-  // 5. evenness — flap balanced across sides, BOTH axes counted
+  // 4. THE BALANCE RULE outranks tightness (Dan 2026-08-14 and his 2026-08-10 brief: "what may
+  //    seem logical on paper and mathematically correct may miss the law of balance and
+  //    symmetry"). Flap balanced across sides, BOTH axes counted, before any tightness compare.
   if (a.wrap.imbalanceSumMM !== b.wrap.imbalanceSumMM)
     return a.wrap.imbalanceSumMM < b.wrap.imbalanceSumMM
+  // 5. tight wrap — least total overhang
+  if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
   // 6. smaller manufactured size
   if (a.sizeMM !== b.sizeMM) return a.sizeMM < b.sizeMM
   // deterministic close: the denser population first
