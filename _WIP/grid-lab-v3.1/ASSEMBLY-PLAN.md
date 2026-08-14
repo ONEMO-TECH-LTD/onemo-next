@@ -1,7 +1,8 @@
 # Installation plan — GPT Pro's three modules into the scaffold
 
-**Scope: installation only.** Install what GPT Pro delivered, verbatim, into the scaffold's existing
-modular structure, and run it. No rebuilding, no improving, no new architecture, no solvers, no
+**Scope: installation only.** Install the **accepted three-part stack without rewriting** — Parts 1
+and 3 as verbatim GPT deliveries, Part 2 as the Dan-authorised patched artifact copied verbatim —
+into the scaffold's existing modular structure, and run it. No rebuilding, no improving, no new architecture, no solvers, no
 policy. Everything else is deferred until we have looked at real output.
 
 **Read in full before this plan** (Dan's requirement): scaffold — `spec.ts` 210, `engine.ts` 227,
@@ -57,13 +58,16 @@ kept. The shell stores it and passes it through the one bridge; drawing still us
 1. clean the traced ring only as the kernel demands (it rejects duplicates rather than repairing);
 2. `measureLattice(...)` — lattice pitch, origin, field extent and disc all **read** from `spec`
    through the scaffold's own engine; sizes and anchor come from what the page already has;
-3. `enumerateCandidates(...)` on that measurement, with the delivered grammar;
+3. `enumerateCandidates(...)` on that measurement, with the **accepted released grammar from
+   `spec.ts`** — the enumerator ships no default grammar, and requires one as explicit caller data;
 4. return the candidates with positions in millimetres.
 
 **What the seam does own:** the transform and field arithmetic needed to drive the packages — that
 is calculation, and calculation belongs in compute. **What it does not own:** the grammar (released
-policy, now in `spec.ts`) and any product judgement. Zero law literals, grep-checked; every law value
-read from the spec through the scaffold's engine.
+policy, now in `spec.ts`) and any product judgement. Zero law literals, grep-checked. Law values reach it two
+ways, both from the spec: derived ones through the scaffold's engine helpers (`cellDiameterMM`,
+`registrationOffsetMM`) and released ones read from `spec.grid` directly (`basePitchMM`,
+`positionsPerAxis`). There is no engine-only route and the plan does not imply one.
 
 **Files this installation touches, in full** — `compute/candidates.ts` (new), `spec.ts` (grammar),
 `ui/trace-cutout.ts` (keep the ring), `bridge.ts` (one door), `page.tsx` (state + control),
