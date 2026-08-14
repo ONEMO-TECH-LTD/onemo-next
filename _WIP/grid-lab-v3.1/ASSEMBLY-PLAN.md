@@ -77,14 +77,35 @@ already produces. It discards nothing it computes today and gains no new maths.
 If contour simplification is ever wanted, it is a separately ruled input-preparation module with its
 own QA — never smuggled into this seam.
 
-### 3.2 The transform — ⛔ IMPLEMENTATION WITHDRAWN PENDING CLOSURE
+### 3.2 ⛔ ASSEMBLY IS BLOCKED ON ONE ADDITIVE KERNEL DELIVERY
+
+Both remaining compute blockers are missing **neutral geometry facts**, and both belong to the layer
+that owns geometry. Verified in the canon: `grid-spec` §4's closed form is valid **only for convex
+outlines** (*"the formula treats each edge as an infinite line, which is only valid when the shape is
+convex"*), and §4a hands non-convex shapes to a decomposition it does not define. Our accepted input
+domain is arbitrary simple **concave** outlines, so hand-building that closure in
+`compute/candidates.ts` would be a second geometry engine — exactly the rebuilding the brief forbids.
+
+**One additive Part-1 request to the kernel's author, covering both:**
+1. **authoritative maximum-clearance anchor(s)** for a simple polygon, with deterministic tie-breaking
+   (unblocks O-1's third construction, and with it the band-1 duck);
+2. **exact scale/legality intervals** — or a first-lawful-even-size witness — for a requested site set
+   under uniform scaling on an arbitrary simple concave polygon, with the limiting witness
+   (unblocks the size closure, so size is derived rather than swept).
+
+This is the procedure the part-2 acceptance gate already ruled: *a missing kernel fact gets added to
+part 1 additively, never silently computed in a higher layer.* Part 2 then enumerates at the returned
+lawful size occurrences, and the logic adapter preserves every occurrence while marking the published
+minimum by cross-size identity.
+
+### 3.2b The transform inputs that stand meanwhile
 
 **Nothing below prescribes a size sweep any more.** The even-millimetre field-reach sweep is
 falsified (no proved bound, L9 caps grid count not millimetres) and is deleted rather than kept
 beside its own refutation. The polygon, anchor and lattice inputs stand; **the size domain does not
 exist until `grid-spec` §4–§6 closure is specified**, and no sweep ships before then.
 
-### 3.2a The transform inputs that do stand
+
 
 **L8 governs the direction and my earlier drafts broke it.** Dan, verbatim: *"No size inputs may
 exist"* · *"grid first logic — shape + grid = final proportion and dimensions"* · *"you keep
