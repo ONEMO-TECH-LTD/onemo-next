@@ -35,7 +35,7 @@ import {
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
-import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { traceCutout, type TracedCutout } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
@@ -179,7 +179,7 @@ export default function GridEnginePage() {
   const [cutout, setCutout] = useState<{ url: string } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
-  const [outline, setOutline] = useState<OutlineUV | null>(null)
+  const [outline, setOutline] = useState<TracedCutout | null>(null)
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -504,7 +504,7 @@ export default function GridEnginePage() {
             <g pointerEvents="none">
               {asOutline && outline ? (
                 <polygon
-                  points={outline
+                  points={outline.outlineUV
                     .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
                     .join(' ')}
                   fill="rgba(88,194,255,0.08)"

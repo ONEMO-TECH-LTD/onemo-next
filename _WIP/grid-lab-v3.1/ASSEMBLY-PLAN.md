@@ -13,7 +13,8 @@ src + contract + tests, plus the 1,697-line fork transcript.
 
 ```
 src/lib/grid-engine/
-  spec.ts / engine.ts / ui/            UNCHANGED  (values · mm compute · screen)
+  spec.ts / engine.ts                 UNCHANGED  (values · mm compute)
+  ui/                                 ONE adapter change: trace-cutout returns the native ring
   bridge.ts                            + ONE door
   compute/
     magnetic-grid-measurement-kernel/  VERBATIM  (Part 1)
@@ -27,6 +28,12 @@ All three byte-identical to the deliveries (`diff -r` clean), nothing edited, su
 15/15, `tsc --noEmit` clean. Folder names are forced by the enumerator's own relative import of the
 kernel. Each package's `src/test/scripts` are excluded from the app's TS project so the app never
 compiles delivery sources; the seam imports `dist/` only.
+
+**One `ui/` change, and it is preparation not geometry.** `traceCutout` produced the ring in integer
+pixel coordinates and then discarded it, returning only the UV projection. The seam needs those exact
+values, and reconstructing them by multiplying UV back up would be a lossy round trip through data we
+already had. It now returns `{ outlineUV, ring: { points, width, height } }` — nothing computed, only
+kept. The shell stores it and passes it through the one bridge; drawing still uses the UV.
 
 ## 2. The seam — calls the packages as they were built to be called
 

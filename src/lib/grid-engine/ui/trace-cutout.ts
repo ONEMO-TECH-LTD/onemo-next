@@ -15,7 +15,25 @@ import { traceContourRaw } from '@/lib/effect/contour'
 /** The silhouette as fractions of the picture's own box. */
 export type OutlineUV = Array<[number, number]>
 
-export async function traceCutout(file: File): Promise<OutlineUV | null> {
+/**
+ * What the tracer actually produced: the ring in the source image's own INTEGER PIXEL coordinates,
+ * with the image box it came from.
+ *
+ * It was being discarded — only the UV projection was returned — so anything downstream would have
+ * had to reconstruct raw coordinates by multiplying UV back up, which is a lossy round trip through
+ * data we already had exactly. Preserving it is browser-IO preparation, not geometry: no value here
+ * is computed, only kept.
+ */
+export interface TracedCutout {
+  readonly outlineUV: OutlineUV
+  readonly ring: {
+    readonly points: ReadonlyArray<readonly [number, number]>
+    readonly width: number
+    readonly height: number
+  }
+}
+
+export async function traceCutout(file: File): Promise<TracedCutout | null> {
   const bitmap = await createImageBitmap(file)
   const w = bitmap.width
   const h = bitmap.height
@@ -42,5 +60,8 @@ export async function traceCutout(file: File): Promise<OutlineUV | null> {
 
   const ring = traceContourRaw(mask, w, h)
   if (!ring || ring.length < 3) return null
-  return ring.map(([x, y]) => [x / w, y / h] as [number, number])
+  return {
+    outlineUV: ring.map(([x, y]) => [x / w, y / h] as [number, number]),
+    ring: { points: ring.map(([x, y]) => [x, y] as const), width: w, height: h },
+  }
 }
