@@ -239,8 +239,14 @@ describe('the class, not the instances', () => {
   it('the ui submodule does no lattice arithmetic', () => {
     // ui/ may reach outward — it is the adapter — but it may not compute the grid. Nothing checked
     // this before, because nothing read the directory at all.
-    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.includes('/'))
-    expect(submodule.length, 'no submodule files found — this guard would pass vacuously').toBeGreaterThan(0)
+    //
+    // TARGETED AT `ui/` SPECIFICALLY. It used to select every file with a slash in its path, which
+    // meant "every nested directory is the UI submodule". That held only while `ui/` was the sole
+    // submodule: installing `compute/` made the seam fail this for READING LAW VALUES, which is
+    // precisely what compute exists to do. Widening the ban to compute would invert the rule; the
+    // fix is to name the module the rule is about.
+    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.startsWith('ui/'))
+    expect(submodule.length, 'no ui/ files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of submodule) {
       expect(text, `${file} touches a law value`).not.toMatch(
         /\b(basePitchMM|pitchMM|paddingMM|positionsPerAxis)\b/,
@@ -321,6 +327,121 @@ describe('mutation fixtures — every escape class is caught, and legal code is 
       ['basePitchMM', 'grid', 'largeMM', 'magnet', 'maxSizeMM', 'paddingMM', 'pitchMM', 'positionsPerAxis', 'registration', 'smallMM'],
     )
     expect([...RELEASED_VALUES].sort((a, b) => a - b)).toEqual([6, 8, 9, 12, 48, 310])
+  })
+})
+
+/**
+ * MODULE DIRECTIONS — added when the three delivered packages were installed.
+ *
+ * `compute/` and `logic/` hold accepted third-party packages plus one seam file. The rule that
+ * matters is not "who may import a package" but WHICH WAY traffic runs between the semantic
+ * modules, so this reads the actual import specifiers rather than the file's prose.
+ *
+ * The bridge is the orchestrator, so it alone may reach every inward module. That is permission to
+ * cross the unit's INTERNAL layers, never to erase its outer boundary: it travels with the portable
+ * unit, so `ui/`, the app and any framework stay forbidden to it. An earlier draft of the plan said
+ * the bridge was "unconstrained", which would have licensed exactly that.
+ */
+const importSpecifiers = (text: string): string[] => {
+  const found: string[] = []
+  walkAst(text, (n) => {
+    if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) {
+      found.push(n.moduleSpecifier.text)
+    }
+    if (
+      ts.isCallExpression(n) &&
+      n.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      n.arguments[0] &&
+      ts.isStringLiteral(n.arguments[0])
+    ) {
+      found.push((n.arguments[0] as ts.StringLiteral).text)
+    }
+  })
+  return found
+}
+
+/** Which semantic module a specifier resolves INTO, from the importing file's own directory. */
+const targetModule = (fromFile: string, specifier: string): string | null => {
+  const resolved = specifier.startsWith('.')
+    ? join(fromFile.includes('/') ? fromFile.replace(/\/[^/]*$/, '') : '', specifier)
+    : specifier
+  if (/^@\/app\//.test(specifier) || /^(react|next)(\/|$)/.test(specifier)) return 'app-or-framework'
+  if (/(^|\/)ui\//.test(resolved) || resolved.startsWith('ui/')) return 'ui'
+  if (/(^|\/)compute\//.test(resolved) || resolved.startsWith('compute/')) return 'compute'
+  if (/(^|\/)logic\//.test(resolved) || resolved.startsWith('logic/')) return 'logic'
+  return null
+}
+
+const FORBIDDEN: Record<string, readonly string[]> = {
+  'bridge.ts': ['ui', 'app-or-framework'],
+  compute: ['logic', 'ui', 'app-or-framework'],
+  logic: ['compute', 'ui', 'app-or-framework'],
+  ui: ['compute', 'logic'],
+}
+
+describe('module directions — one-way traffic between the semantic modules', () => {
+  /** Only files we author. The delivered packages are third-party bytes and are never edited. */
+  const authored = () =>
+    readTree(UNIT, /\.ts$/).filter(
+      (f) =>
+        !/^(compute|logic)\/[^/]+\/(src|dist|test|scripts)\//.test(f.file) &&
+        !f.file.endsWith('.d.ts'),
+    )
+
+  const moduleOf = (file: string): keyof typeof FORBIDDEN | null =>
+    file === 'bridge.ts'
+      ? 'bridge.ts'
+      : file.startsWith('compute/')
+        ? 'compute'
+        : file.startsWith('logic/')
+          ? 'logic'
+          : file.startsWith('ui/')
+            ? 'ui'
+            : null
+
+  it('no authored unit file imports against the direction table', () => {
+    const files = authored()
+    expect(files.length, 'no authored unit files found — this guard would pass vacuously').toBeGreaterThan(0)
+    for (const { file, text } of files) {
+      const module = moduleOf(file)
+      if (module === null) continue
+      const banned = FORBIDDEN[module]!
+      const violations = importSpecifiers(text)
+        .map((s) => ({ s, target: targetModule(file, s) }))
+        .filter((h) => h.target !== null && banned.includes(h.target))
+        .map((h) => `${h.s} (${h.target})`)
+      expect(violations, `${file} imports against the direction table: ${violations.join(', ')}`).toEqual([])
+    }
+  })
+
+  it('the table is enforced both ways — each ban fires, each permitted direction does not', () => {
+    // `./ui/trace-cutout` from the bridge is the spelling a builder actually reaches for, and the
+    // pre-existing outward guard matched only `@/…` and `../…`, so it walked straight through.
+    expect(targetModule('bridge.ts', './ui/trace-cutout')).toBe('ui')
+    expect(targetModule('bridge.ts', '@/lib/grid-engine/ui/trace-cutout')).toBe('ui')
+    expect(targetModule('bridge.ts', 'react')).toBe('app-or-framework')
+    expect(targetModule('bridge.ts', '@/app/(dev)/grid-engine/page')).toBe('app-or-framework')
+    // …and the bridge's whole job stays legal.
+    expect(targetModule('bridge.ts', './compute/candidates')).toBe('compute')
+    expect(targetModule('bridge.ts', './logic/magnetic-grid-product-logic/dist/index.js')).toBe('logic')
+    expect(FORBIDDEN['bridge.ts']).not.toContain('compute')
+    expect(FORBIDDEN['bridge.ts']).not.toContain('logic')
+    // the seam consumes its own packages and the spec; it may not reach product judgement or a screen.
+    // Its sibling packages resolve INTO compute, which is its own module and therefore permitted —
+    // asserted as "not banned for compute" rather than as null, which is what it actually means.
+    expect(FORBIDDEN.compute).not.toContain(
+      targetModule('compute/candidates.ts', './magnetic-grid-measurement-kernel/dist/index.js'),
+    )
+    expect(targetModule('compute/candidates.ts', '../logic/magnetic-grid-product-logic/dist/index.js')).toBe('logic')
+    expect(targetModule('compute/candidates.ts', '../ui/trace-cutout')).toBe('ui')
+    expect(FORBIDDEN.compute).toContain('logic')
+    expect(FORBIDDEN.ui).toContain('compute')
+  })
+
+  it('third-party package bytes are excluded from authorship rules, and are actually present', () => {
+    const all = readTree(UNIT, /\.ts$/).map((f) => f.file)
+    expect(all.some((f) => /^compute\/[^/]+\/src\//.test(f)), 'no delivered package sources found').toBe(true)
+    expect(authored().some((f) => /^(compute|logic)\/[^/]+\/(src|dist)\//.test(f.file))).toBe(false)
   })
 })
 

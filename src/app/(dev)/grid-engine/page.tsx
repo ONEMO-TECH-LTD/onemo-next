@@ -35,7 +35,7 @@ import {
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
-import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { traceCutout, type TracedCutout } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
@@ -178,8 +178,12 @@ export default function GridEnginePage() {
   // to the unit. The engine is not involved and does not know a cut-out exists.
   const [cutout, setCutout] = useState<{ url: string } | null>(null)
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
-  const [outline, setOutline] = useState<OutlineUV | null>(null)
+  /**
+   * What the tracer produced: the silhouette in the picture's own fractions for drawing, and the
+   * ring it came from. Presentation state — the shell holds it and hands it on; it reads neither.
+   */
+  const [traced, setTraced] = useState<TracedCutout | null>(null)
+  const outline = traced?.outlineUV ?? null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -206,7 +210,7 @@ export default function GridEnginePage() {
     if (!r.refused) setSpec(r.spec)
     // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
     setAsOutline(true)
-    void traceCutout(file).then(setOutline)
+    void traceCutout(file).then(setTraced)
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
@@ -264,7 +268,7 @@ export default function GridEnginePage() {
       return null
     })
     setBox(null)
-    setOutline(null)
+    setTraced(null)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
