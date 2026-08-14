@@ -418,6 +418,7 @@ export function collectCandidates(
     const hi = sizes[sizes.length - 1]
     const spans = band === 4 ? [pitch, pitch * 2, pitch * 3] : [pitch, pitch * 2]
     let pending3: { sizeMM: number; sets: PointMM[][] } | null = null
+    const seenSteps = new Set<string>()
     for (let sizeMM = lo; sizeMM <= hi; sizeMM++) {
       const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
       const prep = prepareOutline(scaled)
@@ -446,14 +447,26 @@ export function collectCandidates(
         }
       }
       if (fours.length) {
+        let added = 0
         for (const held of fours) {
+          const xs = held.map((p) => p[0])
+          const ys = held.map((p) => p[1])
+          const key = `${Math.round((Math.max(...xs) - Math.min(...xs)) / pitch)}x${Math.round((Math.max(...ys) - Math.min(...ys)) / pitch)}`
+          if (band === 4 && seenSteps.has(key)) continue
+          seenSteps.add(key)
           pushCorners(candidates, spec, band, sizeMM, half, held, 'rectangle-corners')
+          added++
         }
-        for (const held of threes) {
-          pushCorners(candidates, spec, band, sizeMM, half, held, 'corner-triangle')
+        if (band === 3) {
+          for (const held of threes) {
+            pushCorners(candidates, spec, band, sizeMM, half, held, 'corner-triangle')
+          }
+          pending3 = null
+          break
         }
         pending3 = null
-        break
+        // A 48mm-wide next-step rectangle is the grid that fits inside. Stop once we have one.
+        if ([...seenSteps].some((k) => k.startsWith('1x'))) break
       }
       if (threes.length && !pending3) pending3 = { sizeMM, sets: threes }
     }

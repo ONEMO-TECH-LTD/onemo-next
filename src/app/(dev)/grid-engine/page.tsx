@@ -241,6 +241,8 @@ export default function GridEnginePage() {
    * dependency list it used to carry meant it read whatever they were on first render.)
    */
   const loadCutout = ((file: File) => {
+    setPan([0, 0])
+    setCandIdx(0)
     // Even match -> the shape's centre falls between magnets (law 9.2), so the four sit symmetric
     // about it. This is the count's parity, not a default anyone picked (law 6.5).
     //
@@ -313,6 +315,8 @@ export default function GridEnginePage() {
     setBox(null)
     setOutline(null)
     setPicture(null)
+    setPan([0, 0])
+    setCandIdx(0)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -416,7 +420,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-31</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-32</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`

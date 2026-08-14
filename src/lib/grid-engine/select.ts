@@ -194,6 +194,7 @@ export function propose(
     }
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
     if (a.n !== b.n) return b.n - a.n
+    if (band === 4 && a.area !== b.area) return a.area - b.area
     if (a.size !== b.size) return a.size - b.size
     if (a.area !== b.area) return a.area - b.area
     if (a.top !== b.top) return a.top - b.top
