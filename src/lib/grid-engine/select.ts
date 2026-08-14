@@ -266,18 +266,12 @@ function targetClass(
     return { n: 1, size: null, four: false, next: false }
   }
   if (band === 3) {
+    if (s2 !== null && s2 <= hi) return { n: 2, size: null, four: false, next: false }
     if (s4 !== null && s4 >= lo && s4 <= hi) return { n: 4, size: s4, four: true, next: false }
-    if (s2 !== null && s2 >= lo && s2 <= hi) return { n: 2, size: s2, four: false, next: false }
-    if (s2 !== null && s2 < lo) return { n: 2, size: 144, four: false, next: false }
     return { n: 1, size: null, four: false, next: false }
   }
-  if (s4 !== null && s4 >= 120 && s4 <= 168 && s4n !== null) {
-    return { n: 4, size: s4n, four: true, next: true }
-  }
-  if (s2 !== null) {
-    const pairWrap = s2 >= 120 && s2 <= 168 ? s2 : 144
-    return { n: 2, size: pairWrap * 2, four: false, next: false }
-  }
+  if (s2 !== null) return { n: 2, size: null, four: false, next: false }
+  if (s4n !== null) return { n: 4, size: s4n, four: true, next: true }
   return { n: 1, size: null, four: false, next: false }
 }
 
@@ -316,7 +310,7 @@ export function propose(
 
   scored.sort((a, b) => {
     if (a.hit !== b.hit) return a.hit ? -1 : 1
-    if (a.hit && b.hit && want.n === 1) {
+    if (a.hit && b.hit && (want.n === 1 || want.n === 2)) {
       if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
       if (a.top !== b.top) return a.top - b.top
     }
