@@ -20,7 +20,7 @@ import {
   type CandidateEnumerationDocumentJson,
 } from './enumerator/dist/index.js'
 import { cellDiameterMM, registrationOffsetMM, type PointMM } from '../engine'
-import type { GridSystemSpec, Registration } from '../spec'
+import { RELEASED_ARRANGEMENT_GRAMMAR, type GridSystemSpec, type Registration } from '../spec'
 
 /** The traced silhouette as the tracer produces it: integer pixel coordinates, plus its image box. */
 export interface TracedRing {
@@ -171,24 +171,11 @@ export function enumerateForRing(
       sizes: options.sizesMM.map((size) => int(size, 'sizesMM entry')),
     })
 
+    // The grammar is released POLICY DATA and belongs to the spec. Compute consumes it; it does
+    // not own it. Authoring it here put product policy inside the calculation module.
     const document = enumerateCandidates({
       measurement,
-      grammar: {
-        schema: 'magnetic-grid-candidate-enumerator/grammar/v1',
-        populations: [
-          { id: 'base', origin: { column: '0', row: '0' }, indexStep: '1' },
-          // Explicit caller data, per the delivered contract: sparse is every second base point.
-          // Never inferred from the shell's selected pitch.
-          { id: 'sparse', origin: { column: '0', row: '0' }, indexStep: '2' },
-        ],
-        families: {
-          single: {},
-          run: { stepDomain: 'any-positive-whole-population-step' },
-          'rectangle-corners': {},
-          'corner-triangle': {},
-          'full-window': { oneByOne: 'include' },
-        },
-      },
+      grammar: RELEASED_ARRANGEMENT_GRAMMAR as Parameters<typeof enumerateCandidates>[0]['grammar'],
     })
 
     const display: RawCandidate[] = []

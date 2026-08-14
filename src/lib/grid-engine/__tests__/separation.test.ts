@@ -239,11 +239,33 @@ describe('the class, not the instances', () => {
   it('the ui submodule does no lattice arithmetic', () => {
     // ui/ may reach outward — it is the adapter — but it may not compute the grid. Nothing checked
     // this before, because nothing read the directory at all.
-    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.includes('/'))
-    expect(submodule.length, 'no submodule files found — this guard would pass vacuously').toBeGreaterThan(0)
+    // ui/ SPECIFICALLY. This read every nested directory, so installing compute/ and logic/ —
+    // which legitimately read law values through the spec — turned the guard red for doing their
+    // job. Narrowed to the submodule it was written for, rather than excused for the new ones.
+    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.startsWith('ui/'))
+    expect(submodule.length, 'no ui/ files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of submodule) {
       expect(text, `${file} touches a law value`).not.toMatch(
         /\b(basePitchMM|pitchMM|paddingMM|positionsPerAxis)\b/,
+      )
+    }
+  })
+
+  it('the installed packages stay verbatim — nothing in the unit imports them but the seam', () => {
+    // compute/ and logic/ hold GPT Pro's delivered packages. Only the seam may reach into them, so
+    // a package import appearing anywhere else is the first sign of the modules leaking outward.
+    for (const { file, text } of readTree(UNIT, /\.ts$/)) {
+      if (file === 'compute/candidates.ts' || file.includes('/dist/') || file.includes('/src/')) continue
+      expect(text, `${file} imports an installed package directly`).not.toMatch(
+        /from '\.{1,2}\/(compute|logic)\/(magnetic-grid|enumerator)/,
+      )
+    }
+  })
+
+  it('the shell imports neither compute nor logic', () => {
+    for (const { file, text } of read(SHELL, /\.tsx?$/)) {
+      expect(text, `${file} reaches into a unit module`).not.toMatch(
+        /grid-engine\/(compute|logic)\//,
       )
     }
   })
