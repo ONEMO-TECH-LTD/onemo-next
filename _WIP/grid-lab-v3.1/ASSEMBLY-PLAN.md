@@ -13,13 +13,16 @@ src + contract + tests, plus the 1,697-line fork transcript.
 
 ```
 src/lib/grid-engine/
-  spec.ts / engine.ts                 UNCHANGED  (values · mm compute)
-  ui/                                 ONE adapter change: trace-cutout returns the native ring
+  engine.ts                           UNCHANGED  (mm compute)
+  spec.ts                             + the released arrangement grammar (policy data)
+  ui/trace-cutout.ts                  + keeps the native ring it already produced
+  bridge.ts                           + ONE door
+  __tests__/separation.test.ts        + direction guards for the new modules
   bridge.ts                            + ONE door
   compute/
     magnetic-grid-measurement-kernel/  VERBATIM  (Part 1)
     enumerator/                        VERBATIM  (Part 2)
-    candidates.ts                      the seam — the only file we write
+    candidates.ts                      the seam — the only NEW file
   logic/
     magnetic-grid-product-logic/       VERBATIM  (Part 3)
 ```
@@ -45,7 +48,14 @@ kept. The shell stores it and passes it through the one bridge; drawing still us
 3. `enumerateCandidates(...)` on that measurement, with the delivered grammar;
 4. return the candidates with positions in millimetres.
 
-No geometry, no grammar, no policy written here. Zero law literals (grep-checked).
+**What the seam does own:** the transform and field arithmetic needed to drive the packages — that
+is calculation, and calculation belongs in compute. **What it does not own:** the grammar (released
+policy, now in `spec.ts`) and any product judgement. Zero law literals, grep-checked; every law value
+read from the spec through the scaffold's engine.
+
+**Files this installation touches, in full** — `compute/candidates.ts` (new), `spec.ts` (grammar),
+`ui/trace-cutout.ts` (keep the ring), `bridge.ts` (one door), `page.tsx` (state + control),
+`__tests__/separation.test.ts` (direction guards). Nothing else, and no delivered package byte.
 
 ## 3. Part 3 — installed and callable, not faked
 
