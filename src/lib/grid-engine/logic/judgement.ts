@@ -91,6 +91,7 @@ function variantFrom(
   contour: Contour,
   sizeMM: number,
   pitchMM: number,
+  pattern: string,
   grid: GridResult,
   layout?: string,
 ): SizeVariant | null {
@@ -119,7 +120,7 @@ function variantFrom(
     flaps: grid.flaps,
     uncoveredMM: grid.uncoveredMM,
     pitchMM,
-    pattern: 'standard',
+    pattern,
     nearestAnchorMM: nearestAnchorPair(grid.anchors)?.distanceMM ?? null,
     wrap,
     tier,
@@ -129,7 +130,12 @@ function variantFrom(
 }
 
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
-function better(a: SizeVariant, b: SizeVariant, band: BandSpec): boolean {
+function better(
+  a: SizeVariant,
+  b: SizeVariant,
+  band: BandSpec,
+  calibration: CalibrationSpec,
+): boolean {
   // 1. tight beats allowed beats limb (the flap law's preference order)
   if (a.tier !== b.tier) {
     const order = { tight: 0, allowed: 1, limb: 2 }
@@ -139,8 +145,14 @@ function better(a: SizeVariant, b: SizeVariant, band: BandSpec): boolean {
   const countA = Math.abs(a.anchors.length - band.targetMagnets)
   const countB = Math.abs(b.anchors.length - band.targetMagnets)
   if (countA !== countB) return countA < countB
-  // 3. GRAVITY — the top of the material is held: least top overhang first
-  if (a.wrap.top !== b.wrap.top) return a.wrap.top < b.wrap.top
+  // 3. GRAVITY AS A GUARD, not a climb (Dan, 2026-08-14: the pill single drifted off-centre
+  //    because "least top overhang" walked every layout as high as clearance allowed). The law —
+  //    "gravity must not place magnets in the bottom and leave top unprotected" — is a constraint:
+  //    a placement whose top overhang stays within the outer flap bound HOLDS the top; among
+  //    holders, wrap and evenness centre the assembly.
+  const holdsTopA = a.wrap.top <= calibration.flapMaxMM
+  const holdsTopB = b.wrap.top <= calibration.flapMaxMM
+  if (holdsTopA !== holdsTopB) return holdsTopA
   // 4. tight wrap — least total overhang
   if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
   // 5. evenness — flap balanced across sides
@@ -166,7 +178,7 @@ function judgeBand(
         existing.sizeMM === variant.sizeMM && existing.anchors.length === variant.anchors.length,
     )
     if (twin >= 0) {
-      if (better(variant, kept[twin], band)) kept[twin] = variant
+      if (better(variant, kept[twin], band, calibration)) kept[twin] = variant
       return
     }
     kept.push(variant)
@@ -185,17 +197,20 @@ function judgeBand(
     sizeMM += step
   ) {
     const contour = scaleContour(unitContour, sizeMM)
-    // 1. The engine's own search, on both released populations of the one lattice.
+    // 1. The engine's own search — both released populations, straight AND diamond links
+    //    (Dan, 2026-08-13: "diagonal is also correct it does not introduce separate grid").
     for (const pitchMM of LAUNCH_PITCHES_MM) {
-      const grid = computeGrid(contour, {
-        pitchMM,
-        pattern: 'standard',
-        paddingMM: spec.grid.paddingMM,
-        plan: calibration.plan,
-        perimeterOnly: true,
-        center: calibration.center,
-      })
-      consider(variantFrom(spec, calibration, band, contour, sizeMM, pitchMM, grid))
+      for (const pattern of ['standard', 'diamond'] as const) {
+        const grid = computeGrid(contour, {
+          pitchMM,
+          pattern,
+          paddingMM: spec.grid.paddingMM,
+          plan: calibration.plan,
+          perimeterOnly: true,
+          center: calibration.center,
+        })
+        consider(variantFrom(spec, calibration, band, contour, sizeMM, pitchMM, pattern, grid))
+      }
     }
     // 2. The released templates, proposed at swept positions and VALIDATED by the engine's own
     //    catalogue door (construction: padding, on-lattice and overlap checks are the engine's) —
@@ -230,6 +245,7 @@ function judgeBand(
                 contour,
                 sizeMM,
                 spec.grid.basePitchMM,
+                'standard',
                 grid,
                 template.name,
               ),
@@ -242,7 +258,7 @@ function judgeBand(
     }
   }
 
-  kept.sort((a, b) => (better(a, b, band) ? -1 : 1))
+  kept.sort((a, b) => (better(a, b, band, calibration) ? -1 : 1))
   return { band, variants: kept.slice(0, VARIANTS_PER_BAND) }
 }
 
