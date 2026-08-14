@@ -88,11 +88,17 @@ regression, however the ladder is spelled.
 *"I know that cap binds differently per shape I am not fixated on the standardised sizing — you
 are."* So `bandSpanMM(...)` as the domain was still forward size-testing; QA was right twice.
 
+**The falsifying case, from the canon, and it is why the ladder had to go:** the same 2×2 grid gives
+a square 72mm and a circle 91.88mm → published 92; the same 3×3 gives 120 and 159.76 → 160. A
+`bandSpanMM` ladder returns 72 and 120 for both shapes and can never produce 92 or 160 — it omits
+the shape from the dimension, which is precisely what L8 forbids. An even-millimetre sweep produces
+them naturally, because each arrangement reports the first size at which *this shape* holds it.
+
 **The lawful model is Dan's own sentence:** *"a shape is never too small; it scales until it
 holds."* The output is therefore, **per arrangement, the smallest whole-millimetre size at which
 that arrangement holds** — a value derived from this shape against this lattice, different for every
 outline. That is the inverse L8 asks for, and it needs no solver: sizes publish in whole millimetres
-(L19), so the domain is the **integer millimetres across the field's reach**, every one evaluated
+(L19), so the domain is the **whole EVEN millimetres across the field's reach** (the brief: manufactured sizes publish as whole even mm), every one evaluated
 **independently** in a single call. Every one is evaluated **independently**, which is exactly what
 the kernel's own non-monotonicity theorem requires: *"do not binary-search scale… evaluate every
 legal published size."* GPT's first answer says the same — *"there is no reason to solve for
@@ -112,7 +118,7 @@ all.
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
 | `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
 | `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
-| `sizes` | **never supplied, never standardised** — every whole millimetre across the field's reach, in one call, so one `preparePolygon` serves all of them. Each is evaluated independently (non-monotonicity forbids search). The seam then reports, per arrangement, the smallest size at which it holds: **that derived value is the manufactured size, and it is an output** |
+| `sizes` | **never supplied, never standardised** — every whole EVEN millimetre across the field's reach, in one call, so one `preparePolygon` serves all of them. Each is evaluated independently (non-monotonicity forbids search). The seam then reports, per arrangement, the smallest size at which it holds: **that derived value is the manufactured size, and it is an output** |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
