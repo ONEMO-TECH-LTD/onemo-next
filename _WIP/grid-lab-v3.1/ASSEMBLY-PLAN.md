@@ -38,8 +38,9 @@ authorised on 08-13, when the band-1 duck was reachable only as a 1×1 window �
 20 lines: an `enumerateSingles` pass emitting one candidate per held position, `"single"` added to
 the family union, and the required-key list going from four families to five.
 
-So installation **sources part 2 from `52c91380`**, and copies that same artifact into the archive
-beside the original delivery, so provenance stays checkable on disk rather than only in history.
+So installation **sources part 2 from `52c91380`**. No second archive copy is made: the installed
+tree plus that immutable git object already make provenance checkable, and duplicating a package
+into the archive is not installation work.
 
 Dan's instruction not to rebuild what is already done and his authorisation of that patch agree:
 the accepted artifact is what installs. No new ruling is needed.
@@ -69,17 +70,26 @@ flattening `dist/` breaks the delivered package and would force an edit to it, w
 redeclares the upstream types locally), so it is free to sit in `logic/`, which is where the
 scaffold's separation puts product judgement.
 
-**Two accepted packages, one nested copy that stays.** Part 2's delivery ships GPT's own copy of the
-kernel inside it — that is how the package was sent, and it remains exactly as received.
+**What the part-2 archive actually contains.** Its wrapper `enumerator-v1.0.0/` holds two sibling
+folders — `enumerator/` and a carried copy of `magnetic-grid-measurement-kernel/`. The carried kernel
+is a sibling of the enumerator, not nested inside it, and it is how GPT satisfied that forced
+relative import when shipping. The installation tree already places the accepted part-1 kernel at
+exactly that sibling path, so nothing extra is copied from the part-2 wrapper.
 
 ## 3. The seam — calls the packages as they were built to be called
 
 `compute/candidates.ts`, one new file. Its shape follows from what the contracts actually demand:
 
-1. **Clean the traced ring only as the kernel demands.** `preparePolygon` rejects rather than
-   repairs: duplicate vertices, a repeated closing vertex, zero-length edges, zero area,
-   self-touching edges all throw. A raw traced contour contains duplicates, so normalising the input
-   is compute work the seam owns. It normalises input; it re-implements no kernel behaviour.
+1. **Encode the traced ring exactly — no cleaning, no repair.** `traceContourRaw` emits
+   marching-squares **edge midpoints**, so every coordinate is a half-integer
+   (`contour.ts:34-37`), and it already runs `dedup`, which removes consecutive duplicates *and* the
+   wrap (`contour.ts:130,150`). The earlier claim that this ring is integral, and the claim that it
+   arrives with duplicates needing repair, were both **false**. The kernel takes only exact integers,
+   so the seam **multiplies every coordinate by 2** — a lossless change of unit that turns every
+   half-integer into an integer and alters no geometry. Nothing else is done to the ring. If the
+   kernel then rejects a real trace — a non-consecutive duplicate at a pinch point, a self-touch —
+   that **fails loudly and is reported**, because part 1's contract forbids silent repair and a
+   rejected trace is a finding, not something to paper over.
 2. **`measureLattice(...)` once, carrying every size.** Polygon validation is O(n²) in edges and runs
    **once per call, not per size** (contract §7), so one call with the whole size list is both the
    cheap shape and the one the contract describes.
@@ -95,10 +105,27 @@ spec two ways, both legitimate — derived ones through the scaffold's engine he
 (`cellDiameterMM`, `registrationOffsetMM`) and released ones read from `spec.grid` directly
 (`basePitchMM`, `positionsPerAxis`).
 
-**The transform is identity unless we ask otherwise.** The kernel applies
-`T_s(p) = targetAnchor + (s/sourceSize)·(p − sourceAnchor)`. The shell has already sized and placed
-the shape, so the seam supplies the ring in its own pixel space with `sourceSize` and the requested
-size equal and both anchors pinned where the shell drew it — scale exactly 1, no second scaling.
+**The transform is a real pixel→millimetre conversion, and it must reproduce the shell's own drawing
+exactly.** The kernel applies `T_s(p) = targetAnchor + (s/sourceSize)·(p − sourceAnchor)`. Calling
+that "identity" was wrong and dimensionally false: the ring is in pixels while the lattice is in
+millimetres, so scale 1 would have measured a pixel-sized shape against a millimetre grid. The
+correct inputs, in the ×2 encoded source space, for an image of `W × H` pixels at size `sizeMM`:
+
+| kernel input | value | why |
+|---|---|---|
+| polygon | ring × 2 | exact integers, no rounding |
+| `sourceSize` | `2 · max(W, H)` | the longest source dimension, in the polygon's own units |
+| `sourceAnchor` | `(W, H)` | the image centre `(W/2, H/2)`, ×2 — integers |
+| `targetAnchor` | `(0, 0)` | where the shell centres the box |
+| requested size | `sizeMM` | the millimetre size already on screen |
+
+This is not asserted — it is **checked against the shell's own drawing expression**. The shell draws
+`box.x + (px/W)·box.w` with `box.w = W·k`, `box.x = −box.w/2`, `k = sizeMM/max(W,H)`
+(`page.tsx:215-218`, `page.tsx:508`). Both reduce to `sizeMM·(px − W/2)/max(W,H)`; evaluated over
+sample coordinates they agree to 7e-15 in floating point, and the kernel computes it exactly in
+BigInt rationals. **So the engine measures precisely the shape the shell draws** — the same class of
+error as measuring the silhouette bbox while the shell drew the image box, caught before it shipped
+rather than after.
 
 **Files this installation touches, in full.** Two kinds, stated separately because they are not the
 same act:
@@ -112,13 +139,42 @@ delivery sources — they use BigInt literals and the app targets ES2017).
 *Accepted package trees — ADDED, never edited:* `compute/magnetic-grid-measurement-kernel/`,
 `compute/enumerator/`, `logic/magnetic-grid-product-logic/`. Not one delivered byte is modified.
 
+### 3a. The grammar — the exact accepted object, not a fresh one
+
+Current `spec.ts` declares no grammar (verified: zero matches). The enumerator refuses to choose two
+ambiguities, so re-authoring the grammar would silently pick them. The accepted object survives at
+`a9b1f793` and is **copied exactly**, not rewritten:
+
+```ts
+export const RELEASED_ARRANGEMENT_GRAMMAR = Object.freeze({
+  schema: 'magnetic-grid-candidate-enumerator/grammar/v1',
+  populations: Object.freeze([
+    Object.freeze({ id: 'base',   origin: Object.freeze({ column: '0', row: '0' }), indexStep: '1' }),
+    Object.freeze({ id: 'sparse', origin: Object.freeze({ column: '0', row: '0' }), indexStep: '2' }),
+  ]),
+  families: Object.freeze({
+    single: Object.freeze({}),
+    run: Object.freeze({ stepDomain: 'any-positive-whole-population-step' }),
+    'rectangle-corners': Object.freeze({}),
+    'corner-triangle': Object.freeze({}),
+    'full-window': Object.freeze({ oneByOne: 'include' }),
+  }),
+})
+```
+
+The two settled ambiguities are `run.stepDomain` and `full-window.oneByOne`; the sparse population is
+declared as the rule it is — every second base point from a shared 0,0 origin — never inferred from
+whichever pitch the screen happens to be showing.
+
 ## 4. Two scaffold repairs the installation forces
 
 **The tracer must keep what it already produced.** `traceCutout` computes the outline in exact
-integer pixel coordinates and then discards them, returning only the UV projection
-(`trace-cutout.ts:43-45`). The seam needs those exact values, and multiplying UV back up is a lossy
-round trip through data we already had. It returns `{ outlineUV, ring: { points, width, height } }`
-— nothing computed, only kept. That is browser-IO preparation, not geometry. Drawing still uses UV.
+half-integer pixel coordinates and then discards them, returning only the UV projection
+(`trace-cutout.ts:43-45`). The seam needs those exact values plus the image dimensions the UV
+division used, and multiplying UV back up is a lossy round trip through data we already had. It
+returns `{ outlineUV, ring: { points, width, height } }` — nothing computed, only kept. That is
+browser-IO preparation, not geometry. Drawing still uses UV; the ×2 encoding happens in the seam,
+because changing units for the kernel is compute work.
 
 **The separation guard will go red, and it must be fixed rather than excused.** Its "ui submodule"
 test classifies **every** nested directory under the unit as `ui/` (`separation.test.ts:242`) and
@@ -158,9 +214,10 @@ changing it.
 
 ## 8. Order of work
 
-1. Copy the three packages in (part 2 from `52c91380`); restore the archive copy of the accepted
-   part 2; add the tsconfig exclusions. Gate: three suites green, `tsc` 0 errors.
-2. Grammar into `spec.ts`; the tracer keeps its ring; repair + extend the separation guard.
+1. Copy the three packages in (part 2 from `52c91380`); add the tsconfig exclusions. Gate: three
+   suites green, `tsc` 0 errors.
+2. Copy the accepted grammar into `spec.ts` from `a9b1f793`; the tracer keeps its ring; repair +
+   extend the separation guard.
 3. The seam.
 4. The one bridge door, then the shell control.
 5. Run on real traces; screenshot; Dan looks.
