@@ -252,6 +252,16 @@ describe('collectCandidates — shipped entry', () => {
     expect(face[0]?.sites.length).toBe(2)
   })
 
+  it('standing view sites stay on the candidate millimetres, not a later slider size', () => {
+    const outline = square(36)
+    const doc = listCandidates(RELEASED, outline)
+    const c = doc.candidates.find((row) => row.sizeMM === 72 && row.sites.length >= 1)
+    expect(c).toBeTruthy()
+    const view = standingView(RELEASED, c!, outline, undefined, 120)
+    const k = 120 / c!.sizeMM
+    expect(view.sites[0]).toEqual([c!.sites[0].x * k, c!.sites[0].y * k])
+  })
+
   it('standing view keeps the sticker size when the law size changes', () => {
     const outline = square(36)
     const doc = listCandidates(RELEASED, outline)

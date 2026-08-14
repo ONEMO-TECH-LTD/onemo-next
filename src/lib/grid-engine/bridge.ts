@@ -164,14 +164,13 @@ export function candidateSites(doc: CandidateDocument, id: string): PointMM[] {
   return hit ? hit.sites.map((s) => [s.x, s.y] as PointMM) : []
 }
 
-/** Shape stays put. Lattice pans by the candidate origin (same 48mm lattice). */
+/** Shape stays put. Sites stay on the candidate — a later slider size must not remap them. */
 export function standingView(
   spec: GridSystemSpec,
   candidate: Candidate,
   outline: ReadonlyArray<PointMM>,
   picture?: { w: number; h: number },
   stickerMM?: number,
-  lawSizeMM?: number,
 ): {
   spec: GridSystemSpec
   panMM: PointMM
@@ -184,8 +183,7 @@ export function standingView(
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
   const draw = stickerMM && stickerMM > 0 ? stickerMM : candidate.sizeMM
-  const law = lawSizeMM && lawSizeMM > 0 ? lawSizeMM : candidate.sizeMM
-  const k = draw / law
+  const k = draw / candidate.sizeMM
   return {
     spec: pitched.spec,
     panMM: candidate.origin,
