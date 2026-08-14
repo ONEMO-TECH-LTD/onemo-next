@@ -15,6 +15,7 @@
 // It reads values from Sub 2 and hands them to Sub 1. It holds no values and does no geometry.
 
 import {
+  alignmentPanMM,
   bandSpanMM,
   cellDiameterMM,
   fieldSpanMM,
@@ -135,4 +136,17 @@ export function solveCutout(
   contourMM: Contour,
 ): ShapeJudgement | null {
   return judgeShape(spec, calibration, contourMM)
+}
+
+/**
+ * REALIGN THE ONE LATTICE to a chosen layout: the pan that puts the grid on the given millimetre
+ * point (a seated magnet, in canvas frame). The protocol's "selecting a candidate realigns the
+ * grid" — the field pans to meet the layout; no second lattice is ever drawn.
+ */
+export function panToAlign(spec: GridSystemSpec, targetMM: PointMM): PointMM {
+  return alignmentPanMM(
+    spec.grid,
+    registrationOffsetMM(spec.grid, spec.registration),
+    targetMM,
+  )
 }

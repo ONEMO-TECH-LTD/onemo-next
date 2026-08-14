@@ -32,6 +32,7 @@ import {
   bandSpan,
   fieldBlockSpan,
   minShapeSpan,
+  panToAlign,
   resizeShape,
   solveCutout,
   type Contour,
@@ -40,7 +41,7 @@ import {
   type SizeVariant,
 } from '@/lib/grid-engine/bridge'
 import { RELEASED_CALIBRATION } from '@/lib/grid-engine/spec'
-import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { engineOutline, traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
@@ -297,9 +298,11 @@ export default function GridEnginePage() {
     // Yield one frame so the busy state paints before the synchronous solve runs.
     setTimeout(() => {
       try {
-        // The silhouette in its own proportions — the engine normalizes and owns every millimetre.
+        // The ENGINE'S copy: v1's own minimum-feature simplification (the shape on SCREEN is the
+        // untouched original), in the picture's true proportions — the engine owns every millimetre.
+        const manufacturable = engineOutline(outline)
         const contourMM: Contour = {
-          outer: { pts: outline.map(([u, v]) => [u * boxW, v * boxH] as [number, number]) },
+          outer: { pts: manufacturable.map(([u, v]) => [u * boxW, v * boxH] as [number, number]) },
           holes: [],
         }
         const answer = solveCutout(spec, RELEASED_CALIBRATION, contourMM)
@@ -316,6 +319,13 @@ export default function GridEnginePage() {
   const pickVariant = (variant: SizeVariant) => {
     setPicked(variant)
     setSize(variant.sizeMM)
+    // REALIGN THE ONE LATTICE to this layout — the grid pans to meet the chosen registration
+    // (protocol law). The first seated magnet, in canvas frame, is the alignment point.
+    const first = variant.anchors[0]
+    if (first) {
+      const { dx, dy } = engineFrame(variant)
+      setPan(panToAlign(spec, [first.p[0] + dx, first.p[1] + dy]))
+    }
   }
 
   /** Where the engine's frame sits on the canvas: its effect box centred, like the picture's box. */
@@ -615,28 +625,24 @@ export default function GridEnginePage() {
             </g>
           )}
           {picked && (
-            /* THE ENGINE'S VERDICT, drawn verbatim: its effect outline, every seated magnet at its
-               true diameter inside its padding spot, the dropped interior spots faint, and any flap
-               markers red. Every coordinate is the bridge's; this group only centres the frame. */
+            /* THE ENGINE'S VERDICT — magnets and flap markers ONLY. The lattice on screen is the
+               field's own, realigned to this layout when it was picked; the shape on screen is the
+               original. No second lattice, no redrawn shape. Coordinates are the bridge's; this
+               group only centres the engine's frame on the canvas. */
             (() => {
               const { dx, dy } = engineFrame(picked)
               return (
                 <g pointerEvents="none" transform={`translate(${dx} ${dy})`}>
-                  <polygon
-                    points={picked.effectContourMM.outer.pts.map(([x, y]) => `${x},${y}`).join(' ')}
-                    fill="none"
-                    stroke="#7dd87d"
-                    strokeWidth={1.5}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  {picked.candidates.map(([x, y], i) => (
-                    <circle key={`c${i}`} cx={x} cy={y} r={spec.grid.paddingMM} fill="none" stroke="#7dd87d" strokeOpacity={0.25} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-                  ))}
                   {picked.anchors.map((anchor, i) => (
-                    <g key={`a${i}`}>
-                      <circle cx={anchor.p[0]} cy={anchor.p[1]} r={spec.grid.paddingMM} fill="rgba(125,216,125,0.10)" stroke="#7dd87d" strokeOpacity={0.6} vectorEffect="non-scaling-stroke" />
-                      <circle cx={anchor.p[0]} cy={anchor.p[1]} r={anchor.dia / 2} fill={anchor.dia === spec.magnet.largeMM ? '#e8a33d' : '#1f2530'} stroke="#7dd87d" vectorEffect="non-scaling-stroke" />
-                    </g>
+                    <circle
+                      key={`a${i}`}
+                      cx={anchor.p[0]}
+                      cy={anchor.p[1]}
+                      r={anchor.dia / 2}
+                      fill={anchor.dia === spec.magnet.largeMM ? '#e8a33d' : '#1f2530'}
+                      stroke="#7dd87d"
+                      vectorEffect="non-scaling-stroke"
+                    />
                   ))}
                   {picked.flaps.map(([x, y], i) => (
                     <circle key={`f${i}`} cx={x} cy={y} r={2} fill="#e5484d" />
@@ -719,29 +725,30 @@ export default function GridEnginePage() {
         {judged && (
           <div className={styles.fixture}>
             <span className={styles.fixtureName}>Engine</span>
-            {judged.bands
-              .filter((answer) => answer.band.released)
-              .map((answer) =>
-                answer.variants.length ? (
-                  answer.variants.map((variant) => (
-                    <button
-                      key={`${answer.band.band}-${variant.sizeMM}`}
-                      type="button"
-                      className={styles.chip}
-                      data-on={picked === variant}
-                      onClick={() => pickVariant(variant)}
-                      title={`band ${answer.band.band} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern ?? ''} · margin ${variant.marginMM}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
-                    >
-                      B{answer.band.band}·{variant.sizeMM}·{variant.anchors.length}pt
-                      {variant.flaps.length > 0 ? '·⚠' : ''}
-                    </button>
-                  ))
-                ) : (
-                  <span key={answer.band.band} className={styles.rowUnit}>
-                    B{answer.band.band}: none
-                  </span>
-                ),
-              )}
+            {judged.bands.map((answer) =>
+              answer.variants.length ? (
+                answer.variants.map((variant) => (
+                  <button
+                    key={`${answer.band.band}-${variant.sizeMM}`}
+                    type="button"
+                    className={styles.chip}
+                    data-on={picked === variant}
+                    /* Bands 1 and 4 are hidden in the PRODUCT (Dan, 2026-08-11) — the admin bench
+                       reviews everything, dimmed so the product boundary stays visible. */
+                    style={answer.band.released ? undefined : { opacity: 0.45 }}
+                    onClick={() => pickVariant(variant)}
+                    title={`band ${answer.band.band}${answer.band.released ? '' : ' (hidden in product)'} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern ?? ''} · margin ${variant.marginMM}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
+                  >
+                    B{answer.band.band}·{variant.sizeMM}·{variant.anchors.length}pt
+                    {variant.flaps.length > 0 ? '·⚠' : ''}
+                  </button>
+                ))
+              ) : (
+                <span key={answer.band.band} className={styles.rowUnit}>
+                  B{answer.band.band}: none
+                </span>
+              ),
+            )}
           </div>
         )}
 

@@ -45,14 +45,23 @@ export async function traceCutout(file: File): Promise<OutlineUV | null> {
 
   const ring = traceContourRaw(mask, w, h)
   if (!ring || ring.length < 3) return null
+  // THE ORIGINAL SILHOUETTE, untouched — what the screen draws is the shape as traced.
+  return ring.map(([x, y]) => [x / w, y / h] as [number, number])
+}
 
-  // THE v1 SIMPLIFICATION LAW, verbatim in semantics (prepare-effect.ts, Dan 2026-06-17): the cut
-  // process cannot render detail under the manufacturing minimum feature, so the marching-squares
-  // staircase collapses to straight facets via RDP at that mm floor. The floor is mm-true at the
-  // LARGEST rung the system publishes — a raw multi-thousand-point ring would otherwise hand the
-  // engine minutes of work for detail no cutter can make.
-  const epsilonPx = Math.max(1, (MIN_FEATURE_MM / DEFAULT_LAW.maxRungMM) * Math.max(w, h))
-  const straight = rdpClosed(ring.map(([x, y]) => [x, y] as Vec2Px), epsilonPx)
-  if (straight.length < 3) return null
-  return straight.map(([x, y]) => [x / w, y / h] as [number, number])
+/**
+ * THE ENGINE'S COPY of a traced silhouette — v1's own simplification law applied, nothing else.
+ *
+ * Verbatim v1 semantics (prepare-effect.ts, Dan 2026-06-17): the cut process cannot render detail
+ * under the manufacturing minimum feature, so the marching-squares staircase collapses to straight
+ * facets via RDP at that mm floor — mm-true at the largest rung the system publishes. This is what
+ * v1 ALWAYS fed its grid engine; the raw ring is thousands of points of uncuttable detail.
+ *
+ * The DISPLAYED outline is never this one. The screen shows the original; the engine receives the
+ * manufacturable shape, exactly as in v1.
+ */
+export function engineOutline(outline: OutlineUV): OutlineUV {
+  const epsilonUV = MIN_FEATURE_MM / DEFAULT_LAW.maxRungMM
+  const straight = rdpClosed(outline.map(([u, v]) => [u, v] as Vec2Px), epsilonUV)
+  return straight.length >= 3 ? straight.map(([u, v]) => [u, v] as [number, number]) : outline
 }

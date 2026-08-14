@@ -225,3 +225,18 @@ export function resizeBoxToLongest(box: RegionMM, longestMM: number, minMM: numb
 export function bandSpanMM(grid: GridSpec, magnets: number): number {
   return Math.max(0, magnets - 1) * grid.pitchMM + 2 * grid.paddingMM
 }
+
+/**
+ * THE PAN THAT PUTS THE ONE LATTICE ON A POINT — how a chosen layout REALIGNS the grid instead of
+ * drawing a second one (the protocol: "selecting a candidate realigns the grid to that candidate's
+ * registration"). Wrapped to the nearest half-pitch so the field barely moves. Arithmetic, so it
+ * lives here; the shell hands in a millimetre point and pans by the answer.
+ */
+export function alignmentPanMM(grid: GridSpec, offsetMM: number, target: PointMM): PointMM {
+  const wrap = (v: number) => {
+    const p = grid.basePitchMM
+    const m = ((v % p) + p) % p
+    return m > p / 2 ? m - p : m
+  }
+  return [wrap(target[0] - offsetMM), wrap(target[1] - offsetMM)]
+}
