@@ -84,6 +84,15 @@ exist"* · *"grid first logic — shape + grid = final proportion and dimensions
 regressing into size led logic."* A seam taking a `sizesMM` ladder from its caller is exactly that
 regression, however the ladder is spelled.
 
+**There is no inverse problem, and no search.** The lawful dimensions are a *finite, small,
+grid-derived set* — `bandSpanMM(spec.grid, n)` for n = 1…`positionsPerAxis`, i.e. what the grid can
+express at this pitch and padding. Every one is evaluated **independently**, which is exactly what
+the kernel's own non-monotonicity theorem requires: *"do not binary-search scale… evaluate every
+legal published size."* GPT's first answer says the same — *"there is no reason to solve for
+continuous critical scales first."* So domain (the grid's own steps), termination (finite, ~9
+values) and result (whichever hold) are all defined without any solver, and no monotonicity is
+assumed anywhere.
+
 **So no size crosses into the unit.** The kernel's `sizes` argument is fed from the **grid itself** —
 `bandSpanMM(spec.grid, n)` for every position count the field carries — which the scaffold's own
 engine already computes from pitch and padding. The grid proposes the dimensions, the shape decides
