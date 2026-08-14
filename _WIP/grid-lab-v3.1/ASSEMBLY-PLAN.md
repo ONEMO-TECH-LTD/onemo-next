@@ -90,6 +90,18 @@ own QA — never smuggled into this seam.
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
 
+**Fixed shape, moving lattice — the coordinate frame, stated.** Varying `sourceAnchor` against a
+common `targetAnchor` *moves the transformed polygon*, which contradicts the scaffold's law that the
+cut-out stays put and the grid realigns beneath it. Mapping each construction to its own displayed
+point would fix the polygon but make all three transforms identical, so O-1 would change nothing —
+the switch would be fake. Neither is acceptable.
+
+**The resolution:** the kernel measures in its own frame, and the seam then translates the returned
+lattice origin and every candidate centre into the **fixed drawn-shape frame**. That translation is
+exact, is computed below the bridge, and is **carried on each `RawCandidate`** so the shell can
+realign the drawn lattice without recomputing anything. "Selecting by centre construction" was not
+enough to implement it, and saying so was hand-waving.
+
 **What the seam's test can and cannot assert.** The shape does not move between placements — the
 LATTICE does — so "held centres sit on `layout.magnets`" is only true **per (centre construction,
 registration) pair**, never across all twelve at once. The test therefore asserts, for each of the
@@ -122,8 +134,16 @@ build ships two constructions with the third named as missing.
 maximum-clearance anchoring. Without that construction the raw set may not contain it, and that
 absence would be a missing input, not an engine fault.
 
-**8 measurement calls per frozen outline** — 2 constructions × 4 registrations — each carrying the
-whole size ladder, so `preparePolygon` runs 8 times, never once per size. Each candidate is tagged
+**⛔ THIS IS A SCOPE CUT AND IT IS DAN'S TO AUTHORISE, NOT MINE.** O-1 says test all three
+constructions, and the only known duck@60 answer exists under the missing one. Shipping two and
+naming the third is *partial by construction*, and slicing a directive into a delivered part and a
+deferred part is not a call this lane may make. Until Dan rules, the raw-candidate build is
+**blocked at this dependency**, and a two-anchor surface must not be presented to him as "the
+candidate set". His options are named in §9.
+
+**Call shape once that is settled:** 4 measurement calls per construction (the four registrations),
+each carrying the whole size ladder, so `preparePolygon` runs once per placement and never once per
+size. Each candidate is tagged
 with its centre construction and its x/y registration. Free pan is not a lawful placement domain under L6, so excluding it costs no lawful
 candidate; omitting the 3×4 domain would.
 
@@ -140,6 +160,12 @@ candidate; omitting the 3×4 domain would.
 **A literal 48, 24, 12 or 9 in this file is a defect.** Grammar: `run.stepDomain =
 any-positive-whole-population-step`, `full-window.oneByOne = include`, populations base (step 1) and
 sparse (step 2) at origin 0,0 — complete on a 9×9 field, so no `MissingKernelFactError`.
+
+**L6 has no owner in the cloned packages — that is a real hole, not a deferral.** The Part-3
+package carries no registration or parity rule, so "L6 arrives with the logic module" was false.
+Enforcement needs **one thin handwritten adapter under `logic/`** — not compute, not shell — or this
+milestone must be scoped honestly as a **diagnostic measurement surface** rather than a lawful
+candidate set. Which of those two it is, is Dan's framing call (§9). Tagging is not enforcement.
 
 **L6 is NOT applied in compute, and is not silently dropped.** Measuring four origins makes the
 enumerator emit every family at every origin, and L6 says a candidate's per-axis parity must match
@@ -187,8 +213,11 @@ this plan's authorised deliverable ends at the raw-candidate surface.
 
 1. ✅ All three packages placed verbatim, committed, isolated, typecheck clean.
 2. `ui/trace-cutout.ts` returns the native ring + image dimensions (no new maths).
-3. `compute/candidates.ts` + unit test on a real trace: returned centres coincide with the drawn
-   ring and sit on `layout.magnets`; the 3×4 domain is exercised; no literal law value in the file.
+3. `compute/candidates.ts` + unit test on a real trace: for each (construction, registration) pair
+   independently, the transformed ring coincides with the ring drawn under that construction and
+   every held position coincides with the lattice generated at that registration — never against a
+   single `layout.magnets`. The domain exercised is whatever §3.3 is authorised to be. No literal
+   law value in the file.
 4. Bridge door; shell stepping control and highlight; lattice-pan disabled.
 5. Chrome check on the running page; screenshot; no solve on interaction.
 6. Dan tests the raw set. Only then: judgements, then product logic.
@@ -197,3 +226,22 @@ this plan's authorised deliverable ends at the raw-candidate surface.
 
 No rewrite of any delivered algorithm. No contour simplifier. No second lattice. No geometry or
 policy in the shell. No ranking anywhere. No global compiler change. No new module beyond the seam.
+
+
+## 9. The two decisions that are Dan's, not this lane's
+
+**D1 — the missing third anchor.** O-1 names three centre constructions; two are exactly computable
+from the ring, and **maximum clearance has no accepted implementation anywhere**. The duck at 60mm
+was found only under it.
+- *(a)* Authorise a **two-construction diagnostic surface now**, knowing band-1 duck may be absent
+  for that reason and not because the engine failed; add the third when a source exists.
+- *(b)* **Hold the build** until an accepted exact maximum-clearance source exists — an additive
+  request to the kernel's author, since building one here is the rebuilding the brief forbids.
+
+**D2 — what this milestone IS.** With no L6 owner in the cloned packages, the surface is either
+- *(a)* a **diagnostic measurement surface** — every candidate at every measured registration,
+  tagged, explicitly not filtered by law; or
+- *(b)* a **lawful candidate set**, which requires one thin handwritten L6 adapter under `logic/`
+  before Dan sees it.
+
+Neither is a technical preference; both change what Dan is looking at when he judges it.
