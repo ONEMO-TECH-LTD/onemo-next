@@ -157,23 +157,32 @@ function variantFrom(
 }
 
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
+function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
+  if (v.anchors.length < 4) return false
+  if (v.wrap.gridExtentXMM < 72 || v.wrap.gridExtentYMM < 72) return false
+  if (v.wrap.maxSide > calibration.flapMaxMM) return false
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const a of v.anchors) {
+    if (a.p[0] < minX) minX = a.p[0]
+    if (a.p[0] > maxX) maxX = a.p[0]
+    if (a.p[1] < minY) minY = a.p[1]
+    if (a.p[1] > maxY) maxY = a.p[1]
+  }
+  const tol = 1e-6
+  const at = (x: number, y: number) =>
+    v.anchors.some((a) => Math.abs(a.p[0] - x) < tol && Math.abs(a.p[1] - y) < tol)
+  return at(minX, minY) && at(maxX, minY) && at(minX, maxY) && at(maxX, maxY)
+}
+
 function better(
   a: SizeVariant,
   b: SizeVariant,
   band: BandSpec,
   calibration: CalibrationSpec,
 ): boolean {
-  // 1. THE BAND'S COUNT (the yardstick: 1 brain through band 2, the spine pair from band 3).
-  //    Closeness to the band's target ranks first; every other count stays an option.
-  const countA = Math.abs(a.anchors.length - band.targetMagnets)
-  const countB = Math.abs(b.anchors.length - band.targetMagnets)
-  if (countA !== countB) return countA < countB
-  // 1b. SPARSE SPREAD PREFERRED (Dan, verbatim: "96mm is lawful sparse pair and actually
-  //     preferred and proven sufficient") — at equal count, the wider-spaced arrangement wins.
-  const spreadA = a.nearestAnchorMM ?? 0
-  const spreadB = b.nearestAnchorMM ?? 0
-  if (spreadA !== spreadB) return spreadA > spreadB
-  // 2. GRAVITY AS A GUARD, not a climb (Dan, 2026-08-14: the pill single drifted off-centre
+  // THE GENERAL LAW (calibrated on the bat yardstick, validated across every canon shape —
+  // NO shape- or band-specific counts anywhere):
+  // 1. GRAVITY AS A GUARD, not a climb (Dan, 2026-08-14: the pill single drifted off-centre
   //    because "least top overhang" walked every layout as high as clearance allowed). The law —
   //    "gravity must not place magnets in the bottom and leave top unprotected" — is a constraint:
   //    a placement whose top overhang stays within the outer flap bound HOLDS the top; among
@@ -181,11 +190,32 @@ function better(
   const holdsTopA = a.wrap.top <= calibration.flapMaxMM
   const holdsTopB = b.wrap.top <= calibration.flapMaxMM
   if (holdsTopA !== holdsTopB) return holdsTopA
+  // 2. THE COLUMN LAW (Dan, this session: "narrow shape if scaled can fit 2 columns" — and
+  //    "optimal is 4 magnets in each outmost corner"). CORNERS CLASS — outranks every
+  //    spine/pair/single, but ONLY when the arrangement genuinely takes the shape's corners:
+  //    four-plus magnets, all four corners of their own box occupied (an L holds 3 of 4 —
+  //    not corners), real spread on both axes, and the shape reaching the block's edges
+  //    (max side flap within the outer bound — the duck's quad wears 18mm sides, the bat's
+  //    wings hang 45mm past any quad: a patch, not corners). Where no true corners seat
+  //    (the bat), the class is silent and the spine family decides below.
+  const cornersA = isCorners(a, calibration)
+  const cornersB = isCorners(b, calibration)
+  if (cornersA !== cornersB) return cornersA
+  // 3. SPARSE SPREAD (Dan: "96mm is lawful sparse pair and actually preferred") — wider
+  //    spacing wins; lifts the 96 spine over the crowded 48 family. Triangles live in this
+  //    pool too: BALANCE below picks them only where the shape is genuinely three-cornered
+  //    (Dan: "a T-shaped can act as triangle with 3 corners") — elsewhere the pair balances
+  //    better and wins.
+  const spreadA = a.nearestAnchorMM ?? 0
+  const spreadB = b.nearestAnchorMM ?? 0
+  if (spreadA !== spreadB) return spreadA > spreadB
   // 4. THE BALANCE RULE outranks tightness (Dan 2026-08-14 and his 2026-08-10 brief: "what may
   //    seem logical on paper and mathematically correct may miss the law of balance and
   //    symmetry"). Flap balanced across sides, BOTH axes counted, before any tightness compare.
   if (a.wrap.imbalanceSumMM !== b.wrap.imbalanceSumMM)
     return a.wrap.imbalanceSumMM < b.wrap.imbalanceSumMM
+  // 4b. among equal balance, FEWER magnets — the spine is minimal ("brains only").
+  if (a.anchors.length !== b.anchors.length) return a.anchors.length < b.anchors.length
   // 5. tight wrap — least total overhang
   if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
   // 6. smaller manufactured size

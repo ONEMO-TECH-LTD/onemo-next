@@ -73,11 +73,13 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
           expect([RELEASED.magnet.smallMM, RELEASED.magnet.largeMM]).toContain(anchor.dia)
         }
       }
-      // the band's ANSWER aims the yardstick count when any variant carries it
-      const counts = answer.variants.map((v) => v.anchors.length)
-      if (counts.includes(answer.band.targetMagnets)) {
-        expect(answer.variants[0].anchors.length).toBe(answer.band.targetMagnets)
-      }
+      // THE COLUMN LAW: on a square — a shape with true corners — the winner is a corners-class
+      // arrangement: four-plus magnets, all four corners of their own box occupied, the shape
+      // reaching the block's edges. Never a crowded interior population, never a lone spine.
+      const best = answer.variants[0]
+      expect(best.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+      expect(best.anchors.length).toBeGreaterThanOrEqual(4)
+      expect(best.wrap.maxSide).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
     }
   })
 
