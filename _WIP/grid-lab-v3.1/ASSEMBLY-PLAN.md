@@ -1,137 +1,60 @@
-# Assembly plan — current state
+# Installation plan — GPT Pro's three modules into the scaffold
 
-Rewritten to current state. Thirteen QA rounds; superseded models are deleted, not annotated.
+**Scope: installation only.** Install what GPT Pro delivered, verbatim, into the scaffold's existing
+modular structure, and run it. No rebuilding, no improving, no new architecture, no solvers, no
+policy. Everything else is deferred until we have looked at real output.
 
-## 1. DONE — placement, verbatim
-
-All three delivered packages cloned complete and byte-identical, nothing edited, committed:
+## 1. Where each module goes — DONE, committed
 
 ```
 src/lib/grid-engine/
-  spec.ts / engine.ts / ui/            UNCHANGED (values · mm compute · screen)
-  bridge.ts                            the only door; ONE function to be added
+  spec.ts / engine.ts / ui/            UNCHANGED  (values · mm compute · screen)
+  bridge.ts                            + ONE door
   compute/
-    magnetic-grid-measurement-kernel/  VERBATIM   (Part 1)
-    enumerator/                        VERBATIM   (Part 2)
-    candidates.ts                      the seam — not yet written
+    magnetic-grid-measurement-kernel/  VERBATIM  (Part 1)
+    enumerator/                        VERBATIM  (Part 2)
+    candidates.ts                      the seam — the only file we write
   logic/
-    magnetic-grid-product-logic/       VERBATIM   (Part 3)
-    registration-law.ts                L6 owner — not yet written
+    magnetic-grid-product-logic/       VERBATIM  (Part 3)
 ```
 
-Folder names are forced: `enumerator/dist/types.d.ts` imports
-`"../../magnetic-grid-measurement-kernel/dist/index.js"`. Each package's `src/test/scripts` are
-excluded from the app's TS project (removing that exclusion = 101 TS2737 errors, measured); the app
-target is unchanged; the seam imports only `dist/`. `tsc --noEmit` clean; suites 18/18 · 13/13 · 15/15.
+All three byte-identical to the deliveries (`diff -r` clean), nothing edited, suites 18/18 · 13/13 ·
+15/15, `tsc --noEmit` clean. Folder names are forced by the enumerator's own relative import of the
+kernel. Each package's `src/test/scripts` are excluded from the app's TS project so the app never
+compiles delivery sources; the seam imports `dist/` only.
 
-## 2. BLOCKED — the delivered modules cannot satisfy L8 as delivered
+## 2. The seam — calls the packages as they were built to be called
 
-**The pipeline is circular under grid-first.** L8: *"No size inputs may exist; shape + grid = final
-proportion and dimensions."* But:
+`compute/candidates.ts`, one file:
 
-- Part 2 exposes only `enumerateCandidates({ measurement, grammar })` and builds every family from
-  the **held points of a measurement**, which already required a size.
-- Deriving an arrangement's lawful size needs **that arrangement first**.
+1. clean the traced ring only as the kernel demands (it rejects duplicates rather than repairing);
+2. `measureLattice(...)` — lattice pitch, origin, field extent and disc all **read** from `spec`
+   through the scaffold's own engine; sizes and anchor come from what the page already has;
+3. `enumerateCandidates(...)` on that measurement, with the delivered grammar;
+4. return the candidates with positions in millimetres.
 
-So the only order the delivered code supports is **size → held facts → arrangements**, which is
-size-led. Grid-first needs **placements → per-placement closure → verification**. Fabricating an
-all-held measurement, generating placements in the seam, or copying Part 2's family loops would each
-duplicate or bypass a verbatim package — forbidden.
+No geometry, no grammar, no policy written here. Zero law literals (grep-checked).
 
-**This traces back to my own Part-1 prompt, which asked for "a list of sizes".** The size-led
-direction was built in at the first instruction.
+## 3. Part 3 — installed and callable, not faked
 
-### The additive delivery — the requirement is a PROVED non-circular pipeline, not a mechanism we dictate
+Exposed through its own accepted contract. It requires supplied gravity, region, status and
+precedence inputs; the scaffold has none today. So it is **called with what exists and reports the
+missing inputs by name** — nothing is fabricated to make it run. It stays integration-testable
+against its own delivered fixtures.
 
-The hard requirement is that grid-first becomes possible without a size input. **Two shapes could
-satisfy it, and this lane does not precommit to either** — the kernel's author is asked to audit
-which exact finite representation is achievable for arbitrary simple concave polygons, and to
-deliver that one.
+## 4. One bridge door, then the shell
 
-**Completeness is non-negotiable in either shape.** L13 requires every lawful size variation to
-survive, and on a concave shape feasibility comes in **disjoint windows** — so a single
-first-lawful witness cannot reconstruct the later ones. The delivery must return the **complete**
-exact lawful-size set (or a complete finite measurement-state partition from which every lawful
-occurrence follows). The published minimum is **derived from** that complete set, never an
-alternative to it.
+One result: measurement + raw candidates + Part 3's output or its named missing inputs. The shell
+browses and draws that result. It computes nothing and orders nothing.
 
-**(A) — preferred, and it changes nothing above Part 1.** The kernel publishes, for **every lattice
-site**, the complete exact partition of positive scale into intervals where that site's held state
-is constant (equivalently, the lawful whole-even size intervals), for the finite field and a given
-anchor. Then the **unchanged** enumerator runs at each distinct measurement state, arrangements
-emerge from **real held facts** rather than predeclared sets, and the seam dedupes only **repeated
-measurement STATES**, as a computation saving. **Every lawful size occurrence is retained in the
-output** — L13 requires every variation to survive — with the first lawful even publication marked
-separately. Candidate id excludes size by contract, so identity must never be used to collapse size
-occurrences away. Minimal, and it keeps
-Part 2 verbatim and authoritative.
+## 5. Run it and look
 
-**(B) — fallback, only if (A) is not finitely representable.** Part 2 gains a deterministic,
-geometry-blind `enumeratePatternPlacements(grammar, fieldExtent)` returning every family / population
-/ steps / position-set placement without held facts; Part 1 then evaluates those requested site sets
-and returns the **complete** exact lawful-scale set with limiting witnesses. Part 2's existing
-`enumerateCandidates` still verifies at the returned lawful sizes.
+Real traces on the running page. **This is a diagnostic of the delivered engine, not production
+output** — it is size-first because that is how the modules were built, and Dan sees exactly what
+GPT Pro's work does before anyone proposes changing it.
 
-**Either way, also additive to Part 1:** authoritative **maximum-clearance anchors** with
-deterministic tie-breaking — the missing O-1 construction, and the only one under which the band-1
-duck was ever found.
+## 6. Explicitly deferred until after that
 
-Candidate `id` already excludes size by contract, so cross-size identity is that id plus the
-construction and registration tags. No new identity law is needed under either shape.
-
-Why not hand-build the closure: `grid-spec` §4's formula is valid **only for convex** outlines by its
-own words, and §4a defers concave shapes to a decomposition it never defines. Our domain is concave.
-
-## 3. What is settled and stands
-
-- **Canonical polygon**: `traceContourRaw`'s native integer pixel ring. UV derived from it for
-  drawing only, so shell and kernel measure one shape. No invented quantisation (1e6-per-UV and
-  whole-mm contour rounding were both wrong and are struck).
-- **Placement domain**: O-1's centre constructions set `sourceAnchor` (which point of the shape is
-  anchored); L6's per-axis parity sets the lattice origin — four origins, not one scalar.
-- **Fixed shape, moving grid**: `delta = s(A − B) + C − P` is constant; kernel results translate into
-  the drawn frame below the bridge and ride on each candidate.
-- **Field extent**: `minIndex = −floor(N/2)`, `maxIndex = minIndex + N − 1`.
-- **Populations**: base and sparse always enumerated (L7); `pitchMM` selects what the shell draws.
-- **Publication**: first **lawful whole-even** size after exact closure, re-checked (concave windows),
-  every lawful size record preserved with the published minimum marked.
-- **Canon goldens** (square 72 · circle 92 · square 120 · circle 160 · a concave odd-first-fit case)
-  belong to the **additive Part-1 acceptance gate**, not the seam.
-- **Shell**: candidate index, stepping controls, highlights from bridge coordinates. Lattice-pan
-  disabled for this build. No compute, no policy.
-
-## 4. Part 3 — placed; activation in scope; two of its three inputs undefined
-
-| judgement | state |
-|---|---|
-| tight wrap | **has a formula** — grid bbox = magnet extent + padding; flap = per-side overhang, clamped at 0 (L14/L14a) |
-| gravity | **explicit input** — L11/L20 give intent and precedence, never a rule for which way is up on an arbitrary trace or how several magnets resolve to one boolean |
-| region / mass | **explicit input** — named in words only. "Corridor-connected components" was this lane's invented proxy, withdrawn; the kernel says a straight corridor is evidence for that corridor alone |
-
-## 5. The one decision that is Dan's
-
-**Maximum-clearance anchoring has no accepted implementation**, and the band-1 duck at 60mm was found
-only under it. **Default: HOLD** for the full brief until the additive delivery lands. A
-two-construction diagnostic surface is a scope cut Dan may authorise; this lane does not take it.
-
-## 6. Order of work
-
-1. ✅ Placement, isolation, typecheck.
-2. Draft the **additive audit request**, QA it, Dan sends it. It asks the author to prove which
-   architecture is minimal — under the preferred (A) only Part 1 changes.
-3. On delivery: verify verbatim, then write `compute/candidates.ts`, then
-   `logic/registration-law.ts`.
-4. **Activate Part 3 against its EXISTING contract — nothing is asked of its author.** That contract
-   already defines the explicit judgement, status and precedence inputs and the trusted candidate /
-   kernel documents, and this lane audited it. Requesting a new assembly contract would risk
-   re-versioning a package Dan required cloned verbatim, so the additive request stays strictly on
-   the Parts 1/2 geometry gap and max-clearance. Here we supply the judgement document (wrap
-   computed from the flap equation; gravity and region **supplied**, and where they are absent the
-   layer **reports the named gap rather than silently skipping Part 3**), run Part 3 unchanged, and
-   take its ranked tiers. Ranking exists only inside Part 3.
-5. **ONE bridge door, written after logic — not before it.** It returns a single result carrying the
-   raw candidates, the named gaps and the ranked tiers together. Writing a raw-only bridge first and
-   widening it later would mean two bridge shapes and exactly the incremental mess this plan exists
-   to avoid.
-6. Shell renders that one result — nothing derived, nothing ordered.
-7. Chrome check, screenshot, Dan tests the assembled three.
+Grid-first closure · maximum-clearance anchor · `registration-law.ts` (L6) · judgement producers ·
+any additive request to the modules' author. All are improvements beyond the delivered code, and
+none is in this plan.
