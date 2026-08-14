@@ -83,6 +83,28 @@ export interface ShapeJudgement {
 /** How many variants a band reports — the answer plus the nearest runners-up. */
 const VARIANTS_PER_BAND = 4
 
+/** What makes two variants THE SAME ARRANGEMENT (Dan, 2026-08-14: variants are distinct
+ *  layouts at their snug size — "not micro steps in millimetres"). Identity is the PHYSICAL
+ *  arrangement — the anchors' relative lattice geometry — never the search path that found it:
+ *  a vertical pair is one arrangement whether a template or the auto search proposed it. */
+function layoutIdentity(variant: SizeVariant, halfPitchMM: number): string {
+  let minX = Infinity
+  let minY = Infinity
+  for (const anchor of variant.anchors) {
+    if (anchor.p[0] < minX) minX = anchor.p[0]
+    if (anchor.p[1] < minY) minY = anchor.p[1]
+  }
+  // Half-pitch resolution: straight vs diagonal vs sparse arrangements stay distinct, while the
+  // same arrangement found at neighbouring sizes collapses to its one snug record.
+  return variant.anchors
+    .map(
+      (anchor) =>
+        `${Math.round((anchor.p[0] - minX) / halfPitchMM)},${Math.round((anchor.p[1] - minY) / halfPitchMM)}`,
+    )
+    .sort()
+    .join(';')
+}
+
 /** Judge one delivered grid against the flap law. Returns null when the law refuses it. */
 function variantFrom(
   spec: GridSystemSpec,
@@ -102,15 +124,18 @@ function variantFrom(
     spec.grid.paddingMM,
   )
   if (!wrap) return null
-  // THE FLAP LAW with the limb exception: any side beyond the limb allowance refuses outright;
-  // between the outer bound and the limb allowance it survives as a 'limb' answer (hanging legs,
-  // bodies, arms); the tiers rank tight wraps first, gravity still ranks the rest.
-  if (wrap.maxSide > calibration.flapLimbMM) return null
+  // THE FLAP LAW (Dan 2026-08-14, corrected): left, right and top hold the STRICT outer bound —
+  // a side flap lifts off the surface and is refused. ONLY the bottom carries the limb allowance
+  // ("trivial limb especially at the bottom"). ENFORCED CENTERING: an assembly whose horizontal
+  // centre drifts past the tolerance is refused, never merely ranked lower.
   const sideMax = Math.max(wrap.left, wrap.right, wrap.top)
+  if (sideMax > calibration.flapMaxMM) return null
+  if (wrap.bottom > calibration.flapLimbMM) return null
+  if (Math.abs(wrap.left - wrap.right) / 2 > calibration.centerToleranceMM) return null
   const tier: SizeVariant['tier'] =
     sideMax <= calibration.flapTightMM && wrap.bottom <= calibration.flapMaxMM
       ? 'tight'
-      : sideMax <= calibration.flapMaxMM
+      : wrap.bottom <= calibration.flapMaxMM
         ? 'allowed'
         : 'limb'
   return {
@@ -173,11 +198,11 @@ function judgeBand(
   const kept: SizeVariant[] = []
   const consider = (variant: SizeVariant | null) => {
     if (!variant) return
-    // one record per (size, count): keep the better placement
-    const twin = kept.findIndex(
-      (existing) =>
-        existing.sizeMM === variant.sizeMM && existing.anchors.length === variant.anchors.length,
-    )
+    // ONE RECORD PER ARRANGEMENT — a band offers distinct layouts, each at its snug size,
+    // never millimetre-step copies of the same one.
+    const halfPitchMM = spec.grid.basePitchMM / 2
+    const identity = layoutIdentity(variant, halfPitchMM)
+    const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
       if (better(variant, kept[twin], band, calibration)) kept[twin] = variant
       return

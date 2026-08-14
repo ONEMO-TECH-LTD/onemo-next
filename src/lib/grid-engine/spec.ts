@@ -261,6 +261,9 @@ export interface CalibrationSpec {
   flapLimbMM: number
   /** The judge's template-placement sweep step, millimetres, within one lattice cell. */
   sweepStepMM: number
+  /** ENFORCED centering (Dan 2026-08-14): the assembly's horizontal centre may sit at most this
+   *  far from the shape's — beyond it the placement is refused, never merely ranked lower. */
+  centerToleranceMM: number
   /** The judge's size step inside a band, millimetres (sizes stay even). */
   sizeStepMM: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
@@ -288,6 +291,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   flapMaxMM: 24,
   flapLimbMM: 40,
   sweepStepMM: 2,
+  centerToleranceMM: 12,
   sizeStepMM: 2,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
@@ -321,6 +325,7 @@ export type CalibrationNumberKey =
   | 'flapMaxMM'
   | 'flapLimbMM'
   | 'sweepStepMM'
+  | 'centerToleranceMM'
   | 'sizeStepMM'
 
 /** Bounds a calibration write must satisfy. Outside them the write is refused, not clamped. */
@@ -332,6 +337,7 @@ const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: numbe
   flapMaxMM: { min: 0, max: 80 },
   flapLimbMM: { min: 0, max: 120 },
   sweepStepMM: { min: 1, max: 48 },
+  centerToleranceMM: { min: 0, max: 60 },
   sizeStepMM: { min: 2, max: 48 },
 }
 

@@ -12,7 +12,6 @@
 
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
-import { MIN_FEATURE_MM } from '@/lib/effect/geometry-truth'
 import { DEFAULT_LAW } from '@/lib/grid-engine/compute/grid-core'
 
 /** The silhouette as fractions of the picture's own box. */
@@ -50,18 +49,16 @@ export async function traceCutout(file: File): Promise<OutlineUV | null> {
 }
 
 /**
- * THE ENGINE'S COPY of a traced silhouette — v1's own simplification law applied, nothing else.
+ * THE ENGINE'S COPY of a traced silhouette — the raw ring reduced to a FINE fidelity floor.
  *
- * Verbatim v1 semantics (prepare-effect.ts, Dan 2026-06-17): the cut process cannot render detail
- * under the manufacturing minimum feature, so the marching-squares staircase collapses to straight
- * facets via RDP at that mm floor — mm-true at the largest rung the system publishes. This is what
- * v1 ALWAYS fed its grid engine; the raw ring is thousands of points of uncuttable detail.
- *
- * The DISPLAYED outline is never this one. The screen shows the original; the engine receives the
- * manufacturable shape, exactly as in v1.
+ * Dan, 2026-08-14: a magnet spot may NEVER cross the drawn outline. The old 5mm manufacturing
+ * floor (v1's cutter law) let the judged polygon deviate visibly OUTSIDE the original, so a spot
+ * lawful on the copy intersected the shape on screen. The judge's copy now reduces at ~1mm on the
+ * largest rung — a deviation no eye can see at any size — purely to keep the solve fast; the 5mm
+ * manufacturing simplification remains a DOWNSTREAM cut-path step, never the judged geometry.
  */
 export function engineOutline(outline: OutlineUV): OutlineUV {
-  const epsilonUV = MIN_FEATURE_MM / DEFAULT_LAW.maxRungMM
+  const epsilonUV = 1 / DEFAULT_LAW.maxRungMM
   const straight = rdpClosed(outline.map(([u, v]) => [u, v] as Vec2Px), epsilonUV)
   return straight.length >= 3 ? straight.map(([u, v]) => [u, v] as [number, number]) : outline
 }
