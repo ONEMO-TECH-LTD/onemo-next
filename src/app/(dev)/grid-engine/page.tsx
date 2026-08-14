@@ -94,6 +94,8 @@ const CUTOUT_LIBRARY = [
 const DEFAULT_SIZE_BAND = 3
 /** Four square-standard bands. Millimetres live on the spec, not here. */
 const BANDS = [1, 2, 3, 4] as const
+/** Trackpad and the global size slider. One millimetre. The band slider has its own step. */
+const SHAPE_STEP_MM = 1
 const CUTOUT_OPACITY = 0.55
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
@@ -186,15 +188,6 @@ export default function GridEnginePage() {
   const bandLo = bandSizes[0]
   const bandHi = bandSizes[bandSizes.length - 1]
   const bandStep = bandSizes[1] - bandSizes[0]
-  const snapBand = (n: number) => {
-    const snapped = bandLo + Math.round((n - bandLo) / bandStep) * bandStep
-    return Math.max(bandLo, Math.min(bandHi, snapped))
-  }
-  const commitSize = () => {
-    const next = Number(sizeDraft)
-    if (Number.isFinite(next) && next > 0) setSize(snapBand(next))
-    else setSizeDraft(String(sizeMM))
-  }
   const [candDoc, setCandDoc] = useState({ candidates: [] as ReturnType<typeof listCandidates>['candidates'] })
   useEffect(() => {
     if (!metric) {
@@ -373,27 +366,24 @@ export default function GridEnginePage() {
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
   /** The unit's own floor. The control offers exactly what the unit will produce, never less. */
   const minSpanMM = Math.round(minShapeSpan(spec))
+  const commitSize = () => {
+    const next = Number(sizeDraft)
+    if (Number.isFinite(next) && next > 0) {
+      setSize(Math.max(minSpanMM, Math.min(maxSpanMM, Math.round(next))))
+    } else setSizeDraft(String(sizeMM))
+  }
 
   /**
-   * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
-   * grid to the resizing same as slider would".
+   * PINCH THE GRID — the same size the global slider sets. Dan, 2026-08-11: "link the pinch
+   * gestures on the grid to the resizing same as slider would".
    *
-   * It drives `setSize` and nothing else, so there is ONE size and three ways to reach it: the band
-   * chips, the slider, the pinch. A second scale living beside the first is how a surface ends up
-   * showing a number the shape does not have (law 5.3).
-   *
-   * The direction follows what the hand is doing to the GRID, not to the shape. Spread the fingers
-   * and the grid grows, which means the shape covers less of it — a smaller shape in millimetres.
-   * Pinch in and the grid shrinks under a shape that is therefore bigger. The shape itself never
-   * changes on screen; only its size in millimetres does, which is the inverted model.
-   *
-   * Whole millimetres, like every other move, and bounded by the same floor and 9x9 ceiling the
-   * slider carries.
+   * Whole millimetres, floor to 9×9 ceiling. Not the band step — that is the other slider.
+   * Accumulate unrounded so a slow trackpad still moves 1mm.
    */
   useEffect(() => {
     applyPinch.current = (factor: number) => {
       const next = sizeExactMM.current * factor
-      const held = snapBand(next)
+      const held = Math.min(maxSpanMM, Math.max(minSpanMM, next))
       sizeExactMM.current = held
       setSize(Math.round(held))
     }
@@ -426,7 +416,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-24</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-25</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
@@ -691,6 +681,35 @@ export default function GridEnginePage() {
         </details>
 
         <div className={styles.fixture}>
+          <span className={styles.fixtureName}>Size</span>
+          <input
+            className={styles.slider}
+            type="range"
+            min={minSpanMM}
+            max={maxSpanMM}
+            step={SHAPE_STEP_MM}
+            value={Math.min(Math.max(sizeMM, minSpanMM), maxSpanMM)}
+            onChange={(e) => setSize(Number(e.target.value))}
+            aria-label="Shape size"
+          />
+          <input
+            className={styles.input}
+            type="number"
+            inputMode="numeric"
+            min={minSpanMM}
+            max={maxSpanMM}
+            step={SHAPE_STEP_MM}
+            value={sizeDraft}
+            onChange={(e) => setSizeDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitSize()
+            }}
+            onBlur={commitSize}
+          />
+          <span className={styles.rowUnit}>mm</span>
+        </div>
+
+        <div className={styles.fixture}>
           <span className={styles.fixtureName}>Band</span>
           {BANDS.map((n) => {
             const sizes = BAND_SIZES_MM[n]
@@ -722,21 +741,6 @@ export default function GridEnginePage() {
             onChange={(e) => setSize(Number(e.target.value))}
             aria-label="Shape size in this band"
           />
-          <input
-            className={styles.input}
-            type="number"
-            inputMode="numeric"
-            min={bandLo}
-            max={bandHi}
-            step={bandStep}
-            value={sizeDraft}
-            onChange={(e) => setSizeDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitSize()
-            }}
-            onBlur={commitSize}
-          />
-          <span className={styles.rowUnit}>mm</span>
         </div>
       </section>
     </div>
