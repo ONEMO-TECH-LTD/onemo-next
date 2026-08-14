@@ -54,10 +54,8 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
         expect(variant.sizeMM).toBeGreaterThanOrEqual(answer.band.minSizeMM)
         expect(variant.sizeMM).toBeLessThan(answer.band.maxSizeMM)
         expect(variant.sizeMM % 2).toBe(0)
-        // THE MINIMUM-PAIR LAW: the pair is the floor (single in band 1); target is preference
-        expect(variant.anchors.length).toBeGreaterThanOrEqual(
-          Math.min(answer.band.targetMagnets, 2),
-        )
+        // NO COUNT GATE — any count that fits is lawful
+        expect(variant.anchors.length).toBeGreaterThanOrEqual(1)
         // THE FLAP LAW, proportional: sides bounded by the padded block's own span (capped by
         // the limb allowance); vertical carries the limb allowance
         expect(Math.max(variant.wrap.left, variant.wrap.right)).toBeLessThanOrEqual(

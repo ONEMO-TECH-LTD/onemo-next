@@ -80,8 +80,10 @@ export interface ShapeJudgement {
   bands: BandAnswer[]
 }
 
-/** How many variants a band reports — the answer plus the nearest runners-up. */
-const VARIANTS_PER_BAND = 4
+/** How many variants a band reports. WIDE OPEN by Dan's ruling (2026-08-14): "each band must
+ *  provide different options … maximum amount of the options, no pairs no 4s, any count that
+ *  fits — first we identify what works, then refine to prefer specific layouts." */
+const VARIANTS_PER_BAND = 12
 
 /** What makes two variants THE SAME ARRANGEMENT (Dan, 2026-08-14: variants are distinct
  *  layouts at their snug size — "not micro steps in millimetres"). Identity is the PHYSICAL
@@ -117,12 +119,9 @@ function variantFrom(
   grid: GridResult,
   layout?: string,
 ): SizeVariant | null {
-  // THE MINIMUM-PAIR LAW (Dan, verbatim: "pair is minimum but engine must calculate in the
-  // size band minimum pair and other options mag quantity and layout"). A band never demands
-  // its target — the target is the ranking's preference, the PAIR is the floor (single in
-  // band 1). Refusing lawful pairs/triangles was why B3/B4 read "none" on shapes that
-  // plainly hold five layouts.
-  if (grid.anchors.length < Math.min(band.targetMagnets, 2)) return null
+  // NO COUNT GATE (Dan 2026-08-14: "any 1/2/3/4/5/6/7 — whatever fits; don't cut the
+  // engine's legs prematurely"). The physics laws below are the only judges.
+  if (grid.anchors.length < 1) return null
   const wrap = measureWrap(
     contour,
     grid.anchors.map((anchor) => anchor.p),
@@ -162,22 +161,13 @@ function variantFrom(
 }
 
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
-function better(
-  a: SizeVariant,
-  b: SizeVariant,
-  band: BandSpec,
-  calibration: CalibrationSpec,
-): boolean {
+function better(a: SizeVariant, b: SizeVariant, calibration: CalibrationSpec): boolean {
   // 1. tight beats allowed beats limb (the flap law's preference order)
   if (a.tier !== b.tier) {
     const order = { tight: 0, allowed: 1, limb: 2 }
     return order[a.tier] < order[b.tier]
   }
-  // 2. the band's target count (pair minimum, four optimal)
-  const countA = Math.abs(a.anchors.length - band.targetMagnets)
-  const countB = Math.abs(b.anchors.length - band.targetMagnets)
-  if (countA !== countB) return countA < countB
-  // 3. GRAVITY AS A GUARD, not a climb (Dan, 2026-08-14: the pill single drifted off-centre
+  // 2. GRAVITY AS A GUARD, not a climb (Dan, 2026-08-14: the pill single drifted off-centre
   //    because "least top overhang" walked every layout as high as clearance allowed). The law —
   //    "gravity must not place magnets in the bottom and leave top unprotected" — is a constraint:
   //    a placement whose top overhang stays within the outer flap bound HOLDS the top; among
@@ -213,7 +203,7 @@ function judgeBand(
     const identity = layoutIdentity(variant, halfPitchMM)
     const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
-      if (better(variant, kept[twin], band, calibration)) kept[twin] = variant
+      if (better(variant, kept[twin], calibration)) kept[twin] = variant
       return
     }
     kept.push(variant)
@@ -221,11 +211,8 @@ function judgeBand(
 
   const step = calibration.sizeStepMM
   const sweep = calibration.sweepStepMM
-  const templates = calibration.templates.filter(
-    (template) =>
-      template.steps.length >= Math.min(band.targetMagnets, 2) &&
-      template.steps.length <= band.targetMagnets + 2,
-  )
+  // EVERY released template is proposed in every band — no count-based pruning.
+  const templates = calibration.templates
   for (
     let sizeMM = Math.ceil(band.minSizeMM / step) * step;
     sizeMM < band.maxSizeMM;
@@ -253,11 +240,10 @@ function judgeBand(
     const prepared = prepareExactContour(contour)
     const bb = prepared.bbox
     for (const template of templates) {
-      // Alternates below the band's target sweep at half resolution — they are options, not the
-      // aim; the target-count templates keep the fine step. (Cost, not law: the full fine sweep
-      // over every alternate quadrupled the solve.)
-      const stepMM =
-        template.steps.length >= band.targetMagnets ? sweep : sweep * 2
+      // Small templates floating on large shapes sweep at half resolution — cost, not law:
+      // their origin range is huge and the fine step over it quadrupled the solve. Large
+      // templates have small ranges and keep the fine step.
+      const stepMM = template.steps.length <= 3 && sizeMM > 120 ? sweep * 2 : sweep
       let stepsAcross = 0
       let stepsDown = 0
       for (const [across, down] of template.steps) {
@@ -298,7 +284,7 @@ function judgeBand(
     }
   }
 
-  kept.sort((a, b) => (better(a, b, band, calibration) ? -1 : 1))
+  kept.sort((a, b) => (better(a, b, calibration) ? -1 : 1))
   return { band, variants: kept.slice(0, VARIANTS_PER_BAND) }
 }
 
