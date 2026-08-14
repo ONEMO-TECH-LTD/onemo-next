@@ -217,12 +217,13 @@ export default function GridEnginePage() {
   const stickerMM = Math.round(bandSpan(spec, 3))
   const shownView =
     shownCand && metric
-      ? standingView(spec, shownCand, metric, picture ?? undefined, stickerMM)
+      ? standingView(spec, shownCand, metric, picture ?? undefined, stickerMM, sizeMM)
       : null
   const displayK = shownCand ? stickerMM / Math.max(sizeMM, 1) : 1
-  const engineK = shownCand ? stickerMM / Math.max(shownCand.sizeMM, 1) : 1
   const shownScore = shownCand && metric ? measureProposal(spec, shownCand, metric) : null
-  const marks = shownView ? shownView.sites : []
+  const marks = shownView
+    ? shownView.sites.map(([x, y]) => [x + pan[0] * displayK, y + pan[1] * displayK] as [number, number])
+    : []
   const demoVerts = shownView ? shownView.shape : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
@@ -415,7 +416,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-28</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-30</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
@@ -558,7 +559,7 @@ export default function GridEnginePage() {
               data-candidate-mark="true"
               cx={x}
               cy={y}
-              r={(minSpanMM / 2) * engineK}
+              r={(minSpanMM / 2) * displayK}
               fill="none"
               stroke="#3dd68c"
               strokeWidth={2}

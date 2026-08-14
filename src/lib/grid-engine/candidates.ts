@@ -207,6 +207,52 @@ function pushPair(
   })
 }
 
+function pushCorners(
+  candidates: Candidate[],
+  spec: GridSystemSpec,
+  band: BandId,
+  sizeMM: number,
+  half: number,
+  corners: PointMM[],
+  family: 'rectangle-corners' | 'corner-triangle',
+) {
+  const pitch = spec.grid.basePitchMM
+  const [ox, oy] = originOf(corners[0][0], corners[0][1], pitch)
+  const sites = corners.map(([x, y]) => ({
+    col: Math.round((x - ox) / pitch),
+    row: Math.round((y - oy) / pitch),
+    x,
+    y,
+  }))
+  const cols = sites.map((s) => s.col)
+  const rows = sites.map((s) => s.row)
+  const stepCol = Math.max(...cols) - Math.min(...cols)
+  const stepRow = Math.max(...rows) - Math.min(...rows)
+  candidates.push({
+    id: [
+      band,
+      sizeMM,
+      ox,
+      oy,
+      family,
+      'base',
+      stepCol,
+      stepRow,
+      sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
+    ].join(':'),
+    band,
+    sizeMM,
+    anchor: 'bbox',
+    registration: { x: namedOrigin(ox, half), y: namedOrigin(oy, half) },
+    origin: [ox, oy],
+    family,
+    population: 'base',
+    stepCol,
+    stepRow,
+    sites,
+  })
+}
+
 function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[] {
   return verts.map(([x, y]) => [x + dx, y + dy])
 }
@@ -361,6 +407,55 @@ export function collectCandidates(
         }
       }
       if (found) break
+    }
+  }
+
+  // Bands 3–4: first size a corner set holds. Do not stop on a 3 if a 4 still fits tighter later.
+  for (const band of [3, 4] as const) {
+    const pitch = spec.grid.basePitchMM
+    const sizes = BAND_SIZES_MM[band]
+    const lo = sizes[0]
+    const hi = sizes[sizes.length - 1]
+    const spans = [pitch, pitch * 2]
+    let pending3: { sizeMM: number; sets: PointMM[][] } | null = null
+    for (let sizeMM = lo; sizeMM <= hi; sizeMM++) {
+      const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
+      const prep = prepareOutline(scaled)
+      const cells = fitCells(prep, spec)
+      const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+      const fours: PointMM[][] = []
+      const threes: PointMM[][] = []
+      for (const [x, y] of cells) {
+        for (const dx of spans) {
+          for (const dy of spans) {
+            const corners: PointMM[] = [
+              [x, y],
+              [x + dx, y],
+              [x, y + dy],
+              [x + dx, y + dy],
+            ]
+            const held = corners.filter(([cx, cy]) => at.has(`${cx},${cy}`))
+            if (held.length === 4) fours.push(held)
+            else if (held.length === 3 && band === 3) threes.push(held)
+          }
+        }
+      }
+      if (fours.length) {
+        for (const held of fours) {
+          pushCorners(candidates, spec, band, sizeMM, half, held, 'rectangle-corners')
+        }
+        for (const held of threes) {
+          pushCorners(candidates, spec, band, sizeMM, half, held, 'corner-triangle')
+        }
+        pending3 = null
+        break
+      }
+      if (threes.length && !pending3) pending3 = { sizeMM, sets: threes }
+    }
+    if (pending3) {
+      for (const held of pending3.sets) {
+        pushCorners(candidates, spec, band, pending3.sizeMM, half, held, 'corner-triangle')
+      }
     }
   }
 

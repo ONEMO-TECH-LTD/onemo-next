@@ -149,18 +149,15 @@ export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMe
     if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
     return 'placement-at-size'
   }
-  if (band === 2) {
+  if (band === 2 || band === 3 || band === 4) {
     if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
     if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
     if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
+    if (won.area !== lost.area) return `area ${won.area} < ${lost.area}`
     return 'placement-at-size'
   }
   if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
   if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
-  if (band === 4 && won.step !== lost.step) return `step ${Math.sqrt(won.step).toFixed(0)} > ${Math.sqrt(lost.step).toFixed(0)}`
-  const ae = won.extremes / (won.size * won.size)
-  const be = lost.extremes / (lost.size * lost.size)
-  if (ae !== be) return `extremes ${ae.toFixed(3)} < ${be.toFixed(3)}`
   if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
   if (won.area !== lost.area) return `area`
   return 'tie'
@@ -187,22 +184,12 @@ export function propose(
       if (a.top !== b.top) return a.top - b.top
       return a.c.id.localeCompare(b.c.id)
     }
-    if (band === 2) {
-      if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
-      if (a.n !== b.n) return b.n - a.n
-      if (a.size !== b.size) return a.size - b.size
-      if (a.top !== b.top) return a.top - b.top
-      if (a.clear !== b.clear) return b.clear - a.clear
-      return a.c.id.localeCompare(b.c.id)
-    }
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
     if (a.n !== b.n) return b.n - a.n
-    if (band === 4 && a.step !== b.step) return b.step - a.step
-    const ae = a.extremes / (a.size * a.size)
-    const be = b.extremes / (b.size * b.size)
-    if (ae !== be) return ae - be
     if (a.size !== b.size) return a.size - b.size
     if (a.area !== b.area) return a.area - b.area
+    if (a.top !== b.top) return a.top - b.top
+    if (a.clear !== b.clear) return b.clear - a.clear
     return a.c.id.localeCompare(b.c.id)
   })
 
