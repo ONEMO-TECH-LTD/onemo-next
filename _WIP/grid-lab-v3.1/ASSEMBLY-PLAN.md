@@ -72,7 +72,7 @@ enumerateCandidatesForField(spec, layout, outlineMM, opts) → RawCandidate[]
 | kernel input | source |
 |---|---|
 | `lattice.pitch` | `spec.grid.basePitchMM` |
-| `lattice.origin` | `layout.anchorMM` — the scaffold's own anchor (registration + pan) |
+| `lattice.origin` | the lawful registration offset from `spec` via `registrationOffsetMM` — **not** `layout.anchorMM`, which carries the live pan (see the solve contract below) |
 | `lattice.fieldExtent` | integer bounds from `spec.grid.positionsPerAxis` (see below) |
 | `discDiameter` | `layout.cellMM` |
 | population `indexStep` | `spec.grid.pitchMM / spec.grid.basePitchMM` |
