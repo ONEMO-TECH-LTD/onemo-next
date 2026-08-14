@@ -391,5 +391,22 @@ export function collectCandidates(
     if (wrap !== null) emitMillimetre(band, wrap)
   }
 
+  // Band 4 may grow the same class past 216 (bat-woman yardstick 285).
+  for (const sizeMM of [228, 240, 252, 264, 276, 288]) {
+    const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
+    const prep: PreparedOutline = prepareOutline(scaled)
+    for (const origin of origins) {
+      const raw = magnetsInRegion(dense, field, 0, origin)
+      const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
+      const measured: SiteInput[] = indexed.map((s) => ({
+        ...s,
+        fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
+      }))
+      const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
+      emitArrangements(4, sizeMM, origin, measured, 'base')
+      emitArrangements(4, sizeMM, origin, sparseSites, 'sparse')
+    }
+  }
+
   return { candidates }
 }

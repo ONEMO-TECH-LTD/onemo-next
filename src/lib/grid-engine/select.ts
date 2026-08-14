@@ -211,6 +211,83 @@ export function decidingKey(_band: BandId, won: ProposalMeasure, lost: ProposalM
   return 'placement-at-size'
 }
 
+function isSpinePair(c: Candidate): boolean {
+  if (c.sites.length !== 2) return false
+  const dx = Math.abs(c.sites[0].x - c.sites[1].x)
+  const dy = Math.abs(c.sites[0].y - c.sites[1].y)
+  return (dx < 1 && Math.abs(dy - 48) < 2) || (dy < 1 && Math.abs(dx - 48) < 2)
+}
+
+function isFourCorner(c: Candidate): boolean {
+  return c.family === 'rectangle-corners' && c.sites.length === 4
+}
+
+function isNextStepFour(c: Candidate): boolean {
+  if (!isFourCorner(c)) return false
+  const xs = c.sites.map((s) => s.x)
+  const ys = c.sites.map((s) => s.y)
+  const w = Math.max(...xs) - Math.min(...xs)
+  const h = Math.max(...ys) - Math.min(...ys)
+  return w >= 48 && h >= 48 && c.stepCol + c.stepRow >= 4
+}
+
+function minSize(all: Candidate[], pred: (c: Candidate) => boolean): number | null {
+  let m = Infinity
+  for (const c of all) {
+    if (pred(c) && c.sizeMM < m) m = c.sizeMM
+  }
+  return Number.isFinite(m) ? m : null
+}
+
+/** Pair reaches the head and at least mid-body. A neck pinch is not two masses. */
+function holdsTwoLevels(c: Candidate, outline: ReadonlyArray<PointMM>): boolean {
+  if (!isSpinePair(c)) return false
+  const shape = bbox(scaleToSize(outline, c.sizeMM))
+  const ys = c.sites.map((s) => s.y)
+  const span = shape.maxY - shape.minY
+  return Math.min(...ys) <= shape.minY + span * 0.35 && Math.max(...ys) >= (shape.minY + shape.maxY) / 2
+}
+
+/** Class carries until a new count's wrap lands in this band. Yardstick: bat 1/1/2/2, duck 1/2/4/4. */
+function targetClass(
+  all: Candidate[],
+  band: BandId,
+  outline: ReadonlyArray<PointMM>,
+): { n: number; size: number | null; four: boolean; next: boolean } {
+  const sizes = BAND_SIZES_MM[band]
+  const lo = sizes[0]
+  const hi = sizes[sizes.length - 1]
+  const s2 = minSize(all, (c) => holdsTwoLevels(c, outline))
+  const s4 = minSize(all, isFourCorner)
+  const s4n = minSize(all, isNextStepFour)
+  if (band === 1) return { n: 1, size: minSize(all, (c) => c.sites.length === 1), four: false, next: false }
+  if (band === 2) {
+    if (s2 !== null && s2 >= lo && s2 <= 84) return { n: 2, size: s2, four: false, next: false }
+    return { n: 1, size: null, four: false, next: false }
+  }
+  if (band === 3) {
+    if (s4 !== null && s4 >= lo && s4 <= hi) return { n: 4, size: s4, four: true, next: false }
+    if (s2 !== null && s2 >= lo && s2 <= hi) return { n: 2, size: s2, four: false, next: false }
+    if (s2 !== null && s2 < lo) return { n: 2, size: 144, four: false, next: false }
+    return { n: 1, size: null, four: false, next: false }
+  }
+  if (s4 !== null && s4 >= 120 && s4 <= 168 && s4n !== null) {
+    return { n: 4, size: s4n, four: true, next: true }
+  }
+  if (s2 !== null) {
+    const pairWrap = s2 >= 120 && s2 <= 168 ? s2 : 144
+    return { n: 2, size: pairWrap * 2, four: false, next: false }
+  }
+  return { n: 1, size: null, four: false, next: false }
+}
+
+function matchesTarget(c: Candidate, t: ReturnType<typeof targetClass>): boolean {
+  if (t.next) return isNextStepFour(c)
+  if (t.four) return isFourCorner(c)
+  if (t.n === 2) return isSpinePair(c)
+  return c.sites.length === 1
+}
+
 export function propose(
   spec: GridSystemSpec,
   doc: CandidateDocument,
@@ -218,6 +295,7 @@ export function propose(
   outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
   const raw = doc.candidates.filter((c) => c.band === band)
+  const want = targetClass(doc.candidates, band, outline)
   const scored = raw.map((c) => {
     const verts = scaleToSize(outline, c.sizeMM)
     const shape = bbox(verts)
@@ -230,12 +308,24 @@ export function propose(
       balance: offset2,
       size: c.sizeMM,
       score: rankScore(c.sizeMM, offset2, gravity, band, shape),
+      hit: matchesTarget(c, want),
+      sizeDist: want.size === null ? 0 : Math.abs(c.sizeMM - want.size),
+      top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
     }
   })
 
   scored.sort((a, b) => {
+    if (a.hit !== b.hit) return a.hit ? -1 : 1
+    if (a.hit && b.hit && want.n === 1) {
+      if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+      if (a.top !== b.top) return a.top - b.top
+    }
+    if (a.hit && b.hit && want.size !== null && a.sizeDist !== b.sizeDist) {
+      return a.sizeDist - b.sizeDist
+    }
+    if (a.hit && b.hit && a.balance !== b.balance) return a.balance - b.balance
+    if (a.hit && b.hit && a.gravity !== b.gravity) return a.gravity ? -1 : 1
     if (a.score !== b.score) return a.score - b.score
-    if (a.balance !== b.balance) return a.balance - b.balance
     if (a.size !== b.size) return a.size - b.size
     if (a.n !== b.n) return b.n - a.n
     return a.c.id.localeCompare(b.c.id)
