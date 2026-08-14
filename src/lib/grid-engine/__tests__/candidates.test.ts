@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listCandidates } from '../bridge'
+import { listCandidates, standingView } from '../bridge'
 import { enumerateArrangements, type SiteInput } from '../enumerate'
 import { RELEASED } from '../spec'
 
@@ -124,6 +124,25 @@ describe('collectCandidates — shipped entry', () => {
     expect(singles.length).toBeGreaterThan(0)
     expect(singles.some((c) => c.sites[0].x !== 0 || c.sites[0].y !== 0)).toBe(true)
     expect(singles.every((c) => !('preferred' in c))).toBe(true)
+  })
+
+  it('standing view lands every mark on the frozen lattice', () => {
+    const outline = square(36)
+    const doc = listCandidates(RELEASED, outline)
+    expect(doc.candidates.length).toBeGreaterThan(0)
+    const pitch = RELEASED.grid.basePitchMM
+    for (const c of doc.candidates) {
+      const view = standingView(RELEASED, c, outline)
+      expect(view.panMM).toEqual([0, 0])
+      for (const [x, y] of view.sites) {
+        expect(x % pitch === 0).toBe(true)
+        expect(y % pitch === 0).toBe(true)
+        if (c.population === 'sparse') {
+          expect(x % (pitch * 2) === 0).toBe(true)
+          expect(y % (pitch * 2) === 0).toBe(true)
+        }
+      }
+    }
   })
 
   it('emits a diagonal run and a skipped-row rectangle on a large square', () => {

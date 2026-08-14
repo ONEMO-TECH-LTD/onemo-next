@@ -22,7 +22,6 @@ import {
   limitsFor,
   RELEASED,
   selectPitch,
-  selectRegistration,
   type GridKey,
   type GridSystemSpec,
   type WriteRefusal,
@@ -30,13 +29,11 @@ import {
 import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
-  candidateSites,
-  canvasForCandidate,
   fieldBlockSpan,
   listCandidates,
   minShapeSpan,
-  placedOutline,
   resizeShape,
+  standingView,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
@@ -86,7 +83,6 @@ const CUTOUT_LIBRARY = [
   'POKE2.png',
 ] as const
 
-const DEFAULT_MATCH_MAGNETS = 2
 /**
  * And it arrives at BAND 3 on its longest side. Dan, 2026-08-11: "the defaiult image cutout load
  * must be in outline mode and centered to 4 squares in band 3".
@@ -199,8 +195,9 @@ export default function GridEnginePage() {
     [candDoc, activeBand],
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
-  const marks = shownCand ? candidateSites(candDoc, shownCand.id) : []
-  const demoVerts = shownCand && outline ? placedOutline(outline, shownCand.sizeMM, shownCand.anchor) : null
+  const shownView = shownCand && outline ? standingView(spec, shownCand, outline) : null
+  const marks = shownView ? shownView.sites : []
+  const demoVerts = shownView ? shownView.shape : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -222,10 +219,7 @@ export default function GridEnginePage() {
     //
     // Through the GUARD, like every other law value. It used to be a bare setState, which was a
     // second write route into the spec that no guard and no test could see.
-    const r = selectRegistration(spec, DEFAULT_MATCH_MAGNETS % 2 === 0 ? 'gap' : 'point')
-    setRefused(r.refused ?? null)
-    if (!r.refused) setSpec(r.spec)
-    // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
+    // Standing lattice does not move for a load. Candidates remap onto it.
     setAsOutline(true)
     void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
@@ -256,9 +250,8 @@ export default function GridEnginePage() {
   useEffect(() => {
     if (!shownCand) return
     setSize(shownCand.sizeMM)
-    setPan([0, 0])
   }, [shownCand?.id])
-  const shownField = shownCand ? canvasForCandidate(spec, shownCand, pan) : { spec, panMM: pan }
+  const shownField = shownView ?? { spec, panMM: pan }
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
   const panSurface = useRef<HTMLDivElement>(null)
   /**

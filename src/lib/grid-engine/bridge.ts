@@ -35,7 +35,7 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { selectPitch, selectRegistration, type GridSystemSpec } from './spec'
+import { selectPitch, type GridSystemSpec } from './spec'
 
 export type { Candidate, CandidateDocument }
 export { placedOutline }
@@ -137,23 +137,33 @@ export function candidateSites(doc: CandidateDocument, id: string): PointMM[] {
   return hit ? hit.sites.map((s) => [s.x, s.y] as PointMM) : []
 }
 
-/** Lattice the canvas must draw so this candidate sits on the magnets, not beside them. */
-export function canvasForCandidate(
+function originAxis(reg: 'gap' | 'point', half: number): number {
+  return reg === 'gap' ? half : 0
+}
+
+/**
+ * One lattice. Magnets never move. A candidate whose origin is not the standing
+ * origin is shown by moving the SHAPE so its sites land on the standing magnets.
+ * Sparse only hides every second standing point.
+ */
+export function standingView(
   spec: GridSystemSpec,
   candidate: Candidate,
-  userPan: PointMM,
-): { spec: GridSystemSpec; panMM: PointMM } {
+  outline: ReadonlyArray<PointMM>,
+): { spec: GridSystemSpec; panMM: PointMM; shape: PointMM[]; sites: PointMM[] } {
   const half = spec.grid.basePitchMM / 2
+  const standX = originAxis(spec.registration, half)
+  const standY = originAxis(spec.registration, half)
+  const dx = standX - originAxis(candidate.registration.x, half)
+  const dy = standY - originAxis(candidate.registration.y, half)
   const pitched = selectPitch(
     spec,
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
-  const pointed = selectRegistration(pitched.spec, 'point')
   return {
-    spec: pointed.spec,
-    panMM: [
-      userPan[0] + (candidate.registration.x === 'gap' ? half : 0),
-      userPan[1] + (candidate.registration.y === 'gap' ? half : 0),
-    ],
+    spec: pitched.spec,
+    panMM: [0, 0],
+    shape: placedOutline(outline, candidate.sizeMM, candidate.anchor).map(([x, y]) => [x + dx, y + dy]),
+    sites: candidate.sites.map((s) => [s.x + dx, s.y + dy]),
   }
 }
