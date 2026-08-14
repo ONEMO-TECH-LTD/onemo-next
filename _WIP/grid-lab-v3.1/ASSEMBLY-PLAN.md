@@ -20,11 +20,11 @@ src/lib/grid-engine/
   bridge.ts                           + ONE door
   __tests__/separation.test.ts        + direction guards for the new modules
   compute/
-    magnetic-grid-measurement-kernel/  VERBATIM  (Part 1)
-    enumerator/                        VERBATIM  (Part 2)
+    magnetic-grid-measurement-kernel/  VERBATIM GPT DELIVERY (Part 1)
+    enumerator/                        VERBATIM ACCEPTED PATCHED ARTIFACT (Part 2)
     candidates.ts                      the seam — the only NEW file
   logic/
-    magnetic-grid-product-logic/       VERBATIM  (Part 3)
+    magnetic-grid-product-logic/       VERBATIM GPT DELIVERY (Part 3)
 ```
 
 **Provenance, exactly — the earlier blanket claim was false and is corrected.** Verified by
@@ -37,9 +37,9 @@ src/lib/grid-engine/
 | Part 2 enumerator | **GPT delivery + the Dan-authorised `single`-family patch** — 12 files differ (contract, readme, 3 src, 3 dist, 3 fixtures, test), copied verbatim from the accepted `_WIP/grid-lab-v3.1/engine/enumerator` |
 
 The patch was authorised by Dan on 2026-08-13 (`single` was missing as a family, so the band-1 duck
-was reachable only as a 1×1 window) and peer-audited against the pristine delivery. **⛔ If Dan's
-"clone verbatim" wording is meant to supersede that patch, only he can say so — installation does
-not decide it silently.**
+was reachable only as a 1×1 window) and peer-audited against the pristine delivery. His current
+instruction — do not rebuild or approximate what is already done — and that authorisation agree:
+**the accepted patched artifact is what gets installed. No further ruling is needed.**
 
 Suites 18/18 · 13/13 · 15/15, `tsc --noEmit` clean, separation 22/22. Folder names are forced by the enumerator's own relative import of the
 kernel. Each package's `src/test/scripts` are excluded from the app's TS project so the app never
