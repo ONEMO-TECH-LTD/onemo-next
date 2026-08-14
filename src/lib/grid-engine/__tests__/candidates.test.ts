@@ -171,6 +171,20 @@ describe('collectCandidates — shipped entry', () => {
     expect(face[0]!.sites[0].y).toBeLessThan(0)
   })
 
+  it('proposes the wide body, not the skinny tip, when the top cannot hold', () => {
+    const spike: Array<[number, number]> = [
+      [0, -36],
+      [8, 8],
+      [28, 36],
+      [-28, 36],
+      [-8, 8],
+    ]
+    const doc = listCandidates(RELEASED, spike)
+    const face = benchCandidates(RELEASED, doc, 1, spike)
+    expect(face[0]?.sites.length).toBe(1)
+    expect(face[0]!.sites[0].y).toBeGreaterThan(0)
+  })
+
   it('proposes two magnets on a two-lobed outline', () => {
     const lobes: Array<[number, number]> = [
       [-16, -40],
