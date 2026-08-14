@@ -134,15 +134,22 @@ describe('2 — the transform reproduces the shell drawing exactly, in rationals
     const size = built.sizes[0]!
     const longest = BigInt(Math.max(W, H))
 
-    for (const doubledPx of [BigInt(1), BigInt(W), BigInt(2 * W - 1), BigInt(0)]) {
-      // kernel, on the doubled ring: (size/sourceSize) * (2px - W)
-      const kernel: [bigint, bigint] = [size * (doubledPx - sourceAnchor.x.numerator), sourceSize]
-      // shell: k*(px - W/2) with k = sizeMM/max(W,H); doubled px keeps it exact
-      const shell: [bigint, bigint] = [size * (doubledPx - BigInt(W)), BigInt(2) * longest]
-      expect(
-        equalFractions(kernel, shell),
-        `x at doubled px ${doubledPx}: kernel ${kernel} vs shell ${shell}`,
-      ).toBe(true)
+    // BOTH AXES. The anchors differ per axis — x is W, y is H — so proving x does not prove y, and
+    // this is the test guarding the error class that already nearly shipped once.
+    for (const [axis, extent, anchor] of [
+      ['x', W, sourceAnchor.x.numerator],
+      ['y', H, sourceAnchor.y.numerator],
+    ] as const) {
+      for (const doubled of [BigInt(1), BigInt(extent), BigInt(2 * extent - 1), BigInt(0)]) {
+        // kernel, on the doubled ring: (size/sourceSize) * (2px - extent)
+        const kernel: [bigint, bigint] = [size * (doubled - anchor), sourceSize]
+        // shell: k*(px - extent/2) with k = sizeMM/max(W,H); doubled px keeps it exact
+        const shell: [bigint, bigint] = [size * (doubled - BigInt(extent)), BigInt(2) * longest]
+        expect(
+          equalFractions(kernel, shell),
+          `${axis} at doubled ${doubled}: kernel ${kernel} vs shell ${shell}`,
+        ).toBe(true)
+      }
     }
   })
 })
@@ -223,7 +230,13 @@ describe('4 — a kernel rejection propagates. No fallback, no repair.', () => {
   })
 })
 
-describe('5 — a real run through both delivered packages', () => {
+/**
+ * The packages here are real; THE RING IS SYNTHETIC — a rectangle, not a traced silhouette. Calling
+ * this "a real run" without that qualifier overstated it. A real trace needs a browser (canvas,
+ * createImageBitmap), so it belongs to the on-screen gate, and it has been run independently
+ * end-to-end against DUCK.png through `traceContourRaw` into `measureField`.
+ */
+describe('5 — a run through both delivered packages, on a synthetic ring', () => {
   const input = request()
   const result = measureField(input)
 
