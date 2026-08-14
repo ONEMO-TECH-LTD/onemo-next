@@ -157,6 +157,59 @@ function variantFrom(
 }
 
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
+/** Does the shape mirror about its vertical axis? Every scanline's centre must sit within
+ *  tolFrac of the width from the shape's own axis. Pure geometry, tolerance from spec. */
+function contourIsMirrorSymmetric(contour: Contour, tolFrac: number): boolean {
+  const pts = contour.outer.pts
+  if (pts.length < 3) return false
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  const cx = (minX + maxX) / 2
+  const width = maxX - minX
+  if (width <= 0) return false
+  const SAMPLES = 24
+  for (let i = 1; i < SAMPLES; i++) {
+    const y = minY + ((maxY - minY) * i) / SAMPLES
+    let rowMin = Infinity
+    let rowMax = -Infinity
+    for (let j = 0; j < pts.length; j++) {
+      const [x1, y1] = pts[j]
+      const [x2, y2] = pts[(j + 1) % pts.length]
+      if (y1 === y2) continue
+      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+        const x = x1 + ((y - y1) / (y2 - y1)) * (x2 - x1)
+        if (x < rowMin) rowMin = x
+        if (x > rowMax) rowMax = x
+      }
+    }
+    if (rowMin > rowMax) continue
+    if (Math.abs((rowMin + rowMax) / 2 - cx) > tolFrac * width) return false
+  }
+  return true
+}
+
+/** Is the arrangement itself mirror-symmetric — every anchor reflected about the block's own
+ *  vertical centre lands on another anchor? Lattice points reflect exactly; no tolerance games. */
+function anchorsAreMirrorSymmetric(v: SizeVariant): boolean {
+  let minX = Infinity, maxX = -Infinity
+  for (const a of v.anchors) {
+    if (a.p[0] < minX) minX = a.p[0]
+    if (a.p[0] > maxX) maxX = a.p[0]
+  }
+  const cx = minX + (maxX - minX) / 2
+  const tol = 1e-6
+  return v.anchors.every((a) =>
+    v.anchors.some(
+      (b) => Math.abs(b.p[0] - (2 * cx - a.p[0])) < tol && Math.abs(b.p[1] - a.p[1]) < tol,
+    ),
+  )
+}
+
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
   if (v.anchors.length < 4) return false
   if (v.wrap.gridExtentXMM < 72 || v.wrap.gridExtentYMM < 72) return false
@@ -179,6 +232,7 @@ function better(
   b: SizeVariant,
   band: BandSpec,
   calibration: CalibrationSpec,
+  shapeSymmetric: boolean,
 ): boolean {
   // THE GENERAL LAW (calibrated on the bat yardstick, validated across every canon shape —
   // NO shape- or band-specific counts anywhere):
@@ -201,6 +255,14 @@ function better(
   const cornersA = isCorners(a, calibration)
   const cornersB = isCorners(b, calibration)
   if (cornersA !== cornersB) return cornersA
+  // 2b. THE SYMMETRY LAW: a mirror-symmetric shape (the bat, the bot, the butterfly) demands a
+  //     mirror-symmetric arrangement — a diagonal pair breaks the figure's axis and ranks below.
+  //     Asymmetric shapes (the duck, the tilted pill) take whatever seats best.
+  if (shapeSymmetric) {
+    const symA = anchorsAreMirrorSymmetric(a)
+    const symB = anchorsAreMirrorSymmetric(b)
+    if (symA !== symB) return symA
+  }
   // 3. SPARSE SPREAD (Dan: "96mm is lawful sparse pair and actually preferred") — wider
   //    spacing wins; lifts the 96 spine over the crowded 48 family. Triangles live in this
   //    pool too: BALANCE below picks them only where the shape is genuinely three-cornered
@@ -229,6 +291,7 @@ function judgeBand(
   calibration: CalibrationSpec,
   band: BandSpec,
   unitContour: Contour,
+  shapeSymmetric: boolean,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const consider = (variant: SizeVariant | null) => {
@@ -239,7 +302,7 @@ function judgeBand(
     const identity = layoutIdentity(variant, halfPitchMM)
     const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
-      if (better(variant, kept[twin], band, calibration)) kept[twin] = variant
+      if (better(variant, kept[twin], band, calibration, shapeSymmetric)) kept[twin] = variant
       return
     }
     kept.push(variant)
@@ -320,7 +383,7 @@ function judgeBand(
     }
   }
 
-  kept.sort((a, b) => (better(a, b, band, calibration) ? -1 : 1))
+  kept.sort((a, b) => (better(a, b, band, calibration, shapeSymmetric) ? -1 : 1))
   return { band, variants: kept.slice(0, VARIANTS_PER_BAND) }
 }
 
@@ -336,7 +399,10 @@ export function judgeShape(
 ): ShapeJudgement | null {
   const unitContour = normalizeContour(contourMM)
   if (!unitContour) return null
+  const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
   return {
-    bands: calibration.bands.map((band) => judgeBand(spec, calibration, band, unitContour)),
+    bands: calibration.bands.map((band) =>
+      judgeBand(spec, calibration, band, unitContour, shapeSymmetric),
+    ),
   }
 }

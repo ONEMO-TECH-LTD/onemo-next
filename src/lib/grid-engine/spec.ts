@@ -267,6 +267,12 @@ export interface CalibrationSpec {
   /** ENFORCED centering (Dan 2026-08-14): the assembly's horizontal centre may sit at most this
    *  far from the shape's — beyond it the placement is refused, never merely ranked lower. */
   centerToleranceMM: number
+  /** THE SYMMETRY LAW (Dan's balance-and-symmetry brief, calibrated on the bat yardstick):
+   *  a shape whose left and right halves mirror (every scanline's centre within this fraction
+   *  of its width from the shape's axis) demands a mirror-symmetric layout — asymmetric
+   *  arrangements rank below symmetric ones there. Asymmetric shapes (the duck, the tilted
+   *  pill) are untouched. */
+  symmetryTolFrac: number
   /** The judge's size step inside a band, millimetres (sizes stay even). */
   sizeStepMM: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
@@ -295,6 +301,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   flapLimbMM: 40,
   sweepStepMM: 2,
   centerToleranceMM: 12,
+  symmetryTolFrac: 0.11,
   sizeStepMM: 2,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
