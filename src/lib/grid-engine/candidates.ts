@@ -416,7 +416,7 @@ export function collectCandidates(
     const sizes = BAND_SIZES_MM[band]
     const lo = sizes[0]
     const hi = sizes[sizes.length - 1]
-    const spans = [pitch, pitch * 2]
+    const spans = band === 4 ? [pitch, pitch * 2, pitch * 3] : [pitch, pitch * 2]
     let pending3: { sizeMM: number; sets: PointMM[][] } | null = null
     for (let sizeMM = lo; sizeMM <= hi; sizeMM++) {
       const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
@@ -435,8 +435,13 @@ export function collectCandidates(
               [x + dx, y + dy],
             ]
             const held = corners.filter(([cx, cy]) => at.has(`${cx},${cy}`))
-            if (held.length === 4) fours.push(held)
-            else if (held.length === 3 && band === 3) threes.push(held)
+            if (held.length === 4) {
+              const sc = dx / pitch
+              const sr = dy / pitch
+              // Band 4 jumps the grid step. 48×96 is band 3; keep 48×144 / 96×96 and up.
+              if (band === 4 && sc + sr < 4) continue
+              fours.push(held)
+            } else if (held.length === 3 && band === 3) threes.push(held)
           }
         }
       }

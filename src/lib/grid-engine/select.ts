@@ -12,6 +12,12 @@ function nativeCount(band: BandId, n: number): boolean {
   return n === 4
 }
 
+/** Band 4 jumps a lattice step. 48×96 is band 3; 48×144 / 96×96 and up belong here. */
+function nextStep(c: { stepCol: number; stepRow: number }, band: BandId): boolean {
+  if (band !== 4) return true
+  return c.stepCol + c.stepRow >= 4
+}
+
 function bbox(verts: ReadonlyArray<PointMM>) {
   let minX = verts[0][0]
   let maxX = verts[0][0]
@@ -169,7 +175,9 @@ export function propose(
   band: BandId,
   outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
-  const raw = doc.candidates.filter((c) => c.band === band && nativeCount(band, c.sites.length))
+  const raw = doc.candidates.filter(
+    (c) => c.band === band && nativeCount(band, c.sites.length) && nextStep(c, band),
+  )
   const scored = raw.map((c) => ({ c, ...measureProposal(spec, c, outline) }))
 
   scored.sort((a, b) => {
