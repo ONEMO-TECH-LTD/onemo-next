@@ -43,7 +43,15 @@ const read = (dir: string, filter: RegExp) =>
     .map((f) => ({ file: f, text: readFileSync(join(dir, f), 'utf8') }))
 
 /** The three files that TRAVEL. `ui/` is the adapter and is allowed to reach outward (see ui/README). */
-const PORTABLE = ['engine.ts', 'spec.ts', 'bridge.ts', 'measure.ts', 'enumerate.ts', 'candidates.ts'] as const
+const PORTABLE = [
+  'engine.ts',
+  'spec.ts',
+  'bridge.ts',
+  'measure.ts',
+  'enumerate.ts',
+  'candidates.ts',
+  'select.ts',
+] as const
 const portable = () => PORTABLE.map((f) => ({ file: f, text: readFileSync(join(UNIT, f), 'utf8') }))
 
 const walkAst = (src: string, visit: (n: ts.Node) => void) => {

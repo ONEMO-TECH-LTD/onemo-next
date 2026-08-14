@@ -154,17 +154,41 @@ describe('collectCandidates — shipped entry', () => {
     expect(singles.every((c) => !('preferred' in c))).toBe(true)
   })
 
-  it('bench face follows the selection-example class per band', () => {
-    const doc = listCandidates(RELEASED, square(36))
-    const b1 = benchCandidates(RELEASED, doc, 1)
-    const b2 = benchCandidates(RELEASED, doc, 2)
-    const b3 = benchCandidates(RELEASED, doc, 3)
-    const b4 = benchCandidates(RELEASED, doc, 4)
-    expect(b1[0]?.family).toBe('single')
-    expect(b1[0]?.sites.length).toBe(1)
-    expect(b2[0]?.sites.length).toBe(2)
-    expect(b3[0]?.sites.length === 3 || b3[0]?.sites.length === 4).toBe(true)
-    expect(b4[0]?.sites.length).toBe(4)
+  it('proposes a top-half single on a top-heavy outline, never a bottom one', () => {
+    const topHeavy: Array<[number, number]> = [
+      [-22, -40],
+      [22, -40],
+      [22, -8],
+      [8, -8],
+      [8, 40],
+      [-8, 40],
+      [-8, -8],
+      [-22, -8],
+    ]
+    const doc = listCandidates(RELEASED, topHeavy)
+    const face = benchCandidates(RELEASED, doc, 1, topHeavy)
+    expect(face[0]?.sites.length).toBe(1)
+    expect(face[0]!.sites[0].y).toBeLessThan(0)
+  })
+
+  it('proposes two magnets on a two-lobed outline', () => {
+    const lobes: Array<[number, number]> = [
+      [-16, -40],
+      [16, -40],
+      [16, -8],
+      [4, -8],
+      [4, 8],
+      [16, 8],
+      [16, 40],
+      [-16, 40],
+      [-16, 8],
+      [-4, 8],
+      [-4, -8],
+      [-16, -8],
+    ]
+    const doc = listCandidates(RELEASED, lobes)
+    const face = benchCandidates(RELEASED, doc, 2, lobes)
+    expect(face[0]?.sites.length).toBe(2)
   })
 
   it('standing view lands every mark on the frozen lattice', () => {

@@ -36,10 +36,12 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import { BAND_SIZES_MM, selectPitch, type BandId, type GridSystemSpec } from './spec'
+import { selectPitch, type BandId, type GridSystemSpec } from './spec'
+import { propose } from './select'
 
 export type { Candidate, CandidateDocument }
 export { placedOutline, placedPicture }
+export { propose }
 
 export type { FieldSummary, PointMM, RegionMM }
 
@@ -115,58 +117,13 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
   return bandSpanMM(spec.grid, magnets)
 }
 
-/** Ladder step the selection examples sit on, per band. */
-const EXAMPLE_SIZE_INDEX: Record<BandId, number> = { 1: 3, 2: 1, 3: 2, 4: 4 }
-
-function isExampleClass(c: Candidate, band: BandId): boolean {
-  const n = c.sites.length
-  if (band === 1) return c.family === 'single' && n === 1
-  if (band === 2) return n === 2 && (c.family === 'run' || c.family === 'full-window')
-  if (band === 3) {
-    if (n === 3 && c.family === 'corner-triangle') return true
-    if (n === 4 && (c.family === 'rectangle-corners' || c.family === 'run')) return true
-    return false
-  }
-  return n === 4 && (c.family === 'rectangle-corners' || c.population === 'sparse')
-}
-
-function siteTop(c: Candidate): number {
-  return Math.min(...c.sites.map((s) => s.y))
-}
-
-/** Bench face = the example class for that band. Engine still holds the full document. */
 export function benchCandidates(
   spec: GridSystemSpec,
   doc: CandidateDocument,
   band: BandId,
+  outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
-  const home = BAND_SIZES_MM[band][EXAMPLE_SIZE_INDEX[band]]
-  const raw = doc.candidates.filter((c) => c.band === band && isExampleClass(c, band))
-  raw.sort((a, b) => {
-    const da = Math.abs(a.sizeMM - home)
-    const db = Math.abs(b.sizeMM - home)
-    if (da !== db) return da - db
-    if (band === 1 && siteTop(a) !== siteTop(b)) return siteTop(a) - siteTop(b)
-    if (b.sites.length !== a.sites.length) return b.sites.length - a.sites.length
-    return a.id.localeCompare(b.id)
-  })
-  const seen = new Set<string>()
-  const out: Candidate[] = []
-  for (const c of raw) {
-    const key = [
-      c.sizeMM,
-      c.family,
-      c.population,
-      c.sites
-        .map((s) => `${s.col},${s.row}`)
-        .sort()
-        .join('_'),
-    ].join('|')
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(c)
-  }
-  return out
+  return propose(spec, doc, band, outline)
 }
 
 /**

@@ -195,8 +195,8 @@ export default function GridEnginePage() {
     setCandDoc(listCandidates(spec, metric))
   }, [metric, spec])
   const visibleCands = useMemo(
-    () => benchCandidates(spec, candDoc, activeBand),
-    [candDoc, activeBand, spec],
+    () => (metric ? benchCandidates(spec, candDoc, activeBand, metric) : []),
+    [candDoc, activeBand, spec, metric],
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
   const shownView = shownCand && metric ? standingView(spec, shownCand, metric, picture ?? undefined) : null

@@ -142,6 +142,11 @@ export function discFitsGrid(prep: PreparedOutline, center: PointMM, grid: GridS
   return discFits(prep, center, grid.paddingMM)
 }
 
+/** Distance from centre to the nearest edge, millimetres. */
+export function discClearanceMM(prep: PreparedOutline, center: PointMM): number {
+  return Math.sqrt(Number(minDist2(prep, toUm(center[0]), toUm(center[1])))) / 1000
+}
+
 export function bboxCenter(prep: PreparedOutline): PointMM {
   return [Number(prep.minX + prep.maxX) / 2000, Number(prep.minY + prep.maxY) / 2000]
 }
