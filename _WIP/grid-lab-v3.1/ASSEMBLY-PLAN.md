@@ -96,10 +96,17 @@ cut-out stays put and the grid realigns beneath it. Mapping each construction to
 point would fix the polygon but make all three transforms identical, so O-1 would change nothing —
 the switch would be fake. Neither is acceptable.
 
-**The resolution:** the kernel measures in its own frame, and the seam then translates the returned
-lattice origin and every candidate centre into the **fixed drawn-shape frame**. That translation is
-exact, is computed below the bridge, and is **carried on each `RawCandidate`** so the shell can
-realign the drawn lattice without recomputing anything. "Selecting by centre construction" was not
+**The resolution, and it is a constant — no solver needed.** With the fixed displayed outline
+`D(x) = s(x − B) + C` (B = ring bbox centre, C = the shell's fixed shape centre) and the kernel frame
+`K(x) = s(x − A) + P` for construction anchor A mapped to common field point P, the difference is
+constant:
+
+    delta = D(x) − K(x) = s(A − B) + C − P
+
+So each kernel lattice centre and origin returns as `q_display = q_kernel + delta`. The cut-out never
+moves, the grid realigns exactly, and bbox / centroid / maximum-clearance stay genuinely different
+placements. Computed below the bridge from exact rationals and **carried on each `RawCandidate`**
+(displayed origin and centres, or delta) — the shell never derives it. "Selecting by centre construction" was not
 enough to implement it, and saying so was hand-waving.
 
 **What the seam's test can and cannot assert.** The shape does not move between placements — the
@@ -134,7 +141,8 @@ build ships two constructions with the third named as missing.
 maximum-clearance anchoring. Without that construction the raw set may not contain it, and that
 absence would be a missing input, not an engine fault.
 
-**⛔ THIS IS A SCOPE CUT AND IT IS DAN'S TO AUTHORISE, NOT MINE.** O-1 says test all three
+**⛔ THE HONEST STATE IS "DEPENDENCY MISSING, COMPLETE RAW-CANDIDATE SURFACE BLOCKED" — NOT "SHIPS
+TWO". THIS IS DAN'S TO AUTHORISE, NOT MINE.** O-1 says test all three
 constructions, and the only known duck@60 answer exists under the missing one. Shipping two and
 naming the third is *partial by construction*, and slicing a directive into a delivered part and a
 deferred part is not a call this lane may make. Until Dan rules, the raw-candidate build is
@@ -163,9 +171,10 @@ sparse (step 2) at origin 0,0 — complete on a 9×9 field, so no `MissingKernel
 
 **L6 has no owner in the cloned packages — that is a real hole, not a deferral.** The Part-3
 package carries no registration or parity rule, so "L6 arrives with the logic module" was false.
-Enforcement needs **one thin handwritten adapter under `logic/`** — not compute, not shell — or this
-milestone must be scoped honestly as a **diagnostic measurement surface** rather than a lawful
-candidate set. Which of those two it is, is Dan's framing call (§9). Tagging is not enforcement.
+Enforcement needs **one thin handwritten `logic/registration-law.ts`** — not compute, not shell — as
+the named semantic owner, before anything may be called lawful. Until it exists, the unfiltered 2×4
+measurement surface may exist **only as a diagnostic intermediate, never as the completed
+assembly**. Which of those two it is, is Dan's framing call (§9). Tagging is not enforcement.
 
 **L6 is NOT applied in compute, and is not silently dropped.** Measuring four origins makes the
 enumerator emit every family at every origin, and L6 says a candidate's per-axis parity must match
