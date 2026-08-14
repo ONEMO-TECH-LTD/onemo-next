@@ -89,6 +89,13 @@ describe('enumerateArrangements', () => {
 })
 
 describe('collectCandidates — shipped entry', () => {
+  it('band-2 pairs include millimetre seats, not only 12mm pans', () => {
+    const doc = listCandidates(RELEASED, square(50))
+    const pairs = doc.candidates.filter((c) => c.band === 2 && c.sites.length === 2)
+    expect(pairs.length).toBeGreaterThan(0)
+    expect(pairs.some((c) => c.origin[0] % 12 !== 0 || c.origin[1] % 12 !== 0)).toBe(true)
+  })
+
   it('band-1 singles include millimetre seats, not only 12mm pans', () => {
     const doc = listCandidates(RELEASED, square(36))
     const ones = doc.candidates.filter(

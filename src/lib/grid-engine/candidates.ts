@@ -115,6 +115,98 @@ function thinForFit(verts: ReadonlyArray<PointMM>, minMM: number): PointMM[] {
   return out.length >= 3 ? out : verts.map(([x, y]) => [x, y] as PointMM)
 }
 
+function originOf(x: number, y: number, pitch: number): PointMM {
+  const ox = ((x % pitch) + pitch) % pitch
+  const oy = ((y % pitch) + pitch) % pitch
+  return [ox, oy]
+}
+
+function fitCells(prep: PreparedOutline, spec: GridSystemSpec): PointMM[] {
+  const x0 = Math.ceil(Number(prep.minX) / 1000)
+  const x1 = Math.floor(Number(prep.maxX) / 1000)
+  const y0 = Math.ceil(Number(prep.minY) / 1000)
+  const y1 = Math.floor(Number(prep.maxY) / 1000)
+  const out: PointMM[] = []
+  for (let x = x0; x <= x1; x++) {
+    for (let y = y0; y <= y1; y++) {
+      if (discFitsGrid(prep, [x, y], spec.grid)) out.push([x, y])
+    }
+  }
+  return out
+}
+
+function pushSingle(
+  candidates: Candidate[],
+  spec: GridSystemSpec,
+  band: BandId,
+  sizeMM: number,
+  half: number,
+  x: number,
+  y: number,
+) {
+  const pitch = spec.grid.basePitchMM
+  const [ox, oy] = originOf(x, y, pitch)
+  const col = Math.round((x - ox) / pitch)
+  const row = Math.round((y - oy) / pitch)
+  candidates.push({
+    id: [band, sizeMM, ox, oy, 'single', 'base', 0, 0, `${col},${row}`].join(':'),
+    band,
+    sizeMM,
+    anchor: 'bbox',
+    registration: { x: namedOrigin(ox, half), y: namedOrigin(oy, half) },
+    origin: [ox, oy],
+    family: 'single',
+    population: 'base',
+    stepCol: 0,
+    stepRow: 0,
+    sites: [{ col, row, x, y }],
+  })
+}
+
+function pushPair(
+  candidates: Candidate[],
+  spec: GridSystemSpec,
+  band: BandId,
+  sizeMM: number,
+  half: number,
+  a: PointMM,
+  b: PointMM,
+) {
+  const pitch = spec.grid.basePitchMM
+  const [ox, oy] = originOf(a[0], a[1], pitch)
+  const sites = [a, b].map(([x, y]) => ({
+    col: Math.round((x - ox) / pitch),
+    row: Math.round((y - oy) / pitch),
+    x,
+    y,
+  }))
+  const stepCol = Math.abs(sites[1].col - sites[0].col)
+  const stepRow = Math.abs(sites[1].row - sites[0].row)
+  candidates.push({
+    id: [
+      band,
+      sizeMM,
+      ox,
+      oy,
+      'run',
+      'base',
+      stepCol,
+      stepRow,
+      sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
+    ].join(':'),
+    band,
+    sizeMM,
+    anchor: 'bbox',
+    registration: { x: namedOrigin(ox, half), y: namedOrigin(oy, half) },
+    origin: [ox, oy],
+    family: 'run',
+    population: 'base',
+    stepCol,
+    stepRow,
+    sites,
+  })
+}
+
 function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[] {
   return verts.map(([x, y]) => [x + dx, y + dy])
 }
@@ -234,40 +326,41 @@ export function collectCandidates(
           }
         }
       }
-      // Band 1 is one disc. The 12mm seats miss a pocket 1–2mm off the grid
-      // (duck head at 60). Walk every millimetre the disc actually fits.
       if (band === 1) {
-        const pitch = spec.grid.basePitchMM
-        const x0 = Math.ceil(Number(prep.minX) / 1000)
-        const x1 = Math.floor(Number(prep.maxX) / 1000)
-        const y0 = Math.ceil(Number(prep.minY) / 1000)
-        const y1 = Math.floor(Number(prep.maxY) / 1000)
-        for (let x = x0; x <= x1; x++) {
-          for (let y = y0; y <= y1; y++) {
-            if (!discFitsGrid(prep, [x, y], spec.grid)) continue
-            const ox = ((x % pitch) + pitch) % pitch
-            const oy = ((y % pitch) + pitch) % pitch
-            const col = Math.round((x - ox) / pitch)
-            const row = Math.round((y - oy) / pitch)
-            candidates.push({
-              id: [band, sizeMM, ox, oy, 'single', 'base', 0, 0, `${col},${row}`].join(':'),
-              band,
-              sizeMM,
-              anchor: 'bbox',
-              registration: {
-                x: namedOrigin(ox, half),
-                y: namedOrigin(oy, half),
-              },
-              origin: [ox, oy],
-              family: 'single',
-              population: 'base',
-              stepCol: 0,
-              stepRow: 0,
-              sites: [{ col, row, x, y }],
-            })
-          }
+        for (const [x, y] of fitCells(prep, spec)) {
+          pushSingle(candidates, spec, band, sizeMM, half, x, y)
         }
       }
+    }
+  }
+
+  // Band 2 is a pair. Same 1mm seats; keep every lattice neighbour that both hold.
+  // The duck wrap is 78mm — not on the 12mm ladder, and not on the 12mm pans.
+  {
+    const pitch = spec.grid.basePitchMM
+    const sizes = BAND_SIZES_MM[2]
+    const lo = sizes[0]
+    const hi = sizes[sizes.length - 1]
+    const dirs: PointMM[] = [
+      [0, pitch],
+      [pitch, 0],
+      [pitch, pitch],
+      [pitch, -pitch],
+    ]
+    for (let sizeMM = lo; sizeMM <= hi; sizeMM++) {
+      const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
+      const prep = prepareOutline(scaled)
+      const cells = fitCells(prep, spec)
+      const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+      let found = 0
+      for (const [x, y] of cells) {
+        for (const [dx, dy] of dirs) {
+          if (!at.has(`${x + dx},${y + dy}`)) continue
+          pushPair(candidates, spec, 2, sizeMM, half, [x, y], [x + dx, y + dy])
+          found++
+        }
+      }
+      if (found) break
     }
   }
 

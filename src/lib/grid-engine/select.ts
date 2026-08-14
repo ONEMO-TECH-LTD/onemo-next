@@ -149,6 +149,12 @@ export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMe
     if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
     return 'placement-at-size'
   }
+  if (band === 2) {
+    if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
+    if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
+    if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
+    return 'placement-at-size'
+  }
   if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
   if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
   if (band === 4 && won.step !== lost.step) return `step ${Math.sqrt(won.step).toFixed(0)} > ${Math.sqrt(lost.step).toFixed(0)}`
@@ -184,6 +190,14 @@ export function propose(
       if (aTopHold !== bTopHold) return aTopHold ? -1 : 1
       if (!aTopHold && !bTopHold && a.clear !== b.clear) return b.clear - a.clear
       if (a.top !== b.top) return a.top - b.top
+      return a.c.id.localeCompare(b.c.id)
+    }
+    if (band === 2) {
+      if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+      if (a.n !== b.n) return b.n - a.n
+      if (a.size !== b.size) return a.size - b.size
+      if (a.top !== b.top) return a.top - b.top
+      if (a.clear !== b.clear) return b.clear - a.clear
       return a.c.id.localeCompare(b.c.id)
     }
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
