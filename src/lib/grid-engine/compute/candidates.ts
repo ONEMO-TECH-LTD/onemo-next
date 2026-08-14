@@ -11,8 +11,14 @@
 // the measurement — and we look at what comes out. Nothing here improves, reorders or second-guesses
 // them.
 
-import { measureLattice } from './magnetic-grid-measurement-kernel/dist/index.js'
-import { enumerateCandidates } from './enumerator/dist/index.js'
+import {
+  measureLattice,
+  type LatticeMeasurementDocumentJson,
+} from './magnetic-grid-measurement-kernel/dist/index.js'
+import {
+  enumerateCandidates,
+  type CandidateEnumerationDocumentJson,
+} from './enumerator/dist/index.js'
 import { cellDiameterMM, registrationOffsetMM, type PointMM } from '../engine'
 import type { GridSystemSpec, Registration } from '../spec'
 
@@ -30,10 +36,10 @@ export interface TracedRing {
  */
 export interface MeasuredRegistration {
   readonly registration: Registration
-  /** The kernel's document, exactly as returned. */
-  readonly measurementDocument: unknown
-  /** The enumerator's document, exactly as returned. */
-  readonly candidateDocument: unknown
+  /** The kernel's document, exactly as returned, in its own delivered type. */
+  readonly measurementDocument: LatticeMeasurementDocumentJson
+  /** The enumerator's document, exactly as returned, in its own delivered type. */
+  readonly candidateDocument: CandidateEnumerationDocumentJson
   /** Additive, for drawing only. */
   readonly display: ReadonlyArray<RawCandidate>
 }
@@ -52,14 +58,26 @@ export interface RawCandidate {
   readonly registration: Registration
 }
 
-const int = (n: number): string => Math.round(n).toString()
-const rational = (n: number) => ({ numerator: int(n), denominator: '1' })
+/**
+ * Kernel integer fields are asserted, never rounded. Dan's brief forbids approximation, and silent
+ * rounding of a law value or a traced coordinate is exactly that.
+ */
+const int = (n: number, what: string): string => {
+  if (!Number.isInteger(n)) {
+    throw new Error(`grid-engine seam: ${what} must be an integer, received ${n}`)
+  }
+  return n.toString()
+}
+const rational = (n: number, what: string) => ({ numerator: int(n, what), denominator: '1' })
 
 /** The kernel rejects rather than repairs: drop consecutive duplicates and any repeated close. */
 function cleanRing(points: TracedRing['points']): Array<{ x: bigint; y: bigint }> {
   const out: Array<{ x: bigint; y: bigint }> = []
   for (const [x, y] of points) {
-    const p = { x: BigInt(Math.round(x)), y: BigInt(Math.round(y)) }
+    if (!Number.isInteger(x) || !Number.isInteger(y)) {
+      throw new Error(`grid-engine seam: traced ring must carry integer pixel coordinates, received ${x},${y}`)
+    }
+    const p = { x: BigInt(x), y: BigInt(y) }
     const last = out[out.length - 1]
     if (!last || last.x !== p.x || last.y !== p.y) out.push(p)
   }
@@ -70,17 +88,6 @@ function cleanRing(points: TracedRing['points']): Array<{ x: bigint; y: bigint }
     else break
   }
   return out
-}
-
-function boundsOf(v: ReadonlyArray<{ x: bigint; y: bigint }>) {
-  let minX = v[0]!.x, maxX = v[0]!.x, minY = v[0]!.y, maxY = v[0]!.y
-  for (const p of v) {
-    if (p.x < minX) minX = p.x
-    if (p.x > maxX) maxX = p.x
-    if (p.y < minY) minY = p.y
-    if (p.y > maxY) maxY = p.y
-  }
-  return { minX, maxX, minY, maxY }
 }
 
 export interface EnumerateOptions {
@@ -110,11 +117,14 @@ export function enumerateForRing(
   // The shell sizes and draws the whole IMAGE box and maps trace points through image UV, so the
   // seam must measure that same box. Tight-wrapping to the silhouette bbox here would put the
   // engine on a different shape than the screen whenever the picture carries transparent margin.
+  if (!Number.isInteger(ring.width) || !Number.isInteger(ring.height)) {
+    throw new Error('grid-engine seam: image dimensions must be integers')
+  }
   const b = {
     minX: BigInt(0),
-    maxX: BigInt(Math.round(ring.width)),
+    maxX: BigInt(ring.width),
     minY: BigInt(0),
-    maxY: BigInt(Math.round(ring.height)),
+    maxY: BigInt(ring.height),
   }
   const spanX = b.maxX - b.minX
   const spanY = b.maxY - b.minY
@@ -136,16 +146,16 @@ export function enumerateForRing(
       polygon: { vertices },
       parameters: {
         lattice: {
-          pitch: int(spec.grid.basePitchMM),
-          origin: { x: rational(originMM), y: rational(originMM) },
+          pitch: int(spec.grid.basePitchMM, 'spec.grid.basePitchMM'),
+          origin: { x: rational(originMM, 'originMM'), y: rational(originMM, 'originMM') },
           fieldExtent: {
-            minColumn: int(minIndex),
-            maxColumn: int(maxIndex),
-            minRow: int(minIndex),
-            maxRow: int(maxIndex),
+            minColumn: int(minIndex, 'minIndex'),
+            maxColumn: int(maxIndex, 'maxIndex'),
+            minRow: int(minIndex, 'minIndex'),
+            maxRow: int(maxIndex, 'maxIndex'),
           },
         },
-        discDiameter: int(discDiameter),
+        discDiameter: int(discDiameter, 'discDiameter'),
         sizeTransform: {
           sourceSize: sourceSize.toString(),
           sourceAnchor: {
@@ -153,12 +163,12 @@ export function enumerateForRing(
             y: { numerator: (b.minY + b.maxY).toString(), denominator: '2' },
           },
           targetAnchor: {
-            x: rational(options.targetAnchorMM[0]),
-            y: rational(options.targetAnchorMM[1]),
+            x: rational(options.targetAnchorMM[0], 'options.targetAnchorMM[0]'),
+            y: rational(options.targetAnchorMM[1], 'options.targetAnchorMM[1]'),
           },
         },
       },
-      sizes: options.sizesMM.map((s) => int(s)),
+      sizes: options.sizesMM.map((size) => int(size, 'sizesMM entry')),
     })
 
     const document = enumerateCandidates({
