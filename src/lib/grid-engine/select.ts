@@ -111,6 +111,60 @@ function holdsTop(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
   return Math.min(...c.sites.map((s) => s.y)) <= mid
 }
 
+export interface ProposalMeasure {
+  n: number
+  gravity: boolean
+  top: number
+  extremes: number
+  clear: number
+  pair: number
+  step: number
+  area: number
+  size: number
+}
+
+export function measureProposal(
+  spec: GridSystemSpec,
+  c: Candidate,
+  outline: ReadonlyArray<PointMM>,
+): ProposalMeasure {
+  const verts = scaleToSize(outline, c.sizeMM)
+  const shape = bbox(verts)
+  return {
+    n: c.sites.length,
+    gravity: holdsTop(c, shape),
+    top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
+    extremes: extremeFlap(c, verts),
+    clear: clearance(c, verts),
+    pair: pairSpan(c),
+    step: minPairSpan(c),
+    area: spanArea(c),
+    size: c.sizeMM,
+  }
+}
+
+/** Which sort key put `won` above `lost`. Empty if they compare equal. */
+export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMeasure): string {
+  if (band === 1) {
+    if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
+    return 'placement-at-size'
+  }
+  if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
+  if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
+  if (band === 4 && won.step !== lost.step) return `step ${Math.sqrt(won.step).toFixed(0)} > ${Math.sqrt(lost.step).toFixed(0)}`
+  const ae = won.extremes / (won.size * won.size)
+  const be = lost.extremes / (lost.size * lost.size)
+  if (ae !== be) return `extremes ${ae.toFixed(3)} < ${be.toFixed(3)}`
+  if (band === 2) {
+    const ap = won.pair / (won.size * won.size)
+    const bp = lost.pair / (lost.size * lost.size)
+    if (ap !== bp) return `pair-span`
+  }
+  if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
+  if (won.area !== lost.area) return `area`
+  return 'tie'
+}
+
 export function propose(
   spec: GridSystemSpec,
   doc: CandidateDocument,
@@ -118,22 +172,7 @@ export function propose(
   outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
   const raw = doc.candidates.filter((c) => c.band === band && nativeCount(band, c.sites.length))
-  const scored = raw.map((c) => {
-    const verts = scaleToSize(outline, c.sizeMM)
-    const shape = bbox(verts)
-    return {
-      c,
-      n: c.sites.length,
-      gravity: holdsTop(c, shape),
-      top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
-      extremes: extremeFlap(c, verts),
-      clear: clearance(c, verts),
-      pair: pairSpan(c),
-      step: minPairSpan(c),
-      area: spanArea(c),
-      size: c.sizeMM,
-    }
-  })
+  const scored = raw.map((c) => ({ c, ...measureProposal(spec, c, outline) }))
 
   scored.sort((a, b) => {
     if (band === 1) {

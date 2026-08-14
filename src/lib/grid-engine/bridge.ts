@@ -38,11 +38,12 @@ import {
   type RegionMM,
 } from './engine'
 import { selectPitch, type BandId, type GridSystemSpec } from './spec'
-import { propose } from './select'
+import { decidingKey, measureProposal, propose, type ProposalMeasure } from './select'
 
 export type { Candidate, CandidateDocument }
 export { placedOutline, placedPicture }
-export { propose }
+export { decidingKey, measureProposal, propose }
+export type { ProposalMeasure }
 
 export type { FieldSummary, PointMM, RegionMM }
 

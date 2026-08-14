@@ -33,6 +33,7 @@ import {
   benchCandidates,
   fieldBlockSpan,
   listCandidates,
+  measureProposal,
   minShapeSpan,
   resizeShape,
   standingView,
@@ -200,6 +201,7 @@ export default function GridEnginePage() {
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
   const shownView = shownCand && metric ? standingView(spec, shownCand, metric, picture ?? undefined) : null
+  const shownScore = shownCand && metric ? measureProposal(spec, shownCand, metric) : null
   const marks = shownView ? shownView.sites : []
   const demoVerts = shownView ? shownView.shape : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
@@ -497,6 +499,11 @@ export default function GridEnginePage() {
               ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length} · ${shownCand.sizeMM} · ${shownCand.sites.length}pt · ${shownCand.family} · ${shownCand.population}`
               : '0'}
           </button>
+        )}
+        {shownScore && (
+          <span className={styles.fieldReadout} data-calibrate="scores">
+            g:{shownScore.gravity ? 'Y' : 'n'} top:{shownScore.top.toFixed(0)} clr:{shownScore.clear.toFixed(1)} ext:{Math.sqrt(shownScore.extremes).toFixed(0)} step:{Math.sqrt(shownScore.step).toFixed(0)}
+          </span>
         )}
 
         {view && (
