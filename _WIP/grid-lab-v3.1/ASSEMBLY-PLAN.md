@@ -18,7 +18,6 @@ src/lib/grid-engine/
   ui/trace-cutout.ts                  + keeps the native ring it already produced
   bridge.ts                           + ONE door
   __tests__/separation.test.ts        + direction guards for the new modules
-  bridge.ts                            + ONE door
   compute/
     magnetic-grid-measurement-kernel/  VERBATIM  (Part 1)
     enumerator/                        VERBATIM  (Part 2)
@@ -27,8 +26,21 @@ src/lib/grid-engine/
     magnetic-grid-product-logic/       VERBATIM  (Part 3)
 ```
 
-All three byte-identical to the deliveries (`diff -r` clean), nothing edited, suites 18/18 · 13/13 ·
-15/15, `tsc --noEmit` clean. Folder names are forced by the enumerator's own relative import of the
+**Provenance, exactly — the earlier blanket claim was false and is corrected.** Verified by
+`diff -qr` against each ORIGINAL GPT delivery:
+
+| package | provenance |
+|---|---|
+| Part 1 kernel | **verbatim GPT delivery** — identical, zero differences |
+| Part 3 product logic | **verbatim GPT delivery** — identical, zero differences |
+| Part 2 enumerator | **GPT delivery + the Dan-authorised `single`-family patch** — 12 files differ (contract, readme, 3 src, 3 dist, 3 fixtures, test), copied verbatim from the accepted `_WIP/grid-lab-v3.1/engine/enumerator` |
+
+The patch was authorised by Dan on 2026-08-13 (`single` was missing as a family, so the band-1 duck
+was reachable only as a 1×1 window) and peer-audited against the pristine delivery. **⛔ If Dan's
+"clone verbatim" wording is meant to supersede that patch, only he can say so — installation does
+not decide it silently.**
+
+Suites 18/18 · 13/13 · 15/15, `tsc --noEmit` clean, separation 22/22. Folder names are forced by the enumerator's own relative import of the
 kernel. Each package's `src/test/scripts` are excluded from the app's TS project so the app never
 compiles delivery sources; the seam imports `dist/` only.
 
