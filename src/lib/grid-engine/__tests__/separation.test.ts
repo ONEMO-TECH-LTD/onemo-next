@@ -572,11 +572,6 @@ describe('the two subs stay apart', () => {
 })
 
 describe('the surface states what it draws', () => {
-  /**
-   * The chip read the CHOSEN pitch while the canvas drew the SELECTED CANDIDATE's population, so
-   * 48mm sat lit while 96mm was on screen. Asserted against the production source directly: a test
-   * that re-derived the rule beside the page passed with the defect reinstated.
-   */
   it('the pitch chip reads the drawn spec, never the chosen one', () => {
     const page = readFileSync(join(SHELL, 'page.tsx'), 'utf8')
     expect(page).toMatch(/data-on=\{canvasSpec\.grid\.pitchMM === p\}/)
