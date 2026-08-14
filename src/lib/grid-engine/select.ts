@@ -125,9 +125,18 @@ function holdsTop(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
   return Math.min(...c.sites.map((s) => s.y)) <= mid
 }
 
+/** Top mass and bottom mass both have a disc. A 48×48 in the belly fails this. */
+function coversMasses(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
+  if (c.sites.length < 2) return true
+  const span = shape.maxY - shape.minY
+  const ys = c.sites.map((s) => s.y)
+  return Math.min(...ys) <= shape.minY + span / 3 && Math.max(...ys) >= shape.maxY - span / 3
+}
+
 export interface ProposalMeasure {
   n: number
   gravity: boolean
+  masses: boolean
   top: number
   extremes: number
   clear: number
@@ -147,6 +156,7 @@ export function measureProposal(
   return {
     n: c.sites.length,
     gravity: holdsTop(c, shape),
+    masses: coversMasses(c, shape),
     top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
     extremes: extremeFlap(c, verts),
     clear: clearance(c, verts),
@@ -166,6 +176,7 @@ export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMe
   if (band === 2 || band === 3 || band === 4) {
     if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
     if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
+    if (won.masses !== lost.masses) return won.masses ? 'masses' : 'masses-lost'
     if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
     if (won.area !== lost.area) return `area ${won.area} < ${lost.area}`
     return 'placement-at-size'
@@ -202,6 +213,7 @@ export function propose(
     }
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
     if (a.n !== b.n) return b.n - a.n
+    if (a.masses !== b.masses) return a.masses ? -1 : 1
     if (band === 4 && a.area !== b.area) return a.area - b.area
     if (a.size !== b.size) return a.size - b.size
     if (a.area !== b.area) return a.area - b.area

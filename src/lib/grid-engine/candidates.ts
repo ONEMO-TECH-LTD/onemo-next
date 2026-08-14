@@ -452,7 +452,7 @@ export function collectCandidates(
           const xs = held.map((p) => p[0])
           const ys = held.map((p) => p[1])
           const key = `${Math.round((Math.max(...xs) - Math.min(...xs)) / pitch)}x${Math.round((Math.max(...ys) - Math.min(...ys)) / pitch)}`
-          if (band === 4 && seenSteps.has(key)) continue
+          if (seenSteps.has(key)) continue
           seenSteps.add(key)
           pushCorners(candidates, spec, band, sizeMM, half, held, 'rectangle-corners')
           added++
@@ -462,11 +462,12 @@ export function collectCandidates(
             pushCorners(candidates, spec, band, sizeMM, half, held, 'corner-triangle')
           }
           pending3 = null
-          break
+          // 48×48 in the belly is not the hold. Keep going until a 48×96 (or 96×48) exists.
+          if (seenSteps.has('1x2') || seenSteps.has('2x1') || seenSteps.has('2x2')) break
+        } else {
+          pending3 = null
+          if ([...seenSteps].some((k) => k.startsWith('1x'))) break
         }
-        pending3 = null
-        // A 48mm-wide next-step rectangle is the grid that fits inside. Stop once we have one.
-        if ([...seenSteps].some((k) => k.startsWith('1x'))) break
       }
       if (threes.length && !pending3) pending3 = { sizeMM, sets: threes }
     }
