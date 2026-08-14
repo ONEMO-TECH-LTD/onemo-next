@@ -1,5 +1,12 @@
 # ERRORS
 
+## S62 1mm collect froze the bench (~40s)
+
+- What did not work: walking every millimetre of every band size and testing every bbox cell with BigInt disc-fit, then scoring thousands of leftover 12mm-ladder singles.
+- Symptom: bot/large outlines took ~40s in Chrome (8s in node). Band 1 also could not emit 43mm — only 12mm ladder sizes — so the first pick sat high and loose at 48.
+- What worked: 12mm coarse + 1mm binary wrap; existence probes cache cells; emit only the wrap-size class; band 1 sorts by size then centre, not “highest seat”; band 2 grows to the first on-spine pair.
+- Remember: 1mm precision is required for wrap. Brute-forcing every millimetre of every size is not. Failed existence scans must not re-test each disc a dozen times.
+
 ## KAI-9728 Playwright browser extraction under Node 26
 
 - What did not work: `npx playwright install webkit chromium` under the active Node 26 runtime, both

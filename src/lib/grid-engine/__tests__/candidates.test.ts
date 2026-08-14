@@ -97,11 +97,31 @@ describe('collectCandidates — shipped entry', () => {
   })
 
   it('band-1 singles include millimetre seats, not only 12mm pans', () => {
-    const doc = listCandidates(RELEASED, square(36))
-    const ones = doc.candidates.filter(
-      (c) => c.band === 1 && c.family === 'single' && c.sizeMM === 72,
-    )
+    const slim: Array<[number, number]> = [
+      [-21.5, -12],
+      [21.5, -12],
+      [21.5, 12],
+      [-21.5, 12],
+    ]
+    const doc = listCandidates(RELEASED, slim)
+    const ones = doc.candidates.filter((c) => c.band === 1 && c.family === 'single')
+    expect(ones.length).toBeGreaterThan(0)
     expect(ones.some((c) => c.origin[0] % 12 !== 0 || c.origin[1] % 12 !== 0)).toBe(true)
+  })
+
+  it('band-1 wrap is the smallest millimetre, not the next 12mm ladder step', () => {
+    // 43×24: a 24mm disc kisses the short side at 43 and falls out at 42.
+    const slim: Array<[number, number]> = [
+      [-21.5, -12],
+      [21.5, -12],
+      [21.5, 12],
+      [-21.5, 12],
+    ]
+    const doc = listCandidates(RELEASED, slim)
+    const face = benchCandidates(RELEASED, doc, 1, slim)
+    expect(face[0]?.sizeMM).toBe(43)
+    expect(face[0]?.sites[0].x).toBeCloseTo(0, 0)
+    expect(face[0]?.sites[0].y).toBeCloseTo(0, 0)
   })
 
   it('a pixel-dense outline still collects in millimetre time', () => {

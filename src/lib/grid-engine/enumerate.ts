@@ -64,7 +64,11 @@ export function registrationOf(sites: readonly IndexedSite[]): { x: AxisParity; 
   }
 }
 
-export function enumerateArrangements(sites: readonly SiteInput[], population: Population): Arrangement[] {
+export function enumerateArrangements(
+  sites: readonly SiteInput[],
+  population: Population,
+  opts: { windows?: boolean } = {},
+): Arrangement[] {
   const mesh = toPopulationCoords(sites, population)
   const held = mesh.filter((s) => s.fits)
   if (held.length === 0) return []
@@ -160,32 +164,34 @@ export function enumerateArrangements(sites: readonly SiteInput[], population: P
     }
   }
 
-  for (const c0 of cols) {
-    for (const c1 of cols) {
-      if (c1 < c0) continue
-      for (const r0 of rows) {
-        for (const r1 of rows) {
-          if (r1 < r0) continue
-          const block: IndexedSite[] = []
-          let all = true
-          for (let c = c0; c <= c1 && all; c++) {
-            for (let r = r0; r <= r1; r++) {
-              const s = heldAt(map, c, r)
-              if (!s) {
-                all = false
-                break
+  if (opts.windows !== false) {
+    for (const c0 of cols) {
+      for (const c1 of cols) {
+        if (c1 < c0) continue
+        for (const r0 of rows) {
+          for (const r1 of rows) {
+            if (r1 < r0) continue
+            const block: IndexedSite[] = []
+            let all = true
+            for (let c = c0; c <= c1 && all; c++) {
+              for (let r = r0; r <= r1; r++) {
+                const s = heldAt(map, c, r)
+                if (!s) {
+                  all = false
+                  break
+                }
+                block.push(s)
               }
-              block.push(s)
             }
-          }
-          if (all && block.length >= 1) {
-            push({
-              family: 'full-window',
-              population,
-              stepCol: Math.max(1, c1 - c0),
-              stepRow: Math.max(1, r1 - r0),
-              sites: block,
-            })
+            if (all && block.length >= 1) {
+              push({
+                family: 'full-window',
+                population,
+                stepCol: Math.max(1, c1 - c0),
+                stepRow: Math.max(1, r1 - r0),
+                sites: block,
+              })
+            }
           }
         }
       }

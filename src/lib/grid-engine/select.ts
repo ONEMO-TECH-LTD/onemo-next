@@ -110,6 +110,19 @@ function spanArea(c: Candidate): number {
   return (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys))
 }
 
+/** How far the hold sits from the shape centre. Snug wrap already picked the size; this centres it. */
+function balance(c: Candidate, shape: ReturnType<typeof bbox>): number {
+  const xs = c.sites.map((s) => s.x)
+  const ys = c.sites.map((s) => s.y)
+  const hx = (Math.min(...xs) + Math.max(...xs)) / 2
+  const hy = (Math.min(...ys) + Math.max(...ys)) / 2
+  const cx = (shape.minX + shape.maxX) / 2
+  const cy = (shape.minY + shape.maxY) / 2
+  const dx = hx - cx
+  const dy = hy - cy
+  return dx * dx + dy * dy
+}
+
 function clearance(c: Candidate, verts: ReadonlyArray<PointMM>): number {
   const prep = prepareOutline(verts)
   let worst = Infinity
@@ -143,6 +156,7 @@ export interface ProposalMeasure {
   pair: number
   step: number
   area: number
+  balance: number
   size: number
 }
 
@@ -163,6 +177,7 @@ export function measureProposal(
     pair: pairSpan(c),
     step: minPairSpan(c),
     area: spanArea(c),
+    balance: balance(c, shape),
     size: c.sizeMM,
   }
 }
@@ -171,6 +186,7 @@ export function measureProposal(
 export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMeasure): string {
   if (band === 1) {
     if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
+    if (won.balance !== lost.balance) return 'balance'
     return 'placement-at-size'
   }
   if (band === 2 || band === 3 || band === 4) {
@@ -202,13 +218,7 @@ export function propose(
   scored.sort((a, b) => {
     if (band === 1) {
       if (a.size !== b.size) return a.size - b.size
-      const atSize = scored.filter((s) => s.size === a.size)
-      const maxClear = Math.max(...atSize.map((s) => s.clear))
-      const aTopHold = a.gravity && a.clear >= maxClear * 0.85
-      const bTopHold = b.gravity && b.clear >= maxClear * 0.85
-      if (aTopHold !== bTopHold) return aTopHold ? -1 : 1
-      if (!aTopHold && !bTopHold && a.clear !== b.clear) return b.clear - a.clear
-      if (a.top !== b.top) return a.top - b.top
+      if (a.balance !== b.balance) return a.balance - b.balance
       return a.c.id.localeCompare(b.c.id)
     }
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
@@ -217,6 +227,7 @@ export function propose(
     if (band === 4 && a.area !== b.area) return a.area - b.area
     if (a.size !== b.size) return a.size - b.size
     if (a.area !== b.area) return a.area - b.area
+    if (a.balance !== b.balance) return a.balance - b.balance
     if (a.top !== b.top) return a.top - b.top
     if (a.clear !== b.clear) return b.clear - a.clear
     return a.c.id.localeCompare(b.c.id)

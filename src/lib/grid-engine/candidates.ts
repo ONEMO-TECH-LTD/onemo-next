@@ -121,18 +121,77 @@ function originOf(x: number, y: number, pitch: number): PointMM {
   return [ox, oy]
 }
 
-function fitCells(prep: PreparedOutline, spec: GridSystemSpec): PointMM[] {
+/** Centre-out so an existence probe on a large shape hits on the first disc. */
+function walkFits(
+  prep: PreparedOutline,
+  spec: GridSystemSpec,
+  visit: (x: number, y: number) => boolean,
+): void {
   const x0 = Math.ceil(Number(prep.minX) / 1000)
   const x1 = Math.floor(Number(prep.maxX) / 1000)
   const y0 = Math.ceil(Number(prep.minY) / 1000)
   const y1 = Math.floor(Number(prep.maxY) / 1000)
-  const out: PointMM[] = []
-  for (let x = x0; x <= x1; x++) {
-    for (let y = y0; y <= y1; y++) {
-      if (discFitsGrid(prep, [x, y], spec.grid)) out.push([x, y])
+  if (x1 < x0 || y1 < y0) return
+  const cx = Math.round((x0 + x1) / 2)
+  const cy = Math.round((y0 + y1) / 2)
+  const xs: number[] = []
+  const ys: number[] = []
+  for (let x = x0; x <= x1; x++) xs.push(x)
+  for (let y = y0; y <= y1; y++) ys.push(y)
+  xs.sort((a, b) => Math.abs(a - cx) - Math.abs(b - cx))
+  ys.sort((a, b) => Math.abs(a - cy) - Math.abs(b - cy))
+  for (const x of xs) {
+    for (const y of ys) {
+      if (!discFitsGrid(prep, [x, y], spec.grid)) continue
+      if (visit(x, y)) return
     }
   }
+}
+
+function fitCells(prep: PreparedOutline, spec: GridSystemSpec): PointMM[] {
+  const out: PointMM[] = []
+  walkFits(prep, spec, (x, y) => {
+    out.push([x, y])
+    return false
+  })
   return out
+}
+
+function makePrepAt(outline: ReadonlyArray<PointMM>) {
+  const cache = new Map<number, PreparedOutline>()
+  return (sizeMM: number) => {
+    const hit = cache.get(sizeMM)
+    if (hit) return hit
+    const prep = prepareOutline(thinForFit(scaleToSize(outline, sizeMM), 1))
+    cache.set(sizeMM, prep)
+    return prep
+  }
+}
+
+/** Smallest millimetre in [lo, hi] that passes. 12mm coarse, then binary refine. */
+function smallestWhere(lo: number, hi: number, pred: (sizeMM: number) => boolean): number | null {
+  let hit: number | null = null
+  for (let sizeMM = lo; sizeMM <= hi; sizeMM += 12) {
+    if (pred(sizeMM)) {
+      hit = sizeMM
+      break
+    }
+  }
+  if (hit === null) {
+    const stepped = lo + Math.floor((hi - lo) / 12) * 12
+    for (let sizeMM = stepped + 1; sizeMM <= hi; sizeMM++) {
+      if (pred(sizeMM)) return sizeMM
+    }
+    return null
+  }
+  let a = Math.max(lo, hit - 11)
+  let b = hit
+  while (a < b) {
+    const mid = (a + b) >> 1
+    if (pred(mid)) b = mid
+    else a = mid + 1
+  }
+  return a
 }
 
 function pushSingle(
@@ -323,28 +382,32 @@ export function collectCandidates(
   const bands = [1, 2, 3, 4] as const
   const origins = latticeOrigins(spec)
 
-  for (const band of bands) {
-    for (const sizeMM of BAND_SIZES_MM[band]) {
-      const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
-      const prep: PreparedOutline = prepareOutline(scaled)
-      for (const origin of origins) {
-        const registration: AxisRegistration = {
-          x: namedOrigin(origin[0], half),
-          y: namedOrigin(origin[1], half),
-        }
-        const raw = magnetsInRegion(dense, field, 0, origin)
-        const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
-        const measured: SiteInput[] = indexed.map((s) => ({
-          ...s,
-          fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
-        }))
-        const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
-        const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
-          { population: 'base', sites: measured },
-          { population: 'sparse', sites: sparseSites },
-        ]
-        for (const pack of packs) {
-          for (const arr of enumerateArrangements(pack.sites, pack.population)) {
+  // Grammar pack stays on the small ladder plus 168 (tests lock those seats).
+  // Large-band 12mm enumerations were the 40s — wrap below already finds those holds.
+  const packSizes = new Set<number>([...BAND_SIZES_MM[1], 168])
+  for (const sizeMM of packSizes) {
+    const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
+    const prep: PreparedOutline = prepareOutline(scaled)
+    const homeBands = bands.filter((band) => BAND_SIZES_MM[band].includes(sizeMM))
+    for (const origin of origins) {
+      const registration: AxisRegistration = {
+        x: namedOrigin(origin[0], half),
+        y: namedOrigin(origin[1], half),
+      }
+      const raw = magnetsInRegion(dense, field, 0, origin)
+      const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
+      const measured: SiteInput[] = indexed.map((s) => ({
+        ...s,
+        fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
+      }))
+      const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
+      const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
+        { population: 'base', sites: measured },
+        { population: 'sparse', sites: sparseSites },
+      ]
+      for (const pack of packs) {
+        for (const arr of enumerateArrangements(pack.sites, pack.population, { windows: false })) {
+          for (const band of homeBands) {
             const id = [
               band,
               sizeMM,
@@ -372,110 +435,202 @@ export function collectCandidates(
           }
         }
       }
-      if (band === 1) {
-        for (const [x, y] of fitCells(prep, spec)) {
-          pushSingle(candidates, spec, band, sizeMM, half, x, y)
-        }
-      }
     }
   }
 
-  // Band 2 is a pair. Same 1mm seats; keep every lattice neighbour that both hold.
-  // The duck wrap is 78mm — not on the 12mm ladder, and not on the 12mm pans.
+  const pitch = spec.grid.basePitchMM
+  const prepAt = makePrepAt(outline)
+  const cellCache = new Map<number, PointMM[]>()
+  const cellsAt = (sizeMM: number) => {
+    const hit = cellCache.get(sizeMM)
+    if (hit) return hit
+    const cells = fitCells(prepAt(sizeMM), spec)
+    cellCache.set(sizeMM, cells)
+    return cells
+  }
+  const pairDirs: PointMM[] = [
+    [0, pitch],
+    [pitch, 0],
+    [pitch, pitch],
+    [pitch, -pitch],
+  ]
+
+  const emitPairs = (sizeMM: number) => {
+    const cells = cellsAt(sizeMM)
+    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+    let n = 0
+    for (const [x, y] of cells) {
+      for (const [dx, dy] of pairDirs) {
+        if (!at.has(`${x + dx},${y + dy}`)) continue
+        pushPair(candidates, spec, 2, sizeMM, half, [x, y], [x + dx, y + dy])
+        n++
+      }
+    }
+    return n
+  }
+
+  const emitRects = (
+    band: 3 | 4,
+    sizeMM: number,
+    spans: number[],
+    accept: (sc: number, sr: number) => boolean,
+    seenSteps: Set<string>,
+  ) => {
+    const cells = cellsAt(sizeMM)
+    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+    const fours: PointMM[][] = []
+    const threes: PointMM[][] = []
+    for (const [x, y] of cells) {
+      for (const dx of spans) {
+        for (const dy of spans) {
+          const corners: PointMM[] = [
+            [x, y],
+            [x + dx, y],
+            [x, y + dy],
+            [x + dx, y + dy],
+          ]
+          const held = corners.filter(([cx, cy]) => at.has(`${cx},${cy}`))
+          if (held.length === 4 && accept(dx / pitch, dy / pitch)) fours.push(held)
+          else if (held.length === 3 && band === 3) threes.push(held)
+        }
+      }
+    }
+    for (const held of fours) {
+      const xs = held.map((p) => p[0])
+      const ys = held.map((p) => p[1])
+      const key = `${Math.round((Math.max(...xs) - Math.min(...xs)) / pitch)}x${Math.round(
+        (Math.max(...ys) - Math.min(...ys)) / pitch,
+      )}`
+      if (seenSteps.has(key)) continue
+      seenSteps.add(key)
+      pushCorners(candidates, spec, band, sizeMM, half, held, 'rectangle-corners')
+    }
+    return { fours: fours.length, threes }
+  }
+
+  const bboxOf = (sizeMM: number) => {
+    const prep = prepAt(sizeMM)
+    return {
+      w: Number(prep.maxX - prep.minX) / 1000,
+      h: Number(prep.maxY - prep.minY) / 1000,
+    }
+  }
+
+  const anyFit = (sizeMM: number) => {
+    const box = bboxOf(sizeMM)
+    if (box.w < 24 || box.h < 24) return false
+    const cached = cellCache.get(sizeMM)
+    if (cached) return cached.length > 0
+    let hit = false
+    walkFits(prepAt(sizeMM), spec, () => {
+      hit = true
+      return true
+    })
+    return hit
+  }
+
+  const anyPair = (sizeMM: number, spine = false) => {
+    const box = bboxOf(sizeMM)
+    if (box.w < 24 || box.h < 24) return false
+    if (box.w < 72 && box.h < 72) return false
+    const cells = cellsAt(sizeMM)
+    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+    const { cx, cy } = formBbox(scaleToSize(outline, sizeMM))
+    const slop = spec.grid.paddingMM / 2
+    for (const [x, y] of cells) {
+      for (const [dx, dy] of pairDirs) {
+        if (!at.has(`${x + dx},${y + dy}`)) continue
+        if (!spine) return true
+        const vertical = Math.abs(dx) < Math.abs(dy)
+        const mid = vertical ? (x + x + dx) / 2 - cx : (y + y + dy) / 2 - cy
+        if (Math.abs(mid) <= slop) return true
+      }
+    }
+    return false
+  }
+
+  const anyRect = (
+    sizeMM: number,
+    spans: number[],
+    accept: (sc: number, sr: number) => boolean,
+  ) => {
+    const box = bboxOf(sizeMM)
+    const viable = spans.filter(
+      (dx) => spans.some((dy) => accept(dx / pitch, dy / pitch) && box.w >= dx + 24 && box.h >= dy + 24),
+    )
+    if (!viable.length) return false
+    const cells = cellsAt(sizeMM)
+    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+    for (const [x, y] of cells) {
+      for (const dx of spans) {
+        for (const dy of spans) {
+          if (!accept(dx / pitch, dy / pitch)) continue
+          if (
+            at.has(`${x + dx},${y}`) &&
+            at.has(`${x},${y + dy}`) &&
+            at.has(`${x + dx},${y + dy}`)
+          ) {
+            return true
+          }
+        }
+      }
+    }
+    return false
+  }
+
+  // Band 1 wrap is the smallest millimetre a disc holds — 43 on the bot, not the 48 ladder step.
   {
-    const pitch = spec.grid.basePitchMM
-    const sizes = BAND_SIZES_MM[2]
-    const lo = sizes[0]
-    const hi = sizes[sizes.length - 1]
-    const dirs: PointMM[] = [
-      [0, pitch],
-      [pitch, 0],
-      [pitch, pitch],
-      [pitch, -pitch],
-    ]
-    for (let sizeMM = lo; sizeMM <= hi; sizeMM++) {
-      const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
-      const prep = prepareOutline(scaled)
-      const cells = fitCells(prep, spec)
-      const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-      let found = 0
-      for (const [x, y] of cells) {
-        for (const [dx, dy] of dirs) {
-          if (!at.has(`${x + dx},${y + dy}`)) continue
-          pushPair(candidates, spec, 2, sizeMM, half, [x, y], [x + dx, y + dy])
-          found++
-        }
+    const sizes = BAND_SIZES_MM[1]
+    const wrap = smallestWhere(sizes[0], sizes[sizes.length - 1], anyFit)
+    if (wrap !== null) {
+      for (const [x, y] of cellsAt(wrap)) {
+        pushSingle(candidates, spec, 1, wrap, half, x, y)
       }
-      if (found) break
     }
   }
 
-  // Bands 3–4: first size a corner set holds. Do not stop on a 3 if a 4 still fits tighter later.
-  for (const band of [3, 4] as const) {
-    const pitch = spec.grid.basePitchMM
-    const sizes = BAND_SIZES_MM[band]
-    const lo = sizes[0]
-    const hi = sizes[sizes.length - 1]
-    const spans = band === 4 ? [pitch, pitch * 2, pitch * 3] : [pitch, pitch * 2]
-    let pending3: { sizeMM: number; sets: PointMM[][] } | null = null
-    const seenSteps = new Set<string>()
-    for (let sizeMM = lo; sizeMM <= hi; sizeMM++) {
-      const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
-      const prep = prepareOutline(scaled)
-      const cells = fitCells(prep, spec)
-      const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-      const fours: PointMM[][] = []
-      const threes: PointMM[][] = []
-      for (const [x, y] of cells) {
-        for (const dx of spans) {
-          for (const dy of spans) {
-            const corners: PointMM[] = [
-              [x, y],
-              [x + dx, y],
-              [x, y + dy],
-              [x + dx, y + dy],
-            ]
-            const held = corners.filter(([cx, cy]) => at.has(`${cx},${cy}`))
-            if (held.length === 4) {
-              const sc = dx / pitch
-              const sr = dy / pitch
-              // Band 4 jumps the grid step. 48×96 is band 3; keep 48×144 / 96×96 and up.
-              if (band === 4 && sc + sr < 4) continue
-              fours.push(held)
-            } else if (held.length === 3 && band === 3) threes.push(held)
-          }
+  // Band 2: first pair, then the 1mm wrap of that pair.
+  {
+    const sizes = BAND_SIZES_MM[2]
+    const wrap =
+      smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyPair(s, true)) ??
+      smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyPair(s, false))
+    if (wrap !== null) emitPairs(wrap)
+  }
+
+  // Band 3: first 4 that reaches both masses (48×96 / 96×48 / 96×96), not a 48×48 belly.
+  {
+    const sizes = BAND_SIZES_MM[3]
+    const spans = [pitch, pitch * 2]
+    const mass = (sc: number, sr: number) => sc + sr >= 3
+    const wrap = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, mass))
+    const seen = new Set<string>()
+    if (wrap !== null) {
+      emitRects(3, wrap, spans, mass, seen)
+    } else {
+      const any4 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) =>
+        anyRect(s, spans, () => true),
+      )
+      if (any4 !== null) {
+        const { threes } = emitRects(3, any4, spans, () => true, seen)
+        for (const held of threes) {
+          pushCorners(candidates, spec, 3, any4, half, held, 'corner-triangle')
         }
-      }
-      if (fours.length) {
-        let added = 0
-        for (const held of fours) {
-          const xs = held.map((p) => p[0])
-          const ys = held.map((p) => p[1])
-          const key = `${Math.round((Math.max(...xs) - Math.min(...xs)) / pitch)}x${Math.round((Math.max(...ys) - Math.min(...ys)) / pitch)}`
-          if (seenSteps.has(key)) continue
-          seenSteps.add(key)
-          pushCorners(candidates, spec, band, sizeMM, half, held, 'rectangle-corners')
-          added++
-        }
-        if (band === 3) {
-          for (const held of threes) {
-            pushCorners(candidates, spec, band, sizeMM, half, held, 'corner-triangle')
-          }
-          pending3 = null
-          // 48×48 in the belly is not the hold. Keep going until a 48×96 (or 96×48) exists.
-          if (seenSteps.has('1x2') || seenSteps.has('2x1') || seenSteps.has('2x2')) break
-        } else {
-          pending3 = null
-          if ([...seenSteps].some((k) => k.startsWith('1x'))) break
-        }
-      }
-      if (threes.length && !pending3) pending3 = { sizeMM, sets: threes }
-    }
-    if (pending3) {
-      for (const held of pending3.sets) {
-        pushCorners(candidates, spec, band, pending3.sizeMM, half, held, 'corner-triangle')
       }
     }
+  }
+
+  // Band 4: jump a lattice step. Keep the first next-step and the first narrow 1×N (inner rectangle).
+  {
+    const sizes = BAND_SIZES_MM[4]
+    const spans = [pitch, pitch * 2, pitch * 3]
+    const next = (sc: number, sr: number) => sc + sr >= 4
+    const narrow = (sc: number, sr: number) => next(sc, sr) && (sc === 1 || sr === 1)
+    const first = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, next))
+    const tall = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, narrow))
+    const seen = new Set<string>()
+    if (first !== null) emitRects(4, first, spans, next, seen)
+    if (tall !== null && tall !== first) emitRects(4, tall, spans, narrow, seen)
   }
 
   return { candidates }
