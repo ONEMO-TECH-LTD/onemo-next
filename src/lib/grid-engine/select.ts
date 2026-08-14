@@ -12,9 +12,17 @@ function nativeCount(band: BandId, n: number): boolean {
   return n === 4
 }
 
-/** Band 4 jumps a lattice step. 48×96 is band 3; 48×144 / 96×96 and up belong here. */
-function nextStep(c: { stepCol: number; stepRow: number }, band: BandId): boolean {
+/** Band 4 jumps a lattice step. A file of four is not a rectangle. 48×96 is band 3. */
+function nextStep(
+  c: { stepCol: number; stepRow: number; sites: Array<{ x: number; y: number }> },
+  band: BandId,
+): boolean {
   if (band !== 4) return true
+  const xs = c.sites.map((s) => s.x)
+  const ys = c.sites.map((s) => s.y)
+  const w = Math.max(...xs) - Math.min(...xs)
+  const h = Math.max(...ys) - Math.min(...ys)
+  if (w < 48 || h < 48) return false
   return c.stepCol + c.stepRow >= 4
 }
 
