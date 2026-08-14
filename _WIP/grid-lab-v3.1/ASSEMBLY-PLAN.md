@@ -88,6 +88,20 @@ regression, however the ladder is spelled.
 *"I know that cap binds differently per shape I am not fixated on the standardised sizing — you
 are."* So `bandSpanMM(...)` as the domain was still forward size-testing; QA was right twice.
 
+**⛔ OPEN: THE SIZE DOMAIN HAS NO PROVED BOUND, AND I WILL NOT ASSERT ONE.** L9 caps the GRID COUNT,
+never millimetres, so "the field's reach" is not a proved upper bound: a narrow locked-aspect shape
+can need a manufactured size well beyond the field's span before a 24mm disc fits, and
+non-monotonicity means truncating there can miss lawful answers while an impossible arrangement
+never terminates. The canon defines the mechanism — `grid-spec` §4 binding scale per arrangement,
+§5 centring, §6 safe publication upward to the first legal even millimetre. **Next action: read
+those sections in full and specify that closure**, or state that the three delivered packages lack
+it and an additive compute capability is required. No sweep ships until then.
+
+**⛔ OPEN: CROSS-SIZE IDENTITY.** "The smallest size at which an arrangement holds" needs a grouping
+key — family + population + steps + position set + construction + registration, **excluding the size
+occurrence** — and every lawful size record must be preserved with the minimum marked, or L13's
+required variations are silently deleted.
+
 **The falsifying case, from the canon, and it is why the ladder had to go:** the same 2×2 grid gives
 a square 72mm and a circle 91.88mm → published 92; the same 3×3 gives 120 and 159.76 → 160. A
 `bandSpanMM` ladder returns 72 and 120 for both shapes and can never produce 92 or 160 — it omits
@@ -106,11 +120,8 @@ continuous critical scales first."* So domain (the grid's own steps), terminatio
 values) and result (whichever hold) are all defined without any solver, and no monotonicity is
 assumed anywhere.
 
-**So no size crosses into the unit.** The kernel's `sizes` argument is fed from the **grid itself** —
-`bandSpanMM(spec.grid, n)` for every position count the field carries — which the scaffold's own
-engine already computes from pitch and padding. The grid proposes the dimensions, the shape decides
-which of them hold, and **size comes back as an output**. The bridge door takes no size parameter at
-all.
+**No size crosses into the unit, in either direction.** The bridge door takes no size parameter, and
+nothing outside the unit names, caps or targets a size. Size is what comes back.
 
 | kernel input | value |
 |---|---|
@@ -206,7 +217,7 @@ package carries no registration or parity rule, so "L6 arrives with the logic mo
 Enforcement needs **one thin handwritten `logic/registration-law.ts`** — not compute, not shell — as
 the named semantic owner, before anything may be called lawful. Until it exists, the unfiltered 2×4
 measurement surface may exist **only as a diagnostic intermediate, never as the completed
-assembly**. Which of those two it is, is Dan's framing call (§9). Tagging is not enforcement.
+assembly**. This lane writes that adapter — it is not Dan's framing call, and it was wrong to put it to him. Tagging is not enforcement.
 
 **L6 is NOT applied in compute, and is not silently dropped.** Measuring four origins makes the
 enumerator emit every family at every origin, and L6 says a candidate's per-axis parity must match
@@ -247,8 +258,12 @@ no lattice number, no notion of "better".
 ## 6. Product logic — placed, deliberately not wired
 
 Cloned verbatim under `logic/`. It requires a gravity boolean, a wrap value and a regional value
-**per candidate**; those are ruled but not implemented. Placement and activation are separate, and
-this plan's authorised deliverable ends at the raw-candidate surface.
+**per candidate**; those are ruled (L11 gravity, the flap equation for wrap, corridor-connected
+components for mass) but not yet implemented as producers. **Activation stays in this plan** —
+Dan's directive was to assemble all three and test with him, and this lane does not authorise its
+own slice. The judgement producers, the trusted-enumerator seam and the route by which ranked tiers
+reach the bridge without logic entering the shell are the remaining design work, sequenced after the
+measurement surface exists but not removed from it.
 
 ## 7. Order of work
 
@@ -261,12 +276,12 @@ this plan's authorised deliverable ends at the raw-candidate surface.
    law value in the file.
 4. Bridge door; shell stepping control and highlight; lattice-pan disabled.
 5. Chrome check on the running page; screenshot; no solve on interaction.
-6. Dan tests the raw set. Only then: judgements, then product logic.
+6. Judgement producers, then Part 3 activated through the bridge; Dan tests the assembled three.
 
 ## 8. Out of scope
 
 No rewrite of any delivered algorithm. No contour simplifier. No second lattice. No geometry or
-policy in the shell. No ranking anywhere. No global compiler change. No new module beyond the seam.
+policy in the shell. No global compiler change. Ranking exists only inside Part 3, never in compute or shell.
 
 
 ## 9. The two decisions that are Dan's, not this lane's
@@ -279,14 +294,7 @@ was found only under it.
 - *(b)* **Hold the build** until an accepted exact maximum-clearance source exists — an additive
   request to the kernel's author, since building one here is the rebuilding the brief forbids.
 
-**D2 — RESOLVED, NOT DAN'S.** L6 already decides the behaviour and the minimal owner is named:
-this lane writes `logic/registration-law.ts`. The unfiltered surface is an internal intermediate,
-never something presented as a milestone. *(Kept here only to record that it was wrongly put to Dan.)*
+**D2 — WITHDRAWN. Never Dan's.** L6 decides the behaviour; this lane writes `logic/registration-law.ts`. Recorded only because putting it to Dan was a manufactured question.
 
-~~**D2 — what this milestone IS.**~~ With no L6 owner in the cloned packages, the surface is either
-- *(a)* a **diagnostic measurement surface** — every candidate at every measured registration,
-  tagged, explicitly not filtered by law; or
-- *(b)* a **lawful candidate set**, which requires one thin handwritten L6 adapter under `logic/`
-  before Dan sees it.
 
-Neither is a technical preference; both change what Dan is looking at when he judges it.
+D1 is the only genuine decision here, and it is scope: authorise a two-anchor diagnostic knowing the consequence, or hold for the missing fact.
