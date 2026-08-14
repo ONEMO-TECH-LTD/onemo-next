@@ -18,6 +18,7 @@ import {
   applyGridValue,
   isOptionsOnly,
   isSealedInCode,
+  BAND_SIZES_MM,
   LAUNCH_PITCHES_MM,
   limitsFor,
   RELEASED,
@@ -57,13 +58,6 @@ const stepFor = (key: GridKey, spec: GridSystemSpec): number =>
   key === 'pitchMM' ? spec.grid.basePitchMM : key === 'maxSizeMM' ? 2 : 1
 
 /**
- * The slider's step — presentation only. Its FLOOR and CEILING are not here: the floor is the unit's
- * minimum shape span and the ceiling is the 9x9 grid, both asked for at the point of use, so the
- * control cannot offer a size the unit would refuse to produce.
- */
-const SHAPE_STEP_MM = 2
-
-/**
  * A loaded cut-out arrives at FOUR POINTS CENTRED — two magnets across, two down.
  *
  * Dan, 2026-08-11: "By default 4 points must be centerd with cutout", and law 3.1: "perfect shape x
@@ -96,10 +90,7 @@ const CUTOUT_LIBRARY = [
  * 4.2: change an input and everything re-derives.
  */
 const DEFAULT_SIZE_BAND = 3
-/**
- * THE THREE BANDS, as counts (law 10.7 — the selector offers 2, 3 and 4; size 1 is coded, not shown).
- * Their millimetres are the SQUARE STANDARD and come from the unit, never from here.
- */
+/** Four square-standard bands. Millimetres live on the spec, not here. */
 const BANDS = [1, 2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
@@ -166,12 +157,6 @@ export default function GridEnginePage() {
     setBox((b) => (b ? resizeShape(spec, b, next) : b))
   }
 
-  const commitSize = () => {
-    const next = Number(sizeDraft)
-    if (Number.isFinite(next) && next > 0) setSize(Math.max(minSpanMM, Math.min(maxSpanMM, next)))
-    else setSizeDraft(String(sizeMM))
-  }
-
   // THE CUT-OUT — the picture, laid on the field so the magnets show through it.
   //
   // Presentation only. The shell reads the file and draws it; nothing is traced, measured or handed
@@ -182,6 +167,19 @@ export default function GridEnginePage() {
   const [outline, setOutline] = useState<OutlineUV | null>(null)
   const [candIdx, setCandIdx] = useState(0)
   const [activeBand, setActiveBand] = useState<(typeof BANDS)[number]>(DEFAULT_SIZE_BAND)
+  const bandSizes = BAND_SIZES_MM[activeBand]
+  const bandLo = bandSizes[0]
+  const bandHi = bandSizes[bandSizes.length - 1]
+  const bandStep = bandSizes[1] - bandSizes[0]
+  const snapBand = (n: number) => {
+    const snapped = bandLo + Math.round((n - bandLo) / bandStep) * bandStep
+    return Math.max(bandLo, Math.min(bandHi, snapped))
+  }
+  const commitSize = () => {
+    const next = Number(sizeDraft)
+    if (Number.isFinite(next) && next > 0) setSize(snapBand(next))
+    else setSizeDraft(String(sizeMM))
+  }
   const [candDoc, setCandDoc] = useState({ candidates: [] as ReturnType<typeof listCandidates>['candidates'] })
   useEffect(() => {
     if (!outline) {
@@ -361,7 +359,7 @@ export default function GridEnginePage() {
       // discarded it, so a hundred 0.1s moved nothing while one 10 moved thirteen millimetres — the
       // same defect as the drag, in the other gesture.
       const next = sizeExactMM.current * factor
-      const held = Math.min(maxSpanMM, Math.max(minSpanMM, next))
+      const held = snapBand(next)
       sizeExactMM.current = held
       setSize(Math.round(held))
     }
@@ -652,38 +650,44 @@ export default function GridEnginePage() {
         </details>
 
         <div className={styles.fixture}>
-          <span className={styles.fixtureName}>Size</span>
-          {BANDS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={styles.chip}
-              data-on={activeBand === n}
-              onClick={() => {
-                setActiveBand(n)
-                setCandIdx(0)
-              }}
-              title={`band ${n}`}
-            >
-              {n}
-            </button>
-          ))}
+          <span className={styles.fixtureName}>Band</span>
+          {BANDS.map((n) => {
+            const sizes = BAND_SIZES_MM[n]
+            const lo = sizes[0]
+            const hi = sizes[sizes.length - 1]
+            return (
+              <button
+                key={n}
+                type="button"
+                className={styles.chip}
+                data-on={activeBand === n}
+                onClick={() => {
+                  setActiveBand(n)
+                  setCandIdx(0)
+                }}
+                title={`band ${n} — ${lo}–${hi}mm`}
+              >
+                {lo}–{hi}
+              </button>
+            )
+          })}
           <input
             className={styles.slider}
             type="range"
-            min={minSpanMM}
-            max={maxSpanMM}
-            step={SHAPE_STEP_MM}
-            value={Math.min(sizeMM, maxSpanMM)}
+            min={bandLo}
+            max={bandHi}
+            step={bandStep}
+            value={Math.min(Math.max(sizeMM, bandLo), bandHi)}
             onChange={(e) => setSize(Number(e.target.value))}
-            aria-label="Shape size"
+            aria-label="Shape size in this band"
           />
           <input
             className={styles.input}
             type="number"
             inputMode="numeric"
-            min={minSpanMM}
-            step={SHAPE_STEP_MM}
+            min={bandLo}
+            max={bandHi}
+            step={bandStep}
             value={sizeDraft}
             onChange={(e) => setSizeDraft(e.target.value)}
             onKeyDown={(e) => {
