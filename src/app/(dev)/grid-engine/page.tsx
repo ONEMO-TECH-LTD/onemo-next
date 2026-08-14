@@ -295,8 +295,8 @@ export default function GridEnginePage() {
   // PROOF HOOK — the v1 bench discipline (window.__GRID_LAB_PROOF__): the engine's live answer,
   // readable by probes and QA in the running page. Instrumentation only; nothing reads it back.
   useEffect(() => {
-    ;(window as unknown as Record<string, unknown>).__GRID_ENGINE_PROOF__ = { judged, picked }
-  }, [judged, picked])
+    ;(window as unknown as Record<string, unknown>).__GRID_ENGINE_PROOF__ = { judged, picked, outline, box }
+  }, [judged, picked, outline, box])
 
   const solveNow = () => {
     if (!outline || !box || solving) return

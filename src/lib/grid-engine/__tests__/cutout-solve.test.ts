@@ -86,7 +86,7 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
     }
   })
 
-  it('is deterministic — the same shape answers byte-identically twice', () => {
+  it('is deterministic — the same shape answers byte-identically twice', { timeout: 60000 }, () => {
     const first = solveCutout(RELEASED, RELEASED_CALIBRATION, lShape(140))
     const second = solveCutout(RELEASED, RELEASED_CALIBRATION, lShape(140))
     expect(JSON.stringify(second)).toBe(JSON.stringify(first))

@@ -18,8 +18,12 @@ export interface WrapMeasures {
   maxSide: number
   /** Sum of all four overhangs — the tightness number (smaller = tighter wrap). */
   total: number
-  /** Largest pairwise imbalance (|left−right|, |top−bottom|) — the evenness number. */
+  /** Largest pairwise imbalance (|left−right|, |top−bottom|) — the worst-axis evenness. */
   imbalance: number
+  /** BOTH axes' imbalance summed — the evenness the judge orders by. The worst-axis number
+   *  alone masked the other axis: every same-size placement shared one axis's imbalance, so
+   *  a centred and an off-centre seat scored identically (Dan's bat pair, 2026-08-14). */
+  imbalanceSumMM: number
 }
 
 function bbox(pts: ReadonlyArray<Pt>) {
@@ -57,6 +61,7 @@ export function measureWrap(
     maxSide: Math.max(left, right, top, bottom),
     total: left + right + top + bottom,
     imbalance: Math.max(Math.abs(left - right), Math.abs(top - bottom)),
+    imbalanceSumMM: Math.abs(left - right) + Math.abs(top - bottom),
   }
 }
 

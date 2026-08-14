@@ -155,8 +155,9 @@ function better(
   if (holdsTopA !== holdsTopB) return holdsTopA
   // 4. tight wrap — least total overhang
   if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
-  // 5. evenness — flap balanced across sides
-  if (a.wrap.imbalance !== b.wrap.imbalance) return a.wrap.imbalance < b.wrap.imbalance
+  // 5. evenness — flap balanced across sides, BOTH axes counted
+  if (a.wrap.imbalanceSumMM !== b.wrap.imbalanceSumMM)
+    return a.wrap.imbalanceSumMM < b.wrap.imbalanceSumMM
   // 6. smaller manufactured size
   if (a.sizeMM !== b.sizeMM) return a.sizeMM < b.sizeMM
   // deterministic close: the denser population first

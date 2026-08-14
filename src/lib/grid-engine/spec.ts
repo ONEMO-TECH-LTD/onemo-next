@@ -287,7 +287,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   flapTightMM: 12,
   flapMaxMM: 24,
   flapLimbMM: 40,
-  sweepStepMM: 8,
+  sweepStepMM: 2,
   sizeStepMM: 2,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
