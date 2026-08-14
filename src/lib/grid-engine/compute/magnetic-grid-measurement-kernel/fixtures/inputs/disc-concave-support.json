@@ -1,0 +1,86 @@
+{
+  "polygon": {
+    "vertices": [
+      {
+        "x": "-5",
+        "y": "-5"
+      },
+      {
+        "x": "5",
+        "y": "-5"
+      },
+      {
+        "x": "5",
+        "y": "5"
+      },
+      {
+        "x": "2",
+        "y": "5"
+      },
+      {
+        "x": "2",
+        "y": "-2"
+      },
+      {
+        "x": "-2",
+        "y": "-2"
+      },
+      {
+        "x": "-2",
+        "y": "5"
+      },
+      {
+        "x": "-5",
+        "y": "5"
+      }
+    ]
+  },
+  "parameters": {
+    "lattice": {
+      "pitch": "3",
+      "origin": {
+        "x": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "fieldExtent": {
+        "minColumn": "-1",
+        "maxColumn": "1",
+        "minRow": "1",
+        "maxRow": "1"
+      }
+    },
+    "discDiameter": "1",
+    "sizeTransform": {
+      "sourceSize": "10",
+      "sourceAnchor": {
+        "x": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "targetAnchor": {
+        "x": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    }
+  },
+  "sizes": [
+    "10"
+  ]
+}

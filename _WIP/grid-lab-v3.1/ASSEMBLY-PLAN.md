@@ -140,7 +140,9 @@ verbatim because they are two of part 3's four mandatory inputs.
 (return `{ outlineUV, ring: { points, width, height } }` — kept, not computed) · `bridge.ts` (one
 door) · `page.tsx` (state + control) · `__tests__/separation.test.ts` (direction guards) ·
 `tsconfig.json` (exclude each package's `src`/`test`/`scripts`; they use BigInt literals and the app
-targets ES2017).
+targets ES2017) · `vitest.config.mts` (exclude the same `test/` directories: the packages ship
+`node:test` suites that vitest cannot execute and would report as failures while they are green
+under their own runner — plus `_WIP`, which the archive already needed).
 
 *Added, never edited:* the three package trees.
 

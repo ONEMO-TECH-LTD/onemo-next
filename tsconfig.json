@@ -44,6 +44,15 @@
     "studio-v2",
     "storybook",
     "_prototypes",
-    "_WIP"
+    "_WIP",
+    "src/lib/grid-engine/compute/magnetic-grid-measurement-kernel/src",
+    "src/lib/grid-engine/compute/magnetic-grid-measurement-kernel/test",
+    "src/lib/grid-engine/compute/magnetic-grid-measurement-kernel/scripts",
+    "src/lib/grid-engine/compute/enumerator/src",
+    "src/lib/grid-engine/compute/enumerator/test",
+    "src/lib/grid-engine/compute/enumerator/scripts",
+    "src/lib/grid-engine/logic/magnetic-grid-product-logic/src",
+    "src/lib/grid-engine/logic/magnetic-grid-product-logic/test",
+    "src/lib/grid-engine/logic/magnetic-grid-product-logic/scripts"
   ]
 }
