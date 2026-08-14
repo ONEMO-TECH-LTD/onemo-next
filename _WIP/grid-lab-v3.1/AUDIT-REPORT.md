@@ -65,11 +65,30 @@ existed to attach anything; GPT reported the absence rather than pretending. **N
 has ever been checked against the ordering.** Part 3's 15 tests use synthetic fixtures with hand-set
 judgements — they prove the mechanism, never conformance to canon.
 
-### F2 — Part 3 relocates the unsolved problem rather than reducing it *(owner: this lane + Dan)*
-Every candidate needs a gravity boolean, a tight-wrap value and a regional-support value or the call
-throws. Nothing can be ordered until "upper material", "wraps most closely" and "a mass of the
-shape" are concrete enough to emit one value per candidate. That is correct under the brief and it
-is now the whole remaining product problem, in one place.
+### F2 — The three judgements are ALREADY RULED — **WITHDRAWN as a question** *(owner: this lane)*
+The first draft called "upper material", "wraps most closely" and "a mass of the shape" undefined
+product concepts needing Dan's ruling. **That was wrong. All three are ruled, two of them with
+formulas, and the fault was not grepping the law before asking.**
+
+- **Upper material (gravity).** L11, Dan verbatim: *"the gravity rules of magnets having support on
+  the top side to hold top side and not make only 1 row at the bottom"*; band-1's ruling puts the
+  lone disc in the TOP HALF. Computable today: does the candidate hold a position in the upper half
+  of the shape's own bbox.
+- **Wraps most closely (tight wrap).** Ruled with an equation, after both a blueprint and this lane
+  measured it wrong. Dan verbatim: *"the flap is calculated from the edge of the grid bounding box to
+  the outer edges of the shape cutout"*, and separately *"flap = outer edges not supported by magnet
+  connection and hold"*. So
+  `box = [min qx − P, max qx + P] × [min qy − P, max qy + P]`, `flap = per side overhang of the
+  outline past that box, clamped at 0`. L14a adds that even flap on all sides IS centred. Tight wrap
+  is four subtractions and their imbalance — no threshold to invent.
+- **A mass of the shape.** L11 binds "material-aware"; L20's escalation speaks of holding *every
+  major region*; and Dan settled the decomposition on 2026-08-13: segmented shapes with narrow necks
+  attract separate boxes. The kernel already publishes both facts needed — held positions and the
+  straight-corridor fact between them — so masses are the corridor-connected components of held
+  positions. No new geometry, no threshold.
+
+What remains is **implementation**, not a question: emit those three values per candidate in the spec
+layer and feed them to part 3, which asks for exactly them.
 
 ### F3 — Ordering is quadratic, but the real load is small *(owner: this lane)* — **CORRECTED**
 Ordering cost, measured: 100 candidates 12 ms · 300 → 41–71 ms · 600 → 139–281 ms · 1000 →
@@ -105,11 +124,24 @@ vertical material against a 107 mm-tall shape. The engine produces the real plac
 a correct engine look wrong. **Every geometric claim in the four description files and L20 must be
 reconciled against its frame before any engine is judged.**
 
-### F5 — Dan's accepted placements come from a panned lattice *(owner: Dan — a law question)*
-His frames show the lattice panned, so his registrations are not necessarily reachable from the four
-half-pitch origins of a bbox / centroid / refined-sample anchor. L6 rules registration by parity and
-O-1 makes the centre construction a switch to test, but neither settles the origin domain the engine
-should sweep. Three of the ten canon cases are currently not found within the tested anchors.
+### F5 — The origin domain is ALREADY RULED — **WITHDRAWN as a question** *(owner: this lane)*
+The first draft asked Dan which shape-to-grid registrations are lawful. **He ruled it, this lane
+already established that on 2026-08-13 at 17:00, and the debate was closed with
+@s62-pixel-grid-pixel the same hour.** Re-opening it was a manufactured question.
+
+- **L6 — parity decides registration, and nothing else.** *"Nothing is chosen — the count decides."*
+  An even run centres in the gap, an odd run on a magnet. A free or 12mm offset is therefore
+  forbidden, which already invalidated this lane's earlier offset sweep.
+- **L7 — at 96mm nothing is re-centred**; points hide, the lattice stays put.
+- **O-1 — the centre construction is settled by SWITCH, not ruling.** Dan verbatim: *"why do i need
+  to rule if i never tested the difference in the real life - why not add all options and test?"* So
+  bbox centre, material centroid and maximum-clearance are all exercised and compared.
+
+The lawful domain is therefore **the three anchor constructions under parity registration** — which
+is exactly what the harness sweeps. So when a canon placement is not found inside it, that is an
+engine or harness finding to chase, **never a question for Dan**. What the panned screenshots show is
+that the anchor set must genuinely include maximum-clearance (it does — that is the only construction
+that reaches the band-1 duck), not that a new law is needed.
 
 ### F7 — Candidate-document integrity is provenance only *(owner: this lane)* — from the independent audit
 Product logic authenticates each candidate **position** against a held kernel fact. It does **not**
