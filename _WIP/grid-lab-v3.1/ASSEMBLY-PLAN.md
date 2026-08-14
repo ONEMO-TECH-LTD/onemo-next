@@ -136,6 +136,12 @@ a square 72mm and a circle 91.88mm → published 92; the same 3×3 gives 120 and
 the shape from the dimension, which is precisely what L8 forbids. An even-millimetre sweep produces
 them naturally, because each arrangement reports the first size at which *this shape* holds it.
 
+**The falsifying case, from the canon, and it is why the ladder had to go:** the same 2×2 grid gives
+a square 72mm and a circle 91.88mm → published 92; the same 3×3 gives 120 and 159.76 → 160. A
+`bandSpanMM` ladder returns 72 and 120 for both shapes and can never produce 92 or 160 — it omits
+the shape from the dimension, which is precisely what L8 forbids. An even-millimetre sweep produces
+them naturally, because each arrangement reports the first size at which *this shape* holds it.
+
 **The lawful model is Dan's own sentence:** *"a shape is never too small; it scales until it
 holds."* The output is therefore, **per arrangement, the first lawful whole EVEN millimetre at which
 that arrangement holds** (L10 — publication rounds upward to an even value and the result is
@@ -159,7 +165,7 @@ nothing outside the unit names, caps or targets a size. Size is what comes back.
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
 | `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
 | `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
-| `sizes` | ⛔ **UNDEFINED — blocked on §4–§6 closure.** Never supplied by a caller; derived per arrangement by exact binding, then published upward to the first LAWFUL whole-even value and re-checked for legality. Every lawful size record is preserved under the cross-size key, with the published minimum marked separately |
+| `sizes` | ⛔ **UNDEFINED, blocked on the additive delivery — blocked on §4–§6 closure.** Never supplied by a caller; derived per arrangement by exact binding, then published upward to the first LAWFUL whole-even value and re-checked for legality. Every lawful size record is preserved under the cross-size key, with the published minimum marked separately |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
@@ -223,7 +229,7 @@ deferred part is not a call this lane may make. Until Dan rules, the raw-candida
 candidate set". His options are named in §9.
 
 **Call shape once that is settled:** 4 measurement calls per construction (the four registrations),
-each carrying the whole size ladder, so `preparePolygon` runs once per placement and never once per
+each carrying the size set the closure returns, so `preparePolygon` runs once per placement and never once per
 size. Each candidate is tagged
 with its centre construction and its x/y registration. Free pan is not a lawful placement domain under L6, so excluding it costs no lawful
 candidate; omitting the 3×4 domain would.
@@ -288,8 +294,13 @@ no lattice number, no notion of "better".
 ## 6. Product logic — placed; activation is in scope
 
 Cloned verbatim under `logic/`. It requires a gravity boolean, a wrap value and a regional value
-**per candidate**; **two of those three are ruled with formulas — L11 for gravity, the flap
-equation for wrap — and the third is NOT.** "A mass of the shape" is named in the canon in words
+**per candidate**; **only ONE of the three has a producer formula.** Tight wrap does: the flap
+equation (grid bbox = magnet extent + padding; flap = per-side overhang, clamped at 0). **Gravity
+does not** — L11 and L20 give intent and precedence ("hold the top"; a lone magnet holds the top
+half), not a rule that defines which way is up for an arbitrary trace or how several magnets resolve
+to one boolean. Calling it "ruled with a formula" was this lane overclaiming, twice. It is an
+explicit supplied input until a computable top rule is sourced, exactly as Part 3's own prompt
+demanded. "A mass of the shape" is named in the canon in words
 only. This lane previously asserted masses = corridor-connected components: that was an INVENTED
 PROXY, it is withdrawn, and the delivered kernel refutes it directly — a straight corridor is
 evidence for that corridor alone, never for general fabric connectivity (the U-shape
@@ -308,9 +319,9 @@ measurement surface exists but not removed from it.
    independently, the transformed ring coincides with the ring drawn under that construction and
    every held position coincides with the lattice generated at that registration — never against a
    single `layout.magnets`. The domain exercised is whatever §3.3 is authorised to be. No literal
-   law value in the file. **Goldens locked from the canon: square 2×2 → 72, circle 2×2 → 92,
-   square 3×3 → 120, circle 3×3 → 160, plus a concave case whose first fit is odd, proving the
-   published value is even AND re-checked rather than merely rounded.**
+   law value in the file. (The canon goldens — square 72, circle 92, square 120, circle 160, plus a concave
+   case whose first fit is odd — belong to the **additive Part-1 closure acceptance gate**, not
+   here: the seam cannot test values whose derivation does not yet exist.)
 4. Bridge door; shell stepping control and highlight; lattice-pan disabled.
 5. Chrome check on the running page; screenshot; no solve on interaction.
 6. Judgement producers, then Part 3 activated through the bridge; Dan tests the assembled three.
@@ -326,6 +337,8 @@ policy in the shell. No global compiler change. Ranking exists only inside Part 
 **D1 — the missing third anchor.** O-1 names three centre constructions; two are exactly computable
 from the ring, and **maximum clearance has no accepted implementation anywhere**. The duck at 60mm
 was found only under it.
+**Default is HOLD for the full brief.** A diagnostic slice is an optional scope cut only Dan may
+authorise; it is not a branch of the executable plan.
 - *(a)* Authorise a **two-construction diagnostic surface now**, knowing band-1 duck may be absent
   for that reason and not because the engine failed; add the third when a source exists.
 - *(b)* **Hold the build** until an accepted exact maximum-clearance source exists — an additive
