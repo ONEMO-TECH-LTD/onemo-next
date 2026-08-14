@@ -714,7 +714,7 @@ export default function GridEnginePage() {
               answer.variants.length ? (
                 answer.variants.map((variant) => (
                   <button
-                    key={`${answer.band.band}-${variant.sizeMM}`}
+                    key={`${answer.band.band}-${variant.sizeMM}-${variant.anchors.length}-${variant.layout ?? variant.pattern + variant.pitchMM}`}
                     type="button"
                     className={styles.chip}
                     data-on={picked === variant}
