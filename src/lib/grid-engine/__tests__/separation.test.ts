@@ -239,8 +239,12 @@ describe('the class, not the instances', () => {
   it('the ui submodule does no lattice arithmetic', () => {
     // ui/ may reach outward — it is the adapter — but it may not compute the grid. Nothing checked
     // this before, because nothing read the directory at all.
-    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.includes('/'))
-    expect(submodule.length, 'no submodule files found — this guard would pass vacuously').toBeGreaterThan(0)
+    //
+    // Scoped to ui/ BY THE GUARD'S OWN RULE: compute/ and logic/ are the unit's calculators — the
+    // lifted v1 engine and its judge — and lattice names are exactly what their parameters are
+    // called. The rule this guard states has only ever been about the ADAPTER not computing.
+    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.startsWith('ui/'))
+    expect(submodule.length, 'no ui/ files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of submodule) {
       expect(text, `${file} touches a law value`).not.toMatch(
         /\b(basePitchMM|pitchMM|paddingMM|positionsPerAxis)\b/,

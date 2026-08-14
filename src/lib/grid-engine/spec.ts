@@ -208,3 +208,122 @@ export const RELEASED: GridSystemSpec = Object.freeze({
 
 /** The launch pitches. 24 and 72 do not exist anywhere in the system (law 1.3). */
 export const LAUNCH_PITCHES_MM: readonly number[] = Object.freeze([48, 96])
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CALIBRATION — the values fed to the lifted v1 engine. Values only, same law as above.
+//
+// Dan, 2026-08-14: "the entire v1 is already correct — 10mm or 12/24mm semantics are just that …
+// the semantics are calibration." The engine in compute/ is the proven v1 code, BYTE-VERBATIM.
+// What is writable here is exactly what that engine's own API accepts as input — padding, frame,
+// size ceilings, margins, density, pattern, magnet plan, centering. The engine's internal physics
+// constants (hold reach 48, focal thresholds 100/200, the determinism quantum) are SEALED IN CODE
+// at level 1: they live in compute/grid-core.ts as released constants, and changing one is a code
+// edit and a release, never a runtime write. This block states the seams; it does not fork them.
+
+export interface BandSpec {
+  /** Product label. Bands group sizes; which bands are offered is product law. */
+  band: number
+  /** Smallest and largest manufactured longest-side this band may publish, millimetres. */
+  minSizeMM: number
+  maxSizeMM: number
+  /** Whether the product currently offers this band. Hidden bands still compute. */
+  released: boolean
+}
+
+/**
+ * The engine-input calibration — every field maps 1:1 onto a parameter the verbatim v1 engine
+ * already accepts (GridPlanOptions / SizeLaw). Nothing here invents a knob the engine lacks.
+ */
+export interface CalibrationSpec {
+  /** SizeLaw.frameMM — frame stroke per side. */
+  frameMM: number
+  /** SizeLaw.maxTestedMM — largest physically tested size; rungs above ship hidden. */
+  maxTestedMM: number
+  /** GridPlanOptions.maxGrowMM — outward margin band an adaptive plan may add to seek balance. */
+  maxGrowMM: number
+  /** GridPlanOptions.density — 'standard' (48-first) or 'light' (96-first). */
+  density: 'standard' | 'light'
+  /** GridPlanOptions.mode — 'auto' or a pinned pattern. */
+  mode: 'auto' | 'standard' | 'quincunx' | 'diamond'
+  /** GridPlanOptions.plan — magnet sizing plan; 'auto' is the size-driven focal law. */
+  plan: 'auto' | 'all6' | 'all8' | 'corners8'
+  /** GridPlanOptions.center — where the rigid grid anchors. */
+  center: 'centroid' | 'bbox'
+  /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
+  bands: readonly BandSpec[]
+}
+
+export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
+  frameMM: 1,
+  maxTestedMM: 214,
+  maxGrowMM: 12,
+  density: 'light',
+  mode: 'auto',
+  plan: 'auto',
+  center: 'centroid',
+  bands: Object.freeze([
+    Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, released: false }),
+    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, released: true }),
+    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, released: true }),
+    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, released: false }),
+  ]) as readonly BandSpec[],
+}) as CalibrationSpec
+
+export type CalibrationNumberKey = 'frameMM' | 'maxTestedMM' | 'maxGrowMM'
+
+/** Bounds a calibration write must satisfy. Outside them the write is refused, not clamped. */
+const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: number }> = {
+  frameMM: { min: 0, max: 10 },
+  maxTestedMM: { min: 20, max: 1000 },
+  maxGrowMM: { min: 0, max: 80 },
+}
+
+const RELEASED_DENSITIES: readonly CalibrationSpec['density'][] = Object.freeze([
+  'standard',
+  'light',
+])
+const RELEASED_MODES: readonly CalibrationSpec['mode'][] = Object.freeze([
+  'auto',
+  'standard',
+  'quincunx',
+  'diamond',
+])
+const RELEASED_PLANS: readonly CalibrationSpec['plan'][] = Object.freeze([
+  'auto',
+  'all6',
+  'all8',
+  'corners8',
+])
+const RELEASED_CENTERS: readonly CalibrationSpec['center'][] = Object.freeze(['centroid', 'bbox'])
+
+/** The one guarded writer for numeric calibration values — same shape as applyGridValue. */
+export function applyCalibrationValue(
+  calibration: CalibrationSpec,
+  key: CalibrationNumberKey,
+  value: number,
+): { calibration: CalibrationSpec; refused?: WriteRefusal } {
+  if (!Number.isFinite(value)) return { calibration, refused: 'not-a-number' }
+  const { min, max } = CALIBRATION_LIMITS[key]
+  if (value < min || value > max) return { calibration, refused: 'out-of-range' }
+  return { calibration: { ...calibration, [key]: value } }
+}
+
+/** Released-options writers — a choice between values the system has, never typed freehand. */
+export function selectCalibrationOption(
+  calibration: CalibrationSpec,
+  key: 'density' | 'mode' | 'plan' | 'center',
+  value: string,
+): { calibration: CalibrationSpec; refused?: WriteRefusal } {
+  const released: Record<typeof key, readonly string[]> = {
+    density: RELEASED_DENSITIES,
+    mode: RELEASED_MODES,
+    plan: RELEASED_PLANS,
+    center: RELEASED_CENTERS,
+  }
+  if (!released[key].includes(value)) return { calibration, refused: 'options-only' }
+  return { calibration: { ...calibration, [key]: value } }
+}
+
+export function calibrationLimitsFor(key: CalibrationNumberKey): { min: number; max: number } {
+  return CALIBRATION_LIMITS[key]
+}

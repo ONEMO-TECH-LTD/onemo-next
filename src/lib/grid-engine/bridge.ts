@@ -114,3 +114,25 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
 export function fieldBlockSpan(spec: GridSystemSpec): number {
   return fieldSpanMM(spec)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE CUTOUT DOOR — shape in, sizes + layouts out.
+//
+// One call: a millimetre contour enters, and the lifted v1 engine (compute/) answers through the
+// judge (logic/): the grid-first size ladder, cut into the released bands, each size carrying its
+// exact magnet layout, coordinates, magnet diameters, margin and coverage verdict. The bridge
+// assembles the call from the released values and does no geometry of its own.
+
+import { judgeShape, type BandAnswer, type ShapeJudgement, type SizeVariant } from './logic/judgement'
+import type { CalibrationSpec } from './spec'
+import type { Contour } from './compute/types'
+
+export type { BandAnswer, ShapeJudgement, SizeVariant, Contour }
+
+export function solveCutout(
+  spec: GridSystemSpec,
+  calibration: CalibrationSpec,
+  contourMM: Contour,
+): ShapeJudgement | null {
+  return judgeShape(spec, calibration, contourMM)
+}
