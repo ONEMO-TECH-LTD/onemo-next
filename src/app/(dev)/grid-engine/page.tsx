@@ -33,8 +33,13 @@ import {
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
+  solveCutout,
+  type Contour,
   type FieldSummary,
+  type ShapeJudgement,
+  type SizeVariant,
 } from '@/lib/grid-engine/bridge'
+import { RELEASED_CALIBRATION } from '@/lib/grid-engine/spec'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
@@ -206,6 +211,9 @@ export default function GridEnginePage() {
     if (!r.refused) setSpec(r.spec)
     // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
     setAsOutline(true)
+    // A new silhouette invalidates the old verdict — the answer belongs to the shape it was asked of.
+    setJudged(null)
+    setPicked(null)
     void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -265,6 +273,64 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    setJudged(null)
+    setPicked(null)
+  }
+
+  // ── THE ENGINE'S ANSWER ────────────────────────────────────────────────────
+  //
+  // Solve is EXPLICIT — a press, never a side effect of interaction (no solve on pan, drag, pinch or
+  // slider; outline and law changes simply clear a stale answer). The shell hands the traced
+  // silhouette to the bridge and draws exactly what comes back: per released band, every
+  // grid-dictated size, and for the picked size the engine's own effect outline, magnet centres,
+  // magnet diameters, padding spots and flap markers. Nothing here computes; it renders the verdict.
+  const [judged, setJudged] = useState<ShapeJudgement | null>(null)
+  const [picked, setPicked] = useState<SizeVariant | null>(null)
+  const [solving, setSolving] = useState(false)
+
+  const solveNow = () => {
+    if (!outline || !box || solving) return
+    setSolving(true)
+    // The box carries the picture's true proportions; a bare UV pair does not — u and v are
+    // fractions of DIFFERENT sides, and feeding them raw squashed the shape (locked-aspect law).
+    const { w: boxW, h: boxH } = box
+    // Yield one frame so the busy state paints before the synchronous solve runs.
+    setTimeout(() => {
+      try {
+        // The silhouette in its own proportions — the engine normalizes and owns every millimetre.
+        const contourMM: Contour = {
+          outer: { pts: outline.map(([u, v]) => [u * boxW, v * boxH] as [number, number]) },
+          holes: [],
+        }
+        const answer = solveCutout(spec, RELEASED_CALIBRATION, contourMM)
+        setJudged(answer)
+        const first = answer?.bands.find((b) => b.band.released && b.variants.length)?.variants[0]
+        setPicked(first ?? null)
+        if (first) setSize(first.sizeMM)
+      } finally {
+        setSolving(false)
+      }
+    }, 0)
+  }
+
+  const pickVariant = (variant: SizeVariant) => {
+    setPicked(variant)
+    setSize(variant.sizeMM)
+  }
+
+  /** Where the engine's frame sits on the canvas: its effect box centred, like the picture's box. */
+  const engineFrame = (variant: SizeVariant): { dx: number; dy: number } => {
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity
+    for (const [x, y] of variant.effectContourMM.outer.pts) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    return { dx: -(minX + maxX) / 2, dy: -(minY + maxY) / 2 }
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -447,6 +513,19 @@ export default function GridEnginePage() {
           </button>
         )}
 
+        {cutout && (
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={Boolean(judged)}
+            onClick={solveNow}
+            disabled={!outline || solving}
+            title="Ask the engine: every grid-dictated size per band, with its exact magnet layout"
+          >
+            {solving ? 'solving…' : 'solve'}
+          </button>
+        )}
+
         <span className={styles.spacer} />
 
         {view && (
@@ -535,6 +614,37 @@ export default function GridEnginePage() {
               />
             </g>
           )}
+          {picked && (
+            /* THE ENGINE'S VERDICT, drawn verbatim: its effect outline, every seated magnet at its
+               true diameter inside its padding spot, the dropped interior spots faint, and any flap
+               markers red. Every coordinate is the bridge's; this group only centres the frame. */
+            (() => {
+              const { dx, dy } = engineFrame(picked)
+              return (
+                <g pointerEvents="none" transform={`translate(${dx} ${dy})`}>
+                  <polygon
+                    points={picked.effectContourMM.outer.pts.map(([x, y]) => `${x},${y}`).join(' ')}
+                    fill="none"
+                    stroke="#7dd87d"
+                    strokeWidth={1.5}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {picked.candidates.map(([x, y], i) => (
+                    <circle key={`c${i}`} cx={x} cy={y} r={spec.grid.paddingMM} fill="none" stroke="#7dd87d" strokeOpacity={0.25} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                  ))}
+                  {picked.anchors.map((anchor, i) => (
+                    <g key={`a${i}`}>
+                      <circle cx={anchor.p[0]} cy={anchor.p[1]} r={spec.grid.paddingMM} fill="rgba(125,216,125,0.10)" stroke="#7dd87d" strokeOpacity={0.6} vectorEffect="non-scaling-stroke" />
+                      <circle cx={anchor.p[0]} cy={anchor.p[1]} r={anchor.dia / 2} fill={anchor.dia === spec.magnet.largeMM ? '#e8a33d' : '#1f2530'} stroke="#7dd87d" vectorEffect="non-scaling-stroke" />
+                    </g>
+                  ))}
+                  {picked.flaps.map(([x, y], i) => (
+                    <circle key={`f${i}`} cx={x} cy={y} r={2} fill="#e5484d" />
+                  ))}
+                </g>
+              )
+            })()
+          )}
         </GridCanvas>
       </div>
 
@@ -605,6 +715,35 @@ export default function GridEnginePage() {
             {refused && <p className={styles.refusal}>{REFUSAL_TEXT[refused]}</p>}
           </div>
         </details>
+
+        {judged && (
+          <div className={styles.fixture}>
+            <span className={styles.fixtureName}>Engine</span>
+            {judged.bands
+              .filter((answer) => answer.band.released)
+              .map((answer) =>
+                answer.variants.length ? (
+                  answer.variants.map((variant) => (
+                    <button
+                      key={`${answer.band.band}-${variant.sizeMM}`}
+                      type="button"
+                      className={styles.chip}
+                      data-on={picked === variant}
+                      onClick={() => pickVariant(variant)}
+                      title={`band ${answer.band.band} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern ?? ''} · margin ${variant.marginMM}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
+                    >
+                      B{answer.band.band}·{variant.sizeMM}·{variant.anchors.length}pt
+                      {variant.flaps.length > 0 ? '·⚠' : ''}
+                    </button>
+                  ))
+                ) : (
+                  <span key={answer.band.band} className={styles.rowUnit}>
+                    B{answer.band.band}: none
+                  </span>
+                ),
+              )}
+          </div>
+        )}
 
         <div className={styles.fixture}>
           <span className={styles.fixtureName}>Size</span>

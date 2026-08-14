@@ -11,6 +11,9 @@
 // before turned the shape upside down.
 
 import { traceContourRaw } from '@/lib/effect/contour'
+import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
+import { MIN_FEATURE_MM } from '@/lib/effect/geometry-truth'
+import { DEFAULT_LAW } from '@/lib/grid-engine/compute/grid-core'
 
 /** The silhouette as fractions of the picture's own box. */
 export type OutlineUV = Array<[number, number]>
@@ -42,5 +45,14 @@ export async function traceCutout(file: File): Promise<OutlineUV | null> {
 
   const ring = traceContourRaw(mask, w, h)
   if (!ring || ring.length < 3) return null
-  return ring.map(([x, y]) => [x / w, y / h] as [number, number])
+
+  // THE v1 SIMPLIFICATION LAW, verbatim in semantics (prepare-effect.ts, Dan 2026-06-17): the cut
+  // process cannot render detail under the manufacturing minimum feature, so the marching-squares
+  // staircase collapses to straight facets via RDP at that mm floor. The floor is mm-true at the
+  // LARGEST rung the system publishes — a raw multi-thousand-point ring would otherwise hand the
+  // engine minutes of work for detail no cutter can make.
+  const epsilonPx = Math.max(1, (MIN_FEATURE_MM / DEFAULT_LAW.maxRungMM) * Math.max(w, h))
+  const straight = rdpClosed(ring.map(([x, y]) => [x, y] as Vec2Px), epsilonPx)
+  if (straight.length < 3) return null
+  return straight.map(([x, y]) => [x / w, y / h] as [number, number])
 }
