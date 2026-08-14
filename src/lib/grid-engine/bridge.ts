@@ -29,9 +29,11 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import type { GridSystemSpec } from './spec'
+import { measureField, type MeasuredField, type TracedRingInput } from './compute/candidates'
+import { RELEASED_ARRANGEMENT_GRAMMAR, type GridSystemSpec } from './spec'
 
 export type { FieldSummary, PointMM, RegionMM }
+export type { TracedRingInput }
 
 /** One field, solved. Everything a surface may draw or say about it is in here. */
 interface FieldLayout {
@@ -113,4 +115,59 @@ export function bandSpan(spec: GridSystemSpec, magnets: number): number {
  */
 export function fieldBlockSpan(spec: GridSystemSpec): number {
   return fieldSpanMM(spec)
+}
+
+/**
+ * What the ranking layer needs and does not have. NAMED, never invented.
+ *
+ * Part 3 requires four top-level inputs and a complete judgement per candidate; it has no partial
+ * mode and throws on less. The scaffold supplies no judgements today, so the honest report is this
+ * list — and part 3 is NOT CALLED. Saying it ran, or feeding it placeholders to make it run, would
+ * be the fabrication the whole review has been guarding against.
+ */
+export interface ProductLogicUnavailable {
+  readonly kind: 'unavailable'
+  /** Exactly what is missing, in the delivered contract's own vocabulary. */
+  readonly missingInputs: readonly string[]
+}
+
+const PRODUCT_LOGIC_GAP: ProductLogicUnavailable = Object.freeze({
+  kind: 'unavailable',
+  missingInputs: Object.freeze([
+    'rules.gravity — which material is "upper" for this shape',
+    'rules.tightWrap — the wrap measure and its comparator',
+    'rules.regionalSupport — the mass/region definition and its precedence',
+    'rules.bands — a band per kernel size occurrence',
+    'judgements[] — gravity, tightWrap and regionalSupport per candidate',
+  ]),
+})
+
+/** One field of candidates, and the honest state of the layer above it. */
+export interface FieldCandidates extends MeasuredField {
+  /** Ranked tiers when part 3 can run; until judgements exist, the named gap. */
+  readonly productLogic: ProductLogicUnavailable
+}
+
+/**
+ * THE ONE DOOR to the installed engine.
+ *
+ * The shell hands over the traced ring and the size it is already showing; everything else the
+ * packages need is read from the spec here rather than assembled by a surface. The grammar is
+ * released policy and travels from `spec`, because the enumerator ships none and demands one.
+ *
+ * NO SIZE LADDER: the one size on screen. NO PAN: the lattice origin is the registration offset,
+ * and the diagnostic freezes pan while candidates are shown, so what is measured is what is drawn.
+ */
+export function solveCandidates(
+  spec: GridSystemSpec,
+  ring: TracedRingInput,
+  sizeMM: number,
+): FieldCandidates {
+  const measured = measureField({
+    ring,
+    spec,
+    sizeMM,
+    grammar: RELEASED_ARRANGEMENT_GRAMMAR as unknown as Parameters<typeof measureField>[0]['grammar'],
+  })
+  return { ...measured, productLogic: PRODUCT_LOGIC_GAP }
 }

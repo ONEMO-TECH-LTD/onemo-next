@@ -13,7 +13,7 @@
 // from, "Prototypes / Control" node 14209:26629 at 402pt; that measurement is the design's, never
 // the implementation's.) The studio's visual design comes from Figma; this invents none.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyGridValue,
   isOptionsOnly,
@@ -33,10 +33,19 @@ import {
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
+  solveCandidates,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type TracedCutout } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
+import {
+  CLOSED,
+  clearSelection,
+  isDragEnabled,
+  selectCandidate,
+  stepCandidate,
+  type CandidateViewState,
+} from './candidate-view'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -236,6 +245,40 @@ export default function GridEnginePage() {
    * themselves, so it is placement — the shape stays still and the grid comes to meet it.
    */
   const [pan, setPan] = useState<[number, number]>([0, 0])
+
+  /**
+   * THE CANDIDATE DIAGNOSTIC — one index, and the lattice held still while it is open.
+   *
+   * The engine is solved for the traced ring, the size and the spec, and for nothing else: browsing
+   * candidates and attempting to drag both leave that answer alone. The transitions are in
+   * `candidate-view` so they are testable rather than merely intended.
+   */
+  const [candidateView, setCandidateView] = useState<CandidateViewState>(CLOSED)
+  const dragEnabled = isDragEnabled(candidateView)
+
+  /**
+   * ONE SOLVE per (ring, size, spec). Not per render, not per pan, not per candidate — those change
+   * how you look at the answer, never what it is. `traced` is the identity of the ring itself, so a
+   * new trace re-solves and nothing else does.
+   */
+  const field = useMemo(() => {
+    if (!traced) return null
+    try {
+      return { ok: true as const, value: solveCandidates(spec, traced.ring, sizeMM) }
+    } catch (error) {
+      // The kernel refuses shapes it cannot measure rather than repairing them. Surfaced, never
+      // swallowed: an empty result would read as "this shape holds nothing".
+      return { ok: false as const, message: error instanceof Error ? error.message : String(error) }
+    }
+  }, [traced, sizeMM, spec])
+
+  const candidates = field?.ok ? field.value.candidates.candidates : []
+  const selectedCandidate =
+    candidateView.selected !== null ? candidates[candidateView.selected] ?? null : null
+  const selectedCentresMM =
+    field?.ok && candidateView.selected !== null
+      ? field.value.display[candidateView.selected]?.centresMM ?? []
+      : []
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
   const panSurface = useRef<SVGRectElement>(null)
   /**
@@ -322,6 +365,12 @@ export default function GridEnginePage() {
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
   /** The unit's own floor. The control offers exactly what the unit will produce, never less. */
   const minSpanMM = Math.round(minShapeSpan(spec))
+  /**
+   * The highlight ring sits exactly on the magnet spot, so a selected candidate reads as "these
+   * discs" rather than as a second decoration near them. The spot comes from the unit — the same
+   * value the canvas draws its circles at — and is halved for a radius, exactly as the canvas does.
+   */
+  const selectionRadiusMM = minShapeSpan(spec) / 2
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
@@ -464,7 +513,9 @@ export default function GridEnginePage() {
       <div className={styles.canvas}>
         <GridCanvas
           spec={spec}
-          panMM={pan}
+          /* While a candidate is shown the lattice sits at the frozen origin, not at the live pan.
+             Copied rather than passed: the view state is readonly on purpose. */
+          panMM={dragEnabled ? pan : [candidateView.panMM[0], candidateView.panMM[1]]}
           /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
              lands on it. Handing in a region built from the shape's size read as the shape defining
              the world, and did nothing besides — every reachable size is under the field's own floor.
@@ -483,6 +534,9 @@ export default function GridEnginePage() {
             fill="transparent"
             className={styles.panSurface}
             onPointerDown={(e) => {
+              // Refused, not merely un-handled: the lattice holds still while candidates are on
+              // screen, because a moved lattice changes which positions actually hold.
+              if (!dragEnabled) return
               e.currentTarget.setPointerCapture(e.pointerId)
               panGrabbedAt.current = { atMM: toMM(e), panMM: pan }
             }}
@@ -500,6 +554,24 @@ export default function GridEnginePage() {
               e.currentTarget.releasePointerCapture?.(e.pointerId)
             }}
           />
+          {/* THE SELECTED CANDIDATE. Every centre came back from the bridge on this render; the
+              shell draws circles at them and derives nothing. */}
+          {selectedCentresMM.length > 0 && (
+            <g pointerEvents="none">
+              {selectedCentresMM.map(([cx, cy]) => (
+                <circle
+                  key={`sel-${cx},${cy}`}
+                  cx={cx}
+                  cy={cy}
+                  r={selectionRadiusMM}
+                  fill="none"
+                  stroke="#ffd166"
+                  strokeWidth={2}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+          )}
           {cutout && box && (
             /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
                dragging even over the shape the canvas must continue to react". It is drawn above the
@@ -609,6 +681,63 @@ export default function GridEnginePage() {
             {refused && <p className={styles.refusal}>{REFUSAL_TEXT[refused]}</p>}
           </div>
         </details>
+
+        {field && (
+          <div className={styles.fixture}>
+            <span className={styles.fixtureName}>Candidates</span>
+            {!field.ok ? (
+              <span className={styles.refusal}>{field.message}</span>
+            ) : candidates.length === 0 ? (
+              <span className={styles.rowUnit}>none at this size</span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.chip}
+                  data-on={candidateView.selected !== null}
+                  onClick={() =>
+                    setCandidateView((v) =>
+                      v.selected === null ? selectCandidate(v, 0) : clearSelection(v),
+                    )
+                  }
+                >
+                  {candidateView.selected === null ? `show ${candidates.length}` : 'clear'}
+                </button>
+                {candidateView.selected !== null && (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.chip}
+                      onClick={() => setCandidateView((v) => stepCandidate(v, candidates.length, -1))}
+                      aria-label="Previous candidate"
+                    >
+                      &lt;
+                    </button>
+                    <span className={styles.rowUnit}>
+                      {candidateView.selected + 1} / {candidates.length}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.chip}
+                      onClick={() => setCandidateView((v) => stepCandidate(v, candidates.length, 1))}
+                      aria-label="Next candidate"
+                    >
+                      &gt;
+                    </button>
+                    {selectedCandidate && (
+                      <span className={styles.rowUnit}>
+                        {selectedCandidate.family} · {selectedCandidate.positions.length} on {selectedCandidate.population}
+                      </span>
+                    )}
+                  </>
+                )}
+                <span className={styles.rowUnit} title={field.value.productLogic.missingInputs.join('\n')}>
+                  unranked — {field.value.productLogic.missingInputs.length} inputs missing
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         <div className={styles.fixture}>
           <span className={styles.fixtureName}>Size</span>
