@@ -82,15 +82,11 @@ falsification step missing. That is not a defect in the delivered code — it do
 brief asked — but the layer whose entire job is "order as Dan orders" was never once tested against
 how Dan orders.
 
-### 3.2 The placement domain was never commissioned **in this fork**
+### 3.2 The placement domain is commissioned to no part in this transcript
 
-**Scope correction.** The claim below is true of the three-part fork in this transcript. It is not
-true of the GPT Pro work overall: a separate track-2 chat — not present in `_WIP/GPT PRO`, so this
-folder is not the complete GPT history — reportedly commissioned exactly this orchestration and
-delivered an engine that prepares the outline once and then loops finitely over sizes,
-registrations, populations, patterns and translations. That package was removed from the repo on
-2026-08-14 as not part of the installation slice; it survives in Dan's Downloads. **Unverified by
-me** — recorded here as a peer finding to check, not as established fact.
+**Scope of this claim:** the three prompts in this transcript, and nothing wider. It says where
+placement was assigned across parts 1–3 as commissioned here. It makes no statement about any GPT
+Pro work outside this transcript, which this audit did not examine and cannot speak to.
 
 The original algorithm answer had placement inside the loop:
 
