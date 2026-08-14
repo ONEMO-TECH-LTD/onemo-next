@@ -5,27 +5,6 @@ import { discClearanceMM, prepareOutline } from './measure'
 import type { BandId, GridSystemSpec } from './spec'
 import type { PointMM } from './engine'
 
-function nativeCount(band: BandId, n: number): boolean {
-  if (band === 1) return n === 1
-  if (band === 2) return n === 2
-  if (band === 3) return n === 3 || n === 4
-  return n === 4
-}
-
-/** Band 4 jumps a lattice step. A file of four is not a rectangle. 48×96 is band 3. */
-function nextStep(
-  c: { stepCol: number; stepRow: number; sites: Array<{ x: number; y: number }> },
-  band: BandId,
-): boolean {
-  if (band !== 4) return true
-  const xs = c.sites.map((s) => s.x)
-  const ys = c.sites.map((s) => s.y)
-  const w = Math.max(...xs) - Math.min(...xs)
-  const h = Math.max(...ys) - Math.min(...ys)
-  if (w < 48 || h < 48) return false
-  return c.stepCol + c.stepRow >= 4
-}
-
 function bbox(verts: ReadonlyArray<PointMM>) {
   let minX = verts[0][0]
   let maxX = verts[0][0]
@@ -184,24 +163,11 @@ export function measureProposal(
 
 /** Which sort key put `won` above `lost`. Empty if they compare equal. */
 export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMeasure): string {
-  if (band === 1) {
-    if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
-    if (won.balance !== lost.balance) return 'balance'
-    return 'placement-at-size'
-  }
-  if (band === 2 || band === 3 || band === 4) {
-    if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
-    if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
-    if (won.masses !== lost.masses) return won.masses ? 'masses' : 'masses-lost'
-    if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
-    if (won.area !== lost.area) return `area ${won.area} < ${lost.area}`
-    return 'placement-at-size'
-  }
+  if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
+  if (won.balance !== lost.balance) return 'balance'
   if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
   if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
-  if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
-  if (won.area !== lost.area) return `area`
-  return 'tie'
+  return 'placement-at-size'
 }
 
 export function propose(
@@ -210,35 +176,24 @@ export function propose(
   band: BandId,
   outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
-  const raw = doc.candidates.filter(
-    (c) => c.band === band && nativeCount(band, c.sites.length) && nextStep(c, band),
-  )
-  const scored = raw.map((c) => ({ c, ...measureProposal(spec, c, outline) }))
+  const raw = doc.candidates.filter((c) => c.band === band)
+  const scored = raw.map((c) => {
+    const verts = scaleToSize(outline, c.sizeMM)
+    const shape = bbox(verts)
+    return {
+      c,
+      n: c.sites.length,
+      gravity: holdsTop(c, shape),
+      balance: balance(c, shape),
+      size: c.sizeMM,
+    }
+  })
 
   scored.sort((a, b) => {
-    if (band === 1) {
-      if (a.size !== b.size) return a.size - b.size
-      if (a.balance !== b.balance) return a.balance - b.balance
-      return a.c.id.localeCompare(b.c.id)
-    }
-    if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
-    if (band === 3 && a.masses !== b.masses) return a.masses ? -1 : 1
-    if (
-      band === 3 &&
-      a.c.family === 'run' &&
-      b.c.family === 'run' &&
-      a.size !== b.size
-    ) {
-      return a.size - b.size
-    }
-    if (a.n !== b.n) return b.n - a.n
-    if (a.masses !== b.masses) return a.masses ? -1 : 1
-    if (band === 4 && a.area !== b.area) return a.area - b.area
     if (a.size !== b.size) return a.size - b.size
-    if (a.area !== b.area) return a.area - b.area
     if (a.balance !== b.balance) return a.balance - b.balance
-    if (a.top !== b.top) return a.top - b.top
-    if (a.clear !== b.clear) return b.clear - a.clear
+    if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+    if (a.n !== b.n) return b.n - a.n
     return a.c.id.localeCompare(b.c.id)
   })
 

@@ -1,7 +1,13 @@
 // Grammar → arrangements. Held mask in. No scores.
 // Traverse in population coordinates; publish base-lattice col/row.
 
-export type Family = 'single' | 'run' | 'rectangle-corners' | 'corner-triangle' | 'full-window'
+export type Family =
+  | 'single'
+  | 'run'
+  | 'rectangle-corners'
+  | 'corner-triangle'
+  | 'full-window'
+  | 'tee'
 export type Population = 'base' | 'sparse'
 export type AxisParity = 'gap' | 'point'
 
@@ -164,7 +170,50 @@ export function enumerateArrangements(
     }
   }
 
-  if (opts.windows !== false) {
+  const ortho: Array<[number, number]> = [
+    [1, 0],
+    [0, 1],
+  ]
+  for (const mid of held) {
+    for (const [adc, adr] of ortho) {
+      const neg: IndexedSite[] = []
+      const pos: IndexedSite[] = []
+      for (let k = 1; k <= 8; k++) {
+        const a = heldAt(map, mid.popCol - adc * k, mid.popRow - adr * k)
+        const b = heldAt(map, mid.popCol + adc * k, mid.popRow + adr * k)
+        if (a) neg.push(a)
+        if (b) pos.push(b)
+        if (!a && !b) break
+      }
+      if (!neg.length || !pos.length) continue
+      const stems: Array<[number, number]> = [
+        [-adr, adc],
+        [adr, -adc],
+      ]
+      for (const [sdc, sdr] of stems) {
+        const stem: IndexedSite[] = []
+        for (let k = 1; k <= 3; k++) {
+          const s = heldAt(map, mid.popCol + sdc * k, mid.popRow + sdr * k)
+          if (!s) break
+          stem.push(s)
+          const arm = Math.min(neg.length, pos.length, 2)
+          const bar = [...neg.slice(0, arm).reverse(), mid, ...pos.slice(0, arm)]
+          const sites = [...bar, ...stem]
+          const colsT = sites.map((p) => p.popCol)
+          const rowsT = sites.map((p) => p.popRow)
+          push({
+            family: 'tee',
+            population,
+            stepCol: Math.max(...colsT) - Math.min(...colsT),
+            stepRow: Math.max(...rowsT) - Math.min(...rowsT),
+            sites,
+          })
+        }
+      }
+    }
+  }
+
+  if (opts.windows !== false && held.length <= 25) {
     for (const c0 of cols) {
       for (const c1 of cols) {
         if (c1 < c0) continue

@@ -194,135 +194,6 @@ function smallestWhere(lo: number, hi: number, pred: (sizeMM: number) => boolean
   return a
 }
 
-function pushSingle(
-  candidates: Candidate[],
-  spec: GridSystemSpec,
-  band: BandId,
-  sizeMM: number,
-  half: number,
-  x: number,
-  y: number,
-) {
-  const pitch = spec.grid.basePitchMM
-  const [ox, oy] = originOf(x, y, pitch)
-  const col = Math.round((x - ox) / pitch)
-  const row = Math.round((y - oy) / pitch)
-  candidates.push({
-    id: [band, sizeMM, ox, oy, 'single', 'base', 0, 0, `${col},${row}`].join(':'),
-    band,
-    sizeMM,
-    anchor: 'bbox',
-    registration: { x: namedOrigin(ox, half), y: namedOrigin(oy, half) },
-    origin: [ox, oy],
-    family: 'single',
-    population: 'base',
-    stepCol: 0,
-    stepRow: 0,
-    sites: [{ col, row, x, y }],
-  })
-}
-
-function pushRun(
-  candidates: Candidate[],
-  spec: GridSystemSpec,
-  band: BandId,
-  sizeMM: number,
-  half: number,
-  pts: PointMM[],
-) {
-  const pitch = spec.grid.basePitchMM
-  const [ox, oy] = originOf(pts[0][0], pts[0][1], pitch)
-  const sites = pts.map(([x, y]) => ({
-    col: Math.round((x - ox) / pitch),
-    row: Math.round((y - oy) / pitch),
-    x,
-    y,
-  }))
-  const stepCol = Math.abs(sites[1].col - sites[0].col)
-  const stepRow = Math.abs(sites[1].row - sites[0].row)
-  candidates.push({
-    id: [
-      band,
-      sizeMM,
-      ox,
-      oy,
-      'run',
-      'base',
-      stepCol,
-      stepRow,
-      sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
-    ].join(':'),
-    band,
-    sizeMM,
-    anchor: 'bbox',
-    registration: { x: namedOrigin(ox, half), y: namedOrigin(oy, half) },
-    origin: [ox, oy],
-    family: 'run',
-    population: 'base',
-    stepCol,
-    stepRow,
-    sites,
-  })
-}
-
-function pushPair(
-  candidates: Candidate[],
-  spec: GridSystemSpec,
-  band: BandId,
-  sizeMM: number,
-  half: number,
-  a: PointMM,
-  b: PointMM,
-) {
-  pushRun(candidates, spec, band, sizeMM, half, [a, b])
-}
-
-function pushCorners(
-  candidates: Candidate[],
-  spec: GridSystemSpec,
-  band: BandId,
-  sizeMM: number,
-  half: number,
-  corners: PointMM[],
-  family: 'rectangle-corners' | 'corner-triangle',
-) {
-  const pitch = spec.grid.basePitchMM
-  const [ox, oy] = originOf(corners[0][0], corners[0][1], pitch)
-  const sites = corners.map(([x, y]) => ({
-    col: Math.round((x - ox) / pitch),
-    row: Math.round((y - oy) / pitch),
-    x,
-    y,
-  }))
-  const cols = sites.map((s) => s.col)
-  const rows = sites.map((s) => s.row)
-  const stepCol = Math.max(...cols) - Math.min(...cols)
-  const stepRow = Math.max(...rows) - Math.min(...rows)
-  candidates.push({
-    id: [
-      band,
-      sizeMM,
-      ox,
-      oy,
-      family,
-      'base',
-      stepCol,
-      stepRow,
-      sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
-    ].join(':'),
-    band,
-    sizeMM,
-    anchor: 'bbox',
-    registration: { x: namedOrigin(ox, half), y: namedOrigin(oy, half) },
-    origin: [ox, oy],
-    family,
-    population: 'base',
-    stepCol,
-    stepRow,
-    sites,
-  })
-}
-
 function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[] {
   return verts.map(([x, y]) => [x + dx, y + dy])
 }
@@ -393,18 +264,55 @@ export function collectCandidates(
   const bands = [1, 2, 3, 4] as const
   const origins = latticeOrigins(spec)
 
-  // Grammar pack stays on the small ladder plus 168 (tests lock those seats).
-  // Large-band 12mm enumerations were the 40s — wrap below already finds those holds.
-  const packSizes = new Set<number>([...BAND_SIZES_MM[1], 168])
+  const emitArrangements = (
+    band: BandId,
+    sizeMM: number,
+    origin: PointMM,
+    sites: SiteInput[],
+    population: 'base' | 'sparse',
+  ) => {
+    const registration: AxisRegistration = {
+      x: namedOrigin(origin[0], half),
+      y: namedOrigin(origin[1], half),
+    }
+    for (const arr of enumerateArrangements(sites, population)) {
+      const id = [
+        band,
+        sizeMM,
+        origin[0],
+        origin[1],
+        arr.family,
+        arr.population,
+        arr.stepCol,
+        arr.stepRow,
+        arr.sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
+      ].join(':')
+      candidates.push({
+        id,
+        band,
+        sizeMM,
+        anchor: 'bbox',
+        registration,
+        origin,
+        family: arr.family,
+        population: arr.population,
+        stepCol: arr.stepCol,
+        stepRow: arr.stepRow,
+        sites: arr.sites.map((s) => ({ col: s.col, row: s.row, x: s.x, y: s.y })),
+      })
+    }
+  }
+
+  // Every 12mm size in every band — all lawful holds, any count.
+  const packSizes = new Set<number>()
+  for (const band of bands) {
+    for (const sizeMM of BAND_SIZES_MM[band]) packSizes.add(sizeMM)
+  }
   for (const sizeMM of packSizes) {
     const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
     const prep: PreparedOutline = prepareOutline(scaled)
     const homeBands = bands.filter((band) => BAND_SIZES_MM[band].includes(sizeMM))
     for (const origin of origins) {
-      const registration: AxisRegistration = {
-        x: namedOrigin(origin[0], half),
-        y: namedOrigin(origin[1], half),
-      }
       const raw = magnetsInRegion(dense, field, 0, origin)
       const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
       const measured: SiteInput[] = indexed.map((s) => ({
@@ -412,39 +320,9 @@ export function collectCandidates(
         fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
       }))
       const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
-      const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
-        { population: 'base', sites: measured },
-        { population: 'sparse', sites: sparseSites },
-      ]
-      for (const pack of packs) {
-        for (const arr of enumerateArrangements(pack.sites, pack.population, { windows: false })) {
-          for (const band of homeBands) {
-            const id = [
-              band,
-              sizeMM,
-              origin[0],
-              origin[1],
-              arr.family,
-              arr.population,
-              arr.stepCol,
-              arr.stepRow,
-              arr.sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
-            ].join(':')
-            candidates.push({
-              id,
-              band,
-              sizeMM,
-              anchor: 'bbox',
-              registration,
-              origin,
-              family: arr.family,
-              population: arr.population,
-              stepCol: arr.stepCol,
-              stepRow: arr.stepRow,
-              sites: arr.sites.map((s) => ({ col: s.col, row: s.row, x: s.x, y: s.y })),
-            })
-          }
-        }
+      for (const band of homeBands) {
+        emitArrangements(band, sizeMM, origin, measured, 'base')
+        emitArrangements(band, sizeMM, origin, sparseSites, 'sparse')
       }
     }
   }
@@ -459,82 +337,6 @@ export function collectCandidates(
     cellCache.set(sizeMM, cells)
     return cells
   }
-  const pairDirs: PointMM[] = [
-    [0, pitch],
-    [pitch, 0],
-    [pitch, pitch],
-    [pitch, -pitch],
-  ]
-
-  const emitPairs = (sizeMM: number) => {
-    const cells = cellsAt(sizeMM)
-    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-    let n = 0
-    for (const [x, y] of cells) {
-      for (const [dx, dy] of pairDirs) {
-        if (!at.has(`${x + dx},${y + dy}`)) continue
-        pushPair(candidates, spec, 2, sizeMM, half, [x, y], [x + dx, y + dy])
-        n++
-      }
-    }
-    return n
-  }
-
-  const emitTriples = (sizeMM: number) => {
-    const cells = cellsAt(sizeMM)
-    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-    let n = 0
-    for (const [x, y] of cells) {
-      for (const [dx, dy] of pairDirs) {
-        const b: PointMM = [x + dx, y + dy]
-        const c: PointMM = [x + dx * 2, y + dy * 2]
-        if (!at.has(`${b[0]},${b[1]}`) || !at.has(`${c[0]},${c[1]}`)) continue
-        pushRun(candidates, spec, 3, sizeMM, half, [[x, y], b, c])
-        n++
-      }
-    }
-    return n
-  }
-
-  const emitRects = (
-    band: 3 | 4,
-    sizeMM: number,
-    spans: number[],
-    accept: (sc: number, sr: number) => boolean,
-    seenSteps: Set<string>,
-  ) => {
-    const cells = cellsAt(sizeMM)
-    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-    const fours: PointMM[][] = []
-    const threes: PointMM[][] = []
-    for (const [x, y] of cells) {
-      for (const dx of spans) {
-        for (const dy of spans) {
-          const corners: PointMM[] = [
-            [x, y],
-            [x + dx, y],
-            [x, y + dy],
-            [x + dx, y + dy],
-          ]
-          const held = corners.filter(([cx, cy]) => at.has(`${cx},${cy}`))
-          if (held.length === 4 && accept(dx / pitch, dy / pitch)) fours.push(held)
-          else if (held.length === 3 && band === 3) threes.push(held)
-        }
-      }
-    }
-    for (const held of fours) {
-      const xs = held.map((p) => p[0])
-      const ys = held.map((p) => p[1])
-      const key = `${Math.round((Math.max(...xs) - Math.min(...xs)) / pitch)}x${Math.round(
-        (Math.max(...ys) - Math.min(...ys)) / pitch,
-      )}`
-      if (seenSteps.has(key)) continue
-      seenSteps.add(key)
-      pushCorners(candidates, spec, band, sizeMM, half, held, 'rectangle-corners')
-    }
-    return { fours: fours.length, threes }
-  }
-
   const bboxOf = (sizeMM: number) => {
     const prep = prepAt(sizeMM)
     return {
@@ -556,131 +358,37 @@ export function collectCandidates(
     return hit
   }
 
-  const anyPair = (sizeMM: number, spine = false) => {
-    const box = bboxOf(sizeMM)
-    if (box.w < 24 || box.h < 24) return false
-    if (box.w < 72 && box.h < 72) return false
+  const emitMillimetre = (band: BandId, sizeMM: number) => {
     const cells = cellsAt(sizeMM)
-    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-    const { cx, cy } = formBbox(scaleToSize(outline, sizeMM))
-    const slop = spec.grid.paddingMM / 2
-    for (const [x, y] of cells) {
-      for (const [dx, dy] of pairDirs) {
-        if (!at.has(`${x + dx},${y + dy}`)) continue
-        if (!spine) return true
-        const vertical = Math.abs(dx) < Math.abs(dy)
-        const mid = vertical ? (x + x + dx) / 2 - cx : (y + y + dy) / 2 - cy
-        if (Math.abs(mid) <= slop) return true
+    // Off-ladder wrap only. A ladder size already has the 12mm pack.
+    if (BAND_SIZES_MM[band].includes(sizeMM)) return
+    const groups = new Map<string, { origin: PointMM; pts: PointMM[] }>()
+    for (const p of cells) {
+      const origin = originOf(p[0], p[1], pitch)
+      const key = `${origin[0]},${origin[1]}`
+      let g = groups.get(key)
+      if (!g) {
+        g = { origin, pts: [] }
+        groups.set(key, g)
       }
+      g.pts.push(p)
     }
-    return false
+    for (const { origin, pts } of groups.values()) {
+      const measured: SiteInput[] = indexSites(pts, origin, pitch).map((s) => ({
+        ...s,
+        fits: true,
+      }))
+      const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
+      emitArrangements(band, sizeMM, origin, measured, 'base')
+      emitArrangements(band, sizeMM, origin, sparseSites, 'sparse')
+    }
   }
 
-  const anyTriple = (sizeMM: number, masses = false) => {
-    const box = bboxOf(sizeMM)
-    if (box.h < 120 && box.w < 120) return false
-    const cells = cellsAt(sizeMM)
-    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-    const prep = prepAt(sizeMM)
-    const minY = Number(prep.minY) / 1000
-    const maxY = Number(prep.maxY) / 1000
-    const span = maxY - minY
-    for (const [x, y] of cells) {
-      for (const [dx, dy] of pairDirs) {
-        if (!at.has(`${x + dx},${y + dy}`) || !at.has(`${x + dx * 2},${y + dy * 2}`)) continue
-        if (!masses) return true
-        const ys = [y, y + dy, y + dy * 2]
-        if (Math.min(...ys) <= minY + span / 3 && Math.max(...ys) >= maxY - span / 3) return true
-      }
-    }
-    return false
-  }
-
-  const anyRect = (
-    sizeMM: number,
-    spans: number[],
-    accept: (sc: number, sr: number) => boolean,
-  ) => {
-    const box = bboxOf(sizeMM)
-    const viable = spans.filter(
-      (dx) => spans.some((dy) => accept(dx / pitch, dy / pitch) && box.w >= dx + 24 && box.h >= dy + 24),
-    )
-    if (!viable.length) return false
-    const cells = cellsAt(sizeMM)
-    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
-    for (const [x, y] of cells) {
-      for (const dx of spans) {
-        for (const dy of spans) {
-          if (!accept(dx / pitch, dy / pitch)) continue
-          if (
-            at.has(`${x + dx},${y}`) &&
-            at.has(`${x},${y + dy}`) &&
-            at.has(`${x + dx},${y + dy}`)
-          ) {
-            return true
-          }
-        }
-      }
-    }
-    return false
-  }
-
-  // Band 1 wrap is the smallest millimetre a disc holds — 43 on the bot, not the 48 ladder step.
-  {
-    const sizes = BAND_SIZES_MM[1]
+  // Tight wrap: first millimetre a disc holds, every arrangement on those seats.
+  for (const band of bands) {
+    const sizes = BAND_SIZES_MM[band]
     const wrap = smallestWhere(sizes[0], sizes[sizes.length - 1], anyFit)
-    if (wrap !== null) {
-      for (const [x, y] of cellsAt(wrap)) {
-        pushSingle(candidates, spec, 1, wrap, half, x, y)
-      }
-    }
-  }
-
-  // Band 2: first pair, then the 1mm wrap of that pair.
-  {
-    const sizes = BAND_SIZES_MM[2]
-    const wrap =
-      smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyPair(s, true)) ??
-      smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyPair(s, false))
-    if (wrap !== null) emitPairs(wrap)
-  }
-
-  // Band 3: first 4 that reaches both masses (48×96 / 96×48 / 96×96), not a 48×48 belly.
-  {
-    const sizes = BAND_SIZES_MM[3]
-    const spans = [pitch, pitch * 2]
-    const mass = (sc: number, sr: number) => sc + sr >= 3
-    const wrap4 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, mass))
-    const wrap3 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyTriple(s, true))
-    const seen = new Set<string>()
-    if (wrap4 !== null) {
-      emitRects(3, wrap4, spans, mass, seen)
-    }
-    if (wrap3 !== null) emitTriples(wrap3)
-    if (wrap4 === null && wrap3 === null) {
-      const any4 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) =>
-        anyRect(s, spans, () => true),
-      )
-      if (any4 !== null) {
-        const { threes } = emitRects(3, any4, spans, () => true, seen)
-        for (const held of threes) {
-          pushCorners(candidates, spec, 3, any4, half, held, 'corner-triangle')
-        }
-      }
-    }
-  }
-
-  // Band 4: jump a lattice step. Keep the first next-step and the first narrow 1×N (inner rectangle).
-  {
-    const sizes = BAND_SIZES_MM[4]
-    const spans = [pitch, pitch * 2, pitch * 3]
-    const next = (sc: number, sr: number) => sc + sr >= 4
-    const narrow = (sc: number, sr: number) => next(sc, sr) && (sc === 1 || sr === 1)
-    const first = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, next))
-    const tall = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, narrow))
-    const seen = new Set<string>()
-    if (first !== null) emitRects(4, first, spans, next, seen)
-    if (tall !== null && tall !== first) emitRects(4, tall, spans, narrow, seen)
+    if (wrap !== null) emitMillimetre(band, wrap)
   }
 
   return { candidates }
