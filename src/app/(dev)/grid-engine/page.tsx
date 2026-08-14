@@ -202,10 +202,14 @@ export default function GridEnginePage() {
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
   const stickerMM = Math.round(bandSpan(spec, 3))
   const shownView =
-    shownCand && metric ? standingView(spec, shownCand, metric, picture ?? undefined, stickerMM) : null
-  const displayK = shownCand ? stickerMM / shownCand.sizeMM : 1
+    shownCand && metric
+      ? standingView(spec, shownCand, metric, picture ?? undefined, stickerMM, sizeMM)
+      : null
+  const displayK = shownCand ? stickerMM / Math.max(sizeMM, 1) : 1
   const shownScore = shownCand && metric ? measureProposal(spec, shownCand, metric) : null
-  const marks = shownView ? shownView.sites : []
+  const marks = shownView
+    ? shownView.sites.map(([x, y]) => [x + pan[0] * displayK, y + pan[1] * displayK] as [number, number])
+    : []
   const demoVerts = shownView ? shownView.shape : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
@@ -257,6 +261,7 @@ export default function GridEnginePage() {
    * themselves, so it is placement — the shape stays still and the grid comes to meet it.
    */
   const [pan, setPan] = useState<[number, number]>([0, 0])
+  const [viewZoom, setViewZoom] = useState(1)
   useEffect(() => {
     if (!shownCand) return
     setSize(shownCand.sizeMM)
@@ -301,6 +306,7 @@ export default function GridEnginePage() {
     setBox(null)
     setOutline(null)
     setPicture(null)
+    setViewZoom(1)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -373,9 +379,10 @@ export default function GridEnginePage() {
    */
   useEffect(() => {
     applyPinch.current = (factor: number) => {
-      // Accumulate against the UNROUNDED size. Rounding each packet threw the fraction away and then
-      // discarded it, so a hundred 0.1s moved nothing while one 10 moved thirteen millimetres — the
-      // same defect as the drag, in the other gesture.
+      if (cutout) {
+        setViewZoom((z) => Math.min(4, Math.max(0.4, z * factor)))
+        return
+      }
       const next = sizeExactMM.current * factor
       const held = snapBand(next)
       sizeExactMM.current = held
@@ -544,7 +551,7 @@ export default function GridEnginePage() {
           panMM={shownField.panMM}
           displayK={displayK}
           frameMM={shownCand ? stickerMM * 1.15 : undefined}
-          zoom={shownCand ? 1 : gridScale}
+          zoom={shownCand ? viewZoom : gridScale}
           onView={onView}
         >
           {marks.map(([x, y]) => (

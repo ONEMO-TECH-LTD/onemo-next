@@ -119,7 +119,7 @@ export function GridCanvas({
     frameMM && frameMM > 0
       ? { x: -frameMM / 2, y: -frameMM / 2, w: frameMM, h: frameMM }
       : layout.padded
-  const view = viewBox(framed, frameMM ? ZOOM_FIT : zoom, box.w / box.h)
+  const view = viewBox(framed, zoom, box.w / box.h)
 
   const { cols, rows, spanXMM, spanYMM } = describeRegion(spec, layout, view)
   useEffect(() => {

@@ -171,6 +171,7 @@ export function standingView(
   outline: ReadonlyArray<PointMM>,
   picture?: { w: number; h: number },
   stickerMM?: number,
+  lawSizeMM?: number,
 ): {
   spec: GridSystemSpec
   panMM: PointMM
@@ -183,7 +184,8 @@ export function standingView(
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
   const draw = stickerMM && stickerMM > 0 ? stickerMM : candidate.sizeMM
-  const k = draw / candidate.sizeMM
+  const law = lawSizeMM && lawSizeMM > 0 ? lawSizeMM : candidate.sizeMM
+  const k = draw / law
   return {
     spec: pitched.spec,
     panMM: candidate.origin,
