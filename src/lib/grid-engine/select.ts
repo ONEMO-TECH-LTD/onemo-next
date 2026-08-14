@@ -161,11 +161,6 @@ export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMe
   const ae = won.extremes / (won.size * won.size)
   const be = lost.extremes / (lost.size * lost.size)
   if (ae !== be) return `extremes ${ae.toFixed(3)} < ${be.toFixed(3)}`
-  if (band === 2) {
-    const ap = won.pair / (won.size * won.size)
-    const bp = lost.pair / (lost.size * lost.size)
-    if (ap !== bp) return `pair-span`
-  }
   if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
   if (won.area !== lost.area) return `area`
   return 'tie'
@@ -206,11 +201,6 @@ export function propose(
     const ae = a.extremes / (a.size * a.size)
     const be = b.extremes / (b.size * b.size)
     if (ae !== be) return ae - be
-    if (band === 2) {
-      const ap = a.pair / (a.size * a.size)
-      const bp = b.pair / (b.size * b.size)
-      if (ap !== bp) return bp - ap
-    }
     if (a.size !== b.size) return a.size - b.size
     if (a.area !== b.area) return a.area - b.area
     return a.c.id.localeCompare(b.c.id)
