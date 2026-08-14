@@ -151,11 +151,14 @@ targets ES2017).
 2. Grammar into `spec.ts`; tracer keeps its ring; repair + extend the separation guard.
    **Gate:** separation guard green including the new direction checks.
 3. The seam. **Gate:** runs on a real fixture trace end to end.
-4. The one bridge door, then the shell control. While the candidate diagnostic is active the shell
-   freezes `panMM` at `[0,0]` and disables the lattice drag; stepping candidates changes only the
-   selected record and highlight, and never solves. **Gate:** `tsc` clean, guards green, plus two
-   assertions — a pan or candidate-index change calls the seam zero times, and selected candidate
-   centres coincide with drawn magnet centres.
+4. The one bridge door, then the shell control. Shell state is one selected candidate index,
+   `number | null`: selecting an index enters candidate view, resets `panMM` to `[0,0]` and disables
+   the lattice drag; setting it back to `null` clears the view and restores the existing drag.
+   Stepping and clearing are indexed presentation changes and never solve.
+   **Gate:** `tsc` clean, guards green, plus four assertions — with a candidate selected, an
+   attempted drag leaves `panMM` at `[0,0]` and calls the seam zero times; stepping the candidate
+   changes only the highlight and calls the seam zero times; clearing the selection restores the
+   drag; highlighted candidate centres coincide with drawn magnet centres.
 5. Run on real traces in profiled Chrome; screenshot; Dan looks.
 
 One bridge result carries measurement, raw candidates, and part 3's named missing inputs. The shell
