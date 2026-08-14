@@ -48,6 +48,13 @@ satisfy it, and this lane does not precommit to either** — the kernel's author
 which exact finite representation is achievable for arbitrary simple concave polygons, and to
 deliver that one.
 
+**Completeness is non-negotiable in either shape.** L13 requires every lawful size variation to
+survive, and on a concave shape feasibility comes in **disjoint windows** — so a single
+first-lawful witness cannot reconstruct the later ones. The delivery must return the **complete**
+exact lawful-size set (or a complete finite measurement-state partition from which every lawful
+occurrence follows). The published minimum is **derived from** that complete set, never an
+alternative to it.
+
 **(A) — preferred, and it changes nothing above Part 1.** The kernel publishes, for **every lattice
 site**, the complete exact partition of positive scale into intervals where that site's held state
 is constant (equivalently, the lawful whole-even size intervals), for the finite field and a given
@@ -59,7 +66,7 @@ Part 2 verbatim and authoritative.
 **(B) — fallback, only if (A) is not finitely representable.** Part 2 gains a deterministic,
 geometry-blind `enumeratePatternPlacements(grammar, fieldExtent)` returning every family / population
 / steps / position-set placement without held facts; Part 1 then evaluates those requested site sets
-and returns exact scale/legality intervals with limiting witnesses. Part 2's existing
+and returns the **complete** exact lawful-scale set with limiting witnesses. Part 2's existing
 `enumerateCandidates` still verifies at the returned lawful sizes.
 
 **Either way, also additive to Part 1:** authoritative **maximum-clearance anchors** with
@@ -110,4 +117,11 @@ two-construction diagnostic surface is a scope cut Dan may authorise; this lane 
 2. Draft the additive request (Parts 1 + 2), QA it, Dan sends it.
 3. On delivery: verify verbatim, then write `compute/candidates.ts`, `logic/registration-law.ts`,
    the bridge door, the shell controls.
-4. Chrome check, screenshot, Dan tests the assembled three.
+4. **Activate Part 3 — named, not assumed.** The additive request also asks the author for Part 3's
+   **minimal explicit-input assembly contract**: what the trusted-enumerator seam requires, and the
+   smallest supplied form of the gravity and region judgements it will accept. On that answer this
+   lane wires the supplied judgements in, runs Part 3, and routes its ranked tiers out through the
+   bridge — **producers are supplied inputs, never invented here** (tight wrap is the one with a
+   formula; gravity and region are supplied until a computable rule is sourced). Ranking exists
+   only inside Part 3; never in compute, never in the shell.
+5. Chrome check, screenshot, Dan tests the assembled three.
