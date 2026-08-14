@@ -342,53 +342,94 @@ describe('mutation fixtures — every escape class is caught, and legal code is 
  * unit, so `ui/`, the app and any framework stay forbidden to it. An earlier draft of the plan said
  * the bridge was "unconstrained", which would have licensed exactly that.
  */
+/**
+ * EVERY module-loading form, not just the two spellings I thought of first.
+ *
+ * The first version collected `import` and `import()` only. Measured: `export * from`,
+ * `export { x } from`, `require()` and `import x = require()` all walked straight through — four of
+ * six forms unguarded. That is the same defect class as the pattern-shaped guards above.
+ */
 const importSpecifiers = (text: string): string[] => {
   const found: string[] = []
   walkAst(text, (n) => {
     if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) {
       found.push(n.moduleSpecifier.text)
     }
+    if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
+      found.push(n.moduleSpecifier.text)
+    }
     if (
-      ts.isCallExpression(n) &&
-      n.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      n.arguments[0] &&
-      ts.isStringLiteral(n.arguments[0])
+      ts.isImportEqualsDeclaration(n) &&
+      ts.isExternalModuleReference(n.moduleReference) &&
+      ts.isStringLiteral(n.moduleReference.expression)
     ) {
-      found.push((n.arguments[0] as ts.StringLiteral).text)
+      found.push(n.moduleReference.expression.text)
+    }
+    if (ts.isCallExpression(n) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+      const callee = n.expression
+      if (callee.kind === ts.SyntaxKind.ImportKeyword || callee.getText() === 'require') {
+        found.push((n.arguments[0] as ts.StringLiteral).text)
+      }
     }
   })
   return found
 }
 
-/** Which semantic module a specifier resolves INTO, from the importing file's own directory. */
-const targetModule = (fromFile: string, specifier: string): string | null => {
-  const resolved = specifier.startsWith('.')
-    ? join(fromFile.includes('/') ? fromFile.replace(/\/[^/]*$/, '') : '', specifier)
-    : specifier
-  if (/^@\/app\//.test(specifier) || /^(react|next)(\/|$)/.test(specifier)) return 'app-or-framework'
-  if (/(^|\/)ui\//.test(resolved) || resolved.startsWith('ui/')) return 'ui'
-  if (/(^|\/)compute\//.test(resolved) || resolved.startsWith('compute/')) return 'compute'
-  if (/(^|\/)logic\//.test(resolved) || resolved.startsWith('logic/')) return 'logic'
-  return null
+/** The three accepted packages, named exactly. Everything else under compute/logic is authored. */
+const DELIVERED_PACKAGES = [
+  'compute/magnetic-grid-measurement-kernel',
+  'compute/enumerator',
+  'logic/magnetic-grid-product-logic',
+] as const
+
+/**
+ * Which semantic module a specifier resolves INTO, relative to the importing file.
+ *
+ * ANYTHING LEAVING THE UNIT — an alias, a bare package, a node builtin, a `../` that escapes — is
+ * `outward`, never `null`. The first version returned null for everything it did not recognise and
+ * the caller treated null as permitted, so `compute` importing `@/lib/effect/contour` or `node:fs`
+ * passed silently. A deny-list cannot express "may import", which is what the table actually says.
+ */
+const targetModule = (fromFile: string, specifier: string): string => {
+  if (!specifier.startsWith('.')) return 'outward'
+  const dir = fromFile.includes('/') ? fromFile.replace(/\/[^/]*$/, '') : ''
+  const resolved = join(dir, specifier)
+  if (resolved.startsWith('..')) return 'outward'
+  // A delivered package is classified by the MODULE IT LIVES IN, not as its own class. Giving all
+  // three a shared `package` class made `compute -> logic/magnetic-grid-product-logic` legal, since
+  // the seam is allowed to reach its own packages. Its own means its own module's.
+  if (resolved.startsWith('ui/')) return 'ui'
+  if (resolved.startsWith('compute/')) return 'compute'
+  if (resolved.startsWith('logic/')) return 'logic'
+  if (/^(spec|engine|bridge)(\.|$)/.test(resolved)) return resolved.replace(/\..*$/, '')
+  return 'outward'
 }
 
-const FORBIDDEN: Record<string, readonly string[]> = {
-  'bridge.ts': ['ui', 'app-or-framework'],
-  compute: ['logic', 'ui', 'app-or-framework'],
-  logic: ['compute', 'ui', 'app-or-framework'],
-  ui: ['compute', 'logic'],
+/**
+ * ALLOW-LISTS, straight off the plan's direction table. An unlisted target is a violation, so a
+ * spelling nobody anticipated fails closed instead of passing as "unclassified".
+ *
+ * `ui/` is the only module permitted outward: it is the adapter, and reading a file or calling the
+ * tracer is browser IO the portable unit may not do itself.
+ */
+const ALLOWED: Record<string, readonly string[]> = {
+  'bridge.ts': ['spec', 'engine', 'compute', 'logic'],
+  compute: ['spec', 'engine', 'compute'],
+  logic: ['logic'],
+  ui: ['ui', 'outward'],
 }
 
 describe('module directions — one-way traffic between the semantic modules', () => {
-  /** Only files we author. The delivered packages are third-party bytes and are never edited. */
-  const authored = () =>
-    readTree(UNIT, /\.ts$/).filter(
-      (f) =>
-        !/^(compute|logic)\/[^/]+\/(src|dist|test|scripts)\//.test(f.file) &&
-        !f.file.endsWith('.d.ts'),
-    )
+  /**
+   * Only files we author. The three delivered packages are third-party bytes and are never edited,
+   * so they are exempt — BY EXACT ROOT, never by shape. A wildcard of the form
+   * "compute, any module, src" would exempt any future authored module that happened to use the
+   * same layout, which is a guard that disables guards.
+   */
+  const isDelivered = (file: string) => DELIVERED_PACKAGES.some((p) => file.startsWith(`${p}/`))
+  const authored = () => readTree(UNIT, /\.ts$/).filter((f) => !isDelivered(f.file))
 
-  const moduleOf = (file: string): keyof typeof FORBIDDEN | null =>
+  const moduleOf = (file: string): keyof typeof ALLOWED | null =>
     file === 'bridge.ts'
       ? 'bridge.ts'
       : file.startsWith('compute/')
@@ -399,49 +440,84 @@ describe('module directions — one-way traffic between the semantic modules', (
             ? 'ui'
             : null
 
-  it('no authored unit file imports against the direction table', () => {
+  it('no authored unit file imports outside its allow-list', () => {
     const files = authored()
     expect(files.length, 'no authored unit files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of files) {
       const module = moduleOf(file)
       if (module === null) continue
-      const banned = FORBIDDEN[module]!
+      const allowed = ALLOWED[module]!
       const violations = importSpecifiers(text)
         .map((s) => ({ s, target: targetModule(file, s) }))
-        .filter((h) => h.target !== null && banned.includes(h.target))
+        .filter((h) => !allowed.includes(h.target))
         .map((h) => `${h.s} (${h.target})`)
-      expect(violations, `${file} imports against the direction table: ${violations.join(', ')}`).toEqual([])
+      expect(violations, `${file} imports outside its allow-list: ${violations.join(', ')}`).toEqual([])
     }
+  })
+
+  it('every module-loading form is collected, not just the two obvious ones', () => {
+    // Measured escapes: the first collector caught `import` and `import()` and missed these four.
+    for (const src of [
+      `import { x } from './ui/trace-cutout'`,
+      `const m = await import('./ui/trace-cutout')`,
+      `export * from './ui/trace-cutout'`,
+      `export { x } from './ui/trace-cutout'`,
+      `const m = require('./ui/trace-cutout')`,
+      `import m = require('./ui/trace-cutout')`,
+    ]) {
+      expect(importSpecifiers(src), `not collected: ${src}`).toContain('./ui/trace-cutout')
+    }
+    // a same-named local call is not a module load
+    expect(importSpecifiers(`const require = (s: string) => s; requireSomething('./ui/x')`)).toEqual([])
+  })
+
+  it('anything leaving the unit classifies as outward, never as unclassified', () => {
+    // The deny-list version returned null here and the caller read null as permitted, so the seam
+    // could have reached the app's own tracer internals or a node builtin unnoticed.
+    expect(targetModule('compute/candidates.ts', '@/lib/effect/contour')).toBe('outward')
+    expect(targetModule('compute/candidates.ts', '../../effect/contour')).toBe('outward')
+    expect(targetModule('bridge.ts', '../effect/contour')).toBe('outward')
+    expect(targetModule('logic/adapter.ts', 'node:fs')).toBe('outward')
+    expect(targetModule('bridge.ts', 'react')).toBe('outward')
+    expect(ALLOWED['bridge.ts']).not.toContain('outward')
+    expect(ALLOWED.compute).not.toContain('outward')
+    expect(ALLOWED.logic).not.toContain('outward')
+    // ui/ is the adapter: reaching outward is its job, and it alone may.
+    expect(ALLOWED.ui).toContain('outward')
   })
 
   it('the table is enforced both ways — each ban fires, each permitted direction does not', () => {
     // `./ui/trace-cutout` from the bridge is the spelling a builder actually reaches for, and the
     // pre-existing outward guard matched only `@/…` and `../…`, so it walked straight through.
-    expect(targetModule('bridge.ts', './ui/trace-cutout')).toBe('ui')
-    expect(targetModule('bridge.ts', '@/lib/grid-engine/ui/trace-cutout')).toBe('ui')
-    expect(targetModule('bridge.ts', 'react')).toBe('app-or-framework')
-    expect(targetModule('bridge.ts', '@/app/(dev)/grid-engine/page')).toBe('app-or-framework')
+    expect(ALLOWED['bridge.ts']).not.toContain(targetModule('bridge.ts', './ui/trace-cutout'))
     // …and the bridge's whole job stays legal.
-    expect(targetModule('bridge.ts', './compute/candidates')).toBe('compute')
-    expect(targetModule('bridge.ts', './logic/magnetic-grid-product-logic/dist/index.js')).toBe('logic')
-    expect(FORBIDDEN['bridge.ts']).not.toContain('compute')
-    expect(FORBIDDEN['bridge.ts']).not.toContain('logic')
-    // the seam consumes its own packages and the spec; it may not reach product judgement or a screen.
-    // Its sibling packages resolve INTO compute, which is its own module and therefore permitted —
-    // asserted as "not banned for compute" rather than as null, which is what it actually means.
-    expect(FORBIDDEN.compute).not.toContain(
+    expect(ALLOWED['bridge.ts']).toContain(targetModule('bridge.ts', './compute/candidates'))
+    expect(ALLOWED['bridge.ts']).toContain(targetModule('bridge.ts', './spec'))
+    expect(ALLOWED['bridge.ts']).toContain(targetModule('bridge.ts', './engine'))
+    expect(ALLOWED['bridge.ts']).toContain(
+      targetModule('bridge.ts', './logic/magnetic-grid-product-logic/dist/index.js'),
+    )
+    // the seam consumes its own delivered packages and the spec, and may reach neither judgement nor screen
+    expect(ALLOWED.compute).toContain(
       targetModule('compute/candidates.ts', './magnetic-grid-measurement-kernel/dist/index.js'),
     )
-    expect(targetModule('compute/candidates.ts', '../logic/magnetic-grid-product-logic/dist/index.js')).toBe('logic')
-    expect(targetModule('compute/candidates.ts', '../ui/trace-cutout')).toBe('ui')
-    expect(FORBIDDEN.compute).toContain('logic')
-    expect(FORBIDDEN.ui).toContain('compute')
+    expect(ALLOWED.compute).toContain(targetModule('compute/candidates.ts', '../spec'))
+    expect(ALLOWED.compute).not.toContain(
+      targetModule('compute/candidates.ts', '../logic/magnetic-grid-product-logic/dist/index.js'),
+    )
+    expect(ALLOWED.compute).not.toContain(targetModule('compute/candidates.ts', '../ui/trace-cutout'))
+    expect(ALLOWED.ui).not.toContain(targetModule('ui/trace-cutout.ts', '../compute/candidates'))
   })
 
-  it('third-party package bytes are excluded from authorship rules, and are actually present', () => {
+  it('the three delivered packages are exempt by exact root, and are actually present', () => {
     const all = readTree(UNIT, /\.ts$/).map((f) => f.file)
-    expect(all.some((f) => /^compute\/[^/]+\/src\//.test(f)), 'no delivered package sources found').toBe(true)
-    expect(authored().some((f) => /^(compute|logic)\/[^/]+\/(src|dist)\//.test(f.file))).toBe(false)
+    for (const pkg of DELIVERED_PACKAGES) {
+      expect(all.some((f) => f.startsWith(`${pkg}/`)), `delivered package missing: ${pkg}`).toBe(true)
+    }
+    expect(authored().some((f) => isDelivered(f.file))).toBe(false)
+    // a future authored module using the same layout is NOT exempted
+    expect(isDelivered('compute/my-new-module/src/thing.ts')).toBe(false)
+    expect(isDelivered('logic/registration-law/src/thing.ts')).toBe(false)
   })
 })
 
