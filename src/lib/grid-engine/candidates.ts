@@ -222,18 +222,17 @@ function pushSingle(
   })
 }
 
-function pushPair(
+function pushRun(
   candidates: Candidate[],
   spec: GridSystemSpec,
   band: BandId,
   sizeMM: number,
   half: number,
-  a: PointMM,
-  b: PointMM,
+  pts: PointMM[],
 ) {
   const pitch = spec.grid.basePitchMM
-  const [ox, oy] = originOf(a[0], a[1], pitch)
-  const sites = [a, b].map(([x, y]) => ({
+  const [ox, oy] = originOf(pts[0][0], pts[0][1], pitch)
+  const sites = pts.map(([x, y]) => ({
     col: Math.round((x - ox) / pitch),
     row: Math.round((y - oy) / pitch),
     x,
@@ -264,6 +263,18 @@ function pushPair(
     stepRow,
     sites,
   })
+}
+
+function pushPair(
+  candidates: Candidate[],
+  spec: GridSystemSpec,
+  band: BandId,
+  sizeMM: number,
+  half: number,
+  a: PointMM,
+  b: PointMM,
+) {
+  pushRun(candidates, spec, band, sizeMM, half, [a, b])
 }
 
 function pushCorners(
@@ -469,6 +480,22 @@ export function collectCandidates(
     return n
   }
 
+  const emitTriples = (sizeMM: number) => {
+    const cells = cellsAt(sizeMM)
+    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+    let n = 0
+    for (const [x, y] of cells) {
+      for (const [dx, dy] of pairDirs) {
+        const b: PointMM = [x + dx, y + dy]
+        const c: PointMM = [x + dx * 2, y + dy * 2]
+        if (!at.has(`${b[0]},${b[1]}`) || !at.has(`${c[0]},${c[1]}`)) continue
+        pushRun(candidates, spec, 3, sizeMM, half, [[x, y], b, c])
+        n++
+      }
+    }
+    return n
+  }
+
   const emitRects = (
     band: 3 | 4,
     sizeMM: number,
@@ -549,6 +576,26 @@ export function collectCandidates(
     return false
   }
 
+  const anyTriple = (sizeMM: number, masses = false) => {
+    const box = bboxOf(sizeMM)
+    if (box.h < 120 && box.w < 120) return false
+    const cells = cellsAt(sizeMM)
+    const at = new Set(cells.map(([x, y]) => `${x},${y}`))
+    const prep = prepAt(sizeMM)
+    const minY = Number(prep.minY) / 1000
+    const maxY = Number(prep.maxY) / 1000
+    const span = maxY - minY
+    for (const [x, y] of cells) {
+      for (const [dx, dy] of pairDirs) {
+        if (!at.has(`${x + dx},${y + dy}`) || !at.has(`${x + dx * 2},${y + dy * 2}`)) continue
+        if (!masses) return true
+        const ys = [y, y + dy, y + dy * 2]
+        if (Math.min(...ys) <= minY + span / 3 && Math.max(...ys) >= maxY - span / 3) return true
+      }
+    }
+    return false
+  }
+
   const anyRect = (
     sizeMM: number,
     spans: number[],
@@ -603,11 +650,14 @@ export function collectCandidates(
     const sizes = BAND_SIZES_MM[3]
     const spans = [pitch, pitch * 2]
     const mass = (sc: number, sr: number) => sc + sr >= 3
-    const wrap = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, mass))
+    const wrap4 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyRect(s, spans, mass))
+    const wrap3 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) => anyTriple(s, true))
     const seen = new Set<string>()
-    if (wrap !== null) {
-      emitRects(3, wrap, spans, mass, seen)
-    } else {
+    if (wrap4 !== null) {
+      emitRects(3, wrap4, spans, mass, seen)
+    }
+    if (wrap3 !== null) emitTriples(wrap3)
+    if (wrap4 === null && wrap3 === null) {
       const any4 = smallestWhere(sizes[0], sizes[sizes.length - 1], (s) =>
         anyRect(s, spans, () => true),
       )

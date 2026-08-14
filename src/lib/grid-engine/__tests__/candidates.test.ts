@@ -109,6 +109,21 @@ describe('collectCandidates — shipped entry', () => {
     expect(ones.some((c) => c.origin[0] % 12 !== 0 || c.origin[1] % 12 !== 0)).toBe(true)
   })
 
+  it('band-3 wrap is a three-in-a-line at the smallest millimetre, not the 168 pack', () => {
+    const tall: Array<[number, number]> = [
+      [-12, -75],
+      [12, -75],
+      [12, 75],
+      [-12, 75],
+    ]
+    const doc = listCandidates(RELEASED, tall)
+    const face = benchCandidates(RELEASED, doc, 3, tall)
+    expect(face[0]?.sites.length).toBe(3)
+    expect(face[0]?.family).toBe('run')
+    expect(face[0]!.sizeMM).toBeLessThan(168)
+    expect(face[0]!.sizeMM).toBeGreaterThanOrEqual(120)
+  })
+
   it('band-1 wrap is the smallest millimetre, not the next 12mm ladder step', () => {
     // 43×24: a 24mm disc kisses the short side at 43 and falls out at 42.
     const slim: Array<[number, number]> = [

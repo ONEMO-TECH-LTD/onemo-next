@@ -220,10 +220,13 @@ export default function GridEnginePage() {
       ? standingView(spec, shownCand, metric, picture ?? undefined, stickerMM)
       : null
   const displayK = shownCand ? stickerMM / Math.max(sizeMM, 1) : 1
-  const markK = shownCand ? stickerMM / Math.max(shownCand.sizeMM, 1) : 1
   const shownScore = shownCand && metric ? measureProposal(spec, shownCand, metric) : null
-  // Engine seats stay on the shape. Pan and the size slider only move the lattice.
-  const marks = shownView ? shownView.sites : []
+  // Same lattice as the grey discs — not a second set of seats.
+  const marks = shownCand
+    ? shownCand.sites.map(
+        (s) => [(s.x + pan[0]) * displayK, (s.y + pan[1]) * displayK] as [number, number],
+      )
+    : []
   const demoVerts = shownView ? shownView.shape : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
@@ -420,7 +423,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-36</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-37</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
@@ -563,7 +566,7 @@ export default function GridEnginePage() {
               data-candidate-mark="true"
               cx={x}
               cy={y}
-              r={(minSpanMM / 2) * markK}
+              r={(minSpanMM / 2) * displayK}
               fill="none"
               stroke="#3dd68c"
               strokeWidth={2}

@@ -222,6 +222,15 @@ export function propose(
       return a.c.id.localeCompare(b.c.id)
     }
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+    if (band === 3 && a.masses !== b.masses) return a.masses ? -1 : 1
+    if (
+      band === 3 &&
+      a.c.family === 'run' &&
+      b.c.family === 'run' &&
+      a.size !== b.size
+    ) {
+      return a.size - b.size
+    }
     if (a.n !== b.n) return b.n - a.n
     if (a.masses !== b.masses) return a.masses ? -1 : 1
     if (band === 4 && a.area !== b.area) return a.area - b.area
