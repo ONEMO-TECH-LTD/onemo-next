@@ -180,9 +180,35 @@ because changing units for the kernel is compute work.
 test classifies **every** nested directory under the unit as `ui/` (`separation.test.ts:242`) and
 forbids law-value names there — so installing `compute/` makes the seam fail for reading law values,
 which is exactly what compute is supposed to do. Fix: target `ui/` specifically, and add the
-direction checks the guard never had — the seam may not reach logic or the app; logic may not reach
-compute or ui; ui may not reach compute or logic; the shell reaches none of them; the bridge is
-deliberately unconstrained, because orchestrating all three is its job.
+direction checks the guard never had.
+
+**The bridge is bounded, not unconstrained — and an earlier draft of this plan got that wrong.**
+Saying "the bridge is deliberately unconstrained" would have licensed it to reach outward into
+`ui/`, the app, or a framework. It travels with the portable unit (`PORTABLE` already lists
+`bridge.ts`), so its freedom is to cross the unit's **internal** semantic layers, never to erase the
+unit's outer boundary:
+
+| module | may import | may not import |
+|---|---|---|
+| `bridge.ts` | spec · engine · `compute/*` · `logic/*` | `ui/*` · app · React/Next/CSS · browser globals |
+| `compute/*` | spec · engine · its own delivered packages | `logic/*` · `ui/*` · app |
+| `logic/*` | its own delivered package | `compute/*` · `ui/*` · app |
+| `ui/*` | outward adapters only (see `ui/README`) | `compute/*` · `logic/*` |
+| shell | bridge · spec · `ui/*` | everything else in the unit |
+
+**And the existing guard has a hole here that this installation must close rather than inherit.**
+Measured: the test named *"the three files that travel import nothing outward — not even from ui/"*
+matches only `@/…` and `../…` specifiers (`separation.test.ts:154`). A bridge importing
+`./ui/trace-cutout` — a plain relative path, the spelling a builder would actually reach for —
+**passes it today**. It passes because `bridge.ts` happens not to do that, not because the rule
+holds. (A bare `react` import is caught, but by a different test — the whole-tree framework check.)
+The repaired guard checks the direction table above on resolved specifiers, so `./ui/…` from the
+bridge fails.
+
+**One consequence to state now, because it is where a builder would be tempted to weaken the guard:**
+the bridge may not import the ring's type from `ui/trace-cutout.ts`. So that type is declared in
+`compute/` (with the seam that consumes it) and the tracer's return value satisfies it structurally.
+The shell passes the ring through the bridge as data; no type crosses inward from `ui/`.
 
 ## 5. Part 3 — installed and callable, not faked
 
