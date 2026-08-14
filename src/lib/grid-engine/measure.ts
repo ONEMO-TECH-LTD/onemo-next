@@ -134,6 +134,7 @@ function clearsRadius(p: PreparedOutline, qx: bigint, qy: bigint, r: bigint): bo
 export function discFits(prep: PreparedOutline, center: PointMM, radiusMM: number): boolean {
   const qx = toUm(center[0])
   const qy = toUm(center[1])
+  if (qx < prep.minX || qx > prep.maxX || qy < prep.minY || qy > prep.maxY) return false
   if (!interior(prep, qx, qy)) return false
   return clearsRadius(prep, qx, qy, toUm(radiusMM))
 }

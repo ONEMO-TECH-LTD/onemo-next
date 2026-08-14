@@ -89,6 +89,18 @@ describe('enumerateArrangements', () => {
 })
 
 describe('collectCandidates — shipped entry', () => {
+  it('a pixel-dense outline still collects in millimetre time', () => {
+    const ring: Array<[number, number]> = []
+    for (let i = 0; i < 4000; i++) {
+      const a = (i / 4000) * Math.PI * 2
+      ring.push([36 * Math.cos(a), 36 * Math.sin(a)])
+    }
+    const t0 = Date.now()
+    const doc = listCandidates(RELEASED, ring)
+    expect(Date.now() - t0).toBeLessThan(4000)
+    expect(doc.candidates.length).toBeGreaterThan(0)
+  })
+
   it('flush-fits a 2×2 on a 72mm square under gap parity even if the spec is point', () => {
     const doc = listCandidates(RELEASED, square(36))
     const corners = doc.candidates.filter(

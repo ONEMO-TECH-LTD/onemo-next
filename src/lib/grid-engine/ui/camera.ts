@@ -52,20 +52,28 @@ export function pinchFactor(deltaY: number): number {
  *
  * Centre-preserving is the whole contract. Scale about a corner and the drawing crawls across the
  * screen as you zoom, which is what "it zooms to the top left" looks like.
+ *
+ * Zoom has no product min/max. 0 / Inf / NaN fall back to fit so the SVG never gets a dead viewBox.
  */
 export function viewBox(framed: Box, zoom: number, boxAspect: number): Box {
+  const z = Number.isFinite(zoom) && zoom > 0 ? zoom : ZOOM_FIT
+  const aspect = Number.isFinite(boxAspect) && boxAspect > 0 ? boxAspect : 1
   const cx = framed.x + framed.w / 2
   const cy = framed.y + framed.h / 2
-  const w = framed.w / zoom
-  const h = framed.h / zoom
+  let w = framed.w / z
+  let h = framed.h / z
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    w = framed.w
+    h = framed.h
+  }
 
   const view: Box = { x: cx - w / 2, y: cy - h / 2, w, h }
-  if (w / h < boxAspect) {
-    const widened = h * boxAspect
+  if (w / h < aspect) {
+    const widened = h * aspect
     view.x = cx - widened / 2
     view.w = widened
   } else {
-    const taller = w / boxAspect
+    const taller = w / aspect
     view.y = cy - taller / 2
     view.h = taller
   }

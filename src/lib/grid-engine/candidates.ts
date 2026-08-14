@@ -87,6 +87,34 @@ export function scaleToSize(verts: ReadonlyArray<PointMM>, sizeMM: number): Poin
   return verts.map(([x, y]) => [(x - cx) * k, (y - cy) * k])
 }
 
+/**
+ * Pixel traces put a vertex every fraction of a millimetre. Disc-fit is millimetre work;
+ * walking thousands of those edges on every lattice point kills the tab. Keep one point
+ * per millimetre. The drawn silhouette stays the full trace.
+ */
+function thinForFit(verts: ReadonlyArray<PointMM>, minMM: number): PointMM[] {
+  if (verts.length <= 3) return verts.map(([x, y]) => [x, y] as PointMM)
+  const min2 = minMM * minMM
+  const out: PointMM[] = []
+  for (const p of verts) {
+    const last = out[out.length - 1]
+    if (last) {
+      const dx = p[0] - last[0]
+      const dy = p[1] - last[1]
+      if (dx * dx + dy * dy < min2) continue
+    }
+    out.push([p[0], p[1]])
+  }
+  if (out.length > 3) {
+    const a = out[0]
+    const b = out[out.length - 1]
+    const dx = a[0] - b[0]
+    const dy = a[1] - b[1]
+    if (dx * dx + dy * dy < min2) out.pop()
+  }
+  return out.length >= 3 ? out : verts.map(([x, y]) => [x, y] as PointMM)
+}
+
 function shift(verts: ReadonlyArray<PointMM>, dx: number, dy: number): PointMM[] {
   return verts.map(([x, y]) => [x + dx, y + dy])
 }
@@ -159,7 +187,7 @@ export function collectCandidates(
 
   for (const band of bands) {
     for (const sizeMM of BAND_SIZES_MM[band]) {
-      const scaled = scaleToSize(outline, sizeMM)
+      const scaled = thinForFit(scaleToSize(outline, sizeMM), 1)
       const prep: PreparedOutline = prepareOutline(scaled)
       for (const origin of origins) {
         const registration: AxisRegistration = {

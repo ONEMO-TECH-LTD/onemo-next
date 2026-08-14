@@ -174,6 +174,14 @@ export default function GridEnginePage() {
   }, [outline, picture])
   const [candIdx, setCandIdx] = useState(0)
   const [activeBand, setActiveBand] = useState<(typeof BANDS)[number]>(DEFAULT_SIZE_BAND)
+  /**
+   * WHERE THE LATTICE SITS against the shape, in millimetres. Not a camera: this moves the magnets
+   * themselves, so it is placement — the shape stays still and the grid comes to meet it.
+   *
+   * Declared before the marks that read it. After a cut-out the marks mapped `pan` while it was
+   * still in the temporal dead zone, and the tab died.
+   */
+  const [pan, setPan] = useState<[number, number]>([0, 0])
   const bandSizes = BAND_SIZES_MM[activeBand]
   const bandLo = bandSizes[0]
   const bandHi = bandSizes[bandSizes.length - 1]
@@ -193,7 +201,20 @@ export default function GridEnginePage() {
       setCandDoc({ candidates: [] })
       return
     }
-    setCandDoc(listCandidates(spec, metric))
+    let live = true
+    const id = window.setTimeout(() => {
+      if (!live) return
+      try {
+        const doc = listCandidates(spec, metric)
+        if (live) setCandDoc(doc)
+      } catch {
+        if (live) setCandDoc({ candidates: [] })
+      }
+    }, 0)
+    return () => {
+      live = false
+      window.clearTimeout(id)
+    }
   }, [metric, spec])
   const visibleCands = useMemo(
     () => (metric ? benchCandidates(spec, candDoc, activeBand, metric) : []),
@@ -255,13 +276,6 @@ export default function GridEnginePage() {
     loadCutout(new File([await response.blob()], name, { type: 'image/png' }))
   }
 
-  /** Screen pixels to millimetres, off the SVG's own matrix. Screen maths — the shell's own job. */
-  /**
-   * WHERE THE LATTICE SITS against the shape, in millimetres. Not a camera: this moves the magnets
-   * themselves, so it is placement — the shape stays still and the grid comes to meet it.
-   */
-  const [pan, setPan] = useState<[number, number]>([0, 0])
-  const [viewZoom, setViewZoom] = useState(1)
   useEffect(() => {
     if (!shownCand) return
     setSize(shownCand.sizeMM)
@@ -306,7 +320,6 @@ export default function GridEnginePage() {
     setBox(null)
     setOutline(null)
     setPicture(null)
-    setViewZoom(1)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -379,10 +392,6 @@ export default function GridEnginePage() {
    */
   useEffect(() => {
     applyPinch.current = (factor: number) => {
-      if (cutout) {
-        setViewZoom((z) => z * factor)
-        return
-      }
       const next = sizeExactMM.current * factor
       const held = snapBand(next)
       sizeExactMM.current = held
@@ -417,7 +426,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build 0963303f</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-24</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
@@ -551,7 +560,7 @@ export default function GridEnginePage() {
           panMM={shownField.panMM}
           displayK={displayK}
           frameMM={shownCand ? stickerMM * 1.15 : undefined}
-          zoom={shownCand ? viewZoom : gridScale}
+          zoom={shownCand ? 1 : gridScale}
           onView={onView}
         >
           {marks.map(([x, y]) => (

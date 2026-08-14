@@ -12,7 +12,7 @@
 // size and rounds only what it shows. Both halves are exercised here.
 
 import { describe, expect, it } from 'vitest'
-import { pinchFactor } from '../ui/camera'
+import { pinchFactor, viewBox } from '../ui/camera'
 import { bandSpan, minShapeSpan } from '../bridge'
 import { RELEASED } from '../spec'
 
@@ -133,5 +133,17 @@ describe('the factor itself', () => {
   it('squeeze grows the shape and spread shrinks it — the inverted model', () => {
     expect(pinchFactor(10)).toBeGreaterThan(1)
     expect(pinchFactor(-10)).toBeLessThan(1)
+  })
+})
+
+describe('a dead zoom cannot kill the view', () => {
+  const frame = { x: -60, y: -60, w: 120, h: 120 }
+  const finite = (b: { x: number; y: number; w: number; h: number }) =>
+    [b.x, b.y, b.w, b.h].every(Number.isFinite) && b.w > 0 && b.h > 0
+
+  it('0 / Inf / NaN still frame the sticker', () => {
+    for (const z of [0, -1, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(finite(viewBox(frame, z, 1)), `zoom ${z}`).toBe(true)
+    }
   })
 })
