@@ -14,7 +14,12 @@
 //
 // It reads values from Sub 2 and hands them to Sub 1. It holds no values and does no geometry.
 
-import { collectCandidates, type Candidate, type CandidateDocument } from './candidates'
+import {
+  collectCandidates,
+  placedOutline,
+  type Candidate,
+  type CandidateDocument,
+} from './candidates'
 import {
   bandSpanMM,
   cellDiameterMM,
@@ -30,9 +35,10 @@ import {
   type PointMM,
   type RegionMM,
 } from './engine'
-import type { GridSystemSpec } from './spec'
+import { selectPitch, selectRegistration, type GridSystemSpec } from './spec'
 
 export type { Candidate, CandidateDocument }
+export { placedOutline }
 
 export type { FieldSummary, PointMM, RegionMM }
 
@@ -129,4 +135,25 @@ export function listCandidates(
 export function candidateSites(doc: CandidateDocument, id: string): PointMM[] {
   const hit = doc.candidates.find((c: Candidate) => c.id === id)
   return hit ? hit.sites.map((s) => [s.x, s.y] as PointMM) : []
+}
+
+/** Lattice the canvas must draw so this candidate sits on the magnets, not beside them. */
+export function canvasForCandidate(
+  spec: GridSystemSpec,
+  candidate: Candidate,
+  userPan: PointMM,
+): { spec: GridSystemSpec; panMM: PointMM } {
+  const half = spec.grid.basePitchMM / 2
+  const pitched = selectPitch(
+    spec,
+    candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
+  )
+  const pointed = selectRegistration(pitched.spec, 'point')
+  return {
+    spec: pointed.spec,
+    panMM: [
+      userPan[0] + (candidate.registration.x === 'gap' ? half : 0),
+      userPan[1] + (candidate.registration.y === 'gap' ? half : 0),
+    ],
+  }
 }

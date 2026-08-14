@@ -89,6 +89,15 @@ function placeOnAnchor(scaled: PointMM[], kind: AnchorKind): PointMM[] {
   return shift(scaled, -src[0], -src[1])
 }
 
+/** Same transform collect uses. The shell draws this so the picture matches the candidate. */
+export function placedOutline(
+  verts: ReadonlyArray<PointMM>,
+  sizeMM: number,
+  anchor: AnchorKind,
+): PointMM[] {
+  return placeOnAnchor(scaleToSize(verts, sizeMM), anchor)
+}
+
 function indexSites(
   points: PointMM[],
   origin: PointMM,

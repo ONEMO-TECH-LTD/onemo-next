@@ -31,9 +31,11 @@ import { GridCanvas } from './GridCanvas'
 import {
   bandSpan,
   candidateSites,
+  canvasForCandidate,
   fieldBlockSpan,
   listCandidates,
   minShapeSpan,
+  placedOutline,
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
@@ -183,6 +185,7 @@ export default function GridEnginePage() {
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
   const [candIdx, setCandIdx] = useState(0)
+  const [activeBand, setActiveBand] = useState<(typeof BANDS)[number]>(DEFAULT_SIZE_BAND)
   const [candDoc, setCandDoc] = useState({ candidates: [] as ReturnType<typeof listCandidates>['candidates'] })
   useEffect(() => {
     if (!outline) {
@@ -192,11 +195,12 @@ export default function GridEnginePage() {
     setCandDoc(listCandidates(spec, outline))
   }, [outline, spec])
   const visibleCands = useMemo(
-    () => candDoc.candidates.filter((c) => c.sizeMM === sizeMM),
-    [candDoc, sizeMM],
+    () => candDoc.candidates.filter((c) => c.band === activeBand),
+    [candDoc, activeBand],
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
   const marks = shownCand ? candidateSites(candDoc, shownCand.id) : []
+  const demoVerts = shownCand && outline ? placedOutline(outline, shownCand.sizeMM, shownCand.anchor) : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
   const cutoutInput = useRef<HTMLInputElement>(null)
@@ -249,6 +253,12 @@ export default function GridEnginePage() {
    * themselves, so it is placement — the shape stays still and the grid comes to meet it.
    */
   const [pan, setPan] = useState<[number, number]>([0, 0])
+  useEffect(() => {
+    if (!shownCand) return
+    setSize(shownCand.sizeMM)
+    setPan([0, 0])
+  }, [shownCand?.id])
+  const shownField = shownCand ? canvasForCandidate(spec, shownCand, pan) : { spec, panMM: pan }
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
   const panSurface = useRef<HTMLDivElement>(null)
   /**
@@ -475,7 +485,9 @@ export default function GridEnginePage() {
               setCandIdx((i) => (visibleCands.length ? (i + 1) % visibleCands.length : 0))
             }
           >
-            {visibleCands.length ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length}` : '0'}
+            {shownCand
+              ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length} · ${shownCand.sizeMM} · ${shownCand.family} · ${shownCand.population} · ${shownCand.registration.x}/${shownCand.registration.y}`
+              : '0'}
           </button>
         )}
 
@@ -510,8 +522,8 @@ export default function GridEnginePage() {
           }}
         />
         <GridCanvas
-          spec={spec}
-          panMM={pan}
+          spec={shownField.spec}
+          panMM={shownField.panMM}
           /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
              lands on it. Handing in a region built from the shape's size read as the shape defining
              the world, and did nothing besides — every reachable size is under the field's own floor.
@@ -542,8 +554,8 @@ export default function GridEnginePage() {
               {asOutline && outline ? (
                 <polygon
                   data-silhouette="outline"
-                  points={outline
-                    .map(([u, v]) => `${box.x + u * box.w},${box.y + v * box.h}`)
+                  points={(demoVerts ?? outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h] as [number, number]))
+                    .map(([x, y]) => `${x},${y}`)
                     .join(' ')}
                   fill="rgba(88,194,255,0.08)"
                   stroke="#58c2ff"
@@ -648,21 +660,21 @@ export default function GridEnginePage() {
 
         <div className={styles.fixture}>
           <span className={styles.fixtureName}>Size</span>
-          {BANDS.map((n) => {
-            const mm = Math.round(bandSpan(spec, n))
-            return (
-              <button
-                key={n}
-                type="button"
-                className={styles.chip}
-                data-on={sizeMM === mm}
-                onClick={() => setSize(mm)}
-                title={`band ${n} — ${n} magnets across, the square standard`}
-              >
-                {mm}
-              </button>
-            )
-          })}
+          {BANDS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={styles.chip}
+              data-on={activeBand === n}
+              onClick={() => {
+                setActiveBand(n)
+                setCandIdx(0)
+              }}
+              title={`band ${n}`}
+            >
+              {n}
+            </button>
+          ))}
           <input
             className={styles.slider}
             type="range"
