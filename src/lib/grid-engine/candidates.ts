@@ -98,6 +98,31 @@ export function placedOutline(
   return placeOnAnchor(scaleToSize(verts, sizeMM), anchor)
 }
 
+/**
+ * Picture box under the same uniform scale + anchor as placedOutline.
+ * `picture` is the source pixel rectangle (origin top-left). `verts` are in that space.
+ */
+export function placedPicture(
+  verts: ReadonlyArray<PointMM>,
+  picture: { w: number; h: number },
+  sizeMM: number,
+  anchor: AnchorKind,
+): { x: number; y: number; w: number; h: number } {
+  const { cx, cy, longest } = formBbox(verts)
+  const k = longest <= 0 ? 1 : sizeMM / longest
+  const placed = placeOnAnchor(scaleToSize(verts, sizeMM), anchor)
+  const src = placed[0]
+  const scaled0: PointMM = [(verts[0][0] - cx) * k, (verts[0][1] - cy) * k]
+  const dx = src[0] - scaled0[0]
+  const dy = src[1] - scaled0[1]
+  return {
+    x: (0 - cx) * k + dx,
+    y: (0 - cy) * k + dy,
+    w: picture.w * k,
+    h: picture.h * k,
+  }
+}
+
 function indexSites(
   points: PointMM[],
   origin: PointMM,

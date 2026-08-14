@@ -166,6 +166,11 @@ export default function GridEnginePage() {
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   /** The silhouette in the picture's own fractions, so it can be drawn against any box. */
   const [outline, setOutline] = useState<OutlineUV | null>(null)
+  const [picture, setPicture] = useState<{ w: number; h: number } | null>(null)
+  const metric = useMemo(() => {
+    if (!outline || !picture) return null
+    return outline.map(([u, v]) => [u * picture.w, v * picture.h] as [number, number])
+  }, [outline, picture])
   const [candIdx, setCandIdx] = useState(0)
   const [activeBand, setActiveBand] = useState<(typeof BANDS)[number]>(DEFAULT_SIZE_BAND)
   const bandSizes = BAND_SIZES_MM[activeBand]
@@ -183,18 +188,18 @@ export default function GridEnginePage() {
   }
   const [candDoc, setCandDoc] = useState({ candidates: [] as ReturnType<typeof listCandidates>['candidates'] })
   useEffect(() => {
-    if (!outline) {
+    if (!metric) {
       setCandDoc({ candidates: [] })
       return
     }
-    setCandDoc(listCandidates(spec, outline))
-  }, [outline, spec])
+    setCandDoc(listCandidates(spec, metric))
+  }, [metric, spec])
   const visibleCands = useMemo(
     () => benchCandidates(spec, candDoc, activeBand),
     [candDoc, activeBand, spec],
   )
   const shownCand = visibleCands[Math.min(candIdx, Math.max(0, visibleCands.length - 1))]
-  const shownView = shownCand && outline ? standingView(spec, shownCand, outline) : null
+  const shownView = shownCand && metric ? standingView(spec, shownCand, metric, picture ?? undefined) : null
   const marks = shownView ? shownView.sites : []
   const demoVerts = shownView ? shownView.shape : null
   /** Which face of the cut-out is on: the picture, or its outline alone. */
@@ -225,6 +230,7 @@ export default function GridEnginePage() {
     const img = new Image()
     img.onload = () => {
       setCutout({ url })
+      setPicture({ w: img.naturalWidth, h: img.naturalHeight })
       // Fitted to the size already on screen, longest side, proportions untouched (law 2.1a).
       const k = sizeMM / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * k
@@ -284,6 +290,7 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    setPicture(null)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -395,7 +402,11 @@ export default function GridEnginePage() {
         <div className={styles.titleRow}>
           <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build 0963303f</span></span>
           <span className={styles.readout}>
-            {box ? `${Math.round(box.w)} × ${Math.round(box.h)}mm` : `${sizeMM}mm`}
+            {shownView?.picture
+              ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
+              : box
+                ? `${Math.round(box.w)} × ${Math.round(box.h)}mm`
+                : `${sizeMM}mm`}
           </span>
         </div>
       </header>
@@ -537,7 +548,7 @@ export default function GridEnginePage() {
               pointerEvents="none"
             />
           ))}
-          {cutout && box && (
+          {cutout && (shownView?.picture || box) && (
             /* THE SHAPE IS INVISIBLE TO THE POINTER. Dan, 2026-08-11: "the shape must be invisible to
                dragging even over the shape the canvas must continue to react". It is drawn above the
                drag surface, so without this it swallows the press and the lattice stops following the
@@ -546,7 +557,7 @@ export default function GridEnginePage() {
               {asOutline && outline ? (
                 <polygon
                   data-silhouette="outline"
-                  points={(demoVerts ?? outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h] as [number, number]))
+                  points={(demoVerts ?? outline.map(([u, v]) => [box!.x + u * box!.w, box!.y + v * box!.h] as [number, number]))
                     .map(([x, y]) => `${x},${y}`)
                     .join(' ')}
                   fill="rgba(88,194,255,0.08)"
@@ -558,20 +569,20 @@ export default function GridEnginePage() {
                 <image
                   data-silhouette="picture"
                   href={cutout.url}
-                  x={box.x}
-                  y={box.y}
-                  width={box.w}
-                  height={box.h}
+                  x={(shownView?.picture ?? box)!.x}
+                  y={(shownView?.picture ?? box)!.y}
+                  width={(shownView?.picture ?? box)!.w}
+                  height={(shownView?.picture ?? box)!.h}
                   opacity={CUTOUT_OPACITY}
                   preserveAspectRatio="none"
                 />
               )}
               <rect
                 data-silhouette="cutout-box"
-                x={box.x}
-                y={box.y}
-                width={box.w}
-                height={box.h}
+                x={(shownView?.picture ?? box)!.x}
+                y={(shownView?.picture ?? box)!.y}
+                width={(shownView?.picture ?? box)!.w}
+                height={(shownView?.picture ?? box)!.h}
                 fill="none"
                 stroke="#58c2ff"
                 strokeWidth={1}

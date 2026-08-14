@@ -17,6 +17,7 @@
 import {
   collectCandidates,
   placedOutline,
+  placedPicture,
   type Candidate,
   type CandidateDocument,
 } from './candidates'
@@ -38,7 +39,7 @@ import {
 import { BAND_SIZES_MM, selectPitch, type BandId, type GridSystemSpec } from './spec'
 
 export type { Candidate, CandidateDocument }
-export { placedOutline }
+export { placedOutline, placedPicture }
 
 export type { FieldSummary, PointMM, RegionMM }
 
@@ -204,7 +205,14 @@ export function standingView(
   spec: GridSystemSpec,
   candidate: Candidate,
   outline: ReadonlyArray<PointMM>,
-): { spec: GridSystemSpec; panMM: PointMM; shape: PointMM[]; sites: PointMM[] } {
+  picture?: { w: number; h: number },
+): {
+  spec: GridSystemSpec
+  panMM: PointMM
+  shape: PointMM[]
+  sites: PointMM[]
+  picture: { x: number; y: number; w: number; h: number } | null
+} {
   const half = spec.grid.basePitchMM / 2
   const standX = originAxis(spec.registration, half)
   const standY = originAxis(spec.registration, half)
@@ -214,10 +222,12 @@ export function standingView(
     spec,
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
+  const pic = picture ? placedPicture(outline, picture, candidate.sizeMM, candidate.anchor) : null
   return {
     spec: pitched.spec,
     panMM: [0, 0],
     shape: placedOutline(outline, candidate.sizeMM, candidate.anchor).map(([x, y]) => [x + dx, y + dy]),
     sites: candidate.sites.map((s) => [s.x + dx, s.y + dy]),
+    picture: pic ? { x: pic.x + dx, y: pic.y + dy, w: pic.w, h: pic.h } : null,
   }
 }

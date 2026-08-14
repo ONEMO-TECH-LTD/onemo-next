@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { benchCandidates, listCandidates, standingView } from '../bridge'
+import { placedPicture, scaleToSize } from '../candidates'
 import { enumerateArrangements, type SiteInput } from '../enumerate'
 import { RELEASED } from '../spec'
 
@@ -9,6 +10,33 @@ const square = (half: number): Array<[number, number]> => [
   [half, half],
   [-half, half],
 ]
+
+describe('scaleToSize — proportions', () => {
+  it('does not change aspect ratio', () => {
+    const tall: Array<[number, number]> = [
+      [0, 0],
+      [10, 0],
+      [10, 20],
+      [0, 20],
+    ]
+    const scaled = scaleToSize(tall, 100)
+    const xs = scaled.map((p) => p[0])
+    const ys = scaled.map((p) => p[1])
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(100)
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(50)
+  })
+
+  it('places a tall picture with the same aspect as the source', () => {
+    const verts: Array<[number, number]> = [
+      [0, 0],
+      [1240, 0],
+      [1240, 1912],
+      [0, 1912],
+    ]
+    const pic = placedPicture(verts, { w: 1240, h: 1912 }, 144, 'bbox')
+    expect(pic.w / pic.h).toBeCloseTo(1240 / 1912)
+  })
+})
 
 describe('enumerateArrangements', () => {
   it('emits every run length ≥ 2 on four consecutive held sites', () => {
