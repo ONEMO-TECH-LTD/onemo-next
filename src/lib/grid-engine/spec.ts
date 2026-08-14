@@ -226,6 +226,8 @@ export interface BandSpec {
   /** Smallest and largest manufactured longest-side this band may publish, millimetres. */
   minSizeMM: number
   maxSizeMM: number
+  /** The magnet count this band aims for (Dan's canon: pair minimum, four optimal, six above). */
+  targetMagnets: number
   /** Whether the product currently offers this band. Hidden bands still compute. */
   released: boolean
 }
@@ -249,8 +251,29 @@ export interface CalibrationSpec {
   plan: 'auto' | 'all6' | 'all8' | 'corners8'
   /** GridPlanOptions.center — where the rigid grid anchors. */
   center: 'centroid' | 'bbox'
+  /** Flap law (Dan 2026-08-11): preferred per-side overhang bound, millimetres. */
+  flapTightMM: number
+  /** Flap law: the outer acceptance bound — a side beyond this refuses the placement. */
+  flapMaxMM: number
+  /** Flap law's limb exception (Dan: "unless it is trivial limb especially at the bottom"):
+   *  any side may overhang up to this before the placement is refused outright — hanging legs,
+   *  bodies and arms are lawful; the tiers still rank them below tight wraps. */
+  flapLimbMM: number
+  /** The judge's template-placement sweep step, millimetres, within one lattice cell. */
+  sweepStepMM: number
+  /** The judge's size step inside a band, millimetres (sizes stay even). */
+  sizeStepMM: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
   bands: readonly BandSpec[]
+  /** The released layout templates (Dan's canon arrangements), in base-lattice steps. The judge
+   *  proposes each at swept positions; the ENGINE validates and measures — never re-solves. */
+  templates: ReadonlyArray<LayoutTemplate>
+}
+
+export interface LayoutTemplate {
+  name: string
+  /** Magnet positions in whole base-lattice steps, [across, down]. */
+  steps: ReadonlyArray<readonly [number, number]>
 }
 
 export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
@@ -261,21 +284,52 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   mode: 'auto',
   plan: 'auto',
   center: 'centroid',
+  flapTightMM: 12,
+  flapMaxMM: 24,
+  flapLimbMM: 40,
+  sweepStepMM: 8,
+  sizeStepMM: 2,
   bands: Object.freeze([
-    Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, released: false }),
-    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, released: true }),
-    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, released: true }),
-    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, released: false }),
+    Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
+    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),
+    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 4, released: true }),
+    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 6, released: false }),
   ]) as readonly BandSpec[],
+  // Dan's canon arrangements (2026-08-13 walkthrough): pair either way; the 48 square; the
+  // 48-wide x 96-tall rectangle and its transpose; the 96 square; the six-point 48x96 blocks.
+  templates: Object.freeze([
+    Object.freeze({ name: 'single', steps: [[0, 0]] }),
+    Object.freeze({ name: 'pair-v', steps: [[0, 0], [0, 1]] }),
+    Object.freeze({ name: 'pair-h', steps: [[0, 0], [1, 0]] }),
+    Object.freeze({ name: 'square-48', steps: [[0, 0], [1, 0], [0, 1], [1, 1]] }),
+    Object.freeze({ name: 'rect-48x96', steps: [[0, 0], [1, 0], [0, 2], [1, 2]] }),
+    Object.freeze({ name: 'rect-96x48', steps: [[0, 0], [2, 0], [0, 1], [2, 1]] }),
+    Object.freeze({ name: 'square-96', steps: [[0, 0], [2, 0], [0, 2], [2, 2]] }),
+    Object.freeze({ name: 'six-48x96', steps: [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]] }),
+    Object.freeze({ name: 'six-96x48', steps: [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]] }),
+  ] as unknown as LayoutTemplate[]) as ReadonlyArray<LayoutTemplate>,
 }) as CalibrationSpec
 
-export type CalibrationNumberKey = 'frameMM' | 'maxTestedMM' | 'maxGrowMM'
+export type CalibrationNumberKey =
+  | 'frameMM'
+  | 'maxTestedMM'
+  | 'maxGrowMM'
+  | 'flapTightMM'
+  | 'flapMaxMM'
+  | 'flapLimbMM'
+  | 'sweepStepMM'
+  | 'sizeStepMM'
 
 /** Bounds a calibration write must satisfy. Outside them the write is refused, not clamped. */
 const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: number }> = {
   frameMM: { min: 0, max: 10 },
   maxTestedMM: { min: 20, max: 1000 },
   maxGrowMM: { min: 0, max: 80 },
+  flapTightMM: { min: 0, max: 60 },
+  flapMaxMM: { min: 0, max: 80 },
+  flapLimbMM: { min: 0, max: 120 },
+  sweepStepMM: { min: 1, max: 48 },
+  sizeStepMM: { min: 2, max: 48 },
 }
 
 const RELEASED_DENSITIES: readonly CalibrationSpec['density'][] = Object.freeze([

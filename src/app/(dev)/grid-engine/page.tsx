@@ -292,6 +292,12 @@ export default function GridEnginePage() {
   const [picked, setPicked] = useState<SizeVariant | null>(null)
   const [solving, setSolving] = useState(false)
 
+  // PROOF HOOK — the v1 bench discipline (window.__GRID_LAB_PROOF__): the engine's live answer,
+  // readable by probes and QA in the running page. Instrumentation only; nothing reads it back.
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__GRID_ENGINE_PROOF__ = { judged, picked }
+  }, [judged, picked])
+
   const solveNow = () => {
     if (!outline || !box || solving) return
     setSolving(true)
@@ -732,7 +738,7 @@ export default function GridEnginePage() {
                        reviews everything, dimmed so the product boundary stays visible. */
                     style={answer.band.released ? undefined : { opacity: 0.45 }}
                     onClick={() => pickVariant(variant)}
-                    title={`band ${answer.band.band}${answer.band.released ? '' : ' (hidden in product)'} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern ?? ''} · margin ${variant.marginMM}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
+                    title={`band ${answer.band.band}${answer.band.released ? '' : ' (hidden in product)'} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern} · ${variant.tier} · flap ${Math.round(variant.wrap.maxSide)}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
                   >
                     B{answer.band.band}·{variant.sizeMM}·{variant.anchors.length}pt
                     {variant.flaps.length > 0 ? '·⚠' : ''}
