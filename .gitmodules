@@ -1,0 +1,6 @@
+[submodule "src/lib/grid-engine/compute/dependencies/cmake"]
+	path = src/lib/grid-engine/compute/dependencies/cmake
+	url = https://github.com/Kitware/CMake.git
+[submodule "src/lib/grid-engine/compute/dependencies/boost"]
+	path = src/lib/grid-engine/compute/dependencies/boost
+	url = https://github.com/boostorg/boost.git
