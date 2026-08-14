@@ -34,7 +34,7 @@ src/lib/grid-engine/
 |---|---|
 | Part 1 kernel | **verbatim GPT delivery** — identical, zero differences |
 | Part 3 product logic | **verbatim GPT delivery** — identical, zero differences |
-| Part 2 enumerator | **GPT delivery + the Dan-authorised `single`-family patch** — 12 files differ (contract, readme, 3 src, 3 dist, 3 fixtures, test), copied verbatim from the accepted `_WIP/grid-lab-v3.1/engine/enumerator` |
+| Part 2 enumerator | **GPT delivery + the Dan-authorised `single`-family patch** — 12 files differ (contract, readme, 3 src, 3 dist, 3 fixtures, test), copied verbatim from the accepted `src/lib/grid-engine/compute/enumerator` |
 
 The patch was authorised by Dan on 2026-08-13 (`single` was missing as a family, so the band-1 duck
 was reachable only as a 1×1 window) and peer-audited against the pristine delivery. His current

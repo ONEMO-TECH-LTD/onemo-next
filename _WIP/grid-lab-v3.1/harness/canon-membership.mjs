@@ -19,8 +19,8 @@
 // has been through QA.
 
 import { readFileSync } from "node:fs";
-import { measureLattice } from "../engine/magnetic-grid-measurement-kernel/dist/index.js";
-import { enumerateCandidates } from "../engine/enumerator/dist/index.js";
+import { measureLattice } from "../../../src/lib/grid-engine/compute/magnetic-grid-measurement-kernel/dist/index.js";
+import { enumerateCandidates } from "../../../src/lib/grid-engine/compute/enumerator/dist/index.js";
 
 const TRACES = JSON.parse(readFileSync(
   "/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-grid-canvas/_WIP/grid-engine-v3/evidence/canonical-traces.json",

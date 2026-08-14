@@ -22,7 +22,7 @@ Every claim below is a check run in this lane. Where a thing is unproven it says
 | 2 — candidate enumerator | kernel facts + explicit grammar in, every lawful arrangement out; five families, two populations | fork delivery `magnetic-grid-candidate-enumerator v1.0.0` | delivered, verified, **one local patch** (`single` family) |
 | 3 — product logic | candidate + measurement documents + caller judgements in, ranked tiers out | fork delivery `magnetic-grid-product-logic v1.0.0` | delivered, verified, **not wired to anything** |
 
-Assembled kernel + enumerator run as one pipeline at `_WIP/grid-lab-v3.1/engine/`. Part 3 is booked
+Assembled kernel + enumerator run as one pipeline at `src/lib/grid-engine/compute/`. Part 3 is booked
 at `gpt-pro/part-3-product-logic/delivery/` and is **not** part of that pipeline yet.
 
 The fork itself is clean: it branches at GPT's first uninfluenced answer, and the three build prompts
