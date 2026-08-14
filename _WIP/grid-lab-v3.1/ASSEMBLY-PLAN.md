@@ -84,9 +84,16 @@ exist"* · *"grid first logic — shape + grid = final proportion and dimensions
 regressing into size led logic."* A seam taking a `sizesMM` ladder from its caller is exactly that
 regression, however the ladder is spelled.
 
-**There is no inverse problem, and no search.** The lawful dimensions are a *finite, small,
-grid-derived set* — `bandSpanMM(spec.grid, n)` for n = 1…`positionsPerAxis`, i.e. what the grid can
-express at this pitch and padding. Every one is evaluated **independently**, which is exactly what
+**A band ladder is standardised sizing, and Dan rejected it in the same breath as size inputs:**
+*"I know that cap binds differently per shape I am not fixated on the standardised sizing — you
+are."* So `bandSpanMM(...)` as the domain was still forward size-testing; QA was right twice.
+
+**The lawful model is Dan's own sentence:** *"a shape is never too small; it scales until it
+holds."* The output is therefore, **per arrangement, the smallest whole-millimetre size at which
+that arrangement holds** — a value derived from this shape against this lattice, different for every
+outline. That is the inverse L8 asks for, and it needs no solver: sizes publish in whole millimetres
+(L19), so the domain is the **integer millimetres across the field's reach**, every one evaluated
+**independently** in a single call. Every one is evaluated **independently**, which is exactly what
 the kernel's own non-monotonicity theorem requires: *"do not binary-search scale… evaluate every
 legal published size."* GPT's first answer says the same — *"there is no reason to solve for
 continuous critical scales first."* So domain (the grid's own steps), termination (finite, ~9
@@ -105,7 +112,7 @@ all.
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
 | `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
 | `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
-| `sizes` | **derived from the grid, never supplied** — `bandSpanMM(spec.grid, n)` for n = 1…`positionsPerAxis`, computed by the scaffold's own engine. The whole grid-derived ladder goes in one call, so one `preparePolygon` serves all of it |
+| `sizes` | **never supplied, never standardised** — every whole millimetre across the field's reach, in one call, so one `preparePolygon` serves all of them. Each is evaluated independently (non-monotonicity forbids search). The seam then reports, per arrangement, the smallest size at which it holds: **that derived value is the manufactured size, and it is an output** |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
@@ -154,15 +161,14 @@ Drafts 1–2 conflated two separate laws:
 integer-shoelace area centroid are exact rationals. **The third, maximum clearance, has no
 authoritative implementation in any accepted module**: the refined sample this lane wrote was
 explicitly recorded as non-authoritative, and inventing a largest-inscribed-circle solver in the
-seam is exactly the rebuilding the brief forbids. So it is **BLOCKED, not implemented**, and the
-build ships two constructions with the third named as missing.
+seam is exactly the rebuilding the brief forbids. So it is **BLOCKED, not implemented**, and the complete
+surface is **blocked** on it — this lane does not ship two and call it done.
 
 **This has a consequence Dan must know:** the band-1 duck at 60mm was found *only* under
 maximum-clearance anchoring. Without that construction the raw set may not contain it, and that
 absence would be a missing input, not an engine fault.
 
-**⛔ THE HONEST STATE IS "DEPENDENCY MISSING, COMPLETE RAW-CANDIDATE SURFACE BLOCKED" — NOT "SHIPS
-TWO". THIS IS DAN'S TO AUTHORISE, NOT MINE.** O-1 says test all three
+**⛔ DEPENDENCY MISSING — THE COMPLETE SURFACE IS BLOCKED. THIS IS DAN'S TO AUTHORISE, NOT MINE.** O-1 says test all three
 constructions, and the only known duck@60 answer exists under the missing one. Shipping two and
 naming the third is *partial by construction*, and slicing a directive into a delivered part and a
 deferred part is not a call this lane may make. Until Dan rules, the raw-candidate build is
@@ -267,7 +273,11 @@ was found only under it.
 - *(b)* **Hold the build** until an accepted exact maximum-clearance source exists — an additive
   request to the kernel's author, since building one here is the rebuilding the brief forbids.
 
-**D2 — what this milestone IS.** With no L6 owner in the cloned packages, the surface is either
+**D2 — RESOLVED, NOT DAN'S.** L6 already decides the behaviour and the minimal owner is named:
+this lane writes `logic/registration-law.ts`. The unfiltered surface is an internal intermediate,
+never something presented as a milestone. *(Kept here only to record that it was wrongly put to Dan.)*
+
+~~**D2 — what this milestone IS.**~~ With no L6 owner in the cloned packages, the surface is either
 - *(a)* a **diagnostic measurement surface** — every candidate at every measured registration,
   tagged, explicitly not filtered by law; or
 - *(b)* a **lawful candidate set**, which requires one thin handwritten L6 adapter under `logic/`
