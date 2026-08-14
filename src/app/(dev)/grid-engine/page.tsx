@@ -19,6 +19,7 @@ import {
   isOptionsOnly,
   isSealedInCode,
   LAUNCH_PITCHES_MM,
+  POPULATION_PITCH_MM,
   limitsFor,
   RELEASED,
   selectPitch,
@@ -38,14 +39,6 @@ import {
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type TracedCutout } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
-import {
-  CLOSED,
-  clearSelection,
-  isDragEnabled,
-  selectCandidate,
-  stepCandidate,
-  type CandidateViewState,
-} from './candidate-view'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -111,6 +104,10 @@ const DEFAULT_SIZE_BAND = 3
  */
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
+
+/** Step through the candidate set, wrapping. Index arithmetic, nothing else. */
+const step = (index: number | null, total: number, delta: number): number | null =>
+  index === null || total <= 0 ? index : (((index + delta) % total) + total) % total
 
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
@@ -253,8 +250,9 @@ export default function GridEnginePage() {
    * candidates and attempting to drag both leave that answer alone. The transitions are in
    * `candidate-view` so they are testable rather than merely intended.
    */
-  const [candidateView, setCandidateView] = useState<CandidateViewState>(CLOSED)
-  const dragEnabled = isDragEnabled(candidateView)
+  const [selected, setSelected] = useState<number | null>(null)
+  /** The lattice holds still while a candidate is shown — one state path, the page's own pan. */
+  const dragEnabled = selected === null
 
   /**
    * ONE SOLVE per (ring, size, spec). Not per render, not per pan, not per candidate — those change
@@ -273,12 +271,21 @@ export default function GridEnginePage() {
   }, [traced, sizeMM, spec])
 
   const candidates = field?.ok ? field.value.candidates.candidates : []
-  const selectedCandidate =
-    candidateView.selected !== null ? candidates[candidateView.selected] ?? null : null
+
+  /**
+   * A SELECTION BELONGS TO THE ANSWER IT WAS MADE AGAINST. Change the size, or clear the cut-out,
+   * and the candidate set is a different set — index 601 of a 29-candidate answer is not a
+   * candidate, and leaving it selected also left the lattice locked with no control to release it.
+   */
+  useEffect(() => {
+    setSelected(null)
+  }, [field])
+
+  // Guards the frame between a new answer and that reset, so a stale index can never be rendered.
+  const liveSelected = selected !== null && selected < candidates.length ? selected : null
+  const selectedCandidate = liveSelected !== null ? candidates[liveSelected] ?? null : null
   const selectedCentresMM =
-    field?.ok && candidateView.selected !== null
-      ? field.value.display[candidateView.selected]?.centresMM ?? []
-      : []
+    field?.ok && liveSelected !== null ? field.value.display[liveSelected]?.centresMM ?? [] : []
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
   const panSurface = useRef<SVGRectElement>(null)
   /**
@@ -371,6 +378,23 @@ export default function GridEnginePage() {
    * value the canvas draws its circles at — and is halved for a radius, exactly as the canvas does.
    */
   const selectionRadiusMM = minShapeSpan(spec) / 2
+
+  /**
+   * THE DRAWN LATTICE FOLLOWS THE SELECTED CANDIDATE'S POPULATION.
+   *
+   * The engine measures the one lattice and returns candidates on both declared populations; the
+   * canvas draws whichever population the pitch selects. Showing a base-population candidate while
+   * the canvas drew the sparse one put every highlight in a gap. The pitch moves through
+   * `selectPitch` — the released-option guard, the same route the chips use — never by assignment,
+   * and only for what is DRAWN: the answer itself is untouched and the raw set is preserved.
+   */
+  const canvasSpec = (() => {
+    if (!selectedCandidate) return spec
+    const pitch = POPULATION_PITCH_MM[selectedCandidate.population]
+    if (pitch === undefined || pitch === spec.grid.pitchMM) return spec
+    const chosen = selectPitch(spec, pitch)
+    return chosen.refused ? spec : chosen.spec
+  })()
 
   /**
    * PINCH THE GRID — the same size the slider sets. Dan, 2026-08-11: "link the pinch gestures on the
@@ -512,10 +536,8 @@ export default function GridEnginePage() {
 
       <div className={styles.canvas}>
         <GridCanvas
-          spec={spec}
-          /* While a candidate is shown the lattice sits at the frozen origin, not at the live pan.
-             Copied rather than passed: the view state is readonly on purpose. */
-          panMM={dragEnabled ? pan : [candidateView.panMM[0], candidateView.panMM[1]]}
+          spec={canvasSpec}
+          panMM={pan}
           /* No extent is passed. THE FIELD IS THE WORLD and it frames itself (law 5.1); the shape
              lands on it. Handing in a region built from the shape's size read as the shape defining
              the world, and did nothing besides — every reachable size is under the field's own floor.
@@ -694,32 +716,37 @@ export default function GridEnginePage() {
                 <button
                   type="button"
                   className={styles.chip}
-                  data-on={candidateView.selected !== null}
-                  onClick={() =>
-                    setCandidateView((v) =>
-                      v.selected === null ? selectCandidate(v, 0) : clearSelection(v),
-                    )
-                  }
+                  data-on={liveSelected !== null}
+                  onClick={() => {
+                    if (liveSelected === null) {
+                      // Entering the view genuinely returns the lattice to the origin — the real
+                      // pan, not a display copy, so clearing cannot restore a stale one.
+                      setPan([0, 0])
+                      setSelected(0)
+                    } else {
+                      setSelected(null)
+                    }
+                  }}
                 >
-                  {candidateView.selected === null ? `show ${candidates.length}` : 'clear'}
+                  {liveSelected === null ? `show ${candidates.length}` : 'clear'}
                 </button>
-                {candidateView.selected !== null && (
+                {liveSelected !== null && (
                   <>
                     <button
                       type="button"
                       className={styles.chip}
-                      onClick={() => setCandidateView((v) => stepCandidate(v, candidates.length, -1))}
+                      onClick={() => setSelected((i) => step(i, candidates.length, -1))}
                       aria-label="Previous candidate"
                     >
                       &lt;
                     </button>
                     <span className={styles.rowUnit}>
-                      {candidateView.selected + 1} / {candidates.length}
+                      {liveSelected + 1} / {candidates.length}
                     </span>
                     <button
                       type="button"
                       className={styles.chip}
-                      onClick={() => setCandidateView((v) => stepCandidate(v, candidates.length, 1))}
+                      onClick={() => setSelected((i) => step(i, candidates.length, 1))}
                       aria-label="Next candidate"
                     >
                       &gt;

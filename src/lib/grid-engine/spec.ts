@@ -210,6 +210,24 @@ export const RELEASED: GridSystemSpec = Object.freeze({
 export const LAUNCH_PITCHES_MM: readonly number[] = Object.freeze([48, 96])
 
 /**
+ * WHICH RELEASED PITCH EACH DECLARED POPULATION IS DRAWN AT.
+ *
+ * The grammar below declares two populations of the ONE lattice — base takes every point, sparse
+ * every second (law 1.2). A surface showing candidates has to draw the population the candidate
+ * actually belongs to: at the 96mm view the canvas draws only the sparse points, so a base-population
+ * candidate's magnets fell in the gaps between drawn discs — 13,332 of 17,078 highlighted positions
+ * landing where no magnet was drawn.
+ *
+ * Stated as DATA here, beside the grammar that declares the populations, because it is released
+ * policy and because this file computes nothing: the values are the launch pitches themselves, read
+ * rather than multiplied out.
+ */
+export const POPULATION_PITCH_MM: Readonly<Record<string, number>> = Object.freeze({
+  base: LAUNCH_PITCHES_MM[0]!,
+  sparse: LAUNCH_PITCHES_MM[1]!,
+})
+
+/**
  * THE ARRANGEMENT GRAMMAR — released input DATA for the installed candidate enumerator.
  *
  * It lives here because it is policy, not calculation: which families exist, which populations the

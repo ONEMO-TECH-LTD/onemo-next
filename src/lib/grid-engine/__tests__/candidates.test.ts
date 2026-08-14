@@ -16,7 +16,8 @@ import {
 } from '../compute/candidates'
 import { measureLattice } from '../compute/magnetic-grid-measurement-kernel/dist/index.js'
 import { enumerateCandidates } from '../compute/enumerator/dist/index.js'
-import { RELEASED, RELEASED_ARRANGEMENT_GRAMMAR, type GridSystemSpec } from '../spec'
+import { layoutField, solveCandidates } from '../bridge'
+import { POPULATION_PITCH_MM, RELEASED, RELEASED_ARRANGEMENT_GRAMMAR, type GridSystemSpec } from '../spec'
 
 const GRAMMAR = RELEASED_ARRANGEMENT_GRAMMAR as unknown as MeasureFieldRequest['grammar']
 
@@ -307,6 +308,61 @@ describe('6 — inputs are not mutated, and the same call gives the same answer'
     expect(JSON.stringify(first.measurement)).toBe(JSON.stringify(second.measurement))
     expect(JSON.stringify(first.candidates)).toBe(JSON.stringify(second.candidates))
     expect(JSON.stringify(first.display)).toBe(JSON.stringify(second.display))
+  })
+})
+
+describe('8 — highlighted centres land on drawn magnets IN BOTH POPULATIONS', () => {
+  /**
+   * This assertion previously ran at the released 48mm only — the one mode where the drawn lattice
+   * and the base population coincide, so it could not fail. At 96mm the canvas draws every second
+   * point, and base-population candidates put 13,332 of 17,078 highlights in the gaps. A test that
+   * exercises one mode of a two-mode system is not evidence about the system.
+   *
+   * The shell answers this by drawing the population the SELECTED candidate belongs to, so the
+   * check is: for each population, the candidates of that population land on the magnets drawn at
+   * that population's released pitch.
+   */
+  const ring = ringBox(200, 200)
+
+  it.each([
+    ['base', 48],
+    ['sparse', 96],
+  ])('%s population candidates sit on magnets drawn at %imm', (population, pitchMM) => {
+    const spec = { ...RELEASED, grid: { ...RELEASED.grid, pitchMM } }
+    expect(POPULATION_PITCH_MM[population]).toBe(pitchMM)
+
+    const solved = solveCandidates(spec, ring, 408)
+    const drawn = layoutField(spec, { x: 0, y: 0, w: 0, h: 0 }, [0, 0])
+    const drawnKeys = new Set(drawn.magnets.map(([x, y]) => `${x},${y}`))
+    expect(drawnKeys.size).toBeGreaterThan(0)
+
+    const ofPopulation = solved.candidates.candidates
+      .map((candidate, index) => ({ candidate, display: solved.display[index]! }))
+      .filter(({ candidate }) => candidate.population === population)
+    expect(ofPopulation.length, `no ${population} candidates — this would pass vacuously`).toBeGreaterThan(0)
+
+    let checked = 0
+    for (const { candidate, display } of ofPopulation) {
+      for (const [x, y] of display.centresMM) {
+        checked += 1
+        expect(
+          drawnKeys.has(`${x},${y}`),
+          `${population} candidate ${candidate.id} centre ${x},${y} is not drawn at ${pitchMM}mm`,
+        ).toBe(true)
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  it('the raw set is preserved — both populations still come back at either pitch', () => {
+    // The fix must not have narrowed the answer to whatever is currently drawn.
+    for (const pitchMM of [48, 96]) {
+      const spec = { ...RELEASED, grid: { ...RELEASED.grid, pitchMM } }
+      const populations = new Set(
+        solveCandidates(spec, ring, 408).candidates.candidates.map((c) => c.population),
+      )
+      expect([...populations].sort(), `at ${pitchMM}mm`).toEqual(['base', 'sparse'])
+    }
   })
 })
 
