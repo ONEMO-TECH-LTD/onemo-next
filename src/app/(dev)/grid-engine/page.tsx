@@ -170,6 +170,9 @@ export default function GridEnginePage() {
     setSizeMM(next)
     setSizeDraft(String(next))
     setBox((b) => (b ? resizeShape(spec, b, next) : b))
+    // An engine answer belongs to ITS size. Any move to a different size makes it stale — showing
+    // its marks at the new size drew a phantom second lattice (Dan, 2026-08-14).
+    setPicked((p) => (p && p.sizeMM === next ? p : null))
   }
 
   const commitSize = () => {
@@ -319,10 +322,11 @@ export default function GridEnginePage() {
   }
 
   const pickVariant = (variant: SizeVariant) => {
-    setPicked(variant)
     setSize(variant.sizeMM)
+    setPicked(variant)
     // REALIGN THE ONE LATTICE to this layout — the grid pans to meet the chosen registration
-    // (protocol law). The first seated magnet, in canvas frame, is the alignment point.
+    // (protocol law). The first seated magnet, in canvas frame, is the alignment point. The
+    // lattice's own discs ARE the magnet spots; nothing else is drawn.
     const first = variant.anchors[0]
     if (first) {
       const { dx, dy } = engineFrame(variant)
@@ -626,26 +630,15 @@ export default function GridEnginePage() {
               />
             </g>
           )}
-          {picked && (
-            /* THE ENGINE'S VERDICT — magnets and flap markers ONLY. The lattice on screen is the
-               field's own, realigned to this layout when it was picked; the shape on screen is the
-               original. No second lattice, no redrawn shape. Coordinates are the bridge's; this
-               group only centres the engine's frame on the canvas. */
+          {picked && picked.flaps.length > 0 && (
+            /* FLAP WARNINGS ONLY. The engine's layout is expressed entirely through the ONE
+               lattice — realigned on pick, its discs ARE the magnet spots (Dan, 2026-08-14:
+               "we don't need the magnets, we need discs, original lattice only"). The only mark
+               the engine may add is its red flap-risk witness. */
             (() => {
               const { dx, dy } = engineFrame(picked)
               return (
                 <g pointerEvents="none" transform={`translate(${dx} ${dy})`}>
-                  {picked.anchors.map((anchor, i) => (
-                    <circle
-                      key={`a${i}`}
-                      cx={anchor.p[0]}
-                      cy={anchor.p[1]}
-                      r={anchor.dia / 2}
-                      fill={anchor.dia === spec.magnet.largeMM ? '#e8a33d' : '#1f2530'}
-                      stroke="#7dd87d"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
                   {picked.flaps.map(([x, y], i) => (
                     <circle key={`f${i}`} cx={x} cy={y} r={2} fill="#e5484d" />
                   ))}
