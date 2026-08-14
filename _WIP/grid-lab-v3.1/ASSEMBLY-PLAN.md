@@ -32,7 +32,7 @@ src/lib/grid-engine/
     enumerator/                        VERBATIM, complete package   ← ACTIVATED
     candidates.ts                      the seam — the only file written here (§3)
   logic/
-    magnetic-grid-product-logic/       VERBATIM, complete package   ← PLACED, NOT WIRED (§6)
+    magnetic-grid-product-logic/       VERBATIM, complete package   ← PLACED; activation sequenced in §6
 ```
 
 Committed at `52c91380`: 138 files, all three `diff -r` byte-identical to their accepted deliveries,
@@ -77,7 +77,14 @@ already produces. It discards nothing it computes today and gains no new maths.
 If contour simplification is ever wanted, it is a separately ruled input-preparation module with its
 own QA — never smuggled into this seam.
 
-### 3.2 The transform, stated once
+### 3.2 The transform — ⛔ IMPLEMENTATION WITHDRAWN PENDING CLOSURE
+
+**Nothing below prescribes a size sweep any more.** The even-millimetre field-reach sweep is
+falsified (no proved bound, L9 caps grid count not millimetres) and is deleted rather than kept
+beside its own refutation. The polygon, anchor and lattice inputs stand; **the size domain does not
+exist until `grid-spec` §4–§6 closure is specified**, and no sweep ships before then.
+
+### 3.2a The transform inputs that do stand
 
 **L8 governs the direction and my earlier drafts broke it.** Dan, verbatim: *"No size inputs may
 exist"* · *"grid first logic — shape + grid = final proportion and dimensions"* · *"you keep
@@ -131,7 +138,7 @@ nothing outside the unit names, caps or targets a size. Size is what comes back.
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
 | `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
 | `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
-| `sizes` | **never supplied, never standardised** — every whole EVEN millimetre across the field's reach, in one call, so one `preparePolygon` serves all of them. Each is evaluated independently (non-monotonicity forbids search). The seam then reports, per arrangement, the smallest size at which it holds: **that derived value is the manufactured size, and it is an output** |
+| `sizes` | ⛔ **UNDEFINED — blocked on §4–§6 closure.** Never supplied by a caller; derived per arrangement by exact binding, then published upward to the first LAWFUL whole-even value and re-checked for legality. Every lawful size record is preserved under the cross-size key, with the published minimum marked separately |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
@@ -257,11 +264,16 @@ Otherwise the shell gains only: the index of the candidate being viewed, control
 highlight elements passed as `children` to `GridCanvas` from bridge-returned coordinates. No compute,
 no lattice number, no notion of "better".
 
-## 6. Product logic — placed, deliberately not wired
+## 6. Product logic — placed; activation is in scope
 
 Cloned verbatim under `logic/`. It requires a gravity boolean, a wrap value and a regional value
-**per candidate**; those are ruled (L11 gravity, the flap equation for wrap, corridor-connected
-components for mass) but not yet implemented as producers. **Activation stays in this plan** —
+**per candidate**; **two of those three are ruled with formulas — L11 for gravity, the flap
+equation for wrap — and the third is NOT.** "A mass of the shape" is named in the canon in words
+only. This lane previously asserted masses = corridor-connected components: that was an INVENTED
+PROXY, it is withdrawn, and the delivered kernel refutes it directly — a straight corridor is
+evidence for that corridor alone, never for general fabric connectivity (the U-shape
+counterexample). Part 3 therefore takes the explicitly supplied regional judgement its contract
+demands, and the missing computable region definition is stated as missing. **Activation stays in this plan** —
 Dan's directive was to assemble all three and test with him, and this lane does not authorise its
 own slice. The judgement producers, the trusted-enumerator seam and the route by which ranked tiers
 reach the bridge without logic entering the shell are the remaining design work, sequenced after the
@@ -297,8 +309,6 @@ was found only under it.
   for that reason and not because the engine failed; add the third when a source exists.
 - *(b)* **Hold the build** until an accepted exact maximum-clearance source exists — an additive
   request to the kernel's author, since building one here is the rebuilding the brief forbids.
-
-**D2 — WITHDRAWN. Never Dan's.** L6 decides the behaviour; this lane writes `logic/registration-law.ts`. Recorded only because putting it to Dan was a manufactured question.
 
 
 D1 is the only genuine decision here, and it is scope: authorise a two-anchor diagnostic knowing the consequence, or hold for the missing fact.
