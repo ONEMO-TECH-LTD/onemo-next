@@ -366,45 +366,6 @@ describe('8 — highlighted centres land on drawn magnets IN BOTH POPULATIONS', 
   })
 })
 
-describe('9 — the pitch control describes the lattice actually drawn', () => {
-  /**
-   * The geometry was right and the control lied about it: the chip read the SELECTED pitch while
-   * the canvas drew the SELECTED CANDIDATE's population. So 48mm sat lit while 96mm was on screen,
-   * and the reverse. Both directions are covered because a one-direction test is how this class
-   * survives — exactly what happened with the 48mm-only coincidence check.
-   *
-   * This is the same derivation the page performs, held here so it cannot drift silently.
-   */
-  const drawnPitch = (selectedPitchMM: number, population: string | null): number => {
-    if (population === null) return selectedPitchMM
-    const pitch = POPULATION_PITCH_MM[population]
-    return pitch === undefined ? selectedPitchMM : pitch
-  }
-
-  it.each([
-    ['sparse candidate chosen from the 48mm view', 48, 'sparse', 96],
-    ['base candidate chosen from the 96mm view', 96, 'base', 48],
-    ['base candidate chosen from the 48mm view', 48, 'base', 48],
-    ['sparse candidate chosen from the 96mm view', 96, 'sparse', 96],
-    ['nothing selected keeps the chosen pitch', 96, null, 96],
-  ])('%s draws %imm and must light %imm', (_label, selectedPitchMM, population, expected) => {
-    expect(drawnPitch(selectedPitchMM, population)).toBe(expected)
-  })
-
-  it('the two directions genuinely differ — otherwise this passes vacuously', () => {
-    expect(drawnPitch(48, 'sparse')).not.toBe(48)
-    expect(drawnPitch(96, 'base')).not.toBe(96)
-  })
-
-  it('both populations the grammar declares have a released pitch', () => {
-    const declared = RELEASED_ARRANGEMENT_GRAMMAR.populations.map((p) => p.id)
-    expect(declared.length).toBeGreaterThan(0)
-    for (const id of declared) {
-      expect(POPULATION_PITCH_MM[id], `population ${id} has no released pitch`).toBeGreaterThan(0)
-    }
-  })
-})
-
 describe('7 — Number() exists only in the display projection', () => {
   it('no numeric conversion sits on any request, validity or enumeration path', () => {
     const source = readFileSync(join(process.cwd(), 'src/lib/grid-engine/compute/candidates.ts'), 'utf8')

@@ -471,11 +471,6 @@ export default function GridEnginePage() {
             key={p}
             type="button"
             className={styles.chip}
-            /* THE CHIP DESCRIBES WHAT IS DRAWN, not what was last chosen. While a candidate is
-               shown the lattice follows that candidate's population, so reading the selected pitch
-               here stated a density the canvas was not drawing — 48mm lit while 96mm was on screen,
-               and the reverse. The write below is untouched: it still moves the chosen pitch through
-               the guard. */
             data-on={canvasSpec.grid.pitchMM === p}
             onClick={() => {
               const r = selectPitch(spec, p)
