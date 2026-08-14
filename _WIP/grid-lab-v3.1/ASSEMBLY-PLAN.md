@@ -47,9 +47,7 @@ src/lib/grid-engine/
     magnetic-grid-measurement-kernel/dist/   VERBATIM, byte-identical
     enumerator/dist/                         VERBATIM (carries our single-family patch)
     candidates.ts                            OURS — the seam (§3), the only file we write here
-  logic/                                   ← NOT YET WIRED (§6)
-    magnetic-grid-product-logic/dist/        VERBATIM, when it is wired
-    judgements.ts                            OURS — gravity / wrap / mass from the law's formulas
+  (no logic/ in this build — product logic is deferred, §6)
   ui/                                      UNCHANGED — camera, trace-cutout
 ```
 
@@ -75,28 +73,71 @@ enumerateCandidatesForField(spec, layout, outlineMM, opts) → RawCandidate[]
 |---|---|
 | `lattice.pitch` | `spec.grid.basePitchMM` |
 | `lattice.origin` | `layout.anchorMM` — the scaffold's own anchor (registration + pan) |
-| `lattice.fieldExtent` | `±(spec.grid.positionsPerAxis − 1)/2` |
+| `lattice.fieldExtent` | integer bounds from `spec.grid.positionsPerAxis` (see below) |
 | `discDiameter` | `layout.cellMM` |
 | population `indexStep` | `spec.grid.pitchMM / spec.grid.basePitchMM` |
 
 **A literal 48, 24, 12 or 9 anywhere in this file is a defect** — that duplication is exactly what
 produced the impossible 24mm-spaced discs, and it is the one failure this seam exists to prevent.
 
-**Units — integer micrometres, scale = 1.** The shell has already sized the shape through
-`resizeShape`, so the kernel must not scale it again: polygon vertices, pitch, disc and origin all go
-in as `round(mm × 1000)`, `sourceSize = 1000` and the requested size is `1000`, so `scale = 1`.
-Returned centres divide by 1000 back to mm. The 1000 is a unit, not a law value.
+**Field extent — integer bounds, and my first formula was wrong.** `±(positionsPerAxis − 1)/2`
+produces **half-integer indices whenever the count is even**, and the guard allows any count from 1
+to 99, so an even count is reachable and the kernel takes integers only. Correct construction:
+
+    minIndex = −floor(N / 2)        maxIndex = minIndex + N − 1
+
+N=9 → [−4, 4] (the released case) · N=8 → [−4, 3] · N=1 → [0, 0]. Exactly N positions per axis, for
+every value the guard permits.
+
+**Transform model — ONE model, stated exactly.** The first draft carried two incompatible ones
+("requested size is 1000" *and* "one call with the whole sizes array"). The kernel is used as
+designed: **a canonical unscaled polygon plus real requested sizes**, so one `preparePolygon` serves
+every size.
+
+| kernel input | value |
+|---|---|
+| `polygon.vertices` | the traced ring in its own space, quantised: `round(u × 1e6)`, `round(v × 1e6)` |
+| `sizeTransform.sourceSize` | the longest bbox span of that quantised ring, in the same units |
+| `sizeTransform.sourceAnchor` | that ring's bbox centre, same units |
+| `sizeTransform.targetAnchor` | the millimetre point where that centre currently sits on the field |
+| `sizes` | the millimetre sizes wanted — the displayed size, or a ladder, in one call |
+
+`sourceAnchor` and `targetAnchor` are what pin the shape where the shell has already drawn it; the
+first draft left both unassigned, which would have let the kernel translate the shape out from under
+the picture. Both must be supplied, and the seam's test asserts the returned centres coincide with
+the drawn outline.
+
+**The quantised polygon is the authoritative input**, not the float outline it came from. At 1e6 per
+unit the step is far below a micrometre on any real shape, but it is a quantisation and can in
+principle flip a fit that is tangent to within it — so the plan claims fidelity to the quantised
+ring, never equivalence to the float one.
 
 **Input normalisation is required and belongs here.** `preparePolygon` rejects — never repairs —
 duplicate vertices, zero-length edges, a repeated closing vertex, zero area and self-touching edges.
 A raw traced ring contains duplicates. So this file dedupes consecutive points and drops a repeated
-closing vertex **before** calling. That prepares input; it re-implements no kernel behaviour.
+closing vertex **after quantisation and before calling** — rounding itself can create duplicates, so
+cleaning before it would miss them. That prepares input; it re-implements no kernel behaviour.
 
-**Cost, measured from the source, decides the call shape.** `preparePolygon` runs on *every*
-`measureLattice` call and its `validateNonAdjacentEdges` is O(n²) over edges; per-position distance
-queries are cheap (the kernel builds an AABB tree). Therefore: **one call carrying the whole `sizes`
-array**, and the result cached per (outline, anchor). Pan and stepping never re-validate — which is
-also the scaffold's own "zero solve on interaction" contract.
+**Cost and the solve contract — the first draft contradicted itself.** `preparePolygon` runs on every
+`measureLattice` call and its `validateNonAdjacentEdges` is O(n²) over edges; per-position queries
+are cheap (the kernel builds an AABB tree). So the seam calls **once per outline, carrying every size
+it needs**.
+
+But the draft also keyed the cache on `layout.anchorMM` — **which contains the pan**. Every pan
+therefore changes every physical lattice site, so that cache misses on each new pan and solves during
+a drag, breaking the scaffold's own zero-solve-on-interaction contract. Both could not hold. The
+resolution follows the scaffold and the law rather than inventing a third thing:
+
+- **Candidates are solved for the lawful registrations, not for the live pan.** L6 rules registration
+  by parity and O-1 makes the centre construction a switch, so the origins the seam measures are
+  those — a small, fixed, law-derived set, computed from `spec` via `registrationOffsetMM`.
+- **Pan does not re-solve.** During this raw-set build it is presentation only; selecting a candidate
+  realigns the drawn grid to that candidate's registration, which is the behaviour the scaffold
+  already describes.
+- **The cache key is everything the result depends on**: outline identity, `basePitchMM`, `pitchMM`
+  (population stride), `paddingMM` (disc), `positionsPerAxis` (extent), registration, the requested
+  sizes, and the grammar. Anything outside that key must clear the cache rather than be assumed
+  irrelevant.
 
 **Grammar** — the two ambiguities the enumerator makes mandatory are supplied here, as already
 settled in QA: `run.stepDomain = any-positive-whole-population-step`, `full-window.oneByOne =
