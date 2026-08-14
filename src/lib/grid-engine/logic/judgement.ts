@@ -117,7 +117,12 @@ function variantFrom(
   grid: GridResult,
   layout?: string,
 ): SizeVariant | null {
-  if (grid.anchors.length < band.targetMagnets) return null
+  // THE MINIMUM-PAIR LAW (Dan, verbatim: "pair is minimum but engine must calculate in the
+  // size band minimum pair and other options mag quantity and layout"). A band never demands
+  // its target — the target is the ranking's preference, the PAIR is the floor (single in
+  // band 1). Refusing lawful pairs/triangles was why B3/B4 read "none" on shapes that
+  // plainly hold five layouts.
+  if (grid.anchors.length < Math.min(band.targetMagnets, 2)) return null
   const wrap = measureWrap(
     contour,
     grid.anchors.map((anchor) => anchor.p),
@@ -218,7 +223,7 @@ function judgeBand(
   const sweep = calibration.sweepStepMM
   const templates = calibration.templates.filter(
     (template) =>
-      template.steps.length >= band.targetMagnets &&
+      template.steps.length >= Math.min(band.targetMagnets, 2) &&
       template.steps.length <= band.targetMagnets + 2,
   )
   for (
@@ -248,6 +253,11 @@ function judgeBand(
     const prepared = prepareExactContour(contour)
     const bb = prepared.bbox
     for (const template of templates) {
+      // Alternates below the band's target sweep at half resolution — they are options, not the
+      // aim; the target-count templates keep the fine step. (Cost, not law: the full fine sweep
+      // over every alternate quadrupled the solve.)
+      const stepMM =
+        template.steps.length >= band.targetMagnets ? sweep : sweep * 2
       let stepsAcross = 0
       let stepsDown = 0
       for (const [across, down] of template.steps) {
@@ -256,8 +266,8 @@ function judgeBand(
       }
       const spanX = stepsAcross * spec.grid.basePitchMM
       const spanY = stepsDown * spec.grid.basePitchMM
-      for (let x = bb.minX; x + spanX <= bb.maxX; x += sweep) {
-        for (let y = bb.minY; y + spanY <= bb.maxY; y += sweep) {
+      for (let x = bb.minX; x + spanX <= bb.maxX; x += stepMM) {
+        for (let y = bb.minY; y + spanY <= bb.maxY; y += stepMM) {
           try {
             const grid = computePreparedGrid(prepared, {
               pitchMM: spec.grid.basePitchMM,

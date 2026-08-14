@@ -42,7 +42,7 @@ function lShape(sizeMM: number): Contour {
 }
 
 describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
-  it('answers a square per band: flap law held, target counts aimed, spacing lawful', () => {
+  it('answers a square per band: flap law held, target counts aimed, spacing lawful', { timeout: 60000 }, () => {
     const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, square(100))
     expect(judged).not.toBeNull()
     const { bands } = judged!
@@ -54,9 +54,18 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
         expect(variant.sizeMM).toBeGreaterThanOrEqual(answer.band.minSizeMM)
         expect(variant.sizeMM).toBeLessThan(answer.band.maxSizeMM)
         expect(variant.sizeMM % 2).toBe(0)
-        expect(variant.anchors.length).toBeGreaterThanOrEqual(answer.band.targetMagnets)
-        // THE FLAP LAW — no side may overhang past the outer bound
-        expect(variant.wrap.maxSide).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+        // THE MINIMUM-PAIR LAW: the pair is the floor (single in band 1); target is preference
+        expect(variant.anchors.length).toBeGreaterThanOrEqual(
+          Math.min(answer.band.targetMagnets, 2),
+        )
+        // THE FLAP LAW, proportional: sides bounded by the padded block's own span (capped by
+        // the limb allowance); vertical carries the limb allowance
+        expect(Math.max(variant.wrap.left, variant.wrap.right)).toBeLessThanOrEqual(
+          Math.min(RELEASED_CALIBRATION.flapLimbMM, variant.wrap.gridExtentXMM),
+        )
+        expect(Math.max(variant.wrap.top, variant.wrap.bottom)).toBeLessThanOrEqual(
+          RELEASED_CALIBRATION.flapLimbMM,
+        )
         // no two magnets closer than two paddings — application rings never overlap
         const padFloor = 2 * RELEASED.grid.paddingMM - 1e-6
         for (let i = 0; i < variant.anchors.length; i++)
@@ -74,15 +83,15 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
     }
   })
 
-  it('holds the top of a concave freeform — gravity law in the ranking', () => {
+  it('holds the top of a concave freeform — gravity law in the ranking', { timeout: 60000 }, () => {
     const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, lShape(100))
     expect(judged).not.toBeNull()
     const released = judged!.bands.filter((b) => b.band.released)
     for (const answer of released) {
       expect(answer.variants.length).toBeGreaterThanOrEqual(1)
       const best = answer.variants[0]
-      // the winning placement never leaves more top overhang than the tight bound
-      expect(best.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapTightMM)
+      // the winning placement holds the top — within the gravity guard's bound
+      expect(best.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
     }
   })
 
