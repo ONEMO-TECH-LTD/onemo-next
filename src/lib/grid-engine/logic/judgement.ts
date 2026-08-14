@@ -124,18 +124,20 @@ function variantFrom(
     spec.grid.paddingMM,
   )
   if (!wrap) return null
-  // THE FLAP LAW (Dan 2026-08-14, corrected): left, right and top hold the STRICT outer bound —
-  // a side flap lifts off the surface and is refused. ONLY the bottom carries the limb allowance
-  // ("trivial limb especially at the bottom"). ENFORCED CENTERING: an assembly whose horizontal
-  // centre drifts past the tolerance is refused, never merely ranked lower.
-  const sideMax = Math.max(wrap.left, wrap.right, wrap.top)
+  // THE FLAP LAW (Dan 2026-08-14): LEFT and RIGHT hold the strict outer bound — a side flap
+  // peels off the surface and is refused. TOP and BOTTOM carry the limb allowance: mass above
+  // a held row presses flat under gravity (the duck's crown), and the bottom is Dan's stated
+  // limb case — neither dangles the way a side does. ENFORCED CENTERING: an assembly whose
+  // horizontal centre drifts past the tolerance is refused, never merely ranked lower.
+  const sideMax = Math.max(wrap.left, wrap.right)
   if (sideMax > calibration.flapMaxMM) return null
-  if (wrap.bottom > calibration.flapLimbMM) return null
+  if (Math.max(wrap.top, wrap.bottom) > calibration.flapLimbMM) return null
   if (Math.abs(wrap.left - wrap.right) / 2 > calibration.centerToleranceMM) return null
+  const verticalMax = Math.max(wrap.top, wrap.bottom)
   const tier: SizeVariant['tier'] =
-    sideMax <= calibration.flapTightMM && wrap.bottom <= calibration.flapMaxMM
+    sideMax <= calibration.flapTightMM && verticalMax <= calibration.flapMaxMM
       ? 'tight'
-      : wrap.bottom <= calibration.flapMaxMM
+      : verticalMax <= calibration.flapMaxMM
         ? 'allowed'
         : 'limb'
   return {

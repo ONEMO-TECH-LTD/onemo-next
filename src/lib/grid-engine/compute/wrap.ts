@@ -24,6 +24,11 @@ export interface WrapMeasures {
    *  alone masked the other axis: every same-size placement shared one axis's imbalance, so
    *  a centred and an off-centre seat scored identically (Dan's bat pair, 2026-08-14). */
   imbalanceSumMM: number
+  /** The padded magnet block's own extents — the flap law's proportional yardstick (Dan,
+   *  2026-08-14: "the 4x48 grid points have a 72mm bounding box — no flap recognised inside
+   *  it"; flap may not exceed the span of the structure holding it). */
+  gridExtentXMM: number
+  gridExtentYMM: number
 }
 
 function bbox(pts: ReadonlyArray<Pt>) {
@@ -62,6 +67,8 @@ export function measureWrap(
     total: left + right + top + bottom,
     imbalance: Math.max(Math.abs(left - right), Math.abs(top - bottom)),
     imbalanceSumMM: Math.abs(left - right) + Math.abs(top - bottom),
+    gridExtentXMM: grid.maxX - grid.minX + 2 * paddingMM,
+    gridExtentYMM: grid.maxY - grid.minY + 2 * paddingMM,
   }
 }
 
