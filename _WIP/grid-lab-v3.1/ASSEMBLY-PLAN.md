@@ -69,9 +69,18 @@ ways, both from the spec: derived ones through the scaffold's engine helpers (`c
 `registrationOffsetMM`) and released ones read from `spec.grid` directly (`basePitchMM`,
 `positionsPerAxis`). There is no engine-only route and the plan does not imply one.
 
-**Files this installation touches, in full** — `compute/candidates.ts` (new), `spec.ts` (grammar),
-`ui/trace-cutout.ts` (keep the ring), `bridge.ts` (one door), `page.tsx` (state + control),
-`__tests__/separation.test.ts` (direction guards). Nothing else, and no delivered package byte.
+**Files this installation touches, in full.** Two kinds, stated separately because they are not the
+same act:
+
+*Integration / scaffold files — written or modified here:*
+`compute/candidates.ts` (new — the seam) · `spec.ts` (the released grammar) ·
+`ui/trace-cutout.ts` (keep the ring it already produced) · `bridge.ts` (one door) ·
+`page.tsx` (state + control) · `__tests__/separation.test.ts` (direction guards) ·
+`tsconfig.json` (excludes each package's `src/test/scripts` so the app never compiles delivery
+sources — omitting this from the earlier list made the footprint claim false).
+
+*Accepted package trees — ADDED, never edited:* `compute/magnetic-grid-measurement-kernel/`,
+`compute/enumerator/`, `logic/magnetic-grid-product-logic/`. Not one delivered byte is modified.
 
 ## 3. Part 3 — installed and callable, not faked
 
