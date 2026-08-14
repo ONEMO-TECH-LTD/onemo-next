@@ -358,6 +358,51 @@ export function collectCandidates(
     return hit
   }
 
+  /** Two discs 48mm apart — ortho or diagonal — on one lattice origin. */
+  const hasAdjacentPair = (sizeMM: number) => {
+    const cells = cellsAt(sizeMM)
+    const set = new Set(cells.map(([x, y]) => `${x},${y}`))
+    for (const [x, y] of cells) {
+      if (
+        set.has(`${x},${y + pitch}`) ||
+        set.has(`${x + pitch},${y}`) ||
+        set.has(`${x + pitch},${y + pitch}`) ||
+        set.has(`${x + pitch},${y - pitch}`)
+      )
+        return true
+    }
+    return false
+  }
+
+  /** Top row + two base corners on one origin — the L20 utmost triangle. */
+  const hasUtmostThree = (sizeMM: number) => {
+    const cells = cellsAt(sizeMM)
+    const groups = new Map<string, PointMM[]>()
+    for (const p of cells) {
+      const origin = originOf(p[0], p[1], pitch)
+      const key = `${origin[0]},${origin[1]}`
+      let g = groups.get(key)
+      if (!g) {
+        g = []
+        groups.set(key, g)
+      }
+      g.push(p)
+    }
+    for (const pts of groups.values()) {
+      if (pts.length < 3) continue
+      const minY = Math.min(...pts.map((p) => p[1]))
+      const maxY = Math.max(...pts.map((p) => p[1]))
+      if (maxY - minY < pitch) continue
+      const bot = pts.filter((p) => p[1] === maxY)
+      if (bot.length < 2) continue
+      const L = Math.min(...bot.map((p) => p[0]))
+      const R = Math.max(...bot.map((p) => p[0]))
+      if (R - L < pitch) continue
+      if (pts.some((p) => p[1] === minY && p[0] !== L && p[0] !== R)) return true
+    }
+    return false
+  }
+
   const emitMillimetre = (band: BandId, sizeMM: number) => {
     const cells = cellsAt(sizeMM)
     // Off-ladder wrap only. A ladder size already has the 12mm pack.
@@ -384,11 +429,19 @@ export function collectCandidates(
     }
   }
 
-  // Tight wrap: first millimetre a disc holds, every arrangement on those seats.
+  // Tight wrap: first millimetre a disc holds, then a pair, then the utmost 3.
   for (const band of bands) {
     const sizes = BAND_SIZES_MM[band]
-    const wrap = smallestWhere(sizes[0], sizes[sizes.length - 1], anyFit)
+    const lo = sizes[0]
+    const hi = sizes[sizes.length - 1]
+    const wrap = smallestWhere(lo, hi, anyFit)
     if (wrap !== null) emitMillimetre(band, wrap)
+    const wrap2 = smallestWhere(lo, hi, hasAdjacentPair)
+    if (wrap2 !== null) emitMillimetre(band, wrap2)
+    if (band === 3) {
+      const wrap3 = smallestWhere(lo, hi, hasUtmostThree)
+      if (wrap3 !== null) emitMillimetre(band, wrap3)
+    }
   }
 
   return { candidates }

@@ -274,19 +274,9 @@ export default function GridEnginePage() {
     loadCutout(new File([await response.blob()], name, { type: 'image/png' }))
   }
 
-  /**
-   * Yardstick display wraps (Dan 2026-08-14 22:40). The hold is the candidate;
-   * these sizes are how the lattice is drawn under the sticker.
-   */
-  const YARD_DISPLAY: Partial<Record<(typeof BANDS)[number], number>> = {
-    2: 87,
-    3: 144,
-    4: 285,
-  }
   useEffect(() => {
     if (!shownCand) return
-    const yard = candIdx === 0 ? YARD_DISPLAY[activeBand] : undefined
-    setSize(yard ?? shownCand.sizeMM)
+    setSize(shownCand.sizeMM)
   }, [shownCand?.id, activeBand, candIdx])
   const shownField = shownView
     ? {
@@ -433,7 +423,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-42</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-43</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`

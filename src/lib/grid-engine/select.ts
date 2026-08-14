@@ -211,75 +211,52 @@ export function decidingKey(_band: BandId, won: ProposalMeasure, lost: ProposalM
   return 'placement-at-size'
 }
 
-function isSpinePair(c: Candidate): boolean {
-  if (c.sites.length !== 2) return false
-  const dx = Math.abs(c.sites[0].x - c.sites[1].x)
-  const dy = Math.abs(c.sites[0].y - c.sites[1].y)
-  return (dx < 1 && Math.abs(dy - 48) < 2) || (dy < 1 && Math.abs(dx - 48) < 2)
+function isExtreme(c: Candidate): boolean {
+  return c.family === 'corner-triangle' || c.family === 'rectangle-corners'
 }
 
-function isFourCorner(c: Candidate): boolean {
-  return c.family === 'rectangle-corners' && c.sites.length === 4
-}
+type Kind = 'single' | 'pair' | 'extreme'
 
-function isNextStepFour(c: Candidate): boolean {
-  if (!isFourCorner(c)) return false
-  const xs = c.sites.map((s) => s.x)
-  const ys = c.sites.map((s) => s.y)
-  const w = Math.max(...xs) - Math.min(...xs)
-  const h = Math.max(...ys) - Math.min(...ys)
-  return w >= 48 && h >= 48 && c.stepCol + c.stepRow >= 4
-}
-
-function minSize(all: Candidate[], pred: (c: Candidate) => boolean): number | null {
-  let m = Infinity
-  for (const c of all) {
-    if (pred(c) && c.sizeMM < m) m = c.sizeMM
-  }
-  return Number.isFinite(m) ? m : null
-}
-
-/** Pair reaches the head and at least mid-body. A neck pinch is not two masses. */
-function holdsTwoLevels(c: Candidate, outline: ReadonlyArray<PointMM>): boolean {
-  if (!isSpinePair(c)) return false
-  const shape = bbox(scaleToSize(outline, c.sizeMM))
-  const ys = c.sites.map((s) => s.y)
-  const span = shape.maxY - shape.minY
-  return Math.min(...ys) <= shape.minY + span * 0.35 && Math.max(...ys) >= (shape.minY + shape.maxY) / 2
-}
-
-/** Class carries until a new count's wrap lands in this band. Yardstick: bat 1/1/2/2, duck 1/2/4/4. */
-function targetClass(
+/** L20 per band: 1 disc · pair on two masses · extreme corners. Band is a size label. */
+function targetKind(
   all: Candidate[],
   band: BandId,
   outline: ReadonlyArray<PointMM>,
-): { n: number; size: number | null; four: boolean; next: boolean } {
+): Kind {
   const sizes = BAND_SIZES_MM[band]
   const lo = sizes[0]
   const hi = sizes[sizes.length - 1]
-  const s2 = minSize(all, (c) => holdsTwoLevels(c, outline))
-  const s4 = minSize(all, isFourCorner)
-  const s4n = minSize(all, isNextStepFour)
-  if (band === 1) return { n: 1, size: minSize(all, (c) => c.sites.length === 1), four: false, next: false }
-  if (band === 2) {
-    if (s2 !== null && s2 >= lo && s2 <= 84) return { n: 2, size: s2, four: false, next: false }
-    return { n: 1, size: null, four: false, next: false }
-  }
-  if (band === 3) {
-    if (s2 !== null && s2 <= hi) return { n: 2, size: null, four: false, next: false }
-    if (s4 !== null && s4 >= lo && s4 <= hi) return { n: 4, size: s4, four: true, next: false }
-    return { n: 1, size: null, four: false, next: false }
-  }
-  if (s2 !== null) return { n: 2, size: null, four: false, next: false }
-  if (s4n !== null) return { n: 4, size: s4n, four: true, next: true }
-  return { n: 1, size: null, four: false, next: false }
+  const inBand = (c: Candidate) => c.band === band && c.sizeMM >= lo && c.sizeMM <= hi
+  if (band === 1) return 'single'
+  const hasPair = all.some((c) => inBand(c) && c.sites.length === 2)
+  const hasMassExtreme = all.some((c) => {
+    if (!inBand(c) || !isExtreme(c)) return false
+    return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
+  })
+  if (band === 2) return hasPair ? 'pair' : 'single'
+  if (hasMassExtreme) return 'extreme'
+  if (hasPair) return 'pair'
+  return 'single'
 }
 
-function matchesTarget(c: Candidate, t: ReturnType<typeof targetClass>): boolean {
-  if (t.next) return isNextStepFour(c)
-  if (t.four) return isFourCorner(c)
-  if (t.n === 2) return isSpinePair(c)
+function matchesKind(c: Candidate, kind: Kind): boolean {
+  if (kind === 'extreme') return isExtreme(c)
+  if (kind === 'pair') return c.sites.length === 2
   return c.sites.length === 1
+}
+
+/** Duck's 4-corners cover both head sides; bat's 3 is the utmost set. Class carries. */
+function extremeCount(
+  all: Candidate[],
+  outline: ReadonlyArray<PointMM>,
+): number {
+  const covering = all.filter((c) => {
+    if (c.band !== 3 || !isExtreme(c)) return false
+    return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
+  })
+  if (covering.some((c) => c.family === 'rectangle-corners' || c.sites.length === 4)) return 4
+  if (covering.some((c) => c.sites.length === 3)) return 3
+  return 0
 }
 
 export function propose(
@@ -289,7 +266,8 @@ export function propose(
   outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
   const raw = doc.candidates.filter((c) => c.band === band)
-  const want = targetClass(doc.candidates, band, outline)
+  const kind = targetKind(doc.candidates, band, outline)
+  const classN = kind === 'extreme' ? extremeCount(doc.candidates, outline) : 0
   const pad = spec.grid.paddingMM
   const scored = raw.map((c) => {
     const verts = scaleToSize(outline, c.sizeMM)
@@ -298,36 +276,49 @@ export function propose(
     const offset2 = balance(c, shape)
     const span = shape.maxY - shape.minY || 1
     const top = Math.min(...c.sites.map((s) => s.y)) - shape.minY
+    const flap = extremeFlap(c, verts)
     return {
       c,
       n: c.sites.length,
       gravity,
+      masses: coversMasses(c, shape),
       balance: offset2,
       size: c.sizeMM,
+      step: minPairSpan(c),
+      flap,
       score: rankScore(c.sizeMM, offset2, gravity, band, shape),
-      hit: matchesTarget(c, want),
-      sizeDist: want.size === null ? 0 : Math.abs(c.sizeMM - want.size),
+      hit: matchesKind(c, kind),
       top,
       topFrac: top / span,
-      flush: want.n === 1 ? Math.abs(clearance(c, verts) - pad) : 0,
+      flush: kind === 'single' ? Math.abs(clearance(c, verts) - pad) : 0,
     }
   })
 
   scored.sort((a, b) => {
     if (a.hit !== b.hit) return a.hit ? -1 : 1
-    if (a.hit && b.hit && want.n === 1) {
-      if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+    if (a.hit && b.hit && a.gravity !== b.gravity) return a.gravity ? -1 : 1
+    if (a.hit && b.hit && kind === 'single') {
+      if (a.size !== b.size) return a.size - b.size
       if (a.flush !== b.flush) return a.flush - b.flush
     }
-    if (a.hit && b.hit && want.n === 2) {
+    if (a.hit && b.hit && kind === 'pair') {
+      if (a.masses !== b.masses) return a.masses ? -1 : 1
       if (a.size !== b.size) return a.size - b.size
       const head = 1 / 3
       const ad = Math.abs(a.topFrac - head)
       const bd = Math.abs(b.topFrac - head)
       if (ad !== bd) return ad - bd
     }
-    if (a.hit && b.hit && want.size !== null && a.sizeDist !== b.sizeDist) {
-      return a.sizeDist - b.sizeDist
+    if (a.hit && b.hit && kind === 'extreme') {
+      if (a.masses !== b.masses) return a.masses ? -1 : 1
+      if (classN > 0) {
+        const ad = Math.abs(a.n - classN)
+        const bd = Math.abs(b.n - classN)
+        if (ad !== bd) return ad - bd
+      }
+      if (band === 4 && a.step !== b.step) return b.step - a.step
+      if (a.flap !== b.flap) return a.flap - b.flap
+      if (a.size !== b.size) return a.size - b.size
     }
     if (a.hit && b.hit && a.balance !== b.balance) return a.balance - b.balance
     if (a.score !== b.score) return a.score - b.score

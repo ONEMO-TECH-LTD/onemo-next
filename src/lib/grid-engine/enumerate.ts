@@ -170,6 +170,33 @@ export function enumerateArrangements(
     }
   }
 
+  // Apex + two base corners. The top disc sits on the mid-edge, so this is
+  // not three corners of a rectangle — L20 utmost-corners on a triangular mass.
+  if (held.length >= 3) {
+    const minY = Math.min(...held.map((s) => s.popRow))
+    const maxY = Math.max(...held.map((s) => s.popRow))
+    if (maxY - minY >= 1) {
+      const topBand = held.filter((s) => s.popRow === minY)
+      const botBand = held.filter((s) => s.popRow === maxY)
+      if (botBand.length >= 2) {
+        const L = botBand.reduce((a, b) => (a.popCol < b.popCol ? a : b))
+        const R = botBand.reduce((a, b) => (a.popCol > b.popCol ? a : b))
+        if (L !== R && R.popCol - L.popCol >= 1) {
+          for (const T of topBand) {
+            if (T === L || T === R) continue
+            push({
+              family: 'corner-triangle',
+              population,
+              stepCol: R.popCol - L.popCol,
+              stepRow: maxY - minY,
+              sites: [T, L, R],
+            })
+          }
+        }
+      }
+    }
+  }
+
   const ortho: Array<[number, number]> = [
     [1, 0],
     [0, 1],

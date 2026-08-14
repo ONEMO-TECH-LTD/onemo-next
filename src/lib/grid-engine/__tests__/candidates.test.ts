@@ -82,6 +82,16 @@ describe('enumerateArrangements', () => {
     expect(tees.some((a) => a.sites.length === 4)).toBe(true)
   })
 
+  it('emits the utmost triangle when the apex is on the top mid-edge', () => {
+    const sites: SiteInput[] = [
+      { col: 0, row: -1, x: 0, y: -48, fits: true },
+      { col: -1, row: 1, x: -48, y: 48, fits: true },
+      { col: 1, row: 1, x: 48, y: 48, fits: true },
+    ]
+    const tris = enumerateArrangements(sites, 'base').filter((a) => a.family === 'corner-triangle')
+    expect(tris.some((a) => a.sites.length === 3 && a.stepCol === 2 && a.stepRow === 2)).toBe(true)
+  })
+
   it('builds a sparse full window on even base indices', () => {
     const sites: SiteInput[] = []
     for (const col of [0, 2]) {
