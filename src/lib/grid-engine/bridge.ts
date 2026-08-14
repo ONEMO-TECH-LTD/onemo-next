@@ -150,14 +150,7 @@ export function candidateSites(doc: CandidateDocument, id: string): PointMM[] {
   return hit ? hit.sites.map((s) => [s.x, s.y] as PointMM) : []
 }
 
-function originAxis(reg: 'gap' | 'point', half: number): number {
-  return reg === 'gap' ? half : 0
-}
-
-/**
- * Shape stays put (bbox-centred). The lattice pans by registration only.
- * Sparse only hides every second standing point.
- */
+/** Shape stays put. Lattice pans by the candidate origin (same 48mm lattice). */
 export function standingView(
   spec: GridSystemSpec,
   candidate: Candidate,
@@ -170,23 +163,15 @@ export function standingView(
   sites: PointMM[]
   picture: { x: number; y: number; w: number; h: number } | null
 } {
-  const half = spec.grid.basePitchMM / 2
-  const standX = originAxis(spec.registration, half)
-  const standY = originAxis(spec.registration, half)
-  const dx = standX - originAxis(candidate.registration.x, half)
-  const dy = standY - originAxis(candidate.registration.y, half)
   const pitched = selectPitch(
     spec,
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
   return {
     spec: pitched.spec,
-    panMM: [
-      originAxis(candidate.registration.x, half),
-      originAxis(candidate.registration.y, half),
-    ],
+    panMM: candidate.origin,
     shape: scaleToSize(outline, candidate.sizeMM),
-    sites: candidate.sites.map((s) => [s.x + dx, s.y + dy]),
+    sites: candidate.sites.map((s) => [s.x, s.y]),
     picture: picture ? placedPicture(outline, picture, candidate.sizeMM, 'bbox') : null,
   }
 }

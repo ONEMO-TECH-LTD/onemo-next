@@ -15,7 +15,6 @@ import {
   type PreparedOutline,
 } from './measure'
 import {
-  ANCHORS,
   BAND_SIZES_MM,
   type AnchorKind,
   type BandId,
@@ -31,6 +30,7 @@ export interface Candidate {
   sizeMM: number
   anchor: AnchorKind
   registration: AxisRegistration
+  origin: PointMM
   family: Arrangement['family']
   population: Arrangement['population']
   stepCol: number
@@ -42,12 +42,21 @@ export interface CandidateDocument {
   candidates: Candidate[]
 }
 
-const HALF_PITCH_ORIGINS: readonly AxisRegistration[] = [
-  { x: 'point', y: 'point' },
-  { x: 'gap', y: 'gap' },
-  { x: 'gap', y: 'point' },
-  { x: 'point', y: 'gap' },
-]
+function latticeOrigins(spec: GridSystemSpec): PointMM[] {
+  const step = spec.grid.paddingMM
+  const pitch = spec.grid.basePitchMM
+  const out: PointMM[] = []
+  for (let x = 0; x < pitch; x += step) {
+    for (let y = 0; y < pitch; y += step) {
+      out.push([x, y])
+    }
+  }
+  return out
+}
+
+function namedOrigin(v: number, half: number): Registration {
+  return v === half ? 'gap' : 'point'
+}
 
 function fieldOf(spec: GridSystemSpec): RegionMM {
   const half = ((spec.grid.positionsPerAxis - 1) * spec.grid.basePitchMM) / 2
@@ -136,10 +145,6 @@ function indexSites(
   }))
 }
 
-function originOf(reg: AxisRegistration, half: number): PointMM {
-  return [reg.x === 'gap' ? half : 0, reg.y === 'gap' ? half : 0]
-}
-
 export function collectCandidates(
   spec: GridSystemSpec,
   outline: ReadonlyArray<PointMM>,
@@ -150,54 +155,54 @@ export function collectCandidates(
   const field = fieldOf(spec)
   const candidates: Candidate[] = []
   const bands = [1, 2, 3, 4] as const
+  const origins = latticeOrigins(spec)
 
   for (const band of bands) {
     for (const sizeMM of BAND_SIZES_MM[band]) {
       const scaled = scaleToSize(outline, sizeMM)
-      for (const anchor of ANCHORS) {
-        const placed = placeOnAnchor(scaled, anchor)
-        const prep: PreparedOutline = prepareOutline(placed)
-        for (const registration of HALF_PITCH_ORIGINS) {
-          const origin = originOf(registration, half)
-          const raw = magnetsInRegion(dense, field, 0, origin)
-          const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
-          const measured: SiteInput[] = indexed.map((s) => ({
-            ...s,
-            fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
-          }))
-          // Sparse = every second base site, same origin. Not a second label on the same array.
-          const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
-          const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
-            { population: 'base', sites: measured },
-            { population: 'sparse', sites: sparseSites },
-          ]
-          for (const pack of packs) {
-            for (const arr of enumerateArrangements(pack.sites, pack.population)) {
-              const id = [
-                band,
-                sizeMM,
-                anchor,
-                registration.x,
-                registration.y,
-                arr.family,
-                arr.population,
-                arr.stepCol,
-                arr.stepRow,
-                arr.sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
-              ].join(':')
-              candidates.push({
-                id,
-                band,
-                sizeMM,
-                anchor,
-                registration,
-                family: arr.family,
-                population: arr.population,
-                stepCol: arr.stepCol,
-                stepRow: arr.stepRow,
-                sites: arr.sites.map((s) => ({ col: s.col, row: s.row, x: s.x, y: s.y })),
-              })
-            }
+      const prep: PreparedOutline = prepareOutline(scaled)
+      for (const origin of origins) {
+        const registration: AxisRegistration = {
+          x: namedOrigin(origin[0], half),
+          y: namedOrigin(origin[1], half),
+        }
+        const raw = magnetsInRegion(dense, field, 0, origin)
+        const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
+        const measured: SiteInput[] = indexed.map((s) => ({
+          ...s,
+          fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
+        }))
+        const sparseSites = measured.filter((s) => s.col % 2 === 0 && s.row % 2 === 0)
+        const packs: Array<{ population: 'base' | 'sparse'; sites: SiteInput[] }> = [
+          { population: 'base', sites: measured },
+          { population: 'sparse', sites: sparseSites },
+        ]
+        for (const pack of packs) {
+          for (const arr of enumerateArrangements(pack.sites, pack.population)) {
+            const id = [
+              band,
+              sizeMM,
+              origin[0],
+              origin[1],
+              arr.family,
+              arr.population,
+              arr.stepCol,
+              arr.stepRow,
+              arr.sites.map((s) => `${s.col},${s.row}`).sort().join('_'),
+            ].join(':')
+            candidates.push({
+              id,
+              band,
+              sizeMM,
+              anchor: 'bbox',
+              registration,
+              origin,
+              family: arr.family,
+              population: arr.population,
+              stepCol: arr.stepCol,
+              stepRow: arr.stepRow,
+              sites: arr.sites.map((s) => ({ col: s.col, row: s.row, x: s.x, y: s.y })),
+            })
           }
         }
       }

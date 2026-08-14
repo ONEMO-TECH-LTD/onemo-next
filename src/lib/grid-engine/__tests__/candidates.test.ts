@@ -213,16 +213,12 @@ describe('collectCandidates — shipped entry', () => {
     const pitch = RELEASED.grid.basePitchMM
     for (const c of doc.candidates) {
       const view = standingView(RELEASED, c, outline)
-      const half = pitch / 2
-      expect(view.panMM[0] === 0 || view.panMM[0] === half).toBe(true)
-      expect(view.panMM[1] === 0 || view.panMM[1] === half).toBe(true)
+      const atom = RELEASED.grid.paddingMM
+      expect(view.panMM[0] % atom === 0).toBe(true)
+      expect(view.panMM[1] % atom === 0).toBe(true)
       for (const [x, y] of view.sites) {
-        expect(x % pitch === 0).toBe(true)
-        expect(y % pitch === 0).toBe(true)
-        if (c.population === 'sparse') {
-          expect(x % (pitch * 2) === 0).toBe(true)
-          expect(y % (pitch * 2) === 0).toBe(true)
-        }
+        expect((x - view.panMM[0]) % pitch === 0).toBe(true)
+        expect((y - view.panMM[1]) % pitch === 0).toBe(true)
       }
     }
   })

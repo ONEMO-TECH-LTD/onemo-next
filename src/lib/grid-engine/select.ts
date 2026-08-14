@@ -1,6 +1,6 @@
 // L20 — gravity first, then tight wrap. No shape names. Any outline.
 
-import { placedOutline, type Candidate, type CandidateDocument } from './candidates'
+import { scaleToSize, type Candidate, type CandidateDocument } from './candidates'
 import { discClearanceMM, prepareOutline } from './measure'
 import type { BandId, GridSystemSpec } from './spec'
 import type { PointMM } from './engine'
@@ -79,10 +79,11 @@ export function propose(
 ): Candidate[] {
   const raw = doc.candidates.filter((c) => c.band === band && nativeCount(band, c.sites.length))
   const scored = raw.map((c) => {
-    const verts = placedOutline(outline, c.sizeMM, c.anchor)
+    const verts = scaleToSize(outline, c.sizeMM)
     const shape = bbox(verts)
     return {
       c,
+      n: c.sites.length,
       gravity: holdsTop(c, shape),
       top: topReach(c, shape),
       cover: coverageFlap(c, verts),
@@ -92,11 +93,16 @@ export function propose(
   })
   scored.sort((a, b) => {
     if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+    if (a.n !== b.n) return b.n - a.n
     if (a.top !== b.top) return a.top - b.top
-    if (a.local !== b.local) return a.local - b.local
+    if (a.n === 1 && b.n === 1) {
+      if (a.local !== b.local) return a.local - b.local
+      return a.c.id.localeCompare(b.c.id)
+    }
     const ac = a.cover / (a.c.sizeMM * a.c.sizeMM)
     const bc = b.cover / (b.c.sizeMM * b.c.sizeMM)
     if (ac !== bc) return ac - bc
+    if (a.local !== b.local) return a.local - b.local
     if (a.span !== b.span) return a.span - b.span
     return a.c.id.localeCompare(b.c.id)
   })
