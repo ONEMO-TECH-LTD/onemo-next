@@ -47,8 +47,17 @@ so it sits in `logic/`.
    half-integers (`contour.ts:34-37`); doubling makes them exact integers. It already dedups,
    including the wrap (`contour.ts:130,150`), so **no cleaning or repair happens here** — the ring is
    passed exactly and the kernel fails loudly if it rejects a real trace.
-2. **`measureLattice(...)` once, carrying every size** — polygon validation is O(n²) in edges and
-   runs once per call, not per size.
+2. **`measureLattice(...)` once.** Polygon validation is O(n²) in edges and runs once per call, not
+   per size. **Sizes = `[sizeMM]`, the one size currently on screen** — the scaffold has no guarded
+   legal-size array, and `maxSizeMM` is a generator stop, not a ladder. Compute invents none.
+   **Lattice inputs, all from the scaffold's own definitions:** pitch `spec.grid.basePitchMM` ·
+   origin `latticeAnchorMM(registrationOffsetMM(spec.grid, spec.registration), panMM)` — the same
+   value the bridge already hands the canvas to draw its rule on (`bridge.ts:64`), so a pan moves the
+   measured lattice and the drawn one together · disc `cellDiameterMM(spec.grid)` · extent
+   `min = -floor(N/2)`, `max = min + N - 1` for `N = positionsPerAxis`, which yields exactly `N`
+   positions for all 99 values the guard permits, where `[-floor(N/2), floor(N/2)]` emits `N+1` for
+   every even `N` (probe: `probes/field-extent-check.mjs`). It measures the currently selected
+   registration, not a sweep.
 3. **`enumerateCandidates(...)`** on that measurement with the grammar from `spec.ts`.
 4. **Return both delivered documents verbatim**, plus an additive millimetre projection for drawing.
 
