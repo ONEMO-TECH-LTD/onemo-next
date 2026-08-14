@@ -79,13 +79,24 @@ own QA — never smuggled into this seam.
 
 ### 3.2 The transform, stated once
 
+**L8 governs the direction and my earlier drafts broke it.** Dan, verbatim: *"No size inputs may
+exist"* · *"grid first logic — shape + grid = final proportion and dimensions"* · *"you keep
+regressing into size led logic."* A seam taking a `sizesMM` ladder from its caller is exactly that
+regression, however the ladder is spelled.
+
+**So no size crosses into the unit.** The kernel's `sizes` argument is fed from the **grid itself** —
+`bandSpanMM(spec.grid, n)` for every position count the field carries — which the scaffold's own
+engine already computes from pitch and padding. The grid proposes the dimensions, the shape decides
+which of them hold, and **size comes back as an output**. The bridge door takes no size parameter at
+all.
+
 | kernel input | value |
 |---|---|
 | `polygon.vertices` | the native integer pixel ring, deduped for `preparePolygon`'s strictness |
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
 | `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
 | `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
-| `sizes` | the whole-millimetre size ladder — **the entire ladder in one call**, so one `preparePolygon` serves every size in that placement |
+| `sizes` | **derived from the grid, never supplied** — `bandSpanMM(spec.grid, n)` for n = 1…`positionsPerAxis`, computed by the scaffold's own engine. The whole grid-derived ladder goes in one call, so one `preparePolygon` serves all of it |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
@@ -190,7 +201,7 @@ construction, registration, requested sizes, grammar. Anything outside the key c
 ## 4. The bridge gains one door
 
 ```ts
-candidatesForField(spec, tracedRing, sizesMM, opts) → RawCandidate[]
+candidatesForField(spec, tracedRing, opts) → RawCandidate[]   // NO size parameter
 ```
 `RawCandidate` carries positions in mm, family, population, per-axis steps, kernel fact references,
 **the size occurrence, the centre construction, and the x/y registration** — the last three because
