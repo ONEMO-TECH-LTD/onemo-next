@@ -148,6 +148,10 @@ The app suite additionally carries **five pre-existing failures** — vitest col
 archive's own `node:test` suites. Proven present at baseline `7b84a719` and untouched by this
 installation; recorded here, not repaired, because repository-wide test discovery is unrelated work.
 
+*Test and evidence files added:* `__tests__/candidates.test.ts` (the seam's suite) ·
+`probes/` (runnable checks the plan cites rather than restates) · `evidence/` (screenshots from the
+on-screen gate).
+
 *Added, never edited:* the three package trees.
 
 ## 8. Order of work
@@ -165,7 +169,7 @@ installation; recorded here, not repaired, because repository-wide test discover
    attempted drag leaves `panMM` at `[0,0]` and calls the seam zero times; stepping the candidate
    changes only the highlight and calls the seam zero times; clearing the selection restores the
    drag; highlighted candidate centres coincide with drawn magnet centres.
-5. Run on real traces in profiled Chrome; screenshot; Dan looks.
+5. Run on real traces; screenshot; Dan looks. Executed via the declared Playwright fallback — the Chrome extension is not connected here.
 
 One bridge result carries measurement, raw candidates, and part 3's named missing inputs. The shell
 draws it and computes nothing. This is a diagnostic of the delivered engine — size-first, because

@@ -105,7 +105,6 @@ const DEFAULT_SIZE_BAND = 3
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
-
 /** Step through the candidate set, wrapping. Index arithmetic, nothing else. */
 const step = (index: number | null, total: number, delta: number): number | null =>
   index === null || total <= 0 ? index : (((index + delta) % total) + total) % total
@@ -372,11 +371,6 @@ export default function GridEnginePage() {
   const maxSpanMM = Math.round(bandSpan(spec, spec.grid.positionsPerAxis))
   /** The unit's own floor. The control offers exactly what the unit will produce, never less. */
   const minSpanMM = Math.round(minShapeSpan(spec))
-  /**
-   * The highlight ring sits exactly on the magnet spot, so a selected candidate reads as "these
-   * discs" rather than as a second decoration near them. The spot comes from the unit — the same
-   * value the canvas draws its circles at — and is halved for a radius, exactly as the canvas does.
-   */
   const selectionRadiusMM = minShapeSpan(spec) / 2
 
   /**
