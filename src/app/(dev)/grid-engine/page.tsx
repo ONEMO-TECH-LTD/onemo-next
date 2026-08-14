@@ -636,22 +636,6 @@ export default function GridEnginePage() {
               />
             </g>
           )}
-          {picked && picked.flaps.length > 0 && (
-            /* FLAP WARNINGS ONLY. The engine's layout is expressed entirely through the ONE
-               lattice — realigned on pick, its discs ARE the magnet spots (Dan, 2026-08-14:
-               "we don't need the magnets, we need discs, original lattice only"). The only mark
-               the engine may add is its red flap-risk witness. */
-            (() => {
-              const { dx, dy } = engineFrame(picked)
-              return (
-                <g pointerEvents="none" transform={`translate(${dx} ${dy})`}>
-                  {picked.flaps.map(([x, y], i) => (
-                    <circle key={`f${i}`} cx={x} cy={y} r={2} fill="#e5484d" />
-                  ))}
-                </g>
-              )
-            })()
-          )}
         </GridCanvas>
       </div>
 
