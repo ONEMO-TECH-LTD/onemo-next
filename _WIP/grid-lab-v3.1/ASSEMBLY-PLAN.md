@@ -41,16 +41,33 @@ duplicate or bypass a verbatim package — forbidden.
 **This traces back to my own Part-1 prompt, which asked for "a list of sizes".** The size-led
 direction was built in at the first instruction.
 
-### The minimal additive delivery — to the original author, both packages verbatim-preserving
+### The additive delivery — the requirement is a PROVED non-circular pipeline, not a mechanism we dictate
 
-1. **Part 2** — a deterministic, geometry-blind `enumeratePatternPlacements(grammar, fieldExtent)`:
-   every family/population/steps/position-set placement, without held facts.
-2. **Part 1** — consuming those requested site sets: exact scale/legality intervals (or a
-   first-lawful-even-size witness) for arbitrary simple **concave** polygons under uniform scaling,
-   with limiting witness; plus **authoritative maximum-clearance anchors** with deterministic ties.
-3. **Part 2's existing `enumerateCandidates`** then verifies at the returned lawful size occurrences.
-   Candidate `id` already excludes size by contract, so cross-size identity is that id plus the
-   construction and registration tags — no new identity law needed.
+The hard requirement is that grid-first becomes possible without a size input. **Two shapes could
+satisfy it, and this lane does not precommit to either** — the kernel's author is asked to audit
+which exact finite representation is achievable for arbitrary simple concave polygons, and to
+deliver that one.
+
+**(A) — preferred, and it changes nothing above Part 1.** The kernel publishes, for **every lattice
+site**, the complete exact partition of positive scale into intervals where that site's held state
+is constant (equivalently, the lawful whole-even size intervals), for the finite field and a given
+anchor. Then the **unchanged** enumerator runs at each distinct measurement state, arrangements
+emerge from **real held facts** rather than predeclared sets, and the seam only dedupes existing
+candidate ids across equivalent states and marks the first lawful occurrence. Minimal, and it keeps
+Part 2 verbatim and authoritative.
+
+**(B) — fallback, only if (A) is not finitely representable.** Part 2 gains a deterministic,
+geometry-blind `enumeratePatternPlacements(grammar, fieldExtent)` returning every family / population
+/ steps / position-set placement without held facts; Part 1 then evaluates those requested site sets
+and returns exact scale/legality intervals with limiting witnesses. Part 2's existing
+`enumerateCandidates` still verifies at the returned lawful sizes.
+
+**Either way, also additive to Part 1:** authoritative **maximum-clearance anchors** with
+deterministic tie-breaking — the missing O-1 construction, and the only one under which the band-1
+duck was ever found.
+
+Candidate `id` already excludes size by contract, so cross-size identity is that id plus the
+construction and registration tags. No new identity law is needed under either shape.
 
 Why not hand-build the closure: `grid-spec` §4's formula is valid **only for convex** outlines by its
 own words, and §4a defers concave shapes to a decomposition it never defines. Our domain is concave.
