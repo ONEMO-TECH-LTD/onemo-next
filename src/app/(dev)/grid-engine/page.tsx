@@ -247,8 +247,7 @@ export default function GridEnginePage() {
    * THE CANDIDATE DIAGNOSTIC — one index, and the lattice held still while it is open.
    *
    * The engine is solved for the traced ring, the size and the spec, and for nothing else: browsing
-   * candidates and attempting to drag both leave that answer alone. The transitions are in
-   * `candidate-view` so they are testable rather than merely intended.
+   * candidates and attempting to drag both leave that answer alone.
    */
   const [selected, setSelected] = useState<number | null>(null)
   /** The lattice holds still while a candidate is shown — one state path, the page's own pan. */
@@ -464,7 +463,12 @@ export default function GridEnginePage() {
             key={p}
             type="button"
             className={styles.chip}
-            data-on={spec.grid.pitchMM === p}
+            /* THE CHIP DESCRIBES WHAT IS DRAWN, not what was last chosen. While a candidate is
+               shown the lattice follows that candidate's population, so reading the selected pitch
+               here stated a density the canvas was not drawing — 48mm lit while 96mm was on screen,
+               and the reverse. The write below is untouched: it still moves the chosen pitch through
+               the guard. */
+            data-on={canvasSpec.grid.pitchMM === p}
             onClick={() => {
               const r = selectPitch(spec, p)
               setRefused(r.refused ?? null)
