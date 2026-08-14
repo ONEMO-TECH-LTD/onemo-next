@@ -119,13 +119,19 @@ two-construction diagnostic surface is a scope cut Dan may authorise; this lane 
 1. ✅ Placement, isolation, typecheck.
 2. Draft the **additive audit request**, QA it, Dan sends it. It asks the author to prove which
    architecture is minimal — under the preferred (A) only Part 1 changes.
-3. On delivery: verify verbatim, then write `compute/candidates.ts`, `logic/registration-law.ts`,
-   the bridge door, the shell controls.
-4. **Activate Part 3 — named, not assumed.** The additive request also asks the author for Part 3's
-   **minimal explicit-input assembly contract**: what the trusted-enumerator seam requires, and the
-   smallest supplied form of the gravity and region judgements it will accept. On that answer this
-   lane wires the supplied judgements in, runs Part 3, and routes its ranked tiers out through the
-   bridge — **producers are supplied inputs, never invented here** (tight wrap is the one with a
-   formula; gravity and region are supplied until a computable rule is sourced). Ranking exists
-   only inside Part 3; never in compute, never in the shell.
-5. Chrome check, screenshot, Dan tests the assembled three.
+3. On delivery: verify verbatim, then write `compute/candidates.ts`, then
+   `logic/registration-law.ts`.
+4. **Activate Part 3 against its EXISTING contract — nothing is asked of its author.** That contract
+   already defines the explicit judgement, status and precedence inputs and the trusted candidate /
+   kernel documents, and this lane audited it. Requesting a new assembly contract would risk
+   re-versioning a package Dan required cloned verbatim, so the additive request stays strictly on
+   the Parts 1/2 geometry gap and max-clearance. Here we supply the judgement document (wrap
+   computed from the flap equation; gravity and region **supplied**, and where they are absent the
+   layer **reports the named gap rather than silently skipping Part 3**), run Part 3 unchanged, and
+   take its ranked tiers. Ranking exists only inside Part 3.
+5. **ONE bridge door, written after logic — not before it.** It returns a single result carrying the
+   raw candidates, the named gaps and the ranked tiers together. Writing a raw-only bridge first and
+   widening it later would mean two bridge shapes and exactly the incremental mess this plan exists
+   to avoid.
+6. Shell renders that one result — nothing derived, nothing ordered.
+7. Chrome check, screenshot, Dan tests the assembled three.
