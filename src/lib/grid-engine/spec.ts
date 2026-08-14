@@ -208,30 +208,3 @@ export const RELEASED: GridSystemSpec = Object.freeze({
 
 /** The launch pitches. 24 and 72 do not exist anywhere in the system (law 1.3). */
 export const LAUNCH_PITCHES_MM: readonly number[] = Object.freeze([48, 96])
-
-
-/**
- * THE ARRANGEMENT GRAMMAR — released input DATA for the installed candidate enumerator.
- *
- * It lives here because it is policy, not calculation: which families exist, which populations the
- * one lattice carries, and the two formal readings the delivered enumerator refuses to choose for
- * us (run spacing, and whether a 1x1 window is a window). Compute may CONSUME it; compute may not
- * OWN it — the seam was authoring it, which put released policy inside the calculation module.
- *
- * The sparse population is every second base point (law 1.2), stated here as the declared
- * population rule rather than inferred from whichever pitch a surface happens to be drawing.
- */
-export const RELEASED_ARRANGEMENT_GRAMMAR = Object.freeze({
-  schema: 'magnetic-grid-candidate-enumerator/grammar/v1',
-  populations: Object.freeze([
-    Object.freeze({ id: 'base', origin: Object.freeze({ column: '0', row: '0' }), indexStep: '1' }),
-    Object.freeze({ id: 'sparse', origin: Object.freeze({ column: '0', row: '0' }), indexStep: '2' }),
-  ]),
-  families: Object.freeze({
-    single: Object.freeze({}),
-    run: Object.freeze({ stepDomain: 'any-positive-whole-population-step' }),
-    'rectangle-corners': Object.freeze({}),
-    'corner-triangle': Object.freeze({}),
-    'full-window': Object.freeze({ oneByOne: 'include' }),
-  }),
-})

@@ -239,53 +239,12 @@ describe('the class, not the instances', () => {
   it('the ui submodule does no lattice arithmetic', () => {
     // ui/ may reach outward — it is the adapter — but it may not compute the grid. Nothing checked
     // this before, because nothing read the directory at all.
-    // ui/ SPECIFICALLY. This read every nested directory, so installing compute/ and logic/ —
-    // which legitimately read law values through the spec — turned the guard red for doing their
-    // job. Narrowed to the submodule it was written for, rather than excused for the new ones.
-    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.startsWith('ui/'))
-    expect(submodule.length, 'no ui/ files found — this guard would pass vacuously').toBeGreaterThan(0)
+    const submodule = readTree(UNIT, /\.ts$/).filter((f) => f.file.includes('/'))
+    expect(submodule.length, 'no submodule files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of submodule) {
       expect(text, `${file} touches a law value`).not.toMatch(
         /\b(basePitchMM|pitchMM|paddingMM|positionsPerAxis)\b/,
       )
-    }
-  })
-
-  // Direction, by IMPORT SPECIFIER rather than by text shape. My first version of this guard
-  // forbade bridge.ts from importing Part 3 — which forbids the orchestration the scaffold says the
-  // bridge exists to do, so Part 3 could never have been wired at all.
-  const specifiersOf = (text: string): string[] =>
-    [...text.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]!)
-
-  it('module direction holds: compute, logic and ui each import only what they may', () => {
-    const files = readTree(UNIT, /\.tsx?$/).filter(
-      (f) => !f.file.includes('/dist/') && !f.file.includes('/src/') && !f.file.includes('/test/'),
-    )
-    expect(files.length, 'no unit files read — this guard would pass vacuously').toBeGreaterThan(0)
-
-    for (const { file, text } of files) {
-      const reaches = (fragment: string) => specifiersOf(text).some((s) => s.includes(fragment))
-      if (file === 'compute/candidates.ts') {
-        expect(reaches('logic/'), `${file} imports logic`).toBe(false)
-        expect(reaches('/app/'), `${file} imports the app`).toBe(false)
-      } else if (file.startsWith('logic/')) {
-        expect(reaches('compute/'), `${file} imports compute`).toBe(false)
-        expect(reaches('ui/'), `${file} imports ui`).toBe(false)
-      } else if (file.startsWith('ui/')) {
-        expect(reaches('compute/'), `${file} imports compute`).toBe(false)
-        expect(reaches('logic/'), `${file} imports logic`).toBe(false)
-      }
-      // bridge.ts is deliberately unconstrained: it is the sole orchestrator and may reach the
-      // compute seam and Part 3's public entry. That is its job.
-    }
-  })
-
-  it('the shell imports neither compute nor logic', () => {
-    for (const { file, text } of read(SHELL, /\.tsx?$/)) {
-      const specifiers = specifiersOf(text)
-      for (const forbidden of ['grid-engine/compute/', 'grid-engine/logic/']) {
-        expect(specifiers.some((s) => s.includes(forbidden)), `${file} reaches into ${forbidden}`).toBe(false)
-      }
     }
   })
 })
