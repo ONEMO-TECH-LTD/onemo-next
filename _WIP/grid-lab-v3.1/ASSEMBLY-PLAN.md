@@ -51,9 +51,10 @@ so it sits in `logic/`.
    per size. **Sizes = `[sizeMM]`, the one size currently on screen** — the scaffold has no guarded
    legal-size array, and `maxSizeMM` is a generator stop, not a ladder. Compute invents none.
    **Lattice inputs, all from the scaffold's own definitions:** pitch `spec.grid.basePitchMM` ·
-   origin `latticeAnchorMM(registrationOffsetMM(spec.grid, spec.registration), panMM)` — the same
-   value the bridge already hands the canvas to draw its rule on (`bridge.ts:64`), so a pan moves the
-   measured lattice and the drawn one together · disc `cellDiameterMM(spec.grid)` · extent
+   origin on both axes `registrationOffsetMM(spec.grid, spec.registration)`, **without pan** — live
+   pan in the solve input would make the document depend on every pointer move, and the diagnostic
+   freezes `panMM` at `[0,0]` instead (§8 step 4) so measured and drawn still coincide ·
+   disc `cellDiameterMM(spec.grid)` · extent
    `min = -floor(N/2)`, `max = min + N - 1` for `N = positionsPerAxis`, which yields exactly `N`
    positions for all 99 values the guard permits, where `[-floor(N/2), floor(N/2)]` emits `N+1` for
    every even `N` (probe: `probes/field-extent-check.mjs`). It measures the currently selected
@@ -150,7 +151,11 @@ targets ES2017).
 2. Grammar into `spec.ts`; tracer keeps its ring; repair + extend the separation guard.
    **Gate:** separation guard green including the new direction checks.
 3. The seam. **Gate:** runs on a real fixture trace end to end.
-4. The one bridge door, then the shell control. **Gate:** `tsc` clean, guards green.
+4. The one bridge door, then the shell control. While the candidate diagnostic is active the shell
+   freezes `panMM` at `[0,0]` and disables the lattice drag; stepping candidates changes only the
+   selected record and highlight, and never solves. **Gate:** `tsc` clean, guards green, plus two
+   assertions — a pan or candidate-index change calls the seam zero times, and selected candidate
+   centres coincide with drawn magnet centres.
 5. Run on real traces in profiled Chrome; screenshot; Dan looks.
 
 One bridge result carries measurement, raw candidates, and part 3's named missing inputs. The shell
