@@ -23,6 +23,21 @@ export interface TracedRing {
   readonly height: number
 }
 
+/**
+ * What one registration produced: **both delivered documents unchanged**, plus an additive
+ * millimetre projection for drawing. Part 3 requires the two documents verbatim, so nothing here
+ * may discard them.
+ */
+export interface MeasuredRegistration {
+  readonly registration: Registration
+  /** The kernel's document, exactly as returned. */
+  readonly measurementDocument: unknown
+  /** The enumerator's document, exactly as returned. */
+  readonly candidateDocument: unknown
+  /** Additive, for drawing only. */
+  readonly display: ReadonlyArray<RawCandidate>
+}
+
 /** One arrangement the delivered enumerator returned, with its positions in millimetres. */
 export interface RawCandidate {
   readonly id: string
@@ -85,23 +100,35 @@ export function enumerateForRing(
   spec: GridSystemSpec,
   ring: TracedRing,
   options: EnumerateOptions,
-): RawCandidate[] {
+): MeasuredRegistration[] {
   const vertices = cleanRing(ring.points)
-  if (vertices.length < 3) return []
+  if (vertices.length < 3) {
+    // Loud, not empty: an unusable ring must not look like a valid no-candidate result.
+    throw new Error('grid-engine seam: traced ring has fewer than three distinct points')
+  }
 
-  const b = boundsOf(vertices)
+  // The shell sizes and draws the whole IMAGE box and maps trace points through image UV, so the
+  // seam must measure that same box. Tight-wrapping to the silhouette bbox here would put the
+  // engine on a different shape than the screen whenever the picture carries transparent margin.
+  const b = {
+    minX: BigInt(0),
+    maxX: BigInt(Math.round(ring.width)),
+    minY: BigInt(0),
+    maxY: BigInt(Math.round(ring.height)),
+  }
   const spanX = b.maxX - b.minX
   const spanY = b.maxY - b.minY
   const sourceSize = spanX > spanY ? spanX : spanY
-  if (sourceSize <= BigInt(0)) return []
+  if (sourceSize <= BigInt(0)) {
+    throw new Error('grid-engine seam: traced ring has zero extent')
+  }
 
   const discDiameter = cellDiameterMM(spec.grid)
   const half = Math.floor(spec.grid.positionsPerAxis / 2)
   const minIndex = -half
   const maxIndex = minIndex + spec.grid.positionsPerAxis - 1
-  const stride = spec.grid.pitchMM / spec.grid.basePitchMM
 
-  const out: RawCandidate[] = []
+  const out: MeasuredRegistration[] = []
 
   for (const registration of ['point', 'gap'] as const) {
     const originMM = registrationOffsetMM(spec.grid, registration)
@@ -140,7 +167,9 @@ export function enumerateForRing(
         schema: 'magnetic-grid-candidate-enumerator/grammar/v1',
         populations: [
           { id: 'base', origin: { column: '0', row: '0' }, indexStep: '1' },
-          { id: 'sparse', origin: { column: '0', row: '0' }, indexStep: int(stride === 1 ? 2 : stride) },
+          // Explicit caller data, per the delivered contract: sparse is every second base point.
+          // Never inferred from the shell's selected pitch.
+          { id: 'sparse', origin: { column: '0', row: '0' }, indexStep: '2' },
         ],
         families: {
           single: {},
@@ -152,8 +181,9 @@ export function enumerateForRing(
       },
     })
 
+    const display: RawCandidate[] = []
     for (const candidate of document.candidates) {
-      out.push({
+      display.push({
         id: candidate.id,
         family: candidate.family,
         population: candidate.population,
@@ -166,6 +196,8 @@ export function enumerateForRing(
         ] as PointMM),
       })
     }
+    // Documents preserved verbatim; the projection is additive, never a replacement.
+    out.push({ registration, measurementDocument: measurement, candidateDocument: document, display })
   }
 
   return out

@@ -4,6 +4,11 @@
 modular structure, and run it. No rebuilding, no improving, no new architecture, no solvers, no
 policy. Everything else is deferred until we have looked at real output.
 
+**Read in full before this plan** (Dan's requirement): scaffold — `spec.ts` 210, `engine.ts` 227,
+`bridge.ts` 116, `ui/camera.ts` 73, `ui/trace-cutout.ts` 46, `GridCanvas.tsx` 175, `page.tsx` 654.
+Deliveries — kernel src 1,927 + `CONTRACT.md` 590; enumerator src 1,229 + contract; product logic
+src + contract + tests, plus the 1,697-line fork transcript.
+
 ## 1. Where each module goes — DONE, committed
 
 ```
@@ -37,12 +42,19 @@ No geometry, no grammar, no policy written here. Zero law literals (grep-checked
 
 ## 3. Part 3 — installed and callable, not faked
 
-Exposed through its own accepted contract. It requires supplied gravity, region, status and
-precedence inputs; the scaffold has none today. So it is **called with what exists and reports the
-missing inputs by name** — nothing is fabricated to make it run. It stays integration-testable
-against its own delivered fixtures.
+Installed and callable through its own accepted contract, which requires all four inputs and a
+complete judgement per candidate — it has **no partial mode**, and calling it with less throws. The
+scaffold supplies none of those judgements today, so **the bridge reports those inputs as
+unavailable; Part 3 is not called and we never claim it was.** The seam therefore preserves the
+kernel and enumerator documents **verbatim**, because those are two of Part 3's mandatory inputs the
+moment judgements exist. It stays integration-testable against its own delivered fixtures.
 
-## 4. One bridge door, then the shell
+## 4. Ownership — one bridge door, then the shell
+
+**Compute** holds the two measurement packages and the seam. **Logic** holds Part 3. **The shell
+imports neither** — `page.tsx` and `GridCanvas.tsx` import only `spec`, `bridge` and `ui/*`, exactly
+as they do today, and no raw package import, geometry or policy enters them. Everything the shell
+draws arrived from the bridge on that render.
 
 One result: measurement + raw candidates + Part 3's output or its named missing inputs. The shell
 browses and draws that result. It computes nothing and orders nothing.
@@ -52,9 +64,3 @@ browses and draws that result. It computes nothing and orders nothing.
 Real traces on the running page. **This is a diagnostic of the delivered engine, not production
 output** — it is size-first because that is how the modules were built, and Dan sees exactly what
 GPT Pro's work does before anyone proposes changing it.
-
-## 6. Explicitly deferred until after that
-
-Grid-first closure · maximum-clearance anchor · `registration-law.ts` (L6) · judgement producers ·
-any additive request to the modules' author. All are improvements beyond the delivered code, and
-none is in this plan.
