@@ -85,7 +85,7 @@ own QA — never smuggled into this seam.
 | `sizeTransform.sourceSize` | that ring's integer longest bbox span, in pixels |
 | `sizeTransform.sourceAnchor` | **the centre construction under test** (§3.3), as a point of the ring in pixel coordinates — bbox centre, area centroid or maximum-clearance point |
 | `sizeTransform.targetAnchor` | the field point that anchor lands on — the shape's placement, not a construction. **Must be supplied**, or the kernel translates the shape out from under the drawing |
-| `sizes` | the whole-millimetre sizes wanted — **many in one call**, one `preparePolygon` for all |
+| `sizes` | the whole-millimetre size ladder — **the entire ladder in one call**, so one `preparePolygon` serves every size in that placement |
 
 `scale = size / sourceSize` is the kernel's own exact rational, so nothing rescales twice and no
 float enters.
@@ -111,8 +111,20 @@ Drafts 1–2 conflated two separate laws:
   the gap, an odd on a magnet. The lawful set is four origins — point/point, gap/point, point/gap,
   gap/gap — not the single scalar `registrationOffsetMM` returns.
 
-**12 solves per size.** Each candidate is tagged with its centre construction and its x/y
-registration. Free pan is not a lawful placement domain under L6, so excluding it costs no lawful
+**Two of the three constructions are computable from the ring exactly** — bbox centre and the
+integer-shoelace area centroid are exact rationals. **The third, maximum clearance, has no
+authoritative implementation in any accepted module**: the refined sample this lane wrote was
+explicitly recorded as non-authoritative, and inventing a largest-inscribed-circle solver in the
+seam is exactly the rebuilding the brief forbids. So it is **BLOCKED, not implemented**, and the
+build ships two constructions with the third named as missing.
+
+**This has a consequence Dan must know:** the band-1 duck at 60mm was found *only* under
+maximum-clearance anchoring. Without that construction the raw set may not contain it, and that
+absence would be a missing input, not an engine fault.
+
+**8 measurement calls per frozen outline** — 2 constructions × 4 registrations — each carrying the
+whole size ladder, so `preparePolygon` runs 8 times, never once per size. Each candidate is tagged
+with its centre construction and its x/y registration. Free pan is not a lawful placement domain under L6, so excluding it costs no lawful
 candidate; omitting the 3×4 domain would.
 
 ### 3.4 Everything read, nothing written
@@ -122,12 +134,20 @@ candidate; omitting the 3×4 domain would.
 | `lattice.pitch` | `spec.grid.basePitchMM` |
 | `lattice.origin` | the L6 registration under test, from `spec` via `registrationOffsetMM` |
 | `lattice.fieldExtent` | `minIndex = −floor(N/2)`, `maxIndex = minIndex + N − 1`, `N = positionsPerAxis` — integer for every permitted value (9 → [−4,4], 8 → [−4,3]) |
-| `discDiameter` | `layout.cellMM` |
-| population `indexStep` | `spec.grid.pitchMM / spec.grid.basePitchMM` |
+| `discDiameter` | `cellDiameterMM(spec.grid)` — read from the spec through the scaffold engine. The seam takes no `layout`, so sourcing it from `layout.cellMM` was incoherent |
+| population `indexStep` | **both populations, always**: base `1` and sparse `2`. L7 rules that at 96mm points hide and the lattice stays put, so the sparse set is a residue of the same lattice and the canon needs both. `spec.grid.pitchMM` selects what the shell DRAWS, never what is enumerated |
 
 **A literal 48, 24, 12 or 9 in this file is a defect.** Grammar: `run.stepDomain =
 any-positive-whole-population-step`, `full-window.oneByOne = include`, populations base (step 1) and
 sparse (step 2) at origin 0,0 — complete on a 9×9 field, so no `MissingKernelFactError`.
+
+**L6 is NOT applied in compute, and is not silently dropped.** Measuring four origins makes the
+enumerator emit every family at every origin, and L6 says a candidate's per-axis parity must match
+its registration. Applying that filter inside `compute/candidates.ts` would put product law in the
+compute module — the separation Dan's brief exists to protect. So for this build the surface is
+labelled honestly for what it is: **every candidate at every measured registration, each tagged with
+the registration it came from**. Applying L6 is a logic-side step that arrives with the logic module;
+it is named here so it cannot disappear, and the raw surface must never be described as "lawful".
 
 **Cache key**: outline identity, `basePitchMM`, `pitchMM`, `paddingMM`, `positionsPerAxis`, centre
 construction, registration, requested sizes, grammar. Anything outside the key clears it.
