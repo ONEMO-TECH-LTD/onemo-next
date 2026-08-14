@@ -191,6 +191,21 @@ describe('collectCandidates — shipped entry', () => {
     expect(face[0]?.sites.length).toBe(2)
   })
 
+  it('standing view keeps the shape bbox-centred across origins', () => {
+    const outline = square(36)
+    const doc = listCandidates(RELEASED, outline)
+    const pair = doc.candidates.filter((c) => c.sizeMM === 72 && c.sites.length >= 1)
+    expect(pair.length).toBeGreaterThan(1)
+    const a = standingView(RELEASED, pair[0], outline)
+    const b = standingView(RELEASED, pair[pair.length - 1], outline)
+    const box = (verts: Array<[number, number]>) => {
+      const xs = verts.map((p) => p[0])
+      const ys = verts.map((p) => p[1])
+      return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+    }
+    expect(box(a.shape)).toEqual(box(b.shape))
+  })
+
   it('standing view lands every mark on the frozen lattice', () => {
     const outline = square(36)
     const doc = listCandidates(RELEASED, outline)
@@ -198,7 +213,9 @@ describe('collectCandidates — shipped entry', () => {
     const pitch = RELEASED.grid.basePitchMM
     for (const c of doc.candidates) {
       const view = standingView(RELEASED, c, outline)
-      expect(view.panMM).toEqual([0, 0])
+      const half = pitch / 2
+      expect(view.panMM[0] === 0 || view.panMM[0] === half).toBe(true)
+      expect(view.panMM[1] === 0 || view.panMM[1] === half).toBe(true)
       for (const [x, y] of view.sites) {
         expect(x % pitch === 0).toBe(true)
         expect(y % pitch === 0).toBe(true)

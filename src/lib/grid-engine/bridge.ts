@@ -18,6 +18,7 @@ import {
   collectCandidates,
   placedOutline,
   placedPicture,
+  scaleToSize,
   type Candidate,
   type CandidateDocument,
 } from './candidates'
@@ -154,8 +155,7 @@ function originAxis(reg: 'gap' | 'point', half: number): number {
 }
 
 /**
- * One lattice. Magnets never move. A candidate whose origin is not the standing
- * origin is shown by moving the SHAPE so its sites land on the standing magnets.
+ * Shape stays put (bbox-centred). The lattice pans by registration only.
  * Sparse only hides every second standing point.
  */
 export function standingView(
@@ -179,12 +179,14 @@ export function standingView(
     spec,
     candidate.population === 'sparse' ? spec.grid.basePitchMM * 2 : spec.grid.basePitchMM,
   )
-  const pic = picture ? placedPicture(outline, picture, candidate.sizeMM, candidate.anchor) : null
   return {
     spec: pitched.spec,
-    panMM: [0, 0],
-    shape: placedOutline(outline, candidate.sizeMM, candidate.anchor).map(([x, y]) => [x + dx, y + dy]),
+    panMM: [
+      originAxis(candidate.registration.x, half),
+      originAxis(candidate.registration.y, half),
+    ],
+    shape: scaleToSize(outline, candidate.sizeMM),
     sites: candidate.sites.map((s) => [s.x + dx, s.y + dy]),
-    picture: pic ? { x: pic.x + dx, y: pic.y + dy, w: pic.w, h: pic.h } : null,
+    picture: picture ? placedPicture(outline, picture, candidate.sizeMM, 'bbox') : null,
   }
 }

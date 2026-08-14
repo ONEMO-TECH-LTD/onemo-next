@@ -256,7 +256,12 @@ export default function GridEnginePage() {
     if (!shownCand) return
     setSize(shownCand.sizeMM)
   }, [shownCand?.id])
-  const shownField = shownView ?? { spec, panMM: pan }
+  const shownField = shownView
+    ? {
+        spec: shownView.spec,
+        panMM: [shownView.panMM[0] + pan[0], shownView.panMM[1] + pan[1]] as [number, number],
+      }
+    : { spec, panMM: pan }
   /** The surface a pinch is measured on. Same rect the drag uses — one place the canvas reacts. */
   const panSurface = useRef<HTMLDivElement>(null)
   /**
