@@ -423,7 +423,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-38</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-39</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`

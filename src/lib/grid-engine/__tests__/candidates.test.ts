@@ -243,6 +243,20 @@ describe('collectCandidates — shipped entry', () => {
     expect(singles.every((c) => !('preferred' in c))).toBe(true)
   })
 
+  it('proposes the centred seat over an offset one at the same wrap', () => {
+    const box: Array<[number, number]> = [
+      [-30, -30],
+      [30, -30],
+      [30, 30],
+      [-30, 30],
+    ]
+    const doc = listCandidates(RELEASED, box)
+    const face = benchCandidates(RELEASED, doc, 1, box)
+    expect(face[0]?.sites.length).toBe(1)
+    expect(Math.abs(face[0]!.sites[0].x)).toBeLessThan(6)
+    expect(Math.abs(face[0]!.sites[0].y)).toBeLessThan(6)
+  })
+
   it('proposes a top-half single on a top-heavy outline, never a bottom one', () => {
     const topHeavy: Array<[number, number]> = [
       [-22, -40],

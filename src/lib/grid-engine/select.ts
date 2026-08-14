@@ -1,8 +1,8 @@
-// L20 — any outline. Gravity, then wrap the masses. No shape names.
+// L20 — any outline. Gravity, wrap, and centre are weights. No shape names.
 
 import { scaleToSize, type Candidate, type CandidateDocument } from './candidates'
 import { discClearanceMM, prepareOutline } from './measure'
-import type { BandId, GridSystemSpec } from './spec'
+import { BAND_SIZES_MM, type BandId, type GridSystemSpec } from './spec'
 import type { PointMM } from './engine'
 
 function bbox(verts: ReadonlyArray<PointMM>) {
@@ -89,7 +89,45 @@ function spanArea(c: Candidate): number {
   return (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys))
 }
 
-/** How far the hold sits from the shape centre. Snug wrap already picked the size; this centres it. */
+/** Wrap, centre, gravity — peers. Centre is a law, not a leftover. */
+const WEIGHT_WRAP = 1
+const WEIGHT_CENTER = 1
+const WEIGHT_GRAVITY = 0.25
+
+function bandRange(band: BandId): { lo: number; span: number } {
+  const sizes = BAND_SIZES_MM[band]
+  const lo = sizes[0]
+  const hi = sizes[sizes.length - 1]
+  return { lo, span: Math.max(1, hi - lo) }
+}
+
+function wrapWeight(sizeMM: number, band: BandId): number {
+  const { lo, span } = bandRange(band)
+  return (sizeMM - lo) / span
+}
+
+function centerWeight(offset2: number, shape: ReturnType<typeof bbox>): number {
+  const hw = (shape.maxX - shape.minX) / 2
+  const hh = (shape.maxY - shape.minY) / 2
+  const reach = Math.hypot(hw, hh) || 1
+  return Math.sqrt(offset2) / reach
+}
+
+function rankScore(
+  sizeMM: number,
+  offset2: number,
+  gravity: boolean,
+  band: BandId,
+  shape: ReturnType<typeof bbox>,
+): number {
+  return (
+    WEIGHT_WRAP * wrapWeight(sizeMM, band) +
+    WEIGHT_CENTER * centerWeight(offset2, shape) +
+    WEIGHT_GRAVITY * (gravity ? 0 : 1)
+  )
+}
+
+/** How far the hold sits from the shape centre. */
 function balance(c: Candidate, shape: ReturnType<typeof bbox>): number {
   const xs = c.sites.map((s) => s.x)
   const ys = c.sites.map((s) => s.y)
@@ -137,6 +175,7 @@ export interface ProposalMeasure {
   area: number
   balance: number
   size: number
+  score: number
 }
 
 export function measureProposal(
@@ -146,9 +185,11 @@ export function measureProposal(
 ): ProposalMeasure {
   const verts = scaleToSize(outline, c.sizeMM)
   const shape = bbox(verts)
+  const gravity = holdsTop(c, shape)
+  const offset2 = balance(c, shape)
   return {
     n: c.sites.length,
-    gravity: holdsTop(c, shape),
+    gravity,
     masses: coversMasses(c, shape),
     top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
     extremes: extremeFlap(c, verts),
@@ -156,17 +197,17 @@ export function measureProposal(
     pair: pairSpan(c),
     step: minPairSpan(c),
     area: spanArea(c),
-    balance: balance(c, shape),
+    balance: offset2,
     size: c.sizeMM,
+    score: rankScore(c.sizeMM, offset2, gravity, c.band, shape),
   }
 }
 
 /** Which sort key put `won` above `lost`. Empty if they compare equal. */
-export function decidingKey(band: BandId, won: ProposalMeasure, lost: ProposalMeasure): string {
+export function decidingKey(_band: BandId, won: ProposalMeasure, lost: ProposalMeasure): string {
+  if (won.score !== lost.score) return won.score < lost.score ? 'center+wrap' : 'center+wrap-lost'
+  if (won.balance !== lost.balance) return 'center'
   if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
-  if (won.balance !== lost.balance) return 'balance'
-  if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
-  if (won.n !== lost.n) return `count ${won.n} > ${lost.n}`
   return 'placement-at-size'
 }
 
@@ -180,19 +221,22 @@ export function propose(
   const scored = raw.map((c) => {
     const verts = scaleToSize(outline, c.sizeMM)
     const shape = bbox(verts)
+    const gravity = holdsTop(c, shape)
+    const offset2 = balance(c, shape)
     return {
       c,
       n: c.sites.length,
-      gravity: holdsTop(c, shape),
-      balance: balance(c, shape),
+      gravity,
+      balance: offset2,
       size: c.sizeMM,
+      score: rankScore(c.sizeMM, offset2, gravity, band, shape),
     }
   })
 
   scored.sort((a, b) => {
-    if (a.size !== b.size) return a.size - b.size
+    if (a.score !== b.score) return a.score - b.score
     if (a.balance !== b.balance) return a.balance - b.balance
-    if (a.gravity !== b.gravity) return a.gravity ? -1 : 1
+    if (a.size !== b.size) return a.size - b.size
     if (a.n !== b.n) return b.n - a.n
     return a.c.id.localeCompare(b.c.id)
   })
