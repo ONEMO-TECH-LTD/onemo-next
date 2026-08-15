@@ -75,6 +75,37 @@ describe('guarded writers — refusal, never clamping or silent acceptance', () 
   })
 })
 
+describe('band fallback — proven to RUN, not just to be lawful (QA base-closure F2)', () => {
+  it('a narrow column forces band 4 through the fallback: the stepping law forbids echoing a lower band, so an echoed-yet-lawful answer can only come from the fallback branch', { timeout: 300000 }, () => {
+    // 55:220 aspect — one anchor column only. The 96-spaced 3-run spans 192+24 > every
+    // band-4 size (cap 214), so band 4 has NO fresh arrangement: every candidate's identity
+    // already answered a lower band. The normal path (stepUp echo filter) must empty; only
+    // the fallback may answer — and it answers with a lower band's identity, lawfully.
+    const contour: Contour = {
+      outer: {
+        pts: [
+          [0, 0],
+          [55, 0],
+          [55, 220],
+          [0, 220],
+        ] as Pt[],
+      },
+      holes: [],
+    }
+    const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, contour)
+    expect(judged).not.toBeNull()
+    const b3 = judged!.bands.find((b) => b.band.band === 3)!.variants[0]
+    const b4 = judged!.bands.find((b) => b.band.band === 4)!.variants[0]
+    expect(b3).toBeDefined()
+    expect(b4, 'band 4 must still answer (every band answers)').toBeDefined()
+    // the proof the fallback ran: band 4 repeats band 3's arrangement, which the stepping
+    // law bars from the normal offer path on a stepUp band
+    expect(b4.layout, 'echoed arrangement = fallback branch').toBe(b3.layout)
+    expect(b4.topHangMM ?? b4.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+    expect(b4.wrap.bottom).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapLimbMM)
+  })
+})
+
 describe('band fallback — preferences may relax, hold laws never', () => {
   it('no band winner ever violates gravity, vertical hold, or connectivity', { timeout: 300000 }, () => {
     // a shape hostile enough to force fallbacks: a wide shallow slab with a hanging tongue

@@ -1,8 +1,11 @@
-// BOUNDARY FIXTURES — one step below, exactly on, and one step above every threshold
-// (R3 §13.4 / Meta's plan row / QA's knife-edge finding: rule results may change only through
-// a stated boundary, never by backend accident). This file covers every PURE threshold —
-// predicates and guarded writers. Solve-level boundary shapes (a wrap engineered to exactly
-// 28.0mm) require exact seat construction and ride with Phase 1's certified placement.
+// BOUNDARY FIXTURES (R3 §13.4 / QA's knife-edge finding: rule results may change only through
+// a stated boundary, never by backend accident). SCOPE, stated exactly (QA base-closure F3):
+// this file covers the pure PREDICATES (strip link, filled-block quantization, mirror
+// symmetry, waist arithmetic) and every GUARDED WRITER bound. NOT covered here, by named
+// deferral: solve-level boundary shapes (a wrap engineered to exactly 28.0mm — needs Step 1's
+// certified placement) and the shapeStructure classifier's decision boundaries (taper/diag/
+// waist/mass classification is judge-internal; its boundary tests ride with Step 2's mass
+// measures).
 
 import { describe, expect, it } from 'vitest'
 
@@ -50,6 +53,14 @@ describe('filled-block quantization — the half-cell rounding boundary', () => 
     // 12.1/24 rounds to 1 — a 2x2 grid with only 2 points
     expect(pointsFillBlock(pts, cell)).toBe(false)
   })
+  it('offset exactly on the half-cell (12.0) — pinned: rounds up to two columns', () => {
+    const pts: Pt[] = [
+      [0, 0],
+      [12, 48],
+    ]
+    // Math.round(0.5) = 1 in JS — the exact half-cell lands on the two-column side
+    expect(pointsFillBlock(pts, cell)).toBe(false)
+  })
 })
 
 describe('mirror-symmetry tolerance — below/above the exact-reflection bound', () => {
@@ -59,6 +70,9 @@ describe('mirror-symmetry tolerance — below/above the exact-reflection bound',
     [40, 0],
     [20 + deltaMM, 10],
   ]
+  it('exact reflection (zero deviation) is symmetric', () => {
+    expect(pointsMirrorSymmetric(trio(0))).toBe(true)
+  })
   it('reflection error 8e-7 (below tol) is symmetric', () => {
     expect(pointsMirrorSymmetric(trio(4e-7))).toBe(true)
   })
@@ -79,6 +93,38 @@ describe('waist ratio — exact arithmetic at the classification boundary value'
       { span: 100 },
     ]
     expect(waistRatio(rows)).toBeCloseTo(t, 12)
+  })
+})
+
+describe('waist ratio — one step below and above the released threshold resolves to that side', () => {
+  const t = RELEASED_CALIBRATION.structureWaistRatio
+  const rowsAt = (mid: number) => [
+    { span: 100 },
+    { span: 100 },
+    { span: mid },
+    { span: mid },
+    { span: 100 },
+    { span: 100 },
+  ]
+  it('mid span one step below the threshold measures below it', () => {
+    expect(waistRatio(rowsAt(100 * t - 0.5))).toBeLessThan(t)
+  })
+  it('mid span one step above the threshold measures above it', () => {
+    expect(waistRatio(rowsAt(100 * t + 0.5))).toBeGreaterThan(t)
+  })
+})
+
+describe('count-valued writers — whole numbers only, fractions refused never rounded (F1)', () => {
+  const COUNT_KEYS = ['optionsPerBand', 'structureScanlines', 'massFieldSamples'] as const
+  for (const key of COUNT_KEYS) {
+    it(`${key}: integer accepted, fraction refused as not-a-count`, () => {
+      const mid = Math.ceil((RELEASED_CALIBRATION[key] as number + 1))
+      expect(applyCalibrationValue(RELEASED_CALIBRATION, key, mid).refused).toBeUndefined()
+      expect(applyCalibrationValue(RELEASED_CALIBRATION, key, mid + 0.5).refused).toBe('not-a-count')
+    })
+  }
+  it('millimetre keys still accept fractions (the guard is count-scoped)', () => {
+    expect(applyCalibrationValue(RELEASED_CALIBRATION, 'flapMaxMM', 28.5).refused).toBeUndefined()
   })
 })
 
@@ -103,12 +149,14 @@ describe('guarded writer bounds — min/max accepted, one step outside refused',
     ['massFieldSamples', 8, 128],
     ['maxTestedMM', 20, 1000],
   ]
+  const COUNTS = new Set(['optionsPerBand', 'structureScanlines', 'massFieldSamples'])
   for (const [key, min, max] of NUMERIC) {
     it(`${key}: [${min}, ${max}] closed, outside refused`, () => {
       expect(applyCalibrationValue(RELEASED_CALIBRATION, key, min).refused).toBeUndefined()
       expect(applyCalibrationValue(RELEASED_CALIBRATION, key, max).refused).toBeUndefined()
-      expect(applyCalibrationValue(RELEASED_CALIBRATION, key, min - 0.001).refused).toBe('out-of-range')
-      expect(applyCalibrationValue(RELEASED_CALIBRATION, key, max + 0.001).refused).toBe('out-of-range')
+      const step = COUNTS.has(key) ? 1 : 0.001
+      expect(applyCalibrationValue(RELEASED_CALIBRATION, key, min - step).refused).toBe('out-of-range')
+      expect(applyCalibrationValue(RELEASED_CALIBRATION, key, max + step).refused).toBe('out-of-range')
     })
   }
 

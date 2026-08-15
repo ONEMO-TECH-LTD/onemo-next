@@ -98,7 +98,7 @@ const LIMITS: Record<GridKey, { min: number; max: number }> = {
   positionsPerAxis: { min: 1, max: 99 },
 }
 
-export type WriteRefusal = 'sealed-in-code' | 'options-only' | 'not-a-number' | 'out-of-range'
+export type WriteRefusal = 'sealed-in-code' | 'options-only' | 'not-a-number' | 'not-a-count' | 'out-of-range'
 
 interface WriteResult {
   spec: GridSystemSpec
@@ -427,6 +427,12 @@ const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: numbe
   stripLinkMM: { min: 48, max: 136 },
 }
 
+const COUNT_KEYS: ReadonlySet<CalibrationNumberKey> = new Set([
+  'optionsPerBand',
+  'structureScanlines',
+  'massFieldSamples',
+] as const)
+
 const RELEASED_PLANS: readonly CalibrationSpec['plan'][] = Object.freeze([
   'auto',
   'all6',
@@ -442,6 +448,9 @@ export function applyCalibrationValue(
   value: number,
 ): { calibration: CalibrationSpec; refused?: WriteRefusal } {
   if (!Number.isFinite(value)) return { calibration, refused: 'not-a-number' }
+  // COUNT-VALUED KEYS (QA base-closure F1): these describe counts of things — a fractional
+  // count has no meaning and is refused, never rounded.
+  if (COUNT_KEYS.has(key) && !Number.isInteger(value)) return { calibration, refused: 'not-a-count' }
   const { min, max } = CALIBRATION_LIMITS[key]
   if (value < min || value > max) return { calibration, refused: 'out-of-range' }
   return { calibration: { ...calibration, [key]: value } }

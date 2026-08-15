@@ -1,4 +1,18 @@
-# Canon source-of-truth adjudication — the 28 frames, frame by frame
+# Canon adjudication — RESOLVED BY LAW (reframed per Dan, 2026-08-15 23:20)
+
+> **Standing frame:** canon is the LAW SET, not per-shape frames. The rows below are decided
+> by RUNNING the laws — the lawful answer under the current law set wins and is pinned as a
+> regression tripwire (never as truth). Nothing is patched per shape; a veto by Dan on any
+> frame is a cheap calibration flip. Rows the laws could not answer were exactly the two
+> named gaps — **no mass measure** and **no complete placement enumeration** — which are the
+> build itself: Step 1 (certified placement) and Step 2 (mass measures). The first mass
+> measure (mass-aware gravity, `topHangMM`) landed at `fe822773` and resolved every open
+> band-4 row: bat B4 = full 5-point grid ·172, duck B4 = 5-point ·210, poke2 B4 = 96-step
+> triangle ·196 — all verified on the bench and re-pinned as tripwires. No rulings are owed
+> by Dan; the historical questions below stand as the record of what the law set could not
+> yet answer at `5dae83e0`.
+
+# (historical) Canon source-of-truth adjudication — the 28 frames, frame by frame
 
 **For:** Dan · **Produced by:** s62-kai (bench owner) per the amended assembly plan
 **Frames + data captured at head `5dae83e0`** on the live bench (port 3063, worktree-verified).

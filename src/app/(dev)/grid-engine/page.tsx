@@ -113,6 +113,7 @@ const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
   'options-only': 'Released options only — pick one, it is never typed in freehand.',
   'not-a-number': 'That is not a number.',
+  'not-a-count': 'Counts are whole numbers — refused, never rounded.',
   'out-of-range': 'Outside the value’s allowed range — refused, not clamped.',
 }
 
