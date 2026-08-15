@@ -278,6 +278,14 @@ function better(
   const holdsBottomA = a.wrap.bottom <= calibration.flapLimbMM
   const holdsBottomB = b.wrap.bottom <= calibration.flapLimbMM
   if (holdsBottomA !== holdsBottomB) return holdsBottomA
+  // 1c. THE STRIP LAW (v1's own hold physics: rim pairs bond material only up to the sparse
+  //     pitch — its coverage oracle bounds pair strips at 96mm): magnets spaced beyond it are
+  //     disconnected islands, not an arrangement (the poke's 136mm corner-to-corner diagonal
+  //     measured perfect bbox wraps while 301mm of edge hung unheld — eyes-on, 2026-08-15).
+  const stripCapMM = Math.max(...LAUNCH_PITCHES_MM)
+  const connectedA = a.anchors.length < 2 || (a.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6
+  const connectedB = b.anchors.length < 2 || (b.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6
+  if (connectedA !== connectedB) return connectedA
   // 2. THE COLUMN LAW (Dan, this session: "narrow shape if scaled can fit 2 columns" — and
   //    "optimal is 4 magnets in each outmost corner"). CORNERS CLASS — outranks every
   //    spine/pair/single, but ONLY when the arrangement genuinely takes the shape's corners:
@@ -455,10 +463,12 @@ function judgeBand(
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
+  const stripCapMM = Math.max(...LAUNCH_PITCHES_MM)
   const lawful = kept.filter(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
+      (v.anchors.length < 2 || (v.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
       // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
       // butterfly cross-wing diagonals) — on a mirror shape they are not options at all
