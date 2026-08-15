@@ -660,10 +660,11 @@ function judgeBand(
     const prepared = prepareExactContour(contour)
     const bb = prepared.bbox
     for (const template of templates) {
-      // Small templates floating on large shapes sweep at half resolution — cost, not law:
-      // their origin range is huge and the fine step over it quadrupled the solve. Large
-      // templates have small ranges and keep the fine step.
-      const stepMM = template.steps.length <= 3 && sizeMM > 120 ? sweep * 2 : sweep
+      // FULL-RESOLUTION SWEEP everywhere (Meta build-audit, 2026-08-15): the half-res
+      // exception for small templates on large shapes re-opened the missed-snug-seat class
+      // this lane already shipped twice. Cost is paid until the continuous-placement MVP
+      // removes the sweep entirely.
+      const stepMM = sweep
       let stepsAcross = 0
       let stepsDown = 0
       for (const [across, down] of template.steps) {
