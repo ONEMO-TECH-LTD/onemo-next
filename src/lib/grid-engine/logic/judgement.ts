@@ -332,14 +332,26 @@ function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStruc
   if (taperCorr > calibration.structureTaperCorr) return { kind: 'tapered' }
   if (waistRatio(rows) < calibration.structureWaistRatio) return { kind: 'waistedY' }
   if (waistRatio(cols) < calibration.structureWaistRatio) return { kind: 'waistedX' }
-  const sorted = [...spans].sort((a, b) => a - b)
-  const median = sorted[Math.floor(sorted.length / 2)]
-  const widest = Math.max(...spans)
+  // the uniform split: a MILD waist marks the limbed standing mass (the bot, 0.68 — arms and
+  // legs off a narrow torso: column hold); no waist at all marks the full blob (the poke,
+  // 0.97: corner-square hold).
   return {
     kind: 'uniform',
     tall: maxY - minY >= maxX - minX,
-    narrowMass: widest > 0 && median / widest < calibration.structureMassRatio,
+    narrowMass: waistRatio(rows) < calibration.structureMassRatio,
   }
+}
+
+/** A FILLED BLOCK: the anchors are every combination of their distinct columns and rows —
+ *  a pair-in-line, a rect, a square. A diagonal shares the box but not the block. */
+function isFilledBlock(v: SizeVariant, halfPitchMM: number): boolean {
+  const q = (n: number) => Math.round(n / halfPitchMM)
+  const xs = new Set(v.anchors.map((a) => q(a.p[0])))
+  const ys = new Set(v.anchors.map((a) => q(a.p[1])))
+  if (xs.size * ys.size !== v.anchors.length) return false
+  const have = new Set(v.anchors.map((a) => `${q(a.p[0])}:${q(a.p[1])}`))
+  for (const x of xs) for (const y of ys) if (!have.has(`${x}:${y}`)) return false
+  return true
 }
 
 /** How well an arrangement answers the shape's structure: 2 = spans/embodies it, 1 = aligned
@@ -396,8 +408,10 @@ function structureScore(
     if (extY < half && extX > eps) return 1
     return 0
   }
-  // uniform, narrow mass (the bot): the tight column/rect along the long axis
+  // uniform, narrow mass (the bot): the tight column/rect along the long axis — a FILLED
+  // block only (the diagonal shares the narrow box but is no column).
   if (structure.narrowMass) {
+    if (!isFilledBlock(v, half)) return 0
     if (structure.tall) return extX <= basePitchMM + eps && extY > eps ? 1 : 0
     return extY <= basePitchMM + eps && extX > eps ? 1 : 0
   }
@@ -405,6 +419,7 @@ function structureScore(
   // the pair follows the shape's own axis ("vertical for standing shapes" — canon B2).
   if (n >= 4 && extX >= 2 * basePitchMM - eps && extY >= 2 * basePitchMM - eps) return 2
   if (n >= 4) return 1
+  if (!isFilledBlock(v, half)) return 0
   if (structure.tall) return extX < half && extY > eps ? 1 : 0
   return extY < half && extX > eps ? 1 : 0
 }
