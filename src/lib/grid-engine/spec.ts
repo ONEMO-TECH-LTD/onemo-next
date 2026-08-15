@@ -226,7 +226,8 @@ export interface BandSpec {
   /** Smallest and largest manufactured longest-side this band may publish, millimetres. */
   minSizeMM: number
   maxSizeMM: number
-  /** The magnet count this band aims for (Dan's canon: pair minimum, four optimal, six above). */
+  /** The band's ruled magnet count (canon walkthrough: band 1 is ONE, band 2 is TWO — every
+   *  ruled example; 0 = free, the structure law decides — band 3/4 vary by shape). */
   targetMagnets: number
   /** Whether the product currently offers this band. Hidden bands still compute. */
   released: boolean
@@ -279,6 +280,9 @@ export interface CalibrationSpec {
   structureWaistRatio: number
   structureTaperCorr: number
   structureDiagSlope: number
+  /** Uniform shapes split by MASS WIDTH (Dan: the bot is a "narrow standing mass" — column hold;
+   *  the poke is a full blob — corner square): median scanline width over the widest. */
+  structureMassRatio: number
   /** The judge's size step inside a band, millimetres (sizes stay even). */
   sizeStepMM: number
   /** How many curated variants a band OFFERS (Dan, 2026-08-15: "i need 1 optimal" — the band
@@ -315,17 +319,18 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   sweepStepMM: 2,
   centerToleranceMM: 12,
   symmetryTolFrac: 0.11,
-  structureWaistRatio: 0.7,
-  structureTaperCorr: 0.55,
+  structureWaistRatio: 0.6,
+  structureTaperCorr: 0.7,
   structureDiagSlope: 0.35,
+  structureMassRatio: 0.85,
   sizeStepMM: 2,
   optionsPerBand: 1,
   bandSizeStepMM: 24,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
-    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 1, released: true }),
-    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 2, released: true }),
-    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 2, released: false }),
+    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),
+    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 0, released: true }),
+    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 0, released: false }),
   ]) as readonly BandSpec[],
   // Dan's canon arrangements (2026-08-13 walkthrough): pair either way; the 48 square; the
   // 48-wide x 96-tall rectangle and its transpose; the 96 square; the six-point 48x96 blocks.

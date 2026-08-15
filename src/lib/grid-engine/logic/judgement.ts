@@ -251,7 +251,7 @@ type ShapeStructure =
   | { kind: 'tapered' }
   | { kind: 'waistedY' }
   | { kind: 'waistedX' }
-  | { kind: 'uniform'; tall: boolean }
+  | { kind: 'uniform'; tall: boolean; narrowMass: boolean }
 
 function profile(
   pts: ReadonlyArray<Pt>,
@@ -304,7 +304,7 @@ function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStruc
   }
   const rows = profile(pts, 1, minY, maxY)
   const cols = profile(pts, 0, minX, maxX)
-  if (rows.length < 4 || cols.length < 4) return { kind: 'uniform', tall: true }
+  if (rows.length < 4 || cols.length < 4) return { kind: 'uniform', tall: true, narrowMass: true }
   // diagonal: the row centres drift linearly across the height
   const n = rows.length
   const ys = rows.map((_, i) => i / (n - 1))
@@ -332,7 +332,14 @@ function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStruc
   if (taperCorr > calibration.structureTaperCorr) return { kind: 'tapered' }
   if (waistRatio(rows) < calibration.structureWaistRatio) return { kind: 'waistedY' }
   if (waistRatio(cols) < calibration.structureWaistRatio) return { kind: 'waistedX' }
-  return { kind: 'uniform', tall: maxY - minY >= maxX - minX }
+  const sorted = [...spans].sort((a, b) => a - b)
+  const median = sorted[Math.floor(sorted.length / 2)]
+  const widest = Math.max(...spans)
+  return {
+    kind: 'uniform',
+    tall: maxY - minY >= maxX - minX,
+    narrowMass: widest > 0 && median / widest < calibration.structureMassRatio,
+  }
 }
 
 /** How well an arrangement answers the shape's structure: 2 = spans/embodies it, 1 = aligned
@@ -389,9 +396,15 @@ function structureScore(
     if (extY < half && extX > eps) return 1
     return 0
   }
-  // uniform: the narrow arrangement along the shape's long axis
-  if (structure.tall) return extX <= basePitchMM + eps && extY > eps ? 1 : 0
-  return extY <= basePitchMM + eps && extX > eps ? 1 : 0
+  // uniform, narrow mass (the bot): the tight column/rect along the long axis
+  if (structure.narrowMass) {
+    if (structure.tall) return extX <= basePitchMM + eps && extY > eps ? 1 : 0
+    return extY <= basePitchMM + eps && extX > eps ? 1 : 0
+  }
+  // uniform, full mass (the poke blob): the corner square — widest first
+  if (n >= 4 && extX >= 2 * basePitchMM - eps && extY >= 2 * basePitchMM - eps) return 2
+  if (n >= 4) return 1
+  return 0
 }
 
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
@@ -445,6 +458,13 @@ function better(
   const connectedA = a.anchors.length < 2 || (a.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6
   const connectedB = b.anchors.length < 2 || (b.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6
   if (connectedA !== connectedB) return connectedA
+  // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
+  //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
+  if (band.targetMagnets > 0) {
+    const offA = Math.abs(a.anchors.length - band.targetMagnets)
+    const offB = Math.abs(b.anchors.length - band.targetMagnets)
+    if (offA !== offB) return offA < offB
+  }
   // 2. THE COLUMN LAW (Dan, this session: "narrow shape if scaled can fit 2 columns" — and
   //    "optimal is 4 magnets in each outmost corner"). CORNERS CLASS — outranks every
   //    spine/pair/single, but ONLY when the arrangement genuinely takes the shape's corners:
