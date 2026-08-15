@@ -536,7 +536,14 @@ function judgeBand(
     }
   }
 
-  kept.sort((a, b) => (better(a, b, band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM) ? -1 : 1))
+  // Equality-safe three-way comparator (QA adjudication: `better ? -1 : 1` never returns 0,
+  // so exact duplicates compare +1 both ways — an intransitive comparator voids the sort
+  // contract). Ties return 0; the stable sort then keeps deterministic consideration order.
+  kept.sort((a, b) => {
+    if (better(a, b, band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) return -1
+    if (better(b, a, band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) return 1
+    return 0
+  })
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
