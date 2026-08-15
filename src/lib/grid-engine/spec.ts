@@ -275,8 +275,8 @@ export interface CalibrationSpec {
   symmetryTolFrac: number
   /** The judge's size step inside a band, millimetres (sizes stay even). */
   sizeStepMM: number
-  /** How many curated variants a band OFFERS (Dan, 2026-08-15: the band is a verdict, not the
-   *  raw search — a few optimal options, every one passing the hold laws). */
+  /** How many curated variants a band OFFERS (Dan, 2026-08-15: "i need 1 optimal" — the band
+   *  is a verdict; one answer, not a menu). */
   optionsPerBand: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
   bands: readonly BandSpec[]
@@ -306,7 +306,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   centerToleranceMM: 12,
   symmetryTolFrac: 0.11,
   sizeStepMM: 2,
-  optionsPerBand: 4,
+  optionsPerBand: 1,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
     Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 1, released: true }),
