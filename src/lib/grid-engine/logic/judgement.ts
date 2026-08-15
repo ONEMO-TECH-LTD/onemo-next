@@ -751,10 +751,20 @@ function judgeBand(
       (!band.stepUp && i === 0) || !offeredBelow.has(layoutIdentity(v, halfPitch)),
   )
   let final = fresh.slice(0, calibration.optionsPerBand)
-  // EVERY BAND ANSWERS (Dan, 2026-08-15: "each band must have at least one optimal layout"):
-  // when the offer filters empty a band, its ranked-best size-separated placement stands in —
-  // an imperfect answer beats a silent band.
-  if (!final.length && kept.length) final = [kept[0]]
+  // EVERY BAND ANSWERS (Dan: "each band must have at least one optimal layout") — but never
+  // with a LAW-REJECTED placement (QA build-audit, 2026-08-15: the old kept[0] fallback could
+  // emit an answer the hold laws refused). The fallback relaxes only the PREFERENCE filters
+  // (symmetry offer, footprint, echo); the hold laws are non-negotiable. If nothing passes
+  // them, the band honestly answers NONE.
+  if (!final.length) {
+    const holdLawful = kept.find(
+      (v) =>
+        v.wrap.top <= calibration.flapMaxMM &&
+        v.wrap.bottom <= calibration.flapLimbMM &&
+        isOneStrip(v, calibration.stripLinkMM),
+    )
+    if (holdLawful) final = [holdLawful]
+  }
   for (const v of final) offeredBelow.add(layoutIdentity(v, halfPitch))
   return { band, variants: final }
 }
