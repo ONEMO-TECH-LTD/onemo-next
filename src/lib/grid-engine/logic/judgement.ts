@@ -38,6 +38,7 @@ import { normalizeContour } from '../compute/normalize'
 import {
   shapeFeatures,
   deepestPointSampled,
+  areaAboveLine,
   pointsMirrorSymmetric,
   pointsFillBlock,
   pointsOneComponent,
@@ -68,6 +69,11 @@ export interface SizeVariant {
   nearestAnchorMM: number | null
   /** The flap-law measures this variant was judged on. */
   wrap: WrapMeasures
+  /** MASS-AWARE GRAVITY (Dan, 2026-08-15 22:52: band 4 must step UP to the full grid — the
+   *  raw top extent let a thin ear tip veto every 4-point arrangement): material area above
+   *  the padded block top, divided by the block width — the equivalent height of the hanging
+   *  mass, judged against the same flap bound. A thin tip is light; a hanging body is not. */
+  topHangMM?: number
   /** Horizontal distance from the assembly's centre to the shape's MASS AXIS (the deepest-material
    *  point) — the figure's own axis, which on a winged shape is not the bounding box's centre. */
   massAxisOffMM?: number
@@ -226,11 +232,20 @@ function structureScore(
     return 2
   }
   if (structure.kind === 'tapered') {
-    if (n === 3) {
-      const sorted = [...v.anchors].sort((a, b) => a.p[1] - b.p[1])
-      const topRow = v.anchors.filter((a) => Math.abs(a.p[1] - sorted[0].p[1]) < half).length
-      const baseRow = v.anchors.filter((a) => Math.abs(a.p[1] - sorted[n - 1].p[1]) < half).length
-      if (topRow === 1 && baseRow === 2) return 2
+    // THE APEX FAMILY (Dan, 2026-08-15 22:50: band 4 must step UP to the fuller grid, not fall
+    // to the sparse spine with the wings hanging — "tight full grid position centered and
+    // stepped up"). A tapered shape's class is one apex anchor over a wider base row: the
+    // 3-point triangle AND its grown forms (apex + base row of three, the canon
+    // "top support + distributed lower row"). One anchor on the top row, two or more on the
+    // bottom row, base wider than the top.
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+    if (maxY - minY > eps) {
+      const topRow = v.anchors.filter((a) => Math.abs(a.p[1] - minY) < half)
+      const baseRow = v.anchors.filter((a) => Math.abs(a.p[1] - maxY) < half)
+      const baseXs = baseRow.map((a) => a.p[0])
+      const baseSpan = Math.max(...baseXs) - Math.min(...baseXs)
+      if (topRow.length === 1 && baseRow.length >= 2 && baseSpan > eps) return 2
     }
     if (extX < half && extY > eps) return 1
     return 0
@@ -306,8 +321,8 @@ function better(
   //    "gravity must not place magnets in the bottom and leave top unprotected" — is a constraint:
   //    a placement whose top overhang stays within the outer flap bound HOLDS the top; among
   //    holders, wrap and evenness centre the assembly.
-  const holdsTopA = a.wrap.top <= calibration.flapMaxMM
-  const holdsTopB = b.wrap.top <= calibration.flapMaxMM
+  const holdsTopA = (a.topHangMM ?? a.wrap.top) <= calibration.flapMaxMM
+  const holdsTopB = (b.topHangMM ?? b.wrap.top) <= calibration.flapMaxMM
   if (holdsTopA !== holdsTopB) return holdsTopA
   // 1b. VERTICAL HOLD: the bottom may hang only as a limb (within the limb allowance) — a
   //     placement leaving more below the block ranks under everything that holds its material
@@ -437,6 +452,18 @@ function judgeBand(
       if (d < minDepth) minDepth = d
     }
     variant.minDepthMM = Number.isFinite(minDepth) ? minDepth : 0
+    if (variant.anchors.length) {
+      let minAx = Infinity, maxAx = -Infinity, minAy = Infinity
+      for (const anchor of variant.anchors) {
+        if (anchor.p[0] < minAx) minAx = anchor.p[0]
+        if (anchor.p[0] > maxAx) maxAx = anchor.p[0]
+        if (anchor.p[1] < minAy) minAy = anchor.p[1]
+      }
+      const pad = spec.grid.paddingMM
+      const blockWidth = maxAx - minAx + 2 * pad
+      const area = areaAboveLine(variant.effectContourMM.outer.pts, minAy - pad, calibration.structureScanlines)
+      variant.topHangMM = blockWidth > 0 ? area / blockWidth : variant.wrap.top
+    }
     if (unitMassX !== null && variant.anchors.length) {
       let sumX = 0
       for (const anchor of variant.anchors) sumX += anchor.p[0]
@@ -549,7 +576,7 @@ function judgeBand(
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
   const lawful = kept.filter(
     (v) =>
-      v.wrap.top <= calibration.flapMaxMM &&
+      (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
       pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
@@ -598,7 +625,7 @@ function judgeBand(
   if (!final.length) {
     const holdLawful = kept.find(
       (v) =>
-        v.wrap.top <= calibration.flapMaxMM &&
+        (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
         v.wrap.bottom <= calibration.flapLimbMM &&
         pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM),
     )

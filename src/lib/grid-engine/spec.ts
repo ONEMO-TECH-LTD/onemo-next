@@ -361,6 +361,10 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
     Object.freeze({ name: 'tri-48-sw', steps: Object.freeze([[0, 0], [0, 1], [1, 1]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-48-se', steps: Object.freeze([[1, 0], [0, 1], [1, 1]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96-down', steps: Object.freeze([[0, 0], [2, 0], [1, 2]].map((s) => Object.freeze(s))) }),
+    // Dan's canon "top support + distributed lower row" grown to the 96 step (2026-08-15 22:53:
+    // band 4 steps UP to the fuller grid): one apex over a base row of three, 96mm below.
+    Object.freeze({ name: 'tee-96', steps: Object.freeze([[1, 0], [0, 2], [1, 2], [2, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tee-96-down', steps: Object.freeze([[0, 0], [1, 0], [2, 0], [1, 2]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96-up', steps: Object.freeze([[1, 0], [0, 2], [2, 2]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96x48-down', steps: Object.freeze([[0, 0], [2, 0], [1, 1]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96x48-up', steps: Object.freeze([[1, 0], [0, 1], [2, 1]].map((s) => Object.freeze(s))) }),

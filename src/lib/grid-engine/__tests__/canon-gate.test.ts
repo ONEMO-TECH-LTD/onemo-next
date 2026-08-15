@@ -35,13 +35,15 @@ const CANON: Record<
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v'] },
     3: { count: 3, layouts: ['tri-96-up'] },
-    4: { count: 2, layouts: ['pair-v-96'] },
+    // Dan 2026-08-15 22:52: band 4 steps UP to the tight full grid ("at least 4 points is
+    // easy") — the mass-aware gravity law unlocked the full population; sparse pair is out.
+    4: { count: 5, layouts: [null] },
   },
   duck: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v'] },
     3: { count: 4, layouts: ['rect-48x96'] },
-    4: { count: 2, layouts: ['pair-v-96'] },
+    4: { count: 5, layouts: [null] },
   },
   butterfly: {
     1: { count: 1, layouts: ['single', null] },
@@ -71,7 +73,7 @@ const CANON: Record<
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
     3: { count: 2, layouts: ['pair-v-96'] },
-    4: { count: 4, layouts: [null, 'rect-48x96', 'square-96'] },
+    4: { count: 3, layouts: [null, 'tri-96-down', 'rect-48x96', 'square-96'] },
   },
 }
 

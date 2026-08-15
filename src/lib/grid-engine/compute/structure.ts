@@ -37,6 +37,36 @@ export function scanProfile(
   return out
 }
 
+/** Sampled material area strictly above a horizontal line (y-down frame: y < yLine).
+ *  All spans per scanline (paired crossings), not just the outermost — concave rows count
+ *  their true material only. Pure measurement; the caller owns any bound. */
+export function areaAboveLine(
+  pts: ReadonlyArray<Pt>,
+  yLine: number,
+  samples: number,
+): number {
+  let minY = Infinity
+  for (const p of pts) if (p[1] < minY) minY = p[1]
+  if (!(yLine > minY) || samples < 1) return 0
+  const dy = (yLine - minY) / samples
+  let area = 0
+  for (let i = 0; i < samples; i++) {
+    const c = minY + (i + 0.5) * dy
+    const xs: number[] = []
+    for (let j = 0; j < pts.length; j++) {
+      const a = pts[j]
+      const b = pts[(j + 1) % pts.length]
+      if (a[1] === b[1]) continue
+      if ((a[1] <= c && b[1] > c) || (b[1] <= c && a[1] > c)) {
+        xs.push(a[0] + ((c - a[1]) / (b[1] - a[1])) * (b[0] - a[0]))
+      }
+    }
+    xs.sort((m, n) => m - n)
+    for (let k = 0; k + 1 < xs.length; k += 2) area += (xs[k + 1] - xs[k]) * dy
+  }
+  return area
+}
+
 /** Middle-third minimum span over end-third maximum span — the waist measure. */
 export function waistRatio(rows: ReadonlyArray<{ span: number }>): number {
   const third = Math.floor(rows.length / 3)

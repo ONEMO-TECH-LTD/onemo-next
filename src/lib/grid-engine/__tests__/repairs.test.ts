@@ -98,7 +98,7 @@ describe('band fallback — preferences may relax, hold laws never', () => {
     for (const band of judged!.bands) {
       const v = band.variants[0]
       if (!v) continue // NONE is an honest answer
-      expect(v.wrap.top, `B${band.band.band} top`).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+      expect(v.topHangMM ?? v.wrap.top, `B${band.band.band} top`).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
       expect(v.wrap.bottom, `B${band.band.band} bottom`).toBeLessThanOrEqual(
         RELEASED_CALIBRATION.flapLimbMM,
       )
