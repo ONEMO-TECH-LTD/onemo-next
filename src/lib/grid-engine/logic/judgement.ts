@@ -241,6 +241,159 @@ function anchorsAreMirrorSymmetric(v: SizeVariant): boolean {
   )
 }
 
+/** THE STRUCTURE LAW (Dan's ruled canon, selection-examples): the shape's own build names its
+ *  arrangement class — "a TRIANGULAR shape takes a triangular hold"; the duck's waist is spanned
+ *  by corners with the mid row skipped; the bot's "narrow standing mass" takes the tight column;
+ *  "diagonal for diagonal". Measured from the outline with the same scanline machinery as the
+ *  symmetry law; thresholds are spec values. */
+type ShapeStructure =
+  | { kind: 'diagonal'; sign: 1 | -1 }
+  | { kind: 'tapered' }
+  | { kind: 'waistedY' }
+  | { kind: 'waistedX' }
+  | { kind: 'uniform'; tall: boolean }
+
+function profile(
+  pts: ReadonlyArray<Pt>,
+  axis: 0 | 1,
+  lo: number,
+  hi: number,
+): { span: number; centre: number }[] {
+  const out: { span: number; centre: number }[] = []
+  const N = 24
+  for (let i = 1; i < N; i++) {
+    const c = lo + ((hi - lo) * i) / N
+    let mn = Infinity
+    let mx = -Infinity
+    for (let j = 0; j < pts.length; j++) {
+      const a = pts[j]
+      const b = pts[(j + 1) % pts.length]
+      const a1 = a[axis], b1 = b[axis]
+      if (a1 === b1) continue
+      if ((a1 <= c && b1 > c) || (b1 <= c && a1 > c)) {
+        const other = axis === 0 ? 1 : 0
+        const x = a[other] + ((c - a1) / (b1 - a1)) * (b[other] - a[other])
+        if (x < mn) mn = x
+        if (x > mx) mx = x
+      }
+    }
+    if (mn <= mx) out.push({ span: mx - mn, centre: (mn + mx) / 2 })
+  }
+  return out
+}
+
+function waistRatio(rows: { span: number }[]): number {
+  const third = Math.floor(rows.length / 3)
+  if (third < 1) return 1
+  const midMin = Math.min(...rows.slice(third, rows.length - third).map((r) => r.span))
+  const endMax = Math.max(
+    ...rows.slice(0, third).map((r) => r.span),
+    ...rows.slice(rows.length - third).map((r) => r.span),
+  )
+  return endMax > 0 ? midMin / endMax : 1
+}
+
+function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStructure {
+  const pts = unit.outer.pts
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  const rows = profile(pts, 1, minY, maxY)
+  const cols = profile(pts, 0, minX, maxX)
+  if (rows.length < 4 || cols.length < 4) return { kind: 'uniform', tall: true }
+  // diagonal: the row centres drift linearly across the height
+  const n = rows.length
+  const ys = rows.map((_, i) => i / (n - 1))
+  const cxs = rows.map((r) => r.centre)
+  const meanY = ys.reduce((a, b) => a + b, 0) / n
+  const meanC = cxs.reduce((a, b) => a + b, 0) / n
+  let cov = 0, varY = 0, varC = 0
+  for (let i = 0; i < n; i++) {
+    cov += (ys[i] - meanY) * (cxs[i] - meanC)
+    varY += (ys[i] - meanY) ** 2
+    varC += (cxs[i] - meanC) ** 2
+  }
+  const slope = varY > 0 ? cov / varY / (maxX - minX) : 0
+  if (Math.abs(slope) > calibration.structureDiagSlope)
+    return { kind: 'diagonal', sign: slope > 0 ? 1 : -1 }
+  // tapered: width grows steadily toward the base
+  const spans = rows.map((r) => r.span)
+  const meanS = spans.reduce((a, b) => a + b, 0) / n
+  let covS = 0, varS = 0
+  for (let i = 0; i < n; i++) {
+    covS += (ys[i] - meanY) * (spans[i] - meanS)
+    varS += (spans[i] - meanS) ** 2
+  }
+  const taperCorr = varS > 0 ? covS / Math.sqrt(varY * varS) : 0
+  if (taperCorr > calibration.structureTaperCorr) return { kind: 'tapered' }
+  if (waistRatio(rows) < calibration.structureWaistRatio) return { kind: 'waistedY' }
+  if (waistRatio(cols) < calibration.structureWaistRatio) return { kind: 'waistedX' }
+  return { kind: 'uniform', tall: maxY - minY >= maxX - minX }
+}
+
+/** How well an arrangement answers the shape's structure: 2 = spans/embodies it, 1 = aligned
+ *  with its axis, 0 = neither. Compared before spread — the class outranks the spacing. */
+function structureScore(
+  v: SizeVariant,
+  structure: ShapeStructure,
+  basePitchMM: number,
+): number {
+  const xs = v.anchors.map((a) => a.p[0])
+  const ys = v.anchors.map((a) => a.p[1])
+  const extX = Math.max(...xs) - Math.min(...xs)
+  const extY = Math.max(...ys) - Math.min(...ys)
+  const half = basePitchMM / 2
+  const n = v.anchors.length
+  const eps = 1e-6
+  if (structure.kind === 'diagonal') {
+    if (n < 2) return 0
+    // every anchor pair steps as far across as down — a diagonal line/chain of the lattice
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        const dx = v.anchors[j].p[0] - v.anchors[i].p[0]
+        const dy = v.anchors[j].p[1] - v.anchors[i].p[1]
+        if (Math.abs(Math.abs(dx) - Math.abs(dy)) > half) return 0
+        if (Math.sign(dx * dy) !== (structure.sign > 0 ? 1 : -1)) return 0
+      }
+    return 2
+  }
+  if (structure.kind === 'tapered') {
+    if (n === 3) {
+      const sorted = [...v.anchors].sort((a, b) => a.p[1] - b.p[1])
+      const topRow = v.anchors.filter((a) => Math.abs(a.p[1] - sorted[0].p[1]) < half).length
+      const baseRow = v.anchors.filter((a) => Math.abs(a.p[1] - sorted[n - 1].p[1]) < half).length
+      if (topRow === 1 && baseRow === 2) return 2
+    }
+    if (extX < half && extY > eps) return 1
+    return 0
+  }
+  if (structure.kind === 'waistedY') {
+    const rowsSpanned = extY >= 2 * basePitchMM - eps
+    const midRowFree = !v.anchors.some(
+      (a) => a.p[1] > Math.min(...ys) + half && a.p[1] < Math.max(...ys) - half,
+    )
+    if (n >= 2 && rowsSpanned && midRowFree) return 2
+    if (extX < half && extY > eps) return 1
+    return 0
+  }
+  if (structure.kind === 'waistedX') {
+    const colsSpanned = extX >= 2 * basePitchMM - eps
+    const midColFree = !v.anchors.some(
+      (a) => a.p[0] > Math.min(...xs) + half && a.p[0] < Math.max(...xs) - half,
+    )
+    if (n >= 2 && colsSpanned && midColFree) return 2
+    if (extY < half && extX > eps) return 1
+    return 0
+  }
+  // uniform: the narrow arrangement along the shape's long axis
+  if (structure.tall) return extX <= basePitchMM + eps && extY > eps ? 1 : 0
+  return extY <= basePitchMM + eps && extX > eps ? 1 : 0
+}
+
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
   if (v.anchors.length < 4) return false
   if (v.wrap.gridExtentXMM < 72 || v.wrap.gridExtentYMM < 72) return false
@@ -264,6 +417,8 @@ function better(
   band: BandSpec,
   calibration: CalibrationSpec,
   shapeSymmetric: boolean,
+  structure: ShapeStructure,
+  basePitchMM: number,
 ): boolean {
   // THE GENERAL LAW (calibrated on the bat yardstick, validated across every canon shape —
   // NO shape- or band-specific counts anywhere):
@@ -314,14 +469,14 @@ function better(
   //    pool too: BALANCE below picks them only where the shape is genuinely three-cornered
   //    (Dan: "a T-shaped can act as triangle with 3 corners") — elsewhere the pair balances
   //    better and wins.
-  // 2c. THE STRONG-REGION LAW (Dan's ruled canon, selection-examples: the bat is "3 magnets
-  //     utmost corners", the bot's narrow rect beats the arm-riding square, the butterfly's
-  //     wing-centres carry the hold): every magnet sits in real mass — the arrangement whose
-  //     SHALLOWEST disc is deeper outranks one with a disc in thin material. Coarse steps.
-  const depthStepMM = calibration.flapTightMM / 2
-  const depthA = Math.round((a.minDepthMM ?? 0) / depthStepMM)
-  const depthB = Math.round((b.minDepthMM ?? 0) / depthStepMM)
-  if (depthA !== depthB) return depthA > depthB
+  // 2c. THE STRUCTURE LAW (Dan's ruled canon): the arrangement matching the shape's build wins —
+  //     triangle on the tapered bat, waist-spanning corners on the duck/butterfly/poke, the
+  //     narrow column on the standing bot, diagonal on the tilted pill. (A depth-based
+  //     strong-region key was measured and rejected: canon-good and canon-bad seats carried
+  //     identical depths.)
+  const structA = structureScore(a, structure, basePitchMM)
+  const structB = structureScore(b, structure, basePitchMM)
+  if (structA !== structB) return structA > structB
   //    Spread credit CAPS at the released sparse pitch (Dan's law: 96 is the sparse spacing
   //    "proven sufficient" — not "the further the better"): an extreme diagonal pair flung
   //    corner-to-corner (135mm) must not outrank layouts that hold the mass (poke1 B4, eyes-on
@@ -371,6 +526,7 @@ function judgeBand(
   unitMassX: number | null,
   offeredBelow: Set<string>,
   sizeFloorMM: number,
+  structure: ShapeStructure,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const preparedBySize = new Map<number, ReturnType<typeof prepareExactContour>>()
@@ -402,7 +558,7 @@ function judgeBand(
     const identity = layoutIdentity(variant, halfPitchMM)
     const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
-      if (better(variant, kept[twin], band, calibration, shapeSymmetric)) kept[twin] = variant
+      if (better(variant, kept[twin], band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) kept[twin] = variant
       return
     }
     kept.push(variant)
@@ -487,7 +643,7 @@ function judgeBand(
     }
   }
 
-  kept.sort((a, b) => (better(a, b, band, calibration, shapeSymmetric) ? -1 : 1))
+  kept.sort((a, b) => (better(a, b, band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM) ? -1 : 1))
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
@@ -552,6 +708,7 @@ export function judgeShape(
   const unitContour = normalizeContour(contourMM)
   if (!unitContour) return null
   const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
+  const structure = shapeStructure(unitContour, calibration)
   const massCentre = unitMassCentre(unitContour)
   const offeredBelow = new Set<string>()
   const bands: BandAnswer[] = []
@@ -566,6 +723,7 @@ export function judgeShape(
       massCentre ? massCentre[0] : null,
       offeredBelow,
       sizeFloorMM,
+      structure,
     )
     if (answer.variants[0]) sizeFloorMM = answer.variants[0].sizeMM + calibration.bandSizeStepMM
     bands.push(answer)

@@ -273,6 +273,12 @@ export interface CalibrationSpec {
    *  arrangements rank below symmetric ones there. Asymmetric shapes (the duck, the tilted
    *  pill) are untouched. */
   symmetryTolFrac: number
+  /** THE STRUCTURE LAW thresholds (Dan's ruled canon: "arrangement follows the shape's
+   *  extremes" — triangle-shape takes a triangle, waisted shape takes corners spanning the
+   *  waist, standing mass takes the narrow column, diagonal takes diagonal). */
+  structureWaistRatio: number
+  structureTaperCorr: number
+  structureDiagSlope: number
   /** The judge's size step inside a band, millimetres (sizes stay even). */
   sizeStepMM: number
   /** How many curated variants a band OFFERS (Dan, 2026-08-15: "i need 1 optimal" — the band
@@ -309,6 +315,9 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   sweepStepMM: 2,
   centerToleranceMM: 12,
   symmetryTolFrac: 0.11,
+  structureWaistRatio: 0.7,
+  structureTaperCorr: 0.55,
+  structureDiagSlope: 0.35,
   sizeStepMM: 2,
   optionsPerBand: 1,
   bandSizeStepMM: 24,
