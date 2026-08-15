@@ -275,7 +275,7 @@ export function collectCandidates(
       x: namedOrigin(origin[0], half),
       y: namedOrigin(origin[1], half),
     }
-    for (const arr of enumerateArrangements(sites, population, { windows: false, tees: false })) {
+    for (const arr of enumerateArrangements(sites, population, { windows: true, tees: false })) {
       const id = [
         band,
         sizeMM,

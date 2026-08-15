@@ -226,10 +226,18 @@ export function decidingKey(_band: BandId, won: ProposalMeasure, lost: ProposalM
   return 'placement-at-size'
 }
 
+function isFilledWindow(c: Candidate): boolean {
+  if (c.family !== 'full-window' || c.sites.length < 4) return false
+  const xs = c.sites.map((s) => s.x)
+  const ys = c.sites.map((s) => s.y)
+  return Math.max(...xs) - Math.min(...xs) >= 48 && Math.max(...ys) - Math.min(...ys) >= 48
+}
+
 function isExtreme(c: Candidate): boolean {
   return (
     c.family === 'corner-triangle' ||
     c.family === 'rectangle-corners' ||
+    isFilledWindow(c) ||
     (c.family === 'tee' && c.sites.length >= 4)
   )
 }
@@ -273,6 +281,8 @@ function extremeCount(
     if (c.band !== 3 || !isExtreme(c)) return false
     return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
   })
+  const filled = covering.filter((c) => isFilledWindow(c))
+  if (filled.length) return Math.max(...filled.map((c) => c.sites.length))
   if (covering.some((c) => c.family === 'tee' && c.sites.length >= 4)) return 4
   if (covering.some((c) => c.family === 'rectangle-corners' || c.sites.length === 4)) return 4
   if (covering.some((c) => c.sites.length === 3)) return 3
@@ -289,12 +299,19 @@ export function propose(
   const kind = targetKind(doc.candidates, band, outline)
   let classN = kind === 'extreme' ? extremeCount(doc.candidates, outline) : 0
   if (band === 4 && kind === 'extreme') {
-    const fourHead = raw.some((c) => {
-      if (c.family !== 'rectangle-corners' || c.sites.length !== 4) return false
-      const shape = bbox(scaleToSize(outline, c.sizeMM))
-      return coversMasses(c, shape) && hasHeadPair(c, shape)
+    const fills = raw.filter((c) => {
+      if (!isFilledWindow(c)) return false
+      return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
     })
-    if (fourHead) classN = 4
+    if (fills.length) classN = Math.max(...fills.map((c) => c.sites.length))
+    else {
+      const fourHead = raw.some((c) => {
+        if (c.family !== 'rectangle-corners' || c.sites.length !== 4) return false
+        const shape = bbox(scaleToSize(outline, c.sizeMM))
+        return coversMasses(c, shape) && hasHeadPair(c, shape)
+      })
+      if (fourHead) classN = 4
+    }
   }
   const cell = spec.grid.paddingMM * 2
   let stepFloor = 0
@@ -318,6 +335,7 @@ export function propose(
     const span = shape.maxY - shape.minY || 1
     const top = Math.min(...c.sites.map((s) => s.y)) - shape.minY
     const flap = extremeFlap(c, verts)
+    const clear = clearance(c, verts)
     return {
       c,
       n: c.sites.length,
@@ -330,10 +348,10 @@ export function propose(
       xOff: Math.abs((Math.min(...c.sites.map((s) => s.x)) + Math.max(...c.sites.map((s) => s.x))) / 2 - (shape.minX + shape.maxX) / 2),
       flap,
       score: rankScore(c.sizeMM, offset2, gravity, band, shape),
-      hit: matchesKind(c, kind),
+      hit: matchesKind(c, kind) && clear >= pad - 0.05,
       top,
       topFrac: top / span,
-      flush: Math.abs(clearance(c, verts) - pad),
+      flush: Math.abs(clear - pad),
     }
   })
 

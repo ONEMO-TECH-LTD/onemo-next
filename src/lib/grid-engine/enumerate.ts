@@ -265,7 +265,7 @@ export function enumerateArrangements(
     }
   }
 
-  if (opts.windows !== false && held.length <= 25) {
+  if (opts.windows !== false && held.length <= 12) {
     for (const c0 of cols) {
       for (const c1 of cols) {
         if (c1 < c0) continue
