@@ -490,9 +490,8 @@ function better(
   //     pitch — its coverage oracle bounds pair strips at 96mm): magnets spaced beyond it are
   //     disconnected islands, not an arrangement (the poke's 136mm corner-to-corner diagonal
   //     measured perfect bbox wraps while 301mm of edge hung unheld — eyes-on, 2026-08-15).
-  const stripCapMM = Math.max(...LAUNCH_PITCHES_MM)
-  const connectedA = isOneStrip(a, stripCapMM)
-  const connectedB = isOneStrip(b, stripCapMM)
+  const connectedA = isOneStrip(a, calibration.stripLinkMM)
+  const connectedB = isOneStrip(b, calibration.stripLinkMM)
   if (connectedA !== connectedB) return connectedA
   // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
   //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
@@ -709,12 +708,11 @@ function judgeBand(
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
-  const stripCapMM = Math.max(...LAUNCH_PITCHES_MM)
   const lawful = kept.filter(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
-      isOneStrip(v, stripCapMM) &&
+      isOneStrip(v, calibration.stripLinkMM) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
       // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
       // butterfly cross-wing diagonals) — on a mirror shape they are not options at all

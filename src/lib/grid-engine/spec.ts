@@ -296,6 +296,11 @@ export interface CalibrationSpec {
    *  in proximity, at least 1 24mm step larger") — a band's answer sits at least this far above
    *  the previous band's. */
   bandSizeStepMM: number
+  /** THE STRIP LAW's link bound: the longest anchor-to-anchor link that still bonds material —
+   *  the released vocabulary's own maximum, the sparse lattice diagonal sqrt(48^2+96^2) = 107.3
+   *  (Dan's ruled canon triangle carries exactly this link; the 135.8 corner-fling stays out).
+   *  Every arrangement must be ONE component under links within this bound. */
+  stripLinkMM: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
   bands: readonly BandSpec[]
   /** The released layout templates (Dan's canon arrangements), in base-lattice steps. The judge
@@ -330,6 +335,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   sizeStepMM: 2,
   optionsPerBand: 1,
   bandSizeStepMM: 24,
+  stripLinkMM: 108,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
     Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),

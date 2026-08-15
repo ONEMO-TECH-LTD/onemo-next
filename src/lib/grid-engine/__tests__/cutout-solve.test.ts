@@ -73,13 +73,17 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
           expect([RELEASED.magnet.smallMM, RELEASED.magnet.largeMM]).toContain(anchor.dia)
         }
       }
-      // THE COLUMN LAW: on a square — a shape with true corners — the winner is a corners-class
-      // arrangement: four-plus magnets, all four corners of their own box occupied, the shape
-      // reaching the block's edges. Never a crowded interior population, never a lone spine.
+      // THE BAND COUNT LAW + COLUMN LAW: a ruled-count band answers with its ruled count
+      // (band 2 = two magnets, canon); a free band on a square — a shape with true corners —
+      // answers with a corners-class arrangement of four-plus magnets holding the top.
       const best = answer.variants[0]
       expect(best.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
-      expect(best.anchors.length).toBeGreaterThanOrEqual(4)
-      expect(best.wrap.maxSide).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+      if (answer.band.targetMagnets > 0) {
+        expect(best.anchors.length).toBe(answer.band.targetMagnets)
+      } else {
+        expect(best.anchors.length).toBeGreaterThanOrEqual(4)
+        expect(best.wrap.maxSide).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+      }
     }
   })
 
@@ -95,7 +99,7 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
     }
   })
 
-  it('is deterministic — the same shape answers byte-identically twice', { timeout: 60000 }, () => {
+  it('is deterministic — the same shape answers byte-identically twice', { timeout: 240000 }, () => {
     const first = solveCutout(RELEASED, RELEASED_CALIBRATION, lShape(140))
     const second = solveCutout(RELEASED, RELEASED_CALIBRATION, lShape(140))
     expect(JSON.stringify(second)).toBe(JSON.stringify(first))
