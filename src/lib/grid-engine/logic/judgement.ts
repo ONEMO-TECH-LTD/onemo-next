@@ -401,10 +401,12 @@ function structureScore(
     if (structure.tall) return extX <= basePitchMM + eps && extY > eps ? 1 : 0
     return extY <= basePitchMM + eps && extX > eps ? 1 : 0
   }
-  // uniform, full mass (the poke blob): the corner square — widest first
+  // uniform, full mass (the poke blob): the corner square, widest first; below four magnets
+  // the pair follows the shape's own axis ("vertical for standing shapes" — canon B2).
   if (n >= 4 && extX >= 2 * basePitchMM - eps && extY >= 2 * basePitchMM - eps) return 2
   if (n >= 4) return 1
-  return 0
+  if (structure.tall) return extX < half && extY > eps ? 1 : 0
+  return extY < half && extX > eps ? 1 : 0
 }
 
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
