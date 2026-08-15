@@ -720,8 +720,12 @@ function judgeBand(
   // and looser): a band offers what its size range UNLOCKS. A non-default variant whose layout
   // already earned a chip in a lower band is an echo, not an option.
   const halfPitch = spec.grid.basePitchMM / 2
+  // THE STEPPING LAW (canon band-4: "only the lattice step grows"): a stepped band may not
+  // re-offer a lower band's arrangement at all — not even as its default. Other bands keep
+  // their default exempt (the band's best answer stands even when a lower band shares it).
   const fresh = offered.filter(
-    (v, i) => i === 0 || !offeredBelow.has(layoutIdentity(v, halfPitch)),
+    (v, i) =>
+      (!band.stepUp && i === 0) || !offeredBelow.has(layoutIdentity(v, halfPitch)),
   )
   let final = fresh.slice(0, calibration.optionsPerBand)
   // EVERY BAND ANSWERS (Dan, 2026-08-15: "each band must have at least one optimal layout"):
@@ -746,7 +750,22 @@ export function judgeShape(
   if (!unitContour) return null
   const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
   const structure = shapeStructure(unitContour, calibration)
-  const massCentre = unitMassCentre(unitContour)
+  // THE AXIS (L13: "fitting and centering in the shape"): on a mirror-symmetric shape the mass
+  // axis IS the mirror axis — the deepest blob may sit in a wing and would drag the assembly
+  // off the figure (the butterfly single, Dan 2026-08-15 20:13).
+  let massX: number | null = null
+  if (shapeSymmetric) {
+    let minX = Infinity
+    let maxX = -Infinity
+    for (const [x] of unitContour.outer.pts) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+    }
+    massX = (minX + maxX) / 2
+  } else {
+    const massCentre = unitMassCentre(unitContour)
+    massX = massCentre ? massCentre[0] : null
+  }
   const offeredBelow = new Set<string>()
   const bands: BandAnswer[] = []
   let sizeFloorMM = 0
@@ -757,7 +776,7 @@ export function judgeShape(
       band,
       unitContour,
       shapeSymmetric,
-      massCentre ? massCentre[0] : null,
+      massX,
       offeredBelow,
       sizeFloorMM,
       structure,

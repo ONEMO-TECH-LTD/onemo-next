@@ -231,6 +231,10 @@ export interface BandSpec {
   targetMagnets: number
   /** Whether the product currently offers this band. Hidden bands still compute. */
   released: boolean
+  /** THE STEPPING LAW (canon band-4 rows: "the arrangement class carries across bands, only the
+   *  lattice step grows 48 -> 96"): a stepped band may not re-offer the previous band's answer —
+   *  its arrangement moves to the next step of the ladder. */
+  stepUp?: boolean
 }
 
 /**
@@ -330,7 +334,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
     Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),
     Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 0, released: true }),
-    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 0, released: false }),
+    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 0, released: false, stepUp: true }),
   ]) as readonly BandSpec[],
   // Dan's canon arrangements (2026-08-13 walkthrough): pair either way; the 48 square; the
   // 48-wide x 96-tall rectangle and its transpose; the 96 square; the six-point 48x96 blocks.
