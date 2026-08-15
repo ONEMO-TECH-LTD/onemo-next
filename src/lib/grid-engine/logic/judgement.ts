@@ -272,6 +272,13 @@ function better(
   const holdsTopA = a.wrap.top <= calibration.flapMaxMM
   const holdsTopB = b.wrap.top <= calibration.flapMaxMM
   if (holdsTopA !== holdsTopB) return holdsTopA
+  // 1b. VERTICAL HOLD: the bottom may hang only as a limb (within the limb allowance) — a
+  //     placement leaving more below the block ranks under everything that holds its material
+  //     (the butterfly's sparse top pair left 86mm of lower wing unheld and still outranked
+  //     the tight six on spread alone — that is the failure this bars).
+  const holdsBottomA = a.wrap.bottom <= calibration.flapLimbMM
+  const holdsBottomB = b.wrap.bottom <= calibration.flapLimbMM
+  if (holdsBottomA !== holdsBottomB) return holdsBottomA
   // 2. THE COLUMN LAW (Dan, this session: "narrow shape if scaled can fit 2 columns" — and
   //    "optimal is 4 magnets in each outmost corner"). CORNERS CLASS — outranks every
   //    spine/pair/single, but ONLY when the arrangement genuinely takes the shape's corners:
