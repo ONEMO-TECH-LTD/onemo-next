@@ -242,16 +242,9 @@ export interface BandSpec {
  * already accepts (GridPlanOptions / SizeLaw). Nothing here invents a knob the engine lacks.
  */
 export interface CalibrationSpec {
-  /** SizeLaw.frameMM — frame stroke per side. */
-  frameMM: number
-  /** SizeLaw.maxTestedMM — largest physically tested size; rungs above ship hidden. */
+  /** The largest physically tested size — the judge's size sweep is CAPPED here (wired
+   *  per the meta build-audit: values that feed nothing are drift). */
   maxTestedMM: number
-  /** GridPlanOptions.maxGrowMM — outward margin band an adaptive plan may add to seek balance. */
-  maxGrowMM: number
-  /** GridPlanOptions.density — 'standard' (48-first) or 'light' (96-first). */
-  density: 'standard' | 'light'
-  /** GridPlanOptions.mode — 'auto' or a pinned pattern. */
-  mode: 'auto' | 'standard' | 'quincunx' | 'diamond'
   /** GridPlanOptions.plan — magnet sizing plan; 'auto' is the size-driven focal law. */
   plan: 'auto' | 'all6' | 'all8' | 'corners8'
   /** GridPlanOptions.center — where the rigid grid anchors. */
@@ -315,11 +308,7 @@ export interface LayoutTemplate {
 }
 
 export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
-  frameMM: 1,
   maxTestedMM: 214,
-  maxGrowMM: 12,
-  density: 'light',
-  mode: 'auto',
   plan: 'auto',
   center: 'centroid',
   flapTightMM: 12,
@@ -383,9 +372,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
 }) as CalibrationSpec
 
 export type CalibrationNumberKey =
-  | 'frameMM'
   | 'maxTestedMM'
-  | 'maxGrowMM'
   | 'flapTightMM'
   | 'flapMaxMM'
   | 'flapLimbMM'
@@ -403,9 +390,7 @@ export type CalibrationNumberKey =
 
 /** Bounds a calibration write must satisfy. Outside them the write is refused, not clamped. */
 const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: number }> = {
-  frameMM: { min: 0, max: 10 },
   maxTestedMM: { min: 20, max: 1000 },
-  maxGrowMM: { min: 0, max: 80 },
   flapTightMM: { min: 0, max: 60 },
   flapMaxMM: { min: 0, max: 80 },
   flapLimbMM: { min: 0, max: 120 },
@@ -422,16 +407,6 @@ const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: numbe
   stripLinkMM: { min: 48, max: 136 },
 }
 
-const RELEASED_DENSITIES: readonly CalibrationSpec['density'][] = Object.freeze([
-  'standard',
-  'light',
-])
-const RELEASED_MODES: readonly CalibrationSpec['mode'][] = Object.freeze([
-  'auto',
-  'standard',
-  'quincunx',
-  'diamond',
-])
 const RELEASED_PLANS: readonly CalibrationSpec['plan'][] = Object.freeze([
   'auto',
   'all6',
@@ -455,12 +430,10 @@ export function applyCalibrationValue(
 /** Released-options writers — a choice between values the system has, never typed freehand. */
 export function selectCalibrationOption(
   calibration: CalibrationSpec,
-  key: 'density' | 'mode' | 'plan' | 'center',
+  key: 'plan' | 'center',
   value: string,
 ): { calibration: CalibrationSpec; refused?: WriteRefusal } {
   const released: Record<typeof key, readonly string[]> = {
-    density: RELEASED_DENSITIES,
-    mode: RELEASED_MODES,
     plan: RELEASED_PLANS,
     center: RELEASED_CENTERS,
   }

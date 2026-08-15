@@ -462,9 +462,11 @@ function judgeBand(
   // previous band's answer — bounding the search itself, so every layout family re-seats above
   // the floor instead of being collapsed to a below-floor snug seat and then filtered away.
   const startSizeMM = Math.max(band.minSizeMM, sizeFloorMM)
+  // maxTestedMM WIRED (meta audit): nothing above the physically tested ceiling is offered.
+  const bandCapMM = Math.min(band.maxSizeMM, calibration.maxTestedMM + 1)
   for (
     let sizeMM = Math.ceil(startSizeMM / step) * step;
-    sizeMM < band.maxSizeMM;
+    sizeMM < bandCapMM;
     sizeMM += step
   ) {
     const contour = scaleContour(unitContour, sizeMM)
