@@ -344,6 +344,7 @@ function judgeBand(
   unitContour: Contour,
   shapeSymmetric: boolean,
   unitMassX: number | null,
+  offeredBelow: Set<string>,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const consider = (variant: SizeVariant | null) => {
@@ -473,7 +474,17 @@ function judgeBand(
     seen.add(key)
     offered.push(v)
   }
-  return { band, variants: offered.slice(0, calibration.optionsPerBand) }
+  // THE BAND-GIFT LAW, reverse clause (Dan's calibration sweep, 2026-08-15: the band-2 single
+  // and band-3 48-pair were "not necessary" — each was a lower band's answer re-listed bigger
+  // and looser): a band offers what its size range UNLOCKS. A non-default variant whose layout
+  // already earned a chip in a lower band is an echo, not an option.
+  const halfPitch = spec.grid.basePitchMM / 2
+  const fresh = offered.filter(
+    (v, i) => i === 0 || !offeredBelow.has(layoutIdentity(v, halfPitch)),
+  )
+  const final = fresh.slice(0, calibration.optionsPerBand)
+  for (const v of final) offeredBelow.add(layoutIdentity(v, halfPitch))
+  return { band, variants: final }
 }
 
 /**
@@ -490,9 +501,18 @@ export function judgeShape(
   if (!unitContour) return null
   const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
   const massCentre = unitMassCentre(unitContour)
+  const offeredBelow = new Set<string>()
   return {
     bands: calibration.bands.map((band) =>
-      judgeBand(spec, calibration, band, unitContour, shapeSymmetric, massCentre ? massCentre[0] : null),
+      judgeBand(
+        spec,
+        calibration,
+        band,
+        unitContour,
+        shapeSymmetric,
+        massCentre ? massCentre[0] : null,
+        offeredBelow,
+      ),
     ),
   }
 }
