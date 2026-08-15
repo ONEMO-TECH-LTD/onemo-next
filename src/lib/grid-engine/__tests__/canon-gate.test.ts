@@ -22,9 +22,15 @@ import { engineOutline } from '../ui/trace-cutout'
 const SHAPES: Record<string, { outline: [number, number][]; box: { w: number; h: number } }> =
   JSON.parse(readFileSync(join(__dirname, '__fixtures-canon-shapes.json'), 'utf8'))
 
-/** Per band: the ruled magnet count and the allowed arrangement families ('auto' = the engine's
- *  own population where the canon accepts it). */
-const CANON: Record<string, Record<number, { count: number; layouts: (string | null)[] }>> = {
+/** Per band: the ruled magnet count, the allowed arrangement families ('auto' = the engine's
+ *  own population where the canon accepts it), and — where a null is accepted — the GEOMETRY
+ *  the auto must still satisfy (Meta Phase-0 gate finding: a wrong arrangement with a right
+ *  count must not hide behind the auto). */
+type Geometry = 'vertical' | 'horizontal' | 'diagonal' | undefined
+const CANON: Record<
+  string,
+  Record<number, { count: number; layouts: (string | null)[]; geometry?: Geometry }>
+> = {
   bat: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v'] },
@@ -51,19 +57,19 @@ const CANON: Record<string, Record<number, { count: number; layouts: (string | n
   },
   pill: {
     1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null] },
-    3: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null] },
-    4: { count: 3, layouts: ['run-antidiag-3', 'run-diag-3', null] },
+    2: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null], geometry: 'diagonal' },
+    3: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null], geometry: 'diagonal' },
+    4: { count: 3, layouts: ['run-antidiag-3', 'run-diag-3', null], geometry: 'diagonal' },
   },
   poke1: {
     1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v', null] },
+    2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
     3: { count: 4, layouts: ['square-48'] },
     4: { count: 4, layouts: ['rect-48x96', 'square-96', null] },
   },
   poke2: {
     1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v', null] },
+    2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
     3: { count: 2, layouts: ['pair-v-96'] },
     4: { count: 4, layouts: [null, 'rect-48x96', 'square-96'] },
   },
@@ -98,6 +104,17 @@ describe('the canon gate — every band winner stays in its ruled family', () =>
         ).toContain(best.layout ?? null)
         expect(best.sizeMM).toBeGreaterThanOrEqual(answer.band.minSizeMM)
         expect(best.sizeMM).toBeLessThan(answer.band.maxSizeMM)
+        if (rule.geometry && best.anchors.length >= 2) {
+          for (let i = 0; i < best.anchors.length; i++)
+            for (let j = i + 1; j < best.anchors.length; j++) {
+              const dx = Math.abs(best.anchors[i].p[0] - best.anchors[j].p[0])
+              const dy = Math.abs(best.anchors[i].p[1] - best.anchors[j].p[1])
+              const label = `${name} B${answer.band.band}: geometry ${rule.geometry} violated (dx ${dx.toFixed(1)}, dy ${dy.toFixed(1)})`
+              if (rule.geometry === 'vertical') expect(dx, label).toBeLessThan(1)
+              if (rule.geometry === 'horizontal') expect(dy, label).toBeLessThan(1)
+              if (rule.geometry === 'diagonal') expect(Math.abs(dx - dy), label).toBeLessThan(1)
+            }
+        }
       }
     })
   }
