@@ -278,6 +278,10 @@ export interface CalibrationSpec {
   /** How many curated variants a band OFFERS (Dan, 2026-08-15: "i need 1 optimal" — the band
    *  is a verdict; one answer, not a menu). */
   optionsPerBand: number
+  /** Band separation (Dan, 2026-08-15: "each band size must be not the same as other band size
+   *  in proximity, at least 1 24mm step larger") — a band's answer sits at least this far above
+   *  the previous band's. */
+  bandSizeStepMM: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
   bands: readonly BandSpec[]
   /** The released layout templates (Dan's canon arrangements), in base-lattice steps. The judge
@@ -307,6 +311,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   symmetryTolFrac: 0.11,
   sizeStepMM: 2,
   optionsPerBand: 1,
+  bandSizeStepMM: 24,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
     Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 1, released: true }),

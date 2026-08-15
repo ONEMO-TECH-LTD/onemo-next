@@ -345,6 +345,7 @@ function judgeBand(
   shapeSymmetric: boolean,
   unitMassX: number | null,
   offeredBelow: Set<string>,
+  sizeFloorMM: number,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const consider = (variant: SizeVariant | null) => {
@@ -445,7 +446,10 @@ function judgeBand(
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
-  const lawful = kept.filter(
+  // BAND SEPARATION (Dan, 2026-08-15): a band's answer sits at least one 24mm step above the
+  // previous band's — neighbouring bands never publish near-identical sizes.
+  const separated = kept.filter((v) => v.sizeMM >= sizeFloorMM)
+  const lawful = separated.filter(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
@@ -482,7 +486,11 @@ function judgeBand(
   const fresh = offered.filter(
     (v, i) => i === 0 || !offeredBelow.has(layoutIdentity(v, halfPitch)),
   )
-  const final = fresh.slice(0, calibration.optionsPerBand)
+  let final = fresh.slice(0, calibration.optionsPerBand)
+  // EVERY BAND ANSWERS (Dan, 2026-08-15: "each band must have at least one optimal layout"):
+  // when the offer filters empty a band, its ranked-best size-separated placement stands in —
+  // an imperfect answer beats a silent band.
+  if (!final.length && separated.length) final = [separated[0]]
   for (const v of final) offeredBelow.add(layoutIdentity(v, halfPitch))
   return { band, variants: final }
 }
@@ -502,17 +510,21 @@ export function judgeShape(
   const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
   const massCentre = unitMassCentre(unitContour)
   const offeredBelow = new Set<string>()
-  return {
-    bands: calibration.bands.map((band) =>
-      judgeBand(
-        spec,
-        calibration,
-        band,
-        unitContour,
-        shapeSymmetric,
-        massCentre ? massCentre[0] : null,
-        offeredBelow,
-      ),
-    ),
+  const bands: BandAnswer[] = []
+  let sizeFloorMM = 0
+  for (const band of calibration.bands) {
+    const answer = judgeBand(
+      spec,
+      calibration,
+      band,
+      unitContour,
+      shapeSymmetric,
+      massCentre ? massCentre[0] : null,
+      offeredBelow,
+      sizeFloorMM,
+    )
+    if (answer.variants[0]) sizeFloorMM = answer.variants[0].sizeMM + calibration.bandSizeStepMM
+    bands.push(answer)
   }
+  return { bands }
 }
