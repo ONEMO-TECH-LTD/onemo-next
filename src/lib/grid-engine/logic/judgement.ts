@@ -447,7 +447,11 @@ function judgeBand(
   const lawful = kept.filter(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
-      v.wrap.bottom <= calibration.flapLimbMM,
+      v.wrap.bottom <= calibration.flapLimbMM &&
+      // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
+      // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
+      // butterfly cross-wing diagonals) — on a mirror shape they are not options at all
+      (!shapeSymmetric || anchorsAreMirrorSymmetric(v)),
   )
   return { band, variants: lawful.slice(0, calibration.optionsPerBand) }
 }
