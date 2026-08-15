@@ -33,8 +33,15 @@ import {
   type Anchor,
   type GridResult,
 } from '../compute/grid-core'
-import { prepareExactContour, distanceToPreparedContour, pointInPreparedContour } from '../compute/grid-prepared'
+import { prepareExactContour, distanceToPreparedContour } from '../compute/grid-prepared'
 import { normalizeContour } from '../compute/normalize'
+import {
+  shapeFeatures,
+  deepestPointSampled,
+  pointsMirrorSymmetric,
+  pointsFillBlock,
+  pointsOneComponent,
+} from '../compute/structure'
 import { placeTemplate } from '../compute/templates'
 import { measureWrap, type WrapMeasures } from '../compute/wrap'
 import type { Contour, Pt } from '../compute/types'
@@ -162,85 +169,13 @@ function variantFrom(
   }
 }
 
+/** Measurement resolutions the judge requests from compute — representation, not law. */
+const STRUCTURE_SCANLINES = 24
+const MASS_FIELD_SAMPLES = 40
+
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
 /** Does the shape mirror about its vertical axis? Every scanline's centre must sit within
  *  tolFrac of the width from the shape's own axis. Pure geometry, tolerance from spec. */
-/** The unit shape's deepest-material point — the mass centre a placement should align to.
- *  Pure sampling over the exact distance field; scales linearly with the shape. */
-function unitMassCentre(unit: Contour): Pt | null {
-  const prepared = prepareExactContour(unit)
-  const bb = prepared.bbox
-  let best: Pt | null = null
-  let bestD = -Infinity
-  const N = 40
-  for (let i = 1; i < N; i++) {
-    for (let j = 1; j < N; j++) {
-      const p: Pt = [
-        bb.minX + ((bb.maxX - bb.minX) * i) / N,
-        bb.minY + ((bb.maxY - bb.minY) * j) / N,
-      ]
-      if (!pointInPreparedContour(p, prepared)) continue
-      const d = distanceToPreparedContour(p, prepared)
-      if (d > bestD) {
-        bestD = d
-        best = p
-      }
-    }
-  }
-  return best
-}
-
-function contourIsMirrorSymmetric(contour: Contour, tolFrac: number): boolean {
-  const pts = contour.outer.pts
-  if (pts.length < 3) return false
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-  for (const [x, y] of pts) {
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-  }
-  const cx = (minX + maxX) / 2
-  const width = maxX - minX
-  if (width <= 0) return false
-  const SAMPLES = 24
-  for (let i = 1; i < SAMPLES; i++) {
-    const y = minY + ((maxY - minY) * i) / SAMPLES
-    let rowMin = Infinity
-    let rowMax = -Infinity
-    for (let j = 0; j < pts.length; j++) {
-      const [x1, y1] = pts[j]
-      const [x2, y2] = pts[(j + 1) % pts.length]
-      if (y1 === y2) continue
-      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
-        const x = x1 + ((y - y1) / (y2 - y1)) * (x2 - x1)
-        if (x < rowMin) rowMin = x
-        if (x > rowMax) rowMax = x
-      }
-    }
-    if (rowMin > rowMax) continue
-    if (Math.abs((rowMin + rowMax) / 2 - cx) > tolFrac * width) return false
-  }
-  return true
-}
-
-/** Is the arrangement itself mirror-symmetric — every anchor reflected about the block's own
- *  vertical centre lands on another anchor? Lattice points reflect exactly; no tolerance games. */
-function anchorsAreMirrorSymmetric(v: SizeVariant): boolean {
-  let minX = Infinity, maxX = -Infinity
-  for (const a of v.anchors) {
-    if (a.p[0] < minX) minX = a.p[0]
-    if (a.p[0] > maxX) maxX = a.p[0]
-  }
-  const cx = minX + (maxX - minX) / 2
-  const tol = 1e-6
-  return v.anchors.every((a) =>
-    v.anchors.some(
-      (b) => Math.abs(b.p[0] - (2 * cx - a.p[0])) < tol && Math.abs(b.p[1] - a.p[1]) < tol,
-    ),
-  )
-}
-
 /** THE STRUCTURE LAW (Dan's ruled canon, selection-examples): the shape's own build names its
  *  arrangement class — "a TRIANGULAR shape takes a triangular hold"; the duck's waist is spanned
  *  by corners with the mid row skipped; the bot's "narrow standing mass" takes the tight column;
@@ -253,105 +188,19 @@ type ShapeStructure =
   | { kind: 'waistedX' }
   | { kind: 'uniform'; tall: boolean; narrowMass: boolean }
 
-function profile(
-  pts: ReadonlyArray<Pt>,
-  axis: 0 | 1,
-  lo: number,
-  hi: number,
-): { span: number; centre: number }[] {
-  const out: { span: number; centre: number }[] = []
-  const N = 24
-  for (let i = 1; i < N; i++) {
-    const c = lo + ((hi - lo) * i) / N
-    let mn = Infinity
-    let mx = -Infinity
-    for (let j = 0; j < pts.length; j++) {
-      const a = pts[j]
-      const b = pts[(j + 1) % pts.length]
-      const a1 = a[axis], b1 = b[axis]
-      if (a1 === b1) continue
-      if ((a1 <= c && b1 > c) || (b1 <= c && a1 > c)) {
-        const other = axis === 0 ? 1 : 0
-        const x = a[other] + ((c - a1) / (b1 - a1)) * (b[other] - a[other])
-        if (x < mn) mn = x
-        if (x > mx) mx = x
-      }
-    }
-    if (mn <= mx) out.push({ span: mx - mn, centre: (mn + mx) / 2 })
-  }
-  return out
-}
-
-function waistRatio(rows: { span: number }[]): number {
-  const third = Math.floor(rows.length / 3)
-  if (third < 1) return 1
-  const midMin = Math.min(...rows.slice(third, rows.length - third).map((r) => r.span))
-  const endMax = Math.max(
-    ...rows.slice(0, third).map((r) => r.span),
-    ...rows.slice(rows.length - third).map((r) => r.span),
-  )
-  return endMax > 0 ? midMin / endMax : 1
-}
-
 function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStructure {
-  const pts = unit.outer.pts
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-  for (const [x, y] of pts) {
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-  }
-  const rows = profile(pts, 1, minY, maxY)
-  const cols = profile(pts, 0, minX, maxX)
-  if (rows.length < 4 || cols.length < 4) return { kind: 'uniform', tall: true, narrowMass: true }
-  // diagonal: the row centres drift linearly across the height
-  const n = rows.length
-  const ys = rows.map((_, i) => i / (n - 1))
-  const cxs = rows.map((r) => r.centre)
-  const meanY = ys.reduce((a, b) => a + b, 0) / n
-  const meanC = cxs.reduce((a, b) => a + b, 0) / n
-  let cov = 0, varY = 0, varC = 0
-  for (let i = 0; i < n; i++) {
-    cov += (ys[i] - meanY) * (cxs[i] - meanC)
-    varY += (ys[i] - meanY) ** 2
-    varC += (cxs[i] - meanC) ** 2
-  }
-  const slope = varY > 0 ? cov / varY / (maxX - minX) : 0
-  if (Math.abs(slope) > calibration.structureDiagSlope)
-    return { kind: 'diagonal', sign: slope > 0 ? 1 : -1 }
-  // tapered: width grows steadily toward the base
-  const spans = rows.map((r) => r.span)
-  const meanS = spans.reduce((a, b) => a + b, 0) / n
-  let covS = 0, varS = 0
-  for (let i = 0; i < n; i++) {
-    covS += (ys[i] - meanY) * (spans[i] - meanS)
-    varS += (spans[i] - meanS) ** 2
-  }
-  const taperCorr = varS > 0 ? covS / Math.sqrt(varY * varS) : 0
-  if (taperCorr > calibration.structureTaperCorr) return { kind: 'tapered' }
-  if (waistRatio(rows) < calibration.structureWaistRatio) return { kind: 'waistedY' }
-  if (waistRatio(cols) < calibration.structureWaistRatio) return { kind: 'waistedX' }
-  // the uniform split: a MILD waist marks the limbed standing mass (the bot, 0.68 — arms and
-  // legs off a narrow torso: column hold); no waist at all marks the full blob (the poke,
-  // 0.97: corner-square hold).
-  return {
-    kind: 'uniform',
-    tall: maxY - minY >= maxX - minX,
-    narrowMass: waistRatio(rows) < calibration.structureMassRatio,
-  }
-}
-
-/** A FILLED BLOCK: the anchors are every combination of their distinct columns and rows —
- *  a pair-in-line, a rect, a square. A diagonal shares the box but not the block. */
-function isFilledBlock(v: SizeVariant, halfPitchMM: number): boolean {
-  const q = (n: number) => Math.round(n / halfPitchMM)
-  const xs = new Set(v.anchors.map((a) => q(a.p[0])))
-  const ys = new Set(v.anchors.map((a) => q(a.p[1])))
-  if (xs.size * ys.size !== v.anchors.length) return false
-  const have = new Set(v.anchors.map((a) => `${q(a.p[0])}:${q(a.p[1])}`))
-  for (const x of xs) for (const y of ys) if (!have.has(`${x}:${y}`)) return false
-  return true
+  // CLASSIFICATION ONLY (QA build-audit): the measurements live in compute/structure.ts; this
+  // function compares them against the released thresholds and names the class.
+  const f = shapeFeatures(unit, STRUCTURE_SCANLINES)
+  if (!f) return { kind: 'uniform', tall: true, narrowMass: true }
+  if (Math.abs(f.diagSlopeFrac) > calibration.structureDiagSlope)
+    return { kind: 'diagonal', sign: f.diagSlopeFrac > 0 ? 1 : -1 }
+  if (f.taperCorr > calibration.structureTaperCorr) return { kind: 'tapered' }
+  if (f.waistY < calibration.structureWaistRatio) return { kind: 'waistedY' }
+  if (f.waistX < calibration.structureWaistRatio) return { kind: 'waistedX' }
+  // the uniform split: a MILD waist marks the limbed standing mass (column hold); no waist at
+  // all marks the full blob (corner-square hold).
+  return { kind: 'uniform', tall: f.tall, narrowMass: f.waistY < calibration.structureMassRatio }
 }
 
 /** How well an arrangement answers the shape's structure: 2 = spans/embodies it, 1 = aligned
@@ -411,7 +260,7 @@ function structureScore(
   // uniform, narrow mass (the bot): the tight column/rect along the long axis — a FILLED
   // block only (the diagonal shares the narrow box but is no column).
   if (structure.narrowMass) {
-    if (!isFilledBlock(v, half)) return 0
+    if (!pointsFillBlock(v.anchors.map((x) => x.p), half)) return 0
     if (structure.tall) return extX <= basePitchMM + eps && extY > eps ? 1 : 0
     return extY <= basePitchMM + eps && extX > eps ? 1 : 0
   }
@@ -419,28 +268,9 @@ function structureScore(
   // the pair follows the shape's own axis ("vertical for standing shapes" — canon B2).
   if (n >= 4 && extX >= 2 * basePitchMM - eps && extY >= 2 * basePitchMM - eps) return 2
   if (n >= 4) return 1
-  if (!isFilledBlock(v, half)) return 0
+  if (!pointsFillBlock(v.anchors.map((x) => x.p), half)) return 0
   if (structure.tall) return extX < half && extY > eps ? 1 : 0
   return extY < half && extX > eps ? 1 : 0
-}
-
-/** THE STRIP LAW's real test (Meta finding, 2026-08-15): connectivity is SINGLE-LINKAGE, not
- *  a pairwise minimum — two tight pairs 200mm apart have nearestAnchorMM 48 yet are two
- *  disconnected islands. Every anchor must reach every other through links <= the strip cap. */
-function isOneStrip(v: SizeVariant, stripCapMM: number): boolean {
-  const n = v.anchors.length
-  if (n < 2) return true
-  const parent = Array.from({ length: n }, (_, i) => i)
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
-  for (let i = 0; i < n; i++)
-    for (let j = i + 1; j < n; j++) {
-      const a = v.anchors[i].p
-      const b = v.anchors[j].p
-      if (Math.hypot(a[0] - b[0], a[1] - b[1]) <= stripCapMM + 1e-6) parent[find(i)] = find(j)
-    }
-  const root = find(0)
-  for (let i = 1; i < n; i++) if (find(i) !== root) return false
-  return true
 }
 
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
@@ -490,8 +320,8 @@ function better(
   //     pitch — its coverage oracle bounds pair strips at 96mm): magnets spaced beyond it are
   //     disconnected islands, not an arrangement (the poke's 136mm corner-to-corner diagonal
   //     measured perfect bbox wraps while 301mm of edge hung unheld — eyes-on, 2026-08-15).
-  const connectedA = isOneStrip(a, calibration.stripLinkMM)
-  const connectedB = isOneStrip(b, calibration.stripLinkMM)
+  const connectedA = pointsOneComponent(a.anchors.map((x) => x.p), calibration.stripLinkMM)
+  const connectedB = pointsOneComponent(b.anchors.map((x) => x.p), calibration.stripLinkMM)
   if (connectedA !== connectedB) return connectedA
   // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
   //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
@@ -515,8 +345,8 @@ function better(
   //     mirror-symmetric arrangement — a diagonal pair breaks the figure's axis and ranks below.
   //     Asymmetric shapes (the duck, the tilted pill) take whatever seats best.
   if (shapeSymmetric) {
-    const symA = anchorsAreMirrorSymmetric(a)
-    const symB = anchorsAreMirrorSymmetric(b)
+    const symA = pointsMirrorSymmetric(a.anchors.map((x) => x.p))
+    const symB = pointsMirrorSymmetric(b.anchors.map((x) => x.p))
     if (symA !== symB) return symA
   }
   // 3. SPARSE SPREAD (Dan: "96mm is lawful sparse pair and actually preferred") — wider
@@ -712,11 +542,11 @@ function judgeBand(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
-      isOneStrip(v, calibration.stripLinkMM) &&
+      pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
       // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
       // butterfly cross-wing diagonals) — on a mirror shape they are not options at all
-      (!shapeSymmetric || anchorsAreMirrorSymmetric(v)),
+      (!shapeSymmetric || pointsMirrorSymmetric(v.anchors.map((x) => x.p))),
   )
   // ONE OFFER PER FOOTPRINT (the sparse law, operationalised — Dan: "96mm pair preferred and
   // proven sufficient"): variants whose padded blocks occupy the same box at the same size are
@@ -761,7 +591,7 @@ function judgeBand(
       (v) =>
         v.wrap.top <= calibration.flapMaxMM &&
         v.wrap.bottom <= calibration.flapLimbMM &&
-        isOneStrip(v, calibration.stripLinkMM),
+        pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM),
     )
     if (holdLawful) final = [holdLawful]
   }
@@ -781,7 +611,8 @@ export function judgeShape(
 ): ShapeJudgement | null {
   const unitContour = normalizeContour(contourMM)
   if (!unitContour) return null
-  const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
+  const features = shapeFeatures(unitContour, STRUCTURE_SCANLINES)
+  const shapeSymmetric = features !== null && features.mirrorDeviationFrac <= calibration.symmetryTolFrac
   const structure = shapeStructure(unitContour, calibration)
   // THE AXIS (L13: "fitting and centering in the shape"): on a mirror-symmetric shape the mass
   // axis IS the mirror axis — the deepest blob may sit in a wing and would drag the assembly
@@ -796,7 +627,7 @@ export function judgeShape(
     }
     massX = (minX + maxX) / 2
   } else {
-    const massCentre = unitMassCentre(unitContour)
+    const massCentre = deepestPointSampled(unitContour, MASS_FIELD_SAMPLES)
     massX = massCentre ? massCentre[0] : null
   }
   const offeredBelow = new Set<string>()
