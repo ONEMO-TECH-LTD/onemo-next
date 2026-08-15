@@ -64,6 +64,10 @@ export interface SizeVariant {
   /** Horizontal distance from the assembly's centre to the shape's MASS AXIS (the deepest-material
    *  point) — the figure's own axis, which on a winged shape is not the bounding box's centre. */
   massAxisOffMM?: number
+  /** The shallowest anchor's true distance to the outline — the STRONG-REGION measure (Dan's
+   *  canon walkthrough: magnets belong in the mass; "limbs carry the hold" only where the limb
+   *  is itself a full mass region). */
+  minDepthMM?: number
   /** 'tight' within the tight bound; 'allowed' within the outer bound; 'limb' rides the limb
    *  exception (some side hangs beyond the outer bound but within the limb allowance). */
   tier: 'tight' | 'allowed' | 'limb'
@@ -240,7 +244,7 @@ function anchorsAreMirrorSymmetric(v: SizeVariant): boolean {
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
   if (v.anchors.length < 4) return false
   if (v.wrap.gridExtentXMM < 72 || v.wrap.gridExtentYMM < 72) return false
-  if (v.wrap.maxSide > calibration.flapMaxMM) return false
+  if (v.wrap.maxSide > calibration.flapLimbMM) return false
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const a of v.anchors) {
     if (a.p[0] < minX) minX = a.p[0]
@@ -310,6 +314,14 @@ function better(
   //    pool too: BALANCE below picks them only where the shape is genuinely three-cornered
   //    (Dan: "a T-shaped can act as triangle with 3 corners") — elsewhere the pair balances
   //    better and wins.
+  // 2c. THE STRONG-REGION LAW (Dan's ruled canon, selection-examples: the bat is "3 magnets
+  //     utmost corners", the bot's narrow rect beats the arm-riding square, the butterfly's
+  //     wing-centres carry the hold): every magnet sits in real mass — the arrangement whose
+  //     SHALLOWEST disc is deeper outranks one with a disc in thin material. Coarse steps.
+  const depthStepMM = calibration.flapTightMM / 2
+  const depthA = Math.round((a.minDepthMM ?? 0) / depthStepMM)
+  const depthB = Math.round((b.minDepthMM ?? 0) / depthStepMM)
+  if (depthA !== depthB) return depthA > depthB
   //    Spread credit CAPS at the released sparse pitch (Dan's law: 96 is the sparse spacing
   //    "proven sufficient" — not "the further the better"): an extreme diagonal pair flung
   //    corner-to-corner (135mm) must not outrank layouts that hold the mass (poke1 B4, eyes-on
@@ -361,8 +373,24 @@ function judgeBand(
   sizeFloorMM: number,
 ): BandAnswer {
   const kept: SizeVariant[] = []
+  const preparedBySize = new Map<number, ReturnType<typeof prepareExactContour>>()
+  const preparedFor = (variant: SizeVariant) => {
+    let prep = preparedBySize.get(variant.sizeMM)
+    if (!prep) {
+      prep = prepareExactContour(variant.effectContourMM)
+      preparedBySize.set(variant.sizeMM, prep)
+    }
+    return prep
+  }
   const consider = (variant: SizeVariant | null) => {
     if (!variant) return
+    const prep = preparedFor(variant)
+    let minDepth = Infinity
+    for (const anchor of variant.anchors) {
+      const d = distanceToPreparedContour(anchor.p, prep)
+      if (d < minDepth) minDepth = d
+    }
+    variant.minDepthMM = Number.isFinite(minDepth) ? minDepth : 0
     if (unitMassX !== null && variant.anchors.length) {
       let sumX = 0
       for (const anchor of variant.anchors) sumX += anchor.p[0]
