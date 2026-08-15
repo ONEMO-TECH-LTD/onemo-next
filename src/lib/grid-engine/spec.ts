@@ -290,10 +290,17 @@ export interface CalibrationSpec {
    *  the previous band's. */
   bandSizeStepMM: number
   /** THE STRIP LAW's link bound: the longest anchor-to-anchor link that still bonds material —
-   *  the released vocabulary's own maximum, the sparse lattice diagonal sqrt(48^2+96^2) = 107.3
+   *  the released vocabulary's own maximum, the 48x96 mixed-step diagonal sqrt(48^2+96^2) = 107.3 — the longest link any released arrangement carries (Dan's ruled canon triangle)
    *  (Dan's ruled canon triangle carries exactly this link; the 135.8 corner-fling stays out).
    *  Every arrangement must be ONE component under links within this bound. */
   stripLinkMM: number
+  /** The corners class demands real spread on both axes — the padded block must span at least
+   *  this per axis (one 48 step + padding). Was a literal in the judge (QA adjudication). */
+  cornersMinExtentMM: number
+  /** Measurement resolutions the judge requests from compute (QA: decision inputs belong in
+   *  the spec, not as literals in the judge). */
+  structureScanlines: number
+  massFieldSamples: number
   /** The size bands. Ranges are product law; solved sizes inside them are engine output. */
   bands: readonly BandSpec[]
   /** The released layout templates (Dan's canon arrangements), in base-lattice steps. The judge
@@ -325,6 +332,9 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   optionsPerBand: 1,
   bandSizeStepMM: 24,
   stripLinkMM: 108,
+  cornersMinExtentMM: 72,
+  structureScanlines: 24,
+  massFieldSamples: 40,
   bands: Object.freeze([
     Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
     Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),
@@ -379,6 +389,9 @@ export type CalibrationNumberKey =
   | 'sweepStepMM'
   | 'centerToleranceMM'
   | 'sizeStepMM'
+  | 'cornersMinExtentMM'
+  | 'structureScanlines'
+  | 'massFieldSamples'
   | 'symmetryTolFrac'
   | 'structureWaistRatio'
   | 'structureTaperCorr'
@@ -397,6 +410,9 @@ const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: numbe
   sweepStepMM: { min: 1, max: 48 },
   centerToleranceMM: { min: 0, max: 60 },
   sizeStepMM: { min: 2, max: 48 },
+  cornersMinExtentMM: { min: 24, max: 216 },
+  structureScanlines: { min: 8, max: 96 },
+  massFieldSamples: { min: 8, max: 128 },
   symmetryTolFrac: { min: 0, max: 1 },
   structureWaistRatio: { min: 0, max: 1 },
   structureTaperCorr: { min: 0, max: 1 },

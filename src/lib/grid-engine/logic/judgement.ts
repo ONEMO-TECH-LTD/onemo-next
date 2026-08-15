@@ -169,10 +169,6 @@ function variantFrom(
   }
 }
 
-/** Measurement resolutions the judge requests from compute — representation, not law. */
-const STRUCTURE_SCANLINES = 24
-const MASS_FIELD_SAMPLES = 40
-
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
 /** Does the shape mirror about its vertical axis? Every scanline's centre must sit within
  *  tolFrac of the width from the shape's own axis. Pure geometry, tolerance from spec. */
@@ -275,7 +271,11 @@ function structureScore(
 
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
   if (v.anchors.length < 4) return false
-  if (v.wrap.gridExtentXMM < 72 || v.wrap.gridExtentYMM < 72) return false
+  if (
+    v.wrap.gridExtentXMM < calibration.cornersMinExtentMM ||
+    v.wrap.gridExtentYMM < calibration.cornersMinExtentMM
+  )
+    return false
   if (v.wrap.maxSide > calibration.flapLimbMM) return false
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const a of v.anchors) {
@@ -620,7 +620,7 @@ export function judgeShape(
 ): ShapeJudgement | null {
   const unitContour = normalizeContour(contourMM)
   if (!unitContour) return null
-  const features = shapeFeatures(unitContour, STRUCTURE_SCANLINES)
+  const features = shapeFeatures(unitContour, calibration.structureScanlines)
   const shapeSymmetric = features !== null && features.mirrorDeviationFrac <= calibration.symmetryTolFrac
   const structure = shapeStructure(unitContour, calibration)
   // THE AXIS (L13: "fitting and centering in the shape"): on a mirror-symmetric shape the mass
@@ -636,7 +636,7 @@ export function judgeShape(
     }
     massX = (minX + maxX) / 2
   } else {
-    const massCentre = deepestPointSampled(unitContour, MASS_FIELD_SAMPLES)
+    const massCentre = deepestPointSampled(unitContour, calibration.massFieldSamples)
     massX = massCentre ? massCentre[0] : null
   }
   const offeredBelow = new Set<string>()
