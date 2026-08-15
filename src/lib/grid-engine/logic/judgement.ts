@@ -525,7 +525,10 @@ function better(
   // 3b. THE MASS AXIS (Dan, 2026-08-15: the pair must be "centered AND fit to shape" — and his
   //     centre is the FIGURE's axis, not the box the wings span). A seat aligned to the deepest
   //     material outranks one dragged toward an asymmetric wing. Coarse steps, like balance.
-  const axisStepMM = calibration.flapTightMM / 2
+  //     CANONICAL REGISTRATION (GPT PRO v3.3 spec §6, adopted 2026-08-15): the centred seat is
+  //     the first test — off-centre must WIN, never tie. Quarter-tight steps so dead-centre
+  //     and 5mm-off never land in one bucket.
+  const axisStepMM = calibration.flapTightMM / 4
   const axisA = Math.round((a.massAxisOffMM ?? 0) / axisStepMM)
   const axisB = Math.round((b.massAxisOffMM ?? 0) / axisStepMM)
   if (axisA !== axisB) return axisA < axisB
