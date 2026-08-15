@@ -338,6 +338,15 @@ function better(
   const connectedA = pointsOneComponent(a.anchors.map((x) => x.p), calibration.stripLinkMM)
   const connectedB = pointsOneComponent(b.anchors.map((x) => x.p), calibration.stripLinkMM)
   if (connectedA !== connectedB) return connectedA
+  // 1e. THE SIDE HOLD LAW (Dan, 2026-08-15 23:4x: "the judgement logic must prevail by
+  //     identifying unreasonable spacing and flap not tight" — the bat's band-4 spine wore
+  //     70mm wings and still won on spread because sides had NO hold law, only top and
+  //     bottom did). A side may hang only as a limb, same allowance as the bottom: a
+  //     placement leaving more material past its block sideways ranks under everything
+  //     that actually covers the shape.
+  const holdsSidesA = Math.max(a.wrap.left, a.wrap.right) <= calibration.flapLimbMM
+  const holdsSidesB = Math.max(b.wrap.left, b.wrap.right) <= calibration.flapLimbMM
+  if (holdsSidesA !== holdsSidesB) return holdsSidesA
   // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
   //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
   if (band.targetMagnets > 0) {
@@ -412,8 +421,11 @@ function better(
   const balA = Math.round(a.wrap.imbalanceSumMM / balanceStepMM)
   const balB = Math.round(b.wrap.imbalanceSumMM / balanceStepMM)
   if (balA !== balB) return balA < balB
-  // 4b. among equal balance, FEWER magnets — the spine is minimal ("brains only").
-  if (a.anchors.length !== b.anchors.length) return a.anchors.length < b.anchors.length
+  // 4b. among equal balance: at counted bands FEWER magnets (the spine is minimal, "brains
+  //     only"); at the free bands the FULLER population (Dan, 2026-08-15 23:47 — the honest
+  //     count, never the artificial subset).
+  if (a.anchors.length !== b.anchors.length)
+    return band.targetMagnets > 0 ? a.anchors.length < b.anchors.length : a.anchors.length > b.anchors.length
   // 5. tight wrap — least total overhang
   if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
   // 6. smaller manufactured size
@@ -432,6 +444,7 @@ function judgeBand(
   offeredBelow: Set<string>,
   sizeFloorMM: number,
   structure: ShapeStructure,
+  prevCount: number,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const preparedBySize = new Map<number, ReturnType<typeof prepareExactContour>>()
@@ -578,6 +591,8 @@ function judgeBand(
     (v) =>
       (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
+      // side hold law — sides hang only as limbs (unreasonable spacing is not an offer)
+      Math.max(v.wrap.left, v.wrap.right) <= calibration.flapLimbMM &&
       pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
       // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
@@ -588,10 +603,13 @@ function judgeBand(
   // proven sufficient"): variants whose padded blocks occupy the same box at the same size are
   // the same physical hold; the ranked-best (fewest magnets, by the sparse ordering above)
   // keeps the chip, the rest are redundant middles.
-  const seen = new Set<string>()
-  const offered: SizeVariant[] = []
-  const half = spec.grid.basePitchMM / 2
-  for (const v of lawful) {
+  // THE HONEST POPULATION LAW (Dan, 2026-08-15 23:47: the band-3 chip claimed 3 points while
+  // 5 lawful nodes sat in the same window — "not artificially claim 3 points fitting all 5").
+  // One footprint = one chip, and at the free bands (no target count) the chip belongs to the
+  // FULLEST lawful population of that footprint, never a subset. At counted bands (1–2) the
+  // target law owns the count and the ranked-best keeps the chip as before.
+  const fullest = band.targetMagnets === 0
+  const footKey = (v: SizeVariant) => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
     for (const anchor of v.anchors) {
       if (anchor.p[0] < minX) minX = anchor.p[0]
@@ -599,11 +617,22 @@ function judgeBand(
       if (anchor.p[1] < minY) minY = anchor.p[1]
       if (anchor.p[1] > maxY) maxY = anchor.p[1]
     }
-    const key = [v.sizeMM, Math.round(minX / half), Math.round(maxX / half), Math.round(minY / half), Math.round(maxY / half)].join(':')
-    if (seen.has(key)) continue
-    seen.add(key)
-    offered.push(v)
+    const half = spec.grid.basePitchMM / 2
+    return [v.sizeMM, Math.round(minX / half), Math.round(maxX / half), Math.round(minY / half), Math.round(maxY / half)].join(':')
   }
+  const byFoot = new Map<string, SizeVariant>()
+  const footOrder: string[] = []
+  for (const v of lawful) {
+    const key = footKey(v)
+    const held = byFoot.get(key)
+    if (!held) {
+      byFoot.set(key, v)
+      footOrder.push(key)
+    } else if (fullest && v.anchors.length > held.anchors.length) {
+      byFoot.set(key, v)
+    }
+  }
+  const offered: SizeVariant[] = footOrder.map((k) => byFoot.get(k)!)
   // THE BAND-GIFT LAW, reverse clause (Dan's calibration sweep, 2026-08-15: the band-2 single
   // and band-3 48-pair were "not necessary" — each was a lower band's answer re-listed bigger
   // and looser): a band offers what its size range UNLOCKS. A non-default variant whose layout
@@ -612,9 +641,14 @@ function judgeBand(
   // THE STEPPING LAW (canon band-4: "only the lattice step grows"): a stepped band may not
   // re-offer a lower band's arrangement at all — not even as its default. Other bands keep
   // their default exempt (the band's best answer stands even when a lower band shares it).
+  // THE GROWTH LAW (Dan, 2026-08-15 23:5x: "it must scale to include extra magnet disk
+  // minimum or entire column or row" — band 4 re-sold band 3's population at looser spacing,
+  // and band 3 re-sold band 2's pair): EVERY band's offer carries MORE magnets than the band
+  // below's answer and never repeats a lower band's arrangement. What a band unlocks is a
+  // bigger grid, not the same grid looser. (Where nothing grown seats, the fallback below
+  // still answers with the best hold-lawful placement — honesty over silence.)
   const fresh = offered.filter(
-    (v, i) =>
-      (!band.stepUp && i === 0) || !offeredBelow.has(layoutIdentity(v, halfPitch)),
+    (v) => !offeredBelow.has(layoutIdentity(v, halfPitch)) && v.anchors.length > prevCount,
   )
   let final = fresh.slice(0, calibration.optionsPerBand)
   // EVERY BAND ANSWERS (Dan: "each band must have at least one optimal layout") — but never
@@ -627,6 +661,7 @@ function judgeBand(
       (v) =>
         (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
         v.wrap.bottom <= calibration.flapLimbMM &&
+        Math.max(v.wrap.left, v.wrap.right) <= calibration.flapLimbMM &&
         pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM),
     )
     if (holdLawful) final = [holdLawful]
@@ -669,6 +704,7 @@ export function judgeShape(
   const offeredBelow = new Set<string>()
   const bands: BandAnswer[] = []
   let sizeFloorMM = 0
+  let prevCount = 0
   for (const band of calibration.bands) {
     const answer = judgeBand(
       spec,
@@ -680,8 +716,12 @@ export function judgeShape(
       offeredBelow,
       sizeFloorMM,
       structure,
+      prevCount,
     )
-    if (answer.variants[0]) sizeFloorMM = answer.variants[0].sizeMM + calibration.bandSizeStepMM
+    if (answer.variants[0]) {
+      sizeFloorMM = answer.variants[0].sizeMM + calibration.bandSizeStepMM
+      prevCount = answer.variants[0].anchors.length
+    }
     bands.push(answer)
   }
   return { bands }

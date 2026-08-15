@@ -31,12 +31,15 @@ const CANON: Record<
   string,
   Record<number, { count: number; layouts: (string | null)[]; geometry?: Geometry }>
 > = {
+  // Re-pinned 2026-08-16 to the LAW-DERIVED winners (Dan's frame: canon is the law set,
+  // fixtures are regression tripwires, never truth). The honest-population law (the fullest
+  // lawful population keeps a footprint's chip), the growth law (every band carries more
+  // magnets than the band below — "extra magnet disk minimum or entire column or row"),
+  // the side-hold law (sides hang only as limbs) and mass-aware gravity produced these.
   bat: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v'] },
-    3: { count: 3, layouts: ['tri-96-up'] },
-    // Dan 2026-08-15 22:52: band 4 steps UP to the tight full grid ("at least 4 points is
-    // easy") — the mass-aware gravity law unlocked the full population; sparse pair is out.
+    3: { count: 4, layouts: ['tee-96'] },
     4: { count: 5, layouts: [null] },
   },
   duck: {
@@ -49,33 +52,34 @@ const CANON: Record<
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-h'] },
     3: { count: 4, layouts: ['square-48'] },
-    4: { count: 4, layouts: ['square-96'] },
+    4: { count: 6, layouts: [null] },
   },
   bot: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v'] },
     3: { count: 4, layouts: ['rect-48x96'] },
-    4: { count: 2, layouts: ['pair-v-96'] },
+    4: { count: 6, layouts: ['six-48x96'] },
   },
   pill: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null], geometry: 'diagonal' },
-    3: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null], geometry: 'diagonal' },
-    4: { count: 3, layouts: ['run-antidiag-3', 'run-diag-3', null], geometry: 'diagonal' },
+    3: { count: 3, layouts: ['run-antidiag-3', 'run-diag-3'], geometry: 'diagonal' },
+    4: { count: 8, layouts: [null] },
   },
   poke1: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
     3: { count: 4, layouts: ['square-48'] },
-    4: { count: 4, layouts: ['rect-48x96', 'square-96', null] },
+    4: { count: 6, layouts: ['six-48x96', null] },
   },
   poke2: {
     1: { count: 1, layouts: ['single', null] },
     2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
-    3: { count: 2, layouts: ['pair-v-96'] },
-    4: { count: 3, layouts: [null, 'tri-96-down', 'rect-48x96', 'square-96'] },
+    3: { count: 3, layouts: ['run-v-3'], geometry: 'vertical' },
+    4: { count: 4, layouts: ['tee-96-down', null] },
   },
 }
+
 
 function contourFor(name: string): Contour {
   const { outline, box } = SHAPES[name]
