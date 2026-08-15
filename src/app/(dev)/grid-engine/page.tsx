@@ -423,7 +423,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-47</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-48</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
@@ -519,7 +519,7 @@ export default function GridEnginePage() {
         )}
         {shownScore && (
           <span className={styles.fieldReadout} data-calibrate="scores">
-            g:{shownScore.gravity ? 'Y' : 'n'} top:{shownScore.top.toFixed(0)} clr:{shownScore.clear.toFixed(1)} ext:{Math.sqrt(shownScore.extremes).toFixed(0)} step:{Math.sqrt(shownScore.step).toFixed(0)}
+            g:{shownScore.gravity ? 'Y' : 'n'} T{shownScore.wrap?.top.toFixed(0)} B{shownScore.wrap?.bottom.toFixed(0)} tot:{shownScore.wrap?.total.toFixed(0)} clr:{shownScore.clear.toFixed(1)}
           </span>
         )}
 

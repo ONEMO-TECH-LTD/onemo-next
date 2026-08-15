@@ -1,9 +1,21 @@
-// L20 — any outline. Gravity, wrap, and centre are weights. No shape names.
+// Lexicographic judge. Counts emerge from the physics. No blended score.
+// Candidate collect is untouched — this file only orders what collect already listed.
 
 import { scaleToSize, type Candidate, type CandidateDocument } from './candidates'
 import { discClearanceMM, prepareOutline } from './measure'
-import { BAND_SIZES_MM, type BandId, type GridSystemSpec } from './spec'
+import { type BandId, type GridSystemSpec } from './spec'
 import type { PointMM } from './engine'
+
+/** Calibrated on the v3.2 bench (Dan 2026-08-14/15). Named constants, never a blend. */
+const GRAVITY_GUARD_MM = 28
+const VERTICAL_HOLD_MM = 40
+const STRIP_LINK_MM = 96
+const SPARSE_CAP_MM = 96
+const TIGHT_STEP_MM = 12
+const EVEN_STEP_MM = 6
+const AXIS_STEP_MM = 3
+const SYMMETRY_TOL_FRAC = 0.11
+const BAND_STEP_MM = 24
 
 function bbox(verts: ReadonlyArray<PointMM>) {
   let minX = verts[0][0]
@@ -19,54 +31,78 @@ function bbox(verts: ReadonlyArray<PointMM>) {
   return { minX, maxX, minY, maxY }
 }
 
-/** Leftmost, rightmost, topmost, bottommost outline vertices — the masses' extremes. */
-function extremes(verts: ReadonlyArray<PointMM>): PointMM[] {
-  let L = verts[0]
-  let R = verts[0]
-  let T = verts[0]
-  let B = verts[0]
-  for (const p of verts) {
-    if (p[0] < L[0]) L = p
-    if (p[0] > R[0]) R = p
-    if (p[1] < T[1]) T = p
-    if (p[1] > B[1]) B = p
-  }
-  return [L, R, T, B]
+export interface WrapMeasures {
+  left: number
+  right: number
+  top: number
+  bottom: number
+  maxSide: number
+  total: number
+  imbalance: number
+  imbalanceSumMM: number
+  gridExtentXMM: number
+  gridExtentYMM: number
 }
 
-function nearest2(c: Candidate, p: PointMM): number {
-  let best = Infinity
+/** Per-side overhang of the shape beyond the magnets' padded box. Pure measure. */
+export function measureWrap(
+  verts: ReadonlyArray<PointMM>,
+  sites: ReadonlyArray<{ x: number; y: number }>,
+  paddingMM: number,
+): WrapMeasures | null {
+  if (!sites.length || verts.length < 3) return null
+  const shape = bbox(verts)
+  const grid = bbox(sites.map((s) => [s.x, s.y] as PointMM))
+  const left = Math.max(0, grid.minX - paddingMM - shape.minX)
+  const right = Math.max(0, shape.maxX - (grid.maxX + paddingMM))
+  const top = Math.max(0, grid.minY - paddingMM - shape.minY)
+  const bottom = Math.max(0, shape.maxY - (grid.maxY + paddingMM))
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    maxSide: Math.max(left, right, top, bottom),
+    total: left + right + top + bottom,
+    imbalance: Math.max(Math.abs(left - right), Math.abs(top - bottom)),
+    imbalanceSumMM: Math.abs(left - right) + Math.abs(top - bottom),
+    gridExtentXMM: grid.maxX - grid.minX + 2 * paddingMM,
+    gridExtentYMM: grid.maxY - grid.minY + 2 * paddingMM,
+  }
+}
+
+/** bbox-thirds proxy — not real mass coverage. Short-term stand-in only. */
+function coversMasses(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
+  const span = shape.maxY - shape.minY
+  if (span <= 0) return true
+  const ys = c.sites.map((s) => s.y)
+  return Math.min(...ys) <= shape.minY + span / 3 && Math.max(...ys) >= shape.maxY - span / 3
+}
+
+function siteInTopThird(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
+  const span = shape.maxY - shape.minY
+  if (span <= 0) return true
+  const cut = shape.minY + span / 3
+  return c.sites.some((s) => s.y <= cut)
+}
+
+/** Four magnets on all four corners of their own box, both axes spread. */
+function isCorners(c: Candidate): boolean {
+  if (c.sites.length < 4) return false
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
   for (const s of c.sites) {
-    const dx = p[0] - s.x
-    const dy = p[1] - s.y
-    const d = dx * dx + dy * dy
-    if (d < best) best = d
+    if (s.x < minX) minX = s.x
+    if (s.x > maxX) maxX = s.x
+    if (s.y < minY) minY = s.y
+    if (s.y > maxY) maxY = s.y
   }
-  return best
-}
-
-/** Flap at the four extremes. Buried discs score badly. */
-function extremeFlap(c: Candidate, verts: ReadonlyArray<PointMM>): number {
-  let worst = 0
-  for (const p of extremes(verts)) {
-    const d = nearest2(c, p)
-    if (d > worst) worst = d
-  }
-  return worst
-}
-
-function minPairSpan(c: Candidate): number {
-  if (c.sites.length < 2) return 0
-  let best = Infinity
-  for (let i = 0; i < c.sites.length; i++) {
-    for (let j = i + 1; j < c.sites.length; j++) {
-      const dx = c.sites[i].x - c.sites[j].x
-      const dy = c.sites[i].y - c.sites[j].y
-      const d = dx * dx + dy * dy
-      if (d < best) best = d
-    }
-  }
-  return best
+  if (maxX - minX < 48 - 1e-6 || maxY - minY < 48 - 1e-6) return false
+  const at = (x: number, y: number) =>
+    c.sites.some((s) => Math.abs(s.x - x) < 1e-6 && Math.abs(s.y - y) < 1e-6)
+  return at(minX, minY) && at(maxX, minY) && at(minX, maxY) && at(maxX, maxY)
 }
 
 function pairSpan(c: Candidate): number {
@@ -74,10 +110,20 @@ function pairSpan(c: Candidate): number {
   let best = 0
   for (let i = 0; i < c.sites.length; i++) {
     for (let j = i + 1; j < c.sites.length; j++) {
-      const dx = c.sites[i].x - c.sites[j].x
-      const dy = c.sites[i].y - c.sites[j].y
-      const d = dx * dx + dy * dy
+      const d = Math.hypot(c.sites[i].x - c.sites[j].x, c.sites[i].y - c.sites[j].y)
       if (d > best) best = d
+    }
+  }
+  return best
+}
+
+function minPairSpan(c: Candidate): number {
+  if (c.sites.length < 2) return 0
+  let best = Infinity
+  for (let i = 0; i < c.sites.length; i++) {
+    for (let j = i + 1; j < c.sites.length; j++) {
+      const d = Math.hypot(c.sites[i].x - c.sites[j].x, c.sites[i].y - c.sites[j].y)
+      if (d < best) best = d
     }
   }
   return best
@@ -87,57 +133,6 @@ function spanArea(c: Candidate): number {
   const xs = c.sites.map((s) => s.x)
   const ys = c.sites.map((s) => s.y)
   return (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys))
-}
-
-/** Wrap, centre, gravity — peers. Centre is a law, not a leftover. */
-const WEIGHT_WRAP = 1
-const WEIGHT_CENTER = 1
-const WEIGHT_GRAVITY = 0.25
-
-function bandRange(band: BandId): { lo: number; span: number } {
-  const sizes = BAND_SIZES_MM[band]
-  const lo = sizes[0]
-  const hi = sizes[sizes.length - 1]
-  return { lo, span: Math.max(1, hi - lo) }
-}
-
-function wrapWeight(sizeMM: number, band: BandId): number {
-  const { lo, span } = bandRange(band)
-  return (sizeMM - lo) / span
-}
-
-function centerWeight(offset2: number, shape: ReturnType<typeof bbox>): number {
-  const hw = (shape.maxX - shape.minX) / 2
-  const hh = (shape.maxY - shape.minY) / 2
-  const reach = Math.hypot(hw, hh) || 1
-  return Math.sqrt(offset2) / reach
-}
-
-function rankScore(
-  sizeMM: number,
-  offset2: number,
-  gravity: boolean,
-  band: BandId,
-  shape: ReturnType<typeof bbox>,
-): number {
-  return (
-    WEIGHT_WRAP * wrapWeight(sizeMM, band) +
-    WEIGHT_CENTER * centerWeight(offset2, shape) +
-    WEIGHT_GRAVITY * (gravity ? 0 : 1)
-  )
-}
-
-/** How far the hold sits from the shape centre. */
-function balance(c: Candidate, shape: ReturnType<typeof bbox>): number {
-  const xs = c.sites.map((s) => s.x)
-  const ys = c.sites.map((s) => s.y)
-  const hx = (Math.min(...xs) + Math.max(...xs)) / 2
-  const hy = (Math.min(...ys) + Math.max(...ys)) / 2
-  const cx = (shape.minX + shape.maxX) / 2
-  const cy = (shape.minY + shape.maxY) / 2
-  const dx = hx - cx
-  const dy = hy - cy
-  return dx * dx + dy * dy
 }
 
 function clearance(c: Candidate, verts: ReadonlyArray<PointMM>): number {
@@ -150,32 +145,62 @@ function clearance(c: Candidate, verts: ReadonlyArray<PointMM>): number {
   return worst
 }
 
-function holdsTop(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
-  const mid = (shape.minY + shape.maxY) / 2
-  return Math.min(...c.sites.map((s) => s.y)) <= mid
+function isOneStrip(sites: ReadonlyArray<{ x: number; y: number }>, cap: number): boolean {
+  const n = sites.length
+  if (n < 2) return true
+  const parent = Array.from({ length: n }, (_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (Math.hypot(sites[i].x - sites[j].x, sites[i].y - sites[j].y) <= cap + 1e-6) {
+        parent[find(i)] = find(j)
+      }
+    }
+  }
+  const root = find(0)
+  for (let i = 1; i < n; i++) if (find(i) !== root) return false
+  return true
 }
 
-function holdBox(c: Candidate): { w: number; h: number; area: number } {
-  if (c.sites.length < 2) return { w: 0, h: 0, area: 0 }
-  const xs = c.sites.map((s) => s.x)
-  const ys = c.sites.map((s) => s.y)
-  const w = Math.max(...xs) - Math.min(...xs)
-  const h = Math.max(...ys) - Math.min(...ys)
-  return { w, h, area: w * h }
+function contourIsMirrorSymmetric(verts: ReadonlyArray<PointMM>, tolFrac: number): boolean {
+  if (verts.length < 3) return false
+  const shape = bbox(verts)
+  const cx = (shape.minX + shape.maxX) / 2
+  const width = shape.maxX - shape.minX
+  if (width <= 0) return false
+  const SAMPLES = 24
+  for (let i = 1; i < SAMPLES; i++) {
+    const y = shape.minY + ((shape.maxY - shape.minY) * i) / SAMPLES
+    let rowMin = Infinity
+    let rowMax = -Infinity
+    for (let j = 0; j < verts.length; j++) {
+      const [x1, y1] = verts[j]
+      const [x2, y2] = verts[(j + 1) % verts.length]
+      if (y1 === y2) continue
+      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+        const x = x1 + ((y - y1) / (y2 - y1)) * (x2 - x1)
+        if (x < rowMin) rowMin = x
+        if (x > rowMax) rowMax = x
+      }
+    }
+    if (rowMin > rowMax) continue
+    if (Math.abs((rowMin + rowMax) / 2 - cx) > tolFrac * width) return false
+  }
+  return true
 }
 
-/** Two discs in the top third — a head pair, not a single apex. */
-function hasHeadPair(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
-  const cut = shape.minY + (shape.maxY - shape.minY) / 3
-  return c.sites.filter((s) => s.y <= cut).length >= 2
-}
-
-/** Top mass and bottom mass both have a disc. A 48×48 in the belly fails this. */
-function coversMasses(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
-  if (c.sites.length < 2) return true
-  const span = shape.maxY - shape.minY
-  const ys = c.sites.map((s) => s.y)
-  return Math.min(...ys) <= shape.minY + span / 3 && Math.max(...ys) >= shape.maxY - span / 3
+function sitesAreMirrorSymmetric(sites: ReadonlyArray<{ x: number; y: number }>): boolean {
+  if (sites.length < 2) return true
+  let minX = Infinity
+  let maxX = -Infinity
+  for (const s of sites) {
+    if (s.x < minX) minX = s.x
+    if (s.x > maxX) maxX = s.x
+  }
+  const cx = (minX + maxX) / 2
+  return sites.every((a) =>
+    sites.some((b) => Math.abs(b.x - (2 * cx - a.x)) < 1e-6 && Math.abs(b.y - a.y) < 1e-6),
+  )
 }
 
 export interface ProposalMeasure {
@@ -191,6 +216,7 @@ export interface ProposalMeasure {
   balance: number
   size: number
   score: number
+  wrap: WrapMeasures | null
 }
 
 export function measureProposal(
@@ -200,93 +226,153 @@ export function measureProposal(
 ): ProposalMeasure {
   const verts = scaleToSize(outline, c.sizeMM)
   const shape = bbox(verts)
-  const gravity = holdsTop(c, shape)
-  const offset2 = balance(c, shape)
+  const wrap = measureWrap(verts, c.sites, spec.grid.paddingMM)
+  const offset2 = (() => {
+    const xs = c.sites.map((s) => s.x)
+    const ys = c.sites.map((s) => s.y)
+    const hx = (Math.min(...xs) + Math.max(...xs)) / 2
+    const hy = (Math.min(...ys) + Math.max(...ys)) / 2
+    const cx = (shape.minX + shape.maxX) / 2
+    const cy = (shape.minY + shape.maxY) / 2
+    return (hx - cx) ** 2 + (hy - cy) ** 2
+  })()
   return {
     n: c.sites.length,
-    gravity,
+    gravity: wrap
+      ? wrap.top <= GRAVITY_GUARD_MM ||
+        (wrap.top <= VERTICAL_HOLD_MM && siteInTopThird(c, shape))
+      : false,
     masses: coversMasses(c, shape),
-    top: Math.min(...c.sites.map((s) => s.y)) - shape.minY,
-    extremes: extremeFlap(c, verts),
+    top: wrap ? wrap.top : 0,
+    extremes: wrap ? wrap.total : 0,
     clear: clearance(c, verts),
     pair: pairSpan(c),
     step: minPairSpan(c),
     area: spanArea(c),
     balance: offset2,
     size: c.sizeMM,
-    score: rankScore(c.sizeMM, offset2, gravity, c.band, shape),
+    score: wrap ? wrap.total : 0,
+    wrap,
   }
 }
 
-/** Which sort key put `won` above `lost`. Empty if they compare equal. */
 export function decidingKey(_band: BandId, won: ProposalMeasure, lost: ProposalMeasure): string {
-  if (won.score !== lost.score) return won.score < lost.score ? 'center+wrap' : 'center+wrap-lost'
-  if (won.balance !== lost.balance) return 'center'
+  if (won.gravity !== lost.gravity) return won.gravity ? 'gravity' : 'gravity-lost'
+  if (won.wrap && lost.wrap) {
+    const vb = won.wrap.bottom <= VERTICAL_HOLD_MM
+    const lb = lost.wrap.bottom <= VERTICAL_HOLD_MM
+    if (vb !== lb) return vb ? 'vertical-hold' : 'vertical-hold-lost'
+    if (won.wrap.total !== lost.wrap.total) return 'tightness'
+    if (won.wrap.imbalanceSumMM !== lost.wrap.imbalanceSumMM) return 'evenness'
+  }
+  if (won.n !== lost.n) return won.n < lost.n ? 'fewer' : 'fewer-lost'
   if (won.size !== lost.size) return `size ${won.size} < ${lost.size}`
-  return 'placement-at-size'
+  return 'tie'
 }
 
-function isFilledWindow(c: Candidate): boolean {
-  if (c.family !== 'full-window' || c.sites.length < 4) return false
+type Row = {
+  c: Candidate
+  wrap: WrapMeasures
+  holdsTop: boolean
+  holdsBottom: boolean
+  connected: boolean
+  arrangementSym: boolean
+  masses: boolean
+  corners: boolean
+  overSparse: boolean
+  spread: number
+  axisOff: number
+  tight: number
+  even: number
+  n: number
+  size: number
+}
+
+function rowOf(spec: GridSystemSpec, c: Candidate, outline: ReadonlyArray<PointMM>): Row | null {
+  const verts = scaleToSize(outline, c.sizeMM)
+  const wrap = measureWrap(verts, c.sites, spec.grid.paddingMM)
+  if (!wrap) return null
+  const shape = bbox(verts)
+  const cx = (shape.minX + shape.maxX) / 2
   const xs = c.sites.map((s) => s.x)
-  const ys = c.sites.map((s) => s.y)
-  return Math.max(...xs) - Math.min(...xs) >= 48 && Math.max(...ys) - Math.min(...ys) >= 48
+  const hx = (Math.min(...xs) + Math.max(...xs)) / 2
+  const nearest = minPairSpan(c) || 0
+  return {
+    c,
+    wrap,
+    holdsTop:
+      wrap.top <= GRAVITY_GUARD_MM ||
+      (wrap.top <= VERTICAL_HOLD_MM && siteInTopThird(c, shape)),
+    holdsBottom: wrap.bottom <= VERTICAL_HOLD_MM,
+    connected: isOneStrip(c.sites, STRIP_LINK_MM),
+    arrangementSym: sitesAreMirrorSymmetric(c.sites),
+    masses: coversMasses(c, shape),
+    corners: isCorners(c),
+    // Cap, not a preference: spacing past 96 is not an advantage.
+    overSparse: nearest > SPARSE_CAP_MM + 1e-6,
+    spread: Math.min(nearest, SPARSE_CAP_MM),
+    axisOff: Math.abs(hx - cx),
+    tight: Math.round(wrap.total / TIGHT_STEP_MM),
+    even: Math.round(wrap.imbalanceSumMM / EVEN_STEP_MM),
+    n: c.sites.length,
+    size: c.sizeMM,
+  }
 }
 
-function isExtreme(c: Candidate): boolean {
-  return (
-    c.family === 'corner-triangle' ||
-    c.family === 'rectangle-corners' ||
-    isFilledWindow(c) ||
-    (c.family === 'tee' && c.sites.length >= 4)
-  )
+function better(a: Row, b: Row, shapeSymmetric: boolean): boolean {
+  if (a.holdsTop !== b.holdsTop) return a.holdsTop
+  if (a.holdsBottom !== b.holdsBottom) return a.holdsBottom
+  if (a.connected !== b.connected) return a.connected
+  if (shapeSymmetric && a.arrangementSym !== b.arrangementSym) return a.arrangementSym
+  if (a.masses !== b.masses) return a.masses
+  if (a.corners !== b.corners) return a.corners
+  if (a.n >= 2 && b.n >= 2 && a.n === b.n && a.overSparse !== b.overSparse) return !a.overSparse
+  const axisA = Math.round(a.axisOff / AXIS_STEP_MM)
+  const axisB = Math.round(b.axisOff / AXIS_STEP_MM)
+  if (axisA !== axisB) return axisA < axisB
+  if (a.tight !== b.tight) return a.tight < b.tight
+  if (a.even !== b.even) return a.even < b.even
+  if (a.n !== b.n) return a.n < b.n
+  if (a.size !== b.size) return a.size < b.size
+  return a.c.id < b.c.id
 }
 
-type Kind = 'single' | 'pair' | 'extreme'
-
-/** L20 per band: 1 disc · pair on two masses · extreme corners. Band is a size label. */
-function targetKind(
-  all: Candidate[],
+function rankBand(
+  spec: GridSystemSpec,
+  doc: CandidateDocument,
   band: BandId,
   outline: ReadonlyArray<PointMM>,
-): Kind {
-  const sizes = BAND_SIZES_MM[band]
-  const lo = sizes[0]
-  const hi = sizes[sizes.length - 1]
-  const inBand = (c: Candidate) => c.band === band && c.sizeMM >= lo && c.sizeMM <= hi
-  if (band === 1) return 'single'
-  const hasPair = all.some((c) => inBand(c) && c.sites.length === 2)
-  const hasMassExtreme = all.some((c) => {
-    if (!inBand(c) || !isExtreme(c)) return false
-    return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
-  })
-  if (band === 2) return hasPair ? 'pair' : 'single'
-  if (hasMassExtreme) return 'extreme'
-  if (hasPair) return 'pair'
-  return 'single'
-}
-
-function matchesKind(c: Candidate, kind: Kind): boolean {
-  if (kind === 'extreme') return isExtreme(c)
-  if (kind === 'pair') return c.sites.length === 2
-  return c.sites.length === 1
-}
-
-/** Duck's 4-corners cover both head sides; bat's 3 is the utmost set. Class carries. */
-function extremeCount(
-  all: Candidate[],
-  outline: ReadonlyArray<PointMM>,
-): number {
-  const covering = all.filter((c) => {
-    if (c.band !== 3 || !isExtreme(c)) return false
-    return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
-  })
-  const filled = covering.filter((c) => isFilledWindow(c))
-  if (filled.length) return Math.max(...filled.map((c) => c.sites.length))
-  if (covering.some((c) => c.family === 'tee' && c.sites.length >= 4)) return 4
-  if (covering.some((c) => c.family === 'rectangle-corners' || c.sites.length === 4)) return 4
-  if (covering.some((c) => c.sites.length === 3)) return 3
-  return 0
+  sizeFloor: number,
+): Candidate[] {
+  const raw = doc.candidates.filter((c) => c.band === band)
+  const unit = scaleToSize(outline, 100)
+  const shapeSymmetric = contourIsMirrorSymmetric(unit, SYMMETRY_TOL_FRAC)
+  const rows: Row[] = []
+  for (const c of raw) {
+    const row = rowOf(spec, c, outline)
+    if (row) rows.push(row)
+  }
+  // Bands 1–3 already live in their own size lists. Only band 4 steps ≥24mm above the last answer.
+  const above = band === 4 ? rows.filter((r) => r.size >= sizeFloor) : rows
+  let pool = above.length ? above : rows
+  // Band 1 is the first size a hold exists. Counts emerge there: only a disc fits.
+  if (band === 1 && pool.length) {
+    const minSize = Math.min(...pool.map((r) => r.size))
+    pool = pool.filter((r) => r.size === minSize)
+  }
+  pool.sort((a, b) => (better(a, b, shapeSymmetric) ? -1 : 1))
+  const seen = new Set<string>()
+  const out: Candidate[] = []
+  for (const { c } of pool) {
+    const id = `${c.sizeMM}|${c.family}|${c.population}|${c.sites
+      .map((s) => `${s.col},${s.row}`)
+      .sort()
+      .join('|')}`
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(c)
+  }
+  return out
 }
 
 export function propose(
@@ -295,130 +381,14 @@ export function propose(
   band: BandId,
   outline: ReadonlyArray<PointMM>,
 ): Candidate[] {
-  const raw = doc.candidates.filter((c) => c.band === band)
-  const kind = targetKind(doc.candidates, band, outline)
-  let classN = kind === 'extreme' ? extremeCount(doc.candidates, outline) : 0
-  if (band === 4 && kind === 'extreme') {
-    const fills = raw.filter((c) => {
-      if (!isFilledWindow(c)) return false
-      return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
-    })
-    if (fills.length) classN = Math.max(...fills.map((c) => c.sites.length))
-    else {
-      const fourHead = raw.some((c) => {
-        if (c.family !== 'rectangle-corners' || c.sites.length !== 4) return false
-        const shape = bbox(scaleToSize(outline, c.sizeMM))
-        return coversMasses(c, shape) && hasHeadPair(c, shape)
-      })
-      if (fourHead) classN = 4
-    }
+  let floor = 0
+  let ranked: Candidate[] = []
+  for (const b of [1, 2, 3, 4] as const) {
+    if (b > band) break
+    ranked = rankBand(spec, doc, b, outline, b === 1 ? 0 : floor)
+    const win = ranked[0]
+    if (win) floor = win.sizeMM + BAND_STEP_MM
+    if (b === band) return ranked
   }
-  const cell = spec.grid.paddingMM * 2
-  let stepFloor = 0
-  if (band === 4 && classN === 4) {
-    let lo = Infinity
-    for (const c of doc.candidates) {
-      if (c.band !== 3 || c.family !== 'rectangle-corners' || c.sites.length !== 4) continue
-      if (!coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))) continue
-      if (c.sizeMM < lo) lo = c.sizeMM
-    }
-    if (Number.isFinite(lo)) stepFloor = lo + cell
-  }
-  const pad = spec.grid.paddingMM
-  const pool = raw.filter((c) => matchesKind(c, kind))
-  const measure = pool.length > 0 ? pool : raw
-  const scored = measure.map((c) => {
-    const verts = scaleToSize(outline, c.sizeMM)
-    const shape = bbox(verts)
-    const gravity = holdsTop(c, shape)
-    const offset2 = balance(c, shape)
-    const span = shape.maxY - shape.minY || 1
-    const top = Math.min(...c.sites.map((s) => s.y)) - shape.minY
-    const flap = extremeFlap(c, verts)
-    const clear = clearance(c, verts)
-    return {
-      c,
-      n: c.sites.length,
-      gravity,
-      masses: coversMasses(c, shape),
-      balance: offset2,
-      size: c.sizeMM,
-      step: minPairSpan(c),
-      area: holdBox(c).area,
-      xOff: Math.abs((Math.min(...c.sites.map((s) => s.x)) + Math.max(...c.sites.map((s) => s.x))) / 2 - (shape.minX + shape.maxX) / 2),
-      flap,
-      score: rankScore(c.sizeMM, offset2, gravity, band, shape),
-      hit: matchesKind(c, kind) && clear >= pad - 0.05,
-      top,
-      topFrac: top / span,
-      flush: Math.abs(clear - pad),
-    }
-  })
-
-  scored.sort((a, b) => {
-    if (a.hit !== b.hit) return a.hit ? -1 : 1
-    if (a.hit && b.hit && a.gravity !== b.gravity) return a.gravity ? -1 : 1
-    if (a.hit && b.hit && kind === 'single') {
-      if (a.size !== b.size) return a.size - b.size
-      if (a.flush !== b.flush) return a.flush - b.flush
-    }
-    if (a.hit && b.hit && kind === 'pair') {
-      if (a.masses !== b.masses) return a.masses ? -1 : 1
-      const ac = a.xOff <= pad ? 0 : 1
-      const bc = b.xOff <= pad ? 0 : 1
-      if (ac !== bc) return ac - bc
-      if (a.xOff !== b.xOff) return a.xOff - b.xOff
-      if (a.size !== b.size) return a.size - b.size
-      const head = 1 / 3
-      const ad = Math.abs(a.topFrac - head)
-      const bd = Math.abs(b.topFrac - head)
-      if (ad !== bd) return ad - bd
-    }
-    if (a.hit && b.hit && kind === 'extreme') {
-      if (a.masses !== b.masses) return a.masses ? -1 : 1
-      if (classN > 0) {
-        const ad = Math.abs(a.n - classN)
-        const bd = Math.abs(b.n - classN)
-        if (ad !== bd) return ad - bd
-      }
-      if (band === 4 && stepFloor > 0) {
-        const aOk = a.size >= stepFloor ? 0 : 1
-        const bOk = b.size >= stepFloor ? 0 : 1
-        if (aOk !== bOk) return aOk - bOk
-      }
-      if (band === 4 && a.area !== b.area) return b.area - a.area
-      if (a.size !== b.size) return a.size - b.size
-      if (a.flush !== b.flush) return a.flush - b.flush
-      if (a.balance !== b.balance) return a.balance - b.balance
-      if (a.flap !== b.flap) return a.flap - b.flap
-    }
-    if (a.hit && b.hit && a.balance !== b.balance) return a.balance - b.balance
-    if (a.score !== b.score) return a.score - b.score
-    if (a.size !== b.size) return a.size - b.size
-    if (a.n !== b.n) return b.n - a.n
-    return a.c.id.localeCompare(b.c.id)
-  })
-
-  const seen = new Set<string>()
-  const out: Candidate[] = []
-  const keyOf = (c: Candidate) =>
-    `${c.sizeMM}|${c.family}|${c.population}|${c.sites
-      .map((s) => `${s.col},${s.row}`)
-      .sort()
-      .join('|')}`
-  for (const { c } of scored) {
-    const id = keyOf(c)
-    if (seen.has(id)) continue
-    seen.add(id)
-    out.push(c)
-  }
-  if (measure !== raw) {
-    for (const c of raw) {
-      const id = keyOf(c)
-      if (seen.has(id)) continue
-      seen.add(id)
-      out.push(c)
-    }
-  }
-  return out
+  return ranked
 }
