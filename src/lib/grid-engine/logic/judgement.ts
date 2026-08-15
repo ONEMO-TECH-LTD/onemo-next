@@ -302,8 +302,13 @@ function better(
   //    pool too: BALANCE below picks them only where the shape is genuinely three-cornered
   //    (Dan: "a T-shaped can act as triangle with 3 corners") — elsewhere the pair balances
   //    better and wins.
-  const spreadA = a.nearestAnchorMM ?? 0
-  const spreadB = b.nearestAnchorMM ?? 0
+  //    Spread credit CAPS at the released sparse pitch (Dan's law: 96 is the sparse spacing
+  //    "proven sufficient" — not "the further the better"): an extreme diagonal pair flung
+  //    corner-to-corner (135mm) must not outrank layouts that hold the mass (poke1 B4, eyes-on
+  //    sweep 2026-08-15).
+  const spreadCapMM = Math.max(...LAUNCH_PITCHES_MM)
+  const spreadA = Math.min(a.nearestAnchorMM ?? 0, spreadCapMM)
+  const spreadB = Math.min(b.nearestAnchorMM ?? 0, spreadCapMM)
   if (spreadA !== spreadB) return spreadA > spreadB
   // 3b. THE MASS AXIS (Dan, 2026-08-15: the pair must be "centered AND fit to shape" — and his
   //     centre is the FIGURE's axis, not the box the wings span). A seat aligned to the deepest
