@@ -309,8 +309,18 @@ function better(
   // 4. THE BALANCE RULE outranks tightness (Dan 2026-08-14 and his 2026-08-10 brief: "what may
   //    seem logical on paper and mathematically correct may miss the law of balance and
   //    symmetry"). Flap balanced across sides, BOTH axes counted, before any tightness compare.
-  if (a.wrap.imbalanceSumMM !== b.wrap.imbalanceSumMM)
-    return a.wrap.imbalanceSumMM < b.wrap.imbalanceSumMM
+  //    TIGHT BEFORE EVEN (Dan, repeatedly: "could be tighter", "if tight option possible the
+  //    engine makes space", "my B2 is 2 disks" — centred AND fit to shape): with centering
+  //    enforced and the mass axis already holding the figure's line, the snug seat wins; evenness
+  //    is the tiebreak, both in coarse steps so millimetre noise never decides.
+  const tightStepMM = calibration.flapTightMM
+  const tightA = Math.round(a.wrap.total / tightStepMM)
+  const tightB = Math.round(b.wrap.total / tightStepMM)
+  if (tightA !== tightB) return tightA < tightB
+  const balanceStepMM = calibration.flapTightMM / 2
+  const balA = Math.round(a.wrap.imbalanceSumMM / balanceStepMM)
+  const balB = Math.round(b.wrap.imbalanceSumMM / balanceStepMM)
+  if (balA !== balB) return balA < balB
   // 4b. among equal balance, FEWER magnets — the spine is minimal ("brains only").
   if (a.anchors.length !== b.anchors.length) return a.anchors.length < b.anchors.length
   // 5. tight wrap — least total overhang
