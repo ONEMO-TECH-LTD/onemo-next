@@ -424,6 +424,25 @@ function structureScore(
   return extY < half && extX > eps ? 1 : 0
 }
 
+/** THE STRIP LAW's real test (Meta finding, 2026-08-15): connectivity is SINGLE-LINKAGE, not
+ *  a pairwise minimum — two tight pairs 200mm apart have nearestAnchorMM 48 yet are two
+ *  disconnected islands. Every anchor must reach every other through links <= the strip cap. */
+function isOneStrip(v: SizeVariant, stripCapMM: number): boolean {
+  const n = v.anchors.length
+  if (n < 2) return true
+  const parent = Array.from({ length: n }, (_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++) {
+      const a = v.anchors[i].p
+      const b = v.anchors[j].p
+      if (Math.hypot(a[0] - b[0], a[1] - b[1]) <= stripCapMM + 1e-6) parent[find(i)] = find(j)
+    }
+  const root = find(0)
+  for (let i = 1; i < n; i++) if (find(i) !== root) return false
+  return true
+}
+
 function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
   if (v.anchors.length < 4) return false
   if (v.wrap.gridExtentXMM < 72 || v.wrap.gridExtentYMM < 72) return false
@@ -472,8 +491,8 @@ function better(
   //     disconnected islands, not an arrangement (the poke's 136mm corner-to-corner diagonal
   //     measured perfect bbox wraps while 301mm of edge hung unheld — eyes-on, 2026-08-15).
   const stripCapMM = Math.max(...LAUNCH_PITCHES_MM)
-  const connectedA = a.anchors.length < 2 || (a.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6
-  const connectedB = b.anchors.length < 2 || (b.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6
+  const connectedA = isOneStrip(a, stripCapMM)
+  const connectedB = isOneStrip(b, stripCapMM)
   if (connectedA !== connectedB) return connectedA
   // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
   //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
@@ -694,7 +713,7 @@ function judgeBand(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
-      (v.anchors.length < 2 || (v.nearestAnchorMM ?? 0) <= stripCapMM + 1e-6) &&
+      isOneStrip(v, stripCapMM) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
       // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
       // butterfly cross-wing diagonals) — on a mirror shape they are not options at all
