@@ -371,8 +371,12 @@ function judgeBand(
   const sweep = calibration.sweepStepMM
   // EVERY released template is proposed in every band — no count-based pruning.
   const templates = calibration.templates
+  // BAND SEPARATION (Dan, 2026-08-15): the band's candidates START one 24mm step above the
+  // previous band's answer — bounding the search itself, so every layout family re-seats above
+  // the floor instead of being collapsed to a below-floor snug seat and then filtered away.
+  const startSizeMM = Math.max(band.minSizeMM, sizeFloorMM)
   for (
-    let sizeMM = Math.ceil(band.minSizeMM / step) * step;
+    let sizeMM = Math.ceil(startSizeMM / step) * step;
     sizeMM < band.maxSizeMM;
     sizeMM += step
   ) {
@@ -446,10 +450,7 @@ function judgeBand(
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
-  // BAND SEPARATION (Dan, 2026-08-15): a band's answer sits at least one 24mm step above the
-  // previous band's — neighbouring bands never publish near-identical sizes.
-  const separated = kept.filter((v) => v.sizeMM >= sizeFloorMM)
-  const lawful = separated.filter(
+  const lawful = kept.filter(
     (v) =>
       v.wrap.top <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
@@ -490,7 +491,7 @@ function judgeBand(
   // EVERY BAND ANSWERS (Dan, 2026-08-15: "each band must have at least one optimal layout"):
   // when the offer filters empty a band, its ranked-best size-separated placement stands in —
   // an imperfect answer beats a silent band.
-  if (!final.length && separated.length) final = [separated[0]]
+  if (!final.length && kept.length) final = [kept[0]]
   for (const v of final) offeredBelow.add(layoutIdentity(v, halfPitch))
   return { band, variants: final }
 }
