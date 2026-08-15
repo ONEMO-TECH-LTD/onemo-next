@@ -453,7 +453,27 @@ function judgeBand(
       // butterfly cross-wing diagonals) — on a mirror shape they are not options at all
       (!shapeSymmetric || anchorsAreMirrorSymmetric(v)),
   )
-  return { band, variants: lawful.slice(0, calibration.optionsPerBand) }
+  // ONE OFFER PER FOOTPRINT (the sparse law, operationalised — Dan: "96mm pair preferred and
+  // proven sufficient"): variants whose padded blocks occupy the same box at the same size are
+  // the same physical hold; the ranked-best (fewest magnets, by the sparse ordering above)
+  // keeps the chip, the rest are redundant middles.
+  const seen = new Set<string>()
+  const offered: SizeVariant[] = []
+  const half = spec.grid.basePitchMM / 2
+  for (const v of lawful) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (const anchor of v.anchors) {
+      if (anchor.p[0] < minX) minX = anchor.p[0]
+      if (anchor.p[0] > maxX) maxX = anchor.p[0]
+      if (anchor.p[1] < minY) minY = anchor.p[1]
+      if (anchor.p[1] > maxY) maxY = anchor.p[1]
+    }
+    const key = [v.sizeMM, Math.round(minX / half), Math.round(maxX / half), Math.round(minY / half), Math.round(maxY / half)].join(':')
+    if (seen.has(key)) continue
+    seen.add(key)
+    offered.push(v)
+  }
+  return { band, variants: offered.slice(0, calibration.optionsPerBand) }
 }
 
 /**
