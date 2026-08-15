@@ -374,6 +374,39 @@ export function collectCandidates(
     return false
   }
 
+  /** Four corners that reach the top and bottom thirds — 16 origins, no mm sweep. */
+  const hasCoveringFour = (sizeMM: number) => {
+    const prep = prepAt(sizeMM)
+    const minY = Number(prep.minY) / 1000
+    const maxY = Number(prep.maxY) / 1000
+    const third = (maxY - minY) / 3
+    for (const origin of origins) {
+      const raw = magnetsInRegion(dense, field, 0, origin)
+      const held = raw.filter(([x, y]) => discFitsGrid(prep, [x, y], spec.grid))
+      const xs = [...new Set(held.map((p) => p[0]))]
+      const ys = [...new Set(held.map((p) => p[1]))]
+      for (const x0 of xs) {
+        for (const x1 of xs) {
+          if (x1 <= x0) continue
+          for (const y0 of ys) {
+            for (const y1 of ys) {
+              if (y1 - y0 < pitch) continue
+              const corners: PointMM[] = [
+                [x0, y0],
+                [x1, y0],
+                [x0, y1],
+                [x1, y1],
+              ]
+              if (!corners.every(([x, y]) => held.some((p) => p[0] === x && p[1] === y))) continue
+              if (y0 <= minY + third && y1 >= maxY - third) return true
+            }
+          }
+        }
+      }
+    }
+    return false
+  }
+
   /** Same pair, but the pair's midline sits within one pad of the shape centre. */
   const hasCenteredPair = (sizeMM: number) => {
     const cells = cellsAt(sizeMM)
@@ -439,6 +472,21 @@ export function collectCandidates(
       if (wrap2 !== null) emitMillimetre(band, wrap2)
       const wrap2c = smallestWhere(lo, hi, hasCenteredPair)
       if (wrap2c !== null) emitMillimetre(band, wrap2c)
+    }
+    if (band === 3) {
+      const wrap4 = smallestWhere(lo, hi, hasCoveringFour)
+      if (wrap4 !== null && !BAND_SIZES_MM[band].includes(wrap4)) {
+        const prep = prepAt(wrap4)
+        for (const origin of origins) {
+          const raw = magnetsInRegion(dense, field, 0, origin)
+          const indexed = indexSites(raw, origin, spec.grid.basePitchMM)
+          const measured: SiteInput[] = indexed.map((s) => ({
+            ...s,
+            fits: discFitsGrid(prep, [s.x, s.y], spec.grid),
+          }))
+          emitArrangements(band, wrap4, origin, measured, 'base')
+        }
+      }
     }
   }
 

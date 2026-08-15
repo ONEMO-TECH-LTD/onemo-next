@@ -291,6 +291,17 @@ export function propose(
     })
     if (fourHead) classN = 4
   }
+  const cell = spec.grid.paddingMM * 2
+  let stepFloor = 0
+  if (band === 4 && classN === 4) {
+    let lo = Infinity
+    for (const c of doc.candidates) {
+      if (c.band !== 3 || c.family !== 'rectangle-corners' || c.sites.length !== 4) continue
+      if (!coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))) continue
+      if (c.sizeMM < lo) lo = c.sizeMM
+    }
+    if (Number.isFinite(lo)) stepFloor = lo + cell
+  }
   const pad = spec.grid.paddingMM
   const pool = raw.filter((c) => matchesKind(c, kind))
   const measure = pool.length > 0 ? pool : raw
@@ -346,6 +357,11 @@ export function propose(
         const ad = Math.abs(a.n - classN)
         const bd = Math.abs(b.n - classN)
         if (ad !== bd) return ad - bd
+      }
+      if (band === 4 && stepFloor > 0) {
+        const aOk = a.size >= stepFloor ? 0 : 1
+        const bOk = b.size >= stepFloor ? 0 : 1
+        if (aOk !== bOk) return aOk - bOk
       }
       if (band === 4 && a.area !== b.area) return b.area - a.area
       if (a.size !== b.size) return a.size - b.size

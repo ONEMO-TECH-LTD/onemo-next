@@ -47,8 +47,8 @@ Gravity first (a disc in the top half). Then the band’s arrangement. Then tigh
 |---|---|---|
 | 1 | One disc | Smallest size, then clearance nearest 12 mm (flush — the disc already is the pad). |
 | 2 | Pair that reaches top and bottom thirds | **Centre of the pair = centre of the shape** (within 12 mm), then smallest size. A lopsided tight pair loses to a centred one. |
-| 3 | Extreme hold that covers both masses: 4-corners if they exist, else the 3-corner utmost triangle | Smallest size (tight wrap), then flush to 12 mm, then centre. |
-| 4 | Same class, **larger hold** (span of the seats, at least another cell). If a 4-corner with a **head pair** exists, that outranks a 3 — more anchors at the larger size. | Then tight wrap, flush, centre. |
+| 3 | Extreme hold that covers both masses: 4-corners if they exist, else the 3-corner utmost triangle | **Tight wrap**: first millimetre those four discs hold (not the next 12 mm ladder). Then flush to 12 mm, then centre. |
+| 4 | Same class, at least **24 mm** above the band-3 wrap (one cell). Larger hold area wins when it exists. A head-pair four outranks a 3. | Then tight wrap, flush, centre. |
 
 No shape names. Duck gets 4-corners because they cover both masses; bat-woman stays on the 3-corner until a head-pair 4 fits in band 4.
 
