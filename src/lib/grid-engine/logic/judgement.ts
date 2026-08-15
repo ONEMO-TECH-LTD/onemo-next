@@ -33,7 +33,7 @@ import {
   type Anchor,
   type GridResult,
 } from '../compute/grid-core'
-import { prepareExactContour } from '../compute/grid-prepared'
+import { prepareExactContour, distanceToPreparedContour, pointInPreparedContour } from '../compute/grid-prepared'
 import { normalizeContour } from '../compute/normalize'
 import { placeTemplate } from '../compute/templates'
 import { measureWrap, type WrapMeasures } from '../compute/wrap'
@@ -61,6 +61,9 @@ export interface SizeVariant {
   nearestAnchorMM: number | null
   /** The flap-law measures this variant was judged on. */
   wrap: WrapMeasures
+  /** Horizontal distance from the assembly's centre to the shape's MASS AXIS (the deepest-material
+   *  point) — the figure's own axis, which on a winged shape is not the bounding box's centre. */
+  massAxisOffMM?: number
   /** 'tight' within the tight bound; 'allowed' within the outer bound; 'limb' rides the limb
    *  exception (some side hangs beyond the outer bound but within the limb allowance). */
   tier: 'tight' | 'allowed' | 'limb'
@@ -159,6 +162,31 @@ function variantFrom(
 /** The judgement order — each comparison is one of Dan's rules, applied in precedence. */
 /** Does the shape mirror about its vertical axis? Every scanline's centre must sit within
  *  tolFrac of the width from the shape's own axis. Pure geometry, tolerance from spec. */
+/** The unit shape's deepest-material point — the mass centre a placement should align to.
+ *  Pure sampling over the exact distance field; scales linearly with the shape. */
+function unitMassCentre(unit: Contour): Pt | null {
+  const prepared = prepareExactContour(unit)
+  const bb = prepared.bbox
+  let best: Pt | null = null
+  let bestD = -Infinity
+  const N = 40
+  for (let i = 1; i < N; i++) {
+    for (let j = 1; j < N; j++) {
+      const p: Pt = [
+        bb.minX + ((bb.maxX - bb.minX) * i) / N,
+        bb.minY + ((bb.maxY - bb.minY) * j) / N,
+      ]
+      if (!pointInPreparedContour(p, prepared)) continue
+      const d = distanceToPreparedContour(p, prepared)
+      if (d > bestD) {
+        bestD = d
+        best = p
+      }
+    }
+  }
+  return best
+}
+
 function contourIsMirrorSymmetric(contour: Contour, tolFrac: number): boolean {
   const pts = contour.outer.pts
   if (pts.length < 3) return false
@@ -271,6 +299,13 @@ function better(
   const spreadA = a.nearestAnchorMM ?? 0
   const spreadB = b.nearestAnchorMM ?? 0
   if (spreadA !== spreadB) return spreadA > spreadB
+  // 3b. THE MASS AXIS (Dan, 2026-08-15: the pair must be "centered AND fit to shape" — and his
+  //     centre is the FIGURE's axis, not the box the wings span). A seat aligned to the deepest
+  //     material outranks one dragged toward an asymmetric wing. Coarse steps, like balance.
+  const axisStepMM = calibration.flapTightMM / 2
+  const axisA = Math.round((a.massAxisOffMM ?? 0) / axisStepMM)
+  const axisB = Math.round((b.massAxisOffMM ?? 0) / axisStepMM)
+  if (axisA !== axisB) return axisA < axisB
   // 4. THE BALANCE RULE outranks tightness (Dan 2026-08-14 and his 2026-08-10 brief: "what may
   //    seem logical on paper and mathematically correct may miss the law of balance and
   //    symmetry"). Flap balanced across sides, BOTH axes counted, before any tightness compare.
@@ -292,10 +327,16 @@ function judgeBand(
   band: BandSpec,
   unitContour: Contour,
   shapeSymmetric: boolean,
+  unitMassX: number | null,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const consider = (variant: SizeVariant | null) => {
     if (!variant) return
+    if (unitMassX !== null && variant.anchors.length) {
+      let sumX = 0
+      for (const anchor of variant.anchors) sumX += anchor.p[0]
+      variant.massAxisOffMM = Math.abs(sumX / variant.anchors.length - unitMassX * variant.sizeMM)
+    }
     // ONE RECORD PER ARRANGEMENT — a band offers distinct layouts, each at its snug size,
     // never millimetre-step copies of the same one.
     const halfPitchMM = spec.grid.basePitchMM / 2
@@ -400,9 +441,10 @@ export function judgeShape(
   const unitContour = normalizeContour(contourMM)
   if (!unitContour) return null
   const shapeSymmetric = contourIsMirrorSymmetric(unitContour, calibration.symmetryTolFrac)
+  const massCentre = unitMassCentre(unitContour)
   return {
     bands: calibration.bands.map((band) =>
-      judgeBand(spec, calibration, band, unitContour, shapeSymmetric),
+      judgeBand(spec, calibration, band, unitContour, shapeSymmetric, massCentre ? massCentre[0] : null),
     ),
   }
 }
