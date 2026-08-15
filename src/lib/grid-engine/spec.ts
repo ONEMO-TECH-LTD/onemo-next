@@ -345,40 +345,40 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   // Dan's canon arrangements (2026-08-13 walkthrough): pair either way; the 48 square; the
   // 48-wide x 96-tall rectangle and its transpose; the 96 square; the six-point 48x96 blocks.
   templates: Object.freeze([
-    Object.freeze({ name: 'single', steps: [[0, 0]] }),
-    Object.freeze({ name: 'pair-v', steps: [[0, 0], [0, 1]] }),
-    Object.freeze({ name: 'pair-h', steps: [[0, 0], [1, 0]] }),
-    Object.freeze({ name: 'pair-v-96', steps: [[0, 0], [0, 2]] }),
-    Object.freeze({ name: 'pair-h-96', steps: [[0, 0], [2, 0]] }),
-    Object.freeze({ name: 'pair-diag', steps: [[0, 0], [1, 1]] }),
-    Object.freeze({ name: 'pair-antidiag', steps: [[0, 1], [1, 0]] }),
-    Object.freeze({ name: 'run-diag-3', steps: [[0, 0], [1, 1], [2, 2]] }),
-    Object.freeze({ name: 'square-48', steps: [[0, 0], [1, 0], [0, 1], [1, 1]] }),
-    Object.freeze({ name: 'rect-48x96', steps: [[0, 0], [1, 0], [0, 2], [1, 2]] }),
-    Object.freeze({ name: 'rect-96x48', steps: [[0, 0], [2, 0], [0, 1], [2, 1]] }),
-    Object.freeze({ name: 'square-96', steps: [[0, 0], [2, 0], [0, 2], [2, 2]] }),
-    Object.freeze({ name: 'tri-48-nw', steps: [[0, 0], [1, 0], [0, 1]] }),
-    Object.freeze({ name: 'tri-48-ne', steps: [[0, 0], [1, 0], [1, 1]] }),
-    Object.freeze({ name: 'tri-48-sw', steps: [[0, 0], [0, 1], [1, 1]] }),
-    Object.freeze({ name: 'tri-48-se', steps: [[1, 0], [0, 1], [1, 1]] }),
-    Object.freeze({ name: 'tri-96-down', steps: [[0, 0], [2, 0], [1, 2]] }),
-    Object.freeze({ name: 'tri-96-up', steps: [[1, 0], [0, 2], [2, 2]] }),
-    Object.freeze({ name: 'tri-96x48-down', steps: [[0, 0], [2, 0], [1, 1]] }),
-    Object.freeze({ name: 'tri-96x48-up', steps: [[1, 0], [0, 1], [2, 1]] }),
-    Object.freeze({ name: 'run-h-3', steps: [[0, 0], [1, 0], [2, 0]] }),
-    Object.freeze({ name: 'run-v-3', steps: [[0, 0], [0, 1], [0, 2]] }),
-    Object.freeze({ name: 'run-antidiag-3', steps: [[2, 0], [1, 1], [0, 2]] }),
-    Object.freeze({ name: 'T-down', steps: [[0, 0], [1, 0], [2, 0], [1, 1]] }),
-    Object.freeze({ name: 'T-up', steps: [[1, 0], [0, 1], [1, 1], [2, 1]] }),
-    Object.freeze({ name: 'T-right', steps: [[0, 0], [0, 1], [0, 2], [1, 1]] }),
-    Object.freeze({ name: 'T-left', steps: [[1, 0], [1, 1], [1, 2], [0, 1]] }),
-    Object.freeze({ name: 'L-se', steps: [[0, 0], [0, 1], [0, 2], [1, 2]] }),
-    Object.freeze({ name: 'L-sw', steps: [[1, 0], [1, 1], [1, 2], [0, 2]] }),
-    Object.freeze({ name: 'L-ne', steps: [[0, 0], [1, 0], [0, 1], [0, 2]] }),
-    Object.freeze({ name: 'L-nw', steps: [[0, 0], [1, 0], [1, 1], [1, 2]] }),
-    Object.freeze({ name: 'X-5', steps: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]] }),
-    Object.freeze({ name: 'six-48x96', steps: [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]] }),
-    Object.freeze({ name: 'six-96x48', steps: [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]] }),
+    Object.freeze({ name: 'single', steps: Object.freeze([[0, 0]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'pair-v', steps: Object.freeze([[0, 0], [0, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'pair-h', steps: Object.freeze([[0, 0], [1, 0]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'pair-v-96', steps: Object.freeze([[0, 0], [0, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'pair-h-96', steps: Object.freeze([[0, 0], [2, 0]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'pair-diag', steps: Object.freeze([[0, 0], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'pair-antidiag', steps: Object.freeze([[0, 1], [1, 0]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'run-diag-3', steps: Object.freeze([[0, 0], [1, 1], [2, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'square-48', steps: Object.freeze([[0, 0], [1, 0], [0, 1], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'rect-48x96', steps: Object.freeze([[0, 0], [1, 0], [0, 2], [1, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'rect-96x48', steps: Object.freeze([[0, 0], [2, 0], [0, 1], [2, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'square-96', steps: Object.freeze([[0, 0], [2, 0], [0, 2], [2, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-48-nw', steps: Object.freeze([[0, 0], [1, 0], [0, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-48-ne', steps: Object.freeze([[0, 0], [1, 0], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-48-sw', steps: Object.freeze([[0, 0], [0, 1], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-48-se', steps: Object.freeze([[1, 0], [0, 1], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-96-down', steps: Object.freeze([[0, 0], [2, 0], [1, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-96-up', steps: Object.freeze([[1, 0], [0, 2], [2, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-96x48-down', steps: Object.freeze([[0, 0], [2, 0], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'tri-96x48-up', steps: Object.freeze([[1, 0], [0, 1], [2, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'run-h-3', steps: Object.freeze([[0, 0], [1, 0], [2, 0]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'run-v-3', steps: Object.freeze([[0, 0], [0, 1], [0, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'run-antidiag-3', steps: Object.freeze([[2, 0], [1, 1], [0, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'T-down', steps: Object.freeze([[0, 0], [1, 0], [2, 0], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'T-up', steps: Object.freeze([[1, 0], [0, 1], [1, 1], [2, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'T-right', steps: Object.freeze([[0, 0], [0, 1], [0, 2], [1, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'T-left', steps: Object.freeze([[1, 0], [1, 1], [1, 2], [0, 1]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'L-se', steps: Object.freeze([[0, 0], [0, 1], [0, 2], [1, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'L-sw', steps: Object.freeze([[1, 0], [1, 1], [1, 2], [0, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'L-ne', steps: Object.freeze([[0, 0], [1, 0], [0, 1], [0, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'L-nw', steps: Object.freeze([[0, 0], [1, 0], [1, 1], [1, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'X-5', steps: Object.freeze([[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'six-48x96', steps: Object.freeze([[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'six-96x48', steps: Object.freeze([[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]].map((s) => Object.freeze(s))) }),
   ] as unknown as LayoutTemplate[]) as ReadonlyArray<LayoutTemplate>,
 }) as CalibrationSpec
 
@@ -392,6 +392,14 @@ export type CalibrationNumberKey =
   | 'sweepStepMM'
   | 'centerToleranceMM'
   | 'sizeStepMM'
+  | 'symmetryTolFrac'
+  | 'structureWaistRatio'
+  | 'structureTaperCorr'
+  | 'structureDiagSlope'
+  | 'structureMassRatio'
+  | 'optionsPerBand'
+  | 'bandSizeStepMM'
+  | 'stripLinkMM'
 
 /** Bounds a calibration write must satisfy. Outside them the write is refused, not clamped. */
 const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: number }> = {
@@ -404,6 +412,14 @@ const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: numbe
   sweepStepMM: { min: 1, max: 48 },
   centerToleranceMM: { min: 0, max: 60 },
   sizeStepMM: { min: 2, max: 48 },
+  symmetryTolFrac: { min: 0, max: 1 },
+  structureWaistRatio: { min: 0, max: 1 },
+  structureTaperCorr: { min: 0, max: 1 },
+  structureDiagSlope: { min: 0, max: 1 },
+  structureMassRatio: { min: 0, max: 1 },
+  optionsPerBand: { min: 1, max: 12 },
+  bandSizeStepMM: { min: 0, max: 96 },
+  stripLinkMM: { min: 48, max: 136 },
 }
 
 const RELEASED_DENSITIES: readonly CalibrationSpec['density'][] = Object.freeze([
