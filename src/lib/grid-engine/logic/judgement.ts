@@ -86,7 +86,6 @@ export interface ShapeJudgement {
 /** How many variants a band reports. WIDE OPEN by Dan's ruling (2026-08-14): "each band must
  *  provide different options … maximum amount of the options, no pairs no 4s, any count that
  *  fits — first we identify what works, then refine to prefer specific layouts." */
-const VARIANTS_PER_BAND = 12
 
 /** What makes two variants THE SAME ARRANGEMENT (Dan, 2026-08-14: variants are distinct
  *  layouts at their snug size — "not micro steps in millimetres"). Identity is the PHYSICAL
@@ -442,7 +441,15 @@ function judgeBand(
   }
 
   kept.sort((a, b) => (better(a, b, band, calibration, shapeSymmetric) ? -1 : 1))
-  return { band, variants: kept.slice(0, VARIANTS_PER_BAND) }
+  // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
+  // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
+  // assembly on the shape's axis. The band then presents its few best, not the raw search.
+  const lawful = kept.filter(
+    (v) =>
+      v.wrap.top <= calibration.flapMaxMM &&
+      v.wrap.bottom <= calibration.flapLimbMM,
+  )
+  return { band, variants: lawful.slice(0, calibration.optionsPerBand) }
 }
 
 /**
