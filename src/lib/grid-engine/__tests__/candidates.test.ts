@@ -158,7 +158,6 @@ describe('collectCandidates — shipped entry', () => {
     expect(
       doc.candidates.some((c) => c.family === 'run' && c.stepCol >= 1 && c.stepRow >= 1),
     ).toBe(true)
-    expect(doc.candidates.some((c) => c.family === 'tee')).toBe(true)
   })
 
   it('band-1 wrap is the smallest millimetre, not the next 12mm ladder step', () => {

@@ -275,7 +275,7 @@ export function collectCandidates(
       x: namedOrigin(origin[0], half),
       y: namedOrigin(origin[1], half),
     }
-    for (const arr of enumerateArrangements(sites, population)) {
+    for (const arr of enumerateArrangements(sites, population, { windows: false, tees: false })) {
       const id = [
         band,
         sizeMM,
@@ -374,9 +374,12 @@ export function collectCandidates(
     return false
   }
 
-  /** Top row + two base corners on one origin — the L20 utmost triangle. */
-  const hasUtmostThree = (sizeMM: number) => {
+  /** Same pair, but the pair's midline sits within one pad of the shape centre. */
+  const hasCenteredPair = (sizeMM: number) => {
     const cells = cellsAt(sizeMM)
+    const prep = prepAt(sizeMM)
+    const cx = Number(prep.minX + prep.maxX) / 2000
+    const pad = spec.grid.paddingMM
     const groups = new Map<string, PointMM[]>()
     for (const p of cells) {
       const origin = originOf(p[0], p[1], pitch)
@@ -389,16 +392,11 @@ export function collectCandidates(
       g.push(p)
     }
     for (const pts of groups.values()) {
-      if (pts.length < 3) continue
-      const minY = Math.min(...pts.map((p) => p[1]))
-      const maxY = Math.max(...pts.map((p) => p[1]))
-      if (maxY - minY < pitch) continue
-      const bot = pts.filter((p) => p[1] === maxY)
-      if (bot.length < 2) continue
-      const L = Math.min(...bot.map((p) => p[0]))
-      const R = Math.max(...bot.map((p) => p[0]))
-      if (R - L < pitch) continue
-      if (pts.some((p) => p[1] === minY && p[0] !== L && p[0] !== R)) return true
+      const set = new Set(pts.map(([x, y]) => `${x},${y}`))
+      for (const [x, y] of pts) {
+        if (set.has(`${x},${y + pitch}`) && Math.abs(x - cx) <= pad) return true
+        if (set.has(`${x + pitch},${y}`) && Math.abs(x + pitch / 2 - cx) <= pad) return true
+      }
     }
     return false
   }
@@ -436,11 +434,11 @@ export function collectCandidates(
     const hi = sizes[sizes.length - 1]
     const wrap = smallestWhere(lo, hi, anyFit)
     if (wrap !== null) emitMillimetre(band, wrap)
-    const wrap2 = smallestWhere(lo, hi, hasAdjacentPair)
-    if (wrap2 !== null) emitMillimetre(band, wrap2)
-    if (band === 3) {
-      const wrap3 = smallestWhere(lo, hi, hasUtmostThree)
-      if (wrap3 !== null) emitMillimetre(band, wrap3)
+    if (band === 2) {
+      const wrap2 = smallestWhere(lo, hi, hasAdjacentPair)
+      if (wrap2 !== null) emitMillimetre(band, wrap2)
+      const wrap2c = smallestWhere(lo, hi, hasCenteredPair)
+      if (wrap2c !== null) emitMillimetre(band, wrap2c)
     }
   }
 

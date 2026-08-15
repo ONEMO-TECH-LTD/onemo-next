@@ -73,7 +73,7 @@ export function registrationOf(sites: readonly IndexedSite[]): { x: AxisParity; 
 export function enumerateArrangements(
   sites: readonly SiteInput[],
   population: Population,
-  opts: { windows?: boolean } = {},
+  opts: { windows?: boolean; tees?: boolean } = {},
 ): Arrangement[] {
   const mesh = toPopulationCoords(sites, population)
   const held = mesh.filter((s) => s.fits)
@@ -201,6 +201,7 @@ export function enumerateArrangements(
     [1, 0],
     [0, 1],
   ]
+  if (opts.tees !== false)
   for (const mid of held) {
     for (const [adc, adr] of ortho) {
       const neg: IndexedSite[] = []

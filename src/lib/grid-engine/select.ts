@@ -155,6 +155,21 @@ function holdsTop(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
   return Math.min(...c.sites.map((s) => s.y)) <= mid
 }
 
+function holdBox(c: Candidate): { w: number; h: number; area: number } {
+  if (c.sites.length < 2) return { w: 0, h: 0, area: 0 }
+  const xs = c.sites.map((s) => s.x)
+  const ys = c.sites.map((s) => s.y)
+  const w = Math.max(...xs) - Math.min(...xs)
+  const h = Math.max(...ys) - Math.min(...ys)
+  return { w, h, area: w * h }
+}
+
+/** Two discs in the top third — a head pair, not a single apex. */
+function hasHeadPair(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
+  const cut = shape.minY + (shape.maxY - shape.minY) / 3
+  return c.sites.filter((s) => s.y <= cut).length >= 2
+}
+
 /** Top mass and bottom mass both have a disc. A 48×48 in the belly fails this. */
 function coversMasses(c: Candidate, shape: ReturnType<typeof bbox>): boolean {
   if (c.sites.length < 2) return true
@@ -267,9 +282,19 @@ export function propose(
 ): Candidate[] {
   const raw = doc.candidates.filter((c) => c.band === band)
   const kind = targetKind(doc.candidates, band, outline)
-  const classN = kind === 'extreme' ? extremeCount(doc.candidates, outline) : 0
+  let classN = kind === 'extreme' ? extremeCount(doc.candidates, outline) : 0
+  if (band === 4 && kind === 'extreme') {
+    const fourHead = raw.some((c) => {
+      if (c.family !== 'rectangle-corners' || c.sites.length !== 4) return false
+      const shape = bbox(scaleToSize(outline, c.sizeMM))
+      return coversMasses(c, shape) && hasHeadPair(c, shape)
+    })
+    if (fourHead) classN = 4
+  }
   const pad = spec.grid.paddingMM
-  const scored = raw.map((c) => {
+  const pool = raw.filter((c) => matchesKind(c, kind))
+  const measure = pool.length > 0 ? pool : raw
+  const scored = measure.map((c) => {
     const verts = scaleToSize(outline, c.sizeMM)
     const shape = bbox(verts)
     const gravity = holdsTop(c, shape)
@@ -285,12 +310,14 @@ export function propose(
       balance: offset2,
       size: c.sizeMM,
       step: minPairSpan(c),
+      area: holdBox(c).area,
+      xOff: Math.abs((Math.min(...c.sites.map((s) => s.x)) + Math.max(...c.sites.map((s) => s.x))) / 2 - (shape.minX + shape.maxX) / 2),
       flap,
       score: rankScore(c.sizeMM, offset2, gravity, band, shape),
       hit: matchesKind(c, kind),
       top,
       topFrac: top / span,
-      flush: kind === 'single' ? Math.abs(clearance(c, verts) - pad) : 0,
+      flush: Math.abs(clearance(c, verts) - pad),
     }
   })
 
@@ -303,6 +330,10 @@ export function propose(
     }
     if (a.hit && b.hit && kind === 'pair') {
       if (a.masses !== b.masses) return a.masses ? -1 : 1
+      const ac = a.xOff <= pad ? 0 : 1
+      const bc = b.xOff <= pad ? 0 : 1
+      if (ac !== bc) return ac - bc
+      if (a.xOff !== b.xOff) return a.xOff - b.xOff
       if (a.size !== b.size) return a.size - b.size
       const head = 1 / 3
       const ad = Math.abs(a.topFrac - head)
@@ -316,9 +347,11 @@ export function propose(
         const bd = Math.abs(b.n - classN)
         if (ad !== bd) return ad - bd
       }
-      if (band === 4 && a.step !== b.step) return b.step - a.step
-      if (a.flap !== b.flap) return a.flap - b.flap
+      if (band === 4 && a.area !== b.area) return b.area - a.area
       if (a.size !== b.size) return a.size - b.size
+      if (a.flush !== b.flush) return a.flush - b.flush
+      if (a.balance !== b.balance) return a.balance - b.balance
+      if (a.flap !== b.flap) return a.flap - b.flap
     }
     if (a.hit && b.hit && a.balance !== b.balance) return a.balance - b.balance
     if (a.score !== b.score) return a.score - b.score
@@ -329,14 +362,24 @@ export function propose(
 
   const seen = new Set<string>()
   const out: Candidate[] = []
-  for (const { c } of scored) {
-    const id = `${c.sizeMM}|${c.family}|${c.population}|${c.sites
+  const keyOf = (c: Candidate) =>
+    `${c.sizeMM}|${c.family}|${c.population}|${c.sites
       .map((s) => `${s.col},${s.row}`)
       .sort()
       .join('|')}`
+  for (const { c } of scored) {
+    const id = keyOf(c)
     if (seen.has(id)) continue
     seen.add(id)
     out.push(c)
+  }
+  if (measure !== raw) {
+    for (const c of raw) {
+      const id = keyOf(c)
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push(c)
+    }
   }
   return out
 }

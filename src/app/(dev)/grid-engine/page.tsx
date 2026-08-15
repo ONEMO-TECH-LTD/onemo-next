@@ -423,7 +423,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-43</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>build snap-44</span></span>
           <span className={styles.readout}>
             {shownView?.picture
               ? `${Math.round(shownView.picture.w)} × ${Math.round(shownView.picture.h)}mm`
@@ -507,9 +507,10 @@ export default function GridEnginePage() {
             type="button"
             className={styles.chip}
             disabled={visibleCands.length === 0}
-            onClick={() =>
+            onClick={() => {
+              setPan([0, 0])
               setCandIdx((i) => (visibleCands.length ? (i + 1) % visibleCands.length : 0))
-            }
+            }}
           >
             {shownCand
               ? `${Math.min(candIdx, visibleCands.length - 1) + 1}/${visibleCands.length} · ${shownCand.sizeMM} · ${shownCand.sites.length}pt · ${shownCand.family} · ${shownCand.population}`
@@ -731,6 +732,7 @@ export default function GridEnginePage() {
                 onClick={() => {
                   setActiveBand(n)
                   setCandIdx(0)
+                  setPan([0, 0])
                 }}
                 title={`band ${n} — ${lo}–${hi}mm`}
               >
