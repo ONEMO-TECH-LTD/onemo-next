@@ -82,6 +82,19 @@ describe('enumerateArrangements', () => {
     expect(tees.some((a) => a.sites.length === 4)).toBe(true)
   })
 
+  it('emits a T from one apex and a base row of three', () => {
+    const sites: SiteInput[] = [
+      { col: 0, row: -2, x: 0, y: -96, fits: true },
+      { col: -2, row: 2, x: -96, y: 96, fits: true },
+      { col: 0, row: 2, x: 0, y: 96, fits: true },
+      { col: 2, row: 2, x: 96, y: 96, fits: true },
+    ]
+    const tees = enumerateArrangements(sites, 'base', { windows: false, tees: false }).filter(
+      (a) => a.family === 'tee' && a.sites.length === 4,
+    )
+    expect(tees.length).toBeGreaterThan(0)
+  })
+
   it('emits the utmost triangle when the apex is on the top mid-edge', () => {
     const sites: SiteInput[] = [
       { col: 0, row: -1, x: 0, y: -48, fits: true },

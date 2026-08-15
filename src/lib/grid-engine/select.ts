@@ -227,7 +227,11 @@ export function decidingKey(_band: BandId, won: ProposalMeasure, lost: ProposalM
 }
 
 function isExtreme(c: Candidate): boolean {
-  return c.family === 'corner-triangle' || c.family === 'rectangle-corners'
+  return (
+    c.family === 'corner-triangle' ||
+    c.family === 'rectangle-corners' ||
+    (c.family === 'tee' && c.sites.length >= 4)
+  )
 }
 
 type Kind = 'single' | 'pair' | 'extreme'
@@ -269,6 +273,7 @@ function extremeCount(
     if (c.band !== 3 || !isExtreme(c)) return false
     return coversMasses(c, bbox(scaleToSize(outline, c.sizeMM)))
   })
+  if (covering.some((c) => c.family === 'tee' && c.sites.length >= 4)) return 4
   if (covering.some((c) => c.family === 'rectangle-corners' || c.sites.length === 4)) return 4
   if (covering.some((c) => c.sites.length === 3)) return 3
   return 0

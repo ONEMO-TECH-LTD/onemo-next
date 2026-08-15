@@ -194,6 +194,30 @@ export function enumerateArrangements(
           }
         }
       }
+      // T: one apex + a base row of three. The neck need not be held.
+      if (topBand.length >= 1 && botBand.length >= 3) {
+        const bar = [...botBand].sort((a, b) => a.popCol - b.popCol)
+        const L = bar[0]
+        const R = bar[bar.length - 1]
+        if (R.popCol - L.popCol >= 2) {
+          const midX = (L.popCol + R.popCol) / 2
+          const M = bar.reduce((a, b) =>
+            Math.abs(a.popCol - midX) <= Math.abs(b.popCol - midX) ? a : b,
+          )
+          if (M !== L && M !== R) {
+            for (const T of topBand) {
+              if (T.popCol < L.popCol || T.popCol > R.popCol) continue
+              push({
+                family: 'tee',
+                population,
+                stepCol: R.popCol - L.popCol,
+                stepRow: maxY - minY,
+                sites: [T, L, M, R],
+              })
+            }
+          }
+        }
+      }
     }
   }
 
