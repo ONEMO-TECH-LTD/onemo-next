@@ -187,7 +187,7 @@ type ShapeStructure =
 function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStructure {
   // CLASSIFICATION ONLY (QA build-audit): the measurements live in compute/structure.ts; this
   // function compares them against the released thresholds and names the class.
-  const f = shapeFeatures(unit, STRUCTURE_SCANLINES)
+  const f = shapeFeatures(unit, calibration.structureScanlines)
   if (!f) return { kind: 'uniform', tall: true, narrowMass: true }
   if (Math.abs(f.diagSlopeFrac) > calibration.structureDiagSlope)
     return { kind: 'diagonal', sign: f.diagSlopeFrac > 0 ? 1 : -1 }
