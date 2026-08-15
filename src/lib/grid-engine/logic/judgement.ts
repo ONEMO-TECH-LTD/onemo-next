@@ -526,9 +526,11 @@ function better(
   //     centre is the FIGURE's axis, not the box the wings span). A seat aligned to the deepest
   //     material outranks one dragged toward an asymmetric wing. Coarse steps, like balance.
   //     CANONICAL REGISTRATION (GPT PRO v3.3 spec §6, adopted 2026-08-15): the centred seat is
-  //     the first test — off-centre must WIN, never tie. Quarter-tight steps so dead-centre
-  //     and 5mm-off never land in one bucket.
-  const axisStepMM = calibration.flapTightMM / 4
+  //     the first test — off-centre must WIN, never tie. Quarter-tight steps where the axis is
+  //     EXACT (the mirror axis); the deepest-point axis of an asymmetric shape is a blob
+  //     estimate — half-tight steps there, or its noise drags seats loose (the pill regressed
+  //     82 -> 98 under uniform sharpness, measured).
+  const axisStepMM = shapeSymmetric ? calibration.flapTightMM / 4 : calibration.flapTightMM / 2
   const axisA = Math.round((a.massAxisOffMM ?? 0) / axisStepMM)
   const axisB = Math.round((b.massAxisOffMM ?? 0) / axisStepMM)
   if (axisA !== axisB) return axisA < axisB
