@@ -50,7 +50,7 @@ import {
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
-import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { engineOutline, traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
@@ -321,7 +321,7 @@ export default function GridEnginePage() {
     // fractions of DIFFERENT sides, and feeding them raw squashed the shape (locked-aspect law).
     const { w: boxW, h: boxH } = box
     setPicked(null)
-    setSubmittedOutline(outline.map(([u, v]) => ({ x: u * boxW, y: v * boxH })))
+    setSubmittedOutline(engineOutline(outline).map(([u, v]) => ({ x: u * boxW, y: v * boxH })))
   }
 
   const pickBand = (band: string) => {
