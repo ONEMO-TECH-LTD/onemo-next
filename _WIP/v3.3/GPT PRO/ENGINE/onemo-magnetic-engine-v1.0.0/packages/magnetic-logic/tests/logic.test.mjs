@@ -8,6 +8,7 @@ import {
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
 const circle=(diameter,segments=64)=>Array.from({length:segments},(_,i)=>{const a=2*Math.PI*i/segments;return{x:Math.cos(a)*diameter/2,y:Math.sin(a)*diameter/2};});
 const editableReference=()=>{const profile=structuredClone(createReferenceProfile());delete profile.profileHash;return profile;};
+const patternsAtStride=(patterns,stride)=>patterns.map(pattern=>{const [x0,y0]=pattern.cells[0];return{...pattern,cells:pattern.cells.map(([x,y])=>[x0+(x-x0)*stride/2,y0+(y-y0)*stride/2])};});
 
 test('profile is immutable and content-addressed',()=>{
   const profile=createReferenceProfile();assert.ok(profile.profileHash.length===64);assert.equal(Object.isFrozen(profile),true);
@@ -49,7 +50,7 @@ test('reference profile blocks physical fulfilment until tolerances are supplied
 });
 
 test('alternate calibrated values reuse the same Compute engine',()=>{
-  const base=createReferenceProfile();const draft=structuredClone(base);delete draft.profileHash;draft.id='alternate-grid';draft.version=1;draft.grid.cellMm=20;draft.grid.nodeStrideCells=3;draft.grid.populations=[{id:'grid60',strideCells:3,enabled:true,originParities:[[0,0]]}];draft.patterns=draft.patterns.map(pattern=>({...pattern,populationId:'grid60'}));const alternate=registerProfile(draft);assert.equal(alternate.grid.cellMm,20);assert.notEqual(alternate.profileHash,base.profileHash);
+  const base=createReferenceProfile();const draft=structuredClone(base);delete draft.profileHash;draft.id='alternate-grid';draft.version=1;draft.grid.cellMm=20;draft.grid.nodeStrideCells=3;draft.grid.populations=[{id:'grid60',strideCells:3,enabled:true,originParities:[[0,0]]}];draft.patterns=patternsAtStride(draft.patterns,3).map(pattern=>({...pattern,populationId:'grid60'}));const alternate=registerProfile(draft);assert.equal(alternate.grid.cellMm,20);assert.notEqual(alternate.profileHash,base.profileHash);
 });
 
 test('solve revalidates a supplied registered-profile hash',async()=>{
@@ -84,6 +85,20 @@ test('profile registration rejects non-executable domains and policies',async(t)
 test('reference profile cannot be promoted to production while product inputs remain unresolved',()=>{
   const raw=editableReference();raw.id='technical-production-test';raw.productionReady=true;
   assert.throws(()=>registerProfile(raw),/unresolved production assumptions/);
+});
+
+test('productionReady remains closed until later R3 authority groups are implemented',()=>{
+  const profile=editableReference();profile.productionReady=true;profile.engineeringAssumptions=[];profile.provenance={ONLY:'one unscoped note'};
+  assert.throws(()=>registerProfile(profile),/production profile incomplete R3 authority/);
+});
+
+test('patterns use their population stride rather than a hard-coded parity',()=>{
+  const invalid=editableReference();invalid.grid.nodeStrideCells=3;invalid.grid.populations[0].strideCells=3;
+  assert.throws(()=>registerProfile(invalid),/population stride/);
+
+  const valid=editableReference();valid.grid.nodeStrideCells=3;valid.grid.populations[0].strideCells=3;
+  valid.patterns=patternsAtStride(valid.patterns,3);
+  assert.doesNotThrow(()=>registerProfile(valid));
 });
 
 test('continuous certification reports indeterminate instead of guessing when mechanics cannot be proved',()=>{

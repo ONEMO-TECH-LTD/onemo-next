@@ -47,7 +47,7 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
     if(population.enabled&&population.originParities.length===0)errors.push(`population ${population.id} requires an origin parity`);
     const parityKeys=new Set<string>();
     for(const parity of population.originParities){
-      const valid=parity.length===2&&parity.every(value=>Number.isInteger(value)&&(value===0||value===1));
+      const valid=parity.length===2&&parity.every(value=>Number.isInteger(value)&&value>=0&&value<population.strideCells);
       if(!valid)errors.push(`population ${population.id} has invalid parity`);
       const key=parity.join(',');if(parityKeys.has(key))errors.push(`population ${population.id} has duplicate parity ${key}`);parityKeys.add(key);
     }
@@ -102,7 +102,7 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
     }
     if(population&&pattern.cells.length>0){
       const [x0,y0]=pattern.cells[0]!;
-      if(pattern.cells.some(([x,y])=>(x-x0)%2!==0||(y-y0)%2!==0))errors.push(`pattern ${pattern.id} mixes population parities`);
+      if(pattern.cells.some(([x,y])=>(x-x0)%population.strideCells!==0||(y-y0)%population.strideCells!==0))errors.push(`pattern ${pattern.id} violates population stride ${population.strideCells}`);
     }
   }
 
@@ -130,6 +130,9 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
   if(profile.b1Guarantee!=='ONLY_WHEN_LAWFUL_IN_B1')errors.push('unsupported B1 guarantee');
   if(Object.keys(profile.provenance).length===0||Object.entries(profile.provenance).some(([key,value])=>!nonEmpty(key)||!nonEmpty(value)))errors.push('profile provenance must contain non-empty source facts');
   if(profile.engineeringAssumptions.some(value=>!nonEmpty(value)))errors.push('engineering assumptions must be non-empty strings');
-  if(profile.productionReady&&(profile.approvalState!=='approved'||profile.engineeringAssumptions.length>0))errors.push('unresolved production assumptions prevent production readiness');
+  if(profile.productionReady){
+    if(profile.approvalState!=='approved'||profile.engineeringAssumptions.length>0)errors.push('unresolved production assumptions prevent production readiness');
+    errors.push('production profile incomplete R3 authority: later Frames, mechanics identity, Fulfilment, Regression, and approval-trace groups are not implemented');
+  }
   return{valid:errors.length===0,errors:Object.freeze(errors)};
 }
