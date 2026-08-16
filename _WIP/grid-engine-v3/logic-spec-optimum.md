@@ -109,20 +109,38 @@ its own step — never as a compensating rule downstream.
 
 ## 5. STANDARD LAYOUTS AND SIZES — per class, per band
 
-The geometric classes have EXACT standards (they are the calibration controls); the free
-classes have STANDARD LAYOUT FAMILIES with canon reference sizes (the snug seat is found by
-the funnel, the family is fixed).
+**The derivation hierarchy [RULED — Dan 2026-08-16: "we have banding based on square as
+standard - rectangle is derivative and anything else walks from there"]:**
 
-### 5.1 Geometric classes — exact standards
+```text
+SQUARE  — THE STANDARD. Banding itself is defined by it (24 · 72 · 120 · 168 · 216).
+   ↓
+RECTANGLE — the first derivative: the square standard applied PER AXIS
+            (axis classes combine: a tall B3 is a square-standard 72 axis × a 120 axis).
+   ↓
+CIRCLE / OVAL — walks from the square: same counts, sizes grown by the padding the
+                rounded corners demand (measured: 92 / 160 / 228).
+   ↓
+FREE CLASSES — walk from the nearest geometric ancestor: the funnel's step-6 structural
+               map names the class; the frame hypothesis is inherited from the square/
+               rectangle standard at its axis classes; the material then reduces it
+               (an L drops to 1+2 by itself — L5). Never invented, always derived.
+```
 
-| Class | B1 | B2 | B3 | B4 | B5 | Source |
+The square is the calibration control; every other class's standard is a stated derivation
+from it, so a change to the square standard rederives everything below — nothing carries its
+own independent numbers.
+
+### 5.1 The square standard and its derivatives — exact
+
+| Class | B1 | B2 | B3 | B4 | B5 | Derivation |
 |---|---|---|---|---|---|---|
-| **Square-like** (fills its box) | single · **24** | 2×2 · **72** | 3×3 · **120** | 4×4 · **168** | 5×5 · **216** | RULED — the square standard, "measured by squares is the easiest" |
-| **Tall rectangular** | single | 1×2 column pair · **24×72** | 1×3 / 2×3 column · **72×120** | 2×4 / 3×4 · **120×168** | 3×5 / 4×5 · **168×216** | RULED §4–5 — per-axis standards combine; layouts follow the long axis |
-| **Wide rectangular** | single | 2×1 row pair · **72×24** | 3×1 / 3×2 row · **120×72** | 4×2 / 4×3 · **168×120** | 5×3 / 5×4 · **216×168** | RULED — mirror of tall |
-| **Circle / oval** | single · ~40 | 2×2 · **92** | 3×3 · **160** | 4×4 · **228** | — | RULED L18 measured (rounded corners demand padding growth; encapsulation variant 102/170/238) |
+| **SQUARE** (the standard) | single · **24** | 2×2 · **72** | 3×3 · **120** | 4×4 · **168** | 5×5 · **216** | ROOT — "measured by squares is the easiest"; span = (n−1)·48 + 2·12 |
+| **Tall rectangle** | single | 1×2 column · **24×72** | 1×3 / 2×3 · **72×120** | 2×4 / 3×4 · **120×168** | 3×5 / 4×5 · **168×216** | square standard per axis; layouts follow the long axis |
+| **Wide rectangle** | single | 2×1 row · **72×24** | 3×1 / 3×2 · **120×72** | 4×2 / 4×3 · **168×120** | 5×3 / 5×4 · **216×168** | mirror of tall |
+| **Circle / oval** | single · ~40 | 2×2 · **92** | 3×3 · **160** | 4×4 · **228** | — | square counts + padding growth (L18 measured; encapsulation variant 102/170/238) |
 
-### 5.2 Free classes — standard layout families (canon reference sizes from the walkthrough)
+### 5.2 Free classes — walked from the standards (canon reference sizes from the walkthrough)
 
 | Class (step-6 refinement) | B1 | B2 | B3 | B4 | Source |
 |---|---|---|---|---|---|
