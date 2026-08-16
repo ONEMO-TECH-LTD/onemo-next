@@ -98,3 +98,18 @@ T0b's commit boundary passes: 94eeda89 adds only the audit; no code entered eith
 **Necessity — no new task, document or gate.** Repair only the two existing artifacts. Pattern-permission resolution belongs inside the already-planned engineering work; T7 verifies rather than substitutes for implementation.
 
 **Sufficiency — partial.** The pair still does not provide a source-honest executable permission policy or a complete implementation-to-gate mapping, and T0b does not yet audit the current ledger it claims to cover.
+
+## Final bounded re-gate — 97313324
+
+**Verdict: QA CLEAR.** The five corrections requested at `859b12ba` are present in the committed pair and no new T0 scope is opened.
+
+- The files identify binding plan `2e6bd212`, the current paired review surface, the unchanged committed code tree and the excluded dirty `judgement.ts` diff separately.
+- Pattern permissions are correctly recorded as an ENGINEERING input still owed by T6; frame capacity and lattice realisability are necessary, not sufficient, constraints.
+- Implementation obligations map to T4/T5/T6 with T7 as verifier, and the input boundary is assigned.
+- T0b now agrees with the PARTIAL §1 rows, audits the repaired 8D contract and withdraws its false per-row task-assignment claim.
+- The remaining provenance routes are corrected; the exact 1 mm ruling was independently re-walked at the cited vault locations.
+- `git diff --check` passes. Worktree bytes equal commit `97313324` for both artifacts (ledger SHA-256 `4ed291eb…`; audit SHA-256 `46e7a402…`). The commit changes only the T0/T0b documents; no code entered it.
+
+**Necessity — no unnecessary execution work remains in T0.** Do not add another ledger round. The still-owed engineering decisions stay in their existing implementation tasks.
+
+**Sufficiency — delivers T0 in full.** The pair now distinguishes settled authority, reversible engineering ownership, implementation obligations and code deltas sufficiently for T1–T9. T1 may begin only after the required Meta close.
