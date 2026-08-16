@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCertifiedBandOffers, buildEngineManufacturingPayload, buildStructuralEvidence, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
+  buildCertifiedBandOffers, buildEngineManufacturingPayload, buildStructuralEvidence, certifySizeSolution, classifyAxis, clearSolverCaches, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
   criterionDescriptor, currentManufacturingVerificationResolver, LOGIC_ARTIFACT_HASH, permittedPatterns, ProfileRegistry, registerProfile, selectedOffer,
   selectDiscreteIdentity, solveOutline, validatePhysicalComponentProfile, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
@@ -45,6 +45,17 @@ test('an indeterminate offer cannot be selected for ManufacturingSpec',()=>{
 
 test('same input and artifact identities produce byte-identical canonical result',async()=>{
   const p=singleRungProfile();const a=await solveOutline({outlineMm:rectangle(24,24),profile:p});const b=await solveOutline({outlineMm:rectangle(24,24),profile:p});assert.equal(a.canonicalHash,b.canonicalHash);assert.deepEqual(a.offers,b.offers);
+});
+
+test('warm solves use a bounded fingerprint cache that is explicitly clearable',async()=>{
+  const profile=singleRungProfile(),outline=rectangle(24,24);clearSolverCaches();
+  const cold=await solveOutline({outlineMm:outline,profile});
+  const warm=await solveOutline({outlineMm:structuredClone(outline),profile});
+  assert.equal(warm,cold);
+  assert.throws(()=>warm.offers.push({}),TypeError);
+  clearSolverCaches();
+  const rebuilt=await solveOutline({outlineMm:outline,profile});
+  assert.notEqual(rebuilt,cold);assert.deepEqual(rebuilt,cold);
 });
 
 test('engine ManufacturingSpec round-trips and exact re-verifies',async()=>{

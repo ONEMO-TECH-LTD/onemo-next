@@ -13,6 +13,7 @@ test('closed tangency is legal and one-quantum intrusion is illegal',()=>{
   const p=preparePolygon([{x:-12,y:-12},{x:12,y:-12},{x:12,y:12},{x:-12,y:12}],{quantumMm:q});
   assert.equal(discContainedExact(p,{x:0,y:0},12).legal,true);
   assert.equal(discContainedExact(p,{x:0.01,y:0},12).legal,false);
+  assert.equal(discContainedExact(p,{x:0,y:12},0).location,'BOUNDARY');
 });
 
 test('non-aligned safety radius rounds upward and cannot approve negative margin',()=>{
@@ -33,6 +34,14 @@ test('canonical polygon hash is independent of winding and starting vertex',()=>
   const a=preparePolygon([{x:0,y:0},{x:40,y:0},{x:40,y:30},{x:0,y:30}],{quantumMm:q});
   const b=preparePolygon([{x:40,y:30},{x:40,y:0},{x:0,y:0},{x:0,y:30}],{quantumMm:q});
   assert.equal(a.geometryHash,b.geometryHash);
+});
+
+test('accelerated validation preserves high-vertex geometry and rejects distant crossings',()=>{
+  const ring=Array.from({length:1024},(_,index)=>{const angle=2*Math.PI*index/1024;return{x:100*Math.cos(angle),y:100*Math.sin(angle)};});
+  const polygon=preparePolygon(ring,{quantumMm:q,maxVertices:4096});
+  assert.equal(polygon.ringInt.length,1024);
+  assert.equal(discContainedExact(polygon,{x:0,y:0},99).legal,true);
+  assert.throws(()=>preparePolygon([{x:-10,y:-10},{x:10,y:10},{x:-10,y:10},{x:10,y:-10}],{quantumMm:q}),/simple polygon/);
 });
 
 test('adaptive translation preserves continuous vertical pair feasibility',()=>{

@@ -30,6 +30,13 @@ export interface Edge {
   readonly lengthSquared: number;
 }
 
+export interface EdgeAccelerationIndex {
+  readonly minY: number;
+  readonly maxY: number;
+  readonly binHeight: number;
+  readonly bins: readonly (readonly number[])[];
+}
+
 export interface PolygonMetrics {
   readonly bounds: Bounds;
   readonly width: number;
@@ -50,6 +57,7 @@ export interface PreparedPolygon {
   readonly ringInt: readonly IntPoint[];
   readonly ringMm: readonly Point[];
   readonly edges: readonly Edge[];
+  readonly edgeIndex: EdgeAccelerationIndex;
   readonly metrics: PolygonMetrics;
   readonly geometryHash: string;
   readonly artifactHash: string;

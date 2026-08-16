@@ -1,16 +1,5 @@
 # Browser verification status
 
-A browser smoke page and Playwright runner are included.
+The real `/grid-engine` route was exercised through the existing Playwright-controlled Chrome surface. The within-budget PILL contour preserved all 3,796 traced vertices, completed all 21 certified rung evaluations, and returned explicit `DECISION_INDETERMINATE` offers for B1–B5. The over-budget POKE1 contour returned visible `RESOURCE_LIMIT_EXCEEDED` without simplification.
 
-Execution in this container was blocked before page execution:
-
-- Chromium navigation returned `ERR_BLOCKED_BY_ADMINISTRATOR` for both localhost and `file:` attempts.
-- A WebKit executable was not installed.
-
-Consequently:
-
-- Node execution is verified;
-- browser-oriented ESM/React source is built;
-- browser runtime and physical-device performance are **not claimed as passed** in this delivery environment.
-
-Run `python scripts/browser-smoke.py` in an environment that permits local navigation, then perform the benchmark page on representative iPhone/iPad Safari and Android Chrome hardware.
+This proves the current Chromium integration path. WebKit and physical mobile devices remain unmeasured, and no physical-device performance is claimed.

@@ -216,3 +216,12 @@
   restore the 10-second acceptance threshold, then rerun the final oracle on an idle server.
 - Remember: a transient timing failure must not be hidden by permanently weakening the shipped gate;
   separate golden collection from the final performance verdict.
+
+## 2026-08-16 — magnetic engine release scripts assumed unsafe path/runtime defaults
+
+- Failed: the first release stopped because `manifest.mjs` used URL-encoded `.pathname` under the
+  `GPT PRO` directory; the next package step called unavailable `python`.
+- Worked: convert the manifest URL with `fileURLToPath` and invoke the release scripts with
+  `python3`; manifest verification and all four archive integrity checks then passed.
+- Remember: filesystem paths from `import.meta.url` must use `fileURLToPath`, and macOS release
+  scripts must call the installed `python3` executable explicitly.

@@ -1,20 +1,20 @@
 {
-  "generatedAt": "2026-08-15T23:23:28.801Z",
+  "generatedAt": "2026-08-16T19:10:05.492Z",
   "packages": {
     "compute": {
       "javascriptFiles": 20,
-      "rawBytes": 72896,
-      "gzipBytes": 17089
+      "rawBytes": 87120,
+      "gzipBytes": 20354
     },
     "logic": {
       "javascriptFiles": 19,
-      "rawBytes": 52835,
-      "gzipBytes": 12974
+      "rawBytes": 72803,
+      "gzipBytes": 16454
     },
     "nextAdapter": {
       "javascriptFiles": 10,
-      "rawBytes": 6338,
-      "gzipBytes": 2179
+      "rawBytes": 9180,
+      "gzipBytes": 2999
     }
   }
 }

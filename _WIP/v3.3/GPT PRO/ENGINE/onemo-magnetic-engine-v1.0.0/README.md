@@ -14,10 +14,7 @@ The authoritative source specifications are preserved unchanged under `specs/`.
 
 ## Important delivery status
 
-The software is complete as a modular reference implementation and executable package. It contains two intentionally different solve paths:
-
-1. **Interactive preview solve** — low-latency deterministic critical/witness candidate evaluation with exact final 24 mm-disc legality. It is suitable for live Effects Studio size and overlay previews.
-2. **Continuous certification solve** — dominance-safe adaptive feasibility and mechanical optimisation for a selected physical size. It either returns a certified solution or an explicit `DECISION_INDETERMINATE`; it never guesses.
+The software is a modular reference implementation and executable package. `solveOutline` runs the continuous certified path for every configured rung, reconstructs offers from that complete evidence, and returns `DECISION_INDETERMINATE` rather than guessing when proof is incomplete.
 
 The bundled `onemo-magnetic-v1-reference` profile is deliberately `productionReady: false` because the supplied final specifications still leave product values without approved concrete data: structural thresholds, the complete permission matrix, the Batwoman vector fixture, physical process tolerances, the 96 mm population decision, and several product policies. The engine therefore blocks final physical fulfilment under that reference profile instead of inventing those values.
 
@@ -33,16 +30,17 @@ The ZIP contains compiled ESM output; no install is required to inspect or run t
 node scripts/run-demo.mjs
 ```
 
-To rebuild from source where `tsc` is available:
+To install the pinned build toolchain and rebuild from source:
 
 ```bash
+npm ci
 npm run clean
 npm run build
 npm run test
 npm run benchmark
 ```
 
-`npm run build` creates local workspace links itself; no third-party runtime package is downloaded.
+`npm run build` uses the lockfile-pinned local TypeScript compiler and creates local workspace links itself. The shipped runtime has no third-party dependency.
 
 ### Minimal API
 
@@ -92,13 +90,13 @@ The Next adapter converts canvas/SVG down-positive coordinates before solving.
 
 ## Verification summary
 
-- 25 automated Node tests currently pass.
+- 70 automated Node tests currently pass.
 - Exact tangency passes; one-quantum intrusion fails.
 - Concave-edge intrusion is rejected.
 - Canonical geometry, profiles, solve outputs and manufacturing payloads are content-addressed.
 - Compute and Logic runtime hashes are generated from their compiled executable JavaScript, excluding only the self-referential manifest module.
 - Current container benchmark and compressed sizes are in `reports/`.
-- Browser automation was attempted, but this execution environment blocked Chromium navigation by administrator policy and did not contain WebKit. No physical-device claim is made.
+- The real route is verified in the existing Playwright-controlled Chrome surface. WebKit and physical mobile performance remain unmeasured.
 
 ## Main documentation
 

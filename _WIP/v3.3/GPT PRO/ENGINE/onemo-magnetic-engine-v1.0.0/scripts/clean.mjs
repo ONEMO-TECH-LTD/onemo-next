@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises';
 for (const path of [
+  'dist',
   'packages/geometry-compute/dist',
   'packages/magnetic-logic/dist',
   'packages/magnetic-next/dist',

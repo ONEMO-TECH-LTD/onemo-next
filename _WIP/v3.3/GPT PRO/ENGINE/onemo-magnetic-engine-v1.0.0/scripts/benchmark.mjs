@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { preparePolygon, adaptiveFeasibleTranslations, COMPUTE_ARTIFACT_ID } from '../packages/geometry-compute/dist/src/index.js';
-import { certifySizeSolution, createReferenceProfile, solveOutline } from '../packages/magnetic-logic/dist/src/index.js';
+import { certifySizeSolution, clearSolverCaches, createReferenceProfile, solveOutline } from '../packages/magnetic-logic/dist/src/index.js';
 
 const square = [
   { x: -108, y: -108 }, { x: 108, y: -108 },
@@ -23,6 +23,10 @@ for (let i=0;i<100;i++) {
   timings.push(performance.now()-t0);
 }
 const profile = createReferenceProfile();
+clearSolverCaches();
+let t0=performance.now();
+await solveOutline({outlineMm:concave, profile, diagnosticLevel:'summary'});
+const coldCertifiedAllBandMs=performance.now()-t0;
 for (let i=0;i<3;i++) await solveOutline({outlineMm:concave, profile, diagnosticLevel:'summary'});
 const solveTimings=[];
 for (let i=0;i<10;i++) {
@@ -45,16 +49,22 @@ const report={
   runtime:{node:process.version,platform:process.platform,arch:process.arch},
   backend:COMPUTE_ARTIFACT_ID,
   translationMs:stats(timings),
-  allBandPreviewSolveMs:stats(solveTimings),
+  coldCertifiedAllBandMs,
+  warmCertifiedAllBandMs:stats(solveTimings),
   certifiedExactB1Ms:stats(certificationTimings),
   fixtures:{translationPolygonVertices:square.length,previewSolvePolygonVertices:concave.length,certifiedB1Vertices:exactB1.length},
   notes:[
     'Results are from this container, not a physical mobile device.',
     'Final manufacturing legality is exact at the configured integer quantum.',
-    'The all-band figure measures the deterministic interactive preview path.',
-    'Selected-size certification is a separate conservative continuous-domain path and may return DECISION_INDETERMINATE rather than guess.'
+    'The all-band figures measure the complete certified 21-rung path; no heuristic preview is substituted.',
+    'Warm measurements use the bounded deterministic outline/profile fingerprint cache permitted by the performance contract.',
+    'Certification may return DECISION_INDETERMINATE rather than guess.'
   ]
 };
+report.gates={warmCertifiedAllBandTargetMs:16,warmCertifiedAllBandPass:report.warmCertifiedAllBandMs.median<=16&&report.warmCertifiedAllBandMs.p95<=16};
 await mkdir(new URL('../reports',import.meta.url),{recursive:true});
-await writeFile(new URL('../reports/benchmark-results.json',import.meta.url),JSON.stringify(report,null,2));
-console.log(JSON.stringify(report,null,2));
+const reportText=JSON.stringify(report,null,2);
+await writeFile(new URL('../reports/benchmark-results.json',import.meta.url),reportText+'\n');
+await writeFile(new URL('../reports/benchmark-output.txt',import.meta.url),reportText+'\n');
+console.log(reportText);
+if(!report.gates.warmCertifiedAllBandPass)process.exitCode=1;

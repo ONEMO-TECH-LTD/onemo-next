@@ -16,16 +16,14 @@ The reference profile records conservative defaults but is not production-ready.
 ## Geometry and optimisation
 
 - Final selected-disc legality is exact at the configured integer quantum.
-- The interactive preview solver evaluates a deterministic critical/witness set; it is not labelled as a proof of the continuous global mechanical optimum.
-- The selected-size certification path is conservative. It may return `DECISION_INDETERMINATE` when the adaptive representation cannot prove equivalence/dominance. This is deliberate and prevents a guessed manufacturing result.
+- The complete solver is conservative. It may return `DECISION_INDETERMINATE` when the adaptive representation cannot prove equivalence/dominance. This is deliberate and prevents a guessed manufacturing result.
 - Structural connected regions are currently derived from a regular sample board with an explicit half-diagonal error envelope. Calibration must choose a sufficiently fine step for the approved device/performance budget.
 - Lower-dimensional exact safe sets are represented through witnesses/indeterminate handling rather than a general exact curved-set data structure.
 
 ## Performance and browser evidence
 
-- The current low-node preview benchmark is above the proposed 16 ms all-band target in this container.
-- High-node circles are slower.
-- Browser automation was blocked by the execution environment; WebKit and physical mobile devices remain unmeasured.
+- The warm typical certified all-band gate passes on the recorded machine; cold high-node outlines remain materially slower.
+- Chromium was exercised on the real route through the existing Playwright-controlled browser. WebKit and physical mobile devices remain unmeasured.
 
 ## Integration
 

@@ -9,7 +9,7 @@
 - Versioned neutral geometry-criterion registry.
 - Dominance/equivalence interval helpers and global-anchor restriction primitives.
 - Product bands, frame capacity, parity registration and pattern library.
-- Low-latency preview solve across B1–B5.
+- Certified complete solve across every configured rung and B1–B5 offer reconstruction.
 - Selected-size continuous certification entry point.
 - Deterministic Compute, Logic, profile, geometry, solve and ManufacturingSpec identities.
 - React/Next.js integration adapters and example route.
@@ -31,10 +31,8 @@ The final source documents still carry unresolved product rows. The package does
 
 ## Certification boundary
 
-The preview solver is exact about final disc legality but its critical candidate set is not represented as a formal proof of global continuous mechanical optimality. Its `decisionProof` is therefore `DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY`.
-
-The separate `certifySizeSolution` path uses adaptive continuous feasible sets, interval criteria, dominance-safe comparison and global-anchor restriction. It may conservatively return `DECISION_INDETERMINATE` when finite refinement cannot prove a decision. A production-ready profile cannot create a ManufacturingSpec from an uncertified preview result.
+`solveOutline` evaluates every configured rung through `certifySizeSolution`, then reconstructs each band offer only from that complete evidence. The certified path uses adaptive continuous feasible sets, interval criteria, dominance-safe comparison and global-anchor restriction. It may conservatively return `DECISION_INDETERMINATE` when finite refinement cannot prove a decision.
 
 ## Performance result in this environment
 
-The current low-node all-band preview median is about 50 ms on the supplied Linux x64 container. The neutral translation predicate itself is well below 1 ms. The proposed 16 ms all-band target was not met in this environment, and no physical-mobile measurement was possible. See `reports/benchmark-report.md`.
+The recorded warm certified all-band median and p95 pass the 16 ms target through the bounded deterministic outline/profile cache. Cold and high-vertex work is reported separately. No physical-mobile measurement is claimed. See `reports/benchmark-report.md`.

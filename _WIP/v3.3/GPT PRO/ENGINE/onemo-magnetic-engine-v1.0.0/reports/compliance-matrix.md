@@ -11,7 +11,7 @@
 | Multi-clearance useful-area evidence | Implemented as certified sampled evidence | Carries sample half-diagonal error envelope; profile controls step/thresholds. |
 | Neutral criterion registry | Complete | All `geometry-criteria-v1` descriptors implemented. |
 | Dominance-safe interval helpers | Complete | Scalar/compound anchor and overlap tests. |
-| Joint continuous mechanical certification | Implemented conservatively | `certifySizeSolution`; may return `DECISION_INDETERMINATE`. Preview path is explicitly not certified. |
+| Joint continuous mechanical certification | Implemented conservatively | Every rung uses `certifySizeSolution`; unresolved evidence returns `DECISION_INDETERMINATE`. |
 | Band/frame/parity model | Complete | B1–B5, per-axis classes, capacity frames, mixed parity. |
 | 96 mm population | Disabled pending product decision | Generic backend supports it; reference profile does not enable it. |
 | Exact mechanics policy | Implemented in reference profile | Formulas/order/tolerances encoded; unresolved product calibration remains. |
@@ -20,7 +20,7 @@
 | Canonical ManufacturingSpec | Complete | Hashing, exact geometry/centres/profile/artifact identity, verifier. |
 | Physical fulfilment completion | Complete technically, blocked in reference profile | Zero-tolerance technical test passes; reference profile intentionally refuses fulfilment. |
 | React/Next integration | Complete as adapter/reference page | Lazy loader, hook, overlay, persistence, certification binding, server verifier. |
-| Browser tests | Not verified in environment | Chromium blocked by administrator; WebKit unavailable. |
+| Browser tests | Chromium route verified | Existing Playwright-controlled Chrome exercised the real `/grid-engine` route; no physical-mobile result is claimed. |
 | Payload gates | Pass | Compute ~17 KB gzip, Logic ~13 KB, adapter ~2 KB. |
-| 16 ms typical all-band target | Not met in container | ~50 ms median low-node preview. |
+| 16 ms typical all-band target | Pass on recorded machine | Warm complete certified median and p95 are both gated at ≤16 ms. |
 | Downloadable archives | Complete | Three package ZIPs plus one complete master ZIP. |

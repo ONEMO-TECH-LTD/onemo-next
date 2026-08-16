@@ -13,13 +13,16 @@
     "benchmark": "node scripts/benchmark.mjs",
     "verify": "npm run clean && npm run build && npm run test && npm run benchmark",
     "manifest": "node scripts/manifest.mjs",
-    "browser-smoke": "python scripts/browser-smoke.py",
+    "browser-smoke": "python3 scripts/browser-smoke.py",
     "size-report": "node scripts/size-report.mjs",
-    "package": "python scripts/package-release.py",
+    "package": "python3 scripts/package-release.py",
     "release": "npm run clean && npm run build && npm run test && npm run benchmark && npm run size-report && npm run manifest && npm run package",
     "demo": "node scripts/run-demo.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
   }
 }

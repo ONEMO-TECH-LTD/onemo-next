@@ -14,4 +14,5 @@ export * from './selection.js';
 export * from './solver.js';
 export * from './manufacturing-spec.js';
 export * from './verifier.js';
-export * from './certified-solver.js';
+export { certifySizeSolution } from './certified-solver.js';
+export type { CertifiedSizeInput } from './certified-solver.js';

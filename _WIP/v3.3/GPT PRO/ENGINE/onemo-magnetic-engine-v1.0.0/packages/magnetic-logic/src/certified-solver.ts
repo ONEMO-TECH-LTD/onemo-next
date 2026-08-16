@@ -18,6 +18,7 @@ import {
   type Direction,
   type GeometryCriterionDescriptor,
   type Point,
+  type PreparedPolygon,
   type RegionEvidence,
   type ScoreInterval
 } from '@onemo/geometry-compute';
@@ -275,17 +276,12 @@ export interface CertifiedSizeInput {
   readonly targetDominantMm: number;
 }
 
-/** Certifies one selected physical size. This is intentionally separate from the
- * low-latency preview solve: production specifications must be created from this
- * continuous-domain, dominance-safe path. */
-export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | SizeFailure {
-  const profile = registerProfile(input.profile);
-  if (profile.approvalState !== 'approved') throw new Error('PROFILE_UNAPPROVED');
-  const { targetDominantMm: target } = input;
-  const source = preparePolygon(input.outlineMm, {
-    quantumMm: profile.numeric.coordinateQuantumMm,
-    maxVertices: profile.numeric.maxVertices
-  });
+export function certifyPreparedSizeSolution(source:PreparedPolygon,profile:RegisteredProfile,target:number):SizeSolution|SizeFailure{
+  if(source.quantumMm!==profile.numeric.coordinateQuantumMm)throw new Error('SOURCE_QUANTUM_MISMATCH');
+  return certifyPreparedSize(source,profile,target);
+}
+
+function certifyPreparedSize(source:PreparedPolygon,profile:RegisteredProfile,target:number):SizeSolution|SizeFailure {
   const polygon = scaleToDominantDimension(source, target);
   const classX = classifyAxis(polygon.metrics.width, profile.sizeDomain.bands);
   const classY = classifyAxis(polygon.metrics.height, profile.sizeDomain.bands);
@@ -310,19 +306,11 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
   for (const policy of productCriteria) {
     const result = optimiseCriterionAcrossCandidates(candidates, policy, profile);
     if (result.status === 'INDETERMINATE') {
-      return {
-        status: 'DECISION_INDETERMINATE',
-        targetDominantMm: target,
-        band,
-        reasons: ['CRITERION_SCORE_UNCERTAIN', policy.id]
-      };
+      return {status:'DECISION_INDETERMINATE',targetDominantMm:target,band,reasons:['CRITERION_SCORE_UNCERTAIN', policy.id]};
     }
     candidates = [...result.candidates];
-    if (candidates.length === 0) {
-      return { status: 'REJECTED', targetDominantMm: target, band, reasons: ['NO_APPROVED_PATTERN'] };
-    }
+    if (candidates.length === 0) return { status: 'REJECTED', targetDominantMm: target, band, reasons: ['NO_APPROVED_PATTERN'] };
   }
-
   const selectedHypothesis=selectDiscreteIdentity(candidates.map(candidate=>candidate.hypothesis));
   const winner = candidates.find(candidate=>candidate.hypothesis===selectedHypothesis)!;
   const discreteDescriptor=criterionDescriptor(discretePolicy,winner.hypothesis,profile,winner.regions);
@@ -330,59 +318,28 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
   const discreteTrace:CandidateScoreTrace={criterionId:discretePolicy.id,descriptorId:discreteDescriptor.id,score:{lower:0,upper:0},status:'CERTIFIED',identityKey:discreteDescriptor.key};
   const registrationDescriptor=criterionDescriptor(registrationPolicy,winner.hypothesis,profile,winner.regions);
   if(registrationDescriptor.id!=='FINAL_REGISTRATION_ORDER_V1')throw new Error('invalid M10 descriptor');
-  const tie = finalRegistrationTieBreak(
-    polygon,
-    winner.hypothesis.offsetsMm,
-    profile.safety.effectiveVerificationRadiusMm,
-    winner.boxes,
-    registrationDescriptor.canonicalTarget,
-    profile.numeric.coordinateQuantumMm
-  );
-  if (tie.status !== 'SELECTED' || !tie.point) {
-    return {
-      status: tie.status === 'FEASIBLE_BELOW_OUTPUT_QUANTUM' ? 'DECISION_INDETERMINATE' : 'DECISION_INDETERMINATE',
-      targetDominantMm: target,
-      band,
-      reasons: [tie.status]
-    };
-  }
+  const tie = finalRegistrationTieBreak(polygon,winner.hypothesis.offsetsMm,profile.safety.effectiveVerificationRadiusMm,winner.boxes,registrationDescriptor.canonicalTarget,profile.numeric.coordinateQuantumMm);
+  if (tie.status !== 'SELECTED' || !tie.point) return {status:'DECISION_INDETERMINATE',targetDominantMm:target,band,reasons:[tie.status]};
   const selectedCells=patternCellsForFrame(profile,winner.hypothesis.pattern,winner.hypothesis.frame);
-  const proofs = selectedCells.map((cell, index) => {
-    const offset = winner.hypothesis.offsetsMm[index]!;
-    const point = { x: tie.point!.x + offset.x, y: tie.point!.y + offset.y };
-    const proof = discContainedExact(polygon, point, profile.safety.effectiveVerificationRadiusMm);
-    return { cell, xMm: proof.point.x, yMm: proof.point.y, clearanceMm: proof.clearanceMm, marginMm: proof.marginMm, legal: proof.legal };
-  });
-  if (!proofs.every((proof) => proof.legal)) {
-    return { status: 'REJECTED', targetDominantMm: target, band, reasons: ['EXACT_REVALIDATION_FAILED'] };
-  }
+  const proofs = selectedCells.map((cell, index) => {const offset=winner.hypothesis.offsetsMm[index]!;const point={x:tie.point!.x+offset.x,y:tie.point!.y+offset.y};const proof=discContainedExact(polygon,point,profile.safety.effectiveVerificationRadiusMm);return{cell,xMm:proof.point.x,yMm:proof.point.y,clearanceMm:proof.clearanceMm,marginMm:proof.marginMm,legal:proof.legal};});
+  if (!proofs.every((proof) => proof.legal)) return { status: 'REJECTED', targetDominantMm: target, band, reasons: ['EXACT_REVALIDATION_FAILED'] };
   const centres = proofs.map(({ legal: _legal, ...rest }) => rest);
-  const registrationTrace:CandidateScoreTrace={
-    criterionId:registrationPolicy.id,descriptorId:registrationDescriptor.id,
-    score:{components:[{lower:tie.canonicalDistanceSquared!,upper:tie.canonicalDistanceSquared!},{lower:tie.point.x,upper:tie.point.x},{lower:tie.point.y,upper:tie.point.y}]},
-    status:'CERTIFIED',registration:tie.point
-  };
-  const result: SizeSolution = {
-    status: 'ACCEPTED',
-    targetDominantMm: target,
-    widthMm: polygon.metrics.width,
-    heightMm: polygon.metrics.height,
-    scale: polygon.metrics.dominantDimension / source.metrics.dominantDimension,
-    classX,
-    classY,
-    band,
-    frame: winner.hypothesis.frame,
-    patternId: winner.hypothesis.pattern.id,
-    registration: tie.point,
-    centres: Object.freeze(centres),
-    minimumMarginMm: Math.min(...centres.map((centre) => centre.marginMm)),
-    scoreTrace: Object.freeze([...winner.trace,discreteTrace,registrationTrace]),
-    geometryHash: polygon.geometryHash,
-    decisionProof: 'CERTIFIED_CONTINUOUS_OPTIMUM',
-    finalRingInt: Object.freeze(polygon.ringInt.map((point) => Object.freeze([point.x, point.y] as const)))
-  };
-  // Materialise the result once through the canonicaliser during tests/callers;
-  // this catches accidental non-serialisable evidence early.
+  const registrationTrace:CandidateScoreTrace={criterionId:registrationPolicy.id,descriptorId:registrationDescriptor.id,score:{components:[{lower:tie.canonicalDistanceSquared!,upper:tie.canonicalDistanceSquared!},{lower:tie.point.x,upper:tie.point.x},{lower:tie.point.y,upper:tie.point.y}]},status:'CERTIFIED',registration:tie.point};
+  const result:SizeSolution={status:'ACCEPTED',targetDominantMm:target,widthMm:polygon.metrics.width,heightMm:polygon.metrics.height,scale:polygon.metrics.dominantDimension/source.metrics.dominantDimension,classX,classY,band,frame:winner.hypothesis.frame,patternId:winner.hypothesis.pattern.id,registration:tie.point,centres:Object.freeze(centres),minimumMarginMm:Math.min(...centres.map(centre=>centre.marginMm)),scoreTrace:Object.freeze([...winner.trace,discreteTrace,registrationTrace]),geometryHash:polygon.geometryHash,decisionProof:'CERTIFIED_CONTINUOUS_OPTIMUM',finalRingInt:Object.freeze(polygon.ringInt.map(point=>Object.freeze([point.x,point.y] as const)))};
   void canonicalHash({ result, computeArtifactHash: COMPUTE_ARTIFACT_HASH });
   return Object.freeze(result);
+}
+
+/** Certifies one selected physical size. This is intentionally separate from the
+ * low-latency preview solve: production specifications must be created from this
+ * continuous-domain, dominance-safe path. */
+export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | SizeFailure {
+  const profile = registerProfile(input.profile);
+  if (profile.approvalState !== 'approved') throw new Error('PROFILE_UNAPPROVED');
+  const { targetDominantMm: target } = input;
+  const source = preparePolygon(input.outlineMm, {
+    quantumMm: profile.numeric.coordinateQuantumMm,
+    maxVertices: profile.numeric.maxVertices
+  });
+  return certifyPreparedSize(source,profile,target);
 }

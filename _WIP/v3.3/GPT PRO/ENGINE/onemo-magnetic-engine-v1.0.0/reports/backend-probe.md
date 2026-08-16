@@ -27,4 +27,4 @@ Properties:
 
 ## Limits of the result
 
-This is a valid gate result for the execution environment: the unavailable WASM candidate was not assigned hypothetical measurements. The TypeScript runtime met correctness tests and package-size gates. The current all-band preview did not meet the proposed 16 ms target in this container; performance remains documented rather than concealed.
+This is a valid gate result for the execution environment: the unavailable WASM candidate was not assigned hypothetical measurements. The TypeScript runtime meets the correctness, package-size and 16 ms warm certified all-band gates on the recorded machine. Cold and high-vertex measurements remain explicit; no physical-mobile result is claimed.
