@@ -365,6 +365,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
     // band 4 steps UP to the fuller grid): one apex over a base row of three, 96mm below.
     Object.freeze({ name: 'tee-96', steps: Object.freeze([[1, 0], [0, 2], [1, 2], [2, 2]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tee-96-down', steps: Object.freeze([[0, 0], [1, 0], [2, 0], [1, 2]].map((s) => Object.freeze(s))) }),
+    Object.freeze({ name: 'trapezoid-144x96', steps: Object.freeze([[1, 0], [2, 0], [0, 2], [1, 2], [2, 2], [3, 2]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96-up', steps: Object.freeze([[1, 0], [0, 2], [2, 2]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96x48-down', steps: Object.freeze([[0, 0], [2, 0], [1, 1]].map((s) => Object.freeze(s))) }),
     Object.freeze({ name: 'tri-96x48-up', steps: Object.freeze([[1, 0], [0, 1], [2, 1]].map((s) => Object.freeze(s))) }),
