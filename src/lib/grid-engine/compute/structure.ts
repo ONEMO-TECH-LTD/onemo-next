@@ -67,6 +67,46 @@ export function areaAboveLine(
   return area
 }
 
+/** Sampled material area strictly beyond a vertical line (dir -1: x < xLine; +1: x > xLine).
+ *  Same discipline as areaAboveLine — all spans per scanline. Pure measurement. */
+export function areaBeyondVertical(
+  pts: ReadonlyArray<Pt>,
+  xLine: number,
+  dir: -1 | 1,
+  samples: number,
+): number {
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const p of pts) {
+    if (p[1] < minY) minY = p[1]
+    if (p[1] > maxY) maxY = p[1]
+  }
+  if (!(maxY > minY) || samples < 1) return 0
+  const dy = (maxY - minY) / samples
+  let area = 0
+  for (let i = 0; i < samples; i++) {
+    const c = minY + (i + 0.5) * dy
+    const xs: number[] = []
+    for (let j = 0; j < pts.length; j++) {
+      const a = pts[j]
+      const b = pts[(j + 1) % pts.length]
+      if (a[1] === b[1]) continue
+      if ((a[1] <= c && b[1] > c) || (b[1] <= c && a[1] > c)) {
+        xs.push(a[0] + ((c - a[1]) / (b[1] - a[1])) * (b[0] - a[0]))
+      }
+    }
+    xs.sort((m, n) => m - n)
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const lo = xs[k]
+      const hi = xs[k + 1]
+      const clippedLo = dir < 0 ? lo : Math.max(lo, xLine)
+      const clippedHi = dir < 0 ? Math.min(hi, xLine) : hi
+      if (clippedHi > clippedLo) area += (clippedHi - clippedLo) * dy
+    }
+  }
+  return area
+}
+
 /** Middle-third minimum span over end-third maximum span — the waist measure. */
 export function waistRatio(rows: ReadonlyArray<{ span: number }>): number {
   const third = Math.floor(rows.length / 3)

@@ -33,12 +33,13 @@ import {
   type Anchor,
   type GridResult,
 } from '../compute/grid-core'
-import { prepareExactContour, distanceToPreparedContour } from '../compute/grid-prepared'
+import { prepareExactContour, distanceToPreparedContour, pointInPreparedContour } from '../compute/grid-prepared'
 import { normalizeContour } from '../compute/normalize'
 import {
   shapeFeatures,
   deepestPointSampled,
   areaAboveLine,
+  areaBeyondVertical,
   pointsMirrorSymmetric,
   pointsFillBlock,
   pointsOneComponent,
@@ -74,6 +75,11 @@ export interface SizeVariant {
    *  the padded block top, divided by the block width — the equivalent height of the hanging
    *  mass, judged against the same flap bound. A thin tip is light; a hanging body is not. */
   topHangMM?: number
+  /** MASS-AWARE SIDE HOLD (same law as topHangMM, 2026-08-16: the bat's thin wings measured
+   *  48-70mm of raw side extent — a few mm of actual material — and vetoed every grown grid,
+   *  the same tip-fallacy the gravity fix removed): worst side's material area beyond the
+   *  padded block edge divided by block height. */
+  sideHangMM?: number
   /** Horizontal distance from the assembly's centre to the shape's MASS AXIS (the deepest-material
    *  point) — the figure's own axis, which on a winged shape is not the bounding box's centre. */
   massAxisOffMM?: number
@@ -344,8 +350,8 @@ function better(
   //     bottom did). A side may hang only as a limb, same allowance as the bottom: a
   //     placement leaving more material past its block sideways ranks under everything
   //     that actually covers the shape.
-  const holdsSidesA = Math.max(a.wrap.left, a.wrap.right) <= calibration.flapLimbMM
-  const holdsSidesB = Math.max(b.wrap.left, b.wrap.right) <= calibration.flapLimbMM
+  const holdsSidesA = (a.sideHangMM ?? Math.max(a.wrap.left, a.wrap.right)) <= calibration.flapLimbMM
+  const holdsSidesB = (b.sideHangMM ?? Math.max(b.wrap.left, b.wrap.right)) <= calibration.flapLimbMM
   if (holdsSidesA !== holdsSidesB) return holdsSidesA
   // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
   //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
@@ -476,6 +482,12 @@ function judgeBand(
       const blockWidth = maxAx - minAx + 2 * pad
       const area = areaAboveLine(variant.effectContourMM.outer.pts, minAy - pad, calibration.structureScanlines)
       variant.topHangMM = blockWidth > 0 ? area / blockWidth : variant.wrap.top
+      let maxAy = -Infinity
+      for (const anchor of variant.anchors) if (anchor.p[1] > maxAy) maxAy = anchor.p[1]
+      const blockHeight = maxAy - minAy + 2 * pad
+      const leftArea = areaBeyondVertical(variant.effectContourMM.outer.pts, minAx - pad, -1, calibration.structureScanlines)
+      const rightArea = areaBeyondVertical(variant.effectContourMM.outer.pts, maxAx + pad, 1, calibration.structureScanlines)
+      variant.sideHangMM = blockHeight > 0 ? Math.max(leftArea, rightArea) / blockHeight : Math.max(variant.wrap.left, variant.wrap.right)
     }
     if (unitMassX !== null && variant.anchors.length) {
       let sumX = 0
@@ -580,64 +592,92 @@ function judgeBand(
     //    each step is the LAWFUL population of that sub-window at the engine's own
     //    registration — nodes the shape refuses simply drop, which is where the rectangular /
     //    T / L bottom-heavy variants come from. The laws judge every step like any candidate.
-    try {
-      const field = computePreparedGrid(prepared, {
-        pitchMM: spec.grid.basePitchMM,
-        pattern: 'standard',
-        paddingMM: spec.grid.paddingMM,
-        plan: calibration.plan,
-        perimeterOnly: false,
-        center: calibration.center,
-      })
-      const nodes: Pt[] = field.anchors.map((a) => a.p)
-      const xs = [...new Set(nodes.map((n) => Math.round(n[0] * 100) / 100))].sort((m, n) => m - n)
-      const ys = [...new Set(nodes.map((n) => Math.round(n[1] * 100) / 100))].sort((m, n) => m - n)
-      for (let xi = 0; xi < xs.length; xi++) {
-        for (let xj = xi; xj < xs.length; xj++) {
-          for (let yi = 0; yi < ys.length; yi++) {
-            for (let yj = yi; yj < ys.length; yj++) {
-              const sub = nodes.filter(
-                (n) => n[0] >= xs[xi] - 1 && n[0] <= xs[xj] + 1 && n[1] >= ys[yi] - 1 && n[1] <= ys[yj] + 1,
-              )
-              if (sub.length < 1) continue
-              try {
-                const origin = sub[0]
-                const steps = sub.map(
-                  (n) =>
-                    [
-                      Math.round((n[0] - origin[0]) / spec.grid.basePitchMM),
-                      Math.round((n[1] - origin[1]) / spec.grid.basePitchMM),
-                    ] as [number, number],
-                )
-                const grid = computePreparedGrid(prepared, {
-                  pitchMM: spec.grid.basePitchMM,
-                  pattern: 'standard',
-                  paddingMM: spec.grid.paddingMM,
-                  plan: calibration.plan,
-                  perimeterOnly: true,
-                  construction: placeTemplate([origin[0], origin[1]], steps, spec.grid.basePitchMM),
-                })
-                const wv = variantFrom(
-                  spec,
-                  calibration,
-                  band,
-                  contour,
-                  sizeMM,
-                  spec.grid.basePitchMM,
-                  'standard',
-                  grid,
-                  `win-${xj - xi + 1}x${yj - yi + 1}`,
-                )
-                consider(wv)
-              } catch {
-                // refused sub-window — lawful silence
+    // EVERY REGISTRATION PHASE (Dan's bat condemnation, 2026-08-16: the population that
+    // holds the head — face disc + shoulders + skirt on ONE lattice — exists only at the
+    // face-row registration, which the field search's single winning phase kept missing).
+    // The door enumerates the same phase family the engine's own search uses (centred,
+    // half-shifted, edge-registered — per axis, from both the centroid and the bbox/mirror
+    // anchor), tests every lattice node's lawfulness exactly, and grows sub-windows from
+    // each registration's population.
+    {
+      const pitch = spec.grid.basePitchMM
+      const pad = spec.grid.paddingMM
+      const bb = prepared.bbox
+      const phaseSet = (anchor: number, min: number, max: number): number[] => {
+        const normalized = (value: number) => ((value % pitch) + pitch) % pitch
+        const values = [
+          normalized(anchor - min),
+          normalized(anchor - min + pitch / 2),
+          normalized(pad),
+          normalized(max - min - pad),
+        ]
+        return [...new Set(values.map((v) => Math.round(v * 1000) / 1000))]
+      }
+      const anchorsX = [prepared.centroid[0], (bb.minX + bb.maxX) / 2]
+      const anchorsY = [prepared.centroid[1], (bb.minY + bb.maxY) / 2]
+      const oxs = [...new Set(anchorsX.flatMap((a) => phaseSet(a, bb.minX, bb.maxX)))]
+      const oys = [...new Set(anchorsY.flatMap((a) => phaseSet(a, bb.minY, bb.maxY)))]
+      for (const ox of oxs) {
+        for (const oy of oys) {
+          const nodes: Pt[] = []
+          for (let x = bb.minX + ox; x <= bb.maxX + 1e-9; x += pitch) {
+            for (let y = bb.minY + oy; y <= bb.maxY + 1e-9; y += pitch) {
+              const pt: Pt = [x, y]
+              if (!pointInPreparedContour(pt, prepared)) continue
+              if (distanceToPreparedContour(pt, prepared) < pad - 1e-9) continue
+              nodes.push(pt)
+            }
+          }
+          if (nodes.length < 2) continue
+          const xs = [...new Set(nodes.map((n) => Math.round(n[0] * 100) / 100))].sort((m, n) => m - n)
+          const ys = [...new Set(nodes.map((n) => Math.round(n[1] * 100) / 100))].sort((m, n) => m - n)
+          for (let xi = 0; xi < xs.length; xi++) {
+            for (let xj = xi; xj < xs.length; xj++) {
+              for (let yi = 0; yi < ys.length; yi++) {
+                for (let yj = yi; yj < ys.length; yj++) {
+                  const sub = nodes.filter(
+                    (n) => n[0] >= xs[xi] - 1 && n[0] <= xs[xj] + 1 && n[1] >= ys[yi] - 1 && n[1] <= ys[yj] + 1,
+                  )
+                  if (sub.length < 1) continue
+                  try {
+                    const origin = sub[0]
+                    const steps = sub.map(
+                      (n) =>
+                        [
+                          Math.round((n[0] - origin[0]) / pitch),
+                          Math.round((n[1] - origin[1]) / pitch),
+                        ] as [number, number],
+                    )
+                    const grid = computePreparedGrid(prepared, {
+                      pitchMM: pitch,
+                      pattern: 'standard',
+                      paddingMM: pad,
+                      plan: calibration.plan,
+                      perimeterOnly: true,
+                      construction: placeTemplate([origin[0], origin[1]], steps, pitch),
+                    })
+                    consider(
+                      variantFrom(
+                        spec,
+                        calibration,
+                        band,
+                        contour,
+                        sizeMM,
+                        pitch,
+                        'standard',
+                        grid,
+                        `win-${xj - xi + 1}x${yj - yi + 1}`,
+                      ),
+                    )
+                  } catch {
+                    // refused sub-window — lawful silence
+                  }
+                }
               }
             }
           }
         }
       }
-    } catch {
-      // no field at this size — lawful silence
     }
   }
 
@@ -652,12 +692,26 @@ function judgeBand(
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
   // assembly on the shape's axis. The band then presents its few best, not the raw search.
+  if (process.env.B4DEBUG && band.band === 4) {
+    for (const v of kept) {
+      if (v.anchors.length < 6) continue
+      const pts = v.anchors.map((x) => x.p)
+      const kills: string[] = []
+      if ((v.topHangMM ?? v.wrap.top) > calibration.flapMaxMM) kills.push(`toph${(v.topHangMM ?? 0).toFixed(0)}`)
+      if (v.wrap.bottom > calibration.flapLimbMM) kills.push(`bot${v.wrap.bottom.toFixed(0)}`)
+      if ((v.sideHangMM ?? 0) > calibration.flapLimbMM) kills.push(`sideh${(v.sideHangMM ?? 0).toFixed(0)}`)
+      if (!pointsOneComponent(pts, calibration.stripLinkMM)) kills.push('strip')
+      if (shapeSymmetric && !pointsMirrorSymmetric(pts)) kills.push('mirror')
+      process.stderr.write(`B4 6+: ${v.layout ?? 'auto'}\u00b7${v.sizeMM}\u00b7${v.anchors.length}pt ${kills.length ? 'KILL:' + kills.join(',') : 'LAWFUL'}\n`)
+    }
+  }
   const lawful = kept.filter(
     (v) =>
       (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
       v.wrap.bottom <= calibration.flapLimbMM &&
-      // side hold law — sides hang only as limbs (unreasonable spacing is not an offer)
-      Math.max(v.wrap.left, v.wrap.right) <= calibration.flapLimbMM &&
+      // side hold law — a side's MASS hangs only as a limb (thin wings are light; a hanging
+      // body is not — same measure as gravity)
+      (v.sideHangMM ?? Math.max(v.wrap.left, v.wrap.right)) <= calibration.flapLimbMM &&
       pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM) &&
       // eyes-on calibration sweep, 2026-08-15: every asymmetric arrangement on a symmetric
       // figure read wrong (bat diag pair off the face, L/T into the ear and wing edges,
@@ -741,7 +795,7 @@ function judgeBand(
       (v) =>
         (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
         v.wrap.bottom <= calibration.flapLimbMM &&
-        Math.max(v.wrap.left, v.wrap.right) <= calibration.flapLimbMM &&
+        (v.sideHangMM ?? Math.max(v.wrap.left, v.wrap.right)) <= calibration.flapLimbMM &&
         pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM),
     )
     if (holdLawful) final = [holdLawful]
