@@ -16,7 +16,6 @@
 //     EVENNESS breaks ties.
 //   • "gravity must not place magnets in the bottom and leave top unprotected" — TOP SUPPORT
 //     outranks general tightness.
-//   • "pair is minimum but optimal is 4 magnets" — each band carries its target count.
 //   • "unless it is trivial limb especially at the bottom" — the LIMB EXCEPTION: the bottom side
 //     alone carries a wider allowance, so hanging legs and bodies do not refuse a lawful hold.
 //   • Both populations of the one lattice are judged — 48 dense and 96 sparse (the same lattice
@@ -99,10 +98,6 @@ export interface BandAnswer {
 export interface ShapeJudgement {
   bands: BandAnswer[]
 }
-
-/** How many variants a band reports. WIDE OPEN by Dan's ruling (2026-08-14): "each band must
- *  provide different options … maximum amount of the options, no pairs no 4s, any count that
- *  fits — first we identify what works, then refine to prefer specific layouts." */
 
 /** What makes two variants THE SAME ARRANGEMENT (Dan, 2026-08-14: variants are distinct
  *  layouts at their snug size — "not micro steps in millimetres"). Identity is the PHYSICAL
@@ -206,7 +201,7 @@ function shapeStructure(unit: Contour, calibration: CalibrationSpec): ShapeStruc
 }
 
 /** How well an arrangement answers the shape's structure: 2 = spans/embodies it, 1 = aligned
- *  with its axis, 0 = neither. Compared before spread — the class outranks the spacing. */
+ *  with its axis, 0 = neither. The class precedes later tie-breaks. */
 function structureScore(
   v: SizeVariant,
   structure: ShapeStructure,
@@ -308,7 +303,6 @@ function isCorners(v: SizeVariant, calibration: CalibrationSpec): boolean {
 function better(
   a: SizeVariant,
   b: SizeVariant,
-  band: BandSpec,
   calibration: CalibrationSpec,
   shapeSymmetric: boolean,
   structure: ShapeStructure,
@@ -347,13 +341,6 @@ function better(
   const holdsSidesA = Math.max(a.wrap.left, a.wrap.right) <= calibration.flapLimbMM
   const holdsSidesB = Math.max(b.wrap.left, b.wrap.right) <= calibration.flapLimbMM
   if (holdsSidesA !== holdsSidesB) return holdsSidesA
-  // 1d. THE BAND COUNT LAW (canon walkthrough titles: "Band 1 · one magnet", "Band 2 · two
-  //     magnets" — every ruled example; bands 3/4 are free, the structure decides there).
-  if (band.targetMagnets > 0) {
-    const offA = Math.abs(a.anchors.length - band.targetMagnets)
-    const offB = Math.abs(b.anchors.length - band.targetMagnets)
-    if (offA !== offB) return offA < offB
-  }
   // 2. THE COLUMN LAW (Dan, this session: "narrow shape if scaled can fit 2 columns" — and
   //    "optimal is 4 magnets in each outmost corner"). CORNERS CLASS — outranks every
   //    spine/pair/single, but ONLY when the arrangement genuinely takes the shape's corners:
@@ -373,11 +360,6 @@ function better(
     const symB = pointsMirrorSymmetric(b.anchors.map((x) => x.p))
     if (symA !== symB) return symA
   }
-  // 3. SPARSE SPREAD (Dan: "96mm is lawful sparse pair and actually preferred") — wider
-  //    spacing wins; lifts the 96 spine over the crowded 48 family. Triangles live in this
-  //    pool too: BALANCE below picks them only where the shape is genuinely three-cornered
-  //    (Dan: "a T-shaped can act as triangle with 3 corners") — elsewhere the pair balances
-  //    better and wins.
   // 2c. THE STRUCTURE LAW (Dan's ruled canon): the arrangement matching the shape's build wins —
   //     triangle on the tapered bat, waist-spanning corners on the duck/butterfly/poke, the
   //     narrow column on the standing bot, diagonal on the tilted pill. (A depth-based
@@ -386,14 +368,6 @@ function better(
   const structA = structureScore(a, structure, basePitchMM)
   const structB = structureScore(b, structure, basePitchMM)
   if (structA !== structB) return structA > structB
-  //    Spread credit CAPS at the released sparse pitch (Dan's law: 96 is the sparse spacing
-  //    "proven sufficient" — not "the further the better"): an extreme diagonal pair flung
-  //    corner-to-corner (135mm) must not outrank layouts that hold the mass (poke1 B4, eyes-on
-  //    sweep 2026-08-15).
-  const spreadCapMM = Math.max(...LAUNCH_PITCHES_MM)
-  const spreadA = Math.min(a.nearestAnchorMM ?? 0, spreadCapMM)
-  const spreadB = Math.min(b.nearestAnchorMM ?? 0, spreadCapMM)
-  if (spreadA !== spreadB) return spreadA > spreadB
   // 3b. THE MASS AXIS (Dan, 2026-08-15: the pair must be "centered AND fit to shape" — and his
   //     centre is the FIGURE's axis, not the box the wings span). A seat aligned to the deepest
   //     material outranks one dragged toward an asymmetric wing. Coarse steps, like balance.
@@ -421,11 +395,9 @@ function better(
   const balA = Math.round(a.wrap.imbalanceSumMM / balanceStepMM)
   const balB = Math.round(b.wrap.imbalanceSumMM / balanceStepMM)
   if (balA !== balB) return balA < balB
-  // 4b. among equal balance: at counted bands FEWER magnets (the spine is minimal, "brains
-  //     only"); at the free bands the FULLER population (Dan, 2026-08-15 23:47 — the honest
-  //     count, never the artificial subset).
+  // 4b. fewer magnets only after the preceding support evidence is equivalent.
   if (a.anchors.length !== b.anchors.length)
-    return band.targetMagnets > 0 ? a.anchors.length < b.anchors.length : a.anchors.length > b.anchors.length
+    return a.anchors.length < b.anchors.length
   // 5. tight wrap — least total overhang
   if (a.wrap.total !== b.wrap.total) return a.wrap.total < b.wrap.total
   // 6. smaller manufactured size
@@ -441,10 +413,7 @@ function judgeBand(
   unitContour: Contour,
   shapeSymmetric: boolean,
   unitMassX: number | null,
-  offeredBelow: Set<string>,
-  sizeFloorMM: number,
   structure: ShapeStructure,
-  prevCount: number,
 ): BandAnswer {
   const kept: SizeVariant[] = []
   const preparedBySize = new Map<number, ReturnType<typeof prepareExactContour>>()
@@ -488,7 +457,7 @@ function judgeBand(
     const identity = layoutIdentity(variant, halfPitchMM)
     const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
-      if (better(variant, kept[twin], band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) kept[twin] = variant
+      if (better(variant, kept[twin], calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) kept[twin] = variant
       return
     }
     kept.push(variant)
@@ -498,15 +467,9 @@ function judgeBand(
   const sweep = calibration.sweepStepMM
   // EVERY released template is proposed in every band — no count-based pruning.
   const templates = calibration.templates
-  // BAND SEPARATION (Dan, 2026-08-15): the band's candidates START one 24mm step above the
-  // previous band's answer — bounding the search itself, so every layout family re-seats above
-  // the floor instead of being collapsed to a below-floor snug seat and then filtered away.
-  const startSizeMM = Math.max(band.minSizeMM, sizeFloorMM)
-  // maxTestedMM WIRED (meta audit): nothing above the physically tested ceiling is offered.
-  const bandCapMM = Math.min(band.maxSizeMM, calibration.maxTestedMM + 1)
   for (
-    let sizeMM = Math.ceil(startSizeMM / step) * step;
-    sizeMM < bandCapMM;
+    let sizeMM = Math.ceil(band.minSizeMM / step) * step;
+    sizeMM < band.maxSizeMM;
     sizeMM += step
   ) {
     const contour = scaleContour(unitContour, sizeMM)
@@ -580,13 +543,13 @@ function judgeBand(
   // so exact duplicates compare +1 both ways — an intransitive comparator voids the sort
   // contract). Ties return 0; the stable sort then keeps deterministic consideration order.
   kept.sort((a, b) => {
-    if (better(a, b, band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) return -1
-    if (better(b, a, band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) return 1
+    if (better(a, b, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) return -1
+    if (better(b, a, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) return 1
     return 0
   })
   // THE OFFER IS A VERDICT (Dan, 2026-08-15: "look how many results"): only variants that pass
   // every hold law are offered at all — top held, bottom hanging at most as a limb, and the
-  // assembly on the shape's axis. The band then presents its few best, not the raw search.
+  // assembly on the shape's axis. The band presents the ranked lawful offers, not the raw search.
   const lawful = kept.filter(
     (v) =>
       (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
@@ -599,16 +562,8 @@ function judgeBand(
       // butterfly cross-wing diagonals) — on a mirror shape they are not options at all
       (!shapeSymmetric || pointsMirrorSymmetric(v.anchors.map((x) => x.p))),
   )
-  // ONE OFFER PER FOOTPRINT (the sparse law, operationalised — Dan: "96mm pair preferred and
-  // proven sufficient"): variants whose padded blocks occupy the same box at the same size are
-  // the same physical hold; the ranked-best (fewest magnets, by the sparse ordering above)
-  // keeps the chip, the rest are redundant middles.
-  // THE HONEST POPULATION LAW (Dan, 2026-08-15 23:47: the band-3 chip claimed 3 points while
-  // 5 lawful nodes sat in the same window — "not artificially claim 3 points fitting all 5").
-  // One footprint = one chip, and at the free bands (no target count) the chip belongs to the
-  // FULLEST lawful population of that footprint, never a subset. At counted bands (1–2) the
-  // target law owns the count and the ranked-best keeps the chip as before.
-  const fullest = band.targetMagnets === 0
+  // ONE OFFER PER FOOTPRINT: variants whose padded blocks occupy the same box at the same size
+  // are the same physical hold; the ranked-best keeps the chip.
   const footKey = (v: SizeVariant) => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
     for (const anchor of v.anchors) {
@@ -628,29 +583,10 @@ function judgeBand(
     if (!held) {
       byFoot.set(key, v)
       footOrder.push(key)
-    } else if (fullest && v.anchors.length > held.anchors.length) {
-      byFoot.set(key, v)
     }
   }
   const offered: SizeVariant[] = footOrder.map((k) => byFoot.get(k)!)
-  // THE BAND-GIFT LAW, reverse clause (Dan's calibration sweep, 2026-08-15: the band-2 single
-  // and band-3 48-pair were "not necessary" — each was a lower band's answer re-listed bigger
-  // and looser): a band offers what its size range UNLOCKS. A non-default variant whose layout
-  // already earned a chip in a lower band is an echo, not an option.
-  const halfPitch = spec.grid.basePitchMM / 2
-  // THE STEPPING LAW (canon band-4: "only the lattice step grows"): a stepped band may not
-  // re-offer a lower band's arrangement at all — not even as its default. Other bands keep
-  // their default exempt (the band's best answer stands even when a lower band shares it).
-  // THE GROWTH LAW (Dan, 2026-08-15 23:5x: "it must scale to include extra magnet disk
-  // minimum or entire column or row" — band 4 re-sold band 3's population at looser spacing,
-  // and band 3 re-sold band 2's pair): EVERY band's offer carries MORE magnets than the band
-  // below's answer and never repeats a lower band's arrangement. What a band unlocks is a
-  // bigger grid, not the same grid looser. (Where nothing grown seats, the fallback below
-  // still answers with the best hold-lawful placement — honesty over silence.)
-  const fresh = offered.filter(
-    (v) => !offeredBelow.has(layoutIdentity(v, halfPitch)) && v.anchors.length > prevCount,
-  )
-  let final = fresh.slice(0, calibration.optionsPerBand)
+  let final = offered
   // EVERY BAND ANSWERS (Dan: "each band must have at least one optimal layout") — but never
   // with a LAW-REJECTED placement (QA build-audit, 2026-08-15: the old kept[0] fallback could
   // emit an answer the hold laws refused). The fallback relaxes only the PREFERENCE filters
@@ -666,13 +602,12 @@ function judgeBand(
     )
     if (holdLawful) final = [holdLawful]
   }
-  for (const v of final) offeredBelow.add(layoutIdentity(v, halfPitch))
   return { band, variants: final }
 }
 
 /**
  * The whole deliverable for one cutout shape: normalize once, then per band search sizes and
- * placements, judge every lawful answer against the released flap/gravity/target laws, and
+ * placements, judge every lawful answer against the released flap/gravity laws, and
  * return each band's ordered variants. The verbatim engine does all the mathematics.
  */
 export function judgeShape(
@@ -701,10 +636,7 @@ export function judgeShape(
     const massCentre = deepestPointSampled(unitContour, calibration.massFieldSamples)
     massX = massCentre ? massCentre[0] : null
   }
-  const offeredBelow = new Set<string>()
   const bands: BandAnswer[] = []
-  let sizeFloorMM = 0
-  let prevCount = 0
   for (const band of calibration.bands) {
     const answer = judgeBand(
       spec,
@@ -713,15 +645,8 @@ export function judgeShape(
       unitContour,
       shapeSymmetric,
       massX,
-      offeredBelow,
-      sizeFloorMM,
       structure,
-      prevCount,
     )
-    if (answer.variants[0]) {
-      sizeFloorMM = answer.variants[0].sizeMM + calibration.bandSizeStepMM
-      prevCount = answer.variants[0].anchors.length
-    }
     bands.push(answer)
   }
   return { bands }

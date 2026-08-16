@@ -226,15 +226,8 @@ export interface BandSpec {
   /** Smallest and largest manufactured longest-side this band may publish, millimetres. */
   minSizeMM: number
   maxSizeMM: number
-  /** The band's ruled magnet count (canon walkthrough: band 1 is ONE, band 2 is TWO — every
-   *  ruled example; 0 = free, the structure law decides — band 3/4 vary by shape). */
-  targetMagnets: number
   /** Whether the product currently offers this band. Hidden bands still compute. */
   released: boolean
-  /** THE STEPPING LAW (canon band-4 rows: "the arrangement class carries across bands, only the
-   *  lattice step grows 48 -> 96"): a stepped band may not re-offer the previous band's answer —
-   *  its arrangement moves to the next step of the ladder. */
-  stepUp?: boolean
 }
 
 /**
@@ -242,9 +235,6 @@ export interface BandSpec {
  * already accepts (GridPlanOptions / SizeLaw). Nothing here invents a knob the engine lacks.
  */
 export interface CalibrationSpec {
-  /** The largest physically tested size — the judge's size sweep is CAPPED here (wired
-   *  per the meta build-audit: values that feed nothing are drift). */
-  maxTestedMM: number
   /** GridPlanOptions.plan — magnet sizing plan; 'auto' is the size-driven focal law. */
   plan: 'auto' | 'all6' | 'all8' | 'corners8'
   /** GridPlanOptions.center — where the rigid grid anchors. */
@@ -282,13 +272,6 @@ export interface CalibrationSpec {
   structureMassRatio: number
   /** The judge's size step inside a band, millimetres (sizes stay even). */
   sizeStepMM: number
-  /** How many curated variants a band OFFERS (Dan, 2026-08-15: "i need 1 optimal" — the band
-   *  is a verdict; one answer, not a menu). */
-  optionsPerBand: number
-  /** Band separation (Dan, 2026-08-15: "each band size must be not the same as other band size
-   *  in proximity, at least 1 24mm step larger") — a band's answer sits at least this far above
-   *  the previous band's. */
-  bandSizeStepMM: number
   /** THE STRIP LAW's link bound: the longest anchor-to-anchor link that still bonds material —
    *  the released vocabulary's own maximum, the 48x96 mixed-step diagonal sqrt(48^2+96^2) = 107.3 — the longest link any released arrangement carries (Dan's ruled canon triangle)
    *  (Dan's ruled canon triangle carries exactly this link; the 135.8 corner-fling stays out).
@@ -315,7 +298,6 @@ export interface LayoutTemplate {
 }
 
 export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
-  maxTestedMM: 214,
   plan: 'auto',
   center: 'centroid',
   flapTightMM: 12,
@@ -329,17 +311,15 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   structureDiagSlope: 0.35,
   structureMassRatio: 0.85,
   sizeStepMM: 2,
-  optionsPerBand: 1,
-  bandSizeStepMM: 24,
   stripLinkMM: 108,
   cornersMinExtentMM: 72,
   structureScanlines: 24,
   massFieldSamples: 40,
   bands: Object.freeze([
-    Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, targetMagnets: 1, released: false }),
-    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, targetMagnets: 2, released: true }),
-    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, targetMagnets: 0, released: true }),
-    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, targetMagnets: 0, released: false, stepUp: true }),
+    Object.freeze({ band: 1, minSizeMM: 24, maxSizeMM: 72, released: false }),
+    Object.freeze({ band: 2, minSizeMM: 72, maxSizeMM: 120, released: true }),
+    Object.freeze({ band: 3, minSizeMM: 120, maxSizeMM: 168, released: true }),
+    Object.freeze({ band: 4, minSizeMM: 168, maxSizeMM: 216, released: false }),
   ]) as readonly BandSpec[],
   // Dan's canon arrangements (2026-08-13 walkthrough): pair either way; the 48 square; the
   // 48-wide x 96-tall rectangle and its transpose; the 96 square; the six-point 48x96 blocks.
@@ -386,7 +366,6 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
 }) as CalibrationSpec
 
 export type CalibrationNumberKey =
-  | 'maxTestedMM'
   | 'flapTightMM'
   | 'flapMaxMM'
   | 'flapLimbMM'
@@ -401,13 +380,10 @@ export type CalibrationNumberKey =
   | 'structureTaperCorr'
   | 'structureDiagSlope'
   | 'structureMassRatio'
-  | 'optionsPerBand'
-  | 'bandSizeStepMM'
   | 'stripLinkMM'
 
 /** Bounds a calibration write must satisfy. Outside them the write is refused, not clamped. */
 const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: number }> = {
-  maxTestedMM: { min: 20, max: 1000 },
   flapTightMM: { min: 0, max: 60 },
   flapMaxMM: { min: 0, max: 80 },
   flapLimbMM: { min: 0, max: 120 },
@@ -422,13 +398,10 @@ const CALIBRATION_LIMITS: Record<CalibrationNumberKey, { min: number; max: numbe
   structureTaperCorr: { min: 0, max: 1 },
   structureDiagSlope: { min: 0, max: 1 },
   structureMassRatio: { min: 0, max: 1 },
-  optionsPerBand: { min: 1, max: 12 },
-  bandSizeStepMM: { min: 0, max: 96 },
   stripLinkMM: { min: 48, max: 136 },
 }
 
 const COUNT_KEYS: ReadonlySet<CalibrationNumberKey> = new Set([
-  'optionsPerBand',
   'structureScanlines',
   'massFieldSamples',
 ] as const)

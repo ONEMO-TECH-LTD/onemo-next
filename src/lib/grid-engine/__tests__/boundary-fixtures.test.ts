@@ -115,7 +115,7 @@ describe('waist ratio — one step below and above the released threshold resolv
 })
 
 describe('count-valued writers — whole numbers only, fractions refused never rounded (F1)', () => {
-  const COUNT_KEYS = ['optionsPerBand', 'structureScanlines', 'massFieldSamples'] as const
+  const COUNT_KEYS = ['structureScanlines', 'massFieldSamples'] as const
   for (const key of COUNT_KEYS) {
     it(`${key}: integer accepted, fraction refused as not-a-count`, () => {
       const mid = Math.ceil((RELEASED_CALIBRATION[key] as number + 1))
@@ -141,15 +141,12 @@ describe('guarded writer bounds — min/max accepted, one step outside refused',
     ['structureTaperCorr', 0, 1],
     ['structureDiagSlope', 0, 1],
     ['structureMassRatio', 0, 1],
-    ['optionsPerBand', 1, 12],
-    ['bandSizeStepMM', 0, 96],
     ['stripLinkMM', 48, 136],
     ['cornersMinExtentMM', 24, 216],
     ['structureScanlines', 8, 96],
     ['massFieldSamples', 8, 128],
-    ['maxTestedMM', 20, 1000],
   ]
-  const COUNTS = new Set(['optionsPerBand', 'structureScanlines', 'massFieldSamples'])
+  const COUNTS = new Set(['structureScanlines', 'massFieldSamples'])
   for (const [key, min, max] of NUMERIC) {
     it(`${key}: [${min}, ${max}] closed, outside refused`, () => {
       expect(applyCalibrationValue(RELEASED_CALIBRATION, key, min).refused).toBeUndefined()
