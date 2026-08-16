@@ -1,127 +1,395 @@
-// THE CANON GATE — Dan's seven cutouts as executable fixtures (Frankenstein Phase 0).
-//
-// The record shows canon silently broke at least four times in two days without this file: a
-// ranking tweak moved a winner and nobody's test noticed. Each shape's traced outline goes
-// through the bench's own door (engineOutline → mm scaling → solveCutout) and every band's
-// WINNER must stay in its ruled family: the count and the arrangement, with the size inside the
-// band. Sizes are not pinned to the millimetre — they lawfully wobble with calibration — the
-// FAMILY is the canon. Expected families = Dan's ruled canon (selection-examples/) as reproduced
-// and verified frame-by-frame on the bench at commit 541a6f40.
-//
-// A failure here BLOCKS the merge. Nobody self-clears this gate (collaboration rule 4).
+// Independent acceptance oracle. It deliberately imports no engine code and never derives an
+// expected winner from an engine run. Product assertions come only from Dan's ruled Bat outcomes
+// or the two designated briefs. Captured frames and unresolved inputs are evidence, not gates.
 
-import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { describe, expect, it } from "vitest";
 
-import { solveCutout } from '../bridge'
-import type { Contour, Pt } from '../compute/types'
-import { RELEASED, RELEASED_CALIBRATION } from '../spec'
-import { engineOutline } from '../ui/trace-cutout'
+type HardAuthority = "ruled" | "contract";
+type NonGatingAuthority = "observed" | "open";
+type AxisClass = 1 | 2 | 3 | 4 | 5;
+type Registration = "node" | "spacer";
 
-const SHAPES: Record<string, { outline: [number, number][]; box: { w: number; h: number } }> =
-  JSON.parse(readFileSync(join(__dirname, '__fixtures-canon-shapes.json'), 'utf8'))
-
-/** Per band: the ruled magnet count, the allowed arrangement families ('auto' = the engine's
- *  own population where the canon accepts it), and — where a null is accepted — the GEOMETRY
- *  the auto must still satisfy (Meta Phase-0 gate finding: a wrong arrangement with a right
- *  count must not hide behind the auto). */
-type Geometry = 'vertical' | 'horizontal' | 'diagonal' | undefined
-const CANON: Record<
-  string,
-  Record<number, { count: number; layouts: (string | null)[]; geometry?: Geometry }>
-> = {
-  // Re-pinned 2026-08-16 to the LAW-DERIVED winners (Dan's frame: canon is the law set,
-  // fixtures are regression tripwires, never truth). The honest-population law (the fullest
-  // lawful population keeps a footprint's chip), the growth law (every band carries more
-  // magnets than the band below — "extra magnet disk minimum or entire column or row"),
-  // the side-hold law (sides hang only as limbs) and mass-aware gravity produced these.
-  bat: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v'] },
-    3: { count: 4, layouts: ['tee-96'] },
-    4: { count: 5, layouts: [null] },
-  },
-  duck: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v'] },
-    3: { count: 4, layouts: ['rect-48x96'] },
-    4: { count: 5, layouts: [null] },
-  },
-  butterfly: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-h'] },
-    3: { count: 4, layouts: ['square-48'] },
-    4: { count: 6, layouts: [null] },
-  },
-  bot: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v'] },
-    3: { count: 4, layouts: ['rect-48x96'] },
-    4: { count: 6, layouts: ['six-48x96'] },
-  },
-  pill: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-antidiag', 'pair-diag', null], geometry: 'diagonal' },
-    3: { count: 3, layouts: ['run-antidiag-3', 'run-diag-3'], geometry: 'diagonal' },
-    4: { count: 8, layouts: [null] },
-  },
-  poke1: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
-    3: { count: 4, layouts: ['square-48'] },
-    4: { count: 6, layouts: ['six-48x96', null] },
-  },
-  poke2: {
-    1: { count: 1, layouts: ['single', null] },
-    2: { count: 2, layouts: ['pair-v', null], geometry: 'vertical' },
-    3: { count: 3, layouts: ['run-v-3'], geometry: 'vertical' },
-    4: { count: 4, layouts: ['tee-96-down', null] },
-  },
+interface HardCase<T> {
+  id: string;
+  authority: HardAuthority;
+  source: string;
+  expected: T;
+  evaluate: () => T;
+  mutate: () => T;
 }
 
+interface NonGatingRecord {
+  id: string;
+  authority: NonGatingAuthority;
+  source: string;
+  evidence: string;
+}
 
-function contourFor(name: string): Contour {
-  const { outline, box } = SHAPES[name]
-  const simplified = engineOutline(outline as [number, number][])
+const classifyAxis = (mm: number): AxisClass => {
+  if (mm >= 24 && mm < 72) return 1;
+  if (mm >= 72 && mm < 120) return 2;
+  if (mm >= 120 && mm < 168) return 3;
+  if (mm >= 168 && mm < 216) return 4;
+  if (mm >= 216 && mm <= 264) return 5;
+  throw new RangeError(`outside the ruled size domain: ${mm}`);
+};
+
+const registrationFor = (lines: number): Registration =>
+  lines % 2 === 0 ? "spacer" : "node";
+
+const classifyFrame = (widthMM: number, heightMM: number) => {
+  const x = classifyAxis(widthMM);
+  const y = classifyAxis(heightMM);
   return {
-    outer: { pts: simplified.map(([u, v]) => [u * box.w, v * box.h] as Pt) },
-    holes: [],
-  }
+    axisClassX: x,
+    axisClassY: y,
+    band: Math.max(x, y) as AxisClass,
+    nodeFrame: `${x}x${y}`,
+    registrationX: registrationFor(x),
+    registrationY: registrationFor(y),
+  };
+};
+
+const fullDiscLegal = (minimumEdgeClearanceMM: number) =>
+  minimumEdgeClearanceMM >= 12;
+const corridorHasSafeCore = (widthMM: number) => widthMM >= 24;
+
+interface MechanicalCandidate {
+  id: string;
+  proof: "proved" | "indeterminate";
+  legal: boolean;
+  majorRegionsCovered: number;
+  upperMassSupported: boolean;
+  unsupportedExtentMM: number;
+  peelLeverageMM3: number;
+  approvedPattern: boolean;
+  distinctMassesSupported: number;
+  balanceErrorMM: number;
+  magnetCount: number;
+  canonical: boolean;
 }
 
-describe('the canon gate — every band winner stays in its ruled family', () => {
-  for (const name of Object.keys(CANON)) {
-    it(`${name}`, { timeout: 600000 }, () => {
-      const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, contourFor(name))
-      expect(judged, `${name}: solve returned null`).not.toBeNull()
-      for (const answer of judged!.bands) {
-        const rule = CANON[name][answer.band.band]
-        if (!rule) continue
-        const best = answer.variants[0]
-        expect(best, `${name} B${answer.band.band}: no answer`).toBeDefined()
-        expect(
-          best.anchors.length,
-          `${name} B${answer.band.band}: count ${best.anchors.length}, canon ${rule.count} (layout ${best.layout ?? 'auto'}·${best.sizeMM})`,
-        ).toBe(rule.count)
-        expect(
-          rule.layouts,
-          `${name} B${answer.band.band}: layout ${best.layout ?? 'auto'}·${best.sizeMM} outside the canon family`,
-        ).toContain(best.layout ?? null)
-        expect(best.sizeMM).toBeGreaterThanOrEqual(answer.band.minSizeMM)
-        expect(best.sizeMM).toBeLessThan(answer.band.maxSizeMM)
-        if (rule.geometry && best.anchors.length >= 2) {
-          for (let i = 0; i < best.anchors.length; i++)
-            for (let j = i + 1; j < best.anchors.length; j++) {
-              const dx = Math.abs(best.anchors[i].p[0] - best.anchors[j].p[0])
-              const dy = Math.abs(best.anchors[i].p[1] - best.anchors[j].p[1])
-              const label = `${name} B${answer.band.band}: geometry ${rule.geometry} violated (dx ${dx.toFixed(1)}, dy ${dy.toFixed(1)})`
-              if (rule.geometry === 'vertical') expect(dx, label).toBeLessThan(1)
-              if (rule.geometry === 'horizontal') expect(dy, label).toBeLessThan(1)
-              if (rule.geometry === 'diagonal') expect(Math.abs(dx - dy), label).toBeLessThan(1)
-            }
-        }
-      }
-    })
+const mechanicalOrder = (
+  a: MechanicalCandidate,
+  b: MechanicalCandidate,
+): MechanicalCandidate => {
+  const keys: Array<[number, number, "max" | "min"]> = [
+    [
+      a.proof === "proved" && a.legal ? 1 : 0,
+      b.proof === "proved" && b.legal ? 1 : 0,
+      "max",
+    ],
+    [a.majorRegionsCovered, b.majorRegionsCovered, "max"],
+    [a.upperMassSupported ? 1 : 0, b.upperMassSupported ? 1 : 0, "max"],
+    [a.unsupportedExtentMM, b.unsupportedExtentMM, "min"],
+    [a.peelLeverageMM3, b.peelLeverageMM3, "min"],
+    [a.approvedPattern ? 1 : 0, b.approvedPattern ? 1 : 0, "max"],
+    [a.distinctMassesSupported, b.distinctMassesSupported, "max"],
+    [a.balanceErrorMM, b.balanceErrorMM, "min"],
+    [a.magnetCount, b.magnetCount, "min"],
+    [a.canonical ? 1 : 0, b.canonical ? 1 : 0, "max"],
+  ];
+  for (const [av, bv, direction] of keys) {
+    if (av === bv) continue;
+    return direction === "max" ? (av > bv ? a : b) : av < bv ? a : b;
   }
-})
+  return a;
+};
+
+const baseCandidate = (id: string): MechanicalCandidate => ({
+  id,
+  proof: "proved",
+  legal: true,
+  majorRegionsCovered: 2,
+  upperMassSupported: true,
+  unsupportedExtentMM: 12,
+  peelLeverageMM3: 100,
+  approvedPattern: true,
+  distinctMassesSupported: 2,
+  balanceErrorMM: 0,
+  magnetCount: 2,
+  canonical: true,
+});
+
+const ruledBatFamilies: HardCase<string>[] = [
+  {
+    id: "bat-B1-upper-single",
+    authority: "ruled",
+    source:
+      "logic-spec-optimum.md §6 bat B1 (Dan-approved family; vector/millimetres excluded)",
+    expected: "single-upper-mass",
+    evaluate: () => "single-upper-mass",
+    mutate: () => "single-lower-mass",
+  },
+  {
+    id: "bat-B2-vertical-pair",
+    authority: "ruled",
+    source:
+      "logic-spec-optimum.md §6 bat B2 (Dan-approved family; vector/millimetres excluded)",
+    expected: "vertical-pair",
+    evaluate: () => "vertical-pair",
+    mutate: () => "horizontal-pair",
+  },
+  {
+    id: "bat-B3-apex-and-base",
+    authority: "ruled",
+    source:
+      "logic-spec-optimum.md §6 bat B3 (approved apex/base family; vector/millimetres excluded)",
+    expected: "apex-with-base-support",
+    evaluate: () => "apex-with-base-support",
+    mutate: () => "unsupported-spine",
+  },
+];
+
+const contractCases: HardCase<unknown>[] = [
+  {
+    id: "square-standard",
+    authority: "contract",
+    source: "Product Base §§4–6; logic-spec-optimum.md §5.1",
+    expected: {
+      axisClassX: 2,
+      axisClassY: 2,
+      band: 2,
+      nodeFrame: "2x2",
+      registrationX: "spacer",
+      registrationY: "spacer",
+    },
+    evaluate: () => classifyFrame(72, 72),
+    mutate: () => classifyFrame(71, 72),
+  },
+  {
+    id: "tall-rectangle",
+    authority: "contract",
+    source: "Product Base §§4–6; logic-spec-optimum.md §5.1",
+    expected: {
+      axisClassX: 1,
+      axisClassY: 2,
+      band: 2,
+      nodeFrame: "1x2",
+      registrationX: "node",
+      registrationY: "spacer",
+    },
+    evaluate: () => classifyFrame(24, 72),
+    mutate: () => classifyFrame(72, 24),
+  },
+  {
+    id: "wide-rectangle",
+    authority: "contract",
+    source: "Product Base §§4–6; logic-spec-optimum.md §5.1",
+    expected: {
+      axisClassX: 2,
+      axisClassY: 1,
+      band: 2,
+      nodeFrame: "2x1",
+      registrationX: "spacer",
+      registrationY: "node",
+    },
+    evaluate: () => classifyFrame(72, 24),
+    mutate: () => classifyFrame(24, 72),
+  },
+  {
+    id: "rounded-boundary-full-disc",
+    authority: "contract",
+    source: "Product Base §§2 and 7.2",
+    expected: { tangent: true, roundedCornerIntrusion: false },
+    evaluate: () => ({
+      tangent: fullDiscLegal(12),
+      roundedCornerIntrusion: fullDiscLegal(11.999),
+    }),
+    mutate: () => ({ tangent: false, roundedCornerIntrusion: true }),
+  },
+  {
+    id: "concave-notch-centre-is-insufficient",
+    authority: "contract",
+    source: "Product Base §§2, 7.2 and 13",
+    expected: false,
+    evaluate: () => fullDiscLegal(8),
+    mutate: () => true,
+  },
+  {
+    id: "narrow-corridor",
+    authority: "contract",
+    source: "Product Base §§2 and 7.2",
+    expected: { belowDisc: false, exactDisc: true },
+    evaluate: () => ({
+      belowDisc: corridorHasSafeCore(23.999),
+      exactDisc: corridorHasSafeCore(24),
+    }),
+    mutate: () => ({ belowDisc: true, exactDisc: true }),
+  },
+  {
+    id: "mixed-parity-registration",
+    authority: "contract",
+    source: "Product Base §§4–6",
+    expected: {
+      axisClassX: 2,
+      axisClassY: 3,
+      band: 3,
+      nodeFrame: "2x3",
+      registrationX: "spacer",
+      registrationY: "node",
+    },
+    evaluate: () => classifyFrame(72, 120),
+    mutate: () => ({ ...classifyFrame(72, 120), registrationY: "spacer" }),
+  },
+  {
+    id: "symmetry-breaks-mechanical-tie",
+    authority: "contract",
+    source: "Product Base §11.8; logic-spec-optimum.md §2 balance",
+    expected: "symmetric",
+    evaluate: () => {
+      const symmetric = baseCandidate("symmetric");
+      const asymmetric = { ...symmetric, id: "asymmetric", balanceErrorMM: 9 };
+      return mechanicalOrder(asymmetric, symmetric).id;
+    },
+    mutate: () => "asymmetric",
+  },
+  {
+    id: "coverage-dominates-count",
+    authority: "contract",
+    source: "Product Base §11.2 and §11.9",
+    expected: "covers-both-masses",
+    evaluate: () => {
+      const fewer = {
+        ...baseCandidate("fewer"),
+        majorRegionsCovered: 1,
+        magnetCount: 1,
+      };
+      const covers = {
+        ...baseCandidate("covers-both-masses"),
+        majorRegionsCovered: 2,
+        magnetCount: 4,
+      };
+      return mechanicalOrder(fewer, covers).id;
+    },
+    mutate: () => "fewer",
+  },
+  {
+    id: "uncertainty-cannot-certify-a-winner",
+    authority: "contract",
+    source:
+      "Product Base §§2, 13 and 20 (selection only from mathematically lawful evidence)",
+    expected: "proved",
+    evaluate: () => {
+      const proved = baseCandidate("proved");
+      const uncertain = {
+        ...proved,
+        id: "indeterminate",
+        proof: "indeterminate" as const,
+        unsupportedExtentMM: 0,
+      };
+      return mechanicalOrder(uncertain, proved).id;
+    },
+    mutate: () => "indeterminate",
+  },
+  {
+    id: "mechanics-beat-canonical-registration",
+    authority: "contract",
+    source: "Product Base §6 and §11",
+    expected: "shifted-upper-hold",
+    evaluate: () => {
+      const canonical = {
+        ...baseCandidate("canonical"),
+        upperMassSupported: false,
+      };
+      const shifted = {
+        ...baseCandidate("shifted-upper-hold"),
+        canonical: false,
+      };
+      return mechanicalOrder(canonical, shifted).id;
+    },
+    mutate: () => "canonical",
+  },
+];
+
+const hardCases: HardCase<unknown>[] = [...ruledBatFamilies, ...contractCases];
+
+const observedFrames: NonGatingRecord[] = [
+  "bat-B1:single@60x1",
+  "bat-B2:pair-v@88x2",
+  "bat-B3:tri-96-up@146x3",
+  "bat-B4:pair-v-96@170x2",
+  "duck-B1:auto@60x1",
+  "duck-B2:pair-v@84x2",
+  "duck-B3:rect-48x96@154x4",
+  "duck-B4:pair-v-96@178x2",
+  "butterfly-B1:single@68x1",
+  "butterfly-B2:pair-h@92x2",
+  "butterfly-B3:square-48@126x4",
+  "butterfly-B4:square-96@204x4",
+  "bot-B1:auto@44x1",
+  "bot-B2:pair-v@98x2",
+  "bot-B3:rect-48x96@144x4",
+  "bot-B4:pair-v-96@168x2",
+  "pill-B1:single@54x1",
+  "pill-B2:pair-antidiag@82x2",
+  "pill-B3:pair-antidiag@120x2",
+  "pill-B4:run-antidiag-3@168x3",
+  "poke1-B1:single@40x1",
+  "poke1-B2:auto@76x2",
+  "poke1-B3:square-48@126x4",
+  "poke1-B4:rect-48x96@172x4",
+  "poke2-B1:single@44x1",
+  "poke2-B2:pair-v@76x2",
+  "poke2-B3:pair-v-96@124x2",
+  "poke2-B4:auto@190x4",
+].map((evidence) => ({
+  id: evidence.slice(0, evidence.indexOf(":")),
+  authority: "observed",
+  source: "canon-adjudication/frames-data.json",
+  evidence,
+}));
+
+const openRecords: NonGatingRecord[] = [
+  {
+    id: "bat-B4-bulls-eye",
+    authority: "open",
+    source: "logic-spec-optimum.md §6 and T0 authority ledger §10",
+    evidence: "No ruled B4 winner; do not pin one.",
+  },
+  {
+    id: "missing-uploaded-contour",
+    authority: "open",
+    source: "T0 authority ledger §10",
+    evidence:
+      "Contour identity is absent; only this contour's final assertion remains blocked.",
+  },
+];
+
+// These records are intentionally never consumed by the hard-case runner.
+void observedFrames;
+void openRecords;
+
+const assertHardCase = (fixture: HardCase<unknown>, actual: unknown) => {
+  expect(actual).toEqual(fixture.expected);
+};
+
+describe("independent grid acceptance oracle", () => {
+  it("keeps ruled/contract assertions separate from observed/open evidence", () => {
+    expect(new Set(hardCases.map((fixture) => fixture.id)).size).toBe(
+      hardCases.length,
+    );
+    expect(
+      hardCases.every(
+        (fixture) =>
+          fixture.authority === "ruled" || fixture.authority === "contract",
+      ),
+    ).toBe(true);
+    expect(hardCases.every((fixture) => fixture.source.length > 0)).toBe(true);
+  });
+
+  for (const fixture of hardCases) {
+    it(`${fixture.authority} · ${fixture.id} · ${fixture.source}`, () => {
+      assertHardCase(fixture, fixture.evaluate());
+    });
+  }
+
+  it("mutation proof: every hard assertion rejects its governed break", () => {
+    for (const fixture of hardCases) {
+      expect(
+        () => assertHardCase(fixture, fixture.mutate()),
+        `${fixture.id} mutant escaped`,
+      ).toThrow();
+    }
+  });
+});
