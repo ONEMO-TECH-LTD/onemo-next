@@ -1,21 +1,106 @@
-// Independent acceptance oracle. It deliberately imports no engine code and never derives an
-// expected winner from an engine run. Product assertions come only from Dan's ruled Bat outcomes
-// or the two designated briefs. Captured frames and unresolved inputs are evidence, not gates.
+// Independent acceptance oracle: executable inputs plus source-grounded expected results.
+// It implements no geometry, classification or selection. Later stages supply SubjectAdapter;
+// captured frames and unresolved inputs remain evidence, never expected answers.
 
 import { describe, expect, it } from "vitest";
 
+type PointMM = readonly [number, number];
 type HardAuthority = "ruled" | "contract";
 type NonGatingAuthority = "observed" | "open";
-type AxisClass = 1 | 2 | 3 | 4 | 5;
-type Registration = "node" | "spacer";
 
-interface HardCase<T> {
+interface ContourFixture {
+  outer: readonly PointMM[];
+  holes: readonly [];
+}
+
+interface SelectionCandidate {
+  id: string;
+  legality: "CERTIFIED";
+  majorRegionsCovered: number;
+  upperMassSupported: boolean;
+  unsupportedExtent:
+    | { status: "CERTIFIED"; valueMM: number }
+    | { status: "SCORE_UNCERTAIN"; lowerBoundMM: number; upperBoundMM: number };
+  peelLeverageMM3: number;
+  approvedPattern: boolean;
+  distinctMassesSupported: number;
+  balanceErrorMM: number;
+  mirrorSymmetric: boolean;
+  magnetCount: number;
+  canonicalRegistration: boolean;
+}
+
+type OracleInput =
+  | {
+      id: string;
+      kind: "classification";
+      boundingBoxMM: { width: number; height: number };
+    }
+  | {
+      id: string;
+      kind: "legality";
+      contour: ContourFixture;
+      requiredDiscRadiusMM: 12;
+      probes: ReadonlyArray<{ id: string; centreMM: PointMM }>;
+    }
+  | {
+      id: string;
+      kind: "selection";
+      shapeMirrorSymmetric: boolean;
+      candidates: readonly SelectionCandidate[];
+    }
+  | {
+      id: string;
+      kind: "bat-family";
+      band: 1 | 2 | 3;
+      geometryHash: null;
+    };
+
+type OracleResult =
+  | {
+      kind: "classification";
+      axisClassX: 1 | 2 | 3 | 4 | 5;
+      axisClassY: 1 | 2 | 3 | 4 | 5;
+      band: 1 | 2 | 3 | 4 | 5;
+      nodeFrame: string;
+      registrationX: "node" | "spacer";
+      registrationY: "node" | "spacer";
+    }
+  | {
+      kind: "legality";
+      safeCore: "NON_EMPTY" | "EMPTY";
+      probes: ReadonlyArray<{
+        id: string;
+        fullDiscContained: boolean;
+        minimumClearanceMM: number;
+        boundaryWitnessMM: PointMM;
+      }>;
+    }
+  | {
+      kind: "selection";
+      status: "SELECTED" | "DECISION_INDETERMINATE";
+      winnerId: string | null;
+      decisiveCriterion: string;
+    }
+  | {
+      kind: "bat-family";
+      band: 1 | 2 | 3;
+      layoutFamily:
+        "single-upper-mass" | "vertical-pair" | "apex-with-base-support";
+    };
+
+interface ResultMutation {
+  name: string;
+  apply: (result: OracleResult) => OracleResult;
+}
+
+interface HardCase {
   id: string;
   authority: HardAuthority;
   source: string;
-  expected: T;
-  evaluate: () => T;
-  mutate: () => T;
+  input: OracleInput;
+  expected: OracleResult;
+  mutations: readonly ResultMutation[];
 }
 
 interface NonGatingRecord {
@@ -25,203 +110,293 @@ interface NonGatingRecord {
   evidence: string;
 }
 
-const classifyAxis = (mm: number): AxisClass => {
-  if (mm >= 24 && mm < 72) return 1;
-  if (mm >= 72 && mm < 120) return 2;
-  if (mm >= 120 && mm < 168) return 3;
-  if (mm >= 168 && mm < 216) return 4;
-  if (mm >= 216 && mm <= 264) return 5;
-  throw new RangeError(`outside the ruled size domain: ${mm}`);
+type SubjectAdapter = (input: OracleInput) => OracleResult;
+
+const assertOracleCase = (fixture: HardCase, subject: SubjectAdapter) => {
+  expect(subject(fixture.input)).toEqual(fixture.expected);
 };
 
-const registrationFor = (lines: number): Registration =>
-  lines % 2 === 0 ? "spacer" : "node";
-
-const classifyFrame = (widthMM: number, heightMM: number) => {
-  const x = classifyAxis(widthMM);
-  const y = classifyAxis(heightMM);
-  return {
-    axisClassX: x,
-    axisClassY: y,
-    band: Math.max(x, y) as AxisClass,
-    nodeFrame: `${x}x${y}`,
-    registrationX: registrationFor(x),
-    registrationY: registrationFor(y),
+const harnessSubject =
+  (inputId: string, result: OracleResult): SubjectAdapter =>
+  (input) => {
+    if (input.id !== inputId)
+      throw new Error(`adapter received ${input.id}, expected ${inputId}`);
+    return result;
   };
-};
 
-const fullDiscLegal = (minimumEdgeClearanceMM: number) =>
-  minimumEdgeClearanceMM >= 12;
-const corridorHasSafeCore = (widthMM: number) => widthMM >= 24;
+const mutate = (
+  name: string,
+  apply: (result: OracleResult) => OracleResult,
+): ResultMutation => ({ name, apply });
 
-interface MechanicalCandidate {
-  id: string;
-  proof: "proved" | "indeterminate";
-  legal: boolean;
-  majorRegionsCovered: number;
-  upperMassSupported: boolean;
-  unsupportedExtentMM: number;
-  peelLeverageMM3: number;
-  approvedPattern: boolean;
-  distinctMassesSupported: number;
-  balanceErrorMM: number;
-  magnetCount: number;
-  canonical: boolean;
-}
+const patchResult = (
+  name: string,
+  patch: Partial<OracleResult>,
+): ResultMutation =>
+  mutate(name, (result) => ({ ...result, ...patch }) as OracleResult);
 
-const mechanicalOrder = (
-  a: MechanicalCandidate,
-  b: MechanicalCandidate,
-): MechanicalCandidate => {
-  const keys: Array<[number, number, "max" | "min"]> = [
-    [
-      a.proof === "proved" && a.legal ? 1 : 0,
-      b.proof === "proved" && b.legal ? 1 : 0,
-      "max",
-    ],
-    [a.majorRegionsCovered, b.majorRegionsCovered, "max"],
-    [a.upperMassSupported ? 1 : 0, b.upperMassSupported ? 1 : 0, "max"],
-    [a.unsupportedExtentMM, b.unsupportedExtentMM, "min"],
-    [a.peelLeverageMM3, b.peelLeverageMM3, "min"],
-    [a.approvedPattern ? 1 : 0, b.approvedPattern ? 1 : 0, "max"],
-    [a.distinctMassesSupported, b.distinctMassesSupported, "max"],
-    [a.balanceErrorMM, b.balanceErrorMM, "min"],
-    [a.magnetCount, b.magnetCount, "min"],
-    [a.canonical ? 1 : 0, b.canonical ? 1 : 0, "max"],
-  ];
-  for (const [av, bv, direction] of keys) {
-    if (av === bv) continue;
-    return direction === "max" ? (av > bv ? a : b) : av < bv ? a : b;
-  }
-  return a;
-};
-
-const baseCandidate = (id: string): MechanicalCandidate => ({
+const candidate = (
+  id: string,
+  overrides: Partial<SelectionCandidate> = {},
+): SelectionCandidate => ({
   id,
-  proof: "proved",
-  legal: true,
+  legality: "CERTIFIED",
   majorRegionsCovered: 2,
   upperMassSupported: true,
-  unsupportedExtentMM: 12,
+  unsupportedExtent: { status: "CERTIFIED", valueMM: 12 },
   peelLeverageMM3: 100,
   approvedPattern: true,
   distinctMassesSupported: 2,
   balanceErrorMM: 0,
+  mirrorSymmetric: false,
   magnetCount: 2,
-  canonical: true,
+  canonicalRegistration: false,
+  ...overrides,
 });
 
-const ruledBatFamilies: HardCase<string>[] = [
-  {
-    id: "bat-B1-upper-single",
-    authority: "ruled",
-    source:
-      "logic-spec-optimum.md §6 bat B1 (Dan-approved family; vector/millimetres excluded)",
-    expected: "single-upper-mass",
-    evaluate: () => "single-upper-mass",
-    mutate: () => "single-lower-mass",
-  },
-  {
-    id: "bat-B2-vertical-pair",
-    authority: "ruled",
-    source:
-      "logic-spec-optimum.md §6 bat B2 (Dan-approved family; vector/millimetres excluded)",
-    expected: "vertical-pair",
-    evaluate: () => "vertical-pair",
-    mutate: () => "horizontal-pair",
-  },
-  {
-    id: "bat-B3-apex-and-base",
-    authority: "ruled",
-    source:
-      "logic-spec-optimum.md §6 bat B3 (approved apex/base family; vector/millimetres excluded)",
-    expected: "apex-with-base-support",
-    evaluate: () => "apex-with-base-support",
-    mutate: () => "unsupported-spine",
-  },
+const selected = (
+  winnerId: string,
+  decisiveCriterion: string,
+): OracleResult => ({
+  kind: "selection",
+  status: "SELECTED",
+  winnerId,
+  decisiveCriterion,
+});
+
+const classificationMutations: readonly ResultMutation[] = [
+  mutate("axis class", (result) => ({
+    ...(result as Extract<OracleResult, { kind: "classification" }>),
+    axisClassX:
+      result.kind === "classification" && result.axisClassX === 1 ? 2 : 1,
+  })),
+  patchResult("frame", { nodeFrame: "wrong-frame" }),
+  mutate("parity registration", (result) => ({
+    ...(result as Extract<OracleResult, { kind: "classification" }>),
+    registrationY:
+      result.kind === "classification" && result.registrationY === "node"
+        ? "spacer"
+        : "node",
+  })),
 ];
 
-const contractCases: HardCase<unknown>[] = [
-  {
-    id: "square-standard",
-    authority: "contract",
-    source: "Product Base §§4–6; logic-spec-optimum.md §5.1",
-    expected: {
-      axisClassX: 2,
-      axisClassY: 2,
-      band: 2,
-      nodeFrame: "2x2",
-      registrationX: "spacer",
-      registrationY: "spacer",
-    },
-    evaluate: () => classifyFrame(72, 72),
-    mutate: () => classifyFrame(71, 72),
-  },
-  {
-    id: "tall-rectangle",
-    authority: "contract",
-    source: "Product Base §§4–6; logic-spec-optimum.md §5.1",
-    expected: {
-      axisClassX: 1,
-      axisClassY: 2,
-      band: 2,
-      nodeFrame: "1x2",
-      registrationX: "node",
-      registrationY: "spacer",
-    },
-    evaluate: () => classifyFrame(24, 72),
-    mutate: () => classifyFrame(72, 24),
-  },
-  {
-    id: "wide-rectangle",
-    authority: "contract",
-    source: "Product Base §§4–6; logic-spec-optimum.md §5.1",
-    expected: {
-      axisClassX: 2,
-      axisClassY: 1,
-      band: 2,
-      nodeFrame: "2x1",
-      registrationX: "spacer",
-      registrationY: "node",
-    },
-    evaluate: () => classifyFrame(72, 24),
-    mutate: () => classifyFrame(24, 72),
-  },
+const batCase = (
+  band: 1 | 2 | 3,
+  id: string,
+  layoutFamily: Extract<OracleResult, { kind: "bat-family" }>["layoutFamily"],
+  brokenFamily: Extract<OracleResult, { kind: "bat-family" }>["layoutFamily"],
+): HardCase => ({
+  id,
+  authority: "ruled",
+  source: `logic-spec-optimum.md §6 bat B${band} (family only; vector and millimetres excluded)`,
+  input: { id, kind: "bat-family", band, geometryHash: null },
+  expected: { kind: "bat-family", band, layoutFamily },
+  mutations: [patchResult("layout family", { layoutFamily: brokenFamily })],
+});
+
+const classificationCase = (
+  id: string,
+  width: number,
+  height: number,
+  expected: Extract<OracleResult, { kind: "classification" }>,
+  source = "Product Base §§4–6; logic-spec-optimum.md §5.1",
+): HardCase => ({
+  id,
+  authority: "contract",
+  source,
+  input: { id, kind: "classification", boundingBoxMM: { width, height } },
+  expected,
+  mutations: classificationMutations,
+});
+
+const roundedContour: ContourFixture = {
+  outer: [
+    [12, 0],
+    [28, 0],
+    [40, 12],
+    [40, 28],
+    [28, 40],
+    [12, 40],
+    [0, 28],
+    [0, 12],
+  ],
+  holes: [],
+};
+
+const notchedContour: ContourFixture = {
+  outer: [
+    [0, 0],
+    [100, 0],
+    [100, 40],
+    [55, 40],
+    [55, 60],
+    [100, 60],
+    [100, 100],
+    [0, 100],
+  ],
+  holes: [],
+};
+
+const corridorContour: ContourFixture = {
+  outer: [
+    [0, 0],
+    [23, 0],
+    [23, 80],
+    [0, 80],
+  ],
+  holes: [],
+};
+
+const hardCases: HardCase[] = [
+  batCase(1, "bat-B1-upper-single", "single-upper-mass", "vertical-pair"),
+  batCase(2, "bat-B2-vertical-pair", "vertical-pair", "single-upper-mass"),
+  batCase(3, "bat-B3-apex-and-base", "apex-with-base-support", "vertical-pair"),
+  classificationCase("square-standard", 72, 72, {
+    kind: "classification",
+    axisClassX: 2,
+    axisClassY: 2,
+    band: 2,
+    nodeFrame: "2x2",
+    registrationX: "spacer",
+    registrationY: "spacer",
+  }),
+  classificationCase("tall-rectangle", 24, 72, {
+    kind: "classification",
+    axisClassX: 1,
+    axisClassY: 2,
+    band: 2,
+    nodeFrame: "1x2",
+    registrationX: "node",
+    registrationY: "spacer",
+  }),
+  classificationCase("wide-rectangle", 72, 24, {
+    kind: "classification",
+    axisClassX: 2,
+    axisClassY: 1,
+    band: 2,
+    nodeFrame: "2x1",
+    registrationX: "spacer",
+    registrationY: "node",
+  }),
   {
     id: "rounded-boundary-full-disc",
     authority: "contract",
     source: "Product Base §§2 and 7.2",
-    expected: { tangent: true, roundedCornerIntrusion: false },
-    evaluate: () => ({
-      tangent: fullDiscLegal(12),
-      roundedCornerIntrusion: fullDiscLegal(11.999),
-    }),
-    mutate: () => ({ tangent: false, roundedCornerIntrusion: true }),
+    input: {
+      id: "rounded-boundary-full-disc",
+      kind: "legality",
+      contour: roundedContour,
+      requiredDiscRadiusMM: 12,
+      probes: [
+        { id: "tangent", centreMM: [20, 12] },
+        { id: "intruding", centreMM: [20, 10] },
+      ],
+    },
+    expected: {
+      kind: "legality",
+      safeCore: "NON_EMPTY",
+      probes: [
+        {
+          id: "tangent",
+          fullDiscContained: true,
+          minimumClearanceMM: 12,
+          boundaryWitnessMM: [20, 0],
+        },
+        {
+          id: "intruding",
+          fullDiscContained: false,
+          minimumClearanceMM: 10,
+          boundaryWitnessMM: [20, 0],
+        },
+      ],
+    },
+    mutations: [
+      mutate("tangency", (result) => {
+        const legal = result as Extract<OracleResult, { kind: "legality" }>;
+        return {
+          ...legal,
+          probes: [
+            { ...legal.probes[0], fullDiscContained: false },
+            legal.probes[1],
+          ],
+        };
+      }),
+      mutate("intrusion", (result) => {
+        const legal = result as Extract<OracleResult, { kind: "legality" }>;
+        return {
+          ...legal,
+          probes: [
+            legal.probes[0],
+            { ...legal.probes[1], fullDiscContained: true },
+          ],
+        };
+      }),
+    ],
   },
   {
     id: "concave-notch-centre-is-insufficient",
     authority: "contract",
     source: "Product Base §§2, 7.2 and 13",
-    expected: false,
-    evaluate: () => fullDiscLegal(8),
-    mutate: () => true,
+    input: {
+      id: "concave-notch-centre-is-insufficient",
+      kind: "legality",
+      contour: notchedContour,
+      requiredDiscRadiusMM: 12,
+      probes: [{ id: "notch-wall", centreMM: [50, 50] }],
+    },
+    expected: {
+      kind: "legality",
+      safeCore: "NON_EMPTY",
+      probes: [
+        {
+          id: "notch-wall",
+          fullDiscContained: false,
+          minimumClearanceMM: 5,
+          boundaryWitnessMM: [55, 50],
+        },
+      ],
+    },
+    mutations: [
+      mutate("concave witness", (result) => {
+        const legal = result as Extract<OracleResult, { kind: "legality" }>;
+        return {
+          ...legal,
+          probes: [{ ...legal.probes[0], fullDiscContained: true }],
+        };
+      }),
+    ],
   },
   {
     id: "narrow-corridor",
     authority: "contract",
     source: "Product Base §§2 and 7.2",
-    expected: { belowDisc: false, exactDisc: true },
-    evaluate: () => ({
-      belowDisc: corridorHasSafeCore(23.999),
-      exactDisc: corridorHasSafeCore(24),
-    }),
-    mutate: () => ({ belowDisc: true, exactDisc: true }),
-  },
-  {
-    id: "mixed-parity-registration",
-    authority: "contract",
-    source: "Product Base §§4–6",
+    input: {
+      id: "narrow-corridor",
+      kind: "legality",
+      contour: corridorContour,
+      requiredDiscRadiusMM: 12,
+      probes: [{ id: "corridor-midline", centreMM: [11.5, 40] }],
+    },
     expected: {
+      kind: "legality",
+      safeCore: "EMPTY",
+      probes: [
+        {
+          id: "corridor-midline",
+          fullDiscContained: false,
+          minimumClearanceMM: 11.5,
+          boundaryWitnessMM: [0, 40],
+        },
+      ],
+    },
+    mutations: [patchResult("empty safe core", { safeCore: "NON_EMPTY" })],
+  },
+  classificationCase(
+    "mixed-parity-registration",
+    72,
+    120,
+    {
+      kind: "classification",
       axisClassX: 2,
       axisClassY: 3,
       band: 3,
@@ -229,80 +404,109 @@ const contractCases: HardCase<unknown>[] = [
       registrationX: "spacer",
       registrationY: "node",
     },
-    evaluate: () => classifyFrame(72, 120),
-    mutate: () => ({ ...classifyFrame(72, 120), registrationY: "spacer" }),
-  },
+    "Product Base §§4–6",
+  ),
   {
     id: "symmetry-breaks-mechanical-tie",
     authority: "contract",
     source: "Product Base §11.8; logic-spec-optimum.md §2 balance",
-    expected: "symmetric",
-    evaluate: () => {
-      const symmetric = baseCandidate("symmetric");
-      const asymmetric = { ...symmetric, id: "asymmetric", balanceErrorMM: 9 };
-      return mechanicalOrder(asymmetric, symmetric).id;
+    input: {
+      id: "symmetry-breaks-mechanical-tie",
+      kind: "selection",
+      shapeMirrorSymmetric: true,
+      candidates: [
+        candidate("symmetric", { mirrorSymmetric: true }),
+        candidate("symmetry-broken"),
+      ],
     },
-    mutate: () => "asymmetric",
+    expected: selected("symmetric", "SYMMETRY"),
+    mutations: [
+      patchResult("symmetry-only tie", { winnerId: "symmetry-broken" }),
+    ],
   },
   {
     id: "coverage-dominates-count",
     authority: "contract",
     source: "Product Base §11.2 and §11.9",
-    expected: "covers-both-masses",
-    evaluate: () => {
-      const fewer = {
-        ...baseCandidate("fewer"),
-        majorRegionsCovered: 1,
-        magnetCount: 1,
-      };
-      const covers = {
-        ...baseCandidate("covers-both-masses"),
-        majorRegionsCovered: 2,
-        magnetCount: 4,
-      };
-      return mechanicalOrder(fewer, covers).id;
+    input: {
+      id: "coverage-dominates-count",
+      kind: "selection",
+      shapeMirrorSymmetric: false,
+      candidates: [
+        candidate("fewer", {
+          majorRegionsCovered: 1,
+          distinctMassesSupported: 1,
+          magnetCount: 1,
+        }),
+        candidate("covers-both-masses", { magnetCount: 4 }),
+      ],
     },
-    mutate: () => "fewer",
+    expected: selected("covers-both-masses", "MAJOR_REGION_COVERAGE"),
+    mutations: [
+      patchResult("count before coverage", {
+        winnerId: "fewer",
+        decisiveCriterion: "MAGNET_COUNT",
+      }),
+    ],
   },
   {
-    id: "uncertainty-cannot-certify-a-winner",
+    id: "uncertain-dominance-is-indeterminate",
     authority: "contract",
-    source:
-      "Product Base §§2, 13 and 20 (selection only from mathematically lawful evidence)",
-    expected: "proved",
-    evaluate: () => {
-      const proved = baseCandidate("proved");
-      const uncertain = {
-        ...proved,
-        id: "indeterminate",
-        proof: "indeterminate" as const,
-        unsupportedExtentMM: 0,
-      };
-      return mechanicalOrder(uncertain, proved).id;
+    source: "FINAL-CONSOLIDATED-PROPOSAL.md T5.3–T5.5",
+    input: {
+      id: "uncertain-dominance-is-indeterminate",
+      kind: "selection",
+      shapeMirrorSymmetric: false,
+      candidates: [
+        candidate("certified-12"),
+        candidate("score-uncertain", {
+          unsupportedExtent: {
+            status: "SCORE_UNCERTAIN",
+            lowerBoundMM: 0,
+            upperBoundMM: 20,
+          },
+        }),
+      ],
     },
-    mutate: () => "indeterminate",
+    expected: {
+      kind: "selection",
+      status: "DECISION_INDETERMINATE",
+      winnerId: null,
+      decisiveCriterion: "UNCERTIFIED_DOMINANCE",
+    },
+    mutations: [
+      patchResult("silent uncertain drop", {
+        status: "SELECTED",
+        winnerId: "certified-12",
+        decisiveCriterion: "UNSUPPORTED_EXTENT",
+      }),
+    ],
   },
   {
     id: "mechanics-beat-canonical-registration",
     authority: "contract",
     source: "Product Base §6 and §11",
-    expected: "shifted-upper-hold",
-    evaluate: () => {
-      const canonical = {
-        ...baseCandidate("canonical"),
-        upperMassSupported: false,
-      };
-      const shifted = {
-        ...baseCandidate("shifted-upper-hold"),
-        canonical: false,
-      };
-      return mechanicalOrder(canonical, shifted).id;
+    input: {
+      id: "mechanics-beat-canonical-registration",
+      kind: "selection",
+      shapeMirrorSymmetric: false,
+      candidates: [
+        candidate("canonical", {
+          upperMassSupported: false,
+          canonicalRegistration: true,
+        }),
+        candidate("shifted-upper-hold"),
+      ],
     },
-    mutate: () => "canonical",
+    expected: selected("shifted-upper-hold", "UPPER_MASS_SUPPORT"),
+    mutations: [
+      patchResult("canonical override", {
+        winnerId: "canonical",
+        decisiveCriterion: "CANONICAL_REGISTRATION",
+      }),
+    ],
   },
 ];
-
-const hardCases: HardCase<unknown>[] = [...ruledBatFamilies, ...contractCases];
 
 const observedFrames: NonGatingRecord[] = [
   "bat-B1:single@60x1",
@@ -356,16 +560,12 @@ const openRecords: NonGatingRecord[] = [
   },
 ];
 
-// These records are intentionally never consumed by the hard-case runner.
+// Observed/open records are deliberately unreachable from the hard-case runner.
 void observedFrames;
 void openRecords;
 
-const assertHardCase = (fixture: HardCase<unknown>, actual: unknown) => {
-  expect(actual).toEqual(fixture.expected);
-};
-
 describe("independent grid acceptance oracle", () => {
-  it("keeps ruled/contract assertions separate from observed/open evidence", () => {
+  it("keeps only direct/designated contract rows in the hard set", () => {
     expect(new Set(hardCases.map((fixture) => fixture.id)).size).toBe(
       hardCases.length,
     );
@@ -379,17 +579,18 @@ describe("independent grid acceptance oracle", () => {
   });
 
   for (const fixture of hardCases) {
-    it(`${fixture.authority} · ${fixture.id} · ${fixture.source}`, () => {
-      assertHardCase(fixture, fixture.evaluate());
+    it(`${fixture.authority} · ${fixture.id} · mutation proof`, () => {
+      for (const mutation of fixture.mutations) {
+        const mutated = mutation.apply(fixture.expected);
+        expect(
+          () =>
+            assertOracleCase(
+              fixture,
+              harnessSubject(fixture.input.id, mutated),
+            ),
+          `${fixture.id} / ${mutation.name} escaped`,
+        ).toThrow();
+      }
     });
   }
-
-  it("mutation proof: every hard assertion rejects its governed break", () => {
-    for (const fixture of hardCases) {
-      expect(
-        () => assertHardCase(fixture, fixture.mutate()),
-        `${fixture.id} mutant escaped`,
-      ).toThrow();
-    }
-  });
 });
