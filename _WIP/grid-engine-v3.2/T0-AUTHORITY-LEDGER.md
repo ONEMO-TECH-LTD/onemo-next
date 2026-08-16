@@ -189,7 +189,13 @@ region is not necessarily at a vertex).
 | **balance** | ‖anchorCentroid(t) − materialCentroid‖² | minimise | mm² | quantum² | Convex quadratic **with a proof**: unconstrained minimiser projected onto `F`; optimum may be strictly interior. The one row whose completeness argument is established rather than deferred. |
 | **count** | number of anchors | minimise **only at equivalent support** (6.2 pos. 9) | dimensionless | exact | discrete |
 
-**STANDING RULE FOR THIS REGISTRY (QA f078dfae):** no descriptor may claim its optimum lies at a vertex, a canonical projection or a directional extremum of `F`. Every row either **proves** its optimisation method or **defers the proof to T5**, and T5 may not implement a descriptor whose completeness is unproved.
+**THE T5 COMPLETENESS INVARIANT — governing plan `2e6bd212`, binding on every row below.**
+Every **registration-sensitive** descriptor must certify its **global optimum over the whole feasible set `F`** by exactly one of:
+1. **exact argopt** — the optimal set computed in closed form or by a certified program;
+2. **interval-refined equivalent set** — a conservative set proven to contain the optimum, refined until dominance is decided;
+3. **`DECISION_INDETERMINATE`** — returned honestly when neither can be established within budget.
+
+**No recipe based on vertices, canonical projections, directional extrema or any fixed sample may imply completeness** — that is the defect meta identified as systemic after it recurred in my critical set (T4.3) and again in this registry's first draft. **Each descriptor owes its own proof**; a proof for one does not transfer to another. T5 may not implement a descriptor whose completeness is unproved, and a descriptor that cannot certify must return indeterminate rather than a plausible answer.
 
 **Comparator:** lexicographic in the 6.2 order; a descriptor decides only when all earlier ones
 tie **within their stated tolerance**; equality inside tolerance carries both candidates forward
