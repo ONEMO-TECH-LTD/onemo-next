@@ -587,11 +587,10 @@ function judgeBand(
   }
   const offered: SizeVariant[] = footOrder.map((k) => byFoot.get(k)!)
   let final = offered
-  // EVERY BAND ANSWERS (Dan: "each band must have at least one optimal layout") — but never
-  // with a LAW-REJECTED placement (QA build-audit, 2026-08-15: the old kept[0] fallback could
-  // emit an answer the hold laws refused). The fallback relaxes only the PREFERENCE filters
-  // (symmetry offer, footprint, echo); the hold laws are non-negotiable. If nothing passes
-  // them, the band honestly answers NONE.
+  // Retained T1 fallback: if the ranked lawful offer set is empty, return the first candidate
+  // that still passes the top, bottom, side and connectivity hold laws. This relaxes only the
+  // symmetry offer filter; it never relaxes a hold law. If no such candidate exists, the band
+  // returns no variant.
   if (!final.length) {
     const holdLawful = kept.find(
       (v) =>
