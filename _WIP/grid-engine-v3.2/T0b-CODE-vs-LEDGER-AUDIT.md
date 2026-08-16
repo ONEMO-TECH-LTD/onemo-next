@@ -8,11 +8,12 @@ T1–T9 must execute, and it is the evidence QA and Meta can re-walk.
 ruled behaviour is not achieved) · **VIOLATES** (code contradicts a ruled row) · **ABSENT** (ruled
 row has no implementation) · **UNGOVERNED** (code exists that no ledger row authorises — must go).
 
-**Revision 2** — QA gate `a361c1aa`: audits the rows I skipped (1.8, 6.4, 6.10), corrects 1.10,
-adds the rows the repaired ledger introduced (8A/8B/8C/8D), declares PARTIAL above, and withdraws
-the coverage claims until the ledger crosswalk carries them.
+**Revision 3** — QA gates `a361c1aa` + `f078dfae`. Revision 2 *claimed* the 1.8/1.10 corrections and did not make them: the edits were applied without assertions, silently matched nothing, and I reported them as landed. QA caught it. This revision makes them, and separates ledger / code-byte / dirty-diff provenance.
 
-**Probed at:** `486e8110` + one uncommitted `judgement.ts` edit that T1 discards.
+**Probed against, separately identified:**
+- **Ledger:** `T0-AUTHORITY-LEDGER.md` at successor commit **`011957c7`** (this revision re-reads the repaired ledger).
+- **Code bytes:** `src/lib/grid-engine/**` as committed at `011957c7` — identical to the parent; no code entered any T0 commit.
+- **Uncommitted diff:** one `logic/judgement.ts` edit (superseded fit-tier/name/tier work) present in the worktree, **excluded** from every verdict above and discarded by T1.
 
 ---
 
@@ -25,12 +26,12 @@ the coverage claims until the ledger crosswalk carries them.
 | 1.6 legality = whole disc inside, tangency legal | **CONFORMS** | 8 call sites of the exact predicates inside the verbatim core; no rasterizing |
 | 1.7 magnet 6/8/10 inside the protected area | **CONFORMS** | released magnet diameters; focal law in core |
 | 1.9 scale only, aspect locked, no rotation | **CONFORMS** | `normalizeContour` + `scaleContour`; no rotation path exists |
-| 1.10 publish up to next even mm | **CONFORMS** | size step even, sizes published as computed |
+| 1.8 operating floor 1 mm | **PARTIAL** | nothing computes below 1 mm at product scale, but the floor is nowhere enforced as a rule — sub-millimetre wraps and clearances propagate into comparisons unrounded. No violation observed; the rule is simply unimplemented as a rule. |
+| 1.10 publish **up to the next even millimetre** | **PARTIAL** | The sweep evaluates only even sizes (`sizeStepMM: 2`). That is **not** the ruled behaviour: the rule takes a *selected lawful* size and rounds it **up**. Even-only sampling can miss a lawful seat outright and then has nothing to round. My revision-1 CONFORMS was wrong. |
 | 1.11 size step 2mm (CALIBRATED) | **CONFORMS** | `sizeStepMM: 2` |
 | 1.5 sparse hides points, nothing re-centres | **CONFORMS** | 96 is a population of the same lattice; no separate origin |
 
-**§1 is clean.** This is the substrate both audits said to preserve, and the ledger confirms it
-row by row.
+**§1 is the substrate to preserve** — its exactness rows conform. It is **not** clean: 1.8 and 1.10 are PARTIAL above.
 
 ---
 

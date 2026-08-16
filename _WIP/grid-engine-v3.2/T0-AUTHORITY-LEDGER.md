@@ -133,7 +133,7 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 | # | Rule / value | Class | Source |
 |---|---|---|---|
 | 7.1 | **Every candidate size evaluated independently.** No result inferred from a smaller or larger size | RULED | PB §12 |
-| 7.2 | A band returns **all distinct optima its range unlocks**, with **one marked** as the guaranteed answer | RULED | (V) Dan 08-16, this lane's day-file *"each band must show within its size range all optimal sizes and layouts if range permits — not just 1 if there are more"*; L17 bulls-eye |
+| 7.2 | A band returns **all distinct optima its range unlocks**, with **one marked** as the guaranteed answer | RULED | **Captured source (V):** Dan 2026-08-16 10:52:27, this lane's day-file line 219 — *"i tested on the other shapes via upload and noticed that bands while having more than 1 optimal choice at different scales - engine does not show them all only 1"*, with *"Band 4 stopped at 168 but could have shown extra ... at 200-216mm range"*. **DERIVATION:** the normalized rule wording ("all optimal sizes and layouts if range permits") is **my normalization of an uncaptured mid-turn message**, not a captured turn — it is a derivation and is labelled as one. The marking half is (D) L17. |
 | 7.3 | **Distinct = distinct governed window/scale identity** — never "more magnets" | RULED | Dan's own wording is scale-based: *"more than 1 optimal choice at different scales"*, *"Band 4 stopped at 168 but could have shown extra at 200-216mm range"*; PB §11.9 + §13 forbid count as the driver |
 | 7.4 | A size may be **rejected with a machine-readable reason** — refusal is a legitimate outcome | RULED | PB §19 |
 | 7.5 | Presentation cap on how many offers are shown | ENGINEERING (owner s62-kai) | applied only after the complete certified set exists |
@@ -181,13 +181,15 @@ region is not necessarily at a vertex).
 
 | Descriptor | Formula | Direction | Units | Tolerance | Completeness-proof duty |
 |---|---|---|---|---|---|
-| **coverage** | fraction of major regions (5.4) containing ≥1 anchor | maximise | dimensionless | exact (integer counts) | discrete per candidate — no continuous optimisation |
-| **upperSupport** | material area above the topmost anchor line ÷ block width = equivalent hanging height | minimise | mm | coordinate quantum (8C.1) | monotone in translation-y ⇒ optimum at the −y support point of `F` |
-| **unsupportedExtent** | per side, outline reach beyond the padded block edge (6.6); score = max side; exempt limb regions **returned as data** (6.8) | minimise | mm | coordinate quantum | piecewise-linear in translation ⇒ optimum at vertices/edge extrema of `F` |
-| **peelLeverage** | first moment of unsupported material about the nearest anchor line: ∫(reach beyond edge)·dA | minimise | mm³ | quantum × area scale | convex piecewise ⇒ **own argmin required**; may lie interior to `F` |
-| **distribution** | count of distinct major masses holding ≥1 anchor; tie-break by variance of anchors per mass | maximise, then minimise | dimensionless | exact | discrete per candidate |
-| **balance** | ‖anchorCentroid(t) − materialCentroid‖² | minimise | mm² | quantum² | **convex quadratic — unconstrained minimiser projected into `F`; the optimum may be strictly interior.** This is the row meta's correction exists for. |
+| **coverage** | fraction of major regions (5.4) containing ≥1 anchor | maximise | dimensionless | exact (integer counts) | **NOT discrete per candidate.** Which regions an anchor set covers **changes as the registration moves across `F`**; the value is piecewise-constant over a partition of `F`. Duty: a **certified partition of `F` into constant-coverage cells** with the argopt cell set returned — never one sampled registration. |
+| **upperSupport** | material area above the **padded support boundary** — the block edge, one padding radius (12 mm) above the topmost anchor centre-line — ÷ block width | minimise | mm | coordinate quantum (8C.1) | **QA f078dfae correction:** the earlier formula used the anchor centre-line and so counted protected material as hanging mass. Reference line is the protected boundary. **Completeness duty deferred to T5's proof** — no optimisation shortcut is asserted here. |
+| **unsupportedExtent** | per side, outline reach beyond the padded block edge (6.6); score = max side; exempt limb regions **returned as data** (6.8) | minimise | mm | coordinate quantum | **QA counterexample, accepted:** the score is a **max of linear functions** — convex, and on a symmetric feasible square `max(C+x, C−x, C+y, C−y)` is minimised at the strict interior `(0,0)`, not at any vertex or directional extremum. My earlier duty repeated the rejected critical-set recipe. Duty: **certified global argmin over `F` in its own right** (convex-program or certified subdivision), interior admissible. |
+| **peelLeverage** | first moment of unsupported material about the padded support boundary: ∫(reach beyond edge)·dA | minimise | mm³ | quantum × area scale | **Convexity is NOT claimed** (unproved — QA f078dfae). Duty: **certified global argmin over `F`** by a method that does not assume convexity (certified subdivision with bounds), interior admissible. |
+| **distribution** | count of distinct major masses holding ≥1 anchor; tie-break by variance of anchors per mass | maximise, then minimise | dimensionless | exact | **Same defect, same duty as coverage** — piecewise-constant over `F`, requires the certified partition and argopt cells, not a representative registration. |
+| **balance** | ‖anchorCentroid(t) − materialCentroid‖² | minimise | mm² | quantum² | Convex quadratic **with a proof**: unconstrained minimiser projected onto `F`; optimum may be strictly interior. The one row whose completeness argument is established rather than deferred. |
 | **count** | number of anchors | minimise **only at equivalent support** (6.2 pos. 9) | dimensionless | exact | discrete |
+
+**STANDING RULE FOR THIS REGISTRY (QA f078dfae):** no descriptor may claim its optimum lies at a vertex, a canonical projection or a directional extremum of `F`. Every row either **proves** its optimisation method or **defers the proof to T5**, and T5 may not implement a descriptor whose completeness is unproved.
 
 **Comparator:** lexicographic in the 6.2 order; a descriptor decides only when all earlier ones
 tie **within their stated tolerance**; equality inside tolerance carries both candidates forward
@@ -216,25 +218,25 @@ two conditions and recorded per profile version, not hand-authored per shape.
 | 8C.1 | Coordinate quantum | ENGINEERING (s62-kai) | Internal integer arithmetic at **1 µm** (Clipper2 `SCALE = 1000`, the existing convention in `compute/offset.ts`); published sizes remain even millimetres (1.10). Proof duty: exact tangency legal at the quantum, one-quantum intrusion illegal. |
 | 8C.2 | Approximation / error envelope | ENGINEERING (s62-kai) | Any polygonal approximation of the safe core must be **conservative inward** with a stated ε, so a lawful placement can never be silently erased. Proof duty: demonstrate the sandwich relation; return `INDETERMINATE_WITHIN_TOLERANCE` rather than certify empty. |
 | 8C.3 | Input vertex budget | ENGINEERING (s62-kai) | Not yet measured. Proof duty: establish at T3 on the real corpus and record the number; until measured, no vertex claim may be made. |
-| 8C.4 | Runtime / memory gates | ENGINEERING (s62-kai) | R3's **provisional** 16 ms typical / 50 ms hard for an all-band solve — *a target, not a Dan ruling*. Proof duty: measure and report; a miss is reported, never hidden. |
-| 8C.5 | Determinism | RULED | Same outline + same profile + same artifacts ⇒ byte-identical canonical output. (D) R3 certification mechanics, compatible with PB §19's "deterministic decision reasons". |
+| 8C.4 | Runtime / memory gates | ENGINEERING (s62-kai) | R3's 16 ms / 50 ms is **provisional and not a Dan ruling**, so it is not itself the gate. **T3 selects and RECORDS the engineering runtime and memory gate from its measured probe; that recorded number becomes binding, and T7 FAILS if it is missed.** Reporting a miss is not sufficient — a non-falsifiable target is not a gate. |
+| 8C.5 | Determinism | **ENGINEERING** (s62-kai) | Byte-identical canonical output for the same outline + profile + artifacts is an **R3 certification mechanism**, and R3 is a technical reference — it cannot carry (D). What *is* RULED is PB §19's "deterministic decision reasons". Classified ENGINEERING with the proof duty: two runs, byte-identical. |
 
 ---
 
 ## 8D. RESULT IDENTITY AND OUTPUT CONTRACT  *(QA correction 2 — replaces the narrow §8)*
 
-**Identity** (all required; a result is not addressable without them):
+**Identity — ENGINEERING (s62-kai), R3-derived certification mechanics** (not PB-ruled; recorded here because T6 consumes it):
 source-geometry identity (canonical outline hash) · governed size/window · population ID and
 origin parity · frame · pattern and variant · registration · profile hash · Compute artifact
 hash · Logic artifact hash · canonical output hash.
 
-**Result payload** (PB §19, in full): band · exact width · exact height · scale factor · axis
+**Result payload — RULED (D) PB §19, in full:** band · exact width · exact height · scale factor · axis
 class X · axis class Y · node frame · registration offset · selected pattern ID · selected node
 addresses · magnet centres (mm) · minimum edge clearance · supported structural regions ·
 unsupported-extent metrics (per-side vector + score + exempt regions) · gravity-support result ·
 **proof / uncertainty status** · validation status · deterministic decision reasons.
 
-**Rejection payload:** machine-readable reason — safe core empty · no strong grid node · no
+**Rejection payload — RULED (D) PB §19** for the listed reasons; the indeterminate codes are **ENGINEERING** (R3-derived): machine-readable reason — safe core empty · no strong grid node · no
 approved lawful pattern · upper critical mass unsupported · excessive unsupported extent ·
 registration search exhausted · **legality indeterminate** · **decision indeterminate**.
 
@@ -309,6 +311,8 @@ crosswalk a reviewer can walk. A task input with no row here is a ledger gap, by
 | T7 gate | flap-switch measurement · perf report · determinism | 6.7a · 6.7b · 8C.4 · 8C.5 |
 | T9 UI | result identity as chip key · refusal display | 8D |
 
-**Unmapped task inputs: none.** **Ledger rows no task consumes: none** — every row above is
-consumed by at least one task.
+| T1 | which mechanisms to subtract, and the authority for each | §9 displaced clauses · 2.6 · 6.2 · 6.3 · 7.1 · 7.3 |
+| T7 | live visual gate — real surface, provenance, captured frames | 8D result payload (what a frame must evidence) · 6.7a |
+| T8 | what may be deleted once the replacement passes | §9 · T0b's UNGOVERNED list |
 
+**Scope of this crosswalk, stated honestly (QA f078dfae):** it enumerates **task inputs → rows**. It does **not** claim the reverse enumeration is complete, and the earlier "no unmapped inputs / no unconsumed rows" claims are **withdrawn**. Rows not appearing above (1.7 · 1.8 · 2.7 · 3.7 · 3.8 · 5.7 · 6.8 · 6.12 · 6.13 · 6.14 · 8A.2 · 8C.5) are **constraints the tasks must honour rather than inputs they read** — they are enforced through T7's gate, not consumed by a step. That distinction is the honest form of the claim I over-stated.
