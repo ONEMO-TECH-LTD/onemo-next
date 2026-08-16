@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
+  buildCertifiedBandOffers, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
   LOGIC_ARTIFACT_HASH, registerProfile, selectedOffer, solveOutline, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
 
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
-const circle=(diameter,segments=64)=>Array.from({length:segments},(_,i)=>{const a=2*Math.PI*i/segments;return{x:Math.cos(a)*diameter/2,y:Math.sin(a)*diameter/2};});
 const editableReference=()=>{const profile=structuredClone(createReferenceProfile());delete profile.profileHash;return profile;};
 const patternsAtStride=(patterns,stride)=>patterns.map(pattern=>{const [x0,y0]=pattern.cells[0];return{...pattern,cells:pattern.cells.map(([x,y])=>[x0+(x-x0)*stride/2,y0+(y-y0)*stride/2])};});
+const boundedB1Profile=maxMm=>{const profile=editableReference();profile.sizeDomain={minMm:24,maxMm,stepMm:12,bands:[{id:'B1',class:1,minMm:24,maxMm,maxInclusive:true,referenceMm:24}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1']}));return registerProfile(profile);};
+const singleRungProfile=()=>boundedB1Profile(25);
 
 test('profile is immutable and content-addressed',()=>{
   const profile=createReferenceProfile();assert.ok(profile.profileHash.length===64);assert.equal(Object.isFrozen(profile),true);
@@ -19,33 +20,35 @@ test('band thresholds are lower-inclusive and upper-exclusive except final maxim
   const p=createReferenceProfile();assert.equal(classifyAxis(71.99,p.sizeDomain.bands),1);assert.equal(classifyAxis(72,p.sizeDomain.bands),2);assert.equal(classifyAxis(120,p.sizeDomain.bands),3);assert.equal(classifyAxis(264,p.sizeDomain.bands),5);
 });
 
-test('square produces one deterministic primary offer per band',async()=>{
-  const p=createReferenceProfile();const result=await solveOutline({outlineMm:rectangle(120,120),profile:p});
-  assert.deepEqual(result.offers.map(o=>o.status),['OFFERED','OFFERED','OFFERED','OFFERED','OFFERED']);
-  assert.equal(result.offers[0].solution.patternId,'single');assert.equal(result.offers[2].solution.patternId,'t.top1-bottom3');
+test('solve authority comes only from independently certified rungs',async()=>{
+  const result=await solveOutline({outlineMm:rectangle(24,24),profile:singleRungProfile()});
+  assert.equal(result.evaluated.length,1);assert.equal(result.offers[0].status,'OFFERED');
+  assert.equal(result.offers[0].solution.decisionProof,'CERTIFIED_CONTINUOUS_OPTIMUM');
 });
 
-test('long rectangles select the lawful pair orientation',async()=>{
-  const p=createReferenceProfile();const tall=await solveOutline({outlineMm:rectangle(36,72),profile:p});const wide=await solveOutline({outlineMm:rectangle(72,36),profile:p});
-  assert.equal(tall.offers.find(o=>o.band==='B2')?.solution?.patternId,'pair.vertical');
-  assert.equal(wide.offers.find(o=>o.band==='B2')?.solution?.patternId,'pair.horizontal');
+test('an unresolved smaller rung blocks a larger accepted offer',()=>{
+  const profile=boundedB1Profile(37);
+  const accepted={status:'ACCEPTED',targetDominantMm:36,band:'B1',decisionProof:'CERTIFIED_CONTINUOUS_OPTIMUM'};
+  const evaluated=[{status:'DECISION_INDETERMINATE',targetDominantMm:24,band:'B1',reasons:['CRITERION_SCORE_UNCERTAIN']},accepted];
+  const offers=buildCertifiedBandOffers(evaluated,profile);
+  assert.equal(offers[0].status,'DECISION_INDETERMINATE');
 });
 
-test('rounded shape does not assume square-corner occupancy',async()=>{
-  const p=createReferenceProfile();const result=await solveOutline({outlineMm:circle(72),profile:p});const b2=result.offers.find(o=>o.band==='B2')?.solution;
-  assert.ok(b2);assert.notEqual(b2.patternId,'square.4');
+test('an indeterminate offer cannot be selected for ManufacturingSpec',()=>{
+  const preview={schema:'onemo-magnetic-solve-v1',profileId:'p',profileHash:'h',computeArtifactHash:'c',logicArtifactHash:'l',sourceGeometryHash:'g',canonicalHash:'z',evaluated:[],offers:[{band:'B1',status:'DECISION_INDETERMINATE',reasons:['DECISION_INDETERMINATE']}]};
+  assert.throws(()=>selectedOffer(preview,'B1'),/no offered solution/);
 });
 
 test('same input and artifact identities produce byte-identical canonical result',async()=>{
-  const p=createReferenceProfile();const a=await solveOutline({outlineMm:rectangle(72,36),profile:p});const b=await solveOutline({outlineMm:rectangle(72,36),profile:p});assert.equal(a.canonicalHash,b.canonicalHash);assert.deepEqual(a.offers,b.offers);
+  const p=singleRungProfile();const a=await solveOutline({outlineMm:rectangle(24,24),profile:p});const b=await solveOutline({outlineMm:rectangle(24,24),profile:p});assert.equal(a.canonicalHash,b.canonicalHash);assert.deepEqual(a.offers,b.offers);
 });
 
 test('engine ManufacturingSpec round-trips and exact re-verifies',async()=>{
-  const p=createReferenceProfile();const result=await solveOutline({outlineMm:rectangle(120,120),profile:p});const solution=selectedOffer(result,'B3');const spec=createEngineManufacturingSpec(result,solution,p);const verified=verifyEngineManufacturingSpec(spec,p);assert.equal(verified.valid,true);assert.equal(spec.proofStatus,'REFERENCE_PROFILE_NOT_PRODUCTION');
+  const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const solution=selectedOffer(result,'B1');const spec=createEngineManufacturingSpec(result,solution,p);const verified=verifyEngineManufacturingSpec(spec,p);assert.equal(verified.valid,true);assert.equal(spec.proofStatus,'REFERENCE_PROFILE_NOT_PRODUCTION');
 });
 
 test('reference profile blocks physical fulfilment until tolerances are supplied',async()=>{
-  const p=createReferenceProfile();const result=await solveOutline({outlineMm:rectangle(120,120),profile:p});const spec=createEngineManufacturingSpec(result,selectedOffer(result,'B3'),p);
+  const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const spec=createEngineManufacturingSpec(result,selectedOffer(result,'B1'),p);
   assert.throws(()=>completeFulfilmentSpec(spec,p,{id:'demo',version:1,magnetDiameterMm:8,magnetThicknessMm:1,cutToleranceMm:0,placementToleranceMm:0,materialToleranceMm:0,assemblyToleranceMm:0,assemblyProfileId:'demo'}),/REFERENCE_PROFILE_NOT_PRODUCTION/);
 });
 

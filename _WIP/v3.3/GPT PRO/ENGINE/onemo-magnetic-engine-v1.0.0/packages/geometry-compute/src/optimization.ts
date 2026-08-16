@@ -39,6 +39,36 @@ function certifiedWorseThanAnchor(value:ScoreInterval,anchor:ScoreInterval,direc
   return direction==='MIN'?value.lower>anchor.upper+tolerance:value.upper<anchor.lower-tolerance;
 }
 
+function symmetricEquivalent(a:ScoreInterval,b:ScoreInterval,direction:Direction,tolerance:number):boolean{
+  return direction==='MIN'
+    ?a.upper<=b.lower+tolerance&&b.upper<=a.lower+tolerance
+    :a.lower>=b.upper-tolerance&&b.lower>=a.upper-tolerance;
+}
+
+/** Candidate-to-candidate comparison. Unlike anchored restriction, equivalence
+ * is symmetric and no later component may decide while an earlier one is uncertain. */
+export function compareCertifiedScores(
+  aScore:ScoreInterval|CompoundScoreInterval,
+  bScore:ScoreInterval|CompoundScoreInterval,
+  directions:readonly Direction[],
+  tolerances:readonly number[]
+):-1|0|1|null{
+  const a=asComponents(aScore),b=asComponents(bScore);
+  for(let i=0;i<directions.length;i++){
+    const direction=directions[i]!,tolerance=tolerances[i]??0,x=a[i]!,y=b[i]!;
+    if(symmetricEquivalent(x,y,direction,tolerance))continue;
+    if(direction==='MIN'){
+      if(x.upper<y.lower-tolerance)return-1;
+      if(y.upper<x.lower-tolerance)return 1;
+    }else{
+      if(x.lower>y.upper+tolerance)return-1;
+      if(y.lower>x.upper+tolerance)return 1;
+    }
+    return null;
+  }
+  return 0;
+}
+
 export function possiblyEquivalentToAnchor(
   score:ScoreInterval|CompoundScoreInterval,
   anchor:ScoreInterval|CompoundScoreInterval,
@@ -64,7 +94,12 @@ export function computeGlobalAnchor(
   for(let component=0;component<directions.length;component++){
     const intervals=active.map(item=>asComponents(item.score)[component]!);
     const anchor=globalScalarAnchor(intervals,directions[component]!);anchors.push(anchor);
-    active=active.filter(item=>{
+    const equivalent=active.filter(item=>{
+      const value=asComponents(item.score)[component]!;
+      return certifiedEquivalentToAnchor(value,anchor,directions[component]!,tolerances[component]??0);
+    });
+    if(equivalent.length>0)active=equivalent;
+    else active=active.filter(item=>{
       const value=asComponents(item.score)[component]!;
       return !certifiedWorseThanAnchor(value,anchor,directions[component]!,tolerances[component]??0);
     });

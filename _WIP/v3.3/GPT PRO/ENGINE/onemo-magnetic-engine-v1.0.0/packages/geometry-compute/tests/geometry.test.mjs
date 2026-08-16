@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, computeGlobalAnchor,
-  criticalTranslationCandidates, discContainedExact, generateLattice, possiblyEquivalentToAnchor,
+  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, compareCertifiedScores, computeGlobalAnchor,
+  criticalTranslationCandidates, discContainedExact, finalRegistrationTieBreak, generateLattice, possiblyEquivalentToAnchor,
   preparePolygon, scaleToDominantDimension
 } from '../dist/src/index.js';
 
@@ -69,6 +69,34 @@ test('global-anchor restriction excludes locally tolerated but globally inferior
   const global={lower:0,upper:0};
   assert.equal(possiblyEquivalentToAnchor({lower:1.9,upper:1.9},global,['MIN'],[1]),false);
   assert.equal(possiblyEquivalentToAnchor({lower:0.9,upper:0.9},global,['MIN'],[1]),true);
+});
+
+test('compound anchor cannot advance while an earlier component is uncertain',()=>{
+  const a={components:[{lower:0,upper:0},{lower:100,upper:100}]};
+  const b={components:[{lower:0.5,upper:1.5},{lower:0,upper:0}]};
+  const anchor=computeGlobalAnchor([a,b],['MIN','MIN'],[1,1]);
+  assert.deepEqual(anchor,{components:[{lower:0,upper:0},{lower:100,upper:100}]});
+  assert.equal(possiblyEquivalentToAnchor(a,anchor,['MIN','MIN'],[1,1]),true);
+  assert.equal(possiblyEquivalentToAnchor(b,anchor,['MIN','MIN'],[1,1]),true);
+});
+
+test('candidate equivalence is symmetric and cannot use a later compound component',()=>{
+  const uncertain={components:[{lower:0.5,upper:1.5},{lower:0,upper:0}]};
+  const exact={components:[{lower:0,upper:0},{lower:100,upper:100}]};
+  assert.equal(compareCertifiedScores(exact,uncertain,['MIN','MIN'],[1,1]),null);
+  assert.equal(compareCertifiedScores(
+    {components:[{lower:0,upper:0},{lower:100,upper:100}]},
+    {components:[{lower:10,upper:10},{lower:0,upper:0}]},
+    ['MIN','MIN'],[1,1]
+  ),-1);
+});
+
+test('final tie-break searches the representable optimum set beyond five samples',()=>{
+  const polygon=preparePolygon([{x:-11.75,y:-12},{x:12.25,y:-12},{x:12.25,y:12},{x:-11.75,y:12}],{quantumMm:q});
+  const result=finalRegistrationTieBreak(polygon,[{x:0,y:0}],12,[{minX:-1,minY:-1,maxX:1,maxY:1,depth:0,status:'BOUNDARY',id:'probe'}],{x:0,y:0},q);
+  assert.equal(result.status,'SELECTED');
+  assert.deepEqual(result.point,{x:0.25,y:0});
+  assert.ok(result.attemptedPoints>5);
 });
 
 test('canonical hash is stable',()=>{assert.equal(canonicalHash({b:2,a:1}),canonicalHash({a:1,b:2}));});

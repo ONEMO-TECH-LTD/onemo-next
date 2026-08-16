@@ -2,6 +2,7 @@ import {
   COMPUTE_ARTIFACT_HASH,
   adaptiveFeasibleTranslations,
   canonicalHash,
+  compareCertifiedScores,
   computeGlobalAnchor,
   descriptorDirections,
   discContainedExact,
@@ -14,6 +15,7 @@ import {
   scaleToDominantDimension,
   type AdaptiveBox,
   type CompoundScoreInterval,
+  type Direction,
   type GeometryCriterionDescriptor,
   type Point,
   type RegionEvidence,
@@ -43,49 +45,8 @@ interface ContinuousCandidate {
   readonly boxes: readonly AdaptiveBox[];
 }
 
-type Direction = 'MIN' | 'MAX';
-
 function asComponents(score: ScoreInterval | CompoundScoreInterval): readonly ScoreInterval[] {
   return 'components' in score ? score.components : [score];
-}
-
-function symmetricEquivalent(
-  a: ScoreInterval,
-  b: ScoreInterval,
-  direction: Direction,
-  tolerance: number
-): boolean {
-  return direction === 'MIN'
-    ? a.upper <= b.lower + tolerance && b.upper <= a.lower + tolerance
-    : a.lower >= b.upper - tolerance && b.lower >= a.upper - tolerance;
-}
-
-/** Returns -1 when a is certified better, +1 when b is certified better, 0 when
- * certified equivalent, and null when the current intervals are not decisive. */
-function compareCertified(
-  aScore: ScoreInterval | CompoundScoreInterval,
-  bScore: ScoreInterval | CompoundScoreInterval,
-  directions: readonly Direction[],
-  tolerances: readonly number[]
-): -1 | 0 | 1 | null {
-  const a = asComponents(aScore);
-  const b = asComponents(bScore);
-  for (let index = 0; index < directions.length; index += 1) {
-    const direction = directions[index]!;
-    const tolerance = tolerances[index] ?? 0;
-    const x = a[index]!;
-    const y = b[index]!;
-    if (symmetricEquivalent(x, y, direction, tolerance)) continue;
-    if (direction === 'MIN') {
-      if (x.upper < y.lower - tolerance) return -1;
-      if (y.upper < x.lower - tolerance) return 1;
-    } else {
-      if (x.lower > y.upper + tolerance) return -1;
-      if (y.lower > x.upper + tolerance) return 1;
-    }
-    return null;
-  }
-  return 0;
 }
 
 
@@ -221,7 +182,7 @@ function optimiseCriterionAcrossCandidates(
 
   const survivingLocal = local.filter((item, index) => !local.some((other, otherIndex) => {
     if (index === otherIndex) return false;
-    const comparison = compareCertified(
+    const comparison = compareCertifiedScores(
       item.result.optimum,
       other.result.optimum,
       descriptorDirections(item.descriptor),
@@ -237,7 +198,7 @@ function optimiseCriterionAcrossCandidates(
     for (let right = left + 1; right < survivingLocal.length; right += 1) {
       const a = survivingLocal[left]!;
       const b = survivingLocal[right]!;
-      const comparison = compareCertified(a.result.optimum, b.result.optimum, descriptorDirections(a.descriptor), a.tolerances);
+      const comparison = compareCertifiedScores(a.result.optimum, b.result.optimum, descriptorDirections(a.descriptor), a.tolerances);
       if (comparison === null || comparison === -1 || comparison === 1) return { status: 'INDETERMINATE' };
     }
   }

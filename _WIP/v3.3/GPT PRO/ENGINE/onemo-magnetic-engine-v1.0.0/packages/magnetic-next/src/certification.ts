@@ -1,5 +1,5 @@
 import type { EngineManufacturingSpec, RegisteredProfile, SizeSolution, SolveResult } from '@onemo/magnetic-logic';
-import { certifySizeSolution, createEngineManufacturingSpec, selectedOffer } from '@onemo/magnetic-logic';
+import { candidateSizes, certifySizeSolution, createEngineManufacturingSpec, selectedOffer } from '@onemo/magnetic-logic';
 import type { StudioPoint } from './outline-adapter.js';
 import { adaptStudioOutline } from './outline-adapter.js';
 
@@ -18,6 +18,12 @@ export function certifyAndBindSelectedBand(
   adapter: Parameters<typeof adaptStudioOutline>[1] = { inputYAxis: 'DOWN', centreOnBounds: true }
 ): CertifiedSelection {
   const selected = selectedOffer(preview, band);
+  if(selected.decisionProof!=='CERTIFIED_CONTINUOUS_OPTIMUM')throw new Error('SELECTED_OFFER_NOT_CERTIFIED');
+  const selectedEvidence=preview.evaluated.find(item=>item.band===selected.band&&item.targetDominantMm===selected.targetDominantMm);
+  if(!selectedEvidence||selectedEvidence.status!=='ACCEPTED'||selectedEvidence.decisionProof!=='CERTIFIED_CONTINUOUS_OPTIMUM')throw new Error('SELECTED_RUNG_NOT_CERTIFIED');
+  const bandDefinition=profile.sizeDomain.bands.find(candidate=>candidate.id===selected.band);
+  const smallerRungs=candidateSizes(profile).filter(size=>size<selected.targetDominantMm&&bandDefinition&&size>=bandDefinition.minMm-1e-12&&(bandDefinition.maxInclusive?size<=bandDefinition.maxMm+1e-12:size<bandDefinition.maxMm-1e-12));
+  if(smallerRungs.some(size=>!preview.evaluated.some(item=>item.band===selected.band&&item.targetDominantMm===size&&item.status==='REJECTED')))throw new Error('SMALLEST_ACCEPTED_RUNG_NOT_CERTIFIED');
   const certified = certifySizeSolution({
     outlineMm: adaptStudioOutline(studioOutline, adapter),
     profile,
