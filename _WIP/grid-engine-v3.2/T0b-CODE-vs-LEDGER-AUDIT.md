@@ -4,8 +4,13 @@
 (@ `486e8110`). Read-only: no code touched. It converts the ledger into the exact task list
 T1–T9 must execute, and it is the evidence QA and Meta can re-walk.
 
-**Verdicts:** **CONFORMS** · **VIOLATES** (code contradicts a ruled row) · **ABSENT** (ruled row
-has no implementation) · **UNGOVERNED** (code exists that no ledger row authorises — must go).
+**Verdicts:** **CONFORMS** · **PARTIAL** (implemented in part, or in the wrong position, so the
+ruled behaviour is not achieved) · **VIOLATES** (code contradicts a ruled row) · **ABSENT** (ruled
+row has no implementation) · **UNGOVERNED** (code exists that no ledger row authorises — must go).
+
+**Revision 2** — QA gate `a361c1aa`: audits the rows I skipped (1.8, 6.4, 6.10), corrects 1.10,
+adds the rows the repaired ledger introduced (8A/8B/8C/8D), declares PARTIAL above, and withdraws
+the coverage claims until the ledger crosswalk carries them.
 
 **Probed at:** `486e8110` + one uncommitted `judgement.ts` edit that T1 discards.
 
@@ -103,7 +108,9 @@ exact wrap → smaller size.
 | 6.2 position 8 balance / evenness | **VIOLATES position** | evenness is a coarse-bucket tiebreak at the tail, not a first-class criterion |
 | 6.2 position 9 fewer at equivalent support | **VIOLATES** | count direction flips by band (`band.stepUp ? fuller : fewer`) — the ledger forbids count winning upward |
 | 6.3 more magnets never automatically better | **VIOLATES** | same flip |
+| 6.4 centroid is evidence, not the rule | **PARTIAL** | `massAxisOffMM` compares the assembly centre against a mass axis (deepest-material point on asymmetric shapes, mirror axis on symmetric), in coarse buckets, as a mid-rank key. Centroid is therefore *not* the placement rule (conforms in spirit), but it is also **not** the ledger's balance descriptor (8B), and the bucket granularity means near-equal candidates tie arbitrarily. |
 | 6.6 flap from the padded grid bbox | **CONFORMS** | `wrap.ts` measures exactly this |
+| 6.10 tie tolerances between equivalent arrangements | **ABSENT** | no tolerance concept exists. Comparisons use coarse fixed buckets (12 mm tightness, 6 mm evenness, 3/6 mm axis) which act as *de facto* tolerances but are neither declared, per-descriptor, nor unit-aware — so "equivalent within tolerance" cannot be expressed and both candidates cannot be carried forward. |
 | 6.7 flap 12/24 as a tested switch | **ABSENT** | only `flapTightMM 12` as a tier label; no switch, no measurement |
 | 6.8 limb exemption measured **and reported** | **VIOLATES** | applied silently; nothing is reported |
 | 6.11 snug seat selects the size | **PARTIAL** | tightness exists but at the tail, after spread and structure |
@@ -125,9 +132,21 @@ exact wrap → smaller size.
 
 ---
 
-## §8 OUTPUT CONTRACT
+## §8 OUTPUT CONTRACT, INPUT BOUNDARY, REGISTRY  *(rows added by the repaired ledger)*
 
-Ledger requires: band · exact width/height · scale · axis classes · node frame · registration
+| Ledger | Verdict | Evidence |
+|---|---|---|
+| 8A input boundary (validated simple closed polygon, top direction, size domain, profile versions) | **PARTIAL** | a contour enters through `bridge.ts`; **no validation, no top-direction input, no profile version** on the call |
+| 8A.8 holes / disconnected **hard-reject** | **ABSENT** | `Contour` carries a `holes` array and the core walks it; there is no rejection path |
+| 8B mechanics registry (formula · direction · units · tolerance · completeness) | **ABSENT** | comparator keys are inline expressions; no descriptor is named, versioned, unit-bearing or tolerance-bearing |
+| 8B.1 unsupported-extent definition | **PARTIAL** | the per-side measure exists (`wrap.ts`); the **score**, the exempt-region evidence and the limb reporting do not |
+| 8B.2 pattern-permission matrix | **ABSENT** | every template is tried in every band |
+| 8C.1 coordinate quantum | **PARTIAL** | Clipper2 integer micron exists in `offset.ts` only; the judge compares raw floats |
+| 8C.2 approximation envelope | **ABSENT** | no approximation is used and none is certified — the sweep simply samples |
+| 8C.3 vertex budget · 8C.4 perf gates | **ABSENT** | unmeasured; the measured 42.2 s bat solve is the only datum |
+| 8C.5 determinism | **PARTIAL** | a determinism fixture exists (byte-identical twice) but no artifact/profile hashing |
+
+Ledger 8D requires: band · exact width/height · scale · axis classes · node frame · registration
 offset · pattern ID · node addresses · magnet centres · minimum clearance · supported regions ·
 unsupported-extent metrics · gravity result · validation status · decision reasons · both
 address and millimetre coordinates · identity hashes.
@@ -174,8 +193,13 @@ measure the ledger displaced.
 - **Ungoverned (must go):** eleven mechanisms listed in §9.
 
 **Necessity:** every deletion above is authorised by a ledger row or a displaced-clause entry —
-none is taste. **Sufficiency:** every ABSENT row maps to a task in the governing plan (T2 oracle ·
-T4 safe core/feasibility · T5 regions + descriptors · T6 selection/identity/output). No absent row
-is unassigned.
+none is taste.
+
+**Sufficiency — claim withdrawn and re-grounded.** Revision 1 asserted "every row" and "no absent
+row unassigned"; QA correctly refused that, because it rested on an incomplete ledger. The claim
+now rests only on the repaired ledger's §11 crosswalk, which maps each task input to its row.
+**What this audit can state on its own evidence:** every ABSENT/PARTIAL/VIOLATES row above names
+the task that must resolve it (T2 · T3 · T4 · T5 · T6 · T7), and no row above is left without
+one. Whether the *ledger* is complete is the crosswalk's claim to defend, not this audit's.
 
 **Nothing was modified. This audit is evidence for T1–T9, not a licence to start them.**

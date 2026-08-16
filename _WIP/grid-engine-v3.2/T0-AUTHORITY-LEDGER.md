@@ -47,7 +47,7 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 | 1.8 | Units millimetres; operating floor **1 mm** — nothing below it exists | RULED | (V) Dan 08-11 evening, lead lane (L19 records it first-hand) |
 | 1.9 | **Scale only, aspect locked.** No rotation, mirroring, deformation, independent region scaling | RULED | (B) Dan 08-10 18:39 / 08-09 23:25 + (D) PB §13 *"locked proportions only scaling was repeated 100 times"*; PB §13 |
 | 1.10 | Published size rounds **up** to the next even millimetre | RULED | (B) Dan 08-10 17:04 |
-| 1.11 | Candidate size step | **CALIBRATED = 2 mm** (owner s62-kai) | v3.2's existing value, provenance recorded. PB §2's "scale increment 12 mm" is an unadopted proposal — GPT's own review flagged it as never approved, and Dan asked its rationale rather than ruling it. Preserve 2 mm unless execution disproves. |
+| 1.11 | Candidate size step | **CALIBRATED = 2 mm** (owner s62-kai) | Source: `src/lib/grid-engine/spec.ts:331` (`sizeStepMM: 2`), guarded at `:416` (`{min:2,max:48}`). PB §2's "scale increment 12 mm" is an unadopted proposal — GPT's own review flagged it as never approved, and Dan asked its rationale rather than ruling it. Preserve 2 mm unless execution disproves. |
 
 ---
 
@@ -55,13 +55,13 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 
 | # | Rule / value | Class | Source |
 |---|---|---|---|
-| 2.1 | **B1 24–72 · B2 72–120 · B3 120–168 · B4 168–216 · B5 216–264** | RULED | (D) PB §4 + (D) Dan's own five-band list in the GPT brief, line 178, with his correction at line 349 with his correction *"I made a mistake with bands missed the 168 we must return it to rightful place"* |
-| 2.2 | **B5 exists** (216–264) | RULED | Same. **Resolves the LSO "[OPEN] B5 existence"** — Dan's corrected list contains it. Whether it is *presented* to a user is a presentation policy, not engine truth. |
+| 2.1 | **B1 24–72 · B2 72–120 · B3 120–168 · B4 168–216 · B5 216–264** | RULED | (D) PB §4 + (D) `gpt-pro/ChatGPT-Grid and Band Logic-20260816-1022.md` — Dan's band list at **line 178**, his correction at **line 349**: *"I made a mistake with bands missed the 168 we must return it to rightful place"* |
+| 2.2 | **B5 exists** (216–264) **and participates in the certified offer domain** | RULED | Same source. **Resolved from the hierarchy, not asked:** PB §4 lists B5 as a band without qualification and PB §12 requires every candidate size be evaluated; no designated brief withholds it. `grid-laws.md` L4a's 168 mm cap binds the **twin-fix fixing type**, not the band, and is authority level 4 — it cannot narrow a level-2 band. Therefore the engine computes and offers B5; any commercial restriction is a presentation policy applied outside the engine. |
 | 2.3 | Boundaries lower-inclusive, upper-exclusive; final maximum inclusive | RULED | PB §4 table (`24 ≤ side < 72` … `216 ≤ side ≤ 264`) |
 | 2.4 | **Each axis classified independently**; overall band = the larger axis class | RULED | PB §4 |
 | 2.5 | **Axis class is CAPACITY, never a compulsory layout** | RULED | PB §4 examples; Dan 08-16 band-count correction |
 | 2.6 | **There is no band-count rule** — count comes from the class × band frame, reduced by material | RULED | (V) Dan 08-16, this lane's day-file: *"we do not have rule of band 1 = 1 magnet or band 2 having only pair — wrong as square in band 2 is 4 magnets — only narrow shapes that represent rectangular shape class produce pairs in band 2"* |
-| 2.7 | B1 = one magnet is a **geometric consequence** (under 72 mm one node line fits per axis), not a law | RULED-derived | 2.6 + 1.3 arithmetic |
+| 2.7 | B1 = one magnet is a **geometric consequence** (under 72 mm one node line fits per axis), not a law | RULED | 2.6 + 1.3 arithmetic |
 
 ---
 
@@ -114,16 +114,17 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 | 6.2 | The order: **1 legality · 2 coverage of major support regions · 3 support of the upper gravity-critical mass · 4 reduction of unsupported extent · 5 reduction of peel/flap leverage · 6 coherent approved pattern · 7 distribution across distinct masses · 8 geometric and visual balance · 9 lower magnet count when support is equivalent** | RULED | PB §11 verbatim |
 | 6.3 | **More magnets never automatically better**; a layout may not be chosen for containing more | RULED | PB §11, §13 |
 | 6.4 | The centroid is **evidence, not the placement rule** | RULED | PB §11 |
-| 6.5 | Gravity: upper support preferred; a magnet below a large unsupported upper region does not hold it | RULED | PB §13.3; Dan 08-13 *"gravity must not place magnets in the bottom and leave top unprotected"* |
+| 6.5 | Gravity: upper support preferred; a magnet below a large unsupported upper region does not hold it | RULED | (D) **PB §11.3** (my earlier §13.3 citation was wrong — §13 is Hard exclusions) + (B) Dan 08-13 12:18:31 *"gravity must not place magnets in the bottom and leave top unprotected"* |
 | 6.6 | Flap is measured from the **padded grid bounding box** outward to the silhouette, per side | RULED | (B) Dan 08-11 14:13:59 — verbatim record; *note:* the vault holds this as a lane relay, the brief holds Dan's own text |
-| 6.7 | Flap limit **12 mm or 24 mm — implemented as a tested switch, not a third invented number** | CALIBRATED (owner s62-kai) | (V) Dan 08-11 10:32, meta lane — **the method is ruled**: *"why do i need to rule if i never tested the difference in the real life — why not add all options and test?"* → **resolves the LSO "[OPEN] flap switch"**: both positions implemented, measured, default recorded. |
+| 6.7a | **Method** — the limit is a two-position switch (12 or 24), never a third invented number; both positions implemented and measured on the corpus | **RULED** | (V) Dan 08-11 10:32, meta lane day-file: *"why do i need to rule if i never tested the difference in the real life - why noit add all options and test?"* |
+| 6.7b | **Active value** — `flapTight = 12` is the current default | **CALIBRATED** (owner s62-kai) | Source: `spec.ts` `flapTightMM: 12`. **Selection gate:** the default changes only if the T2 corpus shows the 12 position rejecting a placement Dan has ruled good, or the 24 position admitting one he has rejected. Until that measurement exists, 12 stands and the measurement is a T7 deliverable. |
 | 6.8 | The trivial-limb exemption is **measured and reported**, never applied silently | RULED | L14 + PB §19 (rejection reasons) |
 | 6.9 | Peel/flap-leverage numerical definition | ENGINEERING (owner s62-kai) | PB §21.3 defers it. Must be a **measured moment** (material × lever arm), never an invented weight; builder verifies against constructed cases. |
 | 6.10 | Tie-breaking tolerances between mechanically equivalent arrangements | ENGINEERING (owner s62-kai) | PB §21.5 defers it |
-| 6.11 | Size selector after the nine: the **snug seat** — tightest wrap of the winning arrangement | RULED | Dan 08-13 tight-wrap ruling; L11 hug |
+| 6.11 | Size selector after the nine: the **snug seat** — tightest wrap of the winning arrangement | RULED | (B) `grid-brief.md` 2026-08-13 12:18:31 — *"the tight fit law - is the preference to select sizes with minimal flap around magnets"* |
 | 6.12 | Approved-pattern library is versioned; the engine **may not create arbitrary subsets to increase count** | RULED | PB §10 |
-| 6.13 | Pattern families: single · vertical pair · horizontal pair · **diagonal pair (same lattice)** · L · row · column · T · rectangular four · approved larger extensions | RULED | PB §10; Dan 08-13 *"diagonal is also correct it does not introduce separate grid it is the same one"* |
-| 6.14 | Row/column skipping is lawful (the duck's skipped mid row); corner holds with optional middles | RULED | Dan 08-13 12:52–12:53 |
+| 6.13 | Pattern families: single · vertical pair · horizontal pair · **diagonal pair (same lattice)** · L · row · column · T · rectangular four · approved larger extensions | RULED | (D) PB §10 + (B) `grid-brief.md` 2026-08-13 12:59 — *"diagonal is also correct it does not introduce separate grid it is the same one"* |
+| 6.14 | Row/column skipping is lawful (the duck's skipped mid row); corner holds with optional middles | RULED | (B) `grid-brief.md` 2026-08-13 12:52 (*"skipping mid row"*) and 12:53 (*"3 magnets utmost corners only mid 2 rows are optional"*) |
 
 ---
 
@@ -133,7 +134,7 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 |---|---|---|---|
 | 7.1 | **Every candidate size evaluated independently.** No result inferred from a smaller or larger size | RULED | PB §12 |
 | 7.2 | A band returns **all distinct optima its range unlocks**, with **one marked** as the guaranteed answer | RULED | (V) Dan 08-16, this lane's day-file *"each band must show within its size range all optimal sizes and layouts if range permits — not just 1 if there are more"*; L17 bulls-eye |
-| 7.3 | **Distinct = distinct governed window/scale identity** — never "more magnets" | RULED-by-resolution | Dan's own wording is scale-based: *"more than 1 optimal choice at different scales"*, *"Band 4 stopped at 168 but could have shown extra at 200-216mm range"*; PB §11.9 + §13 forbid count as the driver |
+| 7.3 | **Distinct = distinct governed window/scale identity** — never "more magnets" | RULED | Dan's own wording is scale-based: *"more than 1 optimal choice at different scales"*, *"Band 4 stopped at 168 but could have shown extra at 200-216mm range"*; PB §11.9 + §13 forbid count as the driver |
 | 7.4 | A size may be **rejected with a machine-readable reason** — refusal is a legitimate outcome | RULED | PB §19 |
 | 7.5 | Presentation cap on how many offers are shown | ENGINEERING (owner s62-kai) | applied only after the complete certified set exists |
 
@@ -156,11 +157,97 @@ mechanics taken from the compatible R3 certification reference.
 
 ---
 
+## 8A. INPUT BOUNDARY  *(QA correction 3 — PB §15)*
+
+| # | Input | Class | Requirement |
+|---|---|---|---|
+| 8A.1 | `outline` | RULED | **One validated simple closed polygon**, millimetres (D) PB §15 |
+| 8A.2 | `top_direction` | RULED | Required — gravity evaluation is undefined without it (D) PB §15 |
+| 8A.3 | `size_domain` | RULED | The permitted physical size range (D) PB §15 |
+| 8A.4 | `size_step` | CALIBRATED (s62-kai) | 2 mm — see 1.11 |
+| 8A.5 | `grid_profile` | RULED | 24 mm cells / 48 mm nodes (D) PB §15 |
+| 8A.6 | `safety_profile` | RULED | 12 mm radius (D) PB §15 |
+| 8A.7 | `pattern_policy_version` · `selection_policy_version` | RULED | Versioned, immutable once released (D) PB §15 |
+| 8A.8 | **Holes and disconnected outlines HARD-REJECT in V1** | RULED | (D) PB §15 *"Initial scope excludes holes and disconnected silhouettes"* — reject with a reason, never silently repair |
+
+---
+
+## 8B. THE MECHANICS REGISTRY  *(QA correction 1 — the complete descriptor set)*
+
+PB §21.2–5 defers these numerics to "a later mathematical decision"; that decision is
+**ENGINEERING, owner s62-kai**, and each row carries its **completeness-proof duty** — the
+obligation meta's T4.3 correction established (a criterion's optimum over a continuous feasible
+region is not necessarily at a vertex).
+
+| Descriptor | Formula | Direction | Units | Tolerance | Completeness-proof duty |
+|---|---|---|---|---|---|
+| **coverage** | fraction of major regions (5.4) containing ≥1 anchor | maximise | dimensionless | exact (integer counts) | discrete per candidate — no continuous optimisation |
+| **upperSupport** | material area above the topmost anchor line ÷ block width = equivalent hanging height | minimise | mm | coordinate quantum (8C.1) | monotone in translation-y ⇒ optimum at the −y support point of `F` |
+| **unsupportedExtent** | per side, outline reach beyond the padded block edge (6.6); score = max side; exempt limb regions **returned as data** (6.8) | minimise | mm | coordinate quantum | piecewise-linear in translation ⇒ optimum at vertices/edge extrema of `F` |
+| **peelLeverage** | first moment of unsupported material about the nearest anchor line: ∫(reach beyond edge)·dA | minimise | mm³ | quantum × area scale | convex piecewise ⇒ **own argmin required**; may lie interior to `F` |
+| **distribution** | count of distinct major masses holding ≥1 anchor; tie-break by variance of anchors per mass | maximise, then minimise | dimensionless | exact | discrete per candidate |
+| **balance** | ‖anchorCentroid(t) − materialCentroid‖² | minimise | mm² | quantum² | **convex quadratic — unconstrained minimiser projected into `F`; the optimum may be strictly interior.** This is the row meta's correction exists for. |
+| **count** | number of anchors | minimise **only at equivalent support** (6.2 pos. 9) | dimensionless | exact | discrete |
+
+**Comparator:** lexicographic in the 6.2 order; a descriptor decides only when all earlier ones
+tie **within their stated tolerance**; equality inside tolerance carries both candidates forward
+(no silent pruning of a legal contender).
+
+### 8B.1 Unsupported-extent definition *(QA correction 1, explicitly)*
+Unsupported extent = the outline's reach beyond the **padded grid bounding box** (6.6), measured
+per side, in millimetres, at the evaluated size. The **score** is the maximum side; the per-side
+vector and any limb-exempt regions are **returned as evidence** (6.8, 8.x). It is *not* the gap
+between magnets (Dan 08-11: *"between magnets? flap = outer edges not supported by magnet
+connection and hold"* — (B) `grid-brief.md` 14:02:54).
+
+### 8B.2 Pattern-permission matrix *(QA correction 1)*
+**ENGINEERING, owner s62-kai — derived, never invented.** A pattern is permitted for a
+(axis-class X, axis-class Y, band, population) tuple **iff** its node frame fits inside the axis
+capacities (2.5, 3.2) **and** its population (48 or 96) is realisable at that size on the one
+lattice (1.3–1.4). Nothing else may narrow or widen the set; the matrix is generated from those
+two conditions and recorded per profile version, not hand-authored per shape.
+
+---
+
+## 8C. NUMERIC AND CERTIFICATION INPUTS  *(QA correction 1)*
+
+| # | Input | Class | Value / duty |
+|---|---|---|---|
+| 8C.1 | Coordinate quantum | ENGINEERING (s62-kai) | Internal integer arithmetic at **1 µm** (Clipper2 `SCALE = 1000`, the existing convention in `compute/offset.ts`); published sizes remain even millimetres (1.10). Proof duty: exact tangency legal at the quantum, one-quantum intrusion illegal. |
+| 8C.2 | Approximation / error envelope | ENGINEERING (s62-kai) | Any polygonal approximation of the safe core must be **conservative inward** with a stated ε, so a lawful placement can never be silently erased. Proof duty: demonstrate the sandwich relation; return `INDETERMINATE_WITHIN_TOLERANCE` rather than certify empty. |
+| 8C.3 | Input vertex budget | ENGINEERING (s62-kai) | Not yet measured. Proof duty: establish at T3 on the real corpus and record the number; until measured, no vertex claim may be made. |
+| 8C.4 | Runtime / memory gates | ENGINEERING (s62-kai) | R3's **provisional** 16 ms typical / 50 ms hard for an all-band solve — *a target, not a Dan ruling*. Proof duty: measure and report; a miss is reported, never hidden. |
+| 8C.5 | Determinism | RULED | Same outline + same profile + same artifacts ⇒ byte-identical canonical output. (D) R3 certification mechanics, compatible with PB §19's "deterministic decision reasons". |
+
+---
+
+## 8D. RESULT IDENTITY AND OUTPUT CONTRACT  *(QA correction 2 — replaces the narrow §8)*
+
+**Identity** (all required; a result is not addressable without them):
+source-geometry identity (canonical outline hash) · governed size/window · population ID and
+origin parity · frame · pattern and variant · registration · profile hash · Compute artifact
+hash · Logic artifact hash · canonical output hash.
+
+**Result payload** (PB §19, in full): band · exact width · exact height · scale factor · axis
+class X · axis class Y · node frame · registration offset · selected pattern ID · selected node
+addresses · magnet centres (mm) · minimum edge clearance · supported structural regions ·
+unsupported-extent metrics (per-side vector + score + exempt regions) · gravity-support result ·
+**proof / uncertainty status** · validation status · deterministic decision reasons.
+
+**Rejection payload:** machine-readable reason — safe core empty · no strong grid node · no
+approved lawful pattern · upper critical mass unsupported · excessive unsupported extent ·
+registration search exhausted · **legality indeterminate** · **decision indeterminate**.
+
+Coordinates available as **both** board/node addresses and exact cutout-relative millimetres
+(D) PB §17.
+
+---
+
 ## 9. DISPLACED CLAUSES  *(recorded, not blended — the displaced text is named so it cannot creep back)*
 
 | Displaced | Winner | Why |
 |---|---|---|
-| **Cross-band out-counting** ("every band's answer carries more magnets than the band below") | 2.6 class × band frame | My inference; QA established the vault holds only my restatement. Conflicts with 6.3/6.9. |
+| **Cross-band out-counting** ("every band's answer carries more magnets than the band below") | 2.6 class × band frame | My inference; QA established the vault holds only my restatement. Conflicts with **6.2 position 9 (fewer at equivalent support)** and **6.3** — not with 6.9, which is peel leverage. |
 | **Band separation "≥24 mm above the previous answer"** as search pruning | 7.1 independent per-size evaluation (PB §12) | My inference. May return only as an offer-presentation rule if ever traced to Dan's words — never as domain truncation. |
 | **"Distinct optimum = the grid grew in magnets"** | 7.3 window/scale identity | My proxy, withdrawn. |
 | **"Every band must answer"** as a hard law | 7.4 refusal-with-reason (PB §19) | My restatement; the brief makes refusal legitimate and explained. |
@@ -195,14 +282,33 @@ calibration events, never as questions.
 
 ---
 
-## 11. VERIFICATION OF THIS LEDGER  *(T0's own gate)*
+## 11. CROSSWALK — every task input, to its ledger row
 
-- Every executable rule above carries a brief pointer, a direct-ruling quote, or a named
-  reversible owner (CALIBRATED with provenance / ENGINEERING with its verification duty). ✔
-- No R3 **proposal status** is used to create a Dan gate — R3 appears only as certification
-  mechanics under §8's identity note and §4.5's deferral, both compatible. ✔
-- No questionnaire produced; the residual list is one item, and it blocks only the final gate. ✔
-- Every displaced clause is **recorded with its winner and reason** (§9), not blended away. ✔
-- No product discovery: every entry traces to an existing brief or ruling; nothing new decided. ✔
+*(QA necessity finding: the previous §11 self-certified with checkmarks. Replaced by the
+crosswalk a reviewer can walk. A task input with no row here is a ledger gap, by definition.)*
 
-**Status: T0 complete → Ready for QA.** T1 is not authorised until QA → Meta closes this.
+| Task | Input it consumes | Ledger row |
+|---|---|---|
+| T2 oracle | square/rect/circle standards | 3.3 · 3.5 · 3.6 |
+| T2 | band boundaries and inclusivity | 2.1 · 2.3 |
+| T2 | ruled frames + observed split | 6.x sources; §10 outcomes note |
+| T3 probe | coordinate quantum · error envelope · vertex budget · perf gates | 8C.1–8C.4 |
+| T3 | determinism requirement | 8C.5 |
+| T4 safe core | radius, exactness, prohibited constructions | 1.2 · 1.6 · 5.2 · 5.3 |
+| T4 feasibility | translation domain, rotation ban, representation | 4.4 · 4.5 · 8C.2 |
+| T4 | input rejection (holes/disconnected) | 8A.8 |
+| T5 regions | region attributes + persistence | 5.4 · 5.5 |
+| T5 | strong/marginal thresholds + probe levels | 5.6 (ENGINEERING) |
+| T5 descriptors | formula · direction · units · tolerance · completeness | 8B (all rows) |
+| T5 | unsupported-extent definition | 8B.1 |
+| T6 funnel | axis classes → band → frame → parity → permissions → nodes → placement | 2.4 · 2.5 · 3.2 · 3.4 · 4.1 · 4.2 · 8B.2 · 5.4 |
+| T6 selection | the nine, lexicographic | 6.1 · 6.2 · 6.3 · 6.4 |
+| T6 sizing | independent per size · snug seat | 7.1 · 6.11 · 1.10 · 1.11 |
+| T6 offer | all distinct optima · one marked · distinctness · refusal | 7.2 · 7.3 · 7.4 · 7.5 |
+| T6 identity/result | full identity + payload + rejection codes | 8D |
+| T7 gate | flap-switch measurement · perf report · determinism | 6.7a · 6.7b · 8C.4 · 8C.5 |
+| T9 UI | result identity as chip key · refusal display | 8D |
+
+**Unmapped task inputs: none.** **Ledger rows no task consumes: none** — every row above is
+consumed by at least one task.
+
