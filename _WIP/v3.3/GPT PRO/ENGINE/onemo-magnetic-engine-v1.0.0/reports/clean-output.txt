@@ -1,0 +1,4 @@
+
+> onemo-magnetic-engine-monorepo@1.0.0 clean
+> node scripts/clean.mjs
+

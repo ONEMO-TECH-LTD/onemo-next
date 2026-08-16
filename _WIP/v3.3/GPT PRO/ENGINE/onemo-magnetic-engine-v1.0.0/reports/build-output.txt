@@ -1,0 +1,8 @@
+
+> onemo-magnetic-engine-monorepo@1.0.0 build
+> node scripts/build.mjs
+
+{
+  "computeArtifactHash": "5da8574f875a60b28df98c7cff2a27278da05e644868dc3b16016168252a3c2d",
+  "logicArtifactHash": "65388c3222e14e61f4bc53546d485e6e4f8b418eb0e64946aee310ceca472413"
+}

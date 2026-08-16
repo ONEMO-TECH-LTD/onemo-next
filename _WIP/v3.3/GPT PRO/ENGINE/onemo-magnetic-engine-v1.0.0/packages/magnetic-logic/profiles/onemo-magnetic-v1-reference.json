@@ -1,0 +1,554 @@
+{
+  "schema": "onemo-magnetic-profile-v1",
+  "id": "onemo-magnetic-v1-reference",
+  "version": 1,
+  "approvalState": "approved",
+  "productionReady": false,
+  "numeric": {
+    "coordinateQuantumMm": 0.01,
+    "approximationToleranceMm": 0.0025,
+    "feasibilityCoarseToleranceMm": 0.25,
+    "maxAdaptiveCells": 120000,
+    "maxVertices": 4096
+  },
+  "grid": {
+    "cellMm": 24,
+    "nodeStrideCells": 2,
+    "displayViewportCells": 10,
+    "populations": [
+      {
+        "id": "grid48",
+        "strideCells": 2,
+        "enabled": true,
+        "originParities": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    ]
+  },
+  "safety": {
+    "baseProtectedRadiusMm": 12,
+    "effectiveVerificationRadiusMm": 12,
+    "tolerancePolicy": {
+      "id": "POST_TOLERANCE_MINIMUM_V1",
+      "cutMm": 0,
+      "placementMm": 0,
+      "materialMm": 0,
+      "assemblyMm": 0
+    }
+  },
+  "sizeDomain": {
+    "minMm": 24,
+    "maxMm": 264,
+    "stepMm": 12,
+    "bands": [
+      {
+        "id": "B1",
+        "class": 1,
+        "minMm": 24,
+        "maxMm": 72,
+        "referenceMm": 24
+      },
+      {
+        "id": "B2",
+        "class": 2,
+        "minMm": 72,
+        "maxMm": 120,
+        "referenceMm": 72
+      },
+      {
+        "id": "B3",
+        "class": 3,
+        "minMm": 120,
+        "maxMm": 168,
+        "referenceMm": 120
+      },
+      {
+        "id": "B4",
+        "class": 4,
+        "minMm": 168,
+        "maxMm": 216,
+        "referenceMm": 168
+      },
+      {
+        "id": "B5",
+        "class": 5,
+        "minMm": 216,
+        "maxMm": 264,
+        "maxInclusive": true,
+        "referenceMm": 216
+      }
+    ],
+    "primaryOffer": "SMALLEST_ACCEPTED_PER_BAND"
+  },
+  "translation": {
+    "periodMm": 48,
+    "allowX": true,
+    "allowY": true
+  },
+  "structural": {
+    "sampleStepMm": 6,
+    "clearanceSurplusLevelsMm": [
+      0,
+      4,
+      8,
+      12
+    ],
+    "majorMinAreaDiscRatio": 0.05,
+    "majorMinAreaShapeFraction": 0.01,
+    "majorMinPersistenceLevels": 2,
+    "forceLargestComponentMajor": true
+  },
+  "patterns": [
+    {
+      "id": "single",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          0,
+          0
+        ]
+      ],
+      "frameId": "1x1"
+    },
+    {
+      "id": "pair.vertical",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          0,
+          -1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "frameId": "1x2"
+    },
+    {
+      "id": "pair.horizontal",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          -1,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "frameId": "2x1"
+    },
+    {
+      "id": "row.3",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          -2,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "frameId": "3x1"
+    },
+    {
+      "id": "column.3",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          0,
+          -2
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "frameId": "1x3"
+    },
+    {
+      "id": "square.4",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          -1,
+          -1
+        ],
+        [
+          1,
+          -1
+        ],
+        [
+          -1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "frameId": "2x2"
+    },
+    {
+      "id": "l.bottom-left",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          -1,
+          -1
+        ],
+        [
+          1,
+          -1
+        ],
+        [
+          -1,
+          1
+        ]
+      ],
+      "symmetryFamily": "l.3",
+      "frameId": "2x2"
+    },
+    {
+      "id": "l.bottom-right",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          -1,
+          -1
+        ],
+        [
+          1,
+          -1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "symmetryFamily": "l.3",
+      "frameId": "2x2"
+    },
+    {
+      "id": "l.top-left",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          -1,
+          -1
+        ],
+        [
+          -1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "symmetryFamily": "l.3",
+      "frameId": "2x2"
+    },
+    {
+      "id": "l.top-right",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          1,
+          -1
+        ],
+        [
+          -1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "symmetryFamily": "l.3",
+      "frameId": "2x2"
+    },
+    {
+      "id": "t.top1-bottom3",
+      "version": 1,
+      "populationId": "grid48",
+      "cells": [
+        [
+          0,
+          2
+        ],
+        [
+          -2,
+          -2
+        ],
+        [
+          0,
+          -2
+        ],
+        [
+          2,
+          -2
+        ]
+      ],
+      "frameId": "3x3"
+    }
+  ],
+  "permissions": [
+    {
+      "patternId": "single",
+      "bands": [
+        "B1"
+      ],
+      "minClassX": 1,
+      "minClassY": 1,
+      "marginalNodesAllowed": false,
+      "patternRank": 0
+    },
+    {
+      "patternId": "pair.vertical",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 1,
+      "minClassY": 2,
+      "marginalNodesAllowed": false,
+      "patternRank": 0
+    },
+    {
+      "patternId": "pair.horizontal",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 2,
+      "minClassY": 1,
+      "marginalNodesAllowed": false,
+      "patternRank": 0
+    },
+    {
+      "patternId": "square.4",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 2,
+      "minClassY": 2,
+      "marginalNodesAllowed": false,
+      "patternRank": 2
+    },
+    {
+      "patternId": "l.bottom-left",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 2,
+      "minClassY": 2,
+      "marginalNodesAllowed": false,
+      "patternRank": 1
+    },
+    {
+      "patternId": "l.bottom-right",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 2,
+      "minClassY": 2,
+      "marginalNodesAllowed": false,
+      "patternRank": 1
+    },
+    {
+      "patternId": "l.top-left",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 2,
+      "minClassY": 2,
+      "marginalNodesAllowed": false,
+      "patternRank": 1
+    },
+    {
+      "patternId": "l.top-right",
+      "bands": [
+        "B2",
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 2,
+      "minClassY": 2,
+      "marginalNodesAllowed": false,
+      "patternRank": 1
+    },
+    {
+      "patternId": "row.3",
+      "bands": [
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 3,
+      "minClassY": 1,
+      "marginalNodesAllowed": false,
+      "patternRank": 1
+    },
+    {
+      "patternId": "column.3",
+      "bands": [
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 1,
+      "minClassY": 3,
+      "marginalNodesAllowed": false,
+      "patternRank": 1
+    },
+    {
+      "patternId": "t.top1-bottom3",
+      "bands": [
+        "B3",
+        "B4",
+        "B5"
+      ],
+      "minClassX": 3,
+      "minClassY": 3,
+      "marginalNodesAllowed": false,
+      "patternRank": 0
+    }
+  ],
+  "mechanics": {
+    "registryId": "onemo-mechanics-v1",
+    "topDirection": {
+      "x": 0,
+      "y": 1
+    },
+    "criteria": [
+      {
+        "id": "M01_MAJOR_COVERAGE",
+        "descriptorId": "REGION_COVERAGE_V1",
+        "tolerances": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "M02_UPPER_REGION",
+        "descriptorId": "REGION_SUBSET_COVERAGE_V1",
+        "tolerances": [
+          0
+        ]
+      },
+      {
+        "id": "M03_UPPER_MOMENT",
+        "descriptorId": "CAP_FIRST_MOMENT_V1",
+        "tolerances": [
+          0
+        ],
+        "toleranceRule": "Q_TIMES_AREA"
+      },
+      {
+        "id": "M04_MAX_OVERHANG",
+        "descriptorId": "MAX_DIRECTIONAL_OVERHANG_V1",
+        "tolerances": [
+          0.01
+        ],
+        "toleranceRule": "Q"
+      },
+      {
+        "id": "M05_PATTERN_RANK",
+        "descriptorId": "DISCRETE_SCALAR_V1",
+        "tolerances": [
+          0
+        ]
+      },
+      {
+        "id": "M06_REGION_LOAD",
+        "descriptorId": "REGION_MAX_LOAD_V1",
+        "tolerances": [
+          0
+        ]
+      },
+      {
+        "id": "M07_BALANCE",
+        "descriptorId": "ANCHOR_CENTROID_BALANCE_V1",
+        "tolerances": [
+          0.01,
+          0
+        ],
+        "toleranceRule": "Q_AND_CENTROID_SQUARED"
+      },
+      {
+        "id": "M08_ANCHOR_COUNT",
+        "descriptorId": "POINT_COUNT_V1",
+        "tolerances": [
+          0
+        ]
+      }
+    ]
+  },
+  "subQuantumPolicy": "DECISION_INDETERMINATE",
+  "b1Guarantee": "ONLY_WHEN_LAWFUL_IN_B1",
+  "provenance": {
+    "PD01": "24 mm protected disc / 12 mm radius",
+    "PD02": "24 mm base cell",
+    "PD03": "48 mm master-node pitch",
+    "PD05": "24/72/120/168/216 references",
+    "PD06": "dominant-side band",
+    "PD11": "B1 bbox-centre start",
+    "PD12": "odd/even parity",
+    "PD13": "continuous registration",
+    "PD28": "Batwoman outcome constraints"
+  },
+  "engineeringAssumptions": [
+    "96 mm sparse population is disabled because PD-04/PD-34 has no verified product approval in the source files.",
+    "Structural thresholds and pattern permissions are conservative reference defaults because PD-17 and PD-19 contain no numeric/matrix values.",
+    "Sub-quantum feasibility returns DECISION_INDETERMINATE.",
+    "No universal B1 guarantee is made.",
+    "Physical tolerances are zero in this reference profile; productionReady is false until real process tolerances and a component profile are supplied.",
+    "The canonical Batwoman vector fixture is not bundled because the approved source geometry was not supplied."
+  ],
+  "profileHash": "841095ac6cc993159bd04c1824c5fd7a753569e276c706648463d6609ef68f02"
+}

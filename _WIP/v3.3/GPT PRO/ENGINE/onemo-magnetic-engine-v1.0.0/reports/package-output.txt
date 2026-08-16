@@ -1,0 +1,10 @@
+Release package paths:
+/mnt/data/onemo-magnetic-engine-v1.0.0.zip
+/mnt/data/onemo-magnetic-engine/dist/onemo-geometry-compute-v1.0.0.zip
+/mnt/data/onemo-magnetic-engine/dist/onemo-magnetic-logic-v1.0.0.zip
+/mnt/data/onemo-magnetic-engine/dist/onemo-magnetic-next-v1.0.0.zip
+
+The final master checksum is stored beside the archive in:
+/mnt/data/onemo-magnetic-engine-v1.0.0.sha256
+
+Per-package checksums are stored in dist/SHA256SUMS.

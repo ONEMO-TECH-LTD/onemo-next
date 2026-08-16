@@ -1,0 +1,39 @@
+
+> onemo-magnetic-engine-monorepo@1.0.0 benchmark
+> node scripts/benchmark.mjs
+
+{
+  "generatedAt": "2026-08-15T23:23:28.683Z",
+  "runtime": {
+    "node": "v22.16.0",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "backend": "geometry-compute-ts-fixed-v1",
+  "translationMs": {
+    "median": 0.06761099999999942,
+    "p95": 0.16848099999999988,
+    "max": 0.3882770000000022
+  },
+  "allBandPreviewSolveMs": {
+    "median": 49.255623999999955,
+    "p95": 55.28974000000002,
+    "max": 58.29598700000008
+  },
+  "certifiedExactB1Ms": {
+    "median": 1.4905469999999923,
+    "p95": 1.7206100000000788,
+    "max": 2.373100000000022
+  },
+  "fixtures": {
+    "translationPolygonVertices": 4,
+    "previewSolvePolygonVertices": 12,
+    "certifiedB1Vertices": 4
+  },
+  "notes": [
+    "Results are from this container, not a physical mobile device.",
+    "Final manufacturing legality is exact at the configured integer quantum.",
+    "The all-band figure measures the deterministic interactive preview path.",
+    "Selected-size certification is a separate conservative continuous-domain path and may return DECISION_INDETERMINATE rather than guess."
+  ]
+}

@@ -1,0 +1,438 @@
+
+> onemo-magnetic-engine-monorepo@1.0.0 demo
+> node scripts/run-demo.mjs
+
+Interactive band offers:
+[
+  {
+    "band": "B1",
+    "status": "OFFERED",
+    "size": [
+      24,
+      24
+    ],
+    "pattern": "single",
+    "decisionProof": "DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY",
+    "centres": [
+      {
+        "cell": [
+          0,
+          0
+        ],
+        "xMm": 0,
+        "yMm": 0,
+        "clearanceMm": 12,
+        "marginMm": 0
+      }
+    ]
+  },
+  {
+    "band": "B2",
+    "status": "OFFERED",
+    "size": [
+      72,
+      72
+    ],
+    "pattern": "l.bottom-left",
+    "decisionProof": "DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY",
+    "centres": [
+      {
+        "cell": [
+          -1,
+          -1
+        ],
+        "xMm": -24,
+        "yMm": -24,
+        "clearanceMm": 12,
+        "marginMm": 0
+      },
+      {
+        "cell": [
+          1,
+          -1
+        ],
+        "xMm": 24,
+        "yMm": -24,
+        "clearanceMm": 12,
+        "marginMm": 0
+      },
+      {
+        "cell": [
+          -1,
+          1
+        ],
+        "xMm": -24,
+        "yMm": 24,
+        "clearanceMm": 12,
+        "marginMm": 0
+      }
+    ]
+  },
+  {
+    "band": "B3",
+    "status": "OFFERED",
+    "size": [
+      120,
+      120
+    ],
+    "pattern": "t.top1-bottom3",
+    "decisionProof": "DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY",
+    "centres": [
+      {
+        "cell": [
+          0,
+          2
+        ],
+        "xMm": 0,
+        "yMm": 48,
+        "clearanceMm": 12,
+        "marginMm": 0
+      },
+      {
+        "cell": [
+          -2,
+          -2
+        ],
+        "xMm": -48,
+        "yMm": -48,
+        "clearanceMm": 12,
+        "marginMm": 0
+      },
+      {
+        "cell": [
+          0,
+          -2
+        ],
+        "xMm": 0,
+        "yMm": -48,
+        "clearanceMm": 12,
+        "marginMm": 0
+      },
+      {
+        "cell": [
+          2,
+          -2
+        ],
+        "xMm": 48,
+        "yMm": -48,
+        "clearanceMm": 12,
+        "marginMm": 0
+      }
+    ]
+  },
+  {
+    "band": "B4",
+    "status": "OFFERED",
+    "size": [
+      168,
+      168
+    ],
+    "pattern": "t.top1-bottom3",
+    "decisionProof": "DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY",
+    "centres": [
+      {
+        "cell": [
+          0,
+          2
+        ],
+        "xMm": 0,
+        "yMm": 72,
+        "clearanceMm": 12,
+        "marginMm": 0
+      },
+      {
+        "cell": [
+          -2,
+          -2
+        ],
+        "xMm": -48,
+        "yMm": -24,
+        "clearanceMm": 36,
+        "marginMm": 24
+      },
+      {
+        "cell": [
+          0,
+          -2
+        ],
+        "xMm": 0,
+        "yMm": -24,
+        "clearanceMm": 60,
+        "marginMm": 48
+      },
+      {
+        "cell": [
+          2,
+          -2
+        ],
+        "xMm": 48,
+        "yMm": -24,
+        "clearanceMm": 36,
+        "marginMm": 24
+      }
+    ]
+  },
+  {
+    "band": "B5",
+    "status": "OFFERED",
+    "size": [
+      216,
+      216
+    ],
+    "pattern": "t.top1-bottom3",
+    "decisionProof": "DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY",
+    "centres": [
+      {
+        "cell": [
+          0,
+          2
+        ],
+        "xMm": 0,
+        "yMm": 72,
+        "clearanceMm": 36,
+        "marginMm": 24
+      },
+      {
+        "cell": [
+          -2,
+          -2
+        ],
+        "xMm": -48,
+        "yMm": -24,
+        "clearanceMm": 60,
+        "marginMm": 48
+      },
+      {
+        "cell": [
+          0,
+          -2
+        ],
+        "xMm": 0,
+        "yMm": -24,
+        "clearanceMm": 84,
+        "marginMm": 72
+      },
+      {
+        "cell": [
+          2,
+          -2
+        ],
+        "xMm": 48,
+        "yMm": -24,
+        "clearanceMm": 60,
+        "marginMm": 48
+      }
+    ]
+  }
+]
+
+Selected-size continuous certification:
+{
+  "status": "DECISION_INDETERMINATE",
+  "targetDominantMm": 120,
+  "band": "B3",
+  "reasons": [
+    "CRITERION_SCORE_UNCERTAIN",
+    "M03_UPPER_MOMENT"
+  ]
+}
+
+Engine ManufacturingSpec (reference/non-production profile):
+{
+  "schema": "onemo-engine-manufacturing-spec-v1",
+  "schemaVersion": 1,
+  "computeArtifactHash": "5da8574f875a60b28df98c7cff2a27278da05e644868dc3b16016168252a3c2d",
+  "logicArtifactHash": "65388c3222e14e61f4bc53546d485e6e4f8b418eb0e64946aee310ceca472413",
+  "profileId": "onemo-magnetic-v1-reference",
+  "profileHash": "841095ac6cc993159bd04c1824c5fd7a753569e276c706648463d6609ef68f02",
+  "sourceGeometryHash": "b0f1199ca6741fdf93ae48500cc3bfdac0d1cc755d89e7fc4350a1723de0e40a",
+  "finalGeometryHash": "b0f1199ca6741fdf93ae48500cc3bfdac0d1cc755d89e7fc4350a1723de0e40a",
+  "finalRingInt": [
+    [
+      -6000,
+      -6000
+    ],
+    [
+      6000,
+      -6000
+    ],
+    [
+      6000,
+      6000
+    ],
+    [
+      -6000,
+      6000
+    ]
+  ],
+  "widthMm": 120,
+  "heightMm": 120,
+  "scale": 1,
+  "coordinateQuantumMm": 0.01,
+  "band": "B3",
+  "populationId": "grid48",
+  "frameId": "3x3",
+  "patternId": "t.top1-bottom3",
+  "registration": {
+    "x": 0,
+    "y": 0
+  },
+  "selectedCellAddresses": [
+    [
+      0,
+      2
+    ],
+    [
+      -2,
+      -2
+    ],
+    [
+      0,
+      -2
+    ],
+    [
+      2,
+      -2
+    ]
+  ],
+  "centres": [
+    {
+      "cell": [
+        0,
+        2
+      ],
+      "xMm": 0,
+      "yMm": 48,
+      "clearanceMm": 12,
+      "marginMm": 0
+    },
+    {
+      "cell": [
+        -2,
+        -2
+      ],
+      "xMm": -48,
+      "yMm": -48,
+      "clearanceMm": 12,
+      "marginMm": 0
+    },
+    {
+      "cell": [
+        0,
+        -2
+      ],
+      "xMm": 0,
+      "yMm": -48,
+      "clearanceMm": 12,
+      "marginMm": 0
+    },
+    {
+      "cell": [
+        2,
+        -2
+      ],
+      "xMm": 48,
+      "yMm": -48,
+      "clearanceMm": 12,
+      "marginMm": 0
+    }
+  ],
+  "baseProtectedRadiusMm": 12,
+  "effectiveVerificationRadiusMm": 12,
+  "toleranceCompositionRuleId": "POST_TOLERANCE_MINIMUM_V1",
+  "approximationToleranceMm": 0.0025,
+  "minimumMarginMm": 0,
+  "decisionTrace": [
+    {
+      "criterionId": "M01_MAJOR_COVERAGE",
+      "descriptorId": "REGION_COVERAGE_V1",
+      "score": {
+        "components": [
+          {
+            "lower": 1,
+            "upper": 1
+          },
+          {
+            "lower": 0,
+            "upper": 0
+          }
+        ]
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M02_UPPER_REGION",
+      "descriptorId": "REGION_SUBSET_COVERAGE_V1",
+      "score": {
+        "lower": 1,
+        "upper": 1
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M03_UPPER_MOMENT",
+      "descriptorId": "CAP_FIRST_MOMENT_V1",
+      "score": {
+        "lower": 8640,
+        "upper": 8640
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M04_MAX_OVERHANG",
+      "descriptorId": "MAX_DIRECTIONAL_OVERHANG_V1",
+      "score": {
+        "lower": 12,
+        "upper": 12
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M05_PATTERN_RANK",
+      "descriptorId": "DISCRETE_SCALAR_V1",
+      "score": {
+        "lower": 0,
+        "upper": 0
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M06_REGION_LOAD",
+      "descriptorId": "REGION_MAX_LOAD_V1",
+      "score": {
+        "lower": 4,
+        "upper": 4
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M07_BALANCE",
+      "descriptorId": "ANCHOR_CENTROID_BALANCE_V1",
+      "score": {
+        "components": [
+          {
+            "lower": 0,
+            "upper": 0
+          },
+          {
+            "lower": 576,
+            "upper": 576
+          }
+        ]
+      },
+      "status": "CERTIFIED"
+    },
+    {
+      "criterionId": "M08_ANCHOR_COUNT",
+      "descriptorId": "POINT_COUNT_V1",
+      "score": {
+        "lower": 4,
+        "upper": 4
+      },
+      "status": "CERTIFIED"
+    }
+  ],
+  "decisionProof": "DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY",
+  "proofStatus": "REFERENCE_PROFILE_NOT_PRODUCTION",
+  "canonicalHash": "a7b464ac1039793bc45eb0020bf3ce6c6ad8a6de07cb2e3aa35ef23b56df3b2b"
+}

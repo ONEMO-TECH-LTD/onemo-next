@@ -1,0 +1,6 @@
+{
+  "name": "onemo-magnetic-cli-demo",
+  "private": true,
+  "type": "module",
+  "dependencies": {"@onemo/magnetic-logic": "1.0.0"}
+}

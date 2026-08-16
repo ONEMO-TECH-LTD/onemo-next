@@ -1,0 +1,10 @@
+{
+  "chromium": {
+    "status": "blocked",
+    "reason": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at file:///mnt/data/onemo-magnetic-engine/reports/browser-smoke.html\nCall log:\n  - navigating to \"file:///mnt/data/onemo-magnetic-engine/reports/browser-smoke.html\", waiting until \"load\"\n"
+  },
+  "webkit": {
+    "status": "not-run",
+    "reason": "WebKit browser executable is not installed in this container"
+  }
+}

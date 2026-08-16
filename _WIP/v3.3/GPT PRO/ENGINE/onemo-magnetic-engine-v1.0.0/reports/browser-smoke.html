@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>ONEMO magnetic engine browser smoke</title>
+<script type="importmap">{"imports":{"@onemo/geometry-compute":"../packages/geometry-compute/dist/src/index.js","@onemo/magnetic-logic":"../packages/magnetic-logic/dist/src/index.js"}}</script>
+<pre id="output">running</pre>
+<script type="module">
+import { createReferenceProfile, solveOutline } from '@onemo/magnetic-logic';
+const outline=[{x:-60,y:-60},{x:60,y:-60},{x:60,y:60},{x:-60,y:60}];
+try {
+  const start=performance.now();
+  const result=await solveOutline({outlineMm:outline,profile:createReferenceProfile()});
+  const payload={ok:true,durationMs:performance.now()-start,offers:result.offers.map(x=>({band:x.band,status:x.status,pattern:x.solution?.patternId}))};
+  document.querySelector('#output').textContent=JSON.stringify(payload,null,2);
+  document.documentElement.dataset.status='passed';
+} catch (error) {
+  document.querySelector('#output').textContent=String(error?.stack??error);
+  document.documentElement.dataset.status='failed';
+}
+</script>

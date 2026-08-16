@@ -1,0 +1,37 @@
+
+> onemo-magnetic-engine-monorepo@1.0.0 test
+> node scripts/test.mjs
+
+✔ closed tangency is legal and one-quantum intrusion is illegal (2.023721ms)
+✔ irregular concave boundary invalidates a centre-inside disc (0.674703ms)
+✔ canonical polygon hash is independent of winding and starting vertex (1.831254ms)
+✔ adaptive translation preserves continuous vertical pair feasibility (200.104576ms)
+✔ multi-clearance hierarchy removes narrow branches before broad mass (5.551188ms)
+✔ neutral lattice is deterministic (0.680162ms)
+✔ critical witness generation finds canonical and directional extrema (1.628272ms)
+✔ dominance-safe interval handling retains overlapping legal contender (0.263372ms)
+✔ global-anchor restriction excludes locally tolerated but globally inferior score (0.323331ms)
+✔ canonical hash is stable (0.37671ms)
+✔ Compute artifact identity is a generated executable digest (0.502677ms)
+✔ profile is immutable and content-addressed (4.521917ms)
+✔ band thresholds are lower-inclusive and upper-exclusive except final maximum (3.181553ms)
+✔ square produces one deterministic primary offer per band (103.539403ms)
+✔ long rectangles select the lawful pair orientation (66.236996ms)
+✔ rounded shape does not assume square-corner occupancy (334.0356ms)
+✔ same input and artifact identities produce byte-identical canonical result (41.222804ms)
+✔ engine ManufacturingSpec round-trips and exact re-verifies (45.237096ms)
+✔ reference profile blocks physical fulfilment until tolerances are supplied (34.414391ms)
+✔ alternate calibrated values reuse the same Compute engine (1.291751ms)
+✔ selected B1 size can complete the certified physical pipeline under an explicitly production-ready profile (38.324292ms)
+✔ continuous certification reports indeterminate instead of guessing when mechanics cannot be proved (166.276708ms)
+✔ studio adapter flips canvas Y and centres bounds (1.85566ms)
+✔ ManufacturingSpec transport parser rejects wrong schema (0.209752ms)
+✔ solution view model preserves band status (0.231705ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 907.520997
