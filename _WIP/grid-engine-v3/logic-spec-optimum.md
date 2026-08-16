@@ -81,7 +81,66 @@ band below's top rung.
 
 ---
 
-## 4. THE OPTIMUM PER SHAPE PER BAND — the canon table
+## 4. THE SOLVING FUNNEL — general to specific [RULED — Dan's multi-step method (GPT conversation 08:51/09:31) + Compute System doc §18]
+
+Each step narrows the space; no step may skip ahead. The governing asymmetry, in the ruled
+words: **"The band tells us how much grid-space the object occupies. The silhouette tells us
+which parts of that grid-space actually contain material."** The bounding box classifies; it
+never places magnets.
+
+| Step | From general… | …to specific | Source |
+|---|---|---|---|
+| 1 | **Bounding box** | width, height, aspect ratio — the rough starting point | RULED ("Match outer bounding box to each band as rough starting point") |
+| 2 | **Shape class + axis classes** | each axis classified independently (1–5); class from aspect + fill: **square-like / tall rect / wide rect / circle-oval / free** (free refines at step 6); band = dominant axis class | RULED (§4) |
+| 3 | **Frame hypothesis** | class implies the candidate node frame — tall → 1×2 column, wide → 2×1 row, square-like → 2×2 (empty centre), larger bands the same logic at scale (2×3, 3×3 …; n lines span 2n−1 cells). **Capacity, never compulsory** — a square-bbox T still takes the vertical pair its material supports | RULED (§4–§5 + "the other bands can in merit same logic on larger scale") |
+| 4 | **Candidate sizes** | scale the silhouette, aspect locked, through the band's range; every size evaluated independently | RULED (§12) |
+| 5 | **Safe core** | 12mm full-disc erosion at that size — ears, necks, spikes vanish by geometry, per size, never by label | RULED (§7.2) |
+| 6 | **Structural map** | major masses / connectors / peripheral branches; strong vs marginal by width + persistence — the general class refined into the FREE class (tapered / waisted / standing / blob / winged / diagonal) by what the material actually is | RULED (§7.3/§8) |
+| 7 | **Registration** | canonical origin = bbox centre + parity (odd count on a node line, even on the spacer); controlled search within one 48mm period; **mechanics choose the registration, canonical breaks ties** | RULED (§6 + review correction) |
+| 8 | **Node classification** | every lattice node: illegal / marginal / strong | RULED (§9) |
+| 9 | **Pattern recognition** | approved templates instantiated from lawful nodes — the T is *revealed*, not invented | RULED (§10–11) |
+| 10 | **Mechanical selection → snug seat** | the §2 order picks among lawful patterns; tight-wrap selects the size; the band's distinct optimals assemble, one bulls-eye marked | RULED (§11 + L20 + L17) |
+
+**Funnel discipline:** a defect is diagnosed at the EARLIEST step that could have caught it (a
+wrong arrangement is usually a step-3/6 miss, not a step-10 tuning problem), and a fix lands at
+its own step — never as a compensating rule downstream.
+
+---
+
+## 5. STANDARD LAYOUTS AND SIZES — per class, per band
+
+The geometric classes have EXACT standards (they are the calibration controls); the free
+classes have STANDARD LAYOUT FAMILIES with canon reference sizes (the snug seat is found by
+the funnel, the family is fixed).
+
+### 5.1 Geometric classes — exact standards
+
+| Class | B1 | B2 | B3 | B4 | B5 | Source |
+|---|---|---|---|---|---|---|
+| **Square-like** (fills its box) | single · **24** | 2×2 · **72** | 3×3 · **120** | 4×4 · **168** | 5×5 · **216** | RULED — the square standard, "measured by squares is the easiest" |
+| **Tall rectangular** | single | 1×2 column pair · **24×72** | 1×3 / 2×3 column · **72×120** | 2×4 / 3×4 · **120×168** | 3×5 / 4×5 · **168×216** | RULED §4–5 — per-axis standards combine; layouts follow the long axis |
+| **Wide rectangular** | single | 2×1 row pair · **72×24** | 3×1 / 3×2 row · **120×72** | 4×2 / 4×3 · **168×120** | 5×3 / 5×4 · **216×168** | RULED — mirror of tall |
+| **Circle / oval** | single · ~40 | 2×2 · **92** | 3×3 · **160** | 4×4 · **228** | — | RULED L18 measured (rounded corners demand padding growth; encapsulation variant 102/170/238) |
+
+### 5.2 Free classes — standard layout families (canon reference sizes from the walkthrough)
+
+| Class (step-6 refinement) | B1 | B2 | B3 | B4 | Source |
+|---|---|---|---|---|---|
+| **Tapered** (triangle-like: bat) | single in the apex mass (~60) | vertical pair on the axis (~88); small shapes: apex + mid-bottom 2-point | **3 points, utmost corners** (two linked 48 pairs; mid-bottom hidden) / apex + base row (~144–146) | the same class grown on the stepped lattice: apex family + row, 2×3 six variation, bottom-heavy | RULED 14:29:46 + bat walkthrough 12:53 + 08-15/16 B4 session |
+| **Waisted** (duck) | single in the head (~60) | vertical head+body pair (~79–84) | **rect 48×96, four corners, mid row SKIPPED** (~152) | grown population (+row/disc) | RULED walkthrough 12:51–12:52 |
+| **Standing mass** (bot) | single (44/60 [OPEN]) | vertical pair (~96–98) | **narrow 96×48 four** (wide square acceptable, narrow BETTER) (~144) | longer rectangle / rect + mid row (ruled 236 frame is B5-territory) | RULED 12:57 + 13:02 |
+| **Blob** (poke) | single (~40–60) | pair along the long axis (~75–76) | **corner square 96×96** (~123–126) | **four on the 96 grid** (~217) + grown ladder | RULED 12:56 + 13:01 |
+| **Winged** (butterfly) | single in the body, dead-centre (~60) | **horizontal wing pair** (~92–97) | four-in-wings corner square (~126–130) | four on the 96 grid (~204–214) | RULED 12:54 + 12:59 |
+| **Diagonal** (pill) | single (end-seat physics) | **diagonal pair** — same lattice, no new grid (~79–82) | **diagonal 3-chain PREFERRED** (~138); staggered square strong alternative | grown diagonal population / staggered square | RULED 12:58–13:03 |
+
+**Reading the tables:** layout family + count are the standard; the size is the snug seat the
+funnel finds near the canon reference. A class's standard is the step-3 frame hypothesis the
+funnel starts from; the material (steps 5–6) may reduce it (L drops to 1+2 by itself — L5),
+never inflate it.
+
+---
+
+## 6. THE OPTIMUM PER SHAPE PER BAND — the canon table
 
 Sizes wobble lawfully with calibration; the FAMILY is the canon. ✅ = frame ruled/blessed by
 Dan · Ⓓ = derived by law, awaiting his eyes/veto · [OPEN] = named conflict.
@@ -98,7 +157,7 @@ Dan · Ⓓ = derived by law, awaiting his eyes/veto · [OPEN] = named conflict.
 
 ---
 
-## 5. LOGIC + COMPUTE = THE ENGINE DESIGN
+## 7. LOGIC + COMPUTE = THE ENGINE DESIGN
 
 **The split** [RULED — "neutral computation in the math engine … values editable but locked in
 the logic engine"]:
@@ -130,11 +189,11 @@ calibration event to show Dan.
 
 ---
 
-## 6. WHAT THIS SPEC SETTLES DAILY
+## 8. WHAT THIS SPEC SETTLES DAILY
 
 Before any judge change, answer from this document:
-1. Which §2 rule does this change implement, at which position?
-2. Which §4 cells does it move — and are they ✅ (stop: canon) or Ⓓ (show Dan)?
+1. Which §2 rule does this change implement, at which §4 funnel step?
+2. Which §5/§6 cells does it move — and are they ✅ (stop: canon) or Ⓓ (show Dan)?
 3. Is the value in LOGIC and the measure in COMPUTE?
 If any answer is missing, the change is drift.
 
