@@ -1,13 +1,15 @@
-# [s62-kai-lead] — grid engine v3.1 build tree
+# s62-grid-exec — Grid v3.2 Codex builder
 
-Owner lane: **s62-kai-lead** (Claude). Do not build here from another lane.
+- Worktree: `.codex/worktrees/s62-grid-exec-60656152`
+- Branch: `session62-task/s62-grid-exec-v3.2`
+- Code base: `60656152e3af1469bb0cab889f880e50e4e762aa`
+- Builder: `@s62-grid-exec` (Codex only)
+- QA: `@s62-grid-meta-qa`
+- Linear: `KAI-10261`
 
-- Branch: `session62-task/s62-kai-lead-grid-engine-v3.1`
-- Base: pixel's clean v3.1 head (`7c45d36e`), itself off the clean scaffold `9cc65867`
-- Peer tree `s62-grid-lab-v3.1-9cc65867` (pixel, codex) is a SEPARATE lane and stays untouched.
+Claude worktrees, drafts and verdicts are evidence only. They carry no execution authority and
+nothing is copied from their dirty trees. Read `_WIP/grid-engine-v3.2/CODEX-EXECUTION-BRIEF.md`
+in full before editing.
 
-Contents at creation: clean scaffold (spec / engine / bridge / GridCanvas / camera /
-trace-cutout, 31 tests green), sealed engine documents, and Dan's selection canon
-(selection-examples bands 1-4, grid-laws L20, grid-brief) as the acceptance oracles.
-
-Build status: HELD — nothing is built here until Dan's explicit go.
+Current authorised task: T1 only. One bounded subtraction, one local code snapshot, then stop for
+QA. No T2 build-ahead, push or merge.
