@@ -142,11 +142,11 @@ v3.2 is an independent redemption of the first working engine. v3.3 is donor and
 
 1. Build the multi-clearance component hierarchy using authority-ledger or provenance-backed calibrated levels; do not invent `r+4/r+8/r+12`.
 2. Implement only the approved neutral descriptor registry, formulas, tolerances and units.
-3. For every registration-sensitive descriptor, return an exact optimum/argopt subset, a conservative interval-refined equivalent set, or a proven-complete critical set with a certificate.
+3. For every registration-sensitive descriptor, certify its global optimum over the full feasible registration set `F`: return an exact optimum/argopt subset, a conservative interval-refined equivalent set, or `DECISION_INDETERMINATE`. No descriptor may infer completeness from vertices, canonical projections, directional extrema or any other fixed sample recipe. A completeness claim without a descriptor-specific proof is a defect.
 4. Apply the two-phase rule: local optimum evidence per hypothesis, then restriction against the certified global anchor.
 5. Preserve score-uncertain legal candidates until certified dominance; otherwise return `DECISION_INDETERMINATE`.
 
-**Why Kai T4.3 is not used:** for an asymmetric pattern, balance minimises `||t + mean(offsets) - materialCentroid||²`. The proposed T pattern has non-zero mean offset. Its optimum can lie strictly inside `F`, where it is neither a vertex, canonical projection nor directional support extremum. Each descriptor needs its own complete optimisation proof.
+**Why Kai T4.3 is not used:** for an asymmetric pattern, balance minimises `||t + mean(offsets) - materialCentroid||²`. The proposed T pattern has non-zero mean offset. Its optimum can lie strictly inside `F`, where it is neither a vertex, canonical projection nor directional support extremum. The same interior-optimum risk applies to every registration-sensitive descriptor, not only balance; each owes its own certified global argopt proof.
 
 **Verification:** exact R3 boundary, global-anchor, compound-uncertainty and candidate-dominance fixtures pass; a one-representative-per-component implementation fails; Node/Chromium/WebKit return the same certified set and bytes.
 
