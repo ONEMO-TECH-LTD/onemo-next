@@ -2,7 +2,7 @@
 
 **Owner:** s62-grid-meta-qa
 
-**Status:** QA-corrected proposal. No product code is authorised until T0 clears and Dan gives the build go.
+**Status:** QA-corrected proposal. No product code is authorised until T0 compiles the settled rules from the designated briefs and Dan gives the build go.
 **Inputs compared:** s62-kai `FINAL-PROPOSAL.md` at `e617ae74`; s62-kai-meta `v3.2-final-execution-proposal.md`; both v3.2 QA reports; the amended R3 system/Compute/Logic contracts; product-base; focus spec; current v3.2 code and commit history.
 
 ## Decision
@@ -15,8 +15,8 @@ The following submitted elements are rejected:
 
 - Meta's `9123ba3d` restore target. It still contains the row/column growth door and count ladder. `60656152` is the earlier, smaller base.
 - Kai's finite critical set of feasible-region vertices, canonical projection and directional extrema. It is not complete for the governing criteria.
-- Both proposals' claim that only the three focus-spec contradictions, Bat B4 and one missing contour remain Dan-open. The binding R3 hold contains further unresolved/proposed decisions unless later direct rulings are traced as explicit supersessions.
-- Both proposals' qualitative comparator. The binding R3 contract requires approved formulas, tolerances, dominance and anchored-restriction semantics; “peel leverage” has no settled numerical definition.
+- Any questionnaire regenerated from R3's old proposal register. Dan designated `logic-spec-optimum.md` and `ONEMO Magnetic Grid Compute System — Product Base and Logic Architecture.md` as the briefs that already answer the product rules. R3 remains a technical certification reference where compatible; it does not reopen settled product decisions.
+- Both proposals' qualitative comparator as executable code. The designated briefs govern intent and order; each implemented descriptor still needs a concrete formula, tolerance and completeness proof derived from those rules and calibrated evidence. A label such as “peel leverage” is not by itself executable.
 - Any claim that agreement with the old sweep proves completeness. The old sweep is a falsification oracle only.
 
 ## Governing boundary
@@ -50,21 +50,26 @@ Do not adopt the GPT package. Audit and port only algorithms that survive source
 
 ## Execution plan
 
-### T0 — close authority before implementation
+### T0 — compile settled authority; do not reopen it
 
-**Objective:** establish the exact executable rule set. The amended R3 contracts remain binding and place implementation behind Hold A.
+**Objective:** turn the two Dan-designated briefs into the exact executable rule ledger without manufacturing a questionnaire.
 
 **Method:**
 
-1. Map every `PROPOSED_FOR_DAN` and `UNRESOLVED` R3 decision to later direct Dan rulings, with transcript pointers.
-2. Mark a row superseded only where a later ruling explicitly conflicts with it.
-3. Return only the residual product decisions to Dan. At minimum, verify the effective safety radius/tolerance policy, coordinate quantum and approximation tolerance, size/band offer policy, translation domain, region thresholds, pattern permissions, exact mechanics registry, sub-quantum behaviour, approved Bat vector, input vertex budget and B1 guarantee.
-4. Resolve the three focus-spec contradictions against that ledger; the focus spec governs only non-conflicting clauses.
-5. Identify the upload behind the missing 200–216 mm case and establish whether its exact contour is an approved fixture.
+1. Read `logic-spec-optimum.md` and `ONEMO Magnetic Grid Compute System — Product Base and Logic Architecture.md` in full. Extract the product rules, derivations, calibration values, explicit opens and their source pointers.
+2. Apply the briefs' declared authority order and later direct rulings. Where an older R3 proposal row conflicts, the settled brief/direct ruling wins; R3 contributes neutral certification mechanics only where compatible.
+3. Classify each implementation input as `RULED`, `CALIBRATED` or `ENGINEERING`:
+   - `RULED`: direct product requirement; implement exactly.
+   - `CALIBRATED`: existing reversible value with provenance; preserve unless execution disproves it.
+   - `ENGINEERING`: reversible implementation choice; the builder owns it and verifies it.
+4. Apply the necessity test before any question. Ask only when the answer is absent from both briefs and prior rulings, the decision is required by the current task, it changes the product rather than only implementation, and choosing silently would exceed reversible engineering authority. Otherwise do not ask Dan.
+5. Resolve apparent focus-spec contradictions from the source hierarchy and surrounding rulings rather than presenting them as a menu. Record the winning clause and the displaced clause.
+6. Locate the upload behind the missing 200–216 mm case from existing briefs, transcripts and artifacts before considering a question.
+7. If one product-consequential contradiction remains after exhaustive source resolution, record the exact conflicting clauses and stop only at the task that genuinely depends on it. Never send a batch questionnaire.
 
-**Verification:** every executable profile value and comparator rule has one authority pointer; no unresolved field enters production mode; the residual Dan decision list contains no already-answered question.
+**Verification:** every executable rule has a brief/direct-ruling pointer or a named reversible calibration/engineering owner; no R3 proposal status is used to create a Dan gate; no questionnaire is produced; every displaced clause is recorded rather than blended.
 
-**Gate:** no backend probe or implementation starts before this task clears and Dan gives the build go.
+**Gate:** T0 is source compilation, not product discovery. It clears from existing evidence. Product implementation still waits for Dan's build go.
 
 ### T1 — restore and subtract to a clean base
 
@@ -131,7 +136,7 @@ Do not adopt the GPT package. Audit and port only algorithms that survive source
 
 **Method:**
 
-1. Build the multi-clearance component hierarchy using T0-approved profile levels; do not invent `r+4/r+8/r+12`.
+1. Build the multi-clearance component hierarchy using authority-ledger or provenance-backed calibrated levels; do not invent `r+4/r+8/r+12`.
 2. Implement only the approved neutral descriptor registry, formulas, tolerances and units.
 3. For every registration-sensitive descriptor, return an exact optimum/argopt subset, a conservative interval-refined equivalent set, or a proven-complete critical set with a certificate.
 4. Apply the two-phase rule: local optimum evidence per hypothesis, then restriction against the certified global anchor.
@@ -147,10 +152,10 @@ Do not adopt the GPT package. Audit and port only algorithms that survive source
 
 **Method:**
 
-1. Apply the T0-approved mechanics registry exactly; no qualitative placeholder or opaque score.
+1. Apply the authority-ledger mechanics exactly; no qualitative placeholder or opaque score.
 2. Evaluate every approved size independently. No prior band's winner truncates another domain.
 3. Use the complete candidate identity: source geometry; size/window; population and origin parity; frame; pattern/variant; registration; profile hash; Compute artifact hash; Logic artifact hash.
-4. Assemble offers only under the T0-approved per-band policy. Equal-count results survive when their governed identity is distinct.
+4. Assemble offers only under the authority-ledger per-band policy. Equal-count results survive when their governed identity is distinct.
 5. Cap presentation only after the complete certified offer set exists.
 6. Remove fallback. Surface stable legality, uncertainty, rejection and indeterminate codes.
 
@@ -195,8 +200,8 @@ These deferrals do not permit omission of profile, Compute artifact and Logic ar
 
 ## Necessity and sufficiency
 
-**Necessity — no unnecessary elements after correction.** One authority closure, one clean subtraction, one independent oracle, one bounded backend probe, one Compute path, one Logic path, one replacement gate, one deletion and one UI wiring step. Hole support, six deletion commits, a fixed critical-point recipe, a new worker and package adoption are removed.
+**Necessity — no unnecessary elements after correction.** One authority compilation, one clean subtraction, one independent oracle, one bounded backend probe, one Compute path, one Logic path, one replacement gate, one deletion and one UI wiring step. Hole support, six deletion commits, a fixed critical-point recipe, a new worker and package adoption are removed.
 
 **Sufficiency — delivers the v3.2 selector directive in full once T0 clears.** The plan covers authority, exact continuous feasibility, lower-dimensional cases, certified mechanics, full identity, honest uncertainty/failure, deterministic output, performance, deletion of the old selector and live UI proof. It does not call an unresolved product rule an engineering fact.
 
-**Final selection:** this document supersedes both submitted proposals. Build remains blocked at T0 plus Dan's explicit go.
+**Final selection:** this document supersedes both submitted proposals. T0 must be completed from the existing briefs without a questionnaire; product build starts only on Dan's explicit go.
