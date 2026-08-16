@@ -1,17 +1,17 @@
 import { canonicalHash, dequantizePoint } from '@onemo/geometry-compute';
 import type {
-  EngineManufacturingSpec,FulfilmentManufacturingSpec,PhysicalComponentProfile,ProductProfile,RegisteredProfile,SizeFailure,SizeSolution
+  EngineManufacturingSpec,FulfilmentManufacturingSpec,PhysicalComponentProfile,ProductProfile,RegisteredProfile,SolveInput,SolveResult
 } from './contracts.js';
 import { COMPUTE_ARTIFACT_HASH } from '@onemo/geometry-compute';
 import { LOGIC_ARTIFACT_HASH } from './artifact.js';
-import { certifySizeSolution, type CertifiedSizeInput } from './certified-solver.js';
 import { assertEngineManufacturingSpecCanonicalHash, buildEngineManufacturingPayload } from './manufacturing-spec.js';
 import { registerProfile } from './profile-registry.js';
+import { solveOutlineSync } from './solver.js';
 
 export interface ResolvedArtifact {readonly artifactHash:string;}
 export interface ResolvedLogicArtifact extends ResolvedArtifact {
   readonly computeArtifactHash:string;
-  readonly certifySizeSolution:(input:CertifiedSizeInput)=>SizeSolution|SizeFailure;
+  readonly solveOutline:(input:SolveInput)=>SolveResult;
 }
 export interface ManufacturingVerificationResolver {
   resolveProfile(profileId:string,profileHash:string):ProductProfile|RegisteredProfile|undefined;
@@ -26,7 +26,7 @@ export function currentManufacturingVerificationResolver(profileInput:ProductPro
   return Object.freeze({
     resolveProfile:(id:string,hash:string)=>id===profile.id&&hash===profile.profileHash?profile:undefined,
     resolveComputeArtifact:(hash:string)=>hash===COMPUTE_ARTIFACT_HASH?{artifactHash:COMPUTE_ARTIFACT_HASH}:undefined,
-    resolveLogicArtifact:(hash:string)=>hash===LOGIC_ARTIFACT_HASH?{artifactHash:LOGIC_ARTIFACT_HASH,computeArtifactHash:COMPUTE_ARTIFACT_HASH,certifySizeSolution}:undefined
+    resolveLogicArtifact:(hash:string)=>hash===LOGIC_ARTIFACT_HASH?{artifactHash:LOGIC_ARTIFACT_HASH,computeArtifactHash:COMPUTE_ARTIFACT_HASH,solveOutline:solveOutlineSync}:undefined
   });
 }
 
@@ -61,8 +61,10 @@ export function verifyEngineManufacturingSpec(
   assertEngineManufacturingSpecCanonicalHash(spec);
   if(!Number.isFinite(spec.baseProtectedRadiusMm)||spec.baseProtectedRadiusMm<=0||!Number.isFinite(spec.effectiveVerificationRadiusMm)||spec.effectiveVerificationRadiusMm<=0||typeof spec.toleranceCompositionRuleId!=='string'||spec.toleranceCompositionRuleId.length===0||spec.effectiveVerificationRadiusMm!==profile.safety.effectiveVerificationRadiusMm||spec.toleranceCompositionRuleId!==profile.safety.tolerancePolicy.id)throw new Error('PHYSICAL_TOLERANCE_POLICY_MISSING');
   const sourceRingMm=spec.sourceRingInt.map(([x,y])=>dequantizePoint({x,y},spec.coordinateQuantumMm));
-  const certified=logic.certifySizeSolution({outlineMm:sourceRingMm,profile,targetDominantMm:spec.targetDominantMm});
-  if(certified.status!=='ACCEPTED')throw new Error('FULFILMENT_VERIFICATION_FAILED');
+  const solve=logic.solveOutline({outlineMm:sourceRingMm,profile});
+  const offer=solve.offers.find(candidate=>candidate.band===spec.band);
+  if(offer?.status!=='OFFERED'||!offer.solution||offer.solution.targetDominantMm!==spec.targetDominantMm)throw new Error('MANUFACTURING_OFFER_MISMATCH');
+  const certified=offer.solution;
   const rebuilt=buildEngineManufacturingPayload({
     computeArtifactHash:spec.computeArtifactHash,logicArtifactHash:spec.logicArtifactHash,
     sourceGeometryHash:spec.sourceGeometryHash,sourceRingInt:spec.sourceRingInt

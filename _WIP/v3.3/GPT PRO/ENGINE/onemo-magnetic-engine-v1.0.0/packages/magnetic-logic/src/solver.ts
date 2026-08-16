@@ -30,7 +30,7 @@ export function buildCertifiedBandOffers(evaluated:readonly (SizeSolution|SizeFa
   });
 }
 
-export async function solveOutline(input:SolveInput):Promise<SolveResult>{
+export function solveOutlineSync(input:SolveInput):SolveResult{
   const profile=registerProfile(input.profile);
   if(profile.approvalState!=='approved')throw new Error('PROFILE_UNAPPROVED');
   const source=preparePolygon(input.outlineMm,{quantumMm:profile.numeric.coordinateQuantumMm,maxVertices:profile.numeric.maxVertices});
@@ -49,3 +49,5 @@ export async function solveOutline(input:SolveInput):Promise<SolveResult>{
   };
   return Object.freeze({...payload,canonicalHash:canonicalHash(payload)});
 }
+
+export async function solveOutline(input:SolveInput):Promise<SolveResult>{return solveOutlineSync(input);}

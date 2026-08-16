@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCertifiedBandOffers, buildStructuralEvidence, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
+  buildCertifiedBandOffers, buildEngineManufacturingPayload, buildStructuralEvidence, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
   criterionDescriptor, currentManufacturingVerificationResolver, LOGIC_ARTIFACT_HASH, permittedPatterns, ProfileRegistry, registerProfile, selectedOffer,
   selectDiscreteIdentity, solveOutline, validatePhysicalComponentProfile, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
@@ -55,6 +55,20 @@ test('engine ManufacturingSpec round-trips and exact re-verifies',async()=>{
   assert.equal(spec.patternVersion,1);assert.equal(spec.patternVariantId,'default');assert.equal(spec.approximationErrorEnvelopeMm,0);
   assert.equal(spec.centreCoordinatesInt.length,spec.centres.length);
   assert.deepEqual(spec.decisionTrace.slice(-2).map(trace=>trace.criterionId),['M09_DISCRETE_ID','M10_REGISTRATION_ID']);
+});
+
+test('manufacturing verification rejects a certified rung that was not the band offer',async()=>{
+  const raw=editableReference();
+  raw.sizeDomain={minMm:48,maxMm:61,stepMm:12,bands:[{id:'B1',class:1,minMm:48,maxMm:61,maxInclusive:true,referenceMm:48}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};
+  raw.permissions=raw.permissions.map(permission=>({...permission,bands:['B1'],allowedAxisClassPairs:[[1,1]]}));
+  raw.translation={...raw.translation,allowX:false,allowY:false};
+  const profile=registerProfile(raw);const solve=await solveOutline({outlineMm:rectangle(24,24),profile});
+  assert.deepEqual(solve.evaluated.map(item=>[item.targetDominantMm,item.status]),[[48,'ACCEPTED'],[60,'ACCEPTED']]);
+  const offered=selectedOffer(solve,'B1');assert.equal(offered.targetDominantMm,48);
+  assert.equal(verifyEngineManufacturingSpec(createEngineManufacturingSpec(solve,offered,profile),profile).valid,true);
+  const nonOffer=solve.evaluated.find(item=>item.targetDominantMm===60);assert.equal(nonOffer.status,'ACCEPTED');
+  const payload=buildEngineManufacturingPayload(solve,nonOffer,profile);
+  assert.throws(()=>verifyEngineManufacturingSpec({...payload,canonicalHash:canonicalHash(payload)},profile),/MANUFACTURING_OFFER_MISMATCH/);
 });
 
 test('recomputed canonical hash cannot legitimise inconsistent manufacturing evidence',async()=>{
