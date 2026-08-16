@@ -50,3 +50,18 @@
 **Necessity — shrink:** remove the self-certifying checkmarks in §11 and replace them with a real source/input crosswalk. No new task, questionnaire or product document is required; all corrections belong in this ledger.
 
 **Sufficiency — partial:** the ledger does not yet supply every input consumed by T4/T5/T6, and its T6 identity/result contract is incomplete.
+
+## T0b code-vs-ledger audit
+
+**The `better()` sequence is read correctly.** The source order is top hold → bottom hold → connectivity → side hold → target count → corners → symmetry → structure → fit tier → sparse spread → mass axis → tightness → balance → count → exact wrap → smaller size. The audit also correctly identifies the later cross-band and offer filters. T6 must replace this policy; the existing comparator cannot be reordered into compliance.
+
+**The claim that every absent requirement is assigned is not yet valid.** T0b inherits T0's incomplete ledger, so it cannot prove coverage of requirements the ledger omitted. After T0 is repaired, T0b must add or correct these rows:
+
+- Audit 1.8, which is skipped despite the claim that all of §1 is clean.
+- Mark 1.10 partial or absent: evaluating only even 2 mm sweep points is not implementation of “round a selected lawful size up to the next even millimetre.”
+- Audit 6.4 and 6.10 explicitly; current centroid use and coarse comparator buckets need a verdict.
+- Add the missing unsupported-extent descriptor, pattern permissions, numeric/certification registry, input contract, full identity/result schema, and offer-domain decision after T0 records them.
+- Replace the undefined `PARTIAL` verdict or add it to the declared verdict vocabulary.
+- Remove “every row” and “no absent row unassigned” until the repaired ledger crosswalk proves both claims.
+
+T0b's commit boundary passes: 94eeda89 adds only the audit; no code entered either T0 commit.
