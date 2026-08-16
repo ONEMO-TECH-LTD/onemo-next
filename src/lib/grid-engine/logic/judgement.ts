@@ -396,6 +396,13 @@ function better(
   const structA = structureScore(a, structure, basePitchMM)
   const structB = structureScore(b, structure, basePitchMM)
   if (structA !== structB) return structA > structB
+  // 2d. THE FIT TIER — Dan's ruled anti-flap law (2026-08-15 07:29: "a layout the shape
+  //     actually wraps outranks one hanging loose — BEFORE any spread preference"; restored
+  //     2026-08-16 after erosion had left the tier as a chip marker only). Sits BELOW the
+  //     structure law — the shape's ruled family outranks raw snugness (a tight diagonal
+  //     must not beat the ruled vertical pair) — and ABOVE spread, exactly as ruled.
+  const TIER_RANK = { tight: 0, allowed: 1, limb: 2 } as const
+  if (TIER_RANK[a.tier] !== TIER_RANK[b.tier]) return TIER_RANK[a.tier] < TIER_RANK[b.tier]
   //    Spread credit CAPS at the released sparse pitch (Dan's law: 96 is the sparse spacing
   //    "proven sufficient" — not "the further the better"): an extreme diagonal pair flung
   //    corner-to-corner (135mm) must not outrank layouts that hold the mass (poke1 B4, eyes-on
@@ -779,9 +786,12 @@ function judgeBand(
   // scales — engine does not show them all, only 1"). A band's extra chips must each carry
   // MORE magnets than every chip before them — a genuinely bigger grid unlocked later in
   // the range, never the same arrangement re-listed looser.
-  // Extras live ONLY at the stepped band (Dan's example was band 4's 168 + the bigger
-  // optimal at 200-216); a lower band offering "next band's answer early" was measured
-  // stealing band 4's arrangement identity through the stepping law — one optimal there.
+  // ALL OPTIMALS PER BAND (Dan, 2026-08-16: "each band must show within its size range all
+  // optimal sizes and layouts if range permits — not just 1 if there are more"). A band's
+  // chips are its growth ladder: each successive chip carries MORE magnets — a genuinely
+  // bigger grid unlocked deeper in the range — never the same arrangement looser. The next
+  // band's growth anchors to THIS band's top rung (see judgeShape), so a rich lower rung can
+  // never steal the band above.
   let maxOffered = 0
   const growing: SizeVariant[] = []
   for (const v of fresh) {
@@ -789,7 +799,7 @@ function judgeBand(
     growing.push(v)
     if (v.anchors.length > maxOffered) maxOffered = v.anchors.length
   }
-  let final = growing.slice(0, band.stepUp ? calibration.optionsPerBand : 1)
+  let final = growing.slice(0, calibration.optionsPerBand)
   // EVERY BAND ANSWERS (Dan: "each band must have at least one optimal layout") — but never
   // with a LAW-REJECTED placement (QA build-audit, 2026-08-15: the old kept[0] fallback could
   // emit an answer the hold laws refused). The fallback relaxes only the PREFERENCE filters
@@ -859,7 +869,8 @@ export function judgeShape(
     )
     if (answer.variants[0]) {
       sizeFloorMM = answer.variants[0].sizeMM + calibration.bandSizeStepMM
-      prevCount = answer.variants[0].anchors.length
+      // growth anchors to the band's TOP rung — the next band must out-grow everything below
+      prevCount = Math.max(...answer.variants.map((v) => v.anchors.length))
     }
     bands.push(answer)
   }
