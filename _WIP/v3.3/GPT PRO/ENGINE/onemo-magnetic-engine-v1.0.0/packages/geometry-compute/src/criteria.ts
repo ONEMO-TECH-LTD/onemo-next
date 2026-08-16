@@ -35,19 +35,28 @@ function overlappedCellRange(region:RegionEvidence,box:{minX:number;minY:number;
   };
 }
 
+function pointCellKeys(region:RegionEvidence,point:Point):readonly string[]{
+  const s=region.cellStepMm,o=region.gridOrigin;
+  const axis=(value:number,origin:number):number[]=>{
+    const scaled=(value-origin)/s,rounded=Math.round(scaled);
+    return Math.abs(scaled-rounded)<=1e-12?[rounded-1,rounded]:[Math.floor(scaled)];
+  };
+  return [...new Set(axis(point.x,o.x).flatMap(i=>axis(point.y,o.y).map(j=>`${i},${j}`)))];
+}
+
 function anchorRegionState(box:AdaptiveBox,offset:Point,region:RegionEvidence):'ALL'|'SOME'|'NONE'{
   const translated={minX:box.minX+offset.x,minY:box.minY+offset.y,maxX:box.maxX+offset.x,maxY:box.maxY+offset.y};
-  const pad=region.cellStepMm*Math.SQRT2/2;
-  if(translated.maxX<region.bounds.minX-pad||translated.minX>region.bounds.maxX+pad||translated.maxY<region.bounds.minY-pad||translated.minY>region.bounds.maxY+pad)return'NONE';
+  if(translated.maxX<region.bounds.minX||translated.minX>region.bounds.maxX||translated.maxY<region.bounds.minY||translated.minY>region.bounds.maxY)return'NONE';
   if(Math.abs(translated.maxX-translated.minX)<=1e-12&&Math.abs(translated.maxY-translated.minY)<=1e-12){
-    const s=region.cellStepMm,o=region.gridOrigin;const x=(translated.minX-o.x)/s,y=(translated.minY-o.y)/s;
-    const candidates=[Math.floor(x),Math.ceil(x)-1,Math.round(x-0.5)];const rows=[Math.floor(y),Math.ceil(y)-1,Math.round(y-0.5)];
-    for(const j of rows)for(const i of candidates)if(region.occupiedCellKeys.has(`${i},${j}`))return'ALL';
-    return'NONE';
+    const point={x:translated.minX,y:translated.minY};
+    if(region.exactWitnessPoints.some(witness=>Math.abs(witness.x-point.x)<=1e-12&&Math.abs(witness.y-point.y)<=1e-12))return'ALL';
+    const candidates=pointCellKeys(region,point);
+    if(candidates.some(key=>region.definitelyOccupiedCellKeys.has(key)))return'ALL';
+    return candidates.some(key=>region.possiblyOccupiedCellKeys.has(key))?'SOME':'NONE';
   }
   const range=overlappedCellRange(region,translated);let any=false,all=true;
   for(let j=range.minJ;j<=range.maxJ;j++)for(let i=range.minI;i<=range.maxI;i++){
-    const occupied=region.occupiedCellKeys.has(`${i},${j}`);any ||= occupied;all &&= occupied;
+    const key=`${i},${j}`;any ||= region.possiblyOccupiedCellKeys.has(key);all &&= region.definitelyOccupiedCellKeys.has(key);
   }
   return all&&any?'ALL':any?'SOME':'NONE';
 }

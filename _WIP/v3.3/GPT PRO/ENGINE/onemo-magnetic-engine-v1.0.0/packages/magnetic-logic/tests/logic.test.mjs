@@ -9,7 +9,7 @@ const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h
 const editableReference=()=>{const profile=structuredClone(createReferenceProfile());delete profile.profileHash;return profile;};
 const patternsAtStride=(patterns,stride)=>patterns.map(pattern=>{const [x0,y0]=pattern.cells[0];return{...pattern,cells:pattern.cells.map(([x,y])=>[x0+(x-x0)*stride/2,y0+(y-y0)*stride/2])};});
 const boundedB1Profile=maxMm=>{const profile=editableReference();profile.sizeDomain={minMm:24,maxMm,stepMm:12,bands:[{id:'B1',class:1,minMm:24,maxMm,maxInclusive:true,referenceMm:24}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1']}));return registerProfile(profile);};
-const singleRungProfile=()=>boundedB1Profile(25);
+const singleRungProfile=()=>{const profile=editableReference();profile.sizeDomain={minMm:48,maxMm:49,stepMm:12,bands:[{id:'B1',class:1,minMm:48,maxMm:49,maxInclusive:true,referenceMm:48}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1']}));profile.translation={...profile.translation,allowX:false,allowY:false};return registerProfile(profile);};
 
 test('profile is immutable and content-addressed',()=>{
   const profile=createReferenceProfile();assert.ok(profile.profileHash.length===64);assert.equal(Object.isFrozen(profile),true);
@@ -120,4 +120,13 @@ test('continuous certification reports indeterminate instead of guessing when me
   const result=certifySizeSolution({outlineMm:rectangle(72,72),profile:createReferenceProfile(),targetDominantMm:72});
   assert.equal(result.status,'DECISION_INDETERMINATE');
   assert.ok(result.reasons.includes('CRITERION_SCORE_UNCERTAIN'));
+});
+
+test('unresolved sampled component structure propagates as decision indeterminate',()=>{
+  const raw=editableReference();
+  raw.structural={...raw.structural,sampleStepMm:6,forceLargestComponentMajor:false};
+  const result=certifySizeSolution({outlineMm:rectangle(34,34),profile:registerProfile(raw),targetDominantMm:34});
+  assert.equal(result.status,'DECISION_INDETERMINATE');
+  assert.ok(result.reasons.includes('STRUCTURAL_EVIDENCE_UNCERTAIN'));
+  assert.ok(result.reasons.includes('COMPONENT_TOPOLOGY_UNCERTAIN'));
 });

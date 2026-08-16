@@ -108,6 +108,7 @@ export interface SafeGridCell {
   readonly centre: Point;
   readonly clearanceMm: number;
   readonly levelMask: number;
+  readonly definiteLevelMask: number;
 }
 
 export interface SafeComponent {
@@ -116,13 +117,23 @@ export interface SafeComponent {
   readonly radiusMm: number;
   readonly cellCount: number;
   readonly areaEstimateMm2: number;
+  readonly areaBoundsMm2: ScoreInterval;
   readonly bounds: Bounds;
   readonly centroid: Point;
   readonly maxClearanceMm: number;
+  readonly maxClearanceBoundsMm: ScoreInterval;
   readonly cells: readonly number[];
   readonly parentId?: string;
   readonly childIds: readonly string[];
   readonly nearToleranceBoundary: boolean;
+  readonly exactWitnessPoints: readonly Point[];
+  readonly topologyCertified: boolean;
+  readonly appearanceLevelIndex: number;
+  readonly disappearanceLevelIndex: number;
+  readonly persistenceLevelInterval: ScoreInterval;
+  readonly persistenceRadiusMm: ScoreInterval;
+  readonly touchesAnotherComponentOnlyBelowCurrentRadius: boolean;
+  readonly perimeterMm: ScoreInterval | null;
 }
 
 export interface ComponentHierarchy {
@@ -184,7 +195,11 @@ export interface RegionEvidence {
   readonly bounds: Bounds;
   readonly gridOrigin: Point;
   readonly cellStepMm: number;
-  readonly occupiedCellKeys: ReadonlySet<string>;
+  readonly radiusMm: number;
+  readonly errorEnvelopeMm: number;
+  readonly definitelyOccupiedCellKeys: ReadonlySet<string>;
+  readonly possiblyOccupiedCellKeys: ReadonlySet<string>;
+  readonly exactWitnessPoints: readonly Point[];
 }
 
 export interface CriterionEvaluation {

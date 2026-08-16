@@ -95,8 +95,9 @@ function makeHypotheses(
   classX: NonNullable<ReturnType<typeof classifyAxis>>,
   classY: NonNullable<ReturnType<typeof classifyAxis>>,
   profile: RegisteredProfile
-): { readonly candidates: readonly ContinuousCandidate[]; readonly reasons: readonly string[] } {
+): { readonly candidates: readonly ContinuousCandidate[]; readonly reasons: readonly string[]; readonly structuralIndeterminate: boolean } {
   const structural = buildStructuralEvidence(polygon, profile);
+  if(structural.status==='INDETERMINATE')return{candidates:Object.freeze([]),reasons:structural.reasons,structuralIndeterminate:true};
   const regions = majorRegionEvidence(structural);
   const domain = translationDomain(profile);
   const radius = profile.safety.effectiveVerificationRadiusMm;
@@ -147,7 +148,7 @@ function makeHypotheses(
     };
     candidates.push({ hypothesis, regions, trace: [], boxes });
   }
-  return { candidates: Object.freeze(candidates), reasons: Object.freeze(reasons) };
+  return { candidates: Object.freeze(candidates), reasons: Object.freeze(reasons), structuralIndeterminate:false };
 }
 
 function optimiseCriterionAcrossCandidates(
@@ -279,6 +280,9 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
   }
   const band = overallBand(classX, classY);
   const built = makeHypotheses(polygon, target, band, classX, classY, profile);
+  if(built.structuralIndeterminate){
+    return {status:'DECISION_INDETERMINATE',targetDominantMm:target,band,reasons:['STRUCTURAL_EVIDENCE_UNCERTAIN',...built.reasons]};
+  }
   let candidates = [...built.candidates];
   if (candidates.length === 0) {
     return { status: 'REJECTED', targetDominantMm: target, band, reasons: built.reasons.length ? built.reasons : ['NO_PERMITTED_PATTERN'] };

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, compareCertifiedScores, computeGlobalAnchor,
+  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
   criticalTranslationCandidates, discContainedExact, finalRegistrationTieBreak, generateLattice, possiblyEquivalentToAnchor,
-  preparePolygon, scaleToDominantDimension
+  evaluateCriterionOnBox, preparePolygon, scaleToDominantDimension
 } from '../dist/src/index.js';
 
 const q=0.01;
@@ -46,6 +46,28 @@ test('multi-clearance hierarchy removes narrow branches before broad mass',()=>{
   const hierarchy=buildComponentHierarchy(p,[12,16,20],2);
   assert.ok(hierarchy.components.some(c=>c.levelIndex===0));
   assert.ok(hierarchy.components.filter(c=>c.levelIndex===2).length<=hierarchy.components.filter(c=>c.levelIndex===0).length);
+});
+
+test('lower-dimensional safe point remains explicit in the component hierarchy',()=>{
+  const p=preparePolygon([{x:-12,y:-12},{x:12,y:-12},{x:12,y:12},{x:-12,y:12}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,[12],6);
+  assert.equal(hierarchy.components.length,1);
+  const component=hierarchy.components[0];
+  assert.ok(component.exactWitnessPoints.some(point=>point.x===0&&point.y===0));
+  assert.deepEqual(component.areaBoundsMm2,{lower:0,upper:144});
+  assert.deepEqual(component.persistenceLevelInterval,{lower:1,upper:1});
+  assert.equal(hierarchy.exactness,'INDETERMINATE');
+  assert.equal(component.perimeterMm,null);
+});
+
+test('possibly occupied sampling cells cannot fabricate exact region membership',()=>{
+  const p=preparePolygon([{x:-17,y:-17},{x:17,y:-17},{x:17,y:17},{x:-17,y:17}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,[12],6);
+  const region=componentToRegionEvidence(hierarchy,hierarchy.components[0]);
+  assert.equal(discContainedExact(p,{x:6,y:0},12).legal,false);
+  const result=evaluateCriterionOnBox(p,[{x:0,y:0}],{minX:6,minY:0,maxX:6,maxY:0,depth:0,status:'BOUNDARY',id:'probe'},{id:'REGION_COVERAGE_V1',regions:[region]});
+  assert.deepEqual(result.score,{components:[{lower:0,upper:1},{lower:0,upper:1}]});
+  assert.equal(result.exactness,'CERTIFIED_APPROXIMATE');
 });
 
 test('neutral lattice is deterministic',()=>{

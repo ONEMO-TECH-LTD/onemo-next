@@ -62,9 +62,9 @@ export interface RegisteredProfile extends ProductProfile {readonly profileHash:
 export interface RegionClassification {
   readonly component:SafeComponent;
   readonly class:'MAJOR'|'MARGINAL'|'CONNECTOR_ONLY'|'UNCLASSIFIED_NEAR_TOLERANCE';
-  readonly persistenceLevels:number;
-  readonly areaDiscRatio:number;
-  readonly areaShapeFraction:number;
+  readonly persistenceLevels:ScoreInterval;
+  readonly areaDiscRatio:ScoreInterval;
+  readonly areaShapeFraction:ScoreInterval;
 }
 
 export interface FrameHypothesis {
@@ -149,4 +149,5 @@ export interface SolverContext {
 
 export interface StructuralEvidence {
   readonly hierarchy:ComponentHierarchy;readonly classifications:readonly RegionClassification[];
+  readonly status:'CERTIFIED'|'INDETERMINATE';readonly reasons:readonly string[];
 }
