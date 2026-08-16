@@ -3,6 +3,12 @@
 // logic layer compares them against released calibration values. (Moved here from the judge —
 // QA build-audit 2026-08-15: geometry belongs in compute/, the judge only ranks.)
 
+import { Clipper, FillRule, type Path64, type Paths64 } from '@countertype/clipper2-ts'
+import {
+  computeContinuousFeasibleSet,
+  CONTINUOUS_REGISTRATION_QUANTUM_MM,
+  type ContinuousFeasibilityResult,
+} from './continuous-feasibility'
 import { prepareExactContour, distanceToPreparedContour, pointInPreparedContour } from './grid-prepared'
 import type { Contour, Pt } from './types'
 
@@ -209,4 +215,1238 @@ export function pointsOneComponent(points: ReadonlyArray<Pt>, capMM: number): bo
   const root = find(0)
   for (let i = 1; i < n; i++) if (find(i) !== root) return false
   return true
+}
+
+// ─── T5 · certified neutral descriptors ────────────────────────────────────────────────────────
+//
+// Compute MEASURES; it never classifies, thresholds, exempts or ranks. Each descriptor certifies
+// its own optimum over the WHOLE feasible set — T4's positive-area components AND T4's exact
+// witnesses, because a lower-dimensional witness can be the global optimum — by exactly one
+// admissible method: an exact argopt, an outward-bounded interval, or an honest
+// DECISION_INDETERMINATE. No vertex set, canonical projection, directional extremum or fixed
+// sample implies completeness on its own; where one is used, the proof that makes it complete is
+// written at its call site. No proof transfers between descriptors.
+//
+// Set operations run on T4's own 1µm integer lattice through the same Clipper representation, so
+// "exact" means exact there, and T4's envelope is CARRIED into every result rather than restated.
+// Areas and first moments accumulate in BigInt: at 1µm a 120mm contour drives the moment sum past
+// 3e17, well beyond Number.MAX_SAFE_INTEGER (9.0e15), where a double is silently wrong. A value is
+// reported EXACT only when its rational form converts losslessly; otherwise it is an outward-
+// rounded INTERVAL and lo !== hi.
+//
+// Direction is a property of the descriptor's physical meaning, not a caller choice.
+
+// FORMULA PROVENANCE. The coverage fraction, the width-normalised hanging measure and the
+// distribution variance key are ENGINEERING. The designated briefs rule the ORDER these feed
+// (Logic Spec §2 / Product Base §11) and leave every numerical definition open; none of them is a
+// ruled value.
+//
+// BigInt is built with BigInt(n): this project targets ES2017, where BigInt literals are unavailable.
+
+const LATTICE = 1 / CONTINUOUS_REGISTRATION_QUANTUM_MM
+const B0 = BigInt(0)
+const B1 = BigInt(1)
+const B2 = BigInt(2)
+const B3 = BigInt(3)
+const B6 = BigInt(6)
+const B10 = BigInt(10)
+const LATTICE_BIG = BigInt(Math.round(1 / CONTINUOUS_REGISTRATION_QUANTUM_MM))
+const MAX_SAFE_BIG = BigInt(Number.MAX_SAFE_INTEGER)
+const ULP = 2 ** -52
+
+export type ObjectiveDirection = 'maximize' | 'minimize'
+export type DescriptorUnit = 'count' | 'ratio' | 'mm' | 'mm2' | 'mm3'
+export type DescriptorStatus = 'EXACT' | 'INTERVAL' | 'DECISION_INDETERMINATE'
+
+/** Certified optimal registrations: cells for a set-valued optimum, points for exact ones. */
+export interface DescriptorArgopt {
+  regions: ReadonlyArray<ReadonlyArray<Pt>>
+  points: ReadonlyArray<Pt>
+}
+
+export interface ComponentDescriptorEvidence {
+  componentIndex: number
+  /** False when this component's own search did not certify; `lo` then only bounds it. */
+  resolved: boolean
+  lo: number
+  hi: number
+  argopt: DescriptorArgopt | null
+}
+
+export interface WitnessDescriptorEvidence {
+  witnessMM: Pt
+  lo: number
+  hi: number
+}
+
+export interface DescriptorEvidence {
+  units: DescriptorUnit
+  direction: ObjectiveDirection
+  status: DescriptorStatus
+  lo: number
+  hi: number
+  argopt: DescriptorArgopt | null
+  completenessProof: string
+  sourceEnvelope: ContinuousFeasibilityResult['envelope']
+  /** Phase one: the local optimum on each positive-area component of F. */
+  perComponent: ReadonlyArray<ComponentDescriptorEvidence>
+  /** Phase one: the exact value at each T4 witness, which may hold the global optimum. */
+  witnessEvidence: ReadonlyArray<WitnessDescriptorEvidence>
+}
+
+/** What every descriptor needs: the material, the pattern, and the complete feasible set. */
+export interface DescriptorSubject {
+  contour: Contour
+  offsetsMM: ReadonlyArray<Pt>
+  effectiveRadiusMM: number
+  feasible: ContinuousFeasibilityResult
+}
+
+interface Interval {
+  lo: number
+  hi: number
+}
+
+const outwardDown = (v: number): number => v - Math.abs(v) * ULP - Number.MIN_VALUE
+const outwardUp = (v: number): number => v + Math.abs(v) * ULP + Number.MIN_VALUE
+
+/** A rational converted to doubles: lossless when it can be, outward-bounded when it cannot. */
+function ratioToInterval(num: bigint, den: bigint): Interval & { exact: boolean } {
+  if (den === B0) throw new RangeError('Descriptor ratio has a zero denominator.')
+  const negative = num < B0 !== den < B0
+  const n = num < B0 ? -num : num
+  const d = den < B0 ? -den : den
+  if (n % d === B0) {
+    const q = n / d
+    if (q <= MAX_SAFE_BIG) {
+      const v = Number(negative ? -q : q)
+      return { lo: v, hi: v, exact: true }
+    }
+  }
+  let decimals = 9
+  let unit = B10 ** BigInt(decimals)
+  let scaled = (n * unit) / d
+  while (decimals > 0 && scaled + B1 > MAX_SAFE_BIG) {
+    decimals -= 1
+    unit = B10 ** BigInt(decimals)
+    scaled = (n * unit) / d
+  }
+  if (scaled + B1 > MAX_SAFE_BIG) throw new RangeError('Descriptor ratio exceeds a representable range.')
+  const denom = Number(unit)
+  const lowMagnitude = outwardDown(Number(scaled) / denom)
+  const highMagnitude = outwardUp(Number(scaled + B1) / denom)
+  return negative
+    ? { lo: -highMagnitude, hi: -lowMagnitude, exact: false }
+    : { lo: lowMagnitude, hi: highMagnitude, exact: false }
+}
+
+/** A Contour copy of a readonly ring — the prepared-contour door takes a mutable point list. */
+function ringContour(ring: ReadonlyArray<Pt>): Contour {
+  return { outer: { pts: ring.map(([x, y]) => [x, y] as Pt) }, holes: [] }
+}
+
+function toLatticePath(ring: ReadonlyArray<Pt>): Path64 | null {
+  if (ring.length < 3) return null
+  const flat: number[] = []
+  for (const [x, y] of ring) flat.push(Math.round(x * LATTICE), Math.round(y * LATTICE))
+  return Clipper.makePath(flat)
+}
+
+function toLatticePaths(rings: ReadonlyArray<ReadonlyArray<Pt>>): Paths64 {
+  const paths: Paths64 = []
+  for (const ring of rings) {
+    const path = toLatticePath(ring)
+    if (path) paths.push(path)
+  }
+  return paths
+}
+
+function fromLatticePaths(paths: Paths64): ReadonlyArray<ReadonlyArray<Pt>> {
+  return paths.map((path) => path.map(({ x, y }) => [x / LATTICE, y / LATTICE] as Pt))
+}
+
+function contourBounds(pts: ReadonlyArray<Pt>): {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+} {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  return { minX, minY, maxX, maxY }
+}
+
+function boundsContour(bounds: ReturnType<typeof contourBounds>): Contour {
+  return {
+    outer: {
+      pts: [
+        [bounds.minX, bounds.minY],
+        [bounds.maxX, bounds.minY],
+        [bounds.maxX, bounds.maxY],
+        [bounds.minX, bounds.maxY],
+      ],
+    },
+    holes: [],
+  }
+}
+
+/** Exact integer area and first moments of a lattice region. Sign-normalised to a positive area. */
+function integerAreaAndMoments(paths: Paths64): {
+  twiceArea: bigint
+  sixMomentX: bigint
+  sixMomentY: bigint
+} {
+  let twiceArea = B0
+  let sixMomentX = B0
+  let sixMomentY = B0
+  for (const path of paths) {
+    for (let index = 0; index < path.length; index += 1) {
+      const a = path[index]
+      const b = path[(index + 1) % path.length]
+      const ax = BigInt(Math.round(a.x)), ay = BigInt(Math.round(a.y))
+      const bx = BigInt(Math.round(b.x)), by = BigInt(Math.round(b.y))
+      const cross = ax * by - bx * ay
+      twiceArea += cross
+      sixMomentX += (ax + bx) * cross
+      sixMomentY += (ay + by) * cross
+    }
+  }
+  return twiceArea < B0
+    ? { twiceArea: -twiceArea, sixMomentX: -sixMomentX, sixMomentY: -sixMomentY }
+    : { twiceArea, sixMomentX, sixMomentY }
+}
+
+/** The material on the lattice, prepared once per descriptor call. */
+interface MaterialSubject {
+  paths: Paths64
+  bounds: ReturnType<typeof contourBounds>
+  twiceArea: bigint
+  sixMomentX: bigint
+  sixMomentY: bigint
+}
+
+function materialSubject(contour: Contour): MaterialSubject {
+  const path = toLatticePath(contour.outer.pts)
+  if (!path) throw new RangeError('Material contour must have at least three vertices.')
+  const paths: Paths64 = [path]
+  return { paths, bounds: contourBounds(contour.outer.pts), ...integerAreaAndMoments(paths) }
+}
+
+/**
+ * The material beyond one axis-aligned lattice cut, with its exact area AND first moment.
+ *
+ * One clip serves both the hanging measure and peel leverage, so there is no second clipping path.
+ * Exact on the lattice: with the cut at integer `c`, ∫|c − u|dA = ±(c·A − ∫u dA), and both terms
+ * come from the BigInt kernel, so the moment is one rational — no centroid division and no float
+ * accumulation.
+ */
+function clippedAreaAndMoment(
+  subject: MaterialSubject,
+  axis: 0 | 1,
+  keepBelow: boolean,
+  cutMM: number,
+): { areaMM2: Interval & { exact: boolean }; momentMM3: Interval & { exact: boolean } } {
+  const cut = Math.round(cutMM * LATTICE)
+  const b = subject.bounds
+  let x0 = Math.round(b.minX * LATTICE) - 1
+  let x1 = Math.round(b.maxX * LATTICE) + 1
+  let y0 = Math.round(b.minY * LATTICE) - 1
+  let y1 = Math.round(b.maxY * LATTICE) + 1
+  if (axis === 0) {
+    if (keepBelow) x1 = Math.min(x1, cut)
+    else x0 = Math.max(x0, cut)
+  } else if (keepBelow) y1 = Math.min(y1, cut)
+  else y0 = Math.max(y0, cut)
+  const zero = { lo: 0, hi: 0, exact: true }
+  if (x1 <= x0 || y1 <= y0) return { areaMM2: zero, momentMM3: zero }
+  const window = Clipper.makePath([x0, y0, x1, y0, x1, y1, x0, y1])
+  const clipped = Clipper.intersect(subject.paths, [window], FillRule.NonZero)
+  if (!clipped.length) return { areaMM2: zero, momentMM3: zero }
+  const { twiceArea, sixMomentX, sixMomentY } = integerAreaAndMoments(clipped)
+  const sixMoment = axis === 0 ? sixMomentX : sixMomentY
+  const cutBig = BigInt(cut)
+  const numerator = keepBelow
+    ? B3 * cutBig * twiceArea - sixMoment
+    : sixMoment - B3 * cutBig * twiceArea
+  return {
+    areaMM2: ratioToInterval(twiceArea, B2 * LATTICE_BIG * LATTICE_BIG),
+    momentMM3: ratioToInterval(numerator, B6 * LATTICE_BIG * LATTICE_BIG * LATTICE_BIG),
+  }
+}
+
+interface PaddedBox {
+  leftMM: number
+  rightMM: number
+  topMM: number
+  bottomMM: number
+}
+
+/** The padded grid box for a registration: the magnet centres grown by the effective radius. */
+function paddedBox(subject: DescriptorSubject, t: Pt): PaddedBox {
+  const xs = subject.offsetsMM.map(([x]) => x)
+  const ys = subject.offsetsMM.map(([, y]) => y)
+  const r = subject.effectiveRadiusMM
+  return {
+    leftMM: t[0] + Math.min(...xs) - r,
+    rightMM: t[0] + Math.max(...xs) + r,
+    topMM: t[1] + Math.min(...ys) - r,
+    bottomMM: t[1] + Math.max(...ys) + r,
+  }
+}
+
+/** The padded block's own width — the hanging measure's normaliser. Registration-invariant. */
+function paddedWidthMM(subject: DescriptorSubject): number {
+  const xs = subject.offsetsMM.map(([x]) => x)
+  return Math.max(...xs) - Math.min(...xs) + 2 * subject.effectiveRadiusMM
+}
+
+function requireSubject(subject: DescriptorSubject): void {
+  if (!subject.offsetsMM.length) throw new RangeError('At least one pattern offset is required.')
+  if (!(subject.effectiveRadiusMM > 0) || !Number.isFinite(subject.effectiveRadiusMM))
+    throw new RangeError('Effective radius must be positive and finite.')
+}
+
+/**
+ * Phase two: restrict phase-one evidence against the certified global anchor.
+ *
+ * The envelope is the tight one — min(lo)/min(hi) to minimise, max(lo)/max(hi) to maximise. An
+ * UNRESOLVED component is never filtered out: it makes the whole descriptor indeterminate unless
+ * its retained DIRECTION-RELEVANT bound proves it cannot win, and a missing such bound always
+ * means it can. `complete` is false when phase one could not gather all of its own evidence.
+ */
+function globalAnchor(
+  direction: ObjectiveDirection,
+  units: DescriptorUnit,
+  completenessProof: string,
+  subject: DescriptorSubject,
+  perComponent: ReadonlyArray<ComponentDescriptorEvidence>,
+  witnessEvidence: ReadonlyArray<WitnessDescriptorEvidence>,
+  exact: boolean,
+  complete = true,
+): DescriptorEvidence {
+  const indeterminate = (): DescriptorEvidence => ({
+    units,
+    direction,
+    status: 'DECISION_INDETERMINATE',
+    lo: Number.NaN,
+    hi: Number.NaN,
+    argopt: null,
+    completenessProof,
+    sourceEnvelope: subject.feasible.envelope,
+    perComponent,
+    witnessEvidence,
+  })
+  const resolved: Array<{ lo: number; hi: number; argopt: DescriptorArgopt }> = [
+    ...perComponent
+      .filter((item) => item.resolved && item.argopt !== null)
+      .map((item) => ({ lo: item.lo, hi: item.hi, argopt: item.argopt as DescriptorArgopt })),
+    ...witnessEvidence.map((item) => ({
+      lo: item.lo,
+      hi: item.hi,
+      argopt: { regions: [], points: [item.witnessMM] } as DescriptorArgopt,
+    })),
+  ]
+  if (!complete || !resolved.length) return indeterminate()
+  const envelopeLo =
+    direction === 'minimize'
+      ? Math.min(...resolved.map((item) => item.lo))
+      : Math.max(...resolved.map((item) => item.lo))
+  const envelopeHi =
+    direction === 'minimize'
+      ? Math.min(...resolved.map((item) => item.hi))
+      : Math.max(...resolved.map((item) => item.hi))
+  // An unresolved component may only be ignored when its retained DIRECTION-RELEVANT bound puts it
+  // out of contention: minimising needs a finite `lo`, maximising a finite `hi`. Missing that bound
+  // always means the component could still win.
+  const unresolvedCanWin = perComponent.some((item) => {
+    if (item.resolved && item.argopt !== null) return false
+    const bound = direction === 'minimize' ? item.lo : item.hi
+    if (!Number.isFinite(bound)) return true
+    return direction === 'minimize' ? bound <= envelopeHi : bound >= envelopeLo
+  })
+  if (unresolvedCanWin) return indeterminate()
+  const tied = resolved.filter((item) =>
+    direction === 'minimize' ? item.lo <= envelopeHi : item.hi >= envelopeLo,
+  )
+  return {
+    units,
+    direction,
+    status: exact ? 'EXACT' : 'INTERVAL',
+    lo: envelopeLo,
+    hi: envelopeHi,
+    argopt: {
+      regions: tied.flatMap((item) => item.argopt.regions),
+      points: tied.flatMap((item) => item.argopt.points),
+    },
+    completenessProof,
+    sourceEnvelope: subject.feasible.envelope,
+    perComponent,
+    witnessEvidence,
+  }
+}
+
+// ─── hierarchy ─────────────────────────────────────────────────────────────────────────────────
+
+export interface SafeComponentNode {
+  levelIndex: number
+  clearanceLevelMM: number
+  /** Certified: a disc of the level's radius fits, so the local width is at least twice it. */
+  widthFloorMM: number
+  areaMM2Lo: number
+  areaMM2Hi: number
+  ringMM: ReadonlyArray<Pt>
+  parentIndex: number | null
+  parentStatus: 'RESOLVED' | 'INDETERMINATE' | 'ROOT'
+  persistenceLevels: number
+}
+
+export interface ComponentHierarchyLevel {
+  clearanceLevelMM: number
+  status: ContinuousFeasibilityResult['status']
+  envelope: ContinuousFeasibilityResult['envelope']
+  nodes: ReadonlyArray<SafeComponentNode>
+  witnessesMM: ReadonlyArray<Pt>
+  /**
+   * No component AND no witness. Such a level is evidence only when T4 certified infeasibility;
+   * otherwise its own `status` is indeterminate and it may not be read as ordinary evidence.
+   */
+  collapsed: boolean
+}
+
+export interface ComponentHierarchy {
+  levels: ReadonlyArray<ComponentHierarchyLevel>
+}
+
+/**
+ * Component and persistence evidence at CALLER-CALIBRATED clearance levels.
+ *
+ * The levels are the caller's alone: finite, positive, strictly increasing and distinct, or the
+ * call is rejected. Nothing here defaults, and no r+4/r+8/r+12 ladder exists. Only certified
+ * quantities are reported — the level, the width floor the erosion actually proves, exact area and
+ * persistence. Strong/marginal classification is Logic's and is not computed.
+ */
+export function buildComponentHierarchy(
+  contour: Contour,
+  levelsMM: ReadonlyArray<number>,
+  callerWitnessesByLevel: ReadonlyArray<ReadonlyArray<Pt>> = [],
+): ComponentHierarchy {
+  if (!levelsMM.length) throw new RangeError('Clearance levels must be supplied by the caller.')
+  levelsMM.forEach((level, index) => {
+    if (!Number.isFinite(level) || level <= 0)
+      throw new RangeError('Clearance levels must be finite and positive.')
+    if (index > 0 && level <= levelsMM[index - 1])
+      throw new RangeError('Clearance levels must be strictly increasing and distinct.')
+  })
+
+  const domain = boundsContour(contourBounds(contour.outer.pts))
+
+  const levels: ComponentHierarchyLevel[] = levelsMM.map((level, levelIndex) => {
+    const feasible = computeContinuousFeasibleSet({
+      contour,
+      permittedDomain: domain,
+      effectiveRadiusMM: level,
+      offsetsMM: [[0, 0]],
+      exactWitnessesMM: callerWitnessesByLevel[levelIndex] ?? [],
+    })
+    const nodes = feasible.components.map((ring) => {
+      const { twiceArea } = integerAreaAndMoments(toLatticePaths([ring]))
+      const area = ratioToInterval(twiceArea, B2 * LATTICE_BIG * LATTICE_BIG)
+      return {
+        levelIndex,
+        clearanceLevelMM: level,
+        widthFloorMM: 2 * level,
+        areaMM2Lo: area.lo,
+        areaMM2Hi: area.hi,
+        ringMM: ring,
+        parentIndex: null as number | null,
+        parentStatus: 'ROOT' as SafeComponentNode['parentStatus'],
+        persistenceLevels: 1,
+      }
+    })
+    return {
+      clearanceLevelMM: level,
+      status: feasible.status,
+      envelope: feasible.envelope,
+      nodes,
+      witnessesMM: feasible.exactWitnessesMM,
+      collapsed: feasible.components.length === 0 && feasible.exactWitnessesMM.length === 0,
+    }
+  })
+
+  // Parent resolution by an EXACT set test — child ⊆ parent iff the difference is empty. No
+  // representative point is chosen, so an ambiguous nesting returns indeterminate instead of a
+  // guess. Erosion monotonicity predicts exactly one parent; the code verifies rather than assumes.
+  for (let levelIndex = 1; levelIndex < levels.length; levelIndex += 1) {
+    const parents = levels[levelIndex - 1].nodes
+    for (const node of levels[levelIndex].nodes) {
+      const child = toLatticePaths([node.ringMM])
+      const containing: number[] = []
+      parents.forEach((parent, parentIndex) => {
+        const remainder = Clipper.difference(child, toLatticePaths([parent.ringMM]), FillRule.NonZero)
+        if (integerAreaAndMoments(remainder).twiceArea === B0) containing.push(parentIndex)
+      })
+      if (containing.length === 1) {
+        node.parentIndex = containing[0]
+        node.parentStatus = 'RESOLVED'
+      } else {
+        node.parentIndex = null
+        node.parentStatus = 'INDETERMINATE'
+      }
+    }
+  }
+
+  for (let levelIndex = levels.length - 2; levelIndex >= 0; levelIndex -= 1)
+    levels[levelIndex].nodes.forEach((node, nodeIndex) => {
+      const deepest = levels[levelIndex + 1].nodes
+        .filter((child) => child.parentStatus === 'RESOLVED' && child.parentIndex === nodeIndex)
+        .reduce((best, child) => Math.max(best, child.persistenceLevels), 0)
+      node.persistenceLevels = 1 + deepest
+    })
+
+  return { levels }
+}
+
+// ─── P8 · balance — minimize, mm² ──────────────────────────────────────────────────────────────
+
+/**
+ * ‖t + mean(offsets) − materialCentroid‖². INTERVAL-REFINED INCUMBENT, not an exact argopt.
+ *
+ * The structure is exact: the value is the squared distance to t* = centroid − mean(offsets), and a
+ * strictly convex quadratic attains its minimum over a closed set either at the unconstrained
+ * minimiser — STRICTLY INTERIOR whenever t* ∈ F, precisely the case a vertex/projection/extremum
+ * recipe misses — or on the boundary, where on each edge it is minimised at the exact point-to-
+ * segment projection. So {t*} ∪ {per-edge projections and endpoints} provably contains the optimum
+ * of the exact problem.
+ *
+ * What is NOT exact is t* itself: the centroid is a rational that converts to an interval, and the
+ * search runs from that interval's midpoint. The returned point is therefore an incumbent whose
+ * value is bracketed to ±ρ, the centroid box's half-diagonal, and the argopt is an equivalent set
+ * under that bracket — not a certified exact minimiser.
+ */
+export function balanceEvidence(subject: DescriptorSubject): DescriptorEvidence {
+  requireSubject(subject)
+  const material = materialSubject(subject.contour)
+  if (material.twiceArea === B0) throw new RangeError('Material contour has zero area.')
+  const centroidX = ratioToInterval(material.sixMomentX, B3 * material.twiceArea * LATTICE_BIG)
+  const centroidY = ratioToInterval(material.sixMomentY, B3 * material.twiceArea * LATTICE_BIG)
+  const meanX = subject.offsetsMM.reduce((sum, [x]) => sum + x, 0) / subject.offsetsMM.length
+  const meanY = subject.offsetsMM.reduce((sum, [, y]) => sum + y, 0) / subject.offsetsMM.length
+  const target: Pt = [(centroidX.lo + centroidX.hi) / 2 - meanX, (centroidY.lo + centroidY.hi) / 2 - meanY]
+  // Half-diagonal of the centroid's own uncertainty box: every distance below is certain to ±ρ.
+  const rho = Math.hypot(centroidX.hi - centroidX.lo, centroidY.hi - centroidY.lo) / 2
+
+  const valueAt = (point: Pt): Interval => {
+    const distance = Math.hypot(point[0] - target[0], point[1] - target[1])
+    const low = Math.max(0, distance - rho)
+    const high = distance + rho
+    return { lo: outwardDown(low * low), hi: outwardUp(high * high) }
+  }
+
+  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
+    const prepared = prepareExactContour(ringContour(ring))
+    if (pointInPreparedContour(target, prepared)) {
+      const value = valueAt(target)
+      return {
+        componentIndex,
+        resolved: true,
+        lo: value.lo,
+        hi: value.hi,
+        argopt: { regions: [], points: [target] } as DescriptorArgopt,
+      }
+    }
+    let best: { point: Pt; value: Interval } | null = null
+    for (let index = 0; index < ring.length; index += 1) {
+      const a = ring[index]
+      const b = ring[(index + 1) % ring.length]
+      for (const point of [[a[0], a[1]] as Pt, segmentProjection(target, a, b)]) {
+        const value = valueAt(point)
+        if (!best || value.lo < best.value.lo) best = { point, value }
+      }
+    }
+    return best
+      ? {
+          componentIndex,
+          resolved: true,
+          lo: best.value.lo,
+          hi: best.value.hi,
+          argopt: { regions: [], points: [best.point] } as DescriptorArgopt,
+        }
+      : { componentIndex, resolved: false, lo: Number.NaN, hi: Number.NaN, argopt: null }
+  })
+
+  const witnessEvidence = subject.feasible.exactWitnessesMM.map((witness) => {
+    const value = valueAt(witness)
+    return { witnessMM: witness, lo: value.lo, hi: value.hi }
+  })
+
+  return globalAnchor(
+    'minimize',
+    'mm2',
+    'interval-refined incumbent: strictly convex quadratic searched from the centroid interval midpoint — interior minimiser when t* is inside, else the per-edge projection; value bracketed by the centroid box',
+    subject,
+    perComponent,
+    witnessEvidence,
+    false,
+  )
+}
+
+function segmentProjection(point: Pt, a: Pt, b: Pt): Pt {
+  const vx = b[0] - a[0]
+  const vy = b[1] - a[1]
+  const lengthSquared = vx * vx + vy * vy
+  if (lengthSquared === 0) return [a[0], a[1]]
+  const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * vx + (point[1] - a[1]) * vy) / lengthSquared))
+  return [a[0] + t * vx, a[1] + t * vy]
+}
+
+// ─── P3 · upper hanging mass — minimize, mm ────────────────────────────────────────────────────
+
+/**
+ * Material area above the TOP PADDED EDGE, y < min_i(t_y + o_iy) − r, divided by the padded block
+ * width: the DEPTH of mass hanging past the protected boundary rather than past the anchor
+ * centre-line. Minimised. Units mm — the normalisation is an ENGINEERING choice at the gate's
+ * direction, not a ruled formula.
+ *
+ * EXACT BY PROVED MONOTONICITY, not by taking a directional extremum on faith: the edge is affine
+ * in t_y, the area above a horizontal line is monotone in that line's position, and the block width
+ * is registration-invariant. The value therefore depends on t_y alone and increases with it, so the
+ * optimum is attained on each component's minimum-t_y face. Only that face's existing vertices are
+ * returned, so the argopt is a CERTIFIED OPTIMAL SUBSET — not the whole face.
+ */
+export function upperHangingMassEvidence(subject: DescriptorSubject): DescriptorEvidence {
+  requireSubject(subject)
+  const material = materialSubject(subject.contour)
+  const width = paddedWidthMM(subject)
+  if (!(width > 0)) throw new RangeError('Padded block width must be positive.')
+  const valueAt = (t: Pt): Interval => {
+    const { areaMM2 } = clippedAreaAndMoment(material, 1, true, paddedBox(subject, t).topMM)
+    return { lo: outwardDown(areaMM2.lo / width), hi: outwardUp(areaMM2.hi / width) }
+  }
+
+  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
+    let minY = Infinity
+    for (const [, y] of ring) if (y < minY) minY = y
+    const face = ring.filter(([, y]) => y === minY).map(([x, y]) => [x, y] as Pt)
+    if (!face.length)
+      return { componentIndex, resolved: false, lo: Number.NaN, hi: Number.NaN, argopt: null }
+    const value = valueAt(face[0])
+    return {
+      componentIndex,
+      resolved: true,
+      lo: value.lo,
+      hi: value.hi,
+      argopt: { regions: [], points: face } as DescriptorArgopt,
+    }
+  })
+
+  const witnessEvidence = subject.feasible.exactWitnessesMM.map((witness) => {
+    const value = valueAt(witness)
+    return { witnessMM: witness, lo: value.lo, hi: value.hi }
+  })
+
+  return globalAnchor(
+    'minimize',
+    'mm',
+    'exact by proved monotonicity in t_y; the returned face vertices are a certified optimal subset, not the whole face',
+    subject,
+    perComponent,
+    witnessEvidence,
+    false,
+  )
+}
+
+// ─── P4 · unsupported extent — minimize, mm ────────────────────────────────────────────────────
+
+export interface RegionReach {
+  regionIndex: number
+  leftMM: number
+  rightMM: number
+  topMM: number
+  bottomMM: number
+}
+
+export interface UnsupportedExtentEvidence extends DescriptorEvidence {
+  /** Per-side reach beyond the padded box at the certified optimum. */
+  reachMM: { left: number; right: number; top: number; bottom: number }
+  maxSideScoreMM: number
+  /** Per-region contribution, so Logic can apply its ruled exemption and switch. Compute does not. */
+  perRegion: ReadonlyArray<RegionReach>
+}
+
+/**
+ * Per-side reach of material beyond the padded grid box; the score is the largest side.
+ *
+ * CERTIFIED ON THE LATTICE, not by a floating candidate recipe with an epsilon membership test.
+ * The score separates into one function of t_x and one of t_y:
+ *   score(t) = max( max(0, t_x+kL, −t_x+kR), max(0, t_y+kT, −t_y+kB) )
+ * so its sublevel set {score ≤ s} is exactly the axis-aligned rectangle
+ * [kR−s, s−kL] × [kB−s, s−kT], which grows monotonically with s. The minimum over a component is
+ * therefore the least s whose rectangle meets it, found by bisection with an exact Clipper
+ * intersection as the test. The constants are quantised to integers ONCE and the rectangle is built
+ * by integer arithmetic alone, so no rounding can admit a coordinate the constraint forbids. The
+ * result is reported as the one-quantum bracket the bisection actually proves.
+ *
+ * The two halves of F are deliberately measured in different senses and are NOT reconciled: area
+ * components are searched on the conservative lattice set, while exact witnesses are scored on true
+ * geometry. A boundary witness can therefore win outright, which is the point.
+ *
+ * Compute reports the per-side and per-region evidence and stops: the trivial-limb exemption and
+ * the 12/24 switch are ruled policy and belong to Logic, so nothing here applies or invents them.
+ */
+export function unsupportedExtentEvidence(
+  subject: DescriptorSubject,
+  regionsMM: ReadonlyArray<Contour> = [],
+): UnsupportedExtentEvidence {
+  requireSubject(subject)
+  const bounds = contourBounds(subject.contour.outer.pts)
+  const xs = subject.offsetsMM.map(([x]) => x)
+  const ys = subject.offsetsMM.map(([, y]) => y)
+  const r = subject.effectiveRadiusMM
+  const kL = Math.min(...xs) - r - bounds.minX
+  const kR = bounds.maxX - (Math.max(...xs) + r)
+  const kT = Math.min(...ys) - r - bounds.minY
+  const kB = bounds.maxY - (Math.max(...ys) + r)
+  // Exact witnesses keep the true-geometry score above; the lattice search below uses the same
+  // constants quantised ONCE to integers, so the rectangle is built without any float rounding.
+  const scoreAt = (t: Pt): number => Math.max(0, t[0] + kL, -t[0] + kR, t[1] + kT, -t[1] + kB)
+  const q = (v: number): number => Math.round(v * LATTICE)
+  const KL = q(Math.min(...xs)) - q(r) - q(bounds.minX)
+  const KR = q(bounds.maxX) - (q(Math.max(...xs)) + q(r))
+  const KT = q(Math.min(...ys)) - q(r) - q(bounds.minY)
+  const KB = q(bounds.maxY) - (q(Math.max(...ys)) + q(r))
+  /**
+   * The sublevel rectangle for score ≤ S in integer lattice units. Every bound is an integer
+   * comparison, so no lattice coordinate outside the constraint can be admitted: a lower bound is
+   * `KR − S` and an upper bound `S − KL` exactly, with no rounding to widen either side.
+   */
+  const sublevelPath = (sLattice: number): Path64 | null => {
+    if (sLattice < 0) return null
+    const x0 = KR - sLattice
+    const x1 = sLattice - KL
+    const y0 = KB - sLattice
+    const y1 = sLattice - KT
+    if (x1 < x0 || y1 < y0) return null
+    return Clipper.makePath([x0, y0, x1, y0, x1, y1, x0, y1])
+  }
+
+  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
+    const componentPaths = toLatticePaths([ring])
+    const ringBounds = contourBounds(ring)
+    const meets = (sLattice: number): boolean => {
+      const rect = sublevelPath(sLattice)
+      if (!rect) return false
+      return (
+        integerAreaAndMoments(Clipper.intersect(componentPaths, [rect], FillRule.NonZero))
+          .twiceArea !== B0
+      )
+    }
+    const latticeScore = (X: number, Y: number): number => Math.max(0, X + KL, -X + KR, Y + KT, -Y + KB)
+    let high = Math.max(
+      latticeScore(q(ringBounds.minX), q(ringBounds.minY)),
+      latticeScore(q(ringBounds.maxX), q(ringBounds.maxY)),
+      latticeScore(q(ringBounds.minX), q(ringBounds.maxY)),
+      latticeScore(q(ringBounds.maxX), q(ringBounds.minY)),
+    )
+    if (!meets(high)) return { componentIndex, resolved: false, lo: 0, hi: Number.NaN, argopt: null }
+    let low = 0
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2)
+      if (meets(mid)) high = mid
+      else low = mid + 1
+    }
+    const rect = sublevelPath(high)
+    const cells = rect ? Clipper.intersect(componentPaths, [rect], FillRule.NonZero) : []
+    return {
+      componentIndex,
+      resolved: true,
+      lo: outwardDown(Math.max(0, high - 1) / LATTICE),
+      hi: outwardUp(high / LATTICE),
+      argopt: { regions: fromLatticePaths(cells), points: [] } as DescriptorArgopt,
+    }
+  })
+
+  const witnessEvidence = subject.feasible.exactWitnessesMM.map((witness) => {
+    const value = scoreAt(witness)
+    return { witnessMM: witness, lo: outwardDown(value), hi: outwardUp(value) }
+  })
+
+  const anchor = globalAnchor(
+    'minimize',
+    'mm',
+    'certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves',
+    subject,
+    perComponent,
+    witnessEvidence,
+    false,
+  )
+  const optimum =
+    anchor.argopt?.points[0] ?? (anchor.argopt?.regions.length ? anchor.argopt.regions[0][0] : null)
+  const box = optimum ? paddedBox(subject, optimum) : null
+  return {
+    ...anchor,
+    reachMM: {
+      left: box ? Math.max(0, box.leftMM - bounds.minX) : Number.NaN,
+      right: box ? Math.max(0, bounds.maxX - box.rightMM) : Number.NaN,
+      top: box ? Math.max(0, box.topMM - bounds.minY) : Number.NaN,
+      bottom: box ? Math.max(0, bounds.maxY - box.bottomMM) : Number.NaN,
+    },
+    maxSideScoreMM: optimum ? scoreAt(optimum) : Number.NaN,
+    perRegion: box
+      ? regionsMM.map((region, regionIndex) => {
+          const regionBounds = contourBounds(region.outer.pts)
+          return {
+            regionIndex,
+            leftMM: Math.max(0, box.leftMM - regionBounds.minX),
+            rightMM: Math.max(0, regionBounds.maxX - box.rightMM),
+            topMM: Math.max(0, box.topMM - regionBounds.minY),
+            bottomMM: Math.max(0, regionBounds.maxY - box.bottomMM),
+          }
+        })
+      : [],
+  }
+}
+
+// ─── P5 · peel leverage — minimize, mm³ ────────────────────────────────────────────────────────
+
+export interface PeelBudget {
+  /** Certified width at which the search may stop, in mm³. Caller-owned. */
+  toleranceMM3: number
+  /** Maximum evaluations, enforced on EVERY cache miss — bounds, loop and witnesses alike. */
+  maxEvaluations: number
+}
+
+/**
+ * Peel leverage: the first moment of unsupported material about each padded box edge,
+ * ∫ (distance beyond the edge) dA, in mm³; the score is the largest side. Minimised.
+ *
+ * DEDICATED SOLVER WITH EXACT CELL BOUNDS — no Lipschitz claim and no generic framework. Each
+ * side's integrand is a hinge of the single scalar edge position, so the side is monotone in that
+ * scalar, and the edge position is affine in exactly one coordinate. Over an axis-aligned cell each
+ * side's minimum is therefore attained at that cell's extreme in its own coordinate and is computed
+ * exactly, giving LB = max over sides of those exact per-side minima. UB comes only from points
+ * proven feasible. Branch and bound prunes on those exact bounds; exhausting the caller's budget
+ * leaves that component UNRESOLVED with its retained bound, which makes the descriptor globally
+ * indeterminate unless the bound proves the component cannot win.
+ */
+export function peelLeverageEvidence(
+  subject: DescriptorSubject,
+  budget: PeelBudget,
+): DescriptorEvidence {
+  requireSubject(subject)
+  if (!(budget.toleranceMM3 >= 0) || !Number.isFinite(budget.toleranceMM3))
+    throw new RangeError('Peel tolerance must be finite and non-negative.')
+  if (!Number.isInteger(budget.maxEvaluations) || budget.maxEvaluations <= 0)
+    throw new RangeError('Peel evaluation budget must be a positive integer.')
+  const material = materialSubject(subject.contour)
+  let evaluations = 0
+  // The FULL interval is cached: a lower bound may only be read from `.lo` and a feasible incumbent
+  // only from `.hi`. Caching one endpoint and reusing it for both would make the bounds unsafe.
+  const cache = new Map<string, Interval>()
+  /** Every cache MISS spends budget; a miss with none left returns null, never a value. */
+  const sideMoment = (axis: 0 | 1, keepBelow: boolean, cutMM: number): Interval | null => {
+    const key = `${axis}:${keepBelow ? 1 : 0}:${Math.round(cutMM * LATTICE)}`
+    const cached = cache.get(key)
+    if (cached !== undefined) return cached
+    if (evaluations >= budget.maxEvaluations) return null
+    evaluations += 1
+    const { momentMM3 } = clippedAreaAndMoment(material, axis, keepBelow, cutMM)
+    const value: Interval = { lo: momentMM3.lo, hi: momentMM3.hi }
+    cache.set(key, value)
+    return value
+  }
+  const sidesAt = (box: PaddedBox, mixed?: PaddedBox): Array<Interval | null> => [
+    sideMoment(0, true, box.leftMM),
+    sideMoment(0, false, (mixed ?? box).rightMM),
+    sideMoment(1, true, box.topMM),
+    sideMoment(1, false, (mixed ?? box).bottomMM),
+  ]
+  /** An upper bound on the score at one feasible point: the max of the sides' upper endpoints. */
+  const scoreUpperAt = (t: Pt): number | null => {
+    const values = sidesAt(paddedBox(subject, t))
+    return values.some((value) => value === null)
+      ? null
+      : Math.max(...(values as Interval[]).map((value) => value.hi))
+  }
+  // Each side's exact minimum over the cell: left/top grow with their coordinate, right/bottom fall.
+  // The bound reads `.lo`, never the cached upper endpoint.
+  const cellLowerBound = (x0: number, x1: number, y0: number, y1: number): number | null => {
+    const values = sidesAt(paddedBox(subject, [x0, y0]), paddedBox(subject, [x1, y1]))
+    return values.some((value) => value === null)
+      ? null
+      : Math.max(...(values as Interval[]).map((value) => value.lo))
+  }
+
+  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
+    const prepared = prepareExactContour(ringContour(ring))
+    const ringBounds = contourBounds(ring)
+    let incumbent: { point: Pt; value: number } | null = null
+    for (const [vx, vy] of ring) {
+      const value = scoreUpperAt([vx, vy])
+      if (value !== null && (!incumbent || value < incumbent.value))
+        incumbent = { point: [vx, vy], value }
+    }
+    const unresolved = (bound: number) => ({
+      componentIndex,
+      resolved: false,
+      lo: bound,
+      hi: incumbent ? incumbent.value : Number.NaN,
+      argopt: null,
+    })
+    if (!incumbent) return unresolved(0)
+    let cells: Array<[number, number, number, number]> = [
+      [ringBounds.minX, ringBounds.maxX, ringBounds.minY, ringBounds.maxY],
+    ]
+    let lowerBound = 0
+    let exhausted = false
+    while (cells.length && !exhausted) {
+      const next: Array<[number, number, number, number]> = []
+      let roundBound = Infinity
+      for (const [x0, x1, y0, y1] of cells) {
+        const bound = cellLowerBound(x0, x1, y0, y1)
+        if (bound === null) {
+          exhausted = true
+          break
+        }
+        if (bound > incumbent.value) continue
+        const midX = (x0 + x1) / 2
+        const midY = (y0 + y1) / 2
+        if (pointInPreparedContour([midX, midY], prepared)) {
+          const value = scoreUpperAt([midX, midY])
+          if (value === null) {
+            exhausted = true
+            break
+          }
+          if (value < incumbent.value) incumbent = { point: [midX, midY], value }
+        }
+        roundBound = Math.min(roundBound, bound)
+        if (incumbent.value - bound > budget.toleranceMM3)
+          next.push(
+            [x0, midX, y0, midY],
+            [midX, x1, y0, midY],
+            [x0, midX, midY, y1],
+            [midX, x1, midY, y1],
+          )
+      }
+      if (Number.isFinite(roundBound)) lowerBound = roundBound
+      cells = next
+    }
+    if (exhausted || incumbent.value - lowerBound > budget.toleranceMM3) return unresolved(lowerBound)
+    return {
+      componentIndex,
+      resolved: true,
+      lo: outwardDown(Math.max(0, lowerBound)),
+      hi: outwardUp(incumbent.value),
+      argopt: { regions: [], points: [incumbent.point] } as DescriptorArgopt,
+    }
+  })
+
+  // Witness work spends the same budget. An unevaluated witness is not skipped: it makes the whole
+  // descriptor indeterminate, because the witness it could not price may hold the optimum.
+  const witnessEvidence: WitnessDescriptorEvidence[] = []
+  let allWitnessesPriced = true
+  for (const witness of subject.feasible.exactWitnessesMM) {
+    const value = scoreUpperAt(witness)
+    if (value === null) {
+      allWitnessesPriced = false
+      break
+    }
+    witnessEvidence.push({ witnessMM: witness, lo: outwardDown(value), hi: outwardUp(value) })
+  }
+
+  return globalAnchor(
+    'minimize',
+    'mm3',
+    'branch and bound on exact per-side cell minima proved by monotonicity in one coordinate; no convexity or Lipschitz assumption, and an exhausted budget leaves the component unresolved or the descriptor indeterminate',
+    subject,
+    perComponent,
+    witnessEvidence,
+    false,
+    allWitnessesPriced,
+  )
+}
+
+// ─── P2 · coverage and P7 · distribution ───────────────────────────────────────────────────────
+
+/** layers[k] = the part of `base` covered by at least k of `sets`. Exact integer set algebra. */
+function depthLayers(base: Paths64, sets: ReadonlyArray<Paths64>): Paths64[] {
+  const layers: Paths64[] = [base]
+  for (const set of sets) {
+    const next: Paths64[] = [layers[0]]
+    for (let depth = 1; depth <= layers.length; depth += 1) {
+      const carried = layers[depth] ?? []
+      const promoted = Clipper.intersect(layers[depth - 1], set, FillRule.NonZero)
+      next[depth] = carried.length ? Clipper.union(carried, promoted, FillRule.NonZero) : promoted
+    }
+    layers.length = 0
+    layers.push(...next)
+  }
+  return layers
+}
+
+/** One set shifted by every pattern offset — where a registration puts an anchor inside it. */
+function shiftedByOffsets(subject: DescriptorSubject, set: Contour): Paths64 {
+  const path = toLatticePaths([set.outer.pts])
+  let union: Paths64 = []
+  for (const [dx, dy] of subject.offsetsMM) {
+    const moved = Clipper.translatePaths(path, -Math.round(dx * LATTICE), -Math.round(dy * LATTICE))
+    union = union.length ? Clipper.union(union, moved, FillRule.NonZero) : moved
+  }
+  return union
+}
+
+function deepestLayer(layers: Paths64[]): { depth: number; cells: Paths64 } {
+  for (let depth = layers.length - 1; depth >= 1; depth -= 1)
+    if (layers[depth] && layers[depth].length) return { depth, cells: layers[depth] }
+  // Depth zero is reached everywhere in the base, so the argopt is the whole base component.
+  return { depth: 0, cells: layers[0] ?? [] }
+}
+
+/** How many anchors land in each caller set, at one exact registration. */
+function anchorCountsAt(
+  subject: DescriptorSubject,
+  preparedSets: ReadonlyArray<ReturnType<typeof prepareExactContour>>,
+  t: Pt,
+): number[] {
+  return preparedSets.map(
+    (set) =>
+      subject.offsetsMM.filter(([dx, dy]) => pointInPreparedContour([t[0] + dx, t[1] + dy], set))
+        .length,
+  )
+}
+
+/**
+ * The FRACTION of the caller-classified major support regions holding at least one anchor —
+ * covered / total, dimensionless. Maximised. Piecewise-constant in t.
+ *
+ * EXACT CERTIFIED PARTITION: for region j, U_j = ⋃_i (R_j − o_i) is an exact integer Clipper
+ * operation, and the depth layers over the U_j give the maximum-coverage cells exactly. The argopt
+ * is returned as CELLS, never a sampled point; witnesses use the exact predicates on the true
+ * geometry; and the fraction is an exact rational. An empty caller set is rejected rather than
+ * given an invented value.
+ */
+export function coverageEvidence(
+  subject: DescriptorSubject,
+  majorSupportRegionsMM: ReadonlyArray<Contour>,
+): DescriptorEvidence {
+  requireSubject(subject)
+  if (!majorSupportRegionsMM.length)
+    throw new RangeError('Coverage requires at least one caller-classified major support region.')
+  const total = BigInt(majorSupportRegionsMM.length)
+  const shifted = majorSupportRegionsMM.map((region) => shiftedByOffsets(subject, region))
+  const prepared = majorSupportRegionsMM.map((region) => prepareExactContour(region))
+
+  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
+    const { depth, cells } = deepestLayer(depthLayers(toLatticePaths([ring]), shifted))
+    const fraction = ratioToInterval(BigInt(depth), total)
+    return {
+      componentIndex,
+      resolved: true,
+      lo: fraction.lo,
+      hi: fraction.hi,
+      argopt: { regions: fromLatticePaths(cells), points: [] } as DescriptorArgopt,
+    }
+  })
+
+  const witnessEvidence = subject.feasible.exactWitnessesMM.map((witness) => {
+    const covered = anchorCountsAt(subject, prepared, witness).filter((count) => count > 0).length
+    const fraction = ratioToInterval(BigInt(covered), total)
+    return { witnessMM: witness, lo: fraction.lo, hi: fraction.hi }
+  })
+
+  return globalAnchor(
+    'maximize',
+    'ratio',
+    'exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational',
+    subject,
+    perComponent,
+    witnessEvidence,
+    false,
+  )
+}
+
+export interface DistributionEvidence extends DescriptorEvidence {
+  /**
+   * The ruled second key, kept separate rather than folded into an opaque score: once the distinct
+   * mass count is maximised, the minimum variance of anchors per mass over that argopt.
+   */
+  anchorVariance: DescriptorEvidence
+}
+
+/**
+ * Distribution across the caller-classified DISTINCT MASSES — a different set from coverage's.
+ *
+ * Primary key: the number of masses holding at least one anchor, maximised, by the same exact
+ * certified partition. Secondary key: the variance of anchors per mass, minimised, evaluated only
+ * over the primary argopt so the lexicographic order is preserved. The two keys are returned
+ * SEPARATELY; nothing here combines them into a single number.
+ *
+ * The per-mass anchor counts are piecewise-constant, so the secondary key is certified over the
+ * joint partition of the per-mass depth layers, pruned by real geometry. Only cells and witnesses
+ * TIED AT THE PRIMARY MAXIMUM are eligible, preserving the lexicographic order. `maxCells` is a
+ * required caller input — there is no default — and exceeding it makes the secondary key
+ * DECISION_INDETERMINATE rather than estimated.
+ */
+export function distributionEvidence(
+  subject: DescriptorSubject,
+  distinctMassesMM: ReadonlyArray<Contour>,
+  maxCells: number,
+): DistributionEvidence {
+  requireSubject(subject)
+  if (!distinctMassesMM.length)
+    throw new RangeError('Distribution requires at least one caller-classified distinct mass.')
+  if (!Number.isInteger(maxCells) || maxCells <= 0)
+    throw new RangeError('Distribution requires a positive integer cell budget from the caller.')
+  const shifted = distinctMassesMM.map((mass) => shiftedByOffsets(subject, mass))
+  const prepared = distinctMassesMM.map((mass) => prepareExactContour(mass))
+
+  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
+    const { depth, cells } = deepestLayer(depthLayers(toLatticePaths([ring]), shifted))
+    return {
+      componentIndex,
+      resolved: true,
+      lo: depth,
+      hi: depth,
+      argopt: { regions: fromLatticePaths(cells), points: [] } as DescriptorArgopt,
+    }
+  })
+
+  const witnessCounts = subject.feasible.exactWitnessesMM.map((witness) =>
+    anchorCountsAt(subject, prepared, witness),
+  )
+  const witnessEvidence = subject.feasible.exactWitnessesMM.map((witness, index) => {
+    const held = witnessCounts[index].filter((count) => count > 0).length
+    return { witnessMM: witness, lo: held, hi: held }
+  })
+
+  const primary = globalAnchor(
+    'maximize',
+    'count',
+    'exact certified partition over the distinct masses; argopt returned as cells',
+    subject,
+    perComponent,
+    witnessEvidence,
+    true,
+  )
+
+  const varianceOf = (counts: ReadonlyArray<number>): Interval & { exact: boolean } => {
+    const n = BigInt(counts.length)
+    const sum = counts.reduce((total, count) => total + BigInt(count), B0)
+    const squares = counts.reduce((total, count) => total + BigInt(count) * BigInt(count), B0)
+    return ratioToInterval(n * squares - sum * sum, n * n)
+  }
+  const indeterminateVariance = (reason: string): DescriptorEvidence => ({
+    units: 'ratio',
+    direction: 'minimize',
+    status: 'DECISION_INDETERMINATE',
+    lo: Number.NaN,
+    hi: Number.NaN,
+    argopt: null,
+    completenessProof: reason,
+    sourceEnvelope: subject.feasible.envelope,
+    perComponent: [],
+    witnessEvidence: [],
+  })
+
+  if (primary.status === 'DECISION_INDETERMINATE')
+    return {
+      ...primary,
+      anchorVariance: indeterminateVariance('the primary distinct-mass key is itself undecided'),
+    }
+
+  // Split the primary argopt on each mass's own depth layers: the counts are constant per cell.
+  const primaryCells = toLatticePaths(primary.argopt?.regions ?? [])
+  let partition: Array<{ cells: Paths64; counts: number[] }> = primaryCells.length
+    ? [{ cells: primaryCells, counts: [] }]
+    : []
+  let overflowed = false
+  for (let massIndex = 0; massIndex < distinctMassesMM.length && !overflowed; massIndex += 1) {
+    const massPath = toLatticePaths([distinctMassesMM[massIndex].outer.pts])
+    const layers = depthLayers(
+      primaryCells,
+      subject.offsetsMM.map(([dx, dy]) =>
+        Clipper.translatePaths(massPath, -Math.round(dx * LATTICE), -Math.round(dy * LATTICE)),
+      ),
+    )
+    const split: Array<{ cells: Paths64; counts: number[] }> = []
+    for (const piece of partition) {
+      for (let depth = 0; depth < layers.length && !overflowed; depth += 1) {
+        const exactDepth =
+          depth + 1 < layers.length && layers[depth + 1].length
+            ? Clipper.difference(layers[depth], layers[depth + 1], FillRule.NonZero)
+            : layers[depth]
+        const cells = Clipper.intersect(piece.cells, exactDepth, FillRule.NonZero)
+        if (integerAreaAndMoments(cells).twiceArea === B0) continue
+        split.push({ cells, counts: [...piece.counts, depth] })
+        if (split.length > maxCells) overflowed = true
+      }
+      if (overflowed) break
+    }
+    if (!overflowed) partition = split
+  }
+
+  // Only candidates tied at the primary maximum are eligible for the secondary key. The cells are
+  // already the primary argopt; the witnesses must be filtered by their own primary count.
+  const primaryMax = primary.lo
+  const evaluated = partition
+    .filter((piece) => piece.counts.length === distinctMassesMM.length)
+    .map((piece) => ({ piece, value: varianceOf(piece.counts) }))
+  const witnessVariance = witnessCounts
+    .map((counts, index) => ({ counts, index }))
+    .filter(({ counts }) => counts.filter((count) => count > 0).length === primaryMax)
+    .map(({ counts, index }) => ({
+      witnessMM: subject.feasible.exactWitnessesMM[index],
+      value: varianceOf(counts),
+    }))
+
+  const anchorVariance =
+    overflowed || (!evaluated.length && !witnessVariance.length)
+      ? indeterminateVariance(
+          'the joint per-mass partition exceeded the caller cell budget; the variance key is not estimated',
+        )
+      : globalAnchor(
+          'minimize',
+          'ratio',
+          'exact variance over the certified joint partition of the primary argopt, restricted to candidates tied at the primary maximum',
+          subject,
+          evaluated.map(({ piece, value }, index) => ({
+            componentIndex: index,
+            resolved: true,
+            lo: value.lo,
+            hi: value.hi,
+            argopt: { regions: fromLatticePaths(piece.cells), points: [] } as DescriptorArgopt,
+          })),
+          witnessVariance.map(({ witnessMM, value }) => ({
+            witnessMM,
+            lo: value.lo,
+            hi: value.hi,
+          })),
+          false,
+        )
+  return { ...primary, anchorVariance }
+}
+
+// ─── dominance ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Certified dominance only. Direction comes from the evidence's own physical meaning, never from
+ * the caller; the caller supplies only a tolerance in the descriptor's own unit. A unit or
+ * direction mismatch is an invalid comparison. Any overlap, or either side undecided, preserves
+ * both candidates — Compute resolves no tie and invents no equivalence policy.
+ */
+export function certifiedDominance(
+  a: DescriptorEvidence,
+  b: DescriptorEvidence,
+  tolerance: number,
+): boolean {
+  if (a.units !== b.units) throw new RangeError('Dominance requires both descriptors in the same unit.')
+  if (a.direction !== b.direction) throw new RangeError('Dominance requires a single objective direction.')
+  if (!Number.isFinite(tolerance) || tolerance < 0)
+    throw new RangeError('Dominance tolerance must be finite and non-negative.')
+  if (a.status === 'DECISION_INDETERMINATE' || b.status === 'DECISION_INDETERMINATE') return false
+  return a.direction === 'minimize' ? a.hi < b.lo - tolerance : a.lo > b.hi + tolerance
 }
