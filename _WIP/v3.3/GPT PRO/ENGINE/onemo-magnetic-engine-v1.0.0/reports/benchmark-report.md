@@ -9,9 +9,9 @@
 - Each sample returns a new immutable `SolveResult` and independently executes all 21 configured rungs.
 - A repeated object identity is a benchmark failure, preventing final-result-cache substitution.
 - Warm state retains bounded registered-profile, prepared/scaled-source, safe-region, component-hierarchy and region-measurement caches. No final solve result is retained.
-- Median: 2.448 ms.
-- p95: 11.022 ms.
-- Maximum: 54.114 ms (one high-vertex outlier; the gated p95 remains below 16 ms).
+- Median: 2.393666 ms.
+- p95: 11.586167 ms.
+- Maximum: 12.736125 ms.
 - The median and p95 pass the 16 ms gate.
 
 Cold results are recorded separately per fixture in `benchmark-results.json`; the circle cold path is materially slower and is not represented as a frame-budget pass.
@@ -22,6 +22,6 @@ The JSON record includes runtime, OS, CPU, installed Chromium version, warm/cold
 
 Exact compressed ESM sizes from `bundle-size-results.json`:
 
-- Compute: 24,613 bytes.
-- Logic: 16,962 bytes.
+- Compute: 24,799 bytes.
+- Logic: 16,856 bytes.
 - Next adapter: 2,999 bytes.

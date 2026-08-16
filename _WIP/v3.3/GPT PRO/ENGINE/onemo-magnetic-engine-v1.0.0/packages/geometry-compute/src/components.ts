@@ -13,6 +13,13 @@ function rememberHierarchy(key:string,value:ComponentHierarchy):ComponentHierarc
   if(hierarchyCache.size>HIERARCHY_CACHE_LIMIT)hierarchyCache.delete(hierarchyCache.keys().next().value!);
   return value;
 }
+function copyRegionEvidence(evidence:RegionEvidence):RegionEvidence{return{
+  ...evidence,
+  bounds:{...evidence.bounds},gridOrigin:{...evidence.gridOrigin},
+  definitelyOccupiedCellKeys:new Set(evidence.definitelyOccupiedCellKeys),
+  possiblyOccupiedCellKeys:new Set(evidence.possiblyOccupiedCellKeys),
+  exactWitnessPoints:Object.freeze(evidence.exactWitnessPoints.map(point=>({...point})))
+};}
 function isConvex(ring:readonly Point[]):boolean{
   let direction=0;
   for(let index=0;index<ring.length;index++){
@@ -113,9 +120,9 @@ export function buildComponentHierarchy(
 
 export function componentToRegionEvidence(hierarchy:ComponentHierarchy,component:SafeComponent):RegionEvidence{
   let cachedById=regionEvidenceCache.get(hierarchy);if(!cachedById){cachedById=new Map();regionEvidenceCache.set(hierarchy,cachedById);}
-  const cached=cachedById.get(component.id);if(cached)return cached;
+  const cached=cachedById.get(component.id);if(cached)return copyRegionEvidence(cached);
   const definitelyOccupiedCellKeys=new Set<string>(),possiblyOccupiedCellKeys=new Set<string>();
   for(const index of component.cells){const cell=hierarchy.cells[index]!,cellKey=key(cell.ix,cell.iy);possiblyOccupiedCellKeys.add(cellKey);if(cell.definiteLevels[component.levelIndex])definitelyOccupiedCellKeys.add(cellKey);}
   const evidence={id:component.id,bounds:component.bounds,gridOrigin:{x:hierarchy.bounds.minX,y:hierarchy.bounds.minY},cellStepMm:hierarchy.stepMm,radiusMm:component.radiusMm,errorEnvelopeMm:hierarchy.errorEnvelopeMm,definitelyOccupiedCellKeys,possiblyOccupiedCellKeys,exactWitnessPoints:component.exactWitnessPoints};
-  cachedById.set(component.id,evidence);return evidence;
+  cachedById.set(component.id,evidence);return copyRegionEvidence(evidence);
 }

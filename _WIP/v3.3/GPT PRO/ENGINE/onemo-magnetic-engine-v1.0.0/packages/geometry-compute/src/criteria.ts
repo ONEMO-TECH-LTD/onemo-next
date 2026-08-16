@@ -12,6 +12,12 @@ export function clearCriterionCaches():void{regionStateCache=new WeakMap();crite
 
 function interval(lower:number,upper:number):ScoreInterval{return{lower:Math.min(lower,upper),upper:Math.max(lower,upper)};}
 function compound(...components:ScoreInterval[]):CompoundScoreInterval{return{components};}
+function copyEvaluation(evaluation:CriterionEvaluation):CriterionEvaluation{
+  const score='components' in evaluation.score
+    ?{components:evaluation.score.components.map(component=>({...component}))}
+    :{...evaluation.score};
+  return{...evaluation,score};
+}
 
 function translatedProjectionInterval(box:AdaptiveBox,direction:Point):ScoreInterval{
   const values=[
@@ -170,6 +176,6 @@ export function evaluateCriterionOnBox(
   let regions=regionListIdentity.get(descriptor.regions as object);if(!regions){regions=nextRegionListIdentity++;regionListIdentity.set(descriptor.regions as object,regions);}
   const subset=descriptor.id==='REGION_SUBSET_COVERAGE_V1'?descriptor.subsetIds.join(','):'';
   const key=`${descriptor.id}:${regions}:${subset}:${offsets.map(offset=>`${offset.x},${offset.y}`).join(';')}`;
-  const cached=cache.get(key);if(cached){cache.delete(key);cache.set(key,cached);return cached;}
-  const evaluation=evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);cache.set(key,evaluation);if(cache.size>CRITERION_EVALUATION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return evaluation;
+  const cached=cache.get(key);if(cached){cache.delete(key);cache.set(key,cached);return copyEvaluation(cached);}
+  const evaluation=evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);cache.set(key,evaluation);if(cache.size>CRITERION_EVALUATION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return copyEvaluation(evaluation);
 }

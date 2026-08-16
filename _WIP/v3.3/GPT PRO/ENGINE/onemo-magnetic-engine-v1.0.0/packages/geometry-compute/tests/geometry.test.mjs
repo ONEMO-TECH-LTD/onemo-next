@@ -80,6 +80,14 @@ test('component hierarchy cache is bounded intermediate evidence and explicitly 
   assert.notEqual(rebuilt,first);assert.deepEqual(rebuilt,first);
 });
 
+test('cached region evidence cannot be poisoned through a returned mutable set',()=>{
+  const p=preparePolygon(dumbbell,{quantumMm:q});const hierarchy=buildComponentHierarchy(p,[12],6),component=hierarchy.components[0];
+  const first=componentToRegionEvidence(hierarchy,component),definiteCount=first.definitelyOccupiedCellKeys.size,possibleCount=first.possiblyOccupiedCellKeys.size;
+  first.definitelyOccupiedCellKeys.clear();first.possiblyOccupiedCellKeys.clear();
+  const second=componentToRegionEvidence(hierarchy,component);
+  assert.notEqual(second,first);assert.equal(second.definitelyOccupiedCellKeys.size,definiteCount);assert.equal(second.possiblyOccupiedCellKeys.size,possibleCount);
+});
+
 test('lower-dimensional safe point remains explicit in the component hierarchy',()=>{
   const p=preparePolygon([{x:-12,y:-12},{x:12,y:-12},{x:12,y:12},{x:-12,y:12}],{quantumMm:q});
   const hierarchy=buildComponentHierarchy(p,[12],6);
@@ -100,6 +108,15 @@ test('possibly occupied sampling cells cannot fabricate exact region membership'
   const result=evaluateCriterionOnBox(p,[{x:0,y:0}],{minX:6,minY:0,maxX:6,maxY:0,depth:0,status:'BOUNDARY',id:'probe'},{id:'REGION_COVERAGE_V1',regions:[region]});
   assert.deepEqual(result.score,{components:[{lower:0,upper:1},{lower:0,upper:1}]});
   assert.equal(result.exactness,'CERTIFIED_APPROXIMATE');
+});
+
+test('cached criterion evaluation cannot be poisoned through a returned score',()=>{
+  const p=preparePolygon([{x:-17,y:-17},{x:17,y:-17},{x:17,y:17},{x:-17,y:17}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,[12],6),region=componentToRegionEvidence(hierarchy,hierarchy.components[0]);
+  const box={minX:0,minY:0,maxX:0,maxY:0,depth:0,status:'INSIDE',id:'cache-poison'},descriptor={id:'REGION_COVERAGE_V1',regions:[region]};
+  const first=evaluateCriterionOnBox(p,[{x:0,y:0}],box,descriptor);first.score.components[0].lower=999;
+  const second=evaluateCriterionOnBox(p,[{x:0,y:0}],box,descriptor);
+  assert.notEqual(second,first);assert.deepEqual(second.score,{components:[{lower:1,upper:1},{lower:0,upper:0}]});
 });
 
 test('possible-cell bridge cannot certify two exact safe components as one',()=>{

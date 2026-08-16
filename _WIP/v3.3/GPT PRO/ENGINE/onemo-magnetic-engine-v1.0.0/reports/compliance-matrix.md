@@ -21,6 +21,6 @@
 | Physical fulfilment completion | Complete technically, blocked in reference profile | Zero-tolerance technical test passes; reference profile intentionally refuses fulfilment. |
 | React/Next integration | Complete as adapter/reference page | Lazy loader, hook, overlay, persistence, certification binding, server verifier. |
 | Browser tests | Chromium route verified | Existing Playwright-controlled Chrome exercised the real `/grid-engine` route; no physical-mobile result is claimed. |
-| Payload gates | Pass | Compute 24,613 bytes gzip, Logic 16,962 bytes, adapter 2,999 bytes. |
+| Payload gates | Pass | Compute 24,799 bytes gzip, Logic 16,856 bytes, adapter 2,999 bytes. |
 | 16 ms typical all-band target | Pass on recorded machine | The available R3 probe corpus covers eight full-solve fixtures. Each timed sample creates a new result and recomputes all 21 certified rungs; only bounded intermediate evidence is cached. Median and p95 are gated at ≤16 ms. |
 | Downloadable archives | Complete | Three package ZIPs plus one complete master ZIP. |
