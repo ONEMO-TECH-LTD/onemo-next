@@ -22,7 +22,7 @@ The reference profile records conservative defaults but is not production-ready.
 
 ## Performance and browser evidence
 
-- The warm typical certified all-band gate passes on the recorded machine; cold high-node outlines remain materially slower.
+- The warm available R3 probe corpus passes on the recorded machine with only bounded intermediate caches; it is not the final product-approved typical corpus. Batwoman remains excluded pending approved vector intake. Cold results remain materially slower and are reported per fixture.
 - Chromium was exercised on the real route through the existing Playwright-controlled browser. WebKit and physical mobile devices remain unmeasured.
 
 ## Integration

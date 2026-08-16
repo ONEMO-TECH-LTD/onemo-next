@@ -1,37 +1,248 @@
 {
-  "generatedAt": "2026-08-16T19:10:05.313Z",
+  "generatedAt": "2026-08-16T20:35:18.176Z",
   "runtime": {
     "node": "v26.7.0",
     "platform": "darwin",
-    "arch": "arm64"
+    "arch": "arm64",
+    "os": "darwin 25.5.0",
+    "cpu": "Apple M1 Max",
+    "logicalCpuCount": 10
+  },
+  "browserVersions": {
+    "chromium": "151.0.7922.138",
+    "webkit": "not measured in this Node benchmark; browser gate is recorded separately"
   },
   "backend": "geometry-compute-ts-fixed-v1",
+  "method": {
+    "warmupRunsPerFixture": 5,
+    "timedRunsPerFixture": 30,
+    "aggregatePercentilesAcrossAllFixtureSamples": true
+  },
+  "benchmarkState": {
+    "corpusLabel": "available R3 probe corpus",
+    "cold": "solver and all permitted intermediate caches cleared before each fixture",
+    "warm": "runtime warmed; bounded registered-profile, prepared/scaled-source, safe-region, component-hierarchy and region-measurement caches retained",
+    "finalSolveResultCache": false
+  },
   "translationMs": {
-    "median": 0.039790999999993915,
-    "p95": 0.12562499999999943,
-    "max": 0.2732080000000039
+    "median": 0.0019580000000019027,
+    "p95": 0.0037080000000031532,
+    "max": 0.0077920000000020195
   },
-  "coldCertifiedAllBandMs": 68.88875,
-  "warmCertifiedAllBandMs": {
-    "median": 0.553875000000005,
-    "p95": 0.575958,
-    "max": 0.6592500000000001
+  "certifiedAllBand": {
+    "corpus": [
+      {
+        "id": "square",
+        "polygonEdges": 4,
+        "coldMs": 123.416541,
+        "warmMs": {
+          "median": 5.0979580000000055,
+          "p95": 5.725209000000007,
+          "max": 6.682749999999999
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 12,
+        "statusCounts": {
+          "ACCEPTED": 12,
+          "REJECTED": 7,
+          "DECISION_INDETERMINATE": 2
+        }
+      },
+      {
+        "id": "long-vertical-rectangle",
+        "polygonEdges": 4,
+        "coldMs": 40.253917,
+        "warmMs": {
+          "median": 2.345375000000047,
+          "p95": 3.019957999999974,
+          "max": 3.5596249999999827
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 9,
+        "statusCounts": {
+          "ACCEPTED": 9,
+          "REJECTED": 9,
+          "DECISION_INDETERMINATE": 3
+        }
+      },
+      {
+        "id": "long-horizontal-rectangle",
+        "polygonEdges": 4,
+        "coldMs": 38.37100000000004,
+        "warmMs": {
+          "median": 2.5052500000000464,
+          "p95": 3.005457999999976,
+          "max": 3.1975830000000087
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 9,
+        "statusCounts": {
+          "ACCEPTED": 9,
+          "REJECTED": 9,
+          "DECISION_INDETERMINATE": 3
+        }
+      },
+      {
+        "id": "approved-test-circle-64",
+        "polygonEdges": 64,
+        "coldMs": 25517.200791,
+        "warmMs": {
+          "median": 11.481375000003027,
+          "p95": 12.358374999999796,
+          "max": 12.736124999999447
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 16,
+        "statusCounts": {
+          "ACCEPTED": 16,
+          "REJECTED": 3,
+          "DECISION_INDETERMINATE": 2
+        }
+      },
+      {
+        "id": "concave-notch",
+        "polygonEdges": 12,
+        "coldMs": 55.50116700000217,
+        "warmMs": {
+          "median": 0.15725000000020373,
+          "p95": 0.2686250000006112,
+          "max": 0.46916699999928824
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 0,
+        "statusCounts": {
+          "ACCEPTED": 0,
+          "REJECTED": 2,
+          "DECISION_INDETERMINATE": 19
+        }
+      },
+      {
+        "id": "narrow-neck",
+        "polygonEdges": 12,
+        "coldMs": 24.29504100000122,
+        "warmMs": {
+          "median": 0.14937500000087311,
+          "p95": 0.15562499999941792,
+          "max": 0.17520800000056624
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 0,
+        "statusCounts": {
+          "ACCEPTED": 0,
+          "REJECTED": 2,
+          "DECISION_INDETERMINATE": 19
+        }
+      },
+      {
+        "id": "thin-terminal-limb",
+        "polygonEdges": 8,
+        "coldMs": 23.487084000000323,
+        "warmMs": {
+          "median": 0.1477500000000873,
+          "p95": 0.2924170000005688,
+          "max": 0.344042000000627
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 0,
+        "statusCounts": {
+          "ACCEPTED": 0,
+          "REJECTED": 2,
+          "DECISION_INDETERMINATE": 19
+        }
+      },
+      {
+        "id": "valid-high-vertex-outline-4096",
+        "polygonEdges": 4096,
+        "coldMs": 1256.8909999999996,
+        "warmMs": {
+          "median": 5.822000000000116,
+          "p95": 6.204916000002413,
+          "max": 6.46941599999991
+        },
+        "sizeRungs": 21,
+        "outputRegistrations": 0,
+        "statusCounts": {
+          "ACCEPTED": 0,
+          "REJECTED": 1,
+          "DECISION_INDETERMINATE": 20
+        }
+      }
+    ],
+    "warmAggregateMs": {
+      "median": 2.393666000000053,
+      "p95": 11.586166999997658,
+      "max": 12.736124999999447
+    },
+    "sampleCount": 240,
+    "radiiCount": 4,
+    "patternPointCounts": [
+      {
+        "id": "single",
+        "points": 1
+      },
+      {
+        "id": "pair.vertical",
+        "points": 2
+      },
+      {
+        "id": "pair.horizontal",
+        "points": 2
+      },
+      {
+        "id": "row.3",
+        "points": 3
+      },
+      {
+        "id": "column.3",
+        "points": 3
+      },
+      {
+        "id": "square.4",
+        "points": 4
+      },
+      {
+        "id": "l.bottom-left",
+        "points": 3
+      },
+      {
+        "id": "l.bottom-right",
+        "points": 3
+      },
+      {
+        "id": "l.top-left",
+        "points": 3
+      },
+      {
+        "id": "l.top-right",
+        "points": 3
+      },
+      {
+        "id": "t.top1-bottom3",
+        "points": 4
+      }
+    ],
+    "sizeRungsPerSolve": 21
   },
-  "certifiedExactB1Ms": {
-    "median": 0.5304159999999882,
-    "p95": 0.6488339999999937,
-    "max": 0.6719170000000076
+  "compressedArtifactBytes": {
+    "compute": 24613,
+    "logic": 16962,
+    "nextAdapter": 2999
   },
-  "fixtures": {
-    "translationPolygonVertices": 4,
-    "previewSolvePolygonVertices": 12,
-    "certifiedB1Vertices": 4
+  "memoryBytes": {
+    "heapBefore": 7249640,
+    "peakHeapUsed": 147329600,
+    "heapAfter": 54960896,
+    "totalSystem": 34359738368,
+    "freeSystemBefore": 774766592,
+    "freeSystemAfter": 451739648,
+    "interpretation": "process heap is sampled; browser peak memory is not available from this Node harness"
   },
   "notes": [
-    "Results are from this container, not a physical mobile device.",
-    "Final manufacturing legality is exact at the configured integer quantum.",
-    "The all-band figures measure the complete certified 21-rung path; no heuristic preview is substituted.",
-    "Warm measurements use the bounded deterministic outline/profile fingerprint cache permitted by the performance contract.",
+    "Results are from this machine, not a physical mobile device.",
+    "The corpus is the available R3 probe corpus, not the final product-approved typical corpus; Batwoman remains excluded pending approved vector intake.",
+    "Every timed sample creates a new SolveResult and executes all 21 certified rungs; identity reuse is a benchmark failure.",
+    "Only exact intermediate geometry/evidence measurements are warm-cached; no final result, heuristic preview, simplification or rung skipping is used.",
+    "Tangency/intrusion, mixed parity and empty/multi-component correctness remain measured by the supporting-operation and regression suites.",
     "Certification may return DECISION_INDETERMINATE rather than guess."
   ],
   "gates": {

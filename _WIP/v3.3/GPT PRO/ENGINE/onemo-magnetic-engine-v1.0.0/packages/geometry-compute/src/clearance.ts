@@ -13,6 +13,11 @@ function nearestPointOnSegment(point:Point,a:Point,b:Point):{point:Point;distanc
 export function clearanceAtPoint(polygon:PreparedPolygon,point:Point):ClearanceResult{
   const location=pointLocationPreparedNumber(polygon,point);
   let best=Infinity,bestPoint={x:NaN,y:NaN},bestIndex=-1;
+  if(polygon.edges.length<=32){
+    for(const edge of polygon.edges){const hit=nearestPointOnSegment(point,edge.a,edge.b);if(hit.distanceSquared<best){best=hit.distanceSquared;bestPoint=hit.point;bestIndex=edge.index;}}
+    const clearance=Math.sqrt(best),signed=location==='OUTSIDE'?-clearance:location==='BOUNDARY'?0:clearance;
+    return{point,location,signedClearanceMm:signed,clearanceMm:clearance,nearestBoundaryPoint:bestPoint,nearestEdgeIndex:bestIndex,exactness:'CERTIFIED_APPROXIMATE'};
+  }
   const bins=polygon.edgeIndex.bins.map((_,index)=>index).sort((left,right)=>{
     const distance=(bin:number)=>{const min=polygon.edgeIndex.minY+bin*polygon.edgeIndex.binHeight,max=min+polygon.edgeIndex.binHeight;return point.y<min?min-point.y:point.y>max?point.y-max:0;};
     return distance(left)-distance(right)||left-right;

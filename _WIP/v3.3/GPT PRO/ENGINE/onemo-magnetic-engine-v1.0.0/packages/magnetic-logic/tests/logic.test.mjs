@@ -47,11 +47,11 @@ test('same input and artifact identities produce byte-identical canonical result
   const p=singleRungProfile();const a=await solveOutline({outlineMm:rectangle(24,24),profile:p});const b=await solveOutline({outlineMm:rectangle(24,24),profile:p});assert.equal(a.canonicalHash,b.canonicalHash);assert.deepEqual(a.offers,b.offers);
 });
 
-test('warm solves use a bounded fingerprint cache that is explicitly clearable',async()=>{
+test('warm solves reuse only prepared source data and recompute certified rungs',async()=>{
   const profile=singleRungProfile(),outline=rectangle(24,24);clearSolverCaches();
   const cold=await solveOutline({outlineMm:outline,profile});
   const warm=await solveOutline({outlineMm:structuredClone(outline),profile});
-  assert.equal(warm,cold);
+  assert.notEqual(warm,cold);assert.deepEqual(warm,cold);
   assert.throws(()=>warm.offers.push({}),TypeError);
   clearSolverCaches();
   const rebuilt=await solveOutline({outlineMm:outline,profile});

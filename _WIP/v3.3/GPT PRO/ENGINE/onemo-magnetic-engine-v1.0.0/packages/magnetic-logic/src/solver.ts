@@ -1,16 +1,15 @@
-import { COMPUTE_ARTIFACT_HASH, canonicalHash, preparePolygon } from '@onemo/geometry-compute';
+import { COMPUTE_ARTIFACT_HASH, canonicalHash, clearAdaptiveFeasibilityCache, clearComponentHierarchyCache, clearCriterionCaches, clearOptimizationCaches, preparePolygon } from '@onemo/geometry-compute';
 import type { BandOffer, RegisteredProfile, SizeFailure, SizeSolution, SolveInput, SolveResult } from './contracts.js';
 import { LOGIC_ARTIFACT_HASH } from './artifact.js';
-import { certifyPreparedSizeSolution } from './certified-solver.js';
+import { certifyPreparedSizeSolution, clearCertifiedSolverCaches } from './certified-solver.js';
 import { registerProfile } from './profile-registry.js';
 import { candidateSizes } from './size-domain.js';
 
 const CACHE_LIMIT=16;
-const solveCache=new Map<string,SolveResult>();
 const sourceCache=new Map<string,ReturnType<typeof preparePolygon>>();
 function remember<T>(cache:Map<string,T>,key:string,value:T):T{cache.delete(key);cache.set(key,value);if(cache.size>CACHE_LIMIT)cache.delete(cache.keys().next().value!);return value;}
 function deepFreeze<T>(value:T,seen=new Set<object>()):T{if(value&&typeof value==='object'){if(seen.has(value as object))return value;seen.add(value as object);for(const child of Object.values(value as Record<string,unknown>))deepFreeze(child,seen);Object.freeze(value);}return value;}
-export function clearSolverCaches():void{solveCache.clear();sourceCache.clear();}
+export function clearSolverCaches():void{sourceCache.clear();clearCertifiedSolverCaches();clearAdaptiveFeasibilityCache();clearComponentHierarchyCache();clearCriterionCaches();clearOptimizationCaches();}
 
 function solveSizeSequence(source:ReturnType<typeof preparePolygon>,profile:RegisteredProfile):(SizeSolution|SizeFailure)[]{
   return candidateSizes(profile).map(targetDominantMm=>certifyPreparedSizeSolution(source,profile,targetDominantMm));
@@ -37,7 +36,6 @@ export function solveOutlineSync(input:SolveInput):SolveResult{
   const profile=registerProfile(input.profile);
   if(profile.approvalState!=='approved')throw new Error('PROFILE_UNAPPROVED');
   const sourceKey=canonicalHash({outlineMm:input.outlineMm,quantumMm:profile.numeric.coordinateQuantumMm,maxVertices:profile.numeric.maxVertices});
-  const solveKey=`${profile.profileHash}:${sourceKey}`;const cached=solveCache.get(solveKey);if(cached){solveCache.delete(solveKey);solveCache.set(solveKey,cached);return cached;}
   const source=sourceCache.get(sourceKey)??remember(sourceCache,sourceKey,preparePolygon(input.outlineMm,{quantumMm:profile.numeric.coordinateQuantumMm,maxVertices:profile.numeric.maxVertices}));
   const evaluated=solveSizeSequence(source,profile);
   const offers=buildCertifiedBandOffers(evaluated,profile);
@@ -52,7 +50,7 @@ export function solveOutlineSync(input:SolveInput):SolveResult{
     evaluated,
     offers
   };
-  return remember(solveCache,solveKey,deepFreeze({...payload,canonicalHash:canonicalHash(payload)}));
+  return deepFreeze({...payload,canonicalHash:canonicalHash(payload)});
 }
 
 export async function solveOutline(input:SolveInput):Promise<SolveResult>{return solveOutlineSync(input);}

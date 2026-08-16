@@ -2,6 +2,8 @@ import { canonicalHash, canonicalJson } from '@onemo/geometry-compute';
 import type { ProductProfile, RegisteredProfile } from './contracts.js';
 import { validateProfile } from './profile-schema.js';
 
+const registeredProfiles=new WeakSet<object>();
+
 function deepFreeze<T>(value:T,seen=new Set<object>()):T{
   if(value&&typeof value==='object'){
     if(seen.has(value as object))return value;seen.add(value as object);
@@ -16,10 +18,11 @@ export function profileCanonicalPayload(profile:ProductProfile):unknown{
 }
 
 export function registerProfile(profile:ProductProfile):RegisteredProfile{
+  if(registeredProfiles.has(profile as object))return profile as RegisteredProfile;
   const validation=validateProfile(profile);if(!validation.valid)throw new Error(`invalid profile: ${validation.errors.join('; ')}`);
   const hash=canonicalHash(profileCanonicalPayload(profile));
   if(profile.profileHash&&profile.profileHash!==hash)throw new Error(`profile hash mismatch: expected ${profile.profileHash}, computed ${hash}`);
-  return deepFreeze({...profile,profileHash:hash}) as RegisteredProfile;
+  const registered=deepFreeze({...profile,profileHash:hash}) as RegisteredProfile;registeredProfiles.add(registered as object);return registered;
 }
 
 export class ProfileRegistry{

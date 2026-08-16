@@ -166,6 +166,7 @@ export function edgeIndicesNearY(polygon:PreparedPolygon,y:number,maxDistance=In
 
 export function pointLocationPreparedNumber(polygon:PreparedPolygon,point:Point):'INSIDE'|'OUTSIDE'|'BOUNDARY'{
   const bounds=polygon.metrics.bounds;if(point.y<bounds.minY||point.y>bounds.maxY||point.x<bounds.minX||point.x>bounds.maxX)return'OUTSIDE';
+  if(polygon.edges.length<=32)return pointLocationNumber(polygon.ringMm,point);
   let winding=0;for(const index of edgeIndicesNearY(polygon,point.y,0)){
     const {a,b,dx,dy}=polygon.edges[index]!;const cross=dx*(point.y-a.y)-dy*(point.x-a.x);const dot=(point.x-a.x)*dx+(point.y-a.y)*dy;
     if(Math.abs(cross)<=1e-10*Math.max(1,Math.hypot(dx,dy))&&dot>=-1e-10&&dot<=dx*dx+dy*dy+1e-10)return'BOUNDARY';
@@ -175,6 +176,7 @@ export function pointLocationPreparedNumber(polygon:PreparedPolygon,point:Point)
 
 export function pointLocationPreparedInt(polygon:PreparedPolygon,point:IntPoint):'INSIDE'|'OUTSIDE'|'BOUNDARY'{
   const mm=dequantizePoint(point,polygon.quantumMm),bounds=polygon.metrics.bounds;if(mm.y<bounds.minY||mm.y>bounds.maxY||mm.x<bounds.minX||mm.x>bounds.maxX)return'OUTSIDE';
+  if(polygon.edges.length<=32)return pointLocationInt(polygon.ringInt,point);
   let winding=0;for(const index of edgeIndicesNearY(polygon,mm.y,0)){
     const a=polygon.ringInt[index]!,b=polygon.ringInt[(index+1)%polygon.ringInt.length]!;
     if(pointOnSegmentInt(point,a,b))return'BOUNDARY';
@@ -197,6 +199,6 @@ export function centrePolygon(polygon:PreparedPolygon):PreparedPolygon{
 export function scaleToDominantDimension(polygon:PreparedPolygon,targetMm:number):PreparedPolygon{
   if(!Number.isFinite(targetMm)||targetMm<=0)throw new ComputeError('INVALID_OUTLINE','target dimension must be finite and positive',{targetMm});
   const scale=targetMm/polygon.metrics.dominantDimension;
-  const scaled=transformPolygon(polygon,{scale,origin:polygon.metrics.boundsCenter});
-  return centrePolygon(scaled);
+  const centre=polygon.metrics.boundsCenter;
+  return transformPolygon(polygon,{scale,origin:centre,translation:{x:-centre.x,y:-centre.y}});
 }

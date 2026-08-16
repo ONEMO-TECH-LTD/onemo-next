@@ -36,7 +36,7 @@ import { registerProfile } from './profile-registry.js';
 import { classifyAxis, overallBand } from './bands.js';
 import { permittedPatterns } from './patterns-permissions.js';
 import { frameFits, framesForPattern, patternCellsForFrame, patternOffsetsMm, translationDomain } from './frames-registration.js';
-import { buildStructuralEvidence, majorRegionEvidence } from './region-policy.js';
+import { buildStructuralEvidence, clearStructuralEvidenceCache, majorRegionEvidence } from './region-policy.js';
 import { criterionDescriptor, criterionTolerances } from './mechanics.js';
 import { selectDiscreteIdentity } from './selection.js';
 
@@ -45,6 +45,17 @@ interface ContinuousCandidate {
   readonly regions: readonly RegionEvidence[];
   readonly trace: readonly CandidateScoreTrace[];
   readonly boxes: readonly AdaptiveBox[];
+}
+
+const SCALED_SOURCE_CACHE_LIMIT=64;
+const scaledSourceCache=new Map<string,ReturnType<typeof scaleToDominantDimension>>();
+export function clearCertifiedSolverCaches():void{scaledSourceCache.clear();clearStructuralEvidenceCache();}
+function scaledSource(source:PreparedPolygon,target:number):ReturnType<typeof scaleToDominantDimension>{
+  const key=`${source.geometryHash}:${target}`;const cached=scaledSourceCache.get(key);
+  if(cached){scaledSourceCache.delete(key);scaledSourceCache.set(key,cached);return cached;}
+  const polygon=scaleToDominantDimension(source,target);scaledSourceCache.set(key,polygon);
+  if(scaledSourceCache.size>SCALED_SOURCE_CACHE_LIMIT)scaledSourceCache.delete(scaledSourceCache.keys().next().value!);
+  return polygon;
 }
 
 function asComponents(score: ScoreInterval | CompoundScoreInterval): readonly ScoreInterval[] {
@@ -191,7 +202,8 @@ function optimiseCriterionAcrossCandidates(
         quantumMm: profile.numeric.coordinateQuantumMm,
         maxDepth: 32,
         witnessIterations: 20
-      }
+      },
+      false
     );
     return { candidate, descriptor, tolerances, result };
   });
@@ -241,7 +253,8 @@ function optimiseCriterionAcrossCandidates(
         quantumMm: profile.numeric.coordinateQuantumMm,
         maxDepth: 32,
         witnessIterations: 20
-      }
+      },
+      false
     );
     if (result.survivingBoxes.length === 0) continue;
     if (result.status !== 'CERTIFIED') {
@@ -282,7 +295,7 @@ export function certifyPreparedSizeSolution(source:PreparedPolygon,profile:Regis
 }
 
 function certifyPreparedSize(source:PreparedPolygon,profile:RegisteredProfile,target:number):SizeSolution|SizeFailure {
-  const polygon = scaleToDominantDimension(source, target);
+  const polygon = scaledSource(source, target);
   const classX = classifyAxis(polygon.metrics.width, profile.sizeDomain.bands);
   const classY = classifyAxis(polygon.metrics.height, profile.sizeDomain.bands);
   const expectedBand = expectedBandForTarget(target, profile);

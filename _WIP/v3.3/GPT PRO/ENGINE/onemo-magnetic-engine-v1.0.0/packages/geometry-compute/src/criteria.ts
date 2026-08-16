@@ -3,6 +3,13 @@ import { capMoment } from './halfplane.js';
 import { dot, normalizeDirection } from './numeric.js';
 import { projectRing } from './measure.js';
 
+type RegionState='ALL'|'SOME'|'NONE';
+const REGION_STATE_CACHE_LIMIT=4096,CRITERION_EVALUATION_CACHE_LIMIT=64;
+let regionStateCache=new WeakMap<RegionEvidence,Map<string,RegionState>>();
+let criterionEvaluationCache=new WeakMap<PreparedPolygon,WeakMap<AdaptiveBox,Map<string,CriterionEvaluation>>>();
+let regionListIdentity=new WeakMap<object,number>(),nextRegionListIdentity=1;
+export function clearCriterionCaches():void{regionStateCache=new WeakMap();criterionEvaluationCache=new WeakMap();regionListIdentity=new WeakMap();nextRegionListIdentity=1;}
+
 function interval(lower:number,upper:number):ScoreInterval{return{lower:Math.min(lower,upper),upper:Math.max(lower,upper)};}
 function compound(...components:ScoreInterval[]):CompoundScoreInterval{return{components};}
 
@@ -44,21 +51,24 @@ function pointCellKeys(region:RegionEvidence,point:Point):readonly string[]{
   return [...new Set(axis(point.x,o.x).flatMap(i=>axis(point.y,o.y).map(j=>`${i},${j}`)))];
 }
 
-function anchorRegionState(box:AdaptiveBox,offset:Point,region:RegionEvidence):'ALL'|'SOME'|'NONE'{
+function anchorRegionState(box:AdaptiveBox,offset:Point,region:RegionEvidence):RegionState{
+  let cache=regionStateCache.get(region);if(!cache){cache=new Map();regionStateCache.set(region,cache);}
+  const cacheKey=`${box.minX},${box.minY},${box.maxX},${box.maxY}:${offset.x},${offset.y}`;const cached=cache.get(cacheKey);if(cached)return cached;
+  const remember=(state:RegionState):RegionState=>{cache!.set(cacheKey,state);if(cache!.size>REGION_STATE_CACHE_LIMIT)cache!.delete(cache!.keys().next().value!);return state;};
   const translated={minX:box.minX+offset.x,minY:box.minY+offset.y,maxX:box.maxX+offset.x,maxY:box.maxY+offset.y};
-  if(translated.maxX<region.bounds.minX||translated.minX>region.bounds.maxX||translated.maxY<region.bounds.minY||translated.minY>region.bounds.maxY)return'NONE';
+  if(translated.maxX<region.bounds.minX||translated.minX>region.bounds.maxX||translated.maxY<region.bounds.minY||translated.minY>region.bounds.maxY)return remember('NONE');
   if(Math.abs(translated.maxX-translated.minX)<=1e-12&&Math.abs(translated.maxY-translated.minY)<=1e-12){
     const point={x:translated.minX,y:translated.minY};
-    if(region.exactWitnessPoints.some(witness=>Math.abs(witness.x-point.x)<=1e-12&&Math.abs(witness.y-point.y)<=1e-12))return'ALL';
+    if(region.exactWitnessPoints.some(witness=>Math.abs(witness.x-point.x)<=1e-12&&Math.abs(witness.y-point.y)<=1e-12))return remember('ALL');
     const candidates=pointCellKeys(region,point);
-    if(candidates.some(key=>region.definitelyOccupiedCellKeys.has(key)))return'ALL';
-    return candidates.some(key=>region.possiblyOccupiedCellKeys.has(key))?'SOME':'NONE';
+    if(candidates.some(key=>region.definitelyOccupiedCellKeys.has(key)))return remember('ALL');
+    return remember(candidates.some(key=>region.possiblyOccupiedCellKeys.has(key))?'SOME':'NONE');
   }
   const range=overlappedCellRange(region,translated);let any=false,all=true;
   for(let j=range.minJ;j<=range.maxJ;j++)for(let i=range.minI;i<=range.maxI;i++){
     const key=`${i},${j}`;any ||= region.possiblyOccupiedCellKeys.has(key);all &&= region.definitelyOccupiedCellKeys.has(key);
   }
-  return all&&any?'ALL':any?'SOME':'NONE';
+  return remember(all&&any?'ALL':any?'SOME':'NONE');
 }
 
 function coverageIntervals(box:AdaptiveBox,offsets:readonly Point[],regions:readonly RegionEvidence[],subset?:ReadonlySet<string>):{coverage:ScoreInterval;outside:ScoreInterval;loads:{lower:number;upper:number}[]}{
@@ -82,7 +92,7 @@ function coverageIntervals(box:AdaptiveBox,offsets:readonly Point[],regions:read
   return{coverage:interval(coverageLower,coverageUpper),outside:interval(outsideLower,outsideUpper),loads};
 }
 
-export function evaluateCriterionOnBox(
+function evaluateCriterionOnBoxUncached(
   polygon:PreparedPolygon,
   offsets:readonly Point[],
   box:AdaptiveBox,
@@ -146,4 +156,20 @@ export function evaluateCriterionOnBox(
     }
     default:{const neverDescriptor:never=descriptor;throw new TypeError(`unsupported descriptor ${(neverDescriptor as {id?:string}).id??'unknown'}`);}
   }
+}
+
+export function evaluateCriterionOnBox(
+  polygon:PreparedPolygon,
+  offsets:readonly Point[],
+  box:AdaptiveBox,
+  descriptor:GeometryCriterionDescriptor
+):CriterionEvaluation{
+  if(descriptor.id!=='REGION_COVERAGE_V1'&&descriptor.id!=='REGION_SUBSET_COVERAGE_V1'&&descriptor.id!=='REGION_MAX_LOAD_V1')return evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);
+  let polygonCache=criterionEvaluationCache.get(polygon);if(!polygonCache){polygonCache=new WeakMap();criterionEvaluationCache.set(polygon,polygonCache);}
+  let cache=polygonCache.get(box);if(!cache){cache=new Map();polygonCache.set(box,cache);}
+  let regions=regionListIdentity.get(descriptor.regions as object);if(!regions){regions=nextRegionListIdentity++;regionListIdentity.set(descriptor.regions as object,regions);}
+  const subset=descriptor.id==='REGION_SUBSET_COVERAGE_V1'?descriptor.subsetIds.join(','):'';
+  const key=`${descriptor.id}:${regions}:${subset}:${offsets.map(offset=>`${offset.x},${offset.y}`).join(';')}`;
+  const cached=cache.get(key);if(cached){cache.delete(key);cache.set(key,cached);return cached;}
+  const evaluation=evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);cache.set(key,evaluation);if(cache.size>CRITERION_EVALUATION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return evaluation;
 }

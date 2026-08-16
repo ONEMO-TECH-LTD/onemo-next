@@ -3,7 +3,14 @@ import {
 } from '@onemo/geometry-compute';
 import type { RegionClassification, RegisteredProfile, StructuralEvidence } from './contracts.js';
 
+const STRUCTURAL_CACHE_LIMIT=64;
+const structuralCache=new Map<string,StructuralEvidence>();
+let majorRegionCache=new WeakMap<StructuralEvidence,readonly RegionEvidence[]>();
+export function clearStructuralEvidenceCache():void{structuralCache.clear();majorRegionCache=new WeakMap();}
+
 export function buildStructuralEvidence(polygon:PreparedPolygon,profile:RegisteredProfile):StructuralEvidence{
+  const cacheKey=`${polygon.geometryHash}:${profile.profileHash}`;const cached=structuralCache.get(cacheKey);
+  if(cached){structuralCache.delete(cacheKey);structuralCache.set(cacheKey,cached);return cached;}
   const levels=profile.structural.clearanceSurplusLevelsMm.map(x=>profile.safety.effectiveVerificationRadiusMm+x);
   const hierarchy=buildComponentHierarchy(polygon,levels,profile.structural.sampleStepMm);
   const base=hierarchy.components.filter(c=>c.levelIndex===0);
@@ -25,9 +32,12 @@ export function buildStructuralEvidence(polygon:PreparedPolygon,profile:Register
   });
   const reasons:string[]=[];
   if(classifications.some(c=>c.class==='UNCLASSIFIED_NEAR_TOLERANCE'))reasons.push('COMPONENT_TOPOLOGY_UNCERTAIN','REGION_CLASSIFICATION_UNCERTAIN');
-  return{hierarchy,classifications:Object.freeze(classifications),status:reasons.length?'INDETERMINATE':'CERTIFIED',reasons:Object.freeze(reasons)};
+  const evidence:StructuralEvidence={hierarchy,classifications:Object.freeze(classifications),status:reasons.length?'INDETERMINATE':'CERTIFIED',reasons:Object.freeze(reasons)};
+  structuralCache.set(cacheKey,evidence);if(structuralCache.size>STRUCTURAL_CACHE_LIMIT)structuralCache.delete(structuralCache.keys().next().value!);return evidence;
 }
 
-export function majorRegionEvidence(evidence:StructuralEvidence):RegionEvidence[]{
-  return evidence.classifications.filter(c=>c.class==='MAJOR').map(c=>componentToRegionEvidence(evidence.hierarchy,c.component));
+export function majorRegionEvidence(evidence:StructuralEvidence):readonly RegionEvidence[]{
+  const cached=majorRegionCache.get(evidence);if(cached)return cached;
+  const regions=Object.freeze(evidence.classifications.filter(c=>c.class==='MAJOR').map(c=>componentToRegionEvidence(evidence.hierarchy,c.component)));
+  majorRegionCache.set(evidence,regions);return regions;
 }

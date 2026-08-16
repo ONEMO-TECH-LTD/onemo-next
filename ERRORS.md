@@ -225,3 +225,15 @@
   `python3`; manifest verification and all four archive integrity checks then passed.
 - Remember: filesystem paths from `import.meta.url` must use `fileURLToPath`, and macOS release
   scripts must call the installed `python3` executable explicitly.
+
+## 2026-08-16 — cached final solves hid certified all-band cost
+
+- Failed: a final `SolveResult` cache reported sub-frame timings without executing the 21-rung solve;
+  removing it exposed 44–47 ms prepared-source runs, and generic box refinement made square/circle
+  corpus cases far slower.
+- Worked: retain only bounded immutable intermediate evidence, use exact axis/cardinal mechanics
+  restrictions, and skip Logic-requested witness material that Logic discards while preserving final
+  registration and exact containment proofs. The eight-fixture available R3 corpus then passed on
+  fresh result objects.
+- Remember: a warm benchmark must assert result identity changes and name every retained cache; time
+  the governed computation, not a cached answer.

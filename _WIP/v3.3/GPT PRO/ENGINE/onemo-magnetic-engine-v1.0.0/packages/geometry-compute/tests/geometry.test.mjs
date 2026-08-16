@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
+  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, clearComponentHierarchyCache, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
   criticalTranslationCandidates, discContainedExact, finalRegistrationTieBreak, generateLattice, possiblyEquivalentToAnchor,
-  evaluateCriterionOnBox, preparePolygon, scaleToDominantDimension
+  evaluateCriterionOnBox, optimizeCriterion, preparePolygon, scaleToDominantDimension
 } from '../dist/src/index.js';
 
 const q=0.01;
@@ -48,7 +48,21 @@ test('adaptive translation preserves continuous vertical pair feasibility',()=>{
   const p=preparePolygon([{x:-20,y:-50},{x:20,y:-50},{x:20,y:50},{x:-20,y:50}],{quantumMm:q});
   const set=adaptiveFeasibleTranslations(p,[{x:0,y:-24},{x:0,y:24}],12,{minX:-24,minY:-24,maxX:24,maxY:24},{toleranceMm:0.05,maxCells:20000,quantumMm:q});
   assert.equal(set.status,'FEASIBLE');
+  assert.equal(set.exactness,'EXACT');assert.equal(set.cellsVisited,1);
+  assert.deepEqual(set.insideBoxes.map(({minX,minY,maxX,maxY})=>({minX,minY,maxX,maxY})),[{minX:-8,minY:-14,maxX:8,maxY:14}]);
   assert.ok(set.witnessPoints.some(point=>Math.abs(point.x)<q&&Math.abs(point.y)<q));
+});
+
+test('axis-aligned mechanics use exact closed-form optimum restrictions',()=>{
+  const polygon=preparePolygon([{x:-50,y:-50},{x:50,y:-50},{x:50,y:50},{x:-50,y:50}],{quantumMm:q});
+  const boxes=[{minX:-10,minY:-10,maxX:10,maxY:10,depth:0,status:'INSIDE',id:'domain'}];
+  const options={toleranceMm:.01,maxCells:20000,quantumMm:q};
+  const cap=optimizeCriterion(polygon,[{x:0,y:0}],0,boxes,{id:'CAP_FIRST_MOMENT_V1',direction:{x:0,y:1}},[100],options);
+  assert.equal(cap.status,'CERTIFIED');assert.equal(cap.refinements,0);assert.deepEqual(cap.optimum,{lower:80000,upper:80000});
+  const overhang=optimizeCriterion(polygon,[{x:0,y:0}],0,boxes,{id:'MAX_DIRECTIONAL_OVERHANG_V1',directions:[{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0}]},[q],options);
+  assert.equal(overhang.status,'CERTIFIED');assert.equal(overhang.refinements,0);assert.deepEqual(overhang.optimum,{lower:50,upper:50});
+  const balance=optimizeCriterion(polygon,[{x:0,y:0}],0,boxes,{id:'ANCHOR_CENTROID_BALANCE_V1',materialCentroid:{x:0,y:0},lateralDirection:{x:1,y:0}},[q,2.01],options);
+  assert.deepEqual(balance.optimum,{components:[{lower:0,upper:0},{lower:0,upper:0}]});
 });
 
 test('multi-clearance hierarchy removes narrow branches before broad mass',()=>{
@@ -56,6 +70,14 @@ test('multi-clearance hierarchy removes narrow branches before broad mass',()=>{
   const hierarchy=buildComponentHierarchy(p,[12,16,20],2);
   assert.ok(hierarchy.components.some(c=>c.levelIndex===0));
   assert.ok(hierarchy.components.filter(c=>c.levelIndex===2).length<=hierarchy.components.filter(c=>c.levelIndex===0).length);
+});
+
+test('component hierarchy cache is bounded intermediate evidence and explicitly clearable',()=>{
+  const p=preparePolygon(dumbbell,{quantumMm:q});clearComponentHierarchyCache();
+  const first=buildComponentHierarchy(p,[12,16,20],2),warm=buildComponentHierarchy(p,[12,16,20],2);
+  assert.equal(warm,first);
+  clearComponentHierarchyCache();const rebuilt=buildComponentHierarchy(p,[12,16,20],2);
+  assert.notEqual(rebuilt,first);assert.deepEqual(rebuilt,first);
 });
 
 test('lower-dimensional safe point remains explicit in the component hierarchy',()=>{

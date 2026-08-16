@@ -1,25 +1,27 @@
 # Benchmark report
 
-The current machine/runtime is recorded in `benchmark-results.json`; it is not a physical mobile device.
+`benchmark-results.json` is the authoritative machine-readable result. This is a Node measurement on the recorded Apple M1 Max, not a physical-mobile result.
 
-Latest measured warm results are stored in `benchmark-results.json`.
+## Certified all-band result
 
-## Current result
+- Corpus: the available R3 probe corpus—square, both long rectangles, the approved 64-edge test circle, concave notch, narrow neck, thin terminal limb and a valid 4,096-edge outline.
+- Batwoman is excluded pending approved vector intake; this is not labeled the final product-approved typical corpus.
+- Each sample returns a new immutable `SolveResult` and independently executes all 21 configured rungs.
+- A repeated object identity is a benchmark failure, preventing final-result-cache substitution.
+- Warm state retains bounded registered-profile, prepared/scaled-source, safe-region, component-hierarchy and region-measurement caches. No final solve result is retained.
+- Median: 2.448 ms.
+- p95: 11.022 ms.
+- Maximum: 54.114 ms (one high-vertex outlier; the gated p95 remains below 16 ms).
+- The median and p95 pass the 16 ms gate.
 
-- Neutral single-point translation feasibility: sub-millisecond median.
-- Complete certified 21-rung solve, cold: measured separately and reported without claiming a frame-budget pass.
-- Complete certified 21-rung solve, warm from the bounded outline/profile fingerprint cache: median and p95 both below the 16 ms target.
-- Compiled ESM compressed as one concatenated gzip stream:
-  - Compute: approximately 17 KB;
-  - Logic: approximately 13 KB;
-  - Next adapter: approximately 2 KB.
+Cold results are recorded separately per fixture in `benchmark-results.json`; the circle cold path is materially slower and is not represented as a frame-budget pass.
 
-## Gate interpretation
+## Required evidence
 
-The payload targets and the 16 ms warm typical all-band gate pass on the recorded machine. The measured path is the certified solver; no heuristic preview is substituted. High-vertex cold solves remain slower and are reported separately from the warm gate. No physical-mobile number is claimed.
+The JSON record includes runtime, OS, CPU, installed Chromium version, warm/cold state, warmup and sample counts, polygon edge counts, four structural radii, pattern point counts, 21 size rungs, output-registration counts, median/p95/maximum, exact compressed bytes, and sampled process-memory data. Tangency/intrusion, mixed parity and empty/multi-component cases remain in supporting-operation/correctness measurements. WebKit and physical-device memory/performance remain explicitly unmeasured.
 
-## Benchmark modes
+Exact compressed ESM sizes from `bundle-size-results.json`:
 
-- Cold mode clears the bounded caches before one complete solve.
-- Warm mode repeats the same certified solve through the deterministic outline/profile fingerprint cache.
-- Selected-size certification is measured independently and may return `DECISION_INDETERMINATE` rather than guess.
+- Compute: 24,613 bytes.
+- Logic: 16,962 bytes.
+- Next adapter: 2,999 bytes.
