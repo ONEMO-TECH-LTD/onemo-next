@@ -1,5 +1,5 @@
 import type { EngineManufacturingSpec, RegisteredProfile, SizeSolution, SolveResult } from '@onemo/magnetic-logic';
-import { candidateSizes, certifySizeSolution, createEngineManufacturingSpec, selectedOffer } from '@onemo/magnetic-logic';
+import { candidateSizes, certifySizeSolution, createEngineManufacturingSpec, selectedOffer, sourceGeometryIdentity } from '@onemo/magnetic-logic';
 import type { StudioPoint } from './outline-adapter.js';
 import { adaptStudioOutline } from './outline-adapter.js';
 
@@ -24,8 +24,11 @@ export function certifyAndBindSelectedBand(
   const bandDefinition=profile.sizeDomain.bands.find(candidate=>candidate.id===selected.band);
   const smallerRungs=candidateSizes(profile).filter(size=>size<selected.targetDominantMm&&bandDefinition&&size>=bandDefinition.minMm-1e-12&&(bandDefinition.maxInclusive?size<=bandDefinition.maxMm+1e-12:size<bandDefinition.maxMm-1e-12));
   if(smallerRungs.some(size=>!preview.evaluated.some(item=>item.band===selected.band&&item.targetDominantMm===size&&item.status==='REJECTED')))throw new Error('SMALLEST_ACCEPTED_RUNG_NOT_CERTIFIED');
+  const outlineMm=adaptStudioOutline(studioOutline, adapter);
+  const source=sourceGeometryIdentity(outlineMm,profile);
+  if(source.sourceGeometryHash!==preview.sourceGeometryHash||JSON.stringify(source.sourceRingInt)!==JSON.stringify(preview.sourceRingInt))throw new Error('SOURCE_GEOMETRY_MISMATCH');
   const certified = certifySizeSolution({
-    outlineMm: adaptStudioOutline(studioOutline, adapter),
+    outlineMm,
     profile,
     targetDominantMm: selected.targetDominantMm
   });

@@ -148,7 +148,7 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
   if(profile.engineeringAssumptions.some(value=>!nonEmpty(value)))errors.push('engineering assumptions must be non-empty strings');
   if(profile.productionReady){
     if(profile.approvalState!=='approved'||profile.engineeringAssumptions.length>0)errors.push('unresolved production assumptions prevent production readiness');
-    errors.push('production profile incomplete R3 authority: later Fulfilment, Regression, and approval-trace groups are not implemented');
+    errors.push('production profile incomplete R3 authority: later Regression and approval-trace groups are not implemented');
   }
   return{valid:errors.length===0,errors:Object.freeze(errors)};
 }

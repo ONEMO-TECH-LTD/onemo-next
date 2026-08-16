@@ -29,5 +29,6 @@ export class ProfileRegistry{
     const matches=[...this.#profiles.values()].filter(p=>p.id===id&&(version===undefined||p.version===version)).sort((a,b)=>b.version-a.version);
     const profile=matches[0];if(!profile)throw new Error(`profile not found: ${id}${version?`@${version}`:''}`);return profile;
   }
+  public resolvePinned(id:string,hash:string):RegisteredProfile|undefined{return[...this.#profiles.values()].find(profile=>profile.id===id&&profile.profileHash===hash);}
   public canonicalBytes(profile:RegisteredProfile):string{return canonicalJson(profileCanonicalPayload(profile));}
 }

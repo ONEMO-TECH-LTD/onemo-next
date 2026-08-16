@@ -118,6 +118,7 @@ export interface BandOffer {readonly band:BandId;readonly solution?:SizeSolution
 export interface SolveResult {
   readonly schema:'onemo-magnetic-solve-v1';readonly profileId:string;readonly profileHash:string;
   readonly computeArtifactHash:string;readonly logicArtifactHash:string;readonly sourceGeometryHash:string;
+  readonly sourceRingInt:readonly (readonly [number,number])[];
   readonly evaluated:readonly (SizeSolution|SizeFailure)[];readonly offers:readonly BandOffer[];
   readonly canonicalHash:string;
 }
@@ -127,13 +128,17 @@ export interface SolveInput {readonly outlineMm:readonly Point[];readonly profil
 export interface EngineManufacturingSpec {
   readonly schema:'onemo-engine-manufacturing-spec-v1';readonly schemaVersion:1;
   readonly computeArtifactHash:string;readonly logicArtifactHash:string;readonly profileId:string;readonly profileHash:string;
-  readonly sourceGeometryHash:string;readonly finalGeometryHash:string;readonly finalRingInt:readonly (readonly [number,number])[];
-  readonly widthMm:number;readonly heightMm:number;readonly scale:number;readonly coordinateQuantumMm:number;
+  readonly sourceGeometryHash:string;readonly sourceRingInt:readonly (readonly [number,number])[];
+  readonly finalGeometryHash:string;readonly finalRingInt:readonly (readonly [number,number])[];
+  readonly targetDominantMm:number;readonly widthMm:number;readonly heightMm:number;readonly scale:number;readonly coordinateQuantumMm:number;
+  readonly canonicalOrigin:'SOURCE_BOUNDS_CENTER';readonly axisConvention:'X_RIGHT_Y_UP';
   readonly band:BandId;readonly populationId:string;readonly populationStrideCells:number;
   readonly populationOriginParity:readonly [number,number];readonly frameId:string;readonly patternId:string;
+  readonly patternVersion:number;readonly patternVariantId:string;
   readonly registration:Point;readonly selectedCellAddresses:readonly (readonly [number,number])[];
-  readonly centres:readonly MagnetCentre[];readonly baseProtectedRadiusMm:number;readonly effectiveVerificationRadiusMm:number;
-  readonly toleranceCompositionRuleId:string;readonly approximationToleranceMm:number;readonly minimumMarginMm:number;
+  readonly centreCoordinatesInt:readonly (readonly [number,number])[];readonly centres:readonly MagnetCentre[];
+  readonly baseProtectedRadiusMm:number;readonly effectiveVerificationRadiusMm:number;
+  readonly toleranceCompositionRuleId:string;readonly approximationToleranceMm:number;readonly approximationErrorEnvelopeMm:0;readonly minimumMarginMm:number;
   readonly decisionTrace:readonly CandidateScoreTrace[];readonly decisionProof:SizeSolution['decisionProof'];
   readonly proofStatus:'CERTIFIED_CONTINUOUS_OPTIMUM_EXACT_AT_QUANTUM'|'REFERENCE_PROFILE_NOT_PRODUCTION'|'INTERACTIVE_RESULT_NOT_CERTIFIED_FOR_PRODUCTION';
   readonly canonicalHash:string;
@@ -147,7 +152,9 @@ export interface PhysicalComponentProfile {
 
 export interface FulfilmentManufacturingSpec {
   readonly schema:'onemo-fulfilment-manufacturing-spec-v1';readonly engineSpec:EngineManufacturingSpec;
-  readonly physicalComponent:PhysicalComponentProfile;readonly verificationStatus:'VERIFIED';readonly canonicalHash:string;
+  readonly physicalComponent:PhysicalComponentProfile;
+  readonly verifierComputeArtifactHash:string;readonly verifierLogicArtifactHash:string;
+  readonly verificationStatus:'VERIFIED';readonly canonicalHash:string;
 }
 
 export interface SolverContext {

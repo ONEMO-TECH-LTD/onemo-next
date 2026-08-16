@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildCertifiedBandOffers, buildStructuralEvidence, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
-  criterionDescriptor, LOGIC_ARTIFACT_HASH, permittedPatterns, registerProfile, selectedOffer, selectDiscreteIdentity, solveOutline, verifyEngineManufacturingSpec
+  criterionDescriptor, currentManufacturingVerificationResolver, LOGIC_ARTIFACT_HASH, permittedPatterns, ProfileRegistry, registerProfile, selectedOffer,
+  selectDiscreteIdentity, solveOutline, validatePhysicalComponentProfile, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
 import * as logic from '../dist/src/index.js';
-import {preparePolygon} from '../../geometry-compute/dist/src/index.js';
+import {canonicalHash,preparePolygon} from '../../geometry-compute/dist/src/index.js';
 
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
 const dumbbell=[{x:-50,y:-30},{x:-10,y:-30},{x:-10,y:-11.9},{x:20,y:-11.9},{x:20,y:-12},{x:44,y:-12},{x:44,y:12},{x:20,y:12},{x:20,y:11.9},{x:-10,y:11.9},{x:-10,y:30},{x:-50,y:30}];
@@ -48,8 +49,55 @@ test('same input and artifact identities produce byte-identical canonical result
 
 test('engine ManufacturingSpec round-trips and exact re-verifies',async()=>{
   const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const solution=selectedOffer(result,'B1');const spec=createEngineManufacturingSpec(result,solution,p);const verified=verifyEngineManufacturingSpec(spec,p);assert.equal(verified.valid,true);assert.equal(spec.proofStatus,'REFERENCE_PROFILE_NOT_PRODUCTION');
+  assert.deepEqual(spec.sourceRingInt,result.sourceRingInt);assert.equal(spec.targetDominantMm,solution.targetDominantMm);
+  assert.equal(spec.canonicalOrigin,'SOURCE_BOUNDS_CENTER');assert.equal(spec.axisConvention,'X_RIGHT_Y_UP');
   assert.equal(spec.populationStrideCells,2);assert.deepEqual(spec.populationOriginParity,[0,0]);
+  assert.equal(spec.patternVersion,1);assert.equal(spec.patternVariantId,'default');assert.equal(spec.approximationErrorEnvelopeMm,0);
+  assert.equal(spec.centreCoordinatesInt.length,spec.centres.length);
   assert.deepEqual(spec.decisionTrace.slice(-2).map(trace=>trace.criterionId),['M09_DISCRETE_ID','M10_REGISTRATION_ID']);
+});
+
+test('recomputed canonical hash cannot legitimise inconsistent manufacturing evidence',async()=>{
+  const profile=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile});const spec=createEngineManufacturingSpec(result,selectedOffer(result,'B1'),profile);
+  const forge=changes=>{const value={...structuredClone(spec),...changes};const {canonicalHash:_old,...payload}=value;return{...value,canonicalHash:canonicalHash(payload)};};
+  assert.throws(()=>verifyEngineManufacturingSpec(forge({sourceGeometryHash:'0'.repeat(64)}),profile),/SOURCE_GEOMETRY_MISMATCH/);
+  assert.throws(()=>verifyEngineManufacturingSpec(forge({frameId:'forged',patternId:'forged',populationId:'forged',registration:{x:999,y:999},selectedCellAddresses:[[999,999]],decisionTrace:[]}),profile),/MANUFACTURING_EVIDENCE_MISMATCH/);
+  assert.throws(()=>verifyEngineManufacturingSpec(forge({widthMm:999,heightMm:999,scale:999}),profile),/MANUFACTURING_EVIDENCE_MISMATCH/);
+  assert.throws(()=>verifyEngineManufacturingSpec(forge({effectiveVerificationRadiusMm:0,toleranceCompositionRuleId:''}),profile),/PHYSICAL_TOLERANCE_POLICY_MISSING/);
+  assert.equal('timestamp' in spec,false);
+});
+
+test('historical verification resolves every pinned profile and artifact explicitly',async()=>{
+  const profile=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile});const spec=createEngineManufacturingSpec(result,selectedOffer(result,'B1'),profile);
+  const current=currentManufacturingVerificationResolver(profile);const profiles=new ProfileRegistry();profiles.add(profile);
+  const resolver={...current,resolveProfile:(id,hash)=>profiles.resolvePinned(id,hash)};
+  assert.equal(verifyEngineManufacturingSpec(spec,resolver).valid,true);
+  const historicalCompute='1'.repeat(64),historicalLogic='2'.repeat(64);
+  const historicalPayload={...structuredClone(spec),computeArtifactHash:historicalCompute,logicArtifactHash:historicalLogic};delete historicalPayload.canonicalHash;
+  const historicalSpec={...historicalPayload,canonicalHash:canonicalHash(historicalPayload)};
+  const currentLogic=current.resolveLogicArtifact(spec.logicArtifactHash);
+  const historicalResolver={
+    resolveProfile:(id,hash)=>profiles.resolvePinned(id,hash),
+    resolveComputeArtifact:hash=>hash===historicalCompute?{artifactHash:historicalCompute}:undefined,
+    resolveLogicArtifact:hash=>hash===historicalLogic?{...currentLogic,artifactHash:historicalLogic,computeArtifactHash:historicalCompute}:undefined
+  };
+  assert.throws(()=>verifyEngineManufacturingSpec(historicalSpec,profile),/COMPUTE_ARTIFACT_UNRESOLVABLE/);
+  assert.equal(verifyEngineManufacturingSpec(historicalSpec,historicalResolver).valid,true);
+  assert.throws(()=>verifyEngineManufacturingSpec(spec,{...resolver,resolveProfile:()=>undefined}),/PROFILE_UNRESOLVABLE/);
+  assert.throws(()=>verifyEngineManufacturingSpec(spec,{...resolver,resolveComputeArtifact:()=>undefined}),/COMPUTE_ARTIFACT_UNRESOLVABLE/);
+  assert.throws(()=>verifyEngineManufacturingSpec(spec,{...resolver,resolveComputeArtifact:()=>({artifactHash:'0'.repeat(64)})}),/COMPUTE_ARTIFACT_HASH_MISMATCH/);
+  assert.throws(()=>verifyEngineManufacturingSpec(spec,{...resolver,resolveLogicArtifact:()=>undefined}),/LOGIC_ARTIFACT_UNRESOLVABLE/);
+  const drifted=structuredClone(profile);drifted.grid.cellMm=20;
+  assert.throws(()=>verifyEngineManufacturingSpec(spec,{...resolver,resolveProfile:()=>drifted}),/PROFILE_HASH_MISMATCH/);
+});
+
+test('physical component dimensions and tolerances fail closed',()=>{
+  const valid={id:'magnet-8',version:1,magnetDiameterMm:8,magnetThicknessMm:1,cutToleranceMm:0,placementToleranceMm:0,materialToleranceMm:0,assemblyToleranceMm:0,assemblyProfileId:'assembly-v1'};
+  assert.doesNotThrow(()=>validatePhysicalComponentProfile(valid));
+  assert.throws(()=>validatePhysicalComponentProfile(undefined),/COMPONENT_REFERENCE_MISSING/);
+  for(const mutation of [
+    {magnetDiameterMm:0},{magnetThicknessMm:Infinity},{cutToleranceMm:-1},{placementToleranceMm:NaN},{id:' '},{version:0},{assemblyProfileId:' '}
+  ])assert.throws(()=>validatePhysicalComponentProfile({...valid,...mutation}),/COMPONENT_/);
 });
 
 test('ManufacturingSpec requires certified reconstructed offer authority',async()=>{
@@ -66,7 +114,11 @@ test('ManufacturingSpec requires certified reconstructed offer authority',async(
 
 test('reference profile blocks physical fulfilment until tolerances are supplied',async()=>{
   const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const spec=createEngineManufacturingSpec(result,selectedOffer(result,'B1'),p);
-  assert.throws(()=>completeFulfilmentSpec(spec,p,{id:'demo',version:1,magnetDiameterMm:8,magnetThicknessMm:1,cutToleranceMm:0,placementToleranceMm:0,materialToleranceMm:0,assemblyToleranceMm:0,assemblyProfileId:'demo'}),/REFERENCE_PROFILE_NOT_PRODUCTION/);
+  const physical={id:'demo',version:1,magnetDiameterMm:8,magnetThicknessMm:1,cutToleranceMm:0,placementToleranceMm:0,materialToleranceMm:0,assemblyToleranceMm:0,assemblyProfileId:'demo'};
+  assert.throws(()=>completeFulfilmentSpec(spec,p,physical),/REFERENCE_PROFILE_NOT_PRODUCTION/);
+  assert.throws(()=>completeFulfilmentSpec(spec,p,{...physical,magnetDiameterMm:25}),/COMPONENT_TOLERANCE_INCOMPATIBLE/);
+  assert.throws(()=>completeFulfilmentSpec(spec,p,{...physical,cutToleranceMm:.01}),/COMPONENT_TOLERANCE_INCOMPATIBLE/);
+  assert.throws(()=>completeFulfilmentSpec(spec,p,{...physical,magnetThicknessMm:0}),/COMPONENT_DIMENSIONS_INVALID/);
 });
 
 test('alternate calibrated values reuse the same Compute engine',()=>{

@@ -43,6 +43,7 @@ export async function solveOutline(input:SolveInput):Promise<SolveResult>{
     computeArtifactHash:COMPUTE_ARTIFACT_HASH,
     logicArtifactHash:LOGIC_ARTIFACT_HASH,
     sourceGeometryHash:source.geometryHash,
+    sourceRingInt:Object.freeze(source.ringInt.map(point=>Object.freeze([point.x,point.y] as const))),
     evaluated,
     offers
   };
