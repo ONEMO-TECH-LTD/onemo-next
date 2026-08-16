@@ -14,17 +14,12 @@
 // the implementation's.) The studio's visual design comes from Figma; this invents none.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  createReferenceProfile,
-  currentManufacturingVerificationResolver,
-} from '@onemo/magnetic-logic'
+import { createReferenceProfile } from '@onemo/magnetic-logic'
 import {
   certifyAndBindSelectedBand,
-  parseManufacturingSpec,
   serializeManufacturingSpec,
   ShapeSolutionOverlay,
   useMagneticSolutions,
-  verifyOnServer,
   type CertifiedSelection,
   type StudioPoint,
 } from '@onemo/magnetic-next'
@@ -50,8 +45,10 @@ import {
   resizeShape,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
-import { engineOutline, traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
+import { verifyManufacturingSpecAction } from './actions'
+import { toMagneticStudioOutline } from './engine-boundary'
 import styles from './page.module.css'
 
 /** Presentation only — the order and wording of the law rows. */
@@ -321,16 +318,15 @@ export default function GridEnginePage() {
     // fractions of DIFFERENT sides, and feeding them raw squashed the shape (locked-aspect law).
     const { w: boxW, h: boxH } = box
     setPicked(null)
-    setSubmittedOutline(engineOutline(outline).map(([u, v]) => ({ x: u * boxW, y: v * boxH })))
+    setSubmittedOutline(toMagneticStudioOutline(outline, { w: boxW, h: boxH }))
   }
 
-  const pickBand = (band: string) => {
+  const pickBand = async (band: string) => {
     if (!magnetic.result || !submittedOutline) return
     const bound = certifyAndBindSelectedBand(magnetic.result, band, submittedOutline, profile)
     const serialized = serializeManufacturingSpec(bound.manufacturingSpec)
-    const persisted = parseManufacturingSpec(serialized)
-    verifyOnServer(persisted, currentManufacturingVerificationResolver(profile))
-    const selected = Object.freeze({ solution: bound.solution, manufacturingSpec: persisted })
+    await verifyManufacturingSpecAction(serialized)
+    const selected = Object.freeze({ solution: bound.solution, manufacturingSpec: bound.manufacturingSpec })
     setSize(selected.solution.targetDominantMm)
     setPicked(selected)
     // REALIGN THE ONE LATTICE to this layout — the grid pans to meet the chosen registration
@@ -446,7 +442,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>v3.3.1 · certified</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>v3.3.1 · reference</span></span>
           <span className={styles.readout}>
             {box ? `${Math.round(box.w)} × ${Math.round(box.h)}mm` : `${sizeMM}mm`}
           </span>
@@ -725,7 +721,7 @@ export default function GridEnginePage() {
                     type="button"
                     className={styles.chip}
                     data-on={picked?.solution.band === option.band}
-                    onClick={() => pickBand(option.band)}
+                    onClick={() => void pickBand(option.band)}
                     title={`${option.label} · ${offer.solution.centres.length} magnets · ${offer.solution.patternId}`}
                   >
                     {option.label}
@@ -739,7 +735,13 @@ export default function GridEnginePage() {
             {picked && <ShapeSolutionOverlay className={styles.solutionPreview} solution={picked.solution} coordinateQuantumMm={profile.numeric.coordinateQuantumMm} discRadiusMm={profile.safety.baseProtectedRadiusMm} />}
           </div>
         )}
-        {magnetic.error && <p className={styles.refusal}>{magnetic.error.message}</p>}
+        {magnetic.error && (
+          <p className={styles.refusal}>
+            {'code' in magnetic.error
+              ? `${String(magnetic.error.code)}: ${magnetic.error.message}`
+              : magnetic.error.message}
+          </p>
+        )}
 
         <div className={styles.fixture}>
           <span className={styles.fixtureName}>Size</span>

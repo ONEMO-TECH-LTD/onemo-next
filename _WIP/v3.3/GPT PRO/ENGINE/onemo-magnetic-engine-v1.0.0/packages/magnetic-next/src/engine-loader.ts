@@ -1,5 +1,6 @@
-let enginePromise:Promise<typeof import('@onemo/magnetic-logic')>|undefined;
-export function loadMagneticEngine():Promise<typeof import('@onemo/magnetic-logic')>{
-  enginePromise??=import('@onemo/magnetic-logic');return enginePromise;
+type MagneticEngine=Pick<typeof import('@onemo/magnetic-logic'),'solveOutline'>;
+let enginePromise:Promise<MagneticEngine>|undefined;
+export function loadMagneticEngine():Promise<MagneticEngine>{
+  enginePromise??=import('@onemo/magnetic-logic/solver');return enginePromise;
 }
 export function resetMagneticEngineLoaderForTests():void{enginePromise=undefined;}

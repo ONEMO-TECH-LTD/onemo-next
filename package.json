@@ -14,6 +14,7 @@
     "test:cutout-v1-flow": "node scripts/verify-cutout-v1-flow.mjs",
     "test:cutout-v1-output": "node scripts/verify-cutout-v1-output.mjs",
     "test:cutout-v1-grabcut": "node scripts/verify-cutout-v1-grabcut.mjs",
+    "test:grid-engine-v3-client-boundary": "node scripts/verify-grid-engine-v3-client-boundary.mjs",
     "grid:catalogue:generate": "vite-node --script scripts/generate-grid-static-catalogue.ts",
     "grid:profile": "vite-node --script scripts/profile-grid-baseline.ts",
     "perf:devices": "node scripts/device-performance/run.mjs",
