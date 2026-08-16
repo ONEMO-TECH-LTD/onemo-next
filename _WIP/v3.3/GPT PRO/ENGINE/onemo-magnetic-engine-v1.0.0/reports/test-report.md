@@ -3,46 +3,33 @@
 Command:
 
 ```bash
-npm run clean && npm run build && npm run test
+npm run build && npm run test
 ```
 
-Current result: **25 passed, 0 failed**.
+Current result: **77 passed, 0 failed, 0 skipped**.
 
 ## Covered areas
 
 ### Compute
 
-- closed tangency accepted;
-- one coordinate quantum of intrusion rejected;
-- concave boundary intrusion rejected although centre is inside;
-- winding/start-point canonicalisation;
-- continuous pair feasibility;
-- multi-clearance branch disappearance;
-- deterministic neutral lattice;
-- critical witnesses;
-- dominance-safe interval retention;
-- global-anchor exclusion;
-- stable canonical hash;
-- generated Compute executable digest.
+- exact radius, tangency, intrusion, topology and high-vertex validation;
+- continuous feasibility, component hierarchy and 33-level occupancy;
+- scalar/compound optimisation and final tie-break;
+- bounded, clearable measurement/component/criterion caches, including batched region evidence;
+- stable canonical and generated Compute identities.
 
 ### Logic
 
-- immutable content-addressed profiles;
-- exact band boundaries;
-- one primary preview offer per band;
-- tall/wide pair orientation;
-- circle does not assume square-corner material;
-- byte-identical deterministic solve;
-- Engine ManufacturingSpec verification;
-- reference profile blocks fulfilment;
-- alternate grid profile reuses Compute;
-- certified B1 physical pipeline under an explicitly production-ready technical profile;
-- continuous certification returns indeterminate rather than guessing when proof cannot be completed.
+- registered-profile schema, hash, parity, population, permission and mechanics authority;
+- certified every-rung solve, band-offer reconstruction and deterministic output;
+- continuous classification/optimisation, topology uncertainty and split permission batching;
+- canonical ManufacturingSpec creation, historical resolution, tamper rejection and physical fulfilment gates;
+- M01–M10 trace and certified registration identity.
 
 ### Next integration
 
-- canvas-axis conversion and bbox centring;
-- ManufacturingSpec transport schema rejection;
-- offer view-model preservation.
+- canvas-axis conversion, exact final-ring rendering and offer view-model preservation;
+- lazy Logic loading and transport-schema rejection;
+- certified selection binding and canonical-source persistence.
 
-The full machine output is retained in `test-output.txt`.
+Normalized passing test names and the final machine summary are retained in `test-output.txt`; per-test timings are omitted.

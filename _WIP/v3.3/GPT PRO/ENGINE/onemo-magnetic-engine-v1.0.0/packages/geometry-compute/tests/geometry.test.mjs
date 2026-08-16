@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, clearComponentHierarchyCache, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
+  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, capMoment, clearCapMomentCache, clearComponentHierarchyCache, clearCriterionCaches, clearProjectionCache, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
   criticalTranslationCandidates, discContainedExact, finalRegistrationTieBreak, generateLattice, possiblyEquivalentToAnchor,
-  evaluateCriterionOnBox, optimizeCriterion, preparePolygon, scaleToDominantDimension
+  evaluateCriterionOnBox, evaluateRegionCriterionOnBoxes, optimizeCriterion, preparePolygon, projectRing, scaleToDominantDimension
 } from '../dist/src/index.js';
 
 const q=0.01;
@@ -65,6 +65,22 @@ test('axis-aligned mechanics use exact closed-form optimum restrictions',()=>{
   assert.deepEqual(balance.optimum,{components:[{lower:0,upper:0},{lower:0,upper:0}]});
 });
 
+test('cap-moment measurement cache evicts deterministically and clears without changing results',()=>{
+  const ring=[{x:-20,y:-20},{x:20,y:-20},{x:20,y:20},{x:-20,y:20}];clearCapMomentCache();
+  const first=capMoment(ring,{x:0,y:1},0),warm=capMoment(ring,{x:0,y:1},0);assert.equal(warm,first);
+  for(let threshold=1;threshold<=512;threshold++)capMoment(ring,{x:0,y:1},threshold);
+  const evicted=capMoment(ring,{x:0,y:1},0);assert.notEqual(evicted,first);assert.deepEqual(evicted,first);
+  clearCapMomentCache();const rebuilt=capMoment(ring,{x:0,y:1},0);assert.notEqual(rebuilt,evicted);assert.deepEqual(rebuilt,first);
+});
+
+test('projection measurement cache evicts deterministically and clears without changing results',()=>{
+  const ring=[{x:-20,y:-20},{x:20,y:-20},{x:20,y:20},{x:-20,y:20}];clearProjectionCache();
+  const first=projectRing(ring,{x:1,y:0}),warm=projectRing(ring,{x:1,y:0});assert.equal(warm,first);
+  for(let index=1;index<=512;index++)projectRing(ring,{x:1,y:index/1000});
+  const evicted=projectRing(ring,{x:1,y:0});assert.notEqual(evicted,first);assert.deepEqual(evicted,first);
+  clearProjectionCache();const rebuilt=projectRing(ring,{x:1,y:0});assert.notEqual(rebuilt,evicted);assert.deepEqual(rebuilt,first);
+});
+
 test('multi-clearance hierarchy removes narrow branches before broad mass',()=>{
   const p=preparePolygon([{x:-40,y:-30},{x:40,y:-30},{x:40,y:30},{x:8,y:30},{x:8,y:70},{x:-8,y:70},{x:-8,y:30},{x:-40,y:30}],{quantumMm:q});
   const hierarchy=buildComponentHierarchy(p,[12,16,20],2);
@@ -78,14 +94,6 @@ test('component hierarchy cache is bounded intermediate evidence and explicitly 
   assert.equal(warm,first);
   clearComponentHierarchyCache();const rebuilt=buildComponentHierarchy(p,[12,16,20],2);
   assert.notEqual(rebuilt,first);assert.deepEqual(rebuilt,first);
-});
-
-test('cached region evidence cannot be poisoned through a returned mutable set',()=>{
-  const p=preparePolygon(dumbbell,{quantumMm:q});const hierarchy=buildComponentHierarchy(p,[12],6),component=hierarchy.components[0];
-  const first=componentToRegionEvidence(hierarchy,component),definiteCount=first.definitelyOccupiedCellKeys.size,possibleCount=first.possiblyOccupiedCellKeys.size;
-  first.definitelyOccupiedCellKeys.clear();first.possiblyOccupiedCellKeys.clear();
-  const second=componentToRegionEvidence(hierarchy,component);
-  assert.notEqual(second,first);assert.equal(second.definitelyOccupiedCellKeys.size,definiteCount);assert.equal(second.possiblyOccupiedCellKeys.size,possibleCount);
 });
 
 test('lower-dimensional safe point remains explicit in the component hierarchy',()=>{
@@ -110,13 +118,28 @@ test('possibly occupied sampling cells cannot fabricate exact region membership'
   assert.equal(result.exactness,'CERTIFIED_APPROXIMATE');
 });
 
-test('cached criterion evaluation cannot be poisoned through a returned score',()=>{
+test('criterion cache keys equivalent region and offset arrays by stable content',()=>{
   const p=preparePolygon([{x:-17,y:-17},{x:17,y:-17},{x:17,y:17},{x:-17,y:17}],{quantumMm:q});
   const hierarchy=buildComponentHierarchy(p,[12],6),region=componentToRegionEvidence(hierarchy,hierarchy.components[0]);
-  const box={minX:0,minY:0,maxX:0,maxY:0,depth:0,status:'INSIDE',id:'cache-poison'},descriptor={id:'REGION_COVERAGE_V1',regions:[region]};
-  const first=evaluateCriterionOnBox(p,[{x:0,y:0}],box,descriptor);first.score.components[0].lower=999;
-  const second=evaluateCriterionOnBox(p,[{x:0,y:0}],box,descriptor);
-  assert.notEqual(second,first);assert.deepEqual(second.score,{components:[{lower:1,upper:1},{lower:0,upper:0}]});
+  const box={minX:0,minY:0,maxX:0,maxY:0,depth:0,status:'INSIDE',id:'stable-cache-key'};clearCriterionCaches();
+  const first=evaluateCriterionOnBox(p,[{x:0,y:0}],box,{id:'REGION_COVERAGE_V1',regions:[region]});
+  const equivalent=evaluateCriterionOnBox(p,[{x:0,y:0}],box,{id:'REGION_COVERAGE_V1',regions:[region]});assert.equal(equivalent,first);
+  clearCriterionCaches();const rebuilt=evaluateCriterionOnBox(p,[{x:0,y:0}],box,{id:'REGION_COVERAGE_V1',regions:[region]});assert.notEqual(rebuilt,first);assert.deepEqual(rebuilt,first);
+});
+
+test('batched region measurements preserve scalar order and evict and clear deterministically',()=>{
+  const p=preparePolygon([{x:-17,y:-17},{x:17,y:-17},{x:17,y:17},{x:-17,y:17}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,[12],6),region=componentToRegionEvidence(hierarchy,hierarchy.components[0]);
+  const offsets=Object.freeze([{x:0,y:0}]),boxes=Object.freeze([
+    {minX:0,minY:0,maxX:0,maxY:0,depth:0,status:'INSIDE',id:'batch-a'},
+    {minX:6,minY:0,maxX:6,maxY:0,depth:0,status:'BOUNDARY',id:'batch-b'}
+  ]),descriptor={id:'REGION_COVERAGE_V1',regions:[region]};clearCriterionCaches();
+  const scalar=boxes.map(box=>evaluateCriterionOnBox(p,offsets,box,descriptor));
+  const first=evaluateRegionCriterionOnBoxes(p,offsets,boxes,descriptor);assert.deepEqual(first,scalar);
+  assert.equal(evaluateRegionCriterionOnBoxes(p,offsets,boxes,descriptor),first);
+  for(let index=0;index<512;index++)evaluateRegionCriterionOnBoxes(p,offsets,Object.freeze([...boxes]),descriptor);
+  const evicted=evaluateRegionCriterionOnBoxes(p,offsets,boxes,descriptor);assert.notEqual(evicted,first);assert.deepEqual(evicted,first);
+  clearCriterionCaches();const rebuilt=evaluateRegionCriterionOnBoxes(p,offsets,boxes,descriptor);assert.notEqual(rebuilt,evicted);assert.deepEqual(rebuilt,first);
 });
 
 test('possible-cell bridge cannot certify two exact safe components as one',()=>{

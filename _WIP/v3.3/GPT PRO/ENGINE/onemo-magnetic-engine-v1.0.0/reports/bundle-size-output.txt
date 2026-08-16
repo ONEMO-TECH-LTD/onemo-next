@@ -3,22 +3,22 @@
 > node scripts/size-report.mjs
 
 {
-  "generatedAt": "2026-08-15T23:23:28.801Z",
+  "generatedAt": "2026-08-16T22:27:42.978Z",
   "packages": {
     "compute": {
       "javascriptFiles": 20,
-      "rawBytes": 72896,
-      "gzipBytes": 17089
+      "rawBytes": 113242,
+      "gzipBytes": 25030
     },
     "logic": {
       "javascriptFiles": 19,
-      "rawBytes": 52835,
-      "gzipBytes": 12974
+      "rawBytes": 75014,
+      "gzipBytes": 16935
     },
     "nextAdapter": {
       "javascriptFiles": 10,
-      "rawBytes": 6338,
-      "gzipBytes": 2179
+      "rawBytes": 9180,
+      "gzipBytes": 2999
     }
   }
 }

@@ -7,6 +7,7 @@ import {
   descriptorDirections,
   discContainedExact,
   evaluateCriterionOnBox,
+  evaluateRegionCriterionOnBoxes,
   finalRegistrationTieBreak,
   optimizeCriterion,
   possiblyEquivalentToAnchor,
@@ -88,10 +89,11 @@ function permissionBoxes(
   regions: readonly RegionEvidence[],
   permission: CandidateHypothesis['permission']
 ): { readonly boxes: readonly AdaptiveBox[]; readonly uncertain: boolean } {
-  const descriptor: GeometryCriterionDescriptor = { id: 'REGION_COVERAGE_V1', regions };
+  const descriptor = { id: 'REGION_COVERAGE_V1' as const, regions };
+  const evaluations=evaluateRegionCriterionOnBoxes(polygon,offsetsMm,boxes,descriptor);
   let uncertain = false;
-  const allowed = boxes.filter((box) => {
-    const [coverage, outside] = asComponents(evaluateCriterionOnBox(polygon, offsetsMm, box, descriptor).score);
+  const allowed = boxes.filter((_box,index) => {
+    const [coverage, outside] = asComponents(evaluations[index]!.score);
     const coveragePass = coverage!.lower >= permission.requiredMajorRegionsCovered;
     const marginalPass = permission.marginalNodesAllowed || outside!.upper === 0;
     if (coveragePass && marginalPass) return true;
@@ -147,12 +149,13 @@ function makeHypotheses(
         reasons.push(`${pattern.id}:${parityKey}:NO_ROBUST_FEASIBLE_REGISTRATION`);
         continue;
       }
-      const rawBoxes = [...feasible.insideBoxes, ...feasible.boundaryBoxes];
-      if (rawBoxes.length === 0) {
+      if (feasible.insideBoxes.length+feasible.boundaryBoxes.length === 0) {
         reasons.push(`${pattern.id}:${parityKey}:${feasible.status}`);
         continue;
       }
-      const permitted=permissionBoxes(polygon,offsetsMm,rawBoxes,regions,permission);
+      const insidePermitted=permissionBoxes(polygon,offsetsMm,feasible.insideBoxes,regions,permission);
+      const boundaryPermitted=permissionBoxes(polygon,offsetsMm,feasible.boundaryBoxes,regions,permission);
+      const permitted={boxes:Object.freeze([...insidePermitted.boxes,...boundaryPermitted.boxes]),uncertain:insidePermitted.uncertain||boundaryPermitted.uncertain};
       if(permitted.boxes.length===0){
         reasons.push(`${pattern.id}:${parityKey}:${permitted.uncertain?'LEGALITY_INDETERMINATE':'PATTERN_PERMISSION_DENIED'}`);
         continue;

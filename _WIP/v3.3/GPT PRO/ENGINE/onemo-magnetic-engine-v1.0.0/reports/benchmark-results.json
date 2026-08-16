@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-16T20:35:18.176Z",
+  "generatedAt": "2026-08-16T22:27:01.285Z",
   "runtime": {
     "node": "v26.7.0",
     "platform": "darwin",
@@ -25,20 +25,20 @@
     "finalSolveResultCache": false
   },
   "translationMs": {
-    "median": 0.0019580000000019027,
-    "p95": 0.0037080000000031532,
-    "max": 0.0077920000000020195
+    "median": 0.0017079999999936035,
+    "p95": 0.003500000000002501,
+    "max": 0.018040999999996643
   },
   "certifiedAllBand": {
     "corpus": [
       {
         "id": "square",
         "polygonEdges": 4,
-        "coldMs": 123.416541,
+        "coldMs": 106.04791599999999,
         "warmMs": {
-          "median": 5.0979580000000055,
-          "p95": 5.725209000000007,
-          "max": 6.682749999999999
+          "median": 4.229999999999961,
+          "p95": 5.026958000000008,
+          "max": 5.377082999999999
         },
         "sizeRungs": 21,
         "outputRegistrations": 12,
@@ -51,11 +51,11 @@
       {
         "id": "long-vertical-rectangle",
         "polygonEdges": 4,
-        "coldMs": 40.253917,
+        "coldMs": 36.49512500000003,
         "warmMs": {
-          "median": 2.345375000000047,
-          "p95": 3.019957999999974,
-          "max": 3.5596249999999827
+          "median": 2.057542000000012,
+          "p95": 2.3819579999999974,
+          "max": 2.476083000000017
         },
         "sizeRungs": 21,
         "outputRegistrations": 9,
@@ -68,11 +68,11 @@
       {
         "id": "long-horizontal-rectangle",
         "polygonEdges": 4,
-        "coldMs": 38.37100000000004,
+        "coldMs": 30.219499999999982,
         "warmMs": {
-          "median": 2.5052500000000464,
-          "p95": 3.005457999999976,
-          "max": 3.1975830000000087
+          "median": 2.3261249999999336,
+          "p95": 3.1702080000000024,
+          "max": 4.512292000000002
         },
         "sizeRungs": 21,
         "outputRegistrations": 9,
@@ -85,11 +85,11 @@
       {
         "id": "approved-test-circle-64",
         "polygonEdges": 64,
-        "coldMs": 25517.200791,
+        "coldMs": 20586.006332999998,
         "warmMs": {
-          "median": 11.481375000003027,
-          "p95": 12.358374999999796,
-          "max": 12.736124999999447
+          "median": 15.138957999999548,
+          "p95": 15.741082999997161,
+          "max": 16.12012500000128
         },
         "sizeRungs": 21,
         "outputRegistrations": 16,
@@ -102,11 +102,11 @@
       {
         "id": "concave-notch",
         "polygonEdges": 12,
-        "coldMs": 55.50116700000217,
+        "coldMs": 37.07545899999968,
         "warmMs": {
-          "median": 0.15725000000020373,
-          "p95": 0.2686250000006112,
-          "max": 0.46916699999928824
+          "median": 0.12375000000247383,
+          "p95": 0.1678749999991851,
+          "max": 0.23174999999901047
         },
         "sizeRungs": 21,
         "outputRegistrations": 0,
@@ -119,11 +119,11 @@
       {
         "id": "narrow-neck",
         "polygonEdges": 12,
-        "coldMs": 24.29504100000122,
+        "coldMs": 25.550916000000143,
         "warmMs": {
-          "median": 0.14937500000087311,
-          "p95": 0.15562499999941792,
-          "max": 0.17520800000056624
+          "median": 0.11379099999976461,
+          "p95": 0.12591600000087055,
+          "max": 0.14512499999909778
         },
         "sizeRungs": 21,
         "outputRegistrations": 0,
@@ -136,11 +136,11 @@
       {
         "id": "thin-terminal-limb",
         "polygonEdges": 8,
-        "coldMs": 23.487084000000323,
+        "coldMs": 25.76116700000057,
         "warmMs": {
-          "median": 0.1477500000000873,
-          "p95": 0.2924170000005688,
-          "max": 0.344042000000627
+          "median": 0.11524999999892316,
+          "p95": 0.1534590000010212,
+          "max": 0.20687499999985448
         },
         "sizeRungs": 21,
         "outputRegistrations": 0,
@@ -153,11 +153,11 @@
       {
         "id": "valid-high-vertex-outline-4096",
         "polygonEdges": 4096,
-        "coldMs": 1256.8909999999996,
+        "coldMs": 1071.2789580000026,
         "warmMs": {
-          "median": 5.822000000000116,
-          "p95": 6.204916000002413,
-          "max": 6.46941599999991
+          "median": 4.965707999999722,
+          "p95": 5.226208000000042,
+          "max": 5.426792000002024
         },
         "sizeRungs": 21,
         "outputRegistrations": 0,
@@ -169,9 +169,9 @@
       }
     ],
     "warmAggregateMs": {
-      "median": 2.393666000000053,
-      "p95": 11.586166999997658,
-      "max": 12.736124999999447
+      "median": 2.25,
+      "p95": 15.20562499999869,
+      "max": 16.12012500000128
     },
     "sampleCount": 240,
     "radiiCount": 4,
@@ -224,17 +224,17 @@
     "sizeRungsPerSolve": 21
   },
   "compressedArtifactBytes": {
-    "compute": 24613,
-    "logic": 16962,
+    "compute": 25030,
+    "logic": 16935,
     "nextAdapter": 2999
   },
   "memoryBytes": {
-    "heapBefore": 7249640,
-    "peakHeapUsed": 147329600,
-    "heapAfter": 54960896,
+    "heapBefore": 7260848,
+    "peakHeapUsed": 204211768,
+    "heapAfter": 195642656,
     "totalSystem": 34359738368,
-    "freeSystemBefore": 774766592,
-    "freeSystemAfter": 451739648,
+    "freeSystemBefore": 1101414400,
+    "freeSystemAfter": 142491648,
     "interpretation": "process heap is sampled; browser peak memory is not available from this Node harness"
   },
   "notes": [

@@ -1,37 +1,80 @@
+Normalized source-gate output; per-test timings omitted.
 
 > onemo-magnetic-engine-monorepo@1.0.0 test
 > node scripts/test.mjs
 
-✔ closed tangency is legal and one-quantum intrusion is illegal (2.023721ms)
-✔ irregular concave boundary invalidates a centre-inside disc (0.674703ms)
-✔ canonical polygon hash is independent of winding and starting vertex (1.831254ms)
-✔ adaptive translation preserves continuous vertical pair feasibility (200.104576ms)
-✔ multi-clearance hierarchy removes narrow branches before broad mass (5.551188ms)
-✔ neutral lattice is deterministic (0.680162ms)
-✔ critical witness generation finds canonical and directional extrema (1.628272ms)
-✔ dominance-safe interval handling retains overlapping legal contender (0.263372ms)
-✔ global-anchor restriction excludes locally tolerated but globally inferior score (0.323331ms)
-✔ canonical hash is stable (0.37671ms)
-✔ Compute artifact identity is a generated executable digest (0.502677ms)
-✔ profile is immutable and content-addressed (4.521917ms)
-✔ band thresholds are lower-inclusive and upper-exclusive except final maximum (3.181553ms)
-✔ square produces one deterministic primary offer per band (103.539403ms)
-✔ long rectangles select the lawful pair orientation (66.236996ms)
-✔ rounded shape does not assume square-corner occupancy (334.0356ms)
-✔ same input and artifact identities produce byte-identical canonical result (41.222804ms)
-✔ engine ManufacturingSpec round-trips and exact re-verifies (45.237096ms)
-✔ reference profile blocks physical fulfilment until tolerances are supplied (34.414391ms)
-✔ alternate calibrated values reuse the same Compute engine (1.291751ms)
-✔ selected B1 size can complete the certified physical pipeline under an explicitly production-ready profile (38.324292ms)
-✔ continuous certification reports indeterminate instead of guessing when mechanics cannot be proved (166.276708ms)
-✔ studio adapter flips canvas Y and centres bounds (1.85566ms)
-✔ ManufacturingSpec transport parser rejects wrong schema (0.209752ms)
-✔ solution view model preserves band status (0.231705ms)
-ℹ tests 25
+✔ closed tangency is legal and one-quantum intrusion is illegal
+✔ non-aligned safety radius rounds upward and cannot approve negative margin
+✔ irregular concave boundary invalidates a centre-inside disc
+✔ canonical polygon hash is independent of winding and starting vertex
+✔ accelerated validation preserves high-vertex geometry and rejects distant crossings
+✔ adaptive translation preserves continuous vertical pair feasibility
+✔ axis-aligned mechanics use exact closed-form optimum restrictions
+✔ cap-moment measurement cache evicts deterministically and clears without changing results
+✔ projection measurement cache evicts deterministically and clears without changing results
+✔ multi-clearance hierarchy removes narrow branches before broad mass
+✔ component hierarchy cache is bounded intermediate evidence and explicitly clearable
+✔ lower-dimensional safe point remains explicit in the component hierarchy
+✔ possibly occupied sampling cells cannot fabricate exact region membership
+✔ criterion cache keys equivalent region and offset arrays by stable content
+✔ batched region measurements preserve scalar order and evict and clear deterministically
+✔ possible-cell bridge cannot certify two exact safe components as one
+✔ per-level occupancy does not alias after 32 clearance levels
+✔ neutral lattice is deterministic
+✔ critical witness generation finds canonical and directional extrema
+✔ dominance-safe interval handling retains overlapping legal contender
+✔ global-anchor restriction excludes locally tolerated but globally inferior score
+✔ compound anchor cannot advance while an earlier component is uncertain
+✔ candidate equivalence is symmetric and cannot use a later compound component
+✔ final tie-break searches the representable optimum set beyond five samples
+✔ canonical hash is stable
+✔ Compute artifact identity is a generated executable digest
+✔ profile is immutable and content-addressed
+✔ band thresholds are lower-inclusive and upper-exclusive except final maximum
+✔ solve authority comes only from independently certified rungs
+✔ an unresolved smaller rung blocks a larger accepted offer
+✔ an indeterminate offer cannot be selected for ManufacturingSpec
+✔ same input and artifact identities produce byte-identical canonical result
+✔ warm solves reuse only prepared source data and recompute certified rungs
+✔ engine ManufacturingSpec round-trips and exact re-verifies
+✔ manufacturing verification rejects a certified rung that was not the band offer
+✔ recomputed canonical hash cannot legitimise inconsistent manufacturing evidence
+✔ historical verification resolves every pinned profile and artifact explicitly
+✔ physical component dimensions and tolerances fail closed
+✔ ManufacturingSpec requires certified reconstructed offer authority
+✔ reference profile blocks physical fulfilment until tolerances are supplied
+✔ alternate calibrated values reuse the same Compute engine
+✔ solve revalidates a supplied registered-profile hash
+✔ selected-size certification revalidates a supplied registered-profile hash
+✔ profile registration rejects non-executable domains and policies
+✔ reference profile cannot be promoted to production while product inputs remain unresolved
+✔ productionReady remains closed until later R3 authority groups are implemented
+✔ patterns use their population stride rather than a hard-coded parity
+✔ continuous certification reports indeterminate instead of guessing when mechanics cannot be proved
+✔ unresolved sampled component structure propagates as decision indeterminate
+✔ possible-cell bridge makes structural region authority indeterminate
+✔ registered 33-level policy cannot create an impossible structural component
+✔ every configured population parity becomes a distinct applied frame hypothesis
+✔ permission records enforce exact axis and population authority
+✔ permission authority requires every PD-19 dimension
+✔ alternative-orientation permission expands only its declared symmetry family
+✔ major-coverage and marginal-node permissions constrain certified registrations
+✔ split permission batches preserve combined ordering and uncertainty
+✔ primary eligibility outranks fallback rank, and fallback is used only when needed
+✔ M02 upper-region identity follows registered topDirection projection
+✔ discrete identity uses canonical code-unit ordering instead of locale
+✔ certified solution trace includes M09 discrete and M10 registration identity
+✔ studio adapter flips canvas Y and centres bounds
+✔ ManufacturingSpec transport parser rejects wrong schema
+✔ solution view model preserves band status
+✔ loader memoises the real Logic module
+✔ overlay renders the exact quantized final ring instead of its bounding rectangle
+✔ selection certification rejects heuristic authority and missing smaller-rung proof
+✔ certification preserves one canonical source identity and is the only public binder
+ℹ tests 77
 ℹ suites 0
-ℹ pass 25
+ℹ pass 77
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 907.520997

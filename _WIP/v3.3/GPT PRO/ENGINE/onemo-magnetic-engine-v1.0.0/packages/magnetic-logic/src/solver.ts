@@ -1,4 +1,4 @@
-import { COMPUTE_ARTIFACT_HASH, canonicalHash, clearAdaptiveFeasibilityCache, clearComponentHierarchyCache, clearCriterionCaches, clearOptimizationCaches, preparePolygon } from '@onemo/geometry-compute';
+import { COMPUTE_ARTIFACT_HASH, canonicalHash, clearAdaptiveFeasibilityCache, clearCapMomentCache, clearComponentHierarchyCache, clearCriterionCaches, clearOptimizationCaches, clearProjectionCache, preparePolygon } from '@onemo/geometry-compute';
 import type { BandOffer, RegisteredProfile, SizeFailure, SizeSolution, SolveInput, SolveResult } from './contracts.js';
 import { LOGIC_ARTIFACT_HASH } from './artifact.js';
 import { certifyPreparedSizeSolution, clearCertifiedSolverCaches } from './certified-solver.js';
@@ -9,7 +9,7 @@ const CACHE_LIMIT=16;
 const sourceCache=new Map<string,ReturnType<typeof preparePolygon>>();
 function remember<T>(cache:Map<string,T>,key:string,value:T):T{cache.delete(key);cache.set(key,value);if(cache.size>CACHE_LIMIT)cache.delete(cache.keys().next().value!);return value;}
 function deepFreeze<T>(value:T,seen=new Set<object>()):T{if(value&&typeof value==='object'){if(seen.has(value as object))return value;seen.add(value as object);for(const child of Object.values(value as Record<string,unknown>))deepFreeze(child,seen);Object.freeze(value);}return value;}
-export function clearSolverCaches():void{sourceCache.clear();clearCertifiedSolverCaches();clearAdaptiveFeasibilityCache();clearComponentHierarchyCache();clearCriterionCaches();clearOptimizationCaches();}
+export function clearSolverCaches():void{sourceCache.clear();clearCertifiedSolverCaches();clearAdaptiveFeasibilityCache();clearComponentHierarchyCache();clearCriterionCaches();clearOptimizationCaches();clearCapMomentCache();clearProjectionCache();}
 
 function solveSizeSequence(source:ReturnType<typeof preparePolygon>,profile:RegisteredProfile):(SizeSolution|SizeFailure)[]{
   return candidateSizes(profile).map(targetDominantMm=>certifyPreparedSizeSolution(source,profile,targetDominantMm));

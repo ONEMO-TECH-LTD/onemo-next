@@ -30,7 +30,9 @@ export function measureRing(ring: readonly Point[]): PolygonMetrics {
   };
 }
 
-const projectionCache=new WeakMap<readonly Point[],Map<string,{min:number;max:number}>>();
+const PROJECTION_CACHE_LIMIT=512;
+let projectionCache=new WeakMap<readonly Point[],Map<string,{min:number;max:number}>>();
+export function clearProjectionCache():void{projectionCache=new WeakMap();}
 export function projectRing(ring: readonly Point[], direction: Point): {min:number;max:number} {
   let cache=projectionCache.get(ring);if(!cache){cache=new Map();projectionCache.set(ring,cache);}
   const key=`${direction.x.toFixed(12)},${direction.y.toFixed(12)}`;const cached=cache.get(key);if(cached)return cached;
@@ -39,5 +41,5 @@ export function projectRing(ring: readonly Point[], direction: Point): {min:numb
     const value=point.x*direction.x+point.y*direction.y;
     min=Math.min(min,value);max=Math.max(max,value);
   }
-  const result={min,max};cache.set(key,result);return result;
+  const result={min,max};cache.set(key,result);if(cache.size>PROJECTION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return result;
 }

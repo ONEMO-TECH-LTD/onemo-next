@@ -30,15 +30,20 @@ export function clipRingHalfPlane(ring:readonly Point[],direction:Point,threshol
   return clean;
 }
 
-const momentCache=new WeakMap<readonly Point[],Map<string,ClippedMoment>>();
+const MOMENT_CACHE_LIMIT=512;
+let momentCache=new WeakMap<readonly Point[],Map<string,ClippedMoment>>();
+export function clearCapMomentCache():void{momentCache=new WeakMap();}
+function rememberMoment(cache:Map<string,ClippedMoment>,key:string,value:ClippedMoment):ClippedMoment{
+  cache.set(key,value);if(cache.size>MOMENT_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return value;
+}
 export function capMoment(ring:readonly Point[],direction:Point,threshold:number,keepAbove=true):ClippedMoment{
   let cache=momentCache.get(ring);if(!cache){cache=new Map();momentCache.set(ring,cache);}
   const key=`${direction.x.toFixed(12)},${direction.y.toFixed(12)},${threshold.toFixed(9)},${keepAbove?1:0}`;
   const cached=cache.get(key);if(cached)return cached;
   const clipped=clipRingHalfPlane(ring,direction,threshold,keepAbove);
-  if(clipped.length<3){const result={ring:clipped,areaMm2:0,centroid:null,firstMomentMm3:0};cache.set(key,result);return result;}
+  if(clipped.length<3)return rememberMoment(cache,key,{ring:clipped,areaMm2:0,centroid:null,firstMomentMm3:0});
   const metrics=measureRing(clipped); const area=metrics.area;
-  if(area<=1e-12){const result={ring:clipped,areaMm2:0,centroid:null,firstMomentMm3:0};cache.set(key,result);return result;}
+  if(area<=1e-12)return rememberMoment(cache,key,{ring:clipped,areaMm2:0,centroid:null,firstMomentMm3:0});
   const signedDistance=keepAbove?dot(metrics.centroid,direction)-threshold:threshold-dot(metrics.centroid,direction);
-  const result={ring:clipped,areaMm2:area,centroid:metrics.centroid,firstMomentMm3:Math.max(0,area*signedDistance)};cache.set(key,result);return result;
+  return rememberMoment(cache,key,{ring:clipped,areaMm2:area,centroid:metrics.centroid,firstMomentMm3:Math.max(0,area*signedDistance)});
 }

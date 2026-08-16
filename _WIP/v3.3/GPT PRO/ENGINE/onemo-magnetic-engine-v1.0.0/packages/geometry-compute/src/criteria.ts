@@ -4,20 +4,25 @@ import { dot, normalizeDirection } from './numeric.js';
 import { projectRing } from './measure.js';
 
 type RegionState='ALL'|'SOME'|'NONE';
-const REGION_STATE_CACHE_LIMIT=4096,CRITERION_EVALUATION_CACHE_LIMIT=64;
+const REGION_STATE_CACHE_LIMIT=4096,CRITERION_EVALUATION_CACHE_LIMIT=64,REGION_BATCH_CACHE_LIMIT=512;
 let regionStateCache=new WeakMap<RegionEvidence,Map<string,RegionState>>();
 let criterionEvaluationCache=new WeakMap<PreparedPolygon,WeakMap<AdaptiveBox,Map<string,CriterionEvaluation>>>();
-let regionListIdentity=new WeakMap<object,number>(),nextRegionListIdentity=1;
-export function clearCriterionCaches():void{regionStateCache=new WeakMap();criterionEvaluationCache=new WeakMap();regionListIdentity=new WeakMap();nextRegionListIdentity=1;}
+let regionIdentity=new WeakMap<RegionEvidence,number>(),nextRegionIdentity=1;
+let offsetsContentKeyCache=new WeakMap<readonly Point[],string>();
+let boxListIdentity=new WeakMap<readonly AdaptiveBox[],number>(),nextBoxListIdentity=1;
+const regionBatchCache=new Map<string,readonly CriterionEvaluation[]>();
+export function clearCriterionCaches():void{regionStateCache=new WeakMap();criterionEvaluationCache=new WeakMap();regionIdentity=new WeakMap();nextRegionIdentity=1;offsetsContentKeyCache=new WeakMap();boxListIdentity=new WeakMap();nextBoxListIdentity=1;regionBatchCache.clear();}
+
+type RegionCriterionDescriptor=Extract<GeometryCriterionDescriptor,{id:'REGION_COVERAGE_V1'|'REGION_SUBSET_COVERAGE_V1'|'REGION_MAX_LOAD_V1'}>;
+function regionCriterionKey(offsets:readonly Point[],descriptor:RegionCriterionDescriptor):string{
+  const regions=descriptor.regions.map(region=>{let identity=regionIdentity.get(region);if(!identity){identity=nextRegionIdentity++;regionIdentity.set(region,identity);}return identity;}).join(',');
+  const subset=descriptor.id==='REGION_SUBSET_COVERAGE_V1'?descriptor.subsetIds.join(','):'';
+  let offsetsKey=offsetsContentKeyCache.get(offsets);if(offsetsKey===undefined){offsetsKey=offsets.map(offset=>`${offset.x},${offset.y}`).join(';');offsetsContentKeyCache.set(offsets,offsetsKey);}
+  return`${descriptor.id}:${regions}:${subset}:${offsetsKey}`;
+}
 
 function interval(lower:number,upper:number):ScoreInterval{return{lower:Math.min(lower,upper),upper:Math.max(lower,upper)};}
 function compound(...components:ScoreInterval[]):CompoundScoreInterval{return{components};}
-function copyEvaluation(evaluation:CriterionEvaluation):CriterionEvaluation{
-  const score='components' in evaluation.score
-    ?{components:evaluation.score.components.map(component=>({...component}))}
-    :{...evaluation.score};
-  return{...evaluation,score};
-}
 
 function translatedProjectionInterval(box:AdaptiveBox,direction:Point):ScoreInterval{
   const values=[
@@ -173,9 +178,20 @@ export function evaluateCriterionOnBox(
   if(descriptor.id!=='REGION_COVERAGE_V1'&&descriptor.id!=='REGION_SUBSET_COVERAGE_V1'&&descriptor.id!=='REGION_MAX_LOAD_V1')return evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);
   let polygonCache=criterionEvaluationCache.get(polygon);if(!polygonCache){polygonCache=new WeakMap();criterionEvaluationCache.set(polygon,polygonCache);}
   let cache=polygonCache.get(box);if(!cache){cache=new Map();polygonCache.set(box,cache);}
-  let regions=regionListIdentity.get(descriptor.regions as object);if(!regions){regions=nextRegionListIdentity++;regionListIdentity.set(descriptor.regions as object,regions);}
-  const subset=descriptor.id==='REGION_SUBSET_COVERAGE_V1'?descriptor.subsetIds.join(','):'';
-  const key=`${descriptor.id}:${regions}:${subset}:${offsets.map(offset=>`${offset.x},${offset.y}`).join(';')}`;
-  const cached=cache.get(key);if(cached){cache.delete(key);cache.set(key,cached);return copyEvaluation(cached);}
-  const evaluation=evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);cache.set(key,evaluation);if(cache.size>CRITERION_EVALUATION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return copyEvaluation(evaluation);
+  const key=regionCriterionKey(offsets,descriptor);
+  const cached=cache.get(key);if(cached){cache.delete(key);cache.set(key,cached);return cached;}
+  const evaluation=evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);cache.set(key,evaluation);if(cache.size>CRITERION_EVALUATION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return evaluation;
+}
+
+export function evaluateRegionCriterionOnBoxes(polygon:PreparedPolygon,offsets:readonly Point[],boxes:readonly AdaptiveBox[],descriptor:RegionCriterionDescriptor):readonly CriterionEvaluation[]{
+  let boxesId=boxListIdentity.get(boxes);if(!boxesId){boxesId=nextBoxListIdentity++;boxListIdentity.set(boxes,boxesId);}
+  const key=regionCriterionKey(offsets,descriptor),batchKey=`${polygon.geometryHash}:${boxesId}:${key}`;
+  const cachedBatch=regionBatchCache.get(batchKey);if(cachedBatch)return cachedBatch;
+  let polygonCache=criterionEvaluationCache.get(polygon);if(!polygonCache){polygonCache=new WeakMap();criterionEvaluationCache.set(polygon,polygonCache);}
+  const result=Object.freeze(boxes.map(box=>{
+    let cache=polygonCache!.get(box);if(!cache){cache=new Map();polygonCache!.set(box,cache);}
+    const cached=cache.get(key);if(cached)return cached;
+    const evaluation=evaluateCriterionOnBoxUncached(polygon,offsets,box,descriptor);cache.set(key,evaluation);if(cache.size>CRITERION_EVALUATION_CACHE_LIMIT)cache.delete(cache.keys().next().value!);return evaluation;
+  }));
+  regionBatchCache.set(batchKey,result);if(regionBatchCache.size>REGION_BATCH_CACHE_LIMIT)regionBatchCache.delete(regionBatchCache.keys().next().value!);return result;
 }

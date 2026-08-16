@@ -6,7 +6,7 @@ import {
   selectDiscreteIdentity, solveOutline, validatePhysicalComponentProfile, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
 import * as logic from '../dist/src/index.js';
-import {canonicalHash,preparePolygon} from '../../geometry-compute/dist/src/index.js';
+import {canonicalHash,evaluateRegionCriterionOnBoxes,preparePolygon} from '../../geometry-compute/dist/src/index.js';
 
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
 const dumbbell=[{x:-50,y:-30},{x:-10,y:-30},{x:-10,y:-11.9},{x:20,y:-11.9},{x:20,y:-12},{x:44,y:-12},{x:44,y:12},{x:20,y:12},{x:20,y:11.9},{x:-10,y:11.9},{x:-10,y:30},{x:-50,y:30}];
@@ -283,6 +283,16 @@ test('major-coverage and marginal-node permissions constrain certified registrat
   assert.equal(certifySizeSolution({outlineMm:rectangle(24,24),profile:registerProfile(marginal),targetDominantMm:48}).status,'REJECTED');
   marginal.permissions=marginal.permissions.map(permission=>({...permission,marginalNodesAllowed:true}));
   assert.equal(certifySizeSolution({outlineMm:rectangle(24,24),profile:registerProfile(marginal),targetDominantMm:48}).status,'ACCEPTED');
+});
+
+test('split permission batches preserve combined ordering and uncertainty',()=>{
+  const polygon=preparePolygon(rectangle(10,10),{quantumMm:.01}),offsets=[{x:0,y:0}];
+  const region={id:'permission-region',bounds:{minX:0,minY:0,maxX:2,maxY:1},gridOrigin:{x:0,y:0},cellStepMm:1,radiusMm:0,errorEnvelopeMm:0,definitelyOccupiedCellKeys:new Set(['0,0']),possiblyOccupiedCellKeys:new Set(['0,0','1,0']),exactWitnessPoints:[]};
+  const inside=Object.freeze([{minX:.5,minY:.5,maxX:.5,maxY:.5,depth:0,status:'INSIDE',id:'inside'}]);
+  const boundary=Object.freeze([{minX:1.5,minY:.5,maxX:1.5,maxY:.5,depth:0,status:'BOUNDARY',id:'possible'},{minX:3,minY:.5,maxX:3,maxY:.5,depth:0,status:'BOUNDARY',id:'outside'}]);
+  const filter=boxes=>{const evaluations=evaluateRegionCriterionOnBoxes(polygon,offsets,boxes,{id:'REGION_COVERAGE_V1',regions:[region]});let uncertain=false;const allowed=boxes.filter((_box,index)=>{const [coverage,outside]=evaluations[index].score.components;const pass=coverage.lower>=1&&outside.upper===0;if(pass)return true;const impossible=coverage.upper<1||outside.lower>0;if(!impossible)uncertain=true;return false;});return{boxes:allowed,uncertain};};
+  const combined=filter(Object.freeze([...inside,...boundary])),insideResult=filter(inside),boundaryResult=filter(boundary);
+  assert.deepEqual([...insideResult.boxes,...boundaryResult.boxes],combined.boxes);assert.equal(insideResult.uncertain||boundaryResult.uncertain,combined.uncertain);assert.deepEqual(combined.boxes.map(box=>box.id),['inside']);assert.equal(combined.uncertain,true);
 });
 
 test('primary eligibility outranks fallback rank, and fallback is used only when needed',()=>{
