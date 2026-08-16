@@ -65,3 +65,20 @@
 - Remove “every row” and “no absent row unassigned” until the repaired ledger crosswalk proves both claims.
 
 T0b's commit boundary passes: 94eeda89 adds only the audit; no code entered either T0 commit.
+
+## Successor re-gate — 011957c7
+
+**Verdict: REWORK.** The successor closes most structural omissions, but two promised corrections did not land and the new mechanics registry reintroduces the incomplete-critical-set defect. T1 remains blocked.
+
+1. **Apply the missing T0b correction.** T0b still omits row 1.8, still marks 1.10 `CONFORMS` because the sweep visits even sizes, and still says §1 is clean. Its Revision 2 header claims those corrections landed. Change 1.8 to `PARTIAL`; change 1.10 to `PARTIAL`; remove the clean-section claim.
+2. **Apply the missing 7.2 provenance correction.** Ledger 7.2 still labels the uncaptured normalized sentence as a `(V)` Dan turn. Cite the captured 2026-08-16 10:52:27 turn in Dan's actual words and mark the normalized rule as derivation, exactly as the delivery report says was done.
+3. **Repair the mechanics registry before it becomes build authority.** Coverage and distinct-mass distribution vary as registration moves across `F`; they require a certified partition/argopt treatment and are not “discrete per candidate” while the candidate still carries a feasible registration set. Unsupported extent also has an interior optimum counterexample: on a symmetric square feasible region, `max(C+x,C-x,C+y,C-y)` is minimized at the strict interior `(0,0)`, not at a feasible-region vertex or directional extremum. Its completeness duty therefore repeats the rejected critical-set recipe. Peel leverage's claimed convexity is unproved; require its own certified global argmin without asserting convexity.
+4. **Correct upper-support geometry.** The formula measures material above the topmost anchor centre-line. The supported boundary is the padded block edge, 12 mm above that line. The current formula counts protected material as hanging mass. Derive the reference line from the protected support boundary or defer the exact formula to T5's proof.
+5. **Repair classifications.** Row 8C.5 calls byte-identical canonical output `RULED` through R3, but the ledger's hierarchy permits `(D)` only for PB/LSO and makes R3 a technical reference. Classify this certification mechanism `ENGINEERING` unless a designated/direct source actually rules it. Section 8D must likewise separate PB-ruled result fields from R3-derived engineering identity/certification fields.
+6. **Make performance falsifiable.** A provisional 16/50 ms target whose miss is merely reported is not a gate. T3 must select and record the measured engineering runtime and memory gate; T7 must fail if the selected gate is missed.
+7. **Make the crosswalk honest.** It does not enumerate every ledger row or every task/input, despite claiming both directions are complete. Either produce the full bidirectional enumeration or narrow the claims. T1, T8, the live visual gate and several ledger rows are currently absent.
+8. **Fix successor provenance and formatting.** T0b still says it was probed against ledger 486e8110; identify code bytes, dirty diff and ledger 011957c7 separately. Remove the extra blank line at ledger EOF so `git diff --check` passes.
+
+**Necessity — no new task or document is required.** These are corrections inside the existing T0/T0b pair.
+
+**Sufficiency — partial.** Until the descriptor completeness errors, provenance mismatches and missing explicit corrections are repaired, T0 cannot safely govern T5/T6.
