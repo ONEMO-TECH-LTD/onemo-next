@@ -1,5 +1,16 @@
 import { canonicalHash } from '@onemo/geometry-compute';
 import type { EngineManufacturingSpec, RegisteredProfile, SizeSolution, SolveResult } from './contracts.js';
+import { buildCertifiedBandOffers } from './solver.js';
+
+function assertCertifiedOfferAuthority(solve:SolveResult,solution:SizeSolution,profile:RegisteredProfile):void{
+  if(solution.decisionProof!=='CERTIFIED_CONTINUOUS_OPTIMUM')throw new Error('MECHANICAL_OPTIMUM_NOT_CERTIFIED');
+  const reconstructed=buildCertifiedBandOffers(solve.evaluated,profile).find(offer=>offer.band===solution.band);
+  const declared=solve.offers.find(offer=>offer.band===solution.band);
+  if(reconstructed?.status!=='OFFERED'||!reconstructed.solution||declared?.status!=='OFFERED'||!declared.solution)throw new Error('CERTIFIED_OFFER_EVIDENCE_MISSING');
+  if(reconstructed.solution.decisionProof!=='CERTIFIED_CONTINUOUS_OPTIMUM')throw new Error('MECHANICAL_OPTIMUM_NOT_CERTIFIED');
+  const selectedHash=canonicalHash(solution);
+  if(canonicalHash(reconstructed.solution)!==selectedHash||canonicalHash(declared.solution)!==selectedHash)throw new Error('CERTIFIED_OFFER_SOLUTION_MISMATCH');
+}
 
 export function createEngineManufacturingSpec(
   solve:SolveResult,
@@ -8,7 +19,7 @@ export function createEngineManufacturingSpec(
 ):EngineManufacturingSpec{
   if(solve.profileHash!==profile.profileHash)throw new Error('PROFILE_HASH_MISMATCH');
   if(solve.computeArtifactHash.length===0||solve.logicArtifactHash.length===0)throw new Error('ENGINE_ARTIFACT_UNRESOLVABLE');
-  if(profile.productionReady&&solution.decisionProof!=='CERTIFIED_CONTINUOUS_OPTIMUM')throw new Error('MECHANICAL_OPTIMUM_NOT_CERTIFIED');
+  assertCertifiedOfferAuthority(solve,solution,profile);
   const payload=Object.freeze({
     schema:'onemo-engine-manufacturing-spec-v1' as const,schemaVersion:1 as const,
     computeArtifactHash:solve.computeArtifactHash,logicArtifactHash:solve.logicArtifactHash,

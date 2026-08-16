@@ -47,6 +47,18 @@ test('engine ManufacturingSpec round-trips and exact re-verifies',async()=>{
   const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const solution=selectedOffer(result,'B1');const spec=createEngineManufacturingSpec(result,solution,p);const verified=verifyEngineManufacturingSpec(spec,p);assert.equal(verified.valid,true);assert.equal(spec.proofStatus,'REFERENCE_PROFILE_NOT_PRODUCTION');
 });
 
+test('ManufacturingSpec requires certified reconstructed offer authority',async()=>{
+  const profile=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile});const certified=selectedOffer(result,'B1');
+  const emptySolve={...result,evaluated:[],offers:[]};
+  assert.throws(()=>createEngineManufacturingSpec(emptySolve,{...certified,decisionProof:'DETERMINISTIC_CRITICAL_SET_EXACT_LEGALITY'},profile),/MECHANICAL_OPTIMUM_NOT_CERTIFIED/);
+  assert.throws(()=>createEngineManufacturingSpec(emptySolve,certified,profile),/CERTIFIED_OFFER_EVIDENCE_MISSING/);
+  assert.throws(()=>createEngineManufacturingSpec(result,{...certified,patternId:'forged'},profile),/CERTIFIED_OFFER_SOLUTION_MISMATCH/);
+
+  const twoRungProfile=boundedB1Profile(37);const later={...certified,targetDominantMm:36};
+  const missingSmaller={...result,profileHash:twoRungProfile.profileHash,evaluated:[later],offers:[{band:'B1',status:'OFFERED',solution:later,reasons:[]}]};
+  assert.throws(()=>createEngineManufacturingSpec(missingSmaller,later,twoRungProfile),/CERTIFIED_OFFER_EVIDENCE_MISSING/);
+});
+
 test('reference profile blocks physical fulfilment until tolerances are supplied',async()=>{
   const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const spec=createEngineManufacturingSpec(result,selectedOffer(result,'B1'),p);
   assert.throws(()=>completeFulfilmentSpec(spec,p,{id:'demo',version:1,magnetDiameterMm:8,magnetThicknessMm:1,cutToleranceMm:0,placementToleranceMm:0,materialToleranceMm:0,assemblyToleranceMm:0,assemblyProfileId:'demo'}),/REFERENCE_PROFILE_NOT_PRODUCTION/);
