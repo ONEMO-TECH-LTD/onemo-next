@@ -47,7 +47,7 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
     if(population.enabled&&population.originParities.length===0)errors.push(`population ${population.id} requires an origin parity`);
     const parityKeys=new Set<string>();
     for(const parity of population.originParities){
-      const valid=parity.length===2&&parity.every(value=>Number.isInteger(value)&&value>=0&&value<population.strideCells);
+      const valid=parity.length===2&&parity.every(value=>Number.isInteger(value)&&(value===0||value===1));
       if(!valid)errors.push(`population ${population.id} has invalid parity`);
       const key=parity.join(',');if(parityKeys.has(key))errors.push(`population ${population.id} has duplicate parity ${key}`);parityKeys.add(key);
     }

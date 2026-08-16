@@ -70,7 +70,7 @@ test('profile registration rejects non-executable domains and policies',async(t)
     ['zero size step',profile=>{profile.sizeDomain.stepMm=0;}],
     ['non-finite translation period',profile=>{profile.translation.periodMm=Infinity;}],
     ['unordered clearance levels',profile=>{profile.structural.clearanceSurplusLevelsMm=[0,8,4];}],
-    ['invalid population parity',profile=>{profile.grid.populations[0].originParities=[[2,0]];}],
+    ['population parity remains binary at stride 3',profile=>{profile.grid.populations[0].strideCells=3;profile.grid.populations[0].originParities=[[2,0]];profile.patterns=patternsAtStride(profile.patterns,3);}],
     ['duplicate population id',profile=>{profile.grid.populations.push(structuredClone(profile.grid.populations[0]));}],
     ['off-population pattern coordinates',profile=>{profile.patterns[0].cells=[[0,0],[1,0]];}],
     ['incomplete mechanics registry',profile=>{profile.mechanics.criteria=profile.mechanics.criteria.slice(0,-1);}],
