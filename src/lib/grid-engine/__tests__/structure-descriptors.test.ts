@@ -377,8 +377,9 @@ describe('coverage', () => {
 
     expect(result.units).toBe('ratio')
     expect(result.direction).toBe('maximize')
-    // 1/2 is reported as an outward bracket, not collapsed to a single double: the exact branch is
-    // reserved for rationals that divide to an integer, so a half is honestly bracketed instead.
+    // 0.5 is losslessly representable, so an exact answer would be legitimate here; this
+    // implementation simply reserves its exact branch for rationals that divide to an integer and
+    // brackets everything else conservatively. The contract is the bracket containing the truth.
     expect(result.lo).toBeLessThanOrEqual(0.5)
     expect(result.hi).toBeGreaterThanOrEqual(0.5)
     expect(result.hi - result.lo).toBeLessThan(1e-8)

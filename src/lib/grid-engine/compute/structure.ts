@@ -311,7 +311,7 @@ const outwardDown = (v: number): number => v - Math.abs(v) * ULP - Number.MIN_VA
 const outwardUp = (v: number): number => v + Math.abs(v) * ULP + Number.MIN_VALUE
 
 /** A rational converted to doubles: lossless when it can be, outward-bounded when it cannot. */
-function ratioToInterval(num: bigint, den: bigint): Interval & { exact: boolean } {
+function ratioToInterval(num: bigint, den: bigint): Interval {
   if (den === B0) throw new RangeError('Descriptor ratio has a zero denominator.')
   const negative = num < B0 !== den < B0
   const n = num < B0 ? -num : num
@@ -320,7 +320,7 @@ function ratioToInterval(num: bigint, den: bigint): Interval & { exact: boolean 
     const q = n / d
     if (q <= MAX_SAFE_BIG) {
       const v = Number(negative ? -q : q)
-      return { lo: v, hi: v, exact: true }
+      return { lo: v, hi: v }
     }
   }
   let decimals = 9
@@ -336,8 +336,8 @@ function ratioToInterval(num: bigint, den: bigint): Interval & { exact: boolean 
   const lowMagnitude = outwardDown(Number(scaled) / denom)
   const highMagnitude = outwardUp(Number(scaled + B1) / denom)
   return negative
-    ? { lo: -highMagnitude, hi: -lowMagnitude, exact: false }
-    : { lo: lowMagnitude, hi: highMagnitude, exact: false }
+    ? { lo: -highMagnitude, hi: -lowMagnitude }
+    : { lo: lowMagnitude, hi: highMagnitude }
 }
 
 /** A Contour copy of a readonly ring — the prepared-contour door takes a mutable point list. */
@@ -450,7 +450,7 @@ function clippedAreaAndMoment(
   axis: 0 | 1,
   keepBelow: boolean,
   cutMM: number,
-): { areaMM2: Interval & { exact: boolean }; momentMM3: Interval & { exact: boolean } } {
+): { areaMM2: Interval; momentMM3: Interval } {
   const cut = Math.round(cutMM * LATTICE)
   const b = subject.bounds
   let x0 = Math.round(b.minX * LATTICE) - 1
@@ -462,7 +462,7 @@ function clippedAreaAndMoment(
     else x0 = Math.max(x0, cut)
   } else if (keepBelow) y1 = Math.min(y1, cut)
   else y0 = Math.max(y0, cut)
-  const zero = { lo: 0, hi: 0, exact: true }
+  const zero: Interval = { lo: 0, hi: 0 }
   if (x1 <= x0 || y1 <= y0) return { areaMM2: zero, momentMM3: zero }
   const window = Clipper.makePath([x0, y0, x1, y0, x1, y1, x0, y1])
   const clipped = Clipper.intersect(subject.paths, [window], FillRule.NonZero)
@@ -1271,8 +1271,8 @@ export function coverageEvidence(
 
 export interface DistributionEvidence extends DescriptorEvidence {
   /**
-   * The ruled second key, kept separate rather than folded into an opaque score: once the distinct
-   * mass count is maximised, the minimum variance of anchors per mass over that argopt.
+   * The engineering second key, kept separate rather than folded into an opaque score: once the
+   * distinct mass count is maximised, the minimum variance of anchors per mass over that argopt.
    */
   anchorVariance: DescriptorEvidence
 }
@@ -1333,7 +1333,7 @@ export function distributionEvidence(
     true,
   )
 
-  const varianceOf = (counts: ReadonlyArray<number>): Interval & { exact: boolean } => {
+  const varianceOf = (counts: ReadonlyArray<number>): Interval => {
     const n = BigInt(counts.length)
     const sum = counts.reduce((total, count) => total + BigInt(count), B0)
     const squares = counts.reduce((total, count) => total + BigInt(count) * BigInt(count), B0)
