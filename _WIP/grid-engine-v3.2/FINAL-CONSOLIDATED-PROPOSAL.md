@@ -2,8 +2,8 @@
 
 **Owner:** s62-grid-meta-qa
 
-**Status:** QA-corrected proposal. No product code is authorised until T0 compiles the settled rules from the designated briefs and Dan gives the build go.
-**Inputs compared:** s62-kai `FINAL-PROPOSAL.md` at `e617ae74`; s62-kai-meta `v3.2-final-execution-proposal.md`; both v3.2 QA reports; the amended R3 system/Compute/Logic contracts; product-base; focus spec; current v3.2 code and commit history.
+**Status:** QA-corrected proposal, amended after a full-folder necessity/deslop sweep. No product code is authorised until T0 compiles the settled rules from the designated briefs and Dan gives the build go.
+**Inputs compared:** every artifact under the v3.2 `_WIP/grid-engine-v3.2` folder, including all 28 adjudication frames and raw data; both submitted final proposals; all v3.2 QA reports; the complete GPT transcript and delivered-engine evidence; the amended R3 contracts; product-base; focus spec; current v3.2 code and commit history.
 
 ## Decision
 
@@ -48,6 +48,8 @@ Delete after the replacement passes its independent gate:
 
 Do not adopt the GPT package. Audit and port only algorithms that survive source-level review and the local gates. No line-count target governs reuse.
 
+v3.2 is an independent redemption of the first working engine. v3.3 is donor and example only: a mechanism may cross the boundary only when a named v3.2 task requires it, the v3.2 substrate lacks it, and the mechanism passes the v3.2 task's own gate. v3.3 architecture, package shape, task order and policy do not govern v3.2.
+
 ## Execution plan
 
 ### T0 — compile settled authority; do not reopen it
@@ -66,6 +68,7 @@ Do not adopt the GPT package. Audit and port only algorithms that survive source
 5. Resolve apparent focus-spec contradictions from the source hierarchy and surrounding rulings rather than presenting them as a menu. Record the winning clause and the displaced clause.
 6. Locate the upload behind the missing 200–216 mm case from existing briefs, transcripts and artifacts before considering a question.
 7. If one product-consequential contradiction remains after exhaustive source resolution, record the exact conflicting clauses and stop only at the task that genuinely depends on it. Never send a batch questionnaire.
+8. Carry the already-resolved source findings into the ledger: class-by-band frame classification displaces out-counting; every size is evaluated independently; fewer anchors wins only at equivalent support; Bat B4 is known to require an answer but its exact expected geometry remains uncertified; the missing 200–216 mm contour blocks only the final gate that asserts it.
 
 **Verification:** every executable rule has a brief/direct-ruling pointer or a named reversible calibration/engineering owner; no R3 proposal status is used to create a Dan gate; no questionnaire is produced; every displaced clause is recorded rather than blended.
 
@@ -95,6 +98,7 @@ Do not adopt the GPT package. Audit and port only algorithms that survive source
 3. Preserve Dan-approved Bat B1–B3 outcomes, but treat the vector itself as authoritative only after its exact geometry hash and mappings clear T0.
 4. Add the identified uploaded contour and its ruled outcomes. Leave Bat B4 unpinned until ruled.
 5. Add mutation checks proving each hard assertion fails when its governed behaviour is broken.
+6. Treat `canon-adjudication/frames-data.json` and all 28 captured frames as observed/falsification evidence only. They may expose a contradiction; they may not supply an expected winner.
 
 **Verification:** no expected winner comes only from a prior engine run; every hard assertion has an authority pointer; observed rows cannot pass or fail the release gate; expected initial engine failures are named rather than treated as T2 failure.
 
@@ -152,14 +156,17 @@ Do not adopt the GPT package. Audit and port only algorithms that survive source
 
 **Method:**
 
-1. Apply the authority-ledger mechanics exactly; no qualitative placeholder or opaque score.
-2. Evaluate every approved size independently. No prior band's winner truncates another domain.
-3. Use the complete candidate identity: source geometry; size/window; population and origin parity; frame; pattern/variant; registration; profile hash; Compute artifact hash; Logic artifact hash.
-4. Assemble offers only under the authority-ledger per-band policy. Equal-count results survive when their governed identity is distinct.
-5. Cap presentation only after the complete certified offer set exists.
-6. Remove fallback. Surface stable legality, uncertainty, rejection and indeterminate codes.
+1. Implement the Product Base funnel explicitly for every size: classify X and Y axes; assign overall band; enumerate permitted frame hypotheses within those capacities; construct canonical odd/even parity registration; apply pattern permissions; classify nodes from T5 evidence; instantiate only approved patterns; then run certified placement and selection.
+2. Treat canonical registration as the deterministic starting frame, never the mechanical winner. Canonical proximity/X/Y may act only inside the final mechanically equivalent registration set.
+3. Apply the authority-ledger mechanics exactly; no qualitative placeholder or opaque score.
+4. Evaluate every approved size independently. No prior band's winner truncates another domain.
+5. Use the complete candidate identity: source geometry; size/window; population and origin parity; frame; pattern/variant; registration; profile hash; Compute artifact hash; Logic artifact hash.
+6. Return the complete selector result required by the Product Base: exact width, height and scale; X/Y classes and band; population, frame and registration; pattern ID and ordered node addresses; exact magnet centres; minimum verified clearance; supported-region, unsupported-extent and gravity evidence; proof/uncertainty status; stable decision and rejection reasons; complete identity hashes.
+7. Assemble offers only under the authority-ledger per-band policy. Equal-count results survive when their governed identity is distinct.
+8. Cap presentation only after the complete certified offer set exists.
+9. Remove fallback. Surface stable legality, uncertainty, rejection and indeterminate codes.
 
-**Verification:** every earlier criterion is tied before a later one decides; extra anchors never win by count; no fallback emits an answer; uncertain legal contenders cannot be silently dropped; T2 hard assertions pass.
+**Verification:** each size's trace proves the full classification-to-placement funnel ran; every earlier criterion is tied before a later one decides; canonical proximity never overrides mechanics; extra anchors never win by count; no fallback emits an answer; uncertain legal contenders cannot be silently dropped; every accepted result satisfies the complete selector-output schema; T2 hard assertions pass.
 
 ### T7 — replacement gate
 
@@ -198,10 +205,19 @@ The old sweep may falsify a missed placement. Agreement with it is not proof of 
 
 These deferrals do not permit omission of profile, Compute artifact and Logic artifact identity from the selector result.
 
+The selector increment also may not omit the Product Base's exact dimensions, scale, axis classes, band, frame/registration, pattern/node addresses, centres, clearance, mechanical evidence, proof status or stable reasons. Full fulfilment completion is deferred; the selector's own reproducible result is not.
+
+## Folder evidence disposition
+
+- **Governing:** this proposal, the two designated briefs and later direct rulings.
+- **Merge into execution:** the source-resolution findings, QA counterexamples, R3 neutral certification mechanics and the GPT transcript's Product Base derivations.
+- **Evidence only:** all adjudication frames/data, old engine observations, benchmarks and GPT delivered-package reports.
+- **Superseded history:** `v3.2-completion-proposal.md`, `v3.2-consolidated-plan.md`, `v3.2-task-breakdown.md`, `v3.2-review-and-mvp.md`, Kai's `FINAL-PROPOSAL.md` and the 27-item ballot brief. None may create work or a Dan gate. Preserve them only as provenance until a separately authorised archive cleanup.
+
 ## Necessity and sufficiency
 
-**Necessity — no unnecessary elements after correction.** One authority compilation, one clean subtraction, one independent oracle, one bounded backend probe, one Compute path, one Logic path, one replacement gate, one deletion and one UI wiring step. Hole support, six deletion commits, a fixed critical-point recipe, a new worker and package adoption are removed.
+**Necessity — no unnecessary elements after correction.** One authority compilation, one clean subtraction, one independent oracle, one bounded backend probe, one Compute path, one Logic path, one replacement gate, one deletion and one UI wiring step. The folder sweep adds no task: the missing classification funnel and selector-output contract belong inside T6. Hole support, six deletion commits, a fixed critical-point recipe, a new worker, package adoption and wholesale v3.3 transfer are removed.
 
-**Sufficiency — delivers the v3.2 selector directive in full once T0 clears.** The plan covers authority, exact continuous feasibility, lower-dimensional cases, certified mechanics, full identity, honest uncertainty/failure, deterministic output, performance, deletion of the old selector and live UI proof. It does not call an unresolved product rule an engineering fact.
+**Sufficiency — delivers the v3.2 selector directive in full once T0 clears.** The plan covers authority, the complete Product Base classification-to-placement funnel, exact continuous feasibility, lower-dimensional cases, certified mechanics, complete selector output and identity, honest uncertainty/failure, deterministic output, performance, deletion of the old selector and live UI proof. It does not call an unresolved product rule an engineering fact or treat v3.3 as the target architecture.
 
 **Final selection:** this document supersedes both submitted proposals. T0 must be completed from the existing briefs without a questionnaire; product build starts only on Dan's explicit go.
