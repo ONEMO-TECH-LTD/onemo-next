@@ -14,10 +14,9 @@ it('winners under side-hold law', { timeout: 3600000 }, () => {
     const contour: Contour = { outer: { pts: simplified.map(([u, v]: number[]) => [u * box.w, v * box.h] as Pt) }, holes: [] }
     const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, contour)!
     const rows = judged.bands.map((b) => {
-      const v = b.variants[0]
-      return v
-        ? `B${b.band.band}=${v.layout ?? 'auto'}·${v.sizeMM}·${v.anchors.length}pt L${v.wrap.left.toFixed(0)} R${v.wrap.right.toFixed(0)} T${v.wrap.top.toFixed(0)}/h${(v.topHangMM ?? 0).toFixed(0)} B${v.wrap.bottom.toFixed(0)}`
-        : `B${b.band.band}=NONE`
+      if (!b.variants.length) return `B${b.band.band}=NONE`
+      return `B${b.band.band}=[` + b.variants.map((v) =>
+        `${v.layout ?? 'auto'}·${v.sizeMM}·${v.anchors.length}pt L${v.wrap.left.toFixed(0)} R${v.wrap.right.toFixed(0)} T${v.wrap.top.toFixed(0)} B${v.wrap.bottom.toFixed(0)}`).join(' ; ') + ']'
     })
     process.stderr.write(`${name}: ${rows.join(' | ')}\n`)
   }

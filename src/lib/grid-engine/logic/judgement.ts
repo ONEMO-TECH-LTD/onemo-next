@@ -574,6 +574,71 @@ function judgeBand(
         }
       }
     }
+    // 3. THE GRID GROWTH DOOR (Dan, 2026-08-16: "geometric patterns are not laws — the shapes
+    //    must fit one grid row or column at a time, test each step growth, try fitting in each
+    //    band range"). The grid grows 1 -> 2 -> 2x2 -> 2x3 -> ... one row/column at a time;
+    //    each step is the LAWFUL population of that sub-window at the engine's own
+    //    registration — nodes the shape refuses simply drop, which is where the rectangular /
+    //    T / L bottom-heavy variants come from. The laws judge every step like any candidate.
+    try {
+      const field = computePreparedGrid(prepared, {
+        pitchMM: spec.grid.basePitchMM,
+        pattern: 'standard',
+        paddingMM: spec.grid.paddingMM,
+        plan: calibration.plan,
+        perimeterOnly: false,
+        center: calibration.center,
+      })
+      const nodes: Pt[] = field.anchors.map((a) => a.p)
+      const xs = [...new Set(nodes.map((n) => Math.round(n[0] * 100) / 100))].sort((m, n) => m - n)
+      const ys = [...new Set(nodes.map((n) => Math.round(n[1] * 100) / 100))].sort((m, n) => m - n)
+      for (let xi = 0; xi < xs.length; xi++) {
+        for (let xj = xi; xj < xs.length; xj++) {
+          for (let yi = 0; yi < ys.length; yi++) {
+            for (let yj = yi; yj < ys.length; yj++) {
+              const sub = nodes.filter(
+                (n) => n[0] >= xs[xi] - 1 && n[0] <= xs[xj] + 1 && n[1] >= ys[yi] - 1 && n[1] <= ys[yj] + 1,
+              )
+              if (sub.length < 1) continue
+              try {
+                const origin = sub[0]
+                const steps = sub.map(
+                  (n) =>
+                    [
+                      Math.round((n[0] - origin[0]) / spec.grid.basePitchMM),
+                      Math.round((n[1] - origin[1]) / spec.grid.basePitchMM),
+                    ] as [number, number],
+                )
+                const grid = computePreparedGrid(prepared, {
+                  pitchMM: spec.grid.basePitchMM,
+                  pattern: 'standard',
+                  paddingMM: spec.grid.paddingMM,
+                  plan: calibration.plan,
+                  perimeterOnly: true,
+                  construction: placeTemplate([origin[0], origin[1]], steps, spec.grid.basePitchMM),
+                })
+                const wv = variantFrom(
+                  spec,
+                  calibration,
+                  band,
+                  contour,
+                  sizeMM,
+                  spec.grid.basePitchMM,
+                  'standard',
+                  grid,
+                  `win-${xj - xi + 1}x${yj - yi + 1}`,
+                )
+                consider(wv)
+              } catch {
+                // refused sub-window — lawful silence
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // no field at this size — lawful silence
+    }
   }
 
   // Equality-safe three-way comparator (QA adjudication: `better ? -1 : 1` never returns 0,
@@ -650,7 +715,22 @@ function judgeBand(
   const fresh = offered.filter(
     (v) => !offeredBelow.has(layoutIdentity(v, halfPitch)) && v.anchors.length > prevCount,
   )
-  let final = fresh.slice(0, calibration.optionsPerBand)
+  // EXTRA OFFERS GROW (Dan, 2026-08-16 10:52: band 4 answered at 168 and hid the bigger
+  // optimal living at 200-216 — "bands while having more than 1 optimal choice at different
+  // scales — engine does not show them all, only 1"). A band's extra chips must each carry
+  // MORE magnets than every chip before them — a genuinely bigger grid unlocked later in
+  // the range, never the same arrangement re-listed looser.
+  // Extras live ONLY at the stepped band (Dan's example was band 4's 168 + the bigger
+  // optimal at 200-216); a lower band offering "next band's answer early" was measured
+  // stealing band 4's arrangement identity through the stepping law — one optimal there.
+  let maxOffered = 0
+  const growing: SizeVariant[] = []
+  for (const v of fresh) {
+    if (growing.length && v.anchors.length <= maxOffered) continue
+    growing.push(v)
+    if (v.anchors.length > maxOffered) maxOffered = v.anchors.length
+  }
+  let final = growing.slice(0, band.stepUp ? calibration.optionsPerBand : 1)
   // EVERY BAND ANSWERS (Dan: "each band must have at least one optimal layout") — but never
   // with a LAW-REJECTED placement (QA build-audit, 2026-08-15: the old kept[0] fallback could
   // emit an answer the hold laws refused). The fallback relaxes only the PREFERENCE filters

@@ -329,7 +329,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   structureDiagSlope: 0.35,
   structureMassRatio: 0.85,
   sizeStepMM: 2,
-  optionsPerBand: 1,
+  optionsPerBand: 4, // one per window step (Dan 2026-08-16: show every scale's optimal)
   bandSizeStepMM: 24,
   stripLinkMM: 108,
   cornersMinExtentMM: 72,
