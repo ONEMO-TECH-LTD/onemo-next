@@ -7,6 +7,7 @@ import {
 } from '../dist/src/index.js';
 
 const q=0.01;
+const dumbbell=[{x:-50,y:-30},{x:-10,y:-30},{x:-10,y:-11.9},{x:20,y:-11.9},{x:20,y:-12},{x:44,y:-12},{x:44,y:12},{x:20,y:12},{x:20,y:11.9},{x:-10,y:11.9},{x:-10,y:30},{x:-50,y:30}];
 
 test('closed tangency is legal and one-quantum intrusion is illegal',()=>{
   const p=preparePolygon([{x:-12,y:-12},{x:12,y:-12},{x:12,y:12},{x:-12,y:12}],{quantumMm:q});
@@ -68,6 +69,23 @@ test('possibly occupied sampling cells cannot fabricate exact region membership'
   const result=evaluateCriterionOnBox(p,[{x:0,y:0}],{minX:6,minY:0,maxX:6,maxY:0,depth:0,status:'BOUNDARY',id:'probe'},{id:'REGION_COVERAGE_V1',regions:[region]});
   assert.deepEqual(result.score,{components:[{lower:0,upper:1},{lower:0,upper:1}]});
   assert.equal(result.exactness,'CERTIFIED_APPROXIMATE');
+});
+
+test('possible-cell bridge cannot certify two exact safe components as one',()=>{
+  const p=preparePolygon(dumbbell,{quantumMm:q});
+  assert.equal(discContainedExact(p,{x:32,y:0},12).legal,true);
+  const hierarchy=buildComponentHierarchy(p,[12],6);
+  assert.equal(hierarchy.components.length,1);
+  assert.equal(hierarchy.components[0].exactWitnessPoints.some(point=>point.x===32&&point.y===0),false);
+  assert.equal(hierarchy.components[0].topologyCertified,false);
+  assert.equal(hierarchy.exactness,'INDETERMINATE');
+});
+
+test('per-level occupancy does not alias after 32 clearance levels',()=>{
+  const p=preparePolygon([{x:-20,y:-20},{x:20,y:-20},{x:20,y:20},{x:-20,y:20}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,Array.from({length:33},(_,index)=>12+index),5);
+  assert.equal(hierarchy.components.some(component=>component.levelIndex===32),false);
+  assert.equal(hierarchy.cells.every(cell=>cell.possibleLevels.length===33&&cell.definiteLevels.length===33),true);
 });
 
 test('neutral lattice is deterministic',()=>{

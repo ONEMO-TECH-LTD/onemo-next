@@ -107,8 +107,8 @@ export interface SafeGridCell {
   readonly iy: number;
   readonly centre: Point;
   readonly clearanceMm: number;
-  readonly levelMask: number;
-  readonly definiteLevelMask: number;
+  readonly possibleLevels: readonly boolean[];
+  readonly definiteLevels: readonly boolean[];
 }
 
 export interface SafeComponent {

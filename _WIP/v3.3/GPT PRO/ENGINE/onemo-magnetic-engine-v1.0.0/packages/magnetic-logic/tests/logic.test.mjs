@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCertifiedBandOffers, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
+  buildCertifiedBandOffers, buildStructuralEvidence, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
   LOGIC_ARTIFACT_HASH, registerProfile, selectedOffer, solveOutline, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
+import {preparePolygon} from '../../geometry-compute/dist/src/index.js';
 
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
+const dumbbell=[{x:-50,y:-30},{x:-10,y:-30},{x:-10,y:-11.9},{x:20,y:-11.9},{x:20,y:-12},{x:44,y:-12},{x:44,y:12},{x:20,y:12},{x:20,y:11.9},{x:-10,y:11.9},{x:-10,y:30},{x:-50,y:30}];
 const editableReference=()=>{const profile=structuredClone(createReferenceProfile());delete profile.profileHash;return profile;};
 const patternsAtStride=(patterns,stride)=>patterns.map(pattern=>{const [x0,y0]=pattern.cells[0];return{...pattern,cells:pattern.cells.map(([x,y])=>[x0+(x-x0)*stride/2,y0+(y-y0)*stride/2])};});
 const boundedB1Profile=maxMm=>{const profile=editableReference();profile.sizeDomain={minMm:24,maxMm,stepMm:12,bands:[{id:'B1',class:1,minMm:24,maxMm,maxInclusive:true,referenceMm:24}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1']}));return registerProfile(profile);};
@@ -129,4 +131,20 @@ test('unresolved sampled component structure propagates as decision indeterminat
   assert.equal(result.status,'DECISION_INDETERMINATE');
   assert.ok(result.reasons.includes('STRUCTURAL_EVIDENCE_UNCERTAIN'));
   assert.ok(result.reasons.includes('COMPONENT_TOPOLOGY_UNCERTAIN'));
+});
+
+test('possible-cell bridge makes structural region authority indeterminate',()=>{
+  const raw=editableReference();
+  raw.structural={...raw.structural,sampleStepMm:6,clearanceSurplusLevelsMm:[0],majorMinAreaDiscRatio:0,majorMinAreaShapeFraction:0,majorMinPersistenceLevels:1,forceLargestComponentMajor:true};
+  const evidence=buildStructuralEvidence(preparePolygon(dumbbell,{quantumMm:.01}),registerProfile(raw));
+  assert.equal(evidence.status,'INDETERMINATE');
+  assert.ok(evidence.reasons.includes('COMPONENT_TOPOLOGY_UNCERTAIN'));
+});
+
+test('registered 33-level policy cannot create an impossible structural component',()=>{
+  const raw=editableReference();
+  raw.structural={...raw.structural,clearanceSurplusLevelsMm:Array.from({length:33},(_,index)=>index),sampleStepMm:5};
+  const polygon=preparePolygon(rectangle(40,40),{quantumMm:.01});
+  const evidence=buildStructuralEvidence(polygon,registerProfile(raw));
+  assert.equal(evidence.hierarchy.components.some(component=>component.levelIndex===32),false);
 });
