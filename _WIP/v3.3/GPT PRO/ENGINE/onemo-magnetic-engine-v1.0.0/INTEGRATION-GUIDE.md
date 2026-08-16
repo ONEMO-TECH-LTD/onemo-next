@@ -20,8 +20,7 @@ The engine begins after the existing browser shell has produced one validated ou
 ```ts
 const canonicalOutline = adaptStudioOutline(editorOutline, {
   inputYAxis: 'DOWN',
-  centreOnBounds: true,
-  scaleToMm: 1
+  centreOnBounds: true
 });
 ```
 
@@ -45,7 +44,7 @@ Use `serializeManufacturingSpec` and `parseManufacturingSpec`. Store the exact s
 ## Server verification
 
 ```ts
-verifyOnServer(spec, registeredProfile);
+verifyOnServer(spec, currentManufacturingVerificationResolver(registeredProfile));
 ```
 
 Verification checks artifact hashes, profile hash, canonical hash, final geometry hash and exact centre containment at the effective verification radius.

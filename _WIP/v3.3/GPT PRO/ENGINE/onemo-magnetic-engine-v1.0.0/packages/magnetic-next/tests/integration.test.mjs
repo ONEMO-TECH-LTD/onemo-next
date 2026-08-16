@@ -6,6 +6,8 @@ import { verifyOnServer } from '../dist/src/server-verifier.js';
 import { solutionViewModels } from '../dist/src/solution-view-model.js';
 import { certifyAndBindSelectedBand } from '../dist/src/certification.js';
 import * as next from '../dist/src/index.js';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
 import { createReferenceProfile, currentManufacturingVerificationResolver, registerProfile, solveOutline } from '@onemo/magnetic-logic';
 
 const rectangle=(w,h,dx=0,dy=0)=>[{x:-w/2+dx,y:-h/2+dy},{x:w/2+dx,y:-h/2+dy},{x:w/2+dx,y:h/2+dy},{x:-w/2+dx,y:h/2+dy}];
@@ -21,6 +23,18 @@ test('ManufacturingSpec transport parser rejects wrong schema',()=>{assert.throw
 test('solution view model preserves band status',()=>{
   const models=solutionViewModels({schema:'onemo-magnetic-solve-v1',profileId:'p',profileHash:'h',computeArtifactHash:'c',logicArtifactHash:'l',sourceGeometryHash:'g',evaluated:[],offers:[{band:'B1',status:'NO_SOLUTION',reasons:['x']}],canonicalHash:'z'});
   assert.equal(models[0].status,'NO_SOLUTION');assert.deepEqual(models[0].reasons,['x']);
+});
+
+test('loader memoises the real Logic module',async()=>{
+  next.resetMagneticEngineLoaderForTests();const first=next.loadMagneticEngine(),second=next.loadMagneticEngine();
+  assert.equal(first,second);assert.equal(typeof (await first).solveOutline,'function');
+});
+
+test('overlay renders the exact quantized final ring instead of its bounding rectangle',async()=>{
+  const profile=singleRungProfile();const solve=await solveOutline({outlineMm:rectangle(24,24),profile});const solution=solve.offers[0].solution;
+  const markup=renderToStaticMarkup(createElement(next.ShapeSolutionOverlay,{solution,coordinateQuantumMm:profile.numeric.coordinateQuantumMm}));
+  const points=solution.finalRingInt.map(([x,y])=>`${x*profile.numeric.coordinateQuantumMm},${-y*profile.numeric.coordinateQuantumMm}`).join(' ');
+  assert.match(markup,new RegExp(`data-final-geometry-hash="${solution.geometryHash}"`));assert.ok(markup.includes(`points="${points}"`));assert.equal(markup.includes('<rect'),false);
 });
 
 test('selection certification rejects heuristic authority and missing smaller-rung proof',()=>{

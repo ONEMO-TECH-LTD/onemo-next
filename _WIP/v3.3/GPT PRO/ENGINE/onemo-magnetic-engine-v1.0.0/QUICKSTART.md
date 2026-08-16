@@ -36,7 +36,7 @@ export function MagneticSizing({ outline }) {
   return state.result?.offers.map(offer => (
     <section key={offer.band}>
       <h2>{offer.band}</h2>
-      {offer.solution && <ShapeSolutionOverlay solution={offer.solution} />}
+      {offer.solution && <ShapeSolutionOverlay solution={offer.solution} coordinateQuantumMm={profile.numeric.coordinateQuantumMm} />}
     </section>
   ));
 }

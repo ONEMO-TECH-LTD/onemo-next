@@ -21,6 +21,6 @@ Thin React/Next.js integration package. It contains no product rules.
 4. Persist only the returned canonical spec.
 5. Run `verifyOnServer` with the deployment's pinned profile/artifact resolver before creating a fulfilment record.
 
-The package declares React and Next as peer dependencies and does not bundle them. The source compiles without React installed by using a local declaration shim; the host application supplies the real runtime and types.
+The package declares React and Next as peer dependencies and does not bundle them. Its source and example compile against the real React type package used by the host application.
 
 A reference App Router page is included under `example/app/page.tsx`.

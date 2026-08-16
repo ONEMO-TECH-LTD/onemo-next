@@ -22,6 +22,9 @@
     "perf:page": "browsertime --browser chrome -n 3 --cpu --visualMetrics false"
   },
   "dependencies": {
+    "@onemo/geometry-compute": "file:_WIP/v3.3/GPT PRO/ENGINE/onemo-magnetic-engine-v1.0.0/packages/geometry-compute",
+    "@onemo/magnetic-logic": "file:_WIP/v3.3/GPT PRO/ENGINE/onemo-magnetic-engine-v1.0.0/packages/magnetic-logic",
+    "@onemo/magnetic-next": "file:_WIP/v3.3/GPT PRO/ENGINE/onemo-magnetic-engine-v1.0.0/packages/magnetic-next",
     "@countertype/clipper2-ts": "^1.5.4",
     "@hugeicons/core-free-icons": "^4.2.2",
     "@hugeicons/react": "^1.1.9",

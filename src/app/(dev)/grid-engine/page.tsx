@@ -13,7 +13,21 @@
 // from, "Prototypes / Control" node 14209:26629 at 402pt; that measurement is the design's, never
 // the implementation's.) The studio's visual design comes from Figma; this invents none.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  createReferenceProfile,
+  currentManufacturingVerificationResolver,
+} from '@onemo/magnetic-logic'
+import {
+  certifyAndBindSelectedBand,
+  parseManufacturingSpec,
+  serializeManufacturingSpec,
+  ShapeSolutionOverlay,
+  useMagneticSolutions,
+  verifyOnServer,
+  type CertifiedSelection,
+  type StudioPoint,
+} from '@onemo/magnetic-next'
 import {
   applyGridValue,
   isOptionsOnly,
@@ -34,14 +48,9 @@ import {
   minShapeSpan,
   panToAlign,
   resizeShape,
-  solveCutout,
-  type Contour,
   type FieldSummary,
-  type ShapeJudgement,
-  type SizeVariant,
 } from '@/lib/grid-engine/bridge'
-import { RELEASED_CALIBRATION } from '@/lib/grid-engine/spec'
-import { engineOutline, traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
+import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
 import { pinchFactor } from '@/lib/grid-engine/ui/camera'
 import styles from './page.module.css'
 
@@ -173,7 +182,7 @@ export default function GridEnginePage() {
     setBox((b) => (b ? resizeShape(spec, b, next) : b))
     // An engine answer belongs to ITS size. Any move to a different size makes it stale — showing
     // its marks at the new size drew a phantom second lattice (Dan, 2026-08-14).
-    setPicked((p) => (p && p.sizeMM === next ? p : null))
+    setPicked((p) => (p && p.solution.targetDominantMm === next ? p : null))
   }
 
   const commitSize = () => {
@@ -217,7 +226,7 @@ export default function GridEnginePage() {
     // The silhouette is the face it lands on — the picture is there to be switched TO, not from.
     setAsOutline(true)
     // A new silhouette invalidates the old verdict — the answer belongs to the shape it was asked of.
-    setJudged(null)
+    setSubmittedOutline(null)
     setPicked(null)
     void traceCutout(file).then(setOutline)
     const url = URL.createObjectURL(file)
@@ -278,7 +287,7 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
-    setJudged(null)
+    setSubmittedOutline(null)
     setPicked(null)
   }
 
@@ -286,74 +295,48 @@ export default function GridEnginePage() {
   //
   // Solve is EXPLICIT — a press, never a side effect of interaction (no solve on pan, drag, pinch or
   // slider; outline and law changes simply clear a stale answer). The shell hands the traced
-  // silhouette to the bridge and draws exactly what comes back: per released band, every
-  // grid-dictated size, and for the picked size the engine's own effect outline, magnet centres,
-  // magnet diameters, padding spots and flap markers. Nothing here computes; it renders the verdict.
-  const [judged, setJudged] = useState<ShapeJudgement | null>(null)
-  const [picked, setPicked] = useState<SizeVariant | null>(null)
-  const [solving, setSolving] = useState(false)
+  // silhouette to the v3.3 Next adapter and draws exactly what comes back. The old v3.2
+  // `solveCutout` selector is no longer reachable from this route.
+  const profile = useMemo(() => createReferenceProfile(), [])
+  const [submittedOutline, setSubmittedOutline] = useState<readonly StudioPoint[] | null>(null)
+  const magnetic = useMagneticSolutions(submittedOutline, profile)
+  const [picked, setPicked] = useState<CertifiedSelection | null>(null)
+  const solving = magnetic.status === 'loading'
 
-  // PROOF HOOK — the v1 bench discipline (window.__GRID_LAB_PROOF__): the engine's live answer,
+  // PROOF HOOK — the bench discipline (window.__GRID_ENGINE_PROOF__): the engine's live answer,
   // readable by probes and QA in the running page. Instrumentation only; nothing reads it back.
   useEffect(() => {
-    ;(window as unknown as Record<string, unknown>).__GRID_ENGINE_PROOF__ = { judged, picked, outline, box }
-  }, [judged, picked, outline, box])
+    ;(window as unknown as Record<string, unknown>).__GRID_ENGINE_PROOF__ = {
+      solve: magnetic.result,
+      selectedBand: picked?.solution.band,
+      manufacturingSpecHash: picked?.manufacturingSpec.canonicalHash,
+      outline,
+      box,
+    }
+  }, [magnetic.result, picked, outline, box])
 
   const solveNow = () => {
     if (!outline || !box || solving) return
-    setSolving(true)
     // The box carries the picture's true proportions; a bare UV pair does not — u and v are
     // fractions of DIFFERENT sides, and feeding them raw squashed the shape (locked-aspect law).
     const { w: boxW, h: boxH } = box
-    // Yield one frame so the busy state paints before the synchronous solve runs.
-    setTimeout(() => {
-      try {
-        // The ENGINE'S copy: v1's own minimum-feature simplification (the shape on SCREEN is the
-        // untouched original), in the picture's true proportions — the engine owns every millimetre.
-        const manufacturable = engineOutline(outline)
-        const contourMM: Contour = {
-          outer: { pts: manufacturable.map(([u, v]) => [u * boxW, v * boxH] as [number, number]) },
-          holes: [],
-        }
-        const answer = solveCutout(spec, RELEASED_CALIBRATION, contourMM)
-        setJudged(answer)
-        // The auto-pick takes THE SAME door as a chip press — picking is one path, so the lattice
-        // realigns here too. A second route skipped the pan and put magnets beside the grid.
-        const first = answer?.bands.find((b) => b.band.released && b.variants.length)?.variants[0]
-        if (first) pickVariant(first)
-        else setPicked(null)
-      } finally {
-        setSolving(false)
-      }
-    }, 0)
+    setPicked(null)
+    setSubmittedOutline(outline.map(([u, v]) => ({ x: u * boxW, y: v * boxH })))
   }
 
-  const pickVariant = (variant: SizeVariant) => {
-    setSize(variant.sizeMM)
-    setPicked(variant)
+  const pickBand = (band: string) => {
+    if (!magnetic.result || !submittedOutline) return
+    const bound = certifyAndBindSelectedBand(magnetic.result, band, submittedOutline, profile)
+    const serialized = serializeManufacturingSpec(bound.manufacturingSpec)
+    const persisted = parseManufacturingSpec(serialized)
+    verifyOnServer(persisted, currentManufacturingVerificationResolver(profile))
+    const selected = Object.freeze({ solution: bound.solution, manufacturingSpec: persisted })
+    setSize(selected.solution.targetDominantMm)
+    setPicked(selected)
     // REALIGN THE ONE LATTICE to this layout — the grid pans to meet the chosen registration
-    // (protocol law). The first seated magnet, in canvas frame, is the alignment point. The
-    // lattice's own discs ARE the magnet spots; nothing else is drawn.
-    const first = variant.anchors[0]
-    if (first) {
-      const { dx, dy } = engineFrame(variant)
-      setPan(panToAlign(spec, [first.p[0] + dx, first.p[1] + dy]))
-    }
-  }
-
-  /** Where the engine's frame sits on the canvas: its effect box centred, like the picture's box. */
-  const engineFrame = (variant: SizeVariant): { dx: number; dy: number } => {
-    let minX = Infinity,
-      maxX = -Infinity,
-      minY = Infinity,
-      maxY = -Infinity
-    for (const [x, y] of variant.effectContourMM.outer.pts) {
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-    }
-    return { dx: -(minX + maxX) / 2, dy: -(minY + maxY) / 2 }
+    // (protocol law). Magnetic coordinates are Y-up; the canvas is Y-down.
+    const first = selected.solution.centres[0]
+    if (first) setPan(panToAlign(spec, [first.xMm, -first.yMm]))
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -463,7 +446,7 @@ export default function GridEnginePage() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <div className={styles.titleRow}>
-          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>v3.2 · v1 core</span></span>
+          <span className={styles.title}>Grid engine <span style={{ fontSize: 10, opacity: 0.45, fontWeight: 400 }}>v3.3.1 · certified</span></span>
           <span className={styles.readout}>
             {box ? `${Math.round(box.w)} × ${Math.round(box.h)}mm` : `${sizeMM}mm`}
           </span>
@@ -540,7 +523,7 @@ export default function GridEnginePage() {
           <button
             type="button"
             className={styles.chip}
-            data-on={Boolean(judged)}
+            data-on={Boolean(magnetic.result)}
             onClick={solveNow}
             disabled={!outline || solving}
             title="Ask the engine: every grid-dictated size per band, with its exact magnet layout"
@@ -638,29 +621,27 @@ export default function GridEnginePage() {
             </g>
           )}
           {picked && (
-            /* THE SEATED SPOTS, highlighted the canon way (Dan's yardstick bench): a green ring
-               on the lattice's OWN disc at each seated anchor — same disc, same lattice, no
-               second geometry. Without it seated and empty cells are indistinguishable and no
-               visual gate against the canon is possible. */
-            (() => {
-              const { dx, dy } = engineFrame(picked)
-              return (
-                <g pointerEvents="none" transform={`translate(${dx} ${dy})`}>
-                  {picked.anchors.map((anchor, i) => (
-                    <circle
-                      key={`s${i}`}
-                      cx={anchor.p[0]}
-                      cy={anchor.p[1]}
-                      r={spec.grid.paddingMM}
-                      fill="none"
-                      stroke="#6fdc8c"
-                      strokeWidth={1.5}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </g>
-              )
-            })()
+            <g pointerEvents="none" data-final-geometry-hash={picked.solution.geometryHash}>
+              <polygon
+                points={picked.solution.finalRingInt.map(([x, y]) => `${x * profile.numeric.coordinateQuantumMm},${-y * profile.numeric.coordinateQuantumMm}`).join(' ')}
+                fill="rgba(88,194,255,0.08)"
+                stroke="#58c2ff"
+                strokeWidth={1.5}
+                vectorEffect="non-scaling-stroke"
+              />
+              {picked.solution.centres.map((centre, index) => (
+                <circle
+                  key={`${centre.cell[0]}:${centre.cell[1]}:${index}`}
+                  cx={centre.xMm}
+                  cy={-centre.yMm}
+                  r={profile.safety.baseProtectedRadiusMm}
+                  fill="none"
+                  stroke="#6fdc8c"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
           )}
         </GridCanvas>
       </div>
@@ -733,35 +714,32 @@ export default function GridEnginePage() {
           </div>
         </details>
 
-        {judged && (
+        {magnetic.result && (
           <div className={styles.fixture}>
             <span className={styles.fixtureName}>Engine</span>
-            {judged.bands.map((answer) =>
-              answer.variants.length ? (
-                answer.variants.map((variant) => (
+            {magnetic.options.map((option) => {
+              const offer = magnetic.result?.offers.find((candidate) => candidate.band === option.band)
+              return offer?.solution ? (
                   <button
-                    key={`${answer.band.band}-${variant.sizeMM}-${variant.anchors.length}-${variant.layout ?? variant.pattern + variant.pitchMM}`}
+                    key={option.band}
                     type="button"
                     className={styles.chip}
-                    data-on={picked === variant}
-                    /* Bands 1 and 4 are hidden in the PRODUCT (Dan, 2026-08-11) — the admin bench
-                       reviews everything, dimmed so the product boundary stays visible. */
-                    style={answer.band.released ? undefined : { opacity: 0.45 }}
-                    onClick={() => pickVariant(variant)}
-                    title={`band ${answer.band.band}${answer.band.released ? '' : ' (hidden in product)'} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern} · ${variant.tier} · flap ${Math.round(variant.wrap.maxSide)}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
+                    data-on={picked?.solution.band === option.band}
+                    onClick={() => pickBand(option.band)}
+                    title={`${option.label} · ${offer.solution.centres.length} magnets · ${offer.solution.patternId}`}
                   >
-                    B{answer.band.band}·{variant.sizeMM}·{variant.anchors.length}pt
-                    {variant.flaps.length > 0 ? '·⚠' : ''}
+                    {option.label}
                   </button>
-                ))
               ) : (
-                <span key={answer.band.band} className={styles.rowUnit}>
-                  B{answer.band.band}: none
+                <span key={option.band} className={styles.rowUnit} title={option.reasons.join(', ')}>
+                  {option.label}
                 </span>
-              ),
-            )}
+              )
+            })}
+            {picked && <ShapeSolutionOverlay className={styles.solutionPreview} solution={picked.solution} coordinateQuantumMm={profile.numeric.coordinateQuantumMm} discRadiusMm={profile.safety.baseProtectedRadiusMm} />}
           </div>
         )}
+        {magnetic.error && <p className={styles.refusal}>{magnetic.error.message}</p>}
 
         <div className={styles.fixture}>
           <span className={styles.fixtureName}>Size</span>

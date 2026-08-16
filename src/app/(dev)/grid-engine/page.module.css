@@ -311,6 +311,12 @@
   white-space: nowrap;
 }
 
+.solutionPreview {
+  width: 96px;
+  height: 96px;
+  color: #0284c7;
+}
+
 /* drag for the sweep, type for the exact number — the same value, two ways in */
 .slider {
   flex: 1;
