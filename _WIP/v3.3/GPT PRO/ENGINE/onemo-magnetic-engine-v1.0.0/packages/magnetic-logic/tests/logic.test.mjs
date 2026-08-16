@@ -7,6 +7,7 @@ import {
 
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
 const circle=(diameter,segments=64)=>Array.from({length:segments},(_,i)=>{const a=2*Math.PI*i/segments;return{x:Math.cos(a)*diameter/2,y:Math.sin(a)*diameter/2};});
+const editableReference=()=>{const profile=structuredClone(createReferenceProfile());delete profile.profileHash;return profile;};
 
 test('profile is immutable and content-addressed',()=>{
   const profile=createReferenceProfile();assert.ok(profile.profileHash.length===64);assert.equal(Object.isFrozen(profile),true);
@@ -51,14 +52,38 @@ test('alternate calibrated values reuse the same Compute engine',()=>{
   const base=createReferenceProfile();const draft=structuredClone(base);delete draft.profileHash;draft.id='alternate-grid';draft.version=1;draft.grid.cellMm=20;draft.grid.nodeStrideCells=3;draft.grid.populations=[{id:'grid60',strideCells:3,enabled:true,originParities:[[0,0]]}];draft.patterns=draft.patterns.map(pattern=>({...pattern,populationId:'grid60'}));const alternate=registerProfile(draft);assert.equal(alternate.grid.cellMm,20);assert.notEqual(alternate.profileHash,base.profileHash);
 });
 
-test('selected B1 size can complete the certified physical pipeline under an explicitly production-ready profile',async()=>{
-  const base=createReferenceProfile();const {profileHash:_hash,...raw}=structuredClone(base);raw.id='technical-production-test';raw.productionReady=true;
-  const profile=registerProfile(raw);const outline=rectangle(24,24);const preview=await solveOutline({outlineMm:outline,profile});
-  assert.match(LOGIC_ARTIFACT_HASH,/^[0-9a-f]{64}$/);
-  const certified=certifySizeSolution({outlineMm:outline,profile,targetDominantMm:24});assert.equal(certified.status,'ACCEPTED');assert.equal(certified.decisionProof,'CERTIFIED_CONTINUOUS_OPTIMUM');
-  const spec=createEngineManufacturingSpec(preview,certified,profile);assert.equal(spec.proofStatus,'CERTIFIED_CONTINUOUS_OPTIMUM_EXACT_AT_QUANTUM');
-  const physical={id:'test-magnet',version:1,magnetDiameterMm:8,magnetThicknessMm:1,cutToleranceMm:0,placementToleranceMm:0,materialToleranceMm:0,assemblyToleranceMm:0,assemblyProfileId:'test-assembly'};
-  assert.equal(completeFulfilmentSpec(spec,profile,physical).verificationStatus,'VERIFIED');
+test('solve revalidates a supplied registered-profile hash',async()=>{
+  const profile=structuredClone(createReferenceProfile());
+  profile.grid.cellMm=20;
+  await assert.rejects(()=>solveOutline({outlineMm:rectangle(72,36),profile}),/profile hash mismatch/);
+});
+
+test('selected-size certification revalidates a supplied registered-profile hash',()=>{
+  const profile=structuredClone(createReferenceProfile());
+  profile.grid.cellMm=20;
+  assert.throws(()=>certifySizeSolution({outlineMm:rectangle(24,24),profile,targetDominantMm:24}),/profile hash mismatch/);
+});
+
+test('profile registration rejects non-executable domains and policies',async(t)=>{
+  const cases=[
+    ['zero size step',profile=>{profile.sizeDomain.stepMm=0;}],
+    ['non-finite translation period',profile=>{profile.translation.periodMm=Infinity;}],
+    ['unordered clearance levels',profile=>{profile.structural.clearanceSurplusLevelsMm=[0,8,4];}],
+    ['invalid population parity',profile=>{profile.grid.populations[0].originParities=[[2,0]];}],
+    ['duplicate population id',profile=>{profile.grid.populations.push(structuredClone(profile.grid.populations[0]));}],
+    ['off-population pattern coordinates',profile=>{profile.patterns[0].cells=[[0,0],[1,0]];}],
+    ['incomplete mechanics registry',profile=>{profile.mechanics.criteria=profile.mechanics.criteria.slice(0,-1);}],
+    ['non-finite mechanics tolerance',profile=>{profile.mechanics.criteria[0].tolerances=[NaN,0];}],
+    ['unresolved production assumptions',profile=>{profile.productionReady=true;}]
+  ];
+  for(const [name,mutate] of cases){
+    await t.test(name,()=>{const profile=editableReference();mutate(profile);assert.throws(()=>registerProfile(profile),/invalid profile/);});
+  }
+});
+
+test('reference profile cannot be promoted to production while product inputs remain unresolved',()=>{
+  const raw=editableReference();raw.id='technical-production-test';raw.productionReady=true;
+  assert.throws(()=>registerProfile(raw),/unresolved production assumptions/);
 });
 
 test('continuous certification reports indeterminate instead of guessing when mechanics cannot be proved',()=>{
@@ -66,4 +91,3 @@ test('continuous certification reports indeterminate instead of guessing when me
   assert.equal(result.status,'DECISION_INDETERMINATE');
   assert.ok(result.reasons.includes('CRITERION_SCORE_UNCERTAIN'));
 });
-

@@ -24,6 +24,18 @@ export function quantizeScalar(mm: number, quantumMm: number): number {
   return value;
 }
 
+export function quantizeNonNegativeCeiling(mm: number, quantumMm: number): number {
+  assertQuantum(quantumMm);
+  if (!Number.isFinite(mm) || mm < 0) {
+    throw new ComputeError('NUMERIC_OVERFLOW', 'cannot quantize a non-finite or negative magnitude', { mm, quantumMm });
+  }
+  const value = Math.ceil(mm / quantumMm);
+  if (!Number.isSafeInteger(value) || value > MAX_SAFE_CANONICAL) {
+    throw new ComputeError('NUMERIC_OVERFLOW', 'quantized magnitude exceeds safe integer range', { mm, quantumMm, value });
+  }
+  return value;
+}
+
 export function dequantizeScalar(value: number, quantumMm: number): number {
   if (!Number.isSafeInteger(value)) throw new ComputeError('NUMERIC_OVERFLOW', 'canonical coordinate must be a safe integer', { value });
   return value * quantumMm;

@@ -14,6 +14,13 @@ test('closed tangency is legal and one-quantum intrusion is illegal',()=>{
   assert.equal(discContainedExact(p,{x:0.01,y:0},12).legal,false);
 });
 
+test('non-aligned safety radius rounds upward and cannot approve negative margin',()=>{
+  const p=preparePolygon([{x:-12,y:-12},{x:12,y:-12},{x:12,y:12},{x:-12,y:12}],{quantumMm:q});
+  const proof=discContainedExact(p,{x:0,y:0},12.004);
+  assert.equal(proof.legal,false);
+  assert.ok(proof.marginMm<0);
+});
+
 test('irregular concave boundary invalidates a centre-inside disc',()=>{
   const p=preparePolygon([{x:-50,y:-50},{x:50,y:-50},{x:50,y:50},{x:10,y:50},{x:10,y:0},{x:-10,y:0},{x:-10,y:50},{x:-50,y:50}],{quantumMm:q});
   const proof=discContainedExact(p,{x:0,y:-10},15);

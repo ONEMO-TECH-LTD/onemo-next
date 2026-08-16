@@ -24,10 +24,12 @@ import type {
   CandidateHypothesis,
   CandidateScoreTrace,
   MechanicsCriterionPolicy,
+  ProductProfile,
   RegisteredProfile,
   SizeFailure,
   SizeSolution
 } from './contracts.js';
+import { registerProfile } from './profile-registry.js';
 import { classifyAxis, overallBand } from './bands.js';
 import { permittedPatterns } from './patterns-permissions.js';
 import { frameFits, frameForPattern, patternOffsetsMm, translationDomain } from './frames-registration.js';
@@ -290,7 +292,7 @@ function optimiseCriterionAcrossCandidates(
 
 export interface CertifiedSizeInput {
   readonly outlineMm: readonly Point[];
-  readonly profile: RegisteredProfile;
+  readonly profile: ProductProfile | RegisteredProfile;
   readonly targetDominantMm: number;
 }
 
@@ -298,7 +300,9 @@ export interface CertifiedSizeInput {
  * low-latency preview solve: production specifications must be created from this
  * continuous-domain, dominance-safe path. */
 export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | SizeFailure {
-  const { profile, targetDominantMm: target } = input;
+  const profile = registerProfile(input.profile);
+  if (profile.approvalState !== 'approved') throw new Error('PROFILE_UNAPPROVED');
+  const { targetDominantMm: target } = input;
   const source = preparePolygon(input.outlineMm, {
     quantumMm: profile.numeric.coordinateQuantumMm,
     maxVertices: profile.numeric.maxVertices
