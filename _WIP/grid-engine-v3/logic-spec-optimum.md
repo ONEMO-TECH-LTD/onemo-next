@@ -66,10 +66,18 @@ Bands: B1 24–72 · B2 72–120 · B3 120–168 · B4 168–216 · B5 216–264
 [OPEN]). Band = dominant axis class; each axis classified independently (tall B2 ≠ wide B2 ≠
 square B2 — axis class is CAPACITY, never a compulsory layout).
 
+**THERE IS NO BAND-COUNT RULE** [RULED — Dan 2026-08-16: "we do not have rule of band 1 = 1
+magnet or band 2 having only pair - wrong as square in band 2 is 4 magnets - only narrow
+shapes that represent rectangular shape class produce pairs in band 2"]. The count comes from
+the **class × band frame** (§5), reduced by material — never from the band alone. B1 = one
+magnet is a geometric consequence (under 72mm only one node line fits per axis), not a rule.
+The walkthrough's "band 1 and 1 magnet / band 2 and two" lines were per-shape examples of
+narrow classes, not band laws.
+
 | Band | The optimum it owes | Source |
 |---|---|---|
-| **B1** | ONE magnet, seated in the top of the mass (gravity: "if only one magnet can be placed top is preference"), tightly wrapped | RULED (L20, duck walkthrough) |
-| **B2** | THE PAIR, orientation following the shape's own axis — vertical for standing, horizontal across wings, diagonal for diagonal shapes (same lattice) — snug, centered | RULED (L20 by-example, six shapes) |
+| **B1** | The 1×1 frame (geometry admits nothing more), seated in the top of the mass (gravity: "if only one magnet can be placed top is preference"), tightly wrapped | RULED (L20, duck walkthrough; count = geometric consequence) |
+| **B2** | The class's frame: **square-like → 2×2 four** (the square standard); **narrow/rectangular → the pair**, orientation following the shape's own axis — vertical for standing, horizontal across wings, diagonal for diagonal shapes (same lattice) — snug, centered | RULED (square standard + 08-16 correction; L20 by-example for the narrow classes) |
 | **B3** | The shape's **structural pattern revealed**: the arrangement class its material names — apex/T for tapered, corners spanning the waist, narrow rect for standing mass, corner square for blobs, chain for diagonals. Corners at the extremes; mid rows OPTIONAL | RULED (L20 corner-holds + row-skipping rulings) |
 | **B4** | The **stepped band**: the same arrangement class grown — "only the lattice step grows" (48→96) AND the grid grows by an extra disc minimum or an entire row/column vs B3. "At least 4 points is easy." Bottom-heavy lawful: "6 or 9 or a variation … more disks at the bottom and less in the top" — the upper mass may hang as a limb (hang bound = limb allowance at this band only). Never band 3's answer re-offered looser | RULED (08-13 + 08-15/16 sessions) |
 | **B5** | Exists in the authority doc (216–264). The bat's face+skirt co-registered tight seat (~219) lives here | [OPEN — product call] |
@@ -195,6 +203,8 @@ the logic engine"]:
 - the released profile: pitch 48/96, padding 12, bands, counts, bounds (12/24/28/40/108),
   templates, thresholds — guarded writers, refuse-never-clamp, versioned/hashed when released
 - band/axis classification, frame hypotheses, pattern permissions
+  (KNOWN DELTA: the coded "band count law" — targetMagnets B1=1/B2=2 as a universal ranking
+  key — is mis-derived per the 08-16 correction; it must become the class×band frame of §5)
 - the selection order of §2, the per-band laws of §3, the offer policy of §1.2
 - v3.2 today: `spec.ts` + `logic/judgement.ts` — the ranking re-base to §2's order is the
   known delta (regions in, count last, evenness promoted, bulls-eye marking)
