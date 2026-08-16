@@ -1,5 +1,25 @@
 # FINAL PROPOSAL — v3.2 → THE PRODUCT SELECTOR
 
+> **⚠ SUPERSEDED 2026-08-16.** Dan directed s62-grid-meta-qa to consolidate the plan. The
+> governing document is now **`FINAL-CONSOLIDATED-PROPOSAL.md`** (owner: s62-grid-meta-qa,
+> their worktree `.codex/worktrees/s62-grid-meta-qa-be3df7f9/_WIP/grid-engine-v3.2/`,
+> local commit `e4730ee6`). **Do not build from this file.**
+>
+> It kept this proposal's execution skeleton — the `60656152` base, the dirty-edit disposition,
+> removal separated from replacement, task-level verification — and corrected it in ways I
+> verified myself and accept:
+> - **T4.3's critical set is mathematically incomplete.** Balance minimises a convex quadratic
+>   over the feasible region; when its unconstrained minimiser lies inside, the optimum is
+>   strictly interior — not a vertex, canonical projection, or directional extremum. My recipe
+>   holds only for linear criteria. Each descriptor must carry its own completeness proof.
+> - **`compute/offset.ts` cannot build the safe core** — verified: it keeps only the largest
+>   ring after inflation, which would silently delete a legitimately split safe region.
+> - **Authority closure (their T0) precedes implementation**, and the open-decision set is
+>   larger than the three items I listed — the R3 ledger still holds unresolved rows.
+> - A bounded backend/representation probe becomes its own gated task.
+>
+> This file remains only as the record of what was proposed and how it was corrected.
+
 **Status:** proposal for review. **Nothing is built until Dan says go.**
 **Supersedes** `v3.2-completion-proposal.md`, `v3.2-consolidated-plan.md` and
 `v3.2-task-breakdown.md` — this is the single document; those remain as history.
