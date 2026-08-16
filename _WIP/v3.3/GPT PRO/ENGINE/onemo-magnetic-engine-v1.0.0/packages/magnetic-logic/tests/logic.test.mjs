@@ -2,16 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildCertifiedBandOffers, buildStructuralEvidence, certifySizeSolution, classifyAxis, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
-  LOGIC_ARTIFACT_HASH, registerProfile, selectedOffer, solveOutline, verifyEngineManufacturingSpec
+  criterionDescriptor, LOGIC_ARTIFACT_HASH, permittedPatterns, registerProfile, selectedOffer, selectDiscreteIdentity, solveOutline, verifyEngineManufacturingSpec
 } from '../dist/src/index.js';
+import * as logic from '../dist/src/index.js';
 import {preparePolygon} from '../../geometry-compute/dist/src/index.js';
 
 const rectangle=(w,h)=>[{x:-w/2,y:-h/2},{x:w/2,y:-h/2},{x:w/2,y:h/2},{x:-w/2,y:h/2}];
 const dumbbell=[{x:-50,y:-30},{x:-10,y:-30},{x:-10,y:-11.9},{x:20,y:-11.9},{x:20,y:-12},{x:44,y:-12},{x:44,y:12},{x:20,y:12},{x:20,y:11.9},{x:-10,y:11.9},{x:-10,y:30},{x:-50,y:30}];
 const editableReference=()=>{const profile=structuredClone(createReferenceProfile());delete profile.profileHash;return profile;};
 const patternsAtStride=(patterns,stride)=>patterns.map(pattern=>{const [x0,y0]=pattern.cells[0];return{...pattern,cells:pattern.cells.map(([x,y])=>[x0+(x-x0)*stride/2,y0+(y-y0)*stride/2])};});
-const boundedB1Profile=maxMm=>{const profile=editableReference();profile.sizeDomain={minMm:24,maxMm,stepMm:12,bands:[{id:'B1',class:1,minMm:24,maxMm,maxInclusive:true,referenceMm:24}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1']}));return registerProfile(profile);};
-const singleRungProfile=()=>{const profile=editableReference();profile.sizeDomain={minMm:48,maxMm:49,stepMm:12,bands:[{id:'B1',class:1,minMm:48,maxMm:49,maxInclusive:true,referenceMm:48}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1']}));profile.translation={...profile.translation,allowX:false,allowY:false};return registerProfile(profile);};
+const boundedB1Profile=maxMm=>{const profile=editableReference();profile.sizeDomain={minMm:24,maxMm,stepMm:12,bands:[{id:'B1',class:1,minMm:24,maxMm,maxInclusive:true,referenceMm:24}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1'],allowedAxisClassPairs:[[1,1]]}));return registerProfile(profile);};
+const singleRungProfile=()=>{const profile=editableReference();profile.sizeDomain={minMm:48,maxMm:49,stepMm:12,bands:[{id:'B1',class:1,minMm:48,maxMm:49,maxInclusive:true,referenceMm:48}],primaryOffer:'SMALLEST_ACCEPTED_PER_BAND'};profile.permissions=profile.permissions.map(permission=>({...permission,bands:['B1'],allowedAxisClassPairs:[[1,1]]}));profile.translation={...profile.translation,allowX:false,allowY:false};return registerProfile(profile);};
 
 test('profile is immutable and content-addressed',()=>{
   const profile=createReferenceProfile();assert.ok(profile.profileHash.length===64);assert.equal(Object.isFrozen(profile),true);
@@ -47,6 +48,8 @@ test('same input and artifact identities produce byte-identical canonical result
 
 test('engine ManufacturingSpec round-trips and exact re-verifies',async()=>{
   const p=singleRungProfile();const result=await solveOutline({outlineMm:rectangle(24,24),profile:p});const solution=selectedOffer(result,'B1');const spec=createEngineManufacturingSpec(result,solution,p);const verified=verifyEngineManufacturingSpec(spec,p);assert.equal(verified.valid,true);assert.equal(spec.proofStatus,'REFERENCE_PROFILE_NOT_PRODUCTION');
+  assert.equal(spec.populationStrideCells,2);assert.deepEqual(spec.populationOriginParity,[0,0]);
+  assert.deepEqual(spec.decisionTrace.slice(-2).map(trace=>trace.criterionId),['M09_DISCRETE_ID','M10_REGISTRATION_ID']);
 });
 
 test('ManufacturingSpec requires certified reconstructed offer authority',async()=>{
@@ -67,7 +70,7 @@ test('reference profile blocks physical fulfilment until tolerances are supplied
 });
 
 test('alternate calibrated values reuse the same Compute engine',()=>{
-  const base=createReferenceProfile();const draft=structuredClone(base);delete draft.profileHash;draft.id='alternate-grid';draft.version=1;draft.grid.cellMm=20;draft.grid.nodeStrideCells=3;draft.grid.populations=[{id:'grid60',strideCells:3,enabled:true,originParities:[[0,0]]}];draft.patterns=patternsAtStride(draft.patterns,3).map(pattern=>({...pattern,populationId:'grid60'}));const alternate=registerProfile(draft);assert.equal(alternate.grid.cellMm,20);assert.notEqual(alternate.profileHash,base.profileHash);
+  const base=createReferenceProfile();const draft=structuredClone(base);delete draft.profileHash;draft.id='alternate-grid';draft.version=1;draft.grid.cellMm=20;draft.grid.nodeStrideCells=3;draft.grid.populations=[{id:'grid60',strideCells:3,enabled:true,originParities:[[0,0]]}];draft.patterns=patternsAtStride(draft.patterns,3).map(pattern=>({...pattern,populationId:'grid60'}));draft.permissions=draft.permissions.map(permission=>({...permission,allowedPopulationIds:['grid60']}));const alternate=registerProfile(draft);assert.equal(alternate.grid.cellMm,20);assert.notEqual(alternate.profileHash,base.profileHash);
 });
 
 test('solve revalidates a supplied registered-profile hash',async()=>{
@@ -119,7 +122,8 @@ test('patterns use their population stride rather than a hard-coded parity',()=>
 });
 
 test('continuous certification reports indeterminate instead of guessing when mechanics cannot be proved',()=>{
-  const result=certifySizeSolution({outlineMm:rectangle(72,72),profile:createReferenceProfile(),targetDominantMm:72});
+  const raw=editableReference();raw.permissions=raw.permissions.map(permission=>({...permission,marginalNodesAllowed:true,requiredMajorRegionsCovered:0}));
+  const result=certifySizeSolution({outlineMm:rectangle(72,72),profile:registerProfile(raw),targetDominantMm:72});
   assert.equal(result.status,'DECISION_INDETERMINATE');
   assert.ok(result.reasons.includes('CRITERION_SCORE_UNCERTAIN'));
 });
@@ -147,4 +151,94 @@ test('registered 33-level policy cannot create an impossible structural componen
   const polygon=preparePolygon(rectangle(40,40),{quantumMm:.01});
   const evidence=buildStructuralEvidence(polygon,registerProfile(raw));
   assert.equal(evidence.hierarchy.components.some(component=>component.levelIndex===32),false);
+});
+
+test('every configured population parity becomes a distinct applied frame hypothesis',()=>{
+  const raw=editableReference();
+  raw.grid.populations[0].strideCells=4;
+  raw.grid.populations[0].originParities=[[0,0],[1,0]];
+  raw.patterns=patternsAtStride(raw.patterns,4);
+  const profile=registerProfile(raw);
+  assert.equal(typeof logic.framesForPattern,'function');
+  const pattern=profile.patterns.find(candidate=>candidate.id==='single');
+  const frames=logic.framesForPattern(profile,pattern);
+  assert.deepEqual(frames.map(frame=>frame.populationOriginParity),[[0,0],[1,0]]);
+  assert.deepEqual(logic.patternCellsForFrame(profile,pattern,frames[0]),[[0,0]]);
+  assert.deepEqual(logic.patternCellsForFrame(profile,pattern,frames[1]),[[2,0]]);
+  const row=profile.patterns.find(candidate=>candidate.id==='row.3');
+  assert.equal(logic.framesForPattern(profile,row)[0].nx,3);
+});
+
+test('permission records enforce exact axis and population authority',()=>{
+  const raw=editableReference();
+  raw.permissions=raw.permissions.map(permission=>permission.patternId==='pair.vertical'?{
+    ...permission,bands:['B2'],allowedAxisClassPairs:[[1,2]],allowedPopulationIds:['grid48']
+  }:permission);
+  const profile=registerProfile(raw);
+  assert.equal(permittedPatterns(profile,'B2',2,2).some(item=>item.pattern.id==='pair.vertical'),false);
+});
+
+test('permission authority requires every PD-19 dimension',()=>{
+  for(const field of ['allowedAxisClassPairs','allowedPopulationIds','requiredMajorRegionsCovered','alternativeOrientationsConsidered','primaryOfferAllowed','fallbackAllowed']){
+    const raw=editableReference();delete raw.permissions[0][field];
+    assert.throws(()=>registerProfile(raw),new RegExp(field));
+  }
+});
+
+test('alternative-orientation permission expands only its declared symmetry family',()=>{
+  const raw=editableReference();
+  raw.permissions=raw.permissions.map(permission=>permission.patternId==='l.bottom-left'
+    ?{...permission,bands:['B2'],allowedAxisClassPairs:[[2,2]],alternativeOrientationsConsidered:true}
+    :permission.patternId.startsWith('l.')?{...permission,bands:['B3'],allowedAxisClassPairs:[[3,3]]}:permission);
+  const allowed=permittedPatterns(registerProfile(raw),'B2',2,2).filter(item=>item.pattern.symmetryFamily==='l.3');
+  assert.deepEqual(allowed.map(item=>item.pattern.id),['l.bottom-left','l.bottom-right','l.top-left','l.top-right']);
+});
+
+test('major-coverage and marginal-node permissions constrain certified registrations',()=>{
+  const coverage=structuredClone(singleRungProfile());delete coverage.profileHash;
+  coverage.permissions=coverage.permissions.map(permission=>permission.patternId==='single'?{...permission,requiredMajorRegionsCovered:2}:permission);
+  const denied=certifySizeSolution({outlineMm:rectangle(24,24),profile:registerProfile(coverage),targetDominantMm:48});
+  assert.equal(denied.status,'REJECTED');assert.ok(denied.reasons.some(reason=>reason.includes('PATTERN_PERMISSION_DENIED')));
+
+  const marginal=structuredClone(singleRungProfile());delete marginal.profileHash;
+  marginal.structural={...marginal.structural,clearanceSurplusLevelsMm:[0],majorMinAreaDiscRatio:999,majorMinAreaShapeFraction:999,majorMinPersistenceLevels:2,forceLargestComponentMajor:false};
+  marginal.permissions=marginal.permissions.map(permission=>({...permission,requiredMajorRegionsCovered:0,marginalNodesAllowed:false}));
+  assert.equal(certifySizeSolution({outlineMm:rectangle(24,24),profile:registerProfile(marginal),targetDominantMm:48}).status,'REJECTED');
+  marginal.permissions=marginal.permissions.map(permission=>({...permission,marginalNodesAllowed:true}));
+  assert.equal(certifySizeSolution({outlineMm:rectangle(24,24),profile:registerProfile(marginal),targetDominantMm:48}).status,'ACCEPTED');
+});
+
+test('primary eligibility outranks fallback rank, and fallback is used only when needed',()=>{
+  const fixture=primaryAllowed=>{const raw=structuredClone(singleRungProfile());delete raw.profileHash;
+    const original=raw.patterns.find(pattern=>pattern.id==='single');raw.patterns.push({...original,id:'single.fallback'});
+    const primaryPermission=raw.permissions.find(permission=>permission.patternId==='single');
+    Object.assign(primaryPermission,{patternRank:10,primaryOfferAllowed:primaryAllowed,fallbackAllowed:true});
+    raw.permissions.push({...primaryPermission,patternId:'single.fallback',patternRank:0,primaryOfferAllowed:false,fallbackAllowed:true});return registerProfile(raw);};
+  const primary=certifySizeSolution({outlineMm:rectangle(24,24),profile:fixture(true),targetDominantMm:48});
+  assert.equal(primary.status,'ACCEPTED');assert.equal(primary.patternId,'single');
+
+  const fallback=certifySizeSolution({outlineMm:rectangle(24,24),profile:fixture(false),targetDominantMm:48});
+  assert.equal(fallback.status,'ACCEPTED');assert.equal(fallback.patternId,'single.fallback');
+});
+
+test('M02 upper-region identity follows registered topDirection projection',()=>{
+  const raw=editableReference();raw.mechanics={...raw.mechanics,topDirection:{x:1,y:0}};
+  const profile=registerProfile(raw);
+  const region=(id,bounds)=>({id,bounds,gridOrigin:{x:0,y:0},cellStepMm:1,radiusMm:12,errorEnvelopeMm:0,definitelyOccupiedCellKeys:new Set(),possiblyOccupiedCellKeys:new Set(),exactWitnessPoints:[]});
+  const regions=[region('high-y',{minX:-10,maxX:-9,minY:0,maxY:100}),region('right',{minX:9,maxX:10,minY:0,maxY:1})];
+  const descriptor=criterionDescriptor(profile.mechanics.criteria[1],{},profile,regions);
+  assert.deepEqual(descriptor.subsetIds,['right']);
+});
+
+test('discrete identity uses canonical code-unit ordering instead of locale',()=>{
+  const candidate=populationId=>({frame:{populationId,populationStrideCells:2,populationOriginParity:[0,0],id:'1x1'},pattern:{id:'single',version:1,populationId,cells:[[0,0]],variantId:'default',frameId:'1x1'}});
+  assert.equal(selectDiscreteIdentity([candidate('ä'),candidate('z')]).frame.populationId,'z');
+});
+
+test('certified solution trace includes M09 discrete and M10 registration identity',()=>{
+  const result=certifySizeSolution({outlineMm:rectangle(24,24),profile:singleRungProfile(),targetDominantMm:48});
+  assert.equal(result.status,'ACCEPTED');
+  assert.deepEqual(result.scoreTrace.slice(-2).map(trace=>trace.criterionId),['M09_DISCRETE_ID','M10_REGISTRATION_ID']);
+  assert.deepEqual(result.scoreTrace.at(-2).identityKey,[result.frame.populationId,0,0,result.frame.id,result.patternId,'default']);
+  assert.deepEqual(result.scoreTrace.at(-1).registration,result.registration);
 });

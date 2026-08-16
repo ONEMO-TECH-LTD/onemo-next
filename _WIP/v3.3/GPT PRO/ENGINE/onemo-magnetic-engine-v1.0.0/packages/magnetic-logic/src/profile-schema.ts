@@ -10,7 +10,9 @@ const mechanicsRegistry:readonly Readonly<MechanicsCriterionPolicy>[]=[
   {id:'M05_PATTERN_RANK',descriptorId:'DISCRETE_SCALAR_V1',tolerances:[0]},
   {id:'M06_REGION_LOAD',descriptorId:'REGION_MAX_LOAD_V1',tolerances:[0]},
   {id:'M07_BALANCE',descriptorId:'ANCHOR_CENTROID_BALANCE_V1',tolerances:[0,0],toleranceRule:'Q_AND_CENTROID_SQUARED'},
-  {id:'M08_ANCHOR_COUNT',descriptorId:'POINT_COUNT_V1',tolerances:[0]}
+  {id:'M08_ANCHOR_COUNT',descriptorId:'POINT_COUNT_V1',tolerances:[0]},
+  {id:'M09_DISCRETE_ID',descriptorId:'DISCRETE_KEY_V1',tolerances:[]},
+  {id:'M10_REGISTRATION_ID',descriptorId:'FINAL_REGISTRATION_ORDER_V1',tolerances:[]}
 ];
 
 function finitePositive(value:number):boolean{return Number.isFinite(value)&&value>0;}
@@ -91,7 +93,7 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
   const duplicatePattern=duplicate(profile.patterns.map(pattern=>pattern.id));if(duplicatePattern!==undefined)errors.push(`duplicate pattern ${duplicatePattern}`);
   if(profile.patterns.length===0)errors.push('at least one pattern is required');
   for(const pattern of profile.patterns){
-    if(!nonEmpty(pattern.id)||!Number.isInteger(pattern.version)||pattern.version<1||!nonEmpty(pattern.frameId))errors.push(`invalid pattern identity ${pattern.id}`);
+    if(!nonEmpty(pattern.id)||!Number.isInteger(pattern.version)||pattern.version<1||!nonEmpty(pattern.variantId)||!nonEmpty(pattern.frameId))errors.push(`invalid pattern identity ${pattern.id}`);
     const population=populationById.get(pattern.populationId);
     if(!population||!population.enabled)errors.push(`pattern ${pattern.id} references unknown or disabled population`);
     if(pattern.cells.length===0)errors.push(`pattern ${pattern.id} has no nodes`);
@@ -111,8 +113,22 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
   for(const permission of profile.permissions){
     if(!patternIds.has(permission.patternId))errors.push(`permission references unknown pattern ${permission.patternId}`);
     if(permission.bands.length===0||permission.bands.some(band=>!domain.bands.some(candidate=>candidate.id===band)))errors.push(`permission ${permission.patternId} has invalid bands`);
-    if(!Number.isInteger(permission.minClassX)||permission.minClassX<1||permission.minClassX>5||!Number.isInteger(permission.minClassY)||permission.minClassY<1||permission.minClassY>5)errors.push(`permission ${permission.patternId} has invalid minimum classes`);
-    if(typeof permission.marginalNodesAllowed!=='boolean'||!Number.isInteger(permission.patternRank)||permission.patternRank<0)errors.push(`permission ${permission.patternId} has invalid policy values`);
+    if(!Array.isArray(permission.allowedAxisClassPairs)||permission.allowedAxisClassPairs.length===0||permission.allowedAxisClassPairs.some(pair=>pair.length!==2||pair.some((value:number)=>!Number.isInteger(value)||value<1||value>5)))errors.push(`permission ${permission.patternId} has invalid allowedAxisClassPairs`);
+    if(Array.isArray(permission.allowedAxisClassPairs)&&new Set(permission.allowedAxisClassPairs.map(pair=>pair.join(','))).size!==permission.allowedAxisClassPairs.length)errors.push(`permission ${permission.patternId} has duplicate allowedAxisClassPairs`);
+    if(Array.isArray(permission.allowedAxisClassPairs)&&permission.allowedAxisClassPairs.some(([x,y])=>!permission.bands.includes(`B${Math.max(x,y)}` as ProductProfile['sizeDomain']['bands'][number]['id'])))errors.push(`permission ${permission.patternId} has axis classes outside its bands`);
+    if(Array.isArray(permission.allowedAxisClassPairs)&&permission.bands.some(band=>!permission.allowedAxisClassPairs.some(([x,y])=>band===`B${Math.max(x,y)}`)))errors.push(`permission ${permission.patternId} has a band without an axis-class pair`);
+    if(!Array.isArray(permission.allowedPopulationIds)||permission.allowedPopulationIds.length===0||permission.allowedPopulationIds.some(id=>!populationById.get(id)?.enabled))errors.push(`permission ${permission.patternId} has invalid allowedPopulationIds`);
+    if(Array.isArray(permission.allowedPopulationIds)&&new Set(permission.allowedPopulationIds).size!==permission.allowedPopulationIds.length)errors.push(`permission ${permission.patternId} has duplicate allowedPopulationIds`);
+    const permittedPattern=profile.patterns.find(pattern=>pattern.id===permission.patternId);
+    if(permittedPattern&&Array.isArray(permission.allowedPopulationIds)&&!permission.allowedPopulationIds.includes(permittedPattern.populationId))errors.push(`permission ${permission.patternId} excludes its pattern population`);
+    if(typeof permission.marginalNodesAllowed!=='boolean')errors.push(`permission ${permission.patternId} has invalid marginalNodesAllowed`);
+    if(!Number.isInteger(permission.requiredMajorRegionsCovered)||permission.requiredMajorRegionsCovered<0)errors.push(`permission ${permission.patternId} has invalid requiredMajorRegionsCovered`);
+    if(typeof permission.alternativeOrientationsConsidered!=='boolean')errors.push(`permission ${permission.patternId} has invalid alternativeOrientationsConsidered`);
+    if(permission.alternativeOrientationsConsidered&&!permittedPattern?.symmetryFamily)errors.push(`permission ${permission.patternId} cannot consider alternatives without a symmetry family`);
+    if(typeof permission.primaryOfferAllowed!=='boolean')errors.push(`permission ${permission.patternId} has invalid primaryOfferAllowed`);
+    if(typeof permission.fallbackAllowed!=='boolean')errors.push(`permission ${permission.patternId} has invalid fallbackAllowed`);
+    if(permission.primaryOfferAllowed===false&&permission.fallbackAllowed===false)errors.push(`permission ${permission.patternId} allows neither primary nor fallback use`);
+    if(!Number.isInteger(permission.patternRank)||permission.patternRank<0)errors.push(`permission ${permission.patternId} has invalid pattern rank`);
   }
   for(const patternId of patternIds)if(!profile.permissions.some(permission=>permission.patternId===patternId))errors.push(`pattern ${patternId} has no permission`);
 
@@ -132,7 +148,7 @@ export function validateProfile(profile:ProductProfile):ProfileValidation{
   if(profile.engineeringAssumptions.some(value=>!nonEmpty(value)))errors.push('engineering assumptions must be non-empty strings');
   if(profile.productionReady){
     if(profile.approvalState!=='approved'||profile.engineeringAssumptions.length>0)errors.push('unresolved production assumptions prevent production readiness');
-    errors.push('production profile incomplete R3 authority: later Frames, mechanics identity, Fulfilment, Regression, and approval-trace groups are not implemented');
+    errors.push('production profile incomplete R3 authority: later Fulfilment, Regression, and approval-trace groups are not implemented');
   }
   return{valid:errors.length===0,errors:Object.freeze(errors)};
 }

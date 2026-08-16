@@ -34,9 +34,10 @@ import type {
 import { registerProfile } from './profile-registry.js';
 import { classifyAxis, overallBand } from './bands.js';
 import { permittedPatterns } from './patterns-permissions.js';
-import { frameFits, frameForPattern, patternOffsetsMm, translationDomain } from './frames-registration.js';
+import { frameFits, framesForPattern, patternCellsForFrame, patternOffsetsMm, translationDomain } from './frames-registration.js';
 import { buildStructuralEvidence, majorRegionEvidence } from './region-policy.js';
-import { candidateDiscreteKey, criterionDescriptor, criterionTolerances } from './mechanics.js';
+import { criterionDescriptor, criterionTolerances } from './mechanics.js';
+import { selectDiscreteIdentity } from './selection.js';
 
 interface ContinuousCandidate {
   readonly hypothesis: CandidateHypothesis;
@@ -68,18 +69,25 @@ function boxCertifiedEquivalentToAnchor(
   });
 }
 
-function compareDiscreteKey(a: readonly (string | number)[], b: readonly (string | number)[]): number {
-  const count = Math.max(a.length, b.length);
-  for (let index = 0; index < count; index += 1) {
-    const x = a[index];
-    const y = b[index];
-    if (x === y) continue;
-    if (x === undefined) return -1;
-    if (y === undefined) return 1;
-    if (typeof x === 'number' && typeof y === 'number') return x - y;
-    return String(x).localeCompare(String(y));
-  }
-  return 0;
+function permissionBoxes(
+  polygon: ReturnType<typeof scaleToDominantDimension>,
+  offsetsMm: readonly Point[],
+  boxes: readonly AdaptiveBox[],
+  regions: readonly RegionEvidence[],
+  permission: CandidateHypothesis['permission']
+): { readonly boxes: readonly AdaptiveBox[]; readonly uncertain: boolean } {
+  const descriptor: GeometryCriterionDescriptor = { id: 'REGION_COVERAGE_V1', regions };
+  let uncertain = false;
+  const allowed = boxes.filter((box) => {
+    const [coverage, outside] = asComponents(evaluateCriterionOnBox(polygon, offsetsMm, box, descriptor).score);
+    const coveragePass = coverage!.lower >= permission.requiredMajorRegionsCovered;
+    const marginalPass = permission.marginalNodesAllowed || outside!.upper === 0;
+    if (coveragePass && marginalPass) return true;
+    const impossible = coverage!.upper < permission.requiredMajorRegionsCovered || (!permission.marginalNodesAllowed && outside!.lower > 0);
+    if (!impossible) uncertain = true;
+    return false;
+  });
+  return { boxes: Object.freeze(allowed), uncertain };
 }
 
 function expectedBandForTarget(target: number, profile: RegisteredProfile): BandId | undefined {
@@ -105,50 +113,59 @@ function makeHypotheses(
   const reasons: string[] = [];
   const initialTolerance = Math.max(profile.numeric.feasibilityCoarseToleranceMm, profile.numeric.approximationToleranceMm);
   for (const { pattern, permission } of permittedPatterns(profile, band, classX, classY)) {
-    const frame = frameForPattern(pattern);
-    if (!frameFits(frame, classX, classY)) continue;
-    const offsetsMm = patternOffsetsMm(profile, pattern);
-    const feasible = adaptiveFeasibleTranslations(
-      polygon,
-      offsetsMm,
-      radius,
-      domain,
-      {
-        toleranceMm: initialTolerance,
-        maxCells: profile.numeric.maxAdaptiveCells,
-        quantumMm: profile.numeric.coordinateQuantumMm,
-        maxDepth: 32,
-        witnessIterations: 20
-      },
-      { x: 0, y: 0 }
-    );
-    if (feasible.status === 'INFEASIBLE_CERTIFIED') {
-      reasons.push(`${pattern.id}:NO_ROBUST_FEASIBLE_REGISTRATION`);
-      continue;
+    for (const frame of framesForPattern(profile, pattern)) {
+      if (!frameFits(frame, classX, classY)) continue;
+      const offsetsMm = patternOffsetsMm(profile, pattern, frame);
+      const feasible = adaptiveFeasibleTranslations(
+        polygon,
+        offsetsMm,
+        radius,
+        domain,
+        {
+          toleranceMm: initialTolerance,
+          maxCells: profile.numeric.maxAdaptiveCells,
+          quantumMm: profile.numeric.coordinateQuantumMm,
+          maxDepth: 32,
+          witnessIterations: 20
+        },
+        { x: 0, y: 0 }
+      );
+      const parityKey=frame.populationOriginParity?.join(',')??'none';
+      if (feasible.status === 'INFEASIBLE_CERTIFIED') {
+        reasons.push(`${pattern.id}:${parityKey}:NO_ROBUST_FEASIBLE_REGISTRATION`);
+        continue;
+      }
+      const rawBoxes = [...feasible.insideBoxes, ...feasible.boundaryBoxes];
+      if (rawBoxes.length === 0) {
+        reasons.push(`${pattern.id}:${parityKey}:${feasible.status}`);
+        continue;
+      }
+      const permitted=permissionBoxes(polygon,offsetsMm,rawBoxes,regions,permission);
+      if(permitted.boxes.length===0){
+        reasons.push(`${pattern.id}:${parityKey}:${permitted.uncertain?'LEGALITY_INDETERMINATE':'PATTERN_PERMISSION_DENIED'}`);
+        continue;
+      }
+      const hypothesis: CandidateHypothesis = {
+        id: `${target}:${frame.populationId}:${parityKey}:${pattern.id}`,
+        sizeMm: target,
+        band,
+        classX,
+        classY,
+        frame,
+        pattern,
+        permission,
+        offsetsMm,
+        feasible,
+        boxes: permitted.boxes,
+        scoreTrace: [],
+        polygon
+      };
+      candidates.push({ hypothesis, regions, trace: [], boxes: permitted.boxes });
     }
-    const boxes = [...feasible.insideBoxes, ...feasible.boundaryBoxes];
-    if (boxes.length === 0) {
-      reasons.push(`${pattern.id}:${feasible.status}`);
-      continue;
-    }
-    const hypothesis: CandidateHypothesis = {
-      id: `${target}:${pattern.id}`,
-      sizeMm: target,
-      band,
-      classX,
-      classY,
-      frame,
-      pattern,
-      permission,
-      offsetsMm,
-      feasible,
-      boxes,
-      scoreTrace: [],
-      polygon
-    };
-    candidates.push({ hypothesis, regions, trace: [], boxes });
   }
-  return { candidates: Object.freeze(candidates), reasons: Object.freeze(reasons), structuralIndeterminate:false };
+  const primary=candidates.filter(candidate=>candidate.hypothesis.permission.primaryOfferAllowed);
+  const eligible=primary.length?primary:candidates.filter(candidate=>candidate.hypothesis.permission.fallbackAllowed);
+  return { candidates: Object.freeze(eligible), reasons: Object.freeze(reasons), structuralIndeterminate:false };
 }
 
 function optimiseCriterionAcrossCandidates(
@@ -287,7 +304,10 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
   if (candidates.length === 0) {
     return { status: 'REJECTED', targetDominantMm: target, band, reasons: built.reasons.length ? built.reasons : ['NO_PERMITTED_PATTERN'] };
   }
-  for (const policy of profile.mechanics.criteria) {
+  const productCriteria=profile.mechanics.criteria.slice(0,8);
+  const discretePolicy=profile.mechanics.criteria[8]!;
+  const registrationPolicy=profile.mechanics.criteria[9]!;
+  for (const policy of productCriteria) {
     const result = optimiseCriterionAcrossCandidates(candidates, policy, profile);
     if (result.status === 'INDETERMINATE') {
       return {
@@ -303,14 +323,19 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
     }
   }
 
-  candidates.sort((a, b) => compareDiscreteKey(candidateDiscreteKey(a.hypothesis), candidateDiscreteKey(b.hypothesis)));
-  const winner = candidates[0]!;
+  const selectedHypothesis=selectDiscreteIdentity(candidates.map(candidate=>candidate.hypothesis));
+  const winner = candidates.find(candidate=>candidate.hypothesis===selectedHypothesis)!;
+  const discreteDescriptor=criterionDescriptor(discretePolicy,winner.hypothesis,profile,winner.regions);
+  if(discreteDescriptor.id!=='DISCRETE_KEY_V1')throw new Error('invalid M09 descriptor');
+  const discreteTrace:CandidateScoreTrace={criterionId:discretePolicy.id,descriptorId:discreteDescriptor.id,score:{lower:0,upper:0},status:'CERTIFIED',identityKey:discreteDescriptor.key};
+  const registrationDescriptor=criterionDescriptor(registrationPolicy,winner.hypothesis,profile,winner.regions);
+  if(registrationDescriptor.id!=='FINAL_REGISTRATION_ORDER_V1')throw new Error('invalid M10 descriptor');
   const tie = finalRegistrationTieBreak(
     polygon,
     winner.hypothesis.offsetsMm,
     profile.safety.effectiveVerificationRadiusMm,
     winner.boxes,
-    { x: 0, y: 0 },
+    registrationDescriptor.canonicalTarget,
     profile.numeric.coordinateQuantumMm
   );
   if (tie.status !== 'SELECTED' || !tie.point) {
@@ -321,7 +346,8 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
       reasons: [tie.status]
     };
   }
-  const proofs = winner.hypothesis.pattern.cells.map((cell, index) => {
+  const selectedCells=patternCellsForFrame(profile,winner.hypothesis.pattern,winner.hypothesis.frame);
+  const proofs = selectedCells.map((cell, index) => {
     const offset = winner.hypothesis.offsetsMm[index]!;
     const point = { x: tie.point!.x + offset.x, y: tie.point!.y + offset.y };
     const proof = discContainedExact(polygon, point, profile.safety.effectiveVerificationRadiusMm);
@@ -331,6 +357,11 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
     return { status: 'REJECTED', targetDominantMm: target, band, reasons: ['EXACT_REVALIDATION_FAILED'] };
   }
   const centres = proofs.map(({ legal: _legal, ...rest }) => rest);
+  const registrationTrace:CandidateScoreTrace={
+    criterionId:registrationPolicy.id,descriptorId:registrationDescriptor.id,
+    score:{components:[{lower:tie.canonicalDistanceSquared!,upper:tie.canonicalDistanceSquared!},{lower:tie.point.x,upper:tie.point.x},{lower:tie.point.y,upper:tie.point.y}]},
+    status:'CERTIFIED',registration:tie.point
+  };
   const result: SizeSolution = {
     status: 'ACCEPTED',
     targetDominantMm: target,
@@ -345,7 +376,7 @@ export function certifySizeSolution(input: CertifiedSizeInput): SizeSolution | S
     registration: tie.point,
     centres: Object.freeze(centres),
     minimumMarginMm: Math.min(...centres.map((centre) => centre.marginMm)),
-    scoreTrace: Object.freeze(winner.trace),
+    scoreTrace: Object.freeze([...winner.trace,discreteTrace,registrationTrace]),
     geometryHash: polygon.geometryHash,
     decisionProof: 'CERTIFIED_CONTINUOUS_OPTIMUM',
     finalRingInt: Object.freeze(polygon.ringInt.map((point) => Object.freeze([point.x, point.y] as const)))

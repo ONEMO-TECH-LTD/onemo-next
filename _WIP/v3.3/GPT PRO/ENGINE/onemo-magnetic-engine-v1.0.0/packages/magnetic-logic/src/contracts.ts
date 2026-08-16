@@ -13,12 +13,16 @@ export interface PopulationDefinition {readonly id:string;readonly strideCells:n
 export interface PatternDefinition {
   readonly id:string;readonly version:number;readonly populationId:string;
   readonly cells:readonly (readonly [number,number])[];
-  readonly symmetryFamily?:string;readonly frameId:string;
+  readonly symmetryFamily?:string;readonly variantId:string;readonly frameId:string;
 }
 export interface PatternPermission {
   readonly patternId:string;readonly bands:readonly BandId[];
-  readonly minClassX:AxisClass;readonly minClassY:AxisClass;
-  readonly marginalNodesAllowed:boolean;readonly patternRank:number;
+  readonly allowedAxisClassPairs:readonly (readonly [AxisClass,AxisClass])[];
+  readonly allowedPopulationIds:readonly string[];
+  readonly marginalNodesAllowed:boolean;readonly requiredMajorRegionsCovered:number;
+  readonly alternativeOrientationsConsidered:boolean;
+  readonly primaryOfferAllowed:boolean;readonly fallbackAllowed:boolean;
+  readonly patternRank:number;
 }
 export interface StructuralPolicy {
   readonly sampleStepMm:number;
@@ -69,7 +73,7 @@ export interface RegionClassification {
 
 export interface FrameHypothesis {
   readonly id:string;readonly nx:number;readonly ny:number;readonly populationId:string;
-  readonly populationOriginParity?:readonly [number,number];
+  readonly populationStrideCells:number;readonly populationOriginParity:readonly [number,number];
 }
 
 export interface CandidateHypothesis {
@@ -85,6 +89,8 @@ export interface CandidateScoreTrace {
   readonly criterionId:string;readonly descriptorId:string;
   readonly score:ScoreInterval|CompoundScoreInterval;
   readonly status:'CERTIFIED'|'INDETERMINATE_WITHIN_TOLERANCE';
+  readonly identityKey?:readonly (string|number)[];
+  readonly registration?:Point;
 }
 
 export interface MagnetCentre {
@@ -123,7 +129,8 @@ export interface EngineManufacturingSpec {
   readonly computeArtifactHash:string;readonly logicArtifactHash:string;readonly profileId:string;readonly profileHash:string;
   readonly sourceGeometryHash:string;readonly finalGeometryHash:string;readonly finalRingInt:readonly (readonly [number,number])[];
   readonly widthMm:number;readonly heightMm:number;readonly scale:number;readonly coordinateQuantumMm:number;
-  readonly band:BandId;readonly populationId:string;readonly frameId:string;readonly patternId:string;
+  readonly band:BandId;readonly populationId:string;readonly populationStrideCells:number;
+  readonly populationOriginParity:readonly [number,number];readonly frameId:string;readonly patternId:string;
   readonly registration:Point;readonly selectedCellAddresses:readonly (readonly [number,number])[];
   readonly centres:readonly MagnetCentre[];readonly baseProtectedRadiusMm:number;readonly effectiveVerificationRadiusMm:number;
   readonly toleranceCompositionRuleId:string;readonly approximationToleranceMm:number;readonly minimumMarginMm:number;

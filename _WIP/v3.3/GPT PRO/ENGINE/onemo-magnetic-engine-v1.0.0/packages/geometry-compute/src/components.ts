@@ -3,6 +3,7 @@ import { clearanceAtPoint } from './clearance.js';
 
 function key(ix:number,iy:number):string{return `${ix},${iy}`;}
 function componentId(level:number,index:number):string{return `L${level}:C${index}`;}
+function codeUnitCompare(a:string,b:string):number{return a<b?-1:a>b?1:0;}
 function isConvex(ring:readonly Point[]):boolean{
   let direction=0;
   for(let index=0;index<ring.length;index++){
@@ -90,7 +91,7 @@ export function buildComponentHierarchy(
     if(component.levelIndex===0)continue;
     const parentCounts=new Map<string,number>();const shallower=cellComponentAtLevel[component.levelIndex-1]!;
     for(const cell of component.cells){const parent=shallower.get(cell);if(parent)parentCounts.set(parent,(parentCounts.get(parent)??0)+1);}
-    const parent=[...parentCounts.entries()].sort((a,b2)=>b2[1]-a[1]||a[0].localeCompare(b2[0]))[0]?.[0];
+    const parent=[...parentCounts.entries()].sort((a,b2)=>b2[1]-a[1]||codeUnitCompare(a[0],b2[0]))[0]?.[0];
     if(parent){(component as typeof component & {parentId:string}).parentId=parent;byId.get(parent)?.childIds.push(component.id);}
   }
   const deepest=(component:typeof mutable[number]):number=>Math.max(component.levelIndex,...component.childIds.map(id=>deepest(byId.get(id)!)));

@@ -2,31 +2,34 @@ import type { PatternDefinition, PatternPermission, ProductProfile } from './con
 import { registerProfile } from './profile-registry.js';
 
 const patterns:PatternDefinition[]=[
-  {id:'single',version:1,populationId:'grid48',cells:[[0,0]],frameId:'1x1'},
-  {id:'pair.vertical',version:1,populationId:'grid48',cells:[[0,-1],[0,1]],frameId:'1x2'},
-  {id:'pair.horizontal',version:1,populationId:'grid48',cells:[[-1,0],[1,0]],frameId:'2x1'},
-  {id:'row.3',version:1,populationId:'grid48',cells:[[-2,0],[0,0],[2,0]],frameId:'3x1'},
-  {id:'column.3',version:1,populationId:'grid48',cells:[[0,-2],[0,0],[0,2]],frameId:'1x3'},
-  {id:'square.4',version:1,populationId:'grid48',cells:[[-1,-1],[1,-1],[-1,1],[1,1]],frameId:'2x2'},
-  {id:'l.bottom-left',version:1,populationId:'grid48',cells:[[-1,-1],[1,-1],[-1,1]],symmetryFamily:'l.3',frameId:'2x2'},
-  {id:'l.bottom-right',version:1,populationId:'grid48',cells:[[-1,-1],[1,-1],[1,1]],symmetryFamily:'l.3',frameId:'2x2'},
-  {id:'l.top-left',version:1,populationId:'grid48',cells:[[-1,-1],[-1,1],[1,1]],symmetryFamily:'l.3',frameId:'2x2'},
-  {id:'l.top-right',version:1,populationId:'grid48',cells:[[1,-1],[-1,1],[1,1]],symmetryFamily:'l.3',frameId:'2x2'},
-  {id:'t.top1-bottom3',version:1,populationId:'grid48',cells:[[0,2],[-2,-2],[0,-2],[2,-2]],frameId:'3x3'}
+  {id:'single',version:1,populationId:'grid48',cells:[[0,0]],variantId:'default',frameId:'1x1'},
+  {id:'pair.vertical',version:1,populationId:'grid48',cells:[[0,-1],[0,1]],variantId:'vertical',frameId:'1x2'},
+  {id:'pair.horizontal',version:1,populationId:'grid48',cells:[[-1,0],[1,0]],variantId:'horizontal',frameId:'2x1'},
+  {id:'row.3',version:1,populationId:'grid48',cells:[[-2,0],[0,0],[2,0]],variantId:'horizontal',frameId:'3x1'},
+  {id:'column.3',version:1,populationId:'grid48',cells:[[0,-2],[0,0],[0,2]],variantId:'vertical',frameId:'1x3'},
+  {id:'square.4',version:1,populationId:'grid48',cells:[[-1,-1],[1,-1],[-1,1],[1,1]],variantId:'default',frameId:'2x2'},
+  {id:'l.bottom-left',version:1,populationId:'grid48',cells:[[-1,-1],[1,-1],[-1,1]],symmetryFamily:'l.3',variantId:'bottom-left',frameId:'2x2'},
+  {id:'l.bottom-right',version:1,populationId:'grid48',cells:[[-1,-1],[1,-1],[1,1]],symmetryFamily:'l.3',variantId:'bottom-right',frameId:'2x2'},
+  {id:'l.top-left',version:1,populationId:'grid48',cells:[[-1,-1],[-1,1],[1,1]],symmetryFamily:'l.3',variantId:'top-left',frameId:'2x2'},
+  {id:'l.top-right',version:1,populationId:'grid48',cells:[[1,-1],[-1,1],[1,1]],symmetryFamily:'l.3',variantId:'top-right',frameId:'2x2'},
+  {id:'t.top1-bottom3',version:1,populationId:'grid48',cells:[[0,2],[-2,-2],[0,-2],[2,-2]],variantId:'default',frameId:'3x3'}
 ];
 
-const allBands=['B1','B2','B3','B4','B5'] as const;
+function permission(patternId:string,bands:PatternPermission['bands'],minimumX:PatternPermission['allowedAxisClassPairs'][number][0],minimumY:PatternPermission['allowedAxisClassPairs'][number][1],patternRank:number):PatternPermission{
+  const allowedAxisClassPairs:(readonly [PatternPermission['allowedAxisClassPairs'][number][0],PatternPermission['allowedAxisClassPairs'][number][1]])[]=[];
+  for(let x=minimumX;x<=5;x++)for(let y=minimumY;y<=5;y++)if(bands.includes(`B${Math.max(x,y)}` as PatternPermission['bands'][number]))allowedAxisClassPairs.push([x as typeof minimumX,y as typeof minimumY] as const);
+  return{patternId,bands,allowedAxisClassPairs,allowedPopulationIds:['grid48'],marginalNodesAllowed:false,requiredMajorRegionsCovered:1,alternativeOrientationsConsidered:false,primaryOfferAllowed:true,fallbackAllowed:true,patternRank};
+}
 const permissions:PatternPermission[]=[
-  {patternId:'single',bands:['B1'],minClassX:1,minClassY:1,marginalNodesAllowed:false,patternRank:0},
-  {patternId:'pair.vertical',bands:['B2','B3','B4','B5'],minClassX:1,minClassY:2,marginalNodesAllowed:false,patternRank:0},
-  {patternId:'pair.horizontal',bands:['B2','B3','B4','B5'],minClassX:2,minClassY:1,marginalNodesAllowed:false,patternRank:0},
-  {patternId:'square.4',bands:['B2','B3','B4','B5'],minClassX:2,minClassY:2,marginalNodesAllowed:false,patternRank:2},
-  ...['l.bottom-left','l.bottom-right','l.top-left','l.top-right'].map(patternId=>({patternId,bands:['B2','B3','B4','B5'] as const,minClassX:2 as const,minClassY:2 as const,marginalNodesAllowed:false,patternRank:1})),
-  {patternId:'row.3',bands:['B3','B4','B5'],minClassX:3,minClassY:1,marginalNodesAllowed:false,patternRank:1},
-  {patternId:'column.3',bands:['B3','B4','B5'],minClassX:1,minClassY:3,marginalNodesAllowed:false,patternRank:1},
-  {patternId:'t.top1-bottom3',bands:['B3','B4','B5'],minClassX:3,minClassY:3,marginalNodesAllowed:false,patternRank:0}
+  permission('single',['B1'],1,1,0),
+  permission('pair.vertical',['B2','B3','B4','B5'],1,2,0),
+  permission('pair.horizontal',['B2','B3','B4','B5'],2,1,0),
+  permission('square.4',['B2','B3','B4','B5'],2,2,2),
+  ...['l.bottom-left','l.bottom-right','l.top-left','l.top-right'].map(patternId=>permission(patternId,['B2','B3','B4','B5'],2,2,1)),
+  permission('row.3',['B3','B4','B5'],3,1,1),
+  permission('column.3',['B3','B4','B5'],1,3,1),
+  permission('t.top1-bottom3',['B3','B4','B5'],3,3,0)
 ];
-void allBands;
 
 export function createReferenceProfile():ReturnType<typeof registerProfile>{
   const q=0.01;
@@ -53,7 +56,9 @@ export function createReferenceProfile():ReturnType<typeof registerProfile>{
       {id:'M05_PATTERN_RANK',descriptorId:'DISCRETE_SCALAR_V1',tolerances:[0]},
       {id:'M06_REGION_LOAD',descriptorId:'REGION_MAX_LOAD_V1',tolerances:[0]},
       {id:'M07_BALANCE',descriptorId:'ANCHOR_CENTROID_BALANCE_V1',tolerances:[q,0],toleranceRule:'Q_AND_CENTROID_SQUARED'},
-      {id:'M08_ANCHOR_COUNT',descriptorId:'POINT_COUNT_V1',tolerances:[0]}
+      {id:'M08_ANCHOR_COUNT',descriptorId:'POINT_COUNT_V1',tolerances:[0]},
+      {id:'M09_DISCRETE_ID',descriptorId:'DISCRETE_KEY_V1',tolerances:[]},
+      {id:'M10_REGISTRATION_ID',descriptorId:'FINAL_REGISTRATION_ORDER_V1',tolerances:[]}
     ]},
     subQuantumPolicy:'DECISION_INDETERMINATE',b1Guarantee:'ONLY_WHEN_LAWFUL_IN_B1',
     provenance:{
