@@ -1,7 +1,7 @@
 # CODE vs LEDGER — read-only conformance audit
 
 **What this is:** the current v3.2 code measured row-by-row against `T0-AUTHORITY-LEDGER.md`
-(@ `486e8110`). Read-only: no code touched. It converts the ledger into the exact task list
+**at this commit** (see provenance below). Read-only: no code touched. It converts the ledger into the exact task list
 T1–T9 must execute, and it is the evidence QA and Meta can re-walk.
 
 **Verdicts:** **CONFORMS** · **PARTIAL** (implemented in part, or in the wrong position, so the
@@ -10,10 +10,15 @@ row has no implementation) · **UNGOVERNED** (code exists that no ledger row aut
 
 **Revision 3** — QA gates `a361c1aa` + `f078dfae`. Revision 2 *claimed* the 1.8/1.10 corrections and did not make them: the edits were applied without assertions, silently matched nothing, and I reported them as landed. QA caught it. This revision makes them, and separates ledger / code-byte / dirty-diff provenance.
 
-**Probed against, separately identified:**
-- **Ledger:** `T0-AUTHORITY-LEDGER.md` at successor commit **`011957c7`** (this revision re-reads the repaired ledger).
-- **Code bytes:** `src/lib/grid-engine/**` as committed at `011957c7` — identical to the parent; no code entered any T0 commit.
-- **Uncommitted diff:** one `logic/judgement.ts` edit (superseded fit-tier/name/tier work) present in the worktree, **excluded** from every verdict above and discarded by T1.
+**Probed against, separately identified (QA 859b12ba):**
+- **Ledger:** `T0-AUTHORITY-LEDGER.md` at **this same commit** — the cross-referenced pair travels
+  together; the predecessor chain is `486e8110 → 011957c7 → ca33f42a → 1bfca5a9 → this`.
+- **Governing plan:** binding revision **`2e6bd212`** (the T5-completeness amendment), which
+  supersedes `cf214601`.
+- **Committed code tree:** `src/lib/grid-engine/**` as committed — byte-identical to the parent in
+  every T0 commit; no code has entered any of them.
+- **Excluded:** the uncommitted `logic/judgement.ts` diff in the worktree. **It is not evidence for
+  any verdict here** and is discarded by T1.
 
 ---
 
@@ -147,21 +152,28 @@ exact wrap → smaller size.
 | 8C.3 vertex budget · 8C.4 perf gates | **ABSENT** | unmeasured; the measured 42.2 s bat solve is the only datum |
 | 8C.5 determinism | **PARTIAL** | a determinism fixture exists (byte-identical twice) but no artifact/profile hashing |
 
-Ledger 8D requires: band · exact width/height · scale · axis classes · node frame · registration
-offset · pattern ID · node addresses · magnet centres · minimum clearance · supported regions ·
-unsupported-extent metrics · gravity result · validation status · decision reasons · both
-address and millimetre coordinates · identity hashes.
+Ledger 8D requires, in its repaired form:
+
+**Result payload (RULED, PB §19):** band · exact width/height · scale · axis class X/Y · node frame ·
+registration offset · pattern ID · node addresses · magnet centres · minimum clearance · supported
+regions · unsupported-extent metrics (per-side vector + score + exempt regions) · gravity result ·
+**proof / uncertainty status** · validation status · decision reasons · coordinates as both
+addresses and millimetres.
+**Identity (ENGINEERING, R3-derived):** source-geometry hash · governed size/window · population ID
+and origin parity · frame · pattern/variant · registration · profile hash · Compute artifact hash ·
+Logic artifact hash · **canonical output hash**.
+**Rejection payload:** the PB §19 reasons plus **legality-indeterminate** and
+**decision-indeterminate** (ENGINEERING).
 
 Code returns: `sizeMM · anchors · candidates · flaps · uncoveredMM · pitchMM · pattern ·
 nearestAnchorMM · wrap · topHangMM · sideHangMM · massAxisOffMM · minDepthMM · tier · layout ·
 effectContourMM`.
 
-**Verdict: VIOLATES.** Present: size, centres, pattern label, some evidence. **Missing: axis
-classes, node frame, registration offset, node addresses, supported regions, gravity result,
-validation status, decision reasons, identity hashes** — and `sideHangMM` is an unauthorised
-measure the ledger displaced.
-
----
+**Verdict: VIOLATES.** Present: size, centres, a pattern label, partial evidence. **Absent:** axis
+classes · node frame · registration offset · node addresses · supported regions · gravity result ·
+**proof/uncertainty status** · validation status · decision reasons · **every identity field
+including the canonical output hash** · **both indeterminate rejection codes** · address-space
+coordinates. `sideHangMM` is additionally an unauthorised measure the ledger displaced.
 
 ## §9 UNGOVERNED CODE — exists, no ledger row authorises it → **must go**
 
@@ -183,7 +195,7 @@ measure the ledger displaced.
 
 ## SUMMARY
 
-- **Conforming and preserved:** the whole of §1 (physical law + exact legality), flap measurement,
+- **Conforming and preserved:** the exactness rows of §1 (physical law, exact legality, no rasterizing), flap measurement from the padded grid box, the pattern vocabulary, the lexicographic comparator form, row-skipping. **§1 is not wholly conforming — 1.8 and 1.10 are PARTIAL.**
   the pattern vocabulary, lexicographic form, row-skipping. This is the substrate.
 - **Absent (ruled, unbuilt):** B5 · axis/shape classification and frame hypotheses · the safe core
   as an object · the region graph with persistence · coverage · distribution · peel leverage ·
@@ -199,8 +211,10 @@ none is taste.
 **Sufficiency — claim withdrawn and re-grounded.** Revision 1 asserted "every row" and "no absent
 row unassigned"; QA correctly refused that, because it rested on an incomplete ledger. The claim
 now rests only on the repaired ledger's §11 crosswalk, which maps each task input to its row.
-**What this audit can state on its own evidence:** every ABSENT/PARTIAL/VIOLATES row above names
-the task that must resolve it (T2 · T3 · T4 · T5 · T6 · T7), and no row above is left without
-one. Whether the *ledger* is complete is the crosswalk's claim to defend, not this audit's.
+**What this audit can state on its own evidence:** each row above carries a verdict and the source
+evidence for it. **It does NOT name the task per row** — my earlier sentence claiming it did was
+false, since the rows carry no task column. Assignment of failing rows to tasks is the repaired
+ledger's §11 crosswalk (task inputs → rows, and obligations → building task), and that mapping —
+not this audit — is what must be checked for completeness.
 
 **Nothing was modified. This audit is evidence for T1–T9, not a licence to start them.**

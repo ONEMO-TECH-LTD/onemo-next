@@ -1,8 +1,14 @@
 # T0 — THE EXECUTABLE AUTHORITY LEDGER
 
-**Task:** T0 of the governing proposal (`FINAL-CONSOLIDATED-PROPOSAL.md` @ `cf214601`, owner
-s62-grid-meta-qa). **Scope:** compile the exact executable rule set from the two designated
-briefs and later direct rulings. **Not** product discovery. No questionnaire. No code.
+**Task:** T0 of the governing proposal `FINAL-CONSOLIDATED-PROPOSAL.md` (owner s62-grid-meta-qa),
+**current binding revision `2e6bd212`** — the T5-completeness amendment; `cf214601` was the
+revision this ledger was first compiled against and is superseded.
+**This ledger's current commit:** see the revision line below.
+**Committed code tree:** `src/lib/grid-engine/**` unchanged by every T0 commit — byte-identical to
+the parent throughout. **The uncommitted `logic/judgement.ts` diff in the worktree is NOT evidence
+for anything in this ledger** and is discarded by T1.
+**Scope:** compile the exact executable rule set from the two designated briefs and later direct
+rulings. **Not** product discovery. No questionnaire. No code.
 
 **Sources, in the authority order the briefs declare:**
 1. **Dan's direct rulings** — vault- or pane-verified, cited inline.
@@ -44,7 +50,7 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 | 1.5 | Sparse population **hides points; nothing is re-centred** | RULED | (V) Dan 08-11 08:35, meta lane day-file *"no need force centering — the view remains same just some points are hidden"* → **resolves R3 PD-04/PD-34 (96 mm origin parity): there is no separate origin choice** |
 | 1.6 | **Legality = the complete closed 24 mm disc lies inside the cutout. Boundary tangency is legal.** | RULED | PB §2 |
 | 1.7 | Actual magnet may be 6 / 8 / 10 mm inside the protected area | RULED | PB §2 |
-| 1.8 | Units millimetres; operating floor **1 mm** — nothing below it exists | RULED | (V) Dan 08-11 evening, lead lane (L19 records it first-hand) |
+| 1.8 | Units millimetres; operating floor **1 mm** — nothing below it exists | RULED | **(V)** Dan 2026-08-11, `__TRANSCRIPT VAULT/claude/s62/lead/2026-08-11/_day.md` **line 4329** (segment `4-s62-lead--18-23.md` line 356): *"there is no dimensions below 1mm anywhere…"* |
 | 1.9 | **Scale only, aspect locked.** No rotation, mirroring, deformation, independent region scaling | RULED | (B) Dan 08-10 18:39 / 08-09 23:25 + (D) PB §13 *"locked proportions only scaling was repeated 100 times"*; PB §13 |
 | 1.10 | Published size rounds **up** to the next even millimetre | RULED | (B) Dan 08-10 17:04 |
 | 1.11 | Candidate size step | **CALIBRATED = 2 mm** (owner s62-kai) | Source: `src/lib/grid-engine/spec.ts:331` (`sizeStepMM: 2`), guarded at `:416` (`{min:2,max:48}`). PB §2's "scale increment 12 mm" is an unadopted proposal — GPT's own review flagged it as never approved, and Dan asked its rationale rather than ruling it. Preserve 2 mm unless execution disproves. |
@@ -55,7 +61,7 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 
 | # | Rule / value | Class | Source |
 |---|---|---|---|
-| 2.1 | **B1 24–72 · B2 72–120 · B3 120–168 · B4 168–216 · B5 216–264** | RULED | (D) PB §4 + (D) `gpt-pro/ChatGPT-Grid and Band Logic-20260816-1022.md` — Dan's band list at **line 178**, his correction at **line 349**: *"I made a mistake with bands missed the 168 we must return it to rightful place"* |
+| 2.1 | **B1 24–72 · B2 72–120 · B3 120–168 · B4 168–216 · B5 216–264** | RULED | **(D) PB §4** — the governing five-band table. **Corroboration, first-hand but not a designated brief:** Dan's own band list in the raw GPT export `gpt-pro/ChatGPT-Grid and Band Logic-20260816-1022.md` line 178, with his correction at line 349 (*"I made a mistake with bands missed the 168 we must return it to rightful place"*). |
 | 2.2 | **B5 exists** (216–264) **and participates in the certified offer domain** | RULED | Same source. **Resolved from the hierarchy, not asked:** PB §4 lists B5 as a band without qualification and PB §12 requires every candidate size be evaluated; no designated brief withholds it. `grid-laws.md` L4a's 168 mm cap binds the **twin-fix fixing type**, not the band, and is authority level 4 — it cannot narrow a level-2 band. Therefore the engine computes and offers B5; any commercial restriction is a presentation policy applied outside the engine. |
 | 2.3 | Boundaries lower-inclusive, upper-exclusive; final maximum inclusive | RULED | PB §4 table (`24 ≤ side < 72` … `216 ≤ side ≤ 264`) |
 | 2.4 | **Each axis classified independently**; overall band = the larger axis class | RULED | PB §4 |
@@ -133,7 +139,7 @@ as a lane relay (the collector drops mid-turn messages — `grid-laws.md` §F), 
 | # | Rule / value | Class | Source |
 |---|---|---|---|
 | 7.1 | **Every candidate size evaluated independently.** No result inferred from a smaller or larger size | RULED | PB §12 |
-| 7.2 | A band returns **all distinct optima its range unlocks**, with **one marked** as the guaranteed answer | RULED | **Captured source (V):** Dan 2026-08-16 10:52:27, this lane's day-file line 219 — *"i tested on the other shapes via upload and noticed that bands while having more than 1 optimal choice at different scales - engine does not show them all only 1"*, with *"Band 4 stopped at 168 but could have shown extra ... at 200-216mm range"*. **DERIVATION:** the normalized rule wording ("all optimal sizes and layouts if range permits") is **my normalization of an uncaptured mid-turn message**, not a captured turn — it is a derivation and is labelled as one. The marking half is (D) L17. |
+| 7.2 | A band returns **all distinct optima its range unlocks**, with **one marked** as the guaranteed answer | RULED | **Captured (V):** Dan 2026-08-16 10:52:27, this lane's day-file line 219 — *"bands while having more than 1 optimal choice at different scales - engine does not show them all only 1"*, plus the 200–216 mm line. **The marking half: (D) LSO §1.2** ("One of the set is marked as the guaranteed bulls-eye") — L17 is `grid-laws.md`, authority level 4, and is cited as corroboration, not as (D). **DERIVATION:** the normalized wording is my normalization of an uncaptured mid-turn message, labelled as such. |
 | 7.3 | **Distinct = distinct governed window/scale identity** — never "more magnets" | RULED | Dan's own wording is scale-based: *"more than 1 optimal choice at different scales"*, *"Band 4 stopped at 168 but could have shown extra at 200-216mm range"*; PB §11.9 + §13 forbid count as the driver |
 | 7.4 | A size may be **rejected with a machine-readable reason** — refusal is a legitimate outcome | RULED | PB §19 |
 | 7.5 | Presentation cap on how many offers are shown | ENGINEERING (owner s62-kai) | applied only after the complete certified set exists |
@@ -167,7 +173,8 @@ mechanics taken from the compatible R3 certification reference.
 | 8A.4 | `size_step` | CALIBRATED (s62-kai) | 2 mm — see 1.11 |
 | 8A.5 | `grid_profile` | RULED | 24 mm cells / 48 mm nodes (D) PB §15 |
 | 8A.6 | `safety_profile` | RULED | 12 mm radius (D) PB §15 |
-| 8A.7 | `pattern_policy_version` · `selection_policy_version` | RULED | Versioned, immutable once released (D) PB §15 |
+| 8A.7 | `pattern_policy_version` · `selection_policy_version` **exist as inputs** | RULED | (D) PB §15 |
+| 8A.7b | **Immutability once released** (a released profile is frozen and content-hashed) | **ENGINEERING** (s62-kai) | PB §15 names the two versioned inputs but does **not** rule immutability; that is an R3 certification mechanism and R3 cannot carry (D). Proof duty: a released profile is deep-frozen and hash-addressed, and a value change publishes a new version. |
 | 8A.8 | **Holes and disconnected outlines HARD-REJECT in V1** | RULED | (D) PB §15 *"Initial scope excludes holes and disconnected silhouettes"* — reject with a reason, never silently repair |
 
 ---
@@ -208,12 +215,21 @@ vector and any limb-exempt regions are **returned as evidence** (6.8, 8.x). It i
 between magnets (Dan 08-11: *"between magnets? flap = outer edges not supported by magnet
 connection and hold"* — (B) `grid-brief.md` 14:02:54).
 
-### 8B.2 Pattern-permission matrix *(QA correction 1)*
-**ENGINEERING, owner s62-kai — derived, never invented.** A pattern is permitted for a
-(axis-class X, axis-class Y, band, population) tuple **iff** its node frame fits inside the axis
-capacities (2.5, 3.2) **and** its population (48 or 96) is realisable at that size on the one
-lattice (1.3–1.4). Nothing else may narrow or widen the set; the matrix is generated from those
-two conditions and recorded per profile version, not hand-authored per shape.
+### 8B.2 Pattern-permission matrix *(ENGINEERING — still owed, not derived)*
+**PB §21.4 explicitly defers "the final approved pattern library and its band-specific
+permissions" to a later decision.** This ledger therefore records the matrix as an **ENGINEERING
+input still owed by T6** (owner s62-kai), not as a rule it can derive.
+
+**Two constraints are NECESSARY** and follow from ruled rows — a pattern cannot be permitted if it
+fails either: its node frame must fit the axis capacities (2.5, 3.2) and its population (48/96)
+must be realisable on the one lattice at that size (1.3–1.4).
+**They are not sufficient, and they are not the matrix.** Nothing in PB or LSO says these two
+checks alone determine permission; my previous "permitted **iff** …, nothing else may narrow the
+set" over-reached and is withdrawn.
+
+**Duty (T6):** produce the matrix, justify each entry against the two necessary constraints plus
+execution evidence, version it with the profile, and record it — a permission that cannot be
+justified is not admitted.
 
 ---
 
@@ -321,4 +337,24 @@ crosswalk a reviewer can walk. A task input with no row here is a ledger gap, by
 | T7 | live visual gate — real surface, provenance, captured frames | 8D result payload (what a frame must evidence) · 6.7a |
 | T8 | what may be deleted once the replacement passes | §9 · T0b's UNGOVERNED list |
 
-**Scope of this crosswalk, stated honestly (QA f078dfae):** it enumerates **task inputs → rows**. It does **not** claim the reverse enumeration is complete, and the earlier "no unmapped inputs / no unconsumed rows" claims are **withdrawn**. Rows not appearing above (1.7 · 1.8 · 2.7 · 3.7 · 3.8 · 5.7 · 6.8 · 6.12 · 6.13 · 6.14 · 8A.2 · 8C.5) are **constraints the tasks must honour rather than inputs they read** — they are enforced through T7's gate, not consumed by a step. That distinction is the honest form of the claim I over-stated.
+**Implementation obligations mapped to the tasks that BUILD them** *(QA 859b12ba — T7 is a gate;
+it cannot implement anything):*
+
+| Row | Built by | Verified by |
+|---|---|---|
+| 1.7 magnet sizing inside the protected area | T6 (result payload) | T7 |
+| 1.8 operating floor | T4 (quantisation) · T6 (published sizes) | T7 |
+| 2.7 B1 count as consequence | T6 (frame from capacity, no target) | T2 · T7 |
+| 3.7 free-class frame inheritance then material reduction | T5 (regions) · T6 (frame hypothesis) | T2 · T7 |
+| 3.8 frame as starting capacity | T6 | T7 |
+| 5.7 final legality on the exact silhouette | T4 (re-proof through the exact door) | T7 |
+| 6.8 limb exemption measured **and reported** | T5 (descriptor evidence) · T6 (payload) | T7 |
+| 6.12 no arbitrary subsets | T6 (permission admission, 8B.2) | T7 |
+| 6.13 pattern families | T6 (library) | T2 · T7 |
+| 6.14 row/column skipping lawful | T6 (library) | T2 · T7 |
+| 8A.1–8A.7 input boundary (outline validation, top direction, size domain, profiles) | T4 (validation + hard-reject) · T6 (policy versions) | T7 |
+
+**Scope statement:** the crosswalk enumerates **task inputs → rows** and now **obligations →
+building task**. It does not claim a complete reverse enumeration of every row; the earlier
+"no unmapped inputs / no unconsumed rows" claims stay **withdrawn**. 8C.5 is consumed by T3 and
+verified by T7 — it is not an unmapped row.
