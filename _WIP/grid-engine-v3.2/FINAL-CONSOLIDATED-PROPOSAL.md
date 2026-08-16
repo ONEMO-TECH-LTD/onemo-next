@@ -166,6 +166,8 @@ v3.2 is an independent redemption of the first working engine. v3.3 is donor and
 8. Cap presentation only after the complete certified offer set exists.
 9. Remove fallback. Surface stable legality, uncertainty, rejection and indeterminate codes.
 
+**Internal checkpoints:** prove the classification-to-pattern funnel trace before running mechanics; prove mechanics and final-registration semantics before assembling identity, output and offers. These diagnose T6 failures but do not create new tasks or Dan gates.
+
 **Verification:** each size's trace proves the full classification-to-placement funnel ran; every earlier criterion is tied before a later one decides; canonical proximity never overrides mechanics; extra anchors never win by count; no fallback emits an answer; uncertain legal contenders cannot be silently dropped; every accepted result satisfies the complete selector-output schema; T2 hard assertions pass.
 
 ### T7 — replacement gate
