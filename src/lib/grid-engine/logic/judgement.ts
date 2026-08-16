@@ -544,8 +544,12 @@ function judgeBand(
       }
       const spanX = stepsAcross * spec.grid.basePitchMM
       const spanY = stepsDown * spec.grid.basePitchMM
-      for (let x = bb.minX; x + spanX <= bb.maxX; x += stepMM) {
-        for (let y = bb.minY; y + spanY <= bb.maxY; y += stepMM) {
+      // An anchor inside the padding-wide bbox border cannot satisfy exact containment.
+      // Skip those guaranteed refusals while preserving the same 2mm origin phase and every
+      // placement the exact engine could accept (padding is 12mm, an integer sweep multiple).
+      const pad = spec.grid.paddingMM
+      for (let x = bb.minX + pad; x + spanX <= bb.maxX - pad; x += stepMM) {
+        for (let y = bb.minY + pad; y + spanY <= bb.maxY - pad; y += stepMM) {
           try {
             const grid = computePreparedGrid(prepared, {
               pitchMM: spec.grid.basePitchMM,
