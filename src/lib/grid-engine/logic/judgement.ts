@@ -327,8 +327,12 @@ function better(
   //    "gravity must not place magnets in the bottom and leave top unprotected" — is a constraint:
   //    a placement whose top overhang stays within the outer flap bound HOLDS the top; among
   //    holders, wrap and evenness centre the assembly.
-  const holdsTopA = (a.topHangMM ?? a.wrap.top) <= calibration.flapMaxMM
-  const holdsTopB = (b.topHangMM ?? b.wrap.top) <= calibration.flapMaxMM
+  // STEPPED-BAND ALLOWANCE (Dan, 2026-08-16: band 4 is "6 or 9 or a variation ... more disks
+  // at the bottom and less in the top" — a bottom-heavy grid carries its upper mass as a limb;
+  // the lower bands keep the strict flap bound their ruled frames set).
+  const topBound = band.stepUp ? calibration.flapLimbMM : calibration.flapMaxMM
+  const holdsTopA = (a.topHangMM ?? a.wrap.top) <= topBound
+  const holdsTopB = (b.topHangMM ?? b.wrap.top) <= topBound
   if (holdsTopA !== holdsTopB) return holdsTopA
   // 1b. VERTICAL HOLD: the bottom may hang only as a limb (within the limb allowance) — a
   //     placement leaving more below the block ranks under everything that holds its material
@@ -697,7 +701,7 @@ function judgeBand(
       if (v.anchors.length < 6) continue
       const pts = v.anchors.map((x) => x.p)
       const kills: string[] = []
-      if ((v.topHangMM ?? v.wrap.top) > calibration.flapMaxMM) kills.push(`toph${(v.topHangMM ?? 0).toFixed(0)}`)
+      if ((v.topHangMM ?? v.wrap.top) > (band.stepUp ? calibration.flapLimbMM : calibration.flapMaxMM)) kills.push(`toph${(v.topHangMM ?? 0).toFixed(0)}`)
       if (v.wrap.bottom > calibration.flapLimbMM) kills.push(`bot${v.wrap.bottom.toFixed(0)}`)
       if ((v.sideHangMM ?? 0) > calibration.flapLimbMM) kills.push(`sideh${(v.sideHangMM ?? 0).toFixed(0)}`)
       if (!pointsOneComponent(pts, calibration.stripLinkMM)) kills.push('strip')
@@ -705,9 +709,10 @@ function judgeBand(
       process.stderr.write(`B4 6+: ${v.layout ?? 'auto'}\u00b7${v.sizeMM}\u00b7${v.anchors.length}pt ${kills.length ? 'KILL:' + kills.join(',') : 'LAWFUL'}\n`)
     }
   }
+  const lawfulTopBound = band.stepUp ? calibration.flapLimbMM : calibration.flapMaxMM
   const lawful = kept.filter(
     (v) =>
-      (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
+      (v.topHangMM ?? v.wrap.top) <= lawfulTopBound &&
       v.wrap.bottom <= calibration.flapLimbMM &&
       // side hold law — a side's MASS hangs only as a limb (thin wings are light; a hanging
       // body is not — same measure as gravity)
@@ -793,7 +798,7 @@ function judgeBand(
   if (!final.length) {
     const holdLawful = kept.find(
       (v) =>
-        (v.topHangMM ?? v.wrap.top) <= calibration.flapMaxMM &&
+        (v.topHangMM ?? v.wrap.top) <= lawfulTopBound &&
         v.wrap.bottom <= calibration.flapLimbMM &&
         (v.sideHangMM ?? Math.max(v.wrap.left, v.wrap.right)) <= calibration.flapLimbMM &&
         pointsOneComponent(v.anchors.map((x) => x.p), calibration.stripLinkMM),
