@@ -19,4 +19,6 @@ Independent of lead and meta. Verified against the three files now in `canon/`: 
 - **Necessity — no unnecessary elements.** The two folds restore canon text. No donor machinery added.
 - **Sufficiency — partial.** Every still-missing item is named open (mass map, leftover/peel numbers, B5 sold, limb stamp, balance P8 deferred, PB §21.4, PB §21.5, `top_direction`). Cross-band is no longer parked. The LS B4-vs-more-magnets pair is carried, not silently picked.
 
+**Accuracy after meta’s two conditions (same sign, not a new one):** opener is LS §1.1, not “filled square”; Dan’s zero-flap-like-a-square stays on the leftover row. `:18` now says three canon files. Signature stands.
+
 **I sign.** Engine still not started.
