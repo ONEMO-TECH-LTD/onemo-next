@@ -109,6 +109,31 @@ const DEFAULT_SIZE_BAND = 3
 const BANDS = [2, 3, 4] as const
 const CUTOUT_OPACITY = 0.55
 
+/**
+ * WHY A BAND HAS NOTHING TO SHOW, in the reader's language. Two different kinds of "no" live here
+ * and the screen must not blur them: a POLICY refusal is a released setting declining a shape, and
+ * a GEOMETRY refusal is the shape itself unable to hold the arrangement. "None" alone reads as the
+ * engine being incapable when the truth is often that one number said no.
+ */
+const REFUSAL_LABEL = (code: string): string =>
+  ({
+    EXCESSIVE_UNSUPPORTED_EXTENT: 'too much overhang for the current limit',
+    NO_TEMPLATE_FOR_PERMITTED_FRAME: 'no released layout for this frame',
+    PATTERN_POLICY_DEFERRED: 'this class/band pair is not released',
+    AXIS_CLASS_UNRESOLVED: 'shape proportions unclassified',
+    SAFE_CORE_EMPTY: 'no room for a magnet',
+    NO_LAWFUL_REGISTRATION: 'no lawful position',
+    DECISION_INDETERMINATE: 'undecided',
+  })[code] ?? code
+
+/** What the band's own verdict means. The first entry is the answer ONLY under CERTIFIED_WINNER. */
+const DECISION_LABEL: Record<string, string> = {
+  CERTIFIED_WINNER: 'certified winner',
+  CERTIFIED_SET: 'certified co-optimum — no single winner',
+  UNRESOLVED_SET: 'unresolved — evidence could not separate these',
+  NONE: 'nothing offered',
+}
+
 const REFUSAL_TEXT: Record<WriteRefusal, string> = {
   'sealed-in-code': 'Sealed in code. Change it in the spec module and release it.',
   'options-only': 'Released options only — pick one, it is never typed in freehand.',
@@ -736,11 +761,38 @@ export default function GridEnginePage() {
         {judged && (
           <div className={styles.fixture}>
             <span className={styles.fixtureName}>Engine</span>
-            {judged.bands.map((answer) =>
-              answer.variants.length ? (
-                answer.variants.map((variant) => (
+            {judged.bands.map((answer) => {
+              // AN ELIMINATION IS NOT A REFUSAL. CERTIFIED_DOMINATED means a lawful candidate was
+              // beaten by a better one — it appears in bands that DID answer. Rendering it beside
+              // "no lawful registration" would say a band refused when it did not.
+              const refusals = [
+                ...new Set(
+                  answer.rejections
+                    .flatMap((rejection) => rejection.reasons)
+                    .filter((reason) => reason !== 'CERTIFIED_DOMINATED'),
+                ),
+              ]
+              if (!answer.variants.length) {
+                return (
+                  <span key={answer.band.band} className={styles.rowUnit} title={refusals.join(' · ')}>
+                    B{answer.band.band}: {refusals.length ? refusals.map(REFUSAL_LABEL).join(', ') : 'none'}
+                  </span>
+                )
+              }
+              // THE FIRST ENTRY IS THE ANSWER ONLY WHEN ONE WAS CERTIFIED. Under CERTIFIED_SET the
+              // entries are co-optima and none of them is the winner; under UNRESOLVED_SET the
+              // evidence could not separate them. Marking the first would overstate both.
+              const primary = answer.decisionState === 'CERTIFIED_WINNER' ? answer.variants[0] : null
+              return answer.variants.map((variant) => {
+                const selection = variant.selection
+                const policy = selection?.unsupportedExtentPolicy
+                return (
                   <button
-                    key={`${answer.band.band}-${variant.sizeMM}-${variant.anchors.length}-${variant.layout ?? variant.pattern + variant.pitchMM}`}
+                    // COMPLETE SOLUTION IDENTITY. Band+size+count+pattern collides for two genuinely
+                    // distinct co-optimal arrangements, which is exactly what the selector was
+                    // rebuilt to preserve. The result hash is the identity the engine publishes.
+                    key={selection?.identity.resultHash
+                      ?? `${answer.band.band}-${variant.sizeMM}-${variant.anchors.length}-${variant.layout ?? variant.pattern + variant.pitchMM}`}
                     type="button"
                     className={styles.chip}
                     data-on={picked === variant}
@@ -748,18 +800,30 @@ export default function GridEnginePage() {
                        reviews everything, dimmed so the product boundary stays visible. */
                     style={answer.band.released ? undefined : { opacity: 0.45 }}
                     onClick={() => pickVariant(variant)}
-                    title={`band ${answer.band.band}${answer.band.released ? '' : ' (hidden in product)'} · ${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern} · ${variant.tier} · flap ${Math.round(variant.wrap.maxSide)}mm · unheld ${Math.round(variant.uncoveredMM)}mm`}
+                    title={[
+                      `band ${answer.band.band}${answer.band.released ? '' : ' (hidden in product)'}`,
+                      `${variant.anchors.length} magnets · ${variant.pitchMM}mm ${variant.pattern}`,
+                      selection ? DECISION_LABEL[answer.decisionState] : 'no selector evidence',
+                      policy
+                        ? `unsupported extent ${policy.outcome === 'TRIVIAL_LIMB_EXEMPT'
+                            ? `exempt at ${policy.activeLimitMM}mm (${policy.exemptedSides
+                                .map((side) => `${side.side} ${Math.round(side.reachMM)}mm`).join(', ')})`
+                            : `within ${policy.activeLimitMM}mm`}`
+                        : null,
+                      selection?.selectionTrace.stoppedAt
+                        ? `stopped at ${selection.selectionTrace.stoppedAt}`
+                        : null,
+                      `unheld ${Math.round(variant.uncoveredMM)}mm`,
+                    ].filter(Boolean).join(' · ')}
                   >
                     B{answer.band.band}·{variant.sizeMM}·{variant.anchors.length}pt
+                    {primary === variant ? '·◉' : ''}
+                    {selection && selection.proofStatus !== 'CERTIFIED' ? '·?' : ''}
                     {variant.flaps.length > 0 ? '·⚠' : ''}
                   </button>
-                ))
-              ) : (
-                <span key={answer.band.band} className={styles.rowUnit}>
-                  B{answer.band.band}: none
-                </span>
-              ),
-            )}
+                )
+              })
+            })}
           </div>
         )}
 

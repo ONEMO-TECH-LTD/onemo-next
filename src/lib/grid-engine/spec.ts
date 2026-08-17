@@ -317,19 +317,28 @@ export interface CalibrationSpec {
 }
 
 /**
- * THE ACTIVE UNSUPPORTED-EXTENT LIMIT — Logic Spec P4's per-side 12-or-24mm switch.
+ * THE ACTIVE UNSUPPORTED-EXTENT LIMIT — how far material may reach past the outermost magnets.
  *
- * The Logic Spec releases exactly two positions for this switch and no others; a freehand number is
- * not a position of it. The released default is the tighter one. Compute MEASURES the reach and
- * deliberately applies nothing; this value is what Logic applies it against, and the trivial-limb
- * exemption is REPORTED, never silent — a silently exempted limb is the violation T0b records.
+ * DAN, 2026-08-17: default 0, exposed as a slider. Material past the last magnet has nothing
+ * holding it down, so this is a peel judgement, and no measurement has yet earned a tolerance.
+ * Zero grants none: the engine starts from the strictest defensible position and the operator
+ * opens it while watching real shapes, rather than inheriting a number nobody agreed.
+ *
+ * This replaces a fixed 12-or-24 switch whose authority was the T0 ledger — a document later
+ * found to cite rulings that exist only as lane restatements. Logic Spec §8 still lists the
+ * 12-vs-24 question as OPEN; a calibrated control is what an open question is entitled to, not
+ * a hardcoded position.
+ *
+ * Compute MEASURES the reach and applies nothing. Logic applies it against this value, and the
+ * trivial-limb exemption is REPORTED, never silent.
  */
 export interface UnsupportedExtentPolicy {
   version: string
   because: string
-  /** Exactly one of the released positions. Never a tuned number. */
-  activeLimitMM: 12 | 24
-  releasedOptionsMM: readonly [12, 24]
+  /** Millimetres of reach permitted past the padded grid box. 0 = none granted. */
+  activeLimitMM: number
+  /** Slider bounds for the operator control. Not positions — a continuous range. */
+  limitRangeMM: { min: number; max: number; stepMM: number }
 }
 
 export interface LayoutTemplate {
@@ -514,10 +523,10 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
     strongLevelIndex: 1,
   }) as NodeClassificationPolicy,
   unsupportedExtent: Object.freeze({
-    version: 'unsupported-extent-v1',
-    because: `Logic Spec P4 releases a per-side unsupported-extent switch with exactly two positions, 12mm and 24mm, bound by T0 rows 6.7 and 6.8. The released default is the tighter position. T0b records a fixed 40mm ceiling and a silent limb exemption as violations, so no other value is a position of this switch and any exemption granted under it must be reported.`,
-    activeLimitMM: 12,
-    releasedOptionsMM: Object.freeze([12, 24]),
+    version: 'unsupported-extent-v2',
+    because: `Dan, 2026-08-17: default 0, managed by slider. Material reaching past the outermost magnets has nothing holding it down; permitting any of it is a peel judgement no measurement has yet earned. Zero grants no tolerance and the operator calibrates upward against real shapes. Supersedes the fixed 12-or-24 switch, whose authority was the T0 ledger — later found to cite rulings that exist only as lane restatements — while Logic Spec §8 still lists 12-vs-24 as OPEN. The trivial-limb exemption is unchanged and still reported, never silent.`,
+    activeLimitMM: 0,
+    limitRangeMM: Object.freeze({ min: 0, max: 48, stepMM: 1 }),
   }) as UnsupportedExtentPolicy,
 }) as CalibrationSpec
 
@@ -614,15 +623,16 @@ export function selectCalibrationOption(
   return { calibration: { ...calibration, [key]: value } }
 }
 
-/**
- * The P4 switch writer. Two released positions, nothing else — not a range, so no min/max writer
- * may reach it and a freehand value is refused rather than clamped into one of them.
- */
+/** The P4 limit writer. A continuous millimetre range; out-of-range is REFUSED, never clamped. */
 export function selectUnsupportedExtentLimit(
   calibration: CalibrationSpec,
   value: number,
 ): { calibration: CalibrationSpec; refused?: WriteRefusal } {
-  if (value !== 12 && value !== 24) return { calibration, refused: 'options-only' }
+  const { min, max } = calibration.unsupportedExtent.limitRangeMM
+  if (!Number.isFinite(value)) return { calibration, refused: 'not-a-number' }
+  // REFUSED, NEVER CLAMPED. A value outside the range is a caller error, not a request to be
+  // silently corrected into one the engine finds acceptable.
+  if (value < min || value > max) return { calibration, refused: 'out-of-range' }
   return {
     calibration: {
       ...calibration,

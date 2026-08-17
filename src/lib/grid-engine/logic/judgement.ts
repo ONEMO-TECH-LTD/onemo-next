@@ -349,7 +349,7 @@ export interface SelectorResult {
    * the side and reach that earned it — a silent exemption is the violation T0b records.
    */
   unsupportedExtentPolicy: {
-    activeLimitMM: 12 | 24
+    activeLimitMM: number
     outcome: 'WITHIN_LIMIT' | 'TRIVIAL_LIMB_EXEMPT'
     /** Every side and its reach beyond the padded box, whether or not it exceeded the limit. */
     perSideMM: { left: number; right: number; top: number; bottom: number }

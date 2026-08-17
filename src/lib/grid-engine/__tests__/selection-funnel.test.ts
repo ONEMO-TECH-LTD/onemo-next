@@ -843,23 +843,24 @@ describe('the approved order', () => {
       expect(offer.unsupportedExtentPolicy.outcome).not.toBe('EXCESSIVE_UNSUPPORTED_EXTENT')
   })
 
-  it('refuses any P4 switch value that is not a released position', () => {
-    for (const bad of [0, 11, 13, 18, 23, 25, 40, -12, 12.5, Number.NaN, Infinity]) {
+  it('refuses an out-of-range P4 limit rather than clamping it', () => {
+    const { min, max } = RELEASED_CALIBRATION.unsupportedExtent.limitRangeMM
+    for (const bad of [min - 1, max + 1, -12, Number.NaN, Infinity]) {
       const { calibration, refused } = selectUnsupportedExtentLimit(RELEASED_CALIBRATION, bad)
-      expect(refused).toBe('options-only')
-      // Refused means UNCHANGED — never clamped into a released position.
+      expect(refused).toBeDefined()
+      // Refused means UNCHANGED. A rejected value is never silently corrected into an acceptable one.
       expect(calibration.unsupportedExtent.activeLimitMM).toBe(
         RELEASED_CALIBRATION.unsupportedExtent.activeLimitMM,
       )
     }
-    for (const good of [12, 24] as const) {
+    for (const good of [min, 12, 24, max]) {
       const { calibration, refused } = selectUnsupportedExtentLimit(RELEASED_CALIBRATION, good)
       expect(refused).toBeUndefined()
       expect(calibration.unsupportedExtent.activeLimitMM).toBe(good)
     }
-    // The released default is the tighter position, and 40mm was never a position of this switch.
-    expect(RELEASED_CALIBRATION.unsupportedExtent.activeLimitMM).toBe(12)
-    expect(RELEASED_CALIBRATION.unsupportedExtent.releasedOptionsMM).toEqual([12, 24])
+    // DAN 2026-08-17: zero by default. No overhang tolerance is granted until one is calibrated in.
+    expect(RELEASED_CALIBRATION.unsupportedExtent.activeLimitMM).toBe(0)
+    expect(min).toBe(0)
   })
 
   it('carries the shape\u2019s material masses into P7 from the CERTIFIED safe core', () => {

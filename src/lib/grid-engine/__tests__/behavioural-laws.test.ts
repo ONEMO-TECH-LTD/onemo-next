@@ -96,7 +96,18 @@ function notched(): Contour {
   ])
 }
 
-const solve = (c: Contour) => solveCutout(RELEASED, RELEASED_CALIBRATION, c)!
+/**
+ * TESTS PIN THEIR OWN OVERHANG LIMIT. The released default is 0 — no tolerance granted until an
+ * operator calibrates one in (Dan, 2026-08-17) — so a test that inherited it would assert against
+ * whatever the current calibration happens to be. These fixtures exercise ENGINE behaviour, not the
+ * shipped setting, so they state the limit they need.
+ */
+const CALIBRATED = (limitMM: number) => ({
+  ...RELEASED_CALIBRATION,
+  unsupportedExtent: { ...RELEASED_CALIBRATION.unsupportedExtent, activeLimitMM: limitMM },
+})
+
+const solve = (c: Contour) => solveCutout(RELEASED, CALIBRATED(24), c)!
 
 describe('behavioural laws on synthetic counterexamples', () => {
   it('R3-1 · wide shallow shape: band 2 pairs HORIZONTALLY (orientation follows the shape)', { timeout: 300000 }, () => {
