@@ -809,14 +809,24 @@ function segmentProjection(point: Pt, a: Pt, b: Pt): Pt {
 /**
  * Material area above the TOP PADDED EDGE, y < min_i(t_y + o_iy) − r, divided by the padded block
  * width: the DEPTH of mass hanging past the protected boundary rather than past the anchor
- * centre-line. Minimised. Units mm — the normalisation is an ENGINEERING choice at the gate's
- * direction, not a ruled formula.
+ * centre-line. Minimised. Units mm — dividing by the padded block width is an ENGINEERING
+ * normalisation, chosen so the measure is a DEPTH comparable across arrangements of different
+ * widths rather than an area that grows with the block. It is not a ruled formula.
  *
  * EXACT BY PROVED MONOTONICITY, not by taking a directional extremum on faith: the edge is affine
  * in t_y, the area above a horizontal line is monotone in that line's position, and the block width
  * is registration-invariant. The value therefore depends on t_y alone and increases with it, so the
- * optimum is attained on each component's minimum-t_y face. Only that face's existing vertices are
- * returned, so the argopt is a CERTIFIED OPTIMAL SUBSET — not the whole face.
+ * optimum is attained on each component's minimum-t_y face.
+ *
+ * The argopt is the COMPLETE equivalent set at lattice resolution: the strip of the component within
+ * one quantum of that face, returned as a region. Returning only the face's existing vertices made
+ * the set un-composable — a caller restricting the next priority to it would silently discard every
+ * other equally-optimal registration on the same face.
+ *
+ * The reported interval covers the WHOLE strip: `lo` is the value on the face, `hi` the value one
+ * quantum below it, which by the same monotonicity is the worst any returned point can score. A
+ * strip bracketed only at its face would hand the next priority a set containing points worse than
+ * the interval admits.
  */
 export function upperHangingMassEvidence(subject: DescriptorSubject): DescriptorEvidence {
   requireSubject(subject)
@@ -834,13 +844,30 @@ export function upperHangingMassEvidence(subject: DescriptorSubject): Descriptor
     const face = ring.filter(([, y]) => y === minY).map(([x, y]) => [x, y] as Pt)
     if (!face.length)
       return { componentIndex, resolved: false, lo: Number.NaN, hi: Number.NaN, argopt: null }
-    const value = valueAt(face[0])
+    const best = valueAt(face[0])
+    // Monotone in t_y, so one quantum below the face is the worst point the strip can contain.
+    const worst = valueAt([face[0][0], minY + CONTINUOUS_REGISTRATION_QUANTUM_MM])
+    const value = { lo: best.lo, hi: worst.hi }
+    // The complete equivalent set: everything in the component within one quantum of the optimal
+    // face, cut exactly on the lattice so the strip can be restricted to by the next priority.
+    const bounds = contourBounds(ring)
+    const strip = Clipper.makePath([
+      Math.round(bounds.minX * LATTICE) - 1,
+      Math.round(minY * LATTICE),
+      Math.round(bounds.maxX * LATTICE) + 1,
+      Math.round(minY * LATTICE),
+      Math.round(bounds.maxX * LATTICE) + 1,
+      Math.round((minY + CONTINUOUS_REGISTRATION_QUANTUM_MM) * LATTICE),
+      Math.round(bounds.minX * LATTICE) - 1,
+      Math.round((minY + CONTINUOUS_REGISTRATION_QUANTUM_MM) * LATTICE),
+    ])
+    const cells = Clipper.intersect(toLatticePaths([ring]), [strip], FillRule.NonZero)
     return {
       componentIndex,
       resolved: true,
       lo: value.lo,
       hi: value.hi,
-      argopt: { regions: [], points: face } as DescriptorArgopt,
+      argopt: { regions: fromLatticePaths(cells), points: face } as DescriptorArgopt,
     }
   })
 
@@ -852,7 +879,7 @@ export function upperHangingMassEvidence(subject: DescriptorSubject): Descriptor
   return globalAnchor(
     'minimize',
     'mm',
-    'exact by proved monotonicity in t_y; the returned face vertices are a certified optimal subset, not the whole face',
+    'exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it',
     subject,
     perComponent,
     witnessEvidence,
@@ -862,6 +889,13 @@ export function upperHangingMassEvidence(subject: DescriptorSubject): Descriptor
 
 // ─── P4 · unsupported extent — minimize, mm ────────────────────────────────────────────────────
 
+/**
+ * One major support region's reach past the padded box, in MATERIAL space.
+ *
+ * The region handed in is a magnet-CENTRE region — the body eroded by the safe radius — so its
+ * bounds are reconstructed to the physical support envelope they stand for before the reach is
+ * taken. Without that, a solid body reads as a trivial limb.
+ */
 export interface RegionReach {
   regionIndex: number
   leftMM: number
@@ -874,7 +908,11 @@ export interface UnsupportedExtentEvidence extends DescriptorEvidence {
   /** Per-side reach beyond the padded box at the certified optimum. */
   reachMM: { left: number; right: number; top: number; bottom: number }
   maxSideScoreMM: number
-  /** Per-region contribution, so Logic can apply its ruled exemption and switch. Compute does not. */
+  /**
+   * Per-region contribution in MATERIAL space — the physical support envelope reconstructed from
+   * each centre-space safe-core region — so Logic can apply its ruled exemption and switch against
+   * the material a region actually supports. Compute applies neither.
+   */
   perRegion: ReadonlyArray<RegionReach>
 }
 
@@ -998,13 +1036,31 @@ export function unsupportedExtentEvidence(
     maxSideScoreMM: optimum ? scoreAt(optimum) : Number.NaN,
     perRegion: box
       ? regionsMM.map((region, regionIndex) => {
-          const regionBounds = contourBounds(region.outer.pts)
+          // CENTRE SPACE IS NOT MATERIAL SPACE. A major support region is a MAGNET-CENTRE region:
+          // the body already eroded by the safe radius, so a magnet centred anywhere in it clears
+          // the outline. Its raw bounds therefore sit r inside the material it supports, and
+          // comparing them to the padded box measures the wrong thing — it mislabels a solid body
+          // as a limb, because the body's own core is always r short of its outline.
+          // The envelope this region supports is `core ⊕ disc(r)` — every point within r of a
+          // lawful magnet centre. What is exact is a statement about THAT set's bounds, and only
+          // that: the axis-aligned bounds of `core ⊕ disc(r)` are the core's bounds expanded by r
+          // on each side, because the extreme point of the dilation is the core's extreme pushed
+          // out by the disc's radius. No claim is made about inverting the erosion that produced
+          // the core — a limb whose extremum vanishes under erosion is not recovered by this, and
+          // is not what is being measured. A per-side question needs no dilation engine.
+          const core = contourBounds(region.outer.pts)
+          const supported = {
+            minX: core.minX - subject.effectiveRadiusMM,
+            maxX: core.maxX + subject.effectiveRadiusMM,
+            minY: core.minY - subject.effectiveRadiusMM,
+            maxY: core.maxY + subject.effectiveRadiusMM,
+          }
           return {
             regionIndex,
-            leftMM: Math.max(0, box.leftMM - regionBounds.minX),
-            rightMM: Math.max(0, regionBounds.maxX - box.rightMM),
-            topMM: Math.max(0, box.topMM - regionBounds.minY),
-            bottomMM: Math.max(0, regionBounds.maxY - box.bottomMM),
+            leftMM: Math.max(0, box.leftMM - supported.minX),
+            rightMM: Math.max(0, supported.maxX - box.rightMM),
+            topMM: Math.max(0, box.topMM - supported.minY),
+            bottomMM: Math.max(0, supported.maxY - box.bottomMM),
           }
         })
       : [],
@@ -1024,14 +1080,16 @@ export interface PeelBudget {
  * Peel leverage: the first moment of unsupported material about each padded box edge,
  * ∫ (distance beyond the edge) dA, in mm³; the score is the largest side. Minimised.
  *
- * DEDICATED SOLVER WITH EXACT CELL BOUNDS — no Lipschitz claim and no generic framework. Each
- * side's integrand is a hinge of the single scalar edge position, so the side is monotone in that
- * scalar, and the edge position is affine in exactly one coordinate. Over an axis-aligned cell each
- * side's minimum is therefore attained at that cell's extreme in its own coordinate and is computed
- * exactly, giving LB = max over sides of those exact per-side minima. UB comes only from points
- * proven feasible. Branch and bound prunes on those exact bounds; exhausting the caller's budget
- * leaves that component UNRESOLVED with its retained bound, which makes the descriptor globally
- * indeterminate unless the bound proves the component cannot win.
+ * ONE GLOBAL SUBLEVEL BRACKET — no Lipschitz claim, no generic framework, no search over cells.
+ * Each side's integrand is a hinge of one padded edge, so left and top rise with their own
+ * coordinate while right and bottom fall with theirs, and score = max of the four. The set
+ * {score <= k} is therefore exactly an axis-aligned lattice rectangle, found by certified
+ * coordinate bisection. Two rectangles are built at every threshold: INNER, from each side's .hi,
+ * holds only points PROVEN at or under k and is what gets returned; OUTER, from each side's .lo,
+ * holds every possibly-lawful point, so its emptiness PROVES nothing reaches k. `high` moves only
+ * on inner non-emptiness, `low` only on outer emptiness, and a probe neither proof resolves stops
+ * the bisection rather than moving an unproved bound. Budget exhaustion or a bracket wider than the
+ * caller's tolerance returns DECISION_INDETERMINATE with no partial set.
  */
 export function peelLeverageEvidence(
   subject: DescriptorSubject,
@@ -1044,8 +1102,6 @@ export function peelLeverageEvidence(
     throw new RangeError('Peel evaluation budget must be a positive integer.')
   const material = materialSubject(subject.contour)
   let evaluations = 0
-  // The FULL interval is cached: a lower bound may only be read from `.lo` and a feasible incumbent
-  // only from `.hi`. Caching one endpoint and reusing it for both would make the bounds unsafe.
   const cache = new Map<string, Interval>()
   /** Every cache MISS spends budget; a miss with none left returns null, never a value. */
   const sideMoment = (axis: 0 | 1, keepBelow: boolean, cutMM: number): Interval | null => {
@@ -1059,115 +1115,477 @@ export function peelLeverageEvidence(
     cache.set(key, value)
     return value
   }
-  const sidesAt = (box: PaddedBox, mixed?: PaddedBox): Array<Interval | null> => [
-    sideMoment(0, true, box.leftMM),
-    sideMoment(0, false, (mixed ?? box).rightMM),
-    sideMoment(1, true, box.topMM),
-    sideMoment(1, false, (mixed ?? box).bottomMM),
-  ]
-  /** An upper bound on the score at one feasible point: the max of the sides' upper endpoints. */
-  const scoreUpperAt = (t: Pt): number | null => {
-    const values = sidesAt(paddedBox(subject, t))
-    return values.some((value) => value === null)
-      ? null
-      : Math.max(...(values as Interval[]).map((value) => value.hi))
-  }
-  // Each side's exact minimum over the cell: left/top grow with their coordinate, right/bottom fall.
-  // The bound reads `.lo`, never the cached upper endpoint.
-  const cellLowerBound = (x0: number, x1: number, y0: number, y1: number): number | null => {
-    const values = sidesAt(paddedBox(subject, [x0, y0]), paddedBox(subject, [x1, y1]))
-    return values.some((value) => value === null)
-      ? null
-      : Math.max(...(values as Interval[]).map((value) => value.lo))
-  }
-
-  const perComponent = subject.feasible.components.map((ring, componentIndex) => {
-    const prepared = prepareExactContour(ringContour(ring))
-    const ringBounds = contourBounds(ring)
-    let incumbent: { point: Pt; value: number } | null = null
-    for (const [vx, vy] of ring) {
-      const value = scoreUpperAt([vx, vy])
-      if (value !== null && (!incumbent || value < incumbent.value))
-        incumbent = { point: [vx, vy], value }
-    }
-    const unresolved = (bound: number) => ({
-      componentIndex,
-      resolved: false,
-      lo: bound,
-      hi: incumbent ? incumbent.value : Number.NaN,
-      argopt: null,
-    })
-    if (!incumbent) return unresolved(0)
-    let cells: Array<[number, number, number, number]> = [
-      [ringBounds.minX, ringBounds.maxX, ringBounds.minY, ringBounds.maxY],
+  const sidesAt = (t: Pt): Array<Interval | null> => {
+    const box = paddedBox(subject, t)
+    return [
+      sideMoment(0, true, box.leftMM),
+      sideMoment(0, false, box.rightMM),
+      sideMoment(1, true, box.topMM),
+      sideMoment(1, false, box.bottomMM),
     ]
-    let lowerBound = 0
-    let exhausted = false
-    while (cells.length && !exhausted) {
-      const next: Array<[number, number, number, number]> = []
-      let roundBound = Infinity
-      for (const [x0, x1, y0, y1] of cells) {
-        const bound = cellLowerBound(x0, x1, y0, y1)
-        if (bound === null) {
-          exhausted = true
-          break
-        }
-        if (bound > incumbent.value) continue
-        const midX = (x0 + x1) / 2
-        const midY = (y0 + y1) / 2
-        if (pointInPreparedContour([midX, midY], prepared)) {
-          const value = scoreUpperAt([midX, midY])
-          if (value === null) {
-            exhausted = true
-            break
-          }
-          if (value < incumbent.value) incumbent = { point: [midX, midY], value }
-        }
-        roundBound = Math.min(roundBound, bound)
-        if (incumbent.value - bound > budget.toleranceMM3)
-          next.push(
-            [x0, midX, y0, midY],
-            [midX, x1, y0, midY],
-            [x0, midX, midY, y1],
-            [midX, x1, midY, y1],
-          )
-      }
-      if (Number.isFinite(roundBound)) lowerBound = roundBound
-      cells = next
-    }
-    if (exhausted || incumbent.value - lowerBound > budget.toleranceMM3) return unresolved(lowerBound)
+  }
+  /** The score at one registration, as an interval. Null when the budget is spent. */
+  const scoreAt = (t: Pt): Interval | null => {
+    const values = sidesAt(t)
+    if (values.some((value) => value === null)) return null
+    const certain = values as Interval[]
     return {
-      componentIndex,
-      resolved: true,
-      lo: outwardDown(Math.max(0, lowerBound)),
-      hi: outwardUp(incumbent.value),
-      argopt: { regions: [], points: [incumbent.point] } as DescriptorArgopt,
+      lo: Math.max(...certain.map((value) => value.lo)),
+      hi: Math.max(...certain.map((value) => value.hi)),
     }
-  })
+  }
 
-  // Witness work spends the same budget. An unevaluated witness is not skipped: it makes the whole
-  // descriptor indeterminate, because the witness it could not price may hold the optimum.
-  const witnessEvidence: WitnessDescriptorEvidence[] = []
-  let allWitnessesPriced = true
-  for (const witness of subject.feasible.exactWitnessesMM) {
-    const value = scoreUpperAt(witness)
-    if (value === null) {
-      allWitnessesPriced = false
+  const feasiblePoints: Pt[] = [
+    ...subject.feasible.exactWitnessesMM.map(([x, y]) => [x, y] as Pt),
+    ...subject.feasible.components.flatMap((component) => component.map(([x, y]) => [x, y] as Pt)),
+  ]
+  const indeterminate = (reason: string): DescriptorEvidence => ({
+    units: 'mm3',
+    direction: 'minimize',
+    status: 'DECISION_INDETERMINATE',
+    lo: Number.NaN,
+    hi: Number.NaN,
+    argopt: null,
+    completenessProof: reason,
+    sourceEnvelope: subject.feasible.envelope,
+    perComponent: [],
+    witnessEvidence: [],
+  })
+  if (!feasiblePoints.length)
+    return indeterminate('no feasible registration exists to bracket the optimum from')
+
+  // FINITE F NEEDS NO RECTANGLE. P3 and P4 routinely restrict the feasible set down to exact
+  // witnesses, and a finite set has an exact minimum: price each point once and take the envelope
+  // directly. Pushing it through the continuous bracket instead manufactures a bracket width — the
+  // caller's tolerance then rejects an answer that was already resolved point by point.
+  if (!subject.feasible.components.length) {
+    const priced: WitnessDescriptorEvidence[] = []
+    for (const witness of subject.feasible.exactWitnessesMM) {
+      const value = scoreAt(witness)
+      if (!value) return indeterminate('the evaluation budget was spent scoring an exact witness')
+      priced.push({ witnessMM: [witness[0], witness[1]], lo: value.lo, hi: value.hi })
+    }
+    const finite = globalAnchor(
+      'minimize',
+      'mm3',
+      'finite feasible set: every exact registration priced once and the global minimum taken from those values directly, with no continuous bracket to widen it',
+      subject,
+      [],
+      priced,
+      false,
+    )
+    if (finite.status === 'DECISION_INDETERMINATE')
+      return { ...indeterminate('no exact registration could be priced'), witnessEvidence: priced }
+    if (finite.hi - finite.lo > budget.toleranceMM3)
+      return {
+        ...indeterminate('the finite feasible set could not be resolved inside the caller tolerance'),
+        witnessEvidence: priced,
+      }
+    return finite
+  }
+
+  // ── the sublevel set is a RECTANGLE, and that is what makes this solvable ──
+  //
+  // Each side's integrand is a hinge of one padded edge, so peel_left and peel_top rise with their
+  // own coordinate while peel_right and peel_bottom fall with theirs. score = max of the four, so
+  // {score <= k} is exactly [xLo(k), xHi(k)] x [yLo(k), yHi(k)]. Each bound is monotone but has no
+  // closed form, so it is found by certified bisection on the 1µm lattice: a coordinate is INSIDE
+  // when the side's interval satisfies .hi <= k and OUTSIDE when .lo > k. BOUND CONSTRUCTION has no
+  // interval-straddle case: INNER and OUTER each use ONE side of the measured interval
+  // consistently, so each coordinate limit is decided outright. REACHABILITY is a separate
+  // question — meets() may return unproven — and when neither rectangle resolves a probe the
+  // bracket stops rather than moving a bound it never proved. This replaces a branch-and-bound
+  // that could not certify a region at any budget.
+  const searchBounds = (() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const [x, y] of feasiblePoints) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    return {
+      minX: Math.round(minX * LATTICE),
+      maxX: Math.round(maxX * LATTICE),
+      minY: Math.round(minY * LATTICE),
+      maxY: Math.round(maxY * LATTICE),
+    }
+  })()
+
+  type Bound = { kind: 'ok'; lattice: number } | { kind: 'budget' }
+
+  /**
+   * The extreme lattice coordinate on one axis still admitted at threshold k.
+   *
+   * TWO RECTANGLES, each using ONE side of the measured interval consistently, which is what makes
+   * both certifiable and removes the straddle case entirely:
+   *   INNER  admits a coordinate when the side's `.hi <= k` — every point it holds is PROVEN at or
+   *          under k, so INNER(k) is a sublevel set that can be returned.
+   *   OUTER  admits a coordinate when the side's `.lo <= k` — it holds every point that could
+   *          possibly be at or under k, so OUTER(k) being EMPTY proves no registration reaches k.
+   * `rising` marks a side that grows with its coordinate (left, top): its bound is an upper limit.
+   */
+  const boundFor = (
+    axis: 0 | 1,
+    keepBelow: boolean,
+    rising: boolean,
+    k: number,
+    mode: 'inner' | 'outer',
+  ): Bound => {
+    const from = axis === 0 ? searchBounds.minX : searchBounds.minY
+    const to = axis === 0 ? searchBounds.maxX : searchBounds.maxY
+    const cutAt = (lattice: number): number => {
+      const t: Pt = axis === 0 ? [lattice / LATTICE, 0] : [0, lattice / LATTICE]
+      const box = paddedBox(subject, t)
+      return axis === 0 ? (keepBelow ? box.leftMM : box.rightMM) : keepBelow ? box.topMM : box.bottomMM
+    }
+    /** True when this coordinate is admitted by the mode's own side of the interval. */
+    const admits = (lattice: number): boolean | null => {
+      const value = sideMoment(axis, keepBelow, cutAt(lattice))
+      if (!value) return null
+      return mode === 'inner' ? value.hi <= k : value.lo <= k
+    }
+    let inside = rising ? from : to
+    let outside = rising ? to : from
+    const first = admits(inside)
+    if (first === null) return { kind: 'budget' }
+    if (!first) return { kind: 'ok', lattice: rising ? from - 1 : to + 1 }
+    const edge = admits(outside)
+    if (edge === null) return { kind: 'budget' }
+    if (edge) return { kind: 'ok', lattice: outside }
+    while (Math.abs(outside - inside) > 1) {
+      const mid = Math.floor((inside + outside) / 2)
+      const verdict = admits(mid)
+      if (verdict === null) return { kind: 'budget' }
+      if (verdict) inside = mid
+      else outside = mid
+    }
+    return { kind: 'ok', lattice: inside }
+  }
+
+  type Rect = { x0: number; x1: number; y0: number; y1: number }
+  type Sublevel = { kind: 'rect'; rect: Rect } | { kind: 'budget' }
+
+  const sublevelAt = (k: number, mode: 'inner' | 'outer'): Sublevel => {
+    const xHi = boundFor(0, true, true, k, mode)
+    const xLo = boundFor(0, false, false, k, mode)
+    const yHi = boundFor(1, true, true, k, mode)
+    const yLo = boundFor(1, false, false, k, mode)
+    for (const bound of [xHi, xLo, yHi, yLo]) if (bound.kind === 'budget') return { kind: 'budget' }
+    return {
+      kind: 'rect',
+      rect: {
+        x0: (xLo as { lattice: number }).lattice,
+        x1: (xHi as { lattice: number }).lattice,
+        y0: (yLo as { lattice: number }).lattice,
+        y1: (yHi as { lattice: number }).lattice,
+      },
+    }
+  }
+
+  const rectPath = (rect: Rect): Path64 | null =>
+    rect.x1 < rect.x0 || rect.y1 < rect.y0
+      ? null
+      : Clipper.makePath([rect.x0, rect.y0, rect.x1, rect.y0, rect.x1, rect.y1, rect.x0, rect.y1])
+
+  /** Where the component actually meets the rectangle: area, or exact vertex contact. */
+  const componentCells = (component: ReadonlyArray<Pt>, rect: Rect): Paths64 => {
+    const path = rectPath(rect)
+    if (!path) return []
+    return Clipper.intersect(toLatticePaths([component]), [path], FillRule.NonZero)
+  }
+  /**
+   * EXACT contact between a component ring and the closed rectangle, CLASSIFIED — not a boolean.
+   *
+   * Clipper emits nothing for lower-dimensional contact, so `meets` proving a rectangle reachable
+   * and the final collection keeping positive-area cells were answering different questions: the
+   * bisection could certify a threshold whose equivalent set the collection then could not express,
+   * and the descriptor reported an empty set its own bracket contradicted. This returns what the
+   * contact IS, so both read one geometry. It does not promise every certified threshold is
+   * returnable — a segment or non-lattice crossing is real contact the collection must refuse — it
+   * promises the refusal is honest and named instead of disguised as emptiness:
+   *   none      — provably disjoint.
+   *   points    — a finite contact set, every member exactly on the lattice and returnable.
+   *   segment   — a positive-length collinear overlap. Real contact, but not a finite set, and
+   *               reducing it to its endpoints would drop every registration between them.
+   *   ambiguous — a transversal crossing. Contact is certain, but the crossing point is rational
+   *               and need not lie on the lattice, so it cannot be returned exactly.
+   * Every test is an integer sign comparison; no division, no tolerance.
+   */
+  type Contact =
+    | { kind: 'none' }
+    | { kind: 'points'; points: Pt[] }
+    | { kind: 'segment' }
+    | { kind: 'ambiguous' }
+
+  const classifyContact = (component: ReadonlyArray<Pt>, rect: Rect): Contact => {
+    const pts = component.map(
+      ([x, y]) => [Math.round(x * LATTICE), Math.round(y * LATTICE)] as [number, number],
+    )
+    const orient = (
+      ax: number, ay: number, bx: number, by: number, cx: number, cy: number,
+    ): number => {
+      const value = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+      return value > 0 ? 1 : value < 0 ? -1 : 0
+    }
+    const onSegment = (
+      ax: number, ay: number, bx: number, by: number, px: number, py: number,
+    ): boolean =>
+      Math.min(ax, bx) <= px && px <= Math.max(ax, bx) &&
+      Math.min(ay, by) <= py && py <= Math.max(ay, by)
+    const corners: Array<[number, number]> = [
+      [rect.x0, rect.y0],
+      [rect.x1, rect.y0],
+      [rect.x1, rect.y1],
+      [rect.x0, rect.y1],
+    ]
+    /** CLOSED containment: a point ON the ring counts as inside. */
+    const inRing = (px: number, py: number): boolean => {
+      for (let i = 0; i < pts.length; i += 1) {
+        const [ax, ay] = pts[i]
+        const [bx, by] = pts[(i + 1) % pts.length]
+        if (orient(ax, ay, bx, by, px, py) === 0 && onSegment(ax, ay, bx, by, px, py)) return true
+      }
+      let inside = false
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i, i += 1) {
+        const [xi, yi] = pts[i]
+        const [xj, yj] = pts[j]
+        if (yi > py === yj > py) continue
+        const side = orient(xi, yi, xj, yj, px, py)
+        if (yj > yi ? side > 0 : side < 0) inside = !inside
+      }
+      return inside
+    }
+
+    // FINITE contacts first: each is a lattice point, so each can be returned exactly.
+    const finite = new Map<string, Pt>()
+    for (const [x, y] of pts)
+      if (x >= rect.x0 && x <= rect.x1 && y >= rect.y0 && y <= rect.y1)
+        finite.set(`${x},${y}`, [x / LATTICE, y / LATTICE])
+    for (const [cx, cy] of corners)
+      if (inRing(cx, cy)) finite.set(`${cx},${cy}`, [cx / LATTICE, cy / LATTICE])
+
+    let segment = false
+    let ambiguous = false
+    for (let i = 0; i < pts.length; i += 1) {
+      const [ax, ay] = pts[i]
+      const [bx, by] = pts[(i + 1) % pts.length]
+      for (let c = 0; c < 4; c += 1) {
+        const [cx, cy] = corners[c]
+        const [dx, dy] = corners[(c + 1) % 4]
+        const d1 = orient(ax, ay, bx, by, cx, cy)
+        const d2 = orient(ax, ay, bx, by, dx, dy)
+        const d3 = orient(cx, cy, dx, dy, ax, ay)
+        const d4 = orient(cx, cy, dx, dy, bx, by)
+        if (d1 === 0 && d2 === 0) {
+          // COLLINEAR. A positive-length overlap is a segment; a single shared endpoint is already
+          // in the finite set from the vertex and corner scans above.
+          const along = (px: number, py: number): number => (bx !== ax ? px : py)
+          const lo = Math.max(
+            Math.min(along(ax, ay), along(bx, by)),
+            Math.min(along(cx, cy), along(dx, dy)),
+          )
+          const hi = Math.min(
+            Math.max(along(ax, ay), along(bx, by)),
+            Math.max(along(cx, cy), along(dx, dy)),
+          )
+          if (hi > lo) segment = true
+          continue
+        }
+        // TRANSVERSAL: contact is certain, but its point need not be on the lattice.
+        if (d1 !== d2 && d3 !== d4 && d1 !== 0 && d2 !== 0 && d3 !== 0 && d4 !== 0) ambiguous = true
+      }
+    }
+    if (segment) return { kind: 'segment' }
+    if (ambiguous) return { kind: 'ambiguous' }
+    if (finite.size) return { kind: 'points', points: [...finite.values()] }
+    return { kind: 'none' }
+  }
+
+  /**
+   * Non-emptiness over the WHOLE feasible set. Zero Clipper area is NOT emptiness: a witness in the
+   * rectangle, or exact contact between the rectangle and a component, is a certified registration
+   * inside it. Only a degenerate zero-area Clipper path that the exact predicate then disproves is
+   * reported undecided.
+   */
+  const meets = (rect: Rect): 'yes' | 'no' | 'unproven' => {
+    // An inverted interval is how sublevelAt spells "no such coordinate exists". That is certified
+    // emptiness, not uncertain contact — passing the swapped corners on would read as a real
+    // rectangle and wrongly report contact.
+    if (rect.x1 < rect.x0 || rect.y1 < rect.y0) return 'no'
+    for (const witness of subject.feasible.exactWitnessesMM) {
+      const lx = Math.round(witness[0] * LATTICE)
+      const ly = Math.round(witness[1] * LATTICE)
+      if (lx >= rect.x0 && lx <= rect.x1 && ly >= rect.y0 && ly <= rect.y1) return 'yes'
+    }
+    let touching = false
+    for (const component of subject.feasible.components) {
+      const cells = componentCells(component, rect)
+      if (integerAreaAndMoments(cells).twiceArea !== B0) return 'yes'
+      // ONE classification serves both here and the final collection, so the two never disagree
+      // about WHETHER contact exists. They can still disagree about whether it is RETURNABLE: a
+      // segment or a non-lattice crossing is real contact, so the bisection tightens on it, and the
+      // collection then refuses it honestly as DECISION_INDETERMINATE rather than reporting empty.
+      if (classifyContact(component, rect).kind !== 'none') return 'yes'
+      if (cells.length) touching = true
+    }
+    return touching ? 'unproven' : 'no'
+  }
+
+  // The initial certified high: every feasible point IS a lawful registration, so the least upper
+  // score among them is a threshold whose INNER sublevel is certainly non-empty.
+  let high = Infinity
+  for (const point of feasiblePoints) {
+    const value = scoreAt(point)
+    if (!value) return indeterminate('the evaluation budget was spent bracketing the optimum')
+    if (value.hi < high) high = value.hi
+  }
+  // A peel moment is an integral of non-negative distance, so zero is always a lawful lower bound.
+  let low = 0
+  let rect: Rect | null = null
+  const settle = (k: number): Rect | null => {
+    const inner = sublevelAt(k, 'inner')
+    return inner.kind === 'rect' ? inner.rect : null
+  }
+  const zero = settle(0)
+  if (zero && meets(zero) === 'yes') {
+    high = 0
+    rect = zero
+  } else {
+    let guard = 0
+    while (high - low > budget.toleranceMM3) {
+      if (guard > 4096) return indeterminate('the sublevel bisection failed to converge')
+      guard += 1
+      const mid = (low + high) / 2
+      const inner = sublevelAt(mid, 'inner')
+      if (inner.kind === 'budget')
+        return indeterminate('the evaluation budget was spent inside the sublevel bisection')
+      if (meets(inner.rect) === 'yes') {
+        // PROVEN reachable at mid: the returned sublevel may shrink to it.
+        high = mid
+        rect = inner.rect
+        continue
+      }
+      const outer = sublevelAt(mid, 'outer')
+      if (outer.kind === 'budget')
+        return indeterminate('the evaluation budget was spent proving the outer sublevel')
+      if (meets(outer.rect) === 'no') {
+        // PROVEN unreachable at mid: nothing can score at or under it.
+        low = mid
+        continue
+      }
+      // Neither proof resolves this probe: inner is empty while outer is not, so the truth sits in
+      // a band the measurement cannot split. Stop rather than move a bound that was not proved.
       break
     }
-    witnessEvidence.push({ witnessMM: witness, lo: outwardDown(value), hi: outwardUp(value) })
+    if (high - low > budget.toleranceMM3)
+      return indeterminate('the optimum could not be bracketed inside the caller tolerance')
+    if (!rect) {
+      const settled = settle(high)
+      if (!settled) return indeterminate('the settled sublevel rectangle could not be certified')
+      rect = settled
+    }
   }
 
-  return globalAnchor(
-    'minimize',
-    'mm3',
-    'branch and bound on exact per-side cell minima proved by monotonicity in one coordinate; no convexity or Lipschitz assumption, and an exhausted budget leaves the component unresolved or the descriptor indeterminate',
-    subject,
+  // WITNESS CLOSURE. A witness whose interval straddles `high` may be an optimum or may be worse
+  // than the threshold, and neither dropping it nor keeping it silently is sound. Instead the
+  // threshold ABSORBS it: admit every witness that could still be at or under `high`, raise `high`
+  // to the worst value so admitted, and repeat — each pass can only admit more, so it reaches a
+  // fixed point in at most one pass per witness. The caller's tolerance still decides whether the
+  // widened bracket is acceptable.
+  const scored: Array<{ witness: Pt; lo: number; hi: number }> = []
+  for (const witness of subject.feasible.exactWitnessesMM) {
+    const value = scoreAt(witness)
+    if (!value) return indeterminate('the evaluation budget was spent scoring an exact witness')
+    scored.push({ witness: [witness[0], witness[1]], lo: value.lo, hi: value.hi })
+  }
+  for (let pass = 0; pass <= scored.length; pass += 1) {
+    let raised = high
+    for (const entry of scored) if (entry.lo <= high && entry.hi > raised) raised = entry.hi
+    if (raised === high) break
+    high = raised
+    rect = null
+  }
+  if (high - low > budget.toleranceMM3)
+    return indeterminate('admitting every candidate witness widened the bracket past the tolerance')
+  if (!rect) {
+    const reopened = settle(high)
+    if (!reopened) return indeterminate('the widened sublevel rectangle could not be certified')
+    rect = reopened
+  }
+
+  // F ∩ sublevel(high) — the COMPLETE equivalent set, every component against the SAME global
+  // threshold, with the exact witnesses that certify inside it.
+  const regions: Array<ReadonlyArray<Pt>> = []
+  const contactPoints: Pt[] = []
+  const perComponent: ComponentDescriptorEvidence[] = []
+  for (
+    let componentIndex = 0;
+    componentIndex < subject.feasible.components.length;
+    componentIndex += 1
+  ) {
+    const component = subject.feasible.components[componentIndex]
+    const cells = fromLatticePaths(componentCells(component, rect as Rect))
+    if (cells.length) {
+      regions.push(...cells)
+      perComponent.push({
+        componentIndex,
+        resolved: true,
+        lo: low,
+        hi: high,
+        argopt: { regions: cells, points: [] } as DescriptorArgopt,
+      })
+      continue
+    }
+    // NO POSITIVE AREA. The bisection may still have certified this threshold on lower-dimensional
+    // contact; dropping it here is exactly what made the bracket contradict its own equivalent set.
+    const contact = classifyContact(component, rect as Rect)
+    if (contact.kind === 'segment')
+      return indeterminate(
+        'the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return',
+      )
+    if (contact.kind === 'ambiguous')
+      return indeterminate(
+        'the certified sublevel set crosses a component edge at a point that need not lie on the lattice, so the equivalent set cannot be returned exactly',
+      )
+    const points = contact.kind === 'points' ? contact.points : []
+    contactPoints.push(...points)
+    perComponent.push({
+      componentIndex,
+      resolved: true,
+      lo: low,
+      hi: high,
+      argopt: { regions: [], points } as DescriptorArgopt,
+    })
+  }
+  // witnessEvidence is the PRICING RECORD — its contract is the exact value at every T4 witness, so
+  // every priced witness appears here whether or not it won. argopt.points is the separate thing:
+  // the ADMITTED equivalent set, which excludes any witness proven worse than the closed threshold.
+  const witnessEvidence: WitnessDescriptorEvidence[] = scored.map((entry) => ({
+    witnessMM: entry.witness,
+    lo: entry.lo,
+    hi: entry.hi,
+  }))
+  const points: Pt[] = scored.filter((entry) => entry.lo <= high).map((entry) => entry.witness)
+  const returnedPoints: Pt[] = [...contactPoints, ...points]
+  if (!regions.length && !returnedPoints.length)
+    return indeterminate('the certified sublevel set is empty, which the bracket contradicts')
+
+  // Decision 2: the descriptor comes from the ONE global bracket. perComponent is evidence of each
+  // component's share of that same sublevel, never a local optimum recombined into a global claim.
+  return {
+    units: 'mm3',
+    direction: 'minimize',
+    status: 'INTERVAL',
+    lo: low,
+    hi: high,
+    argopt: { regions, points: returnedPoints },
+    completenessProof:
+      'one global dual-rectangle bracket over every component and witness: the score separates into two monotone coordinate pairs, so the sublevel set is an exact lattice rectangle. high moves only when the INNER rectangle (side .hi <= k, every point proven at or under k) is non-empty; low moves only when the OUTER rectangle (side .lo <= k, every possibly-lawful point) is empty. The returned set is F intersected with INNER(high).',
+    sourceEnvelope: subject.feasible.envelope,
     perComponent,
     witnessEvidence,
-    false,
-    allWitnessesPriced,
-  )
+  }
 }
 
 // ─── P2 · coverage and P7 · distribution ───────────────────────────────────────────────────────
@@ -1212,10 +1630,17 @@ function anchorCountsAt(
   preparedSets: ReadonlyArray<ReturnType<typeof prepareExactContour>>,
   t: Pt,
 ): number[] {
+  // THE SETS ARE CLOSED. A safe core is an erosion and the coverage regions are exact Clipper
+  // polygons; tangency is lawful throughout this engine, and a registration sitting exactly ON a
+  // certified argopt vertex is the answer the chain selected, not a near miss. `pointInPreparedContour`
+  // is an OPEN even-odd test, so re-pricing such a point returned zero anchors and contradicted the
+  // very bracket that produced it — measured on PILL B2, whose registration [12.95, 12.167] is
+  // literally a vertex of the certified P2 argopt. Boundary contact is exact distance zero; no
+  // epsilon is introduced to decide it. One predicate, shared by coverage and distribution.
+  const holds = (point: Pt, set: ReturnType<typeof prepareExactContour>): boolean =>
+    pointInPreparedContour(point, set) || distanceToPreparedContour(point, set) === 0
   return preparedSets.map(
-    (set) =>
-      subject.offsetsMM.filter(([dx, dy]) => pointInPreparedContour([t[0] + dx, t[1] + dy], set))
-        .length,
+    (set) => subject.offsetsMM.filter(([dx, dy]) => holds([t[0] + dx, t[1] + dy], set)).length,
   )
 }
 

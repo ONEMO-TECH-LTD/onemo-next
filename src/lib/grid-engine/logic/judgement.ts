@@ -42,6 +42,7 @@ import {
   pointsFillBlock,
   pointsOneComponent,
 } from '../compute/structure'
+import { computeContinuousFeasibleSet } from '../compute/continuous-feasibility'
 import { placeTemplate } from '../compute/templates'
 import { measureWrap, type WrapMeasures } from '../compute/wrap'
 import type { Contour, Pt } from '../compute/types'
@@ -464,7 +465,6 @@ function judgeBand(
   }
 
   const step = calibration.sizeStepMM
-  const sweep = calibration.sweepStepMM
   // EVERY released template is proposed in every band — no count-based pruning.
   const templates = calibration.templates
   for (
@@ -488,52 +488,89 @@ function judgeBand(
         consider(variantFrom(spec, calibration, band, contour, sizeMM, pitchMM, pattern, grid))
       }
     }
-    // 2. The released templates, proposed at swept positions and VALIDATED by the engine's own
-    //    catalogue door (construction: padding, on-lattice and overlap checks are the engine's) —
-    //    the search freedom Dan exercises by eye, with the verbatim mathematics untouched.
+    // 2. The released templates at the continuous engine's lawful origins, VALIDATED by the
+    //    engine's own catalogue door (construction: padding, on-lattice and overlap checks
+    //    are the engine's). Distinguished points of each feasible component plus the
+    //    box-centred origin (exact witness) enter consider; ranking is unchanged.
     const prepared = prepareExactContour(contour)
     const bb = prepared.bbox
+    const permittedDomain: Contour = {
+      outer: {
+        pts: [
+          [bb.minX, bb.minY],
+          [bb.maxX, bb.minY],
+          [bb.maxX, bb.maxY],
+          [bb.minX, bb.maxY],
+        ],
+      },
+      holes: [],
+    }
+    const pitch = spec.grid.basePitchMM
     for (const template of templates) {
-      // FULL-RESOLUTION SWEEP everywhere (Meta build-audit, 2026-08-15): the half-res
-      // exception for small templates on large shapes re-opened the missed-snug-seat class
-      // this lane already shipped twice. Cost is paid until the continuous-placement MVP
-      // removes the sweep entirely.
-      const stepMM = sweep
-      let stepsAcross = 0
-      let stepsDown = 0
-      for (const [across, down] of template.steps) {
-        if (across > stepsAcross) stepsAcross = across
-        if (down > stepsDown) stepsDown = down
+      const offsetsMM: Pt[] = template.steps.map(([across, down]) => [across * pitch, down * pitch])
+      let minOx = Infinity
+      let maxOx = -Infinity
+      let minOy = Infinity
+      let maxOy = -Infinity
+      for (const [ox, oy] of offsetsMM) {
+        if (ox < minOx) minOx = ox
+        if (ox > maxOx) maxOx = ox
+        if (oy < minOy) minOy = oy
+        if (oy > maxOy) maxOy = oy
       }
-      const spanX = stepsAcross * spec.grid.basePitchMM
-      const spanY = stepsDown * spec.grid.basePitchMM
-      for (let x = bb.minX; x + spanX <= bb.maxX; x += stepMM) {
-        for (let y = bb.minY; y + spanY <= bb.maxY; y += stepMM) {
-          try {
-            const grid = computePreparedGrid(prepared, {
-              pitchMM: spec.grid.basePitchMM,
-              pattern: 'standard',
-              paddingMM: spec.grid.paddingMM,
-              plan: calibration.plan,
-              perimeterOnly: true,
-              construction: placeTemplate([x, y], template.steps, spec.grid.basePitchMM),
-            })
-            consider(
-              variantFrom(
-                spec,
-                calibration,
-                band,
-                contour,
-                sizeMM,
-                spec.grid.basePitchMM,
-                'standard',
-                grid,
-                template.name,
-              ),
-            )
-          } catch {
-            // the engine refused this placement (padding/overlap/off-lattice) — lawful silence
-          }
+      const canonical: Pt = [
+        (bb.minX + bb.maxX) / 2 - (minOx + maxOx) / 2,
+        (bb.minY + bb.maxY) / 2 - (minOy + maxOy) / 2,
+      ]
+      let feasible
+      try {
+        feasible = computeContinuousFeasibleSet({
+          contour,
+          permittedDomain,
+          effectiveRadiusMM: spec.grid.paddingMM,
+          offsetsMM,
+          exactWitnessesMM: [canonical],
+        })
+      } catch {
+        continue
+      }
+      const origins: Pt[] = []
+      const seen = new Set<string>()
+      const addOrigin = (point: Pt) => {
+        const key = `${point[0]}\t${point[1]}`
+        if (seen.has(key)) return
+        seen.add(key)
+        origins.push(point)
+      }
+      for (const ring of feasible.components) {
+        for (const point of ring) addOrigin(point)
+      }
+      for (const witness of feasible.exactWitnessesMM) addOrigin(witness)
+      for (const origin of origins) {
+        try {
+          const grid = computePreparedGrid(prepared, {
+            pitchMM: pitch,
+            pattern: 'standard',
+            paddingMM: spec.grid.paddingMM,
+            plan: calibration.plan,
+            perimeterOnly: true,
+            construction: placeTemplate(origin, template.steps, pitch),
+          })
+          consider(
+            variantFrom(
+              spec,
+              calibration,
+              band,
+              contour,
+              sizeMM,
+              pitch,
+              'standard',
+              grid,
+              template.name,
+            ),
+          )
+        } catch {
+          // the engine refused this placement (padding/overlap/off-lattice) — lawful silence
         }
       }
     }
