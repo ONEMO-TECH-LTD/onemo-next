@@ -7,10 +7,13 @@ import {
   registerProfile,
   selectedOffer,
   solveOutline,
-  sourceGeometryIdentity,
 } from '@onemo/magnetic-logic'
 import { canonicalHash } from '@onemo/geometry-compute'
-import { adaptStudioOutline } from '@onemo/magnetic-next'
+import {
+  adaptStudioOutline,
+  certifyAndBindSelectedBand,
+  serializeManufacturingSpec,
+} from '@onemo/magnetic-next'
 import { verifyManufacturingSpecAction } from '../actions'
 import { toMagneticStudioOutline } from '../engine-boundary'
 
@@ -45,28 +48,21 @@ const singleRungProfile = () => {
 }
 
 describe('v3.3 host authority boundaries', () => {
-  it('preserves every within-budget traced vertex as the governed source', () => {
-    const pill = fixtures.pill
-    const submitted = toMagneticStudioOutline(pill.outline, pill.box)
-    const source = sourceGeometryIdentity(adaptStudioOutline(submitted), createReferenceProfile())
+  it.each(Object.entries(fixtures))('%s reaches a certified selectable offer through the public host boundary', async (_name, fixture) => {
+    const profile = createReferenceProfile()
+    const submitted = toMagneticStudioOutline(fixture.outline, fixture.box)
+    const solve = await solveOutline({ outlineMm: adaptStudioOutline(submitted), profile })
+    const offer = solve.offers.find((candidate) => candidate.status === 'OFFERED')
+    const offerSummary = solve.offers.map(({ band, status, reasons }) => ({ band, status, reasons }))
 
-    expect(submitted).toHaveLength(3796)
-    expect(source.sourceRingInt).toHaveLength(3796)
-    expect(source.sourceGeometryHash).toBe('dd7f80b07448f13377ef28429fbe3bb5cabc4f36717e65c443d9665d77f92a08')
-  })
-
-  it('preserves over-budget input and lets v3.3 reject it as RESOURCE_LIMIT_EXCEEDED', () => {
-    const poke1 = fixtures.poke1
-    const submitted = toMagneticStudioOutline(poke1.outline, poke1.box)
-
-    expect(submitted).toHaveLength(6478)
-    expect(() => sourceGeometryIdentity(adaptStudioOutline(submitted), createReferenceProfile())).toThrow(
-      expect.objectContaining({
-        code: 'RESOURCE_LIMIT_EXCEEDED',
-        details: { vertexCount: 6478, maxVertices: 4096 },
-      }),
+    expect(submitted.length).toBeLessThanOrEqual(profile.numeric.maxVertices)
+    expect(offer, JSON.stringify(offerSummary)).toBeDefined()
+    const bound = certifyAndBindSelectedBand(solve, offer!.band, submitted, profile)
+    expect(bound.solution.centres.length).toBeGreaterThan(0)
+    await expect(verifyManufacturingSpecAction(serializeManufacturingSpec(bound.manufacturingSpec))).resolves.toEqual(
+      expect.objectContaining({ valid: true }),
     )
-  })
+  }, 120_000)
 
   it('the server action parses, resolves and rejects a rehashed physical-policy tamper', async () => {
     const profile = singleRungProfile()

@@ -88,6 +88,14 @@ test('multi-clearance hierarchy removes narrow branches before broad mass',()=>{
   assert.ok(hierarchy.components.filter(c=>c.levelIndex===2).length<=hierarchy.components.filter(c=>c.levelIndex===0).length);
 });
 
+test('stable exact erosion partition certifies a sampled concave component',()=>{
+  const p=preparePolygon([{x:-40,y:-30},{x:40,y:-30},{x:40,y:30},{x:8,y:30},{x:8,y:70},{x:-8,y:70},{x:-8,y:30},{x:-40,y:30}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,[12],6);
+  assert.equal(hierarchy.components.length,1);
+  assert.equal(hierarchy.components[0].topologyCertified,true);
+  assert.equal(hierarchy.exactness,'CERTIFIED_APPROXIMATE');
+});
+
 test('component hierarchy cache is bounded intermediate evidence and explicitly clearable',()=>{
   const p=preparePolygon(dumbbell,{quantumMm:q});clearComponentHierarchyCache();
   const first=buildComponentHierarchy(p,[12,16,20],2),warm=buildComponentHierarchy(p,[12,16,20],2);

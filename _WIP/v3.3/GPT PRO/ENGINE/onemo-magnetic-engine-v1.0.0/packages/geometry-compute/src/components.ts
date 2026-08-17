@@ -1,3 +1,4 @@
+import { Clipper, EndType, FillRule, JoinType, PointInPolygonResult, type Path64, type Paths64 } from '@countertype/clipper2-ts';
 import type { Bounds, ComponentHierarchy, Point, PreparedPolygon, RegionEvidence, SafeComponent, SafeGridCell } from './contracts.js';
 import { clearanceAtPoint } from './clearance.js';
 
@@ -22,6 +23,38 @@ function isConvex(ring:readonly Point[]):boolean{
     const sign=Math.sign(cross);if(direction!==0&&sign!==direction)return false;direction=sign;
   }
   return direction!==0;
+}
+function erodedPaths(polygon:PreparedPolygon,radiusMm:number):Paths64{
+  const paths=Clipper.inflatePaths([polygon.ringInt.map(({x,y})=>({x,y}))],-radiusMm/polygon.quantumMm,JoinType.Round,EndType.Polygon,2,0.25);
+  return paths.filter(path=>path.length>=3&&Math.abs(Clipper.area(path))>=1);
+}
+function partitionsNestOneToOne(outer:Paths64,inner:Paths64):boolean{
+  if(outer.length!==inner.length)return false;
+  const matched=new Set<number>();
+  for(const innerPath of inner){
+    const containers:number[]=[];
+    for(let index=0;index<outer.length;index++){
+      const overlap=Clipper.intersect([innerPath],[outer[index]!],FillRule.NonZero);
+      if(overlap.some(path=>Math.abs(Clipper.area(path))>=1))containers.push(index);
+    }
+    if(containers.length!==1||matched.has(containers[0]!))return false;
+    matched.add(containers[0]!);
+  }
+  return matched.size===outer.length;
+}
+function stableErosionPartition(polygon:PreparedPolygon,radiusMm:number):{certified:boolean;paths:Paths64}{
+  const quantum=polygon.quantumMm;
+  const outer=erodedPaths(polygon,Math.max(0,radiusMm-quantum));
+  const nominal=erodedPaths(polygon,radiusMm);
+  const inner=erodedPaths(polygon,radiusMm+quantum);
+  return {
+    certified:partitionsNestOneToOne(outer,nominal)&&partitionsNestOneToOne(nominal,inner),
+    paths:nominal,
+  };
+}
+function witnessInPath(witness:Point,path:Path64,quantumMm:number):boolean{
+  const point={x:Math.round(witness.x/quantumMm),y:Math.round(witness.y/quantumMm)};
+  return Clipper.pointInPolygon(point,path)!==PointInPolygonResult.IsOutside;
 }
 
 export function buildComponentHierarchy(
@@ -56,6 +89,7 @@ export function buildComponentHierarchy(
   const componentCellsById=new Map<string,Set<number>>();
   const cellComponentAtLevel:Map<number,string>[]=[];
   for(let level=0;level<ordered.length;level++){
+    const levelStart=components.length;
     const assignment=new Map<number,string>(); const visited=new Set<number>(); let sequence=0;
     for(let seed=0;seed<cells.length;seed++){
       const seedCell=cells[seed]!; if(!seedCell.possibleLevels[level]||visited.has(seed))continue;
@@ -87,12 +121,30 @@ export function buildComponentHierarchy(
       for(const seed of definiteMembers){if(definiteVisited.has(seed))continue;definiteGroups++;const queue=[seed];let cursor=0;definiteVisited.add(seed);while(cursor<queue.length){const current=queue[cursor++]!,cell=cells[current]!;for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]] as const){const neighbour=neighbourAt(cell.ix+dx,cell.iy+dy);if(neighbour>=0&&definiteMembers.has(neighbour)&&!definiteVisited.has(neighbour)){definiteVisited.add(neighbour);queue.push(neighbour);}}}}
       exactWitnessPoints.sort((a,b2)=>a.x-b2.x||a.y-b2.y);
       const bounds:Bounds={minX,minY,maxX,maxY};
-      const sameCellPartition=definiteGroups===1&&definiteCellCount===members.length;
       // A non-empty erosion of a convex polygon is convex, so it has one component.
       const convexSinglePartition=convex&&definiteGroups===1&&exactWitnessPoints.length>0;
-      const topologyCertified=sameCellPartition||convexSinglePartition;
+      const topologyCertified=convexSinglePartition;
       const component:SafeComponent={id,levelIndex:level,radiusMm:ordered[level]!,cellCount:members.length,areaEstimateMm2:(definiteCellCount+members.length)*stepMm*stepMm/2,areaBoundsMm2:{lower:definiteCellCount*stepMm*stepMm,upper:members.length*stepMm*stepMm},bounds,centroid:{x:sumX/members.length,y:sumY/members.length},maxClearanceMm:certifiedMaxClearance,maxClearanceBoundsMm:{lower:certifiedMaxClearance,upper:maxClearance+errorEnvelopeMm},cells:Object.freeze(members),childIds:Object.freeze([]),nearToleranceBoundary:!topologyCertified,exactWitnessPoints:Object.freeze(exactWitnessPoints),topologyCertified,appearanceLevelIndex:level,disappearanceLevelIndex:level,persistenceLevelInterval:{lower:exactWitnessPoints.length?1:0,upper:1},persistenceRadiusMm:{lower:exactWitnessPoints.length?ordered[level]!:0,upper:ordered[level]!},touchesAnotherComponentOnlyBelowCurrentRadius:false,perimeterMm:null};
       components.push(component);componentCellsById.set(id,new Set(members));
+    }
+    const erosionPartition=stableErosionPartition(polygon,ordered[level]!);
+    if(erosionPartition.certified){
+      const levelComponents=components.slice(levelStart);
+      const matched=new Set<number>();
+      for(const path of erosionPartition.paths){
+        const candidates=levelComponents
+          .map((component,index)=>component.exactWitnessPoints.some(witness=>witnessInPath(witness,path,polygon.quantumMm))?index:-1)
+          .filter(index=>index>=0);
+        if(candidates.length!==1||matched.has(candidates[0]!)){matched.clear();break;}
+        matched.add(candidates[0]!);
+      }
+      if(matched.size===erosionPartition.paths.length){
+        const retained=levelComponents.filter((_component,index)=>matched.has(index)).map(component=>component.topologyCertified?component:{...component,topologyCertified:true,nearToleranceBoundary:false});
+        const retainedIds=new Set(retained.map(component=>component.id));
+        for(const component of levelComponents)if(!retainedIds.has(component.id))componentCellsById.delete(component.id);
+        for(const [cell,id] of assignment)if(!retainedIds.has(id))assignment.delete(cell);
+        components.splice(levelStart,levelComponents.length,...retained);
+      }
     }
     cellComponentAtLevel.push(assignment);
   }
