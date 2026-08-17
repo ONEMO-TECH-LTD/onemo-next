@@ -105,6 +105,22 @@ the permission removes `pair.vertical` from B2 (2,2).
   rect 48×96 four-corners-with-mid-row-skipped (duck B3, ✅ ruled). Those families are not merely
   unselected — they are **not instantiable**. Canon permits the library to grow (PB §21.4 is open),
   so this is a gap rather than a violation, but it caps what the engine can ever return.
+- **The 96 mm population is DISABLED, and canon rules it repeatedly.** The profile ships only
+  `grid48` and states the reason outright: *"96 mm sparse population is disabled because PD-04/PD-34
+  has no verified product approval in the source files."* That defers to R3's doubt — and **R3 is a
+  donor, not canon.** LS rules the 96 grid at least six places, several with ✅:
+  `:82` B4 *"only the lattice step grows (48→96)"* [RULED] · `:156` duck B3 *"rect 48×96, four
+  corners, mid row SKIPPED"* [RULED] · `:157` bot B3 *"narrow 96×48 four"* [RULED] · `:158` poke B3
+  *"corner square 96×96"* and B4 *"four on the 96 grid"* [RULED] · `:159` butterfly B4 *"four on the
+  96 grid"* [RULED] · `:203` *"the released profile: pitch 48/96"*. The canon table carries ✅ on duck
+  B3, bot B3, butterfly B4 (ruled 214) and poke1 B4 (ruled 217).
+  **Consequence, and it widens the library gap recorded above:** with the 96 population off, every
+  96-grid answer is unreachable, not merely unselected — that is four more ruled rows on top of pill's
+  diagonal pair and 3-chain and duck's skip-mid rect. It also means v3.3.1's "7/7 OFFERED" cannot have
+  been the canon families for those rows, whatever it returned.
+  *(Found while verifying s62-meta's own correction of an R3-sourced claim it had relayed earlier. The
+  underlying error is the same one three times today: treating a donor document as authority.)*
+
 - **`forceLargestComponentMajor: true`** — a profile switch that promotes the biggest component to
   MAJOR regardless of PB §8's five properties. That is the "substitute a tractable thing" pattern.
 - **The structural graph is a 6 mm sampled cell grid** (`components.ts:87-89`) with
