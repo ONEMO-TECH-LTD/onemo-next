@@ -26,8 +26,8 @@ Product Base — two lanes have already had to withdraw findings taken from it.
   (Dan's words, source cited), **[DERIVED]** (a reading offered for veto) or **[OPEN]**
   (named, undecided). Read the marker before treating a clause as authority.
 
-- **`R3-specs/`** — the neutral certification mechanics: system contract, compute engine
-  spec, logic engine spec.
+- **`R3-specs/`** — donor, not canon (Dan 2026-08-17). Neutral certification mechanics
+  only. Cannot require, disable, or hold product work.
 
 - **`../ChatGPT-Grid and Band Logic-20260816-1022.md`** (at this folder's root, not inside
   `canon/`) — the founding GPT Pro conversation the Product Base was derived from. Dan

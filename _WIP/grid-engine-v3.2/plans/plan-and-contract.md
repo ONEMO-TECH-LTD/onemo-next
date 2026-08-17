@@ -36,7 +36,7 @@ Does not invent geometry or numbers.
 
 ## Full spectrum (from the two briefs, nothing else)
 
-If it is not in this list it is not required. If it is in this list it must appear in the execution below. Sources: Product Base (PB) and logic-spec (LS). Product Base outranks LS where they conflict.
+If it is not in this list it is not required. If it is in this list it must appear in the execution below. Sources: Product Base (PB) and logic-spec (LS). Product Base outranks LS where they conflict. **R3-specs are a donor, not canon** (Dan 2026-08-17). They cannot require, disable, or hold anything here.
 
 **Always true**
 

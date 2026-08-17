@@ -31,7 +31,7 @@ A 2×2 box may try 1×1, 1×2, 2×1, 2×2. That is contract step 3.
 
 `7/7 produce a certified offer` means seven shapes got *something* certified. It does not mean bat is a vertical pair or duck skips the waist.
 
-Their library also cannot name several families our exams need: no diagonal pair, no skip-middle four, no 96 population (explicitly disabled, `reference-profile.ts:69`). Pill’s ruled family is not in the pattern list.
+Their library also cannot name several families our exams need: no diagonal pair, no skip-middle four. Their reference profile **turns 96 off** (`reference-profile.ts:69`, citing R3 PD-04). That disable is a donor error, not a fact to inherit — 96 is ruled canon (LS §3 B4; duck/bot/poke B3; butterfly/poke1 B4). Pill’s ruled family is not in their pattern list.
 
 ### 3. Are M09 / M10 real or decoration?
 
@@ -79,7 +79,7 @@ HEAD `dbf31370` plus `+287/−134` across 12 files.
 - `artifact-manifest.ts` ×2 — hash bumps that follow the source edits.
 - `page.tsx` — one-line pass-through of numeric into the new host seam.
 
-**Not a new engine hiding in the diff.** No new pattern, no family gate, no 96 population, no removal of M07.
+**Not a new engine hiding in the diff.** No new pattern, no family gate, 96 still off (their defect), no removal of M07.
 
 I did not re-run the seven shapes on this dirty tree. The 7/7 claim is on `dbf31370`, not on the perf patch. That gap is still open.
 
@@ -97,7 +97,7 @@ It is a **named-template filter with a ceiling**, plus an interval optimiser. It
 
 `primaryOffer: 'SMALLEST_ACCEPTED_PER_BAND'` (`reference-profile.ts:47`) plus `buildCertifiedBandOffers` (`solver.ts:20-32`): one chip per band, the smallest accepted size. Contract wants every *different* layout the band unlocks, one marked as the eye pick. They return one.
 
-Size step 12, bands 24–264 including B5 as a live evaluated band — matches our numbers. 96 is off. Library is eleven drawings, closed.
+Size step 12, bands 24–264 including B5 as a live evaluated band — matches our numbers. Their profile turns 96 off (R3-derived; wrong against LS). Library is eleven drawings, closed.
 
 ## Donor parts — file, and what they close in our contract
 
@@ -114,7 +114,7 @@ Size step 12, bands 24–264 including B5 as a live evaluated band — matches o
 - The engine as the new board. Dan already rejected a rewrite of the chooser.
 - `M07` / `ANCHOR_CENTROID_BALANCE_V1`.
 - `forceLargestComponentMajor`.
-- Their eleven-pattern list as the library (no diagonal, no skip-mid, no 96; Phase 2 library *grows*).
+- Their eleven-pattern list as the library (no diagonal, no skip-mid; they disable 96 — do not copy that disable). Phase 2 library *grows*.
 - `authority-boundaries.test.ts` as the Phase 1 gate (existence ≠ family + registration).
 - `primaryOffer: SMALLEST_ACCEPTED_PER_BAND` as the band answer (one chip, not every different layout).
 - The host inward-offset search as product logic (Dan: raster already solved on v1).
