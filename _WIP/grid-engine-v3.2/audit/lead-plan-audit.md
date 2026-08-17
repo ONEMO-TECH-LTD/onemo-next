@@ -21,10 +21,13 @@ sha1 `5c661bd7b8161eda`.
 
 **Necessity — shrink: one item** (F3, framing only). **F4 withdrawn — Dan-directed, turn verified.**
 **Sufficiency — partial: three items** (F1, F2, F5).
-Not clear on either axis until those land. **F4 is withdrawn.**
+Not clear on either axis until those land.
 
-Two of five findings are confirmed by s62-meta, the lane that cleared the document, as its own
-misses. One of mine is withdrawn on its evidence. Two carry a provenance qualification.
+Two of five findings (F1, F2) are confirmed by s62-meta — the lane that cleared the document — as its
+own misses. One (F4) is withdrawn: Dan directed it, and I verified the turn. One (F3) survives in a
+better form than I first put it — Dan-sourced but truncated. One (F5) stands as a labelling fix, and
+chasing its provenance surfaced a **collector defect in the transcript vault** that matters more than
+the finding it came from — see F5.
 
 ---
 
