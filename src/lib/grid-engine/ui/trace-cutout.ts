@@ -12,7 +12,7 @@
 
 import { traceContourRaw } from '@/lib/effect/contour'
 import { rdpClosed, type Vec2Px } from '@/lib/outline-core/math'
-import { DEFAULT_LAW } from '@/lib/grid-engine/compute/grid-core'
+import { RELEASED } from '@/lib/grid-engine/spec'
 
 /** The silhouette as fractions of the picture's own box. */
 export type OutlineUV = Array<[number, number]>
@@ -58,7 +58,7 @@ export async function traceCutout(file: File): Promise<OutlineUV | null> {
  * manufacturing simplification remains a DOWNSTREAM cut-path step, never the judged geometry.
  */
 export function engineOutline(outline: OutlineUV): OutlineUV {
-  const epsilonUV = 1 / DEFAULT_LAW.maxRungMM
+  const epsilonUV = 1 / RELEASED.grid.maxSizeMM
   const straight = rdpClosed(outline.map(([u, v]) => [u, v] as Vec2Px), epsilonUV)
   return straight.length >= 3 ? straight.map(([u, v]) => [u, v] as [number, number]) : outline
 }

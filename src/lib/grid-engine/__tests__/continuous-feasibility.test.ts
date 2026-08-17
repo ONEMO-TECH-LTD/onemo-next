@@ -207,7 +207,7 @@ describe("continuous safe and feasible sets", () => {
         [1, 0],
       ],
       48,
-      { paddingMM: 12, perimeterOnly: false },
+      { paddingMM: 12 },
     );
 
     expect(valid.originMM).toEqual([12, 30]);
@@ -232,7 +232,7 @@ describe("continuous safe and feasible sets", () => {
         point,
         [[0, 0]],
         48,
-        { paddingMM: 12, perimeterOnly: false },
+        { paddingMM: 12 },
       );
       expect(roundTripped.originMM[0]).toBe(point[0]);
       expect(roundTripped.originMM[1]).toBe(point[1]);
@@ -248,7 +248,7 @@ describe("continuous safe and feasible sets", () => {
           [1, 0],
         ],
         48,
-        { paddingMM: 12, perimeterOnly: false },
+        { paddingMM: 12 },
       ),
     ).toThrow("outside the legal padding floor");
     expect(() =>

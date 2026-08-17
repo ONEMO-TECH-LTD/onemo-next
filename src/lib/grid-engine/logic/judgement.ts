@@ -825,7 +825,7 @@ function judgeBand(
             chosen,
             template.steps,
             spec.grid.basePitchMM,
-            { paddingMM: spec.grid.paddingMM, plan: calibration.plan, perimeterOnly: true },
+            { paddingMM: spec.grid.paddingMM, plan: calibration.plan },
           )
         } catch {
           return { kind: 'reject', reason: 'REGISTRATION_REFUSED_BY_CONSTRUCTION' }
@@ -1103,7 +1103,6 @@ function judgeBand(
               quantiseAndValidateRegistration(prepared, neighbour, template.steps, spec.grid.basePitchMM, {
                 paddingMM: spec.grid.paddingMM,
                 plan: calibration.plan,
-                perimeterOnly: true,
               })
               refined.push(neighbour)
             } catch {
