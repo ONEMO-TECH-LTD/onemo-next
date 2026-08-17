@@ -1,0 +1,478 @@
+/* grid-engine — ADMIN SCAFFOLDING on the studio's own anatomy.
+   Measured from Figma "Prototypes / Control" (ONEMO DS v2.3.6, node 14209:26629), 402pt wide:
+
+     Content Column   402 x 726   vertical, no padding, no gap
+     ├─ Top Section    h 40       pad 0/16/16/16 — title row 370 x 24
+     ├─ Toolbox-2nd    h 60       pad 16, gap 8 — 28px-high chips
+     ├─ Canvas         h 394      FULL BLEED, grows to fill
+     └─ Bottom-section h 232      pad 16/0 — Tool-Nav 64 / Tool-Box 112 / Modes 24
+
+   The studio UI itself comes from Figma; this invents no look. Plain type, repo palette, system
+   light/dark. Mobile first at 402px. */
+
+/* 402 is the iPhone baseline; the same layout scales up to the DS's lg breakpoint (768) and
+   fills the height. Nothing re-arranges — it just gets more room. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  width: 100%;
+  max-width: var(--al-breakpoints-lg, 768px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--gutter) var(--gutter) calc(var(--gutter) + env(safe-area-inset-bottom));
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: #0f172a;
+
+  --gutter: 16px;
+  --gap: 16px;
+}
+
+@media (min-width: 480px) {
+  .screen {
+    --gutter: 24px;
+    --gap: 20px;
+  }
+}
+
+/* ── Top Section — h 40, 16px gutters ─────────────────────────────────────── */
+
+.top {
+  flex-shrink: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.readout {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── Toolbox-secondary — h 60, 28px chips, 8px gaps ───────────────────────── */
+
+.toolbox {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.fieldReadout {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  white-space: nowrap;
+  color: #64748b;
+}
+
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chip[data-on='true'] {
+  border-color: #58c2ff;
+  background: rgba(88, 194, 255, 0.1);
+  color: #0284c7;
+}
+
+/* ── Canvas — square, always; it grows with the column ────────────────────── */
+
+/* It was specified 402 x 402 and fixed (Dan, 2026-08-10), then made responsive when the field had to
+   hold the 9x9 ceiling with its margin. The heading here still claimed "fixed and square" directly
+   above the rule that grows it — the file contradicted itself in three lines. Square is the part
+   that survived; 402 is the baseline it starts from, not a size it is pinned to. */
+.canvas {
+  position: relative;
+  flex: none;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* ── Bottom-section — h 232, pad 16/0 ─────────────────────────────────────── */
+
+.bottom {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--gap);
+}
+
+/* ── the sealed law menu ──────────────────────────────────────────────────── */
+
+.law {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.lawHead {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  background: #f8fafc;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lawHead::-webkit-details-marker {
+  display: none;
+}
+
+.lawHead:active {
+  background: #f1f5f9;
+}
+
+.lawHeadText {
+  flex: 1;
+}
+
+.lawCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.caret {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #64748b;
+  transition: transform 180ms ease;
+}
+
+.law[open] .caret {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    transition: none;
+  }
+}
+
+.lawBody {
+  border-top: 1px solid #e2e8f0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.rowName {
+  flex: 1;
+  font-size: 13px;
+}
+
+.rowUnit {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.input {
+  width: 74px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  text-align: right;
+}
+
+.input:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: #64748b;
+}
+
+.input:focus-visible {
+  outline: 2px solid #58c2ff;
+  outline-offset: 1px;
+}
+
+.lock {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lock[data-open='true'] {
+  border-color: #58c2ff;
+  color: #0284c7;
+}
+
+.lock:disabled {
+  border-color: transparent;
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.sealed {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.refusal {
+  padding: 8px 12px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff7ed;
+  font-size: 12px;
+  color: #9a3412;
+}
+
+/* the one control that is NOT law — a test fixture, kept visibly apart */
+.fixture {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.fixtureName {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* drag for the sweep, type for the exact number — the same value, two ways in */
+.slider {
+  flex: 1;
+  min-width: 0;
+  height: 44px; /* the touch target, not the track */
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: #e2e8f0;
+}
+
+.slider::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: #e2e8f0;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9.5px;
+  border: none;
+  border-radius: 50%;
+  background: #58c2ff;
+}
+
+.slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: #58c2ff;
+}
+
+.slider:focus-visible {
+  outline: 2px solid #58c2ff;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ── the system decides the theme ─────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+  /* The dark palette set text colours but never a surface to put them on, so the page stayed white
+     and every label read as disabled. The surface has to be the whole page, not the 768px column —
+     otherwise the gutters stay lit. Law 7.4: theme follows the system, and this is evening work. */
+
+  /* Paint the whole viewport, not just the 768px column, without reaching outside this module. */
+  .screen::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: #0f172a;
+    z-index: -1;
+  }
+
+  .screen {
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+
+  /* The field is the largest surface on screen; leaving it white is what made this glare. */
+  .canvas {
+    background: #111c2e;
+  }
+
+  .readout,
+  .fieldReadout {
+    color: #94a3b8;
+  }
+
+  .chip {
+    border-color: #334155;
+    background: transparent;
+    color: #cbd5e1;
+  }
+
+  .chip[data-on='true'] {
+    border-color: #58c2ff;
+    background: rgba(88, 194, 255, 0.14);
+    color: #7dd3fc;
+  }
+
+  .law,
+  .lawBody,
+  .row,
+  .canvas,
+  .fixture {
+    border-color: #334155;
+  }
+
+  .lawHead {
+    background: #1e293b;
+  }
+
+  .lawHead:active {
+    background: #263243;
+  }
+
+  .lawCount {
+    background: #334155;
+    color: #cbd5e1;
+  }
+
+  .caret {
+    color: #94a3b8;
+  }
+
+  .row {
+    border-bottom-color: #1e293b;
+  }
+
+  .input {
+    border-color: #334155;
+    background: transparent;
+    color: #f1f5f9;
+  }
+
+  .input:disabled {
+    border-color: transparent;
+    color: #94a3b8;
+  }
+
+  .lock {
+    border-color: #334155;
+    color: #94a3b8;
+  }
+
+  .lock:disabled {
+    border-color: transparent;
+    color: #475569;
+  }
+
+  .refusal {
+    background: #431407;
+    color: #fdba74;
+  }
+}
+
+/* The drag surface's cursor. CSS, not state: the browser already knows the pointer is down, so
+   :active says it without a render. It was an inline style reading a ref during render — which
+   lints as an error AND never worked, because changing a ref renders nothing. */
+.panSurface {
+  cursor: grab;
+}
+
+.panSurface:active {
+  cursor: grabbing;
+}
+
+
+
+
+/* Copied from the bench build so the saved-corpus control is identical on both surfaces. */
+.librarySelect {
+  width: 132px;
+  text-align: left;
+}

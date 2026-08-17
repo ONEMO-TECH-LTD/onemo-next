@@ -31,6 +31,8 @@ export interface Prepared {
 }
 
 const big = (n: number): bigint => BigInt(n)
+/** This project targets ES2017, where BigInt LITERALS (`0n`) do not compile. */
+const ZERO = BigInt(0)
 
 /** Twice the signed area of the triangle abc. Sign gives the turn direction. */
 function orient(a: Pt, b: Pt, c: Pt): bigint {
@@ -39,7 +41,7 @@ function orient(a: Pt, b: Pt, c: Pt): bigint {
 
 /** p lies on the closed segment ab. */
 function onSegment(p: Pt, a: Pt, b: Pt): boolean {
-  if (orient(a, b, p) !== 0n) return false
+  if (orient(a, b, p) !== ZERO) return false
   return (
     p[0] >= Math.min(a[0], b[0]) && p[0] <= Math.max(a[0], b[0]) &&
     p[1] >= Math.min(a[1], b[1]) && p[1] <= Math.max(a[1], b[1])
@@ -70,13 +72,13 @@ export function prepare(ringMM: readonly Pt[], quantumMM = 0.001): Prepared {
   if (first && last && scaled.length > 1 && first[0] === last[0] && first[1] === last[1]) scaled.pop()
   if (scaled.length < 3) throw new RangeError('outline needs at least three distinct vertices')
 
-  let twiceArea = 0n
+  let twiceArea = ZERO
   for (let i = 0; i < scaled.length; i++) {
     const a = scaled[i]!
     const b = scaled[(i + 1) % scaled.length]!
     twiceArea += big(a[0]) * big(b[1]) - big(b[0]) * big(a[1])
   }
-  if (twiceArea === 0n) throw new RangeError('outline encloses no area')
+  if (twiceArea === ZERO) throw new RangeError('outline encloses no area')
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of scaled) {
@@ -100,8 +102,8 @@ export function locate(shape: Prepared, p: Pt): Location {
     const b = ring[(i + 1) % ring.length]!
     if (onSegment(p, a, b)) return 'ON'
     if (a[1] <= p[1]) {
-      if (b[1] > p[1] && orient(a, b, p) > 0n) winding++
-    } else if (b[1] <= p[1] && orient(a, b, p) < 0n) winding--
+      if (b[1] > p[1] && orient(a, b, p) > ZERO) winding++
+    } else if (b[1] <= p[1] && orient(a, b, p) < ZERO) winding--
   }
   return winding === 0 ? 'OUT' : 'IN'
 }
@@ -117,7 +119,7 @@ function atLeast(p: Pt, a: Pt, b: Pt, r2: bigint): boolean {
   const vx = big(b[0] - a[0]), vy = big(b[1] - a[1])
   const wx = big(p[0] - a[0]), wy = big(p[1] - a[1])
   const dot = wx * vx + wy * vy
-  if (dot <= 0n) return wx * wx + wy * wy >= r2
+  if (dot <= ZERO) return wx * wx + wy * wy >= r2
   const len2 = vx * vx + vy * vy
   if (dot >= len2) {
     const ux = big(p[0] - b[0]), uy = big(p[1] - b[1])
