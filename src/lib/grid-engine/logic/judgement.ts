@@ -159,6 +159,8 @@ function variantFrom(
   if (Math.abs(wrap.left - wrap.right) / 2 > calibration.centerToleranceMM) return null
   const sideMax = Math.max(wrap.left, wrap.right)
   const verticalMax = Math.max(wrap.top, wrap.bottom)
+  // tier reported here from raw extents; the RANKED tier uses the mass-aware measures once
+  // they are computed (see consider) — a thin ear is not a limb-tier sentence
   const tier: SizeVariant['tier'] =
     sideMax <= calibration.flapTightMM && verticalMax <= calibration.flapMaxMM
       ? 'tight'
@@ -499,6 +501,14 @@ function judgeBand(
       const leftArea = areaBeyondVertical(variant.effectContourMM.outer.pts, minAx - pad, -1, calibration.structureScanlines)
       const rightArea = areaBeyondVertical(variant.effectContourMM.outer.pts, maxAx + pad, 1, calibration.structureScanlines)
       variant.sideHangMM = blockHeight > 0 ? Math.max(leftArea, rightArea) / blockHeight : Math.max(variant.wrap.left, variant.wrap.right)
+      // the ranked fit tier judges MASS, like every hold law: hanging equivalents, not tips
+      const vertHang = Math.max(variant.topHangMM ?? variant.wrap.top, variant.wrap.bottom)
+      variant.tier =
+        variant.sideHangMM <= calibration.flapTightMM && vertHang <= calibration.flapMaxMM
+          ? 'tight'
+          : vertHang <= calibration.flapMaxMM
+            ? 'allowed'
+            : 'limb'
     }
     if (unitMassX !== null && variant.anchors.length) {
       let sumX = 0
@@ -511,7 +521,16 @@ function judgeBand(
     const identity = layoutIdentity(variant, halfPitchMM)
     const twin = kept.findIndex((existing) => layoutIdentity(existing, halfPitchMM) === identity)
     if (twin >= 0) {
-      if (better(variant, kept[twin], band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) kept[twin] = variant
+      if (better(variant, kept[twin], band, calibration, shapeSymmetric, structure, spec.grid.basePitchMM)) {
+        // the door label is not the arrangement's name: when a growth-door seat wins the
+        // twin merge against a released-template twin, the RULED name survives (win-1x2 IS
+        // the vertical pair; the tripwires and Dan's canon speak template names)
+        const ruledName =
+          kept[twin].layout && !kept[twin].layout.startsWith('win-') && (!variant.layout || variant.layout.startsWith('win-'))
+            ? kept[twin].layout
+            : variant.layout
+        kept[twin] = ruledName === variant.layout ? variant : { ...variant, layout: ruledName }
+      }
       return
     }
     kept.push(variant)

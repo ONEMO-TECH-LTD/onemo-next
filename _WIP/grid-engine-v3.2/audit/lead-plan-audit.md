@@ -19,7 +19,7 @@ sha1 `5c661bd7b8161eda`.
 
 ## Verdict
 
-**Necessity — shrink: one item** (F3, and only its framing).
+**Necessity — shrink: one item** (F3, framing only). **F4 withdrawn — Dan-directed, turn verified.**
 **Sufficiency — partial: three items** (F1, F2, F5).
 Not clear on either axis until those land. **F4 is withdrawn.**
 
@@ -117,16 +117,25 @@ not a deletion.
 
 ## F4 — TRIANGLE / DIAMOND EXAMS · **WITHDRAWN**
 
-I flagged `:108` because neither appears in PB or LS. s62-meta reports Dan directed them at 15:52
-("add circles and triangles and diamonds see what happens?"), and Dan's word outranks canon, so they
-stay.
+I flagged `:108` because neither appears in PB or LS. Dan directed them, and Dan's word outranks
+canon, so they stay.
 
-**One honest qualification, offered as record-keeping rather than doubt.** I could not confirm that
-turn in the vault — the phrase resolves only to meta's own messages, and the 15:52 slots in meta's
-captured file are hook injections rather than Dan turns. Meta is the lane it was said to and is
-better placed to point at it than I am. The substantive finding is withdrawn either way; the only
-residue is that a canon-only document should mark Dan-directed items **as** Dan-directed, so nobody
-later hunts for a canon clause that was never supposed to exist.
+**The turn is fully captured and I verified it myself** — `grok/s62/grok-qa/2026-08-17/_day.md:2241`,
+`## Dan · 15:52:48 BST`, verbatim: *"stop inventing read my canon keep only spec and logic i set and
+design the final engine in 3 parts MVP that delivers that - you can add squares and rectangles to the
+shape library to test engine if it fits them perfectly on tests then it work correct on the baseline
+if not clearly something is wrong - **add circles and triangles and diamonds see what happens?** -
+then fine tune the engine and test on free shapes and cutouts to see if the logic is working"*.
+
+**I initially recorded this as unconfirmed, and that was my error, not a vault gap.** My search
+returned the correct line and I piped it through `cut -c1-150`, which severed the phrase from the
+line I had already retrieved. s62-meta independently made the same class of mistake on the same
+quote via a `head -8` truncation. **A bounded read that returns nothing is not evidence of absence** —
+that is now the third such false negative on this sprint, and it belongs in the method, not in a
+list of accidents.
+
+The only residue is labelling: a canon-only document should mark Dan-directed items **as**
+Dan-directed, so nobody later hunts for a canon clause that was never meant to exist.
 
 **Proposal.** Label the exam row "Dan-directed 15:52" rather than leaving it to read as canon-derived.
 Optionally name the triangle exam as the **tapered** free class (LS §5.2), which is what it tests.
@@ -144,12 +153,28 @@ simultaneously (L14a); mirror symmetry on symmetric shapes; parity registration.
 carry it. But this document's stated rule is canon-only, and this is its one non-canon element. It
 should say so on its face, or a later reader takes it for a clause of the briefs.
 
-**Provenance, stated precisely and without accusation.** The verbatim ruling appears in the vault only
-inside meta's own messages — grok-qa :3317 and :3379, and meta's message to me. Meta's captured
-day-file runs through 16:55, past the ~16:36 ruling, and does not carry it as a Dan block. Meta
-states plainly that Dan said it directly in its session, and meta is the source lane. I am not
-disputing it; I am recording that it is not currently checkable from the vault, which is the property
-the T0 ledger lost. A pointer to the captured turn closes it.
+**Provenance — the ruling is genuine, and chasing it exposed something larger.**
+
+The turn is real and sourced. Verbatim, in the raw session transcript of the meta lane
+(`~/.claude/projects/…/56e474c6-….jsonl`, 17 occurrences): *"and yes balance is old canon that is
+missing we need to skip it for now - or clarify it to be added later"*. Dan said it; the deferral
+stands as his ruling.
+
+**But it is absent from the transcript vault.** I confirmed both halves myself: 17 hits in the raw
+`.jsonl`, **zero** in `claude/s62/meta/2026-08-17/_day.md`. Dan blocks either side of it were
+captured — 16:31:45, 16:32:12, 16:33:20 (*"your pipeline is missing centering and ballancing"*),
+16:35:08 (*"centering?"*) — and the file runs on past 16:55. This is not capture lag. A Dan turn
+reached a lane and did not reach the vault, with its neighbours on both sides present.
+
+**That is the finding worth keeping, and it outranks the balance ruling itself.** Every provenance
+check any lane runs — including the audit that killed the T0 ledger, and my own F4 error above —
+treats the vault as complete. If a directive can go missing from it while its neighbours survive,
+then *"not in the vault"* stops meaning *"never said"*, and every absence-based verdict on this sprint
+inherits that uncertainty. The `.jsonl` is the source the vault is derived from, so this is a
+collector defect, not a fabrication.
+
+**Recommendation:** treat the vault as necessary-but-not-sufficient for absence claims until the gap
+is diagnosed; check the originating lane's raw transcript before recording anything as unsourced.
 
 **The engineering half needs no override at all, and this is the useful part.** PB §11:291 —
 *"The geometric centroid is evidence, not the placement rule."* That alone bars the centroid-distance
@@ -211,6 +236,16 @@ before it.
 ## Provenance
 
 Canon read in full 2026-08-17 in the lead worktree; plan read at sha1 `5c661bd7b8161eda`, 169 lines,
-byte-unchanged after this audit. Line references are to the plan as read and to canon as committed at
-`bc6a8194`. Findings F1 and F2 independently confirmed by s62-meta as its own misses; F4 withdrawn on
-meta's evidence; F3's Dan-source verified by me at grok-qa 2026-08-17 :2149.
+byte-unchanged after this audit and snapshotted by grok at `c38bd0ce`. Line references are to the plan
+as read and to canon as committed at `bc6a8194`.
+
+Findings F1 and F2 independently confirmed by s62-meta as its own misses. F3's Dan-source verified by
+me at `grok-qa/2026-08-17/_day.md:2149`. F4 withdrawn — its Dan turn verified by me at
+`grok-qa/2026-08-17/_day.md:2241`, and my initial "unconfirmed" was a truncated-grep error of my own,
+recorded above. F5's ruling verified in the meta lane's raw `.jsonl` (17 occurrences) and confirmed
+absent from the corresponding vault day-file (0 occurrences) — the collector gap recorded under F5.
+
+**Method note for whoever audits next.** Three false negatives on this sprint came from bounded reads
+— `cut -c1-150`, `head -8`, and a missing trailing newline hiding PB §21 item 5. Two of them nearly
+produced a fabrication verdict against a genuine Dan turn. Absence is only evidence when the read was
+unbounded and the source layer was the right one.

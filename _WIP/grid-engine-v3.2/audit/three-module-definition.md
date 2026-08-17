@@ -93,13 +93,40 @@ and test?"* — **an unruled definition becomes a switch to test, not a number t
 
 | # | Open value | Canon |
 |---|---|---|
-| O1 | Unsupported-extent limit (the overhang allowance). | LS §8, PB §21.3 |
+| O1 | **Numerical definition of unsupported extent** (and therefore what counts as *excessive*). | GPT Pro :2601, PB §522 — *"Numerical definition of unsupported extent and peel leverage"* |
 | O2 | Strong/marginal structural thresholds. | PB §21.2 |
-| O3 | Peel-leverage numerical definition and tolerance. | LS §2 P5, PB §21.3 |
+| O3 | Peel-leverage numerical definition and tolerance. | GPT Pro :2601, PB §522 |
 | O4 | Registration search resolution — continuous or fixed. | PB §6, §21.1 |
 
 **None of these may act as a silent veto while open.** They are exposed, defaulted transparently, and
 calibrated against real shapes.
+
+> **CORRECTION, 2026-08-17 — O1 was framed wrongly here, and I propagated that framing.**
+> I originally wrote O1 as *"the overhang allowance / the 12–24 switch"*, citing `LS §8`. Dan
+> challenged it; I searched both higher-authority sources and he is right.
+>
+> **In the GPT Pro transcript and the Product Base there is no allowance, no switch, no 12, no 24,
+> and no per-side leftover budget — zero occurrences.** What both documents contain is:
+> - *"Reduction of peel or flap leverage"* — a **ranking criterion** (GPT Pro :2362, PB §283)
+> - *"excessive unsupported extent"* — a **refusal reason** (GPT Pro :2586, PB §507)
+> - *"Numerical definition of unsupported extent and peel leverage"* — listed as **an open decision**
+>   (GPT Pro :2601, PB §522)
+> - the physics it protects: *"a magnet below a large unsupported upper region does not adequately
+>   prevent that region from falling, peeling or flapping"* (GPT Pro :1557), and *"upper unsupported
+>   extent has priority over centroid balance"* (:3246)
+>
+> The `12 | 24` switch exists **only** in `logic-spec-optimum.md`, which ranks BELOW Dan's rulings and
+> the Product Base in the authority order that document itself states (§5). Dan's own framing:
+> *"the fit is 0 flap ideally like square — but free shapes are not perfect so we can allow to
+> approximate the max possible fit, not base the engine on [an allowance]."*
+>
+> **So the correct reading is:** unsupported extent is a **quantity to minimise**, weighted to the top
+> where gravity peels; it enters the ranking at L8; *excessive* extent may refuse — but its threshold
+> is undefined, and **an undefined threshold cannot refuse at any value: not 12, not 24, not 0.**
+>
+> Recorded rather than silently edited. This is the third instance today of the same failure — the
+> lead cited the v3 law book as governing, I cited grid-laws, then I cited the logic spec — and mine
+> was the one that reached a build contract. A derived document restating canon is not canon.
 
 ---
 
@@ -132,7 +159,7 @@ Before any line of engine code is written or kept, it answers three questions:
 | v3.2 defect | What it actually is |
 |---|---|
 | The bounding box selecting which layouts may be tried | Logic consuming L3 as a filter instead of a hypothesis |
-| The overhang number refusing layouts | A Spec value (O1) acting as a Logic veto while open |
+| The overhang number refusing layouts | A **ranking quantity** (L8) turned into a Logic veto, on a threshold canon leaves undefined (O1) |
 | Balance measured as centroid distance | Compute computing the wrong quantity (L9) |
 | Coverage and distribution fed one list | C6 never built; two Logic inputs collapsed onto one |
 | No anatomy step | L2 absent — the funnel jumps from safe core to templates |
