@@ -1,7 +1,12 @@
 // The cutout door, end to end: a millimetre contour enters; per band the judge returns the sizes
-// and exact layouts the flap law accepts. These tests encode WHY: placements obey the per-side
-// flap bounds (12 tight / 24 outer), gravity holds the top,
-// magnets keep lawful spacing, and the whole answer is deterministic.
+// and exact layouts it can certify. These tests encode WHY: magnets keep lawful spacing, gravity
+// holds the top, unsupported extent obeys the released P4 switch, and the answer is deterministic.
+//
+// A RELEASED BAND IS NOT OBLIGED TO ANSWER. The old '§9 every band must answer' guarantee was
+// displaced by PB §19's explained refusal, and T6 forbids a fallback that would manufacture one. An
+// empty band must therefore say NONE and carry machine-readable rejections — that IS the answer.
+// The governing refusal is `unsupportedExtentPolicy`, not the legacy centering tolerance or
+// flapMaxMM; those remain reported measurements and are asserted as such, never as the refusal.
 
 import { describe, expect, it } from 'vitest'
 
@@ -48,19 +53,38 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
     const { bands } = judged!
 
     expect(bands.length).toBe(RELEASED_CALIBRATION.bands.length)
-    for (const answer of bands.filter((b) => b.band.released)) {
-      expect(answer.variants.length).toBeGreaterThanOrEqual(1)
+    const released = bands.filter((b) => b.band.released)
+    // NON-VACUITY: at least one released band must genuinely offer something, or every per-offer
+    // check below would pass by never running.
+    expect(released.some((answer) => answer.variants.length > 0)).toBe(true)
+
+    for (const answer of released) {
+      if (!answer.variants.length) {
+        // An explained refusal, not a silent gap.
+        expect(answer.decisionState).toBe('NONE')
+        expect(answer.rejections.length).toBeGreaterThan(0)
+        for (const rejection of answer.rejections) expect(rejection.reasons.length).toBeGreaterThan(0)
+        continue
+      }
       for (const variant of answer.variants) {
         expect(variant.sizeMM).toBeGreaterThanOrEqual(answer.band.minSizeMM)
         expect(variant.sizeMM).toBeLessThan(answer.band.maxSizeMM)
         expect(variant.sizeMM % 2).toBe(0)
         // NO COUNT GATE — any count that fits is lawful
         expect(variant.anchors.length).toBeGreaterThanOrEqual(1)
-        // THE YARDSTICK LAW: flap never refuses — it is reported. Centering is enforced.
+        // THE YARDSTICK IS REPORTED, NEVER THE REFUSAL. wrap is a measurement that must exist;
+        // what governs acceptance is the P4 policy, asserted below.
         expect(variant.wrap).toBeDefined()
-        expect(Math.abs(variant.wrap.left - variant.wrap.right) / 2).toBeLessThanOrEqual(
-          RELEASED_CALIBRATION.centerToleranceMM,
+        // P4 GOVERNS: any side past the active limit is accepted ONLY as an announced exemption.
+        const policy = variant.selection!.unsupportedExtentPolicy
+        expect([12, 24]).toContain(policy.activeLimitMM)
+        const over = (['left', 'right', 'top', 'bottom'] as const).filter(
+          (side) => policy.perSideMM[side] > policy.activeLimitMM,
         )
+        if (over.length) {
+          expect(policy.outcome).toBe('TRIVIAL_LIMB_EXEMPT')
+          expect(policy.exemptedSides.map((entry) => entry.side).sort()).toEqual([...over].sort())
+        } else expect(policy.outcome).toBe('WITHIN_LIMIT')
         // no two magnets closer than two paddings — application rings never overlap
         const padFloor = 2 * RELEASED.grid.paddingMM - 1e-6
         for (let i = 0; i < variant.anchors.length; i++)
@@ -73,8 +97,6 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
           expect([RELEASED.magnet.smallMM, RELEASED.magnet.largeMM]).toContain(anchor.dia)
         }
       }
-      const best = answer.variants[0]
-      expect(best.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
     }
   })
 
@@ -82,11 +104,24 @@ describe('solveCutout — the shape-in, sizes+layouts-out door', () => {
     const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, lShape(100))
     expect(judged).not.toBeNull()
     const released = judged!.bands.filter((b) => b.band.released)
+
+    // NON-VACUITY: the gravity check below is only meaningful if something was offered at all.
+    const offering = released.filter((answer) => answer.variants.length > 0)
+    expect(offering.length).toBeGreaterThan(0)
+
     for (const answer of released) {
-      expect(answer.variants.length).toBeGreaterThanOrEqual(1)
+      if (!answer.variants.length) {
+        expect(answer.decisionState).toBe('NONE')
+        expect(answer.rejections.length).toBeGreaterThan(0)
+        continue
+      }
+      // The offered placement holds the top: its upward reach is the smallest of the four sides,
+      // which is what "gravity holds it" means for a hanging cutout.
       const best = answer.variants[0]
-      // the winning placement holds the top — within the gravity guard's bound
-      expect(best.wrap.top).toBeLessThanOrEqual(RELEASED_CALIBRATION.flapMaxMM)
+      const policy = best.selection!.unsupportedExtentPolicy
+      expect(policy.perSideMM.top).toBeLessThanOrEqual(
+        Math.max(policy.perSideMM.left, policy.perSideMM.right, policy.perSideMM.bottom),
+      )
     }
   })
 

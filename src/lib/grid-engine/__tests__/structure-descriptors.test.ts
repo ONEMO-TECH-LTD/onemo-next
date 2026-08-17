@@ -34,6 +34,18 @@ const rect = (x: number, y: number, w: number, h: number): Contour => ({
 
 const ring = (x: number, y: number, w: number, h: number): Pt[] => rect(x, y, w, h).outer.pts
 
+/** Written out locally: the test must not borrow Compute's own bounds helper to check Compute. */
+const contourBounds = (pts: ReadonlyArray<Pt>) => {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  return { minX, minY, maxX, maxY }
+}
+
 const ENVELOPE: ContinuousFeasibilityResult['envelope'] = {
   quantumMM: QUANTUM_MM,
   arcErrorMM: 0.005,
@@ -74,6 +86,27 @@ const evidence = (over: Partial<DescriptorEvidence>): DescriptorEvidence => ({
   witnessEvidence: [],
   ...over,
 })
+
+/**
+ * The only slack a published value may claim over the interval that advertises it: the two ulps of
+ * outward rounding the descriptors already apply, one per side. Identical to the bracket predicate
+ * in Logic — a test that allowed more would stop being a falsifier.
+ */
+const slack = (value: number): number => Math.abs(value) * 2 ** -51 + Number.MIN_VALUE
+
+/** Every registration a descriptor hands back: exact points, plus each region's vertices AND its
+ *  centroid — a region checked only at its corners can hide a worse value in the middle. */
+const returnedRegistrations = (result: DescriptorEvidence): Pt[] => {
+  const out: Pt[] = [...(result.argopt?.points ?? []).map(([x, y]) => [x, y] as Pt)]
+  for (const cell of result.argopt?.regions ?? []) {
+    for (const [x, y] of cell) out.push([x, y])
+    out.push([
+      cell.reduce((sum, [x]) => sum + x, 0) / cell.length,
+      cell.reduce((sum, [, y]) => sum + y, 0) / cell.length,
+    ])
+  }
+  return out
+}
 
 // ─── 1 · hierarchy ─────────────────────────────────────────────────────────────────────────────
 
@@ -217,6 +250,110 @@ describe('upper hanging mass', () => {
   })
 })
 
+// ─── 3b · the hanging strip is a COMPLETE, self-consistent equivalent set ──────────────────────
+
+describe('upper hanging mass — argopt composability', () => {
+  const material = rect(0, 0, 100, 100)
+  const offsets: Pt[] = [[0, 0]]
+
+  /** Re-price one registration by handing the descriptor a feasible set holding only that point. */
+  const valueAt = (point: Pt) =>
+    upperHangingMassEvidence(subject(material, offsets, 12, givenF([], [point])))
+
+  it('returns interior registrations, not only the face vertices', () => {
+    const component = ring(20, 20, 60, 60)
+    const result = upperHangingMassEvidence(subject(material, offsets, 12, givenF([component])))
+    const strip = result.argopt?.regions ?? []
+
+    expect(strip.length).toBeGreaterThan(0)
+    const stripPoints = strip.flat()
+    const vertices = new Set(component.map(([x, y]) => `${x},${y}`))
+    // The strip is a region: it carries registrations the component's own vertex list does not.
+    expect(stripPoints.some(([x, y]) => !vertices.has(`${x},${y}`))).toBe(true)
+  })
+
+  it('reports an interval that contains every registration it returns, interior included', () => {
+    const component = ring(20, 20, 60, 60)
+    const result = upperHangingMassEvidence(subject(material, offsets, 12, givenF([component])))
+    const cells = result.argopt?.regions ?? []
+    expect(cells.length).toBeGreaterThan(0)
+
+    for (const cell of cells) {
+      // INTERIOR as well as boundary: a strip checked only at its own vertices could hide a worse
+      // value in the middle, which is exactly the composability defect this guards.
+      const interior: Pt = [
+        cell.reduce((sum, [x]) => sum + x, 0) / cell.length,
+        cell.reduce((sum, [, y]) => sum + y, 0) / cell.length,
+      ]
+      for (const point of [...cell.map(([x, y]) => [x, y] as Pt), interior]) {
+        const at = valueAt(point)
+        // MINIMIZE: only the upper bound can make a chosen registration worse than advertised. Its
+        // conservative lo may legitimately sit below the global proven lower bound, and holding
+        // that against it would reject lawful registrations.
+        expect(at.hi).toBeLessThanOrEqual(result.hi + slack(result.hi))
+      }
+    }
+  })
+})
+
+// ─── 5b · peel returns a complete, certified equivalent set ────────────────────────────────────
+
+describe('peel leverage — argopt composability', () => {
+  const material = rect(0, 0, 100, 100)
+  const offsets: Pt[] = [[0, 0]]
+  const budget = { toleranceMM3: 1e5, maxEvaluations: 4000 }
+
+  it('certifies a REGION for an area fixture, and nothing it returns scores above the interval', () => {
+    const component = ring(40, 40, 20, 20)
+    const result = peelLeverageEvidence(subject(material, offsets, 12, givenF([component])), budget)
+
+    expect(result.status).toBe('INTERVAL')
+    // An area F carries no exact witnesses, so demanding argopt POINTS here could only ever pass by
+    // accident. What this fixture is entitled to is a certified region.
+    expect(result.argopt?.regions.length).toBeGreaterThan(0)
+
+    for (const probe of returnedRegistrations(result)) {
+      const at = peelLeverageEvidence(subject(material, offsets, 12, givenF([], [probe])), budget)
+      expect(at.status).not.toBe('DECISION_INDETERMINATE')
+      expect(at.hi).toBeLessThanOrEqual(result.hi + slack(result.hi))
+    }
+  })
+
+  it('refines a contending cell instead of discarding it, and still certifies', () => {
+    // A tolerance far below the spread forces refinement. With an ample budget the answer must be
+    // CERTIFIED with its equivalent set intact — accepting indeterminate here would let an
+    // implementation that simply drops the contending cell pass this gate.
+    const component = ring(30, 30, 40, 40)
+    const tight = peelLeverageEvidence(subject(material, offsets, 12, givenF([component])), {
+      toleranceMM3: 50,
+      maxEvaluations: 20000,
+    })
+
+    expect(tight.status).toBe('INTERVAL')
+    expect(tight.hi - tight.lo).toBeLessThanOrEqual(50 + 1e-6)
+    expect(tight.argopt?.regions.length).toBeGreaterThan(0)
+    for (const probe of returnedRegistrations(tight)) {
+      const at = peelLeverageEvidence(subject(material, offsets, 12, givenF([], [probe])), {
+        toleranceMM3: 50,
+        maxEvaluations: 20000,
+      })
+      expect(at.status).not.toBe('DECISION_INDETERMINATE')
+      expect(at.hi).toBeLessThanOrEqual(tight.hi + slack(tight.hi))
+    }
+  })
+
+  it('says indeterminate when the budget cannot certify, never a partial set', () => {
+    const component = ring(30, 30, 40, 40)
+    const starved = peelLeverageEvidence(subject(material, offsets, 12, givenF([component])), {
+      toleranceMM3: 0,
+      maxEvaluations: 12,
+    })
+
+    expect(starved.status).toBe('DECISION_INDETERMINATE')
+    expect(starved.argopt).toBeNull()
+  })
+})
+
 // ─── 4 · unsupported extent ────────────────────────────────────────────────────────────────────
 
 describe('unsupported extent', () => {
@@ -251,6 +388,30 @@ describe('unsupported extent', () => {
     // The limb is still reported at its true reach; Compute neither drops nor discounts it.
     expect(limbReach.leftMM).toBeGreaterThan(0)
     expect(result.maxSideScoreMM).toBeCloseTo(38, 6)
+  })
+
+  it('reads a major region in MATERIAL space, not centre space', () => {
+    // A major support region is a magnet-CENTRE region: the body already eroded by r, so a magnet
+    // centred anywhere in it clears the outline. Handing back the ERODED square must therefore
+    // reconstruct the BODY's reach, not the core's — otherwise a solid body reads as a thin limb
+    // because its own core is always r short of its outline.
+    const body = rect(20, 20, 60, 60) // the material region: bounds 20..80
+    const core = rect(32, 32, 36, 36) // that body eroded by r = 12: bounds 32..68
+    const result = unsupportedExtentEvidence(
+      subject(material, offsets, 12, givenF([], [[50, 50]])),
+      [core],
+    )
+
+    expect(result.perRegion).toHaveLength(1)
+    // At (50,50) with r = 12 and a single offset, the padded box is [38,62]². The BODY reaches
+    // 38−20 = 18mm past it on every side. Reading the core raw would give 38−32 = 6mm.
+    const bodyBounds = contourBounds(body.outer.pts)
+    expect(bodyBounds.minX).toBe(20)
+    expect(bodyBounds.maxX).toBe(80)
+    for (const side of ['leftMM', 'rightMM', 'topMM', 'bottomMM'] as const) {
+      expect(result.perRegion[0][side]).toBeCloseTo(18, 9)
+      expect(result.perRegion[0][side]).not.toBeCloseTo(6, 6)
+    }
   })
 
   it('lets a true exact witness win over the lattice components', () => {
@@ -293,8 +454,40 @@ describe('peel leverage', () => {
 
     expect(result.status).toBe('INTERVAL')
     expect(result.units).toBe('mm3')
-    expect(result.argopt?.points.length).toBeGreaterThan(0)
+    expect(result.argopt?.regions.length).toBeGreaterThan(0)
     expect(result.lo).toBeLessThanOrEqual(result.hi)
+  })
+
+  it('brackets an optimum reachable only along an edge INTERIOR, with no vertex there', () => {
+    // THE EXACT-CONTACT FALSIFIER. The component's left edge runs x=50, y=40..60, and the material's
+    // symmetric optimum is (50,50) — on that edge's INTERIOR, not at any of its four vertices. As
+    // the sublevel rectangle closes on the optimum it meets the component along a segment with no
+    // vertex inside it and, in the limit, no positive Clipper area. A contact test that only looked
+    // for component vertices, or trusted Clipper's silence, would call that empty and move the lower
+    // bound above a score the component actually attains.
+    const budget = { toleranceMM3: 50, maxEvaluations: 20000 }
+    const component = ring(50, 40, 30, 20)
+    expect(component.some(([x, y]) => x === 50 && y === 50)).toBe(false)
+
+    const result = peelLeverageEvidence(
+      subject(material, offsets, 12, givenF([component])),
+      budget,
+    )
+    const atOptimum = peelLeverageEvidence(
+      subject(material, offsets, 12, givenF([], [[50, 50]])),
+      budget,
+    )
+
+    expect(result.status).toBe('INTERVAL')
+    expect(atOptimum.status).toBe('INTERVAL')
+    expect(result.argopt?.regions.length ?? 0).toBeGreaterThan(0)
+    // The certified lower bound must not have climbed past the score the edge point achieves.
+    expect(result.lo).toBeLessThanOrEqual(atOptimum.hi + slack(atOptimum.hi))
+    for (const probe of returnedRegistrations(result)) {
+      const at = peelLeverageEvidence(subject(material, offsets, 12, givenF([], [probe])), budget)
+      expect(at.status).not.toBe('DECISION_INDETERMINATE')
+      expect(at.hi).toBeLessThanOrEqual(result.hi + slack(result.hi))
+    }
   })
 
   it('never reports a lower bound above a value the component actually achieves', () => {
@@ -338,16 +531,21 @@ describe('peel leverage', () => {
       [50, 50],
       [60, 60],
     ]
+    // The starved case stays genuinely starved — one evaluation cannot price two witnesses. The
+    // funded case is given an AMPLE governed budget rather than a hand-counted one: pinning the
+    // exact evaluation cost made this test a hostage to the solver's internal accounting, which is
+    // not what it is here to prove.
     const starved = peelLeverageEvidence(subject(material, offsets, 12, givenF([], witnesses)), {
       toleranceMM3: 1e6,
-      maxEvaluations: 5,
+      maxEvaluations: 1,
     })
     const funded = peelLeverageEvidence(subject(material, offsets, 12, givenF([], witnesses)), {
       toleranceMM3: 1e6,
-      maxEvaluations: 8,
+      maxEvaluations: 20000,
     })
 
     expect(starved.status).toBe('DECISION_INDETERMINATE')
+    expect(starved.argopt).toBeNull()
     expect(funded.status).toBe('INTERVAL')
     expect(funded.witnessEvidence).toHaveLength(2)
   })
