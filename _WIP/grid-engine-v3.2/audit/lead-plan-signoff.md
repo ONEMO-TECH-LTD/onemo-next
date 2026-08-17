@@ -6,21 +6,38 @@
 today), `ONEMO … Product Base and Logic Architecture.md` (PB), `logic-spec-optimum.md` (LS).
 **Not** R3-specs (Dan: donor). **Not** `FINAL-CONSOLIDATED-PROPOSAL.md` (superseded). **Not** the
 pre-3.2 board.
-**Plan read:** in full, 168 lines, sha1 `72ec209c6ae2bc0d`.
+**Plan signed:** in full, **170 lines, sha1 `54638fef287142fb`**.
 **Independence:** written before reading `audit/grok-qa-plan-signoff.md`. This is my own verdict, not
 a countersignature of anyone's.
 
 ---
 
-## VERDICT
+## VERDICT — CLEAR on both axes
 
-**Necessity — shrink: one item.** Line `:3`'s framing.
-**Sufficiency — partial: three items.** LS §8's five shape-specific opens · PB §16/§17 · the stale
-"two briefs" scope rule at `:18`.
+**Necessity — no unnecessary elements.**
+**Sufficiency — delivers the canon in full**, with every deferral named in the Open register rather
+than dropped.
 
-**I can sign, and I am signing with those three recorded rather than blocking on them.** None is a
-defect in what the plan builds; all three are register/scope bookkeeping, and each is a one-line fix.
-Nothing in the plan asserts a rule canon does not carry.
+> **Scope of that CLEAR, stated so it is not over-read:** this is a verdict on the *plan as a
+> contract against canon* — every canon requirement has a plan element or a named open. It is **not**
+> a verdict on the build. The plan's own sufficiency line (`:170`) correctly stays *partial* until
+> each row is actually delivered in its phase. Both are true at once and they measure different
+> things.
+
+### First pass, and the correction
+
+I first signed sha1 `72ec209c6ae2bc0d` (168 lines) with **shrink: one** / **partial: three**. That
+was a stale copy — two of the three were already fixed in bytes newer than the ones I read, and grok
+folded the third on receiving my note. Re-hashed and re-verified against `54638fef287142fb`:
+
+| # | Recorded against `72ec209c` | State at `54638fef` |
+|---|---|---|
+| 1 | `:3` *"Ideal hug is a filled square"* | **Resolved, and better than I proposed.** The opener is now LS §1.1's optimum, closing *"The box classifies; it never places magnets. Size is the output."* That is the founding conversation's thesis stated directly. Dan's zero-flap square is preserved where it belongs — the leftover row at `:52`, as a score rather than a definition. |
+| 2 | LS §8's five shape opens + PB §16/§17 absent | **Resolved.** `:124` names all five individually as Step C, and carries the precision I asked for — *"The bulls-eye rule is at the band table; this is the open item."* `:125` names PB §16/§17 with the right reason: *"so the spectrum's 'not in this list → not required' cannot drop them."* `:170` updated. |
+| 3 | `:18` *"the two briefs"* | **Resolved.** Now *"the three canon files"*, matching `:37`. |
+
+**Drift check on the delta:** 168 → 170 lines, the two additions being `:124-125`, plus the opener
+rewritten in place. I re-verified every clause I had certified sound; all intact.
 
 ---
 
@@ -30,7 +47,7 @@ Nothing in the plan asserts a rule canon does not carry.
 reading correctly (*"bans inferring a size from a neighbour without evaluating it — not comparing
 published answers after every size has been judged"*), and names inter-band state as a **Phase 2
 build** rather than grounds to reclassify a ruling. Carried through to `:150`, `:153` and the
-sufficiency line at `:168`; removed from the Open register. This is the fold I care most about —
+sufficiency line (`:170` at current bytes); removed from the Open register. This is the fold I care most about —
 *"every band answers"* is the law the shipped engine breaks ten times in fourteen, and it is now a
 build task instead of an open question.
 
@@ -41,7 +58,7 @@ distinction the plan already made correctly for the 40 mm gate, now applied cons
 
 ---
 
-## The three recorded items
+## The three recorded items — all resolved at `54638fef`, kept for the record
 
 ### 1. `:3` — *"Ideal hug is a filled square. Free shapes approximate that."* · necessity
 
@@ -92,7 +109,7 @@ documents.
 
 ---
 
-## PB §16/§17 — recorded, and I do not hold the sign-off on it
+## PB §16/§17 — resolved at `:125`; the reasoning is kept because it is the general rule
 
 Zero references in the file, verified unbounded. PB §16 (the EvaluationPlan Logic sends: target size,
 scale, both axis classes, canonical frame and anchor, permitted translation domain, permitted
@@ -144,7 +161,10 @@ Against all three canon files, in full:
 ## Method note
 
 Every absence claim above was verified by unbounded grep of the whole file, then re-checked with a
-different pattern. Three false negatives on this sprint came from bounded reads — `cut -c150`,
+different pattern. That discipline earned its keep twice on this sign-off: once catching that I had
+read a stale copy, and once when my own re-verification reported the step-3 ceiling clause missing —
+a false negative caused by writing `\|` inside a `grep -E` pattern. The clause was present at `:16`
+and `:62` the whole time. Three false negatives on this sprint came from bounded reads — `cut -c150`,
 `head -8`, and a missing trailing newline — and two of them nearly produced a fabrication verdict
 against a real Dan turn. I did not accept any citation from another lane without checking it at
 source, including the two corrections that landed in my favour.
