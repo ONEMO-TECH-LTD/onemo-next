@@ -474,12 +474,7 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   ] as unknown as LayoutTemplate[]) as ReadonlyArray<LayoutTemplate>,
   patternPolicy: Object.freeze({
     version: 'frame-permission-v1',
-    because:
-      'Keyed by axis class x axis class x BAND. Every populated cell is ENGINEERING-DERIVED ' +
-      'calibration read off Logic Spec §5.1, whose class standards are frame HYPOTHESES — the brief ' +
-      'says capacity, never compulsory — and PB §21.4 leaves the final band-specific matrix ' +
-      'deferred, so no row here is a ruling. A cell the brief does not cover is deferred and permits ' +
-      'nothing; capacity alone permits nothing. A product ruling replaces cells and version.',
+    because: `Keyed by axis class x axis class x BAND. Every populated cell is ENGINEERING-DERIVED calibration read off Logic Spec §5.1, whose class standards are frame HYPOTHESES — the brief says capacity, never compulsory — and PB §21.4 leaves the final band-specific matrix deferred, so no row here is a ruling. A cell the brief does not cover is deferred and permits nothing; capacity alone permits nothing. A product ruling replaces cells and version.`,
     cells: Object.freeze([
       // Logic Spec §5.1, square standard — the calibration control every other class walks from.
       Object.freeze({ band: 1, axisClassX: 1, axisClassY: 1, frames: Object.freeze(['1x1']), source: 'logic-spec §5.1 SQUARE B1 single', status: 'engineering-derived' }),
@@ -514,22 +509,13 @@ export const RELEASED_CALIBRATION: CalibrationSpec = Object.freeze({
   }) as PatternPolicy,
   nodeClassification: Object.freeze({
     version: 'node-classification-v1',
-    because:
-      'PB §8 names strong and marginal regions but releases no threshold. AUTHORED ENGINEERING: a ' +
-      'node is strong when its region survives erosion at twice the released safe radius as well as ' +
-      'at the safe radius itself, marginal when it survives only the safe radius, illegal when the ' +
-      'exact predicate refuses it. The doubling is the authored choice and is versioned with this ' +
-      'policy; no ruling is claimed for it.',
+    because: `PB §8 names strong and marginal regions but releases no threshold. AUTHORED ENGINEERING: a node is strong when its region survives erosion at twice the released safe radius as well as at the safe radius itself, marginal when it survives only the safe radius, illegal when the exact predicate refuses it. The doubling is the authored choice and is versioned with this policy; no ruling is claimed for it.`,
     clearanceLevelsMM: Object.freeze([12, 24]),
     strongLevelIndex: 1,
   }) as NodeClassificationPolicy,
   unsupportedExtent: Object.freeze({
     version: 'unsupported-extent-v1',
-    because:
-      'Logic Spec P4 releases a per-side unsupported-extent switch with exactly two positions, 12mm ' +
-      'and 24mm, bound by T0 rows 6.7 and 6.8. The released default is the tighter position. T0b ' +
-      'records a fixed 40mm ceiling and a silent limb exemption as violations, so no other value is ' +
-      'a position of this switch and any exemption granted under it must be reported.',
+    because: `Logic Spec P4 releases a per-side unsupported-extent switch with exactly two positions, 12mm and 24mm, bound by T0 rows 6.7 and 6.8. The released default is the tighter position. T0b records a fixed 40mm ceiling and a silent limb exemption as violations, so no other value is a position of this switch and any exemption granted under it must be reported.`,
     activeLimitMM: 12,
     releasedOptionsMM: Object.freeze([12, 24]),
   }) as UnsupportedExtentPolicy,

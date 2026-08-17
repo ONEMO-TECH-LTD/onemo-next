@@ -31,7 +31,6 @@ import {
 import {
   prepareExactContour,
   distanceToPreparedContour,
-  pointInPreparedContour,
 } from '../compute/grid-prepared'
 import { normalizeContour } from '../compute/normalize'
 import {
@@ -716,10 +715,18 @@ function judgeBand(
       },
       holes: [],
     }
-    // TWO DISTINCT CLASSIFICATIONS, never one list relabelled: the major support regions are the
-    // safe-core components at the released safe radius; the distinct masses are the components that
-    // survive the deeper authored level. Both come from the hierarchy, and its own uncertainty —
-    // an indeterminate level or an ambiguous parent — is carried into the proof status.
+    // THE MATERIAL-MASS GRAPH IS THE CERTIFIED SAFE CORE. Logic Spec §2 P7 distributes across
+    // distinct MATERIAL masses — one per lobe or wing — and Logic Spec §4 step 6 / PB §§7.3 and 8
+    // put major masses, connectors and branches in the structural graph. PB §21 leaves the exact
+    // strong/marginal thresholds OPEN, and no governing source says a distinct mass is a component
+    // surviving the authored 24mm level. T6 made that equation anyway, so on a shape whose deeper
+    // level cannot be certified P7 lost the shape's masses entirely — measured on BAT B2 and PILL
+    // B2, both distinctMassCount 0 with the 24mm level INDETERMINATE_WITHIN_TOLERANCE and collapsed.
+    //
+    // The deep level is NOT the mass source. It stays exactly what the calibration says it is — the
+    // authored strong/marginal threshold — and is applied per node from exact clearance below. This
+    // is not a fallback: there is no conditional, no "if the deep level failed". The safe-core
+    // components ARE the mass graph, always.
     const levels = calibration.nodeClassification.clearanceLevelsMM
     const hierarchy = buildComponentHierarchy(contour, levels)
     const asContours = (levelIndex: number): Contour[] =>
@@ -727,13 +734,22 @@ function judgeBand(
         outer: { pts: node.ringMM.map(([x, y]) => [x, y] as Pt) },
         holes: [],
       }))
-    const majorSupportRegions = asContours(0)
-    const distinctMasses = asContours(calibration.nodeClassification.strongLevelIndex)
+    const safeCoreMasses = asContours(0)
+    const majorSupportRegions = safeCoreMasses
+    const distinctMasses = safeCoreMasses
+    /** Diagnostic only, and emitted as such: whether EVERY level, deep one included, was certified. */
     const hierarchyCertain =
       hierarchy.levels.every((level) => level.status !== 'INDETERMINATE_WITHIN_TOLERANCE') &&
       hierarchy.levels.every((level) =>
         level.nodes.every((node) => node.parentStatus !== 'INDETERMINATE'),
       )
+    // PROOF RESTS ON WHAT SELECTION ACTUALLY CONSUMED: the certified safe-core masses, plus each
+    // node's exact measured clearance. The deeper level's status is preserved and emitted, but an
+    // uncertainty in a level nothing consumed cannot make a consumed answer uncertain.
+    const safeCoreCertain =
+      hierarchy.levels[0] !== undefined &&
+      hierarchy.levels[0].status !== 'INDETERMINATE_WITHIN_TOLERANCE' &&
+      hierarchy.levels[0].nodes.every((node) => node.parentStatus !== 'INDETERMINATE')
     if (!majorSupportRegions.length) {
       // Emptiness is only a geometric fact when T4 CERTIFIED it. An indeterminate level, or one
       // where only witnesses survived, is undecided evidence — not proof that nothing fits.
@@ -751,8 +767,9 @@ function judgeBand(
     }
     const inputs: DescriptorInputs = {
       majorSupportRegions,
-      // NO SUBSTITUTION. With no deep masses the distribution keys have no input and say so;
-      // handing them the major-support regions would relabel one classification as the other.
+      // The same certified graph, named for the duty it serves here: P7 distributes anchors across
+      // distinct material masses. One source, two named inputs — not one list quietly relabelled
+      // when another failed.
       distinctMasses,
       peelToleranceMM3: calibration.peelToleranceMM3,
       peelMaxEvaluations: calibration.peelMaxEvaluations,
@@ -896,9 +913,6 @@ function judgeBand(
       const nodes: NodeEvidence[] = placed.grid.anchors.map((anchor, index) => {
         const [across, down] = template.steps[index] ?? [0, 0]
         const clearance = distanceToPreparedContour(anchor.p, prepared)
-        const inStrongRegion = distinctMasses.some((region) =>
-          pointInPreparedContour(anchor.p, prepareExactContour(region)),
-        )
         // LEGAL BY CONSTRUCTION: quantiseAndValidateRegistration re-proved every disc through the
         // exact door and throws otherwise, so reaching here IS the proof. No epsilon is invented to
         // re-decide what the door already settled; the measured clearance is reported as evidence.
@@ -907,9 +921,13 @@ function judgeBand(
           centreMM: [anchor.p[0], anchor.p[1]] as Pt,
           edgeClearanceMM: clearance,
           legality: 'legal' as const,
-          structuralClass: !hierarchyCertain
-            ? ('indeterminate' as const)
-            : inStrongRegion
+          // STRONG OR MARGINAL FROM THE NODE'S OWN EXACT CLEARANCE, against the authored deep
+          // threshold. Membership in a conservative deep-level POLYGON answered a different
+          // question — whether a disc of that radius fits somewhere containing this point — and
+          // made every node indeterminate whenever that polygon could not be certified, although
+          // this node's clearance was already measured exactly.
+          structuralClass:
+            clearance >= levels[calibration.nodeClassification.strongLevelIndex]
               ? ('strong' as const)
               : ('marginal' as const),
         }
@@ -1004,7 +1022,7 @@ function judgeBand(
         proofStatus:
           undecided.length === 0 &&
           classificationCertain &&
-          hierarchyCertain &&
+          safeCoreCertain &&
           feasible.status === 'PROVED_FEASIBLE' &&
           chain.stoppedAt === null &&
           bracketViolations.length === 0

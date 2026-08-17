@@ -215,6 +215,30 @@ describe("continuous safe and feasible sets", () => {
       [12, 30],
       [60, 30],
     ]);
+
+    // A LATTICE POINT MUST SURVIVE RE-QUANTISATION UNCHANGED, to the bit. The decode side is
+    // integer/SCALE; re-quantising by dividing by the quantum and multiplying back is NOT its
+    // inverse, because 0.001 is not representable — 12.95 came back as 12.950000000000001 and
+    // 33.221 as 33.221000000000004. Measured consequence: that drift moved a registration off the
+    // coverage boundary its own chain had certified, and shifted a balance value 3.9e-14 past its
+    // bracket. Non-integer coordinates are the ones that expose it, so they are what is asserted.
+    for (const point of [
+      [12.95, 12.167],
+      [33.221, 35.263],
+      [60.167, 23.999],
+    ] as Array<[number, number]>) {
+      const roundTripped = quantiseAndValidateRegistration(
+        prepareExactContour(rect(0, 0, 200, 200)),
+        point,
+        [[0, 0]],
+        48,
+        { paddingMM: 12, perimeterOnly: false },
+      );
+      expect(roundTripped.originMM[0]).toBe(point[0]);
+      expect(roundTripped.originMM[1]).toBe(point[1]);
+      expect(roundTripped.grid.anchors[0].p[0]).toBe(point[0]);
+      expect(roundTripped.grid.anchors[0].p[1]).toBe(point[1]);
+    }
     expect(() =>
       quantiseAndValidateRegistration(
         prepared,

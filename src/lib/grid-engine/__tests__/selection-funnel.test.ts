@@ -23,6 +23,8 @@ import {
 } from '../compute/structure'
 import { computeContinuousFeasibleSet } from '../compute/continuous-feasibility'
 import type { Contour, Pt } from '../compute/types'
+import { readFileSync } from 'node:fs'
+import { engineOutline, type OutlineUV } from '../ui/trace-cutout'
 import { contentHash, stableStringify } from '@/lib/outline-core/math'
 import {
   RELEASED,
@@ -831,6 +833,78 @@ describe('the approved order', () => {
     // The released default is the tighter position, and 40mm was never a position of this switch.
     expect(RELEASED_CALIBRATION.unsupportedExtent.activeLimitMM).toBe(12)
     expect(RELEASED_CALIBRATION.unsupportedExtent.releasedOptionsMM).toEqual([12, 24])
+  })
+
+  it('carries the shape\u2019s material masses into P7 from the CERTIFIED safe core', () => {
+    // THE REAL CONTOURS, not stand-ins. Both of these stopped at "P7 distribution across distinct
+    // masses" with distinctMassCount 0, because the mass graph was taken from the deeper authored
+    // level and that level is INDETERMINATE_WITHIN_TOLERANCE and collapsed on these shapes. No
+    // governing source equates a distinct MATERIAL mass with a component surviving 24mm; the masses
+    // are the certified safe core, and P7 must receive them.
+    type CanonFixture = { outline: OutlineUV; box: { w: number; h: number } }
+    const canon = JSON.parse(
+      readFileSync('src/lib/grid-engine/__tests__/__fixtures-canon-shapes.json', 'utf8'),
+    ) as Record<string, CanonFixture>
+
+    for (const name of ['pill', 'bat'] as const) {
+      const fixture = canon[name]
+      expect(fixture).toBeDefined()
+      const contour: Contour = {
+        outer: {
+          pts: engineOutline(fixture.outline).map(
+            ([u, v]) => [u * fixture.box.w, v * fixture.box.h] as Pt,
+          ),
+        },
+        holes: [],
+      }
+      const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, contour)
+      expect(judged).not.toBeNull()
+      const b2 = judged!.bands.find((band) => band.band.band === 2)
+      expect(b2).toBeDefined()
+      expect(b2!.variants.length).toBeGreaterThan(0)
+
+      for (const offer of b2!.variants.map(selectionOf)) {
+        // The mass graph reached the selector at all...
+        expect(offer.distinctMassCount).toBeGreaterThan(0)
+        // ...and the chain no longer halts at P7 for want of it.
+        expect(offer.selectionTrace.stoppedAt ?? '').not.toContain('P7')
+        expect(decided(offer, 'distribution')).toBe(true)
+      }
+    }
+  })
+
+  it('classifies each node strong or marginal from its OWN exact clearance, both sides exercised', () => {
+    const deepMM =
+      RELEASED_CALIBRATION.nodeClassification.clearanceLevelsMM[
+        RELEASED_CALIBRATION.nodeClassification.strongLevelIndex
+      ]
+    expect(deepMM).toBe(24)
+
+    // Two released bands on the same square, so the SAME rule is checked on nodes that fall either
+    // side of the threshold. Band 2 seats every node near the boundary; band 3 seats a centre node
+    // deep inside the material. Nothing here manufactures a threshold — deepMM is read from the
+    // released calibration, and every clearance compared against it is the engine's own emitted
+    // measurement.
+    const nodes = [
+      ...SQUARE_BAND2().variants.map(selectionOf),
+      ...solve(rect(100, 100), narrow(3, 120, 168, CERTIFYING_P5)).variants.map(selectionOf),
+    ].flatMap((offer) => offer.nodes)
+    expect(nodes.length).toBeGreaterThan(0)
+
+    // HARD PRECONDITION, BOTH SIDES: the run must actually contain a node under the threshold and a
+    // node at or over it. Without this the formula below could hold vacuously on one branch.
+    expect(nodes.some((node) => node.edgeClearanceMM < deepMM)).toBe(true)
+    expect(nodes.some((node) => node.edgeClearanceMM >= deepMM)).toBe(true)
+    expect(nodes.some((node) => node.structuralClass === 'marginal')).toBe(true)
+    expect(nodes.some((node) => node.structuralClass === 'strong')).toBe(true)
+
+    for (const node of nodes) {
+      // The rule, stated against the node's own emitted measurement — not membership in a
+      // conservative polygon that answers a different question and takes every node down with it
+      // when it cannot be certified.
+      expect(node.structuralClass).toBe(node.edgeClearanceMM >= deepMM ? 'strong' : 'marginal')
+      expect(node.structuralClass).not.toBe('indeterminate')
+    }
   })
 
   it('says undecided, not empty, when the structure cannot certify', () => {

@@ -613,6 +613,27 @@ describe('coverage', () => {
     expect(cell.argopt?.regions.length).toBeGreaterThan(0)
   })
 
+  it('counts an anchor sitting exactly ON a region boundary as covered', () => {
+    // THE SETS ARE CLOSED. The Clipper partition that certifies coverage treats a boundary point as
+    // covered; an OPEN point test re-pricing the same registration returns zero and contradicts the
+    // bracket that produced it. Measured on PILL B2, whose registration is literally a vertex of the
+    // certified P2 argopt. Here the anchor lands exactly on the region's left edge.
+    const region = rect(40, 20, 20, 20) // x 40..60, y 20..40
+    const onEdge: Pt = [40, 30] // exactly on the left edge, not inside it
+    const inside: Pt = [50, 30]
+
+    const at = (point: Pt) =>
+      coverageEvidence(subject(material, offsets, 12, givenF([], [point])), [region])
+
+    // PRECONDITION: the interior point is covered, so the fixture exercises a real region.
+    expect(at(inside).hi).toBeCloseTo(1, 9)
+    // AND the boundary point is covered too — tangency is lawful throughout this engine.
+    expect(at(onEdge).hi).toBeCloseTo(1, 9)
+    expect(at(onEdge).lo).toBeCloseTo(1, 9)
+    // A point genuinely outside is still uncovered; the predicate did not become permissive.
+    expect(at([39.5, 30]).hi).toBe(0)
+  })
+
   it('lets an exact witness win over the components', () => {
     const result = coverageEvidence(
       subject(material, offsets, 12, givenF([ring(0, 0, 20, 20)], [[75, 25]])),

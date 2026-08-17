@@ -1630,10 +1630,17 @@ function anchorCountsAt(
   preparedSets: ReadonlyArray<ReturnType<typeof prepareExactContour>>,
   t: Pt,
 ): number[] {
+  // THE SETS ARE CLOSED. A safe core is an erosion and the coverage regions are exact Clipper
+  // polygons; tangency is lawful throughout this engine, and a registration sitting exactly ON a
+  // certified argopt vertex is the answer the chain selected, not a near miss. `pointInPreparedContour`
+  // is an OPEN even-odd test, so re-pricing such a point returned zero anchors and contradicted the
+  // very bracket that produced it — measured on PILL B2, whose registration [12.95, 12.167] is
+  // literally a vertex of the certified P2 argopt. Boundary contact is exact distance zero; no
+  // epsilon is introduced to decide it. One predicate, shared by coverage and distribution.
+  const holds = (point: Pt, set: ReturnType<typeof prepareExactContour>): boolean =>
+    pointInPreparedContour(point, set) || distanceToPreparedContour(point, set) === 0
   return preparedSets.map(
-    (set) =>
-      subject.offsetsMM.filter(([dx, dy]) => pointInPreparedContour([t[0] + dx, t[1] + dy], set))
-        .length,
+    (set) => subject.offsetsMM.filter(([dx, dy]) => holds([t[0] + dx, t[1] + dy], set)).length,
   )
 }
 

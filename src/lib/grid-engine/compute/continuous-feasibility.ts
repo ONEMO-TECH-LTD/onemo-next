@@ -270,8 +270,13 @@ export function quantiseAndValidateRegistration(
     );
   }
   const q = (value: number) =>
-    Math.round(value / CONTINUOUS_REGISTRATION_QUANTUM_MM) *
-    CONTINUOUS_REGISTRATION_QUANTUM_MM;
+    // THE SAME ROUND TRIP fromLatticePaths USES: multiply by SCALE, round, divide by SCALE.
+    // Dividing by the quantum instead and multiplying back is not the inverse of that decode —
+    // 0.001 is not representable, so the two paths disagree in the last bits. MEASURED: 12.95 came
+    // back as 12.950000000000001 and 33.221 as 33.221000000000004. That drift moved PILL off the
+    // coverage boundary its own chain had certified and shifted BAT's balance 3.9e-14 past its
+    // bracket.
+    Math.round(value * SCALE) / SCALE;
   const origin: Pt = [q(originMM[0]), q(originMM[1])];
   const construction = placeTemplate(origin, steps, basePitchMM);
   const paddingMM = config.paddingMM;
