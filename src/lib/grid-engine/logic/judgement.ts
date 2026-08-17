@@ -24,6 +24,7 @@ import {
   type GridResult,
 } from '../compute/grid-core'
 import {
+  CONTINUOUS_REGISTRATION_QUANTUM_MM,
   computeContinuousFeasibleSet,
   quantiseAndValidateRegistration,
   type ContinuousFeasibilityResult,
@@ -803,268 +804,322 @@ function judgeBand(
         effectiveRadiusMM: spec.grid.paddingMM,
         feasible,
       }
-      const chain = restrictInOrder(base, inputs)
-      const chosen = chooseRegistration(chain.surviving, canonical, chain.stoppedAt === null)
-      if (!chosen) {
-        rejections.push({ sizeMM, patternId: template.name, reasons: ['NO_LAWFUL_REGISTRATION'] })
-        continue
-      }
-      let placed: { originMM: Pt; grid: GridResult }
-      try {
-        placed = quantiseAndValidateRegistration(
-          prepared,
-          chosen,
-          template.steps,
-          spec.grid.basePitchMM,
-          { paddingMM: spec.grid.paddingMM, plan: calibration.plan, perimeterOnly: true },
-        )
-      } catch {
-        rejections.push({
-          sizeMM,
-          patternId: template.name,
-          reasons: ['REGISTRATION_REFUSED_BY_CONSTRUCTION'],
-        })
-        continue
-      }
-      // THE QUANTISED REGISTRATION IS RE-PRICED. Every number published for this candidate is
-      // measured at the point that is actually published, not at the pre-quantisation optimum.
-      const atAnswer: DescriptorSubject = { ...base, feasible: singleton(feasible, placed.originMM) }
-      const evidence = {} as Record<(typeof APPROVED_ORDER)[number]['key'], DescriptorEvidence>
-      for (const orderStep of APPROVED_ORDER)
-        evidence[orderStep.key] = runDescriptor(orderStep.key, atAnswer, inputs)
+      type AttemptOutcome =
+        | { kind: 'reject'; reason: RejectionCode }
+        | { kind: 'ok'; candidate: Candidate; violations: string[] }
 
-      // P4 POLICY, APPLIED AT THE PUBLISHED REGISTRATION. Compute measured the per-side reach and
-      // the per-major-region reach and applied NEITHER, by design. Logic applies both here against
-      // the active released switch: a MAJOR support region past the limit rejects the candidate; a
-      // reach past the limit that no major region shares is the ruled trivial-limb exemption, and it
-      // is reported with its side and reach rather than passing silently.
-      // The loop above already measured this at the SAME subject with the SAME regions —
-      // runDescriptor('unsupportedExtent') is exactly unsupportedExtentEvidence(subject,
-      // inputs.majorSupportRegions) — so the narrowing is sound by construction and a second call
-      // would only be a second chance to diverge.
-      const extent = evidence.unsupportedExtent as UnsupportedExtentEvidence
-      const activeLimitMM = calibration.unsupportedExtent.activeLimitMM
-      const SIDES = ['left', 'right', 'top', 'bottom'] as const
-      const overLimit = SIDES.filter((side) => extent.reachMM[side] > activeLimitMM)
-      const majorOverLimit = overLimit.some((side) =>
-        extent.perRegion.some((region) => region[`${side}MM`] > activeLimitMM),
-      )
-      if (majorOverLimit) {
-        rejections.push({
-          sizeMM,
-          patternId: template.name,
-          reasons: ['EXCESSIVE_UNSUPPORTED_EXTENT'],
-        })
-        continue
-      }
-      const unsupportedExtentPolicy = {
-        activeLimitMM,
-        outcome: (overLimit.length ? 'TRIVIAL_LIMB_EXEMPT' : 'WITHIN_LIMIT') as
-          | 'WITHIN_LIMIT'
-          | 'TRIVIAL_LIMB_EXEMPT',
-        perSideMM: { ...extent.reachMM },
-        exemptedSides: overLimit.map((side) => ({ side, reachMM: extent.reachMM[side] })),
-      }
-      // THE PUBLISHED VALUES MUST BE CONTAINED IN THE BRACKETS THE CHAIN CERTIFIED. Not merely
-      // overlapping them: a value that extends past the interval its own restriction proved is not
-      // the answer the chain selected, and that is reported — never published as though it were.
-      const bracketViolations: string[] = []
-      for (const orderStep of APPROVED_ORDER) {
-        const promised = chain.evidence[orderStep.key]
-        const published = evidence[orderStep.key]
-        if (!promised || promised.status === 'DECISION_INDETERMINATE') continue
-        if (published.status === 'DECISION_INDETERMINATE') {
-          bracketViolations.push(`${orderStep.rule} could not be re-measured at the answer`)
-          continue
-        }
-        // DIRECTION-RELEVANT CONTAINMENT. Only the bound that can make the chosen point WORSE is
-        // binding: minimising, the point must not exceed the certified upper bound; maximising, it
-        // must not fall under the certified lower one. The opposite side is outward measurement
-        // uncertainty — a conservative lo may legitimately sit below a global proven lower bound —
-        // and holding it against the point would reject lawful answers. Slack is the two ulps of
-        // outward rounding the descriptors already applied, nothing wider.
-        const slack = (value: number): number => Math.abs(value) * 2 ** -51 + Number.MIN_VALUE
-        const contained =
-          promised.direction === 'minimize'
-            ? published.hi <= promised.hi + slack(promised.hi)
-            : published.lo >= promised.lo - slack(promised.lo)
-        if (!contained)
-          bracketViolations.push(
-            `${orderStep.rule} published [${published.lo},${published.hi}] breaches the certified ${promised.direction === 'minimize' ? 'upper' : 'lower'} bound of [${promised.lo},${promised.hi}]`,
+      /**
+       * ONE COMPLETE PASS over a given feasible set — restrict in order, choose, quantise, re-price,
+       * apply P4, check the brackets. Extracted verbatim so the SAME code can run a second time
+       * against a refined feasible set; nothing here is reimplemented for the retry.
+       */
+      const runAttempt = (attemptFeasible: ContinuousFeasibilityResult): AttemptOutcome => {
+        const attemptBase: DescriptorSubject = { ...base, feasible: attemptFeasible }
+        const chain = restrictInOrder(attemptBase, inputs)
+        const chosen = chooseRegistration(chain.surviving, canonical, chain.stoppedAt === null)
+        if (!chosen) return { kind: 'reject', reason: 'NO_LAWFUL_REGISTRATION' }
+        let placed: { originMM: Pt; grid: GridResult }
+        try {
+          placed = quantiseAndValidateRegistration(
+            prepared,
+            chosen,
+            template.steps,
+            spec.grid.basePitchMM,
+            { paddingMM: spec.grid.paddingMM, plan: calibration.plan, perimeterOnly: true },
           )
+        } catch {
+          return { kind: 'reject', reason: 'REGISTRATION_REFUSED_BY_CONSTRUCTION' }
+        }
+        // THE QUANTISED REGISTRATION IS RE-PRICED. Every number published for this candidate is
+        // measured at the point that is actually published, not at the pre-quantisation optimum.
+        const atAnswer: DescriptorSubject = { ...attemptBase, feasible: singleton(attemptFeasible, placed.originMM) }
+        const evidence = {} as Record<(typeof APPROVED_ORDER)[number]['key'], DescriptorEvidence>
+        for (const orderStep of APPROVED_ORDER)
+          evidence[orderStep.key] = runDescriptor(orderStep.key, atAnswer, inputs)
+
+        // P4 POLICY, APPLIED AT THE PUBLISHED REGISTRATION. Compute measured the per-side reach and
+        // the per-major-region reach and applied NEITHER, by design. Logic applies both here against
+        // the active released switch: a MAJOR support region past the limit rejects the candidate; a
+        // reach past the limit that no major region shares is the ruled trivial-limb exemption, and it
+        // is reported with its side and reach rather than passing silently.
+        // The loop above already measured this at the SAME subject with the SAME regions —
+        // runDescriptor('unsupportedExtent') is exactly unsupportedExtentEvidence(subject,
+        // inputs.majorSupportRegions) — so the narrowing is sound by construction and a second call
+        // would only be a second chance to diverge.
+        const extent = evidence.unsupportedExtent as UnsupportedExtentEvidence
+        const activeLimitMM = calibration.unsupportedExtent.activeLimitMM
+        const SIDES = ['left', 'right', 'top', 'bottom'] as const
+        const overLimit = SIDES.filter((side) => extent.reachMM[side] > activeLimitMM)
+        const majorOverLimit = overLimit.some((side) =>
+          extent.perRegion.some((region) => region[`${side}MM`] > activeLimitMM),
+        )
+        if (majorOverLimit) return { kind: 'reject', reason: 'EXCESSIVE_UNSUPPORTED_EXTENT' }
+        const unsupportedExtentPolicy = {
+          activeLimitMM,
+          outcome: (overLimit.length ? 'TRIVIAL_LIMB_EXEMPT' : 'WITHIN_LIMIT') as
+            | 'WITHIN_LIMIT'
+            | 'TRIVIAL_LIMB_EXEMPT',
+          perSideMM: { ...extent.reachMM },
+          exemptedSides: overLimit.map((side) => ({ side, reachMM: extent.reachMM[side] })),
+        }
+        // THE PUBLISHED VALUES MUST BE CONTAINED IN THE BRACKETS THE CHAIN CERTIFIED. Not merely
+        // overlapping them: a value that extends past the interval its own restriction proved is not
+        // the answer the chain selected, and that is reported — never published as though it were.
+        const bracketViolations: string[] = []
+        for (const orderStep of APPROVED_ORDER) {
+          const promised = chain.evidence[orderStep.key]
+          const published = evidence[orderStep.key]
+          if (!promised || promised.status === 'DECISION_INDETERMINATE') continue
+          if (published.status === 'DECISION_INDETERMINATE') {
+            bracketViolations.push(`${orderStep.rule} could not be re-measured at the answer`)
+            continue
+          }
+          // DIRECTION-RELEVANT CONTAINMENT. Only the bound that can make the chosen point WORSE is
+          // binding: minimising, the point must not exceed the certified upper bound; maximising, it
+          // must not fall under the certified lower one. The opposite side is outward measurement
+          // uncertainty — a conservative lo may legitimately sit below a global proven lower bound —
+          // and holding it against the point would reject lawful answers. Slack is the two ulps of
+          // outward rounding the descriptors already applied, nothing wider.
+          const slack = (value: number): number => Math.abs(value) * 2 ** -51 + Number.MIN_VALUE
+          const contained =
+            promised.direction === 'minimize'
+              ? published.hi <= promised.hi + slack(promised.hi)
+              : published.lo >= promised.lo - slack(promised.lo)
+          if (!contained)
+            bracketViolations.push(
+              `${orderStep.rule} published [${published.lo},${published.hi}] breaches the certified ${promised.direction === 'minimize' ? 'upper' : 'lower'} bound of [${promised.lo},${promised.hi}]`,
+            )
+        }
+
+        const variant = variantFrom(
+          spec,
+          calibration,
+          band,
+          contour,
+          sizeMM,
+          spec.grid.basePitchMM,
+          'standard',
+          placed.grid,
+          template.name,
+        )
+        if (!variant) return { kind: 'reject', reason: 'NO_LAWFUL_REGISTRATION' }
+
+        const nodes: NodeEvidence[] = placed.grid.anchors.map((anchor, index) => {
+          const [across, down] = template.steps[index] ?? [0, 0]
+          const clearance = distanceToPreparedContour(anchor.p, prepared)
+          // LEGAL BY CONSTRUCTION: quantiseAndValidateRegistration re-proved every disc through the
+          // exact door and throws otherwise, so reaching here IS the proof. No epsilon is invented to
+          // re-decide what the door already settled; the measured clearance is reported as evidence.
+          return {
+            address: { across, down },
+            centreMM: [anchor.p[0], anchor.p[1]] as Pt,
+            edgeClearanceMM: clearance,
+            legality: 'legal' as const,
+            // STRONG OR MARGINAL FROM THE NODE'S OWN EXACT CLEARANCE, against the authored deep
+            // threshold. Membership in a conservative deep-level POLYGON answered a different
+            // question — whether a disc of that radius fits somewhere containing this point — and
+            // made every node indeterminate whenever that polygon could not be certified, although
+            // this node's clearance was already measured exactly.
+            structuralClass:
+              clearance >= levels[calibration.nodeClassification.strongLevelIndex]
+                ? ('strong' as const)
+                : ('marginal' as const),
+          }
+        })
+        const regionId = (ring: ReadonlyArray<Pt>): string => contentHash(stableStringify({ ring }))
+        const structuralEvidence: SelectorResult['structuralEvidence'] = {
+          clearanceLevelsMM: levels,
+          levels: hierarchy.levels.map((level) => ({
+            clearanceLevelMM: level.clearanceLevelMM,
+            status: level.status,
+            envelopeOmissionBoundMM: level.envelope.omissionBoundMM,
+            regionCount: level.nodes.length,
+            witnessCount: level.witnessesMM.length,
+            collapsed: level.collapsed,
+          })),
+          regions: hierarchy.levels.flatMap((level, levelIndex) =>
+            level.nodes.map((node) => ({
+              regionId: regionId(node.ringMM),
+              levelIndex,
+              widthFloorMM: node.widthFloorMM,
+              areaMM2Lo: node.areaMM2Lo,
+              areaMM2Hi: node.areaMM2Hi,
+              persistenceLevels: node.persistenceLevels,
+              parentStatus: node.parentStatus,
+              parentRegionId:
+                node.parentStatus === 'RESOLVED' && node.parentIndex !== null
+                  ? regionId(hierarchy.levels[levelIndex - 1].nodes[node.parentIndex].ringMM)
+                  : null,
+            })),
+          ),
+          witnessIds: hierarchy.levels.flatMap((level) =>
+            level.witnessesMM.map((witness) => contentHash(stableStringify({ witness }))),
+          ),
+        }
+        const minimumEdgeClearanceMM = nodes.length
+          ? Math.min(...nodes.map((node) => node.edgeClearanceMM))
+          : 0
+        const undecided = APPROVED_ORDER.filter(
+          (orderStep) => evidence[orderStep.key].status === 'DECISION_INDETERMINATE',
+        )
+        const classificationCertain = nodes.every((node) => node.structuralClass !== 'indeterminate')
+        const magnetCentresMM = placed.grid.anchors.map((anchor) => [anchor.p[0], anchor.p[1]] as Pt)
+        // The evidence hash covers the evidence AS EMITTED — whole descriptor records, the structural
+        // evidence and the feasibility, not a handful of scalars read off them.
+        // ONE object, hashed and emitted. Hashing the object itself rather than an APPROVED_ORDER map
+        // keeps ABSENCE canonical: a priority the chain never reached is a missing key, not a present
+        // key holding undefined, and that distinction is part of the identity.
+        const selectionTrace = { stoppedAt: chain.stoppedAt, chain: chain.evidence }
+        const evidenceHash = contentHash(
+          stableStringify({
+            feasibility: attemptFeasible.status,
+            envelope: attemptFeasible.envelope,
+            measuredAt: placed.originMM,
+            structuralEvidence,
+            emitted: APPROVED_ORDER.map((orderStep) => [orderStep.key, evidence[orderStep.key]]),
+            // The chain the selection ran on, not only what was re-measured at the answer.
+            selectionTrace,
+            // The APPLIED policy, not just the measured reach it was applied to.
+            unsupportedExtentPolicy,
+          }),
+        )
+        const result: SelectorResult = {
+          exactWidthMM: widthMM,
+          exactHeightMM: heightMM,
+          // The uniform scale relative to the SUPPLIED source contour, not the target size.
+          scaleFactor: sourceDominantMM > 0 ? sizeMM / sourceDominantMM : 1,
+          axisClassX,
+          axisClassY,
+          band: band.band,
+          nodeFrame: frame,
+          registrationOffsetMM: placed.originMM,
+          patternId: template.name,
+          nodeAddresses: nodes.map((node) => node.address),
+          magnetCentresMM,
+          minimumEdgeClearanceMM,
+          nodes,
+          supportedRegionCount: majorSupportRegions.length,
+          distinctMassCount: distinctMasses.length,
+          hierarchyCertain,
+          structuralEvidence,
+          unsupportedExtentPolicy,
+          selectionTrace,
+          coverage: evidence.coverage,
+          upperHangingMass: evidence.upperHangingMass,
+          unsupportedExtent: evidence.unsupportedExtent,
+          peelLeverage: evidence.peelLeverage,
+          distribution: evidence.distribution,
+          distributionVariance: evidence.distributionVariance,
+          balance: evidence.balance,
+          feasibility: attemptFeasible.status,
+          // PROOF COVERS THE WHOLE FUNNEL, not the descriptors alone.
+          proofStatus:
+            undecided.length === 0 &&
+            classificationCertain &&
+            safeCoreCertain &&
+            attemptFeasible.status === 'PROVED_FEASIBLE' &&
+            chain.stoppedAt === null &&
+            bracketViolations.length === 0
+              ? 'CERTIFIED'
+              : 'INDETERMINATE',
+          decisionReasons: [
+            `funnel: axis classes ${axisClassX}/${axisClassY} → band ${band.band} → cell ${cell.source} → frame ${frame.across}x${frame.down} → permitted pattern ${template.name}`,
+            chain.stoppedAt
+              ? `restriction stopped at ${chain.stoppedAt}; later priorities did not decide it`
+              : 'restriction ran the whole order; the published registration owns every value',
+            `values re-measured at the quantised registration ${placed.originMM.join(',')}`,
+            unsupportedExtentPolicy.outcome === 'TRIVIAL_LIMB_EXEMPT'
+              ? `P4 at ${activeLimitMM}mm: trivial-limb exemption reported for ${unsupportedExtentPolicy.exemptedSides
+                  .map((entry) => `${entry.side} ${entry.reachMM.toFixed(3)}mm`)
+                  .join(', ')} — no major support region reaches past the limit`
+              : `P4 at ${activeLimitMM}mm: every side within the limit`,
+            ...(bracketViolations.length
+              ? bracketViolations.map((violation) => `bracket violation: ${violation}`)
+              : ['every published value lies inside the bracket its restriction certified']),
+          ],
+          rejectionReasons: bracketViolations.length ? ['DECISION_INDETERMINATE'] : [],
+          canonicalProximityMM: Math.hypot(
+            placed.originMM[0] - canonical[0],
+            placed.originMM[1] - canonical[1],
+          ),
+          identity: {
+            sourceGeometryHash,
+            sizeMM,
+            population: magnetCentresMM.length,
+            originParity: { across: parityOf(frame.across), down: parityOf(frame.down) },
+            frame: `${frame.across}x${frame.down}`,
+            patternVariant: template.name,
+            registrationMM: placed.originMM,
+            profileHash,
+            evidenceHash,
+            // Filled ONCE, after the decision reasons land — the payload is not complete until then,
+            // and a self-hash cannot include itself. A candidate that does not survive is never
+            // published, so it never needs one.
+            resultHash: '',
+          },
+        }
+        return {
+          kind: 'ok',
+          candidate: { variant, result, chain: chain.evidence, stoppedAt: chain.stoppedAt },
+          violations: bracketViolations,
+        }
       }
 
-      const variant = variantFrom(
-        spec,
-        calibration,
-        band,
-        contour,
-        sizeMM,
-        spec.grid.basePitchMM,
-        'standard',
-        placed.grid,
-        template.name,
-      )
-      if (!variant) {
-        rejections.push({ sizeMM, patternId: template.name, reasons: ['NO_LAWFUL_REGISTRATION'] })
+      // FIRST PASS.
+      const first = runAttempt(feasible)
+      if (first.kind === 'reject') {
+        rejections.push({ sizeMM, patternId: template.name, reasons: [first.reason] })
         continue
       }
 
-      const nodes: NodeEvidence[] = placed.grid.anchors.map((anchor, index) => {
-        const [across, down] = template.steps[index] ?? [0, 0]
-        const clearance = distanceToPreparedContour(anchor.p, prepared)
-        // LEGAL BY CONSTRUCTION: quantiseAndValidateRegistration re-proved every disc through the
-        // exact door and throws otherwise, so reaching here IS the proof. No epsilon is invented to
-        // re-decide what the door already settled; the measured clearance is reported as evidence.
-        return {
-          address: { across, down },
-          centreMM: [anchor.p[0], anchor.p[1]] as Pt,
-          edgeClearanceMM: clearance,
-          legality: 'legal' as const,
-          // STRONG OR MARGINAL FROM THE NODE'S OWN EXACT CLEARANCE, against the authored deep
-          // threshold. Membership in a conservative deep-level POLYGON answered a different
-          // question — whether a disc of that radius fits somewhere containing this point — and
-          // made every node indeterminate whenever that polygon could not be certified, although
-          // this node's clearance was already measured exactly.
-          structuralClass:
-            clearance >= levels[calibration.nodeClassification.strongLevelIndex]
-              ? ('strong' as const)
-              : ('marginal' as const),
+      /**
+       * ONE BOUNDED EXACT-WITNESS REFINEMENT, and only when the first answer failed its own
+       * brackets.
+       *
+       * T4's own method: refine and retain EXACT boundary witnesses. A quantised origin can miss a
+       * bracket by a hair; the closed one-quantum neighbourhood is examined for a point that does
+       * not. No single cause is attributed — the construction's error is not bounded by any proof
+       * available here. That is a MEASURED LOCAL refinement,
+       * not a claim that these eight neighbours are every candidate the geometry entitles — no such
+       * global bound is proved, and none is asserted here. Each neighbour is proven through the
+       * SAME construction door, added to the ORIGINAL feasible set as an exact witness, and the
+       * SAME chain runs once more. No loop, no second selector, no widened guard: if the retry does
+       * not clear every bracket, the honest indeterminate first answer is what publishes.
+       */
+      let published = first
+      if (first.violations.length) {
+        const q = CONTINUOUS_REGISTRATION_QUANTUM_MM
+        // THE SAME LATTICE ENCODING THE DECODE USES: multiply, round, divide. Dividing by the
+        // quantum and multiplying back is the round trip already corrected in continuous-feasibility.
+        const scale = 1 / q
+        const onLattice = (value: number): number => Math.round(value * scale) / scale
+        const origin = first.candidate.result.registrationOffsetMM
+        const refined: Pt[] = []
+        for (const dx of [-1, 0, 1])
+          for (const dy of [-1, 0, 1]) {
+            if (dx === 0 && dy === 0) continue
+            const neighbour: Pt = [onLattice(origin[0] + dx * q), onLattice(origin[1] + dy * q)]
+            try {
+              quantiseAndValidateRegistration(prepared, neighbour, template.steps, spec.grid.basePitchMM, {
+                paddingMM: spec.grid.paddingMM,
+                plan: calibration.plan,
+                perimeterOnly: true,
+              })
+              refined.push(neighbour)
+            } catch {
+              // Illegal by construction one quantum away. Rejected by the exact door, not counted.
+            }
+          }
+        if (refined.length) {
+          const retry = runAttempt({
+            ...feasible,
+            exactWitnessesMM: [...feasible.exactWitnessesMM, ...refined],
+          })
+          if (retry.kind === 'ok' && retry.violations.length === 0) published = retry
         }
-      })
-      const regionId = (ring: ReadonlyArray<Pt>): string => contentHash(stableStringify({ ring }))
-      const structuralEvidence: SelectorResult['structuralEvidence'] = {
-        clearanceLevelsMM: levels,
-        levels: hierarchy.levels.map((level) => ({
-          clearanceLevelMM: level.clearanceLevelMM,
-          status: level.status,
-          envelopeOmissionBoundMM: level.envelope.omissionBoundMM,
-          regionCount: level.nodes.length,
-          witnessCount: level.witnessesMM.length,
-          collapsed: level.collapsed,
-        })),
-        regions: hierarchy.levels.flatMap((level, levelIndex) =>
-          level.nodes.map((node) => ({
-            regionId: regionId(node.ringMM),
-            levelIndex,
-            widthFloorMM: node.widthFloorMM,
-            areaMM2Lo: node.areaMM2Lo,
-            areaMM2Hi: node.areaMM2Hi,
-            persistenceLevels: node.persistenceLevels,
-            parentStatus: node.parentStatus,
-            parentRegionId:
-              node.parentStatus === 'RESOLVED' && node.parentIndex !== null
-                ? regionId(hierarchy.levels[levelIndex - 1].nodes[node.parentIndex].ringMM)
-                : null,
-          })),
-        ),
-        witnessIds: hierarchy.levels.flatMap((level) =>
-          level.witnessesMM.map((witness) => contentHash(stableStringify({ witness }))),
-        ),
       }
-      const minimumEdgeClearanceMM = nodes.length
-        ? Math.min(...nodes.map((node) => node.edgeClearanceMM))
-        : 0
-      const undecided = APPROVED_ORDER.filter(
-        (orderStep) => evidence[orderStep.key].status === 'DECISION_INDETERMINATE',
-      )
-      const classificationCertain = nodes.every((node) => node.structuralClass !== 'indeterminate')
-      const magnetCentresMM = placed.grid.anchors.map((anchor) => [anchor.p[0], anchor.p[1]] as Pt)
-      // The evidence hash covers the evidence AS EMITTED — whole descriptor records, the structural
-      // evidence and the feasibility, not a handful of scalars read off them.
-      // ONE object, hashed and emitted. Hashing the object itself rather than an APPROVED_ORDER map
-      // keeps ABSENCE canonical: a priority the chain never reached is a missing key, not a present
-      // key holding undefined, and that distinction is part of the identity.
-      const selectionTrace = { stoppedAt: chain.stoppedAt, chain: chain.evidence }
-      const evidenceHash = contentHash(
-        stableStringify({
-          feasibility: feasible.status,
-          envelope: feasible.envelope,
-          measuredAt: placed.originMM,
-          structuralEvidence,
-          emitted: APPROVED_ORDER.map((orderStep) => [orderStep.key, evidence[orderStep.key]]),
-          // The chain the selection ran on, not only what was re-measured at the answer.
-          selectionTrace,
-          // The APPLIED policy, not just the measured reach it was applied to.
-          unsupportedExtentPolicy,
-        }),
-      )
-      const result: SelectorResult = {
-        exactWidthMM: widthMM,
-        exactHeightMM: heightMM,
-        // The uniform scale relative to the SUPPLIED source contour, not the target size.
-        scaleFactor: sourceDominantMM > 0 ? sizeMM / sourceDominantMM : 1,
-        axisClassX,
-        axisClassY,
-        band: band.band,
-        nodeFrame: frame,
-        registrationOffsetMM: placed.originMM,
-        patternId: template.name,
-        nodeAddresses: nodes.map((node) => node.address),
-        magnetCentresMM,
-        minimumEdgeClearanceMM,
-        nodes,
-        supportedRegionCount: majorSupportRegions.length,
-        distinctMassCount: distinctMasses.length,
-        hierarchyCertain,
-        structuralEvidence,
-        unsupportedExtentPolicy,
-        selectionTrace,
-        coverage: evidence.coverage,
-        upperHangingMass: evidence.upperHangingMass,
-        unsupportedExtent: evidence.unsupportedExtent,
-        peelLeverage: evidence.peelLeverage,
-        distribution: evidence.distribution,
-        distributionVariance: evidence.distributionVariance,
-        balance: evidence.balance,
-        feasibility: feasible.status,
-        // PROOF COVERS THE WHOLE FUNNEL, not the descriptors alone.
-        proofStatus:
-          undecided.length === 0 &&
-          classificationCertain &&
-          safeCoreCertain &&
-          feasible.status === 'PROVED_FEASIBLE' &&
-          chain.stoppedAt === null &&
-          bracketViolations.length === 0
-            ? 'CERTIFIED'
-            : 'INDETERMINATE',
-        decisionReasons: [
-          `funnel: axis classes ${axisClassX}/${axisClassY} → band ${band.band} → cell ${cell.source} → frame ${frame.across}x${frame.down} → permitted pattern ${template.name}`,
-          chain.stoppedAt
-            ? `restriction stopped at ${chain.stoppedAt}; later priorities did not decide it`
-            : 'restriction ran the whole order; the published registration owns every value',
-          `values re-measured at the quantised registration ${placed.originMM.join(',')}`,
-          unsupportedExtentPolicy.outcome === 'TRIVIAL_LIMB_EXEMPT'
-            ? `P4 at ${activeLimitMM}mm: trivial-limb exemption reported for ${unsupportedExtentPolicy.exemptedSides
-                .map((entry) => `${entry.side} ${entry.reachMM.toFixed(3)}mm`)
-                .join(', ')} — no major support region reaches past the limit`
-            : `P4 at ${activeLimitMM}mm: every side within the limit`,
-          ...(bracketViolations.length
-            ? bracketViolations.map((violation) => `bracket violation: ${violation}`)
-            : ['every published value lies inside the bracket its restriction certified']),
-        ],
-        rejectionReasons: bracketViolations.length ? ['DECISION_INDETERMINATE'] : [],
-        canonicalProximityMM: Math.hypot(
-          placed.originMM[0] - canonical[0],
-          placed.originMM[1] - canonical[1],
-        ),
-        identity: {
-          sourceGeometryHash,
-          sizeMM,
-          population: magnetCentresMM.length,
-          originParity: { across: parityOf(frame.across), down: parityOf(frame.down) },
-          frame: `${frame.across}x${frame.down}`,
-          patternVariant: template.name,
-          registrationMM: placed.originMM,
-          profileHash,
-          evidenceHash,
-          // Filled ONCE, after the decision reasons land — the payload is not complete until then,
-          // and a self-hash cannot include itself. A candidate that does not survive is never
-          // published, so it never needs one.
-          resultHash: '',
-        },
-      }
-      candidates.push({ variant, result, chain: chain.evidence, stoppedAt: chain.stoppedAt })
+
+      candidates.push(published.candidate)
     }
   }
 

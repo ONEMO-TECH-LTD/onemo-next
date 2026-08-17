@@ -32,7 +32,12 @@ import {
   selectUnsupportedExtentLimit,
   type CalibrationSpec,
 } from '../spec'
-import type { BandAnswer, SelectorResult, SizeVariant } from '../logic/judgement'
+import type {
+  BandAnswer,
+  SelectorResult,
+  ShapeJudgement,
+  SizeVariant,
+} from '../logic/judgement'
 
 const ring = (pts: Array<[number, number]>): Contour => ({ outer: { pts: pts as Pt[] }, holes: [] })
 
@@ -43,6 +48,28 @@ const rect = (widthMM: number, heightMM: number): Contour =>
     [widthMM, heightMM],
     [0, heightMM],
   ])
+
+/** The canon shapes, loaded once. The SAME door page.tsx uses: engineOutline, scaled to the box. */
+type CanonFixture = { outline: OutlineUV; box: { w: number; h: number } }
+const CANON = JSON.parse(
+  readFileSync('src/lib/grid-engine/__tests__/__fixtures-canon-shapes.json', 'utf8'),
+) as Record<string, CanonFixture>
+
+const solveCanon = (name: string): ShapeJudgement => {
+  const fixture = CANON[name]
+  expect(fixture).toBeDefined()
+  const contour: Contour = {
+    outer: {
+      pts: engineOutline(fixture.outline).map(
+        ([u, v]) => [u * fixture.box.w, v * fixture.box.h] as Pt,
+      ),
+    },
+    holes: [],
+  }
+  const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, contour)
+  expect(judged).not.toBeNull()
+  return judged!
+}
 
 /**
  * A SOLID BODY WITH ONE NARROW TERMINAL LIMB — the shape the ruled exemption exists for. The body
@@ -841,25 +868,8 @@ describe('the approved order', () => {
     // level and that level is INDETERMINATE_WITHIN_TOLERANCE and collapsed on these shapes. No
     // governing source equates a distinct MATERIAL mass with a component surviving 24mm; the masses
     // are the certified safe core, and P7 must receive them.
-    type CanonFixture = { outline: OutlineUV; box: { w: number; h: number } }
-    const canon = JSON.parse(
-      readFileSync('src/lib/grid-engine/__tests__/__fixtures-canon-shapes.json', 'utf8'),
-    ) as Record<string, CanonFixture>
-
     for (const name of ['pill', 'bat'] as const) {
-      const fixture = canon[name]
-      expect(fixture).toBeDefined()
-      const contour: Contour = {
-        outer: {
-          pts: engineOutline(fixture.outline).map(
-            ([u, v]) => [u * fixture.box.w, v * fixture.box.h] as Pt,
-          ),
-        },
-        holes: [],
-      }
-      const judged = solveCutout(RELEASED, RELEASED_CALIBRATION, contour)
-      expect(judged).not.toBeNull()
-      const b2 = judged!.bands.find((band) => band.band.band === 2)
+      const b2 = solveCanon(name).bands.find((band) => band.band.band === 2)
       expect(b2).toBeDefined()
       expect(b2!.variants.length).toBeGreaterThan(0)
 
@@ -905,6 +915,44 @@ describe('the approved order', () => {
       expect(node.structuralClass).toBe(node.edgeClearanceMM >= deepMM ? 'strong' : 'marginal')
       expect(node.structuralClass).not.toBe('indeterminate')
     }
+  })
+
+  it('refines an exact witness when the first quantised answer misses its own bracket', () => {
+    // PILL B2 published origin [12.95, 12.167] and then failed its own P2 coverage bracket — the
+    // chain certified full coverage and the re-price at that point returned zero. The bounded
+    // one-quantum refinement retries the same chain with the neighbouring lattice points admitted
+    // as exact witnesses; only a retry that clears EVERY bracket may publish.
+    const pill = solveCanon('pill').bands.find((band) => band.band.band === 2)!
+    expect(pill.variants.length).toBeGreaterThan(0)
+    const pillOffer = selectionOf(pill.variants[0])
+
+    // The answer now CERTIFIES, with the whole order run and no bracket violation reported.
+    expect(pillOffer.proofStatus).toBe('CERTIFIED')
+    expect(pillOffer.selectionTrace.stoppedAt).toBeNull()
+    expect(pillOffer.decisionReasons.join(' | ')).not.toContain('bracket violation')
+    expect(pillOffer.rejectionReasons).toHaveLength(0)
+    expect(pill.decisionState).toBe('CERTIFIED_WINNER')
+
+    // PRECONDITION THAT MAKES IT NON-VACUOUS: the published origin is no longer the point that
+    // failed. If the retry had not moved it, this would still be [12.95, 12.167].
+    const moved =
+      pillOffer.registrationOffsetMM[0] !== 12.95 || pillOffer.registrationOffsetMM[1] !== 12.167
+    expect(moved).toBe(true)
+    // And every published value still sits inside the bracket its own restriction certified.
+    for (const key of ORDER) {
+      const promised = chainOf(pillOffer, key)
+      expect(promised).toBeDefined()
+      const published = pillOffer[key]
+      if (promised!.direction === 'minimize')
+        expect(published.hi).toBeLessThanOrEqual(promised!.hi + slack(promised!.hi))
+      else expect(published.lo).toBeGreaterThanOrEqual(promised!.lo - slack(promised!.lo))
+    }
+
+    // BAT B2 must still certify, and the whole answer must be reproducible byte for byte.
+    const batBand = solveCanon('bat').bands.find((band) => band.band.band === 2)!
+    expect(batBand.decisionState).toBe('CERTIFIED_WINNER')
+    expect(selectionOf(batBand.variants[0]).proofStatus).toBe('CERTIFIED')
+    expect(JSON.stringify(solveCanon('bat'))).toBe(JSON.stringify(solveCanon('bat')))
   })
 
   it('says undecided, not empty, when the structure cannot certify', () => {
