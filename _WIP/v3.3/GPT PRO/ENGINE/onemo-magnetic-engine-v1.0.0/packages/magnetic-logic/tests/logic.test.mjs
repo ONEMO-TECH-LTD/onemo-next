@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildCertifiedBandOffers, buildEngineManufacturingPayload, buildStructuralEvidence, certifySizeSolution, classifyAxis, clearSolverCaches, completeFulfilmentSpec, createEngineManufacturingSpec, createReferenceProfile,
   criterionDescriptor, currentManufacturingVerificationResolver, LOGIC_ARTIFACT_HASH, permittedPatterns, ProfileRegistry, registerProfile, selectedOffer,
-  selectDiscreteIdentity, solveOutline, validatePhysicalComponentProfile, verifyEngineManufacturingSpec
+  selectDiscreteIdentity, solveOutline, validatePhysicalComponentProfile, verifyEngineManufacturingSpec, majorRegionEvidence
 } from '../dist/src/index.js';
 import * as logic from '../dist/src/index.js';
 import {canonicalHash,evaluateRegionCriterionOnBoxes,preparePolygon} from '../../geometry-compute/dist/src/index.js';
@@ -205,13 +205,21 @@ test('continuous certification reports indeterminate instead of guessing when me
   assert.ok(result.reasons.includes('CRITERION_SCORE_UNCERTAIN'));
 });
 
-test('unresolved sampled component structure propagates as decision indeterminate',()=>{
+test('34mm square keeps its exact two-level persistent major classification',()=>{
   const raw=editableReference();
   raw.structural={...raw.structural,sampleStepMm:6,forceLargestComponentMajor:false};
-  const result=certifySizeSolution({outlineMm:rectangle(34,34),profile:registerProfile(raw),targetDominantMm:34});
-  assert.equal(result.status,'DECISION_INDETERMINATE');
-  assert.ok(result.reasons.includes('STRUCTURAL_EVIDENCE_UNCERTAIN'));
-  assert.ok(result.reasons.includes('COMPONENT_TOPOLOGY_UNCERTAIN'));
+  const evidence=buildStructuralEvidence(preparePolygon(rectangle(34,34),{quantumMm:.01}),registerProfile(raw));
+  assert.equal(evidence.status,'CERTIFIED');
+  assert.deepEqual(evidence.classifications.map(classification=>classification.class),['MAJOR']);
+  assert.deepEqual(evidence.classifications[0].persistenceLevels,{lower:2,upper:2});
+});
+
+test('non-topology major evidence stays bound to its certified persistent inner core',()=>{
+  const ring=[{x:-40,y:-30},{x:40,y:-30},{x:40,y:30},{x:8,y:30},{x:8,y:70},{x:-8,y:70},{x:-8,y:30},{x:-40,y:30}];
+  const evidence=buildStructuralEvidence(preparePolygon(ring,{quantumMm:.01}),createReferenceProfile());
+  assert.equal(evidence.status,'CERTIFIED');assert.equal(evidence.classifications[0].class,'MAJOR');assert.equal(evidence.classifications[0].component.topologyCertified,false);
+  const region=majorRegionEvidence(evidence)[0];assert.equal(region.exactWitnessPoints.length,1);
+  assert.ok(region.definitelyOccupiedCellKeys.size>0);
 });
 
 test('possible-cell bridge makes structural region authority indeterminate',()=>{

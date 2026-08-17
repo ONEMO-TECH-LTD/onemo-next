@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { Clipper, EndType, FillRule, JoinType } from '@countertype/clipper2-ts'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createEngineManufacturingSpec,
   createReferenceProfile,
@@ -16,6 +17,7 @@ import {
 } from '@onemo/magnetic-next'
 import { verifyManufacturingSpecAction } from '../actions'
 import { toMagneticStudioOutline } from '../engine-boundary'
+import { engineOutline } from '@/lib/grid-engine/ui/trace-cutout'
 
 type Fixture = {
   outline: Array<[number, number]>
@@ -50,7 +52,7 @@ const singleRungProfile = () => {
 describe('v3.3 host authority boundaries', () => {
   it.each(Object.entries(fixtures))('%s reaches a certified selectable offer through the public host boundary', async (_name, fixture) => {
     const profile = createReferenceProfile()
-    const submitted = toMagneticStudioOutline(fixture.outline, fixture.box)
+    const submitted = toMagneticStudioOutline(fixture.outline, fixture.box, profile.numeric)
     const solve = await solveOutline({ outlineMm: adaptStudioOutline(submitted), profile })
     const offer = solve.offers.find((candidate) => candidate.status === 'OFFERED')
     const offerSummary = solve.offers.map(({ band, status, reasons }) => ({ band, status, reasons }))
@@ -63,6 +65,60 @@ describe('v3.3 host authority boundaries', () => {
       expect.objectContaining({ valid: true }),
     )
   }, 120_000)
+
+  it('uses the minimum contained PILL engine-copy offset', () => {
+    const fixture = fixtures.pill
+    const profile = createReferenceProfile()
+    const scale = 1 / profile.numeric.coordinateQuantumMm
+    const path = (outline: Fixture['outline']) => outline.map(([u, v]) => ({
+      x: Math.round(u * fixture.box.w * scale),
+      y: Math.round(v * fixture.box.h * scale),
+    }))
+    const raw = path(fixture.outline)
+    const copy = path(engineOutline(fixture.outline))
+    const offset27 = Clipper.inflatePaths([copy], -27, JoinType.Round, EndType.Polygon, 2, 0.25)
+    const offset28 = Clipper.inflatePaths([copy], -28, JoinType.Round, EndType.Polygon, 2, 0.25)
+
+    expect(offset27).toHaveLength(1)
+    expect(Clipper.difference(offset27, [raw], FillRule.NonZero)).not.toHaveLength(0)
+    expect(offset28).toHaveLength(1)
+    expect(Clipper.difference(offset28, [raw], FillRule.NonZero)).toHaveLength(0)
+    expect(toMagneticStudioOutline(fixture.outline, fixture.box, profile.numeric)).toEqual(
+      offset28[0]!.map(({ x, y }) => ({
+        x: x * profile.numeric.coordinateQuantumMm,
+        y: y * profile.numeric.coordinateQuantumMm,
+      })),
+    )
+  })
+
+  it('fails closed when the ruled inward-offset budget is exhausted', () => {
+    const fixture = fixtures.pill
+    const profile = createReferenceProfile()
+    const inflate = vi.spyOn(Clipper, 'inflatePaths').mockReturnValue([])
+    try {
+      expect(toMagneticStudioOutline(fixture.outline, fixture.box, profile.numeric)).toHaveLength(
+        fixture.outline.length,
+      )
+    } finally {
+      inflate.mockRestore()
+    }
+  })
+
+  it('rejects a non-empty sub-quantum outside difference', () => {
+    const outline: Fixture['outline'] = [[0, 0], [1, 0], [1, 1], [0, 1]]
+    const box = { w: 100, h: 100 }
+    const profile = createReferenceProfile()
+    const difference = vi.spyOn(Clipper, 'difference').mockReturnValue([
+      [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }],
+    ])
+    try {
+      expect(toMagneticStudioOutline(outline, box, profile.numeric)).toEqual([
+        { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 },
+      ])
+    } finally {
+      difference.mockRestore()
+    }
+  })
 
   it('the server action parses, resolves and rejects a rehashed physical-policy tamper', async () => {
     const profile = singleRungProfile()

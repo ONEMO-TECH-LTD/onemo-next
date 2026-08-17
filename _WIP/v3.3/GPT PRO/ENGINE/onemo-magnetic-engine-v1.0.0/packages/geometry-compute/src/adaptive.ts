@@ -112,7 +112,7 @@ function rectangularFeasibleTranslations(polygon:PreparedPolygon,offsets:readonl
   for(const offset of offsets){minX=Math.max(minX,polygon.metrics.bounds.minX+radius-offset.x);maxX=Math.min(maxX,polygon.metrics.bounds.maxX-radius-offset.x);minY=Math.max(minY,polygon.metrics.bounds.minY+radius-offset.y);maxY=Math.min(maxY,polygon.metrics.bounds.maxY-radius-offset.y);}
   if(minX>maxX+1e-12||minY>maxY+1e-12)return Object.freeze({domain,insideBoxes:Object.freeze([]),boundaryBoxes:Object.freeze([]),witnessPoints:Object.freeze([]),status:'INFEASIBLE_CERTIFIED',toleranceMm,cellsVisited:1,maxDepthReached:0,exactness:'EXACT'});
   const bounds={minX:Math.min(minX,maxX),minY:Math.min(minY,maxY),maxX:Math.max(minX,maxX),maxY:Math.max(minY,maxY)},box=makeBox(bounds,0,'INSIDE');
-  const witnesses:Point[]=[];const seen=new Set<string>();for(const candidate of candidatePointsForBox(bounds,canonicalTarget)){const point=snappedPoint(candidate,polygon),key=`${point.x},${point.y}`;if(seen.has(key))continue;seen.add(key);if(exactPatternLegal(polygon,offsets,point,radiusMm))witnesses.push(point);}
+  const witnesses:Point[]=[];for(const candidate of candidatePointsForBox(bounds,canonicalTarget)){const point=snappedPoint(candidate,polygon);if(exactPatternLegal(polygon,offsets,point,radiusMm)){witnesses.push(point);break;}}
   return Object.freeze({domain,insideBoxes:Object.freeze([box]),boundaryBoxes:Object.freeze([]),witnessPoints:Object.freeze(witnesses),status:witnesses.length?'FEASIBLE':'INDETERMINATE_WITHIN_TOLERANCE',toleranceMm,cellsVisited:1,maxDepthReached:0,exactness:witnesses.length?'EXACT':'INDETERMINATE'});
 }
 
@@ -146,18 +146,17 @@ export function adaptiveFeasibleTranslations(
   if(resourceExhausted){
     for(let index=cursor;index<queue.length;index++){const item=queue[index]!;boundary.push(makeBox(item.bounds,item.depth,'BOUNDARY'));}
   }
-  const witnesses:Point[]=[]; const seen=new Set<string>();
+  const witnesses:Point[]=[];
   const witnessIterations=options.witnessIterations??12;
-  for(const box of [...inside,...boundary]){
+  const witnessBoxes=inside.length?[inside[0]!]:boundary;
+  witnessSearch:for(const box of witnessBoxes){
     const seeds=candidatePointsForBox(box,canonicalTarget);
     if(box.status==='BOUNDARY')seeds.unshift(improveWitness(polygon,offsets,radiusMm,box,boxCentre(box),witnessIterations));
     for(const seed of seeds){
-      const point=snappedPoint(seed,polygon); const key=`${point.x},${point.y}`;
-      if(seen.has(key))continue; seen.add(key);
-      if(exactPatternLegal(polygon,offsets,point,radiusMm))witnesses.push(point);
+      const point=snappedPoint(seed,polygon);
+      if(exactPatternLegal(polygon,offsets,point,radiusMm)){witnesses.push(point);break witnessSearch;}
     }
   }
-  witnesses.sort((a,b)=>a.x-b.x||a.y-b.y);
   let status:FeasibleTranslationSet['status'];
   if(inside.length>0||witnesses.length>0)status='FEASIBLE';
   else if(boundary.length===0&&!resourceExhausted)status='INFEASIBLE_CERTIFIED';
