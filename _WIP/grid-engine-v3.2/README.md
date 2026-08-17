@@ -1,22 +1,20 @@
 # grid-engine v3.2
 
-`canon/` is what governs. `audit/` is the live evidence and the working contract.
-`99-archive/` is everything else, kept as provenance only — process documents,
+`canon/` is what governs — **two documents, named by Dan, and nothing else.**
+`plans/plan-and-contract.md` is the live engine contract built from them.
+`audit/` is the live evidence. `99-archive/` is provenance only — process documents,
 superseded plans, QA reports and captured frames. Nothing in the archive may create
-work or a gate.
+work or a gate, and neither may `FINAL-CONSOLIDATED-PROPOSAL.md`, which is superseded.
 
 **Authority order** (logic-spec §5, verbatim): Dan's rulings → the ONEMO Compute System
 doc *("latest, has more power")* → `grid-laws.md` → measured physics. The v3 law book in
 `_WIP/grid-engine-v3/` ranks **third** and is superseded wherever it conflicts with the
 Product Base — two lanes have already had to withdraw findings taken from it.
 
-## canon
+## canon — two documents, and only these two
 
-- **`FINAL-CONSOLIDATED-PROPOSAL.md`** — the governing execution plan, T0 through T9.
-  Owner s62-grid-meta-qa. Copied here from
-  `onemo-next/.codex/worktrees/s62-grid-meta-qa-be3df7f9/_WIP/grid-engine-v3.2/`,
-  byte-identical at sha256 `0e166be8a1f3f9d5…`. If that lane amends it, re-copy; the
-  Codex worktree remains the origin.
+Dan, 2026-08-17: *"these 2 are canon."* Nothing else in this folder is canon, however
+useful. An execution plan is not canon; a donor spec is not canon; a transcript is not canon.
 
 - **`ONEMO Magnetic Grid Compute System — Product Base and Logic Architecture.md`** —
   the Product Base. §§4-6 classification, §8 structure, §11 the selection order,
@@ -26,8 +24,25 @@ Product Base — two lanes have already had to withdraw findings taken from it.
   (Dan's words, source cited), **[DERIVED]** (a reading offered for veto) or **[OPEN]**
   (named, undecided). Read the marker before treating a clause as authority.
 
+## Not canon — at this folder's root
+
+- **`plans/plan-and-contract.md`** — **the live engine contract.** This is what governs
+  the build. Owner s62-grid-qa.
+
+- **`FINAL-CONSOLIDATED-PROPOSAL.md`** — **SUPERSEDED, 2026-08-17.** The prior v3.2
+  execution plan, T0 through T9, owner s62-grid-meta-qa. It was executed and the result
+  regressed the engine it was built to perfect; the three audits in `audit/` measured that
+  from three separate worktrees. Superseded by `plans/plan-and-contract.md`. It may not
+  create work or a gate. Kept as provenance, and still load-bearing for one thing: its
+  "Governing boundary" section carries the **v3.3 donor rule** — a mechanism may cross from
+  v3.3.1 only when a named task requires it, the v3.2 substrate lacks it, and it passes that
+  task's own gate.
+
 - **`R3-specs/`** — donor, not canon (Dan 2026-08-17). Neutral certification mechanics
   only. Cannot require, disable, or hold product work.
+
+- **`audit/`** — the live evidence: three independent canon audits of the shipped engine,
+  the lead audit of the contract, and the v3.3.1 donor audit.
 
 - **`../ChatGPT-Grid and Band Logic-20260816-1022.md`** (at this folder's root, not inside
   `canon/`) — the founding GPT Pro conversation the Product Base was derived from. Dan
