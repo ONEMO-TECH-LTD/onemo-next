@@ -280,3 +280,75 @@
 - Exact current production route proves `closeFrac: 0` is insufficient: the near-returning U changes 12,247/15,376 loop-interior pixels and visibly leaves only the car's front section. `finishMask → traceContourRaw` drops the ribbon's inner contour, turning it into a filled negative before Paper subtraction.
 - The committed oracle passes the destructive result because its local box covers the loop interior and its node assertion permits reduction. Default CLASSIC Undo also remains 455 pixels non-exact; Redo is exact.
 - Focused 47, serialized 548/10, typecheck/lint/diff/build, byte-exact closure, preservation, original output and raw Chromium/WebKit GrabCut pass. Necessity: no new owner. Sufficiency: partial on ribbon topology and CLASSIC history. QA returns KAI-10285 to Builder; no product source edit.
+
+# 2026-08-11 — KAI-10285 `482bac6c…` QA REVISE
+
+- The simpler solid-mask rewrite deletes the failed Paper/vector-negative branch and passes 548/10, typecheck/lint/diff/build, byte-exact closure, raw Chromium/WebKit GrabCut, internal no-op and ordinary carve proofs.
+- It does not fix Dan's rejected screenshot case. The exact default-CLASSIC near-returning journey again changes 12,247/15,376 loop-interior pixels and visibly leaves only the car's front; that loss count is identical to `d63a2a6c…`.
+- `fillEnclosedHoles` cannot restore a near-loop interior that remains exterior-reachable. The committed oracle avoids the failure by preconditioning the recipe and allowing 10,000 off-box changed pixels.
+- Necessity: keep the simpler owner; shrink the proof. Sufficiency: partial. Add the exact screenshot journey and retain the actual main blob/local boundary only. KAI-10285 returns to Builder; no product source edit or QA snapshot push.
+
+# 2026-08-12 — KAI-10285 `95162cc8…` QA REVISE
+
+- The visible failure is repaired independently: default-CLASSIC near-loop is a zero-pixel/no-history rejection; shallow boundary carve is local; Undo is exact and Redo Save is byte-exact; all 551/10 static and Chromium/WebKit gates pass.
+- One source blocker remains: the solid proxy drops an allowed small detached residual, but `paintMask` ignores that retained-primary result and accepts the raw mask subtraction. The vector/output clip has one blob while the accepted/history/export mask can retain a hidden second component.
+- Smallest rework is accepted-mask topology only plus one-component proof. No new engine/UI/provider/route/GrabCut change. KAI-10285 returns to Builder; no QA product edit or snapshot push.
+
+# 2026-08-12 — KAI-10285 `b2734220…` QA source checkpoint
+
+- Exact local/upstream snapshot pinned; Linear is In QA review. Full-read the bounded four-file correction.
+- The existing retained-primary topology now gates the original accepted mask before storage/history/export; destructive split rejection and visible Paper behavior are unchanged. Source trace reaches `exportResult` through the exact stored mask.
+- Necessity is clean. Independent binary+soft residual proof, full gates, closure regeneration, browser oracles and exact-current visual observation remain before the QA-only verdict.
+
+# 2026-08-12 — KAI-10285 `b2734220…` QA gate checkpoint
+
+- Independent topology probe proves the hidden detached binary+soft residual is removed, surviving bytes stay exact, and the stored mask has one component. Source trace confirms that exact mask is stored, historied and hashed by `exportResult`.
+- Full 552/10 suite, typecheck/lint/diff/build, byte-exact closure, and all five current Chromium/WebKit oracles pass.
+- Exact-current production route at serving/local/upstream `b2734220…` visibly retains CLASSIC and one smooth local notch; Undo is exact and Redo Save is byte-identical. Near-loop destruction is rejected with zero loop-interior loss and no history.
+- Final necessity/sufficiency audit and QA-only closure remain.
+
+# 2026-08-12 — KAI-10285 `b2734220…` QA CLEAR
+
+- QA CLEAR on exact local/upstream snapshot. The hidden accepted/export-mask residual is removed in binary and soft channels; source/runtime/history/export trace is complete.
+- Full static/build/closure/browser/current-route gates pass. Necessity: no unnecessary elements. Sufficiency: full.
+- Durable verdict: `_WIP/context/QA-space/reviews/KAI-10285-b2734220-qa-clear.md`. Session 62 closes this task on QA; no Meta.
+
+# 2026-08-12 — KAI-10285 superseding Paint recovery in progress
+
+- Plan-first gate enforced after drift: Builder had already modified product/oracle files and run build/runtime before presenting the corrected complete plan. QA issued STOP-NOW; tree preserved as-is. No implementation is accepted until Builder presents the full source-matched minimal plan and QA explicitly agrees.
+- Builder plan v1 is REVISE: reject its local `fitCubicsOpen` Paint vectorizer. Any justified new seam may only splice two outputs of the existing shared Vector resolver, with no double resolution; exact mask/resolved state/recipe/history, explicit Upload/Clear ownership reset, full local smoothing semantics, and custom-preset replay remain required.
+- Owner rule pinned: AI/GrabCut may receive automatic presets; every newly created Paint shape receives the real shared Vector `ZERO` preset, with Detail/Offset/Simplify/Smooth/Radius truthfully shown as exact `0/0/0/0/0`. Brush/loop, Autotune, and Mask smoothing create its initial mask, but Paint remains wired to the same shared Vector resolver. Any later control, named-preset, or custom-setting change recalculates Paint exactly as it does AI/GrabCut. A Paint bypass, inherited CLASSIC, or hidden Simplify 15 is forbidden.
+- Locked recovery uses `e8cf49b9…` architecture, deletes the `982504db…b2734220` special eraser chain, makes fresh Paint Vector exactly zero, retains deliberate later shared-Vector changes, and normalizes erase only across the actual new cut-boundary band.
+- QA retired its obsolete untracked mask-topology probe after the agreed owners were deleted; no product or Builder file was touched.
+- Builder gates are not final. The real-route boundary gesture still targeted an unproven outline component; product changes are held while the oracle derives the main connected contour. The raw-cut-retention line also needs focused proof.
+
+# 2026-08-12 — KAI-10285 exact solution hypothesis sent for independent verification
+
+- QA full-read Builder plan SHA `7751872…` and relevant current Flow/vector-core source. The plan is close but needed explicit atomic publication and deep-cloned history rules.
+- QA sent Builder a concrete nine-clause solution hypothesis rather than another open-ended correction. Builder was explicitly told not to accept it blindly: verify against source and actual resolver outputs, then return `VERIFIED PLAN` or exact disproof/correction.
+- Only the isolated generic splice feasibility proof is potentially authorised next. It must use real shared-resolver ZERO plus named/CUSTOM output pairs, prove continuous closed local replacement with exact off-band baseline geometry, then stop before Flow/history work. No alternate fitter/trace/Paper/Clipper path is authorised.
+
+# 2026-08-12 — KAI-10285 corrected plan agreed; seam-only gate active
+
+- Builder independently corrected the QA hypothesis; QA verified the corrections in source rather than demanding blind acceptance.
+- Locked corrections: open erase swath; first Paint add over accepted base; mask-derived old/new preparation parity; approximate cubic projection with exact split only; fully atomic final publication; deep-cloned drawn plus override history; mechanism-specific cleanup.
+- Builder may update the same plan, then edit only the generic vector-core splice seam and focused fixtures from actual ZERO and named/CUSTOM resolver output pairs. It must stop and report the feasibility result before any Flow/history/mask-tools/oracle/closure work.
+- Failure to obtain continuous coincident local endpoints is GAP. No bridge, fitter, trace, Paper, Clipper, or alternate architecture is authorised.
+
+# 2026-08-12 — KAI-10285 first seam GAP rejected: proof did not execute real pairs
+
+- Focused synthetic tests and typecheck pass, but Builder's real-pair test stores only hashes and prior distance constants; it never constructs real VShapes or calls the seam.
+- Current seam matches independent path crossings of the rectangular edit band. The agreed feasibility question is whether baseline and candidate curves mutually intersect twice inside that band. These are not equivalent.
+- Builder is restricted to correcting the seam proof: bracket/refine mutual curve intersections inside the band and run actual persisted/deterministically generated ZERO plus named/CUSTOM resolved pairs. Exactly two usable intersections or a source-proven GAP; no bridge or alternate geometry path.
+- Canonical contract `c63f70e…` plus later owner corrections must be named in the plan. Flow/history/mask-tools/browser oracles/closure remain frozen.
+
+# 2026-08-12 — KAI-10285 shared execution goal reset
+
+- Dan directed exact product/test rollback to `e8cf49b9…`; independent comparison confirms `scripts` and `src` are byte-identical to that baseline and contain no splice residue.
+- One shared authority now governs Builder and QA: `QA-space/contracts/KAI-10285-shared-execution-goal.md` plus canonical contract `c63f70e…`.
+- Scope is only the inherited mask-local Paint erase correction and first-Paint shared `ZERO 0/0/0/0/0`, with later controls using the existing shared resolver. Seam/override/history redesign and global resolved-vector locality are forbidden.
+
+# 2026-08-12 — KAI-10285 reduced implementation freeze
+
+- Core repair is implemented and bounded; focused Paint tests and typecheck pass.
+- QA stopped a new unproven erase-rejection heuristic introduced while stabilising the browser gesture. Builder must remove it, retain the already-sufficient exterior/component/destructive checks, and complete one bounded browser pass without further product changes.

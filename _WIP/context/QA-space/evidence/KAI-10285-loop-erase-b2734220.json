@@ -1,0 +1,29 @@
+{
+  "snapshot": "b2734220e08d33fc05a34a6e2325c0d52d70afe1",
+  "variant": "loop",
+  "acceptedPreset": "CLASSIC",
+  "erasedPreset": "CLASSIC",
+  "before": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "6f90e9c4a8900af82c05df62a781e4148e710ecff30169f11de7aa57c9867de9",
+    "pngSha256": "36d1a1525efa7e13d3d912005a82459e093b301a583fbe393c174e9b9b3da7f9",
+    "settleReads": 3
+  },
+  "erased": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "3a27ec4648ec9035763b19a9c7cfda3c2e1bac2224786e4e3fec9b6cf2f8f48e",
+    "pngSha256": "6212f5b97812c2ff6be6985d2ad967ee4a81fe1e17e4370d0cf0c6851ae266c1",
+    "settleReads": 3
+  },
+  "changedAfterErase": 455,
+  "loopInteriorDiff": {
+    "changedPixels": 0,
+    "totalPixels": 15376
+  },
+  "undoDisabled": true,
+  "consoleProblems": [
+    "warning: Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  ]
+}

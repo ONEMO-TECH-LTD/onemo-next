@@ -1,0 +1,42 @@
+{
+  "snapshot": "482bac6c6a49bcef2ea33fcd8abe34c65f14263c",
+  "variant": "boundary",
+  "acceptedPreset": "CLASSIC",
+  "erasedPreset": "",
+  "nodesBefore": 26,
+  "nodesAfter": 19,
+  "before": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "99782263a80140af0d6fe8932abba38c14e0e6285afb6f5622599eb70ce792bf",
+    "pngSha256": "c2e44f80ce90060f913547ee9707ef0a9d6ccb6edcdbef8355647ec7779bf98d",
+    "settleReads": 3
+  },
+  "erased": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "9af9d84cff194f5e96fd08b6d86a43564ea5b02592494c7fffd18b101da0d72d",
+    "pngSha256": "bef3bfb039c887d3e72bf0b381d1e941cddda550418132ea2e9dcad875f2deed",
+    "settleReads": 3
+  },
+  "undone": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "6f90e9c4a8900af82c05df62a781e4148e710ecff30169f11de7aa57c9867de9",
+    "pngSha256": "36d1a1525efa7e13d3d912005a82459e093b301a583fbe393c174e9b9b3da7f9",
+    "settleReads": 3
+  },
+  "redone": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "b8c7408d4d61129b66afda0b7400338c447acce4cf5a55bace022b8699b80ae6",
+    "pngSha256": "34d20a4998969f0b0baec60ba256afcf973e65a1cab49f2d325ea0953fac5e0d",
+    "settleReads": 3
+  },
+  "changedAfterUndo": 455,
+  "changedAfterRedo": 4241,
+  "loopInteriorDiff": null,
+  "consoleProblems": [
+    "warning: Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  ]
+}

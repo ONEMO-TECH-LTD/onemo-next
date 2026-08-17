@@ -1,0 +1,13 @@
+{
+  "core": {
+    "whitelist": {
+      "": [],
+      "Algorithm": []
+    }
+  },
+  "imgproc": {
+    "whitelist": {
+      "": ["cvtColor", "grabCut"]
+    }
+  }
+}
