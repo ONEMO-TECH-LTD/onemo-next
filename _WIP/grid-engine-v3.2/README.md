@@ -37,15 +37,17 @@ Product Base — two lanes have already had to withdraw findings taken from it.
 ## audit — the live evidence
 
 Written 2026-08-17 after the v3.2 build was measured against the canon table. Three
-independent audits from three lanes in three separate worktrees, plus the working
-contract the repair is built from.
+independent audits from three lanes in three separate worktrees.
 
 - `lead-audit-report.md` · `grok-qa-audit-report.md` · `meta-audit-report.md` — the three
   independent measurements. They converge: v3.2 regressed the engine it was built to
   perfect. Scored by **family** (Meta/grok), not magnet count (lead) — canon §6 says
   *"the FAMILY is the canon"*, so the count-based score reads too kindly.
-- `plan-and-contract.md` — the working contract for the repair.
 - `three-module-definition.md`.
+
+## plans — the working contract
+
+- `plan-and-contract.md` — the working contract for the repair. This is the only durable plan.
 
 ## One open item that canon does not settle
 
