@@ -2,7 +2,7 @@
 
 Dan asked me to QA this with you. Your last pane still thinks the contract froze at 15:51 and nothing moved. It moved. Please re-read the file, not this note.
 
-**File:** `/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-grid-engine-v3.2/_WIP/grid-engine-v3.2/plans/plan-and-contract.md`
+**File:** `/Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-grid-engine-v3.2/_WIP/grid-engine-v3.2/plans/v3.4 ---plan-and-contract.md`
 
 That is the only durable plan. `EXECUTION.md` is a pointer.
 

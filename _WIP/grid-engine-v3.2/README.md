@@ -1,7 +1,7 @@
 # grid-engine v3.2
 
 `canon/` is what governs — **two documents, named by Dan, and nothing else.**
-`plans/plan-and-contract.md` is the live engine contract built from them.
+`plans/v3.4 ---plan-and-contract.md` is the live engine contract built from them.
 `audit/` is the live evidence. `99-archive/` is provenance only — process documents,
 superseded plans, QA reports and captured frames. Nothing in the archive may create
 work or a gate, and neither may `FINAL-CONSOLIDATED-PROPOSAL.md`, which is superseded.
@@ -26,13 +26,13 @@ useful. An execution plan is not canon; a donor spec is not canon; a transcript 
 
 ## Not canon — at this folder's root
 
-- **`plans/plan-and-contract.md`** — **the live engine contract.** This is what governs
+- **`plans/v3.4 ---plan-and-contract.md`** — **the live engine contract.** This is what governs
   the build. Owner s62-grid-qa.
 
 - **`FINAL-CONSOLIDATED-PROPOSAL.md`** — **SUPERSEDED, 2026-08-17.** The prior v3.2
   execution plan, T0 through T9, owner s62-grid-meta-qa. It was executed and the result
   regressed the engine it was built to perfect; the three audits in `audit/` measured that
-  from three separate worktrees. Superseded by `plans/plan-and-contract.md`. It may not
+  from three separate worktrees. Superseded by `plans/v3.4 ---plan-and-contract.md`. It may not
   create work or a gate. Kept as provenance, and still load-bearing for one thing: its
   "Governing boundary" section carries the **v3.3 donor rule** — a mechanism may cross from
   v3.3.1 only when a named task requires it, the v3.2 substrate lacks it, and it passes that
@@ -58,11 +58,12 @@ independent audits from three lanes in three separate worktrees.
   independent measurements. They converge: v3.2 regressed the engine it was built to
   perfect. Scored by **family** (Meta/grok), not magnet count (lead) — canon §6 says
   *"the FAMILY is the canon"*, so the count-based score reads too kindly.
+- `lead-plan-audit.md` — the lead audit of the live contract against the two canon briefs.
+  Report only; nothing applied. Two findings confirmed by meta as its own misses.
+- `v331-donor-audit.md` — the other track (GPT Pro v3.3 repaired to v3.3.1) audited against
+  the v3.2 rollback. Verdict: not better as the product path, strongest donor available —
+  its permission model is `frame ≤ capacity`, which is the exact rule v3.2 inverted.
 - `three-module-definition.md`.
-
-## plans — the working contract
-
-- `plan-and-contract.md` — the working contract for the repair. This is the only durable plan.
 
 ## One open item that canon does not settle
 
