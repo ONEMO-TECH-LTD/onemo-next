@@ -1,4 +1,4 @@
-# LEAD AUDIT — `plans/plan-and-contract.md` against canon
+# LEAD AUDIT — the live engine contract (`plans/v3.4 ---plan-and-contract.md`) against canon
 
 **Author:** s62-kai-lead · 2026-08-17
 **Directive (Dan):** *"audit this plan against the canon — the final product must be based on the
@@ -6,7 +6,8 @@ canon nothing else that does not belong or exist in the canon"*, with **logic-sp
 and **ONEMO … Product Base and Logic Architecture.md (PB)** named as the two canon documents.
 **Method:** both canon briefs read in full (230 + 523 lines) plus the R3 specs (2,695) and the
 founding GPT transcript (5,932) for context only. Plan read in full at 169 lines,
-sha1 `5c661bd7b8161eda`.
+sha1 `5c661bd7b8161eda`. Audited before the file was renamed to `plans/v3.4 ---plan-and-contract.md`;
+git paths quoted below are historical and correct as written.
 **Status:** PROPOSAL. Nothing here has been applied. The contract file is byte-unchanged.
 
 > **Disclosure.** I first applied these corrections directly (commit `4738b5f8`) before Dan

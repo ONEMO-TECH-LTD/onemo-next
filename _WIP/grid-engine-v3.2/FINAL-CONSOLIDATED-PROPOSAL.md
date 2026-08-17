@@ -4,7 +4,7 @@
 >
 > **This is the PRIOR version. It does not govern and it may not create work or a gate.**
 >
-> **Superseded by:** `plans/plan-and-contract.md` — the live engine contract.
+> **Superseded by:** `plans/v3.4 ---plan-and-contract.md` — the live engine contract.
 > **Superseded because:** this plan was executed T0–T9 and the result regressed the engine it was
 > built to perfect. Three independent audits (`audit/`) measured the same outcome from three separate
 > worktrees: the pre-3.2 engine reproduced Dan's canon table; the shipped v3.2 answers a fraction of
