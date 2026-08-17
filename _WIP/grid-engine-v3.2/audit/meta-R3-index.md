@@ -1,3 +1,40 @@
+> ## ⚠ STATUS CORRECTED — R3 IS A DONOR, NOT CANON
+>
+> **Dan, 2026-08-17:** *"the R3 is the contract created from the chat gpt conversation and the canon i
+> shared so it may be considered as donor not necessarily as canon as canon is my `canon/` folder."*
+>
+> **Read this document as a DONOR INDEX, never as a canon index.** Nothing in it is a requirement.
+> R3 is a derived contract; canon is Dan's own documents (`logic-spec-optimum.md`, the Product Base,
+> the founding GPT Pro conversation).
+>
+> **Three findings below are VOID because they are a derived document doubting a RULED canon fact:**
+>
+> - **N1 (96 mm population) — VOID AND WAS DANGEROUS.** 96 mm is RULED canon, five times, in
+>   `logic-spec-optimum.md`: B4 "only the lattice step grows (48→96)" (:82, RULED) · duck B3 "rect
+>   48×96, four corners, mid row SKIPPED" (:156, RULED 12:51–12:52) · bot B3 "narrow 96×48 four"
+>   (:157) · poke B3 "corner square 96×96" (:158) · "four on the 96 grid" butterfly ~214 and poke1
+>   ~217 (:159, :181, both ✅). R3's PD-04 doubted it because it checked only the Product Base and the
+>   founding chat, where 96 has zero occurrences — but LS carries Dan's timestamped walkthrough
+>   rulings. **Acting on N1 would have cost five ruled rows.**
+> - **N2 (primary offer) — RESOLVED, NOT OPEN.** PD-09's "smallest accepted rung" is donor; LS §1.2's
+>   marked bulls-eye is canon and wins.
+> - **N3 (B1 guarantee) — VOID.** LS §3's B1 row is RULED.
+> - **S14 (performance gates) — VOID as a canon claim.** PD-31 is donor. Dan's original removal of the
+>   timing gate was correct; my push to restore it was not.
+> - **The hard hold (00 §1.2) does not gate canon work.** A donor cannot hold it.
+>
+> **What survives unchanged** is everything traceable to PB, LS or the founding chat — it was never
+> R3's: PB §21.5 · PB §19 · LS §3 cross-band laws · PB §7.3 · PB §8 · PB §10 · PB §14 · PB §6 ·
+> LS §7's counterexample suite.
+>
+> **Everything R3-only is a donor suggestion, judged on merit, never a requirement** — the M01–M10
+> formulas, M09/M10, the no-premature-collapse law, half-open thresholds, D_n = 24+12n, the failure
+> taxonomy, PD-38, the two-stage ManufacturingSpec, the nine reasoning fixtures, the performance gates.
+> Several remain worth taking; none is a canon gap.
+>
+> *Recorded rather than deleted. This is the third-authority error — citing a derived document as
+> governing — committed by me at volume, after I had caught it twice in others the same afternoon.*
+
 # R3-specs indexed against the contract — /o-necessity, both directions
 
 **Author:** s62-kai-meta · 2026-08-17 · **Ask:** Dan — "check R3, does it have additional ideas that are
