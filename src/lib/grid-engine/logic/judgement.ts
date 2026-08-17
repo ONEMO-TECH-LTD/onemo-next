@@ -90,7 +90,7 @@ export interface SizeVariant {
   /** 'tight' within the tight bound; 'allowed' within the outer bound; 'limb' rides the limb
    *  exception (some side hangs beyond the outer bound but within the limb allowance). */
   tier: 'tight' | 'allowed' | 'limb'
-  /** The released template that produced this layout, when one did (the auto search sets none). */
+  /** The released template that produced this layout. */
   layout?: string
   /** The exact contour at this size and placement — for drawing and manufacture. */
   effectContourMM: Contour

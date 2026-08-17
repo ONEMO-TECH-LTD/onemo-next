@@ -84,7 +84,8 @@ export interface GridResult {
   /** twin-fix: the effect ships as a PAIR — this grid is also its mirror counterpart's grid. */
   twinRequired: boolean
   anchors: Anchor[]
-  candidates: Pt[]      // interior points dropped by perimeter mode (faint viz)
+  /** Always empty. It carried the interior nodes the deleted delivery thinning dropped. */
+  candidates: Pt[]
   flaps: Pt[]
   uncoveredMM: number
   ok: boolean
@@ -420,12 +421,12 @@ export function computePreparedGrid(prepared: PreparedContour, cfg: GridConfig =
   const anchors = assignSizes(seated, plan, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY))
 
   if (!seated.length) issues.push(`No room for a magnet — too small/thin to keep a magnet ${pad}mm from every edge.`)
-  else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
+  else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. A larger size seats more.`)
   const coverage = seated.length
     ? exactPerimeterCoverage(contourMM, seated, HOLD_REACH_MM, pattern, pitch)
     : { gaps: [], uncoveredMM: 0 }
   const flaps = coverage.gaps
-  if (flaps.length > 0) issues.push(`Some edge areas sit outside the supported magnet spans (red edge) and could lift. Raise the size / max auto-grow.`)
+  if (flaps.length > 0) issues.push(`Some edge areas sit outside the supported magnet spans (red edge) and could lift. A larger size closes them.`)
 
   let minD = 8, maxD = 6
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
