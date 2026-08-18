@@ -57,17 +57,3 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
 export function isHolding(seatedCount: number, flapCount: number): boolean {
   return seatedCount >= 1 && flapCount === 0
 }
-
-/** The verdict: what counts as a refusal and how it is said. */
-export function verdictIssues(
-  degenerate: boolean,
-  seatedCount: number,
-  flapCount: number,
-  padMM: number,
-): string[] {
-  const issues: string[] = []
-  if (degenerate) issues.push(`No room for a magnet — the shape is too small/thin to fit a magnet plus its ${padMM}mm application ring.`)
-  else if (seatedCount === 0) issues.push(`Too small — no magnet grips material. Pick a band to snap to a holding size.`)
-  if (flapCount > 0) issues.push(`Some edge areas have no magnet within reach (red edge). Pick a band, or raise the flap allowance.`)
-  return issues
-}

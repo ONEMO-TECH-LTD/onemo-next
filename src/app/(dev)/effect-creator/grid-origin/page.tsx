@@ -178,13 +178,6 @@ export default function GridLab() {
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
           </div>
-          {model && <Verdict grid={model.grid} />}
-          <div className="gl-legend">
-            <span><i style={{ background: 'var(--magnet)' }} />6mm magnet</span>
-            <span><i style={{ background: 'var(--mag8)' }} />8mm magnet</span>
-            <span><i style={{ background: 'var(--grid)', opacity: .55 }} />spot · no magnet</span>
-            <span><i style={{ background: 'var(--fail)' }} />flap risk</span>
-          </div>
         </section>
 
         <aside className="gl-controls">
@@ -326,7 +319,6 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
   const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
-  const hasFlap = grid.flaps.length > 0
 
   // Manual calibration gestures — the shape is FROZEN; drag pans the GRID under it (mm, engine
   // y-up), pinch scales the effect size, double-click hands registration back to the engine.
@@ -385,10 +377,10 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-fine)" />
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-pitch)" />
-      {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line; red when edges would lift. */}
+      {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line. */}
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
-      <path d={d} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'}
-        strokeOpacity={0.9} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <path d={d} fill="none" stroke="var(--suede-edge)"
+        strokeOpacity={0.9} strokeWidth={1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       {spots.map((sp, i) => (
         <circle key={'f' + i} cx={sp.x} cy={-sp.y} r={sp.r}
@@ -407,14 +399,6 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
   )
 }
 
-function Verdict({ grid }: { grid: GridResult }) {
-  return (
-    <div className={`gl-verdict ${grid.ok ? 'ok' : 'bad'}`}>
-      <div className="gl-vrow"><span className="gl-dot" /><b>{grid.ok ? `Holds — ${grid.anchors.length} magnets seated, spread across material` : "Won't hold reliably"}</b></div>
-      {grid.issues.map((s, i) => <div key={i} className="gl-issue">{s}</div>)}
-    </div>
-  )
-}
 function Empty({ text, spin }: { text: string; spin?: boolean }) {
   return <div className="gl-empty">{spin && <span className="gl-spin" />}{text}</div>
 }
@@ -465,14 +449,6 @@ const CSS = `
 .gl-empty{display:flex;align-items:center;gap:9px;color:var(--ink-3);font:12.5px var(--mono);text-align:center;padding:20px;max-width:80%}
 .gl-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:gspin .8s linear infinite;flex:none}
 @keyframes gspin{to{transform:rotate(360deg)}}
-.gl-verdict{padding:10px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-size:13px}
-.gl-vrow{display:flex;align-items:center;gap:9px}
-.gl-dot{width:9px;height:9px;border-radius:50%;flex:none}
-.gl-verdict.ok .gl-dot{background:var(--pass)}.gl-verdict.ok b{color:var(--pass)}
-.gl-verdict.bad .gl-dot{background:var(--fail)}.gl-verdict.bad b{color:var(--fail)}
-.gl-issue{font:11.5px var(--mono);color:var(--ink-2);margin-top:6px;padding-left:18px}
-.gl-legend{display:flex;flex-wrap:wrap;gap:13px;font:11px var(--mono);color:var(--ink-2)}
-.gl-legend span{display:inline-flex;align-items:center;gap:5px}.gl-legend i{width:10px;height:10px;border-radius:3px}
 .gl-controls{display:flex;flex-direction:column;gap:16px}
 .gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}

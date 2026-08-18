@@ -26,7 +26,6 @@ import {
   bandOf,
   isHolding,
   registrationScore,
-  verdictIssues,
   type Anchor,
   type MagnetPlan,
 } from './grid-origin-logic'
@@ -57,10 +56,8 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
-  /** Silhouette vertices with no magnet within reach. */
+  /** Silhouette vertices past reach — the band holding gate reads this; not a user-facing verdict. */
   flaps: Pt[]
-  ok: boolean
-  issues: string[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   /** Every lattice position at the chosen phase, seated or not. */
@@ -129,7 +126,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const anchors = assignSizes(coverage.seated, plan)
 
   const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
-  const issues = verdictIssues(!fits, coverage.seated.length, flaps.length, pad)
 
   let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
@@ -138,8 +134,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   return {
     anchors,
     flaps,
-    ok: issues.length === 0,
-    issues,
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
     lattice,
