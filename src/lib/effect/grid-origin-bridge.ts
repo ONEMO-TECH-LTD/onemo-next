@@ -16,7 +16,6 @@ import {
   fieldSpanMM,
   latticeOver,
   MIN_EFFECT_MM,
-  spotRadiusFor,
   type GridPattern,
   type GridResult,
   type MagnetPlan,
@@ -59,8 +58,8 @@ export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>
  * The size range a surface may offer — floor and ceiling both derived, so they move when the
  * pitch, plan or padding do. The shell shows these; it never computes them.
  */
-export function sizeRange(pitchMM: number, plan: MagnetPlan, padMM: number): { minMM: number; maxMM: number } {
-  return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(pitchMM, plan, padMM) }
+export function sizeRange(pitchMM: number, padMM: number): { minMM: number; maxMM: number } {
+  return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(pitchMM, padMM) }
 }
 
 /** One drawable spot: engine-space centre, radius, and whether a magnet seats there. */
@@ -92,24 +91,16 @@ export function fieldSpots(
   const rgn = { minX: view.minX - pad, minY: view.minY - pad, maxX: view.maxX + pad, maxY: view.maxY + pad }
   return latticeOver(rgn, grid.pitchCentreMM, pattern, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => {
     const a = anchorAt.get(n[0].toFixed(2) + ',' + n[1].toFixed(2))
-    return {
-      x: n[0],
-      y: n[1],
-      r: a ? a.dia / 2 + grid.applicationPadMM : grid.spotRadiusMM,
-      held: Boolean(a),
-    }
+    // ONE spot radius — the padding, centre-measured. A seated spot is not larger for carrying
+    // a magnet; the body sits inside the same disc.
+    return { x: n[0], y: n[1], r: grid.spotRadiusMM, held: Boolean(a) }
   })
 }
 
 /** The seated spots alone — what a surface draws when the full field is switched off. */
 export function seatedSpots(grid: GridResult): FieldSpot[] {
-  return grid.anchors.map((a) => ({
-    x: a.p[0],
-    y: a.p[1],
-    r: a.dia / 2 + grid.applicationPadMM,
-    held: true,
-  }))
+  return grid.anchors.map((a) => ({ x: a.p[0], y: a.p[1], r: grid.spotRadiusMM, held: true }))
 }
 
-export { computeGrid, spotRadiusFor }
+export { computeGrid }
 export type { GridResult, GridPattern, MagnetPlan }

@@ -48,7 +48,6 @@ export default function GridLab() {
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [plan, setPlan] = useState<MagnetPlan>('all6')
-  const [frame, setFrame] = useState(true)
   /**
    * SHOW THE WHOLE FIELD, not just the part of it that answered.
    *
@@ -106,7 +105,7 @@ export default function GridLab() {
       }
       if (autoFit) {
         // Snap climbs to the same 9x9 ceiling the slider offers — its own default stopped at 300.
-        const fit = fitSizeToGrid(sized, cfg, sizeMM, { maxMM: sizeRange(pitch, plan, pad).maxMM })
+        const fit = fitSizeToGrid(sized, cfg, sizeMM, { maxMM: sizeRange(pitch, pad).maxMM })
         return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, snapped: fit.snapped }
       }
       const contour = sized(sizeMM)
@@ -115,7 +114,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM])
 
   // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
-  const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, plan, pad)
+  const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -141,7 +140,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} grid={model.grid} frame={frame} lattice={showLattice} gridPattern={pattern} />
+            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} gridPattern={pattern} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -230,9 +229,6 @@ export default function GridLab() {
                   <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
               </div>
             </div>
-            <label className="gl-toggle"><span>1 mm frame</span>
-              <input type="checkbox" checked={frame} onChange={e => setFrame(e.target.checked)} />
-            </label>
             <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
               <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
             </label>
@@ -259,7 +255,7 @@ function dim(c: Contour, axis: 0 | 1): number {
   return hi - lo
 }
 
-function Stage({ contour, grid, frame, lattice, gridPattern }: { contour: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean; lattice: boolean; gridPattern: GridPattern }) {
+function Stage({ contour, grid, lattice, gridPattern }: { contour: Contour; grid: ReturnType<typeof computeGrid>; lattice: boolean; gridPattern: GridPattern }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -310,17 +306,10 @@ function Stage({ contour, grid, frame, lattice, gridPattern }: { contour: Contou
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-fine)" />
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-pitch)" />
-      {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line, so the field reads through it.
-          (Red cut line when edges would lift; the frame toggle weights it.) */}
+      {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line; red when edges would lift. */}
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
-      <path
-        d={d}
-        fill="none"
-        stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'}
-        strokeOpacity={hasFlap ? 0.85 : 0.9}
-        strokeWidth={hasFlap ? 1.5 : frame ? 1 : 0.6}
-        strokeLinejoin="round"
-      />
+      <path d={d} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'}
+        strokeOpacity={0.9} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       {spots.map((sp, i) => (
         <circle key={'f' + i} cx={sp.x} cy={-sp.y} r={sp.r}

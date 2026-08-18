@@ -14,6 +14,10 @@
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
 import { insetRingMM } from './offset'
+// THE EXACT PREDICATE — integer arithmetic, tangency legal by equality. The offset-polygon erosion
+// below it is approximate: at ZERO margin (a 24mm shape whose only legal centre is exactly tangent)
+// the shrunken polygon collapses and a lawful answer is refused. holds() cannot lose that case.
+import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 
 export type GridPattern = 'standard' | 'quincunx' | 'granular'
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
@@ -37,14 +41,22 @@ export function magnetRadiusMM(plan: MagnetPlan): number {
   return plan === 'all6' ? MAGNET_RADIUS_SMALL_MM : MAGNET_RADIUS_LARGE_MM
 }
 
-/** COMPUTE: the spot — magnet radius plus padding, the material one magnet requires. */
-export function spotRadiusFor(plan: MagnetPlan, padMM: number): number {
-  return magnetRadiusMM(plan) + padMM
+/**
+ * COMPUTE: the spot — the padding IS its radius, measured FROM THE MAGNET CENTRE (grid law 2.1:
+ * "the safe magnet placement radius, measured from the magnet centre"). The magnet body sits
+ * inside it; the body's radius bounds how small the padding may go, it never adds to the spot.
+ *
+ * The original engine added them (edge-measured padding), which made every spot 3-4mm larger than
+ * the law's: 15mm discs on a 24mm pitch overlapped by 6mm, and the 9x9 span read 410 instead of
+ * the law's 408. Same slider value, different meaning — the law's meaning wins.
+ */
+export function spotRadiusOf(padMM: number): number {
+  return padMM
 }
 
-/** COMPUTE: the full field's span — the steps across plus one spot's material either side. */
-export function fieldSpanMM(pitchMM: number, plan: MagnetPlan, padMM: number): number {
-  return (FIELD_POSITIONS_PER_AXIS - 1) * pitchMM + 2 * spotRadiusFor(plan, padMM)
+/** COMPUTE: the full field's span — the steps across plus one spot either side. 408 at 48/12. */
+export function fieldSpanMM(pitchMM: number, padMM: number): number {
+  return (FIELD_POSITIONS_PER_AXIS - 1) * pitchMM + 2 * spotRadiusOf(padMM)
 }
 
 export interface GridConfig {
@@ -92,9 +104,8 @@ export interface GridResult {
    */
   phaseMM: Pt
   /**
-   * THE SPOT'S TRUE RADIUS — magnet radius plus padding, the exact figure the erosion used. A
-   * surface reconstructing it from the seated magnets got it 1mm small under corners8, where the
-   * erosion uses the 8mm magnet everywhere but the smallest seated magnet is 6mm.
+   * THE SPOT'S TRUE RADIUS — the padding, centre-measured, the exact figure the erosion used.
+   * Reported so no surface ever reconstructs it and drifts from the geometry that seated.
    */
   spotRadiusMM: number
 }
@@ -215,9 +226,17 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const bb = bbox(outer)
   const issues: string[] = []
 
+  // Centre-measured, EXACT: a centre is legal when every boundary point is at least the padding
+  // away — tangency passes by equality. Quantized to microns for integer arithmetic; the erosion
+  // polygon is no longer the judge (it deleted the exact-fit case at zero margin).
   const rMag = magnetRadiusMM(plan)
-  const safe = insetRingMM(outer, -(rMag + pad), 'round')
-  const hasSafe = !!safe && safe.length >= 3
+  const QUANTUM = 0.001
+  let prep: ReturnType<typeof prepare> | null = null
+  try { prep = prepare(outer, QUANTUM) } catch { prep = null }
+  const rQ = Math.round(spotRadiusOf(pad) / QUANTUM)
+  const fits = (pt: Pt): boolean =>
+    !!prep && holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
+  const hasSafe = !!prep
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
   // Phase-optimize: MAX seated count (coverage) first, then fewest flaps, then most-centred/balanced.
@@ -228,7 +247,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     let bestScore = -Infinity
     for (let iy = 0; iy < OFF; iy++) for (let ix = 0; ix < OFF; ix++) {
       const ox = (ix / OFF) * pitch, oy = (iy / OFF) * pitch
-      const seat = latticeAt(bb, pitch, pattern, ox, oy).filter((p) => pointInPolygon(p, safe!))
+      const seat = latticeAt(bb, pitch, pattern, ox, oy).filter((p) => fits(p))
       if (!seat.length) continue
       const flaps = flapVerts(outer, seat, pitch).length
       let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
@@ -281,7 +300,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // The field as it was asked, at the phase that won. Same call the search made, one more time.
     lattice: latticeAt(bb, pitch, pattern, bestOx, bestOy),
     phaseMM: [bestOx, bestOy],
-    spotRadiusMM: rMag + pad,
+    spotRadiusMM: spotRadiusOf(pad),
   }
 }
 
