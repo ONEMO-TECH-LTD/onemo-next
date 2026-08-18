@@ -40,8 +40,10 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 5 as const, minMM: 216, maxMM: 264 }),
 ])
 
-/** Registration search phase step — the grid's own 12mm increment. */
+/** Registration search phase step — how finely the lattice slides under the shape.
+ *  Default is the grid's own 12mm increment; admin-dialled down to 1mm for continuous panning. */
 export const PHASE_STEP_MM = 12
+export const PHASE_STEP_FLOOR_MM = 1
 
 /** Flap allowance — how far material may extend past a spot's edge. Admin-dialled, 0 = edge-to-edge. */
 export const FLAP_MM = 12

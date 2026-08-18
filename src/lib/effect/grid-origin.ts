@@ -45,6 +45,8 @@ export interface GridConfig {
   paddingMM?: number
   /** How far material may extend past a spot's edge before it counts as a flap. 0 = edge-to-edge. */
   flapMM?: number
+  /** How finely the lattice slides under the shape when searching registrations. */
+  phaseStepMM?: number
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -75,6 +77,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   // Coverage reach from a magnet centre: the spot plus the dialled flap allowance.
   const reach = spotRadiusOf(pad) + Math.max(0, cfg.flapMM ?? FLAP_MM)
+  const phaseStep = Math.max(1, cfg.phaseStepMM ?? PHASE_STEP_MM)
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
@@ -94,7 +97,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const mod = (v: number, m: number) => ((v % m) + m) % m
     const phases = (span: number): { p: number; k: number }[] => {
       const out: { p: number; k: number }[] = []
-      for (let k = 0; k < pitch; k += PHASE_STEP_MM) out.push({ p: mod(span / 2 + k, pitch), k })
+      for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(span / 2 + k, pitch), k })
       return out
     }
     let bestScore = -Infinity
