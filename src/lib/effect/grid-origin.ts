@@ -16,7 +16,6 @@ import {
   centroidMM,
   fieldSpanMM,
   flapExcessMM,
-  flapVerts,
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
@@ -61,8 +60,6 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
-  /** Silhouette vertices past reach — the band holding gate reads this; not a user-facing verdict. */
-  flaps: Pt[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   /** Every lattice position at the chosen phase, seated or not. */
@@ -131,15 +128,12 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
   const anchors = assignSizes(coverage.seated, plan)
 
-  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
-
   let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
   if (anchors.length === 0) { minD = MAGNET_DIA_SMALL_MM; maxD = MAGNET_DIA_SMALL_MM }
 
   return {
     anchors,
-    flaps,
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
     lattice,

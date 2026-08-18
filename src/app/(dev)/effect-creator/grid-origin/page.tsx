@@ -267,7 +267,7 @@ export default function GridLab() {
               </div>
             </div>
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
-            <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
+            <Slider label="Coverage reach · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
             <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 

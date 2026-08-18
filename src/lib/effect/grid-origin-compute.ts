@@ -119,17 +119,6 @@ export function makeCircleSeatPredicate(
   }
 }
 
-/** Silhouette vertices further than `reach` from the nearest magnet (flap-risk edge). */
-export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
-  const out: Pt[] = []
-  for (const v of outer) {
-    let nd = Infinity
-    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d }
-    if (nd > reach) out.push(v)
-  }
-  return out
-}
-
 /** Mean distance silhouette vertices sit PAST `reach`, mm. 0 = fully wrapped. Graded, so a
  *  placement covering more material scores better even when nothing is fully covered. */
 export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
