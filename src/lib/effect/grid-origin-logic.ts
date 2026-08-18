@@ -2,19 +2,11 @@
 
 import type { Pt } from './types'
 import {
-  BANDS,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './grid-origin-spec'
 import { bbox, splitPerimeter } from './grid-origin-compute'
-import type { Band } from './grid-origin-spec'
-
-/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
-export function bandOf(sizeMM: number): Band | null {
-  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
-  return null
-}
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
@@ -50,17 +42,6 @@ export function betterLayout(a: LayoutMeasure, b: LayoutMeasure, order: RankOrde
   return false
 }
 
-/** Band entry rule: what a size must do to appear in a band's list. */
-export type GateMode = 'all' | 'most' | 'seated'
-export function entersBand(mode: GateMode, seats: number, flapCount: number, meanExcessMM: number, looseMM: number): boolean {
-  if (seats < 1) return false
-  if (mode === 'all') return flapCount === 0
-  if (mode === 'most') return meanExcessMM <= looseMM
-  return true
-}
-
-/** Variant rule: what makes a band step its own variant. */
-export type VariantMode = 'layout' | 'count' | 'newcount'
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(

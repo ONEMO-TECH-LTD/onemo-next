@@ -12,8 +12,8 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GateMode, type GridResult, type MagnetPlan, type RankOrder, type VariantMode } from '@/lib/effect/grid-origin'
-import { ANCHOR_BLEND_PCT, BANDS, COVER_TIE_MM, EDGE_REG_TOL_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GATE_LOOSE_MM, GATE_MODE, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RANK_ORDER, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VARIANT_MODE } from '@/lib/effect/grid-origin-spec'
+import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type RankOrder } from '@/lib/effect/grid-origin'
+import { ANCHOR_BLEND_PCT, BANDS, COVER_TIE_MM, EDGE_REG_TOL_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RANK_ORDER, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -68,12 +68,8 @@ export default function GridLab() {
   const [showLattice, setShowLattice] = useState(true)
   /** Faint bounding box with per-side dimensions. */
   const [showBox, setShowBox] = useState(true)
-  /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
+  /** A band bounds the size slider to its range; 'free' uses the typed limits. */
   const [mode, setMode] = useState<number | 'free'>('free')
-  /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
-  const [stepSel, setStepSel] = useState<number | null>(null)
-  /** Snap scan step — admin-tunable for testing; default from spec. */
-  const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   /** Grid anchor position — 0 = box centre, 100 = material weight centre, 50 = midpoint. */
@@ -89,30 +85,25 @@ export default function GridLab() {
   const [enRankN, setEnRankN] = usePersisted('en.rank', 1)
   const [enEdgeTolN, setEnEdgeTolN] = usePersisted('en.edgeTol', 1)
   const [enCoverTieN, setEnCoverTieN] = usePersisted('en.coverTie', 1)
-  const [enGateN, setEnGateN] = usePersisted('en.gate', 1)
-  const [enVariantN, setEnVariantN] = usePersisted('en.variant', 1)
   const [rankOrder, setRankOrder] = useState<RankOrder>(RANK_ORDER as RankOrder)
   const [edgeTol, setEdgeTol] = usePersisted('edgeTol', EDGE_REG_TOL_MM)
   const [coverTie, setCoverTie] = usePersisted('coverTie', COVER_TIE_MM)
-  const [gateMode, setGateMode] = useState<GateMode>(GATE_MODE as GateMode)
-  const [gateLoose, setGateLoose] = usePersisted('gateLoose', GATE_LOOSE_MM)
-  const [variantMode, setVariantMode] = useState<VariantMode>(VARIANT_MODE as VariantMode)
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, snapStep, sizeMin, sizeMax, blend, edgeTol, coverTie, gateLoose })) } catch { }
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, sizeMin, sizeMax, blend, edgeTol, coverTie })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
-      blend: ANCHOR_BLEND_PCT, edgeTol: EDGE_REG_TOL_MM, coverTie: COVER_TIE_MM, gateLoose: GATE_LOOSE_MM,
+      blend: ANCHOR_BLEND_PCT, edgeTol: EDGE_REG_TOL_MM, coverTie: COVER_TIE_MM,
     }
     try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
-    setBlend(d.blend); setEdgeTol(d.edgeTol); setCoverTie(d.coverTie); setGateLoose(d.gateLoose)
-    setRankOrder(RANK_ORDER as RankOrder); setGateMode(GATE_MODE as GateMode); setVariantMode(VARIANT_MODE as VariantMode)
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setBlend(d.blend); setEdgeTol(d.edgeTol); setCoverTie(d.coverTie)
+    setRankOrder(RANK_ORDER as RankOrder)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -168,8 +159,14 @@ export default function GridLab() {
     finally { genMsRef.current = performance.now() - t0 }
   }, [src, preset, gen, p1, p2, sides, points, magic])
 
+  // The band bounds the slider; the size the slider shows is the size that solves. Nothing more.
+  const band = mode !== 'free' ? BANDS.find((b) => b.id === mode) ?? BANDS[0] : null
+  const loMM = band ? band.minMM : sizeMin
+  const hiMM = band ? band.maxMM : sizeMax
+  const effMM = Math.min(hiMM, Math.max(loMM, sizeMM))
+
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -196,15 +193,13 @@ export default function GridLab() {
       ...(enRankN ? { rankOrder } : {}),
       ...(enEdgeTolN ? { edgeTolMM: edgeTol } : {}),
       ...(enCoverTieN ? { coverTieMM: coverTie } : {}),
-      ...(enGateN ? { gateMode, gateLooseMM: gateLoose } : {}),
-      ...(enVariantN ? { variantMode } : {}),
     } : {}
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, ...lab, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
-    w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, enFlapN, enPhaseN, enBlendN, enRankN, enEdgeTolN, enCoverTieN, enGateN, enVariantN, plan, mode, stepSel, coverage, offsetMM, snapStep])
+    w.postMessage({ id, base, offsetMM, cfg, sizeMM: effMM })
+  }, [base, src, preset, effMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, enFlapN, enPhaseN, enBlendN, enRankN, enEdgeTolN, enCoverTieN, plan, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -281,41 +276,26 @@ export default function GridLab() {
           </Fold>
 
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Band · snaps to fit</span>
+            <div className="gl-field"><span>Band · bounds the slider</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null) }}>B{b.id}</button>)}
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setSizeMM((s) => Math.min(b.maxMM, Math.max(b.minMM, s))); setManual(null) }}>B{b.id}</button>)}
                 <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setManual(null) }}>Free</button>
               </div>
             </div>
-            {mode === 'free'
-              ? <>
-                  <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />
-                  <div className="gl-field"><span>Slider limits</span>
-                    <div className="gl-limits">
-                      <span className="gl-num"><i>min</i>
-                        <input key={'mn' + sizeMin} type="number" defaultValue={sizeMin}
-                          onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(n) } }}
-                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
-                      <span className="gl-num"><i>max</i>
-                        <input key={'mx' + sizeMax} type="number" defaultValue={sizeMax}
-                          onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(n) } }}
-                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
-                    </div>
-                  </div>
-                </>
-              : <>
-                  <div className={`gl-snap${model && !model.ladder.length ? ' gl-snap-none' : ''}`}>Fit <b>B{mode}-{model?.ladder.length ? model.idx + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
-                    <span>{model?.ladder.length
-                      ? `${model.ladder.length} holding layouts in band · ${model.grid.anchors.length} magnets`
-                      : `NO FIT in this band at these settings — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
-                  {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
-                    {model!.ladder.map((pt, i) =>
-                      <button key={pt.sizeMM + pt.sig} aria-pressed={i === model!.idx}
-                        onClick={() => setStepSel(i)}>B{mode}-{i + 1}<em>{pt.sizeMM} mm · {pt.count}⌾</em></button>)}
-                  </div>}
-                  <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
-                </>}
+            <Slider label={band ? `Effect size · B${band.id} range` : 'Effect size · longest side'} unit="mm" v={Math.round(effMM)} set={setSizeMM} min={loMM} max={hiMM} />
+            {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
+              <div className="gl-limits">
+                <span className="gl-num"><i>min</i>
+                  <input key={'mn' + sizeMin} type="number" defaultValue={sizeMin}
+                    onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(n) } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
+                <span className="gl-num"><i>max</i>
+                  <input key={'mx' + sizeMax} type="number" defaultValue={sizeMax}
+                    onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(n) } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
+              </div>
+            </div>}
             <div className="gl-field"><span>Grid pitch · released tiers</span>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
@@ -378,23 +358,6 @@ export default function GridLab() {
               </LabRow>
               <LabRow on={enCoverTieN !== 0} set={(b) => setEnCoverTieN(b ? 1 : 0)}>
                 <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
-              </LabRow>
-              <LabRow on={enGateN !== 0} set={(b) => setEnGateN(b ? 1 : 0)}>
-                <div className="gl-field"><span>Band entry rule</span>
-                  <div className="gl-seg">
-                    {([['all', 'All covered'], ['most', 'Mostly'], ['seated', 'Seated']] as [GateMode, string][]).map(([m, l]) =>
-                      <button key={m} aria-pressed={gateMode === m} onClick={() => setGateMode(m)}>{l}</button>)}
-                  </div>
-                </div>
-                {gateMode === 'most' && <Slider label="Loose allowance · mean uncovered" unit="mm" v={gateLoose} set={setGateLoose} min={0} max={48} />}
-              </LabRow>
-              <LabRow on={enVariantN !== 0} set={(b) => setEnVariantN(b ? 1 : 0)}>
-                <div className="gl-field"><span>Variant rule</span>
-                  <div className="gl-seg">
-                    {([['layout', 'Layouts'], ['count', 'Counts'], ['newcount', 'New counts']] as [VariantMode, string][]).map(([m, l]) =>
-                      <button key={m} aria-pressed={variantMode === m} onClick={() => setVariantMode(m)}>{l}</button>)}
-                  </div>
-                </div>
               </LabRow>
             </div>
           </Fold>
@@ -625,13 +588,6 @@ const CSS = `
 .gl-upload{font:600 13px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer;width:100%}
 .gl-upload:hover{filter:brightness(1.05)}
 .gl-magic-note{font:11.5px var(--mono);color:var(--ink-2);line-height:1.5}
-.gl-snap{font-size:12.5px;color:var(--ink-2)}.gl-snap b{font:600 13px var(--mono);color:var(--ink)}.gl-snap span{display:block;font:11px var(--mono);color:var(--ink-3);margin-top:3px}
-.gl-snap-none span{color:#c47f17;font-weight:600}
-.gl-steps{display:flex;flex-wrap:wrap;gap:4px}
-.gl-steps button{font:600 10px var(--mono);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:4px 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
-.gl-steps button em{font-style:normal;color:var(--ink-3);font-size:9px}
-.gl-steps button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
-.gl-steps button[aria-pressed=true] em{color:#fffc}
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}

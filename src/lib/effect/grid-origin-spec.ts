@@ -55,8 +55,6 @@ export const FLAP_MM = 12
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
-/** Snap scan size step. */
-export const SNAP_STEP_MM = 1
 
 /** Edge registration slack: a layout is registered when every side's outermost spot
  *  reaches the shape bound within this tolerance. */
@@ -70,10 +68,3 @@ export const ANCHOR_BLEND_MAX_PCT = 100
 export const RANK_ORDER = 'edges'
 /** Coverage tie range — two layouts covering within this many mm count as equal. */
 export const COVER_TIE_MM = 0
-/** Band entry rule: 'all' = everything covered, 'most' = uncovered stays under the loose
- *  allowance, 'seated' = magnets seated at all. */
-export const GATE_MODE = 'all'
-export const GATE_LOOSE_MM = 24
-/** Variant rule: 'layout' = each distinct arrangement, 'count' = each magnet count,
- *  'newcount' = counts whose snuggest size lives in this band. */
-export const VARIANT_MODE = 'layout'

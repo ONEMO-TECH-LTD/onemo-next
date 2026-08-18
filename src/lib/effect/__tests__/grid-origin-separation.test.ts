@@ -157,10 +157,9 @@ describe('4 — no surface restates a released value', () => {
 })
 
 describe('4b — the law sliders take their bounds from spec, never literals', () => {
-  it('padding and snap-step sliders use identifiers for min', () => {
+  it('the padding slider uses identifiers for its bounds', () => {
     const text = pageText()
     expect(text).toMatch(/label="Magnet padding[^/]*min=\{PADDING_FLOOR_MM\}/)
-    expect(text).toMatch(/label="Snap step"[^/]*min=\{SNAP_STEP_MM\}[^/]*max=\{MIN_EFFECT_MM\}/)
   })
 })
 
