@@ -255,7 +255,7 @@ export default function GridLab() {
                       : `NOTHING SEATS in this band at these settings — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
                   {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
                     {model!.ladder.map((pt, i) =>
-                      <button key={pt.sizeMM + pt.sig} aria-pressed={i === model!.idx}
+                      <button key={pt.count + '-' + pt.sizeMM} aria-pressed={i === model!.idx}
                         onClick={() => setStepSel(i)}>B{mode}-{i + 1}<em>{pt.sizeMM} mm · {pt.count}⌾</em></button>)}
                   </div>}
                   <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
