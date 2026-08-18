@@ -1,4 +1,4 @@
-// grid-compute/occupancy.ts — the whole algorithm.
+// grid-engine/compute/occupancy.ts — the whole algorithm.
 //
 //   Shrink the shape inward by the safe radius.
 //   Lay the fixed lattice over it.
@@ -80,8 +80,10 @@ export interface Arrangement {
 export interface ScanOptions {
   /** Sizes to evaluate, as the shape's longest side in millimetres. */
   readonly sizesMM: readonly number[]
-  /** Lattice spacing, millimetres. */
-  readonly pitchMM: number
+  /** Spacing of the lattice, millimetres. Compute is told it; it is not the
+   *  the spec's name for it and must not borrow one — this module has never
+   *  heard of a product. */
+  readonly latticeMM: number
   /** Safe radius each point requires, millimetres. */
   readonly radiusMM: number
   /**
@@ -119,11 +121,11 @@ export interface Scan {
  * at different phases collapse to one entry, keeping the first phase seen.
  */
 export function scan(ringMM: readonly Pt[], options: ScanOptions): Scan {
-  const { sizesMM, pitchMM, radiusMM, phaseStepMM, quantumMM = 0.001 } = options
-  if (!(pitchMM > 0) || !(radiusMM > 0) || !(phaseStepMM > 0)) {
+  const { sizesMM, latticeMM, radiusMM, phaseStepMM, quantumMM = 0.001 } = options
+  if (!(latticeMM > 0) || !(radiusMM > 0) || !(phaseStepMM > 0)) {
     throw new RangeError('pitch, radius and phase step must be positive')
   }
-  const pitch = Math.round(pitchMM / quantumMM)
+  const pitch = Math.round(latticeMM / quantumMM)
   const radius = Math.round(radiusMM / quantumMM)
   const step = Math.max(1, Math.round(phaseStepMM / quantumMM))
 

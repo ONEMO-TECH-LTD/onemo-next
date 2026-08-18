@@ -33,6 +33,9 @@ import {
   fieldBlockSpan,
   minShapeSpan,
   resizeShape,
+  solveCutout,
+  spotRadius,
+  type CutoutAnswer,
   type FieldSummary,
 } from '@/lib/grid-engine/bridge'
 import { traceCutout, type OutlineUV } from '@/lib/grid-engine/ui/trace-cutout'
@@ -182,6 +185,38 @@ export default function GridEnginePage() {
   const [outline, setOutline] = useState<OutlineUV | null>(null)
   /** Which face of the cut-out is on: the picture, or its outline alone. */
   const [asOutline, setAsOutline] = useState(false)
+
+  /**
+   * WHAT THE MATERIAL CARRIES — the engine's whole answer, at this size.
+   *
+   * Not a layout the shell chose and not one it was offered from a list: the
+   * lattice points this silhouette can legally hold, read straight off the
+   * geometry. An answer belongs to the size and the shape it was asked of, so
+   * any move that changes either clears it rather than leaving a stale one on
+   * screen (law 5.3).
+   */
+  const [answer, setAnswer] = useState<CutoutAnswer | null>(null)
+  const [solving, setSolving] = useState(false)
+
+  /**
+   * Ask the engine. Explicit — a press, never a side effect of dragging.
+   *
+   * The shell hands over exactly what it owns — the silhouette it traced and the
+   * box it drew it in — and renders what comes back. It maps no coordinates,
+   * reads no law value and picks no layout: all three are the bridge's.
+   */
+  const solveNow = () => {
+    if (!outline || !box || solving) return
+    setSolving(true)
+    // Yield a frame so the busy state paints before the synchronous read runs.
+    setTimeout(() => {
+      try {
+        setAnswer(solveCutout(spec, outline, box))
+      } finally {
+        setSolving(false)
+      }
+    }, 0)
+  }
   const cutoutInput = useRef<HTMLInputElement>(null)
 
   /**
@@ -265,6 +300,7 @@ export default function GridEnginePage() {
     })
     setBox(null)
     setOutline(null)
+    setAnswer(null)
   }
 
   // Law rows behave like the fixture: type freely, commit on ENTER or on leaving the field. Writing
@@ -447,7 +483,28 @@ export default function GridEnginePage() {
           </button>
         )}
 
+        {cutout && (
+          <button
+            type="button"
+            className={styles.chip}
+            data-on={Boolean(answer)}
+            onClick={solveNow}
+            disabled={!outline || solving}
+            title="Ask the engine which lattice points this material carries"
+          >
+            {solving ? 'reading…' : 'solve'}
+          </button>
+        )}
+
         <span className={styles.spacer} />
+
+        {answer && (
+          <span className={styles.fieldReadout}>
+            {answer.primary
+              ? `${answer.primary.count} points · ${answer.offers.length} distinct`
+              : 'nothing holds'}
+          </span>
+        )}
 
         {view && (
           <span className={styles.fieldReadout}>
@@ -533,6 +590,26 @@ export default function GridEnginePage() {
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
+            </g>
+          )}
+          {answer?.primary && (
+            /* THE POINTS THE MATERIAL CARRIES — a green ring on the lattice's own
+               24mm spot at each held node. Same lattice, same disc, no second
+               geometry drawn. The richest arrangement is shown; the others are
+               real answers too and the screen does not yet say so. */
+            <g pointerEvents="none">
+              {answer.primary.held.map((node) => (
+                <circle
+                  key={`${node.i}:${node.j}`}
+                  cx={node.xMM}
+                  cy={node.yMM}
+                  r={spotRadius(spec)}
+                  fill="none"
+                  stroke="#6fdc8c"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
             </g>
           )}
         </GridCanvas>
