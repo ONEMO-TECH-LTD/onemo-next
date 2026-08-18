@@ -46,6 +46,53 @@ export interface GridResult {
   /** grid slots that HAVE material but couldn't seat a magnet (padding blocked), flanked by seated
    *  neighbours — i.e. an unbalanced hole. balancedFit nudges the size up until this reaches 0. */
   gaps: number
+  /**
+   * EVERY LATTICE POSITION at the chosen phase, seated or not — the field the shape was judged
+   * against, not just the part of it that answered.
+   *
+   * It was already being generated and thrown away: latticeAt() produces the whole set, the phase
+   * search filters it down to what the safe zone holds, and everything that failed vanished on that
+   * line. A surface could only ever draw the survivors, so the picture showed which points held and
+   * never showed which points were ASKED — and a magnet missing because its slot was blocked looked
+   * identical to one missing because no slot was there.
+   *
+   * Regenerated once, at the winning phase, rather than kept from inside the loop: the loop tries 36
+   * phases and only one of them is the answer.
+   */
+  lattice: Pt[]
+  /**
+   * THE PHASE THE SEARCH CHOSE, in millimetres.
+   *
+   * The 36-phase sweep keeps its winner in a local and returns only what seated there, so a surface
+   * wanting the field over a LARGER region than the shape — the whole canvas — had no way to ask
+   * for it on the same lattice. Returning the phase is what makes `latticeOver` answerable.
+   */
+  phaseMM: Pt
+  /**
+   * THE SPOT'S TRUE RADIUS — magnet radius plus padding, the exact figure the erosion used. A
+   * surface reconstructing it from the seated magnets got it 1mm small under corners8, where the
+   * erosion uses the 8mm magnet everywhere but the smallest seated magnet is 6mm.
+   */
+  spotRadiusMM: number
+}
+
+/**
+ * THE FIELD OVER ANY REGION, on a given phase — the same generator the search itself uses.
+ *
+ * A surface may need more of the lattice than the shape covers: the shape's bounding box is what
+ * the ENGINE judges, but a canvas shows the world around it, and a field that stops at the
+ * silhouette's edge tells you nothing about the spots the shape did not reach.
+ *
+ * It lives here because generating lattice positions is arithmetic on the pitch, and a shell doing
+ * that would be a second lattice definition drifting from the one that seated the magnets.
+ */
+export function latticeOver(
+  region: { minX: number; minY: number; maxX: number; maxY: number },
+  pitch: number,
+  pattern: GridPattern,
+  phase: Pt,
+): Pt[] {
+  return latticeAt(region, pitch, pattern, phase[0], phase[1])
 }
 
 type BBox = { minX: number; minY: number; maxX: number; maxY: number }
@@ -208,6 +255,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     edgeRangeMM: [pitch + minD, pitch + maxD],
     applicationPadMM: pad,
     gaps,
+    // The field as it was asked, at the phase that won. Same call the search made, one more time.
+    lattice: latticeAt(bb, pitch, pattern, bestOx, bestOy),
+    phaseMM: [bestOx, bestOy],
+    spotRadiusMM: rMag + pad,
   }
 }
 

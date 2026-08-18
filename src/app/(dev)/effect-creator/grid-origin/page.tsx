@@ -15,10 +15,13 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import { contourFromShape } from '@/lib/effect/geometry-truth'
 import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, fitSizeToGrid, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { computeGrid, fitSizeToGrid, latticeOver, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
 
 const IMG = 1000
-const VP = 440
+/** The stage's pixel size. 440 was a small fixed square in a card; the scaffold's canvas showed
+ *  what a proper working surface is, so this fills the column instead. Everything derives from it —
+ *  the element, the px/mm scale, the header label — so one value moves the whole surface. */
+const VP = 640
 const FIT = 0.86
 
 const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
@@ -32,12 +35,28 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   for (const p of pts) { if (p.x < a) a = p.x; if (p.x > c) c = p.x; if (p.y < b) b = p.y; if (p.y > d) d = p.y }
   return { w: c - a, h: d - b }
 }
-/** VShape → mm contour normalized so its longest side = 1mm (scaleContour then sizes it). */
+/**
+ * The largest size this bench manufactures at. Curves are flattened AS IF cut at this size, so the
+ * 0.05mm manufacturing tolerance is honoured at every size the slider reaches.
+ */
+const FLATTEN_REF_MM = 250
+
+/**
+ * VShape → mm contour normalized so its longest side = 1mm (scaleContour then sizes it).
+ *
+ * FLATTENED AT REAL SCALE, THEN NORMALIZED — not the other way round. Handing contourFromShape
+ * `1/L` told it the whole shape was one millimetre wide, so its 0.05mm cut tolerance became 50
+ * SOURCE PIXELS and every curve left as a visibly faceted polygon — which the engine then judged
+ * magnets against. Flattening as if manufactured at the reference size keeps the tolerance true;
+ * dividing back to 1mm afterwards changes coordinates, not resolution.
+ */
 function normBase(vs: VShape, maskH: number): Contour | null {
   const rings = flattenShape(vs, 1)
   const bb = bboxOf(rings[0] ?? [])
   const L = Math.max(bb.w, bb.h, 1)
-  return contourFromShape(vs, { mmPerPx: 1 / L, maskHeightPx: maskH })
+  const c = contourFromShape(vs, { mmPerPx: FLATTEN_REF_MM / L, maskHeightPx: maskH })
+  if (!c) return null
+  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt) }, holes: [] }
 }
 
 export default function GridLab() {
@@ -50,11 +69,21 @@ export default function GridLab() {
   const [points, setPoints] = useState(5)
   const [sizeMM, setSizeMM] = useState(70)
   const [pitch, setPitch] = useState(48)
-  const [pad, setPad] = useState(10)
+  // 12mm — Dan's locked padding (2026-08-10: "decided for 12mm padding - locked decision"). The
+  // engine's own floor is still the historical 10; the DEFAULT is the ruling.
+  const [pad, setPad] = useState(12)
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   const [frame, setFrame] = useState(true)
+  /**
+   * SHOW THE WHOLE FIELD, not just the part of it that answered.
+   *
+   * Off, the picture shows where magnets landed. On, it also shows every position they were tried
+   * against — so a slot that held nothing because its padding was blocked stops looking identical
+   * to a slot that was never there at all.
+   */
+  const [showLattice, setShowLattice] = useState(false)
   const [autoFit, setAutoFit] = useState(false)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
@@ -104,13 +133,24 @@ export default function GridLab() {
         return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
       }
       if (autoFit) {
-        const fit = fitSizeToGrid(sized, cfg, sizeMM)
+        // Snap climbs to the same 9x9 ceiling the slider offers — its own default stopped at 300.
+        const fit = fitSizeToGrid(sized, cfg, sizeMM, { maxMM: 8 * pitch + 2 * ((plan === 'all6' ? 3 : 4) + pad) })
         return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, snapped: fit.snapped }
       }
       const contour = sized(sizeMM)
       return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, snapped: false }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM])
+
+  /**
+   * THE SIZE RANGE, derived rather than picked. The floor is one 24mm cell — the smallest thing the
+   * product names. The ceiling is the full 9×9 field: eight lattice steps across plus one spot's
+   * material either side, computed from the live pitch, padding and plan so it moves when they do
+   * (410mm at the standard 48 lattice, 10mm padding, 6mm magnets — the "408" of the product law is
+   * the same construction under its 12mm-from-centre padding).
+   */
+  const minSizeMM = 24
+  const maxSizeMM = 8 * pitch + 2 * ((plan === 'all6' ? 3 : 4) + pad)
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genParams = {
@@ -136,7 +176,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} grid={model.grid} frame={frame} />
+            {model ? <Stage contour={model.contour} grid={model.grid} frame={frame} lattice={showLattice} gridPattern={pattern} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -197,7 +237,7 @@ export default function GridLab() {
               <input type="checkbox" checked={autoFit} onChange={e => setAutoFit(e.target.checked)} /></label>
             {autoFit
               ? <div className="gl-snap">Effect size <b>{model ? model.effSize : '—'} mm</b><span>snapped up the standard ladder to envelop a 4-point cell with padding</span></div>
-              : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={40} max={200} />}
+              : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />}
             <div className="gl-field"><span>Grid pitch · fixed standard</span>
               <div className="gl-seg">
                 <button aria-pressed={pitch === 48} onClick={() => setPitch(48)}>48 mm · standard</button>
@@ -228,6 +268,9 @@ export default function GridLab() {
             <label className="gl-toggle"><span>1 mm frame</span>
               <input type="checkbox" checked={frame} onChange={e => setFrame(e.target.checked)} />
             </label>
+            <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
+              <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
+            </label>
           </div>
 
           {model && <div className="gl-card gl-read">
@@ -251,7 +294,7 @@ function dim(c: Contour, axis: 0 | 1): number {
   return hi - lo
 }
 
-function Stage({ contour, grid, frame }: { contour: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean }) {
+function Stage({ contour, grid, frame, lattice, gridPattern }: { contour: Contour; grid: ReturnType<typeof computeGrid>; frame: boolean; lattice: boolean; gridPattern: GridPattern }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -259,17 +302,113 @@ function Stage({ contour, grid, frame }: { contour: Contour; grid: ReturnType<ty
   const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
+  /** Which magnet sits at a position — so a seated spot draws at ITS OWN magnet's radius. */
+  const anchorAt = new Map(grid.anchors.map(a => [a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2), a]))
   const hasFlap = grid.flaps.length > 0
+
+  /**
+   * THE FIELD FILLS THE FRAME, and the shape does not change size doing it.
+   *
+   * `S` is untouched — it is still px-per-mm derived from the shape's longest side, so the shape
+   * still renders at 86% of the viewport exactly as before. What changes is how much WORLD the
+   * element shows: at the same scale, a 440px square sees VP/S millimetres, so widening the box to
+   * that reveals what surrounds the shape instead of cropping to its edge. Shrinking the shape to
+   * make room would have been the other way, and it is the defect that made it look smaller.
+   */
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+  const spanMM = VP / S
+  const vx = cx - spanMM / 2, vy = cy - spanMM / 2
+
+  /**
+   * THE FIELD ACROSS THE WHOLE CANVAS — every spot the grid has, from the engine's own generator at
+   * the phase its search chose. The seated ones will be drawn as magnets on top; these show the
+   * spots the shape did NOT reach, which is exactly what a bench judging fit needs visible.
+   */
+  /**
+   * THE SPOT — the material one magnet requires: magnet radius PLUS the application padding, the
+   * exact figure the engine's erosion used, reported by the engine rather than reconstructed here.
+   * Drawn at the bare padding it was 3mm small, so the old dashed ring poked out past its own disc.
+   */
+  const spotR = grid.spotRadiusMM
+  /**
+   * ANCHORED ON A REAL LATTICE POINT, not on the reported phase. The generator's phase is relative
+   * to the REGION'S OWN MIN — positions land at min + phase (mod pitch) — so the same phase over a
+   * different region gives a different absolute lattice. Fed the engine's phase over the canvas
+   * region, every disc sat half a step off the magnets it was supposed to contain. An absolute
+   * point from the answer cannot drift: the phase for THIS region is its distance from the min.
+   */
+  const A = grid.anchors[0]?.p ?? grid.lattice[0] ?? null
+  const rgn = { minX: vx - spotR, minY: -(vy + spanMM) - spotR, maxX: vx + spanMM + spotR, maxY: -vy + spotR }
+  const fieldSpots = lattice && A
+    ? latticeOver(rgn, grid.pitchCentreMM, gridPattern, [A[0] - rgn.minX, A[1] - rgn.minY])
+    : []
+  /** Same point, display space — the rule patterns anchor here so lines cross at the centres. */
+  const Afy = A ? fy(A) : [0, 0]
+
   return (
-    <svg width={w * S} height={h * S} viewBox={`${minX} ${minY} ${w} ${h}`}>
-      <path d={d} fill="var(--suede)" />
-      {/* frame: red when edges would lift (flap risk), else the 1mm suede edge — no per-vertex ring spam */}
-      {frame && <path d={d} fill="none" stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'} strokeOpacity={hasFlap ? 0.85 : 1} strokeWidth={hasFlap ? 1.5 : 1} strokeLinejoin="round" />}
+    <svg width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}>
+      {/* THE NOTEPAD, ALWAYS — the scaffold canvas's ground: the millimetre rule at two levels
+          (fine 5%, pitch 10%), anchored ON the lattice so the intersections are the magnet centres.
+          It replaces the container's own decorative CSS grid, which was a second, unrelated ruling
+          fighting this one. The toggle governs the DISCS below, never the ground. */}
+      <defs>
+        <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
+          patternUnits="userSpaceOnUse" x={Afy[0]} y={Afy[1]}>
+          <path d={`M ${grid.pitchCentreMM / 2} 0 L 0 0 0 ${grid.pitchCentreMM / 2}`}
+            fill="none" stroke="var(--ink)" strokeOpacity={0.05} strokeWidth={0.4} />
+        </pattern>
+        <pattern id="gl-pitch" width={grid.pitchCentreMM} height={grid.pitchCentreMM}
+          patternUnits="userSpaceOnUse" x={Afy[0]} y={Afy[1]}>
+          <path d={`M ${grid.pitchCentreMM} 0 L 0 0 0 ${grid.pitchCentreMM}`}
+            fill="none" stroke="var(--ink)" strokeOpacity={0.10} strokeWidth={0.5} />
+        </pattern>
+      </defs>
+      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
+      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-fine)" />
+      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-pitch)" />
+      {/* THE EMPTY POSITIONS — the toggle's whole job. Same lattice, same construction, at the
+          radius the engine's erosion judged them by; faint, so the seated ones read over them. */}
+      {lattice && fieldSpots
+        .filter((n) => !anchorAt.has(n[0].toFixed(2) + ',' + n[1].toFixed(2)))
+        .map((n, i) => {
+          const p = fy(n)
+          return (
+            <circle key={'f' + i} cx={p[0]} cy={p[1]} r={spotR}
+              fill="var(--ink)" fillOpacity={0.04}
+              stroke="var(--ink)" strokeOpacity={0.25} strokeWidth={0.5} />
+          )
+        })}
+      {/* THE SEATED SPOTS — v1's own per-magnet disc (dia/2 + padding, the old dashed ring's exact
+          radius and wiring), ALWAYS drawn, restyled to the scaffold's wash: a mild fill with a
+          hairline edge instead of a dashed outline. The padding slider and magnet plan resize these
+          through the same solve they always did. */}
+      {grid.anchors.map((a, i) => {
+        const p = fy(a.p)
+        return (
+          <circle key={'spot' + i} cx={p[0]} cy={p[1]} r={a.dia / 2 + grid.applicationPadMM}
+            fill="var(--accent)" fillOpacity={0.10}
+            stroke="var(--accent)" strokeOpacity={0.55} strokeWidth={0.6} />
+        )
+      })}
+      {/* THE SHAPE IS ITS OUTLINE. A solid fill is a lid: it hides the field the shape is being
+          judged against, and the judgement is the whole point of this bench. So the material is a
+          wash and the cut line carries it. */}
+      <path d={d} fill="var(--suede)" fillOpacity={0.12} />
+      {/* The cut line, always — red when edges would lift (flap risk). The frame toggle adds the
+          heavier 1mm edge on top; without it the silhouette still reads. */}
+      <path
+        d={d}
+        fill="none"
+        stroke={hasFlap ? 'var(--fail)' : 'var(--suede-edge)'}
+        strokeOpacity={hasFlap ? 0.85 : 0.9}
+        strokeWidth={hasFlap ? 1.5 : frame ? 1 : 0.6}
+        strokeLinejoin="round"
+      />
       {grid.candidates.filter(c => !seat.has(c[0].toFixed(2) + ',' + c[1].toFixed(2))).map((c, i) => {
         const p = fy(c); return <circle key={'c' + i} cx={p[0]} cy={p[1]} r={1.6} fill="var(--grid)" fillOpacity={0.5} />
       })}
-      {/* per-spot application padding ring: magnet radius + padding — the material each magnet needs to bond */}
-      {grid.anchors.map((a, i) => { const p = fy(a.p); return <circle key={'ring' + i} cx={p[0]} cy={p[1]} r={a.dia / 2 + grid.applicationPadMM} fill="none" stroke="var(--accent)" strokeOpacity={0.3} strokeWidth={0.5} strokeDasharray="2.5 2.5" /> })}
+      {/* (The old dashed application-padding ring is gone: the spot disc above IS that circle —
+          magnet radius + padding — drawn once at every position instead of twice at the seated.) */}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
         return <g key={'a' + i}>
@@ -322,7 +461,7 @@ const CSS = `
 .gl-stage-head{display:flex;justify-content:space-between;gap:10px}
 .gl-eye{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .gl-vp{aspect-ratio:1;max-width:${VP}px;width:100%;margin:0 auto;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(var(--line) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/22px 22px,var(--panel-2);
+  background:var(--panel-2);
   border:1px dashed var(--line);border-radius:12px;overflow:hidden}
 .gl-empty{display:flex;align-items:center;gap:9px;color:var(--ink-3);font:12.5px var(--mono);text-align:center;padding:20px;max-width:80%}
 .gl-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:gspin .8s linear infinite;flex:none}
