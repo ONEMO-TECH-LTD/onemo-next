@@ -206,6 +206,15 @@ export const RELEASED: GridSystemSpec = Object.freeze({
   registration: 'point',
 }) as GridSystemSpec
 
+/**
+ * HOW FINELY THE LATTICE IS SLID when reading which points a shape carries.
+ *
+ * A released MEASUREMENT RESOLUTION, not a law value — which is why it sits out
+ * here beside the launch pitches rather than inside the guarded spec. It buys
+ * precision with time and is the one place the reading approximates anything.
+ */
+export const PHASE_STEP_MM = 2
+
 /** The launch pitches. 24 and 72 do not exist anywhere in the system (law 1.3). */
 export const LAUNCH_PITCHES_MM: readonly number[] = Object.freeze([48, 96])
 

@@ -30,7 +30,7 @@ import {
   type RegionMM,
 } from './engine'
 import { measureField, type MeasuredField, type TracedRingInput } from './compute/candidates'
-import { RELEASED_ARRANGEMENT_GRAMMAR, type GridSystemSpec } from './spec'
+import { PHASE_STEP_MM, RELEASED_ARRANGEMENT_GRAMMAR, type GridSystemSpec } from './spec'
 
 export type { FieldSummary, PointMM, RegionMM }
 export type { TracedRingInput }
@@ -170,4 +170,60 @@ export function solveCandidates(
     grammar: RELEASED_ARRANGEMENT_GRAMMAR as unknown as Parameters<typeof measureField>[0]['grammar'],
   })
   return { ...measured, productLogic: PRODUCT_LOGIC_GAP }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE CUTOUT DOOR — the shell hands in what it drew, and gets back what to draw.
+//
+// UI-SPECIFIC WORK LIVES HERE. A silhouette arrives as fractions of a drawn box,
+// which is a screen idea the engine has never heard of; it leaves as a view the
+// canvas can render. That translation is the bridge's job and belongs nowhere
+// else — not in the shell, which decides nothing, and not in the engine, which
+// has no box.
+
+import { scan, type Arrangement, type Node, type SizeReading } from './compute/occupancy'
+import type { Pt } from './compute/geometry'
+import { distinctOffers, primaryArrangement } from './logic/offer'
+
+export type { Arrangement, Node, SizeReading, Pt }
+
+/** A silhouette as the shell holds one: fractions of the box it is drawn in. */
+export type OutlineUV = ReadonlyArray<readonly [number, number]>
+
+export interface CutoutAnswer {
+  /** The layout to draw — logic's pick from everything the material carries. */
+  readonly primary: Arrangement | null
+  /** Every genuinely distinct layout this size unlocks, thinnings removed. */
+  readonly offers: readonly Arrangement[]
+  /** The size that was read, millimetres. */
+  readonly sizeMM: number
+  /** How finely the lattice was slid. An arrangement living in a narrower
+   *  window than this can be missed, and saying so is the point of returning it. */
+  readonly phaseStepMM: number
+}
+
+export function solveCutout(
+  spec: GridSystemSpec,
+  outline: OutlineUV,
+  box: RegionMM,
+): CutoutAnswer {
+  const contourMM: Pt[] = outline.map(([u, v]) => [box.x + u * box.w, box.y + v * box.h])
+  const sizeMM = Math.max(box.w, box.h)
+  const reading: SizeReading = scan(contourMM, {
+    sizesMM: [sizeMM],
+    latticeMM: spec.grid.basePitchMM,
+    radiusMM: spec.grid.paddingMM,
+    phaseStepMM: PHASE_STEP_MM,
+  }).readings[0]!
+  return {
+    primary: primaryArrangement(reading),
+    offers: distinctOffers(reading),
+    sizeMM,
+    phaseStepMM: PHASE_STEP_MM,
+  }
+}
+
+/** The spot a magnet occupies, for drawing. A released value, read not decided. */
+export function spotRadius(spec: GridSystemSpec): number {
+  return spec.grid.paddingMM
 }
