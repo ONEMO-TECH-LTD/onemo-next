@@ -14,7 +14,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type MagnetPlan } from '@/lib/effect/grid-origin'
 import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
-import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeLimitChoices, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
+import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
@@ -116,9 +116,6 @@ export default function GridLab() {
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
 
-  // Limit options come from the bridge, on the 12mm rungs — never computed here.
-  const limits = sizeLimitChoices()
-
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
 
@@ -207,12 +204,14 @@ export default function GridLab() {
                   <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} />
                   <div className="gl-field"><span>Slider limits</span>
                     <div className="gl-limits">
-                      <select value={sizeMin} onChange={(e) => { const v = +e.target.value; setSizeMin(v); if (sizeMM < v) setSizeMM(v) }}>
-                        {limits.mins.map((v) => <option key={v} value={v}>min {v} mm</option>)}
-                      </select>
-                      <select value={sizeMax} onChange={(e) => { const v = +e.target.value; setSizeMax(v); if (sizeMM > v) setSizeMM(v) }}>
-                        {limits.maxs.map((v) => <option key={v} value={v}>max {v} mm</option>)}
-                      </select>
+                      <span className="gl-num"><i>min</i>
+                        <input key={'mn' + sizeMin} type="number" defaultValue={sizeMin}
+                          onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(n) } }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
+                      <span className="gl-num"><i>max</i>
+                        <input key={'mx' + sizeMax} type="number" defaultValue={sizeMax}
+                          onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(n) } }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
                     </div>
                   </div>
                 </>
