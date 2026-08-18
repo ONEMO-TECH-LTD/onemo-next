@@ -324,13 +324,14 @@ function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<
 
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
-      style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none' }}
-      onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; (e.target as Element).setPointerCapture?.(e.pointerId) }}
+      style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
+      onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture?.(e.pointerId) }}
       onPointerMove={(e) => {
         if (!dragAt.current) return
         const k = S * cam.zoom
-        setCam((c) => ({ ...c, dx: c.dx - (e.clientX - dragAt.current!.x) / k, dy: c.dy - (e.clientY - dragAt.current!.y) / k }))
+        const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
         dragAt.current = { x: e.clientX, y: e.clientY }
+        setCam((c) => ({ ...c, dx: c.dx - mx, dy: c.dy - my }))
       }}
       onPointerUp={() => { dragAt.current = null }}
       onDoubleClick={() => setCam({ zoom: 1, dx: 0, dy: 0 })}>
