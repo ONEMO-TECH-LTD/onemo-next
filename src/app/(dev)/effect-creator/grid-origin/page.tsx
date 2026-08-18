@@ -356,9 +356,19 @@ function Empty({ text, spin }: { text: string; spin?: boolean }) {
   return <div className="gl-empty">{spin && <span className="gl-spin" />}{text}</div>
 }
 function Slider({ label, v, set, min, max, unit }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
+  const commit = (raw: string) => {
+    const n = +raw
+    if (Number.isFinite(n)) set(Math.min(max, Math.max(min, Math.round(n))))
+  }
   return (
     <label className="gl-slider">
-      <div className="gl-slider-row"><span>{label}</span><b>{v}{unit ? ' ' + unit : ''}</b></div>
+      <div className="gl-slider-row"><span>{label}</span>
+        <span className="gl-num">
+          <input key={v} type="number" defaultValue={v} min={min} max={max}
+            onBlur={(e) => commit(e.currentTarget.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+          {unit ? <i>{unit}</i> : null}
+        </span></div>
       <input type="range" min={min} max={max} value={v} onChange={e => set(+e.target.value)} />
     </label>
   )
@@ -419,6 +429,10 @@ const CSS = `
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.gl-num{display:inline-flex;align-items:center;gap:4px}
+.gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}
+.gl-num input:focus{outline:none;border-color:var(--accent)}
+.gl-num i{font:600 11px var(--mono);font-style:normal;color:var(--ink-3)}
 .gl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;background:var(--line);outline:none}
 .gl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px #0003;cursor:pointer}
 .gl input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);cursor:pointer}

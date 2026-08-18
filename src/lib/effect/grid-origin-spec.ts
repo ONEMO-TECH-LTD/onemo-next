@@ -44,7 +44,7 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 export const PHASE_STEP_MM = 12
 
 /** Flap allowance — how far material may extend past a spot's edge. Admin-dialled, 0 = edge-to-edge. */
-export const FLAP_MM = 24
+export const FLAP_MM = 12
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
