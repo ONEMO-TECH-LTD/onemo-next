@@ -1,0 +1,39 @@
+// solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
+// bridge/engine calls the page used to make inline, nothing computed here.
+
+import { BANDS, computeGrid, fitSizeInBand, type GridConfig } from '@/lib/effect/grid-origin'
+import { makeSizer } from '@/lib/effect/grid-origin-bridge'
+import type { Contour } from '@/lib/effect/types'
+
+interface SolveRequest {
+  id: number
+  base: Contour
+  offsetMM: number
+  cfg: GridConfig
+  mode: number | 'free'
+  sizeMM: number
+  snapStep: number
+  stepSel: number | null
+}
+
+const ctx = self as unknown as Worker
+
+ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
+  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel } = e.data
+  try {
+    const sized = makeSizer(base, offsetMM)
+    if (mode !== 'free') {
+      const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      const fit = fitSizeInBand(sized, cfg, band.minMM, snapStep)
+      const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
+      const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
+      ctx.postMessage({ id, model: { contour: sized(eff), grid, effSize: eff, ladder: fit.ladder, idx } })
+    } else {
+      const contour = sized(sizeMM)
+      ctx.postMessage({ id, model: { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, ladder: [], idx: 0 } })
+    }
+  } catch (err) {
+    ctx.postMessage({ id, model: null, error: String((err as Error)?.message ?? err) })
+  }
+}

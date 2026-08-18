@@ -1,6 +1,7 @@
 // grid-origin-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
 import type { Contour, Pt } from './types'
+import { pointInPolygon } from './attachment'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
@@ -48,9 +49,28 @@ export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
   return latticeAt(region, pitch, phase[0], phase[1])
 }
 
+/** Float distance from a point to the outline's nearest edge — the prescreen metric. */
+function edgeDistMM(outer: ReadonlyArray<Pt>, pt: Pt): number {
+  let min = Infinity
+  const [px, py] = pt
+  for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+    const [ax, ay] = outer[j], [bx, by] = outer[i]
+    const dx = bx - ax, dy = by - ay
+    const len2 = dx * dx + dy * dy
+    let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0
+    if (t < 0) t = 0; else if (t > 1) t = 1
+    const ex = px - (ax + t * dx), ey = py - (ay + t * dy)
+    const d2 = ex * ex + ey * ey
+    if (d2 < min) min = d2
+  }
+  return Math.sqrt(min)
+}
+
 /**
  * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
  * tangency passing by equality (exact integer arithmetic, micron quantum).
+ * A float prescreen answers the clear cases; only points within a guard band of the exact
+ * threshold fall through to the integer test — the answer never changes, only the cost.
  * Null for a degenerate outline.
  */
 export function makeSeatPredicate(
@@ -58,10 +78,16 @@ export function makeSeatPredicate(
   spotRadiusMM: number,
 ): ((pt: Pt) => boolean) | null {
   const QUANTUM = 0.001
+  const GUARD = 0.05
   let prep: ReturnType<typeof prepare>
   try { prep = prepare(outer, QUANTUM) } catch { return null }
   const rQ = Math.round(spotRadiusMM / QUANTUM)
-  return (pt: Pt) => holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
+  return (pt: Pt) => {
+    const d = edgeDistMM(outer, pt)
+    if (d > spotRadiusMM + GUARD) return pointInPolygon(pt, outer as Pt[])
+    if (d < spotRadiusMM - GUARD) return false
+    return holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
+  }
 }
 
 /**

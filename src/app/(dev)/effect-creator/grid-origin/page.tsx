@@ -12,9 +12,9 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan } from '@/lib/effect/grid-origin'
 import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
-import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
+import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
@@ -93,41 +93,51 @@ export default function GridLab() {
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
   }
 
-  const model = useMemo(() => {
+  // base contour normalized so longest side = 1mm (scale-free) — cheap, main thread.
+  const base = useMemo<Contour | null>(() => {
     try {
-      // base contour normalized so longest side = 1mm (scale-free); scaleContour() sizes it in mm
-      let base: Contour | null = null
       if (src === 'magic') {
         if (!magic) return null
-        base = normBaseContour(magic.vshape, magic.maskH)
-      } else if (src === 'preset' && hasVectorDef(preset)) {
-        base = normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG)
-      } else {
-        const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
-          : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
+        return normBaseContour(magic.vshape, magic.maskH)
+      }
+      if (src === 'preset' && hasVectorDef(preset)) {
+        return normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG)
+      }
+      const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
+        : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
           : gen === 'daisy' ? { kind: gen, depth: p1, petals: p2 }
-          : { kind: gen, swirl: p1, blades: p2 }
-        const ring = generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG)
-        base = normGeneratedRing(ring, IMG)
-      }
-      if (!base || base.outer.pts.length < 3) return null
-      const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
-      // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
-      const sized = makeSizer(b, offsetMM)
-      if (mode !== 'free') {
-        // Band snap: every distinct holding layout is a step; the landing pick is max-count.
-        const band = BANDS.find((bd) => bd.id === mode) ?? BANDS[0]
-        const fit = fitSizeInBand(sized, cfg, band.minMM, snapStep)
-        const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
-        const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
-        const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
-        return { contour: sized(eff), grid, effSize: eff, ladder: fit.ladder, idx }
-      }
-      const contour = sized(sizeMM)
-      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, ladder: [] as BandSnapPoint[], idx: 0 }
+            : { kind: gen, swirl: p1, blades: p2 }
+      const ring = generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG)
+      return normGeneratedRing(ring, IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, manual, plan, magic, mode, stepSel, coverage, offsetMM, snapStep])
+  }, [src, preset, gen, p1, p2, sides, points, magic])
+
+  // The solve runs in a worker so the page never freezes; the last result stays up while solving.
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number }
+  const [model, setModel] = useState<Model | null>(null)
+  const [solving, setSolving] = useState(false)
+  const workerRef = useRef<Worker | null>(null)
+  const seqRef = useRef(0)
+  useEffect(() => {
+    const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
+    workerRef.current = w
+    w.onmessage = (e) => {
+      if (e.data.id !== seqRef.current) return
+      if (e.data.error) console.error('[grid-lab] solve failed', e.data.error)
+      setModel(e.data.model)
+      setSolving(false)
+    }
+    return () => { workerRef.current = null; w.terminate() }
+  }, [])
+  useEffect(() => {
+    const w = workerRef.current
+    if (!w) return
+    if (!base || base.outer.pts.length < 3) { setModel(null); return }
+    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const id = ++seqRef.current
+    setSolving(true)
+    w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -148,6 +158,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
+            {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))}
@@ -290,7 +301,7 @@ function dim(c: Contour, axis: 0 | 1): number {
 }
 
 function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
-  contour: Contour; grid: ReturnType<typeof computeGrid>; lattice: boolean
+  contour: Contour; grid: GridResult; lattice: boolean
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -381,7 +392,7 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
   )
 }
 
-function Verdict({ grid }: { grid: ReturnType<typeof computeGrid> }) {
+function Verdict({ grid }: { grid: GridResult }) {
   return (
     <div className={`gl-verdict ${grid.ok ? 'ok' : 'bad'}`}>
       <div className="gl-vrow"><span className="gl-dot" /><b>{grid.ok ? `Holds — ${grid.anchors.length} magnets seated, spread across material` : "Won't hold reliably"}</b></div>
@@ -432,8 +443,10 @@ const CSS = `
 .gl-stage-head{display:flex;justify-content:space-between;gap:10px}
 .gl-eye{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .gl-vp{aspect-ratio:1;max-width:${VP}px;width:100%;margin:0 auto;display:flex;align-items:center;justify-content:center;
-  background:var(--panel-2);
+  background:var(--panel-2);position:relative;
   border:1px dashed var(--line);border-radius:12px;overflow:hidden}
+.gl-solving{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:8px;
+  font:600 12px var(--mono);color:var(--ink-2);background:rgba(127,132,145,.14);backdrop-filter:blur(1px)}
 .gl-empty{display:flex;align-items:center;gap:9px;color:var(--ink-3);font:12.5px var(--mono);text-align:center;padding:20px;max-width:80%}
 .gl-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:gspin .8s linear infinite;flex:none}
 @keyframes gspin{to{transform:rotate(360deg)}}
