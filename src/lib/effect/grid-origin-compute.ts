@@ -4,8 +4,6 @@ import type { Contour, Pt } from './types'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
-export type GridPattern = 'standard' | 'quincunx' | 'granular'
-
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
@@ -36,27 +34,17 @@ function axisFrom(min: number, max: number, step: number, phase: number): number
   return res
 }
 
-/** Lattice across a region at phase (ox, oy). Patterns are parity variants of the half-pitch atom. */
-export function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy: number): Pt[] {
-  const atom = pitch / 2
+/** Lattice across a region at phase (ox, oy). */
+export function latticeAt(bb: BBox, pitch: number, ox: number, oy: number): Pt[] {
   const out: Pt[] = []
-  const cross = (xs: number[], ys: number[]) => { for (const x of xs) for (const y of ys) out.push([x, y]) }
-  if (pattern === 'granular') {
-    cross(axisFrom(bb.minX, bb.maxX, atom, ox), axisFrom(bb.minY, bb.maxY, atom, oy))
-  } else if (pattern === 'quincunx') {
-    cross(axisFrom(bb.minX, bb.maxX, pitch, ox), axisFrom(bb.minY, bb.maxY, pitch, oy))
-    cross(axisFrom(bb.minX, bb.maxX, pitch, ox + pitch / 2), axisFrom(bb.minY, bb.maxY, pitch, oy + pitch / 2))
-  } else {
-    cross(axisFrom(bb.minX, bb.maxX, pitch, ox), axisFrom(bb.minY, bb.maxY, pitch, oy))
-  }
-  const seen = new Set<string>(); const uniq: Pt[] = []
-  for (const p of out) { const k = p[0].toFixed(2) + ',' + p[1].toFixed(2); if (!seen.has(k)) { seen.add(k); uniq.push(p) } }
-  return uniq
+  for (const x of axisFrom(bb.minX, bb.maxX, pitch, ox))
+    for (const y of axisFrom(bb.minY, bb.maxY, pitch, oy)) out.push([x, y])
+  return out
 }
 
 /** The same lattice generator over an arbitrary region. */
-export function latticeOver(region: BBox, pitch: number, pattern: GridPattern, phase: Pt): Pt[] {
-  return latticeAt(region, pitch, pattern, phase[0], phase[1])
+export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
+  return latticeAt(region, pitch, phase[0], phase[1])
 }
 
 /**
@@ -121,11 +109,6 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
     if (l && r && u && d) interior.push(p); else belt.push(p)
   }
   return { belt, interior }
-}
-
-/** Neighbour distance for the belt test, by pattern. */
-export function neighbourStep(pitch: number, pattern: GridPattern): number {
-  return pattern === 'granular' ? pitch / 2 : pattern === 'quincunx' ? pitch / Math.SQRT2 : pitch
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */

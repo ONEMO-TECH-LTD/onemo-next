@@ -9,7 +9,7 @@ import {
   MIN_ANCHORS,
   SEAT_WEIGHT,
 } from './grid-origin-spec'
-import { bbox, splitPerimeter, type GridPattern } from './grid-origin-compute'
+import { bbox, splitPerimeter } from './grid-origin-compute'
 import type { Band } from './grid-origin-spec'
 
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
@@ -33,11 +33,9 @@ export function applyCoverage(
   seated: Pt[],
   perimeterOnly: boolean,
   pitch: number,
-  pattern: GridPattern,
-  step: (pitch: number, pattern: GridPattern) => number,
 ): { seated: Pt[]; interior: Pt[] } {
   if (!perimeterOnly || seated.length <= 4) return { seated, interior: [] }
-  const split = splitPerimeter(seated, step(pitch, pattern))
+  const split = splitPerimeter(seated, pitch)
   if (split.belt.length >= MIN_ANCHORS) return { seated: split.belt, interior: split.interior }
   return { seated, interior: [] }
 }

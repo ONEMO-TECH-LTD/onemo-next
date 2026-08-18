@@ -16,9 +16,7 @@ import {
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
-  neighbourStep,
   spotRadiusOf,
-  type GridPattern,
 } from './grid-origin-compute'
 import {
   applyCoverage,
@@ -37,14 +35,12 @@ export {
   latticeOver,
   scaleContour,
   spotRadiusOf,
-  type GridPattern,
 } from './grid-origin-compute'
 export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
 
 export interface GridConfig {
   pitchMM?: number
   paddingMM?: number
-  pattern?: GridPattern
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -71,7 +67,6 @@ export interface GridResult {
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-  const pattern = cfg.pattern ?? 'standard'
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
@@ -97,7 +92,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     let bestScore = -Infinity
     for (const oy of phases(bb.maxY - bb.minY)) {
       for (const ox of phases(bb.maxX - bb.minX)) {
-        const seat = latticeAt(bb, pitch, pattern, ox, oy).filter(fits)
+        const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
         if (!seat.length) continue
         const flapCount = flapVerts(outer, seat, pitch).length
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
@@ -108,9 +103,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     }
   }
 
-  const lattice = latticeAt(bb, pitch, pattern, bestOx, bestOy)
+  const lattice = latticeAt(bb, pitch, bestOx, bestOy)
 
-  const coverage = applyCoverage(bestSeated, perimeterOnly, pitch, pattern, neighbourStep)
+  const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
   const anchors = assignSizes(coverage.seated, plan)
 
   const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, pitch) : []

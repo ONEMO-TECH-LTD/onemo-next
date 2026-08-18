@@ -12,7 +12,7 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { bandOf, computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { bandOf, computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type MagnetPlan } from '@/lib/effect/grid-origin'
 import { BANDS, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
@@ -45,7 +45,6 @@ export default function GridLab() {
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = useState(RELEASED_PADDING_MM)
   const [offsetMM, setOffsetMM] = useState(0)
-  const [pattern, setPattern] = useState<GridPattern>('standard')
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(false)
@@ -92,7 +91,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+      const cfg = { pitchMM: pitch, paddingMM: pad, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
       // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
       const sized = makeSizer(b, offsetMM)
       if (autoFit) {
@@ -106,7 +105,7 @@ export default function GridLab() {
       const contour = sized(sizeMM)
       return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, points: [] as BandSnapPoint[] }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM, snapStep, snapSel])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, plan, magic, autoFit, coverage, offsetMM, snapStep, snapSel])
 
   // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
   const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
@@ -130,7 +129,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} gridPattern={pattern} />
+            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -215,12 +214,6 @@ export default function GridLab() {
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
-            <div className="gl-field"><span>Grid pattern</span>
-              <div className="gl-seg">
-                {(['standard', 'quincunx', 'granular'] as GridPattern[]).map(p =>
-                  <button key={p} aria-pressed={pattern === p} onClick={() => setPattern(p)}>{p === 'quincunx' ? 'Dice-5' : cap(p)}</button>)}
-              </div>
-            </div>
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
@@ -244,7 +237,6 @@ export default function GridLab() {
             <Cell k="Pitch · center" v={`${model.grid.pitchCentreMM} mm`} />
             <Cell k="Pitch · edge" v={model.grid.edgeRangeMM[0] === model.grid.edgeRangeMM[1] ? `${model.grid.edgeRangeMM[0]} mm` : `${model.grid.edgeRangeMM[0]}–${model.grid.edgeRangeMM[1]} mm`} />
             <Cell k="Seated magnets" v={String(model.grid.anchors.length)} />
-            <Cell k="Pattern" v={pattern === 'quincunx' ? 'dice-5' : pattern} />
           </div>}
         </aside>
       </div>
@@ -252,14 +244,13 @@ export default function GridLab() {
   )
 }
 
-function cap(s: string) { return s[0].toUpperCase() + s.slice(1) }
 function dim(c: Contour, axis: 0 | 1): number {
   let lo = Infinity, hi = -Infinity
   for (const p of c.outer.pts) { if (p[axis] < lo) lo = p[axis]; if (p[axis] > hi) hi = p[axis] }
   return hi - lo
 }
 
-function Stage({ contour, grid, lattice, gridPattern }: { contour: Contour; grid: ReturnType<typeof computeGrid>; lattice: boolean; gridPattern: GridPattern }) {
+function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<typeof computeGrid>; lattice: boolean }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -276,7 +267,7 @@ function Stage({ contour, grid, lattice, gridPattern }: { contour: Contour; grid
 
   // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
   const spots: readonly FieldSpot[] = lattice
-    ? fieldSpots(grid, gridPattern, { minX: vx, minY: -(vy + spanMM), maxX: vx + spanMM, maxY: -vy })
+    ? fieldSpots(grid, { minX: vx, minY: -(vy + spanMM), maxX: vx + spanMM, maxY: -vy })
     : seatedSpots(grid)
   // Rule anchor: any spot is on the lattice, so lines cross at the centres.
   const A0 = spots[0]

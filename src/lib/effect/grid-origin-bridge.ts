@@ -11,7 +11,6 @@ import {
   fieldSpanMM,
   latticeOver,
   MIN_EFFECT_MM,
-  type GridPattern,
   type GridResult,
   type MagnetPlan,
 } from './grid-origin'
@@ -72,7 +71,6 @@ export interface FieldSpot {
  *  min, so the same phase over a different region would be a different absolute lattice. */
 export function fieldSpots(
   grid: GridResult,
-  pattern: GridPattern,
   view: { minX: number; minY: number; maxX: number; maxY: number },
 ): FieldSpot[] {
   const anchorAt = new Map(grid.anchors.map((a) => [a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2), a]))
@@ -80,7 +78,7 @@ export function fieldSpots(
   if (!A) return []
   const pad = grid.spotRadiusMM
   const rgn = { minX: view.minX - pad, minY: view.minY - pad, maxX: view.maxX + pad, maxY: view.maxY + pad }
-  return latticeOver(rgn, grid.pitchCentreMM, pattern, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => {
+  return latticeOver(rgn, grid.pitchCentreMM, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => {
     const a = anchorAt.get(n[0].toFixed(2) + ',' + n[1].toFixed(2))
     return { x: n[0], y: n[1], r: grid.spotRadiusMM, held: Boolean(a) }
   })
@@ -92,4 +90,4 @@ export function seatedSpots(grid: GridResult): FieldSpot[] {
 }
 
 export { computeGrid }
-export type { GridResult, GridPattern, MagnetPlan }
+export type { GridResult, MagnetPlan }
