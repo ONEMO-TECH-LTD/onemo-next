@@ -32,6 +32,17 @@ const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, st
 type Src = 'preset' | 'gen' | 'magic'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
 
+/** Admin dial that survives reloads — browser-stored, initialized from the spec default. */
+function usePersisted(key: string, initial: number): [number, (n: number) => void] {
+  const [v, setV] = useState(initial)
+  useEffect(() => {
+    const raw = localStorage.getItem('grid-origin.' + key)
+    if (raw !== null && Number.isFinite(+raw)) setV(+raw)
+  }, [key])
+  const set = (n: number) => { setV(n); try { localStorage.setItem('grid-origin.' + key, String(n)) } catch { } }
+  return [v, set]
+}
+
 export default function GridLab() {
   const [src, setSrc] = useState<Src>('preset')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
@@ -42,15 +53,15 @@ export default function GridLab() {
   const [points, setPoints] = useState(5)
   // Opens on the B2 floor — the 72mm square standard (2×2), from spec.
   const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
-  /** Free-slider limits, admin-selectable on the 12mm rungs. */
-  const [sizeMin, setSizeMin] = useState(MIN_EFFECT_MM)
-  const [sizeMax, setSizeMax] = useState(() => sizeRange(RELEASED_PADDING_MM).maxMM)
+  /** Free-slider limits — typed, persisted across reloads. */
+  const [sizeMin, setSizeMin] = usePersisted('sizeMin', MIN_EFFECT_MM)
+  const [sizeMax, setSizeMax] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
-  const [pad, setPad] = useState(RELEASED_PADDING_MM)
+  const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
   /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
-  const [flap, setFlap] = useState(FLAP_MM)
+  const [flap, setFlap] = usePersisted('flap', FLAP_MM)
   /** Placement step dial — how finely the lattice slides under the shape; 1 = continuous panning. */
-  const [phaseStep, setPhaseStep] = useState(PHASE_STEP_MM)
+  const [phaseStep, setPhaseStep] = usePersisted('phaseStep', PHASE_STEP_MM)
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
@@ -60,7 +71,7 @@ export default function GridLab() {
   /** Selected step on the band's fit ladder. */
   const [stepIdx, setStepIdx] = useState(0)
   /** Snap scan step — admin-tunable for testing; default from spec. */
-  const [snapStep, setSnapStep] = useState(SNAP_STEP_MM)
+  const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   const [magic, setMagic] = useState<MagicState>(null)
