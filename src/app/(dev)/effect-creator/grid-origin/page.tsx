@@ -78,6 +78,8 @@ export default function GridLab() {
   const [blend, setBlend] = usePersisted('anchorBlend', ANCHOR_BLEND_PCT)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
   /** Lab dials — spec defaults reproduce shipped behaviour until touched. */
+  const [labOnN, setLabOnN] = usePersisted('labOn', 1)
+  const labOn = labOnN !== 0
   const [rankOrder, setRankOrder] = useState<RankOrder>(RANK_ORDER as RankOrder)
   const [edgeTol, setEdgeTol] = usePersisted('edgeTol', EDGE_REG_TOL_MM)
   const [coverTie, setCoverTie] = usePersisted('coverTie', COVER_TIE_MM)
@@ -177,12 +179,14 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, anchorBlendPct: blend, rankOrder, edgeTolMM: edgeTol, coverTieMM: coverTie, gateMode, gateLooseMM: gateLoose, variantMode, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    // LAB off = pure engine: the six experimental fields are simply not sent, so spec defaults rule.
+    const lab = labOn ? { anchorBlendPct: blend, rankOrder, edgeTolMM: edgeTol, coverTieMM: coverTie, gateMode, gateLooseMM: gateLoose, variantMode } : {}
+    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, ...lab, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -191,15 +195,18 @@ export default function GridLab() {
     <div className="gl">
       <style>{CSS}</style>
       <header className="gl-head">
-        <h1>Magnetic Grid Lab <span className="gl-tag">s59 · registration engine</span></h1>
-        <p>Every engine shape source — presets, generators, and <b>AI image cut-out</b> — through the mm magnetic grid.
-          The window is fixed; change the effect's real size and the proportions move. Drawn entirely from millimetres.</p>
+        <h1>Magnetic Grid Lab <span className="gl-tag">v3.5</span></h1>
       </header>
 
       <div className="gl-body">
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
-            <span className="gl-eye">Editor viewport · fixed {VP}px</span>
+            <span className="gl-eye">
+              load {perf.loadMs != null ? Math.round(perf.loadMs) : '—'}ms
+              · gen {perf.genMs != null ? Math.max(1, Math.round(perf.genMs)) : '—'}ms
+              {perf.cutMs != null ? ` · cut ${(perf.cutMs / 1000).toFixed(1)}s` : ''}
+              · solve {perf.solveMs != null ? (perf.solveMs >= 1000 ? `${(perf.solveMs / 1000).toFixed(1)}s` : `${Math.round(perf.solveMs)}ms`) : '—'}
+            </span>
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
@@ -302,29 +309,6 @@ export default function GridLab() {
             <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
             <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
-
-            <Slider label="Grid anchor · box ↔ weight centre" unit="%" v={blend} set={setBlend} min={0} max={100} />
-            <div className="gl-field"><span>Judging order · what wins</span>
-              <div className="gl-seg">
-                {([['edges', 'Edges'], ['coverage', 'Coverage'], ['count', 'Count']] as [RankOrder, string][]).map(([m, l]) =>
-                  <button key={m} aria-pressed={rankOrder === m} onClick={() => setRankOrder(m)}>{l}</button>)}
-              </div>
-            </div>
-            <Slider label="Edge strictness · reach slack" unit="mm" v={edgeTol} set={setEdgeTol} min={0} max={12} />
-            <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
-            <div className="gl-field"><span>Band entry rule</span>
-              <div className="gl-seg">
-                {([['all', 'All covered'], ['most', 'Mostly'], ['seated', 'Seated']] as [GateMode, string][]).map(([m, l]) =>
-                  <button key={m} aria-pressed={gateMode === m} onClick={() => setGateMode(m)}>{l}</button>)}
-              </div>
-            </div>
-            {gateMode === 'most' && <Slider label="Loose allowance · mean uncovered" unit="mm" v={gateLoose} set={setGateLoose} min={0} max={48} />}
-            <div className="gl-field"><span>Variant rule</span>
-              <div className="gl-seg">
-                {([['layout', 'Layouts'], ['count', 'Counts'], ['newcount', 'New counts']] as [VariantMode, string][]).map(([m, l]) =>
-                  <button key={m} aria-pressed={variantMode === m} onClick={() => setVariantMode(m)}>{l}</button>)}
-              </div>
-            </div>
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
@@ -353,10 +337,39 @@ export default function GridLab() {
             <Cell k="Pitch · edge" v={model.grid.edgeRangeMM[0] === model.grid.edgeRangeMM[1] ? `${model.grid.edgeRangeMM[0]} mm` : `${model.grid.edgeRangeMM[0]}–${model.grid.edgeRangeMM[1]} mm`} />
             <Cell k="Seated magnets" v={String(model.grid.anchors.length)} />
             <Cell k="Registration" v={model.grid.phaseMM.map((n) => n.toFixed(1)).join(' · ') + (manual ? ' manual' : ' auto')} />
-            <Cell k="First load" v={perf.loadMs != null ? `${Math.round(perf.loadMs)} ms` : '—'} />
-            <Cell k="Shape gen" v={(perf.genMs != null ? `${Math.max(1, Math.round(perf.genMs))} ms` : '—') + (perf.cutMs != null ? ` · cut ${(perf.cutMs / 1000).toFixed(1)}s` : '')} />
-            <Cell k="Solve" v={perf.solveMs != null ? (perf.solveMs >= 1000 ? `${(perf.solveMs / 1000).toFixed(1)} s` : `${Math.round(perf.solveMs)} ms`) : '—'} />
           </div>}
+        </aside>
+
+        <aside className="gl-labcol">
+          <div className="gl-card gl-pad">
+            <label className="gl-toggle"><span>LAB · judging experiments <small style={{ color: 'var(--ink-3)' }}>· off = pure engine</small></span>
+              <input type="checkbox" checked={labOn} onChange={(e) => setLabOnN(e.target.checked ? 1 : 0)} />
+            </label>
+            <div className={`gl-lab-body${labOn ? '' : ' gl-lab-off'}`}>
+              <Slider label="Grid anchor · box ↔ weight centre" unit="%" v={blend} set={setBlend} min={0} max={100} />
+              <div className="gl-field"><span>Judging order · what wins</span>
+                <div className="gl-seg">
+                  {([['edges', 'Edges'], ['coverage', 'Coverage'], ['count', 'Count']] as [RankOrder, string][]).map(([m, l]) =>
+                    <button key={m} aria-pressed={rankOrder === m} onClick={() => setRankOrder(m)}>{l}</button>)}
+                </div>
+              </div>
+              <Slider label="Edge strictness · reach slack" unit="mm" v={edgeTol} set={setEdgeTol} min={0} max={12} />
+              <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
+              <div className="gl-field"><span>Band entry rule</span>
+                <div className="gl-seg">
+                  {([['all', 'All covered'], ['most', 'Mostly'], ['seated', 'Seated']] as [GateMode, string][]).map(([m, l]) =>
+                    <button key={m} aria-pressed={gateMode === m} onClick={() => setGateMode(m)}>{l}</button>)}
+                </div>
+              </div>
+              {gateMode === 'most' && <Slider label="Loose allowance · mean uncovered" unit="mm" v={gateLoose} set={setGateLoose} min={0} max={48} />}
+              <div className="gl-field"><span>Variant rule</span>
+                <div className="gl-seg">
+                  {([['layout', 'Layouts'], ['count', 'Counts'], ['newcount', 'New counts']] as [VariantMode, string][]).map(([m, l]) =>
+                    <button key={m} aria-pressed={variantMode === m} onClick={() => setVariantMode(m)}>{l}</button>)}
+                </div>
+              </div>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
@@ -499,8 +512,16 @@ const CSS = `
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
 .gl-tag{font:600 11px var(--mono);color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;letter-spacing:.02em}
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
-.gl-body{max-width:1060px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
-@media (max-width:840px){.gl-body{grid-template-columns:1fr}}
+.gl-body{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:290px minmax(0,1fr) 336px;gap:20px;align-items:start}
+.gl-labcol{grid-column:1;grid-row:1}
+.gl-stage{grid-column:2;grid-row:1}
+.gl-controls{grid-column:3;grid-row:1}
+.gl-lab-body{display:flex;flex-direction:column;gap:15px;margin-top:13px}
+.gl-lab-off{opacity:.4;pointer-events:none}
+@media (max-width:1100px){.gl-body{grid-template-columns:minmax(0,1fr) 336px}
+  .gl-stage{grid-column:1;grid-row:1}.gl-controls{grid-column:2;grid-row:1}.gl-labcol{grid-column:1/-1;grid-row:2}}
+@media (max-width:840px){.gl-body{grid-template-columns:1fr}
+  .gl-stage{grid-column:1;grid-row:auto}.gl-controls{grid-column:1;grid-row:auto}.gl-labcol{grid-column:1;grid-row:auto}}
 .gl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .gl-pad{padding:18px;display:flex;flex-direction:column;gap:15px}
 .gl-stage{padding:20px;display:flex;flex-direction:column;gap:14px}
