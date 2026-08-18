@@ -83,6 +83,8 @@ export default function GridLab() {
   const [labOnN, setLabOnN] = usePersisted('labOn', 1)
   const labOn = labOnN !== 0
   /** Per-control enables — off sends that control's field not at all, so spec default rules it. */
+  const [enFlapN, setEnFlapN] = usePersisted('en.flap', 1)
+  const [enPhaseN, setEnPhaseN] = usePersisted('en.phaseStep', 1)
   const [enBlendN, setEnBlendN] = usePersisted('en.blend', 1)
   const [enRankN, setEnRankN] = usePersisted('en.rank', 1)
   const [enEdgeTolN, setEnEdgeTolN] = usePersisted('en.edgeTol', 1)
@@ -197,12 +199,12 @@ export default function GridLab() {
       ...(enGateN ? { gateMode, gateLooseMM: gateLoose } : {}),
       ...(enVariantN ? { variantMode } : {}),
     } : {}
-    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, ...lab, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, ...lab, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, enBlendN, enRankN, enEdgeTolN, enCoverTieN, enGateN, enVariantN, plan, mode, stepSel, coverage, offsetMM, snapStep])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, enFlapN, enPhaseN, enBlendN, enRankN, enEdgeTolN, enCoverTieN, enGateN, enVariantN, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -321,8 +323,12 @@ export default function GridLab() {
               </div>
             </div>
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
-            <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
-            <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
+            <LabRow on={enFlapN !== 0} set={(b) => setEnFlapN(b ? 1 : 0)}>
+              <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
+            </LabRow>
+            <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
+              <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
+            </LabRow>
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
