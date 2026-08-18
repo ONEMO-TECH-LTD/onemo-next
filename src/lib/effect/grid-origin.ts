@@ -4,6 +4,7 @@
 import type { Contour, Pt } from './types'
 import {
   DEFAULT_PITCH_MM,
+  EDGE_REG_TOL_MM,
   FLAP_MM,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
@@ -13,6 +14,7 @@ import {
 import {
   bbox,
   centroidMM,
+  edgeRegistered,
   fieldSpanMM,
   flapExcessMM,
   flapVerts,
@@ -25,9 +27,10 @@ import {
   applyCoverage,
   assignSizes,
   bandOf,
+  betterLayout,
   isHolding,
-  registrationScore,
   type Anchor,
+  type LayoutMeasure,
   type MagnetPlan,
 } from './grid-origin-logic'
 
@@ -115,16 +118,19 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(off + k, pitch), k })
       return out
     }
-    let bestScore = -Infinity
+    let best: LayoutMeasure | null = null
     for (const py of phases(offY)) {
       for (const px of phases(offX)) {
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
-        const excess = flapExcessMM(outer, seat, reach)
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
-        const balance = Math.hypot(sx / seat.length - centre[0], sy / seat.length - centre[1])
-        const score = registrationScore(seat.length, excess, balance)
-        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
+        const m: LayoutMeasure = {
+          registered: edgeRegistered(bb, seat, spotRadiusOf(pad), EDGE_REG_TOL_MM),
+          excessMM: flapExcessMM(outer, seat, reach),
+          seats: seat.length,
+          balanceMM: Math.hypot(sx / seat.length - centre[0], sy / seat.length - centre[1]),
+        }
+        if (!best || betterLayout(m, best)) { best = m; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
       }
     }
   }

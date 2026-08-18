@@ -58,6 +58,6 @@ export const FLAP_CEIL_MM = 48
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
-/** Registration score weights: seats, then flaps, then balance. */
-export const SEAT_WEIGHT = 100000
-export const FLAP_WEIGHT = 100
+/** Edge registration slack: a layout is registered when every side's outermost spot
+ *  reaches the shape bound within this tolerance. */
+export const EDGE_REG_TOL_MM = 1

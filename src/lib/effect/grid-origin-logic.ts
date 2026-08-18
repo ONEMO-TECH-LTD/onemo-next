@@ -3,11 +3,9 @@
 import type { Pt } from './types'
 import {
   BANDS,
-  FLAP_WEIGHT,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
-  SEAT_WEIGHT,
 } from './grid-origin-spec'
 import { bbox, splitPerimeter } from './grid-origin-compute'
 import type { Band } from './grid-origin-spec'
@@ -23,9 +21,22 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** Registration score: seats above all, then least uncovered material (graded mm), then balance. */
-export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
-  return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
+/** One candidate registration's measures, ranked lexicographically. */
+export interface LayoutMeasure {
+  registered: boolean
+  excessMM: number
+  seats: number
+  balanceMM: number
+}
+
+/** Layout rank (v1 law): edge registration → coverage → seats → balance. Count is demoted —
+ *  more magnets can never buy a worse wrap; it decides only among equally registered,
+ *  equally covered candidates. Returns true when `a` beats `b`. */
+export function betterLayout(a: LayoutMeasure, b: LayoutMeasure): boolean {
+  if (a.registered !== b.registered) return a.registered
+  if (a.excessMM !== b.excessMM) return a.excessMM < b.excessMM
+  if (a.seats !== b.seats) return a.seats > b.seats
+  return a.balanceMM < b.balanceMM
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

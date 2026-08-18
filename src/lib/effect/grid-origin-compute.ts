@@ -143,6 +143,16 @@ export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>
   return sum / outer.length
 }
 
+/** All-or-nothing edge registration: on every side the outermost spot reaches the bbox bound
+ *  within tolMM. Partial contact earns nothing — summed slack rewards asymmetry (v1 law). */
+export function edgeRegistered(bb: BBox, seated: ReadonlyArray<Pt>, spotRadiusMM: number, tolMM: number): boolean {
+  if (!seated.length) return false
+  let nx = Infinity, ny = Infinity, xx = -Infinity, xy = -Infinity
+  for (const [x, y] of seated) { if (x < nx) nx = x; if (x > xx) xx = x; if (y < ny) ny = y; if (y > xy) xy = y }
+  return nx - spotRadiusMM - bb.minX <= tolMM && bb.maxX - (xx + spotRadiusMM) <= tolMM
+    && ny - spotRadiusMM - bb.minY <= tolMM && bb.maxY - (xy + spotRadiusMM) <= tolMM
+}
+
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45
