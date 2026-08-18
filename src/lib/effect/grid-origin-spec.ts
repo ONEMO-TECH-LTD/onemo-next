@@ -7,13 +7,13 @@
 export const DEFAULT_PITCH_MM = 48
 
 /**
- * The released pitches a surface may offer. 96 is the SPARSE tier — the same 48 lattice with every
- * second point skipped, more space per magnet; 24 is the fine bench tier.
+ * The released pitches a surface may offer. 96 is the sparse tier — the same 48 lattice with every
+ * second point skipped, more space per magnet; 24 is the fine bench tier. The number IS the label.
  */
 export const RELEASED_PITCHES_MM: ReadonlyArray<{ mm: number; label: string }> = Object.freeze([
-  Object.freeze({ mm: 96, label: '96 mm · sparse' }),
-  Object.freeze({ mm: 48, label: '48 mm · standard' }),
-  Object.freeze({ mm: 24, label: '24 mm · fine' }),
+  Object.freeze({ mm: 96, label: '96 mm' }),
+  Object.freeze({ mm: 48, label: '48 mm' }),
+  Object.freeze({ mm: 24, label: '24 mm' }),
 ])
 
 /** The slider's floor for padding — the historical minimum. */
