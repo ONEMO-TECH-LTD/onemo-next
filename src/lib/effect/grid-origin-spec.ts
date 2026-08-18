@@ -35,3 +35,18 @@ export const MAGNET_RADIUS_LARGE_MM = 4
 /** Fewest magnets that count as holding; the count auto-fit climbs toward. */
 export const MIN_ANCHORS = 2
 export const TARGET_ANCHORS = 4
+
+/**
+ * The registration search's phase step — THE GRID'S OWN 12mm increment, so the sweep lands on the
+ * centred registrations (a 24mm B1 centre, a 72mm 2x2 at phase 12). The old pitch/6 sampling
+ * stepped 8mm and could never try them; 12mm is also FEWER phases at the 48 pitch (16 vs 36).
+ */
+export const PHASE_STEP_MM = 12
+
+/** Snap scan: size step and ceiling. (Both slated for the band-rung rework.) */
+export const SNAP_STEP_MM = 5
+export const SNAP_MAX_MM = 300
+
+/** Registration scoring weights: seats first, flaps second, balance last. */
+export const SEAT_WEIGHT = 100000
+export const FLAP_WEIGHT = 100
