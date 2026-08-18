@@ -12,8 +12,8 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type RankOrder } from '@/lib/effect/grid-origin'
-import { ANCHOR_BLEND_PCT, BANDS, COVER_TIE_MM, EDGE_REG_TOL_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RANK_ORDER, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-origin-spec'
+import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -68,42 +68,31 @@ export default function GridLab() {
   const [showLattice, setShowLattice] = useState(true)
   /** Faint bounding box with per-side dimensions. */
   const [showBox, setShowBox] = useState(true)
-  /** A band bounds the size slider to its range; 'free' uses the typed limits. */
+  /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number | 'free'>('free')
+  /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
+  const [stepSel, setStepSel] = useState<number | null>(null)
+  /** Snap scan step — admin-tunable for testing; default from spec. */
+  const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
-  /** Grid anchor position — 0 = box centre, 100 = material weight centre, 50 = midpoint. */
-  const [blend, setBlend] = usePersisted('anchorBlend', ANCHOR_BLEND_PCT)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
-  /** Lab dials — spec defaults reproduce shipped behaviour until touched. */
-  const [labOnN, setLabOnN] = usePersisted('labOn', 1)
-  const labOn = labOnN !== 0
   /** Per-control enables — off sends that control's field not at all, so spec default rules it. */
   const [enFlapN, setEnFlapN] = usePersisted('en.flap', 1)
   const [enPhaseN, setEnPhaseN] = usePersisted('en.phaseStep', 1)
-  const [enBlendN, setEnBlendN] = usePersisted('en.blend', 1)
-  const [enRankN, setEnRankN] = usePersisted('en.rank', 1)
-  const [enEdgeTolN, setEnEdgeTolN] = usePersisted('en.edgeTol', 1)
-  const [enCoverTieN, setEnCoverTieN] = usePersisted('en.coverTie', 1)
-  const [rankOrder, setRankOrder] = useState<RankOrder>(RANK_ORDER as RankOrder)
-  const [edgeTol, setEdgeTol] = usePersisted('edgeTol', EDGE_REG_TOL_MM)
-  const [coverTie, setCoverTie] = usePersisted('coverTie', COVER_TIE_MM)
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, sizeMin, sizeMax, blend, edgeTol, coverTie })) } catch { }
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
-      blend: ANCHOR_BLEND_PCT, edgeTol: EDGE_REG_TOL_MM, coverTie: COVER_TIE_MM,
     }
     try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
-    setBlend(d.blend); setEdgeTol(d.edgeTol); setCoverTie(d.coverTie)
-    setRankOrder(RANK_ORDER as RankOrder)
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -159,14 +148,8 @@ export default function GridLab() {
     finally { genMsRef.current = performance.now() - t0 }
   }, [src, preset, gen, p1, p2, sides, points, magic])
 
-  // The band bounds the slider; the size the slider shows is the size that solves. Nothing more.
-  const band = mode !== 'free' ? BANDS.find((b) => b.id === mode) ?? BANDS[0] : null
-  const loMM = band ? band.minMM : sizeMin
-  const hiMM = band ? band.maxMM : sizeMax
-  const effMM = Math.min(hiMM, Math.max(loMM, sizeMM))
-
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -187,19 +170,12 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    // LAB off = pure engine; per-control switches drop single fields the same way.
-    const lab = labOn ? {
-      ...(enBlendN ? { anchorBlendPct: blend } : {}),
-      ...(enRankN ? { rankOrder } : {}),
-      ...(enEdgeTolN ? { edgeTolMM: edgeTol } : {}),
-      ...(enCoverTieN ? { coverTieMM: coverTie } : {}),
-    } : {}
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, ...lab, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
-    w.postMessage({ id, base, offsetMM, cfg, sizeMM: effMM })
-  }, [base, src, preset, effMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, enFlapN, enPhaseN, enBlendN, enRankN, enEdgeTolN, enCoverTieN, plan, coverage, offsetMM])
+    w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -276,14 +252,30 @@ export default function GridLab() {
           </Fold>
 
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Band · bounds the slider</span>
+            <div className="gl-field"><span>Band · snap ladder</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setSizeMM((s) => Math.min(b.maxMM, Math.max(b.minMM, s))); setManual(null) }}>B{b.id}</button>)}
-                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setManual(null) }}>Free</button>
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null) }}>B{b.id}</button>)}
+                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null) }}>Free</button>
               </div>
             </div>
-            <Slider label={band ? `Effect size · B${band.id} range` : 'Effect size · longest side'} unit="mm" v={Math.round(effMM)} set={setSizeMM} min={loMM} max={hiMM} />
+            {mode !== 'free' && <>
+              <div className="gl-snap">
+                {model
+                  ? model.ladder.length
+                    ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
+                    : 'nothing fully fits — best seated shown'
+                  : '—'}
+              </div>
+              {model && model.ladder.length > 0 && <div className="gl-steps">
+                {model.ladder.map((pt, i) =>
+                  <button key={pt.sizeMM + pt.sig} aria-pressed={i === model.idx} onClick={() => setStepSel(i)}>
+                    <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
+                  </button>)}
+              </div>}
+              <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
+            </>}
+            {mode === 'free' && <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />}
             {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>
@@ -334,33 +326,6 @@ export default function GridLab() {
             </div>
           </Fold>
 
-        </aside>
-
-        <aside className="gl-labcol">
-          <Fold title="LAB · judging experiments">
-            <label className="gl-toggle"><span>Experiments active <small style={{ color: 'var(--ink-3)' }}>· off = pure engine</small></span>
-              <input type="checkbox" checked={labOn} onChange={(e) => setLabOnN(e.target.checked ? 1 : 0)} />
-            </label>
-            <div className={`gl-lab-body${labOn ? '' : ' gl-lab-off'}`}>
-              <LabRow on={enBlendN !== 0} set={(b) => setEnBlendN(b ? 1 : 0)}>
-                <Slider label="Grid anchor · box ↔ weight centre" unit="%" v={blend} set={setBlend} min={0} max={100} />
-              </LabRow>
-              <LabRow on={enRankN !== 0} set={(b) => setEnRankN(b ? 1 : 0)}>
-                <div className="gl-field"><span>Judging order · what wins</span>
-                  <div className="gl-seg">
-                    {([['edges', 'Edges'], ['coverage', 'Coverage'], ['count', 'Count']] as [RankOrder, string][]).map(([m, l]) =>
-                      <button key={m} aria-pressed={rankOrder === m} onClick={() => setRankOrder(m)}>{l}</button>)}
-                  </div>
-                </div>
-              </LabRow>
-              <LabRow on={enEdgeTolN !== 0} set={(b) => setEnEdgeTolN(b ? 1 : 0)}>
-                <Slider label="Edge strictness · reach slack" unit="mm" v={edgeTol} set={setEdgeTol} min={0} max={12} />
-              </LabRow>
-              <LabRow on={enCoverTieN !== 0} set={(b) => setEnCoverTieN(b ? 1 : 0)}>
-                <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
-              </LabRow>
-            </div>
-          </Fold>
         </aside>
       </div>
     </div>
@@ -539,11 +504,9 @@ const CSS = `
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;justify-content:center}
 .gl-tag{font:600 11px var(--mono);color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;letter-spacing:.02em}
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
-.gl-body{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:290px minmax(0,1fr) 336px;gap:20px;align-items:start}
-.gl-labcol{grid-column:1;grid-row:1}
-.gl-stage{grid-column:2;grid-row:1}
-.gl-controls{grid-column:3;grid-row:1}
-.gl-lab-body{display:flex;flex-direction:column;gap:15px}
+.gl-body{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
+.gl-stage{grid-column:1;grid-row:1}
+.gl-controls{grid-column:2;grid-row:1}
 .gl-lab-off{opacity:.4;pointer-events:none}
 .gl-labrow{display:flex;gap:9px;align-items:flex-start}
 .gl-labrow>input{width:15px;height:15px;accent-color:var(--accent);margin-top:3px;flex:none}
@@ -553,10 +516,8 @@ const CSS = `
 .gl-fold summary::after{content:'▾';font-size:11px;transition:transform .15s}
 .gl-fold:not([open]) summary::after{transform:rotate(-90deg)}
 .gl-fold-body{display:flex;flex-direction:column;gap:15px;padding:2px 18px 18px}
-@media (max-width:1100px){.gl-body{grid-template-columns:minmax(0,1fr) 336px}
-  .gl-stage{grid-column:1;grid-row:1}.gl-controls{grid-column:2;grid-row:1}.gl-labcol{grid-column:1/-1;grid-row:2}}
 @media (max-width:840px){.gl-body{grid-template-columns:1fr}
-  .gl-stage{grid-column:1;grid-row:auto}.gl-controls{grid-column:1;grid-row:auto}.gl-labcol{grid-column:1;grid-row:auto}}
+  .gl-stage{grid-column:1;grid-row:auto}.gl-controls{grid-column:1;grid-row:auto}}
 .gl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .gl-pad{padding:18px;display:flex;flex-direction:column;gap:15px}
 .gl-stage{padding:20px;display:flex;flex-direction:column;gap:14px}
@@ -604,4 +565,12 @@ const CSS = `
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
 .gl-perf b.gl-slow{color:var(--fail)}
+.gl-snap{font:600 12px var(--mono);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.gl-steps{display:flex;flex-wrap:wrap;gap:5px}
+.gl-steps button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:550 11px var(--sans);color:var(--ink-2);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;transition:.12s}
+.gl-steps button b{font:700 10.5px var(--mono);letter-spacing:.04em}
+.gl-steps button span{font:600 11px var(--mono);font-variant-numeric:tabular-nums}
+.gl-steps button:hover{color:var(--ink)}
+.gl-steps button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 `

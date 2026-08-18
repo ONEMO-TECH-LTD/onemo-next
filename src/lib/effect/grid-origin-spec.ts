@@ -3,7 +3,7 @@
 /** The lattice, centre to centre. */
 export const DEFAULT_PITCH_MM = 48
 
-/** Released pitches, smallest first. 24 = fine bench tier; 96 = the 48 lattice thinned. */
+/** Released pitches. 96 = the 48 lattice thinned (every second point); 24 = fine bench tier. */
 export const RELEASED_PITCHES_MM: ReadonlyArray<{ mm: number; label: string }> = Object.freeze([
   Object.freeze({ mm: 24, label: '24 mm' }),
   Object.freeze({ mm: 48, label: '48 mm' }),
@@ -55,16 +55,9 @@ export const FLAP_MM = 12
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
+/** Snap scan size step. */
+export const SNAP_STEP_MM = 1
 
-/** Edge registration slack: a layout is registered when every side's outermost spot
- *  reaches the shape bound within this tolerance. */
-export const EDGE_REG_TOL_MM = 1
-
-/** Lab dials — these defaults reproduce the shipped behaviour exactly. */
-/** Grid anchor position: 0 = box centre, full scale = material weight centre. */
-export const ANCHOR_BLEND_PCT = 100
-export const ANCHOR_BLEND_MAX_PCT = 100
-/** Judging order when comparing two layouts: edges first, coverage first, or count first. */
-export const RANK_ORDER = 'edges'
-/** Coverage tie range — two layouts covering within this many mm count as equal. */
-export const COVER_TIE_MM = 0
+/** Registration score weights: seats, then flaps, then balance. */
+export const SEAT_WEIGHT = 100000
+export const FLAP_WEIGHT = 100

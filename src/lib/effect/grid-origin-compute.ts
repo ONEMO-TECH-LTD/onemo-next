@@ -15,17 +15,6 @@ export function bbox(pts: ReadonlyArray<Pt>): BBox {
 
 export function dist(a: Pt, b: Pt): number { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
-/** Area centroid of the outline — the material's balance point. BBox centre when degenerate. */
-export function centroidMM(pts: ReadonlyArray<Pt>): Pt {
-  let a = 0, cx = 0, cy = 0
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const w = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
-    a += w; cx += (pts[j][0] + pts[i][0]) * w; cy += (pts[j][1] + pts[i][1]) * w
-  }
-  if (Math.abs(a) < 1e-9) { const b = bbox(pts); return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] }
-  return [cx / (3 * a), cy / (3 * a)]
-}
-
 /** Spot radius = the padding, measured from the magnet centre. */
 export function spotRadiusOf(padMM: number): number {
   return padMM
@@ -119,28 +108,28 @@ export function makeCircleSeatPredicate(
   }
 }
 
+/** Silhouette vertices further than `reach` from the nearest magnet (flap-risk edge). */
+export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
+  const out: Pt[] = []
+  for (const v of outer) {
+    let nd = Infinity
+    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d; if (nd <= reach) break }
+    if (nd > reach) out.push(v)
+  }
+  return out
+}
+
 /** Mean distance silhouette vertices sit PAST `reach`, mm. 0 = fully wrapped. Graded, so a
- *  placement covering more material scores better even when nothing is fully covered.
- *  Covered vertices contribute 0, so their loop exits at the first seat within reach. */
+ *  placement covering more material scores better even when nothing is fully covered. */
 export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
   if (!outer.length || !seated.length) return 0
   let sum = 0
   for (const v of outer) {
     let nd = Infinity
-    for (const a of seated) { const d = dist(v, a); if (d < nd) { nd = d; if (nd <= reach) break } }
+    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d; if (nd <= reach) break }
     if (nd > reach) sum += nd - reach
   }
   return sum / outer.length
-}
-
-/** All-or-nothing edge registration: on every side the outermost spot reaches the bbox bound
- *  within tolMM. Partial contact earns nothing — summed slack rewards asymmetry (v1 law). */
-export function edgeRegistered(bb: BBox, seated: ReadonlyArray<Pt>, spotRadiusMM: number, tolMM: number): boolean {
-  if (!seated.length) return false
-  let nx = Infinity, ny = Infinity, xx = -Infinity, xy = -Infinity
-  for (const [x, y] of seated) { if (x < nx) nx = x; if (x > xx) xx = x; if (y < ny) ny = y; if (y > xy) xy = y }
-  return nx - spotRadiusMM - bb.minX <= tolMM && bb.maxX - (xx + spotRadiusMM) <= tolMM
-    && ny - spotRadiusMM - bb.minY <= tolMM && bb.maxY - (xy + spotRadiusMM) <= tolMM
 }
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */

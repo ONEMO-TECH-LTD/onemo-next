@@ -2,46 +2,31 @@
 
 import type { Pt } from './types'
 import {
+  BANDS,
+  FLAP_WEIGHT,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
+  SEAT_WEIGHT,
 } from './grid-origin-spec'
 import { bbox, splitPerimeter } from './grid-origin-compute'
+import type { Band } from './grid-origin-spec'
+
+/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
+export function bandOf(sizeMM: number): Band | null {
+  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
+  return null
+}
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** One candidate registration's measures, ranked lexicographically. */
-export interface LayoutMeasure {
-  registered: boolean
-  excessMM: number
-  seats: number
-  balanceMM: number
+/** Registration score: seats above all, then least uncovered material (graded mm), then balance. */
+export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
+  return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
 }
-
-/** Judging order: what matters most when two layouts compete. */
-export type RankOrder = 'edges' | 'coverage' | 'count'
-
-/** Layout rank. 'edges' (default, v1 law): registration → coverage → seats → balance.
- *  'coverage' puts wrap first; 'count' is the legacy most-magnets-first behaviour.
- *  Coverage within `tieMM` counts as equal, so lower terms settle near-ties.
- *  Returns true when `a` beats `b`. */
-export function betterLayout(a: LayoutMeasure, b: LayoutMeasure, order: RankOrder, tieMM: number): boolean {
-  const cover = Math.abs(a.excessMM - b.excessMM) <= tieMM ? 0 : a.excessMM < b.excessMM ? 1 : -1
-  const seq = order === 'coverage' ? ['cov', 'reg', 'seats', 'bal']
-    : order === 'count' ? ['seats', 'cov', 'bal']
-      : ['reg', 'cov', 'seats', 'bal']
-  for (const term of seq) {
-    if (term === 'reg' && a.registered !== b.registered) return a.registered
-    if (term === 'cov' && cover !== 0) return cover > 0
-    if (term === 'seats' && a.seats !== b.seats) return a.seats > b.seats
-    if (term === 'bal' && a.balanceMM !== b.balanceMM) return a.balanceMM < b.balanceMM
-  }
-  return false
-}
-
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(
@@ -67,3 +52,22 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   })
 }
 
+/** Holding: at least one seat and every edge within reach. The layout itself is whatever the
+ *  material carries — single, pair, 2x2, rows — never a required pattern. */
+export function isHolding(seatedCount: number, flapCount: number): boolean {
+  return seatedCount >= 1 && flapCount === 0
+}
+
+/** The verdict: what counts as a refusal and how it is said. */
+export function verdictIssues(
+  degenerate: boolean,
+  seatedCount: number,
+  flapCount: number,
+  padMM: number,
+): string[] {
+  const issues: string[] = []
+  if (degenerate) issues.push(`No room for a magnet — the shape is too small/thin to fit a magnet plus its ${padMM}mm application ring.`)
+  else if (seatedCount === 0) issues.push(`Too small — no magnet grips material. Pick a band to snap to a holding size.`)
+  if (flapCount > 0) issues.push(`Some edge areas have no magnet within reach (red edge). Pick a band, or raise the flap allowance.`)
+  return issues
+}
