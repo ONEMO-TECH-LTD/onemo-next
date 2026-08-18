@@ -5,7 +5,6 @@
 //   • Presets    — shape-library getShape() (baked vector data)
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
-// Every source yields a VShape → mm contour, the same input attachment.ts consumes.
 
 import { useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
@@ -14,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { bandOf, computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
-import { BANDS, MIN_EFFECT_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
+import { BANDS, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -41,7 +40,8 @@ export default function GridLab() {
   const [p2, setP2] = useState(7)  // seed / lobes / petals / blades
   const [sides, setSides] = useState(6)
   const [points, setPoints] = useState(5)
-  const [sizeMM, setSizeMM] = useState(70)
+  // Opens on the B2 floor — the 72mm square standard (2×2), from spec.
+  const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = useState(RELEASED_PADDING_MM)
   const [offsetMM, setOffsetMM] = useState(0)
@@ -101,10 +101,10 @@ export default function GridLab() {
         const sel = snapSel !== null ? fit.points.find((pt) => pt.sizeMM === snapSel) : undefined
         const eff = sel ? sel.sizeMM : fit.sizeMM
         const grid = sel ? computeGrid(sized(eff), cfg) : fit.grid
-        return { contour: sized(eff), grid, effSize: eff, snapped: true, points: fit.points }
+        return { contour: sized(eff), grid, effSize: eff, points: fit.points }
       }
       const contour = sized(sizeMM)
-      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, snapped: false, points: [] as BandSnapPoint[] }
+      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, points: [] as BandSnapPoint[] }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM, snapStep, snapSel])
 
@@ -139,7 +139,7 @@ export default function GridLab() {
           <div className="gl-legend">
             <span><i style={{ background: 'var(--magnet)' }} />6mm magnet</span>
             <span><i style={{ background: 'var(--mag8)' }} />8mm magnet</span>
-            <span><i style={{ background: 'var(--grid)', opacity: .55 }} />node · no material</span>
+            <span><i style={{ background: 'var(--grid)', opacity: .55 }} />spot · no magnet</span>
             <span><i style={{ background: 'var(--fail)' }} />flap risk</span>
           </div>
         </section>
@@ -212,7 +212,7 @@ export default function GridLab() {
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
             </div>
-            <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={30} />
+            <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
             <div className="gl-field"><span>Grid pattern</span>

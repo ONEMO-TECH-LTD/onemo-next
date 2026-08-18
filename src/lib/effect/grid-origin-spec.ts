@@ -10,8 +10,9 @@ export const RELEASED_PITCHES_MM: ReadonlyArray<{ mm: number; label: string }> =
   Object.freeze({ mm: 24, label: '24 mm' }),
 ])
 
-/** Padding slider floor. */
+/** Padding slider range — admin test bounds around the locked 12. */
 export const PADDING_FLOOR_MM = 10
+export const PADDING_CEIL_MM = 30
 
 /** Released padding — locked 12mm, measured from the magnet centre. */
 export const RELEASED_PADDING_MM = 12
@@ -42,9 +43,8 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 /** Registration search phase step — the grid's own 12mm increment. */
 export const PHASE_STEP_MM = 12
 
-/** Snap scan: size step and ceiling. */
+/** Snap scan size step. */
 export const SNAP_STEP_MM = 1
-export const SNAP_MAX_MM = 300
 
 /** Registration score weights: seats, then flaps, then balance. */
 export const SEAT_WEIGHT = 100000

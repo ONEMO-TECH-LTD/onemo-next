@@ -8,10 +8,10 @@ import {
   MAGNET_DIA_SMALL_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
-  SNAP_MAX_MM,
 } from './grid-origin-spec'
 import {
   bbox,
+  fieldSpanMM,
   flapVerts,
   latticeAt,
   makeCircleSeatPredicate,
@@ -59,7 +59,6 @@ export interface GridResult {
   issues: string[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
-  applicationPadMM: number
   /** Every lattice position at the chosen phase, seated or not. */
   lattice: Pt[]
   /** The phase the search chose, mm. */
@@ -128,7 +127,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     issues,
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
-    applicationPadMM: pad,
     lattice,
     phaseMM: [bestOx, bestOy],
     spotRadiusMM: spotRadiusOf(pad),
@@ -138,6 +136,13 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 /** One holding size in a band: the size and how many magnets it seats. */
 export interface BandSnapPoint { sizeMM: number; count: number }
 
+/** The walk range: the band as a RANGE; above the last band, up to the derived field span. */
+function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
+  const band = bandOf(fromMM)
+  if (band) return [band.minMM, band.maxMM]
+  return [fromMM, fieldSpanMM(cfg.pitchMM ?? DEFAULT_PITCH_MM, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))]
+}
+
 /**
  * Every holding size in the band, scanned at stepMM. The band is a RANGE: fit is not monotone,
  * so the whole range is walked and each size judged independently.
@@ -145,9 +150,7 @@ export interface BandSnapPoint { sizeMM: number; count: number }
 export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): BandSnapPoint[] {
-  const band = bandOf(fromMM)
-  const lo = band ? band.minMM : fromMM
-  const hi = band ? band.maxMM : SNAP_MAX_MM
+  const [lo, hi] = snapRange(cfg, fromMM)
   const out: BandSnapPoint[] = []
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
@@ -163,22 +166,20 @@ export function bandSnapPoints(
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; snapped: boolean; points: BandSnapPoint[] } {
+): { sizeMM: number; grid: GridResult; points: BandSnapPoint[] } {
   const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const pick = points.find((p) => p.count === maxCount)!
-    return { sizeMM: pick.sizeMM, grid: computeGrid(sized(pick.sizeMM), cfg), snapped: pick.sizeMM !== Math.round(fromMM), points }
+    return { sizeMM: pick.sizeMM, grid: computeGrid(sized(pick.sizeMM), cfg), points }
   }
   // Nothing in the band holds: best-seated rung as a fallback.
-  const band = bandOf(fromMM)
-  const lo = band ? band.minMM : fromMM
-  const hi = band ? band.maxMM : SNAP_MAX_MM
+  const [lo, hi] = snapRange(cfg, fromMM)
   let best: { sizeMM: number; grid: GridResult } | null = null
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, snapped: pick.sizeMM !== Math.round(fromMM), points }
+  return { ...pick, points }
 }
