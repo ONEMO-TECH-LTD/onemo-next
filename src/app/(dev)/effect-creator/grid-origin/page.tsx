@@ -82,6 +82,13 @@ export default function GridLab() {
   /** Lab dials — spec defaults reproduce shipped behaviour until touched. */
   const [labOnN, setLabOnN] = usePersisted('labOn', 1)
   const labOn = labOnN !== 0
+  /** Per-control enables — off sends that control's field not at all, so spec default rules it. */
+  const [enBlendN, setEnBlendN] = usePersisted('en.blend', 1)
+  const [enRankN, setEnRankN] = usePersisted('en.rank', 1)
+  const [enEdgeTolN, setEnEdgeTolN] = usePersisted('en.edgeTol', 1)
+  const [enCoverTieN, setEnCoverTieN] = usePersisted('en.coverTie', 1)
+  const [enGateN, setEnGateN] = usePersisted('en.gate', 1)
+  const [enVariantN, setEnVariantN] = usePersisted('en.variant', 1)
   const [rankOrder, setRankOrder] = useState<RankOrder>(RANK_ORDER as RankOrder)
   const [edgeTol, setEdgeTol] = usePersisted('edgeTol', EDGE_REG_TOL_MM)
   const [coverTie, setCoverTie] = usePersisted('coverTie', COVER_TIE_MM)
@@ -181,14 +188,21 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    // LAB off = pure engine: the six experimental fields are simply not sent, so spec defaults rule.
-    const lab = labOn ? { anchorBlendPct: blend, rankOrder, edgeTolMM: edgeTol, coverTieMM: coverTie, gateMode, gateLooseMM: gateLoose, variantMode } : {}
+    // LAB off = pure engine; per-control switches drop single fields the same way.
+    const lab = labOn ? {
+      ...(enBlendN ? { anchorBlendPct: blend } : {}),
+      ...(enRankN ? { rankOrder } : {}),
+      ...(enEdgeTolN ? { edgeTolMM: edgeTol } : {}),
+      ...(enCoverTieN ? { coverTieMM: coverTie } : {}),
+      ...(enGateN ? { gateMode, gateLooseMM: gateLoose } : {}),
+      ...(enVariantN ? { variantMode } : {}),
+    } : {}
     const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, ...lab, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, labOn, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, enBlendN, enRankN, enEdgeTolN, enCoverTieN, enGateN, enVariantN, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -342,28 +356,40 @@ export default function GridLab() {
               <input type="checkbox" checked={labOn} onChange={(e) => setLabOnN(e.target.checked ? 1 : 0)} />
             </label>
             <div className={`gl-lab-body${labOn ? '' : ' gl-lab-off'}`}>
-              <Slider label="Grid anchor · box ↔ weight centre" unit="%" v={blend} set={setBlend} min={0} max={100} />
-              <div className="gl-field"><span>Judging order · what wins</span>
-                <div className="gl-seg">
-                  {([['edges', 'Edges'], ['coverage', 'Coverage'], ['count', 'Count']] as [RankOrder, string][]).map(([m, l]) =>
-                    <button key={m} aria-pressed={rankOrder === m} onClick={() => setRankOrder(m)}>{l}</button>)}
+              <LabRow on={enBlendN !== 0} set={(b) => setEnBlendN(b ? 1 : 0)}>
+                <Slider label="Grid anchor · box ↔ weight centre" unit="%" v={blend} set={setBlend} min={0} max={100} />
+              </LabRow>
+              <LabRow on={enRankN !== 0} set={(b) => setEnRankN(b ? 1 : 0)}>
+                <div className="gl-field"><span>Judging order · what wins</span>
+                  <div className="gl-seg">
+                    {([['edges', 'Edges'], ['coverage', 'Coverage'], ['count', 'Count']] as [RankOrder, string][]).map(([m, l]) =>
+                      <button key={m} aria-pressed={rankOrder === m} onClick={() => setRankOrder(m)}>{l}</button>)}
+                  </div>
                 </div>
-              </div>
-              <Slider label="Edge strictness · reach slack" unit="mm" v={edgeTol} set={setEdgeTol} min={0} max={12} />
-              <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
-              <div className="gl-field"><span>Band entry rule</span>
-                <div className="gl-seg">
-                  {([['all', 'All covered'], ['most', 'Mostly'], ['seated', 'Seated']] as [GateMode, string][]).map(([m, l]) =>
-                    <button key={m} aria-pressed={gateMode === m} onClick={() => setGateMode(m)}>{l}</button>)}
+              </LabRow>
+              <LabRow on={enEdgeTolN !== 0} set={(b) => setEnEdgeTolN(b ? 1 : 0)}>
+                <Slider label="Edge strictness · reach slack" unit="mm" v={edgeTol} set={setEdgeTol} min={0} max={12} />
+              </LabRow>
+              <LabRow on={enCoverTieN !== 0} set={(b) => setEnCoverTieN(b ? 1 : 0)}>
+                <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
+              </LabRow>
+              <LabRow on={enGateN !== 0} set={(b) => setEnGateN(b ? 1 : 0)}>
+                <div className="gl-field"><span>Band entry rule</span>
+                  <div className="gl-seg">
+                    {([['all', 'All covered'], ['most', 'Mostly'], ['seated', 'Seated']] as [GateMode, string][]).map(([m, l]) =>
+                      <button key={m} aria-pressed={gateMode === m} onClick={() => setGateMode(m)}>{l}</button>)}
+                  </div>
                 </div>
-              </div>
-              {gateMode === 'most' && <Slider label="Loose allowance · mean uncovered" unit="mm" v={gateLoose} set={setGateLoose} min={0} max={48} />}
-              <div className="gl-field"><span>Variant rule</span>
-                <div className="gl-seg">
-                  {([['layout', 'Layouts'], ['count', 'Counts'], ['newcount', 'New counts']] as [VariantMode, string][]).map(([m, l]) =>
-                    <button key={m} aria-pressed={variantMode === m} onClick={() => setVariantMode(m)}>{l}</button>)}
+                {gateMode === 'most' && <Slider label="Loose allowance · mean uncovered" unit="mm" v={gateLoose} set={setGateLoose} min={0} max={48} />}
+              </LabRow>
+              <LabRow on={enVariantN !== 0} set={(b) => setEnVariantN(b ? 1 : 0)}>
+                <div className="gl-field"><span>Variant rule</span>
+                  <div className="gl-seg">
+                    {([['layout', 'Layouts'], ['count', 'Counts'], ['newcount', 'New counts']] as [VariantMode, string][]).map(([m, l]) =>
+                      <button key={m} aria-pressed={variantMode === m} onClick={() => setVariantMode(m)}>{l}</button>)}
+                  </div>
                 </div>
-              </div>
+              </LabRow>
             </div>
           </Fold>
         </aside>
@@ -508,6 +534,15 @@ function Slider({ label, v, set, min, max, unit }: { label: string; v: number; s
     </label>
   )
 }
+/** One lab control with its own enable — off drops the control's field, spec default rules. */
+function LabRow({ on, set, children }: { on: boolean; set: (b: boolean) => void; children: React.ReactNode }) {
+  return (
+    <div className="gl-labrow">
+      <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} />
+      <div className={`gl-labrow-body${on ? '' : ' gl-lab-off'}`}>{children}</div>
+    </div>
+  )
+}
 /** Perf value in seconds — green when fast, red past the 2s comfort line. */
 function Sec({ ms }: { ms?: number }) {
   if (ms == null) return <b>—</b>
@@ -541,6 +576,9 @@ const CSS = `
 .gl-controls{grid-column:3;grid-row:1}
 .gl-lab-body{display:flex;flex-direction:column;gap:15px}
 .gl-lab-off{opacity:.4;pointer-events:none}
+.gl-labrow{display:flex;gap:9px;align-items:flex-start}
+.gl-labrow>input{width:15px;height:15px;accent-color:var(--accent);margin-top:3px;flex:none}
+.gl-labrow-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .gl-fold summary{cursor:pointer;list-style:none;padding:14px 18px;font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center;user-select:none}
 .gl-fold summary::-webkit-details-marker{display:none}
 .gl-fold summary::after{content:'▾';font-size:11px;transition:transform .15s}
