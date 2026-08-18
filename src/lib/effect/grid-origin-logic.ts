@@ -14,9 +14,8 @@ import type { Band } from './grid-origin-spec'
 
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
 export function bandOf(sizeMM: number): Band | null {
-  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM < b.maxMM) return b
-  const last = BANDS[BANDS.length - 1]
-  return sizeMM === last.maxMM ? last : null
+  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
+  return null
 }
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'

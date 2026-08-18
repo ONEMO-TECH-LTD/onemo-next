@@ -13,8 +13,8 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { bandOf, computeGrid, fitSizeInBand, type BandSnapPoint, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
-import { RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
+import { bandOf, computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { BANDS, MIN_EFFECT_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -23,7 +23,12 @@ const VP = 640
 const FIT = 0.86
 
 const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
-const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, { k: 'form', label: 'Clover' }, { k: 'daisy', label: 'Daisy' }, { k: 'pinwheel', label: 'Pinwheel' }]
+const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, string]; p2min: number; p2max: number; p2start: number }[] = [
+  { k: 'blob', label: 'Blob', p1: ['Waviness', '%'], p2: ['Seed', ''], p2min: 1, p2max: 40, p2start: 7 },
+  { k: 'form', label: 'Clover', p1: ['Pinch', '%'], p2: ['Lobes', ''], p2min: 1, p2max: 8, p2start: 4 },
+  { k: 'daisy', label: 'Daisy', p1: ['Depth', '%'], p2: ['Petals', ''], p2min: 5, p2max: 12, p2start: 8 },
+  { k: 'pinwheel', label: 'Pinwheel', p1: ['Swirl', '%'], p2: ['Blades', ''], p2min: 3, p2max: 8, p2start: 5 },
+]
 
 type Src = 'preset' | 'gen' | 'magic'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
@@ -37,7 +42,7 @@ export default function GridLab() {
   const [sides, setSides] = useState(6)
   const [points, setPoints] = useState(5)
   const [sizeMM, setSizeMM] = useState(70)
-  const [pitch, setPitch] = useState(48)
+  const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = useState(RELEASED_PADDING_MM)
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
@@ -107,12 +112,7 @@ export default function GridLab() {
   const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
-  const genParams = {
-    blob: [['Waviness', '%'], ['Seed', '']], form: [['Pinch', '%'], ['Lobes', '']],
-    daisy: [['Depth', '%'], ['Petals', '']], pinwheel: [['Swirl', '%'], ['Blades', '']],
-  } as Record<string, [string, string][]>
-  const p2max = gen === 'blob' ? 40 : gen === 'form' ? 8 : gen === 'daisy' ? 12 : 8
-  const p2min = gen === 'blob' ? 1 : gen === 'form' ? 1 : gen === 'daisy' ? 5 : 3
+  const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
 
   return (
     <div className="gl">
@@ -165,10 +165,10 @@ export default function GridLab() {
 
             {src === 'gen' && <>
               <div className="gl-seg gl-wrap">
-                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.k === 'blob' ? 7 : g.k === 'daisy' ? 8 : g.k === 'pinwheel' ? 5 : 4) }}>{g.label}</button>)}
+                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
               </div>
-              <Slider label={genParams[gen][0][0]} unit={genParams[gen][0][1]} v={p1} set={setP1} min={0} max={100} />
-              <Slider label={genParams[gen][1][0]} v={p2} set={setP2} min={p2min} max={p2max} />
+              <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
+              <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
             </>}
 
             {src === 'magic' && <>
@@ -199,11 +199,11 @@ export default function GridLab() {
                     min={bandOf(sizeMM)?.minMM ?? minSizeMM} max={bandOf(sizeMM)?.maxMM ?? maxSizeMM} />
                 </>
               : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />}
-            {autoFit && <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={1} max={24} />}
+            {autoFit && <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />}
             <div className="gl-field"><span>Band</span>
               <div className="gl-seg">
-                {([[1, 24], [2, 72], [3, 120], [4, 168], [5, 216]] as const).map(([id, lo]) =>
-                  <button key={id} aria-pressed={bandOf(sizeMM)?.id === id} onClick={() => { setSizeMM(lo); setSnapSel(null) }}>B{id}</button>)}
+                {BANDS.map((b) =>
+                  <button key={b.id} aria-pressed={bandOf(sizeMM)?.id === b.id} onClick={() => { setSizeMM(b.minMM); setSnapSel(null) }}>B{b.id}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Grid pitch · released tiers</span>
@@ -212,7 +212,7 @@ export default function GridLab() {
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
             </div>
-            <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} />
+            <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={30} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
             <div className="gl-field"><span>Grid pattern</span>
