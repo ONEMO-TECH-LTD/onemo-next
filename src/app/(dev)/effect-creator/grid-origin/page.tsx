@@ -247,8 +247,10 @@ export default function GridLab() {
                   </div>
                 </>
               : <>
-                  <div className="gl-snap">Fit <b>B{mode}-{model?.ladder.length ? model.idx + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
-                    <span>{model?.ladder.length ?? 0} holding layouts in band · {model?.grid.anchors.length ?? 0} magnets{model && !model.ladder.length ? ' · nothing fully fits — best seated shown' : ''}</span></div>
+                  <div className={`gl-snap${model && !model.ladder.length ? ' gl-snap-none' : ''}`}>Fit <b>B{mode}-{model?.ladder.length ? model.idx + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
+                    <span>{model?.ladder.length
+                      ? `${model.ladder.length} holding layouts in band · ${model.grid.anchors.length} magnets`
+                      : `NO FIT in this band at these settings — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
                   {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
                     {model!.ladder.map((pt, i) =>
                       <button key={pt.sizeMM + pt.sig} aria-pressed={i === model!.idx}
@@ -462,6 +464,7 @@ const CSS = `
 .gl-upload:hover{filter:brightness(1.05)}
 .gl-magic-note{font:11.5px var(--mono);color:var(--ink-2);line-height:1.5}
 .gl-snap{font-size:12.5px;color:var(--ink-2)}.gl-snap b{font:600 13px var(--mono);color:var(--ink)}.gl-snap span{display:block;font:11px var(--mono);color:var(--ink-3);margin-top:3px}
+.gl-snap-none span{color:#c47f17;font-weight:600}
 .gl-steps{display:flex;flex-wrap:wrap;gap:4px}
 .gl-steps button{font:600 10px var(--mono);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:4px 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
 .gl-steps button em{font-style:normal;color:var(--ink-3);font-size:9px}
