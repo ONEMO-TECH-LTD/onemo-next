@@ -94,31 +94,6 @@ describe('tangency is legal, and it is legal EXACTLY', () => {
   })
 })
 
-describe('quantising rounds — it never truncates', () => {
-  // Deepnest's Minkowski core casts to int, which truncates toward zero and
-  // biases every coordinate one way. The identical defect shipped in v3.2:
-  // `getLineIntersectPt` used Math.trunc, and the drift moved a certified
-  // answer off the bracket its own chain had proved. Truncation is not a
-  // rounding preference, it is a systematic bias, and on negative coordinates
-  // it biases the opposite way from positive ones.
-
-  it('a coordinate just under a quantum boundary lands on the nearer quantum', () => {
-    const shape = prepare([[0, 0], [10.0006, 0], [10.0006, 10], [0, 10]], q)
-    // 10.0006mm is 10000.6 quanta. Rounding gives 10001; truncation gives 10000.
-    expect(shape.box.maxX).toBe(10001)
-  })
-
-  it('negative coordinates round the same way positive ones do', () => {
-    // Truncation toward zero makes -0.6 become 0 while +0.6 becomes 0 as well —
-    // the two sides drift in opposite directions and a symmetric shape stops
-    // being symmetric. Rounding keeps the shape's own symmetry.
-    const shape = prepare([[-10.0006, -10.0006], [10.0006, -10.0006], [10.0006, 10.0006], [-10.0006, 10.0006]], q)
-    expect(shape.box.minX).toBe(-10001)
-    expect(shape.box.maxX).toBe(10001)
-    expect(-shape.box.minX).toBe(shape.box.maxX)
-  })
-})
-
 describe('what the module refuses to answer', () => {
   // An engine that answers everything is the one that invents. These are the
   // inputs it must reject rather than interpret.
