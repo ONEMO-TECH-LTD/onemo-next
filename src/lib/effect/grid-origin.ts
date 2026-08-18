@@ -3,13 +3,21 @@
 
 import type { Contour, Pt } from './types'
 import {
+  ANCHOR_BLEND_MAX_PCT,
+  ANCHOR_BLEND_PCT,
+  COVER_TIE_MM,
   DEFAULT_PITCH_MM,
   EDGE_REG_TOL_MM,
   FLAP_MM,
+  GATE_LOOSE_MM,
+  GATE_MODE,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
+  MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
+  RANK_ORDER,
+  VARIANT_MODE,
 } from './grid-origin-spec'
 import {
   bbox,
@@ -28,10 +36,13 @@ import {
   assignSizes,
   bandOf,
   betterLayout,
-  isHolding,
+  entersBand,
   type Anchor,
+  type GateMode,
   type LayoutMeasure,
   type MagnetPlan,
+  type RankOrder,
+  type VariantMode,
 } from './grid-origin-logic'
 
 export * from './grid-origin-spec'
@@ -41,7 +52,7 @@ export {
   scaleContour,
   spotRadiusOf,
 } from './grid-origin-compute'
-export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
+export { bandOf, type Anchor, type GateMode, type MagnetDia, type MagnetPlan, type RankOrder, type VariantMode } from './grid-origin-logic'
 
 export interface GridConfig {
   pitchMM?: number
@@ -52,9 +63,15 @@ export interface GridConfig {
   phaseStepMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
   forcePhaseMM?: Pt
-  /** Grid anchor: centroid balances the MATERIAL (default — coincides with bbox on regular
-   *  shapes); bbox balances the FRAME. An A/B instrument, not two behaviours to maintain. */
-  center?: 'centroid' | 'bbox'
+  /** Grid anchor position: 0 = box centre, 100 = material weight centre, 50 = midpoint. */
+  anchorBlendPct?: number
+  /** Lab dials — spec defaults reproduce shipped behaviour. */
+  rankOrder?: RankOrder
+  edgeTolMM?: number
+  coverTieMM?: number
+  gateMode?: GateMode
+  gateLooseMM?: number
+  variantMode?: VariantMode
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -63,8 +80,10 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
-  /** Silhouette vertices past reach — the band holding gate reads this; not a user-facing verdict. */
+  /** Silhouette vertices past reach — the band entry rule reads this; not a user-facing verdict. */
   flaps: Pt[]
+  /** Mean mm the silhouette sits past reach for the delivered layout — the 'most' gate's measure. */
+  excessMM: number
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   /** Every lattice position at the chosen phase, seated or not. */
@@ -88,11 +107,12 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
   const bb = bbox(outer)
-  // The anchor: where a node line is guaranteed to land, and what balance is measured against.
-  // Centroid = the material's balance point; bbox = the frame's. Identical on regular shapes.
-  const centre: Pt = (cfg.center ?? 'centroid') === 'bbox'
-    ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
-    : centroidMM(outer)
+  // The anchor: where a node line is guaranteed to land, and what balance is measured against —
+  // blended between the box centre (0) and the material's weight centre (100).
+  const t = Math.min(ANCHOR_BLEND_MAX_PCT, Math.max(0, cfg.anchorBlendPct ?? ANCHOR_BLEND_PCT)) / ANCHOR_BLEND_MAX_PCT
+  const bc: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
+  const cc = centroidMM(outer)
+  const centre: Pt = [bc[0] + (cc[0] - bc[0]) * t, bc[1] + (cc[1] - bc[1]) * t]
   const offX = centre[0] - bb.minX, offY = centre[1] - bb.minY
 
   const fits = cfg.circle
@@ -118,14 +138,17 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(off + k, pitch), k })
       return out
     }
+    const order = cfg.rankOrder ?? (RANK_ORDER as RankOrder)
+    const edgeTol = cfg.edgeTolMM ?? EDGE_REG_TOL_MM
+    const coverTie = cfg.coverTieMM ?? COVER_TIE_MM
     let best: LayoutMeasure | null = null
     for (const py of phases(offY)) {
       for (const px of phases(offX)) {
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
-        const registered = edgeRegistered(bb, seat, spotRadiusOf(pad), EDGE_REG_TOL_MM)
-        // An unregistered candidate can never beat a registered best — skip its scoring.
-        if (best?.registered && !registered) continue
+        const registered = edgeRegistered(bb, seat, spotRadiusOf(pad), edgeTol)
+        // Edges-first order only: an unregistered candidate can never beat a registered best.
+        if (order === 'edges' && best?.registered && !registered) continue
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
         const m: LayoutMeasure = {
           registered,
@@ -133,7 +156,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
           seats: seat.length,
           balanceMM: Math.hypot(sx / seat.length - centre[0], sy / seat.length - centre[1]),
         }
-        if (!best || betterLayout(m, best)) { best = m; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
+        if (!best || betterLayout(m, best, order, coverTie)) { best = m; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
       }
     }
   }
@@ -144,6 +167,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const anchors = assignSizes(coverage.seated, plan)
 
   const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
+  const excessMM = coverage.seated.length ? flapExcessMM(outer, coverage.seated, reach) : 0
 
   let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
@@ -152,6 +176,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   return {
     anchors,
     flaps,
+    excessMM,
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
     lattice,
@@ -181,28 +206,36 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
 }
 
 /**
- * Band snap. `ladder` is every DISTINCT holding layout in the band — any count, arrangement or
- * pan variation — each at the smallest size where it appears; as honest as the free slider.
- * The landing pick (`pickIdx`) stays the smallest size at the band's MAXIMUM seated count.
- * ONE walk: the best-seated fallback is tracked as the range is scanned, never re-walked.
+ * Band snap — one walk, no re-scans. The entry rule (gate) decides which sizes join the list;
+ * the variant rule decides what counts as its own step, each at its smallest size; the landing
+ * pick (`pickIdx`) stays the smallest size at the band's MAXIMUM seated count.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[]; pickIdx: number } {
   const [lo, hi] = snapRange(cfg, fromMM)
+  const gate = cfg.gateMode ?? (GATE_MODE as GateMode)
+  const loose = cfg.gateLooseMM ?? GATE_LOOSE_MM
+  const variant = cfg.variantMode ?? (VARIANT_MODE as VariantMode)
+  // 'newcount' homes each count at its globally snuggest size, so its scan starts at the floor.
+  const scanLo = variant === 'newcount' && bandOf(fromMM) ? MIN_EFFECT_MM : lo
   const points: BandSnapPoint[] = []
   let bestAny: { sizeMM: number; grid: GridResult } | null = null
-  for (let mm = lo; mm <= hi; mm += stepMM) {
+  for (let mm = scanLo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
-    if (!bestAny || grid.anchors.length > bestAny.grid.anchors.length) bestAny = { sizeMM: mm, grid }
-    if (isHolding(grid.anchors.length, grid.flaps.length)) points.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+    if (mm >= lo && (!bestAny || grid.anchors.length > bestAny.grid.anchors.length)) bestAny = { sizeMM: mm, grid }
+    if (entersBand(gate, grid.anchors.length, grid.flaps.length, grid.excessMM, loose)) {
+      points.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+    }
   }
-  if (points.length) {
-    const maxCount = Math.max(...points.map((p) => p.count))
-    const seen = new Set<string>()
-    const ladder = points.filter((p) => !seen.has(p.sig) && (seen.add(p.sig), true))
-    const pickSig = points.find((p) => p.count === maxCount)!.sig
-    const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
+  const seen = new Set<string>()
+  const keyOf = (p: BandSnapPoint) => variant === 'layout' ? p.sig : String(p.count)
+  const ladder = points
+    .filter((p) => !seen.has(keyOf(p)) && (seen.add(keyOf(p)), true))
+    .filter((p) => p.sizeMM >= lo)
+  if (ladder.length) {
+    const maxCount = Math.max(...ladder.map((p) => p.count))
+    const pickIdx = ladder.findIndex((p) => p.count === maxCount)
     return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), points, ladder, pickIdx }
   }
   const pick = bestAny ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }

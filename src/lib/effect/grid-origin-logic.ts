@@ -29,15 +29,38 @@ export interface LayoutMeasure {
   balanceMM: number
 }
 
-/** Layout rank (v1 law): edge registration → coverage → seats → balance. Count is demoted —
- *  more magnets can never buy a worse wrap; it decides only among equally registered,
- *  equally covered candidates. Returns true when `a` beats `b`. */
-export function betterLayout(a: LayoutMeasure, b: LayoutMeasure): boolean {
-  if (a.registered !== b.registered) return a.registered
-  if (a.excessMM !== b.excessMM) return a.excessMM < b.excessMM
-  if (a.seats !== b.seats) return a.seats > b.seats
-  return a.balanceMM < b.balanceMM
+/** Judging order: what matters most when two layouts compete. */
+export type RankOrder = 'edges' | 'coverage' | 'count'
+
+/** Layout rank. 'edges' (default, v1 law): registration → coverage → seats → balance.
+ *  'coverage' puts wrap first; 'count' is the legacy most-magnets-first behaviour.
+ *  Coverage within `tieMM` counts as equal, so lower terms settle near-ties.
+ *  Returns true when `a` beats `b`. */
+export function betterLayout(a: LayoutMeasure, b: LayoutMeasure, order: RankOrder, tieMM: number): boolean {
+  const cover = Math.abs(a.excessMM - b.excessMM) <= tieMM ? 0 : a.excessMM < b.excessMM ? 1 : -1
+  const seq = order === 'coverage' ? ['cov', 'reg', 'seats', 'bal']
+    : order === 'count' ? ['seats', 'cov', 'bal']
+      : ['reg', 'cov', 'seats', 'bal']
+  for (const term of seq) {
+    if (term === 'reg' && a.registered !== b.registered) return a.registered
+    if (term === 'cov' && cover !== 0) return cover > 0
+    if (term === 'seats' && a.seats !== b.seats) return a.seats > b.seats
+    if (term === 'bal' && a.balanceMM !== b.balanceMM) return a.balanceMM < b.balanceMM
+  }
+  return false
 }
+
+/** Band entry rule: what a size must do to appear in a band's list. */
+export type GateMode = 'all' | 'most' | 'seated'
+export function entersBand(mode: GateMode, seats: number, flapCount: number, meanExcessMM: number, looseMM: number): boolean {
+  if (seats < 1) return false
+  if (mode === 'all') return flapCount === 0
+  if (mode === 'most') return meanExcessMM <= looseMM
+  return true
+}
+
+/** Variant rule: what makes a band step its own variant. */
+export type VariantMode = 'layout' | 'count' | 'newcount'
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(
@@ -63,8 +86,3 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   })
 }
 
-/** Holding: at least one seat and every edge within reach. The layout itself is whatever the
- *  material carries — single, pair, 2x2, rows — never a required pattern. */
-export function isHolding(seatedCount: number, flapCount: number): boolean {
-  return seatedCount >= 1 && flapCount === 0
-}

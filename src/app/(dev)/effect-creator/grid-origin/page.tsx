@@ -12,8 +12,8 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan } from '@/lib/effect/grid-origin'
-import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
+import { DEFAULT_PITCH_MM, type BandSnapPoint, type GateMode, type GridResult, type MagnetPlan, type RankOrder, type VariantMode } from '@/lib/effect/grid-origin'
+import { ANCHOR_BLEND_PCT, BANDS, COVER_TIE_MM, EDGE_REG_TOL_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GATE_LOOSE_MM, GATE_MODE, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RANK_ORDER, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VARIANT_MODE } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -74,19 +74,32 @@ export default function GridLab() {
   const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
-  /** Grid anchor A/B — centroid balances material, bbox balances the frame. */
-  const [anchorMode, setAnchorMode] = useState<'centroid' | 'bbox'>('centroid')
+  /** Grid anchor position — 0 = box centre, 100 = material weight centre, 50 = midpoint. */
+  const [blend, setBlend] = usePersisted('anchorBlend', ANCHOR_BLEND_PCT)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
+  /** Lab dials — spec defaults reproduce shipped behaviour until touched. */
+  const [rankOrder, setRankOrder] = useState<RankOrder>(RANK_ORDER as RankOrder)
+  const [edgeTol, setEdgeTol] = usePersisted('edgeTol', EDGE_REG_TOL_MM)
+  const [coverTie, setCoverTie] = usePersisted('coverTie', COVER_TIE_MM)
+  const [gateMode, setGateMode] = useState<GateMode>(GATE_MODE as GateMode)
+  const [gateLoose, setGateLoose] = usePersisted('gateLoose', GATE_LOOSE_MM)
+  const [variantMode, setVariantMode] = useState<VariantMode>(VARIANT_MODE as VariantMode)
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, snapStep, sizeMin, sizeMax, blend, edgeTol, coverTie, gateLoose })) } catch { }
   }
   const resetDefaults = () => {
-    let d = { pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, snapStep: SNAP_STEP_MM, sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM }
+    let d = {
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, snapStep: SNAP_STEP_MM,
+      sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
+      blend: ANCHOR_BLEND_PCT, edgeTol: EDGE_REG_TOL_MM, coverTie: COVER_TIE_MM, gateLoose: GATE_LOOSE_MM,
+    }
     try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
     setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setBlend(d.blend); setEdgeTol(d.edgeTol); setCoverTie(d.coverTie); setGateLoose(d.gateLoose)
+    setRankOrder(RANK_ORDER as RankOrder); setGateMode(GATE_MODE as GateMode); setVariantMode(VARIANT_MODE as VariantMode)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -164,12 +177,12 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, center: anchorMode, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, anchorBlendPct: blend, rankOrder, edgeTolMM: edgeTol, coverTieMM: coverTie, gateMode, gateLooseMM: gateLoose, variantMode, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, anchorMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, blend, rankOrder, edgeTol, coverTie, gateMode, gateLoose, variantMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -290,10 +303,26 @@ export default function GridLab() {
             <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
-            <div className="gl-field"><span>Grid anchor</span>
+            <Slider label="Grid anchor · box ↔ weight centre" unit="%" v={blend} set={setBlend} min={0} max={100} />
+            <div className="gl-field"><span>Judging order · what wins</span>
               <div className="gl-seg">
-                {([['centroid', 'Centroid · material'], ['bbox', 'BBox · frame']] as ['centroid' | 'bbox', string][]).map(([m, l]) =>
-                  <button key={m} aria-pressed={anchorMode === m} onClick={() => setAnchorMode(m)}>{l}</button>)}
+                {([['edges', 'Edges'], ['coverage', 'Coverage'], ['count', 'Count']] as [RankOrder, string][]).map(([m, l]) =>
+                  <button key={m} aria-pressed={rankOrder === m} onClick={() => setRankOrder(m)}>{l}</button>)}
+              </div>
+            </div>
+            <Slider label="Edge strictness · reach slack" unit="mm" v={edgeTol} set={setEdgeTol} min={0} max={12} />
+            <Slider label="Coverage tie range" unit="mm" v={coverTie} set={setCoverTie} min={0} max={6} />
+            <div className="gl-field"><span>Band entry rule</span>
+              <div className="gl-seg">
+                {([['all', 'All covered'], ['most', 'Mostly'], ['seated', 'Seated']] as [GateMode, string][]).map(([m, l]) =>
+                  <button key={m} aria-pressed={gateMode === m} onClick={() => setGateMode(m)}>{l}</button>)}
+              </div>
+            </div>
+            {gateMode === 'most' && <Slider label="Loose allowance · mean uncovered" unit="mm" v={gateLoose} set={setGateLoose} min={0} max={48} />}
+            <div className="gl-field"><span>Variant rule</span>
+              <div className="gl-seg">
+                {([['layout', 'Layouts'], ['count', 'Counts'], ['newcount', 'New counts']] as [VariantMode, string][]).map(([m, l]) =>
+                  <button key={m} aria-pressed={variantMode === m} onClick={() => setVariantMode(m)}>{l}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Coverage</span>

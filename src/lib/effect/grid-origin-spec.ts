@@ -61,3 +61,19 @@ export const SNAP_STEP_MM = 1
 /** Edge registration slack: a layout is registered when every side's outermost spot
  *  reaches the shape bound within this tolerance. */
 export const EDGE_REG_TOL_MM = 1
+
+/** Lab dials — these defaults reproduce the shipped behaviour exactly. */
+/** Grid anchor position: 0 = box centre, full scale = material weight centre. */
+export const ANCHOR_BLEND_PCT = 100
+export const ANCHOR_BLEND_MAX_PCT = 100
+/** Judging order when comparing two layouts: edges first, coverage first, or count first. */
+export const RANK_ORDER = 'edges'
+/** Coverage tie range — two layouts covering within this many mm count as equal. */
+export const COVER_TIE_MM = 0
+/** Band entry rule: 'all' = everything covered, 'most' = uncovered stays under the loose
+ *  allowance, 'seated' = magnets seated at all. */
+export const GATE_MODE = 'all'
+export const GATE_LOOSE_MM = 24
+/** Variant rule: 'layout' = each distinct arrangement, 'count' = each magnet count,
+ *  'newcount' = counts whose snuggest size lives in this band. */
+export const VARIANT_MODE = 'layout'
