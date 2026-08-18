@@ -76,6 +76,17 @@ export default function GridLab() {
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
+  /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
+   *  the saved baseline, or spec defaults when none was saved. */
+  const saveDefaults = () => {
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, snapStep, sizeMin, sizeMax })) } catch { }
+  }
+  const resetDefaults = () => {
+    let d = { pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, snapStep: SNAP_STEP_MM, sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM }
+    try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+  }
+
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
   const fileRef = useRef<HTMLInputElement>(null)
@@ -278,6 +289,10 @@ export default function GridLab() {
             <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
               <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
             </label>
+            <div className="gl-seg">
+              <button onClick={saveDefaults}>Save as default</button>
+              <button onClick={resetDefaults}>Reset to default</button>
+            </div>
           </div>
 
           {model && <div className="gl-card gl-read">
