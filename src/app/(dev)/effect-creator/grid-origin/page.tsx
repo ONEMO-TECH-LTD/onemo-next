@@ -93,13 +93,28 @@ export default function GridLab() {
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
   const fileRef = useRef<HTMLInputElement>(null)
 
+  /** Perf dash — screen instrumentation only: page load, shape generation, AI cut, solve. */
+  const [perf, setPerf] = useState<{ loadMs?: number; genMs?: number; cutMs?: number; solveMs?: number }>({})
+  const genMsRef = useRef<number | undefined>(undefined)
+  const solveSentAt = useRef(0)
+  useEffect(() => {
+    const report = () => {
+      const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+      if (nav?.duration) setPerf((x) => ({ ...x, loadMs: nav.duration }))
+    }
+    if (document.readyState === 'complete') report()
+    else { window.addEventListener('load', report, { once: true }); return () => window.removeEventListener('load', report) }
+  }, [])
+
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
     setSrc('magic'); setMagStatus('cutting')
+    const t0 = performance.now()
     prepareShaped(loaded.url, undefined, (s) => setMagStatus(s === 'fallback' ? 'cutting (simple fallback)' : s))
       .then((p) => {
+        setPerf((x) => ({ ...x, cutMs: performance.now() - t0 }))
         setMagic({ vshape: p.spec.vectorShape, maskH: p.spec.maskHeightPx, adapter: p.spec.generator?.adapter ?? 'cut', imgUrl: loaded.url })
         setMagStatus('')
       })
@@ -108,6 +123,7 @@ export default function GridLab() {
 
   // base contour normalized so longest side = 1mm (scale-free) — cheap, main thread.
   const base = useMemo<Contour | null>(() => {
+    const t0 = performance.now()
     try {
       if (src === 'magic') {
         if (!magic) return null
@@ -123,6 +139,7 @@ export default function GridLab() {
       const ring = generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG)
       return normGeneratedRing(ring, IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
+    finally { genMsRef.current = performance.now() - t0 }
   }, [src, preset, gen, p1, p2, sides, points, magic])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
@@ -137,6 +154,7 @@ export default function GridLab() {
     w.onmessage = (e) => {
       if (e.data.id !== seqRef.current) return
       if (e.data.error) console.error('[grid-lab] solve failed', e.data.error)
+      setPerf((x) => ({ ...x, solveMs: performance.now() - solveSentAt.current, genMs: genMsRef.current }))
       setModel(e.data.model)
       setSolving(false)
     }
@@ -149,6 +167,7 @@ export default function GridLab() {
     const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, center: anchorMode, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
+    solveSentAt.current = performance.now()
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
   }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, anchorMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
@@ -305,6 +324,9 @@ export default function GridLab() {
             <Cell k="Pitch · edge" v={model.grid.edgeRangeMM[0] === model.grid.edgeRangeMM[1] ? `${model.grid.edgeRangeMM[0]} mm` : `${model.grid.edgeRangeMM[0]}–${model.grid.edgeRangeMM[1]} mm`} />
             <Cell k="Seated magnets" v={String(model.grid.anchors.length)} />
             <Cell k="Registration" v={model.grid.phaseMM.map((n) => n.toFixed(1)).join(' · ') + (manual ? ' manual' : ' auto')} />
+            <Cell k="First load" v={perf.loadMs != null ? `${Math.round(perf.loadMs)} ms` : '—'} />
+            <Cell k="Shape gen" v={(perf.genMs != null ? `${Math.max(1, Math.round(perf.genMs))} ms` : '—') + (perf.cutMs != null ? ` · cut ${(perf.cutMs / 1000).toFixed(1)}s` : '')} />
+            <Cell k="Solve" v={perf.solveMs != null ? (perf.solveMs >= 1000 ? `${(perf.solveMs / 1000).toFixed(1)} s` : `${Math.round(perf.solveMs)} ms`) : '—'} />
           </div>}
         </aside>
       </div>
