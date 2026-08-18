@@ -12,6 +12,7 @@ import {
 } from './grid-origin-spec'
 import {
   bbox,
+  centroidMM,
   fieldSpanMM,
   flapExcessMM,
   flapVerts,
@@ -48,6 +49,9 @@ export interface GridConfig {
   phaseStepMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
   forcePhaseMM?: Pt
+  /** Grid anchor: centroid balances the MATERIAL (default — coincides with bbox on regular
+   *  shapes); bbox balances the FRAME. An A/B instrument, not two behaviours to maintain. */
+  center?: 'centroid' | 'bbox'
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -81,10 +85,15 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
   const bb = bbox(outer)
-  const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
+  // The anchor: where a node line is guaranteed to land, and what balance is measured against.
+  // Centroid = the material's balance point; bbox = the frame's. Identical on regular shapes.
+  const centre: Pt = (cfg.center ?? 'centroid') === 'bbox'
+    ? [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
+    : centroidMM(outer)
+  const offX = centre[0] - bb.minX, offY = centre[1] - bb.minY
 
   const fits = cfg.circle
-    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
+    ? makeCircleSeatPredicate((bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
     : makeSeatPredicate(outer, spotRadiusOf(pad))
 
   let bestSeated: Pt[] = []
@@ -94,26 +103,26 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // Manual calibration: seat exactly at the given registration, no search.
     bestOx = mod(cfg.forcePhaseMM[0], pitch)
     bestOy = mod(cfg.forcePhaseMM[1], pitch)
-    bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
-    bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
+    bestKx = mod(bestOx - offX, pitch)
+    bestKy = mod(bestOy - offY, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
   } else if (fits) {
-    // Phases anchored on the canonical registration: k=0 puts a node line on the bbox centre
+    // Phases anchored on the canonical registration: k=0 puts a node line on the anchor
     // (odd-count parity); the 24mm offset in the walk is the even-count parity. Mechanics still
     // choose among them; anchoring guarantees the canonical phases are sampled at ANY size.
-    const phases = (span: number): { p: number; k: number }[] => {
+    const phases = (off: number): { p: number; k: number }[] => {
       const out: { p: number; k: number }[] = []
-      for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(span / 2 + k, pitch), k })
+      for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(off + k, pitch), k })
       return out
     }
     let bestScore = -Infinity
-    for (const py of phases(bb.maxY - bb.minY)) {
-      for (const px of phases(bb.maxX - bb.minX)) {
+    for (const py of phases(offY)) {
+      for (const px of phases(offX)) {
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
         const excess = flapExcessMM(outer, seat, reach)
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
-        const balance = Math.hypot(sx / seat.length - cx, sy / seat.length - cy)
+        const balance = Math.hypot(sx / seat.length - centre[0], sy / seat.length - centre[1])
         const score = registrationScore(seat.length, excess, balance)
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
       }

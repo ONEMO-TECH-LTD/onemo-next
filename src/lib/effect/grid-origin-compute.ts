@@ -15,6 +15,17 @@ export function bbox(pts: ReadonlyArray<Pt>): BBox {
 
 export function dist(a: Pt, b: Pt): number { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
+/** Area centroid of the outline — the material's balance point. BBox centre when degenerate. */
+export function centroidMM(pts: ReadonlyArray<Pt>): Pt {
+  let a = 0, cx = 0, cy = 0
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const w = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
+    a += w; cx += (pts[j][0] + pts[i][0]) * w; cy += (pts[j][1] + pts[i][1]) * w
+  }
+  if (Math.abs(a) < 1e-9) { const b = bbox(pts); return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] }
+  return [cx / (3 * a), cy / (3 * a)]
+}
+
 /** Spot radius = the padding, measured from the magnet centre. */
 export function spotRadiusOf(padMM: number): number {
   return padMM

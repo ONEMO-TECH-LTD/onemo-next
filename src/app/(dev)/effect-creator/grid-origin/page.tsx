@@ -74,6 +74,8 @@ export default function GridLab() {
   const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
+  /** Grid anchor A/B — centroid balances material, bbox balances the frame. */
+  const [anchorMode, setAnchorMode] = useState<'centroid' | 'bbox'>('centroid')
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
@@ -144,11 +146,11 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, center: anchorMode, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, plan, mode, stepSel, coverage, offsetMM, snapStep])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, manual, anchorMode, plan, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -269,6 +271,12 @@ export default function GridLab() {
             <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
+            <div className="gl-field"><span>Grid anchor</span>
+              <div className="gl-seg">
+                {([['centroid', 'Centroid · material'], ['bbox', 'BBox · frame']] as ['centroid' | 'bbox', string][]).map(([m, l]) =>
+                  <button key={m} aria-pressed={anchorMode === m} onClick={() => setAnchorMode(m)}>{l}</button>)}
+              </div>
+            </div>
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
