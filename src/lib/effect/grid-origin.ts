@@ -7,7 +7,6 @@ import {
   FLAP_MM,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
-  MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
 } from './grid-origin-spec'
@@ -16,6 +15,7 @@ import {
   centroidMM,
   fieldSpanMM,
   flapExcessMM,
+  flapVerts,
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
@@ -60,12 +60,16 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
+  /** Silhouette vertices past reach — the band holding gate reads this; not a user-facing verdict. */
+  flaps: Pt[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   /** Every lattice position at the chosen phase, seated or not. */
   lattice: Pt[]
   /** The phase the search chose, mm. */
   phaseMM: Pt
+  /** Registration offset from the canonical phase, mm per axis — the pan class. */
+  panMM: Pt
   /** The spot radius the erosion used — the padding, centre-measured. */
   spotRadiusMM: number
 }
@@ -93,32 +97,34 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     : makeSeatPredicate(outer, spotRadiusOf(pad))
 
   let bestSeated: Pt[] = []
-  let bestOx = 0, bestOy = 0
+  let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   const mod = (v: number, m: number) => ((v % m) + m) % m
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search.
     bestOx = mod(cfg.forcePhaseMM[0], pitch)
     bestOy = mod(cfg.forcePhaseMM[1], pitch)
+    bestKx = mod(bestOx - offX, pitch)
+    bestKy = mod(bestOy - offY, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
   } else if (fits) {
     // Phases anchored on the canonical registration: k=0 puts a node line on the anchor
     // (odd-count parity); the 24mm offset in the walk is the even-count parity. Mechanics still
     // choose among them; anchoring guarantees the canonical phases are sampled at ANY size.
-    const phases = (off: number): number[] => {
-      const out: number[] = []
-      for (let k = 0; k < pitch; k += phaseStep) out.push(mod(off + k, pitch))
+    const phases = (off: number): { p: number; k: number }[] => {
+      const out: { p: number; k: number }[] = []
+      for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(off + k, pitch), k })
       return out
     }
     let bestScore = -Infinity
-    for (const oy of phases(offY)) {
-      for (const ox of phases(offX)) {
-        const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
+    for (const py of phases(offY)) {
+      for (const px of phases(offX)) {
+        const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
         const excess = flapExcessMM(outer, seat, reach)
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / seat.length - centre[0], sy / seat.length - centre[1])
         const score = registrationScore(seat.length, excess, balance)
-        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = ox; bestOy = oy }
+        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
       }
     }
   }
@@ -128,22 +134,35 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
   const anchors = assignSizes(coverage.seated, plan)
 
+  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
+
   let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
   if (anchors.length === 0) { minD = MAGNET_DIA_SMALL_MM; maxD = MAGNET_DIA_SMALL_MM }
 
   return {
     anchors,
+    flaps,
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
     lattice,
     phaseMM: [bestOx, bestOy],
+    panMM: [bestKx, bestKy],
     spotRadiusMM: spotRadiusOf(pad),
   }
 }
 
-/** One holding size in a band: the size and how many magnets it seats. */
-export interface BandSnapPoint { sizeMM: number; count: number }
+/** One holding size in a band: the size, the seat count, and the layout's identity. */
+export interface BandSnapPoint { sizeMM: number; count: number; sig: string }
+
+/** Layout identity: the magnets' relative arrangement plus the registration (pan) class. */
+function layoutSig(grid: GridResult): string {
+  if (!grid.anchors.length) return 'none'
+  const pts = grid.anchors.map((a) => a.p).slice().sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  let mx = Infinity, my = Infinity
+  for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
+  return pts.map((p) => Math.round(p[0] - mx) + ',' + Math.round(p[1] - my)).join('|') + '@' + grid.panMM.join(',')
+}
 
 /** The walk range: the band as a RANGE; above the last band, up to the derived field span. */
 function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
@@ -153,38 +172,45 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
 }
 
 /**
- * Band snap. A VARIANT is a magnet COUNT whose SNUGGEST size — measured globally, from the
- * smallest effect up — falls inside this band's range. A count that already seats below the
- * band floor is the previous band's answer stretched loose, never this band's variant.
- * The landing pick (`pickIdx`) is the band's maximum-count variant at its snug size.
+ * Every holding size in the band, scanned at stepMM. The band is a RANGE: fit is not monotone,
+ * so the whole range is walked and each size judged independently.
+ */
+export function bandSnapPoints(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
+): BandSnapPoint[] {
+  const [lo, hi] = snapRange(cfg, fromMM)
+  const out: BandSnapPoint[] = []
+  for (let mm = lo; mm <= hi; mm += stepMM) {
+    const grid = computeGrid(sized(mm), cfg)
+    if (isHolding(grid.anchors.length, grid.flaps.length)) out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+  }
+  return out
+}
+
+/**
+ * Band snap. `ladder` is every DISTINCT holding layout in the band — any count, arrangement or
+ * pan variation — each at the smallest size where it appears; as honest as the free slider.
+ * The landing pick (`pickIdx`) stays the smallest size at the band's MAXIMUM seated count.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
+): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[]; pickIdx: number } {
+  const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
+  if (points.length) {
+    const maxCount = Math.max(...points.map((p) => p.count))
+    const seen = new Set<string>()
+    const ladder = points.filter((p) => !seen.has(p.sig) && (seen.add(p.sig), true))
+    const pickSig = points.find((p) => p.count === maxCount)!.sig
+    const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
+    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), points, ladder, pickIdx }
+  }
+  // Nothing in the band holds: best-seated rung as a fallback.
   const [lo, hi] = snapRange(cfg, fromMM)
-  const scanLo = bandOf(fromMM) ? MIN_EFFECT_MM : lo
-  // Global snug scan: the first (smallest) size each count seats at.
-  const snug = new Map<number, number>()
-  for (let mm = scanLo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), cfg)
-    const c = grid.anchors.length
-    if (isHolding(c) && !snug.has(c)) snug.set(c, mm)
-  }
-  const ladder: BandSnapPoint[] = [...snug.entries()]
-    .filter(([, mm]) => mm >= lo && mm <= hi)
-    .map(([count, sizeMM]) => ({ sizeMM, count }))
-    .sort((a, b) => a.sizeMM - b.sizeMM)
-  if (ladder.length) {
-    const maxCount = Math.max(...ladder.map((p) => p.count))
-    const pickIdx = ladder.findIndex((p) => p.count === maxCount)
-    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
-  }
-  // No count unlocks in this band: best-seated rung as a fallback.
   let best: { sizeMM: number; grid: GridResult } | null = null
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, ladder: [], pickIdx: 0 }
+  return { ...pick, points, ladder: [], pickIdx: 0 }
 }

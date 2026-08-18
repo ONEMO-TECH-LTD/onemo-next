@@ -251,11 +251,11 @@ export default function GridLab() {
               : <>
                   <div className={`gl-snap${model && !model.ladder.length ? ' gl-snap-none' : ''}`}>Fit <b>B{mode}-{model?.ladder.length ? model.idx + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
                     <span>{model?.ladder.length
-                      ? `${model.ladder.length} layouts in band · ${model.grid.anchors.length} magnets`
-                      : `NO NEW LAYOUT unlocks in this band — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
+                      ? `${model.ladder.length} holding layouts in band · ${model.grid.anchors.length} magnets`
+                      : `NO FIT in this band at these settings — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
                   {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
                     {model!.ladder.map((pt, i) =>
-                      <button key={pt.count + '-' + pt.sizeMM} aria-pressed={i === model!.idx}
+                      <button key={pt.sizeMM + pt.sig} aria-pressed={i === model!.idx}
                         onClick={() => setStepSel(i)}>B{mode}-{i + 1}<em>{pt.sizeMM} mm · {pt.count}⌾</em></button>)}
                   </div>}
                   <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
@@ -267,7 +267,7 @@ export default function GridLab() {
               </div>
             </div>
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
-            <Slider label="Coverage reach · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
+            <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
             <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
