@@ -14,7 +14,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { computeGrid, fitSizeToGrid, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
-import { RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-origin-spec'
+import { RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -45,6 +45,8 @@ export default function GridLab() {
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(false)
   const [autoFit, setAutoFit] = useState(false)
+  /** Snap scan step — admin-tunable for testing; default from spec. */
+  const [snapStep, setSnapStep] = useState(SNAP_STEP_MM)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -88,13 +90,13 @@ export default function GridLab() {
       const sized = makeSizer(b, offsetMM)
       if (autoFit) {
         // Snap climbs to the same 9x9 ceiling the slider offers — its own default stopped at 300.
-        const fit = fitSizeToGrid(sized, cfg, sizeMM, { maxMM: sizeRange(pitch, pad).maxMM })
+        const fit = fitSizeToGrid(sized, cfg, sizeMM, { maxMM: sizeRange(pitch, pad).maxMM, step: snapStep })
         return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, snapped: fit.snapped }
       }
       const contour = sized(sizeMM)
       return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, snapped: false }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM, snapStep])
 
   // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
   const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
@@ -185,6 +187,7 @@ export default function GridLab() {
             {autoFit
               ? <div className="gl-snap">Effect size <b>{model ? model.effSize : '—'} mm</b><span>snapped up the standard ladder to envelop a 4-point cell with padding</span></div>
               : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />}
+            {autoFit && <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={1} max={24} />}
             <div className="gl-field"><span>Grid pitch · released tiers</span>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
