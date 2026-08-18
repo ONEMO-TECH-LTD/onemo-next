@@ -67,7 +67,7 @@ export function verdictIssues(
 ): string[] {
   const issues: string[] = []
   if (degenerate) issues.push(`No room for a magnet — the shape is too small/thin to fit a magnet plus its ${padMM}mm application ring.`)
-  else if (seatedCount === 0) issues.push(`Too small — no magnet grips material. Turn on "Snap size to grid" to auto-size it up.`)
-  if (flapCount > 0) issues.push(`Some edge areas have no magnet within reach (red edge). Turn on "Snap size to grid", or reduce the pitch.`)
+  else if (seatedCount === 0) issues.push(`Too small — no magnet grips material. Pick a band to snap to a holding size.`)
+  if (flapCount > 0) issues.push(`Some edge areas have no magnet within reach (red edge). Pick a band, or raise the flap allowance.`)
   return issues
 }

@@ -12,8 +12,8 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { bandOf, computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type MagnetPlan } from '@/lib/effect/grid-origin'
-import { BANDS, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
+import { computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -44,15 +44,18 @@ export default function GridLab() {
   const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = useState(RELEASED_PADDING_MM)
+  /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
+  const [flap, setFlap] = useState(FLAP_MM)
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(false)
-  const [autoFit, setAutoFit] = useState(false)
+  /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
+  const [mode, setMode] = useState<number | 'free'>('free')
+  /** Selected step on the band's fit ladder. */
+  const [stepIdx, setStepIdx] = useState(0)
   /** Snap scan step — admin-tunable for testing; default from spec. */
   const [snapStep, setSnapStep] = useState(SNAP_STEP_MM)
-  /** In snap mode: the holding size the slider chose; null = the full-seat pick. */
-  const [snapSel, setSnapSel] = useState<number | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -91,21 +94,22 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+      const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
       // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
       const sized = makeSizer(b, offsetMM)
-      if (autoFit) {
-        // Band snap: the smallest size seating the band's full count; slider cycles the rest.
-        const fit = fitSizeInBand(sized, cfg, sizeMM, snapStep)
-        const sel = snapSel !== null ? fit.points.find((pt) => pt.sizeMM === snapSel) : undefined
-        const eff = sel ? sel.sizeMM : fit.sizeMM
-        const grid = sel ? computeGrid(sized(eff), cfg) : fit.grid
-        return { contour: sized(eff), grid, effSize: eff, points: fit.points }
+      if (mode !== 'free') {
+        // Band snap: smallest size at the band's max count; the ladder steps every size at that count.
+        const band = BANDS.find((bd) => bd.id === mode) ?? BANDS[0]
+        const fit = fitSizeInBand(sized, cfg, band.minMM, snapStep)
+        const idx = fit.ladder.length ? Math.min(stepIdx, fit.ladder.length - 1) : 0
+        const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
+        const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
+        return { contour: sized(eff), grid, effSize: eff, ladder: fit.ladder }
       }
       const contour = sized(sizeMM)
-      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, points: [] as BandSnapPoint[] }
+      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, ladder: [] as BandSnapPoint[] }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, plan, magic, autoFit, coverage, offsetMM, snapStep, snapSel])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
 
   // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
   const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
@@ -186,25 +190,25 @@ export default function GridLab() {
           </div>
 
           <div className="gl-card gl-pad">
-            <label className="gl-toggle"><span>Snap size to grid <small style={{ color: 'var(--ink-3)' }}>· auto-scale to fit</small></span>
-              <input type="checkbox" checked={autoFit} onChange={e => { setAutoFit(e.target.checked); setSnapSel(null) }} /></label>
-            {autoFit
-              ? <>
-                  <div className="gl-snap">Effect size <b>{model ? model.effSize : '—'} mm</b><span>{model?.points.length ?? 0} holding sizes in band {bandOf(model?.effSize ?? sizeMM)?.id ?? '—'} · {model?.grid.anchors.length ?? 0} magnets</span></div>
-                  <Slider label="Cycle holding sizes" unit="mm" v={model?.effSize ?? sizeMM}
-                    set={(v) => { const pts = model?.points ?? []; if (!pts.length) return
-                      const nearest = pts.reduce((a, b) => Math.abs(b.sizeMM - v) < Math.abs(a.sizeMM - v) ? b : a)
-                      setSnapSel(nearest.sizeMM) }}
-                    min={bandOf(sizeMM)?.minMM ?? minSizeMM} max={bandOf(sizeMM)?.maxMM ?? maxSizeMM} />
-                </>
-              : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />}
-            {autoFit && <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />}
-            <div className="gl-field"><span>Band</span>
+            <div className="gl-field"><span>Band · snaps to fit</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={bandOf(sizeMM)?.id === b.id} onClick={() => { setSizeMM(b.minMM); setSnapSel(null) }}>B{b.id}</button>)}
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepIdx(0) }}>B{b.id}</button>)}
+                <button aria-pressed={mode === 'free'} onClick={() => setMode('free')}>Free</button>
               </div>
             </div>
+            {mode === 'free'
+              ? <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />
+              : <>
+                  <div className="gl-snap">Fit <b>B{mode}-{model?.ladder.length ? Math.min(stepIdx, model.ladder.length - 1) + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
+                    <span>{model?.ladder.length ?? 0} fit steps at {model?.grid.anchors.length ?? 0} magnets{model && !model.ladder.length ? ' · nothing fully fits — best seated shown' : ''}</span></div>
+                  {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
+                    {model!.ladder.map((pt, i) =>
+                      <button key={pt.sizeMM} aria-pressed={i === Math.min(stepIdx, model!.ladder.length - 1)}
+                        onClick={() => setStepIdx(i)}>B{mode}-{i + 1}<em>{pt.sizeMM} mm</em></button>)}
+                  </div>}
+                  <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
+                </>}
             <div className="gl-field"><span>Grid pitch · released tiers</span>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
@@ -212,6 +216,7 @@ export default function GridLab() {
               </div>
             </div>
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
+            <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
 
             <div className="gl-field"><span>Coverage</span>
@@ -380,6 +385,11 @@ const CSS = `
 .gl-upload:hover{filter:brightness(1.05)}
 .gl-magic-note{font:11.5px var(--mono);color:var(--ink-2);line-height:1.5}
 .gl-snap{font-size:12.5px;color:var(--ink-2)}.gl-snap b{font:600 13px var(--mono);color:var(--ink)}.gl-snap span{display:block;font:11px var(--mono);color:var(--ink-3);margin-top:3px}
+.gl-steps{display:flex;flex-wrap:wrap;gap:4px}
+.gl-steps button{font:600 10px var(--mono);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:4px 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
+.gl-steps button em{font-style:normal;color:var(--ink-3);font-size:9px}
+.gl-steps button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.gl-steps button[aria-pressed=true] em{color:#fffc}
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}

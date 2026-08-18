@@ -4,6 +4,7 @@
 import type { Contour, Pt } from './types'
 import {
   DEFAULT_PITCH_MM,
+  FLAP_MM,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   PADDING_FLOOR_MM,
@@ -41,6 +42,8 @@ export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from 
 export interface GridConfig {
   pitchMM?: number
   paddingMM?: number
+  /** How far material may extend past a spot's edge before it counts as a flap. 0 = edge-to-edge. */
+  flapMM?: number
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -67,6 +70,8 @@ export interface GridResult {
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  // Coverage reach from a magnet centre: the spot plus the dialled flap allowance.
+  const reach = spotRadiusOf(pad) + Math.max(0, cfg.flapMM ?? FLAP_MM)
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
@@ -94,7 +99,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       for (const ox of phases(bb.maxX - bb.minX)) {
         const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
         if (!seat.length) continue
-        const flapCount = flapVerts(outer, seat, pitch).length
+        const flapCount = flapVerts(outer, seat, reach).length
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / seat.length - cx, sy / seat.length - cy)
         const score = registrationScore(seat.length, flapCount, balance)
@@ -108,7 +113,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
   const anchors = assignSizes(coverage.seated, plan)
 
-  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, pitch) : []
+  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
   const issues = verdictIssues(!fits, coverage.seated.length, flaps.length, pad)
 
   let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
@@ -155,18 +160,17 @@ export function bandSnapPoints(
 }
 
 /**
- * Band snap: the layout must seat FULLY within the range — never settle for a lost-magnet layout
- * at the floor. The pick is the smallest size achieving the band's MAXIMUM seated count; the other
- * holding sizes are returned so a slider can cycle them.
+ * Band snap: the pick is the smallest size achieving the band's MAXIMUM seated count.
+ * `ladder` is every holding size at that count, smallest to biggest — the band's fit steps.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; points: BandSnapPoint[] } {
+): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[] } {
   const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
-    const pick = points.find((p) => p.count === maxCount)!
-    return { sizeMM: pick.sizeMM, grid: computeGrid(sized(pick.sizeMM), cfg), points }
+    const ladder = points.filter((p) => p.count === maxCount)
+    return { sizeMM: ladder[0].sizeMM, grid: computeGrid(sized(ladder[0].sizeMM), cfg), points, ladder }
   }
   // Nothing in the band holds: best-seated rung as a fallback.
   const [lo, hi] = snapRange(cfg, fromMM)
@@ -176,5 +180,5 @@ export function fitSizeInBand(
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, points }
+  return { ...pick, points, ladder: [] }
 }
