@@ -68,8 +68,8 @@ export default function GridLab() {
   const [showLattice, setShowLattice] = useState(true)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number | 'free'>('free')
-  /** Selected step on the band's fit ladder. */
-  const [stepIdx, setStepIdx] = useState(0)
+  /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
+  const [stepSel, setStepSel] = useState<number | null>(null)
   /** Snap scan step — admin-tunable for testing; default from spec. */
   const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
@@ -116,18 +116,18 @@ export default function GridLab() {
       // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
       const sized = makeSizer(b, offsetMM)
       if (mode !== 'free') {
-        // Band snap: smallest size at the band's max count; the ladder steps every size at that count.
+        // Band snap: every distinct holding layout is a step; the landing pick is max-count.
         const band = BANDS.find((bd) => bd.id === mode) ?? BANDS[0]
         const fit = fitSizeInBand(sized, cfg, band.minMM, snapStep)
-        const idx = fit.ladder.length ? Math.min(stepIdx, fit.ladder.length - 1) : 0
+        const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
         const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
         const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
-        return { contour: sized(eff), grid, effSize: eff, ladder: fit.ladder }
+        return { contour: sized(eff), grid, effSize: eff, ladder: fit.ladder, idx }
       }
       const contour = sized(sizeMM)
-      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, ladder: [] as BandSnapPoint[] }
+      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, ladder: [] as BandSnapPoint[], idx: 0 }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, manual, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, manual, plan, magic, mode, stepSel, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -211,7 +211,7 @@ export default function GridLab() {
             <div className="gl-field"><span>Band · snaps to fit</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepIdx(0); setManual(null) }}>B{b.id}</button>)}
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null) }}>B{b.id}</button>)}
                 <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setManual(null) }}>Free</button>
               </div>
             </div>
@@ -232,12 +232,12 @@ export default function GridLab() {
                   </div>
                 </>
               : <>
-                  <div className="gl-snap">Fit <b>B{mode}-{model?.ladder.length ? Math.min(stepIdx, model.ladder.length - 1) + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
-                    <span>{model?.ladder.length ?? 0} fit steps at {model?.grid.anchors.length ?? 0} magnets{model && !model.ladder.length ? ' · nothing fully fits — best seated shown' : ''}</span></div>
+                  <div className="gl-snap">Fit <b>B{mode}-{model?.ladder.length ? model.idx + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
+                    <span>{model?.ladder.length ?? 0} holding layouts in band · {model?.grid.anchors.length ?? 0} magnets{model && !model.ladder.length ? ' · nothing fully fits — best seated shown' : ''}</span></div>
                   {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
                     {model!.ladder.map((pt, i) =>
-                      <button key={pt.sizeMM} aria-pressed={i === Math.min(stepIdx, model!.ladder.length - 1)}
-                        onClick={() => setStepIdx(i)}>B{mode}-{i + 1}<em>{pt.sizeMM} mm</em></button>)}
+                      <button key={pt.sizeMM + pt.sig} aria-pressed={i === model!.idx}
+                        onClick={() => setStepSel(i)}>B{mode}-{i + 1}<em>{pt.sizeMM} mm · {pt.count}⌾</em></button>)}
                   </div>}
                   <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
                 </>}

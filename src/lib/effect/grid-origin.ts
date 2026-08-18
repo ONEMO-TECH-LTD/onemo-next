@@ -185,19 +185,21 @@ export function bandSnapPoints(
 }
 
 /**
- * Band snap: the pick is the smallest size achieving the band's MAXIMUM seated count.
- * `ladder` is one step per DISTINCT layout at that count — arrangement or pan variation —
- * each at the smallest size where it appears.
+ * Band snap. `ladder` is every DISTINCT holding layout in the band — any count, arrangement or
+ * pan variation — each at the smallest size where it appears; as honest as the free slider.
+ * The landing pick (`pickIdx`) stays the smallest size at the band's MAXIMUM seated count.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[] } {
+): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[]; pickIdx: number } {
   const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const seen = new Set<string>()
-    const ladder = points.filter((p) => p.count === maxCount && !seen.has(p.sig) && (seen.add(p.sig), true))
-    return { sizeMM: ladder[0].sizeMM, grid: computeGrid(sized(ladder[0].sizeMM), cfg), points, ladder }
+    const ladder = points.filter((p) => !seen.has(p.sig) && (seen.add(p.sig), true))
+    const pickSig = points.find((p) => p.count === maxCount)!.sig
+    const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
+    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), points, ladder, pickIdx }
   }
   // Nothing in the band holds: best-seated rung as a fallback.
   const [lo, hi] = snapRange(cfg, fromMM)
@@ -207,5 +209,5 @@ export function fitSizeInBand(
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, points, ladder: [] }
+  return { ...pick, points, ladder: [], pickIdx: 0 }
 }
