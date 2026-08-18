@@ -222,8 +222,7 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          <div className="gl-card gl-pad">
-            <div className="gl-glabel">Shape source</div>
+          <Fold title="Shape source">
             <div className="gl-seg gl-seg3">
               <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
               <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
@@ -261,9 +260,9 @@ export default function GridLab() {
                         : 'AI removes the background and traces the silhouette — that outline meets the grid.'}
               </div>
             </>}
-          </div>
+          </Fold>
 
-          <div className="gl-card gl-pad">
+          <Fold title="Grid settings">
             <div className="gl-field"><span>Band · snaps to fit</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
@@ -328,7 +327,7 @@ export default function GridLab() {
               <button onClick={saveDefaults}>Save as default</button>
               <button onClick={resetDefaults}>Reset to default</button>
             </div>
-          </div>
+          </Fold>
 
           {model && <div className="gl-card gl-read">
             <Cell k="Real size" v={`${Math.round(dim(model.contour, 0))}×${Math.round(dim(model.contour, 1))} mm`} />
@@ -341,8 +340,8 @@ export default function GridLab() {
         </aside>
 
         <aside className="gl-labcol">
-          <div className="gl-card gl-pad">
-            <label className="gl-toggle"><span>LAB · judging experiments <small style={{ color: 'var(--ink-3)' }}>· off = pure engine</small></span>
+          <Fold title="LAB · judging experiments">
+            <label className="gl-toggle"><span>Experiments active <small style={{ color: 'var(--ink-3)' }}>· off = pure engine</small></span>
               <input type="checkbox" checked={labOn} onChange={(e) => setLabOnN(e.target.checked ? 1 : 0)} />
             </label>
             <div className={`gl-lab-body${labOn ? '' : ' gl-lab-off'}`}>
@@ -369,7 +368,7 @@ export default function GridLab() {
                 </div>
               </div>
             </div>
-          </div>
+          </Fold>
         </aside>
       </div>
     </div>
@@ -499,6 +498,15 @@ function Slider({ label, v, set, min, max, unit }: { label: string; v: number; s
   )
 }
 function Cell({ k, v }: { k: string; v: string }) { return <div className="gl-cell"><span>{k}</span><b>{v}</b></div> }
+/** Collapsible card — native details, open by default; collapse the unneeded on a phone. */
+function Fold({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <details className="gl-card gl-fold" open>
+      <summary>{title}</summary>
+      <div className="gl-fold-body">{children}</div>
+    </details>
+  )
+}
 
 const CSS = `
 .gl{--bg:#eef1f5;--panel:#fff;--panel-2:#f6f8fb;--line:#dbe1ea;--ink:#18202e;--ink-2:#5a6577;--ink-3:#93a0b3;
@@ -516,8 +524,13 @@ const CSS = `
 .gl-labcol{grid-column:1;grid-row:1}
 .gl-stage{grid-column:2;grid-row:1}
 .gl-controls{grid-column:3;grid-row:1}
-.gl-lab-body{display:flex;flex-direction:column;gap:15px;margin-top:13px}
+.gl-lab-body{display:flex;flex-direction:column;gap:15px}
 .gl-lab-off{opacity:.4;pointer-events:none}
+.gl-fold summary{cursor:pointer;list-style:none;padding:14px 18px;font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center;user-select:none}
+.gl-fold summary::-webkit-details-marker{display:none}
+.gl-fold summary::after{content:'▾';font-size:11px;transition:transform .15s}
+.gl-fold:not([open]) summary::after{transform:rotate(-90deg)}
+.gl-fold-body{display:flex;flex-direction:column;gap:15px;padding:2px 18px 18px}
 @media (max-width:1100px){.gl-body{grid-template-columns:minmax(0,1fr) 336px}
   .gl-stage{grid-column:1;grid-row:1}.gl-controls{grid-column:2;grid-row:1}.gl-labcol{grid-column:1/-1;grid-row:2}}
 @media (max-width:840px){.gl-body{grid-template-columns:1fr}
