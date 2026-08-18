@@ -18,9 +18,7 @@ import { RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-orig
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
-/** The stage's pixel size. 440 was a small fixed square in a card; the scaffold's canvas showed
- *  what a proper working surface is, so this fills the column instead. Everything derives from it —
- *  the element, the px/mm scale, the header label — so one value moves the whole surface. */
+/** Stage pixel size — element, px/mm scale and header label all derive from it. */
 const VP = 640
 const FIT = 0.86
 
@@ -29,9 +27,6 @@ const GENS: { k: ShapeKind; label: string }[] = [{ k: 'blob', label: 'Blob' }, {
 
 type Src = 'preset' | 'gen' | 'magic'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
-
-// Shape preparation lives in the BRIDGE (normBaseContour / normGeneratedRing) — the shell hands
-// sources over and draws what comes back; it flattens nothing and normalizes nothing.
 
 export default function GridLab() {
   const [src, setSrc] = useState<Src>('preset')
@@ -47,13 +42,7 @@ export default function GridLab() {
   const [offsetMM, setOffsetMM] = useState(0)
   const [pattern, setPattern] = useState<GridPattern>('standard')
   const [plan, setPlan] = useState<MagnetPlan>('all6')
-  /**
-   * SHOW THE WHOLE FIELD, not just the part of it that answered.
-   *
-   * Off, the picture shows where magnets landed. On, it also shows every position they were tried
-   * against — so a slot that held nothing because its padding was blocked stops looking identical
-   * to a slot that was never there at all.
-   */
+  /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(false)
   const [autoFit, setAutoFit] = useState(false)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
@@ -259,32 +248,22 @@ function Stage({ contour, grid, lattice, gridPattern }: { contour: Contour; grid
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
 
-  /**
-   * THE FIELD FILLS THE FRAME, and the shape does not change size doing it. `S` is untouched —
-   * still px-per-mm from the shape's longest side — so the shape renders at 86% of the viewport as
-   * always; the wider box only reveals the world around it.
-   */
+  // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size.
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
   const spanMM = VP / S
   const vx = cx - spanMM / 2, vy = cy - spanMM / 2
 
-  /**
-   * THE SPOTS, asked for — the bridge owns which positions exist and what radius each carries; the
-   * toggle only chooses between the whole field and the seated ones. This file draws circles.
-   */
+  // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
   const spots: readonly FieldSpot[] = lattice
     ? fieldSpots(grid, gridPattern, { minX: vx, minY: -(vy + spanMM), maxX: vx + spanMM, maxY: -vy })
     : seatedSpots(grid)
-  /** The rule's anchor: any spot is on the lattice, so the lines cross at the centres. */
+  // Rule anchor: any spot is on the lattice, so lines cross at the centres.
   const A0 = spots[0]
   const Afy: [number, number] = A0 ? [A0.x, -A0.y] : [0, 0]
 
   return (
     <svg width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}>
-      {/* THE NOTEPAD, ALWAYS — the scaffold canvas's ground: the millimetre rule at two levels
-          (fine 5%, pitch 10%), anchored ON the lattice so the intersections are the magnet centres.
-          It replaces the container's own decorative CSS grid, which was a second, unrelated ruling
-          fighting this one. The toggle governs the DISCS below, never the ground. */}
+      {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
           patternUnits="userSpaceOnUse" x={Afy[0]} y={Afy[1]}>
@@ -311,8 +290,6 @@ function Stage({ contour, grid, lattice, gridPattern }: { contour: Contour; grid
           stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
           strokeWidth={sp.held ? 0.6 : 0.5} />
       ))}
-      {/* (The old dashed application-padding ring is gone: the spot disc above IS that circle —
-          magnet radius + padding — drawn once at every position instead of twice at the seated.) */}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
         return <g key={'a' + i}>

@@ -1,12 +1,5 @@
-// grid-origin-bridge.ts — THE BRIDGE between the origin engine and its bench shell.
-//
-// Separation (the scaffold's law, applied here): the ENGINE computes, its VALUES are declared
-// beside it, and the SHELL draws — it decides nothing and derives nothing. Everything a surface
-// needs that is not a screen concern lives HERE, portable, so the shell can be swapped without
-// touching a formula and the engine never learns a shell exists.
-//
-// Everything in this file is wiring and translation. It holds no values of its own (they come from
-// grid-origin's spec block) and does no geometry the engine doesn't already do — it asks.
+// grid-origin-bridge.ts — UI bridge: shape preparation and display lists for the bench shell.
+// Wiring only — values from spec, geometry from compute, answers from the engine.
 
 import { contourFromShape } from './geometry-truth'
 import { insetRingMM } from './offset'
@@ -23,13 +16,8 @@ import {
   type MagnetPlan,
 } from './grid-origin'
 
-/**
- * The size at which curves are flattened before normalizing — the largest the bench manufactures.
- * Flattening happens AS IF cut at this size so the 0.05mm manufacturing tolerance is honoured at
- * every size a slider reaches; normalizing afterwards changes coordinates, not resolution.
- * (Handing the flattener the normalized 1mm shape instead turned that tolerance into 50 source
- * pixels, and the engine judged magnets against a visibly faceted polygon.)
- */
+/** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
+ *  manufacturing tolerance holds at every slider size. */
 const FLATTEN_REF_MM = 250
 
 function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
@@ -48,10 +36,7 @@ export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | nul
   return { outer: { pts: c.outer.pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt) }, holes: [] }
 }
 
-/**
- * A sizer for one base contour: real-mm contour at any longest side, with the outline offset
- * (grow/shrink) applied. The offset op is geometry — it lives here, never in a shell.
- */
+/** Sizer for one base contour: real-mm contour at any longest side, outline offset applied. */
 export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Contour {
   return (mm: number): Contour => {
     const c = scaleContour(base, mm)
@@ -61,7 +46,7 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
   }
 }
 
-/** A generated polygon ring (image px, y-down) → mm contour normalized to 1mm, y-up. */
+/** Generated polygon ring (image px, y-down) → mm contour normalized to 1mm, y-up. */
 export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>, imgH: number): Contour | null {
   if (ring.length < 3) return null
   const bb = bboxOf(ring.map(([x, y]) => ({ x, y })))
@@ -69,10 +54,7 @@ export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>
   return { outer: { pts: ring.map(([x, y]) => [x / L, (imgH - y) / L] as Pt) }, holes: [] }
 }
 
-/**
- * The size range a surface may offer — floor and ceiling both derived, so they move when the
- * pitch, plan or padding do. The shell shows these; it never computes them.
- */
+/** The size range a surface may offer — floor and ceiling derived, moving with pitch and padding. */
 export function sizeRange(pitchMM: number, padMM: number): { minMM: number; maxMM: number } {
   return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(pitchMM, padMM) }
 }
@@ -85,15 +67,9 @@ export interface FieldSpot {
   readonly held: boolean
 }
 
-/**
- * THE FIELD AS A DISPLAY LIST — every lattice position over a region, each at its true radius.
- *
- * One lattice: positions come from the engine's own generator at the phase its search chose,
- * anchored on a real answer point so the field cannot drift from the magnets (the generator's
- * phase is relative to the region's min, so the same phase over a different region is a different
- * absolute lattice). A seated spot carries its own magnet's radius — the old padding ring's exact
- * construction; an empty spot carries the radius the erosion judged it by.
- */
+/** Every lattice position over a region as a display list, on the engine's own phase.
+ *  Phase is re-anchored on a real answer point: the generator's phase is relative to the region's
+ *  min, so the same phase over a different region would be a different absolute lattice. */
 export function fieldSpots(
   grid: GridResult,
   pattern: GridPattern,
@@ -106,13 +82,11 @@ export function fieldSpots(
   const rgn = { minX: view.minX - pad, minY: view.minY - pad, maxX: view.maxX + pad, maxY: view.maxY + pad }
   return latticeOver(rgn, grid.pitchCentreMM, pattern, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => {
     const a = anchorAt.get(n[0].toFixed(2) + ',' + n[1].toFixed(2))
-    // ONE spot radius — the padding, centre-measured. A seated spot is not larger for carrying
-    // a magnet; the body sits inside the same disc.
     return { x: n[0], y: n[1], r: grid.spotRadiusMM, held: Boolean(a) }
   })
 }
 
-/** The seated spots alone — what a surface draws when the full field is switched off. */
+/** The seated spots alone — what a surface draws when the full field is off. */
 export function seatedSpots(grid: GridResult): FieldSpot[] {
   return grid.anchors.map((a) => ({ x: a.p[0], y: a.p[1], r: grid.spotRadiusMM, held: true }))
 }

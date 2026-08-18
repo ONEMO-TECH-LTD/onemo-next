@@ -1,11 +1,5 @@
-// grid-origin.ts — THE ENGINE'S OWN BRIDGE: the solve, assembled from the three modules.
-//
-// SPEC (grid-origin-spec) holds every value · COMPUTE (grid-origin-compute) does all geometry and
-// arithmetic · LOGIC (grid-origin-logic) applies the policies. This file wires them into the two
-// calls a surface makes — computeGrid and fitSizeToGrid — and re-exports the module surface so
-// consumers keep one door.
-//
-// (Born 2026-07-20 as a 239-line monolith; split on Dan's module law, 2026-08-18, behaviour kept.)
+// grid-origin.ts — the engine bridge: computeGrid and fitSizeToGrid, wiring spec + compute + logic.
+// One import door for consumers; the modules stay behind it.
 
 import type { Contour, Pt } from './types'
 import {
@@ -20,7 +14,6 @@ import {
 import {
   bbox,
   countGaps,
-  fieldSpanMM,
   flapVerts,
   latticeAt,
   makeSeatPredicate,
@@ -31,11 +24,9 @@ import {
 import {
   applyCoverage,
   assignSizes,
-  magnetRadiusMM,
   registrationScore,
   verdictIssues,
   type Anchor,
-  type MagnetDia,
   type MagnetPlan,
 } from './grid-origin-logic'
 
@@ -54,32 +45,31 @@ export interface GridConfig {
   paddingMM?: number
   pattern?: GridPattern
   plan?: MagnetPlan
-  perimeterOnly?: boolean // default true — magnetic belt (drop redundant interior)
+  perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
 }
 
 export interface GridResult {
   anchors: Anchor[]
-  candidates: Pt[]      // interior points dropped by perimeter mode (faint viz)
+  /** Interior nodes dropped by perimeter mode. */
+  candidates: Pt[]
+  /** Silhouette vertices with no magnet within reach. */
   flaps: Pt[]
   ok: boolean
   issues: string[]
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   applicationPadMM: number
-  /** Slots with material that couldn't seat, flanked by seated neighbours — unbalanced holes. */
+  /** Slots with material that couldn't seat, flanked by seated neighbours. */
   gaps: number
-  /** Every lattice position at the chosen phase, seated or not — the field the shape was judged against. */
+  /** Every lattice position at the chosen phase, seated or not. */
   lattice: Pt[]
-  /** The phase the search chose, in millimetres — what makes latticeOver answerable elsewhere. */
+  /** The phase the search chose, mm. */
   phaseMM: Pt
-  /** The spot's true radius — the padding, centre-measured, the erosion's own figure. */
+  /** The spot radius the erosion used — the padding, centre-measured. */
   spotRadiusMM: number
 }
 
-/**
- * The solve: sweep the lattice phase on the grid's own 12mm increment, seat with the exact
- * predicate, judge registrations by logic's score, apply coverage policy, report.
- */
+/** Sweep the lattice phase on the 12mm increment, seat exactly, score, apply coverage, report. */
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -92,7 +82,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
   const fits = makeSeatPredicate(outer, spotRadiusOf(pad))
 
-  // Phase sweep on the grid's own increment — includes the centred registrations by construction.
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0
   if (fits) {
@@ -139,10 +128,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
-/**
- * Sizing ADAPTS: scan UP from the selected size and return the first size whose grid seats the
- * target count. Step and ceiling are spec values; the target is logic's. (Slated for band rungs.)
- */
+/** Scan the size upward until the target count seats. Step/ceiling from spec, target from logic. */
 export function fitSizeToGrid(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number,
   opts: { target?: number; maxMM?: number; step?: number } = {},

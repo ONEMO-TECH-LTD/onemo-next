@@ -1,6 +1,4 @@
-// grid-origin-logic.ts — LOGIC: policies and laws. Which body a plan uses, how a registration is
-// judged, when the belt drops interior nodes, what the verdict says. No geometry — it reads what
-// compute measured and applies a rule; the numbers it weighs with come from spec.
+// grid-origin-logic.ts — LOGIC: policies. Reads what compute measured; weighs with spec's values.
 
 import type { Pt } from './types'
 import {
@@ -17,23 +15,17 @@ export type MagnetDia = 6 | 8
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** POLICY: which magnet body a plan erodes with — the 8mm body governs any plan that carries one. */
+/** Which magnet body a plan erodes with — the 8mm body governs any plan that carries one. */
 export function magnetRadiusMM(plan: MagnetPlan): number {
   return plan === 'all6' ? MAGNET_RADIUS_SMALL_MM : MAGNET_RADIUS_LARGE_MM
 }
 
-/**
- * POLICY: how a registration is judged — seats above all, then fewest flaps, then balance.
- * (The seat-count dominance is v1's standing rule; the selection law is an open product ruling.)
- */
+/** Registration score: seats above all, then fewest flaps, then balance. */
 export function registrationScore(seats: number, flapCount: number, balanceMM: number): number {
   return seats * SEAT_WEIGHT - flapCount * FLAP_WEIGHT - balanceMM
 }
 
-/**
- * POLICY: the perimeter belt — with more than four seated, drop fully-surrounded interior nodes,
- * but never below the holding minimum.
- */
+/** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(
   seated: Pt[],
   perimeterOnly: boolean,
@@ -47,7 +39,7 @@ export function applyCoverage(
   return { seated, interior: [] }
 }
 
-/** POLICY: per-anchor magnet size. corners8 → 8mm on the extreme corners, 6mm elsewhere. */
+/** Per-anchor magnet size. corners8 → 8mm on the extreme corners, 6mm elsewhere. */
 export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   if (plan === 'all8') return seated.map((p) => ({ p, dia: 8 as MagnetDia }))
   if (plan === 'all6') return seated.map((p) => ({ p, dia: 6 as MagnetDia }))
@@ -59,7 +51,7 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   })
 }
 
-/** POLICY: the verdict — what counts as a refusal and how it is said. */
+/** The verdict: what counts as a refusal and how it is said. */
 export function verdictIssues(
   degenerate: boolean,
   seatedCount: number,

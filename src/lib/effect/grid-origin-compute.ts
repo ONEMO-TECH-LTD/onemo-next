@@ -1,11 +1,7 @@
-// grid-origin-compute.ts — COMPUTE: all geometry, formulas and arithmetic. No policy, no values
-// of its own (they arrive from spec or the caller), no product words beyond the shared vocabulary.
+// grid-origin-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
 import type { Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
-// The exact predicate — integer arithmetic, tangency legal by equality. The offset-polygon erosion
-// it replaced was approximate: at ZERO margin (a 24mm shape whose only legal centre is exactly
-// tangent) the shrunken polygon collapses and a lawful answer is refused. holds() cannot lose it.
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
@@ -21,20 +17,17 @@ export function bbox(pts: ReadonlyArray<Pt>): BBox {
 
 export function dist(a: Pt, b: Pt): number { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
-/**
- * The spot — the padding IS its radius, measured FROM THE MAGNET CENTRE (grid law 2.1). The magnet
- * body sits inside it; the body's radius bounds how small the padding may go, never adds to it.
- */
+/** Spot radius = the padding, measured from the magnet centre. */
 export function spotRadiusOf(padMM: number): number {
   return padMM
 }
 
-/** The full field's span — the steps across plus one spot either side. 408 at 48/12. */
+/** Full field span: (N−1) steps plus one spot either side. 408 at 48/12. */
 export function fieldSpanMM(pitchMM: number, padMM: number): number {
   return (FIELD_POSITIONS_PER_AXIS - 1) * pitchMM + 2 * spotRadiusOf(padMM)
 }
 
-/** Node positions along an axis at fixed `step` with a phase offset, spanning [min, max]. */
+/** Axis positions at `step` with a phase offset, spanning [min, max]. */
 function axisFrom(min: number, max: number, step: number, phase: number): number[] {
   if (step <= 0 || max <= min) return [(min + max) / 2]
   const res: number[] = []
@@ -44,7 +37,7 @@ function axisFrom(min: number, max: number, step: number, phase: number): number
   return res
 }
 
-/** Lattice across a region at PHASE (ox, oy). Pattern is a parity variant of the half-pitch atom. */
+/** Lattice across a region at phase (ox, oy). Patterns are parity variants of the half-pitch atom. */
 export function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: number, oy: number): Pt[] {
   const atom = pitch / 2
   const out: Pt[] = []
@@ -62,20 +55,15 @@ export function latticeAt(bb: BBox, pitch: number, pattern: GridPattern, ox: num
   return uniq
 }
 
-/** The field over any region on a given phase — the same generator the search itself uses. */
-export function latticeOver(
-  region: BBox,
-  pitch: number,
-  pattern: GridPattern,
-  phase: Pt,
-): Pt[] {
+/** The same lattice generator over an arbitrary region. */
+export function latticeOver(region: BBox, pitch: number, pattern: GridPattern, phase: Pt): Pt[] {
   return latticeAt(region, pitch, pattern, phase[0], phase[1])
 }
 
 /**
- * The seat predicate for one outline: is a centre at least `spotRadiusMM` from every boundary
- * point, tangency passing by equality. Quantized to microns for exact integer arithmetic. Returns
- * null for a degenerate outline — the caller refuses loudly rather than guessing.
+ * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
+ * tangency passing by equality (exact integer arithmetic, micron quantum).
+ * Null for a degenerate outline.
  */
 export function makeSeatPredicate(
   outer: ReadonlyArray<Pt>,
@@ -88,7 +76,7 @@ export function makeSeatPredicate(
   return (pt: Pt) => holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
 }
 
-/** Silhouette vertices further than `reach` from the nearest magnet (uncovered/flap-risk edge). */
+/** Silhouette vertices further than `reach` from the nearest magnet (flap-risk edge). */
 export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
   const out: Pt[] = []
   for (const v of outer) {
@@ -99,7 +87,7 @@ export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, r
   return out
 }
 
-/** Perimeter split: a node is INTERIOR when it has seated neighbours on all four sides. */
+/** Split seated nodes into perimeter belt and fully-surrounded interior. */
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45
   const belt: Pt[] = [], interior: Pt[] = []
@@ -123,10 +111,7 @@ export function neighbourStep(pitch: number, pattern: GridPattern): number {
   return pattern === 'granular' ? pitch / 2 : pattern === 'quincunx' ? pitch / Math.SQRT2 : pitch
 }
 
-/**
- * GAPS: lattice slots with material under them that couldn't seat (padding blocked) yet are
- * flanked by ≥2 seated neighbours — an unbalanced hole.
- */
+/** Slots with material that couldn't seat, flanked by ≥2 seated neighbours — unbalanced holes. */
 export function countGaps(
   outer: ReadonlyArray<Pt>,
   lattice: ReadonlyArray<Pt>,
@@ -139,7 +124,7 @@ export function countGaps(
   let gaps = 0
   for (const n of lattice) {
     if (seatKeys.has(n[0].toFixed(1) + ',' + n[1].toFixed(1))) continue
-    if (!pointInPolygon(n, outer)) continue // no material → not a gap
+    if (!pointInPolygon(n, outer)) continue
     let nb = 0
     for (const s of seated) if (dist(n, s) <= nR) nb++
     if (nb >= 2) gaps++
@@ -147,7 +132,7 @@ export function countGaps(
   return gaps
 }
 
-/** Scale a normalized contour (longest side = 1mm) to a real longest-side size in mm. */
+/** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */
 export function scaleContour(base: Contour, longestMM: number): Contour {
   return { outer: { pts: base.outer.pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt) }, holes: [] }
 }
