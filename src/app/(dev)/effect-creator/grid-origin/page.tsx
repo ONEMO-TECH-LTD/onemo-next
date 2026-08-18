@@ -6,7 +6,7 @@
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -49,7 +49,7 @@ export default function GridLab() {
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
-  const [showLattice, setShowLattice] = useState(false)
+  const [showLattice, setShowLattice] = useState(true)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number | 'free'>('free')
   /** Selected step on the band's fit ladder. */
@@ -265,10 +265,26 @@ function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
 
-  // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size.
+  // Free camera — trackpad pinch zooms, two-finger scroll / drag pans, double-click resets.
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [cam, setCam] = useState({ zoom: 1, dx: 0, dy: 0 })
+  const dragAt = useRef<{ x: number; y: number } | null>(null)
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      if (e.ctrlKey) setCam((c) => ({ ...c, zoom: Math.min(16, Math.max(0.2, c.zoom * Math.exp(-e.deltaY * 0.01))) }))
+      else setCam((c) => ({ ...c, dx: c.dx + e.deltaX / (S * c.zoom), dy: c.dy + e.deltaY / (S * c.zoom) }))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [S])
+
+  // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size at zoom 1.
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
-  const spanMM = VP / S
-  const vx = cx - spanMM / 2, vy = cy - spanMM / 2
+  const spanMM = VP / S / cam.zoom
+  const vx = cx - spanMM / 2 + cam.dx, vy = cy - spanMM / 2 + cam.dy
 
   // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
   const spots: readonly FieldSpot[] = lattice
@@ -279,7 +295,17 @@ function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<
   const Afy: [number, number] = A0 ? [A0.x, -A0.y] : [0, 0]
 
   return (
-    <svg width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}>
+    <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
+      style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none' }}
+      onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; (e.target as Element).setPointerCapture?.(e.pointerId) }}
+      onPointerMove={(e) => {
+        if (!dragAt.current) return
+        const k = S * cam.zoom
+        setCam((c) => ({ ...c, dx: c.dx - (e.clientX - dragAt.current!.x) / k, dy: c.dy - (e.clientY - dragAt.current!.y) / k }))
+        dragAt.current = { x: e.clientX, y: e.clientY }
+      }}
+      onPointerUp={() => { dragAt.current = null }}
+      onDoubleClick={() => setCam({ zoom: 1, dx: 0, dy: 0 })}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}

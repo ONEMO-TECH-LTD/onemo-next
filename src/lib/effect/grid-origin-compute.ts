@@ -92,6 +92,19 @@ export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, r
   return out
 }
 
+/** Mean distance silhouette vertices sit PAST `reach`, mm. 0 = fully wrapped. Graded, so a
+ *  placement covering more material scores better even when nothing is fully covered. */
+export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+  if (!outer.length || !seated.length) return 0
+  let sum = 0
+  for (const v of outer) {
+    let nd = Infinity
+    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d }
+    if (nd > reach) sum += nd - reach
+  }
+  return sum / outer.length
+}
+
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45

@@ -13,6 +13,7 @@ import {
 import {
   bbox,
   fieldSpanMM,
+  flapExcessMM,
   flapVerts,
   latticeAt,
   makeCircleSeatPredicate,
@@ -99,10 +100,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       for (const ox of phases(bb.maxX - bb.minX)) {
         const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
         if (!seat.length) continue
-        const flapCount = flapVerts(outer, seat, reach).length
+        const excess = flapExcessMM(outer, seat, reach)
         let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / seat.length - cx, sy / seat.length - cy)
-        const score = registrationScore(seat.length, flapCount, balance)
+        const score = registrationScore(seat.length, excess, balance)
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = ox; bestOy = oy }
       }
     }

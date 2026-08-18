@@ -23,9 +23,9 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** Registration score: seats above all, then fewest flaps, then balance. */
-export function registrationScore(seats: number, flapCount: number, balanceMM: number): number {
-  return seats * SEAT_WEIGHT - flapCount * FLAP_WEIGHT - balanceMM
+/** Registration score: seats above all, then least uncovered material (graded mm), then balance. */
+export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
+  return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
