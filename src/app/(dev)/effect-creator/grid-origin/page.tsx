@@ -13,7 +13,7 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { bandOf, computeGrid, fitSizeInBand, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { bandOf, computeGrid, fitSizeInBand, type BandSnapPoint, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
 import { RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
@@ -47,6 +47,8 @@ export default function GridLab() {
   const [autoFit, setAutoFit] = useState(false)
   /** Snap scan step — admin-tunable for testing; default from spec. */
   const [snapStep, setSnapStep] = useState(SNAP_STEP_MM)
+  /** In snap mode: the holding size the slider chose; null = the full-seat pick. */
+  const [snapSel, setSnapSel] = useState<number | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -85,18 +87,21 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter' }
+      const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
       // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
       const sized = makeSizer(b, offsetMM)
       if (autoFit) {
-        // Band snap: first rung in the size's band that holds, any pattern the material carries.
+        // Band snap: the smallest size seating the band's full count; slider cycles the rest.
         const fit = fitSizeInBand(sized, cfg, sizeMM, snapStep)
-        return { contour: sized(fit.sizeMM), grid: fit.grid, effSize: fit.sizeMM, snapped: fit.snapped }
+        const sel = snapSel !== null ? fit.points.find((pt) => pt.sizeMM === snapSel) : undefined
+        const eff = sel ? sel.sizeMM : fit.sizeMM
+        const grid = sel ? computeGrid(sized(eff), cfg) : fit.grid
+        return { contour: sized(eff), grid, effSize: eff, snapped: true, points: fit.points }
       }
       const contour = sized(sizeMM)
-      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, snapped: false }
+      return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, snapped: false, points: [] as BandSnapPoint[] }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM, snapStep])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, pattern, plan, magic, autoFit, coverage, offsetMM, snapStep, snapSel])
 
   // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
   const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
@@ -183,15 +188,22 @@ export default function GridLab() {
 
           <div className="gl-card gl-pad">
             <label className="gl-toggle"><span>Snap size to grid <small style={{ color: 'var(--ink-3)' }}>· auto-scale to fit</small></span>
-              <input type="checkbox" checked={autoFit} onChange={e => setAutoFit(e.target.checked)} /></label>
+              <input type="checkbox" checked={autoFit} onChange={e => { setAutoFit(e.target.checked); setSnapSel(null) }} /></label>
             {autoFit
-              ? <div className="gl-snap">Effect size <b>{model ? model.effSize : '—'} mm</b><span>first size in band {bandOf(model?.effSize ?? sizeMM)?.id ?? '—'} where the shape is held everywhere</span></div>
+              ? <>
+                  <div className="gl-snap">Effect size <b>{model ? model.effSize : '—'} mm</b><span>{model?.points.length ?? 0} holding sizes in band {bandOf(model?.effSize ?? sizeMM)?.id ?? '—'} · {model?.grid.anchors.length ?? 0} magnets</span></div>
+                  <Slider label="Cycle holding sizes" unit="mm" v={model?.effSize ?? sizeMM}
+                    set={(v) => { const pts = model?.points ?? []; if (!pts.length) return
+                      const nearest = pts.reduce((a, b) => Math.abs(b.sizeMM - v) < Math.abs(a.sizeMM - v) ? b : a)
+                      setSnapSel(nearest.sizeMM) }}
+                    min={bandOf(sizeMM)?.minMM ?? minSizeMM} max={bandOf(sizeMM)?.maxMM ?? maxSizeMM} />
+                </>
               : <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />}
             {autoFit && <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={1} max={24} />}
             <div className="gl-field"><span>Band</span>
               <div className="gl-seg">
                 {([[1, 24], [2, 72], [3, 120], [4, 168], [5, 216]] as const).map(([id, lo]) =>
-                  <button key={id} aria-pressed={bandOf(sizeMM)?.id === id} onClick={() => setSizeMM(lo)}>B{id}</button>)}
+                  <button key={id} aria-pressed={bandOf(sizeMM)?.id === id} onClick={() => { setSizeMM(lo); setSnapSel(null) }}>B{id}</button>)}
               </div>
             </div>
             <div className="gl-field"><span>Grid pitch · released tiers</span>

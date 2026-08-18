@@ -76,6 +76,24 @@ export function makeSeatPredicate(
   return (pt: Pt) => holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
 }
 
+/**
+ * Seat predicate for a TRUE CIRCLE (centre c, radius R): the disc of radius r fits iff
+ * |p−c|² ≤ (R−r)² — integer microns, tangency by equality. A flattened polygon's chords sit
+ * microns inside the curve and wrongly refuse the zero-margin case; the analytic form cannot.
+ */
+export function makeCircleSeatPredicate(
+  cx: number, cy: number, R: number, spotRadiusMM: number,
+): ((pt: Pt) => boolean) | null {
+  const q = (v: number) => Math.round(v * 1000)
+  const slack = q(R) - q(spotRadiusMM)
+  if (slack < 0) return null
+  const cqx = q(cx), cqy = q(cy), s2 = slack * slack
+  return (pt: Pt) => {
+    const dx = q(pt[0]) - cqx, dy = q(pt[1]) - cqy
+    return dx * dx + dy * dy <= s2
+  }
+}
+
 /** Silhouette vertices further than `reach` from the nearest magnet (flap-risk edge). */
 export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
   const out: Pt[] = []

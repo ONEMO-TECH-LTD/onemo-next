@@ -16,6 +16,7 @@ import {
   countGaps,
   flapVerts,
   latticeAt,
+  makeCircleSeatPredicate,
   makeSeatPredicate,
   neighbourStep,
   spotRadiusOf,
@@ -48,6 +49,8 @@ export interface GridConfig {
   pattern?: GridPattern
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
+  /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
+  circle?: boolean
 }
 
 export interface GridResult {
@@ -82,7 +85,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const bb = bbox(outer)
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
-  const fits = makeSeatPredicate(outer, spotRadiusOf(pad))
+  const fits = cfg.circle
+    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
+    : makeSeatPredicate(outer, spotRadiusOf(pad))
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0
@@ -139,28 +144,52 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
+/** One holding size in a band: the size and how many magnets it seats. */
+export interface BandSnapPoint { sizeMM: number; count: number }
+
 /**
- * Band snap: walk every rung of the size's band and return the first that HOLDS (any pattern —
- * single, pair, 2x2, rows — whatever the material carries). Fit is not monotone on concave shapes,
- * so no early bail on failures; if no rung holds, the best-seated rung in the band is returned.
+ * Every holding size in the band, scanned at stepMM. The band is a RANGE: fit is not monotone,
+ * so the whole range is walked and each size judged independently.
  */
-export function fitSizeInBand(
+export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; snapped: boolean } {
+): BandSnapPoint[] {
   const band = bandOf(fromMM)
   const lo = band ? band.minMM : fromMM
   const hi = band ? band.maxMM : SNAP_MAX_MM
-  // The snug seat: the SMALLEST size in the band that holds — walk from the band floor.
-  const start = lo
-  let best: { sizeMM: number; grid: GridResult } | null = null
-  for (let mm = start; mm <= hi; mm += stepMM) {
+  const out: BandSnapPoint[] = []
+  for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
-    if (isHolding(grid.anchors.length, grid.flaps.length)) return { sizeMM: mm, grid, snapped: mm !== Math.round(fromMM) }
+    if (isHolding(grid.anchors.length, grid.flaps.length)) out.push({ sizeMM: mm, count: grid.anchors.length })
+  }
+  return out
+}
+
+/**
+ * Band snap: the layout must seat FULLY within the range — never settle for a lost-magnet layout
+ * at the floor. The pick is the smallest size achieving the band's MAXIMUM seated count; the other
+ * holding sizes are returned so a slider can cycle them.
+ */
+export function fitSizeInBand(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
+): { sizeMM: number; grid: GridResult; snapped: boolean; points: BandSnapPoint[] } {
+  const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
+  if (points.length) {
+    const maxCount = Math.max(...points.map((p) => p.count))
+    const pick = points.find((p) => p.count === maxCount)!
+    return { sizeMM: pick.sizeMM, grid: computeGrid(sized(pick.sizeMM), cfg), snapped: pick.sizeMM !== Math.round(fromMM), points }
+  }
+  // Nothing in the band holds: best-seated rung as a fallback.
+  const band = bandOf(fromMM)
+  const lo = band ? band.minMM : fromMM
+  const hi = band ? band.maxMM : SNAP_MAX_MM
+  let best: { sizeMM: number; grid: GridResult } | null = null
+  for (let mm = lo; mm <= hi; mm += stepMM) {
+    const grid = computeGrid(sized(mm), cfg)
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
-  if (best) return { ...best, snapped: best.sizeMM !== Math.round(fromMM) }
-  const grid = computeGrid(sized(start), cfg)
-  return { sizeMM: start, grid, snapped: false }
+  const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
+  return { ...pick, snapped: pick.sizeMM !== Math.round(fromMM), points }
 }
 
 /** Scan the size upward until the target count seats. Step/ceiling from spec, target from logic. */
