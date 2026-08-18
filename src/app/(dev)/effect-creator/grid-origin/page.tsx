@@ -201,15 +201,16 @@ export default function GridLab() {
       <div className="gl-body">
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
-            <span className="gl-eye">
-              load {perf.loadMs != null ? Math.round(perf.loadMs) : '—'}ms
-              · gen {perf.genMs != null ? Math.max(1, Math.round(perf.genMs)) : '—'}ms
-              {perf.cutMs != null ? ` · cut ${(perf.cutMs / 1000).toFixed(1)}s` : ''}
-              · solve {perf.solveMs != null ? (perf.solveMs >= 1000 ? `${(perf.solveMs / 1000).toFixed(1)}s` : `${Math.round(perf.solveMs)}ms`) : '—'}
+            <span className="gl-eye gl-perf">
+              load <b>{perf.loadMs != null ? (perf.loadMs / 1000).toFixed(2) : '—'}s</b>
+              {' · '}gen <b>{perf.genMs != null ? (perf.genMs / 1000).toFixed(2) : '—'}s</b>
+              {perf.cutMs != null ? <> · cut <b>{(perf.cutMs / 1000).toFixed(2)}s</b></> : null}
+              {' · '}solve <b>{perf.solveMs != null ? (perf.solveMs / 1000).toFixed(2) : '—'}s</b>
             </span>
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
+            {model && <div className="gl-size">{Math.round(dim(model.contour, 0))} × {Math.round(dim(model.contour, 1))} mm</div>}
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
@@ -329,14 +330,6 @@ export default function GridLab() {
             </div>
           </Fold>
 
-          {model && <div className="gl-card gl-read">
-            <Cell k="Real size" v={`${Math.round(dim(model.contour, 0))}×${Math.round(dim(model.contour, 1))} mm`} />
-            <Cell k="Render scale" v={`${scale.toFixed(2)} px/mm`} />
-            <Cell k="Pitch · center" v={`${model.grid.pitchCentreMM} mm`} />
-            <Cell k="Pitch · edge" v={model.grid.edgeRangeMM[0] === model.grid.edgeRangeMM[1] ? `${model.grid.edgeRangeMM[0]} mm` : `${model.grid.edgeRangeMM[0]}–${model.grid.edgeRangeMM[1]} mm`} />
-            <Cell k="Seated magnets" v={String(model.grid.anchors.length)} />
-            <Cell k="Registration" v={model.grid.phaseMM.map((n) => n.toFixed(1)).join(' · ') + (manual ? ' manual' : ' auto')} />
-          </div>}
         </aside>
 
         <aside className="gl-labcol">
@@ -497,7 +490,6 @@ function Slider({ label, v, set, min, max, unit }: { label: string; v: number; s
     </label>
   )
 }
-function Cell({ k, v }: { k: string; v: string }) { return <div className="gl-cell"><span>{k}</span><b>{v}</b></div> }
 /** Collapsible card — native details, open by default; collapse the unneeded on a phone. */
 function Fold({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -587,8 +579,8 @@ const CSS = `
 .gl input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);cursor:pointer}
 .gl-toggle{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-2);cursor:pointer}
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
-.gl-read{padding:0;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);overflow:hidden}
-.gl-cell{background:var(--panel);padding:11px 14px;display:flex;flex-direction:column;gap:2px}
-.gl-cell span{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
-.gl-cell b{font:600 14px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.gl-perf b{color:var(--pass);font-weight:700}
+.gl-size{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:2;
+  font:600 13px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:4px 11px;font-variant-numeric:tabular-nums;pointer-events:none}
 `
