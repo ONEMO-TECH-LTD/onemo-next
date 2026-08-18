@@ -332,15 +332,18 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
 
   // Manual calibration gestures — the shape is FROZEN; drag pans the GRID under it (mm, engine
   // y-up), pinch scales the effect size, double-click hands registration back to the engine.
+  // px→mm uses the RENDERED size, so gestures stay true when the canvas shrinks on a phone.
   const svgRef = useRef<SVGSVGElement>(null)
   const dragAt = useRef<{ x: number; y: number } | null>(null)
+  const pxPerMM = (el: Element) => el.getBoundingClientRect().width / (VP / S)
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
+      const k = pxPerMM(el)
       if (e.ctrlKey) onZoom(Math.exp(-e.deltaY * 0.01))
-      else onPan(-e.deltaX / S, e.deltaY / S)
+      else onPan(-e.deltaX / k, e.deltaY / k)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -365,7 +368,8 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
       onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture?.(e.pointerId) }}
       onPointerMove={(e) => {
         if (!dragAt.current) return
-        const mx = (e.clientX - dragAt.current.x) / S, my = (e.clientY - dragAt.current.y) / S
+        const k = pxPerMM(e.currentTarget)
+        const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
         dragAt.current = { x: e.clientX, y: e.clientY }
         onPan(mx, -my)
       }}
@@ -454,6 +458,12 @@ const CSS = `
 .gl-vp{aspect-ratio:1;max-width:${VP}px;width:100%;margin:0 auto;display:flex;align-items:center;justify-content:center;
   background:var(--panel-2);position:relative;
   border:1px dashed var(--line);border-radius:12px;overflow:hidden}
+.gl-vp svg{width:100%;height:auto;max-width:${VP}px}
+@media (max-width:840px){
+  .gl{padding:14px 10px 44px}
+  .gl-stage{padding:12px}
+  .gl-head h1{font-size:17px}
+}
 .gl-solving{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:8px;
   font:600 12px var(--mono);color:var(--ink-2);background:rgba(127,132,145,.14);backdrop-filter:blur(1px)}
 .gl-empty{display:flex;align-items:center;gap:9px;color:var(--ink-3);font:12.5px var(--mono);text-align:center;padding:20px;max-width:80%}

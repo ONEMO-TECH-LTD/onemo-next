@@ -18,13 +18,20 @@ interface SolveRequest {
 
 const ctx = self as unknown as Worker
 
+// The band walk depends on everything EXCEPT the selected step — stepping the ladder reuses it.
+let walkKey = ''
+let walkFit: ReturnType<typeof fitSizeInBand> | null = null
+
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
   const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     if (mode !== 'free') {
       const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
-      const fit = fitSizeInBand(sized, cfg, band.minMM, snapStep)
+      const pts = base.outer.pts
+      const key = JSON.stringify([offsetMM, cfg, mode, snapStep, pts.length, pts[0], pts[pts.length >> 1]])
+      if (key !== walkKey || !walkFit) { walkFit = fitSizeInBand(sized, cfg, band.minMM, snapStep); walkKey = key }
+      const fit = walkFit
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
       const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
