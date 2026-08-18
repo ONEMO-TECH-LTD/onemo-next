@@ -11,6 +11,7 @@ import {
   fieldSpanMM,
   latticeOver,
   MIN_EFFECT_MM,
+  SIZE_CEIL_MARGIN_MM,
   type GridResult,
   type MagnetPlan,
 } from './grid-origin'
@@ -53,9 +54,9 @@ export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>
   return { outer: { pts: ring.map(([x, y]) => [x / L, (imgH - y) / L] as Pt) }, holes: [] }
 }
 
-/** The size range a surface may offer — floor and ceiling derived; the ceiling is the fixed board. */
+/** The size range a surface may offer — the fixed board plus a margin so shapes can pad past it. */
 export function sizeRange(padMM: number): { minMM: number; maxMM: number } {
-  return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(padMM) }
+  return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM }
 }
 
 /** One drawable spot: engine-space centre, radius, and whether a magnet seats there. */
