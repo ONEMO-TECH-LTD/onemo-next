@@ -47,6 +47,8 @@ export interface GridConfig {
   flapMM?: number
   /** How finely the lattice slides under the shape when searching registrations. */
   phaseStepMM?: number
+  /** Manual calibration: force this registration (mm phase) instead of searching. */
+  forcePhaseMM?: Pt
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -90,11 +92,18 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
-  if (fits) {
+  const mod = (v: number, m: number) => ((v % m) + m) % m
+  if (fits && cfg.forcePhaseMM) {
+    // Manual calibration: seat exactly at the given registration, no search.
+    bestOx = mod(cfg.forcePhaseMM[0], pitch)
+    bestOy = mod(cfg.forcePhaseMM[1], pitch)
+    bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
+    bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
+    bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
+  } else if (fits) {
     // Phases anchored on the canonical registration: k=0 puts a node line on the bbox centre
     // (odd-count parity); the 24mm offset in the walk is the even-count parity. Mechanics still
     // choose among them; anchoring guarantees the canonical phases are sampled at ANY size.
-    const mod = (v: number, m: number) => ((v % m) + m) % m
     const phases = (span: number): { p: number; k: number }[] => {
       const out: { p: number; k: number }[] = []
       for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(span / 2 + k, pitch), k })

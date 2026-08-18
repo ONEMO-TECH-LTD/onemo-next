@@ -72,6 +72,8 @@ export default function GridLab() {
   const [stepIdx, setStepIdx] = useState(0)
   /** Snap scan step — admin-tunable for testing; default from spec. */
   const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
+  /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
+  const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -110,7 +112,7 @@ export default function GridLab() {
       }
       if (!base || base.outer.pts.length < 3) return null
       const b = base
-      const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+      const cfg = { pitchMM: pitch, paddingMM: pad, flapMM: flap, phaseStepMM: phaseStep, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
       // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
       const sized = makeSizer(b, offsetMM)
       if (mode !== 'free') {
@@ -125,7 +127,7 @@ export default function GridLab() {
       const contour = sized(sizeMM)
       return { contour, grid: computeGrid(contour, cfg), effSize: sizeMM, ladder: [] as BandSnapPoint[] }
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
-  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
+  }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, manual, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -146,7 +148,10 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} />
+            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice}
+              onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
+              onZoom={(f) => setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))}
+              onReset={() => setManual(null)} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                 : <Empty text="shape unavailable" />}
@@ -206,13 +211,13 @@ export default function GridLab() {
             <div className="gl-field"><span>Band · snaps to fit</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepIdx(0) }}>B{b.id}</button>)}
-                <button aria-pressed={mode === 'free'} onClick={() => setMode('free')}>Free</button>
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepIdx(0); setManual(null) }}>B{b.id}</button>)}
+                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setManual(null) }}>Free</button>
               </div>
             </div>
             {mode === 'free'
               ? <>
-                  <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} />
+                  <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />
                   <div className="gl-field"><span>Slider limits</span>
                     <div className="gl-limits">
                       <span className="gl-num"><i>min</i>
@@ -270,6 +275,7 @@ export default function GridLab() {
             <Cell k="Pitch · center" v={`${model.grid.pitchCentreMM} mm`} />
             <Cell k="Pitch · edge" v={model.grid.edgeRangeMM[0] === model.grid.edgeRangeMM[1] ? `${model.grid.edgeRangeMM[0]} mm` : `${model.grid.edgeRangeMM[0]}–${model.grid.edgeRangeMM[1]} mm`} />
             <Cell k="Seated magnets" v={String(model.grid.anchors.length)} />
+            <Cell k="Registration" v={model.grid.phaseMM.map((n) => n.toFixed(1)).join(' · ') + (manual ? ' manual' : ' auto')} />
           </div>}
         </aside>
       </div>
@@ -283,7 +289,10 @@ function dim(c: Contour, axis: 0 | 1): number {
   return hi - lo
 }
 
-function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<typeof computeGrid>; lattice: boolean }) {
+function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
+  contour: Contour; grid: ReturnType<typeof computeGrid>; lattice: boolean
+  onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
+}) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -293,26 +302,26 @@ function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
   const hasFlap = grid.flaps.length > 0
 
-  // Free camera — trackpad pinch zooms, two-finger scroll / drag pans, double-click resets.
+  // Manual calibration gestures — the shape is FROZEN; drag pans the GRID under it (mm, engine
+  // y-up), pinch scales the effect size, double-click hands registration back to the engine.
   const svgRef = useRef<SVGSVGElement>(null)
-  const [cam, setCam] = useState({ zoom: 1, dx: 0, dy: 0 })
   const dragAt = useRef<{ x: number; y: number } | null>(null)
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      if (e.ctrlKey) setCam((c) => ({ ...c, zoom: Math.min(16, Math.max(0.2, c.zoom * Math.exp(-e.deltaY * 0.01))) }))
-      else setCam((c) => ({ ...c, dx: c.dx + e.deltaX / (S * c.zoom), dy: c.dy + e.deltaY / (S * c.zoom) }))
+      if (e.ctrlKey) onZoom(Math.exp(-e.deltaY * 0.01))
+      else onPan(-e.deltaX / S, e.deltaY / S)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [S])
+  })
 
-  // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size at zoom 1.
+  // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size.
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
-  const spanMM = VP / S / cam.zoom
-  const vx = cx - spanMM / 2 + cam.dx, vy = cy - spanMM / 2 + cam.dy
+  const spanMM = VP / S
+  const vx = cx - spanMM / 2, vy = cy - spanMM / 2
 
   // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
   const spots: readonly FieldSpot[] = lattice
@@ -328,13 +337,12 @@ function Stage({ contour, grid, lattice }: { contour: Contour; grid: ReturnType<
       onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture?.(e.pointerId) }}
       onPointerMove={(e) => {
         if (!dragAt.current) return
-        const k = S * cam.zoom
-        const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
+        const mx = (e.clientX - dragAt.current.x) / S, my = (e.clientY - dragAt.current.y) / S
         dragAt.current = { x: e.clientX, y: e.clientY }
-        setCam((c) => ({ ...c, dx: c.dx - mx, dy: c.dy - my }))
+        onPan(mx, -my)
       }}
       onPointerUp={() => { dragAt.current = null }}
-      onDoubleClick={() => setCam({ zoom: 1, dx: 0, dy: 0 })}>
+      onDoubleClick={onReset}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
