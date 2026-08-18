@@ -1,7 +1,6 @@
 // grid-origin-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
 import type { Contour, Pt } from './types'
-import { pointInPolygon } from './attachment'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
@@ -127,27 +126,6 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
 /** Neighbour distance for the belt test, by pattern. */
 export function neighbourStep(pitch: number, pattern: GridPattern): number {
   return pattern === 'granular' ? pitch / 2 : pattern === 'quincunx' ? pitch / Math.SQRT2 : pitch
-}
-
-/** Slots with material that couldn't seat, flanked by ≥2 seated neighbours — unbalanced holes. */
-export function countGaps(
-  outer: ReadonlyArray<Pt>,
-  lattice: ReadonlyArray<Pt>,
-  seated: ReadonlyArray<Pt>,
-  pitch: number,
-): number {
-  if (!seated.length) return 0
-  const seatKeys = new Set(seated.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)))
-  const nR = pitch * 1.2
-  let gaps = 0
-  for (const n of lattice) {
-    if (seatKeys.has(n[0].toFixed(1) + ',' + n[1].toFixed(1))) continue
-    if (!pointInPolygon(n, outer)) continue
-    let nb = 0
-    for (const s of seated) if (dist(n, s) <= nR) nb++
-    if (nb >= 2) gaps++
-  }
-  return gaps
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */

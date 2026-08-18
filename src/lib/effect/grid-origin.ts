@@ -1,19 +1,17 @@
-// grid-origin.ts — the engine bridge: computeGrid and fitSizeToGrid, wiring spec + compute + logic.
+// grid-origin.ts — the engine bridge: computeGrid and the band snap, wiring spec + compute + logic.
 // One import door for consumers; the modules stay behind it.
 
 import type { Contour, Pt } from './types'
 import {
   DEFAULT_PITCH_MM,
+  MAGNET_DIA_LARGE_MM,
+  MAGNET_DIA_SMALL_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
   SNAP_MAX_MM,
-  SNAP_STEP_MM,
-  TARGET_ANCHORS,
-  MIN_ANCHORS,
 } from './grid-origin-spec'
 import {
   bbox,
-  countGaps,
   flapVerts,
   latticeAt,
   makeCircleSeatPredicate,
@@ -41,7 +39,7 @@ export {
   spotRadiusOf,
   type GridPattern,
 } from './grid-origin-compute'
-export { bandOf, isHolding, magnetRadiusMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
+export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
 
 export interface GridConfig {
   pitchMM?: number
@@ -55,8 +53,6 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
-  /** Interior nodes dropped by perimeter mode. */
-  candidates: Pt[]
   /** Silhouette vertices with no magnet within reach. */
   flaps: Pt[]
   ok: boolean
@@ -64,8 +60,6 @@ export interface GridResult {
   pitchCentreMM: number
   edgeRangeMM: [number, number]
   applicationPadMM: number
-  /** Slots with material that couldn't seat, flanked by seated neighbours. */
-  gaps: number
   /** Every lattice position at the chosen phase, seated or not. */
   lattice: Pt[]
   /** The phase the search chose, mm. */
@@ -116,7 +110,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 
   const lattice = latticeAt(bb, pitch, pattern, bestOx, bestOy)
-  const gaps = countGaps(outer, lattice, bestSeated, pitch)
 
   const coverage = applyCoverage(bestSeated, perimeterOnly, pitch, pattern, neighbourStep)
   const anchors = assignSizes(coverage.seated, plan)
@@ -124,20 +117,18 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, pitch) : []
   const issues = verdictIssues(!fits, coverage.seated.length, flaps.length, pad)
 
-  let minD = 8, maxD = 6
+  let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
   for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
-  if (anchors.length === 0) { minD = 6; maxD = 6 }
+  if (anchors.length === 0) { minD = MAGNET_DIA_SMALL_MM; maxD = MAGNET_DIA_SMALL_MM }
 
   return {
     anchors,
-    candidates: coverage.interior,
     flaps,
     ok: issues.length === 0,
     issues,
     pitchCentreMM: pitch,
     edgeRangeMM: [pitch + minD, pitch + maxD],
     applicationPadMM: pad,
-    gaps,
     lattice,
     phaseMM: [bestOx, bestOy],
     spotRadiusMM: spotRadiusOf(pad),
@@ -190,23 +181,4 @@ export function fitSizeInBand(
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
   return { ...pick, snapped: pick.sizeMM !== Math.round(fromMM), points }
-}
-
-/** Scan the size upward until the target count seats. Step/ceiling from spec, target from logic. */
-export function fitSizeToGrid(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number,
-  opts: { target?: number; maxMM?: number; step?: number } = {},
-): { sizeMM: number; grid: GridResult; snapped: boolean } {
-  const target = opts.target ?? TARGET_ANCHORS
-  const maxMM = opts.maxMM ?? SNAP_MAX_MM
-  const step = opts.step ?? SNAP_STEP_MM
-  const start = Math.round(fromMM)
-  let fallback: { sizeMM: number; grid: GridResult } | null = null
-  for (let mm = start; mm <= maxMM; mm += step) {
-    const grid = computeGrid(sized(mm), cfg)
-    if (!fallback && grid.anchors.length >= MIN_ANCHORS) fallback = { sizeMM: mm, grid }
-    if (grid.anchors.length >= target) return { sizeMM: mm, grid, snapped: mm !== start }
-  }
-  if (fallback) return { ...fallback, snapped: fallback.sizeMM !== start }
-  return { sizeMM: maxMM, grid: computeGrid(sized(maxMM), cfg), snapped: true }
 }

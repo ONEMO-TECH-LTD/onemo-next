@@ -22,13 +22,12 @@ export const MIN_EFFECT_MM = 24
 /** Field positions per axis (9×9). */
 export const FIELD_POSITIONS_PER_AXIS = 9
 
-/** Magnet body radii. */
-export const MAGNET_RADIUS_SMALL_MM = 3
-export const MAGNET_RADIUS_LARGE_MM = 4
+/** Magnet body diameters. */
+export const MAGNET_DIA_SMALL_MM = 6
+export const MAGNET_DIA_LARGE_MM = 8
 
-/** Fewest magnets that count as holding; the count auto-fit climbs toward. */
+/** Fewest seated magnets the perimeter belt may thin down to. */
 export const MIN_ANCHORS = 2
-export const TARGET_ANCHORS = 4
 
 /** Size bands, ends 1mm shy so no size lives in two bands. B5 keeps its ceiling. */
 export interface Band { readonly id: 1 | 2 | 3 | 4 | 5; readonly minMM: number; readonly maxMM: number }

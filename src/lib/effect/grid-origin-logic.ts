@@ -4,8 +4,8 @@ import type { Pt } from './types'
 import {
   BANDS,
   FLAP_WEIGHT,
-  MAGNET_RADIUS_LARGE_MM,
-  MAGNET_RADIUS_SMALL_MM,
+  MAGNET_DIA_LARGE_MM,
+  MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
   SEAT_WEIGHT,
 } from './grid-origin-spec'
@@ -19,14 +19,9 @@ export function bandOf(sizeMM: number): Band | null {
 }
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
-export type MagnetDia = 6 | 8
+export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
-
-/** Which magnet body a plan erodes with — the 8mm body governs any plan that carries one. */
-export function magnetRadiusMM(plan: MagnetPlan): number {
-  return plan === 'all6' ? MAGNET_RADIUS_SMALL_MM : MAGNET_RADIUS_LARGE_MM
-}
 
 /** Registration score: seats above all, then fewest flaps, then balance. */
 export function registrationScore(seats: number, flapCount: number, balanceMM: number): number {
@@ -47,15 +42,15 @@ export function applyCoverage(
   return { seated, interior: [] }
 }
 
-/** Per-anchor magnet size. corners8 → 8mm on the extreme corners, 6mm elsewhere. */
+/** Per-anchor magnet size. corners8 → the large body on the extreme corners, small elsewhere. */
 export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
-  if (plan === 'all8') return seated.map((p) => ({ p, dia: 8 as MagnetDia }))
-  if (plan === 'all6') return seated.map((p) => ({ p, dia: 6 as MagnetDia }))
+  if (plan === 'all8') return seated.map((p) => ({ p, dia: MAGNET_DIA_LARGE_MM }))
+  if (plan === 'all6') return seated.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM }))
   const bb = bbox(seated)
   return seated.map((p) => {
     const ex = Math.abs(p[0] - bb.minX) < 0.6 || Math.abs(p[0] - bb.maxX) < 0.6
     const ey = Math.abs(p[1] - bb.minY) < 0.6 || Math.abs(p[1] - bb.maxY) < 0.6
-    return { p, dia: (ex && ey ? 8 : 6) as MagnetDia }
+    return { p, dia: ex && ey ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM }
   })
 }
 
