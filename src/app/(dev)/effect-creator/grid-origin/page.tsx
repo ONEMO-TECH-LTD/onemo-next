@@ -202,10 +202,10 @@ export default function GridLab() {
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
             <span className="gl-eye gl-perf">
-              load <b>{perf.loadMs != null ? (perf.loadMs / 1000).toFixed(2) : '—'}s</b>
-              {' · '}gen <b>{perf.genMs != null ? (perf.genMs / 1000).toFixed(2) : '—'}s</b>
-              {perf.cutMs != null ? <> · cut <b>{(perf.cutMs / 1000).toFixed(2)}s</b></> : null}
-              {' · '}solve <b>{perf.solveMs != null ? (perf.solveMs / 1000).toFixed(2) : '—'}s</b>
+              load <Sec ms={perf.loadMs} />
+              {' · '}gen <Sec ms={perf.genMs} />
+              {perf.cutMs != null ? <> · cut <Sec ms={perf.cutMs} /></> : null}
+              {' · '}solve <Sec ms={perf.solveMs} />
             </span>
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
@@ -490,6 +490,11 @@ function Slider({ label, v, set, min, max, unit }: { label: string; v: number; s
     </label>
   )
 }
+/** Perf value in seconds — green when fast, red past the 2s comfort line. */
+function Sec({ ms }: { ms?: number }) {
+  if (ms == null) return <b>—</b>
+  return <b className={ms > 2000 ? 'gl-slow' : ''}>{(ms / 1000).toFixed(2)}s</b>
+}
 /** Collapsible card — native details, open by default; collapse the unneeded on a phone. */
 function Fold({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -508,8 +513,8 @@ const CSS = `
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
 @media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#3a3e46;--suede-edge:#22262d;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
 .gl *{box-sizing:border-box}
-.gl-head{max-width:1060px;margin:0 auto 20px}
-.gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.gl-head{max-width:1400px;margin:0 auto 20px;text-align:center}
+.gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;justify-content:center}
 .gl-tag{font:600 11px var(--mono);color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;letter-spacing:.02em}
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
 .gl-body{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:290px minmax(0,1fr) 336px;gap:20px;align-items:start}
@@ -580,6 +585,7 @@ const CSS = `
 .gl-toggle{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-2);cursor:pointer}
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
+.gl-perf b.gl-slow{color:var(--fail)}
 .gl-size{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:2;
   font:600 13px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);
   border-radius:8px;padding:4px 11px;font-variant-numeric:tabular-nums;pointer-events:none}
