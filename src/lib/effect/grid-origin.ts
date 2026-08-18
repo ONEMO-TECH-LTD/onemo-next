@@ -24,6 +24,8 @@ import {
 import {
   applyCoverage,
   assignSizes,
+  bandOf,
+  isHolding,
   registrationScore,
   verdictIssues,
   type Anchor,
@@ -38,7 +40,7 @@ export {
   spotRadiusOf,
   type GridPattern,
 } from './grid-origin-compute'
-export { magnetRadiusMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
+export { bandOf, isHolding, magnetRadiusMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
 
 export interface GridConfig {
   pitchMM?: number
@@ -126,6 +128,29 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     phaseMM: [bestOx, bestOy],
     spotRadiusMM: spotRadiusOf(pad),
   }
+}
+
+/**
+ * Band snap: walk every rung of the size's band and return the first that HOLDS (any pattern —
+ * single, pair, 2x2, rows — whatever the material carries). Fit is not monotone on concave shapes,
+ * so no early bail on failures; if no rung holds, the best-seated rung in the band is returned.
+ */
+export function fitSizeInBand(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
+): { sizeMM: number; grid: GridResult; snapped: boolean } {
+  const band = bandOf(fromMM)
+  const lo = band ? band.minMM : fromMM
+  const hi = band ? band.maxMM : SNAP_MAX_MM
+  const start = Math.max(lo, Math.round(fromMM))
+  let best: { sizeMM: number; grid: GridResult } | null = null
+  for (let mm = start; mm <= hi; mm += stepMM) {
+    const grid = computeGrid(sized(mm), cfg)
+    if (isHolding(grid.anchors.length, grid.flaps.length)) return { sizeMM: mm, grid, snapped: mm !== start }
+    if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
+  }
+  if (best) return { ...best, snapped: best.sizeMM !== start }
+  const grid = computeGrid(sized(start), cfg)
+  return { sizeMM: start, grid, snapped: false }
 }
 
 /** Scan the size upward until the target count seats. Step/ceiling from spec, target from logic. */

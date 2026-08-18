@@ -2,6 +2,7 @@
 
 import type { Pt } from './types'
 import {
+  BANDS,
   FLAP_WEIGHT,
   MAGNET_RADIUS_LARGE_MM,
   MAGNET_RADIUS_SMALL_MM,
@@ -9,6 +10,14 @@ import {
   SEAT_WEIGHT,
 } from './grid-origin-spec'
 import { bbox, splitPerimeter, type GridPattern } from './grid-origin-compute'
+import type { Band } from './grid-origin-spec'
+
+/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
+export function bandOf(sizeMM: number): Band | null {
+  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM < b.maxMM) return b
+  const last = BANDS[BANDS.length - 1]
+  return sizeMM === last.maxMM ? last : null
+}
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
@@ -51,6 +60,12 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   })
 }
 
+/** Holding: at least one seat and every edge within reach. The layout itself is whatever the
+ *  material carries — single, pair, 2x2, rows — never a required pattern. */
+export function isHolding(seatedCount: number, flapCount: number): boolean {
+  return seatedCount >= 1 && flapCount === 0
+}
+
 /** The verdict: what counts as a refusal and how it is said. */
 export function verdictIssues(
   degenerate: boolean,
@@ -60,7 +75,7 @@ export function verdictIssues(
 ): string[] {
   const issues: string[] = []
   if (degenerate) issues.push(`No room for a magnet — the shape is too small/thin to fit a magnet plus its ${padMM}mm application ring.`)
-  else if (seatedCount < MIN_ANCHORS) issues.push(`Too small — only ${seatedCount} magnet grips material. Turn on "Snap size to grid" to auto-size it up.`)
+  else if (seatedCount === 0) issues.push(`Too small — no magnet grips material. Turn on "Snap size to grid" to auto-size it up.`)
   if (flapCount > 0) issues.push(`Some edge areas have no magnet within reach (red edge). Turn on "Snap size to grid", or reduce the pitch.`)
   return issues
 }
