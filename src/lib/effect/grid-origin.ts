@@ -182,7 +182,7 @@ export function bandSnapPoints(
   const out: BandSnapPoint[] = []
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
-    if (isHolding(grid.anchors.length, grid.flaps.length)) out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+    if (isHolding(grid.anchors.length)) out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
   }
   return out
 }

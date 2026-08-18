@@ -52,8 +52,9 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   })
 }
 
-/** Holding: at least one seat and every edge within reach. The layout itself is whatever the
- *  material carries — single, pair, 2x2, rows — never a required pattern. */
-export function isHolding(seatedCount: number, flapCount: number): boolean {
-  return seatedCount >= 1 && flapCount === 0
+/** Holding: the band's layout is SEATED — a snugly seated single IS B1's answer (Dan's ruling,
+ *  18 Aug: "it is not truth if the magnet disk is sitting inside snug — it is optimal").
+ *  Uncovered material informs the placement scoring; it never vetoes a fit. */
+export function isHolding(seatedCount: number): boolean {
+  return seatedCount >= 1
 }
