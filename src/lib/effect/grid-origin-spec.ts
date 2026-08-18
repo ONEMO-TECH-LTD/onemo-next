@@ -44,8 +44,10 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 ])
 
 /** Registration search phase step — how finely the lattice slides under the shape.
- *  Default is the grid's own 12mm increment; admin-dialled down to 1mm for continuous panning. */
-export const PHASE_STEP_MM = 12
+ *  RULED 2026-08-18: continuous 1mm registration — Dan tested the dial and locked 1mm; the
+ *  per-band selection is correct for the first time with it. 12 (the cell increment) remains
+ *  an admin test value, not the law. */
+export const PHASE_STEP_MM = 1
 export const PHASE_STEP_FLOOR_MM = 1
 
 /** Flap allowance — how far material may extend past a spot's edge. Admin-dialled, 0 = edge-to-edge. */
