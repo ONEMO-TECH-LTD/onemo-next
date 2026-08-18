@@ -87,9 +87,18 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0
   if (fits) {
+    // Phases anchored on the canonical registration: k=0 puts a node line on the bbox centre
+    // (odd-count parity); the 24mm offset in the walk is the even-count parity. Mechanics still
+    // choose among them; anchoring guarantees the canonical phases are sampled at ANY size.
+    const mod = (v: number, m: number) => ((v % m) + m) % m
+    const phases = (span: number): number[] => {
+      const out: number[] = []
+      for (let k = 0; k < pitch; k += PHASE_STEP_MM) out.push(mod(span / 2 + k, pitch))
+      return out
+    }
     let bestScore = -Infinity
-    for (let oy = 0; oy < pitch; oy += PHASE_STEP_MM) {
-      for (let ox = 0; ox < pitch; ox += PHASE_STEP_MM) {
+    for (const oy of phases(bb.maxY - bb.minY)) {
+      for (const ox of phases(bb.maxX - bb.minX)) {
         const seat = latticeAt(bb, pitch, pattern, ox, oy).filter(fits)
         if (!seat.length) continue
         const flapCount = flapVerts(outer, seat, pitch).length
@@ -141,14 +150,15 @@ export function fitSizeInBand(
   const band = bandOf(fromMM)
   const lo = band ? band.minMM : fromMM
   const hi = band ? band.maxMM : SNAP_MAX_MM
-  const start = Math.max(lo, Math.round(fromMM))
+  // The snug seat: the SMALLEST size in the band that holds — walk from the band floor.
+  const start = lo
   let best: { sizeMM: number; grid: GridResult } | null = null
   for (let mm = start; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
-    if (isHolding(grid.anchors.length, grid.flaps.length)) return { sizeMM: mm, grid, snapped: mm !== start }
+    if (isHolding(grid.anchors.length, grid.flaps.length)) return { sizeMM: mm, grid, snapped: mm !== Math.round(fromMM) }
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
-  if (best) return { ...best, snapped: best.sizeMM !== start }
+  if (best) return { ...best, snapped: best.sizeMM !== Math.round(fromMM) }
   const grid = computeGrid(sized(start), cfg)
   return { sizeMM: start, grid, snapped: false }
 }
