@@ -34,7 +34,7 @@ export const TARGET_ANCHORS = 4
 export const PHASE_STEP_MM = 12
 
 /** Snap scan: size step and ceiling. */
-export const SNAP_STEP_MM = 5
+export const SNAP_STEP_MM = 1
 export const SNAP_MAX_MM = 300
 
 /** Registration score weights: seats, then flaps, then balance. */
