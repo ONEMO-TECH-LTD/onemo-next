@@ -26,6 +26,9 @@ export const FIELD_POSITIONS_PER_AXIS = 9
 /** Extra size past the board's span so a shape can pad past the outermost spots (408 → 420). */
 export const SIZE_CEIL_MARGIN_MM = 12
 
+/** The size increment — sizes and slider limits live on 12mm rungs. */
+export const SIZE_STEP_MM = 12
+
 /** Magnet body diameters. */
 export const MAGNET_DIA_SMALL_MM = 6
 export const MAGNET_DIA_LARGE_MM = 8

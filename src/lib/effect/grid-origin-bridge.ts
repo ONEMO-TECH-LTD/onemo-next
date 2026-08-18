@@ -8,10 +8,13 @@ import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 import {
   computeGrid,
+  DEFAULT_PITCH_MM,
   fieldSpanMM,
   latticeOver,
   MIN_EFFECT_MM,
+  PADDING_CEIL_MM,
   SIZE_CEIL_MARGIN_MM,
+  SIZE_STEP_MM,
   type GridResult,
   type MagnetPlan,
 } from './grid-origin'
@@ -57,6 +60,17 @@ export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>
 /** The size range a surface may offer — the fixed board plus a margin so shapes can pad past it. */
 export function sizeRange(padMM: number): { minMM: number; maxMM: number } {
   return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM }
+}
+
+/** Selectable free-slider limits, on the 12mm size rungs: mins up to two pitches, maxs to the
+ *  widest board (max padding) plus the margin. */
+export function sizeLimitChoices(): { mins: number[]; maxs: number[] } {
+  const minTop = DEFAULT_PITCH_MM * 2
+  const maxTop = fieldSpanMM(PADDING_CEIL_MM) + SIZE_CEIL_MARGIN_MM
+  const mins: number[] = [], maxs: number[] = []
+  for (let v = SIZE_STEP_MM; v <= minTop; v += SIZE_STEP_MM) mins.push(v)
+  for (let v = minTop + SIZE_STEP_MM; v <= maxTop; v += SIZE_STEP_MM) maxs.push(v)
+  return { mins, maxs }
 }
 
 /** One drawable spot: engine-space centre, radius, and whether a magnet seats there. */

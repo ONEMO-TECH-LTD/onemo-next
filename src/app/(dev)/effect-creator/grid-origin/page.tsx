@@ -14,7 +14,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { computeGrid, DEFAULT_PITCH_MM, fitSizeInBand, type BandSnapPoint, type MagnetPlan } from '@/lib/effect/grid-origin'
 import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
-import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
+import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeLimitChoices, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
@@ -42,6 +42,9 @@ export default function GridLab() {
   const [points, setPoints] = useState(5)
   // Opens on the B2 floor — the 72mm square standard (2×2), from spec.
   const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
+  /** Free-slider limits, admin-selectable on the 12mm rungs. */
+  const [sizeMin, setSizeMin] = useState(MIN_EFFECT_MM)
+  const [sizeMax, setSizeMax] = useState(() => sizeRange(RELEASED_PADDING_MM).maxMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = useState(RELEASED_PADDING_MM)
   /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
@@ -113,8 +116,8 @@ export default function GridLab() {
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
 
-  // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
-  const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pad)
+  // Limit options come from the bridge, on the 12mm rungs — never computed here.
+  const limits = sizeLimitChoices()
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -200,7 +203,19 @@ export default function GridLab() {
               </div>
             </div>
             {mode === 'free'
-              ? <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={minSizeMM} max={maxSizeMM} />
+              ? <>
+                  <Slider label="Effect size · longest side" unit="mm" v={sizeMM} set={setSizeMM} min={sizeMin} max={sizeMax} />
+                  <div className="gl-field"><span>Slider limits</span>
+                    <div className="gl-limits">
+                      <select value={sizeMin} onChange={(e) => { const v = +e.target.value; setSizeMin(v); if (sizeMM < v) setSizeMM(v) }}>
+                        {limits.mins.map((v) => <option key={v} value={v}>min {v} mm</option>)}
+                      </select>
+                      <select value={sizeMax} onChange={(e) => { const v = +e.target.value; setSizeMax(v); if (sizeMM > v) setSizeMM(v) }}>
+                        {limits.maxs.map((v) => <option key={v} value={v}>max {v} mm</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
               : <>
                   <div className="gl-snap">Fit <b>B{mode}-{model?.ladder.length ? Math.min(stepIdx, model.ladder.length - 1) + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
                     <span>{model?.ladder.length ?? 0} fit steps at {model?.grid.anchors.length ?? 0} magnets{model && !model.ladder.length ? ' · nothing fully fits — best seated shown' : ''}</span></div>
@@ -436,6 +451,8 @@ const CSS = `
 .gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}
 .gl-num input:focus{outline:none;border-color:var(--accent)}
 .gl-num i{font:600 11px var(--mono);font-style:normal;color:var(--ink-3)}
+.gl-limits{display:flex;gap:6px}
+.gl-limits select{flex:1;min-width:0}
 .gl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;background:var(--line);outline:none}
 .gl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px #0003;cursor:pointer}
 .gl input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);cursor:pointer}
