@@ -3,11 +3,11 @@
 /** The lattice, centre to centre. */
 export const DEFAULT_PITCH_MM = 48
 
-/** Released pitches. 96 = the 48 lattice thinned (every second point); 24 = fine bench tier. */
+/** Released pitches, smallest first. 24 = fine bench tier; 96 = the 48 lattice thinned. */
 export const RELEASED_PITCHES_MM: ReadonlyArray<{ mm: number; label: string }> = Object.freeze([
-  Object.freeze({ mm: 96, label: '96 mm' }),
-  Object.freeze({ mm: 48, label: '48 mm' }),
   Object.freeze({ mm: 24, label: '24 mm' }),
+  Object.freeze({ mm: 48, label: '48 mm' }),
+  Object.freeze({ mm: 96, label: '96 mm' }),
 ])
 
 /** Padding slider range — admin test bounds around the locked 12. */
