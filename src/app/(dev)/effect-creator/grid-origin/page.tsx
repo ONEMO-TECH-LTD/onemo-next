@@ -252,7 +252,7 @@ export default function GridLab() {
                   <div className={`gl-snap${model && !model.ladder.length ? ' gl-snap-none' : ''}`}>Fit <b>B{mode}-{model?.ladder.length ? model.idx + 1 : '—'}</b> · <b>{model ? model.effSize : '—'} mm</b>
                     <span>{model?.ladder.length
                       ? `${model.ladder.length} layouts in band · ${model.grid.anchors.length} magnets`
-                      : `NOTHING SEATS in this band at these settings — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
+                      : `NO NEW LAYOUT unlocks in this band — closest attempt shown (${model?.grid.anchors.length ?? 0} magnets)`}</span></div>
                   {(model?.ladder.length ?? 0) > 0 && <div className="gl-steps">
                     {model!.ladder.map((pt, i) =>
                       <button key={pt.count + '-' + pt.sizeMM} aria-pressed={i === model!.idx}

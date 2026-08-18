@@ -7,6 +7,7 @@ import {
   FLAP_MM,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
+  MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
 } from './grid-origin-spec'
@@ -158,44 +159,38 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
 }
 
 /**
- * Every holding size in the band, scanned at stepMM. The band is a RANGE: fit is not monotone,
- * so the whole range is walked and each size judged independently.
- */
-export function bandSnapPoints(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): BandSnapPoint[] {
-  const [lo, hi] = snapRange(cfg, fromMM)
-  const out: BandSnapPoint[] = []
-  for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), cfg)
-    if (isHolding(grid.anchors.length)) out.push({ sizeMM: mm, count: grid.anchors.length })
-  }
-  return out
-}
-
-/**
- * Band snap. A VARIANT is a distinct magnet COUNT the band can carry, shown at its snuggest
- * (smallest) size — one step per count, never two layouts of the same count.
- * The landing pick (`pickIdx`) stays the snuggest size at the band's MAXIMUM count.
+ * Band snap. A VARIANT is a magnet COUNT whose SNUGGEST size — measured globally, from the
+ * smallest effect up — falls inside this band's range. A count that already seats below the
+ * band floor is the previous band's answer stretched loose, never this band's variant.
+ * The landing pick (`pickIdx`) is the band's maximum-count variant at its snug size.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[]; pickIdx: number } {
-  const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
-  if (points.length) {
-    const seen = new Set<number>()
-    const ladder = points.filter((p) => !seen.has(p.count) && (seen.add(p.count), true))
+): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
+  const [lo, hi] = snapRange(cfg, fromMM)
+  const scanLo = bandOf(fromMM) ? MIN_EFFECT_MM : lo
+  // Global snug scan: the first (smallest) size each count seats at.
+  const snug = new Map<number, number>()
+  for (let mm = scanLo; mm <= hi; mm += stepMM) {
+    const grid = computeGrid(sized(mm), cfg)
+    const c = grid.anchors.length
+    if (isHolding(c) && !snug.has(c)) snug.set(c, mm)
+  }
+  const ladder: BandSnapPoint[] = [...snug.entries()]
+    .filter(([, mm]) => mm >= lo && mm <= hi)
+    .map(([count, sizeMM]) => ({ sizeMM, count }))
+    .sort((a, b) => a.sizeMM - b.sizeMM)
+  if (ladder.length) {
     const maxCount = Math.max(...ladder.map((p) => p.count))
     const pickIdx = ladder.findIndex((p) => p.count === maxCount)
-    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), points, ladder, pickIdx }
+    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
   }
-  // Nothing in the band holds: best-seated rung as a fallback.
-  const [lo, hi] = snapRange(cfg, fromMM)
+  // No count unlocks in this band: best-seated rung as a fallback.
   let best: { sizeMM: number; grid: GridResult } | null = null
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), cfg)
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, points, ladder: [], pickIdx: 0 }
+  return { ...pick, ladder: [], pickIdx: 0 }
 }
