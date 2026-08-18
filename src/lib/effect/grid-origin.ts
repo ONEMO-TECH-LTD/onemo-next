@@ -19,10 +19,33 @@ export type GridPattern = 'standard' | 'quincunx' | 'granular'
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = 6 | 8
 
-export const DEFAULT_PITCH_MM = 48
-export const PADDING_FLOOR_MM = 10
-export const MIN_ANCHORS = 2
-export const TARGET_ANCHORS = 4
+// SPEC lives beside this file — values only, imported here, re-exported so existing callers keep
+// their one door. COMPUTE (this file) holds the formulas that run on them.
+import {
+  DEFAULT_PITCH_MM,
+  FIELD_POSITIONS_PER_AXIS,
+  MAGNET_RADIUS_LARGE_MM,
+  MAGNET_RADIUS_SMALL_MM,
+  MIN_ANCHORS,
+  PADDING_FLOOR_MM,
+  TARGET_ANCHORS,
+} from './grid-origin-spec'
+export * from './grid-origin-spec'
+
+/** POLICY: which magnet body a plan erodes with — the 8mm body governs any plan that carries one. */
+export function magnetRadiusMM(plan: MagnetPlan): number {
+  return plan === 'all6' ? MAGNET_RADIUS_SMALL_MM : MAGNET_RADIUS_LARGE_MM
+}
+
+/** COMPUTE: the spot — magnet radius plus padding, the material one magnet requires. */
+export function spotRadiusFor(plan: MagnetPlan, padMM: number): number {
+  return magnetRadiusMM(plan) + padMM
+}
+
+/** COMPUTE: the full field's span — the steps across plus one spot's material either side. */
+export function fieldSpanMM(pitchMM: number, plan: MagnetPlan, padMM: number): number {
+  return (FIELD_POSITIONS_PER_AXIS - 1) * pitchMM + 2 * spotRadiusFor(plan, padMM)
+}
 
 export interface GridConfig {
   pitchMM?: number
@@ -192,7 +215,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const bb = bbox(outer)
   const issues: string[] = []
 
-  const rMag = plan === 'all6' ? 3 : 4
+  const rMag = magnetRadiusMM(plan)
   const safe = insetRingMM(outer, -(rMag + pad), 'round')
   const hasSafe = !!safe && safe.length >= 3
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
