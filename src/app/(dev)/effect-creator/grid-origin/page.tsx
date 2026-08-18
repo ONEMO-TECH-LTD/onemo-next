@@ -12,11 +12,10 @@ import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-librar
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
-import { insetRingMM } from '@/lib/effect/offset'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { computeGrid, fitSizeToGrid, scaleContour, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { computeGrid, fitSizeToGrid, type GridPattern, type MagnetPlan } from '@/lib/effect/grid-origin'
 import { RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-origin-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
+import { fieldSpots, makeSizer, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
 /** The stage's pixel size. 440 was a small fixed square in a card; the scaffold's canvas showed
@@ -96,13 +95,8 @@ export default function GridLab() {
       if (!base || base.outer.pts.length < 3) return null
       const b = base
       const cfg = { pitchMM: pitch, paddingMM: pad, pattern, plan, perimeterOnly: coverage === 'perimeter' }
-      // sized(mm): real-mm contour at longest-side `mm`, with the outline offset (grow/shrink) applied.
-      const sized = (mm: number): Contour => {
-        const c = scaleContour(b, mm)
-        if (!offsetMM) return c
-        const o = insetRingMM(c.outer.pts, offsetMM, 'round')
-        return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
-      }
+      // sized(mm): the bridge's sizer — scale + outline offset, no geometry in the shell.
+      const sized = makeSizer(b, offsetMM)
       if (autoFit) {
         // Snap climbs to the same 9x9 ceiling the slider offers — its own default stopped at 300.
         const fit = fitSizeToGrid(sized, cfg, sizeMM, { maxMM: sizeRange(pitch, pad).maxMM })

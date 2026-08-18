@@ -9,6 +9,8 @@
 // grid-origin's spec block) and does no geometry the engine doesn't already do — it asks.
 
 import { contourFromShape } from './geometry-truth'
+import { insetRingMM } from './offset'
+import { scaleContour } from './grid-origin-compute'
 import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 import {
@@ -44,6 +46,19 @@ export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | nul
   const c = contourFromShape(vs, { mmPerPx: FLATTEN_REF_MM / L, maskHeightPx })
   if (!c) return null
   return { outer: { pts: c.outer.pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt) }, holes: [] }
+}
+
+/**
+ * A sizer for one base contour: real-mm contour at any longest side, with the outline offset
+ * (grow/shrink) applied. The offset op is geometry — it lives here, never in a shell.
+ */
+export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Contour {
+  return (mm: number): Contour => {
+    const c = scaleContour(base, mm)
+    if (!offsetMM) return c
+    const o = insetRingMM(c.outer.pts, offsetMM, 'round')
+    return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
+  }
 }
 
 /** A generated polygon ring (image px, y-down) → mm contour normalized to 1mm, y-up. */
