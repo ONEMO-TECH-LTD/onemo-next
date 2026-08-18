@@ -114,7 +114,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, sizeMM, pitch, pad, flap, phaseStep, plan, magic, mode, stepIdx, coverage, offsetMM, snapStep])
 
   // The size range, asked for — floor and ceiling are the bridge's answer, never computed here.
-  const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pitch, pad)
+  const { minMM: minSizeMM, maxMM: maxSizeMM } = sizeRange(pad)
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]

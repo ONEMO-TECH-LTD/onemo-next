@@ -156,7 +156,7 @@ function layoutSig(grid: GridResult): string {
 function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
   const band = bandOf(fromMM)
   if (band) return [band.minMM, band.maxMM]
-  return [fromMM, fieldSpanMM(cfg.pitchMM ?? DEFAULT_PITCH_MM, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))]
+  return [fromMM, fieldSpanMM(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))]
 }
 
 /**

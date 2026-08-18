@@ -2,7 +2,7 @@
 
 import type { Contour, Pt } from './types'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
-import { FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
+import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
@@ -19,9 +19,10 @@ export function spotRadiusOf(padMM: number): number {
   return padMM
 }
 
-/** Full field span: (N−1) steps plus one spot either side. 408 at 48/12. */
-export function fieldSpanMM(pitchMM: number, padMM: number): number {
-  return (FIELD_POSITIONS_PER_AXIS - 1) * pitchMM + 2 * spotRadiusOf(padMM)
+/** Full field span: the fixed 9×9 board on the base 48 grid, plus one spot either side — 408 at
+ *  12 padding. Pitch never changes the board: 96 skips points on it, 24 adds points within it. */
+export function fieldSpanMM(padMM: number): number {
+  return (FIELD_POSITIONS_PER_AXIS - 1) * DEFAULT_PITCH_MM + 2 * spotRadiusOf(padMM)
 }
 
 /** Axis positions at `step` with a phase offset, spanning [min, max]. */

@@ -53,9 +53,9 @@ export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>
   return { outer: { pts: ring.map(([x, y]) => [x / L, (imgH - y) / L] as Pt) }, holes: [] }
 }
 
-/** The size range a surface may offer — floor and ceiling derived, moving with pitch and padding. */
-export function sizeRange(pitchMM: number, padMM: number): { minMM: number; maxMM: number } {
-  return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(pitchMM, padMM) }
+/** The size range a surface may offer — floor and ceiling derived; the ceiling is the fixed board. */
+export function sizeRange(padMM: number): { minMM: number; maxMM: number } {
+  return { minMM: MIN_EFFECT_MM, maxMM: fieldSpanMM(padMM) }
 }
 
 /** One drawable spot: engine-space centre, radius, and whether a magnet seats there. */
