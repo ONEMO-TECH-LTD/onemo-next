@@ -66,6 +66,8 @@ export default function GridLab() {
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
+  /** Faint bounding box with per-side dimensions. */
+  const [showBox, setShowBox] = useState(true)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number | 'free'>('free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
@@ -210,9 +212,8 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {model && <div className="gl-size">{Math.round(dim(model.contour, 0))} × {Math.round(dim(model.contour, 1))} mm</div>}
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
-            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice}
+            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))}
               onReset={() => setManual(null)} />
@@ -324,6 +325,9 @@ export default function GridLab() {
             <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
               <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
             </label>
+            <label className="gl-toggle"><span>Show bounding box <small style={{ color: 'var(--ink-3)' }}>· size on each side</small></span>
+              <input type="checkbox" checked={showBox} onChange={e => setShowBox(e.target.checked)} />
+            </label>
             <div className="gl-seg">
               <button onClick={saveDefaults}>Save as default</button>
               <button onClick={resetDefaults}>Reset to default</button>
@@ -374,8 +378,8 @@ function dim(c: Contour, axis: 0 | 1): number {
   return hi - lo
 }
 
-function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
-  contour: Contour; grid: GridResult; lattice: boolean
+function Stage({ contour, grid, lattice, box, onPan, onZoom, onReset }: {
+  contour: Contour; grid: GridResult; lattice: boolean; box: boolean
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -451,6 +455,20 @@ function Stage({ contour, grid, lattice, onPan, onZoom, onReset }: {
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
       <path d={d} fill="none" stroke="var(--suede-edge)"
         strokeOpacity={0.9} strokeWidth={1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      {/* Faint bounding box, its dimension written on every side. */}
+      {box && <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink)"
+        strokeOpacity={0.22} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
+      {box && (() => {
+        const fs = 11 * spanMM / VP
+        const lbl = { fontSize: fs, fill: 'var(--ink)', fillOpacity: 0.55, fontFamily: 'var(--mono)', fontWeight: 600 } as const
+        const wTxt = `${Math.round(w)} mm`, hTxt = `${Math.round(h)} mm`
+        return (<g style={{ pointerEvents: 'none' }}>
+          <text {...lbl} x={cx} y={minY - fs * 0.6} textAnchor="middle">{wTxt}</text>
+          <text {...lbl} x={cx} y={maxY + fs * 1.5} textAnchor="middle">{wTxt}</text>
+          <text {...lbl} x={minX - fs * 0.6} y={cy} textAnchor="middle" transform={`rotate(-90 ${minX - fs * 0.6} ${cy})`}>{hTxt}</text>
+          <text {...lbl} x={maxX + fs * 0.6} y={cy} textAnchor="middle" transform={`rotate(90 ${maxX + fs * 0.6} ${cy})`}>{hTxt}</text>
+        </g>)
+      })()}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       {spots.map((sp, i) => (
         <circle key={'f' + i} cx={sp.x} cy={-sp.y} r={sp.r}
@@ -586,7 +604,4 @@ const CSS = `
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
 .gl-perf b.gl-slow{color:var(--fail)}
-.gl-size{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:2;
-  font:600 13px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);
-  border-radius:8px;padding:4px 11px;font-variant-numeric:tabular-nums;pointer-events:none}
 `
