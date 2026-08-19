@@ -516,7 +516,7 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
             pattern origin is shifted half a tile so dots land on the corners unclipped. */}
         <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
           patternUnits="userSpaceOnUse" x={Afy[0] - DEFAULT_PITCH_MM / 8} y={Afy[1] - DEFAULT_PITCH_MM / 8}>
-          <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.25} fill="var(--ink)" fillOpacity={0.2} />
+          <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.5} fill="var(--ink)" fillOpacity={0.12} />
         </pattern>
       </defs>
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
