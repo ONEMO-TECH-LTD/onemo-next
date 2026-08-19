@@ -108,27 +108,30 @@ export function makeCircleSeatPredicate(
   }
 }
 
-/** Silhouette vertices further than `reach` from the nearest magnet (flap-risk edge). */
-export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
-  const out: Pt[] = []
-  for (const v of outer) {
-    let nd = Infinity
-    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d; if (nd <= reach) break }
-    if (nd > reach) out.push(v)
-  }
-  return out
+/** How far a point sits OUTSIDE the seated magnets' frame inflated by `reach` per side.
+ *  THE FLAP LAW (spec: "how far material may extend past a spot's edge · 0 = edge-to-edge"):
+ *  material between magnets is held by the frame — flap is only the outline's excess past the
+ *  frame plus the spot reach. At flap 0 the released tangent standards measure exactly 0. */
+function frameExcess(v: Pt, fb: BBox, reach: number): number {
+  const dx = Math.max(fb.minX - reach - v[0], v[0] - fb.maxX - reach, 0)
+  const dy = Math.max(fb.minY - reach - v[1], v[1] - fb.maxY - reach, 0)
+  return Math.hypot(dx, dy)
 }
 
-/** Mean distance silhouette vertices sit PAST `reach`, mm. 0 = fully wrapped. Graded, so a
- *  placement covering more material scores better even when nothing is fully covered. */
+/** Silhouette vertices past the frame's reach (flap-risk edge). */
+export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
+  if (!seated.length) return outer.slice()
+  const fb = bbox(seated)
+  return outer.filter((v) => frameExcess(v, fb, reach) > 0)
+}
+
+/** Mean distance silhouette vertices sit past the frame's reach, mm. 0 = held within the
+ *  allowance. Graded, so a placement leaving less material past the frame scores better. */
 export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
   if (!outer.length || !seated.length) return 0
+  const fb = bbox(seated)
   let sum = 0
-  for (const v of outer) {
-    let nd = Infinity
-    for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d; if (nd <= reach) break }
-    if (nd > reach) sum += nd - reach
-  }
+  for (const v of outer) sum += frameExcess(v, fb, reach)
   return sum / outer.length
 }
 

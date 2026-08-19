@@ -35,6 +35,7 @@ import {
   centeringRef,
   governMass,
   isHolding,
+  holdingFirstScore,
   registrationScore,
   type Anchor,
   type CentreMode,
@@ -73,6 +74,8 @@ export interface GridConfig {
   governor?: number
   /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
   segmentsDetail?: 'full' | 'light'
+  /** Band-walk law: a slide holding at the allowance outranks any that does not. */
+  preferHolding?: boolean
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -160,17 +163,19 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const cands: Array<[number, number, number]> = [
       [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
     ]
-    let best: { seats: number; canon: number; excess: number } | null = null
+    let best: { hold: number; seats: number; canon: number; excess: number } | null = null
     for (const [px, py, canon] of cands) {
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
       const excess = flapExcessMM(outer, seat, reach)
+      const hold = cfg.preferHolding && excess === 0 ? 1 : 0
       const wins = !best
-        || seat.length > best.seats
-        || (seat.length === best.seats && canon > best.canon)
-        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
-      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
+        || hold > best.hold
+        || (hold === best.hold && seat.length > best.seats)
+        || (hold === best.hold && seat.length === best.seats && canon > best.canon)
+        || (hold === best.hold && seat.length === best.seats && canon === best.canon && excess < best.excess)
+      if (wins) { best = { hold, seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
     }
     mainCentre = ruleTarget
   } else if (fits) {
@@ -201,7 +206,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const [tx, ty] = ref ? ref.centreMM : centres[0]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
-        const score = registrationScore(seat.length, excess, balance)
+        const score = holdingFirstScore(
+          registrationScore(seat.length, excess, balance), !!cfg.preferHolding && excess === 0)
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k; mainCentre = [tx, ty] }
       }
     }
@@ -256,14 +262,24 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
 export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): BandSnapPoint[] {
+  return bandWalk(sized, cfg, fromMM, stepMM).points
+}
+
+/** One pass over the band: the holding sizes AND the best-seated rung (the fallback), so a
+ *  gate that passes nothing never costs a second walk. */
+function bandWalk(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
+): { points: BandSnapPoint[]; bestSeatedMM: number } {
   const [lo, hi] = snapRange(cfg, fromMM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
-  const out: BandSnapPoint[] = []
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', preferHolding: true }
+  const points: BandSnapPoint[] = []
+  let bestSeatedMM = lo, bestSeats = -1
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), walkCfg)
-    if (isHolding(grid.anchors.length, grid.flaps.length)) out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+    if (grid.anchors.length > bestSeats) { bestSeats = grid.anchors.length; bestSeatedMM = mm }
+    if (isHolding(grid.anchors.length, grid.flaps.length)) points.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
   }
-  return out
+  return { points, bestSeatedMM }
 }
 
 /**
@@ -275,7 +291,7 @@ export function bandSnapPoints(
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
-  const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
+  const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const seen = new Set<string>()
@@ -284,14 +300,6 @@ export function fitSizeInBand(
     const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
     return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
   }
-  // Nothing in the band holds at this allowance: best-seated rung, walk light, final full.
-  const [lo, hi] = snapRange(cfg, fromMM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
-  let best: { sizeMM: number; grid: GridResult } | null = null
-  for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), walkCfg)
-    if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
-  }
-  const pickMM = best ? best.sizeMM : lo
-  return { sizeMM: pickMM, grid: computeGrid(sized(pickMM), cfg), ladder: [], pickIdx: 0 }
+  // Nothing in the band holds at this allowance: the walk's best-seated rung, solved full.
+  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), cfg), ladder: [], pickIdx: 0 }
 }

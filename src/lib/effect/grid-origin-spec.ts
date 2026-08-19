@@ -62,6 +62,9 @@ export const SNAP_STEP_MM = 1
 export const SEAT_WEIGHT = 100000
 export const FLAP_WEIGHT = 100
 
+/** Band-walk holding boost — a slide holding within the allowance outranks any that doesn't. */
+export const HOLDING_WEIGHT = 1000000000
+
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
 export const MASS_DEPTH_MM = 16

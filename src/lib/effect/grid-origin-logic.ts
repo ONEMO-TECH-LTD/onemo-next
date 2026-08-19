@@ -4,6 +4,7 @@ import type { Pt } from './types'
 import {
   BANDS,
   FLAP_WEIGHT,
+  HOLDING_WEIGHT,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
@@ -29,6 +30,12 @@ export interface Anchor { p: Pt; dia: MagnetDia }
  *  CENTRE-RULES law's job, not this score's — the two positioning laws split the principles. */
 export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
   return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
+}
+
+/** Band-walk rank — Dan's band law: a slide that HOLDS at the dialled allowance outranks any
+ *  that does not, whatever its seat count; the ladder must surface every wrapping variant. */
+export function holdingFirstScore(score: number, holding: boolean): number {
+  return holding ? score + HOLDING_WEIGHT : score
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
