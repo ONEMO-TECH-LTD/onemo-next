@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     exclude: [
       "node_modules/**",
+      "_WIP/**", // vendored GPT Pro delivery packages carry their own runners' suites
       "studio/**",
       "studio-v2/**",
       // The three installed grid-engine packages ship their own node:test suites and run under

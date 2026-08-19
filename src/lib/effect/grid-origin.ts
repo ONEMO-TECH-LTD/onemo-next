@@ -21,7 +21,6 @@ import {
   centroidOf,
   fieldSpanMM,
   flapExcessMM,
-  flapVerts,
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
@@ -93,8 +92,6 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
-  /** Silhouette vertices with no magnet within reach — the band gate's evidence. */
-  flaps: Pt[]
   pitchCentreMM: number
   /** Every lattice position at the chosen phase, seated or not. */
   lattice: Pt[]
@@ -113,6 +110,11 @@ export interface GridResult {
 }
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
+/** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
+const QUANTUM_KEY_MM = 0.001
+
+const mod = (v: number, m: number) => ((v % m) + m) % m
+
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -146,10 +148,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
-  /** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
-const QUANTUM_KEY_MM = 0.001
-
-const mod = (v: number, m: number) => ((v % m) + m) % m
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search.
     bestOx = mod(cfg.forcePhaseMM[0], pitch)
@@ -211,11 +209,12 @@ const mod = (v: number, m: number) => ((v % m) + m) % m
     // on top take the exact single-pass road instead.
     const pyList = phases(centres.map((a) => a[1] - bb.minY))
     const pxList = phases(centres.map((a) => a[0] - bb.minX))
-    const seatsFirst = (cfg.votingOrder ?? VOTING_ORDER) === 0 || cfg.votingOrder === 1
+    const seatsFirst = (cfg.votingOrder ?? VOTING_ORDER) <= 1
     // Legality memo — every grid point is judged once; pass 2 re-reads, never re-measures.
     const memo = new Map<number, boolean>()
     const fitsM = (p: Pt): boolean => {
-      const k = Math.round((p[0] - bb.minX) * 8) * 262144 + Math.round((p[1] - bb.minY) * 8)
+      // Micron identity — exact for any phase source, fractional mass centres included.
+      const k = Math.round((p[0] - bb.minX) / QUANTUM_KEY_MM) * 2097152 + Math.round((p[1] - bb.minY) / QUANTUM_KEY_MM)
       const hit = memo.get(k)
       if (hit !== undefined) return hit
       const v = fits(p)
@@ -259,11 +258,9 @@ const mod = (v: number, m: number) => ((v % m) + m) % m
   const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
   const anchors = assignSizes(coverage.seated, plan)
 
-  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach, pitch) : []
 
   return {
     anchors,
-    flaps,
     pitchCentreMM: pitch,
     lattice,
     phaseMM: [bestOx, bestOy],

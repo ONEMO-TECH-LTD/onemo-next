@@ -101,14 +101,23 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
   try {
     const sized = makeSizer(base, offsetMM)
     const pts = base.outer.pts
-    const sig = JSON.stringify([offsetMM, pts.length, pts[0], pts[pts.length >> 1]])
+    // Full-content hash — sampling (length + two points) collided across shapes (F2, Meta QA).
+    let h = 0
+    for (let i = 0; i < pts.length; i++) {
+      h = (Math.imul(h, 31) + Math.round(pts[i][0] * 1000)) | 0
+      h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
+    }
+    const sig = JSON.stringify([offsetMM, pts.length, h])
     if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
     const cfgSig = JSON.stringify(cfg)
     if (mode !== 'free') {
       const { fit, autoFlapMM } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, seatMarginMM: Math.max(0, autoFlapMM ?? cfg.flapMM ?? 0) })
+      // A stepped rung renders the layout that QUALIFIED it: reach AND margin at the
+      // auto-chosen allowance, never the dial (F1 — Meta QA, verified).
+      const effFlap = Math.max(0, autoFlapMM ?? cfg.flapMM ?? 0)
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, flapMM: effFlap, seatMarginMM: effFlap })
       const contour = sized(eff)
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM } })
     } else {

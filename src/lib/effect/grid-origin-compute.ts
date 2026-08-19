@@ -262,13 +262,6 @@ function heldExcess(v: Pt, g: SeatGrid, reach: number): number {
   return Math.max(0, nd - reach)
 }
 
-/** Silhouette vertices past reach of every disk and span (flap-risk edge). */
-export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): Pt[] {
-  if (!seated.length) return outer.slice()
-  const g = seatGridOf(seated, pitchMM)
-  return outer.filter((v) => heldExcess(v, g, reach) > 0)
-}
-
 /** Mean distance silhouette vertices sit past reach, mm. 0 = held within the allowance.
  *  Graded, so a placement leaving less material loose scores better. */
 export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): number {
