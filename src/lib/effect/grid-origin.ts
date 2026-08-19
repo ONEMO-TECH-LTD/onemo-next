@@ -34,7 +34,6 @@ import {
   centeringAnchors,
   centeringRef,
   governMass,
-  isHolding,
   registrationScore,
   type Anchor,
   type CentreMode,
@@ -52,7 +51,7 @@ export {
   type SafeMass,
   type SafeSegment,
 } from './grid-origin-compute'
-export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
+export { bandOf, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
 
 export interface GridConfig {
   pitchMM?: number
@@ -228,8 +227,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
-/** One holding size in a band: the size, the seat count, and the layout's identity. */
-export interface BandSnapPoint { sizeMM: number; count: number; sig: string }
+/** One seated size in a band: size, seat count, layout identity, and how much material sits
+ *  past reach there (0 = fully wrapped). */
+export interface BandSnapPoint { sizeMM: number; count: number; sig: string; excessMM: number }
 
 /** Layout identity: the magnets' relative arrangement plus the registration (pan) class. */
 function layoutSig(grid: GridResult): string {
@@ -248,47 +248,45 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
 }
 
 /**
- * Every holding size in the band, scanned at stepMM. The band is a RANGE: fit is not monotone,
- * so the whole range is walked and each size judged independently.
+ * Every SEATED size in the band, scanned at stepMM — what a manual sweep of the range finds.
+ * The band is a RANGE: fit is not monotone, so every size is judged independently. No wrap
+ * veto: seating lists a size; how well it wraps is carried as excessMM, never hidden.
  */
 export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): BandSnapPoint[] {
   const [lo, hi] = snapRange(cfg, fromMM)
   const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
+  const reach = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)) + Math.max(0, cfg.flapMM ?? FLAP_MM)
   const out: BandSnapPoint[] = []
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = computeGrid(sized(mm), walkCfg)
-    if (isHolding(grid.anchors.length, grid.flaps.length)) out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+    if (!grid.anchors.length) continue
+    const excess = flapExcessMM(sized(mm).outer.pts, grid.anchors.map((a) => a.p), reach)
+    out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid), excessMM: excess })
   }
   return out
 }
 
 /**
- * Band snap. `ladder` is every DISTINCT holding layout in the band — any count, arrangement or
- * pan variation — each at the smallest size where it appears; as honest as the free slider.
- * The landing pick (`pickIdx`) stays the smallest size at the band's MAXIMUM seated count.
+ * Band snap — RULED 2026-08-19: the CENTRE governs position, the FLAP governs scale.
+ * `ladder` is every distinct seated layout in the band, each at its smallest size — exactly
+ * what a manual sweep of the range shows, nothing hidden behind a wrap veto. The landing pick
+ * is the step with the LEAST material past reach (the snuggest wrap); ties go to the smaller
+ * size. Turning the flap dial therefore moves the chosen scale.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
   if (points.length) {
-    const maxCount = Math.max(...points.map((p) => p.count))
     const seen = new Set<string>()
     const ladder = points.filter((p) => !seen.has(p.sig) && (seen.add(p.sig), true))
-    const pickSig = points.find((p) => p.count === maxCount)!.sig
-    const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
+    let pickIdx = 0
+    for (let i = 1; i < ladder.length; i++) if (ladder[i].excessMM < ladder[pickIdx].excessMM) pickIdx = i
     return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
   }
-  // Nothing in the band holds: best-seated rung as a fallback (walk light, final full).
-  const [lo, hi] = snapRange(cfg, fromMM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
-  let best: { sizeMM: number; grid: GridResult } | null = null
-  for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), walkCfg)
-    if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
-  }
-  const pickMM = best ? best.sizeMM : lo
-  return { sizeMM: pickMM, grid: computeGrid(sized(pickMM), cfg), ladder: [], pickIdx: 0 }
+  // Nothing seats anywhere in the range: show the floor honestly.
+  const [lo] = snapRange(cfg, fromMM)
+  return { sizeMM: lo, grid: computeGrid(sized(lo), cfg), ladder: [], pickIdx: 0 }
 }

@@ -138,9 +138,4 @@ export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   })
 }
 
-/** Holding: at least one seat and every edge within reach. The layout itself is whatever the
- *  material carries — single, pair, 2x2, rows — never a required pattern. */
-export function isHolding(seatedCount: number, flapCount: number): boolean {
-  return seatedCount >= 1 && flapCount === 0
-}
 
