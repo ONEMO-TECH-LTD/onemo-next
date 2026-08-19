@@ -74,6 +74,8 @@ export default function GridLab() {
   const [showBox, setShowBox] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
+  /** Coloured fills of the inner (legal) area — off leaves outlines only. */
+  const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number | 'free'>('free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
@@ -254,7 +256,7 @@ export default function GridLab() {
           <div className="gl-vp">
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
-              segments={showSegs ? model.segments : []}
+              segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => { if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f))) }}
               onReset={() => setManual(null)} />
@@ -426,6 +428,15 @@ export default function GridLab() {
             </div>
             {(centreMode === 2 || centreMode === 5) &&
               <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
+            <div className="gl-legend">
+              <div><i className="gl-sw gl-sw-main" /> main centre — governs the winning layout</div>
+              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[0], background: SEG_HUES[0] + '22' }} /> island S1 · smallest legal area + its candidate centre</div>
+              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[1], background: SEG_HUES[1] + '22' }} /> island S2 · next larger, and so on per colour</div>
+              <div><i className="gl-sw gl-sw-dash" style={{ borderColor: SEG_HUES[0] }} /> mass at depth — the island's solid core (dashed)</div>
+            </div>
+            <label className="gl-toggle"><span>Fill islands <small style={{ color: 'var(--ink-3)' }}>· coloured inner area</small></span>
+              <input type="checkbox" checked={segFillN !== 0} onChange={(e) => setSegFillN(e.target.checked ? 1 : 0)} />
+            </label>
           </Fold>
         </aside>
       </div>
@@ -442,8 +453,8 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }: {
-  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset }: {
+  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -534,7 +545,7 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
         return <g key={'sg' + si} style={{ pointerEvents: 'none' }}>
           {sg.rings.map((ring, ri) => {
             const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
-            return <path key={ri} d={d} fill={hue} fillOpacity={0.12} stroke={hue} strokeOpacity={0.85}
+            return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.12 : 0} stroke={hue} strokeOpacity={0.85}
               strokeWidth={1.2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           })}
           <rect x={sg.bbox.minX} y={-sg.bbox.maxY} width={sg.bbox.maxX - sg.bbox.minX} height={sg.bbox.maxY - sg.bbox.minY}
@@ -543,7 +554,7 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
           {sg.masses.map((m, mi) => <g key={'m' + mi}>
             {m.rings.map((ring, ri) => {
               const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
-              return <path key={ri} d={d} fill={hue} fillOpacity={0.10} stroke={hue} strokeOpacity={0.6}
+              return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.10 : 0} stroke={hue} strokeOpacity={0.6}
                 strokeWidth={0.9} strokeDasharray="3 3" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             })}
             <circle cx={m.centreMM[0]} cy={-m.centreMM[1]} r={fs * 0.35} fill={hue} />
@@ -723,6 +734,11 @@ const CSS = `
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
 .gl-perf b.gl-slow{color:var(--fail)}
+.gl-legend{display:flex;flex-direction:column;gap:6px;font:11.5px var(--mono);color:var(--ink-2);line-height:1.4}
+.gl-legend div{display:flex;align-items:center;gap:8px}
+.gl-sw{flex:none;width:13px;height:13px;border-radius:50%;border:2px solid var(--ink-3);background:transparent}
+.gl-sw-main{border-color:var(--pass);background:var(--pass)}
+.gl-sw-dash{border-style:dashed;background:transparent!important}
 .gl-snap{font:600 12px var(--mono);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
 .gl-steps{display:flex;flex-wrap:wrap;gap:5px}
 .gl-steps button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:550 11px var(--sans);color:var(--ink-2);
