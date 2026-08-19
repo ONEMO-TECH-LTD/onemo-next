@@ -89,8 +89,10 @@ export interface GridResult {
   spotRadiusMM: number
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
-  /** The active centre-mode's target point(s) — drawn so the aim is visible. */
+  /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
   centresMM: Pt[]
+  /** THE centre that governed the winning layout — the main point of the centring system. */
+  centreMainMM: Pt
 }
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
@@ -120,6 +122,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
+  let mainCentre: Pt = centres[0]
   const mod = (v: number, m: number) => ((v % m) + m) % m
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search.
@@ -157,7 +160,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
         const score = registrationScore(seat.length, excess, balance)
-        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
+        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k; mainCentre = [tx, ty] }
       }
     }
   }
@@ -187,6 +190,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     spotRadiusMM: spotRadiusOf(pad),
     segments,
     centresMM: centres,
+    centreMainMM: mainCentre,
   }
 }
 

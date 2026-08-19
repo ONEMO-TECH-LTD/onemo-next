@@ -516,7 +516,7 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
             pattern origin is shifted half a tile so dots land on the corners unclipped. */}
         <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
           patternUnits="userSpaceOnUse" x={Afy[0] - DEFAULT_PITCH_MM / 8} y={Afy[1] - DEFAULT_PITCH_MM / 8}>
-          <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.5} fill="var(--ink)" fillOpacity={0.12} />
+          <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.05} fill="var(--ink)" fillOpacity={0.35} />
         </pattern>
       </defs>
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
@@ -531,7 +531,6 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
       {segments.map((sg, si) => {
         const hue = SEG_HUES[si % SEG_HUES.length]
         const fs = 11 * spanMM / VP
-        const [gx, gy] = [sg.centreMM[0], -sg.centreMM[1]]
         return <g key={'sg' + si} style={{ pointerEvents: 'none' }}>
           {sg.rings.map((ring, ri) => {
             const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
@@ -549,18 +548,28 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
             })}
             <circle cx={m.centreMM[0]} cy={-m.centreMM[1]} r={fs * 0.35} fill={hue} />
           </g>)}
-          <path d={`M ${gx - fs} ${gy} H ${gx + fs} M ${gx} ${gy - fs} V ${gy + fs}`}
-            stroke={hue} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
-          <text x={gx + fs * 0.8} y={gy - fs * 0.8} fontSize={fs} fill={hue} fontFamily="var(--mono)" fontWeight={700}>
+          <text x={sg.bbox.minX} y={-sg.bbox.maxY - fs * 0.5} fontSize={fs} fill={hue} fontFamily="var(--mono)" fontWeight={700}>
             S{si + 1} · {Math.round(sg.areaMM2)} mm² · {sg.masses.length}◆
           </text>
         </g>
       })}
-      {/* The active centre-mode's target(s): a small bullseye at each aimed point. */}
-      {grid.centresMM.map((c, ci) => <g key={'c' + ci} style={{ pointerEvents: 'none' }}>
-        <circle cx={c[0]} cy={-c[1]} r={2.6} fill="none" stroke="var(--accent)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
-        <circle cx={c[0]} cy={-c[1]} r={0.7} fill="var(--accent)" />
-      </g>)}
+      {/* Centring targets. Secondary candidates: small bullseyes in their island's colour.
+          THE MAIN CENTRE — the one that governed the winning layout — draws green on top. */}
+      {grid.centresMM.map((c, ci) => {
+        const isMain = c[0] === grid.centreMainMM[0] && c[1] === grid.centreMainMM[1]
+        if (isMain) return null
+        const si = segments.findIndex((sg) =>
+          c[0] >= sg.bbox.minX && c[0] <= sg.bbox.maxX && c[1] >= sg.bbox.minY && c[1] <= sg.bbox.maxY)
+        const hue = si >= 0 ? SEG_HUES[si % SEG_HUES.length] : 'var(--accent)'
+        return <g key={'c' + ci} style={{ pointerEvents: 'none' }}>
+          <circle cx={c[0]} cy={-c[1]} r={2} fill="none" stroke={hue} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          <circle cx={c[0]} cy={-c[1]} r={0.5} fill={hue} />
+        </g>
+      })}
+      <g style={{ pointerEvents: 'none' }}>
+        <circle cx={grid.centreMainMM[0]} cy={-grid.centreMainMM[1]} r={3.2} fill="none" stroke="var(--pass)" strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+        <circle cx={grid.centreMainMM[0]} cy={-grid.centreMainMM[1]} r={0.8} fill="var(--pass)" />
+      </g>
       {/* Faint bounding box, its dimension written on every side. */}
       {box && <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink)"
         strokeOpacity={0.22} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
