@@ -200,6 +200,32 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
     return [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t]
   }
 
+  /** Pull a ring point onto the exact offset curve (Newton on the signed field), so drawn
+   *  outlines follow the true edge offset instead of the mesh's facets. */
+  const snapToIso = (p: Pt, thr: number): Pt => {
+    let q = p
+    for (let it = 0; it < 2; it++) {
+      const s = signed(q) - thr
+      if (Math.abs(s) < 0.02) break
+      const e = 0.5
+      const gx = (signed([q[0] + e, q[1]]) - signed([q[0] - e, q[1]])) / (2 * e)
+      const gy = (signed([q[0], q[1] + e]) - signed([q[0], q[1] - e])) / (2 * e)
+      const g2 = gx * gx + gy * gy
+      if (g2 < 1e-9) break
+      q = [q[0] - s * gx / g2, q[1] - s * gy / g2]
+    }
+    return q
+  }
+  /** One midpoint per edge, then every point snapped to the exact curve. */
+  const smoothLoop = (loop: Pt[], thr: number): Pt[] => {
+    const dense: Pt[] = []
+    for (let i = 0; i < loop.length; i++) {
+      const a = loop[i], b = loop[(i + 1) % loop.length]
+      dense.push(a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])
+    }
+    return dense.map((p) => snapToIso(p, thr))
+  }
+
   interface LevelItem { areaMM2: number; centreMM: Pt; bbox: BBox; rings: Pt[][]; deepIdx: number }
   /** Regions of S ≥ thr: connectivity, deepest point, bbox and traced outlines. */
   const level = (thr: number): { comp: Int32Array; items: LevelItem[] } => {
@@ -291,7 +317,7 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
     const ringsByComp: Pt[][][] = accs.map(() => [])
     for (const loop of loops) {
       const id = compAt(loop[0])
-      if (id >= 0) ringsByComp[id].push(loop)
+      if (id >= 0) ringsByComp[id].push(smoothLoop(loop, thr))
     }
     const at = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
     return {
