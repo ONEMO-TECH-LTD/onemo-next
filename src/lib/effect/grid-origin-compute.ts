@@ -52,21 +52,121 @@ export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
   return latticeAt(region, pitch, phase[0], phase[1])
 }
 
-/** Float distance from a point to the outline's nearest edge — the prescreen metric. */
-function edgeDistMM(outer: ReadonlyArray<Pt>, pt: Pt): number {
-  let min = Infinity
-  const [px, py] = pt
+/**
+ * Bucketed edge index — accelerates nearest-edge distance and ray parity. Results are
+ * BIT-IDENTICAL to the full scans: every edge that could be nearest is examined with the same
+ * arithmetic, and edges a query skips contribute no ray crossing by construction. Built once
+ * per outline array (WeakMap) — a solve reuses it across its thousands of queries.
+ */
+interface EdgeIdx {
+  cell: number; ox: number; oy: number; cols: number; rows: number
+  buckets: number[][]
+  yBands: number[][]
+  /** Chebyshev ring distance from each cell to the nearest edge-holding cell (BFS). */
+  ring: Int16Array
+  stamp: Int32Array
+  tick: number
+}
+const EDGE_IDX = new WeakMap<object, EdgeIdx>()
+function edgeIdxOf(outer: ReadonlyArray<Pt>): EdgeIdx {
+  let idx = EDGE_IDX.get(outer as object)
+  if (idx) return idx
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of outer) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
+  const cell = Math.max(4, Math.max(maxX - minX, maxY - minY) / 32)
+  const cols = Math.max(1, Math.ceil((maxX - minX) / cell) + 1)
+  const rows = Math.max(1, Math.ceil((maxY - minY) / cell) + 1)
+  const buckets: number[][] = Array.from({ length: cols * rows }, () => [])
+  const yBands: number[][] = Array.from({ length: rows }, () => [])
   for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
     const [ax, ay] = outer[j], [bx, by] = outer[i]
-    const dx = bx - ax, dy = by - ay
-    const len2 = dx * dx + dy * dy
-    let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0
-    if (t < 0) t = 0; else if (t > 1) t = 1
-    const ex = px - (ax + t * dx), ey = py - (ay + t * dy)
-    const d2 = ex * ex + ey * ey
-    if (d2 < min) min = d2
+    const c0 = Math.max(0, Math.min(cols - 1, Math.floor((Math.min(ax, bx) - minX) / cell)))
+    const c1 = Math.max(0, Math.min(cols - 1, Math.floor((Math.max(ax, bx) - minX) / cell)))
+    const r0 = Math.max(0, Math.min(rows - 1, Math.floor((Math.min(ay, by) - minY) / cell)))
+    const r1 = Math.max(0, Math.min(rows - 1, Math.floor((Math.max(ay, by) - minY) / cell)))
+    for (let r = r0; r <= r1; r++) { for (let c = c0; c <= c1; c++) buckets[r * cols + c].push(i); yBands[r].push(i) }
   }
-  return Math.sqrt(min)
+  // dedupe band lists (an edge may span several columns of the same row)
+  for (let r = 0; r < rows; r++) yBands[r] = [...new Set(yBands[r])]
+  // Ring field: multi-source BFS from edge cells — a deep query starts its scan at the ring
+  // that can actually hold the nearest edge instead of expanding through empty space.
+  const ring = new Int16Array(cols * rows).fill(-1)
+  let frontier: number[] = []
+  for (let i = 0; i < cols * rows; i++) if (buckets[i].length) { ring[i] = 0; frontier.push(i) }
+  for (let d = 1; frontier.length; d++) {
+    const next: number[] = []
+    for (const cellIdx of frontier) {
+      const cr0 = Math.floor(cellIdx / cols), cc0 = cellIdx % cols
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const rr = cr0 + dr, c = cc0 + dc
+        if (rr < 0 || rr >= rows || c < 0 || c >= cols) continue
+        const k = rr * cols + c
+        if (ring[k] === -1) { ring[k] = d; next.push(k) }
+      }
+    }
+    frontier = next
+  }
+  idx = { cell, ox: minX, oy: minY, cols, rows, buckets, yBands, ring, stamp: new Int32Array(outer.length), tick: 0 }
+  EDGE_IDX.set(outer as object, idx)
+  return idx
+}
+
+function segDist2(outer: ReadonlyArray<Pt>, i: number, px: number, py: number): number {
+  const j = i === 0 ? outer.length - 1 : i - 1
+  const [ax, ay] = outer[j], [bx, by] = outer[i]
+  const dx = bx - ax, dy = by - ay
+  const len2 = dx * dx + dy * dy
+  let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0
+  if (t < 0) t = 0; else if (t > 1) t = 1
+  const ex = px - (ax + t * dx), ey = py - (ay + t * dy)
+  return ex * ex + ey * ey
+}
+
+/** Float distance from a point to the outline's nearest edge — the prescreen metric. */
+function edgeDistMM(outer: ReadonlyArray<Pt>, pt: Pt): number {
+  const idx = edgeIdxOf(outer)
+  const [px, py] = pt
+  const cc = Math.max(0, Math.min(idx.cols - 1, Math.floor((px - idx.ox) / idx.cell)))
+  const cr = Math.max(0, Math.min(idx.rows - 1, Math.floor((py - idx.oy) / idx.cell)))
+  const tick = ++idx.tick
+  let best = Infinity
+  const maxR = Math.max(idx.cols, idx.rows)
+  const r0 = Math.max(0, idx.ring[cr * idx.cols + cc] - 1)
+  for (let r = r0; ; r++) {
+    // Once every unexamined edge is provably farther than the best, stop.
+    if (r > r0) { const lb = (r - 1) * idx.cell; if (lb * lb > best || r > maxR + r0) break }
+    for (let dr = -r; dr <= r; dr++) {
+      const rr = cr + dr
+      if (rr < 0 || rr >= idx.rows) continue
+      for (let dc = -r; dc <= r; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== r) continue
+        const c = cc + dc
+        if (c < 0 || c >= idx.cols) continue
+        for (const e of idx.buckets[rr * idx.cols + c]) {
+          if (idx.stamp[e] === tick) continue
+          idx.stamp[e] = tick
+          const d2 = segDist2(outer, e, px, py)
+          if (d2 < best) best = d2
+        }
+      }
+    }
+  }
+  return Math.sqrt(best)
+}
+
+/** Even-odd ray parity via the y-band index — identical crossings to the full scan. */
+function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
+  const idx = edgeIdxOf(outer)
+  const band = Math.max(0, Math.min(idx.rows - 1, Math.floor((pt[1] - idx.oy) / idx.cell)))
+  let inside = false
+  for (const i of idx.yBands[band]) {
+    const j = i === 0 ? outer.length - 1 : i - 1
+    const [xi, yi] = outer[i]
+    const [xj, yj] = outer[j]
+    const crosses = (yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi
+    if (crosses) inside = !inside
+  }
+  return inside
 }
 
 /**
@@ -86,8 +186,14 @@ export function makeSeatPredicate(
   try { prep = prepare(outer, QUANTUM) } catch { return null }
   const rQ = Math.round(spotRadiusMM / QUANTUM)
   return (pt: Pt) => {
+    // Ring-field lower bound: a point provably farther than the threshold from every edge
+    // skips the distance query entirely — parity alone decides. Same answer, no scan.
+    const idx = edgeIdxOf(outer)
+    const cc = Math.max(0, Math.min(idx.cols - 1, Math.floor((pt[0] - idx.ox) / idx.cell)))
+    const cr = Math.max(0, Math.min(idx.rows - 1, Math.floor((pt[1] - idx.oy) / idx.cell)))
+    if ((idx.ring[cr * idx.cols + cc] - 1) * idx.cell > spotRadiusMM + GUARD) return pointInOuter(pt, outer)
     const d = edgeDistMM(outer, pt)
-    if (d > spotRadiusMM + GUARD) return pointInPolygon(pt, outer as Pt[])
+    if (d > spotRadiusMM + GUARD) return pointInOuter(pt, outer)
     if (d < spotRadiusMM - GUARD) return false
     return holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
   }
@@ -123,39 +229,53 @@ function distToSeg(v: Pt, a: Pt, b: Pt): number {
 
 /** THE FLAP LAW (spec: "how far material may extend past a spot's edge"): material is held
  *  near a magnet's spot, or along the SPAN between two lattice-adjacent seated magnets —
- *  never over empty cells an L or diagonal layout happens to box in. Excess = how far a
- *  point sits past the nearest disk or adjacent-pair span at `reach`. */
-function heldExcess(v: Pt, seated: ReadonlyArray<Pt>, spans: ReadonlyArray<[Pt, Pt]>, reach: number): number {
-  let nd = Infinity
-  for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d; if (nd <= reach) return 0 }
-  for (const [a, b] of spans) { const d = distToSeg(v, a, b); if (d < nd) nd = d; if (nd <= reach) return 0 }
-  return nd - reach
+ *  never over empty cells an L or diagonal layout happens to box in. Seats always lie on the
+ *  pitch lattice, so the nearest disk/span is found by an expanding ring walk over a seat
+ *  hash — exact minimum, a handful of cells per query instead of every seat. */
+interface SeatGrid { set: Map<number, Pt>; x0: number; y0: number; pitch: number }
+function seatGridOf(seated: ReadonlyArray<Pt>, pitchMM: number): SeatGrid {
+  const x0 = seated[0][0], y0 = seated[0][1]
+  const set = new Map<number, Pt>()
+  for (const s of seated) set.set(Math.round((s[0] - x0) / pitchMM) * 65536 + Math.round((s[1] - y0) / pitchMM), s)
+  return { set, x0, y0, pitch: pitchMM }
 }
-
-/** The spans between lattice-adjacent seated magnets (exactly one pitch apart on one axis). */
-function heldSpans(seated: ReadonlyArray<Pt>, pitchMM: number): Array<[Pt, Pt]> {
-  const spans: Array<[Pt, Pt]> = []
-  for (let i = 0; i < seated.length; i++) for (let j = i + 1; j < seated.length; j++) {
-    const dx = Math.abs(seated[i][0] - seated[j][0]), dy = Math.abs(seated[i][1] - seated[j][1])
-    if ((dx < 0.6 && Math.abs(dy - pitchMM) < 0.6) || (dy < 0.6 && Math.abs(dx - pitchMM) < 0.6)) spans.push([seated[i], seated[j]])
+function heldExcess(v: Pt, g: SeatGrid, reach: number): number {
+  const ci = Math.round((v[0] - g.x0) / g.pitch), cj = Math.round((v[1] - g.y0) / g.pitch)
+  let nd = Infinity
+  for (let r = 0; r <= 64; r++) {
+    // Every yet-unseen disk or span lies at least (r-1)·pitch away — spans are evaluated from
+    // their lower/left seat, so anything anchored in earlier rings is already measured.
+    if (r > 0 && (r - 1) * g.pitch >= nd) break
+    for (let di = -r; di <= r; di++) for (let dj = -r; dj <= r; dj++) {
+      if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue
+      const s = g.set.get((ci + di) * 65536 + (cj + dj))
+      if (!s) continue
+      const d = dist(v, s)
+      if (d < nd) nd = d
+      const rx = g.set.get((ci + di + 1) * 65536 + (cj + dj))
+      if (rx) { const ds = distToSeg(v, s, rx); if (ds < nd) nd = ds }
+      const uy = g.set.get((ci + di) * 65536 + (cj + dj + 1))
+      if (uy) { const ds = distToSeg(v, s, uy); if (ds < nd) nd = ds }
+      if (nd <= reach) return 0
+    }
   }
-  return spans
+  return Math.max(0, nd - reach)
 }
 
 /** Silhouette vertices past reach of every disk and span (flap-risk edge). */
 export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): Pt[] {
   if (!seated.length) return outer.slice()
-  const spans = heldSpans(seated, pitchMM)
-  return outer.filter((v) => heldExcess(v, seated, spans, reach) > 0)
+  const g = seatGridOf(seated, pitchMM)
+  return outer.filter((v) => heldExcess(v, g, reach) > 0)
 }
 
 /** Mean distance silhouette vertices sit past reach, mm. 0 = held within the allowance.
  *  Graded, so a placement leaving less material loose scores better. */
 export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): number {
   if (!outer.length || !seated.length) return 0
-  const spans = heldSpans(seated, pitchMM)
+  const g = seatGridOf(seated, pitchMM)
   let sum = 0
-  for (const v of outer) sum += heldExcess(v, seated, spans, reach)
+  for (const v of outer) sum += heldExcess(v, g, reach)
   return sum / outer.length
 }
 
@@ -227,7 +347,7 @@ export function safeSegments(
   const r = spotRadiusMM
   const signed = (p: Pt): number => {
     const d = edgeDistMM(ring, p)
-    return pointInPolygon(p, ring as Pt[]) ? d - r : -(d + r)
+    return pointInOuter(p, ring) ? d - r : -(d + r)
   }
   const step = 2 // mesh grain, mm
   const bb = bbox(ring)

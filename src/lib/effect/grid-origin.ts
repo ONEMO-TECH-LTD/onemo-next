@@ -14,6 +14,7 @@ import {
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
   POSITIONING,
+  VOTING_ORDER,
 } from './grid-origin-spec'
 import {
   bbox,
@@ -202,10 +203,42 @@ const mod = (v: number, m: number) => ((v % m) + m) % m
       for (let i = 1; i < bases.length; i++) push(mod(bases[i], pitch), 0)
       return out
     }
+    // TWO-PASS SWEEP — same winner, a fraction of the work. Seat count sits on the top
+    // dominance tier for every voting order that begins with magnets, so a slide below the
+    // maximum count can never win: pass 1 counts seats per slide (cheap); pass 2 runs the
+    // full scoring ONLY over the max-count slides, in the same iteration order, so winner
+    // and tie-breaks are identical to the single-pass sweep. Orders that put another force
+    // on top take the exact single-pass road instead.
+    const pyList = phases(centres.map((a) => a[1] - bb.minY))
+    const pxList = phases(centres.map((a) => a[0] - bb.minX))
+    const seatsFirst = (cfg.votingOrder ?? VOTING_ORDER) === 0 || cfg.votingOrder === 1
+    // Legality memo — every grid point is judged once; pass 2 re-reads, never re-measures.
+    const memo = new Map<number, boolean>()
+    const fitsM = (p: Pt): boolean => {
+      const k = Math.round((p[0] - bb.minX) * 8) * 262144 + Math.round((p[1] - bb.minY) * 8)
+      const hit = memo.get(k)
+      if (hit !== undefined) return hit
+      const v = fits(p)
+      memo.set(k, v)
+      return v
+    }
+    let maxCount = 0
+    const counts = seatsFirst ? new Int32Array(pyList.length * pxList.length) : null
+    if (counts) {
+      for (let yi = 0; yi < pyList.length; yi++) for (let xi = 0; xi < pxList.length; xi++) {
+        let n = 0
+        for (const p of latticeAt(bb, pitch, pxList[xi].p, pyList[yi].p)) if (fitsM(p)) n++
+        counts[yi * pxList.length + xi] = n
+        if (n > maxCount) maxCount = n
+      }
+    }
     let bestScore = -Infinity
-    for (const py of phases(centres.map((a) => a[1] - bb.minY))) {
-      for (const px of phases(centres.map((a) => a[0] - bb.minX))) {
-        const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
+    for (let yi = 0; yi < pyList.length; yi++) {
+      const py = pyList[yi]
+      for (let xi = 0; xi < pxList.length; xi++) {
+        if (counts && counts[yi * pxList.length + xi] !== maxCount) continue
+        const px = pxList[xi]
+        const seat = latticeAt(bb, pitch, px.p, py.p).filter(fitsM)
         if (!seat.length) continue
         const excess = flapExcessMM(outer, seat, reach, pitch)
         // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
@@ -322,15 +355,16 @@ export function fitSizeInBand(
  */
 export function autoFlapInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number, maxFlapMM: number,
+  cacheFor?: (flapMM: number) => Map<number, GridResult> | undefined,
 ): { flapMM: number; fit: ReturnType<typeof fitSizeInBand> } {
   const cap = Math.max(0, maxFlapMM)
   let last: ReturnType<typeof fitSizeInBand> | null = null
   for (let f = 0; f <= cap; f += AUTO_FLAP_STEP_MM) {
-    last = fitSizeInBand(sized, { ...cfg, flapMM: f, solveCache: undefined }, fromMM, stepMM)
+    last = fitSizeInBand(sized, { ...cfg, flapMM: f, solveCache: cacheFor?.(f) }, fromMM, stepMM)
     if (last.ladder.length) return { flapMM: f, fit: last }
   }
   if (cap % AUTO_FLAP_STEP_MM !== 0) {
-    const fit = fitSizeInBand(sized, { ...cfg, flapMM: cap, solveCache: undefined }, fromMM, stepMM)
+    const fit = fitSizeInBand(sized, { ...cfg, flapMM: cap, solveCache: cacheFor?.(cap) }, fromMM, stepMM)
     if (fit.ladder.length) return { flapMM: cap, fit }
     last = fit
   }
