@@ -6,8 +6,6 @@ import {
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
   FLAP_MM,
-  MAGNET_DIA_LARGE_MM,
-  MAGNET_DIA_SMALL_MM,
   MASS_DEPTH_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
@@ -34,7 +32,6 @@ import {
   centeringRef,
   isHolding,
   registrationScore,
-  verdictIssues,
   type Anchor,
   type CentreMode,
   type MagnetPlan,
@@ -73,12 +70,9 @@ export interface GridConfig {
 
 export interface GridResult {
   anchors: Anchor[]
-  /** Silhouette vertices with no magnet within reach. */
+  /** Silhouette vertices with no magnet within reach — the band gate's evidence. */
   flaps: Pt[]
-  ok: boolean
-  issues: string[]
   pitchCentreMM: number
-  edgeRangeMM: [number, number]
   /** Every lattice position at the chosen phase, seated or not. */
   lattice: Pt[]
   /** The phase the search chose, mm. */
@@ -171,19 +165,11 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const anchors = assignSizes(coverage.seated, plan)
 
   const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
-  const issues = verdictIssues(!fits, coverage.seated.length, flaps.length, pad)
-
-  let minD: number = MAGNET_DIA_LARGE_MM, maxD: number = MAGNET_DIA_SMALL_MM
-  for (const a of anchors) { if (a.dia < minD) minD = a.dia; if (a.dia > maxD) maxD = a.dia }
-  if (anchors.length === 0) { minD = MAGNET_DIA_SMALL_MM; maxD = MAGNET_DIA_SMALL_MM }
 
   return {
     anchors,
     flaps,
-    ok: issues.length === 0,
-    issues,
     pitchCentreMM: pitch,
-    edgeRangeMM: [pitch + minD, pitch + maxD],
     lattice,
     phaseMM: [bestOx, bestOy],
     panMM: [bestKx, bestKy],
@@ -236,7 +222,7 @@ export function bandSnapPoints(
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; points: BandSnapPoint[]; ladder: BandSnapPoint[]; pickIdx: number } {
+): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const points = bandSnapPoints(sized, cfg, fromMM, stepMM)
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
@@ -244,7 +230,7 @@ export function fitSizeInBand(
     const ladder = points.filter((p) => !seen.has(p.sig) && (seen.add(p.sig), true))
     const pickSig = points.find((p) => p.count === maxCount)!.sig
     const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
-    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), points, ladder, pickIdx }
+    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
   }
   // Nothing in the band holds: best-seated rung as a fallback.
   const [lo, hi] = snapRange(cfg, fromMM)
@@ -254,5 +240,5 @@ export function fitSizeInBand(
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
   const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, points, ladder: [], pickIdx: 0 }
+  return { ...pick, ladder: [], pickIdx: 0 }
 }

@@ -256,7 +256,7 @@ export default function GridLab() {
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
-              onZoom={(f) => setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))}
+              onZoom={(f) => { if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f))) }}
               onReset={() => setManual(null)} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
@@ -548,9 +548,6 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
             })}
             <circle cx={m.centreMM[0]} cy={-m.centreMM[1]} r={fs * 0.35} fill={hue} />
           </g>)}
-          <text x={sg.bbox.minX} y={-sg.bbox.maxY - fs * 0.5} fontSize={fs} fill={hue} fontFamily="var(--mono)" fontWeight={700}>
-            S{si + 1} · {Math.round(sg.areaMM2)} mm² · {sg.masses.length}◆
-          </text>
         </g>
       })}
       {/* Centring targets. Secondary candidates: small bullseyes in their island's colour.

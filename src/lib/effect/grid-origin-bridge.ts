@@ -8,13 +8,11 @@ import { scaleContour } from './grid-origin-compute'
 import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 import {
-  computeGrid,
   fieldSpanMM,
   latticeOver,
   MIN_EFFECT_MM,
   SIZE_CEIL_MARGIN_MM,
   type GridResult,
-  type MagnetPlan,
 } from './grid-origin'
 
 /** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
@@ -101,5 +99,3 @@ export function seatedSpots(grid: GridResult): FieldSpot[] {
   return grid.anchors.map((a) => ({ x: a.p[0], y: a.p[1], r: grid.spotRadiusMM, held: true }))
 }
 
-export { computeGrid }
-export type { GridResult, MagnetPlan }
