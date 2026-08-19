@@ -3,6 +3,7 @@
 
 import type { Contour, Pt } from './types'
 import {
+  BANDS,
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
   FLAP_MM,
@@ -142,21 +143,34 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
   } else if (fits && positioning === 1) {
-    // CENTRE RULES — no voting. The grid locks onto the ruling centre by parity: a node ON it,
-    // or the gap ON it, per axis — four candidates total. Seats pick among the four; coverage
-    // breaks ties. Centring is exact by construction, so balance is not scored at all.
+    // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
+    // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
+    // even count puts the GAP on it — so a 108x91 (class 2x2) shape is judged as a 2x2 frame
+    // whose centre IS the governed centre. Magnets still govern first: a parity seating more
+    // wins; at EQUAL seats the canonical frame parity always beats the rest, and coverage
+    // only sorts the non-canonical remainder. Centring is exact by construction.
     const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
     const half = pitch / 2
-    let bestScore = -Infinity
-    for (const py of [byc, byc + half]) {
-      for (const px of [bxc, bxc + half]) {
-        const ox = mod(px, pitch), oy = mod(py, pitch)
-        const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
-        if (!seat.length) continue
-        const excess = flapExcessMM(outer, seat, reach)
-        const score = registrationScore(seat.length, excess, 0)
-        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = ox; bestOy = oy }
-      }
+    const clsOf = (side: number) => bandOf(side)?.id ?? BANDS[BANDS.length - 1].id
+    const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
+    const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
+    const otherX = canX === bxc ? bxc + half : bxc
+    const otherY = canY === byc ? byc + half : byc
+    // canon = how many axes carry their class-derived parity (2 = the full canonical frame).
+    const cands: Array<[number, number, number]> = [
+      [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
+    ]
+    let best: { seats: number; canon: number; excess: number } | null = null
+    for (const [px, py, canon] of cands) {
+      const ox = mod(px, pitch), oy = mod(py, pitch)
+      const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
+      if (!seat.length) continue
+      const excess = flapExcessMM(outer, seat, reach)
+      const wins = !best
+        || seat.length > best.seats
+        || (seat.length === best.seats && canon > best.canon)
+        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
+      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
     }
     mainCentre = ruleTarget
   } else if (fits) {
