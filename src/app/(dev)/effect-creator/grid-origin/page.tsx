@@ -14,7 +14,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
 import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
+import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
@@ -29,7 +29,7 @@ const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, st
   { k: 'pinwheel', label: 'Pinwheel', p1: ['Swirl', '%'], p2: ['Blades', ''], p2min: 3, p2max: 8, p2start: 5 },
 ]
 
-type Src = 'preset' | 'gen' | 'magic'
+type Src = 'preset' | 'gen' | 'magic' | 'cut'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
 
 /** Admin dial that survives reloads — browser-stored, initialized from the spec default. */
@@ -133,26 +133,55 @@ export default function GridLab() {
     const f = e.target.files?.[0]; if (f) cutFile(f)
   }
 
-  /** Test library — Dan's _WIP/v3.5/asset-lib, served by the bench's own route. */
-  const [lib, setLib] = useState<string[]>([])
+  /** Test libraries — raw images (go through the AI cut) and finished cutouts (traced directly). */
+  const [libRaw, setLibRaw] = useState<string[]>([])
+  const [libCut, setLibCut] = useState<string[]>([])
   const [libSel, setLibSel] = useState('')
+  const [cutSel, setCutSel] = useState('')
+  const [cutC, setCutC] = useState<Contour | null>(null)
+  const [cutStatus, setCutStatus] = useState('')
   useEffect(() => {
-    fetch('/effect-creator/grid-origin/asset-lib').then((r) => r.json()).then((f) => Array.isArray(f) && setLib(f)).catch(() => { })
+    fetch('/effect-creator/grid-origin/asset-lib?dir=raw').then((r) => r.json()).then((f) => Array.isArray(f) && setLibRaw(f)).catch(() => { })
+    fetch('/effect-creator/grid-origin/asset-lib?dir=cut').then((r) => r.json()).then((f) => Array.isArray(f) && setLibCut(f)).catch(() => { })
   }, [])
   async function loadLib(name: string) {
     setSrc('magic'); setMagStatus('cutting')
     try {
-      const res = await fetch('/effect-creator/grid-origin/asset-lib/' + encodeURIComponent(name))
+      const res = await fetch('/effect-creator/grid-origin/asset-lib/' + encodeURIComponent(name) + '?dir=raw')
       if (!res.ok) throw new Error('not found')
       const blob = await res.blob()
       cutFile(new File([blob], name, { type: blob.type || 'image/png' }))
     } catch { setMagStatus('error:could not load the library image') }
+  }
+  /** Cutout path: no AI — decode (browser IO), hand the alpha mask to the bridge to trace. */
+  async function loadCut(name: string) {
+    setSrc('cut'); setCutStatus('tracing')
+    const t0 = performance.now()
+    try {
+      const res = await fetch('/effect-creator/grid-origin/asset-lib/' + encodeURIComponent(name) + '?dir=cut')
+      if (!res.ok) throw new Error('not found')
+      const bmp = await createImageBitmap(await res.blob())
+      const cnv = document.createElement('canvas')
+      cnv.width = bmp.width; cnv.height = bmp.height
+      const ctx = cnv.getContext('2d', { willReadFrequently: true })
+      if (!ctx) throw new Error('no canvas')
+      ctx.drawImage(bmp, 0, 0)
+      bmp.close()
+      const data = ctx.getImageData(0, 0, cnv.width, cnv.height).data
+      const mask = new Uint8Array(cnv.width * cnv.height)
+      for (let i = 0; i < mask.length; i++) if (data[i * 4 + 3] > 128) mask[i] = 1
+      const c = normMaskContour(mask, cnv.width, cnv.height)
+      genMsRef.current = performance.now() - t0
+      if (!c) throw new Error('no outline in this image')
+      setCutC(c); setCutStatus('')
+    } catch (err) { setCutC(null); setCutStatus('error:' + ((err as Error)?.message ?? 'trace failed')) }
   }
 
   // base contour normalized so longest side = 1mm (scale-free) — cheap, main thread.
   const base = useMemo<Contour | null>(() => {
     const t0 = performance.now()
     try {
+      if (src === 'cut') return cutC
       if (src === 'magic') {
         if (!magic) return null
         return normBaseContour(magic.vshape, magic.maskH)
@@ -168,7 +197,7 @@ export default function GridLab() {
       return normGeneratedRing(ring, IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
     finally { genMsRef.current = performance.now() - t0 }
-  }, [src, preset, gen, p1, p2, sides, points, magic])
+  }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[] }
@@ -229,7 +258,9 @@ export default function GridLab() {
               onReset={() => setManual(null)} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
-                : <Empty text="shape unavailable" />}
+                : src === 'cut'
+                  ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
+                  : <Empty text="shape unavailable" />}
           </div>
         </section>
 
@@ -239,6 +270,7 @@ export default function GridLab() {
               <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
               <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
               <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
+              <button aria-pressed={src === 'cut'} onClick={() => setSrc('cut')}>Cutouts</button>
             </div>
 
             {src === 'preset' && <>
@@ -259,11 +291,26 @@ export default function GridLab() {
               <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
             </>}
 
+            {src === 'cut' && <>
+              <label className="gl-field"><span>Cutout library · no AI, traced directly</span>
+                <select value={cutSel} onChange={(e) => { setCutSel(e.target.value); if (e.target.value) loadCut(e.target.value) }}>
+                  <option value="">— pick a cutout —</option>
+                  {libCut.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
+                </select>
+              </label>
+              <div className="gl-magic-note">
+                {cutStatus.startsWith('error') ? '⚠ ' + cutStatus.slice(6)
+                  : cutStatus === 'tracing' ? 'tracing the outline…'
+                    : cutC ? 'outline traced from the alpha edge · edit size below'
+                      : 'finished cutouts — the outline is the image’s own edge, no AI pass.'}
+              </div>
+            </>}
+
             {src === 'magic' && <>
-              {lib.length > 0 && <label className="gl-field"><span>Test library</span>
+              {libRaw.length > 0 && <label className="gl-field"><span>Raw library · goes through the AI cut</span>
                 <select value={libSel} onChange={(e) => { setLibSel(e.target.value); if (e.target.value) loadLib(e.target.value) }}>
                   <option value="">— pick an image —</option>
-                  {lib.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
+                  {libRaw.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
                 </select>
               </label>}
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />

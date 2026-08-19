@@ -92,7 +92,7 @@ describe('2 — traffic is one-way', () => {
     'grid-origin-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-origin-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/],
     'grid-origin-logic.ts': [/^\.\/types$/, /^\.\/grid-origin-spec$/, /^\.\/grid-origin-compute$/],
     'grid-origin.ts': [/^\.\/types$/, /^\.\/grid-origin-spec$/, /^\.\/grid-origin-compute$/, /^\.\/grid-origin-logic$/],
-    'grid-origin-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/offset$/, /^\.\/grid-origin$/, /^\.\/grid-origin-compute$/, /^@\/lib\/vector-core$/],
+    'grid-origin-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-origin$/, /^\.\/grid-origin-compute$/, /^@\/lib\/vector-core$/],
   }
 
   it('every module file imports only from its allow-list', () => {

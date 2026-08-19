@@ -2,6 +2,7 @@
 // Wiring only — values from spec, geometry from compute, answers from the engine.
 
 import { contourFromShape } from './geometry-truth'
+import { traceContourRaw } from './contour'
 import { insetRingMM } from './offset'
 import { scaleContour } from './grid-origin-compute'
 import { flattenShape, type VShape } from '@/lib/vector-core'
@@ -44,6 +45,17 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
     const o = insetRingMM(c.outer.pts, offsetMM, 'round')
     return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
   }
+}
+
+/** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour
+ *  normalized to longest side = 1mm, y-up. No AI — the outline IS the mask's edge. */
+export function normMaskContour(mask: Uint8Array, w: number, h: number): Contour | null {
+  const ring = traceContourRaw(mask, w, h)
+  if (!ring || ring.length < 3) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of ring) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
+  const L = Math.max(maxX - minX, maxY - minY, 1)
+  return { outer: { pts: ring.map(([x, y]) => [(x - minX) / L, (maxY - y) / L] as Pt) }, holes: [] }
 }
 
 /** Generated polygon ring (image px, y-down) → mm contour normalized to 1mm, y-up. */
