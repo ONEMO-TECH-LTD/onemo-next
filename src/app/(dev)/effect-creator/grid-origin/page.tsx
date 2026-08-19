@@ -395,12 +395,21 @@ export default function GridLab() {
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
-                  <button key={pt.sizeMM + pt.sig} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
+                  <button key={pt.sizeMM} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
                     <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
                   </button>)}
               </div>}
               {(() => {
                 const b = BANDS.find((x) => x.id === mode)!
+                // Dan's law: the band slider SNAPS between the qualifying variants — sizes
+                // between rungs fail the selection law and are not stops. Continuous scale
+                // exists only in the fallback, where no variant qualifies to snap to.
+                if (model && model.ladder.length > 0) {
+                  return <Slider label={`Band variant · snaps between the ${model.ladder.length} that qualify`} unit="#"
+                    v={model.idx + 1}
+                    set={(n) => { setStepSel(Math.min(model.ladder.length, Math.max(1, n)) - 1); setBandScale(null) }}
+                    min={1} max={model.ladder.length} />
+                }
                 return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
                   v={Math.round(bandScale ?? (effSizeRef.current || b.minMM))}
                   set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}

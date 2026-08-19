@@ -54,7 +54,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const fit = walkFit
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, preferHolding: true })
       const contour = sized(eff)
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments } })
     } else {

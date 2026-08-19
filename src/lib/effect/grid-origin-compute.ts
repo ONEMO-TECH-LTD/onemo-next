@@ -108,30 +108,50 @@ export function makeCircleSeatPredicate(
   }
 }
 
-/** How far a point sits OUTSIDE the seated magnets' frame inflated by `reach` per side.
- *  THE FLAP LAW (spec: "how far material may extend past a spot's edge · 0 = edge-to-edge"):
- *  material between magnets is held by the frame — flap is only the outline's excess past the
- *  frame plus the spot reach. At flap 0 the released tangent standards measure exactly 0. */
-function frameExcess(v: Pt, fb: BBox, reach: number): number {
-  const dx = Math.max(fb.minX - reach - v[0], v[0] - fb.maxX - reach, 0)
-  const dy = Math.max(fb.minY - reach - v[1], v[1] - fb.maxY - reach, 0)
-  return Math.hypot(dx, dy)
+/** Distance from a point to the segment ab. */
+function distToSeg(v: Pt, a: Pt, b: Pt): number {
+  const dx = b[0] - a[0], dy = b[1] - a[1]
+  const len2 = dx * dx + dy * dy
+  let t = len2 > 0 ? ((v[0] - a[0]) * dx + (v[1] - a[1]) * dy) / len2 : 0
+  t = Math.max(0, Math.min(1, t))
+  return Math.hypot(v[0] - a[0] - t * dx, v[1] - a[1] - t * dy)
 }
 
-/** Silhouette vertices past the frame's reach (flap-risk edge). */
-export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): Pt[] {
+/** THE FLAP LAW (spec: "how far material may extend past a spot's edge"): material is held
+ *  near a magnet's spot, or along the SPAN between two lattice-adjacent seated magnets —
+ *  never over empty cells an L or diagonal layout happens to box in. Excess = how far a
+ *  point sits past the nearest disk or adjacent-pair span at `reach`. */
+function heldExcess(v: Pt, seated: ReadonlyArray<Pt>, spans: ReadonlyArray<[Pt, Pt]>, reach: number): number {
+  let nd = Infinity
+  for (const a of seated) { const d = dist(v, a); if (d < nd) nd = d; if (nd <= reach) return 0 }
+  for (const [a, b] of spans) { const d = distToSeg(v, a, b); if (d < nd) nd = d; if (nd <= reach) return 0 }
+  return nd - reach
+}
+
+/** The spans between lattice-adjacent seated magnets (exactly one pitch apart on one axis). */
+function heldSpans(seated: ReadonlyArray<Pt>, pitchMM: number): Array<[Pt, Pt]> {
+  const spans: Array<[Pt, Pt]> = []
+  for (let i = 0; i < seated.length; i++) for (let j = i + 1; j < seated.length; j++) {
+    const dx = Math.abs(seated[i][0] - seated[j][0]), dy = Math.abs(seated[i][1] - seated[j][1])
+    if ((dx < 0.6 && Math.abs(dy - pitchMM) < 0.6) || (dy < 0.6 && Math.abs(dx - pitchMM) < 0.6)) spans.push([seated[i], seated[j]])
+  }
+  return spans
+}
+
+/** Silhouette vertices past reach of every disk and span (flap-risk edge). */
+export function flapVerts(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): Pt[] {
   if (!seated.length) return outer.slice()
-  const fb = bbox(seated)
-  return outer.filter((v) => frameExcess(v, fb, reach) > 0)
+  const spans = heldSpans(seated, pitchMM)
+  return outer.filter((v) => heldExcess(v, seated, spans, reach) > 0)
 }
 
-/** Mean distance silhouette vertices sit past the frame's reach, mm. 0 = held within the
- *  allowance. Graded, so a placement leaving less material past the frame scores better. */
-export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+/** Mean distance silhouette vertices sit past reach, mm. 0 = held within the allowance.
+ *  Graded, so a placement leaving less material loose scores better. */
+export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): number {
   if (!outer.length || !seated.length) return 0
-  const fb = bbox(seated)
+  const spans = heldSpans(seated, pitchMM)
   let sum = 0
-  for (const v of outer) sum += frameExcess(v, fb, reach)
+  for (const v of outer) sum += heldExcess(v, seated, spans, reach)
   return sum / outer.length
 }
 

@@ -174,7 +174,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
-      const excess = flapExcessMM(outer, seat, reach)
+      const excess = flapExcessMM(outer, seat, reach, pitch)
       const hold = cfg.preferHolding && excess === 0 ? 1 : 0
       const wins = !best
         || hold > best.hold
@@ -204,7 +204,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       for (const px of phases(centres.map((a) => a[0] - bb.minX))) {
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
-        const excess = flapExcessMM(outer, seat, reach)
+        const excess = flapExcessMM(outer, seat, reach, pitch)
         // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
         // containment against the mass's real outline; other modes → the mode's single centre.
         const ref = mode === 2 ? centeringRef(segments, seat, pointInMass, governor, midY) : null
@@ -226,7 +226,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
   const anchors = assignSizes(coverage.seated, plan)
 
-  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach) : []
+  const flaps: Pt[] = coverage.seated.length ? flapVerts(outer, coverage.seated, reach, pitch) : []
 
   return {
     anchors,
@@ -242,17 +242,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
-/** One holding size in a band: the size, the seat count, and the layout's identity. */
-export interface BandSnapPoint { sizeMM: number; count: number; sig: string }
-
-/** Layout identity: the magnets' relative arrangement plus the registration (pan) class. */
-function layoutSig(grid: GridResult): string {
-  if (!grid.anchors.length) return 'none'
-  const pts = grid.anchors.map((a) => a.p).slice().sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  let mx = Infinity, my = Infinity
-  for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
-  return pts.map((p) => Math.round(p[0] - mx) + ',' + Math.round(p[1] - my)).join('|') + '@' + grid.panMM.join(',')
-}
+/** One holding rung in a band: the size and its seat count. */
+export interface BandSnapPoint { sizeMM: number; count: number }
 
 /** The walk range: the band as a RANGE; above the last band, up to the derived field span. */
 function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
@@ -286,7 +277,7 @@ function bandWalk(
     let grid = cfg.solveCache?.get(mm)
     if (!grid) { grid = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, grid) }
     if (grid.anchors.length > bestSeats) { bestSeats = grid.anchors.length; bestSeatedMM = mm }
-    if (isHolding(grid.anchors.length, grid.flaps.length)) points.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
+    if (isHolding(grid.anchors.length, grid.flaps.length)) points.push({ sizeMM: mm, count: grid.anchors.length })
   }
   return { points, bestSeatedMM }
 }
@@ -302,12 +293,14 @@ export function fitSizeInBand(
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
   if (points.length) {
-    const maxCount = Math.max(...points.map((p) => p.count))
-    const seen = new Set<string>()
-    const ladder = points.filter((p) => !seen.has(p.sig) && (seen.add(p.sig), true))
-    const pickSig = points.find((p) => p.count === maxCount)!.sig
-    const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
-    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
+    // THE LADDER LAW (Dan): one rung per magnet COUNT, at the smallest size that wraps.
+    // The same count re-registered at bigger sizes is the same variant, not more options.
+    const seen = new Set<number>()
+    const ladder = points.filter((p) => !seen.has(p.count) && (seen.add(p.count), true))
+    const maxCount = Math.max(...ladder.map((p) => p.count))
+    const pickIdx = ladder.findIndex((p) => p.count === maxCount)
+    const dispCfg: GridConfig = { ...cfg, preferHolding: true }
+    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), dispCfg), ladder, pickIdx }
   }
   // Nothing in the band holds at this allowance: the walk's best-seated rung, solved full.
   return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), cfg), ladder: [], pickIdx: 0 }

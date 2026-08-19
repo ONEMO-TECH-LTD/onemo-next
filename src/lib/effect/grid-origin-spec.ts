@@ -81,7 +81,8 @@ export const MASS_DEPTH_CEIL_MM = 24
  *  1 centre rules (grid locked to the centre by parity; seats pick among 4 parity slides). */
 export const POSITIONING = 0
 
-/** Governor — which mass rules in Masses mode: 0 smallest · 1 deepest · 2 top (gravity). */
+/** Governor — which mass rules in Masses mode: 0 smallest · 1 deepest · 2 top (gravity) ·
+ *  3 top-small (upper-half smallest, else topmost). */
 export const GOVERNOR = 0
 
 /** Centre mode — which centre drives anchoring and balance. Test switch:
