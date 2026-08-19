@@ -84,6 +84,8 @@ export default function GridLab() {
   const [mode, setMode] = useState<number | 'free'>('free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
+  /** Manual scale inside the band's range; null = the ladder rules. */
+  const [bandScale, setBandScale] = useState<number | null>(null)
   /** Snap scan step — admin-tunable for testing; default from spec. */
   const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
@@ -244,14 +246,14 @@ export default function GridLab() {
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
-    // Manual calibration in a band: the walk is meaningless under a forced registration —
-    // solve the current size directly, exactly like free mode.
-    const manualBand = manual !== null && mode !== 'free'
+    // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
+    // solve that size directly, exactly like free mode, band chip stays active.
+    const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
     const id = ++seqRef.current
     const msg = {
       id, base, offsetMM, cfg,
       mode: manualBand ? 'free' : mode,
-      sizeMM: manualBand ? (effSizeRef.current || sizeMM) : sizeMM,
+      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
@@ -259,7 +261,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, manual, bandScale, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -288,9 +290,12 @@ export default function GridLab() {
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
-                // Pinch = manual scaling. In a band it hands over to Free at the held size first.
+                // Pinch = manual scaling. In a band it scales WITHIN the band's range.
                 if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))
-                else { setMode('free'); setSizeMM(Math.min(sizeMax, Math.max(sizeMin, (effSizeRef.current || sizeMM) * f))) }
+                else {
+                  const b = BANDS.find((x) => x.id === mode)!
+                  setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
+                }
               }}
               onReset={() => setManual(null)} />
               : src === 'magic'
@@ -368,15 +373,17 @@ export default function GridLab() {
             <div className="gl-field"><span>Band · snap ladder</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null) }}>B{b.id}</button>)}
-                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null) }}>Free</button>
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
+                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null); setBandScale(null) }}>Free</button>
               </div>
             </div>
             {mode !== 'free' && <>
               <div className="gl-snap">
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
-                  : model
+                  : bandScale !== null
+                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
+                    : model
                     ? model.ladder.length
                       ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
                       : 'nothing fully fits — best seated shown'
@@ -384,10 +391,17 @@ export default function GridLab() {
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
-                  <button key={pt.sizeMM + pt.sig} aria-pressed={i === model.idx} onClick={() => setStepSel(i)}>
+                  <button key={pt.sizeMM + pt.sig} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
                     <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
                   </button>)}
               </div>}
+              {(() => {
+                const b = BANDS.find((x) => x.id === mode)!
+                return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
+                  v={Math.round(bandScale ?? (effSizeRef.current || b.minMM))}
+                  set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}
+                  min={b.minMM} max={b.maxMM} />
+              })()}
               <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
             {mode === 'free' && <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />}
