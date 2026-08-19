@@ -515,9 +515,9 @@ export default function GridLab() {
             <div className="gl-magic-note">
               Each slide&apos;s score: seats × seat weight − uncovered material × flap weight − off-centre distance × centring weight. Raise a weight and its force matters more; the strongest force decides.
             </div>
-            <Slider label="Seat weight · per magnet" unit="×" v={seatW} set={setSeatW} min={WEIGHT_FLOOR} max={SEAT_WEIGHT_CEIL} />
-            <Slider label="Flap weight · per mm uncovered" unit="×" v={flapW} set={setFlapW} min={WEIGHT_FLOOR} max={FLAP_WEIGHT_CEIL} />
-            <Slider label="Centring weight · per mm off-centre" unit="×" v={balW} set={setBalW} min={WEIGHT_FLOOR} max={BALANCE_WEIGHT_CEIL} />
+            <Slider wide label="Seat weight · per magnet" unit="×" v={seatW} set={setSeatW} min={WEIGHT_FLOOR} max={SEAT_WEIGHT_CEIL} />
+            <Slider wide label="Flap weight · per mm uncovered" unit="×" v={flapW} set={setFlapW} min={WEIGHT_FLOOR} max={FLAP_WEIGHT_CEIL} />
+            <Slider wide label="Centring weight · per mm off-centre" unit="×" v={balW} set={setBalW} min={WEIGHT_FLOOR} max={BALANCE_WEIGHT_CEIL} />
           </Fold>}
         </aside>
       </div>
@@ -718,7 +718,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
 function Empty({ text, spin }: { text: string; spin?: boolean }) {
   return <div className="gl-empty">{spin && <span className="gl-spin" />}{text}</div>
 }
-function Slider({ label, v, set, min, max, unit }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
+function Slider({ label, v, set, min, max, unit, wide }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string; wide?: boolean }) {
   const commit = (raw: string) => {
     const n = +raw
     if (Number.isFinite(n)) set(Math.min(max, Math.max(min, Math.round(n))))
@@ -726,7 +726,7 @@ function Slider({ label, v, set, min, max, unit }: { label: string; v: number; s
   return (
     <label className="gl-slider">
       <div className="gl-slider-row"><span>{label}</span>
-        <span className="gl-num">
+        <span className={wide ? 'gl-num gl-num-wide' : 'gl-num'}>
           <input key={v} type="number" defaultValue={v} min={min} max={max}
             onBlur={(e) => commit(e.currentTarget.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
@@ -825,6 +825,7 @@ const CSS = `
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
 .gl-num{display:inline-flex;align-items:center;gap:4px}
 .gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}
+.gl-num-wide input{width:84px}
 .gl-num input:focus{outline:none;border-color:var(--accent)}
 .gl-num i{font:600 11px var(--mono);font-style:normal;color:var(--ink-3)}
 .gl-limits{display:flex;gap:6px}
