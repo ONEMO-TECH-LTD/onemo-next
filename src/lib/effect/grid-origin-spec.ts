@@ -61,9 +61,8 @@ export const FLAP_CEIL_MM = 48
 export const SNAP_STEP_MM = 1
 
 /** Auto flap — the micro-module's scan: allowance tried from 0 up in this step, granting only
- *  what the band needs to produce a contact variant, capped by the admin max. */
+ *  what the band needs to produce a contact variant, capped by the flap dial. */
 export const AUTO_FLAP_STEP_MM = 2
-export const AUTO_FLAP_MAX_MM = 12
 
 /** Voting dominance tiers — strict: the top force always beats the next, never blends.
  *  VOTING_ORDER picks which force sits on which tier (0 = magnets > wrap > centring). */

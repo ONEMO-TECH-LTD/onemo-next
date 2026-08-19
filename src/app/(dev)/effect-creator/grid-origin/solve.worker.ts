@@ -76,7 +76,11 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         freeCache.set(k, hit)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
-      ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, segments: hit.grid.segments } })
+      // Free-mode auto flap: report the allowance THIS size implies — the binding disc gap.
+      const freeAuto = autoFlapMaxMM != null
+        ? Math.min(autoFlapMaxMM, Math.round(impliedFlapMM(hit.contour.outer.pts, hit.grid.anchors.map((a) => a.p), hit.grid.spotRadiusMM)))
+        : null
+      ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, segments: hit.grid.segments, autoFlapMM: freeAuto } })
     }
   } catch (err) {
     ctx.postMessage({ id, model: null, error: String((err as Error)?.message ?? err) })
