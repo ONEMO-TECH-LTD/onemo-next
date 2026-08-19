@@ -32,13 +32,23 @@ export function registrationScore(seats: number, flapExcessMM: number, balanceMM
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
-export type Governor = 0 | 1 | 2
+export type Governor = 0 | 1 | 2 | 3
 
-/** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity). */
+/** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity) ·
+ *  3 top-small — RULED 2026-08-19: among masses in the shape's upper half the smallest governs;
+ *  if nothing lives in the upper half, the topmost governs. The small mass needs the precision,
+ *  the upper mass needs the anchor; a bottom sliver can never rule, and the governor stays
+ *  stable across the size ladder. */
 export function governMass<M extends { areaMM2: number; centreMM: Pt; peakClearMM?: number }>(
-  masses: ReadonlyArray<M>, governor: Governor,
+  masses: ReadonlyArray<M>, governor: Governor, midY?: number,
 ): M | null {
   if (!masses.length) return null
+  if (governor === 3) {
+    const mid = midY ?? Math.min(...masses.map((m) => m.centreMM[1]))
+    const upper = masses.filter((m) => m.centreMM[1] >= mid)
+    if (upper.length) return governMass(upper, 0)
+    return governMass(masses, 2)
+  }
   let best = masses[0]
   for (const m of masses) {
     if (governor === 0 && m.areaMM2 < best.areaMM2) best = m
@@ -94,13 +104,14 @@ export function centeringRef(
   segments: ReadonlyArray<SafeSegment>, seated: ReadonlyArray<Pt>,
   inMass: (p: Pt, mass: { bbox: SafeSegment['bbox']; rings: Pt[][] }) => boolean,
   governor: Governor,
+  midY?: number,
 ): { centreMM: Pt; bbox: SafeSegment['bbox']; rings: Pt[][] } | null {
   const holding: Array<{ areaMM2: number; centreMM: Pt; peakClearMM: number; bbox: SafeSegment['bbox']; rings: Pt[][] }> = []
   for (const seg of segments) {
     const masses = seg.masses.length ? seg.masses : [seg]
     for (const m of masses) if (seated.some((p) => inMass(p, m))) holding.push(m)
   }
-  return governMass(holding, governor)
+  return governMass(holding, governor, midY)
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

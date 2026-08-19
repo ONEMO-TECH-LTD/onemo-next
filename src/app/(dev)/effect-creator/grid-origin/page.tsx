@@ -477,7 +477,7 @@ export default function GridLab() {
             </div>
             {centreMode === 2 && <div className="gl-field"><span>Governor · which mass rules</span>
               <div className="gl-seg">
-                {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top']] as [number, string][]).map(([g, l]) =>
+                {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
             </div>}

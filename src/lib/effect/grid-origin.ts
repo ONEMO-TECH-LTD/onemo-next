@@ -127,7 +127,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const centres = centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
   // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
   const allMasses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
-  const ruleTarget: Pt = mode === 2 ? (governMass(allMasses, governor)?.centreMM ?? centres[0]) : centres[0]
+  const midY = (bb.minY + bb.maxY) / 2
+  const ruleTarget: Pt = mode === 2 ? (governMass(allMasses, governor, midY)?.centreMM ?? centres[0]) : centres[0]
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
@@ -181,7 +182,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const excess = flapExcessMM(outer, seat, reach)
         // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
         // containment against the mass's real outline; other modes → the mode's single centre.
-        const ref = mode === 2 ? centeringRef(segments, seat, pointInMass, governor) : null
+        const ref = mode === 2 ? centeringRef(segments, seat, pointInMass, governor, midY) : null
         const inRef = ref ? seat.filter((p) => pointInMass(p, ref)) : seat
         const [tx, ty] = ref ? ref.centreMM : centres[0]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
