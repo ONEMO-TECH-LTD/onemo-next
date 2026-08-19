@@ -429,10 +429,10 @@ export default function GridLab() {
             {(centreMode === 2 || centreMode === 5) &&
               <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
             <div className="gl-legend">
-              <div><i className="gl-sw gl-sw-main" /> main centre — governs the winning layout</div>
-              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[0], background: SEG_HUES[0] + '22' }} /> island S1 · smallest legal area + its candidate centre</div>
-              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[1], background: SEG_HUES[1] + '22' }} /> island S2 · next larger, and so on per colour</div>
-              <div><i className="gl-sw gl-sw-dash" style={{ borderColor: SEG_HUES[0] }} /> mass at depth — the island's solid core (dashed)</div>
+              <div><i className="gl-sw gl-sw-main" /><span><b>Main centre</b> · governs the winning layout</span></div>
+              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[0], background: SEG_HUES[0] + '22' }} /><span><b>Island S1</b> · smallest legal area</span></div>
+              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[1], background: SEG_HUES[1] + '22' }} /><span><b>Island S2</b> · next larger, per colour</span></div>
+              <div><i className="gl-sw gl-sw-dash" style={{ borderColor: SEG_HUES[0] }} /><span><b>Mass at depth</b> · the island&apos;s solid core</span></div>
             </div>
             <label className="gl-toggle"><span>Fill islands <small style={{ color: 'var(--ink-3)' }}>· coloured inner area</small></span>
               <input type="checkbox" checked={segFillN !== 0} onChange={(e) => setSegFillN(e.target.checked ? 1 : 0)} />
@@ -734,8 +734,10 @@ const CSS = `
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
 .gl-perf b.gl-slow{color:var(--fail)}
-.gl-legend{display:flex;flex-direction:column;gap:6px;font:11.5px var(--mono);color:var(--ink-2);line-height:1.4}
-.gl-legend div{display:flex;align-items:center;gap:8px}
+.gl-legend{display:flex;flex-direction:column;gap:7px;font:11.5px var(--sans);color:var(--ink-2);line-height:1.45}
+.gl-legend div{display:flex;align-items:flex-start;gap:8px}
+.gl-legend .gl-sw{margin-top:1px}
+.gl-legend b{color:var(--ink);font-weight:700}
 .gl-sw{flex:none;width:13px;height:13px;border-radius:50%;border:2px solid var(--ink-3);background:transparent}
 .gl-sw-main{border-color:var(--pass);background:var(--pass)}
 .gl-sw-dash{border-style:dashed;background:transparent!important}
