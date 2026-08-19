@@ -604,7 +604,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
       })}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
-        return <g key={'a' + i}>
+        return <g key={'a' + i} opacity={0.5}>
           <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill={a.dia === 8 ? 'var(--mag8)' : 'var(--magnet)'} />
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
