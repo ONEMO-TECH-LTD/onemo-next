@@ -511,10 +511,18 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
           <path d={`M ${grid.pitchCentreMM} 0 L 0 0 0 ${grid.pitchCentreMM}`}
             fill="none" stroke="var(--ink)" strokeOpacity={0.10} strokeWidth={0.5} />
         </pattern>
+        {/* Registration dots on every 12mm cell corner — the board's atom, phase-locked to the
+            lattice so 12mm steps and centres are always visible. Dot sits at tile centre; the
+            pattern origin is shifted half a tile so dots land on the corners unclipped. */}
+        <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
+          patternUnits="userSpaceOnUse" x={Afy[0] - DEFAULT_PITCH_MM / 8} y={Afy[1] - DEFAULT_PITCH_MM / 8}>
+          <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.25} fill="var(--ink)" fillOpacity={0.2} />
+        </pattern>
       </defs>
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-fine)" />
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-pitch)" />
+      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-dots)" />
       {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line. */}
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
       <path d={d} fill="none" stroke="var(--suede-edge)"
