@@ -116,8 +116,7 @@ export default function GridLab() {
     else { window.addEventListener('load', report, { once: true }); return () => window.removeEventListener('load', report) }
   }, [])
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return
+  function cutFile(f: File) {
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
     setSrc('magic'); setMagStatus('cutting')
@@ -129,6 +128,25 @@ export default function GridLab() {
         setMagStatus('')
       })
       .catch((err) => { console.error('[grid-lab] magic failed', err); setMagStatus('error:' + ((err as Error)?.message ?? 'cut failed')) })
+  }
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (f) cutFile(f)
+  }
+
+  /** Test library — Dan's _WIP/v3.5/asset-lib, served by the bench's own route. */
+  const [lib, setLib] = useState<string[]>([])
+  const [libSel, setLibSel] = useState('')
+  useEffect(() => {
+    fetch('/effect-creator/grid-origin/asset-lib').then((r) => r.json()).then((f) => Array.isArray(f) && setLib(f)).catch(() => { })
+  }, [])
+  async function loadLib(name: string) {
+    setSrc('magic'); setMagStatus('cutting')
+    try {
+      const res = await fetch('/effect-creator/grid-origin/asset-lib/' + encodeURIComponent(name))
+      if (!res.ok) throw new Error('not found')
+      const blob = await res.blob()
+      cutFile(new File([blob], name, { type: blob.type || 'image/png' }))
+    } catch { setMagStatus('error:could not load the library image') }
   }
 
   // base contour normalized so longest side = 1mm (scale-free) — cheap, main thread.
@@ -242,6 +260,12 @@ export default function GridLab() {
             </>}
 
             {src === 'magic' && <>
+              {lib.length > 0 && <label className="gl-field"><span>Test library</span>
+                <select value={libSel} onChange={(e) => { setLibSel(e.target.value); if (e.target.value) loadLib(e.target.value) }}>
+                  <option value="">— pick an image —</option>
+                  {lib.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
+                </select>
+              </label>}
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
               <button className="gl-upload" onClick={() => fileRef.current?.click()}>
                 {magic ? 'Replace image' : 'Upload an image'}
