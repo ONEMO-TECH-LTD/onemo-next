@@ -385,8 +385,8 @@ export default function GridLab() {
                     ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
                     ? model.ladder.length
-                      ? `${(model.ladder[model.idx]?.excessMM ?? 0) > 0.1 ? 'snuggest wrap' : 'Fit'} B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} layouts in band`
-                      : 'nothing seats in this band'
+                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
+                      : 'nothing fully fits at this flap — best seated shown'
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">

@@ -126,6 +126,13 @@ export function applyCoverage(
   return { seated, interior: [] }
 }
 
+/** Holding — THE BAND LAW (Dan, 2026-08-19: "the engine in the bands cannot show by definition
+ *  the variants that have flap greater"): at least one seat AND every edge within reach at the
+ *  dialled allowance. The flap dial is definitional, not advisory. */
+export function isHolding(seatedCount: number, flapCount: number): boolean {
+  return seatedCount >= 1 && flapCount === 0
+}
+
 /** Per-anchor magnet size. corners8 → the large body on the extreme corners, small elsewhere. */
 export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
   if (plan === 'all8') return seated.map((p) => ({ p, dia: MAGNET_DIA_LARGE_MM }))
