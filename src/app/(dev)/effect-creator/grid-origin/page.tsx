@@ -283,7 +283,11 @@ export default function GridLab() {
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
-              onZoom={(f) => { if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f))) }}
+              onZoom={(f) => {
+                // Pinch = manual scaling. In a band it hands over to Free at the held size first.
+                if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))
+                else { setMode('free'); setSizeMM(Math.min(sizeMax, Math.max(sizeMin, (effSizeRef.current || sizeMM) * f))) }
+              }}
               onReset={() => setManual(null)} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
@@ -510,11 +514,14 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
   }
   const pxPerMM = (el: Element) => el.getBoundingClientRect().width / (VP / S)
   useEffect(() => {
-    const el = svgRef.current
-    if (!el) return
+    // Listen on the viewport wrapper, not the svg — the solving overlay sits above the svg
+    // and would otherwise swallow wheel events mid-gesture.
+    const svg = svgRef.current
+    const el = svg?.parentElement
+    if (!svg || !el) return
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      const k = pxPerMM(el)
+      const k = pxPerMM(svg)
       if (e.ctrlKey) { onZoom(Math.exp(-e.deltaY * 0.01)); return }
       setPend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
       if (wheelTimer.current) clearTimeout(wheelTimer.current)
@@ -747,7 +754,7 @@ const CSS = `
   .gl-head h1{font-size:17px}
 }
 .gl-solving{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:8px;
-  font:600 12px var(--mono);color:var(--ink-2);background:rgba(127,132,145,.14);backdrop-filter:blur(1px)}
+  font:600 12px var(--mono);color:var(--ink-2);background:rgba(127,132,145,.14);backdrop-filter:blur(1px);pointer-events:none}
 .gl-empty{display:flex;align-items:center;gap:9px;color:var(--ink-3);font:12.5px var(--mono);text-align:center;padding:20px;max-width:80%}
 .gl-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:gspin .8s linear infinite;flex:none}
 @keyframes gspin{to{transform:rotate(360deg)}}
