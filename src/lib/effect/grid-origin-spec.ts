@@ -51,8 +51,9 @@ export const PHASE_STEP_MM = 1
 export const PHASE_STEP_FLOOR_MM = 1
 
 /** Flap allowance — the invisible margin every disc wears (Dan's contact law): band options
- *  are the sizes where the edge presses against spot + allowance. 0 = edge-to-edge tangency. */
-export const FLAP_MM = 12
+ *  are the sizes where the edge presses against spot + allowance. RULED 2026-08-19: the
+ *  factory default is 0 — edge-to-edge tangency; any margin is an explicit admin grant. */
+export const FLAP_MM = 0
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
