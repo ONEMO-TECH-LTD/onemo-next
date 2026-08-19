@@ -132,6 +132,72 @@ export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>
   return sum / outer.length
 }
 
+/** One connected island of the legal magnet-centre area, measured on a coarse mesh. */
+export interface SafeSegment {
+  areaMM2: number
+  centreMM: Pt
+  bbox: BBox
+  /** Mesh spacing the island was measured at — the drawing draws one cell per point. */
+  cellMM: number
+  /** The yes-points of the mesh belonging to this island. */
+  cells: Pt[]
+}
+
+/**
+ * The legal area's separate islands. The seat predicate is sampled on a mesh over the bbox and
+ * touching yes-cells are grouped (4-neighbour flood). A MEASUREMENT for display and scoring —
+ * every magnet's legality stays the exact per-point test, never this mesh.
+ */
+export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number): SafeSegment[] {
+  const fits = makeSeatPredicate(outer, spotRadiusMM)
+  if (!fits) return []
+  const step = 3 // mesh resolution, mm — measurement grain, not a law value
+  const bb = bbox(outer)
+  const nx = Math.max(1, Math.round((bb.maxX - bb.minX) / step) + 1)
+  const ny = Math.max(1, Math.round((bb.maxY - bb.minY) / step) + 1)
+  const at = (ix: number, iy: number): Pt => [bb.minX + ix * step, bb.minY + iy * step]
+  const flag = new Uint8Array(nx * ny)
+  for (let iy = 0; iy < ny; iy++)
+    for (let ix = 0; ix < nx; ix++)
+      if (fits(at(ix, iy))) flag[iy * nx + ix] = 1
+  const seen = new Uint8Array(nx * ny)
+  const out: SafeSegment[] = []
+  for (let start = 0; start < nx * ny; start++) {
+    if (!flag[start] || seen[start]) continue
+    const stack = [start]
+    seen[start] = 1
+    const cells: Pt[] = []
+    let sx = 0, sy = 0
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    while (stack.length) {
+      const i = stack.pop()!
+      const ix = i % nx, iy = (i / nx) | 0
+      const p = at(ix, iy)
+      cells.push(p)
+      sx += p[0]; sy += p[1]
+      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]
+      if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]
+      const near = [i - 1, i + 1, i - nx, i + nx]
+      for (const j of near) {
+        if (j < 0 || j >= nx * ny || seen[j] || !flag[j]) continue
+        const jx = j % nx
+        if (Math.abs(jx - ix) > 1) continue // row wrap
+        seen[j] = 1
+        stack.push(j)
+      }
+    }
+    out.push({
+      areaMM2: cells.length * step * step,
+      centreMM: [sx / cells.length, sy / cells.length],
+      bbox: { minX, minY, maxX, maxY },
+      cellMM: step,
+      cells,
+    })
+  }
+  out.sort((a, b) => a.areaMM2 - b.areaMM2)
+  return out
+}
+
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45

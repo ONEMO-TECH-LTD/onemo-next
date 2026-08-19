@@ -35,8 +35,10 @@ export * from './grid-origin-spec'
 export {
   fieldSpanMM,
   latticeOver,
+  safeSegments,
   scaleContour,
   spotRadiusOf,
+  type SafeSegment,
 } from './grid-origin-compute'
 export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
 

@@ -12,7 +12,7 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan } from '@/lib/effect/grid-origin'
+import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
 import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
@@ -68,6 +68,8 @@ export default function GridLab() {
   const [showLattice, setShowLattice] = useState(true)
   /** Faint bounding box with per-side dimensions. */
   const [showBox, setShowBox] = useState(true)
+  /** Legal-area islands, coloured + boxed + centre-marked. */
+  const [showSegs, setShowSegs] = useState(true)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number | 'free'>('free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
@@ -149,7 +151,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[] }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -201,6 +203,7 @@ export default function GridLab() {
           <div className="gl-vp">
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
+              segments={showSegs ? model.segments : []}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))}
               onReset={() => setManual(null)} />
@@ -320,6 +323,9 @@ export default function GridLab() {
             <label className="gl-toggle"><span>Show bounding box <small style={{ color: 'var(--ink-3)' }}>· size on each side</small></span>
               <input type="checkbox" checked={showBox} onChange={e => setShowBox(e.target.checked)} />
             </label>
+            <label className="gl-toggle"><span>Show segments <small style={{ color: 'var(--ink-3)' }}>· legal-area islands</small></span>
+              <input type="checkbox" checked={showSegs} onChange={e => setShowSegs(e.target.checked)} />
+            </label>
             <div className="gl-seg">
               <button onClick={saveDefaults}>Save as default</button>
               <button onClick={resetDefaults}>Reset to default</button>
@@ -338,8 +344,11 @@ function dim(c: Contour, axis: 0 | 1): number {
   return hi - lo
 }
 
-function Stage({ contour, grid, lattice, box, onPan, onZoom, onReset }: {
-  contour: Contour; grid: GridResult; lattice: boolean; box: boolean
+/** Island tints — screen colours only, one hue per segment, smallest first. */
+const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
+
+function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }: {
+  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -415,6 +424,23 @@ function Stage({ contour, grid, lattice, box, onPan, onZoom, onReset }: {
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
       <path d={d} fill="none" stroke="var(--suede-edge)"
         strokeOpacity={0.9} strokeWidth={1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      {/* Legal-area islands: coloured cells, dashed box, centre cross — engine y-up, drawn y-down. */}
+      {segments.map((sg, si) => {
+        const hue = SEG_HUES[si % SEG_HUES.length]
+        const c = sg.cellMM
+        const fs = 11 * spanMM / VP
+        const [gx, gy] = [sg.centreMM[0], -sg.centreMM[1]]
+        return <g key={'sg' + si} style={{ pointerEvents: 'none' }}>
+          {sg.cells.map((p, i) => <rect key={i} x={p[0] - c / 2} y={-p[1] - c / 2} width={c} height={c} fill={hue} fillOpacity={0.16} />)}
+          <rect x={sg.bbox.minX} y={-sg.bbox.maxY} width={sg.bbox.maxX - sg.bbox.minX} height={sg.bbox.maxY - sg.bbox.minY}
+            fill="none" stroke={hue} strokeOpacity={0.75} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
+          <path d={`M ${gx - fs} ${gy} H ${gx + fs} M ${gx} ${gy - fs} V ${gy + fs}`}
+            stroke={hue} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+          <text x={gx + fs * 0.8} y={gy - fs * 0.8} fontSize={fs} fill={hue} fontFamily="var(--mono)" fontWeight={700}>
+            S{si + 1} · {Math.round(sg.areaMM2)} mm²
+          </text>
+        </g>
+      })}
       {/* Faint bounding box, its dimension written on every side. */}
       {box && <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink)"
         strokeOpacity={0.22} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
