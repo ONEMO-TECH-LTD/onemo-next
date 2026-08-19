@@ -23,12 +23,12 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** Registration score — Dan's centring ruling 2026-08-19: "the centre must coincide with the
- *  magnet centre." Seats above all, then CENTRING (the governing magnet's distance to the
- *  centre), and coverage only breaks centring ties. With equal magnets, the grid always takes
- *  the slide that puts the governing magnet exactly on the centre when one exists. */
+/** Registration score — the BLESSED voting order (perfect-slow/perfect-fast builds): seats
+ *  above all, then UNCOVERED MATERIAL (the flap dial's placement power — it pulls magnets
+ *  toward material), then balance to the centre as the tie-break. Exact centring is the
+ *  CENTRE-RULES law's job, not this score's — the two positioning laws split the principles. */
 export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
-  return seats * SEAT_WEIGHT - balanceMM * FLAP_WEIGHT - flapExcessMM
+  return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
