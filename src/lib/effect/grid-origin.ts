@@ -47,6 +47,7 @@ import {
 export * from './grid-origin-spec'
 export {
   fieldSpanMM,
+  impliedFlapMM,
   latticeOver,
   safeSegments,
   scaleContour,

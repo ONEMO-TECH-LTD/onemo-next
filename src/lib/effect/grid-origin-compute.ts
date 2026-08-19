@@ -159,6 +159,16 @@ export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>
   return sum / outer.length
 }
 
+/** The allowance a solved layout IMPLIES at its size — the binding gap between the discs and
+ *  the edge: how much margin the discs can wear before one presses against the outline.
+ *  0 = already tangent (true contact size). */
+export function impliedFlapMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, spotRadiusMM: number): number {
+  if (!seated.length) return 0
+  let g = Infinity
+  for (const a of seated) { const d = edgeDistMM(outer, a) - spotRadiusMM; if (d < g) g = d }
+  return Math.max(0, g)
+}
+
 /** A mass inside an island — the region surviving the depth probe, with its outline. */
 export interface SafeMass {
   areaMM2: number

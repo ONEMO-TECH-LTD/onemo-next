@@ -1,7 +1,7 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/effect/grid-origin'
+import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, impliedFlapMM, type GridConfig, type GridResult } from '@/lib/effect/grid-origin'
 import { makeSizer } from '@/lib/effect/grid-origin-bridge'
 import type { Contour } from '@/lib/effect/types'
 

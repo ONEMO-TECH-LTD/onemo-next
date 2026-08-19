@@ -260,7 +260,7 @@ export default function GridLab() {
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
-      autoFlapMaxMM: mode !== 'free' && autoFlapN ? autoFlapMax : null,
+      autoFlapMaxMM: autoFlapN ? autoFlapMax : null,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
@@ -446,14 +446,11 @@ export default function GridLab() {
                 <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
               </div>
             </LabRow>
-            <div className={mode === 'free' ? 'gl-lab-off' : undefined}
-              title={mode === 'free' ? 'auto flap works in band mode — bands grant themselves the allowance they need' : undefined}>
-              <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'bands only — grants what a band needs' : `band grants only what it needs${autoFlapN && model?.autoFlapMM != null ? ` — chose ${model.autoFlapMM}mm` : ''}`}</small></span>
-                <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
-              </label>
-              {autoFlapN !== 0 &&
-                <Slider label="Auto flap · maximum allowance" unit="mm" v={autoFlapMax} set={setAutoFlapMax} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />}
-            </div>
+            <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
+              <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
+            </label>
+            {autoFlapN !== 0 &&
+              <Slider label="Auto flap · maximum allowance" unit="mm" v={autoFlapMax} set={setAutoFlapMax} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />}
             <div className={positioning === 1 ? 'gl-lab-off' : undefined}
               title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
