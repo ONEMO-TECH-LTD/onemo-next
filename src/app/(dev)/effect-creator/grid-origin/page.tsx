@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
-import { BALANCE_WEIGHT, BALANCE_WEIGHT_CEIL, BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, FLAP_WEIGHT, FLAP_WEIGHT_CEIL, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SEAT_WEIGHT, SEAT_WEIGHT_CEIL, SNAP_STEP_MM, WEIGHT_FLOOR } from '@/lib/effect/grid-origin-spec'
+import { AUTO_FLAP_MAX_MM, BALANCE_WEIGHT, BALANCE_WEIGHT_CEIL, BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, FLAP_WEIGHT, FLAP_WEIGHT_CEIL, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SEAT_WEIGHT, SEAT_WEIGHT_CEIL, SNAP_STEP_MM, WEIGHT_FLOOR } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -60,6 +60,9 @@ export default function GridLab() {
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
   /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
   const [flap, setFlap] = usePersisted('flap', FLAP_MM)
+  /** Auto flap micro-module — bands grant themselves only the allowance they need, up to max. */
+  const [autoFlapN, setAutoFlapN] = usePersisted('autoFlap', 0)
+  const [autoFlapMax, setAutoFlapMax] = usePersisted('autoFlapMax', AUTO_FLAP_MAX_MM)
   /** Placement step dial — how finely the lattice slides under the shape; 1 = continuous panning. */
   const [phaseStep, setPhaseStep] = usePersisted('phaseStep', PHASE_STEP_MM)
   /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
@@ -214,7 +217,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[] }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -259,13 +262,14 @@ export default function GridLab() {
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
+      autoFlapMaxMM: mode !== 'free' && autoFlapN ? autoFlapMax : null,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, seatW, flapW, balW, manual, bandScale, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, seatW, flapW, balW, manual, bandScale, enFlapN, enPhaseN, autoFlapN, autoFlapMax, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -292,7 +296,7 @@ export default function GridLab() {
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
-              marginMM={enFlapN ? flap : FLAP_MM}
+              marginMM={model.autoFlapMM ?? (enFlapN ? flap : FLAP_MM)}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
@@ -439,8 +443,18 @@ export default function GridLab() {
             </div>
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
             <LabRow on={enFlapN !== 0} set={(b) => setEnFlapN(b ? 1 : 0)}>
-              <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
+              <div className={mode !== 'free' && autoFlapN ? 'gl-lab-off' : undefined}
+                title={mode !== 'free' && autoFlapN ? 'auto flap is choosing the allowance' : undefined}>
+                <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
+              </div>
             </LabRow>
+            {mode !== 'free' && <>
+              <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· band grants only what it needs{autoFlapN && model?.autoFlapMM != null ? ` — chose ${model.autoFlapMM}mm` : ''}</small></span>
+                <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
+              </label>
+              {autoFlapN !== 0 &&
+                <Slider label="Auto flap · maximum allowance" unit="mm" v={autoFlapMax} set={setAutoFlapMax} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />}
+            </>}
             <div className={positioning === 1 ? 'gl-lab-off' : undefined}
               title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>

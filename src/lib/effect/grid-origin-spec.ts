@@ -59,6 +59,11 @@ export const FLAP_CEIL_MM = 48
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
+/** Auto flap — the micro-module's scan: allowance tried from 0 up in this step, granting only
+ *  what the band needs to produce a contact variant, capped by the admin max. */
+export const AUTO_FLAP_STEP_MM = 2
+export const AUTO_FLAP_MAX_MM = 12
+
 /** Registration score weights: seats, then flaps, then balance — each admin-dialled in the
  *  Voting card so the forces can be balanced live. */
 export const SEAT_WEIGHT = 100000

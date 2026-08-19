@@ -8,6 +8,7 @@ import {
   DEFAULT_PITCH_MM,
   FLAP_MM,
   GOVERNOR,
+  AUTO_FLAP_STEP_MM,
   MASS_DEPTH_MM,
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
@@ -309,4 +310,27 @@ export function fitSizeInBand(
     return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), dispCfg), ladder: points, pickIdx }
   }
   return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), dispCfg), ladder: [], pickIdx: 0 }
+}
+
+/**
+ * AUTO FLAP (micro-module, Dan 2026-08-19): a band tries the snuggest law first — allowance 0 —
+ * and grants itself only as much margin as it needs to produce a contact variant, scanning up
+ * in AUTO_FLAP_STEP_MM steps to the dialled max. Reuses the band walk untouched; the chosen
+ * allowance is reported so the panel and margin rings can show it.
+ */
+export function autoFlapInBand(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number, maxFlapMM: number,
+): { flapMM: number; fit: ReturnType<typeof fitSizeInBand> } {
+  const cap = Math.max(0, maxFlapMM)
+  let last: ReturnType<typeof fitSizeInBand> | null = null
+  for (let f = 0; f <= cap; f += AUTO_FLAP_STEP_MM) {
+    last = fitSizeInBand(sized, { ...cfg, flapMM: f, solveCache: undefined }, fromMM, stepMM)
+    if (last.ladder.length) return { flapMM: f, fit: last }
+  }
+  if (cap % AUTO_FLAP_STEP_MM !== 0) {
+    const fit = fitSizeInBand(sized, { ...cfg, flapMM: cap, solveCache: undefined }, fromMM, stepMM)
+    if (fit.ladder.length) return { flapMM: cap, fit }
+    last = fit
+  }
+  return { flapMM: cap, fit: last! }
 }

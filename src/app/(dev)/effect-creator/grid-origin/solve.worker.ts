@@ -1,7 +1,7 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/effect/grid-origin'
+import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/effect/grid-origin'
 import { makeSizer } from '@/lib/effect/grid-origin-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -14,6 +14,8 @@ interface SolveRequest {
   sizeMM: number
   snapStep: number
   stepSel: number | null
+  /** Auto-flap micro-module: when set, bands scan the allowance from 0 up to this max. */
+  autoFlapMaxMM?: number | null
 }
 
 const ctx = self as unknown as Worker
@@ -21,6 +23,7 @@ const ctx = self as unknown as Worker
 // The band walk depends on everything EXCEPT the selected step — stepping the ladder reuses it.
 let walkKey = ''
 let walkFit: ReturnType<typeof fitSizeInBand> | null = null
+let autoFlapChosen: number | null = null
 
 // Computed once = computed. Per-size solves are keyed by shape + config and reused across
 // free-slider moves, manual band scaling and re-walks; a new shape clears everything.
@@ -31,7 +34,7 @@ const FREE_CAP = 400
 const WALK_CAP = 6
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel } = e.data
+  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, autoFlapMaxMM } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     const pts = base.outer.pts
@@ -46,17 +49,24 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         walkCaches.set(cfgSig, sizeCache)
         if (walkCaches.size > WALK_CAP) walkCaches.delete(walkCaches.keys().next().value!)
       }
-      const key = JSON.stringify([cfgSig, mode, snapStep])
+      const key = JSON.stringify([cfgSig, mode, snapStep, autoFlapMaxMM ?? null])
       if (key !== walkKey || !walkFit) {
-        walkFit = fitSizeInBand(sized, { ...cfg, solveCache: sizeCache }, band.minMM, snapStep)
+        if (autoFlapMaxMM != null) {
+          const auto = autoFlapInBand(sized, cfg, band.minMM, snapStep, autoFlapMaxMM)
+          walkFit = auto.fit
+          autoFlapChosen = auto.flapMM
+        } else {
+          walkFit = fitSizeInBand(sized, { ...cfg, solveCache: sizeCache }, band.minMM, snapStep)
+          autoFlapChosen = null
+        }
         walkKey = key
       }
       const fit = walkFit
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, seatMarginMM: Math.max(0, cfg.flapMM ?? 0) })
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, seatMarginMM: Math.max(0, autoFlapChosen ?? cfg.flapMM ?? 0) })
       const contour = sized(eff)
-      ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments } })
+      ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM: autoFlapChosen } })
     } else {
       const k = cfgSig + '|' + sizeMM
       let hit = freeCache.get(k)
