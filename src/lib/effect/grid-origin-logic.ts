@@ -5,7 +5,6 @@ import {
   BALANCE_WEIGHT,
   BANDS,
   FLAP_WEIGHT,
-  HOLDING_WEIGHT,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
@@ -38,11 +37,6 @@ export function registrationScore(
     - balanceMM * (w?.balance ?? BALANCE_WEIGHT)
 }
 
-/** Band-walk rank — Dan's band law: a slide that HOLDS at the dialled allowance outranks any
- *  that does not, whatever its seat count; the ladder must surface every wrapping variant. */
-export function holdingFirstScore(score: number, holding: boolean): number {
-  return holding ? score + HOLDING_WEIGHT : score
-}
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
 export type Governor = 0 | 1 | 2 | 3
@@ -139,12 +133,6 @@ export function applyCoverage(
   return { seated, interior: [] }
 }
 
-/** Holding — THE BAND LAW (Dan, 2026-08-19: "the engine in the bands cannot show by definition
- *  the variants that have flap greater"): at least one seat AND every edge within reach at the
- *  dialled allowance. The flap dial is definitional, not advisory. */
-export function isHolding(seatedCount: number, flapCount: number): boolean {
-  return seatedCount >= 1 && flapCount === 0
-}
 
 /** Per-anchor magnet size. corners8 → the large body on the extreme corners, small elsewhere. */
 export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {

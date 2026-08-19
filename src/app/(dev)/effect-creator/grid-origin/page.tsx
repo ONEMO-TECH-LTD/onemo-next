@@ -292,6 +292,7 @@ export default function GridLab() {
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
+              marginMM={enFlapN ? flap : FLAP_MM}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
@@ -543,8 +544,9 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan, onZoom, onReset }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  marginMM: number
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -707,10 +709,17 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
         // INNER stroke: the line's outer edge sits exactly on the true spot radius, so a
         // tangent disc never reads past the cut line.
         const sw = sp.held ? 0.6 : 0.5
-        return <circle key={'f' + i} cx={sp.x} cy={-sp.y} r={sp.r - sw / 2}
-          fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
-          stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
-          strokeWidth={sw} />
+        return <g key={'f' + i}>
+          <circle cx={sp.x} cy={-sp.y} r={sp.r - sw / 2}
+            fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
+            stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
+            strokeWidth={sw} />
+          {/* The allowance made visible — the invisible margin every disc wears under the
+              contact law. The edge pressing against THIS ring is what the engine calls fit. */}
+          {sp.held && marginMM > 0 &&
+            <circle cx={sp.x} cy={-sp.y} r={sp.r + marginMM} fill="var(--mag8)" fillOpacity={0.05}
+              stroke="var(--mag8)" strokeOpacity={0.55} strokeWidth={0.4} strokeDasharray="2.4 1.8" />}
+        </g>
       })}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)

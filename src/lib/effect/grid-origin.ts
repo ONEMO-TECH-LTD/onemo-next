@@ -9,6 +9,7 @@ import {
   FLAP_MM,
   GOVERNOR,
   MASS_DEPTH_MM,
+  MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
   POSITIONING,
@@ -34,8 +35,6 @@ import {
   centeringAnchors,
   centeringRef,
   governMass,
-  isHolding,
-  holdingFirstScore,
   registrationScore,
   type Anchor,
   type CentreMode,
@@ -53,7 +52,7 @@ export {
   type SafeMass,
   type SafeSegment,
 } from './grid-origin-compute'
-export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
+export { bandOf, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
 
 export interface GridConfig {
   pitchMM?: number
@@ -74,8 +73,10 @@ export interface GridConfig {
   governor?: number
   /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
   segmentsDetail?: 'full' | 'light'
-  /** Band-walk law: a slide holding at the allowance outranks any that does not. */
-  preferHolding?: boolean
+  /** CONTACT LAW margin (Dan, 2026-08-19): the flap allowance is an invisible margin worn by
+   *  every disc — seats must clear spot + margin from the edge, and a band option is the size
+   *  where the shape's edge presses against the margined disc. */
+  seatMarginMM?: number
   /** Voting-law weights, admin-dialled; spec defaults when absent. */
   seatWeight?: number
   flapWeight?: number
@@ -123,8 +124,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
   const fits = cfg.circle
-    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
-    : makeSeatPredicate(outer, spotRadiusOf(pad))
+    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad) + Math.max(0, cfg.seatMarginMM ?? 0))
+    : makeSeatPredicate(outer, spotRadiusOf(pad) + Math.max(0, cfg.seatMarginMM ?? 0))
 
   const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
   const segments = safeSegments(outer, spotRadiusOf(pad), massDepth, cfg.segmentsDetail ?? 'full')
@@ -169,19 +170,17 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const cands: Array<[number, number, number]> = [
       [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
     ]
-    let best: { hold: number; seats: number; canon: number; excess: number } | null = null
+    let best: { seats: number; canon: number; excess: number } | null = null
     for (const [px, py, canon] of cands) {
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
       const excess = flapExcessMM(outer, seat, reach, pitch)
-      const hold = cfg.preferHolding && excess === 0 ? 1 : 0
       const wins = !best
-        || hold > best.hold
-        || (hold === best.hold && seat.length > best.seats)
-        || (hold === best.hold && seat.length === best.seats && canon > best.canon)
-        || (hold === best.hold && seat.length === best.seats && canon === best.canon && excess < best.excess)
-      if (wins) { best = { hold, seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
+        || seat.length > best.seats
+        || (seat.length === best.seats && canon > best.canon)
+        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
+      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
     }
     mainCentre = ruleTarget
   } else if (fits) {
@@ -212,10 +211,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const [tx, ty] = ref ? ref.centreMM : centres[0]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
-        const score = holdingFirstScore(
-          registrationScore(seat.length, excess, balance,
-            { seat: cfg.seatWeight, flap: cfg.flapWeight, balance: cfg.balanceWeight }),
-          !!cfg.preferHolding && excess === 0)
+        const score = registrationScore(seat.length, excess, balance,
+          { seat: cfg.seatWeight, flap: cfg.flapWeight, balance: cfg.balanceWeight })
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k; mainCentre = [tx, ty] }
       }
     }
@@ -253,10 +250,11 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
 }
 
 /**
- * Every HOLDING size in the band, scanned at stepMM — THE BAND LAW: a size qualifies only when
- * its layout seats and leaves NO material beyond the dialled reach. At flap 0 only true
- * edge-to-edge wraps may appear. The band is a RANGE: fit is not monotone, so every size is
- * judged independently.
+ * THE CONTACT LAW (Dan, 2026-08-19): "the scale must be scaling up and down until edges touch
+ * the disc — this is zero flap." Every disc wears the allowance as an invisible margin, and a
+ * band option is a magnet COUNT at its CONTACT size — the smallest size where that count still
+ * seats against the margined discs. No wrap test: the seat geometry IS the law. A count whose
+ * contact lies below the band belongs to the band below, not here worn loose.
  */
 export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
@@ -264,44 +262,51 @@ export function bandSnapPoints(
   return bandWalk(sized, cfg, fromMM, stepMM).points
 }
 
-/** One pass over the band: the holding sizes AND the best-seated rung (the fallback), so a
- *  gate that passes nothing never costs a second walk. */
+/** One pass over the band: the per-count contact sizes AND the best-seated rung (fallback). */
 function bandWalk(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { points: BandSnapPoint[]; bestSeatedMM: number } {
   const [lo, hi] = snapRange(cfg, fromMM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', preferHolding: true }
+  const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', seatMarginMM: margin }
+  const solve = (mm: number): GridResult => {
+    let g = cfg.solveCache?.get(mm)
+    if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
+    return g
+  }
+  // Counts already seating just below the band reached contact earlier — loose here, not rungs.
+  const below = lo - stepMM >= MIN_EFFECT_MM ? solve(lo - stepMM).anchors.length : 0
   const points: BandSnapPoint[] = []
+  const seen = new Set<number>()
+  for (let c = 1; c <= below; c++) seen.add(c)
   let bestSeatedMM = lo, bestSeats = -1
   for (let mm = lo; mm <= hi; mm += stepMM) {
-    let grid = cfg.solveCache?.get(mm)
-    if (!grid) { grid = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, grid) }
-    if (grid.anchors.length > bestSeats) { bestSeats = grid.anchors.length; bestSeatedMM = mm }
-    if (isHolding(grid.anchors.length, grid.flaps.length)) points.push({ sizeMM: mm, count: grid.anchors.length })
+    const grid = solve(mm)
+    const count = grid.anchors.length
+    if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
+    if (count >= 1 && !seen.has(count)) {
+      seen.add(count)
+      points.push({ sizeMM: mm, count })
+    }
   }
   return { points, bestSeatedMM }
 }
 
 /**
- * Band snap — the blessed semantics. `ladder` is every DISTINCT holding layout in the band,
- * each at its smallest size. The landing pick is the smallest size at the band's MAXIMUM
- * seated count. When nothing in the range holds at the dialled allowance, the best-seated
- * size is shown as an explicit fallback — never presented as a fit.
+ * Band snap under the contact law. `ladder` = one rung per magnet count at its contact size;
+ * the landing pick is the smallest size at the band's maximum count. When no count reaches
+ * contact inside the band, the best-seated size shows as an explicit fallback, never a fit.
  */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
+  const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
+  const dispCfg: GridConfig = { ...cfg, seatMarginMM: margin }
   if (points.length) {
-    // THE LADDER LAW (Dan): one rung per magnet COUNT, at the smallest size that wraps.
-    // The same count re-registered at bigger sizes is the same variant, not more options.
-    const seen = new Set<number>()
-    const ladder = points.filter((p) => !seen.has(p.count) && (seen.add(p.count), true))
-    const maxCount = Math.max(...ladder.map((p) => p.count))
-    const pickIdx = ladder.findIndex((p) => p.count === maxCount)
-    const dispCfg: GridConfig = { ...cfg, preferHolding: true }
-    return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), dispCfg), ladder, pickIdx }
+    const maxCount = Math.max(...points.map((p) => p.count))
+    const pickIdx = points.findIndex((p) => p.count === maxCount)
+    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), dispCfg), ladder: points, pickIdx }
   }
-  // Nothing in the band holds at this allowance: the walk's best-seated rung, solved full.
-  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), cfg), ladder: [], pickIdx: 0 }
+  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), dispCfg), ladder: [], pickIdx: 0 }
 }

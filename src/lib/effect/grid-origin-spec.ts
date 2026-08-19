@@ -50,7 +50,8 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 export const PHASE_STEP_MM = 1
 export const PHASE_STEP_FLOOR_MM = 1
 
-/** Flap allowance — how far material may extend past a spot's edge. Admin-dialled, 0 = edge-to-edge. */
+/** Flap allowance — the invisible margin every disc wears (Dan's contact law): band options
+ *  are the sizes where the edge presses against spot + allowance. 0 = edge-to-edge tangency. */
 export const FLAP_MM = 12
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
@@ -67,9 +68,6 @@ export const WEIGHT_FLOOR = 0
 export const SEAT_WEIGHT_CEIL = 1000000
 export const FLAP_WEIGHT_CEIL = 10000
 export const BALANCE_WEIGHT_CEIL = 1000
-
-/** Band-walk holding boost — a slide holding within the allowance outranks any that doesn't. */
-export const HOLDING_WEIGHT = 1000000000
 
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
