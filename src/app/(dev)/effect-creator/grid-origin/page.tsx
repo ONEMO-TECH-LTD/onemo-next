@@ -568,12 +568,15 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
         </g>)
       })()}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
-      {spots.map((sp, i) => (
-        <circle key={'f' + i} cx={sp.x} cy={-sp.y} r={sp.r}
+      {spots.map((sp, i) => {
+        // INNER stroke: the line's outer edge sits exactly on the true spot radius, so a
+        // tangent disc never reads past the cut line.
+        const sw = sp.held ? 0.6 : 0.5
+        return <circle key={'f' + i} cx={sp.x} cy={-sp.y} r={sp.r - sw / 2}
           fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
           stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
-          strokeWidth={sp.held ? 0.6 : 0.5} />
-      ))}
+          strokeWidth={sw} />
+      })}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
         return <g key={'a' + i}>
