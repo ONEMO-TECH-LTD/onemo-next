@@ -476,7 +476,7 @@ export default function GridLab() {
                         : 'Top — the highest mass governs (gravity rule).'}
             </div>
             {centreMode === 2 && <div className="gl-field"><span>Governor · which mass rules</span>
-              <div className="gl-seg">
+              <div className="gl-seg gl-wrap">
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
