@@ -32,6 +32,21 @@ export function registrationScore(seats: number, flapExcessMM: number, balanceMM
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
+export type Governor = 0 | 1 | 2
+
+/** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity). */
+export function governMass<M extends { areaMM2: number; centreMM: Pt; peakClearMM?: number }>(
+  masses: ReadonlyArray<M>, governor: Governor,
+): M | null {
+  if (!masses.length) return null
+  let best = masses[0]
+  for (const m of masses) {
+    if (governor === 0 && m.areaMM2 < best.areaMM2) best = m
+    if (governor === 1 && (m.peakClearMM ?? 0) > (best.peakClearMM ?? 0)) best = m
+    if (governor === 2 && m.centreMM[1] > best.centreMM[1]) best = m
+  }
+  return best
+}
 
 /**
  * The centres a mode aims at — the switchable test system. Every returned point both anchors
@@ -78,16 +93,14 @@ export function centeringAnchors(
 export function centeringRef(
   segments: ReadonlyArray<SafeSegment>, seated: ReadonlyArray<Pt>,
   inMass: (p: Pt, mass: { bbox: SafeSegment['bbox']; rings: Pt[][] }) => boolean,
+  governor: Governor,
 ): { centreMM: Pt; bbox: SafeSegment['bbox']; rings: Pt[][] } | null {
-  let best: { areaMM2: number; centreMM: Pt; bbox: SafeSegment['bbox']; rings: Pt[][] } | null = null
+  const holding: Array<{ areaMM2: number; centreMM: Pt; peakClearMM: number; bbox: SafeSegment['bbox']; rings: Pt[][] }> = []
   for (const seg of segments) {
     const masses = seg.masses.length ? seg.masses : [seg]
-    for (const m of masses) {
-      if (best && m.areaMM2 >= best.areaMM2) continue
-      if (seated.some((p) => inMass(p, m))) best = m
-    }
+    for (const m of masses) if (seated.some((p) => inMass(p, m))) holding.push(m)
   }
-  return best
+  return governMass(holding, governor)
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

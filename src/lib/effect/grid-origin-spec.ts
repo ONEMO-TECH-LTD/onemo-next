@@ -68,6 +68,13 @@ export const MASS_DEPTH_MM = 16
 export const MASS_DEPTH_FLOOR_MM = 12
 export const MASS_DEPTH_CEIL_MM = 24
 
+/** Positioning law — 0 voting (count/centring/coverage compete across swept slides) ·
+ *  1 centre rules (grid locked to the centre by parity; seats pick among 4 parity slides). */
+export const POSITIONING = 0
+
+/** Governor — which mass rules in Masses mode: 0 smallest · 1 deepest · 2 top (gravity). */
+export const GOVERNOR = 0
+
 /** Centre mode — which centre drives anchoring and balance. Test switch:
  *  0 box · 1 core (erosion mean) · 2 masses (adaptive, default) · 3 weight (material
  *  centroid) · 4 deep (deepest point) · 5 top (highest mass). */

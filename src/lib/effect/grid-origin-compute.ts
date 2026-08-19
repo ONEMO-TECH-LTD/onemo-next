@@ -137,6 +137,8 @@ export interface SafeMass {
   areaMM2: number
   /** The deepest point of the mass — always inside the material. */
   centreMM: Pt
+  /** The mass's peak clearance, mm. */
+  peakClearMM: number
   bbox: BBox
   rings: Pt[][]
 }
@@ -365,7 +367,7 @@ export function safeSegments(
   const massesByIsland: SafeMass[][] = iso0.items.map(() => [])
   for (const m of isoD.items) {
     const islandId = iso0.comp[m.deepIdx]
-    if (islandId >= 0) massesByIsland[islandId].push({ areaMM2: m.areaMM2, centreMM: m.centreMM, bbox: m.bbox, rings: m.rings })
+    if (islandId >= 0) massesByIsland[islandId].push({ areaMM2: m.areaMM2, centreMM: m.centreMM, peakClearMM: m.peakClearMM, bbox: m.bbox, rings: m.rings })
   }
   const out: SafeSegment[] = iso0.items.map((it, id) => ({
     areaMM2: it.areaMM2,

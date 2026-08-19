@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
-import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
+import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -66,6 +66,10 @@ export default function GridLab() {
   const [massDepth, setMassDepth] = usePersisted('massDepth', MASS_DEPTH_MM)
   /** Centre-mode switch — which centre drives anchoring and balance. */
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
+  /** Positioning law — voting vs centre-rules (parity-locked, no voting). */
+  const [positioning, setPositioning] = usePersisted('positioning', POSITIONING)
+  /** Governor — which mass rules in Masses mode. */
+  const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
@@ -92,15 +96,15 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, positioning, governor, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, positioning: POSITIONING, governor: GOVERNOR, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -239,7 +243,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     // Manual calibration in a band: the walk is meaningless under a forced registration —
     // solve the current size directly, exactly like free mode.
     const manualBand = manual !== null && mode !== 'free'
@@ -255,7 +259,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -443,6 +447,17 @@ export default function GridLab() {
 
         <aside className="gl-centercol">
           <Fold title="Centering">
+            <div className="gl-field"><span>Positioning · how the centre is applied</span>
+              <div className="gl-seg">
+                <button aria-pressed={positioning === 0} onClick={() => setPositioning(0)}>Voting</button>
+                <button aria-pressed={positioning === 1} onClick={() => setPositioning(1)}>Centre rules</button>
+              </div>
+            </div>
+            <div className="gl-magic-note">
+              {positioning === 0
+                ? 'Voting — magnets, coverage and centring compete across every grid slide.'
+                : 'Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting.'}
+            </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
@@ -457,6 +472,12 @@ export default function GridLab() {
                       : centreMode === 4 ? 'Deep — the single most buried point of the shape.'
                         : 'Top — the highest mass governs (gravity rule).'}
             </div>
+            {centreMode === 2 && <div className="gl-field"><span>Governor · which mass rules</span>
+              <div className="gl-seg">
+                {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top']] as [number, string][]).map(([g, l]) =>
+                  <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
+              </div>
+            </div>}
             {(centreMode === 2 || centreMode === 5) &&
               <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
             <div className="gl-legend">

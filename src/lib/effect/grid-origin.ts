@@ -6,9 +6,11 @@ import {
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
   FLAP_MM,
+  GOVERNOR,
   MASS_DEPTH_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
+  POSITIONING,
 } from './grid-origin-spec'
 import {
   bbox,
@@ -30,10 +32,12 @@ import {
   bandOf,
   centeringAnchors,
   centeringRef,
+  governMass,
   isHolding,
   registrationScore,
   type Anchor,
   type CentreMode,
+  type Governor,
   type MagnetPlan,
 } from './grid-origin-logic'
 
@@ -62,6 +66,10 @@ export interface GridConfig {
   massDepthMM?: number
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
   centreMode?: number
+  /** Positioning law — 0 voting · 1 centre rules (parity-locked, no voting). */
+  positioning?: number
+  /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */
+  governor?: number
   /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
   segmentsDetail?: 'full' | 'light'
   plan?: MagnetPlan
@@ -114,7 +122,12 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // THE shape's centres — chosen by the centre-mode switch (logic's table). Every returned
   // point anchors the slide walk; single-target modes also fix the balance target.
   const mode = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
+  const positioning = cfg.positioning ?? POSITIONING
+  const governor = (cfg.governor ?? GOVERNOR) as Governor
   const centres = centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
+  // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
+  const allMasses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
+  const ruleTarget: Pt = mode === 2 ? (governMass(allMasses, governor)?.centreMM ?? centres[0]) : centres[0]
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
@@ -127,6 +140,24 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
+  } else if (fits && positioning === 1) {
+    // CENTRE RULES — no voting. The grid locks onto the ruling centre by parity: a node ON it,
+    // or the gap ON it, per axis — four candidates total. Seats pick among the four; coverage
+    // breaks ties. Centring is exact by construction, so balance is not scored at all.
+    const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
+    const half = pitch / 2
+    let bestScore = -Infinity
+    for (const py of [byc, byc + half]) {
+      for (const px of [bxc, bxc + half]) {
+        const ox = mod(px, pitch), oy = mod(py, pitch)
+        const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
+        if (!seat.length) continue
+        const excess = flapExcessMM(outer, seat, reach)
+        const score = registrationScore(seat.length, excess, 0)
+        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = ox; bestOy = oy }
+      }
+    }
+    mainCentre = ruleTarget
   } else if (fits) {
     // Phases: ONE full ladder swept from the first centre, plus each further mass centre's
     // EXACT slide (k=0) — the only slide of a second base the ladder doesn't already cover.
@@ -150,7 +181,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const excess = flapExcessMM(outer, seat, reach)
         // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
         // containment against the mass's real outline; other modes → the mode's single centre.
-        const ref = mode === 2 ? centeringRef(segments, seat, pointInMass) : null
+        const ref = mode === 2 ? centeringRef(segments, seat, pointInMass, governor) : null
         const inRef = ref ? seat.filter((p) => pointInMass(p, ref)) : seat
         const [tx, ty] = ref ? ref.centreMM : centres[0]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
@@ -177,7 +208,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     panMM: [bestKx, bestKy],
     spotRadiusMM: spotRadiusOf(pad),
     segments,
-    centresMM: centres,
+    centresMM: positioning === 1 ? [ruleTarget] : centres,
     centreMainMM: mainCentre,
   }
 }
