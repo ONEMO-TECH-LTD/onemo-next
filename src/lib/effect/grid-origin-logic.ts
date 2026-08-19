@@ -2,7 +2,6 @@
 
 import type { Pt } from './types'
 import {
-  BALANCE_TIE_MM,
   BANDS,
   FLAP_WEIGHT,
   MAGNET_DIA_LARGE_MM,
@@ -24,13 +23,12 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** Registration score: seats above all, then least uncovered material, then balance. Coverage
- *  is bucketed by the tie range, so near-equal coverage lets centring decide — and balance is
- *  capped below one coverage bucket, so centring can NEVER override a real coverage step. */
+/** Registration score — Dan's centring ruling 2026-08-19: "the centre must coincide with the
+ *  magnet centre." Seats above all, then CENTRING (the governing magnet's distance to the
+ *  centre), and coverage only breaks centring ties. With equal magnets, the grid always takes
+ *  the slide that puts the governing magnet exactly on the centre when one exists. */
 export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
-  const covered = Math.round(flapExcessMM / BALANCE_TIE_MM) * BALANCE_TIE_MM
-  const balance = Math.min(balanceMM, BALANCE_TIE_MM * FLAP_WEIGHT - 1)
-  return seats * SEAT_WEIGHT - covered * FLAP_WEIGHT - balance
+  return seats * SEAT_WEIGHT - balanceMM * FLAP_WEIGHT - flapExcessMM
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5

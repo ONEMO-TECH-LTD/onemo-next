@@ -68,9 +68,6 @@ export const MASS_DEPTH_MM = 16
 export const MASS_DEPTH_FLOOR_MM = 12
 export const MASS_DEPTH_CEIL_MM = 24
 
-/** Coverage amounts closer than this count as equal, so centring gets a real vote. */
-export const BALANCE_TIE_MM = 2
-
 /** Centre mode — which centre drives anchoring and balance. Test switch:
  *  0 box · 1 core (erosion mean) · 2 masses (adaptive, default) · 3 weight (material
  *  centroid) · 4 deep (deepest point) · 5 top (highest mass). */
