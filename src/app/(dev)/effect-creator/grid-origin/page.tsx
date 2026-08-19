@@ -1,6 +1,6 @@
 'use client'
 
-// grid-lab — Session 59 magnetic-grid registration bench (2D vector).
+// grid-origin — the v3.5 magnetic-grid bench (2D vector).
 // ALL engine shape sources through contourFromShape → computeGrid, rendered true-to-scale:
 //   • Presets    — shape-library getShape() (baked vector data)
 //   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)

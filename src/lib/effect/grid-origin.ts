@@ -19,6 +19,7 @@ import {
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
+  pointInMass,
   safeSegments,
   spotRadiusOf,
   type SafeSegment,
@@ -84,7 +85,7 @@ export interface GridResult {
   segments: SafeSegment[]
 }
 
-/** Sweep the lattice phase on the 12mm increment, seat exactly, score, apply coverage, report. */
+/** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -131,10 +132,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const excess = flapExcessMM(outer, seat, reach)
         // Balance target: the smallest mass that holds a seat governs (logic's rule); the
         // seats inside it are measured to its deepest point. No mass claimed → box centre.
-        const ref = centeringRef(segments, seat)
-        const inRef = ref
-          ? seat.filter((p) => p[0] >= ref.bbox.minX && p[0] <= ref.bbox.maxX && p[1] >= ref.bbox.minY && p[1] <= ref.bbox.maxY)
-          : seat
+        // Containment is against the mass's real outline, so a seat outside a concave mass
+        // but inside its box cannot wrongly claim it.
+        const ref = centeringRef(segments, seat, pointInMass)
+        const inRef = ref ? seat.filter((p) => pointInMass(p, ref)) : seat
         const [tx, ty] = ref ? ref.centreMM : [cx, cy]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)

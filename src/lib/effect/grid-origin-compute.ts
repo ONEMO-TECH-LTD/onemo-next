@@ -352,6 +352,13 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
   return out
 }
 
+/** Is a point inside a mass's real outline? Box prescreen, then the traced ring. */
+export function pointInMass(p: Pt, mass: { bbox: BBox; rings: Pt[][] }): boolean {
+  if (p[0] < mass.bbox.minX || p[0] > mass.bbox.maxX || p[1] < mass.bbox.minY || p[1] > mass.bbox.maxY) return false
+  if (!mass.rings.length) return true
+  return mass.rings.some((ring) => pointInPolygon(p, ring as Pt[]))
+}
+
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45

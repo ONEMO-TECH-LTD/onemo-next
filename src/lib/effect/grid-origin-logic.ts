@@ -25,10 +25,12 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 export interface Anchor { p: Pt; dia: MagnetDia }
 
 /** Registration score: seats above all, then least uncovered material, then balance. Coverage
- *  is bucketed by the tie range, so near-equal coverage lets centring decide. */
+ *  is bucketed by the tie range, so near-equal coverage lets centring decide — and balance is
+ *  capped below one coverage bucket, so centring can NEVER override a real coverage step. */
 export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
   const covered = Math.round(flapExcessMM / BALANCE_TIE_MM) * BALANCE_TIE_MM
-  return seats * SEAT_WEIGHT - covered * FLAP_WEIGHT - balanceMM
+  const balance = Math.min(balanceMM, BALANCE_TIE_MM * FLAP_WEIGHT - 1)
+  return seats * SEAT_WEIGHT - covered * FLAP_WEIGHT - balance
 }
 
 /**
@@ -38,15 +40,14 @@ export function registrationScore(seats: number, flapExcessMM: number, balanceMM
  */
 export function centeringRef(
   segments: ReadonlyArray<SafeSegment>, seated: ReadonlyArray<Pt>,
-): { centreMM: Pt; bbox: SafeSegment['bbox'] } | null {
-  let best: { areaMM2: number; centreMM: Pt; bbox: SafeSegment['bbox'] } | null = null
+  inMass: (p: Pt, mass: { bbox: SafeSegment['bbox']; rings: Pt[][] }) => boolean,
+): { centreMM: Pt; bbox: SafeSegment['bbox']; rings: Pt[][] } | null {
+  let best: { areaMM2: number; centreMM: Pt; bbox: SafeSegment['bbox']; rings: Pt[][] } | null = null
   for (const seg of segments) {
     const masses = seg.masses.length ? seg.masses : [seg]
     for (const m of masses) {
       if (best && m.areaMM2 >= best.areaMM2) continue
-      const holdsSeat = seated.some((p) =>
-        p[0] >= m.bbox.minX && p[0] <= m.bbox.maxX && p[1] >= m.bbox.minY && p[1] <= m.bbox.maxY)
-      if (holdsSeat) best = m
+      if (seated.some((p) => inMass(p, m))) best = m
     }
   }
   return best
