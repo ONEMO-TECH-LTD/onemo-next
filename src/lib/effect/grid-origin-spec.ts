@@ -58,9 +58,15 @@ export const FLAP_CEIL_MM = 48
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
-/** Registration score weights: seats, then flaps, then balance. */
+/** Registration score weights: seats, then flaps, then balance — each admin-dialled in the
+ *  Voting card so the forces can be balanced live. */
 export const SEAT_WEIGHT = 100000
 export const FLAP_WEIGHT = 100
+export const BALANCE_WEIGHT = 1
+export const WEIGHT_FLOOR = 0
+export const SEAT_WEIGHT_CEIL = 1000000
+export const FLAP_WEIGHT_CEIL = 10000
+export const BALANCE_WEIGHT_CEIL = 1000
 
 /** Band-walk holding boost — a slide holding within the allowance outranks any that doesn't. */
 export const HOLDING_WEIGHT = 1000000000

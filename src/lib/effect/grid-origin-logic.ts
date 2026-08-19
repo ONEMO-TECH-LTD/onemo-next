@@ -2,6 +2,7 @@
 
 import type { Pt } from './types'
 import {
+  BALANCE_WEIGHT,
   BANDS,
   FLAP_WEIGHT,
   HOLDING_WEIGHT,
@@ -28,8 +29,13 @@ export interface Anchor { p: Pt; dia: MagnetDia }
  *  above all, then UNCOVERED MATERIAL (the flap dial's placement power — it pulls magnets
  *  toward material), then balance to the centre as the tie-break. Exact centring is the
  *  CENTRE-RULES law's job, not this score's — the two positioning laws split the principles. */
-export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
-  return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
+export interface VotingWeights { seat?: number; flap?: number; balance?: number }
+export function registrationScore(
+  seats: number, flapExcessMM: number, balanceMM: number, w?: VotingWeights,
+): number {
+  return seats * (w?.seat ?? SEAT_WEIGHT)
+    - flapExcessMM * (w?.flap ?? FLAP_WEIGHT)
+    - balanceMM * (w?.balance ?? BALANCE_WEIGHT)
 }
 
 /** Band-walk rank — Dan's band law: a slide that HOLDS at the dialled allowance outranks any

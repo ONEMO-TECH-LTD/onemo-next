@@ -76,6 +76,12 @@ export interface GridConfig {
   segmentsDetail?: 'full' | 'light'
   /** Band-walk law: a slide holding at the allowance outranks any that does not. */
   preferHolding?: boolean
+  /** Voting-law weights, admin-dialled; spec defaults when absent. */
+  seatWeight?: number
+  flapWeight?: number
+  balanceWeight?: number
+  /** Per-size solve reuse for band walks — owned by the caller (the worker). */
+  solveCache?: Map<number, GridResult>
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -207,7 +213,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
         const score = holdingFirstScore(
-          registrationScore(seat.length, excess, balance), !!cfg.preferHolding && excess === 0)
+          registrationScore(seat.length, excess, balance,
+            { seat: cfg.seatWeight, flap: cfg.flapWeight, balance: cfg.balanceWeight }),
+          !!cfg.preferHolding && excess === 0)
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k; mainCentre = [tx, ty] }
       }
     }
@@ -275,7 +283,8 @@ function bandWalk(
   const points: BandSnapPoint[] = []
   let bestSeatedMM = lo, bestSeats = -1
   for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), walkCfg)
+    let grid = cfg.solveCache?.get(mm)
+    if (!grid) { grid = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, grid) }
     if (grid.anchors.length > bestSeats) { bestSeats = grid.anchors.length; bestSeatedMM = mm }
     if (isHolding(grid.anchors.length, grid.flaps.length)) points.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
   }
