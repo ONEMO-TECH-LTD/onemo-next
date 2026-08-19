@@ -146,6 +146,10 @@ export interface SafeSegment {
   areaMM2: number
   /** The island's deepest point — max clearance, never a concave void. */
   centreMM: Pt
+  /** The island's area-average point — can sit in a concave void; a test-mode reference. */
+  meanMM: Pt
+  /** The island's peak clearance, mm — how deep its most buried point sits. */
+  peakClearMM: number
   bbox: BBox
   /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
   rings: Pt[][]
@@ -226,16 +230,16 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
     return dense.map((p) => snapToIso(p, thr))
   }
 
-  interface LevelItem { areaMM2: number; centreMM: Pt; bbox: BBox; rings: Pt[][]; deepIdx: number }
+  interface LevelItem { areaMM2: number; centreMM: Pt; meanMM: Pt; peakClearMM: number; bbox: BBox; rings: Pt[][]; deepIdx: number }
   /** Regions of S ≥ thr: connectivity, deepest point, bbox and traced outlines. */
   const level = (thr: number): { comp: Int32Array; items: LevelItem[] } => {
     const comp = new Int32Array(nx * ny).fill(-1)
-    type Acc = { n: number; minX: number; minY: number; maxX: number; maxY: number; deepIdx: number; deepS: number }
+    type Acc = { n: number; sx: number; sy: number; minX: number; minY: number; maxX: number; maxY: number; deepIdx: number; deepS: number }
     const accs: Acc[] = []
     for (let seed = 0; seed < nx * ny; seed++) {
       if (S[seed] < thr || comp[seed] >= 0) continue
       const id = accs.length
-      const acc: Acc = { n: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, deepIdx: seed, deepS: -Infinity }
+      const acc: Acc = { n: 0, sx: 0, sy: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, deepIdx: seed, deepS: -Infinity }
       accs.push(acc)
       const stack = [seed]
       comp[seed] = id
@@ -244,6 +248,7 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
         const ix = i % nx, iy = (i / nx) | 0
         const px = x0 + ix * step, py = y0 + iy * step
         acc.n++
+        acc.sx += px; acc.sy += py
         if (S[i] > acc.deepS) { acc.deepS = S[i]; acc.deepIdx = i }
         if (px < acc.minX) acc.minX = px; if (px > acc.maxX) acc.maxX = px
         if (py < acc.minY) acc.minY = py; if (py > acc.maxY) acc.maxY = py
@@ -325,6 +330,8 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
       items: accs.map((a, id) => ({
         areaMM2: a.n * step * step,
         centreMM: at(a.deepIdx),
+        meanMM: [a.sx / a.n, a.sy / a.n] as Pt,
+        peakClearMM: a.deepS + r + thr,
         bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
         rings: ringsByComp[id],
         deepIdx: a.deepIdx,
@@ -344,12 +351,31 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
   const out: SafeSegment[] = iso0.items.map((it, id) => ({
     areaMM2: it.areaMM2,
     centreMM: it.centreMM,
+    meanMM: it.meanMM,
+    peakClearMM: it.peakClearMM,
     bbox: it.bbox,
     rings: it.rings,
     masses: massesByIsland[id].sort((a, b) => a.areaMM2 - b.areaMM2),
   }))
   out.sort((a, b) => a.areaMM2 - b.areaMM2)
   return out
+}
+
+/** Area centroid of a polygon (shoelace) — the material's weight centre. */
+export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
+  let a2 = 0, sx = 0, sy = 0
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const cross = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
+    a2 += cross
+    sx += (pts[j][0] + pts[i][0]) * cross
+    sy += (pts[j][1] + pts[i][1]) * cross
+  }
+  if (Math.abs(a2) < 1e-9) {
+    let mx = 0, my = 0
+    for (const p of pts) { mx += p[0]; my += p[1] }
+    return [mx / pts.length, my / pts.length]
+  }
+  return [sx / (3 * a2), sy / (3 * a2)]
 }
 
 /** Is a point inside a mass's real outline? Box prescreen, then the traced ring. */

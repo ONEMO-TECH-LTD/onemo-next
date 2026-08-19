@@ -33,6 +33,45 @@ export function registrationScore(seats: number, flapExcessMM: number, balanceMM
   return seats * SEAT_WEIGHT - covered * FLAP_WEIGHT - balance
 }
 
+export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
+
+/**
+ * The centres a mode aims at — the switchable test system. Every returned point both anchors
+ * the slide walk and (for single-target modes) is the balance target. Mode 2 returns every
+ * mass centre; its balance target is then the governing mass via centeringRef.
+ */
+export function centeringAnchors(
+  mode: CentreMode,
+  segments: ReadonlyArray<SafeSegment>,
+  boxCentre: Pt,
+  weightCentre: Pt,
+): Pt[] {
+  if (mode === 0) return [boxCentre]
+  if (mode === 3) return [weightCentre]
+  if (!segments.length) return [boxCentre]
+  if (mode === 1) {
+    // The whole erosion area's centre — area-weighted mean of the islands' means.
+    let n = 0, sx = 0, sy = 0
+    for (const seg of segments) { n += seg.areaMM2; sx += seg.meanMM[0] * seg.areaMM2; sy += seg.meanMM[1] * seg.areaMM2 }
+    return [[sx / n, sy / n]]
+  }
+  if (mode === 4) {
+    // The single most buried point of the shape.
+    let best = segments[0]
+    for (const seg of segments) if (seg.peakClearMM > best.peakClearMM) best = seg
+    return [best.centreMM]
+  }
+  const masses = segments.flatMap((seg) => (seg.masses.length ? seg.masses : [seg]))
+  if (mode === 5) {
+    // Gravity: the highest mass governs.
+    let top = masses[0]
+    for (const m of masses) if (m.centreMM[1] > top.centreMM[1]) top = m
+    return [top.centreMM]
+  }
+  // Mode 2 — adaptive: every mass centre anchors; scoring chooses between them.
+  return masses.map((m) => m.centreMM)
+}
+
 /**
  * The centring target — Dan's rule: THE SMALLEST MASS THAT HOLDS A MAGNET GOVERNS; the grid
  * centres on its deepest point. The roomy masses adapt; an unused sliver can never hijack.

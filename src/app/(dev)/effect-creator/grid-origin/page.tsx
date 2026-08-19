@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
-import { BANDS, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
+import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
 const IMG = 1000
@@ -64,6 +64,8 @@ export default function GridLab() {
   const [phaseStep, setPhaseStep] = usePersisted('phaseStep', PHASE_STEP_MM)
   /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
   const [massDepth, setMassDepth] = usePersisted('massDepth', MASS_DEPTH_MM)
+  /** Centre-mode switch — which centre drives anchoring and balance. */
+  const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
@@ -88,15 +90,15 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -221,12 +223,12 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     const id = ++seqRef.current
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -377,7 +379,6 @@ export default function GridLab() {
             <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
               <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
             </LabRow>
-            <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
@@ -405,7 +406,27 @@ export default function GridLab() {
               <button onClick={resetDefaults}>Reset to default</button>
             </div>
           </Fold>
+        </aside>
 
+        <aside className="gl-centercol">
+          <Fold title="Centering">
+            <div className="gl-field"><span>Centre mode · what the grid aims at</span>
+              <div className="gl-seg gl-wrap">
+                {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
+                  <button key={m} aria-pressed={centreMode === m} onClick={() => setCentreMode(m)}>{l}</button>)}
+              </div>
+            </div>
+            <div className="gl-magic-note">
+              {centreMode === 0 ? 'Box — the bounding box centre; ignores where the material is.'
+                : centreMode === 1 ? 'Core — the centre of the whole 12mm legal area, area-weighted.'
+                  : centreMode === 2 ? 'Masses — adaptive: every mass centre anchors; the smallest mass holding a magnet governs.'
+                    : centreMode === 3 ? 'Weight — the material centroid of the silhouette.'
+                      : centreMode === 4 ? 'Deep — the single most buried point of the shape.'
+                        : 'Top — the highest mass governs (gravity rule).'}
+            </div>
+            {(centreMode === 2 || centreMode === 5) &&
+              <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
+          </Fold>
         </aside>
       </div>
     </div>
@@ -527,6 +548,11 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
           </text>
         </g>
       })}
+      {/* The active centre-mode's target(s): a small bullseye at each aimed point. */}
+      {grid.centresMM.map((c, ci) => <g key={'c' + ci} style={{ pointerEvents: 'none' }}>
+        <circle cx={c[0]} cy={-c[1]} r={2.6} fill="none" stroke="var(--accent)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+        <circle cx={c[0]} cy={-c[1]} r={0.7} fill="var(--accent)" />
+      </g>)}
       {/* Faint bounding box, its dimension written on every side. */}
       {box && <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink)"
         strokeOpacity={0.22} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
@@ -616,9 +642,10 @@ const CSS = `
 .gl-head h1{font-size:20px;font-weight:640;letter-spacing:-.01em;margin:0 0 5px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;justify-content:center}
 .gl-tag{font:600 11px var(--mono);color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;letter-spacing:.02em}
 .gl-head p{color:var(--ink-2);font-size:13.5px;margin:0;max-width:74ch;line-height:1.55}
-.gl-body{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
-.gl-stage{grid-column:1;grid-row:1}
-.gl-controls{grid-column:2;grid-row:1}
+.gl-body{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:290px minmax(0,1fr) 336px;gap:20px;align-items:start}
+.gl-centercol{grid-column:1;grid-row:1}
+.gl-stage{grid-column:2;grid-row:1}
+.gl-controls{grid-column:3;grid-row:1}
 .gl-lab-off{opacity:.4;pointer-events:none}
 .gl-labrow{display:flex;gap:9px;align-items:flex-start}
 .gl-labrow>input{width:15px;height:15px;accent-color:var(--accent);margin-top:3px;flex:none}
@@ -628,8 +655,10 @@ const CSS = `
 .gl-fold summary::after{content:'▾';font-size:11px;transition:transform .15s}
 .gl-fold:not([open]) summary::after{transform:rotate(-90deg)}
 .gl-fold-body{display:flex;flex-direction:column;gap:15px;padding:2px 18px 18px}
+@media (max-width:1100px){.gl-body{grid-template-columns:minmax(0,1fr) 336px}
+  .gl-stage{grid-column:1;grid-row:1}.gl-controls{grid-column:2;grid-row:1}.gl-centercol{grid-column:1/-1;grid-row:2}}
 @media (max-width:840px){.gl-body{grid-template-columns:1fr}
-  .gl-stage{grid-column:1;grid-row:auto}.gl-controls{grid-column:1;grid-row:auto}}
+  .gl-stage{grid-column:1;grid-row:auto}.gl-controls{grid-column:1;grid-row:auto}.gl-centercol{grid-column:1;grid-row:auto}}
 .gl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .gl-pad{padding:18px;display:flex;flex-direction:column;gap:15px}
 .gl-stage{padding:20px;display:flex;flex-direction:column;gap:14px}

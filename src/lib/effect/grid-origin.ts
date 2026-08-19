@@ -3,6 +3,7 @@
 
 import type { Contour, Pt } from './types'
 import {
+  CENTRE_MODE,
   DEFAULT_PITCH_MM,
   FLAP_MM,
   MAGNET_DIA_LARGE_MM,
@@ -13,6 +14,7 @@ import {
 } from './grid-origin-spec'
 import {
   bbox,
+  centroidOf,
   fieldSpanMM,
   flapExcessMM,
   flapVerts,
@@ -28,11 +30,13 @@ import {
   applyCoverage,
   assignSizes,
   bandOf,
+  centeringAnchors,
   centeringRef,
   isHolding,
   registrationScore,
   verdictIssues,
   type Anchor,
+  type CentreMode,
   type MagnetPlan,
 } from './grid-origin-logic'
 
@@ -59,6 +63,8 @@ export interface GridConfig {
   forcePhaseMM?: Pt
   /** Clearance a region must survive to count as a mass for centring. */
   massDepthMM?: number
+  /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
+  centreMode?: number
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -83,6 +89,8 @@ export interface GridResult {
   spotRadiusMM: number
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
+  /** The active centre-mode's target point(s) — drawn so the aim is visible. */
+  centresMM: Pt[]
 }
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
@@ -105,13 +113,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
   const segments = safeSegments(outer, spotRadiusOf(pad), massDepth)
 
-  // THE shape's centres — adaptive, not the box: every mass's deepest point anchors the slide
-  // walk, so a mass-centred registration exists for each mass at ANY step size, and the scoring
-  // rule chooses between them. The box centre is only the no-island fallback.
-  const centres: Pt[] = []
-  for (const seg of segments)
-    for (const m of (seg.masses.length ? seg.masses : [seg])) centres.push(m.centreMM)
-  if (!centres.length) centres.push([cx, cy])
+  // THE shape's centres — chosen by the centre-mode switch (logic's table). Every returned
+  // point anchors the slide walk; single-target modes also fix the balance target.
+  const mode = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
+  const centres = centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
@@ -144,13 +149,11 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
         const excess = flapExcessMM(outer, seat, reach)
-        // Balance target: the smallest mass that holds a seat governs (logic's rule); the
-        // seats inside it are measured to its deepest point. No mass claimed → box centre.
-        // Containment is against the mass's real outline, so a seat outside a concave mass
-        // but inside its box cannot wrongly claim it.
-        const ref = centeringRef(segments, seat, pointInMass)
+        // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
+        // containment against the mass's real outline; other modes → the mode's single centre.
+        const ref = mode === 2 ? centeringRef(segments, seat, pointInMass) : null
         const inRef = ref ? seat.filter((p) => pointInMass(p, ref)) : seat
-        const [tx, ty] = ref ? ref.centreMM : [cx, cy]
+        const [tx, ty] = ref ? ref.centreMM : centres[0]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
         const score = registrationScore(seat.length, excess, balance)
@@ -183,6 +186,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     panMM: [bestKx, bestKy],
     spotRadiusMM: spotRadiusOf(pad),
     segments,
+    centresMM: centres,
   }
 }
 
