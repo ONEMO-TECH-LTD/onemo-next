@@ -427,11 +427,14 @@ function Stage({ contour, grid, lattice, box, segments, onPan, onZoom, onReset }
       {/* Legal-area islands: coloured cells, dashed box, centre cross — engine y-up, drawn y-down. */}
       {segments.map((sg, si) => {
         const hue = SEG_HUES[si % SEG_HUES.length]
-        const c = sg.cellMM
         const fs = 11 * spanMM / VP
         const [gx, gy] = [sg.centreMM[0], -sg.centreMM[1]]
         return <g key={'sg' + si} style={{ pointerEvents: 'none' }}>
-          {sg.cells.map((p, i) => <rect key={i} x={p[0] - c / 2} y={-p[1] - c / 2} width={c} height={c} fill={hue} fillOpacity={0.16} />)}
+          {sg.rings.map((ring, ri) => {
+            const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
+            return <path key={ri} d={d} fill={hue} fillOpacity={0.12} stroke={hue} strokeOpacity={0.85}
+              strokeWidth={1.2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          })}
           <rect x={sg.bbox.minX} y={-sg.bbox.maxY} width={sg.bbox.maxX - sg.bbox.minX} height={sg.bbox.maxY - sg.bbox.minY}
             fill="none" stroke={hue} strokeOpacity={0.75} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
           <path d={`M ${gx - fs} ${gy} H ${gx + fs} M ${gx} ${gy - fs} V ${gy + fs}`}
