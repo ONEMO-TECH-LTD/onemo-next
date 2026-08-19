@@ -7,6 +7,7 @@ import {
   FLAP_MM,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
+  MASS_DEPTH_MM,
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
 } from './grid-origin-spec'
@@ -18,12 +19,15 @@ import {
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
+  safeSegments,
   spotRadiusOf,
+  type SafeSegment,
 } from './grid-origin-compute'
 import {
   applyCoverage,
   assignSizes,
   bandOf,
+  centeringRef,
   isHolding,
   registrationScore,
   verdictIssues,
@@ -38,6 +42,7 @@ export {
   safeSegments,
   scaleContour,
   spotRadiusOf,
+  type SafeMass,
   type SafeSegment,
 } from './grid-origin-compute'
 export { bandOf, isHolding, type Anchor, type MagnetDia, type MagnetPlan } from './grid-origin-logic'
@@ -51,6 +56,8 @@ export interface GridConfig {
   phaseStepMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
   forcePhaseMM?: Pt
+  /** Clearance a region must survive to count as a mass for centring. */
+  massDepthMM?: number
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -73,6 +80,8 @@ export interface GridResult {
   panMM: Pt
   /** The spot radius the erosion used — the padding, centre-measured. */
   spotRadiusMM: number
+  /** The legal area's islands with depth masses — what centring anchored on. */
+  segments: SafeSegment[]
 }
 
 /** Sweep the lattice phase on the 12mm increment, seat exactly, score, apply coverage, report. */
@@ -91,6 +100,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const fits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
     : makeSeatPredicate(outer, spotRadiusOf(pad))
+
+  const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
+  const segments = safeSegments(outer, spotRadiusOf(pad), massDepth)
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
@@ -117,8 +129,15 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
         const excess = flapExcessMM(outer, seat, reach)
-        let sx = 0, sy = 0; for (const p of seat) { sx += p[0]; sy += p[1] }
-        const balance = Math.hypot(sx / seat.length - cx, sy / seat.length - cy)
+        // Balance target: the smallest mass that holds a seat governs (logic's rule); the
+        // seats inside it are measured to its deepest point. No mass claimed → box centre.
+        const ref = centeringRef(segments, seat)
+        const inRef = ref
+          ? seat.filter((p) => p[0] >= ref.bbox.minX && p[0] <= ref.bbox.maxX && p[1] >= ref.bbox.minY && p[1] <= ref.bbox.maxY)
+          : seat
+        const [tx, ty] = ref ? ref.centreMM : [cx, cy]
+        let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
+        const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
         const score = registrationScore(seat.length, excess, balance)
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k }
       }
@@ -148,6 +167,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     phaseMM: [bestOx, bestOy],
     panMM: [bestKx, bestKy],
     spotRadiusMM: spotRadiusOf(pad),
+    segments,
   }
 }
 

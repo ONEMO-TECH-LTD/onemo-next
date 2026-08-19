@@ -132,13 +132,25 @@ export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>
   return sum / outer.length
 }
 
+/** A mass inside an island — the region surviving the depth probe, with its outline. */
+export interface SafeMass {
+  areaMM2: number
+  /** The deepest point of the mass — always inside the material. */
+  centreMM: Pt
+  bbox: BBox
+  rings: Pt[][]
+}
+
 /** One connected island of the legal magnet-centre area, measured on a mesh. */
 export interface SafeSegment {
   areaMM2: number
+  /** The island's deepest point — max clearance, never a concave void. */
   centreMM: Pt
   bbox: BBox
   /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
   rings: Pt[][]
+  /** Sub-masses at the depth probe: limbs and slivers die shallow, true masses survive. */
+  masses: SafeMass[]
 }
 
 /** Marching-squares topology: per corner-sign mask (array position), the cell-edge pairs a
@@ -151,14 +163,15 @@ const MS_CASES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
 ]
 
 /**
- * The legal area's separate islands with smooth offset outlines. Signed clearance
- * (distance to the cut line minus the spot radius, negative outside) is sampled on a mesh;
- * islands are its positive regions grouped by connectivity, and each outline is the
- * zero-crossing traced between samples (marching squares with linear interpolation), so the
- * drawn edge follows the true offset curve, not the mesh cells. A MEASUREMENT for display
- * and scoring — every magnet's legality stays the exact per-point test, never this mesh.
+ * The legal area's separate islands with smooth offset outlines and depth masses. Signed
+ * clearance (distance to the cut line minus the spot radius, negative outside) is sampled on
+ * a mesh once; islands are its regions above zero, masses its regions above the depth probe,
+ * and every outline is the level crossing traced between samples (marching squares with
+ * linear interpolation), so drawn edges follow the true offset curves, not mesh cells.
+ * Centres are DEEPEST POINTS, so a crescent's centre sits in its arc, never the void.
+ * A MEASUREMENT for display and scoring — magnet legality stays the exact per-point test.
  */
-export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number): SafeSegment[] {
+export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, massDepthMM: number): SafeSegment[] {
   if (outer.length < 3) return []
   // Dense traced outlines are decimated for this measurement — display grain, not legality.
   const MAXV = 800
@@ -181,110 +194,133 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number): Sa
     for (let ix = 0; ix < nx; ix++)
       S[iy * nx + ix] = signed([x0 + ix * step, y0 + iy * step])
 
-  // Islands: positive samples grouped 4-neighbour; comp id per sample.
-  const comp = new Int32Array(nx * ny).fill(-1)
-  type Acc = { n: number; sx: number; sy: number; minX: number; minY: number; maxX: number; maxY: number }
-  const accs: Acc[] = []
-  for (let start = 0; start < nx * ny; start++) {
-    if (S[start] < 0 || comp[start] >= 0) continue
-    const id = accs.length
-    const acc: Acc = { n: 0, sx: 0, sy: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
-    accs.push(acc)
-    const stack = [start]
-    comp[start] = id
-    while (stack.length) {
-      const i = stack.pop()!
-      const ix = i % nx, iy = (i / nx) | 0
-      const px = x0 + ix * step, py = y0 + iy * step
-      acc.n++; acc.sx += px; acc.sy += py
-      if (px < acc.minX) acc.minX = px; if (px > acc.maxX) acc.maxX = px
-      if (py < acc.minY) acc.minY = py; if (py > acc.maxY) acc.maxY = py
-      for (const j of [i - 1, i + 1, i - nx, i + nx]) {
-        if (j < 0 || j >= nx * ny || comp[j] >= 0 || S[j] < 0) continue
-        if (Math.abs((j % nx) - ix) > 1) continue // row wrap
-        comp[j] = id
-        stack.push(j)
-      }
-    }
-  }
-  if (!accs.length) return []
-
-  // Zero-crossing segments per mesh cell, lerped between samples; chained into rings.
   const key = (p: Pt) => (Math.round(p[0] * 100) + ',' + Math.round(p[1] * 100))
-  const segs: Array<[Pt, Pt]> = []
   const lerp = (pa: Pt, sa: number, pb: Pt, sb: number): Pt => {
     const t = sa / (sa - sb)
     return [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t]
   }
-  for (let iy = 0; iy < ny - 1; iy++) {
-    for (let ix = 0; ix < nx - 1; ix++) {
-      const i00 = iy * nx + ix, i10 = i00 + 1, i01 = i00 + nx, i11 = i01 + 1
-      const s00 = S[i00], s10 = S[i10], s01 = S[i01], s11 = S[i11]
-      const m = (s00 >= 0 ? 1 : 0) | (s10 >= 0 ? 2 : 0) | (s11 >= 0 ? 4 : 0) | (s01 >= 0 ? 8 : 0)
-      if (m === 0 || m === 15) continue
-      const ax = x0 + ix * step, ay = y0 + iy * step
-      const P00: Pt = [ax, ay], P10: Pt = [ax + step, ay], P01: Pt = [ax, ay + step], P11: Pt = [ax + step, ay + step]
-      // Crossing point on each cell edge: 0=top 1=right 2=bottom 3=left.
-      const edge = (e: number): Pt =>
-        e === 0 ? lerp(P00, s00, P10, s10)
-          : e === 1 ? lerp(P10, s10, P11, s11)
-            : e === 2 ? lerp(P01, s01, P11, s11)
-              : lerp(P00, s00, P01, s01)
-      for (const [ea, eb] of MS_CASES[m]) segs.push([edge(ea), edge(eb)])
+
+  interface LevelItem { areaMM2: number; centreMM: Pt; bbox: BBox; rings: Pt[][]; deepIdx: number }
+  /** Regions of S ≥ thr: connectivity, deepest point, bbox and traced outlines. */
+  const level = (thr: number): { comp: Int32Array; items: LevelItem[] } => {
+    const comp = new Int32Array(nx * ny).fill(-1)
+    type Acc = { n: number; minX: number; minY: number; maxX: number; maxY: number; deepIdx: number; deepS: number }
+    const accs: Acc[] = []
+    for (let seed = 0; seed < nx * ny; seed++) {
+      if (S[seed] < thr || comp[seed] >= 0) continue
+      const id = accs.length
+      const acc: Acc = { n: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, deepIdx: seed, deepS: -Infinity }
+      accs.push(acc)
+      const stack = [seed]
+      comp[seed] = id
+      while (stack.length) {
+        const i = stack.pop()!
+        const ix = i % nx, iy = (i / nx) | 0
+        const px = x0 + ix * step, py = y0 + iy * step
+        acc.n++
+        if (S[i] > acc.deepS) { acc.deepS = S[i]; acc.deepIdx = i }
+        if (px < acc.minX) acc.minX = px; if (px > acc.maxX) acc.maxX = px
+        if (py < acc.minY) acc.minY = py; if (py > acc.maxY) acc.maxY = py
+        for (const j of [i - 1, i + 1, i - nx, i + nx]) {
+          if (j < 0 || j >= nx * ny || comp[j] >= 0 || S[j] < thr) continue
+          if (Math.abs((j % nx) - ix) > 1) continue // row wrap
+          comp[j] = id
+          stack.push(j)
+        }
+      }
     }
-  }
-  const byEnd = new Map<string, Array<[Pt, Pt]>>()
-  for (const s of segs) {
-    for (const p of [s[0], s[1]]) {
-      const kk = key(p)
-      const list = byEnd.get(kk)
-      if (list) list.push(s); else byEnd.set(kk, [s])
+    // Level-crossing segments per mesh cell, lerped; chained into closed rings.
+    const segs: Array<[Pt, Pt]> = []
+    for (let iy = 0; iy < ny - 1; iy++) {
+      for (let ix = 0; ix < nx - 1; ix++) {
+        const i00 = iy * nx + ix, i10 = i00 + 1, i01 = i00 + nx, i11 = i01 + 1
+        const s00 = S[i00] - thr, s10 = S[i10] - thr, s01 = S[i01] - thr, s11 = S[i11] - thr
+        const m = (s00 >= 0 ? 1 : 0) | (s10 >= 0 ? 2 : 0) | (s11 >= 0 ? 4 : 0) | (s01 >= 0 ? 8 : 0)
+        if (m === 0 || m === MS_CASES.length - 1) continue
+        const ax = x0 + ix * step, ay = y0 + iy * step
+        const P00: Pt = [ax, ay], P10: Pt = [ax + step, ay], P01: Pt = [ax, ay + step], P11: Pt = [ax + step, ay + step]
+        // Crossing point on each cell edge: 0=top 1=right 2=bottom 3=left.
+        const edge = (e: number): Pt =>
+          e === 0 ? lerp(P00, s00, P10, s10)
+            : e === 1 ? lerp(P10, s10, P11, s11)
+              : e === 2 ? lerp(P01, s01, P11, s11)
+                : lerp(P00, s00, P01, s01)
+        for (const [ea, eb] of MS_CASES[m]) segs.push([edge(ea), edge(eb)])
+      }
     }
-  }
-  const used = new Set<[Pt, Pt]>()
-  const loops: Pt[][] = []
-  for (const s of segs) {
-    if (used.has(s)) continue
-    used.add(s)
-    const loop: Pt[] = [s[0], s[1]]
-    for (; ;) {
-      const tail = loop[loop.length - 1]
-      const cands = byEnd.get(key(tail)) ?? []
-      const next = cands.find((c) => !used.has(c))
-      if (!next) break
-      used.add(next)
-      loop.push(key(next[0]) === key(tail) ? next[1] : next[0])
-      if (key(loop[loop.length - 1]) === key(loop[0])) break
+    const byEnd = new Map<string, Array<[Pt, Pt]>>()
+    for (const s of segs) {
+      for (const p of [s[0], s[1]]) {
+        const kk = key(p)
+        const list = byEnd.get(kk)
+        if (list) list.push(s); else byEnd.set(kk, [s])
+      }
     }
-    if (loop.length > 3) loops.push(loop)
+    const used = new Set<[Pt, Pt]>()
+    const loops: Pt[][] = []
+    for (const s of segs) {
+      if (used.has(s)) continue
+      used.add(s)
+      const loop: Pt[] = [s[0], s[1]]
+      for (; ;) {
+        const tail = loop[loop.length - 1]
+        const cands = byEnd.get(key(tail)) ?? []
+        const next = cands.find((c) => !used.has(c))
+        if (!next) break
+        used.add(next)
+        loop.push(key(next[0]) === key(tail) ? next[1] : next[0])
+        if (key(loop[loop.length - 1]) === key(loop[0])) break
+      }
+      if (loop.length > 3) loops.push(loop)
+    }
+    // Attach each ring to the region of the nearest qualifying sample.
+    const compAt = (p: Pt): number => {
+      let best = -1, bd = Infinity
+      const ix0 = Math.max(0, Math.min(nx - 1, Math.round((p[0] - x0) / step)))
+      const iy0 = Math.max(0, Math.min(ny - 1, Math.round((p[1] - y0) / step)))
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const ix = ix0 + dx, iy = iy0 + dy
+        if (ix < 0 || ix >= nx || iy < 0 || iy >= ny) continue
+        const i = iy * nx + ix
+        if (comp[i] < 0) continue
+        const d = (ix * step + x0 - p[0]) ** 2 + (iy * step + y0 - p[1]) ** 2
+        if (d < bd) { bd = d; best = comp[i] }
+      }
+      return best
+    }
+    const ringsByComp: Pt[][][] = accs.map(() => [])
+    for (const loop of loops) {
+      const id = compAt(loop[0])
+      if (id >= 0) ringsByComp[id].push(loop)
+    }
+    const at = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
+    return {
+      comp,
+      items: accs.map((a, id) => ({
+        areaMM2: a.n * step * step,
+        centreMM: at(a.deepIdx),
+        bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
+        rings: ringsByComp[id],
+        deepIdx: a.deepIdx,
+      })),
+    }
   }
 
-  // Attach each ring to the island of the nearest positive sample.
-  const compAt = (p: Pt): number => {
-    let best = -1, bd = Infinity
-    const ix0 = Math.max(0, Math.min(nx - 1, Math.round((p[0] - x0) / step)))
-    const iy0 = Math.max(0, Math.min(ny - 1, Math.round((p[1] - y0) / step)))
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-      const ix = ix0 + dx, iy = iy0 + dy
-      if (ix < 0 || ix >= nx || iy < 0 || iy >= ny) continue
-      const i = iy * nx + ix
-      if (comp[i] < 0) continue
-      const d = (ix * step + x0 - p[0]) ** 2 + (iy * step + y0 - p[1]) ** 2
-      if (d < bd) { bd = d; best = comp[i] }
-    }
-    return best
+  const iso0 = level(0)
+  if (!iso0.items.length) return []
+  const depthOff = Math.max(0, massDepthMM - r)
+  const isoD = depthOff > 0 ? level(depthOff) : iso0
+  const massesByIsland: SafeMass[][] = iso0.items.map(() => [])
+  for (const m of isoD.items) {
+    const islandId = iso0.comp[m.deepIdx]
+    if (islandId >= 0) massesByIsland[islandId].push({ areaMM2: m.areaMM2, centreMM: m.centreMM, bbox: m.bbox, rings: m.rings })
   }
-  const ringsByComp: Pt[][][] = accs.map(() => [])
-  for (const loop of loops) {
-    const id = compAt(loop[0])
-    if (id >= 0) ringsByComp[id].push(loop)
-  }
-
-  const out: SafeSegment[] = accs.map((a, id) => ({
-    areaMM2: a.n * step * step,
-    centreMM: [a.sx / a.n, a.sy / a.n] as Pt,
-    bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
-    rings: ringsByComp[id],
+  const out: SafeSegment[] = iso0.items.map((it, id) => ({
+    areaMM2: it.areaMM2,
+    centreMM: it.centreMM,
+    bbox: it.bbox,
+    rings: it.rings,
+    masses: massesByIsland[id].sort((a, b) => a.areaMM2 - b.areaMM2),
   }))
   out.sort((a, b) => a.areaMM2 - b.areaMM2)
   return out

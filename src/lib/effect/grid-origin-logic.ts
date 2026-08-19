@@ -2,6 +2,7 @@
 
 import type { Pt } from './types'
 import {
+  BALANCE_TIE_MM,
   BANDS,
   FLAP_WEIGHT,
   MAGNET_DIA_LARGE_MM,
@@ -9,7 +10,7 @@ import {
   MIN_ANCHORS,
   SEAT_WEIGHT,
 } from './grid-origin-spec'
-import { bbox, splitPerimeter } from './grid-origin-compute'
+import { bbox, splitPerimeter, type SafeSegment } from './grid-origin-compute'
 import type { Band } from './grid-origin-spec'
 
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
@@ -23,9 +24,32 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** Registration score: seats above all, then least uncovered material (graded mm), then balance. */
+/** Registration score: seats above all, then least uncovered material, then balance. Coverage
+ *  is bucketed by the tie range, so near-equal coverage lets centring decide. */
 export function registrationScore(seats: number, flapExcessMM: number, balanceMM: number): number {
-  return seats * SEAT_WEIGHT - flapExcessMM * FLAP_WEIGHT - balanceMM
+  const covered = Math.round(flapExcessMM / BALANCE_TIE_MM) * BALANCE_TIE_MM
+  return seats * SEAT_WEIGHT - covered * FLAP_WEIGHT - balanceMM
+}
+
+/**
+ * The centring target — Dan's rule: THE SMALLEST MASS THAT HOLDS A MAGNET GOVERNS; the grid
+ * centres on its deepest point. The roomy masses adapt; an unused sliver can never hijack.
+ * Null when no seated magnet lands in any mass — the caller falls back to the box centre.
+ */
+export function centeringRef(
+  segments: ReadonlyArray<SafeSegment>, seated: ReadonlyArray<Pt>,
+): { centreMM: Pt; bbox: SafeSegment['bbox'] } | null {
+  let best: { areaMM2: number; centreMM: Pt; bbox: SafeSegment['bbox'] } | null = null
+  for (const seg of segments) {
+    const masses = seg.masses.length ? seg.masses : [seg]
+    for (const m of masses) {
+      if (best && m.areaMM2 >= best.areaMM2) continue
+      const holdsSeat = seated.some((p) =>
+        p[0] >= m.bbox.minX && p[0] <= m.bbox.maxX && p[1] >= m.bbox.minY && p[1] <= m.bbox.maxY)
+      if (holdsSeat) best = m
+    }
+  }
+  return best
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

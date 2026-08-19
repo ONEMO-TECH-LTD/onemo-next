@@ -61,3 +61,12 @@ export const SNAP_STEP_MM = 1
 /** Registration score weights: seats, then flaps, then balance. */
 export const SEAT_WEIGHT = 100000
 export const FLAP_WEIGHT = 100
+
+/** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
+ *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
+export const MASS_DEPTH_MM = 16
+export const MASS_DEPTH_FLOOR_MM = 12
+export const MASS_DEPTH_CEIL_MM = 24
+
+/** Coverage amounts closer than this count as equal, so centring gets a real vote. */
+export const BALANCE_TIE_MM = 2
