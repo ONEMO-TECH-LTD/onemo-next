@@ -413,9 +413,12 @@ export default function GridLab() {
             <LabRow on={enFlapN !== 0} set={(b) => setEnFlapN(b ? 1 : 0)}>
               <Slider label="Flap allowance · past spot edge" unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
             </LabRow>
-            <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
-              <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
-            </LabRow>
+            <div className={positioning === 1 ? 'gl-lab-off' : undefined}
+              title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
+              <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
+                <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
+              </LabRow>
+            </div>
             <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
