@@ -48,8 +48,15 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
 /** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour
  *  normalized to longest side = 1mm, y-up. No AI — the outline IS the mask's edge. */
 export function normMaskContour(mask: Uint8Array, w: number, h: number): Contour | null {
-  const ring = traceContourRaw(mask, w, h)
-  if (!ring || ring.length < 3) return null
+  const raw = traceContourRaw(mask, w, h)
+  if (!raw || raw.length < 3) return null
+  // A raw half-pixel trace carries thousands of points; the engine's cost scales with them.
+  // Decimate to the same order the AI path's flatten produces — sub-0.2mm fidelity at product
+  // sizes, ~10x cheaper solves.
+  const MAXV = 600
+  const k = Math.max(1, Math.ceil(raw.length / MAXV))
+  const ring: typeof raw = []
+  for (let i = 0; i < raw.length; i += k) ring.push(raw[i])
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ring) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   const L = Math.max(maxX - minX, maxY - minY, 1)

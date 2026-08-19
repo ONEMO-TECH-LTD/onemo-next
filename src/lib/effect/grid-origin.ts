@@ -62,6 +62,8 @@ export interface GridConfig {
   massDepthMM?: number
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
   centreMode?: number
+  /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
+  segmentsDetail?: 'full' | 'light'
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
@@ -107,7 +109,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     : makeSeatPredicate(outer, spotRadiusOf(pad))
 
   const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
-  const segments = safeSegments(outer, spotRadiusOf(pad), massDepth)
+  const segments = safeSegments(outer, spotRadiusOf(pad), massDepth, cfg.segmentsDetail ?? 'full')
 
   // THE shape's centres — chosen by the centre-mode switch (logic's table). Every returned
   // point anchors the slide walk; single-target modes also fix the balance target.
@@ -126,18 +128,18 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
   } else if (fits) {
-    // Phases anchored on the shape's own centres: for each mass, k=0 puts a node line exactly
-    // on its centre, so every mass-centred registration is sampled at ANY step size — even a
-    // coarse 12mm walk radiates from the real centres. Duplicate phases collapse.
+    // Phases: ONE full ladder swept from the first centre, plus each further mass centre's
+    // EXACT slide (k=0) — the only slide of a second base the ladder doesn't already cover.
+    // Every mass-centred registration is sampled at ANY step size without multiplying the walk.
     const phases = (bases: number[]): { p: number; k: number }[] => {
       const out: { p: number; k: number }[] = []
       const seen = new Set<number>()
-      for (const base of bases)
-        for (let k = 0; k < pitch; k += phaseStep) {
-          const p = mod(base + k, pitch)
-          const id = Math.round(p * 1000)
-          if (!seen.has(id)) { seen.add(id); out.push({ p, k }) }
-        }
+      const push = (p: number, k: number) => {
+        const id = Math.round(p * 1000)
+        if (!seen.has(id)) { seen.add(id); out.push({ p, k }) }
+      }
+      for (let k = 0; k < pitch; k += phaseStep) push(mod(bases[0] + k, pitch), k)
+      for (let i = 1; i < bases.length; i++) push(mod(bases[i], pitch), 0)
       return out
     }
     let bestScore = -Infinity
@@ -207,9 +209,10 @@ export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): BandSnapPoint[] {
   const [lo, hi] = snapRange(cfg, fromMM)
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
   const out: BandSnapPoint[] = []
   for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), cfg)
+    const grid = computeGrid(sized(mm), walkCfg)
     if (isHolding(grid.anchors.length, grid.flaps.length)) out.push({ sizeMM: mm, count: grid.anchors.length, sig: layoutSig(grid) })
   }
   return out
@@ -232,13 +235,14 @@ export function fitSizeInBand(
     const pickIdx = ladder.findIndex((p) => p.sig === pickSig)
     return { sizeMM: ladder[pickIdx].sizeMM, grid: computeGrid(sized(ladder[pickIdx].sizeMM), cfg), ladder, pickIdx }
   }
-  // Nothing in the band holds: best-seated rung as a fallback.
+  // Nothing in the band holds: best-seated rung as a fallback (walk light, final full).
   const [lo, hi] = snapRange(cfg, fromMM)
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
   let best: { sizeMM: number; grid: GridResult } | null = null
   for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = computeGrid(sized(mm), cfg)
+    const grid = computeGrid(sized(mm), walkCfg)
     if (!best || grid.anchors.length > best.grid.anchors.length) best = { sizeMM: mm, grid }
   }
-  const pick = best ?? { sizeMM: lo, grid: computeGrid(sized(lo), cfg) }
-  return { ...pick, ladder: [], pickIdx: 0 }
+  const pickMM = best ? best.sizeMM : lo
+  return { sizeMM: pickMM, grid: computeGrid(sized(pickMM), cfg), ladder: [], pickIdx: 0 }
 }

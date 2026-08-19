@@ -209,15 +209,29 @@ export default function GridLab() {
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
   const seqRef = useRef(0)
+  /** Newest-only dispatch: one solve in flight, at most one (the latest) queued — a burst of
+   *  control changes never builds a backlog the worker has to grind through. */
+  const busyRef = useRef(false)
+  const queuedRef = useRef<object | null>(null)
+  const effSizeRef = useRef(0)
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
     workerRef.current = w
     w.onmessage = (e) => {
+      if (queuedRef.current) {
+        const next = queuedRef.current
+        queuedRef.current = null
+        solveSentAt.current = performance.now()
+        w.postMessage(next)
+      } else {
+        busyRef.current = false
+        setSolving(false)
+      }
       if (e.data.id !== seqRef.current) return
       if (e.data.error) console.error('[grid-lab] solve failed', e.data.error)
       setPerf((x) => ({ ...x, solveMs: performance.now() - solveSentAt.current, genMs: genMsRef.current }))
+      if (e.data.model) effSizeRef.current = e.data.model.effSize
       setModel(e.data.model)
-      setSolving(false)
     }
     return () => { workerRef.current = null; w.terminate() }
   }, [])
@@ -226,10 +240,21 @@ export default function GridLab() {
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    // Manual calibration in a band: the walk is meaningless under a forced registration —
+    // solve the current size directly, exactly like free mode.
+    const manualBand = manual !== null && mode !== 'free'
     const id = ++seqRef.current
+    const msg = {
+      id, base, offsetMM, cfg,
+      mode: manualBand ? 'free' : mode,
+      sizeMM: manualBand ? (effSizeRef.current || sizeMM) : sizeMM,
+      snapStep, stepSel,
+    }
+    if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
+    busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
-    w.postMessage({ id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel })
+    w.postMessage(msg)
   }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, manual, enFlapN, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
@@ -341,11 +366,13 @@ export default function GridLab() {
             </div>
             {mode !== 'free' && <>
               <div className="gl-snap">
-                {model
-                  ? model.ladder.length
-                    ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
-                    : 'nothing fully fits — best seated shown'
-                  : '—'}
+                {manual
+                  ? 'manual calibration · double-click the canvas to return to auto'
+                  : model
+                    ? model.ladder.length
+                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
+                      : 'nothing fully fits — best seated shown'
+                    : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
@@ -467,9 +494,20 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
 
   // Manual calibration gestures — the shape is FROZEN; drag pans the GRID under it (mm, engine
   // y-up), pinch scales the effect size, double-click hands registration back to the engine.
+  // MANUAL MEANS NO COMPUTE (Dan's rule): while a gesture is live the grid layers shift as a
+  // pure visual transform; ONE solve commits when the gesture ends.
   // px→mm uses the RENDERED size, so gestures stay true when the canvas shrinks on a phone.
   const svgRef = useRef<SVGSVGElement>(null)
   const dragAt = useRef<{ x: number; y: number } | null>(null)
+  const [pend, setPend] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const pendRef = useRef(pend)
+  pendRef.current = pend
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const commit = () => {
+    const p = pendRef.current
+    if (p.x || p.y) onPan(p.x, p.y)
+    setPend({ x: 0, y: 0 })
+  }
   const pxPerMM = (el: Element) => el.getBoundingClientRect().width / (VP / S)
   useEffect(() => {
     const el = svgRef.current
@@ -477,8 +515,10 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const k = pxPerMM(el)
-      if (e.ctrlKey) onZoom(Math.exp(-e.deltaY * 0.01))
-      else onPan(-e.deltaX / k, e.deltaY / k)
+      if (e.ctrlKey) { onZoom(Math.exp(-e.deltaY * 0.01)); return }
+      setPend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
+      if (wheelTimer.current) clearTimeout(wheelTimer.current)
+      wheelTimer.current = setTimeout(commit, 250)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -506,10 +546,10 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
         const k = pxPerMM(e.currentTarget)
         const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
         dragAt.current = { x: e.clientX, y: e.clientY }
-        onPan(mx, -my)
+        setPend((p) => ({ x: p.x + mx, y: p.y - my }))
       }}
-      onPointerUp={() => { dragAt.current = null }}
-      onDoubleClick={onReset}>
+      onPointerUp={() => { dragAt.current = null; commit() }}
+      onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
@@ -531,9 +571,12 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
         </pattern>
       </defs>
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
-      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-fine)" />
-      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-pitch)" />
-      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="url(#gl-dots)" />
+      {/* Grid-anchored layers shift as one rigid body while a manual gesture is live. */}
+      <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
+        <rect x={vx - Math.abs(pend.x)} y={vy - Math.abs(pend.y)} width={spanMM + 2 * Math.abs(pend.x)} height={spanMM + 2 * Math.abs(pend.y)} fill="url(#gl-fine)" />
+        <rect x={vx - Math.abs(pend.x)} y={vy - Math.abs(pend.y)} width={spanMM + 2 * Math.abs(pend.x)} height={spanMM + 2 * Math.abs(pend.y)} fill="url(#gl-pitch)" />
+        <rect x={vx - Math.abs(pend.x)} y={vy - Math.abs(pend.y)} width={spanMM + 2 * Math.abs(pend.x)} height={spanMM + 2 * Math.abs(pend.y)} fill="url(#gl-dots)" />
+      </g>
       {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line. */}
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
       <path d={d} fill="none" stroke="var(--suede-edge)"
@@ -593,6 +636,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
         </g>)
       })()}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
+      <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {
         // INNER stroke: the line's outer edge sits exactly on the true spot radius, so a
         // tangent disc never reads past the cut line.
@@ -609,6 +653,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
       })}
+      </g>
     </svg>
   )
 }
