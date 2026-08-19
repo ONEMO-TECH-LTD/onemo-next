@@ -105,6 +105,14 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
   const segments = safeSegments(outer, spotRadiusOf(pad), massDepth)
 
+  // THE shape's centres — adaptive, not the box: every mass's deepest point anchors the slide
+  // walk, so a mass-centred registration exists for each mass at ANY step size, and the scoring
+  // rule chooses between them. The box centre is only the no-island fallback.
+  const centres: Pt[] = []
+  for (const seg of segments)
+    for (const m of (seg.masses.length ? seg.masses : [seg])) centres.push(m.centreMM)
+  if (!centres.length) centres.push([cx, cy])
+
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   const mod = (v: number, m: number) => ((v % m) + m) % m
@@ -116,17 +124,23 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
   } else if (fits) {
-    // Phases anchored on the canonical registration: k=0 puts a node line on the bbox centre
-    // (odd-count parity); the 24mm offset in the walk is the even-count parity. Mechanics still
-    // choose among them; anchoring guarantees the canonical phases are sampled at ANY size.
-    const phases = (span: number): { p: number; k: number }[] => {
+    // Phases anchored on the shape's own centres: for each mass, k=0 puts a node line exactly
+    // on its centre, so every mass-centred registration is sampled at ANY step size — even a
+    // coarse 12mm walk radiates from the real centres. Duplicate phases collapse.
+    const phases = (bases: number[]): { p: number; k: number }[] => {
       const out: { p: number; k: number }[] = []
-      for (let k = 0; k < pitch; k += phaseStep) out.push({ p: mod(span / 2 + k, pitch), k })
+      const seen = new Set<number>()
+      for (const base of bases)
+        for (let k = 0; k < pitch; k += phaseStep) {
+          const p = mod(base + k, pitch)
+          const id = Math.round(p * 1000)
+          if (!seen.has(id)) { seen.add(id); out.push({ p, k }) }
+        }
       return out
     }
     let bestScore = -Infinity
-    for (const py of phases(bb.maxY - bb.minY)) {
-      for (const px of phases(bb.maxX - bb.minX)) {
+    for (const py of phases(centres.map((a) => a[1] - bb.minY))) {
+      for (const px of phases(centres.map((a) => a[0] - bb.minX))) {
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fits)
         if (!seat.length) continue
         const excess = flapExcessMM(outer, seat, reach)
