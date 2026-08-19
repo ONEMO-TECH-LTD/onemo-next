@@ -64,15 +64,12 @@ export const SNAP_STEP_MM = 1
 export const AUTO_FLAP_STEP_MM = 2
 export const AUTO_FLAP_MAX_MM = 12
 
-/** Registration score weights: seats, then flaps, then balance — each admin-dialled in the
- *  Voting card so the forces can be balanced live. */
+/** Voting dominance tiers — strict: the top force always beats the next, never blends.
+ *  VOTING_ORDER picks which force sits on which tier (0 = magnets > wrap > centring). */
 export const SEAT_WEIGHT = 100000
 export const FLAP_WEIGHT = 100
 export const BALANCE_WEIGHT = 1
-export const WEIGHT_FLOOR = 0
-export const SEAT_WEIGHT_CEIL = 1000000
-export const FLAP_WEIGHT_CEIL = 10000
-export const BALANCE_WEIGHT_CEIL = 1000
+export const VOTING_ORDER = 0
 
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */

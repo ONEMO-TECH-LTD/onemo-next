@@ -5,6 +5,9 @@ import { pointInPolygon } from './attachment'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
+/** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
+const KEY_QUANTUM_MM = 0.01
+
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
@@ -98,7 +101,8 @@ export function makeSeatPredicate(
 export function makeCircleSeatPredicate(
   cx: number, cy: number, R: number, spotRadiusMM: number,
 ): ((pt: Pt) => boolean) | null {
-  const q = (v: number) => Math.round(v * 1000)
+  const QUANTUM = 0.001
+  const q = (v: number) => Math.round(v / QUANTUM)
   const slack = q(R) - q(spotRadiusMM)
   if (slack < 0) return null
   const cqx = q(cx), cqy = q(cy), s2 = slack * slack
@@ -226,7 +230,7 @@ export function safeSegments(
     for (let ix = 0; ix < nx; ix++)
       S[iy * nx + ix] = signed([x0 + ix * step, y0 + iy * step])
 
-  const key = (p: Pt) => (Math.round(p[0] * 100) + ',' + Math.round(p[1] * 100))
+  const key = (p: Pt) => (Math.round(p[0] / KEY_QUANTUM_MM) + ',' + Math.round(p[1] / KEY_QUANTUM_MM))
   const lerp = (pa: Pt, sa: number, pb: Pt, sb: number): Pt => {
     const t = sa / (sa - sb)
     return [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t]

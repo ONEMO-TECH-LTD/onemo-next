@@ -37,6 +37,7 @@ import {
   centeringRef,
   governMass,
   registrationScore,
+  type VotingOrder,
   type Anchor,
   type CentreMode,
   type Governor,
@@ -78,10 +79,8 @@ export interface GridConfig {
    *  every disc — seats must clear spot + margin from the edge, and a band option is the size
    *  where the shape's edge presses against the margined disc. */
   seatMarginMM?: number
-  /** Voting-law weights, admin-dialled; spec defaults when absent. */
-  seatWeight?: number
-  flapWeight?: number
-  balanceWeight?: number
+  /** Voting dominance order — which force rules, admin-picked; spec default when absent. */
+  votingOrder?: number
   /** Per-size solve reuse for band walks — owned by the caller (the worker). */
   solveCache?: Map<number, GridResult>
   plan?: MagnetPlan
@@ -145,7 +144,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
-  const mod = (v: number, m: number) => ((v % m) + m) % m
+  /** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
+const QUANTUM_KEY_MM = 0.001
+
+const mod = (v: number, m: number) => ((v % m) + m) % m
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search.
     bestOx = mod(cfg.forcePhaseMM[0], pitch)
@@ -192,7 +194,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       const out: { p: number; k: number }[] = []
       const seen = new Set<number>()
       const push = (p: number, k: number) => {
-        const id = Math.round(p * 1000)
+        const id = Math.round(p / QUANTUM_KEY_MM)
         if (!seen.has(id)) { seen.add(id); out.push({ p, k }) }
       }
       for (let k = 0; k < pitch; k += phaseStep) push(mod(bases[0] + k, pitch), k)
@@ -212,8 +214,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
         const [tx, ty] = ref ? ref.centreMM : centres[0]
         let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
         const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
-        const score = registrationScore(seat.length, excess, balance,
-          { seat: cfg.seatWeight, flap: cfg.flapWeight, balance: cfg.balanceWeight })
+        const score = registrationScore(seat.length, excess, balance, cfg.votingOrder as VotingOrder | undefined)
         if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k; mainCentre = [tx, ty] }
       }
     }

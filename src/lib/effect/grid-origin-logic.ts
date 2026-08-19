@@ -9,6 +9,7 @@ import {
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
   SEAT_WEIGHT,
+  VOTING_ORDER,
 } from './grid-origin-spec'
 import { bbox, splitPerimeter, type SafeSegment } from './grid-origin-compute'
 import type { Band } from './grid-origin-spec'
@@ -28,13 +29,23 @@ export interface Anchor { p: Pt; dia: MagnetDia }
  *  above all, then UNCOVERED MATERIAL (the flap dial's placement power — it pulls magnets
  *  toward material), then balance to the centre as the tie-break. Exact centring is the
  *  CENTRE-RULES law's job, not this score's — the two positioning laws split the principles. */
-export interface VotingWeights { seat?: number; flap?: number; balance?: number }
+/** The six dominance orders — index of the tier each force sits on: [seats, wrap, centring].
+ *  Order 0 is the blessed law: magnets above all, wrap next, centring the tie-break. */
+export type VotingOrder = 0 | 1 | 2 | 3 | 4 | 5
+const TIERS = [SEAT_WEIGHT, FLAP_WEIGHT, BALANCE_WEIGHT] as const
+const ORDERS: ReadonlyArray<readonly [number, number, number]> = [
+  [0, 1, 2], // magnets > wrap > centring (blessed)
+  [0, 2, 1], // magnets > centring > wrap
+  [1, 0, 2], // wrap > magnets > centring
+  [2, 0, 1], // centring > magnets > wrap
+  [1, 2, 0], // wrap > centring > magnets
+  [2, 1, 0], // centring > wrap > magnets
+]
 export function registrationScore(
-  seats: number, flapExcessMM: number, balanceMM: number, w?: VotingWeights,
+  seats: number, flapExcessMM: number, balanceMM: number, order?: VotingOrder,
 ): number {
-  return seats * (w?.seat ?? SEAT_WEIGHT)
-    - flapExcessMM * (w?.flap ?? FLAP_WEIGHT)
-    - balanceMM * (w?.balance ?? BALANCE_WEIGHT)
+  const [si, fi, bi] = ORDERS[order ?? (VOTING_ORDER as VotingOrder)]
+  return seats * TIERS[si] - flapExcessMM * TIERS[fi] - balanceMM * TIERS[bi]
 }
 
 

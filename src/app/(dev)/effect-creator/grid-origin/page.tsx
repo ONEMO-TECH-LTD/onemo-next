@@ -13,10 +13,10 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
-import { AUTO_FLAP_MAX_MM, BALANCE_WEIGHT, BALANCE_WEIGHT_CEIL, BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, FLAP_WEIGHT, FLAP_WEIGHT_CEIL, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SEAT_WEIGHT, SEAT_WEIGHT_CEIL, SNAP_STEP_MM, WEIGHT_FLOOR } from '@/lib/effect/grid-origin-spec'
+import { AUTO_FLAP_MAX_MM, BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 
-const IMG = 1000
+const IMG = 1024
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
 const VP = 640
 const FIT = 0.86
@@ -73,10 +73,8 @@ export default function GridLab() {
   const [positioning, setPositioning] = usePersisted('positioning', POSITIONING)
   /** Governor — which mass rules in Masses mode. */
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
-  /** Voting-law weights — the selection forces, balanced live from the Voting card. */
-  const [seatW, setSeatW] = usePersisted('seatW', SEAT_WEIGHT)
-  const [flapW, setFlapW] = usePersisted('flapW', FLAP_WEIGHT)
-  const [balW, setBalW] = usePersisted('balW', BALANCE_WEIGHT)
+  /** Voting dominance order — which force rules the placement vote. */
+  const [votingOrder, setVotingOrder] = usePersisted('votingOrder', VOTING_ORDER)
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
@@ -105,15 +103,15 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, positioning, governor, seatW, flapW, balW, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, positioning: POSITIONING, governor: GOVERNOR, seatW: SEAT_WEIGHT, flapW: FLAP_WEIGHT, balW: BALANCE_WEIGHT, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, positioning: POSITIONING, governor: GOVERNOR, votingOrder: VOTING_ORDER, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setSeatW(d.seatW); setFlapW(d.flapW); setBalW(d.balW); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -252,7 +250,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, seatWeight: seatW, flapWeight: flapW, balanceWeight: balW, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
@@ -269,7 +267,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, seatW, flapW, balW, manual, bandScale, enFlapN, enPhaseN, autoFlapN, autoFlapMax, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enFlapN, enPhaseN, autoFlapN, autoFlapMax, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -537,11 +535,18 @@ export default function GridLab() {
           </Fold>
           {positioning === 0 && <Fold title="Voting law">
             <div className="gl-magic-note">
-              Each slide&apos;s score: seats × seat weight − uncovered material × flap weight − off-centre distance × centring weight. Raise a weight and its force matters more; the strongest force decides.
+              Three forces vote on every placement — magnet count, wrap (least loose material), centring. The order is strict dominance: the top force always wins; the next only breaks its ties.
             </div>
-            <Slider wide label="Seat weight · per magnet" unit="×" v={seatW} set={setSeatW} min={WEIGHT_FLOOR} max={SEAT_WEIGHT_CEIL} />
-            <Slider wide label="Flap weight · per mm uncovered" unit="×" v={flapW} set={setFlapW} min={WEIGHT_FLOOR} max={FLAP_WEIGHT_CEIL} />
-            <Slider wide label="Centring weight · per mm off-centre" unit="×" v={balW} set={setBalW} min={WEIGHT_FLOOR} max={BALANCE_WEIGHT_CEIL} />
+            <div className="gl-field"><span>Priority · which force rules</span>
+              <select value={votingOrder} onChange={(e) => setVotingOrder(+e.target.value)}>
+                <option value={0}>Magnets &gt; Wrap &gt; Centring (default)</option>
+                <option value={1}>Magnets &gt; Centring &gt; Wrap</option>
+                <option value={2}>Wrap &gt; Magnets &gt; Centring</option>
+                <option value={3}>Centring &gt; Magnets &gt; Wrap</option>
+                <option value={4}>Wrap &gt; Centring &gt; Magnets</option>
+                <option value={5}>Centring &gt; Wrap &gt; Magnets</option>
+              </select>
+            </div>
           </Fold>}
         </aside>
       </div>
@@ -780,7 +785,7 @@ function LabRow({ on, set, children }: { on: boolean; set: (b: boolean) => void;
 /** Perf value in seconds — green when fast, red past the 2s comfort line. */
 function Sec({ ms }: { ms?: number }) {
   if (ms == null) return <b>—</b>
-  return <b className={ms > 2000 ? 'gl-slow' : ''}>{(ms / 1000).toFixed(2)}s</b>
+  return <b className={ms > 2000 ? 'gl-slow' : ''}>{(ms * 0.001).toFixed(2)}s</b>
 }
 /** Collapsible card — native details, open by default; collapse the unneeded on a phone. */
 function Fold({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
