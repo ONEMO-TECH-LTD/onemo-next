@@ -82,20 +82,24 @@ Gate: all of 2.1–2.4 green → Dan judges the matrix → his word "proven" ope
 
 ## Phase 3 — DELETE THE OLD ENGINES · the contract (only on Dan's "proven")
 
-Each numbered step lands as its own commit with guard + suite + a live gate.
-3.1 (closes Meta C1 — each step must compile alone, so consumers die before their spec
-    values) Page first: DELETE the Positioning toggle, Voting-law card, placement-step row
-    + enable, and the four spec imports they carry; persisted namespace → `grid-origin.v2.*`.
-3.1b `grid-origin-spec.ts`: DELETE `SEAT_WEIGHT`, `FLAP_WEIGHT`, `BALANCE_WEIGHT`,
-    `VOTING_ORDER`, `POSITIONING`, `PHASE_STEP_MM`, `PHASE_STEP_FLOOR_MM`.
-3.2 `grid-origin-logic.ts`: DELETE `registrationScore`, `ORDERS`, `VotingOrder`,
-    `centeringRef` (the seat-dependent centre — the corruption root).
-3.3 `grid-origin.ts`: DELETE the voting branch, the old centre-rules branch, `phases()`,
-    the two-pass counts + `fitsM` memo; `GridConfig` loses `positioning`, `phaseStepMM`,
-    `seatMarginMM`, `votingOrder`. Law becomes the only path.
-3.4 `grid-origin-compute.ts`: DELETE `pressExcessMM`; `dist` and `bandSnapPoints` exports
-    go private/die (zero external consumers, verified).
-3.5 Worker: measure Law-speed solves; caches/prefetcher survive ONLY if a measured
+Each numbered step lands as its own commit with guard + suite + a live gate, and each
+compiles alone — consumers always die BEFORE the exports they consume (pixel-QA item 5):
+3.1 PAGE: DELETE the Positioning toggle, the Voting-law card, the placement-step row and
+    its enable, and the spec imports they carry; persisted namespace → `grid-origin.v2.*`
+    (scoring-era dials die); Reset-to-default migrates.
+3.2 DOOR (`grid-origin.ts`): DELETE the voting branch, the old centre-rules branch,
+    `phases()`, the two-pass counts + `fitsM` memo; `GridConfig` loses `positioning`,
+    `phaseStepMM`, `seatMarginMM`, `votingOrder`. Law becomes the only path. This removes
+    the door's imports of `registrationScore`, `VotingOrder`, `centeringRef`,
+    `PHASE_STEP_MM`, `POSITIONING`, `VOTING_ORDER`.
+3.3 LOGIC: DELETE `registrationScore`, `ORDERS`, `VotingOrder`, `centeringRef` (the
+    seat-dependent centre — the corruption root). This removes logic's imports of
+    `SEAT_WEIGHT`, `FLAP_WEIGHT`, `BALANCE_WEIGHT`, `VOTING_ORDER`.
+3.4 SPEC: DELETE `SEAT_WEIGHT`, `FLAP_WEIGHT`, `BALANCE_WEIGHT`, `VOTING_ORDER`,
+    `POSITIONING`, `PHASE_STEP_MM`, `PHASE_STEP_FLOOR_MM` — zero consumers remain by 3.3.
+3.5 COMPUTE: DELETE `pressExcessMM`; `dist` and `bandSnapPoints` exports go private/die
+    (zero external consumers, verified).
+3.6 WORKER: measure Law-speed solves; caches/prefetcher survive ONLY if a measured
     interaction exceeds ~100ms without them — otherwise deleted with the numbers cited.
 3.7 `v3.5-architecture.md` refreshed and stamped as close-out, before final QA reads it.
 
