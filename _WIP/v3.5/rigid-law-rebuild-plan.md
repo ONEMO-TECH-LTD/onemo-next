@@ -55,6 +55,25 @@ Evidence on record: squares 24→1 / 72→4 / 120→8, centre 0.0, press 0.00 at
 pairs VERTICAL (80/90mm) · bot cutout(4) B2: flap 0 honest fallback, flap ≥4 rung 107/2⌾
 press 0.00 · solve ~0.02s · suite 438/438 · live bench screenshot delivered.
 
+### Phase-1 round 2 — pixel's INDEPENDENT full evaluation (goal + code, not my claims)
+
+Four code defects nobody had named, each re-probed by the lead and fixed:
+- F1 manual calibration reported `parityTrue` regardless — a hand-forced grid could sit
+  anywhere and the result claimed the centre law held. Parity is now MEASURED for forced
+  phases via one shared `parityHolds()` predicate (single source of the centre law).
+- F2 flap 0 was not touch: the band gate granted the walk's step (1mm) as hidden slack
+  (rungs observed up to 0.4999mm off contact). The gate is now the CONTACT TOLERANCE —
+  the outline's own accuracy (`CONTACT_TOLERANCE_MM` 0.1, spec'd and named) — and each
+  rung's size is REFINED by bisection below the walk step to the first size where its
+  count seats lawfully, so contact is found rather than approximated.
+- F3 Auto was neither minimal nor consistent: the band scanned in 2mm steps (granting 2
+  where 1 sufficed) and Free's readout used the FIRST disc to touch while the wrap law
+  needs the WORST. Scan step → 1mm; `impliedFlapMM` → worst-disc semantics.
+- F5 `computeGrid`'s public default padding was the slider FLOOR (10), not the released 12
+  — the standards only passed because callers happened to pass 12 explicitly.
+Evidence after fixes: squares 24/72/120 exact (press 0.00) · circle B1 24.0/1 (p0.015),
+B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 438/438.
+
 ## Phase 2 — PROVE · the contract (current phase)
 
 2.1 TRUTH DOT — DONE with Phase 1's reopen (see F4 above): dots measure edge tangency
@@ -68,14 +87,27 @@ press 0.00 · solve ~0.02s · suite 438/438 · live bench screenshot delivered.
     f. CONTROL-TRUTH sweep — flap 0 vs 4 produce different B2 rung sets on the bot base;
        governor 0 vs 3 move `centreMainMM` on a two-mass fixture; mass-depth 12 vs 24
        changes the mass count. One probe per dial, each proving its label.
+    g0. MANUAL TRUTH (F1) — a forced off-centre phase yields `parityTrue === false`, and a
+       forced lawful phase yields true.
+    g1. EXACT GATE (F2) — every flap-0 rung's worst belt gap ≤ CONTACT_TOLERANCE_MM; a
+       synthetic layout 0.5mm off contact is NOT a rung.
+    g2. AUTO MINIMAL (F3) — auto's chosen allowance is the smallest whole mm whose ladder is
+       non-empty; Free's implied allowance equals the worst-belt requirement, not the first
+       disc's gap.
     g. SCALING LAW (the third driver — pixel Meta M2/M3): across two adjacent bands on a
        fixture shape, the ladder carries UNIQUE, STRICTLY INCREASING counts; each rung is
        the FIRST size where its count seats lawful (parity-true) + wrapped; and no count
        lawful in the band below reappears above worn loose. Duplicate, skipped-first-size
        and cross-band-repeat cases each asserted.
 2.3 COMPARISON MATRIX (Dan's instrument): scripted bench screenshots — square, circle,
-    duck cutout(5), bot cutout(4) × B1–B3 × Law / Centre rules / Voting, each frame showing
-    press + centre readouts. Delivered as images, not a doc.
+    duck cutout(5), bot cutout(4) × B1–B5 (all five product bands — pixel full-eval F7:
+    B4/B5 must not be unseen when Dan authorises deletion) × Law / Centre rules / Voting,
+    each frame showing press + centre readouts. Delivered as images, not a doc.
+2.3b WORKER CONTRACT (pixel full-eval F6) — new fixtures over the worker's own logic, which
+    no existing gate covers: shape-signature identity (two different shapes never share a
+    cache), Law prefetch mirrors the walk config exactly, clicked-rung re-render equals the
+    qualifying solve, Auto selection matches `autoFlapInBand`. The separation guard's
+    MODULE_FILES gains the worker so its imports stay one-way.
 2.4 FREE-MODE CONCESSIONS (closes Meta C2): the GOAL's printed-bend promise, built —
     page shows "wrap conceded N.Nmm" / "centre conceded (parity)" from `pressMM` /
     `parityTrue` in Free and manual paths, not band mode only.
@@ -92,6 +124,9 @@ compiles alone — consumers always die BEFORE the exports they consume (pixel-Q
 3.1 PAGE: DELETE the Positioning toggle, the Voting-law card, the placement-step row and
     its enable, and the spec imports they carry; persisted namespace → `grid-origin.v2.*`
     (scoring-era dials die); Reset-to-default migrates.
+3.1b WORKER (pixel full-eval F4): drop `cfg.positioning` branching and every `seatMarginMM`
+    emission — the worker consumes exactly the `GridConfig` fields 3.2 deletes, so it must
+    stop consuming them first or 3.2 cannot compile.
 3.2 DOOR (`grid-origin.ts`): DELETE the voting branch, the old centre-rules branch,
     `phases()`, the two-pass counts + `fitsM` memo; `GridConfig` loses `positioning`,
     `phaseStepMM`, `seatMarginMM`, `votingOrder`. Law becomes the only path. This removes
@@ -102,9 +137,10 @@ compiles alone — consumers always die BEFORE the exports they consume (pixel-Q
     `SEAT_WEIGHT`, `FLAP_WEIGHT`, `BALANCE_WEIGHT`, `VOTING_ORDER`.
 3.4 SPEC: DELETE `SEAT_WEIGHT`, `FLAP_WEIGHT`, `BALANCE_WEIGHT`, `VOTING_ORDER`,
     `POSITIONING`, `PHASE_STEP_MM`, `PHASE_STEP_FLOOR_MM` — zero consumers remain by 3.3.
-3.5 COMPUTE: DELETE `pressExcessMM`; `dist` and `bandSnapPoints` exports go private/die
+3.5 COMPUTE + RESULT: DELETE `pressExcessMM`; DELETE `GridResult.panMM` and the `bestKx/
+    bestKy` state behind it (zero consumers — pixel full-eval F8); `dist` and `bandSnapPoints` exports go private/die
     (zero external consumers, verified).
-3.6 WORKER: measure Law-speed solves; caches/prefetcher survive ONLY if a measured
+3.6 WORKER CACHES: measure Law-speed solves; caches/prefetcher survive ONLY if a measured
     interaction exceeds ~100ms without them — otherwise deleted with the numbers cited.
 3.7 `v3.5-architecture.md` refreshed and stamped as close-out, before final QA reads it.
 

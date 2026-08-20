@@ -60,9 +60,16 @@ export const FLAP_CEIL_MM = 48
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
+/** CONTACT TOLERANCE — how exactly "touch" is judged. It is the OUTLINE'S OWN accuracy (a
+ *  traced/flattened silhouette is faithful to ~0.1mm at product sizes), never the walk's step:
+ *  gating on the step granted a whole millimetre of hidden air at flap 0 (pixel full-eval F2).
+ *  A rung's discs touch within the accuracy of the shape they are touching. */
+export const CONTACT_TOLERANCE_MM = 0.1
+
 /** Auto flap — the micro-module's scan: allowance tried from 0 up in this step, granting only
- *  what the band needs to produce a contact variant, capped by the flap dial. */
-export const AUTO_FLAP_STEP_MM = 2
+ *  what the band needs to produce a contact variant, capped by the flap dial. 1mm = minimal
+ *  grant at the dial's own resolution (pixel full-eval F3: a 2mm scan overgranted). */
+export const AUTO_FLAP_STEP_MM = 1
 
 /** Voting dominance tiers — strict: the top force always beats the next, never blends.
  *  VOTING_ORDER picks which force sits on which tier (0 = magnets > wrap > centring). */

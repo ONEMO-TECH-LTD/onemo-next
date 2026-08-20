@@ -398,7 +398,7 @@ export default function GridLab() {
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
                   <button key={pt.sizeMM} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
-                    <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
+                    <b>B{mode}-{i + 1}</b><span>{Math.round(pt.sizeMM)} mm · {pt.count}⌾</span>
                   </button>)}
               </div>}
               {(() => {

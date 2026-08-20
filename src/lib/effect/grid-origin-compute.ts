@@ -275,13 +275,14 @@ export function contactPointsMM(
   return out
 }
 
-/** The allowance a solved layout IMPLIES at its size — the binding gap between the discs and
- *  the edge: how much margin the discs can wear before one presses against the outline.
- *  0 = already tangent (true contact size). */
+/** The allowance a solved layout IMPLIES at its size — the margin needed to HOLD EVERY disc
+ *  (the worst gap, matching the wrap law), not merely the first one to touch. Free mode's Auto
+ *  readout and the band's granting law therefore speak the same language (pixel full-eval F3).
+ *  0 = every disc already tangent. */
 export function impliedFlapMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, spotRadiusMM: number): number {
   if (!seated.length) return 0
-  let g = Infinity
-  for (const a of seated) { const d = edgeDistMM(outer, a) - spotRadiusMM; if (d < g) g = d }
+  let g = 0
+  for (const a of seated) { const d = edgeDistMM(outer, a) - spotRadiusMM; if (d > g) g = d }
   return Math.max(0, g)
 }
 
