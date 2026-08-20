@@ -90,10 +90,21 @@ describe('exact region integrals', () => {
     expect(unresolved).toBe(false)
     expect(regions).toHaveLength(2)
     const [a, b] = regions
-    expect(Math.abs(a.areaApproxMM2 - b.areaApproxMM2)).toBeLessThan(1e-9)
-    // each island is the 36×36 offset square plus a small lens that bulges past x=48 between the
-    // two neck-corner arcs (clearance there is governed by the corners, not the wall)
-    expect(a.areaApproxMM2).toBeGreaterThan(36 * 36)
-    expect(a.areaApproxMM2).toBeLessThan(36 * 36 + 10)
+    // Closed form. Each island is the 36×36 offset square of its block plus the lens that bulges
+    // past x=48 between the two neck-corner arcs: for 25<y<35 the clearance is governed by the
+    // corners (60,25),(60,35), so the boundary is x = 60 − √(144 − (y−25)²) up to the symmetric
+    // point (60−√119, 30). Lens = 2∫₀⁵ (12 − √(144−u²)) du = 120 − 5√119 − 144·asin(5/12).
+    const lens = 120 - 5 * Math.sqrt(119) - 144 * Math.asin(5 / 12)
+    const expected = 36 * 36 + lens
+    // Independent derivation (Grid-Meta) integrating across the neck mouth instead:
+    // 1296 + ∫_{√119}^{12} (10 − 2√(144−u²)) du = 1296 + 120 − 72π − 5√119 + 144·acos(5/12).
+    // Equal to the above by acos x = π/2 − asin x; both are asserted.
+    const expectedMeta = 1296 + 120 - 72 * Math.PI - 5 * Math.sqrt(119) + 144 * Math.acos(5 / 12)
+    expect(Math.abs(expected - expectedMeta)).toBeLessThan(1e-12)
+    for (const island of [a, b]) {
+      expect(has(island.areaMM2, expected)).toBe(true)
+      expect(has(island.areaMM2, expectedMeta)).toBe(true)
+      expect(w(island.areaMM2)).toBeLessThan(1e-9)
+    }
   })
 })

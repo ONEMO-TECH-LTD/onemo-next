@@ -295,14 +295,17 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
       // vertex: reuse a vertex already on either element when its point is exactly the same.
       let v: SharedVertex | null = null
       let coincidence: 'no' | 'yes' | 'undecidable' = 'no'
-      for (const k of [...cuts.get(a.id)!, ...cuts.get(b.id)!]) {
-        const sx = signOf(cSub(k.v.p.x, hit.p.x)), sy = signOf(cSub(k.v.p.y, hit.p.y))
-        if (sx === 0 && sy === 0) { v = k.v; coincidence = 'yes'; break }
+      const known: SharedVertex[] = [...cuts.get(a.id)!, ...cuts.get(b.id)!].map((k) => k.v)
+      for (const e of [a, b]) { if (e.startV) known.push(e.startV); if (e.endV) known.push(e.endV) }
+      for (const kv of known) {
+        const sx = signOf(cSub(kv.p.x, hit.p.x)), sy = signOf(cSub(kv.p.y, hit.p.y))
+        if (sx === 0 && sy === 0) { v = kv; coincidence = 'yes'; break }
         if (sx === null || sy === null) coincidence = 'undecidable'
       }
       if (!v && coincidence === 'undecidable') { fail(`coincidence at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
       if (!v) v = { id: vid++, p: hit.p }
-      const already = (e: Elem) => cuts.get(e.id)!.some((k) => k.v === v)
+      // a cut that coincides with an element's own junction is that junction — never a second stop
+      const already = (e: Elem) => e.startV === v || e.endV === v || cuts.get(e.id)!.some((k) => k.v === v)
       if (!already(a)) addCut(a, v, hit, 'A')
       if (!already(b)) addCut(b, v, hit, 'B')
     }
