@@ -33,14 +33,17 @@ manual scale within the band; auto flap = the adaptive mode; touch markers must 
      measured concession, never a silent drift.
 4. GRAVITY — deterministic tie-break between otherwise-equal arrangements: vertical beats
    horizontal (the circle's pair rotates upright). A law, not a preference.
-5. CONFLICT RESOLUTION — only when the laws cannot all hold: the order (all six
-   permutations + BALANCED = minimize the largest concession) decides which law bends, by
-   the minimum, and the bend is REPORTED on the status line and in the result
-   ("centre conceded 3mm" / "wrap conceded 2mm" / "count conceded: 2 of 3"). Normal mode
-   never bends WRAP (rigid flap); AUTO adapts the allowance instead — unchanged semantics.
-6. BANDS — unchanged law: rung per count at its contact size; the walk simply calls the law
-   engine per size. Band slider stays continuous manual scale. Free mode = same law at the
-   held size, concessions shown.
+5. THE KEYSTONE (Dan, 2026-08-20: "enforce equally center = wrap = magnets within band
+   variants"): inside a band the three laws are EQUAL and ABSOLUTE — size is the free
+   variable that reconciles them. Per count: place the grid rigidly on the centre (parity),
+   scale until every disc touches within the allowance. A rung EXISTS only where all three
+   hold at once; a count no size can satisfy is not offered (honest fallback; AUTO adapts
+   the allowance instead). No conflict resolution inside bands — none is needed.
+6. CONFLICT RESOLUTION — Free mode only (size held by hand, so something may have to bend):
+   the order (six permutations + BALANCED = minimize the largest concession) decides which
+   law bends, by the minimum, and the bend is REPORTED ("centre conceded 3mm" / "wrap
+   conceded 2mm"). Band slider stays continuous manual scale and reports concessions the
+   same way while between rungs.
 
 ## Minimal diff (the whole deliverable, per file)
 
