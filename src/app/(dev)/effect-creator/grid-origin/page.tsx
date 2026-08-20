@@ -388,10 +388,10 @@ export default function GridLab() {
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
                   : bandScale !== null
-                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
+                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return${model && (model.grid.pressMM ?? 0) > 0.05 ? ` · wrap conceded ${model.grid.pressMM!.toFixed(1)}mm` : ''}`
                     : model
                     ? model.ladder.length
-                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
+                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band${(model.grid.pressMM ?? 0) > 0.05 ? ` · wrap conceded ${model.grid.pressMM!.toFixed(1)}mm` : ''}`
                       : 'nothing fully fits at this flap — best seated shown'
                     : '—'}
               </div>
@@ -436,8 +436,8 @@ export default function GridLab() {
             <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
               <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
             </label>
-            <div className={positioning === 1 ? 'gl-lab-off' : undefined}
-              title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
+            <div className={positioning !== 0 ? 'gl-lab-off' : undefined}
+              title={positioning !== 0 ? 'inactive — nothing slides in a derived mode' : undefined}>
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
                 <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
               </LabRow>
@@ -477,12 +477,15 @@ export default function GridLab() {
               <div className="gl-seg">
                 <button aria-pressed={positioning === 0} onClick={() => setPositioning(0)}>Voting</button>
                 <button aria-pressed={positioning === 1} onClick={() => setPositioning(1)}>Centre rules</button>
+                <button aria-pressed={positioning === 2} onClick={() => setPositioning(2)}>Law</button>
               </div>
             </div>
             <div className="gl-magic-note">
               {positioning === 0
                 ? 'Voting — magnets, coverage and centring compete across every grid slide.'
-                : 'Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting.'}
+                : positioning === 1
+                  ? 'Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting.'
+                  : 'LAW — three equal rigid rules, no scoring: centre held by parity, every belt disc pressed within the flap tolerance, size snaps only where another magnet joins. Vertical beats horizontal.'}
             </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">

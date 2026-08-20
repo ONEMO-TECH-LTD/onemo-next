@@ -106,6 +106,8 @@ export interface GridResult {
   spotRadiusMM: number
   /** Outline points where a disc touches (within one snap step of its margined edge). */
   contactsMM: Pt[]
+  /** LAW mode: the worst belt disc's gap beyond the allowance — 0 when the wrap law holds. */
+  pressMM?: number
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
   /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
@@ -191,6 +193,38 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
     }
     mainCentre = ruleTarget
+  } else if (fits && positioning === 2) {
+    // THE LAW MODE (Dan, 2026-08-20) — Centre rules' rigid centring plus its two equal
+    // siblings. No scoring anywhere: the grid is placed ON the governed centre by parity
+    // (centre law, by construction); among the four lawful placements the ranking is pure
+    // lexicographic law — magnet count (post-belt, the band's step axis) → wrap (the worst
+    // belt disc's gap beyond the allowance, smaller is truer) → gravity (vertical beats
+    // horizontal between otherwise-equal arrangements). Size is the reconciler: the band
+    // walk only rungs sizes where count, wrap and centre hold together.
+    const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
+    const half = pitch / 2
+    const clsOf = (side: number) => bandOf(side)?.id ?? BANDS[BANDS.length - 1].id
+    const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
+    const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
+    const otherX = canX === bxc ? bxc + half : bxc
+    const otherY = canY === byc ? byc + half : byc
+    const cands: Array<[number, number]> = [[canX, canY], [otherX, canY], [canX, otherY], [otherX, otherY]]
+    let bl: { count: number; pressQ: number; vertical: boolean } | null = null
+    for (const [px, py] of cands) {
+      const ox = mod(px, pitch), oy = mod(py, pitch)
+      const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
+      if (!seat.length) continue
+      const belt = applyCoverage(seat, perimeterOnly, pitch).seated
+      const pressQ = Math.round(Math.max(0, maxPressMM(outer, belt, reach)) / QUANTUM_KEY_MM)
+      const sb = bbox(seat)
+      const vertical = sb.maxY - sb.minY >= sb.maxX - sb.minX
+      const wins = !bl
+        || belt.length > bl.count
+        || (belt.length === bl.count && pressQ < bl.pressQ)
+        || (belt.length === bl.count && pressQ === bl.pressQ && vertical && !bl.vertical)
+      if (wins) { bl = { count: belt.length, pressQ, vertical }; bestSeated = seat; bestOx = ox; bestOy = oy }
+    }
+    mainCentre = ruleTarget
   } else if (fits) {
     // Phases: ONE full ladder swept from the first centre, plus each further mass centre's
     // EXACT slide (k=0) — the only slide of a second base the ladder doesn't already cover.
@@ -265,13 +299,16 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     anchors,
     // Tangency made visible: where each disc meets the outline, within one size step's slack.
     contactsMM: contactPointsMM(outer, coverage.seated, reach, SNAP_STEP_MM),
+    ...(positioning === 2 && coverage.seated.length
+      ? { pressMM: Math.max(0, maxPressMM(outer, coverage.seated, reach)) }
+      : {}),
     pitchCentreMM: pitch,
     lattice,
     phaseMM: [bestOx, bestOy],
     panMM: [bestKx, bestKy],
     spotRadiusMM: spotRadiusOf(pad),
     segments,
-    centresMM: positioning === 1 ? [ruleTarget] : centres,
+    centresMM: positioning >= 1 ? [ruleTarget] : centres,
     centreMainMM: mainCentre,
   }
 }
@@ -305,7 +342,12 @@ function bandWalk(
 ): { points: BandSnapPoint[]; bestSeatedMM: number } {
   const [lo, hi] = snapRange(cfg, fromMM)
   const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', seatMarginMM: margin }
+  // LAW mode: the wrap law alone rules the gate — inflating the seat predicate too (the
+  // contact-law margin) would demand gap ≥ allowance AND ≤ allowance at once, a knife edge.
+  const law = (cfg.positioning ?? POSITIONING) === 2
+  const walkCfg: GridConfig = law
+    ? { ...cfg, segmentsDetail: 'light' }
+    : { ...cfg, segmentsDetail: 'light', seatMarginMM: margin }
   const solve = (mm: number): GridResult => {
     let g = cfg.solveCache?.get(mm)
     if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
@@ -347,7 +389,9 @@ export function fitSizeInBand(
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
   const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const dispCfg: GridConfig = { ...cfg, seatMarginMM: margin }
+  const dispCfg: GridConfig = (cfg.positioning ?? POSITIONING) === 2
+    ? { ...cfg }
+    : { ...cfg, seatMarginMM: margin }
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const pickIdx = points.findIndex((p) => p.count === maxCount)
