@@ -7,7 +7,7 @@
 
 import type { Rational } from '../spec'
 import { angleBetween } from './angle'
-import { cAdd, cDiv, cInt, cMul, cSqrt, cSub, evaluate, signOf, type CReal, type Interval } from './certified-real'
+import { cAdd, cDiv, cInt, cMul, cNeg, cSqrt, cSub, evaluate, signOf, type CReal, type Interval } from './certified-real'
 import type { ExactContour } from './clearance'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, ratToNumber } from './exact-real'
 import { offsetArrangement, traversed, type OffsetLoop, type P2 } from './offset'
@@ -37,6 +37,18 @@ export interface ExactRegions {
   readonly reasons: readonly string[]
 }
 
+/** Exact containment in a region: inside its outer loop and outside every hole. */
+export function regionContains(region: ExactRegion, p: P2, r: bigint): boolean | null {
+  const outer = loopContains(region.outer, p, r)
+  if (outer !== true) return outer
+  for (const h of region.holes) {
+    const inHole = loopContains(h, p, r)
+    if (inHole === null) return null
+    if (inHole) return false
+  }
+  return true
+}
+
 const BITS = 64n
 const I = (lo: Rational, hi: Rational): Interval => ({ lo, hi })
 const iAdd = (a: Interval, b: Interval): Interval => I(ratAdd(a.lo, b.lo), ratAdd(a.hi, b.hi))
@@ -48,13 +60,19 @@ const half = (e: CReal) => cDiv(e, cInt(2))
 const third = (e: CReal) => cDiv(e, cInt(3))
 const sixth = (e: CReal) => cDiv(e, cInt(6))
 
-/** Green's theorem terms for a straight piece P→Q (exact). */
+/**
+ * Green's theorem terms for a straight piece P→Q (exact), in the SAME gauge the arc terms use:
+ * area = ½∮(x dy − y dx), Mx = ∮x²/2 dy, My = −∮y²/2 dx. The shoelace moment
+ * (Px+Qx)·cross/6 is a different gauge — equivalent only when summed over an all-segment loop —
+ * so mixing it with arc pieces leaves the area right and the centroid wrong.
+ */
 function segmentTerms(P: P2, Q: P2): RegionIntegrals {
   const crossPQ = cSub(cMul(P.x, Q.y), cMul(Q.x, P.y))
+  const sqSum = (a: CReal, b: CReal) => cAdd(cAdd(cMul(a, a), cMul(a, b)), cMul(b, b))
   return {
     area: iOf(half(crossPQ)),
-    mx: iOf(sixth(cMul(cAdd(P.x, Q.x), crossPQ))),
-    my: iOf(sixth(cMul(cAdd(P.y, Q.y), crossPQ))),
+    mx: iOf(sixth(cMul(cSub(Q.y, P.y), sqSum(P.x, Q.x)))),
+    my: iOf(cNeg(sixth(cMul(cSub(Q.x, P.x), sqSum(P.y, Q.y))))),
   }
 }
 
@@ -101,43 +119,79 @@ export function loopIntegrals(loop: OffsetLoop, r: bigint): RegionIntegrals | nu
   return { area, mx, my }
 }
 
-/** Exact ray-parity containment of a point in a loop (ray toward +x). null when undecidable. */
-function loopContains(loop: OffsetLoop, p: P2, r: bigint): boolean | null {
-  let inside = false
-  for (const op of loop.pieces) {
-    const { from, to, arc } = traversed(op, r)
-    if (!arc) {
-      const a = signOf(cSub(from.y, p.y)), b = signOf(cSub(to.y, p.y))
-      if (a === null || b === null) return null
-      if ((a > 0) === (b > 0)) continue
-      // x of the edge at p.y: from.x + (p.y − from.y)·(to.x − from.x)/(to.y − from.y), compare with p.x
-      const xAt = cAdd(from.x, cDiv(cMul(cSub(p.y, from.y), cSub(to.x, from.x)), cSub(to.y, from.y)))
-      const s = signOf(cSub(xAt, p.x))
-      if (s === null) return null
-      if (s > 0) inside = !inside
-      continue
-    }
-    // arc: the horizontal line y = p.y meets the circle at x = cx ± √(r² − (p.y − cy)²)
-    const dy = cSub(p.y, cInt(arc.cy))
-    const disc = cSub(cInt(arc.r * arc.r), cMul(dy, dy))
-    const sd = signOf(disc)
-    if (sd === null) return null
-    if (sd < 0) continue
-    const root = cSqrt(disc)
-    for (const x of sd === 0 ? [cInt(arc.cx)] : [cSub(cInt(arc.cx), root), cAdd(cInt(arc.cx), root)]) {
-      const right = signOf(cSub(x, p.x))
-      if (right === null) return null
-      if (right <= 0) continue
-      // on the traversed sweep between from and to? (arc spans < π: both cross-product steps agree)
-      const u = { x: cSub(x, cInt(arc.cx)), y: dy }
-      const uf = { x: cSub(from.x, cInt(arc.cx)), y: cSub(from.y, cInt(arc.cy)) }
-      const ut = { x: cSub(to.x, cInt(arc.cx)), y: cSub(to.y, cInt(arc.cy)) }
-      const c1 = signOf(cSub(cMul(uf.x, u.y), cMul(uf.y, u.x))), c2 = signOf(cSub(cMul(u.x, ut.y), cMul(u.y, ut.x)))
-      if (c1 === null || c2 === null) return null
-      if (c1 !== 0 && c2 !== 0 && c1 === c2) inside = !inside
+/**
+ * Exact ray-parity containment of a point in a loop.
+ *
+ * The ray direction is CHOSEN, not fixed: a ray through a shared vertex is counted by both of the
+ * pieces meeting there and flips the answer (the axis ray through the dumbbell's neck-arc junction
+ * did exactly that). Each vertex rules out at most one slope, so among finitely many candidate
+ * slopes one is certified to miss every vertex, and along it every crossing is a strict interior
+ * hit. Tangential touches of an arc are not crossings and change no parity.
+ */
+export function loopContains(loop: OffsetLoop, p: P2, r: bigint): boolean | null {
+  const spans = loop.pieces.map((op) => traversed(op, r))
+  const vertices: P2[] = spans.flatMap((s) => [s.from, s.to])
+
+  let dir: { x: CReal; y: CReal } | null = null
+  for (let k = 0; k <= vertices.length + 1 && !dir; k++) {
+    for (const cand of [{ x: cInt(1), y: cInt(k) }, { x: cInt(1), y: cInt(-k) }]) {
+      let clear = true
+      for (const v of vertices) {
+        // ray hits v iff cross(dir, v − p) = 0 and the hit is forward; reject on either 0 or unknown
+        const cross = cSub(cMul(cand.x, cSub(v.y, p.y)), cMul(cand.y, cSub(v.x, p.x)))
+        const s = signOf(cross)
+        if (s === null) return null
+        if (s === 0) { clear = false; break }
+      }
+      if (clear) { dir = cand; break }
     }
   }
-  return inside
+  if (!dir) return null
+
+  let crossings = 0
+  for (const { from, to, arc } of spans) {
+    if (!arc) {
+      // p + t·dir = from + s·(to − from), strict interior 0 < s < 1 and forward t > 0
+      const ex = cSub(to.x, from.x), ey = cSub(to.y, from.y)
+      const det = cSub(cMul(dir.x, ey), cMul(dir.y, ex))
+      const sDet = signOf(det)
+      if (sDet === null) return null
+      if (sDet === 0) continue // parallel; a collinear piece would have put a vertex on the ray
+      // p + t·dir = from + s·e, w = from − p  ⇒  s = (w × dir)/(dir × e),  t = (w × e)/(dir × e)
+      const wx = cSub(from.x, p.x), wy = cSub(from.y, p.y)
+      const s = cDiv(cSub(cMul(wx, dir.y), cMul(wy, dir.x)), det)
+      const t = cDiv(cSub(cMul(wx, ey), cMul(wy, ex)), det)
+      const s0 = signOf(s), s1 = signOf(cSub(cInt(1), s)), st = signOf(t)
+      if (s0 === null || s1 === null || st === null) return null
+      if (s0 > 0 && s1 > 0 && st > 0) crossings++
+      continue
+    }
+    // |p + t·dir − C|² = r² → quadratic in t
+    const fx = cSub(p.x, cInt(arc.cx)), fy = cSub(p.y, cInt(arc.cy))
+    const A = cAdd(cMul(dir.x, dir.x), cMul(dir.y, dir.y))
+    const B = cMul(cInt(2), cAdd(cMul(fx, dir.x), cMul(fy, dir.y)))
+    const C = cSub(cAdd(cMul(fx, fx), cMul(fy, fy)), cInt(arc.r * arc.r))
+    const disc = cSub(cMul(B, B), cMul(cInt(4), cMul(A, C)))
+    const sd = signOf(disc)
+    if (sd === null) return null
+    if (sd <= 0) continue // miss, or tangential touch: no parity change
+    const root = cSqrt(disc)
+    for (const t of [cDiv(cSub(cSub(cInt(0), B), root), cMul(cInt(2), A)), cDiv(cAdd(cSub(cInt(0), B), root), cMul(cInt(2), A))]) {
+      const st = signOf(t)
+      if (st === null) return null
+      if (st <= 0) continue
+      const q: P2 = { x: cAdd(p.x, cMul(t, dir.x)), y: cAdd(p.y, cMul(t, dir.y)) }
+      // strictly inside the traversed sweep (span < π): u is strictly between from and to
+      const u = { x: cSub(q.x, cInt(arc.cx)), y: cSub(q.y, cInt(arc.cy)) }
+      const uf = { x: cSub(from.x, cInt(arc.cx)), y: cSub(from.y, cInt(arc.cy)) }
+      const ut = { x: cSub(to.x, cInt(arc.cx)), y: cSub(to.y, cInt(arc.cy)) }
+      const c1 = signOf(cSub(cMul(uf.x, u.y), cMul(uf.y, u.x)))
+      const c2 = signOf(cSub(cMul(u.x, ut.y), cMul(u.y, ut.x)))
+      if (c1 === null || c2 === null) return null
+      if (c1 !== 0 && c1 === c2) crossings++
+    }
+  }
+  return crossings % 2 === 1
 }
 
 /**

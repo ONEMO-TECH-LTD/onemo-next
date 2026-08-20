@@ -400,3 +400,24 @@ export function traversed(op: OrientedPiece, r: bigint): { from: P2; to: P2; arc
   return { from: reversed ? b : a, to: reversed ? a : b, arc: e.kind === 'arc' ? { cx: e.cx, cy: e.cy, r } : null }
 }
 export type { Elem }
+
+/** The boundary features that can be nearest to an interior point: every edge (material on its
+ *  left after orientation) and every reflex vertex. Convex vertices never generate interior
+ *  clearance and are excluded. */
+export function boundaryFeatures(c: ExactContour): { edges: ExactSegment[]; reflex: Array<{ x: bigint; y: bigint }> } {
+  const edges: ExactSegment[] = []
+  const reflex: Array<{ x: bigint; y: bigint }> = []
+  for (const { ring, pts } of orientedRings(c)) {
+    const n = pts.length
+    for (let i = 0; i < n; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % n]
+      edges.push({ ax, ay, bx, by, minX: ax < bx ? ax : bx, maxX: ax > bx ? ax : bx, minY: ay < by ? ay : by, maxY: ay > by ? ay : by, ring, edge: i })
+    }
+    for (let i = 0; i < n; i++) {
+      const [px, py] = pts[(i + n - 1) % n], [vx, vy] = pts[i], [qx, qy] = pts[(i + 1) % n]
+      const turn = (vx - px) * (qy - vy) - (vy - py) * (qx - vx)
+      if (turn < 0n) reflex.push({ x: vx, y: vy })
+    }
+  }
+  return { edges, reflex }
+}

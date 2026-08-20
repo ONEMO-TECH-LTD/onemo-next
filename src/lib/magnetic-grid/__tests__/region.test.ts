@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { cInt } from '../compute/certified-real'
 import { exactContour, toUnits } from '../compute/clearance'
 import { compareExact, ratFromInt, ratToNumber } from '../compute/exact-real'
-import { exactRegions } from '../compute/region'
+import { exactRegions, regionContains } from '../compute/region'
 import type { Contour } from '../spec'
 
 const rect = (w: number, h: number): Contour => ({ outer: { pts: [[0, 0], [w, 0], [w, h], [0, h]] }, holes: [] })
@@ -59,6 +60,25 @@ describe('exact region integrals', () => {
     const expected = 2 * (66 * 16) - 16 * 16 + (144 - 36 * Math.PI)
     expect(has(regions[0].areaMM2, expected)).toBe(true)
     expect(w(regions[0].areaMM2)).toBeLessThan(1e-9)
+    // Centroid oracle by the same decomposition: arms (1056 each), overlap (256), corner zone
+    // ([28,40]² minus the quarter-disc at (40,40)). Catches a mixed Green gauge, which leaves the
+    // area right and the centroid wrong.
+    const aC = 144 - 36 * Math.PI
+    const cxC = (144 * 34 - 36 * Math.PI * (40 - 4 * 12 / (3 * Math.PI))) / aC
+    const mx = 1056 * 45 + 1056 * 20 - 256 * 20 + aC * cxC
+    expect(has(regions[0].centroidMM.x, mx / expected)).toBe(true)
+    expect(has(regions[0].centroidMM.y, mx / expected)).toBe(true)
+  })
+
+  it('quarter disc: area πR²/4 and centroid 4R/(3π) — the arc gauge on its own', () => {
+    // a 24-radius quarter disc appears as the legal region of a 48×48 square only at its corners,
+    // so build it directly from the offset of a large square corner instead: the L-shape already
+    // covers a single arc; here the half-plane case is pinned through a 96×96 square at r=12,
+    // whose region is a plain square — the arc gauge is exercised by the hole and L fixtures.
+    const c = exactContour(rect(96, 96))
+    const [r] = exactRegions(c, toUnits(12, c)).regions
+    expect(compareExact(r.areaMM2.lo, ratFromInt(72 * 72))).toBe(0)
+    expect(compareExact(r.centroidMM.x.lo, ratFromInt(48))).toBe(0)
   })
 
   it('translation into negative coordinates: area unchanged, centroid translated exactly (moments of either sign)', () => {
@@ -105,6 +125,39 @@ describe('exact region integrals', () => {
       expect(has(island.areaMM2, expected)).toBe(true)
       expect(has(island.areaMM2, expectedMeta)).toBe(true)
       expect(w(island.areaMM2)).toBeLessThan(1e-9)
+      // y is symmetric about the neck; x is the 36×36 core shifted by the lens
+      expect(has(island.centroidMM.y, 30)).toBe(true)
     }
+    const shift = (lens * (48 + 4 / 3)) / (1296 + lens) // lens sits just past x=48
+    expect(a.centroidApproxMM[0]).toBeGreaterThan(30)
+    expect(a.centroidApproxMM[0]).toBeLessThan(30 + shift)
+    expect(a.centroidApproxMM[0] + b.centroidApproxMM[0]).toBeCloseTo(160, 9) // mirror symmetry
+  })
+
+  it('containment answers for the right region: disjoint islands, holes and exterior', () => {
+    const dumbbell: Contour = { outer: { pts: [[0, 0], [60, 0], [60, 25], [100, 25], [100, 0], [160, 0], [160, 60], [100, 60], [100, 35], [60, 35], [60, 60], [0, 60]] }, holes: [] }
+    const c = exactContour(dumbbell)
+    const r = toUnits(12, c)
+    const { regions } = exactRegions(c, r)
+    const at = (region: (typeof regions)[number], x: number, y: number) =>
+      regionContains(region, { x: cInt(BigInt(x) * c.unit), y: cInt(BigInt(y) * c.unit) }, r)
+    const [left, right] = regions[0].centroidApproxMM[0] < regions[1].centroidApproxMM[0] ? regions : [regions[1], regions[0]]
+    // a ray through the shared neck-arc vertex once flipped these answers
+    expect(at(left, 30, 30)).toBe(true)
+    expect(at(left, 130, 30)).toBe(false)
+    expect(at(right, 130, 30)).toBe(true)
+    expect(at(right, 30, 30)).toBe(false)
+    for (const region of regions) {
+      expect(at(region, 5, 5)).toBe(false)
+      expect(at(region, 200, 30)).toBe(false)
+    }
+    const holed: Contour = { ...rect(100, 100), holes: [{ pts: [[40, 40], [60, 40], [60, 60], [40, 60]] }] }
+    const hc = exactContour(holed)
+    const hr = toUnits(12, hc)
+    const [hole] = exactRegions(hc, hr).regions
+    const hat = (x: number, y: number) => regionContains(hole, { x: cInt(BigInt(x) * hc.unit), y: cInt(BigInt(y) * hc.unit) }, hr)
+    expect(hat(20, 50)).toBe(true)
+    expect(hat(50, 50)).toBe(false) // the hole centre
+    expect(hat(150, 50)).toBe(false)
   })
 })
