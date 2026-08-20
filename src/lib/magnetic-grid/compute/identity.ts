@@ -9,8 +9,8 @@
 // enclosure is not a rational and does not become one; it needs its own certificate, which is a
 // later conversion family with its own proof.
 
-import type { AlgebraicReal, Rational } from '../spec'
-import { isqrt, ratFromInt, rational, sqrtInterval, type ExactRational } from './exact-real'
+import type { AlgebraicReal, CertifiedExpressionReal, Rational } from '../spec'
+import { compareExact, isqrt, ratFromInt, rational, sqrtInterval, type ExactRational } from './exact-real'
 
 /** §6.1 `Rational` — decimal-string integers, normalized, lossless in both directions. */
 export function encodeRational(value: ExactRational): Rational {
@@ -27,6 +27,12 @@ export interface QuadraticSource {
   readonly a: ExactRational
   readonly b: ExactRational
   readonly k: bigint
+}
+
+/** Canonical source extracted from one real `CertifiedSum` by its owning region module. */
+export interface CertifiedExpressionSource {
+  readonly expression: readonly string[]
+  readonly isolating: readonly [ExactRational, ExactRational]
 }
 
 const abs = (value: bigint) => (value < BigInt(0) ? -value : value)
@@ -81,5 +87,23 @@ export function encodeQuadraticAlgebraic(source: QuadraticSource): AlgebraicReal
     polynomial: coefficients.map((value) => value.toString()),
     isolating: [encodeRational(isolating[0]), encodeRational(isolating[1])],
     rootIndex: b.n > BigInt(0) ? 1 : 0,
+  }
+}
+
+/**
+ * §6.1 `CertifiedExpressionReal` from a real, canonically-tokenized certified sum.
+ * The complete length-prefixed token stream is the identity, so two distinct derivations cannot
+ * collide through separators or traversal order. Bounds are carried exactly as directed rationals.
+ */
+export function encodeCertifiedExpression(source: CertifiedExpressionSource): CertifiedExpressionReal | null {
+  const [lo, hi] = source.isolating
+  if (!source.expression.length || compareExact(lo, hi) > 0) return null
+  const content = source.expression.map((token) => `${token.length}:${token}`).join('')
+  const expressionHash = `certified-sum-v1:${content}`
+  return {
+    expressionHash,
+    expression: [...source.expression],
+    isolating: [encodeRational(lo), encodeRational(hi)],
+    proofId: `directed-bigint-interval-v1:${expressionHash}`,
   }
 }

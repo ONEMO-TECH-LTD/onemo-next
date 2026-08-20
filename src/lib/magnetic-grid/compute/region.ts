@@ -6,11 +6,13 @@
 // their island by exact ray parity.
 
 import type { ExactRational } from './exact-real'
+import type { CertifiedExpressionReal } from '../spec'
 import { angleBetween } from './angle'
 import { cAdd, cDiv, cInt, cMul, cNeg, cSqrt, cSub, evaluate, signOf, type CReal, type Interval } from './certified-real'
 import type { ExactContour } from './clearance'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, ratToNumber } from './exact-real'
 import { offsetArrangement, traversed, type OffsetLoop, type P2 } from './offset'
+import { encodeCertifiedExpression } from './identity'
 
 /**
  * One arc sweep: the signed angle a piece turns through, kept as the geometry that DEFINES it
@@ -35,6 +37,50 @@ export interface ArcSweep {
 export interface CertifiedSum {
   readonly exact: CReal
   readonly angles: ReadonlyArray<{ readonly weight: CReal; readonly sweep: ArcSweep }>
+}
+
+/** Canonical exact-expression identity for publication; add/mul order cannot change the bytes. */
+function canonicalExpression(e: CReal): string {
+  if (e.k === 'rat') return `rat(${e.v.n}/${e.v.d})`
+  if (e.k === 'neg') return `neg(${canonicalExpression(e.a)})`
+  if (e.k === 'sqrt') return `sqrt(${canonicalExpression(e.a)})`
+  if (e.k === 'add' || e.k === 'mul') {
+    const operator = e.k
+    const operands: CReal[] = []
+    const collect = (value: CReal) => {
+      if (value.k === 'add') {
+        if (operator === 'add') { collect(value.a); collect(value.b); return }
+      } else if (value.k === 'mul') {
+        if (operator === 'mul') { collect(value.a); collect(value.b); return }
+      }
+      operands.push(value)
+    }
+    collect(e)
+    return `${operator}(${operands.map(canonicalExpression).sort().join(',')})`
+  }
+  if (e.k === 'sub' || e.k === 'div') return `${e.k}(${canonicalExpression(e.a)},${canonicalExpression(e.b)})`
+  throw new Error('canonicalExpression: unsupported expression')
+}
+
+const canonicalPoint = (point: P2) => `${canonicalExpression(point.x)},${canonicalExpression(point.y)}`
+const canonicalSweep = (sweep: ArcSweep) => [
+  sweep.cx.toString(), sweep.cy.toString(), sweep.r.toString(),
+  canonicalPoint(sweep.from), canonicalPoint(sweep.to),
+].join('|')
+
+/**
+ * Publish only a real arc-bearing integral. Pure rational/algebraic expressions use their own
+ * §6.1 variants; an invalid directed enclosure refuses instead of becoming a certificate.
+ */
+export function publishCertifiedSum(sum: CertifiedSum): CertifiedExpressionReal | null {
+  if (!sum.angles.length) return null
+  const expression = [
+    'certified-sum-v1',
+    `exact:${canonicalExpression(sum.exact)}`,
+    ...sum.angles.map(({ weight, sweep }) => `angle:${canonicalExpression(weight)}@${canonicalSweep(sweep)}`).sort(),
+  ]
+  const isolating = evaluateSum(sum, BigInt(128))
+  return encodeCertifiedExpression({ expression, isolating: [isolating.lo, isolating.hi] })
 }
 
 export interface RegionIntegrals {

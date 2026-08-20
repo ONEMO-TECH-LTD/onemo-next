@@ -5,8 +5,10 @@
 
 import { describe, expect, it } from 'vitest'
 import { cAdd, cInt, cMul, cSqrt, asQuadratic } from '../compute/certified-real'
-import { decodeRational, encodeQuadraticAlgebraic, encodeRational } from '../compute/identity'
+import { decodeRational, encodeCertifiedExpression, encodeQuadraticAlgebraic, encodeRational } from '../compute/identity'
 import { compareExact, ratFromInt, ratFromNumber, rational, type ExactRational } from '../compute/exact-real'
+import { exactContour, toUnits } from '../compute/clearance'
+import { exactRegions, publishCertifiedSum, type CertifiedSum } from '../compute/region'
 
 describe('§6.1 canonical serialization of exact rationals', () => {
   const cases: ReadonlyArray<{ id: string; value: ExactRational }> = [
@@ -64,5 +66,67 @@ describe('§6.1 canonical serialization of single-field algebraic reals', () => 
     expect(encodeQuadraticAlgebraic(asQuadratic(cInt(7))!)).toBeNull()
     expect(encodeQuadraticAlgebraic({ a: ratFromInt(0), b: ratFromInt(1), k: BigInt(4) })).toBeNull()
     expect(encodeQuadraticAlgebraic({ a: ratFromInt(0), b: ratFromInt(1), k: BigInt(-2) })).toBeNull()
+  })
+})
+
+describe('§6.1 canonical serialization of certified integral expressions', () => {
+  const source = () => {
+    const contour = exactContour({
+      outer: { pts: [[0, 0], [100, 0], [100, 100], [0, 100]] },
+      holes: [{ pts: [[40, 40], [60, 40], [60, 60], [40, 60]] }],
+    })
+    return exactRegions(contour, toUnits(12, contour)).regions[0].areaExpr
+  }
+
+  it('publishes actual CertifiedSum terms with directed bounds and stable proof identity', () => {
+    const sum = source()
+    const published = publishCertifiedSum(sum)!
+    expect(published.expression[0]).toBe('certified-sum-v1')
+    expect(published.expression.some((token) => token.startsWith('angle:'))).toBe(true)
+    expect(published.proofId).toBe(`directed-bigint-interval-v1:${published.expressionHash}`)
+    expect(compareExact(decodeRational(published.isolating[0]), decodeRational(published.isolating[1]))).toBeLessThanOrEqual(0)
+  })
+
+  it('is invariant to term traversal and associative/commutative exact-tree order', () => {
+    const sum = source()
+    const reversedExact = sum.exact.k === 'add' ? { k: 'add' as const, a: sum.exact.b, b: sum.exact.a } : sum.exact
+    const reordered: CertifiedSum = { exact: reversedExact, angles: [...sum.angles].reverse() }
+    expect(publishCertifiedSum(reordered)).toEqual(publishCertifiedSum(sum))
+  })
+
+  it('changes identity with real sweep geometry and never promotes an interval-only rational sum', () => {
+    const sum = source()
+    const [first, ...rest] = sum.angles
+    const mutated: CertifiedSum = {
+      exact: sum.exact,
+      angles: [{ ...first, sweep: { ...first.sweep, cx: first.sweep.cx + BigInt(1) } }, ...rest],
+    }
+    expect(publishCertifiedSum(mutated)!.expressionHash).not.toBe(publishCertifiedSum(sum)!.expressionHash)
+    const reversed: CertifiedSum = {
+      exact: sum.exact,
+      angles: [{ ...first, sweep: { ...first.sweep, from: first.sweep.to, to: first.sweep.from } }, ...rest],
+    }
+    expect(publishCertifiedSum(reversed)!.expressionHash).not.toBe(publishCertifiedSum(sum)!.expressionHash)
+    expect(publishCertifiedSum({ exact: cInt(7), angles: [] })).toBeNull()
+  })
+
+  it('refuses invalid bounds and keeps proof identity stable across enclosure refinement', () => {
+    const expression = ['certified-sum-v1', 'exact:rat(1/3)', 'angle:rat(2/1)@signed-sweep']
+    expect(encodeCertifiedExpression({
+      expression,
+      isolating: [ratFromInt(2), ratFromInt(1)],
+    })).toBeNull()
+
+    const coarse = encodeCertifiedExpression({
+      expression,
+      isolating: [rational(BigInt(3), BigInt(1)), rational(BigInt(4), BigInt(1))],
+    })!
+    const refined = encodeCertifiedExpression({
+      expression,
+      isolating: [rational(BigInt(31), BigInt(10)), rational(BigInt(32), BigInt(10))],
+    })!
+    expect(refined.expressionHash).toBe(coarse.expressionHash)
+    expect(refined.proofId).toBe(coarse.proofId)
+    expect(refined.isolating).not.toEqual(coarse.isolating)
   })
 })
