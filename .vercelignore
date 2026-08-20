@@ -24,3 +24,6 @@ asset-library
 .gemini
 .grok
 .agents
+
+# Local build/dev output — the dev server mutates .next mid-archive (ENOENT .next/lock)
+.next
