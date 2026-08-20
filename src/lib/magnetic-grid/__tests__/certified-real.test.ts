@@ -1,0 +1,37 @@
+import { describe, expect, it } from 'vitest'
+import { approx, cAdd, cDiv, cInt, cMul, cRat, cSqrt, cSub, compareCReal, evaluate, exactRational, isRationalExpr, signOf } from '../compute/certified-real'
+import { compareExact, rational } from '../compute/exact-real'
+
+describe('certified reals', () => {
+  it('decides rational expressions exactly, never by enclosure', () => {
+    const third = cDiv(cInt(1), cInt(3))
+    const e = cSub(cMul(third, cInt(3)), cInt(1)) // (1/3)·3 − 1 = 0 exactly
+    expect(isRationalExpr(e)).toBe(true)
+    expect(signOf(e)).toBe(0)
+    expect(compareExact(exactRational(cAdd(third, third)), rational(2n, 3n))).toBe(0)
+  })
+
+  it('separates irrational values by refining certified enclosures', () => {
+    const root2 = cSqrt(cInt(2))
+    // √2 > 1.4142135623 and < 1.4142135624 — both decided by enclosure, no float
+    expect(compareCReal(root2, cRat(rational(14142135623n, 10000000000n)))).toBe(1)
+    expect(compareCReal(root2, cRat(rational(14142135624n, 10000000000n)))).toBe(-1)
+    const { lo, hi } = evaluate(root2, 128n)
+    expect(compareExact(lo, hi)).toBeLessThan(0)
+    expect(Math.abs(approx(root2) - Math.SQRT2)).toBeLessThan(1e-15)
+  })
+
+  it('refuses to decide an exact-zero irrational identity rather than guessing', () => {
+    // √2·√2 − 2 is exactly zero; enclosures shrink but never exclude zero → null, honestly
+    const e = cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(2))), cInt(2))
+    expect(signOf(e)).toBeNull()
+  })
+
+  it('enclosures are directed: lower bound floors, upper bound ceils', () => {
+    const e = cDiv(cInt(1), cInt(3))
+    const coarse = evaluate(cAdd(cSqrt(cInt(2)), e), 8n)
+    const fine = evaluate(cAdd(cSqrt(cInt(2)), e), 64n)
+    expect(compareExact(coarse.lo, fine.lo)).toBeLessThanOrEqual(0)
+    expect(compareExact(coarse.hi, fine.hi)).toBeGreaterThanOrEqual(0)
+  })
+})
