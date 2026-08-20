@@ -15,47 +15,61 @@ function deepest(contour: Contour, r = 12) {
   return { c, ru, regions, results: regions.map((region) => clearanceMaximum(c, region, ru)) }
 }
 
+
+function asCertified(m: ReturnType<typeof clearanceMaximum>) {
+  if (m.status !== 'certified') throw new Error(`expected certified, got ${m.status}: ${m.reasons.join('; ')}`)
+  return m
+}
+function asTie(m: ReturnType<typeof clearanceMaximum>) {
+  if (m.status !== 'tie') throw new Error(`expected tie, got ${m.status}: ${m.reasons.join('; ')}`)
+  return m
+}
+function asPlateau(m: ReturnType<typeof clearanceMaximum>) {
+  if (m.status !== 'plateau') throw new Error(`expected plateau, got ${m.status}: ${m.reasons.join('; ')}`)
+  return m
+}
+
 describe('clearance maximum (item 5)', () => {
   it('72 square: certified at exactly (36,36) with clearance exactly 36', () => {
     const { c, results } = deepest(rect(72, 72))
     expect(results).toHaveLength(1)
-    const m = results[0]
-    expect(m.status).toBe('certified')
+    const m = asCertified(results[0])
     const u = c.unit
     // exact: the solution of three axis-aligned bisectors is rational
-    expect(compareExact(m.best!.lo, ratFromInt(BigInt(36) * u))).toBe(0)
-    expect(compareExact(m.best!.hi, ratFromInt(BigInt(36) * u))).toBe(0)
-    const a = candidateApprox(m.best!, u)
+    expect(compareExact(m.best.lo, ratFromInt(BigInt(36) * u))).toBe(0)
+    expect(compareExact(m.best.hi, ratFromInt(BigInt(36) * u))).toBe(0)
+    const a = candidateApprox(m.best, u)
     expect(a.x).toBe(36); expect(a.y).toBe(36)
   })
 
   it('96×48: the maximum is a CONTINUUM — one plateau branch, not a pair of points', () => {
     const { c, results } = deepest(rect(96, 48))
-    const m = results[0]
-    // the whole ridge y=24, 24≤x≤72 is co-maximal; only branch evidence can express that
-    expect(m.status).toBe('plateau')
-    expect(m.plateaus).toHaveLength(1)
-    expect(compareExact(m.best!.lo, ratFromInt(BigInt(24) * c.unit))).toBe(0)
-    const [pl] = m.plateaus
+    const m = asPlateau(results[0])
+    // the whole ridge y=24, 24≤x≤72 is co-maximal; only branch evidence can express that, and the
+    // union offers NO selectable point here — a continuum cannot yield one centre decision
+    expect(m.branches).toHaveLength(1)
+    expect('best' in m).toBe(false)
+    expect(compareExact(m.clearanceLo, ratFromInt(BigInt(24) * c.unit))).toBe(0)
+    const [pl] = m.branches
     const U = Number(c.unit)
     expect([approx(pl.from.x) / U, approx(pl.to.x) / U].sort((a, b) => a - b)).toEqual([24, 72])
     expect(approx(pl.from.y) / U).toBe(24)
     expect(approx(pl.to.y) / U).toBe(24)
-    expect(compareExact(pl.lo, m.best!.lo)).toBe(0)
+    expect(compareExact(pl.lo, m.clearanceLo)).toBe(0)
   })
 
   it('hole: the maximum moves to the corner zone, 40√2/(1+√2), certified', () => {
     const holed: Contour = { ...rect(100, 100), holes: [{ pts: [[40, 40], [60, 40], [60, 60], [40, 60]] }] }
     const { c, results } = deepest(holed)
-    const m = results[0]
+    const m = asTie(results[0])
     // four symmetric corner maxima: isolated points, exactly equal → tie, and no continuum
-    expect(m.status).toBe('tie')
-    expect(m.plateaus).toEqual([])
-    expect(1 + m.ties.length).toBe(4)
+    expect('branches' in m).toBe(false)
+    expect(m.candidates).toHaveLength(4)
     const want = 40 * Math.SQRT2 / (1 + Math.SQRT2)
-    const got = candidateApprox(m.best!, c.unit).clearance
-    expect(Math.abs(got - want)).toBeLessThan(1e-9)
-    for (const t of m.ties) expect(compareExact(t.lo, m.best!.lo)).toBe(0)
+    for (const cand of m.candidates) {
+      expect(Math.abs(candidateApprox(cand, c.unit).clearance - want)).toBeLessThan(1e-9)
+      expect(compareCReal(cand.d2, m.candidates[0].d2)).toBe(0)
+    }
   })
 
   it('plateau evidence is load-bearing: an interior ridge point is co-maximal, not merely near-maximal', () => {
@@ -63,14 +77,13 @@ describe('clearance maximum (item 5)', () => {
     // count reports isolated points here and cannot produce a branch at all; one that samples the
     // ridge cannot prove its interior. Assert an INTERIOR point exactly equals the maximum.
     const { c, results } = deepest(rect(96, 48))
-    const m = results[0]
-    expect(m.plateaus.length).toBeGreaterThan(0)
-    const [pl] = m.plateaus
+    const m = asPlateau(results[0])
+    const [pl] = m.branches
     // interior, strictly between the ends, at exactly the maximal clearance
     const midX = approx(pl.mid.x) / Number(c.unit)
     expect(midX).toBeGreaterThan(24)
     expect(midX).toBeLessThan(72)
-    expect(compareCReal(pl.d2, m.best!.d2)).toBe(0)
+    expect(compareCReal(pl.d2, m.d2)).toBe(0)
     // ...and every point of the branch shares one exact clearance value
     expect(compareExact(pl.lo, pl.hi)).toBe(0)
   })
@@ -87,30 +100,29 @@ describe('clearance maximum (item 5)', () => {
     ]
     for (const { shape, y, x0, x1 } of cases) {
       const { c, results } = deepest(shape)
-      const m = results[0]
+      const m = asPlateau(results[0])
       const U = Number(c.unit)
-      expect(m.status, `${x0}..${x1}`).toBe('plateau')
-      expect(m.plateaus).toHaveLength(1)
-      const [pl] = m.plateaus
+      expect(m.branches, `${x0}..${x1}`).toHaveLength(1)
+      const [pl] = m.branches
       expect([approx(pl.from.x) / U, approx(pl.to.x) / U].sort((a, b) => a - b)).toEqual([x0, x1])
       expect(approx(pl.from.y) / U).toBe(y)
       expect(approx(pl.to.y) / U).toBe(y)
-      expect(compareExact(m.best!.lo, ratFromInt(BigInt(24) * c.unit))).toBe(0)
+      expect(compareExact(m.clearanceLo, ratFromInt(BigInt(24) * c.unit))).toBe(0)
     }
   })
 
   it('a square has no plateau: its maximum is a single certified point, so plateau logic cannot over-report', () => {
     const { results } = deepest(rect(72, 72))
-    expect(results[0].status).toBe('certified')
-    expect(results[0].ties).toEqual([])
-    expect(results[0].plateaus).toEqual([])
+    const m = asCertified(results[0])
+    expect('branches' in m).toBe(false)
+    expect('candidates' in m).toBe(false)
   })
 
   it('dumbbell: each island certified at its own centre (30,30) / (130,30), clearance 30', () => {
     const dumbbell: Contour = { outer: { pts: [[0, 0], [60, 0], [60, 25], [100, 25], [100, 0], [160, 0], [160, 60], [100, 60], [100, 35], [60, 35], [60, 60], [0, 60]] }, holes: [] }
     const { c, results } = deepest(dumbbell)
     expect(results).toHaveLength(2)
-    const centres = results.map((m) => { expect(m.status).toBe('certified'); return candidateApprox(m.best!, c.unit) }).sort((a, b) => a.x - b.x)
+    const centres = results.map((m) => candidateApprox(asCertified(m).best, c.unit)).sort((a, b) => a.x - b.x)
     expect(centres.map((k) => [k.x, k.y, k.clearance])).toEqual([[30, 30, 30], [130, 30, 30]])
   })
 })

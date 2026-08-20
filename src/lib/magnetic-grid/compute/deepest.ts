@@ -42,15 +42,17 @@ export interface Plateau {
   readonly features: readonly [Feature, Feature]
 }
 
-export interface ClearanceMaximum {
-  readonly status: 'certified' | 'tie' | 'plateau' | 'unresolved'
-  readonly best: Candidate | null
-  readonly ties: readonly Candidate[]
-  /** non-empty when the maximum is attained on a continuum rather than at isolated points */
-  readonly plateaus: readonly Plateau[]
-  readonly reasons: readonly string[]
-  readonly cellsEvaluated: number
-}
+/**
+ * The clearance maximum as DISCRIMINATED evidence (R14: evidence and refusal are typed, and Logic
+ * must never receive a duplicate point decision for a continuum). Each variant carries exactly the
+ * evidence its case has: one point, several isolated points, one or more co-maximal branches with
+ * their scalar clearance witness, or nothing at all. Contradictory combinations are unrepresentable.
+ */
+export type ClearanceMaximum =
+  | { readonly status: 'certified'; readonly best: Candidate; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
+  | { readonly status: 'tie'; readonly candidates: readonly [Candidate, Candidate, ...Candidate[]]; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
+  | { readonly status: 'plateau'; readonly branches: readonly [Plateau, ...Plateau[]]; readonly clearanceLo: Rational; readonly clearanceHi: Rational; readonly d2: CReal; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
+  | { readonly status: 'unresolved'; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
 
 const TWO = BigInt(2)
 const SQRT2_HI = sqrtInterval(ratFromInt(2), BigInt(1) << BigInt(40)).hi
@@ -192,7 +194,7 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
       widen(ratSub(cx, rr), ratSub(cy, rr)); widen(ratAdd(cx, rr), ratAdd(cy, rr))
     }
   }
-  if (!minX || !minY || !maxX || !maxY) return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons: ['empty region'], cellsEvaluated: 0 }
+  if (!minX || !minY || !maxX || !maxY) return { status: 'unresolved', reasons: ['empty region'], cellsEvaluated: 0 }
   const floorInt = (r: Rational) => (r.n >= BigInt(0) ? r.n / r.d : -((-r.n + r.d - BigInt(1)) / r.d))
   const ceilInt = (r: Rational) => (r.n >= BigInt(0) ? (r.n + r.d - BigInt(1)) / r.d : -((-r.n) / r.d))
   const x0 = floorInt(minX) - rUnits, x1 = ceilInt(maxX) + rUnits, y0 = floorInt(minY) - rUnits, y1 = ceilInt(maxY) + rUnits
@@ -225,7 +227,7 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
     for (const cell of cells) if (cell.inside) { const lo = loOf(cell); if (compareExact(lo, bestLo) > 0) bestLo = lo }
     cells = cells.filter((cell) => compareExact(hiOf(cell), bestLo) >= 0)
     if (!cells.length) break
-    if (cells.length > MAX_CELLS) { reasons.push(`resource envelope: ${cells.length} live cells`); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
+    if (cells.length > MAX_CELLS) { reasons.push(`resource envelope: ${cells.length} live cells`); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
 
     const queue: Cell[] = []
     for (const cell of cells) {
@@ -295,7 +297,7 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
         // A cell that reaches the representation floor with too many binding features is an
         // unsettled question — it must not vanish from the search.
         reasons.push('cell at the representable floor still has too many binding features')
-        return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated }
+        return { status: 'unresolved', reasons, cellsEvaluated: evaluated }
       }
       const q = cell.half / TWO
       queue.push(make(cell.x - q, cell.y - q, q), make(cell.x + q, cell.y - q, q), make(cell.x - q, cell.y + q, q), make(cell.x + q, cell.y + q, q))
@@ -456,8 +458,8 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
     }
   }
 
-  if (!candidates.length) { reasons.push('no candidate isolated'); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
-  if (cells.length) { reasons.push(`${cells.length} cells still undominated`); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
+  if (!candidates.length) { reasons.push('no candidate isolated'); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
+  if (cells.length) { reasons.push(`${cells.length} cells still undominated`); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
 
   // Winner by EXACT comparison, never by interval order: an enclosure with a lower `lo` may still
   // hold the larger exact value, so every candidate is compared exactly against the running best.
@@ -468,7 +470,7 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
     // a strictly dominated enclosure needs no exact work
     if (compareExact(cand.hi, best.lo) < 0) continue
     const cmp = compareCReal(cand.d2, best.d2)
-    if (cmp === null) { reasons.push('candidate comparison undecidable'); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
+    if (cmp === null) { reasons.push('candidate comparison undecidable'); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
     if (cmp > 0) { best = cand; ties = [] }
     else if (cmp === 0 && !samePoint(cand, best) && !ties.some((t) => samePoint(t, cand))) ties.push(cand)
   }
@@ -478,15 +480,15 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
     if (cand === best || ties.includes(cand)) continue
     if (compareExact(cand.hi, best.lo) < 0) continue
     const cmp = compareCReal(cand.d2, best.d2)
-    if (cmp === null) { reasons.push('candidate comparison undecidable'); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
-    if (cmp > 0) { reasons.push('winner not maximal'); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
+    if (cmp === null) { reasons.push('candidate comparison undecidable'); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
+    if (cmp > 0) { reasons.push('winner not maximal'); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
     if (cmp === 0 && !samePoint(cand, best) && !ties.some((t) => samePoint(t, cand))) ties.push(cand)
   }
   // a plateau is only reported when the maximum is actually attained on it
   const winning: Plateau[] = []
   for (const pl of plateaus) {
     const cmp = compareCReal(pl.d2, best.d2)
-    if (cmp === null) { reasons.push('plateau winner comparison undecidable'); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
+    if (cmp === null) { reasons.push('plateau winner comparison undecidable'); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
     if (cmp === 0) winning.push(pl)
   }
   // CANONICAL EVIDENCE: a co-maximal continuum is reported once. Point candidates lying ON a
@@ -511,15 +513,24 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
       let swallowed = false
       for (const pl of winning) {
         const on = onBranch(cand.p, pl)
-        if (on === null) { reasons.push('plateau absorption undecidable'); return { status: 'unresolved', best: null, ties: [], plateaus: [], reasons, cellsEvaluated: evaluated } }
+        if (on === null) { reasons.push('plateau absorption undecidable'); return { status: 'unresolved', reasons, cellsEvaluated: evaluated } }
         if (on) { swallowed = true; break }
       }
       if (!swallowed) keep.push(cand)
     }
     absorbed = keep
   }
-  const status = winning.length ? 'plateau' : absorbed.length ? 'tie' : 'certified'
-  return { status, best, ties: absorbed, plateaus: winning, reasons, cellsEvaluated: evaluated }
+  if (winning.length) {
+    // A continuum has no selectable point: the branches ARE the evidence, with one scalar
+    // clearance witness. `best` is deliberately not returned here.
+    const [head, ...rest] = winning
+    return { status: 'plateau', branches: [head, ...rest], clearanceLo: head.lo, clearanceHi: head.hi, d2: head.d2, reasons, cellsEvaluated: evaluated }
+  }
+  if (absorbed.length) {
+    const [second, ...rest] = absorbed
+    return { status: 'tie', candidates: [best, second, ...rest], reasons, cellsEvaluated: evaluated }
+  }
+  return { status: 'certified', best, reasons, cellsEvaluated: evaluated }
 }
 
 function nearestDist2ToSeg(px: bigint, py: bigint, s: ExactSegment): Rational {
