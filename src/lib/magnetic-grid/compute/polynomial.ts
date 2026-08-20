@@ -18,6 +18,7 @@ const gcd = (a: bigint, b: bigint): bigint => {
   while (y !== ZERO) { const remainder = x % y; x = y; y = remainder }
   return x === ZERO ? ONE : x
 }
+const lcm = (a: bigint, b: bigint) => abs(a / gcd(a, b) * b)
 
 const trimInteger = (input: readonly bigint[]): bigint[] => {
   const result = [...input]
@@ -70,6 +71,34 @@ function divideRational(dividend: RationalPolynomial, divisor: RationalPolynomia
     remainder = trimRational(updated)
   }
   return { remainder }
+}
+
+const rationalPolynomialToPrimitive = (polynomial: RationalPolynomial): bigint[] | null => {
+  const reduced = trimRational(polynomial)
+  if (isZero(reduced)) return null
+  const denominator = reduced.reduce((value, coefficient) => lcm(value, coefficient.d), ONE)
+  return primitivePolynomial(reduced.map((coefficient) => coefficient.n * (denominator / coefficient.d)))
+}
+
+/** Primitive polynomial GCD over Q[x], used to prove shared algebraic roots. */
+export function polynomialGcd(left: IntegerPolynomial, right: IntegerPolynomial): bigint[] | null {
+  const a0 = primitivePolynomial(left), b0 = primitivePolynomial(right)
+  if (!a0 || !b0) return null
+  let a = asRational(a0), b = asRational(b0)
+  while (!isZero(b)) {
+    const remainder = divideRational(a, b).remainder
+    a = b
+    b = remainder
+  }
+  return rationalPolynomialToPrimitive(a)
+}
+
+/** R14 §7.1 certificate check: repeated polynomial factors are forbidden. */
+export function isSquareFreePolynomial(input: IntegerPolynomial): boolean {
+  const polynomial = primitivePolynomial(input)
+  if (!polynomial || polynomial.length <= 1) return false
+  const common = polynomialGcd(polynomial, derivative(polynomial))
+  return common !== null && common.length === 1
 }
 
 /** Exact Sturm chain. The input must be non-constant and square-free at its isolated roots. */
