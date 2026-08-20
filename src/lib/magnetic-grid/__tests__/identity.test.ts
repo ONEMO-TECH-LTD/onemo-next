@@ -4,11 +4,12 @@
 // unnormalized, and the exact IEEE-754 bit pattern of a decimal that has no finite binary form.
 
 import { describe, expect, it } from 'vitest'
-import { cAdd, cInt, cMul, cSqrt, asQuadratic } from '../compute/certified-real'
+import { cAdd, cInt, cMul, cSqrt, asQuadratic, exactRational, isRationalExpr } from '../compute/certified-real'
+import { decodeCertifiedExpression } from '../compute/exact-value'
 import { decodeRational, encodeCertifiedExpression, encodeQuadraticAlgebraic, encodeRational } from '../compute/identity'
 import { compareExact, ratFromInt, ratFromNumber, rational, type ExactRational } from '../compute/exact-real'
 import { exactContour, toUnits } from '../compute/clearance'
-import { exactRegions, publishCertifiedSum, type CertifiedSum } from '../compute/region'
+import { evaluateSum, exactRegions, publishCertifiedSum, type CertifiedSum } from '../compute/region'
 
 describe('§6.1 canonical serialization of exact rationals', () => {
   const cases: ReadonlyArray<{ id: string; value: ExactRational }> = [
@@ -85,6 +86,49 @@ describe('§6.1 canonical serialization of certified integral expressions', () =
     expect(published.expression.some((token) => token.startsWith('angle:'))).toBe(true)
     expect(published.proofId).toBe(`directed-bigint-interval-v1:${published.expressionHash}`)
     expect(compareExact(decodeRational(published.isolating[0]), decodeRational(published.isolating[1]))).toBeLessThanOrEqual(0)
+  })
+
+  it('publishes all three rational production weight families canonically, including negative moments', () => {
+    const contour = exactContour({
+      outer: { pts: [[-100, -100], [0, -100], [0, 0], [-100, 0]] },
+      holes: [{ pts: [[-60, -60], [-40, -60], [-40, -40], [-60, -40]] }],
+    })
+    const region = exactRegions(contour, toUnits(12, contour)).regions[0]
+    const sources = [region.areaExpr, region.momentExpr.x, region.momentExpr.y]
+    sources.forEach((sum, family) => sum.angles.forEach(({ weight, sweep }) => {
+      expect(isRationalExpr(weight)).toBe(true)
+      const numerator = family === 0 ? BigInt(1) : family === 1 ? sweep.cx : sweep.cy
+      expect(compareExact(exactRational(weight), rational(numerator * sweep.r * sweep.r, BigInt(2)))).toBe(0)
+    }))
+    const [area, mx, my] = sources.map(publishCertifiedSum)
+    for (const value of [area, mx, my]) {
+      expect(value).not.toBeNull()
+      expect(value!.expression.filter((token) => token.startsWith('angle:')).every((token) => token.startsWith('angle:rat('))).toBe(true)
+    }
+    expect(mx!.expression.some((token) => token.startsWith('angle:rat(-'))).toBe(true)
+    expect(my!.expression.some((token) => token.startsWith('angle:rat(-'))).toBe(true)
+  })
+
+  it('refuses a self-consistent certificate carrying a non-rational angle weight', () => {
+    const point = (x: number, y: number) => ({ x: cInt(x), y: cInt(y) })
+    const sum: CertifiedSum = {
+      exact: cInt(7),
+      angles: [{
+        weight: cSqrt(cInt(2)),
+        sweep: { cx: BigInt(0), cy: BigInt(0), r: BigInt(1), from: point(1, 0), to: point(0, 1) },
+      }],
+    }
+    expect(publishCertifiedSum(sum)).toBeNull()
+    const bounds = evaluateSum(sum, BigInt(128))
+    const forged = encodeCertifiedExpression({
+      expression: [
+        'certified-sum-v1',
+        'exact:rat(7/1)',
+        'angle:sqrt(rat(2/1))@0|0|1|rat(1/1),rat(0/1)|rat(0/1),rat(1/1)',
+      ],
+      isolating: [bounds.lo, bounds.hi],
+    })!
+    expect(decodeCertifiedExpression(forged)).toBeNull()
   })
 
   it('is invariant to term traversal and associative/commutative exact-tree order', () => {

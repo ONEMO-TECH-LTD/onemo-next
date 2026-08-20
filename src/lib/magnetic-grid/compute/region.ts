@@ -8,7 +8,7 @@
 import type { ExactRational } from './exact-real'
 import type { CertifiedExpressionReal } from '../spec'
 import { angleBetween, piInterval } from './angle'
-import { cAdd, cDiv, cInt, cMul, cNeg, cSqrt, cSub, evaluate, signOf, type CReal, type Interval } from './certified-real'
+import { cAdd, cDiv, cInt, cMul, cNeg, cRat, cSqrt, cSub, evaluate, exactRational, isRationalExpr, signOf, type CReal, type Interval } from './certified-real'
 import type { ExactContour } from './clearance'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, ratToNumber } from './exact-real'
 import { offsetArrangement, traversed, type OffsetLoop, type P2 } from './offset'
@@ -74,22 +74,30 @@ const canonicalSweep = (sweep: ArcSweep) => [
  */
 export function publishCertifiedSum(sum: CertifiedSum): CertifiedExpressionReal | null {
   if (!sum.angles.length) return null
-  const parent = sum.angles.map((_, index) => index)
+  const sourceAngles: Array<{ weight: CReal; sweep: ArcSweep }> = []
+  for (const term of sum.angles) {
+    if (!isRationalExpr(term.weight)) return null
+    try {
+      sourceAngles.push({ weight: cRat(exactRational(term.weight)), sweep: term.sweep })
+    } catch { return null }
+  }
+  const parent = sourceAngles.map((_, index) => index)
   const find = (index: number): number => (parent[index] === index ? index : (parent[index] = find(parent[index])))
-  for (let left = 0; left < sum.angles.length; left++) for (let right = left + 1; right < sum.angles.length; right++) {
-    const equal = sweepsAgree(sum.angles[left].sweep, sum.angles[right].sweep)
+  for (let left = 0; left < sourceAngles.length; left++) for (let right = left + 1; right < sourceAngles.length; right++) {
+    const equal = sweepsAgree(sourceAngles[left].sweep, sourceAngles[right].sweep)
     if (equal === null) return null
     if (equal) parent[find(left)] = find(right)
   }
-  const groups = new Map<number, Array<(typeof sum.angles)[number]>>()
-  sum.angles.forEach((term, index) => {
+  const groups = new Map<number, Array<(typeof sourceAngles)[number]>>()
+  sourceAngles.forEach((term, index) => {
     const root = find(index)
     const known = groups.get(root)
     if (known) known.push(term); else groups.set(root, [term])
   })
   const normalized: Array<{ weight: CReal; sweep: ArcSweep }> = []
   for (const terms of groups.values()) {
-    const weight = terms.slice(1).reduce((total, term) => cAdd(total, term.weight), terms[0].weight)
+    const combined = terms.slice(1).reduce((total, term) => cAdd(total, term.weight), terms[0].weight)
+    const weight = cRat(exactRational(combined))
     const sign = signOf(weight)
     if (sign === null) return null
     if (sign === 0) continue
