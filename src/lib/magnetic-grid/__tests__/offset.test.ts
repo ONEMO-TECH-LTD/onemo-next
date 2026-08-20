@@ -27,7 +27,7 @@ describe('exact inward-offset arrangement', () => {
     const arr = offsetArrangement(c, toUnits(12, c))
     expect(arr.unresolved).toBe(false)
     expect(arr.loops).toHaveLength(1)
-    const kinds = arr.loops[0].pieces.map((p) => p.elem.kind)
+    const kinds = arr.loops[0].pieces.map(({ piece }) => piece.elem.kind)
     expect(kinds.filter((k) => k === 'arc')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'seg')).toHaveLength(6)
   })
@@ -47,7 +47,7 @@ describe('exact inward-offset arrangement', () => {
     expect(arr.unresolved).toBe(false)
     expect(arr.loops).toHaveLength(2)
     // the hole's four convex corners (seen from the material they are reflex) each contribute an arc
-    const arcs = arr.loops.flatMap((l) => l.pieces).filter((p) => p.elem.kind === 'arc')
+    const arcs = arr.loops.flatMap((l) => l.pieces).filter(({ piece }) => piece.elem.kind === 'arc')
     expect(arcs).toHaveLength(4)
   })
 
@@ -61,7 +61,7 @@ describe('exact inward-offset arrangement', () => {
       const arr = offsetArrangement(c, r)
       expect(arr.unresolved).toBe(false)
       let certified = 0
-      for (const loop of arr.loops) for (const piece of loop.pieces) {
+      for (const loop of arr.loops) for (const { piece } of loop.pieces) {
         if (piece.elem.kind !== 'seg') continue
         const { feat: s, a, dx, dy } = piece.elem
         // Distance from the offset LINE to its generator is constant along the line, so the
@@ -81,7 +81,7 @@ describe('exact inward-offset arrangement', () => {
     const holed: Contour = { ...rect(100, 100), holes: [{ pts: [[40, 40], [60, 40], [60, 60], [40, 60]] }] }
     const c = exactContour(holed)
     const arr = offsetArrangement(c, toUnits(12, c))
-    const rings = new Set(arr.loops.flatMap((l) => l.pieces).filter((p) => p.elem.kind === 'seg').map((p) => (p.elem as { feat: { ring: number } }).feat.ring))
+    const rings = new Set(arr.loops.flatMap((l) => l.pieces).filter(({ piece }) => piece.elem.kind === 'seg').map(({ piece }) => (piece.elem as { feat: { ring: number } }).feat.ring))
     expect([...rings].sort()).toEqual([0, 1])
   })
 })

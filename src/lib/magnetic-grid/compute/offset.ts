@@ -52,7 +52,9 @@ export interface Piece {
   readonly mid: P2
 }
 
-export interface OffsetLoop { readonly pieces: readonly Piece[] }
+/** A piece as traversed along its loop: `reversed` means from `to` back to `from`. */
+export interface OrientedPiece { readonly piece: Piece; readonly reversed: boolean }
+export interface OffsetLoop { readonly pieces: readonly OrientedPiece[] }
 
 export interface OffsetArrangement {
   readonly loops: readonly OffsetLoop[]
@@ -358,13 +360,15 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
   const loops: OffsetLoop[] = []
   for (const start of pieces) {
     if (used.has(start) || !start.from || !start.to) continue
-    const loop: Piece[] = []
+    const loop: OrientedPiece[] = []
     let cur: Piece | undefined = start
     let enter: SharedVertex | null = start.from
     let closed = false
     while (cur && !used.has(cur)) {
-      used.add(cur); loop.push(cur)
-      const exit: SharedVertex | null = cur.from === enter ? cur.to : cur.from
+      used.add(cur)
+      const reversed = cur.from !== enter
+      loop.push({ piece: cur, reversed })
+      const exit: SharedVertex | null = reversed ? cur.from : cur.to
       if (!exit) break
       if (exit === start.from) { closed = true; break }
       const onward: Piece | undefined = (byVertex.get(exit.id) ?? []).find((q) => q !== cur && !used.has(q))
@@ -377,4 +381,19 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
 }
 
 /** report-only coordinates of a loop's piece midpoints */
-export const loopApprox = (loop: OffsetLoop): Array<[number, number]> => loop.pieces.map((p) => [approx(p.mid.x), approx(p.mid.y)])
+export const loopApprox = (loop: OffsetLoop): Array<[number, number]> => loop.pieces.map(({ piece }) => [approx(piece.mid.x), approx(piece.mid.y)])
+
+/** Exact endpoints of a traversed piece, in traversal order; arc pieces expose centre and radius. */
+export function traversed(op: OrientedPiece, r: bigint): { from: P2; to: P2; arc: { cx: bigint; cy: bigint; r: bigint } | null } {
+  const { piece, reversed } = op
+  const e = piece.elem
+  const endpoint = (v: SharedVertex | null, atStart: boolean): P2 => {
+    if (v) return v.p
+    // nominal element end with no shared vertex (convex corner trimmed the rest away)
+    if (e.kind === 'seg') return atStart ? e.a : { x: cAdd(e.a.x, cBig(e.dx)), y: cAdd(e.a.y, cBig(e.dy)) }
+    return arcPoint(e, atStart ? e.s : e.e, r)
+  }
+  const a = endpoint(piece.from, true), b = endpoint(piece.to, false)
+  return { from: reversed ? b : a, to: reversed ? a : b, arc: e.kind === 'arc' ? { cx: e.cx, cy: e.cy, r } : null }
+}
+export type { Elem }

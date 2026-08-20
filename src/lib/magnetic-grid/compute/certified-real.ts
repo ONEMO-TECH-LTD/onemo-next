@@ -79,8 +79,10 @@ const div = (a: Rational, b: Rational) => rational(a.n * b.d, a.d * b.n)
 const minR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
 const maxR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
 
-/** Certified enclosure of the expression at `bits` of dyadic precision. */
+/** Certified enclosure of the expression at `bits` of dyadic precision. A rational-only
+ *  expression is returned exactly, zero-width — rounding is only for radicals. */
 export function evaluate(e: CReal, bits: bigint): Interval {
+  if (e.k !== 'rat' && isRationalExpr(e)) { const v = exactRational(e); return { lo: v, hi: v } }
   switch (e.k) {
     case 'rat': return { lo: e.v, hi: e.v }
     case 'neg': { const a = evaluate(e.a, bits); return { lo: { n: -a.hi.n, d: a.hi.d }, hi: { n: -a.lo.n, d: a.lo.d } } }
