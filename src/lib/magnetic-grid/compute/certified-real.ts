@@ -489,17 +489,18 @@ export function radicalFieldSign(e: CReal): -1 | 0 | 1 | null {
 export function signOf(e: CReal): -1 | 0 | 1 | null {
   const q = asQuadratic(e)
   if (q) return quadraticSign(q)
-  // several radicals at once — a miter's coordinates carry two edge lengths, a crossing against it
-  // adds a third. Exact, and the only route that can certify equality rather than merely fail to
-  // refute it; enclosures below remain the fallback for values outside the field.
-  const exact = radicalFieldSign(e)
-  if (exact !== null) return exact
+  // Enclosures first: they settle almost every NONZERO comparison in a few refinements, and a
+  // bound that has excluded zero is already a proof. Only what survives the whole ladder — the
+  // equalities, which no enclosure can ever certify — is worth normalizing exactly.
   for (const bits of PRECISIONS) {
     const { lo, hi } = evaluate(e, bits)
     if (ratSign(lo) > 0) return 1
     if (ratSign(hi) < 0) return -1
   }
-  return null
+  // Several radicals at once — a miter's coordinates carry two edge lengths, a crossing against it
+  // adds a third. This is the only route that can prove equality rather than merely fail to refute
+  // it, and it runs on exactly the comparisons that need it.
+  return radicalFieldSign(e)
 }
 
 /** Three-way comparison through signOf(a − b). */
