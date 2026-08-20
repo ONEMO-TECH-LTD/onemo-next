@@ -140,8 +140,15 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
               size where a bbox side equals a band edge (closed form); a binding-element
               change is the size where two elements are equidistant from a disc; a
               mass-topology change is where the clearance field's extremum crosses the mass
-              depth. Sort the event sizes; the regimes are the intervals between them. No
-              regime can be stepped over because none is found by stepping.
+              depth; and — the case that unchanged topology hides (closing QA) — a
+              CENTRE-IDENTITY change, where the governor's own comparison flips with the
+              same masses present: two masses equal in area (Smallest), two extrema equal in
+              depth (Deepest), a mass crossing the upper-half line (Top-small), or two local
+              maxima of the clearance field exchanging rank. Each is an equality equation
+              and is enumerated the same way. Sort the event sizes; the regimes are the
+              intervals between them. No regime can be stepped over because none is found by
+              stepping, and no regime contains a jump in the anchor path — which is what
+              makes the Lipschitz bound in (ii) valid rather than assumed.
          ii.  ALL ROOTS INSIDE A REGIME ARE ISOLATED, WITHOUT ASSUMING MONOTONICITY. Under
               uniform scaling the geometry is Lipschitz in the scale with a computable
               constant (outline points move by |p|/s per unit scale; the centre's drift is
@@ -150,9 +157,19 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
               such an interval provably holds no root. What survives isolates every root,
               double roots and equal-end-sign pairs included. Bisection is then used only
               INSIDE an isolated bracket, where a sign change is proven to exist.
-         iii. Each isolated root is refined to the representation's limit (Newton where
-              well-conditioned, bisection as guaranteed fallback). This finds ROOTS; nothing
-              is ever accepted against a threshold, so no tolerance appears at any point.
+         iii. EXISTENCE IS CERTIFIED, NOT INFERRED (closing QA: pruning proves absence
+              only, and a DOUBLE root touches zero without a sign change, so no bisection
+              can certify it). Each surviving interval is put to the interval-Newton /
+              Krawczyk test: with K(X) computed from the interval extensions of the contact
+              function and its scale-derivative, `K(X) ⊆ X` PROVES a root exists and is
+              unique in X — sign changes are no longer required, so tangential double roots
+              are certified like any other. Certified intervals are then refined to the
+              representation's limit (Newton inside, bisection as fallback).
+              FAIL-CLOSED: if an interval is neither proven root-free nor proven to contain
+              a root at the representation's limit (the near-zero / no-root ambiguity), the
+              engine reports that count as UNDECIDED for that band and shows no rung — it
+              never invents one, and never silently drops it either; the undecided case is
+              surfaced, the same way a concession is.
          iv.  The rung is the EARLIEST root, in increasing size, that satisfies the count and
               parity laws; a count with no such root in any regime of the band has no rung —
               an explicit answer, never a silent omission.
