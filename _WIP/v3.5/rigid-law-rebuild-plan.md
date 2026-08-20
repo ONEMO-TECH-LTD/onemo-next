@@ -127,27 +127,37 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        The only remaining inexactness is writing the root down (~1e-13 mm in the number
        system, 10^10 times finer than the engine's micron unit) and it is representation,
        not granted slack.
-       REGIMES (pixel round-3 B2 — a single quadratic is only valid where the geometry is
-       stable, and it is not: erosion is a FIXED 12mm while the shape scales, so the mass
-       map — and with it the governed centre — moves non-affinely with scale; the parity
-       class flips when a bbox side crosses a band boundary; the binding element changes).
-       The law is therefore solved PIECEWISE, and completeness comes from the decomposition,
-       not from one formula:
-         i.   Sweep the band to detect REGIME TRANSITIONS — changes in seated count, parity
-              class, mass-map topology (a mass appearing/vanishing), or which element binds.
-              This is what `bandWalk`'s size loop becomes: a transition finder, never a
-              judge.
-         ii.  Inside a regime every one of those is stable, so the contact condition is a
-              smooth scalar function of scale with a sign change across the regime — at
-              most one root, and its existence is decided by the sign at the two ends.
-         iii. Solve that root with a CERTIFIED root-finder: Newton on the geometric
-              derivative where it is well-conditioned, bisection as the guaranteed fallback,
-              run to the representation's limit. This finds a ROOT; it never accepts a
-              candidate, so no threshold, tolerance or acceptance band appears at any point.
-         iv.  A regime whose root fails the count or parity law yields no rung; a count with
-              no root in any regime has no rung in that band. Every count is decided by
-              exactly one root or by an explicit no-root answer.
-       Consequence: `bandWalk` is a transition finder; each rung's size is a solved root.
+       REGIMES, CERTIFIED (pixel B2 + closing blocker: erosion is a FIXED 12mm while the
+       shape scales, so the mass map and governed centre move non-affinely, the parity class
+       flips when a bbox side crosses a band boundary, and the binding element changes —
+       one quadratic is not the law. And neither sampling nor monotonicity may be assumed:
+       a sampled sweep can step over a narrow regime, and endpoint-sign bisection misses a
+       pair of roots that share their end signs. Either error deletes a lawful rung.)
+       The law is solved piecewise with completeness PROVEN, not sampled:
+         i.   REGIME BOUNDARIES ARE SOLVED, NOT SAMPLED. Every transition is itself an
+              event equation, so enumerate their roots directly: a count change is a disc
+              reaching legality (the same tangency equation); a parity-class flip is the
+              size where a bbox side equals a band edge (closed form); a binding-element
+              change is the size where two elements are equidistant from a disc; a
+              mass-topology change is where the clearance field's extremum crosses the mass
+              depth. Sort the event sizes; the regimes are the intervals between them. No
+              regime can be stepped over because none is found by stepping.
+         ii.  ALL ROOTS INSIDE A REGIME ARE ISOLATED, WITHOUT ASSUMING MONOTONICITY. Under
+              uniform scaling the geometry is Lipschitz in the scale with a computable
+              constant (outline points move by |p|/s per unit scale; the centre's drift is
+              bounded by the same field), so certified isolation applies: subdivide the
+              regime, and prune any subinterval where |contact(s)| exceeds L × halfWidth —
+              such an interval provably holds no root. What survives isolates every root,
+              double roots and equal-end-sign pairs included. Bisection is then used only
+              INSIDE an isolated bracket, where a sign change is proven to exist.
+         iii. Each isolated root is refined to the representation's limit (Newton where
+              well-conditioned, bisection as guaranteed fallback). This finds ROOTS; nothing
+              is ever accepted against a threshold, so no tolerance appears at any point.
+         iv.  The rung is the EARLIEST root, in increasing size, that satisfies the count and
+              parity laws; a count with no such root in any regime of the band has no rung —
+              an explicit answer, never a silent omission.
+       Consequence: `bandWalk`'s size loop is DELETED, not demoted — event solving replaces
+       it entirely; each rung's size is a certified, isolated, refined root.
 
     d. `grid-origin-spec.ts` — DELETE `CONTACT_TOLERANCE_MM`, and `TANGENT_GUARD_MM` loses
        its gate role: the truth dot is drawn from the SAME exact contact predicate (b), so
