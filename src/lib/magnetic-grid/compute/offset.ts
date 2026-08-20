@@ -11,10 +11,19 @@ import {
   approx, cAdd, cDiv, cInt, cMul, cNeg, cRat, cSqrt, cSub, compareCReal, evaluate, signOf, type CReal,
 } from './certified-real'
 import type { Rational } from '../spec'
-import type { ExactContour, ExactSegment } from './clearance'
+import { boxGap2, nearSegments, segmentIndex, type ExactContour, type ExactSegment } from './clearance'
 import { compareExact, ratAdd, ratFromInt, ratSub, rational } from './exact-real'
 
 export interface P2 { readonly x: CReal; readonly y: CReal }
+
+// R14 §7.3: certified pruning may change cost only. Both reductions — the exact 2r generator test
+// on element pairs, and the indexed neighbourhood that validity is measured over — can be switched
+// off, so the fixtures can compare a pruned arrangement against a full scan of every pair and every
+// feature and demand byte-identical loops. Off, the construction is the naive O(n²)·O(n) one.
+let pruningOn = true
+
+/** Neutral pruning control. Disabling it changes cost, never a loop, vertex or refusal. */
+export function offsetPruning(enabled: boolean): void { pruningOn = enabled }
 
 export interface SharedVertex { readonly id: number; readonly p: P2 }
 
@@ -258,29 +267,22 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     else cuts.get(e.id)!.push({ v, u: dirOn(e, hit.p) })
   }
 
-  // Certified extents: rational interval bounds (directed, never converted to float), widened by
-  // the exact radius so an offset line reaching past its nominal span to a convex corner is still
-  // covered. Two elements are skipped only when their certified boxes are provably disjoint.
-  type Box = { minX: Rational; minY: Rational; maxX: Rational; maxY: Rational }
-  const rr = ratFromInt(r)
-  const extent = (e: Elem): Box => {
-    if (e.kind === 'arc') {
-      const cx = ratFromInt(e.cx), cy = ratFromInt(e.cy)
-      return { minX: ratSub(cx, rr), maxX: ratAdd(cx, rr), minY: ratSub(cy, rr), maxY: ratAdd(cy, rr) }
-    }
-    const ax = evaluate(e.a.x, BigInt(16)), ay = evaluate(e.a.y, BigInt(16))
-    const dx = ratFromInt(e.dx), dy = ratFromInt(e.dy)
-    const xs = [ax.lo, ax.hi, ratAdd(ax.lo, dx), ratAdd(ax.hi, dx)]
-    const ys = [ay.lo, ay.hi, ratAdd(ay.lo, dy), ratAdd(ay.hi, dy)]
-    const lo = (v: Rational[]) => v.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
-    const hi = (v: Rational[]) => v.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
-    return { minX: ratSub(lo(xs), rr), maxX: ratAdd(hi(xs), rr), minY: ratSub(lo(ys), rr), maxY: ratAdd(hi(ys), rr) }
+  // EXACT PAIR PRUNE (changes no answer). An arrangement vertex lies on both elements, so it is at
+  // distance exactly r from each element's generating feature. Two generators more than 2r apart
+  // therefore have no common point at clearance r, and the pair cannot contribute a vertex. The
+  // test is integer bounding-box distance against (2r)² — no float, no tolerance, and no reliance
+  // on where the offset lines happen to reach. This replaces the old radius-widened extent test,
+  // which grew every short edge's box to ~2r across and made a densely traced contour quadratic in
+  // its point count with heavy certified work per pair.
+  const generators = (e: Elem): readonly ExactSegment[] => (e.kind === 'seg' ? [e.feat] : e.feats)
+  const fourR2 = BigInt(4) * r * r
+  const tooFarApart = (a: Elem, b: Elem): boolean => {
+    if (!pruningOn) return false
+    for (const f of generators(a)) for (const g of generators(b)) if (boxGap2(f, g) <= fourR2) return false
+    return true
   }
-  const ext = elems.map(extent)
-  const disjoint = (A: Box, B: Box) =>
-    compareExact(A.maxX, B.minX) < 0 || compareExact(B.maxX, A.minX) < 0 || compareExact(A.maxY, B.minY) < 0 || compareExact(B.maxY, A.minY) < 0
   for (let i = 0; i < elems.length; i++) for (let j = i + 1; j < elems.length; j++) {
-    if (disjoint(ext[i], ext[j])) continue
+    if (tooFarApart(elems[i], elems[j])) continue
     const a = elems[i], b = elems[j]
     // an arc and its two adjacent offset segments meet only at their built junctions (tangency)
     if (a.kind === 'arc' && (a.prevSeg === b.id || a.nextSeg === b.id)) continue
@@ -291,7 +293,25 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
         : a.kind === 'arc' && b.kind === 'seg' ? (arcSegHits === null ? null : arcSegHits.map((h) => ({ p: h.p, tB: h.tA })))
           : arcArc(a as ArcElem, b as ArcElem, r)
     if (hits === null) { fail(`intersection ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
+    // A cut records where two offset CURVES cross. A hit on one element's infinite line but outside
+    // the other's span is not such a crossing — the other curve is not there — so it splits a piece
+    // at a parameter where nothing about its validity changes. Requiring the hit on BOTH spans
+    // removes those spurious vertices; it cannot remove a real one, because a genuine crossing lies
+    // on both curves by definition.
+    const onSpan = (e: Elem, hit: Hit, which: 'A' | 'B'): boolean | null => {
+      if (e.kind === 'seg') {
+        const t = which === 'A' ? hit.tA : hit.tB
+        if (!t) return null
+        const lo = signOf(t), hi = signOf(cSub(cInt(1), t))
+        if (lo === null || hi === null) return null
+        return lo >= 0 && hi >= 0
+      }
+      return onSweep(e, dirOn(e, hit.p))
+    }
     for (const hit of hits) {
+      const onA = onSpan(a, hit, 'A'), onB = onSpan(b, hit, 'B')
+      if (onA === null || onB === null) { fail(`span membership at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
+      if (!onA || !onB) continue
       // Three or more curves through one point (collinear edges, symmetric corners) must share ONE
       // vertex: reuse a vertex already on either element when its point is exactly the same.
       let v: SharedVertex | null = null
@@ -313,8 +333,21 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
   }
 
   // split each element at its cuts and keep the sub-pieces at distance ≥ r from every feature
+  // Validity asks one question — is any feature nearer than r? — so only features whose bounding box
+  // reaches within r of the point can answer it. The index returns exactly those; every feature it
+  // omits is provably farther, so the verdict is identical to scanning the whole contour.
+  const index = segmentIndex(feats, r > BigInt(0) ? r : BigInt(1))
+  const candidatesNear = (p: P2): readonly ExactSegment[] | null => {
+    if (!pruningOn) return feats
+    const ix = evaluate(p.x, BigInt(16)), iy = evaluate(p.y, BigInt(16))
+    const floorI = (v: Rational) => (v.n >= BigInt(0) ? v.n / v.d : -((-v.n + v.d - BigInt(1)) / v.d))
+    const ceilI = (v: Rational) => (v.n >= BigInt(0) ? (v.n + v.d - BigInt(1)) / v.d : -((-v.n) / v.d))
+    return nearSegments(index, floorI(ix.lo) - BigInt(1), floorI(iy.lo) - BigInt(1), ceilI(ix.hi) + BigInt(1), ceilI(iy.hi) + BigInt(1), r)
+  }
   const valid = (p: P2, own: readonly ExactSegment[]): boolean | null => {
-    for (const f of feats) {
+    const scope = candidatesNear(p)
+    if (scope === null) return null
+    for (const f of scope) {
       if (own.includes(f)) continue
       const d2 = dist2ToSegment(p, f)
       if (d2 === null) return null

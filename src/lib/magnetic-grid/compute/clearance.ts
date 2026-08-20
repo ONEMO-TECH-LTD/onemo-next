@@ -141,3 +141,64 @@ export function insideContour(px: bigint, py: bigint, c: ExactContour): boolean 
 }
 
 export const ptFromUnits = (px: bigint, py: bigint, c: ExactContour): Pt => [Number(px) / Number(c.unit), Number(py) / Number(c.unit)]
+
+/**
+ * A certified spatial index over the supplied segments. Buckets are integer cells, so membership is
+ * decided by exact integer arithmetic and never by a float or a tolerance. `near` returns every
+ * segment that CAN be within a radius of a point box; a segment it omits is provably farther,
+ * because its bounding box lies entirely outside the queried box. It therefore prunes work without
+ * changing any answer — the same set of binding features survives, found by looking at a
+ * neighbourhood instead of at the whole contour.
+ */
+export interface SegmentIndex {
+  readonly cell: bigint
+  readonly buckets: ReadonlyMap<string, readonly ExactSegment[]>
+  readonly all: readonly ExactSegment[]
+}
+
+const cellKey = (ix: bigint, iy: bigint) => `${ix},${iy}`
+const cellOf = (v: bigint, cell: bigint) => (v >= BigInt(0) ? v / cell : -((-v + cell - BigInt(1)) / cell))
+
+/** The caller passes the exact segments its own decisions are measured against, so an index can
+ *  never answer for a different orientation or feature set than the one in play. */
+export function segmentIndex(segments: readonly ExactSegment[], cell: bigint): SegmentIndex {
+  const size = cell > BigInt(0) ? cell : BigInt(1)
+  const buckets = new Map<string, ExactSegment[]>()
+  for (const s of segments) {
+    for (let ix = cellOf(s.minX, size); ix <= cellOf(s.maxX, size); ix++) {
+      for (let iy = cellOf(s.minY, size); iy <= cellOf(s.maxY, size); iy++) {
+        const key = cellKey(ix, iy)
+        const list = buckets.get(key)
+        if (list) list.push(s); else buckets.set(key, [s])
+      }
+    }
+  }
+  return { cell: size, buckets, all: segments }
+}
+
+/**
+ * Every segment that can lie within `radius` of the integer box [x0,x1]×[y0,y1]. Omitted segments
+ * have their whole bounding box outside the expanded box, so their distance exceeds the radius.
+ */
+export function nearSegments(index: SegmentIndex, x0: bigint, y0: bigint, x1: bigint, y1: bigint, radius: bigint): ExactSegment[] {
+  const lo = { x: x0 - radius, y: y0 - radius }, hi = { x: x1 + radius, y: y1 + radius }
+  const found = new Set<ExactSegment>()
+  for (let ix = cellOf(lo.x, index.cell); ix <= cellOf(hi.x, index.cell); ix++) {
+    for (let iy = cellOf(lo.y, index.cell); iy <= cellOf(hi.y, index.cell); iy++) {
+      const list = index.buckets.get(cellKey(ix, iy))
+      if (!list) continue
+      for (const s of list) {
+        if (s.maxX < lo.x || s.minX > hi.x || s.maxY < lo.y || s.minY > hi.y) continue
+        found.add(s)
+      }
+    }
+  }
+  return [...found]
+}
+
+/** Exact lower bound on the distance between two integer bounding boxes, squared. */
+export function boxGap2(a: ExactSegment, b: ExactSegment): bigint {
+  const dx = a.minX > b.maxX ? a.minX - b.maxX : b.minX > a.maxX ? b.minX - a.maxX : BigInt(0)
+  const dy = a.minY > b.maxY ? a.minY - b.maxY : b.minY > a.maxY ? b.minY - a.maxY : BigInt(0)
+  return dx * dx + dy * dy
+}
