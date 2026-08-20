@@ -11,7 +11,7 @@ import {
   approx, cAdd, cDiv, cInt, cMul, cNeg, cRat, cSqrt, cSub, compareCReal, evaluate, signOf, type CReal,
 } from './certified-real'
 import type { Rational } from '../spec'
-import { boxGap2, nearSegments, segmentIndex, type ExactContour, type ExactSegment } from './clearance'
+import { nearSegments, segmentIndex, type ExactContour, type ExactSegment } from './clearance'
 import { compareExact, ratAdd, ratFromInt, ratSub, rational } from './exact-real'
 
 export interface P2 { readonly x: CReal; readonly y: CReal }
@@ -31,10 +31,18 @@ interface SegElem {
   readonly kind: 'seg'
   readonly id: number
   readonly feat: ExactSegment
-  /** offset line p(t) = a + t·d, nominal t ∈ [0,1] */
+  /** offset line p(t) = a + t·d */
   readonly a: P2
   readonly dx: bigint; readonly dy: bigint
-  /** junction vertices at t=0 / t=1 when the adjacent vertex is reflex (shared with its arc) */
+  /**
+   * The element's own span, junction to junction — NOT the nominal [0,1]. At a reflex vertex the
+   * junction is the arc's tangency, which is the nominal end; at a convex vertex it is the miter
+   * where the two offset lines meet, which lies OUTSIDE the nominal end whenever the edge is
+   * shorter than r·cot(θ/2). Clipping to [0,1] therefore severed every corner of a densely traced
+   * outline and left the loop open — the defect this span exists to remove.
+   */
+  t0: CReal
+  t1: CReal
   startV: SharedVertex | null
   endV: SharedVertex | null
 }
@@ -124,9 +132,10 @@ function orientedRings(c: ExactContour): Array<{ ring: number; pts: Array<[bigin
   return rings
 }
 
-function buildElements(c: ExactContour, r: bigint, nextVertexId: () => number): { elems: Elem[]; feats: ExactSegment[] } {
+function buildElements(c: ExactContour, r: bigint, nextVertexId: () => number): { elems: Elem[]; feats: ExactSegment[]; problems: string[] } {
   const elems: Elem[] = []
   const feats: ExactSegment[] = []
+  const problems: string[] = []
   let id = 0
   for (const { ring, pts } of orientedRings(c)) {
     const n = pts.length
@@ -143,18 +152,56 @@ function buildElements(c: ExactContour, r: bigint, nextVertexId: () => number): 
       const len = cSqrt(cBig(dx * dx + dy * dy))
       // left normal (−dy, dx) scaled to length r
       const nx = cDiv(cMul(cBig(-dy), cBig(r)), len), ny = cDiv(cMul(cBig(dx), cBig(r)), len)
-      const seg: SegElem = { kind: 'seg', id: id++, feat: s, a: { x: cAdd(cBig(s.ax), nx), y: cAdd(cBig(s.ay), ny) }, dx, dy, startV: null, endV: null }
+      const seg: SegElem = { kind: 'seg', id: id++, feat: s, a: { x: cAdd(cBig(s.ax), nx), y: cAdd(cBig(s.ay), ny) }, dx, dy, t0: cInt(0), t1: cInt(1), startV: null, endV: null }
       segElems.push(seg); elems.push(seg)
     }
     for (let i = 0; i < n; i++) {
       const incoming = edgeSeg[(i + n - 1) % n], outgoing = edgeSeg[i]
       const turn = (incoming.bx - incoming.ax) * (outgoing.by - outgoing.ay) - (incoming.by - incoming.ay) * (outgoing.bx - outgoing.ax)
-      if (turn >= BigInt(0)) continue // convex (or straight): offset lines meet, no arc
+      const segIn0 = segElems[(i + n - 1) % n], segOut0 = segElems[i]
+      if (turn > BigInt(0)) {
+        // Convex: the two offset lines meet at the miter. That point is the junction and it defines
+        // both elements' spans, wherever it falls relative to the nominal ends.
+        const det = segIn0.dx * segOut0.dy - segIn0.dy * segOut0.dx
+        if (det === BigInt(0)) continue
+        const w = sub2(segOut0.a, segIn0.a)
+        const tIn = cDiv(cSub(cMul(w.x, cBig(segOut0.dy)), cMul(w.y, cBig(segOut0.dx))), cBig(det))
+        const tOut = cDiv(cSub(cMul(w.x, cBig(segIn0.dy)), cMul(w.y, cBig(segIn0.dx))), cBig(det))
+        const p: P2 = { x: cAdd(segIn0.a.x, cMul(tIn, cBig(segIn0.dx))), y: cAdd(segIn0.a.y, cMul(tIn, cBig(segIn0.dy))) }
+        const j: SharedVertex = { id: nextVertexId(), p }
+        segIn0.endV = j; segIn0.t1 = tIn
+        segOut0.startV = j; segOut0.t0 = tOut
+        continue
+      }
+      if (turn === BigInt(0)) {
+        // Collinear neighbours. Same direction is a straight continuation: the offset lines coincide,
+        // so the junction is the offset of the shared vertex and there is no gap to bridge — and it
+        // must be built here, because an intersection solve returns nothing for parallel lines and
+        // the two elements would keep null ends and open the loop. A 180° REVERSAL is not that: the
+        // outline doubles back on itself, the two offsets sit on opposite sides, and there is no
+        // junction to build — that is refused rather than given one edge's normal.
+        const dIn = { x: incoming.bx - incoming.ax, y: incoming.by - incoming.ay }
+        const dOut = { x: outgoing.bx - outgoing.ax, y: outgoing.by - outgoing.ay }
+        if (dIn.x * dOut.x + dIn.y * dOut.y < BigInt(0)) {
+          problems.push(`ring ${ring} vertex ${i} reverses direction: the outline doubles back and has no offset junction`)
+          continue
+        }
+        const [vx, vy] = pts[i]
+        const d = dOut
+        const len = cSqrt(cBig(d.x * d.x + d.y * d.y))
+        const p: P2 = {
+          x: cAdd(cBig(vx), cDiv(cMul(cBig(-d.y), cBig(r)), len)),
+          y: cAdd(cBig(vy), cDiv(cMul(cBig(d.x), cBig(r)), len)),
+        }
+        const j: SharedVertex = { id: nextVertexId(), p }
+        segIn0.endV = j; segOut0.startV = j
+        continue
+      }
       // reflex vertex: arc of radius r from the incoming edge's left normal to the outgoing edge's, clockwise
       const [vx, vy] = pts[i]
       const n1 = pInt(-(incoming.by - incoming.ay), incoming.bx - incoming.ax)
       const n2 = pInt(-(outgoing.by - outgoing.ay), outgoing.bx - outgoing.ax)
-      const segIn = segElems[(i + n - 1) % n], segOut = segElems[i]
+      const segIn = segIn0, segOut = segOut0
       const arc: ArcElem = { kind: 'arc', id: id++, cx: vx, cy: vy, s: n1, e: n2, prevSeg: segIn.id, nextSeg: segOut.id, feats: [incoming, outgoing], startV: null, endV: null }
       // junctions are known by construction (the offset lines are tangent to the circle there) —
       // built as shared vertices, never rediscovered through a degenerate double root
@@ -165,7 +212,7 @@ function buildElements(c: ExactContour, r: bigint, nextVertexId: () => number): 
       elems.push(arc)
     }
   }
-  return { elems, feats }
+  return { elems, feats, problems }
 }
 
 // ---- arc geometry: positions on a clockwise arc of span < π, by exact signs ------------------
@@ -256,10 +303,11 @@ interface Cut { v: SharedVertex; t?: CReal; u?: P2 } // seg: param t · arc: dir
 
 export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement {
   let vid = 0
-  const { elems, feats } = buildElements(c, r, () => vid++)
+  const { elems, feats, problems } = buildElements(c, r, () => vid++)
   let unresolved = false
   const reasons: string[] = []
   const fail = (why: string) => { unresolved = true; reasons.push(why) }
+  for (const why of problems) fail(why)
   const cuts = new Map<number, Cut[]>()
   for (const e of elems) cuts.set(e.id, [])
   const addCut = (e: Elem, v: SharedVertex, hit: Hit, which: 'A' | 'B') => {
@@ -267,22 +315,57 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     else cuts.get(e.id)!.push({ v, u: dirOn(e, hit.p) })
   }
 
-  // EXACT PAIR PRUNE (changes no answer). An arrangement vertex lies on both elements, so it is at
-  // distance exactly r from each element's generating feature. Two generators more than 2r apart
-  // therefore have no common point at clearance r, and the pair cannot contribute a vertex. The
-  // test is integer bounding-box distance against (2r)² — no float, no tolerance, and no reliance
-  // on where the offset lines happen to reach. This replaces the old radius-widened extent test,
-  // which grew every short edge's box to ~2r across and made a densely traced contour quadratic in
-  // its point count with heavy certified work per pair.
-  const generators = (e: Elem): readonly ExactSegment[] => (e.kind === 'seg' ? [e.feat] : e.feats)
-  const fourR2 = BigInt(4) * r * r
+  // EXACT PAIR PRUNE (changes no answer). Now that every element carries its true junction-to-
+  // junction span, its certified extent bounds where it can be — so two elements whose extents are
+  // provably disjoint cannot cross, whatever their generators do. That matters: a generator-based
+  // 2r test is NOT sound once lines run out to a miter, because a point on the extension is at
+  // distance r from the supporting line while being farther than r from the finite segment
+  // (Grid-Meta). The extents are directed rational bounds, never floats, and an arc's extent is its
+  // centre box at radius r.
+  type Box = { minX: Rational; minY: Rational; maxX: Rational; maxY: Rational }
+  const rr = ratFromInt(r)
+  const extent = (e: Elem): Box => {
+    if (e.kind === 'arc') {
+      const cx = ratFromInt(e.cx), cy = ratFromInt(e.cy)
+      return { minX: ratSub(cx, rr), maxX: ratAdd(cx, rr), minY: ratSub(cy, rr), maxY: ratAdd(cy, rr) }
+    }
+    const at = (t: CReal) => ({
+      x: evaluate(cAdd(e.a.x, cMul(t, cBig(e.dx))), BigInt(24)),
+      y: evaluate(cAdd(e.a.y, cMul(t, cBig(e.dy))), BigInt(24)),
+    })
+    const s0 = at(e.t0), s1 = at(e.t1)
+    const lo = (v: Rational[]) => v.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
+    const hi = (v: Rational[]) => v.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
+    return {
+      minX: lo([s0.x.lo, s1.x.lo]), maxX: hi([s0.x.hi, s1.x.hi]),
+      minY: lo([s0.y.lo, s1.y.lo]), maxY: hi([s0.y.hi, s1.y.hi]),
+    }
+  }
+  const ext = new Map<number, Box>(elems.map((e) => [e.id, extent(e)]))
   const tooFarApart = (a: Elem, b: Elem): boolean => {
     if (!pruningOn) return false
-    for (const f of generators(a)) for (const g of generators(b)) if (boxGap2(f, g) <= fourR2) return false
-    return true
+    const A = ext.get(a.id)!, B = ext.get(b.id)!
+    return compareExact(A.maxX, B.minX) < 0 || compareExact(B.maxX, A.minX) < 0
+      || compareExact(A.maxY, B.minY) < 0 || compareExact(B.maxY, A.minY) < 0
+  }
+  // Construction identities are never re-solved. Two nonparallel offset lines meet exactly once, so
+  // when that point is the miter junction they already share, re-deriving it only produces a span
+  // comparison between two forms that are equal BY CONSTRUCTION — the one comparison certified
+  // bounds can never settle, and the source of every undecidable span report on a traced outline.
+  // Restricted to two straight elements on purpose: two nonparallel lines meet EXACTLY once, so a
+  // shared junction accounts for their only crossing. Two equal-radius arcs can meet twice, so a
+  // shared vertex proves nothing about a second intersection and they are still solved in full.
+  const sharesJunction = (a: Elem, b: Elem): boolean => {
+    if (a.kind !== 'seg' || b.kind !== 'seg') return false
+    for (const va of [a.startV, a.endV]) {
+      if (!va) continue
+      if (va === b.startV || va === b.endV) return true
+    }
+    return false
   }
   for (let i = 0; i < elems.length; i++) for (let j = i + 1; j < elems.length; j++) {
     if (tooFarApart(elems[i], elems[j])) continue
+    if (sharesJunction(elems[i], elems[j])) continue
     const a = elems[i], b = elems[j]
     // an arc and its two adjacent offset segments meet only at their built junctions (tangency)
     if (a.kind === 'arc' && (a.prevSeg === b.id || a.nextSeg === b.id)) continue
@@ -302,14 +385,27 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
       if (e.kind === 'seg') {
         const t = which === 'A' ? hit.tA : hit.tB
         if (!t) return null
-        const lo = signOf(t), hi = signOf(cSub(cInt(1), t))
+        const lo = signOf(cSub(t, e.t0)), hi = signOf(cSub(e.t1, t))
         if (lo === null || hi === null) return null
         return lo >= 0 && hi >= 0
       }
       return onSweep(e, dirOn(e, hit.p))
     }
     for (const hit of hits) {
-      const onA = onSpan(a, hit, 'A'), onB = onSpan(b, hit, 'B')
+      // An endpoint already built by construction is recognised by IDENTITY first: if the hit is one
+      // of these elements' own junction points, its membership is known and no numeric comparison is
+      // attempted. Only genuinely new points are measured against the spans.
+      const atKnownEnd = (e: Elem): SharedVertex | null => {
+        for (const v of [e.startV, e.endV]) {
+          if (!v) continue
+          const sx = signOf(cSub(v.p.x, hit.p.x)), sy = signOf(cSub(v.p.y, hit.p.y))
+          if (sx === 0 && sy === 0) return v
+        }
+        return null
+      }
+      const knownA = atKnownEnd(a), knownB = atKnownEnd(b)
+      const onA = knownA ? true : onSpan(a, hit, 'A')
+      const onB = knownB ? true : onSpan(b, hit, 'B')
       if (onA === null || onB === null) { fail(`span membership at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
       if (!onA || !onB) continue
       // Three or more curves through one point (collinear edges, symmetric corners) must share ONE
@@ -361,10 +457,10 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
   for (const e of elems) {
     const list = cuts.get(e.id)!
     if (e.kind === 'seg') {
-      // keep cuts inside the nominal span [0,1]; order by t
-      const inSpan = list.filter((k) => { const lo = signOf(k.t!), hi = signOf(cSub(cInt(1), k.t!)); if (lo === null || hi === null) { fail(`seg${e.id} cut span undecidable`); return false } return lo >= 0 && hi >= 0 })
+      // keep cuts inside the element's own junction-to-junction span; order by t
+      const inSpan = list.filter((k) => { const lo = signOf(cSub(k.t!, e.t0)), hi = signOf(cSub(e.t1, k.t!)); if (lo === null || hi === null) { fail(`seg${e.id} cut span undecidable`); return false } return lo >= 0 && hi >= 0 })
       inSpan.sort((p, q) => { const s = compareCReal(p.t!, q.t!); if (s === null) { fail(`seg${e.id} cut order undecidable`); return 0 } return s })
-      const stops: Array<{ v: SharedVertex | null; t: CReal }> = [{ v: e.startV, t: cInt(0) }, ...inSpan.map((k) => ({ v: k.v, t: k.t! })), { v: e.endV, t: cInt(1) }]
+      const stops: Array<{ v: SharedVertex | null; t: CReal }> = [{ v: e.startV, t: e.t0 }, ...inSpan.map((k) => ({ v: k.v, t: k.t! })), { v: e.endV, t: e.t1 }]
       for (let k = 0; k + 1 < stops.length; k++) {
         const tm = cDiv(cAdd(stops[k].t, stops[k + 1].t), cInt(2))
         const mid: P2 = { x: cAdd(e.a.x, cMul(tm, cBig(e.dx))), y: cAdd(e.a.y, cMul(tm, cBig(e.dy))) }
@@ -427,7 +523,10 @@ export function traversed(op: OrientedPiece, r: bigint): { from: P2; to: P2; arc
   const endpoint = (v: SharedVertex | null, atStart: boolean): P2 => {
     if (v) return v.p
     // nominal element end with no shared vertex (convex corner trimmed the rest away)
-    if (e.kind === 'seg') return atStart ? e.a : { x: cAdd(e.a.x, cBig(e.dx)), y: cAdd(e.a.y, cBig(e.dy)) }
+    if (e.kind === 'seg') {
+      const t = atStart ? e.t0 : e.t1
+      return { x: cAdd(e.a.x, cMul(t, cBig(e.dx))), y: cAdd(e.a.y, cMul(t, cBig(e.dy))) }
+    }
     return arcPoint(e, atStart ? e.s : e.e, r)
   }
   const a = endpoint(piece.from, true), b = endpoint(piece.to, false)
