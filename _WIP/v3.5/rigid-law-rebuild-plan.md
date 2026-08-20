@@ -15,6 +15,13 @@ everything the customer ever sees:
    only to the next size that seats at least one more magnet while still centred and
    wrapped. Each band is the range holding every such instance, minimum to maximum count.
 
+**EXACTNESS (Dan, ruled 2026-08-20): the dial value is the number, exactly — 0 means
+0.000000…, 1 means 1.000000…** No tolerance is enforced anywhere: a rung exists at the size
+where the binding disc's outer line COINCIDES with the outline (at flap 0), or with the
+outline offset by exactly the dialled allowance. The engine's exact integer seat arithmetic
+(micron unit, tangency by equality) is the instrument; no epsilon, no granted slack, no
+policy constant stands between the dial and the geometry.
+
 No scoring, no weights, no hidden preference anywhere in the driver. Conflict between the
 rules is impossible inside bands (size resolves it); where a human holds the size fixed
 (Free mode / manual), any bend of a rule is minimal and printed on screen in words.
@@ -62,10 +69,15 @@ Four code defects nobody had named, each re-probed by the lead and fixed:
   anywhere and the result claimed the centre law held. Parity is now MEASURED for forced
   phases via one shared `parityHolds()` predicate (single source of the centre law).
 - F2 flap 0 was not touch: the band gate granted the walk's step (1mm) as hidden slack
-  (rungs observed up to 0.4999mm off contact). The gate is now the CONTACT TOLERANCE —
-  the outline's own accuracy (`CONTACT_TOLERANCE_MM` 0.1, spec'd and named) — and each
-  rung's size is REFINED by bisection below the walk step to the first size where its
-  count seats lawfully, so contact is found rather than approximated.
+  (rungs observed up to 0.4999mm off contact). First repair introduced a 0.1mm tolerance —
+  REJECTED by pixel's closing verdict as unruled policy slack, and by Dan's exactness
+  ruling. CLOSED IN PHASE 2.0 below: no tolerance at all; the size refines to exact
+  coincidence at the engine's arithmetic unit. Diagnosis that made it possible (lead
+  probes, this round): tangency IS exactly attainable — square lands 0.000000mm, and a
+  circle lands 0.000055mm (float noise floor) WHEN the centre is exact. The 0.069mm
+  residue came solely from the governed centre being a 2mm-MESH SAMPLE; Box/Weight modes
+  (analytic centres) hit zero on the same shape, and outline resolution was ruled out
+  (256→4096-gon changed nothing).
 - F3 Auto was neither minimal nor consistent: the band scanned in 2mm steps (granting 2
   where 1 sufficed) and Free's readout used the FIRST disc to touch while the wrap law
   needs the WORST. Scan step → 1mm; `impliedFlapMM` → worst-disc semantics.
@@ -75,6 +87,21 @@ Evidence after fixes: squares 24/72/120 exact (press 0.00) · circle B1 24.0/1 (
 B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 438/438.
 
 ## Phase 2 — PROVE · the contract (current phase)
+
+2.0 EXACTNESS (Dan's ruling — the first build item, closes F2 with no unruled value):
+    a. `grid-origin-compute.ts` — refine every mass/island centre below the measurement
+       mesh: apply the existing Newton step (`snapToIso`'s machinery) to the clearance
+       field's maximum so `centreMM` is the true deepest point, not its nearest 2mm sample.
+       The mesh stays the finder; the refinement makes the answer exact.
+    b. `grid-origin-spec.ts` — DELETE `CONTACT_TOLERANCE_MM`. No tolerance constant exists
+       in the engine after this step.
+    c. `grid-origin.ts` (bandWalk) — the rung gate becomes exact coincidence: refine the
+       size to the engine's arithmetic unit (micron) and require the binding belt disc's
+       gap to be zero at that unit; a size that cannot reach coincidence is not a rung.
+    d. Fixture: square 24/72/120 and circle B1/B2 rungs all report gap 0 at the arithmetic
+       unit; a synthetic layout 0.05mm off is NOT a rung.
+    e. Verify the same exactness holds at flap 1, 4, 12 — the allowance shifts the
+       coincidence line, it never widens it.
 
 2.1 TRUTH DOT — DONE with Phase 1's reopen (see F4 above): dots measure edge tangency
     (spot only, TANGENT_GUARD_MM), never the allowance ring.
