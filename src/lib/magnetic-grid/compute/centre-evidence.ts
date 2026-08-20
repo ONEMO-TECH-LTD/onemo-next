@@ -12,11 +12,11 @@
 
 import type { CentreMeasurements, CentreRegionRef, Contour, Pt, Rational, RegionMeasurement } from '../spec'
 import { MASS_DEPTH_MM, SPOT_RADIUS_MM } from '../spec'
-import { evaluate, type CReal, type Interval } from './certified-real'
+import { compareCReal, evaluate, type CReal, type Interval } from './certified-real'
 import { type ExactContour, toUnits } from './clearance'
 import { clearanceMaximum, type ClearanceMaximum } from './deepest'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSub, rational } from './exact-real'
-import { exactRegions, regionContains, type ExactRegion } from './region'
+import { compareCertifiedSum, exactRegions, regionContains, regionIdentity, type ExactRegion } from './region'
 import { bbox } from './seat'
 
 /** Area centroid of a polygon (shoelace) — the material's weight centre. */
@@ -102,6 +102,15 @@ export interface MeasuredRegion {
   readonly peakClear: Interval | null
   /** the finitely many co-equal maxima when the maximum is a tie; empty for a ridge, which has none */
   readonly coEqual: readonly { x: Interval; y: Interval }[]
+  /**
+   * Equality classes, proven here rather than guessed downstream. Two regions share a class when
+   * their integrals are PROVED equal — mirrored lobes have identical areas built from different
+   * coordinates, so no enclosure and no structural key could ever show it, but grouping the angle
+   * terms by provably-equal sweep can. Logic then selects on policy alone: same class means equal,
+   * and it never has to reason about geometry to know that.
+   */
+  readonly areaClass: number
+  readonly clearanceClass: number
 }
 
 export interface ExactIsland extends MeasuredRegion {
@@ -154,18 +163,6 @@ function segmentKey(segment: { ax: bigint; ay: bigint; bx: bigint; by: bigint })
   const a = `${segment.ax},${segment.ay}`
   const b = `${segment.bx},${segment.by}`
   return a <= b ? `${a}|${b}` : `${b}|${a}`
-}
-
-/** A region's exact identity: the sorted set of boundary features that generate it. */
-function regionIdentity(region: ExactRegion): string {
-  const features: string[] = []
-  for (const loop of [region.outer, ...region.holes]) {
-    for (const { piece } of loop.pieces) {
-      const element = piece.elem
-      features.push(element.kind === 'seg' ? `s:${segmentKey(element.feat)}` : `a:${element.cx},${element.cy}`)
-    }
-  }
-  return [...new Set(features)].sort().join(';')
 }
 
 const iAdd = (a: Interval, b: Interval): Interval => ({ lo: ratAdd(a.lo, b.lo), hi: ratAdd(a.hi, b.hi) })
@@ -222,6 +219,37 @@ function pointMM(p: { x: CReal; y: CReal }, unit: bigint): { x: Interval; y: Int
   }
 }
 
+/**
+ * Group measured regions into proven-equal classes.
+ *
+ * Every PAIR is compared, not each item against whichever representative happened to be created
+ * first: a comparison that cannot be settled must never hide one that can, and with representatives
+ * the discovered equalities depended on the order the items arrived in. Proven-true pairs are
+ * unioned; an unsettled pair is simply not a proof and joins nothing.
+ *
+ * Class labels are then derived from the members' own canonical identities and sorted, so the same
+ * evidence yields the same labels however it was ordered on the way in.
+ */
+function classify<T>(items: readonly T[], equal: (a: T, b: T) => boolean | null, identity: (item: T) => string): number[] {
+  const parent = items.map((_, index) => index)
+  const find = (index: number): number => (parent[index] === index ? index : (parent[index] = find(parent[index])))
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if (equal(items[i], items[j]) === true) parent[find(i)] = find(j)
+    }
+  }
+  const canonical = new Map<number, string>()
+  for (let index = 0; index < items.length; index++) {
+    const root = find(index)
+    const key = identity(items[index])
+    const known = canonical.get(root)
+    if (known === undefined || key < known) canonical.set(root, key)
+  }
+  const order = [...canonical.entries()].sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))
+  const label = new Map(order.map(([root], index) => [root, index]))
+  return items.map((_, index) => label.get(find(index))!)
+}
+
 function measure(c: ExactContour, region: ExactRegion, level: bigint): MeasuredRegion {
   const deepest = clearanceMaximum(c, region, level)
   const perUnit = ratFromInt(c.unit)
@@ -234,7 +262,8 @@ function measure(c: ExactContour, region: ExactRegion, level: bigint): MeasuredR
       : deepest.status === 'plateau' ? clearanceOf(deepest.clearanceLo, deepest.clearanceHi)
         : null
   const coEqual = deepest.status === 'tie' ? deepest.candidates.map((cand) => pointMM(cand.p, c.unit)) : []
-  return { region, areaMM2: region.areaMM2, meanMM: region.centroidMM, deepest, centre, peakClear, coEqual }
+  // classes are assigned across the whole evidence set once every region is measured
+  return { region, areaMM2: region.areaMM2, meanMM: region.centroidMM, deepest, centre, peakClear, coEqual, areaClass: -1, clearanceClass: -1 }
 }
 
 /**
@@ -267,10 +296,38 @@ function byAreaAscending<T extends { areaMM2: Interval }>(items: readonly T[], n
  * `massDepthMM` are the ruled values; they are parameters so a fixture can exercise the same
  * construction at another level, never so a caller can invent a policy.
  */
+// Evidence depends on the contour and the two ruled levels — never on which policy will read it —
+// so asking nine policies about one shape must measure it once. R14 §7.3: reuse changes cost only,
+// and it can be switched off so the fixtures can prove the values are identical either way.
+let evidenceMemo = new WeakMap<object, Map<string, ExactCentreEvidence>>()
+let evidenceMemoOn = true
+
+/** Neutral cache control for centre evidence. Disabling it changes cost, never a measurement. */
+export function centreEvidenceMemo(enabled: boolean): void {
+  evidenceMemoOn = enabled
+  evidenceMemo = new WeakMap()
+}
+
 export function exactCentreEvidence(
   c: ExactContour,
   spotRadiusMM: number = SPOT_RADIUS_MM,
   massDepthMM: number = MASS_DEPTH_MM,
+): ExactCentreEvidence {
+  if (!evidenceMemoOn) return measureCentreEvidence(c, spotRadiusMM, massDepthMM)
+  const key = `${spotRadiusMM}:${massDepthMM}`
+  let table = evidenceMemo.get(c)
+  const hit = table?.get(key)
+  if (hit) return hit
+  const measured = measureCentreEvidence(c, spotRadiusMM, massDepthMM)
+  if (!table) { table = new Map(); evidenceMemo.set(c, table) }
+  table.set(key, measured)
+  return measured
+}
+
+function measureCentreEvidence(
+  c: ExactContour,
+  spotRadiusMM: number,
+  massDepthMM: number,
 ): ExactCentreEvidence {
   const reasons: string[] = []
   let unresolved = false
@@ -303,11 +360,47 @@ export function exactCentreEvidence(
 
   const ordered = byAreaAscending(islands, note)
 
+  // Prove which regions are equal, once, over the complete set — islands and their masses alike.
+  const everyRegion: MeasuredRegion[] = ordered.flatMap((island) => [island, ...island.masses])
+  const levelOf = new Map<MeasuredRegion, bigint>()
+  for (const island of ordered) {
+    levelOf.set(island, spot)
+    for (const mass of island.masses) levelOf.set(mass, depth)
+  }
+  const regionKeyOf = (region: MeasuredRegion) => regionIdentity(region.region, levelOf.get(region) ?? spot)
+  const areaClasses = classify(everyRegion, (a, b) => {
+    const order = compareCertifiedSum(a.region.areaExpr, b.region.areaExpr)
+    return order === null ? null : order === 0
+  }, regionKeyOf)
+  // Clearance is an EXACT algebraic value — every resolved maximum carries its squared clearance —
+  // so equality is proved on that, never on matching enclosures. Identical nonzero-width bounds are
+  // not equality; that is the mistake this whole layer exists to avoid.
+  const squaredClearance = (region: MeasuredRegion) => {
+    const deepest = region.deepest
+    if (deepest.status === 'certified') return deepest.best.d2
+    if (deepest.status === 'tie') return deepest.candidates[0].d2
+    if (deepest.status === 'plateau') return deepest.d2
+    return null
+  }
+  const clearanceClasses = classify(everyRegion, (a, b) => {
+    const left = squaredClearance(a), right = squaredClearance(b)
+    if (!left || !right) return null
+    const order = compareCReal(left, right)
+    return order === null ? null : order === 0
+  }, regionKeyOf)
+  const classed = new Map<MeasuredRegion, { areaClass: number; clearanceClass: number }>()
+  everyRegion.forEach((region, index) => classed.set(region, { areaClass: areaClasses[index], clearanceClass: clearanceClasses[index] }))
+  const withClasses = (region: MeasuredRegion): MeasuredRegion => ({ ...region, ...classed.get(region)! })
+  const labelled: ExactIsland[] = ordered.map((island) => ({
+    ...withClasses(island),
+    masses: island.masses.map(withClasses),
+  }))
+
   // core: area-weighted mean of the island means, certified
   let core: { x: Interval; y: Interval } | null = null
-  if (ordered.length) {
+  if (labelled.length) {
     let area: Interval = IZERO, mx: Interval = IZERO, my: Interval = IZERO
-    for (const island of ordered) {
+    for (const island of labelled) {
       area = iAdd(area, island.areaMM2)
       mx = iAdd(mx, iMul(island.meanMM.x, island.areaMM2))
       my = iAdd(my, iMul(island.meanMM.y, island.areaMM2))
@@ -319,9 +412,9 @@ export function exactCentreEvidence(
   const box = exactBoxCentre(c)
   const weight = exactWeightCentre(c)
   // Sorted, so the same shape identifies identically however its points were ordered on the way in.
-  const regionKeys = ordered.map((island) => {
-    const masses = island.masses.map((mass) => `${regionIdentity(mass.region)}#${mass.deepest.status}`).sort()
-    return `${regionIdentity(island.region)}#${island.deepest.status}[${masses.join('+')}]`
+  const regionKeys = labelled.map((island) => {
+    const masses = island.masses.map((mass) => `${regionIdentity(mass.region, depth)}#${mass.deepest.status}`).sort()
+    return `${regionIdentity(island.region, spot)}#${island.deepest.status}[${masses.join('+')}]`
   }).sort()
   const id = contentId([
     'centre-evidence-v1',
@@ -336,7 +429,7 @@ export function exactCentreEvidence(
     box,
     weight,
     core,
-    islands: ordered,
+    islands: labelled,
     midY: box.y,
     unresolved,
     reasons,

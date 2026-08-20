@@ -12,18 +12,117 @@ import type { ExactContour } from './clearance'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, ratToNumber } from './exact-real'
 import { offsetArrangement, traversed, type OffsetLoop, type P2 } from './offset'
 
+/**
+ * One arc sweep: the signed angle a piece turns through, kept as the geometry that DEFINES it
+ * rather than as a number. An angle is transcendental, so it has no exact algebraic value — but it
+ * has an exact identity and can be enclosed to any precision on demand, which is what a certified
+ * expression needs (R14 §7.1b item 4).
+ */
+export interface ArcSweep {
+  readonly cx: bigint
+  readonly cy: bigint
+  readonly r: bigint
+  readonly from: P2
+  readonly to: P2
+}
+
+/**
+ * A certified integral: an exact algebraic part plus angle-weighted parts, each an exact weight on
+ * one sweep. Kept SYMBOLIC deliberately. Evaluating to an interval at a fixed precision — as this
+ * did before — loses two things the engine needs: the ability to refine a comparison that did not
+ * separate, and an identity that does not change when the precision does.
+ */
+export interface CertifiedSum {
+  readonly exact: CReal
+  readonly angles: ReadonlyArray<{ readonly weight: CReal; readonly sweep: ArcSweep }>
+}
+
 export interface RegionIntegrals {
   /** certified signed area (units²): positive = counter-clockwise = island boundary */
-  area: Interval
+  area: CertifiedSum
   /** certified first moments ∬x dA, ∬y dA (units³) */
-  mx: Interval
-  my: Interval
+  mx: CertifiedSum
+  my: CertifiedSum
+}
+
+const sumOf = (exact: CReal): CertifiedSum => ({ exact, angles: [] })
+const sumAdd = (a: CertifiedSum, b: CertifiedSum): CertifiedSum => ({
+  exact: cAdd(a.exact, b.exact),
+  angles: [...a.angles, ...b.angles],
+})
+const SUM_ZERO: CertifiedSum = { exact: cInt(0), angles: [] }
+
+// R14 §7.3: reuse changes cost only. The memo can be switched off so the fixtures can prove that
+// enclosures, comparisons and refusals are identical with it disabled.
+let sumMemo = new WeakMap<object, Map<string, Interval>>()
+let sumMemoOn = true
+
+/** Neutral cache control for certified sums. Disabling it changes cost, never a value. */
+export function certifiedSumMemo(enabled: boolean): void {
+  sumMemoOn = enabled
+  sumMemo = new WeakMap()
+}
+
+/** Enclose a certified sum at a given precision; refinable simply by asking for more bits. */
+export function evaluateSum(sum: CertifiedSum, bits: bigint): Interval {
+  if (!sumMemoOn) return evaluateSumUncached(sum, bits)
+  const key = bits.toString()
+  let table = sumMemo.get(sum)
+  const hit = table?.get(key)
+  if (hit) return hit
+  const value = evaluateSumUncached(sum, bits)
+  if (!table) { table = new Map(); sumMemo.set(sum, table) }
+  table.set(key, value)
+  return value
+}
+
+function evaluateSumUncached(sum: CertifiedSum, bits: bigint): Interval {
+  let total = evaluate(sum.exact, bits)
+  for (const { weight, sweep } of sum.angles) {
+    const u1 = { x: cSub(sweep.from.x, cInt(sweep.cx)), y: cSub(sweep.from.y, cInt(sweep.cy)) }
+    const u2 = { x: cSub(sweep.to.x, cInt(sweep.cx)), y: cSub(sweep.to.y, cInt(sweep.cy)) }
+    const cross = cSub(cMul(u1.x, u2.y), cMul(u1.y, u2.x))
+    const dot = cAdd(cMul(u1.x, u2.x), cMul(u1.y, u2.y))
+    const theta = angleBetween(cross, dot, bits)
+    if (!theta) return { lo: ratFromInt(1), hi: ratFromInt(0) } // empty: the caller reports unresolved
+    const w = evaluate(weight, bits)
+    const products = [ratMul(w.lo, theta.lo), ratMul(w.lo, theta.hi), ratMul(w.hi, theta.lo), ratMul(w.hi, theta.hi)]
+    total = {
+      lo: ratAdd(total.lo, products.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))),
+      hi: ratAdd(total.hi, products.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))),
+    }
+  }
+  return total
+}
+
+/** Structural identity of a certified expression: precision-free, and equal for equal structure. */
+export function expressionKey(e: CReal): string {
+  switch (e.k) {
+    case 'rat': return `${e.v.n}/${e.v.d}`
+    case 'neg': return `-(${expressionKey(e.a)})`
+    case 'sqrt': return `sqrt(${expressionKey(e.a)})`
+    default: return `${e.k}(${expressionKey(e.a)},${expressionKey(e.b)})`
+  }
+}
+
+/** Structural identity of a certified sum, including every sweep it depends on. */
+export function sumKey(sum: CertifiedSum): string {
+  const angles = sum.angles
+    .map(({ weight, sweep }) => `${expressionKey(weight)}@${sweep.cx},${sweep.cy},${sweep.r},${expressionKey(sweep.from.x)},${expressionKey(sweep.from.y)},${expressionKey(sweep.to.x)},${expressionKey(sweep.to.y)}`)
+    .sort()
+  return `${expressionKey(sum.exact)}|${angles.join('+')}`
 }
 
 export interface ExactRegion {
   readonly outer: OffsetLoop
   readonly holes: readonly OffsetLoop[]
-  /** certified area and centroid in mm / mm² */
+  /**
+   * The certified integrals themselves, kept symbolic in units: a comparison that does not separate
+   * can be refined further, and the expression's identity does not move when the precision does.
+   */
+  readonly areaExpr: CertifiedSum
+  readonly momentExpr: { x: CertifiedSum; y: CertifiedSum }
+  /** certified area and centroid in mm / mm², enclosed at the reporting precision */
   readonly areaMM2: Interval
   readonly centroidMM: { x: Interval; y: Interval }
   /** report-only decimals */
@@ -70,9 +169,9 @@ function segmentTerms(P: P2, Q: P2): RegionIntegrals {
   const crossPQ = cSub(cMul(P.x, Q.y), cMul(Q.x, P.y))
   const sqSum = (a: CReal, b: CReal) => cAdd(cAdd(cMul(a, a), cMul(a, b)), cMul(b, b))
   return {
-    area: iOf(half(crossPQ)),
-    mx: iOf(sixth(cMul(cSub(Q.y, P.y), sqSum(P.x, Q.x)))),
-    my: iOf(cNeg(sixth(cMul(cSub(Q.x, P.x), sqSum(P.y, Q.y))))),
+    area: sumOf(half(crossPQ)),
+    mx: sumOf(sixth(cMul(cSub(Q.y, P.y), sqSum(P.x, Q.x)))),
+    my: sumOf(cNeg(sixth(cMul(cSub(Q.x, P.x), sqSum(P.y, Q.y))))),
   }
 }
 
@@ -83,38 +182,42 @@ function segmentTerms(P: P2, Q: P2): RegionIntegrals {
  *   ∮ x²/2 dy = ½[ cx² r(s₂−s₁) + 2cx r²(Δθ/2 + (s₂c₂−s₁c₁)/2) + r³((s₂−s₁) − (s₂³−s₁³)/3) ]
  *   −∮ y²/2 dx = ½[ cy² r(−(c₂−c₁)) + 2cy r²(Δθ/2 − (s₂c₂−s₁c₁)/2) + r³(−(c₂−c₁) + (c₂³−c₁³)/3) ]
  */
-function arcTerms(P: P2, Q: P2, cx: bigint, cy: bigint, r: bigint): RegionIntegrals | null {
+function arcTerms(P: P2, Q: P2, cx: bigint, cy: bigint, r: bigint): RegionIntegrals {
   const C = { x: cInt(cx), y: cInt(cy) }
   const R = cInt(r)
   const u1 = { x: cSub(P.x, C.x), y: cSub(P.y, C.y) }, u2 = { x: cSub(Q.x, C.x), y: cSub(Q.y, C.y) }
-  const cross = cSub(cMul(u1.x, u2.y), cMul(u1.y, u2.x)), dot = cAdd(cMul(u1.x, u2.x), cMul(u1.y, u2.y))
-  const dTheta = angleBetween(cross, dot, BITS)
-  if (!dTheta) return null
   const s1 = cDiv(u1.y, R), c1 = cDiv(u1.x, R), s2 = cDiv(u2.y, R), c2 = cDiv(u2.x, R)
   const r2 = cMul(R, R), r3 = cMul(r2, R)
   const cube = (e: CReal) => cMul(e, cMul(e, e))
   const ds = cSub(s2, s1), dc = cSub(c2, c1)
   const dsc = cSub(cMul(s2, c2), cMul(s1, c1))
-  // area: ½ r² Δθ + ½[cx(Qy−Py) − cy(Qx−Px)]
-  const areaExact = iOf(half(cSub(cMul(C.x, cSub(Q.y, P.y)), cMul(C.y, cSub(Q.x, P.x)))))
-  const area = iAdd(iScale(dTheta, ratDiv(iOf(r2).lo, ratFromInt(2))), areaExact)
-  // mx
-  const mxExact = iOf(half(cAdd(cAdd(cMul(cMul(C.x, C.x), cMul(R, ds)), cMul(cMul(cInt(2), cMul(C.x, r2)), half(dsc))), cMul(r3, cSub(ds, third(cSub(cube(s2), cube(s1))))))))
-  const mxTheta = iScale(dTheta, ratDiv(iOf(cMul(C.x, r2)).lo, ratFromInt(2))) // ½·2cx r²·Δθ/2 = cx r² Δθ / 2
-  // my
-  const myExact = iOf(half(cAdd(cAdd(cMul(cMul(C.y, C.y), cMul(R, cSub(cInt(0), dc))), cMul(cMul(cInt(2), cMul(C.y, r2)), cSub(cInt(0), half(dsc)))), cMul(r3, cAdd(cSub(cInt(0), dc), third(cSub(cube(c2), cube(c1))))))))
-  const myTheta = iScale(dTheta, ratDiv(iOf(cMul(C.y, r2)).lo, ratFromInt(2)))
-  return { area, mx: iAdd(mxExact, mxTheta), my: iAdd(myExact, myTheta) }
+  const sweep: ArcSweep = { cx, cy, r, from: P, to: Q }
+  // The sweep angle stays symbolic: an angle has no exact algebraic value, but it has an exact
+  // identity and encloses to any precision, so the integral remains a certified expression.
+  return {
+    // area: ½ r² Δθ + ½[cx(Qy−Py) − cy(Qx−Px)]
+    area: {
+      exact: half(cSub(cMul(C.x, cSub(Q.y, P.y)), cMul(C.y, cSub(Q.x, P.x)))),
+      angles: [{ weight: half(r2), sweep }],
+    },
+    mx: {
+      exact: half(cAdd(cAdd(cMul(cMul(C.x, C.x), cMul(R, ds)), cMul(cMul(cInt(2), cMul(C.x, r2)), half(dsc))), cMul(r3, cSub(ds, third(cSub(cube(s2), cube(s1))))))),
+      angles: [{ weight: half(cMul(C.x, r2)), sweep }],
+    },
+    my: {
+      exact: half(cAdd(cAdd(cMul(cMul(C.y, C.y), cMul(R, cSub(cInt(0), dc))), cMul(cMul(cInt(2), cMul(C.y, r2)), cSub(cInt(0), half(dsc)))), cMul(r3, cAdd(cSub(cInt(0), dc), third(cSub(cube(c2), cube(c1))))))),
+      angles: [{ weight: half(cMul(C.y, r2)), sweep }],
+    },
+  }
 }
 
 /** Signed integrals of one loop along its traversal. */
-export function loopIntegrals(loop: OffsetLoop, r: bigint): RegionIntegrals | null {
-  let area = ZERO, mx = ZERO, my = ZERO
+export function loopIntegrals(loop: OffsetLoop, r: bigint): RegionIntegrals {
+  let area = SUM_ZERO, mx = SUM_ZERO, my = SUM_ZERO
   for (const op of loop.pieces) {
     const { from, to, arc } = traversed(op, r)
     const t = arc ? arcTerms(from, to, arc.cx, arc.cy, arc.r) : segmentTerms(from, to)
-    if (!t) return null
-    area = iAdd(area, t.area); mx = iAdd(mx, t.mx); my = iAdd(my, t.my)
+    area = sumAdd(area, t.area); mx = sumAdd(mx, t.mx); my = sumAdd(my, t.my)
   }
   return { area, mx, my }
 }
@@ -205,10 +308,17 @@ export function exactRegions(c: ExactContour, rUnits: bigint): ExactRegions {
   const loops = arr.loops.map((loop) => ({ loop, integrals: loopIntegrals(loop, rUnits) }))
   const outers: typeof loops = [], holes: typeof loops = []
   for (const l of loops) {
-    if (!l.integrals) { unresolved = true; reasons.push('loop integral undecidable (arc sweep on the branch cut)'); continue }
-    const s = ratSign(l.integrals.area.lo) > 0 ? 1 : ratSign(l.integrals.area.hi) < 0 ? -1 : 0
-    if (s === 0) { unresolved = true; reasons.push('loop orientation undecidable'); continue }
-    ;(s > 0 ? outers : holes).push(l)
+    // orientation is a sign question, so it refines until it separates rather than accepting one
+    // fixed precision — a loop whose sign is genuinely undecidable is reported, never assumed
+    let sign = 0
+    for (const bits of [BITS, BITS * BigInt(4), BITS * BigInt(16)]) {
+      const enclosure = evaluateSum(l.integrals.area, bits)
+      if (compareExact(enclosure.lo, enclosure.hi) > 0) break // empty: sweep on the branch cut
+      sign = ratSign(enclosure.lo) > 0 ? 1 : ratSign(enclosure.hi) < 0 ? -1 : 0
+      if (sign !== 0) break
+    }
+    if (sign === 0) { unresolved = true; reasons.push('loop orientation undecidable'); continue }
+    ;(sign > 0 ? outers : holes).push(l)
   }
   const unit = c.unit
   const u2 = ratFromInt(unit * unit)
@@ -225,8 +335,13 @@ export function exactRegions(c: ExactContour, rUnits: bigint): ExactRegions {
       if (inside === null) { unresolved = true; reasons.push('hole nesting undecidable'); return false }
       return inside
     })
-    let area = o.integrals!.area, mx = o.integrals!.mx, my = o.integrals!.my
-    for (const h of mine) { area = iAdd(area, h.integrals!.area); mx = iAdd(mx, h.integrals!.mx); my = iAdd(my, h.integrals!.my) }
+    let areaExpr = o.integrals.area, mxExpr = o.integrals.mx, myExpr = o.integrals.my
+    for (const h of mine) {
+      areaExpr = sumAdd(areaExpr, h.integrals.area)
+      mxExpr = sumAdd(mxExpr, h.integrals.mx)
+      myExpr = sumAdd(myExpr, h.integrals.my)
+    }
+    const area = evaluateSum(areaExpr, BITS), mx = evaluateSum(mxExpr, BITS), my = evaluateSum(myExpr, BITS)
     const areaMM2 = I(ratDiv(area.lo, u2), ratDiv(area.hi, u2))
     // centroid = moment / area; area is certified strictly positive for an outer loop, moments may
     // have either sign — divide by all four endpoint quotients, then convert units³/units² → mm
@@ -235,10 +350,129 @@ export function exactRegions(c: ExactContour, rUnits: bigint): ExactRegions {
     const cx = I(ratDiv(cxU.lo, perUnit), ratDiv(cxU.hi, perUnit)), cy = I(ratDiv(cyU.lo, perUnit), ratDiv(cyU.hi, perUnit))
     regions.push({
       outer: o.loop, holes: mine.map((h) => h.loop),
+      areaExpr, momentExpr: { x: mxExpr, y: myExpr },
       areaMM2, centroidMM: { x: cx, y: cy },
       areaApproxMM2: (ratToNumber(areaMM2.lo) + ratToNumber(areaMM2.hi)) / 2,
       centroidApproxMM: [(ratToNumber(cx.lo) + ratToNumber(cx.hi)) / 2, (ratToNumber(cy.lo) + ratToNumber(cy.hi)) / 2],
     })
   }
   return { regions, unresolved, reasons }
+}
+
+/**
+ * Exact comparison of two certified integrals.
+ *
+ * Structural key equality is not enough and never was: two expressions can denote the same value
+ * while being written differently — the dumbbell's mirrored lobes have identical areas built from
+ * different coordinates. What makes the comparison exact is that an angle's VALUE is decidable even
+ * though the angle is transcendental: two sweeps subtend the same angle exactly when their
+ * (cross, dot) pairs are proportional with matching signs, which is an algebraic test.
+ *
+ * So the difference is normalized by grouping its angle terms into provably-equal sweep classes and
+ * summing the weights in each. Every class whose weight is exactly zero disappears — including all
+ * of them, for two congruent regions — and what remains is either a purely algebraic value whose
+ * sign is exact, or a genuine residue that is enclosed and refined instead.
+ */
+export function compareCertifiedSum(a: CertifiedSum, b: CertifiedSum): -1 | 0 | 1 | null {
+  const difference: CertifiedSum = {
+    exact: cSub(a.exact, b.exact),
+    angles: [...a.angles, ...b.angles.map(({ weight, sweep }) => ({ weight: cNeg(weight), sweep }))],
+  }
+  // group by provably equal sweep angle
+  const classes: Array<{ sweep: ArcSweep; weight: CReal }> = []
+  for (const term of difference.angles) {
+    // Every class is examined before giving up: an undecidable comparison against one class must
+    // not pre-empt a PROVEN match against another, or the verdict would depend on the order the
+    // terms happened to arrive in. Only when nothing matches and something was undecidable is the
+    // grouping genuinely unresolved.
+    let target = -1
+    let undecided = false
+    for (let index = 0; index < classes.length; index++) {
+      const same = sweepsAgree(classes[index].sweep, term.sweep)
+      if (same === null) { undecided = true; continue }
+      if (same) { target = index; break }
+    }
+    if (target >= 0) classes[target].weight = cAdd(classes[target].weight, term.weight)
+    else if (undecided) return null
+    else classes.push({ sweep: term.sweep, weight: term.weight })
+  }
+  const residue = classes.filter((entry) => signOf(entry.weight) !== 0)
+  if (residue.some((entry) => signOf(entry.weight) === null)) return null
+  // every angle cancelled: the difference is algebraic and its sign is exact
+  if (!residue.length) return signOf(difference.exact)
+  // otherwise refine the enclosure of what is left; equality here is not provable, only refuted
+  const remaining: CertifiedSum = { exact: difference.exact, angles: residue.map((entry) => ({ weight: entry.weight, sweep: entry.sweep })) }
+  for (const bits of [BITS, BITS * BigInt(4), BITS * BigInt(16)]) {
+    const enclosure = evaluateSum(remaining, bits)
+    if (compareExact(enclosure.lo, enclosure.hi) > 0) return null
+    if (ratSign(enclosure.lo) > 0) return 1
+    if (ratSign(enclosure.hi) < 0) return -1
+  }
+  return null
+}
+
+/** Do two sweeps subtend exactly the same signed angle? Decided by exact algebra, never by value. */
+function sweepsAgree(a: ArcSweep, b: ArcSweep): boolean | null {
+  const parts = (sweep: ArcSweep) => {
+    const u1 = { x: cSub(sweep.from.x, cInt(sweep.cx)), y: cSub(sweep.from.y, cInt(sweep.cy)) }
+    const u2 = { x: cSub(sweep.to.x, cInt(sweep.cx)), y: cSub(sweep.to.y, cInt(sweep.cy)) }
+    return {
+      cross: cSub(cMul(u1.x, u2.y), cMul(u1.y, u2.x)),
+      dot: cAdd(cMul(u1.x, u2.x), cMul(u1.y, u2.y)),
+    }
+  }
+  const first = parts(a), second = parts(b)
+  // atan2(c1,d1) = atan2(c2,d2) ⟺ c1·d2 = c2·d1 with the same quadrant, i.e. matching signs
+  const crossProduct = signOf(cSub(cMul(first.cross, second.dot), cMul(second.cross, first.dot)))
+  if (crossProduct === null) return null
+  if (crossProduct !== 0) return false
+  const crossSigns = [signOf(first.cross), signOf(second.cross)]
+  const dotSigns = [signOf(first.dot), signOf(second.dot)]
+  if (crossSigns.some((sign) => sign === null) || dotSigns.some((sign) => sign === null)) return null
+  return crossSigns[0] === crossSigns[1] && dotSigns[0] === dotSigns[1]
+}
+
+/**
+ * Canonical identity of one loop: the ORDERED cycle of its traversed pieces, each described by its
+ * generator, its exact endpoints and the direction it is traversed in, then normalized by rotation
+ * so the same cycle identifies the same however it was entered.
+ *
+ * A set of generating features is NOT enough — two different surviving regions can be built from the
+ * same generators, and deduplicating them also discards piece domains, traversal direction, arc
+ * sweeps and loop connectivity. Everything that distinguishes one region from another is kept here.
+ */
+function loopIdentity(loop: OffsetLoop, r: bigint): string {
+  const pieces = loop.pieces.map((op) => {
+    const { from, to, arc } = traversed(op, r)
+    const element = op.piece.elem
+    const generator = element.kind === 'seg'
+      ? `s:${element.feat.ax},${element.feat.ay}|${element.feat.bx},${element.feat.by}`
+      : `a:${element.cx},${element.cy},${r}`
+    const span = `${expressionKey(from.x)},${expressionKey(from.y)}>${expressionKey(to.x)},${expressionKey(to.y)}`
+    return `${generator}#${span}#${arc ? 'arc' : 'seg'}${op.reversed ? '-' : '+'}`
+  })
+  if (!pieces.length) return ''
+  // rotation-normalized: the cycle is the same object however it was entered
+  let best: string | null = null
+  for (let start = 0; start < pieces.length; start++) {
+    const rotation = [...pieces.slice(start), ...pieces.slice(0, start)].join(';')
+    if (best === null || rotation < best) best = rotation
+  }
+  return best!
+}
+
+/**
+ * Canonical identity of a region: its outer cycle, its holes' cycles sorted among themselves, and
+ * the identities of its certified integrals. Two regions identify alike exactly when they are the
+ * same region, whatever order their input arrived in.
+ */
+export function regionIdentity(region: ExactRegion, r: bigint): string {
+  const holes = region.holes.map((hole) => loopIdentity(hole, r)).sort()
+  return [
+    `outer:${loopIdentity(region.outer, r)}`,
+    `holes:${holes.join('|')}`,
+    `area:${sumKey(region.areaExpr)}`,
+    `mx:${sumKey(region.momentExpr.x)}`,
+    `my:${sumKey(region.momentExpr.y)}`,
+  ].join('~')
 }
