@@ -21,11 +21,19 @@ describe('certified reals', () => {
     expect(Math.abs(approx(root2) - Math.SQRT2)).toBeLessThan(1e-15)
   })
 
-  it('decides single-radical identities exactly and refuses mixed-radical ones rather than guessing', () => {
+  it('decides radical identities exactly, and still refuses what leaves the field', () => {
     // √2·√2 − 2 lives in one quadratic field: exactly zero, certified
     expect(signOf(cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(2))), cInt(2)))).toBe(0)
-    // √2·√3 − √6 is also zero, but spans two fields: enclosures never exclude zero → null, honestly
-    expect(signOf(cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(3))), cSqrt(cInt(6))))).toBeNull()
+    // √2·√3 − √6 spans two radicals and is exactly zero. Enclosures can never show that — they can
+    // only fail to exclude zero — so this is decided by the multi-radical field, which reduces the
+    // radicands to coprime atoms and finds every coefficient zero.
+    expect(signOf(cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(3))), cSqrt(cInt(6))))).toBe(0)
+    // A nested radical leaves that field, so the enclosure ladder answers instead — which it can do
+    // whenever the value is nonzero: √(1+√2) ≈ 1.5538 > 1.
+    expect(signOf(cSub(cSqrt(cAdd(cInt(1), cSqrt(cInt(2)))), cInt(1)))).toBe(1)
+    // But a nested radical that is exactly ZERO is beyond both routes — 3+2√2 = (1+√2)², so this
+    // vanishes, and no enclosure can ever exclude zero. Reported unknown, never guessed.
+    expect(signOf(cSub(cSqrt(cAdd(cInt(3), cMul(cInt(2), cSqrt(cInt(2))))), cAdd(cInt(1), cSqrt(cInt(2)))))).toBeNull()
     // and a genuine single-field ordering: 3√2 vs 4 → 3√2 > 4 because 18 > 16
     expect(signOf(cSub(cMul(cInt(3), cSqrt(cInt(2))), cInt(4)))).toBe(1)
   })

@@ -29,7 +29,9 @@ const EXPRESSIONS: ReadonlyArray<{ id: string; e: CReal }> = [
   { id: 'shared-subtree', e: cSub(cMul(cAdd(root2, third), cAdd(root2, third)), cMul(root2, cInt(2))) },
   // two distinct radicals — genuinely zero, but the bounds may never exclude zero: must stay undecidable
   { id: 'mixed-radical-undecidable', e: cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(3))), cSqrt(cInt(6))) },
-  { id: 'nested-radical', e: cSub(cSqrt(cAdd(cInt(1), root2)), cInt(1)) },
+  // nested AND exactly zero — 3+2√2 = (1+√2)² — so neither the radical field nor any enclosure can
+  // settle it, which is precisely the value a cache must not turn into a verdict
+  { id: 'nested-radical-exact-zero', e: cSub(cSqrt(cAdd(cInt(3), cMul(cInt(2), root2))), cAdd(cInt(1), root2)) },
 ]
 const PRECISIONS = [BigInt(8), BigInt(16), BigInt(32), BigInt(64), BigInt(128), BigInt(256), BigInt(512), BigInt(1024)]
 
@@ -66,9 +68,13 @@ describe('certified memo is semantically transparent (R14 §7.3)', () => {
       const quad = bothModes(() => asQuadratic(e))
       expect(canonical(quad.on), `${id} quadratic`).toBe(canonical(quad.off))
     }
-    // the mixed-radical case must be undecidable in BOTH modes — a memo must never manufacture a verdict
-    expect(bothModes(() => signOf(EXPRESSIONS[5].e)).on).toBeNull()
-    expect(bothModes(() => signOf(EXPRESSIONS[5].e)).off).toBeNull()
+    // the multi-radical case is exactly zero and must decide the same way in BOTH modes; the nested
+    // radical leaves the field and must stay unknown in both — a memo may never manufacture a verdict
+    expect(bothModes(() => signOf(EXPRESSIONS[5].e)).on).toBe(0)
+    expect(bothModes(() => signOf(EXPRESSIONS[5].e)).off).toBe(0)
+    expect(bothModes(() => signOf(EXPRESSIONS[6].e)).on).toBeNull()
+    expect(bothModes(() => signOf(EXPRESSIONS[6].e)).off).toBeNull()
+    expect(EXPRESSIONS[6].id).toBe('nested-radical-exact-zero')
   })
 
   it('a warm memo cannot serve a stale value across precisions', () => {

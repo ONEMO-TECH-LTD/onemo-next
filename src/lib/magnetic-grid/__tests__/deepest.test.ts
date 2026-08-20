@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { exactContour, toUnits } from '../compute/clearance'
-import { approx, compareCReal } from '../compute/certified-real'
+import { approx, cInt, cMul, cSqrt, cSub, compareCReal } from '../compute/certified-real'
 import { candidateApprox, clearanceMaximum } from '../compute/deepest'
 import { compareExact, ratFromInt } from '../compute/exact-real'
 import { exactRegions } from '../compute/region'
@@ -118,11 +118,41 @@ describe('clearance maximum (item 5)', () => {
     expect('candidates' in m).toBe(false)
   })
 
-  it('dumbbell: each island certified at its own centre (30,30) / (130,30), clearance 30', () => {
+  it('dumbbell: each island is co-maximal along a short ridge into its neck, clearance exactly 30', () => {
+    // The maximum here is NOT the single point (30,30) this once asserted. Walking right from the
+    // block centre, the top and bottom edges stay at exactly 30 while the right wall is BROKEN by
+    // the neck, so its nearest point becomes the corner (60,25) — √(29.8²+5²) ≈ 30.22 at x=30.2,
+    // farther than 30. Clearance therefore holds at 30 until that corner closes in, which happens
+    // exactly where (60−x)² = 30²−5², i.e. x = 60−√875. The ridge is real; the old single-point
+    // claim passed only while an undecidable comparison refused the branch.
     const dumbbell: Contour = { outer: { pts: [[0, 0], [60, 0], [60, 25], [100, 25], [100, 0], [160, 0], [160, 60], [100, 60], [100, 35], [60, 35], [60, 60], [0, 60]] }, holes: [] }
     const { c, results } = deepest(dumbbell)
     expect(results).toHaveLength(2)
-    const centres = results.map((m) => candidateApprox(asCertified(m).best, c.unit)).sort((a, b) => a.x - b.x)
-    expect(centres.map((k) => [k.x, k.y, k.clearance])).toEqual([[30, 30, 30], [130, 30, 30]])
+    const u = c.unit
+    const U = Number(u)
+    // EXACT oracles in engine units — the branch is algebraic, so a decimal cannot certify it.
+    // Left lobe: x runs from 30 to 60−5√35. Right lobe is its mirror about x=160.
+    const block = cInt(BigInt(30) * u)
+    const farLeft = cSub(cInt(BigInt(60) * u), cMul(cInt(BigInt(5) * u), cSqrt(cInt(35))))
+    const farRight = cSub(cInt(BigInt(160) * u), farLeft)
+    for (const result of results) {
+      const m = asPlateau(result)
+      expect(m.branches).toHaveLength(1)
+      const [pl] = m.branches
+      const onLeft = compareCReal(pl.from.x, cInt(BigInt(100) * u)) < 0
+      const ends = [pl.from.x, pl.to.x]
+      const wanted = onLeft ? [block, farLeft] : [cInt(BigInt(130) * u), farRight]
+      // each end matches one exact oracle, in either traversal order
+      for (const target of wanted) {
+        expect(ends.some((end) => compareCReal(end, target) === 0), `${onLeft ? 'left' : 'right'} end`).toBe(true)
+      }
+      expect(compareCReal(pl.from.y, cInt(BigInt(30) * u))).toBe(0)
+      expect(compareCReal(pl.to.y, cInt(BigInt(30) * u))).toBe(0)
+      // the clearance held along the whole ridge is exactly 30, and exactly constant
+      expect(compareExact(pl.lo, ratFromInt(BigInt(30) * u))).toBe(0)
+      expect(compareExact(pl.lo, pl.hi)).toBe(0)
+      // report evidence only
+      expect(approx(pl.from.y) / U).toBe(30)
+    }
   })
 })
