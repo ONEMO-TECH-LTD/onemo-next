@@ -73,7 +73,11 @@ function schedulePrefetch(
   const walkFlap = autoFlapMaxMM != null ? 0 : Math.max(0, cfg.flapMM ?? FLAP_MM)
   const walkBase: GridConfig = autoFlapMaxMM != null ? { ...cfg, flapMM: 0 } : cfg
   const walkSig = autoFlapMaxMM != null ? JSON.stringify(walkBase) : cfgSig
-  const walkCfg: GridConfig = { ...walkBase, segmentsDetail: 'light', seatMarginMM: walkFlap }
+  // Must mirror bandWalk's construction EXACTLY — a prefetched solve with the wrong margin
+  // poisons the shared cache (LAW mode carries no seat inflation; wrap law alone gates).
+  const walkCfg: GridConfig = (cfg.positioning ?? 0) === 2
+    ? { ...walkBase, segmentsDetail: 'light' }
+    : { ...walkBase, segmentsDetail: 'light', seatMarginMM: walkFlap }
   const cache = sizeCacheOf(walkSig)
   const sizes: number[] = []
   for (const b of BANDS) for (let mm = b.minMM; mm <= b.maxMM; mm += Math.max(1, snapStep)) if (!cache.has(mm)) sizes.push(mm)
