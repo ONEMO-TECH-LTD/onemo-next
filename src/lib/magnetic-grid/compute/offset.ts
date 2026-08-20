@@ -348,153 +348,246 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     return compareExact(A.maxX, B.minX) < 0 || compareExact(B.maxX, A.minX) < 0
       || compareExact(A.maxY, B.minY) < 0 || compareExact(B.maxY, A.minY) < 0
   }
-  // Construction identities are never re-solved. Two nonparallel offset lines meet exactly once, so
-  // when that point is the miter junction they already share, re-deriving it only produces a span
-  // comparison between two forms that are equal BY CONSTRUCTION — the one comparison certified
-  // bounds can never settle, and the source of every undecidable span report on a traced outline.
-  // Restricted to two straight elements on purpose: two nonparallel lines meet EXACTLY once, so a
-  // shared junction accounts for their only crossing. Two equal-radius arcs can meet twice, so a
-  // shared vertex proves nothing about a second intersection and they are still solved in full.
-  const sharesJunction = (a: Elem, b: Elem): boolean => {
-    if (a.kind !== 'seg' || b.kind !== 'seg') return false
-    for (const va of [a.startV, a.endV]) {
-      if (!va) continue
-      if (va === b.startV || va === b.endV) return true
-    }
-    return false
-  }
-  for (let i = 0; i < elems.length; i++) for (let j = i + 1; j < elems.length; j++) {
-    if (tooFarApart(elems[i], elems[j])) continue
-    if (sharesJunction(elems[i], elems[j])) continue
-    const a = elems[i], b = elems[j]
-    // an arc and its two adjacent offset segments meet only at their built junctions (tangency)
-    if (a.kind === 'arc' && (a.prevSeg === b.id || a.nextSeg === b.id)) continue
-    if (b.kind === 'arc' && (b.prevSeg === a.id || b.nextSeg === a.id)) continue
-    const arcSegHits = a.kind === 'arc' && b.kind === 'seg' ? segArc(b, a, r) : null
-    const hits: Hit[] | null = a.kind === 'seg' && b.kind === 'seg' ? segSeg(a, b)
-      : a.kind === 'seg' && b.kind === 'arc' ? segArc(a, b, r)
-        : a.kind === 'arc' && b.kind === 'seg' ? (arcSegHits === null ? null : arcSegHits.map((h) => ({ p: h.p, tB: h.tA })))
-          : arcArc(a as ArcElem, b as ArcElem, r)
-    if (hits === null) { fail(`intersection ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
-    // A cut records where two offset CURVES cross. A hit on one element's infinite line but outside
-    // the other's span is not such a crossing — the other curve is not there — so it splits a piece
-    // at a parameter where nothing about its validity changes. Requiring the hit on BOTH spans
-    // removes those spurious vertices; it cannot remove a real one, because a genuine crossing lies
-    // on both curves by definition.
-    // Three-valued on purpose. A point is outside the span as soon as EITHER end proves it outside,
-    // whatever the other end does — so a decisive negative is never discarded because its partner
-    // could not be settled. Only a point with no decisive answer and at least one unknown is
-    // reported unknown. (Every remaining refusal on a traced outline was this: one bound said
-    // "before the span start" outright while the other straddled zero at a near-concurrent corner.)
-    const onSpan = (e: Elem, hit: Hit, which: 'A' | 'B'): boolean | null => {
-      if (e.kind === 'seg') {
-        const t = which === 'A' ? hit.tA : hit.tB
-        if (!t) return null
-        const lo = signOf(cSub(t, e.t0)), hi = signOf(cSub(e.t1, t))
-        if (lo !== null && lo < 0) return false
-        if (hi !== null && hi < 0) return false
-        if (lo === null || hi === null) return null
-        return true
+  // One arrangement pass: intersect, split, keep the valid sub-pieces. It is a function because a
+  // swallowed element can force the surviving neighbours' domains to change, and the pass must then
+  // be redone on the corrected domains rather than patched afterwards.
+  const runPass = (): Piece[] => {
+    for (const e of elems) cuts.set(e.id, [])
+    // Construction identities are never re-solved. Two nonparallel offset lines meet exactly once, so
+    // when that point is the miter junction they already share, re-deriving it only produces a span
+    // comparison between two forms that are equal BY CONSTRUCTION — the one comparison certified
+    // bounds can never settle, and the source of every undecidable span report on a traced outline.
+    // Restricted to two straight elements on purpose: two nonparallel lines meet EXACTLY once, so a
+    // shared junction accounts for their only crossing. Two equal-radius arcs can meet twice, so a
+    // shared vertex proves nothing about a second intersection and they are still solved in full.
+    const sharesJunction = (a: Elem, b: Elem): boolean => {
+      if (a.kind !== 'seg' || b.kind !== 'seg') return false
+      for (const va of [a.startV, a.endV]) {
+        if (!va) continue
+        if (va === b.startV || va === b.endV) return true
       }
-      return onSweep(e, dirOn(e, hit.p))
+      return false
     }
-    for (const hit of hits) {
-      // An endpoint already built by construction is recognised by IDENTITY first: if the hit is one
-      // of these elements' own junction points, its membership is known and no numeric comparison is
-      // attempted. Only genuinely new points are measured against the spans.
-      const atKnownEnd = (e: Elem): SharedVertex | null => {
-        for (const v of [e.startV, e.endV]) {
-          if (!v) continue
-          const sx = signOf(cSub(v.p.x, hit.p.x)), sy = signOf(cSub(v.p.y, hit.p.y))
-          if (sx === 0 && sy === 0) return v
+    for (let i = 0; i < elems.length; i++) for (let j = i + 1; j < elems.length; j++) {
+      if (tooFarApart(elems[i], elems[j])) continue
+      if (sharesJunction(elems[i], elems[j])) continue
+      const a = elems[i], b = elems[j]
+      // an arc and its two adjacent offset segments meet only at their built junctions (tangency)
+      if (a.kind === 'arc' && (a.prevSeg === b.id || a.nextSeg === b.id)) continue
+      if (b.kind === 'arc' && (b.prevSeg === a.id || b.nextSeg === a.id)) continue
+      const arcSegHits = a.kind === 'arc' && b.kind === 'seg' ? segArc(b, a, r) : null
+      const hits: Hit[] | null = a.kind === 'seg' && b.kind === 'seg' ? segSeg(a, b)
+        : a.kind === 'seg' && b.kind === 'arc' ? segArc(a, b, r)
+          : a.kind === 'arc' && b.kind === 'seg' ? (arcSegHits === null ? null : arcSegHits.map((h) => ({ p: h.p, tB: h.tA })))
+            : arcArc(a as ArcElem, b as ArcElem, r)
+      if (hits === null) { fail(`intersection ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
+      // A cut records where two offset CURVES cross. A hit on one element's infinite line but outside
+      // the other's span is not such a crossing — the other curve is not there — so it splits a piece
+      // at a parameter where nothing about its validity changes. Requiring the hit on BOTH spans
+      // removes those spurious vertices; it cannot remove a real one, because a genuine crossing lies
+      // on both curves by definition.
+      // Three-valued on purpose. A point is outside the span as soon as EITHER end proves it outside,
+      // whatever the other end does — so a decisive negative is never discarded because its partner
+      // could not be settled. Only a point with no decisive answer and at least one unknown is
+      // reported unknown. (Every remaining refusal on a traced outline was this: one bound said
+      // "before the span start" outright while the other straddled zero at a near-concurrent corner.)
+      const onSpan = (e: Elem, hit: Hit, which: 'A' | 'B'): boolean | null => {
+        if (e.kind === 'seg') {
+          const t = which === 'A' ? hit.tA : hit.tB
+          if (!t) return null
+          const lo = signOf(cSub(t, e.t0)), hi = signOf(cSub(e.t1, t))
+          if (lo !== null && lo < 0) return false
+          if (hi !== null && hi < 0) return false
+          if (lo === null || hi === null) return null
+          return true
         }
-        return null
+        return onSweep(e, dirOn(e, hit.p))
       }
-      const knownA = atKnownEnd(a), knownB = atKnownEnd(b)
-      const onA = knownA ? true : onSpan(a, hit, 'A')
-      const onB = knownB ? true : onSpan(b, hit, 'B')
-      if (onA === null || onB === null) { fail(`span membership at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
-      if (!onA || !onB) continue
-      // Three or more curves through one point (collinear edges, symmetric corners) must share ONE
-      // vertex: reuse a vertex already on either element when its point is exactly the same.
-      let v: SharedVertex | null = null
-      let coincidence: 'no' | 'yes' | 'undecidable' = 'no'
-      const known: SharedVertex[] = [...cuts.get(a.id)!, ...cuts.get(b.id)!].map((k) => k.v)
-      for (const e of [a, b]) { if (e.startV) known.push(e.startV); if (e.endV) known.push(e.endV) }
-      for (const kv of known) {
-        const sx = signOf(cSub(kv.p.x, hit.p.x)), sy = signOf(cSub(kv.p.y, hit.p.y))
-        if (sx === 0 && sy === 0) { v = kv; coincidence = 'yes'; break }
-        if (sx === null || sy === null) coincidence = 'undecidable'
+      for (const hit of hits) {
+        // An endpoint already built by construction is recognised by IDENTITY first: if the hit is one
+        // of these elements' own junction points, its membership is known and no numeric comparison is
+        // attempted. Only genuinely new points are measured against the spans.
+        const atKnownEnd = (e: Elem): SharedVertex | null => {
+          for (const v of [e.startV, e.endV]) {
+            if (!v) continue
+            const sx = signOf(cSub(v.p.x, hit.p.x)), sy = signOf(cSub(v.p.y, hit.p.y))
+            if (sx === 0 && sy === 0) return v
+          }
+          return null
+        }
+        const knownA = atKnownEnd(a), knownB = atKnownEnd(b)
+        const onA = knownA ? true : onSpan(a, hit, 'A')
+        const onB = knownB ? true : onSpan(b, hit, 'B')
+        if (onA === null || onB === null) { fail(`span membership at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
+        if (!onA || !onB) continue
+        // Three or more curves through one point (collinear edges, symmetric corners) must share ONE
+        // vertex: reuse a vertex already on either element when its point is exactly the same.
+        let v: SharedVertex | null = null
+        let coincidence: 'no' | 'yes' | 'undecidable' = 'no'
+        const known: SharedVertex[] = [...cuts.get(a.id)!, ...cuts.get(b.id)!].map((k) => k.v)
+        for (const e of [a, b]) { if (e.startV) known.push(e.startV); if (e.endV) known.push(e.endV) }
+        for (const kv of known) {
+          const sx = signOf(cSub(kv.p.x, hit.p.x)), sy = signOf(cSub(kv.p.y, hit.p.y))
+          if (sx === 0 && sy === 0) { v = kv; coincidence = 'yes'; break }
+          if (sx === null || sy === null) coincidence = 'undecidable'
+        }
+        if (!v && coincidence === 'undecidable') { fail(`coincidence at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
+        if (!v) v = { id: vid++, p: hit.p }
+        // a cut that coincides with an element's own junction is that junction — never a second stop
+        const already = (e: Elem) => e.startV === v || e.endV === v || cuts.get(e.id)!.some((k) => k.v === v)
+        if (!already(a)) addCut(a, v, hit, 'A')
+        if (!already(b)) addCut(b, v, hit, 'B')
       }
-      if (!v && coincidence === 'undecidable') { fail(`coincidence at ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
-      if (!v) v = { id: vid++, p: hit.p }
-      // a cut that coincides with an element's own junction is that junction — never a second stop
-      const already = (e: Elem) => e.startV === v || e.endV === v || cuts.get(e.id)!.some((k) => k.v === v)
-      if (!already(a)) addCut(a, v, hit, 'A')
-      if (!already(b)) addCut(b, v, hit, 'B')
+    }
+
+    // split each element at its cuts and keep the sub-pieces at distance ≥ r from every feature
+    // Validity asks one question — is any feature nearer than r? — so only features whose bounding box
+    // reaches within r of the point can answer it. The index returns exactly those; every feature it
+    // omits is provably farther, so the verdict is identical to scanning the whole contour.
+    const index = segmentIndex(feats, r > BigInt(0) ? r : BigInt(1))
+    const candidatesNear = (p: P2): readonly ExactSegment[] | null => {
+      if (!pruningOn) return feats
+      const ix = evaluate(p.x, BigInt(16)), iy = evaluate(p.y, BigInt(16))
+      const floorI = (v: Rational) => (v.n >= BigInt(0) ? v.n / v.d : -((-v.n + v.d - BigInt(1)) / v.d))
+      const ceilI = (v: Rational) => (v.n >= BigInt(0) ? (v.n + v.d - BigInt(1)) / v.d : -((-v.n) / v.d))
+      return nearSegments(index, floorI(ix.lo) - BigInt(1), floorI(iy.lo) - BigInt(1), ceilI(ix.hi) + BigInt(1), ceilI(iy.hi) + BigInt(1), r)
+    }
+    // Existential, and three-valued in the same way: the question is whether ANY feature is nearer
+    // than r, so one certified violation answers it no matter how many other comparisons are unknown.
+    // The scan therefore runs to the end, remembers whether anything stayed unknown, and reports
+    // unknown only when nothing was found nearer.
+    const valid = (p: P2, own: readonly ExactSegment[]): boolean | null => {
+      const scope = candidatesNear(p)
+      if (scope === null) return null
+      let unknown = false
+      for (const f of scope) {
+        if (own.includes(f)) continue
+        const d2 = dist2ToSegment(p, f)
+        if (d2 === null) { unknown = true; continue }
+        const s = signOf(cSub(d2, R2(r)))
+        if (s === null) { unknown = true; continue }
+        if (s < 0) return false
+      }
+      return unknown ? null : true
+    }
+    const pieces: Piece[] = []
+    for (const e of elems) {
+      const list = cuts.get(e.id)!
+      if (e.kind === 'seg') {
+        // keep cuts inside the element's own junction-to-junction span; order by t
+        const inSpan = list.filter((k) => { const lo = signOf(cSub(k.t!, e.t0)), hi = signOf(cSub(e.t1, k.t!)); if (lo === null || hi === null) { fail(`seg${e.id} cut span undecidable`); return false } return lo >= 0 && hi >= 0 })
+        inSpan.sort((p, q) => { const s = compareCReal(p.t!, q.t!); if (s === null) { fail(`seg${e.id} cut order undecidable`); return 0 } return s })
+        const stops: Array<{ v: SharedVertex | null; t: CReal }> = [{ v: e.startV, t: e.t0 }, ...inSpan.map((k) => ({ v: k.v, t: k.t! })), { v: e.endV, t: e.t1 }]
+        for (let k = 0; k + 1 < stops.length; k++) {
+          const tm = cDiv(cAdd(stops[k].t, stops[k + 1].t), cInt(2))
+          const mid: P2 = { x: cAdd(e.a.x, cMul(tm, cBig(e.dx))), y: cAdd(e.a.y, cMul(tm, cBig(e.dy))) }
+          const ok = valid(mid, [e.feat])
+          if (ok === null) { fail(`seg${e.id} piece ${k} validity undecidable`); continue }
+          if (ok) pieces.push({ elem: e, from: stops[k].v, to: stops[k + 1].v, mid })
+        }
+      } else {
+        const onArc = list.filter((k) => { const on = onSweep(e, k.u!); if (on === null) { fail(`arc${e.id} cut sweep undecidable`); return false } return on })
+        onArc.sort((p, q) => { const b = cwBefore(p.u!, q.u!); if (b === null) { fail(`arc${e.id} cut order undecidable`); return 0 } return b ? -1 : 1 })
+        const stops: Array<{ v: SharedVertex | null; u: P2 }> = [{ v: e.startV, u: e.s }, ...onArc.map((k) => ({ v: k.v, u: k.u! })), { v: e.endV, u: e.e }]
+        for (let k = 0; k + 1 < stops.length; k++) {
+          // bisector direction of two directions within a half-turn: normalised sum
+          const u0 = stops[k].u, u1 = stops[k + 1].u
+          const l0 = cSqrt(dot2(u0, u0)), l1 = cSqrt(dot2(u1, u1))
+          const um: P2 = { x: cAdd(cDiv(u0.x, l0), cDiv(u1.x, l1)), y: cAdd(cDiv(u0.y, l0), cDiv(u1.y, l1)) }
+          const mid = arcPoint(e, um, r)
+          const ok = valid(mid, e.feats)
+          if (ok === null) { fail(`arc${e.id} piece ${k} validity undecidable`); continue }
+          if (ok) pieces.push({ elem: e, from: stops[k].v, to: stops[k + 1].v, mid })
+        }
+      }
+    }
+
+    return pieces
+  }
+
+  let pieces = runPass()
+
+  // REPAIR: an element with no surviving sub-piece was swallowed whole by another feature's
+  // r-neighbourhood — a notch narrower than 2r. Its neighbours' domains then end at a junction with
+  // something that is not part of the boundary, so the boundary arrives there and cannot continue,
+  // leaving an orphaned vertex and an open chain. The fix is geometric, not a chainer patch: the
+  // surviving neighbours on either side of the swallowed run are re-mitered directly to each other,
+  // and the whole pass is redone so every crossing inside the newly reachable stretch is found.
+  const chainNext = new Map<number, Elem>()
+  const chainPrev = new Map<number, Elem>()
+  {
+    const segByRingEdge = new Map<string, SegElem>()
+    for (const e of elems) if (e.kind === 'seg') segByRingEdge.set(`${e.feat.ring}:${e.feat.edge}`, e)
+    const arcAfter = new Map<number, ArcElem>()
+    for (const e of elems) if (e.kind === 'arc') arcAfter.set(e.prevSeg, e)
+    const link = (a: Elem, b: Elem) => { chainNext.set(a.id, b); chainPrev.set(b.id, a) }
+    const ringSizes = new Map<number, number>()
+    for (const e of elems) if (e.kind === 'seg') ringSizes.set(e.feat.ring, Math.max(ringSizes.get(e.feat.ring) ?? 0, e.feat.edge + 1))
+    for (const [ring, count] of ringSizes) {
+      for (let i = 0; i < count; i++) {
+        const seg = segByRingEdge.get(`${ring}:${i}`)
+        const following = segByRingEdge.get(`${ring}:${(i + 1) % count}`)
+        if (!seg || !following) continue
+        const arc = arcAfter.get(seg.id)
+        if (arc) { link(seg, arc); link(arc, following) } else link(seg, following)
+      }
     }
   }
 
-  // split each element at its cuts and keep the sub-pieces at distance ≥ r from every feature
-  // Validity asks one question — is any feature nearer than r? — so only features whose bounding box
-  // reaches within r of the point can answer it. The index returns exactly those; every feature it
-  // omits is provably farther, so the verdict is identical to scanning the whole contour.
-  const index = segmentIndex(feats, r > BigInt(0) ? r : BigInt(1))
-  const candidatesNear = (p: P2): readonly ExactSegment[] | null => {
-    if (!pruningOn) return feats
-    const ix = evaluate(p.x, BigInt(16)), iy = evaluate(p.y, BigInt(16))
-    const floorI = (v: Rational) => (v.n >= BigInt(0) ? v.n / v.d : -((-v.n + v.d - BigInt(1)) / v.d))
-    const ceilI = (v: Rational) => (v.n >= BigInt(0) ? (v.n + v.d - BigInt(1)) / v.d : -((-v.n) / v.d))
-    return nearSegments(index, floorI(ix.lo) - BigInt(1), floorI(iy.lo) - BigInt(1), ceilI(ix.hi) + BigInt(1), ceilI(iy.hi) + BigInt(1), r)
+  // A swallowed element is NOT by itself a defect: a neck narrower than 2r legitimately removes
+  // elements, and that is exactly how a region splits into separate islands. The only repairable
+  // case is a torn boundary — an ORPHAN junction, where a surviving piece ends at a vertex no other
+  // piece reaches. Repair therefore starts from an orphan, walks the ring across swallowed elements
+  // only, and requires the walk to arrive at another orphan facing it. Both ends orphaned proves the
+  // boundary was torn between them rather than legitimately ended (Grid-Meta). Anything else is left
+  // exactly as measured.
+  const orphanEnds = (current: readonly Piece[]) => {
+    const byV = new Map<number, Piece[]>()
+    for (const piece of current) for (const v of [piece.from, piece.to]) if (v) (byV.get(v.id) ?? byV.set(v.id, []).get(v.id)!).push(piece)
+    return new Map([...byV].filter(([, ps]) => ps.length === 1).map(([id, ps]) => [id, ps[0]]))
   }
-  // Existential, and three-valued in the same way: the question is whether ANY feature is nearer
-  // than r, so one certified violation answers it no matter how many other comparisons are unknown.
-  // The scan therefore runs to the end, remembers whether anything stayed unknown, and reports
-  // unknown only when nothing was found nearer.
-  const valid = (p: P2, own: readonly ExactSegment[]): boolean | null => {
-    const scope = candidatesNear(p)
-    if (scope === null) return null
-    let unknown = false
-    for (const f of scope) {
-      if (own.includes(f)) continue
-      const d2 = dist2ToSegment(p, f)
-      if (d2 === null) { unknown = true; continue }
-      const s = signOf(cSub(d2, R2(r)))
-      if (s === null) { unknown = true; continue }
-      if (s < 0) return false
-    }
-    return unknown ? null : true
-  }
-  const pieces: Piece[] = []
-  for (const e of elems) {
-    const list = cuts.get(e.id)!
-    if (e.kind === 'seg') {
-      // keep cuts inside the element's own junction-to-junction span; order by t
-      const inSpan = list.filter((k) => { const lo = signOf(cSub(k.t!, e.t0)), hi = signOf(cSub(e.t1, k.t!)); if (lo === null || hi === null) { fail(`seg${e.id} cut span undecidable`); return false } return lo >= 0 && hi >= 0 })
-      inSpan.sort((p, q) => { const s = compareCReal(p.t!, q.t!); if (s === null) { fail(`seg${e.id} cut order undecidable`); return 0 } return s })
-      const stops: Array<{ v: SharedVertex | null; t: CReal }> = [{ v: e.startV, t: e.t0 }, ...inSpan.map((k) => ({ v: k.v, t: k.t! })), { v: e.endV, t: e.t1 }]
-      for (let k = 0; k + 1 < stops.length; k++) {
-        const tm = cDiv(cAdd(stops[k].t, stops[k + 1].t), cInt(2))
-        const mid: P2 = { x: cAdd(e.a.x, cMul(tm, cBig(e.dx))), y: cAdd(e.a.y, cMul(tm, cBig(e.dy))) }
-        const ok = valid(mid, [e.feat])
-        if (ok === null) { fail(`seg${e.id} piece ${k} validity undecidable`); continue }
-        if (ok) pieces.push({ elem: e, from: stops[k].v, to: stops[k + 1].v, mid })
+  // Termination: every accepted repair consumes at least one orphan junction and creates a shared
+  // one, and no repair ever creates an orphan, so the count strictly decreases. The loop is bounded
+  // by the element count and exits the moment a round makes no progress.
+  for (let round = 0; round <= elems.length; round++) {
+    const orphans = orphanEnds(pieces)
+    if (!orphans.size) break
+    const surviving = new Set(pieces.map((piece) => piece.elem.id))
+    const swallowedIds = new Set(elems.filter((e) => !surviving.has(e.id)).map((e) => e.id))
+    let repaired = false
+    const handled = new Set<number>()
+    for (const [vertexId, piece] of orphans) {
+      if (handled.has(vertexId)) continue
+      const from = piece.elem
+      const forward = from.endV?.id === vertexId
+      if (!forward && from.startV?.id !== vertexId) continue
+      // walk across swallowed elements only
+      let step: Elem | undefined = forward ? chainNext.get(from.id) : chainPrev.get(from.id)
+      let crossed = 0
+      while (step && swallowedIds.has(step.id) && crossed++ <= elems.length) {
+        step = forward ? chainNext.get(step.id) : chainPrev.get(step.id)
       }
-    } else {
-      const onArc = list.filter((k) => { const on = onSweep(e, k.u!); if (on === null) { fail(`arc${e.id} cut sweep undecidable`); return false } return on })
-      onArc.sort((p, q) => { const b = cwBefore(p.u!, q.u!); if (b === null) { fail(`arc${e.id} cut order undecidable`); return 0 } return b ? -1 : 1 })
-      const stops: Array<{ v: SharedVertex | null; u: P2 }> = [{ v: e.startV, u: e.s }, ...onArc.map((k) => ({ v: k.v, u: k.u! })), { v: e.endV, u: e.e }]
-      for (let k = 0; k + 1 < stops.length; k++) {
-        // bisector direction of two directions within a half-turn: normalised sum
-        const u0 = stops[k].u, u1 = stops[k + 1].u
-        const l0 = cSqrt(dot2(u0, u0)), l1 = cSqrt(dot2(u1, u1))
-        const um: P2 = { x: cAdd(cDiv(u0.x, l0), cDiv(u1.x, l1)), y: cAdd(cDiv(u0.y, l0), cDiv(u1.y, l1)) }
-        const mid = arcPoint(e, um, r)
-        const ok = valid(mid, e.feats)
-        if (ok === null) { fail(`arc${e.id} piece ${k} validity undecidable`); continue }
-        if (ok) pieces.push({ elem: e, from: stops[k].v, to: stops[k + 1].v, mid })
-      }
+      if (!step || !crossed || step === from) continue
+      // the far side must be torn too: its facing junction is itself an orphan
+      const facing = forward ? step.startV : step.endV
+      if (!facing || !orphans.has(facing.id)) continue
+      if (from.kind !== 'seg' || step.kind !== 'seg') { fail(`torn boundary beside ${from.kind}${from.id}/${step.kind}${step.id} needs an arc re-miter`); continue }
+      const before = forward ? from : step, after = forward ? step : from
+      const det = before.dx * after.dy - before.dy * after.dx
+      if (det === BigInt(0)) { fail(`torn boundary between parallel ${before.kind}${before.id} and ${after.kind}${after.id}`); continue }
+      const w = sub2(after.a, before.a)
+      const tBefore = cDiv(cSub(cMul(w.x, cBig(after.dy)), cMul(w.y, cBig(after.dx))), cBig(det))
+      const tAfter = cDiv(cSub(cMul(w.x, cBig(before.dy)), cMul(w.y, cBig(before.dx))), cBig(det))
+      const point: P2 = { x: cAdd(before.a.x, cMul(tBefore, cBig(before.dx))), y: cAdd(before.a.y, cMul(tBefore, cBig(before.dy))) }
+      const junction: SharedVertex = { id: vid++, p: point }
+      before.endV = junction; before.t1 = tBefore
+      after.startV = junction; after.t0 = tAfter
+      handled.add(vertexId); handled.add(facing.id)
+      repaired = true
     }
+    if (!repaired) break
+    // the reconnected stretch is re-measured in full: every crossing and every validity verdict
+    pieces = runPass()
   }
 
   // chain pieces into loops through shared vertices (identity, never numeric matching)
