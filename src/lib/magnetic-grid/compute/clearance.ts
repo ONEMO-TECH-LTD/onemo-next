@@ -41,7 +41,9 @@ const floatParts = (value: number): { mantissa: bigint; exponent: number } => {
 /** Lift a supplied contour (outer + holes) to exact integer geometry. */
 export function exactContour(contour: Contour): ExactContour {
   const rings = [contour.outer, ...contour.holes]
-  let shift = 0
+  // At least 2^12 units per mm so certified refinement has room below the coarsest input
+  // (integer-mm inputs would otherwise make 1mm the finest unit). Still a power of two: lossless.
+  let shift = 12
   for (const ring of rings) for (const [x, y] of ring.pts) {
     shift = Math.max(shift, -floatParts(x).exponent, -floatParts(y).exponent)
   }
@@ -107,6 +109,12 @@ export function nearestDist2(px: bigint, py: bigint, c: ExactContour): { d2: Rat
   let best: Rational | null = null
   let binding: ExactSegment[] = []
   for (const s of c.segments) {
+    // Exact prescreen: the segment's bbox is at least this far — skip when provably farther than best.
+    if (best) {
+      const dx = px < s.minX ? s.minX - px : px > s.maxX ? px - s.maxX : 0n
+      const dy = py < s.minY ? s.minY - py : py > s.maxY ? py - s.maxY : 0n
+      if ((dx * dx + dy * dy) * best.d > best.n) continue
+    }
     const d2 = segmentDist2(px, py, s)
     if (!best) { best = d2; binding = [s]; continue }
     const l = d2.n * best.d, r = best.n * d2.d
