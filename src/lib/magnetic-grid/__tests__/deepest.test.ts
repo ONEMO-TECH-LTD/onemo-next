@@ -139,7 +139,9 @@ describe('clearance maximum (item 5)', () => {
       const m = asPlateau(result)
       expect(m.branches).toHaveLength(1)
       const [pl] = m.branches
-      const onLeft = compareCReal(pl.from.x, cInt(BigInt(100) * u)) < 0
+      const side = compareCReal(pl.from.x, cInt(BigInt(100) * u))
+      expect(side, 'which island this branch belongs to must be decidable').not.toBeNull()
+      const onLeft = (side as -1 | 0 | 1) < 0
       const ends = [pl.from.x, pl.to.x]
       const wanted = onLeft ? [block, farLeft] : [cInt(BigInt(130) * u), farRight]
       // each end matches one exact oracle, in either traversal order
