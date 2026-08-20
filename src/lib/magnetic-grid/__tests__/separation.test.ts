@@ -17,6 +17,7 @@ const FILES = [
   'compute/deepest.ts',
   'compute/seat.ts',
   'compute/centre-evidence.ts',
+  'compute/identity.ts',
   'logic.ts',
   'engine.ts',
 ] as const
@@ -36,6 +37,7 @@ describe('magnetic-grid T1 separation', () => {
       'compute/region.ts': ['./exact-real', './angle', './certified-real', './clearance', './offset'],
       'compute/deepest.ts': ['./exact-real', './certified-real', './clearance', './offset', './region'],
       'compute/seat.ts': ['../spec'],
+      'compute/identity.ts': ['../spec', './exact-real'],
       'compute/centre-evidence.ts': ['../spec', './exact-real', './certified-real', './clearance', './deepest', './region', './seat'],
       'logic.ts': ['./spec'],
       'engine.ts': ['./compute', './logic', './spec'],
