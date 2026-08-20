@@ -63,7 +63,8 @@ export interface CentreRegionRef {
   massIndex: number | null
 }
 
-export interface CentreDecision {
+/** The cloned numeric body's decision shape. §3 deletes it with that body after the gate. */
+export interface ClonedCentreDecision {
   policy: CentrePolicy
   target: Pt
   branch: 'box' | 'core' | 'weight' | 'deep' | 'top' | 'mass'
@@ -88,7 +89,7 @@ export interface CentreBaselineInput {
 }
 
 export interface CentreBaselineResult {
-  centre: CentreDecision
+  centre: ClonedCentreDecision
   phaseMM: Pt
   seated: readonly Pt[]
   canonAxes: 0 | 1 | 2
@@ -124,3 +125,47 @@ export interface ExactPoint {
   y: ExactReal
   approximateMM: PointMM // report/render only
 }
+
+// ---- §6.1 centre evidence and law contracts -----------------------------------------------------
+
+export interface RegionEvidence {
+  id: string
+  centres: readonly ExactPoint[]
+  area: ExactReal
+  peakClear: ExactReal
+  rings: readonly (readonly PointMM[])[]
+}
+export type MassEvidence = RegionEvidence
+export interface CentreEvidence {
+  id: string
+  box: ExactPoint
+  core: ExactPoint | null
+  weight: ExactPoint
+  deepest: readonly ExactPoint[]
+  islands: readonly RegionEvidence[]
+  masses: readonly MassEvidence[]
+}
+export interface CentreDecision { target: ExactPoint; policy: CentrePolicy; evidenceId: string }
+export interface CentreTie { status: 'tie'; decisions: readonly CentreDecision[] }
+export interface RefusalEvidence { readonly [key: string]: string | number | boolean | null }
+export interface Refusal { status: 'refused'; code: RefusalCode; evidence: RefusalEvidence }
+export interface EvaluationContext { band: BandId; scale: ExactScale; regimeId: string; siteId: string }
+export interface CentreBranchMeasurement { context: EvaluationContext; evidence: CentreEvidence }
+export interface CentreLawEvaluation {
+  context: EvaluationContext
+  evidenceId: string
+  decisions: readonly CentreDecision[]
+  refusal: Refusal | null
+}
+
+export type RefusalCode =
+  | 'NO_SAFE_CORE'
+  | 'NO_CENTRE'
+  | 'CENTRE_EVIDENCE_UNRESOLVED'
+  | 'CENTRE_TIE_UNRESOLVED'
+  | 'NO_PARITY_LAWFUL_PLACEMENT'
+  | 'WRAP_EXCEEDS_ALLOWANCE'
+  | 'NO_WRAPPED_LAYOUT_IN_BAND'
+  | 'AUTO_FLAP_CAP_EXCEEDED'
+  | 'RUNG_CONFLICT'
+  | 'REGIME_UNRESOLVED'

@@ -4,7 +4,7 @@
 // to the exact construction. Decisions stay the donor's; the ruler beneath them is what improves.
 
 import type {
-  CentreDecision,
+  ClonedCentreDecision,
   CentreMeasurements,
   CentrePolicy,
   Governor,
@@ -36,11 +36,11 @@ const governorNumber = (policy: Extract<CentrePolicy, { mode: 'masses' }>): Gove
     : policy.governor === 'deepest' ? 1
       : policy.governor === 'top' ? 2 : 3
 
-function decision(policy: CentrePolicy, target: [number, number], branch: CentreDecision['branch'], regionIndex: number | null, massIndex: number | null): CentreDecision {
+function decision(policy: CentrePolicy, target: [number, number], branch: ClonedCentreDecision['branch'], regionIndex: number | null, massIndex: number | null): ClonedCentreDecision {
   return { policy, target, branch, regionIndex, massIndex }
 }
 
-export function evaluateCentrePolicy(measured: CentreMeasurements, policy: CentrePolicy): CentreDecision {
+export function evaluateCentrePolicy(measured: CentreMeasurements, policy: CentrePolicy): ClonedCentreDecision {
   if (policy.mode === 'box') return decision(policy, measured.box, 'box', null, null)
   if (policy.mode === 'weight') return decision(policy, measured.weight, 'weight', null, null)
   if (policy.mode === 'core') return decision(policy, measured.core, 'core', null, null)
