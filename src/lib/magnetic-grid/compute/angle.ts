@@ -3,23 +3,23 @@
 // bounded by its first omitted term; π comes from Machin's formula with the same bound. Every
 // bound is rounded outward on a dyadic grid — no float enters.
 
-import type { Rational } from '../spec'
+import type { ExactRational } from './exact-real'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, rational } from './exact-real'
 import { evaluate, type CReal, type Interval } from './certified-real'
 
-const floorD = (r: Rational, bits: bigint): Rational => {
+const floorD = (r: ExactRational, bits: bigint): ExactRational => {
   const s = BigInt(1) << bits
   let q = (r.n * s) / r.d
   if (r.n < BigInt(0) && (r.n * s) % r.d !== BigInt(0)) q -= BigInt(1)
   return rational(q, s)
 }
-const ceilD = (r: Rational, bits: bigint): Rational => {
+const ceilD = (r: ExactRational, bits: bigint): ExactRational => {
   const s = BigInt(1) << bits
   let q = (r.n * s) / r.d
   if (r.n > BigInt(0) && (r.n * s) % r.d !== BigInt(0)) q += BigInt(1)
   return rational(q, s)
 }
-const out = (lo: Rational, hi: Rational, bits: bigint): Interval => ({ lo: floorD(lo, bits), hi: ceilD(hi, bits) })
+const out = (lo: ExactRational, hi: ExactRational, bits: bigint): Interval => ({ lo: floorD(lo, bits), hi: ceilD(hi, bits) })
 
 /**
  * atan of an exact rational with 0 ≤ x ≤ 1, enclosed to `bits` precision, by Euler's series
@@ -28,7 +28,7 @@ const out = (lo: Rational, hi: Rational, bits: bigint): Interval => ({ lo: floor
  * q = x²/(1+x²) ≤ 1/2, so the tail after term k is at most term_k · q/(1−q). Exact rationals
  * throughout; only the final bounds are rounded, outward.
  */
-function atanSmall(x: Rational, bits: bigint): Interval {
+function atanSmall(x: ExactRational, bits: bigint): Interval {
   if (ratSign(x) === 0) return { lo: ratFromInt(0), hi: ratFromInt(0) }
   const x2 = ratMul(x, x)
   const onePlus = ratAdd(ratFromInt(1), x2)
@@ -57,7 +57,7 @@ export function piInterval(bits: bigint): Interval {
 }
 
 /** atan of an exact rational of any magnitude. */
-export function atanInterval(x: Rational, bits: bigint): Interval {
+export function atanInterval(x: ExactRational, bits: bigint): Interval {
   const s = ratSign(x)
   if (s === 0) return { lo: ratFromInt(0), hi: ratFromInt(0) }
   const ax = s < 0 ? { n: -x.n, d: x.d } : x

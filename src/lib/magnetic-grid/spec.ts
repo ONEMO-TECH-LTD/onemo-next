@@ -4,9 +4,6 @@ export type Pt = [number, number]
 export type PointMM = readonly [number, number]
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
-/** Exact rational value — BigInt terms, normalized by compute/exact-real. */
-export interface Rational { readonly n: bigint; readonly d: bigint }
-export interface ExactPoint { readonly x: Rational; readonly y: Rational }
 
 export interface Ring { pts: Pt[] }
 export interface Contour { outer: Ring; holes: Ring[] }
@@ -96,9 +93,3 @@ export interface CentreBaselineResult {
   seated: readonly Pt[]
   canonAxes: 0 | 1 | 2
 }
-
-// ---- neutral evidence shapes -------------------------------------------------------------------
-
-/** A certified enclosure of a rational quantity, as compute publishes it. */
-export interface Bounds { readonly lo: Rational; readonly hi: Rational }
-export interface BoundedPoint { readonly x: Bounds; readonly y: Bounds }

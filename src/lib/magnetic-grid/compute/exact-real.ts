@@ -1,7 +1,16 @@
 // Neutral exact arithmetic. Rationals over BigInt; no float ever decides a comparison.
 // Supplied float coordinates convert losslessly via their IEEE-754 bit pattern (R14 §7.1).
 
-import type { Rational } from '../spec'
+/**
+ * The compute-internal exact rational: BigInt terms, normalized here. §6.2 gives `exact-real.ts`
+ * ownership of "rational/algebraic values and comparisons", and it is deliberately NOT the public
+ * `ExactRational` of §6.1 — that one carries decimal-string integers because its stated purpose is that
+ * "Node/browser/worker/cache bytes agree" (§6.1) and §6.4 canonicalizes identity the same way.
+ * Arithmetic stays in BigInt; conversion happens at that boundary.
+ */
+export interface ExactRational { readonly n: bigint; readonly d: bigint }
+export interface ExactPointValue { readonly x: ExactRational; readonly y: ExactRational }
+export interface Bounds { readonly lo: ExactRational; readonly hi: ExactRational }
 
 const ZERO = BigInt(0)
 const ONE = BigInt(1)
@@ -15,7 +24,7 @@ const gcd = (a: bigint, b: bigint): bigint => {
 }
 
 /** Normalized rational: denominator positive, terms coprime. */
-export function rational(numerator: bigint, denominator: bigint): Rational {
+export function rational(numerator: bigint, denominator: bigint): ExactRational {
   if (denominator === ZERO) throw new Error('rational: zero denominator')
   const sign = denominator < ZERO ? -ONE : ONE
   const n = numerator * sign
@@ -24,10 +33,10 @@ export function rational(numerator: bigint, denominator: bigint): Rational {
   return { n: n / g, d: d / g }
 }
 
-export const ratFromInt = (v: bigint | number): Rational => rational(BigInt(v), ONE)
+export const ratFromInt = (v: bigint | number): ExactRational => rational(BigInt(v), ONE)
 
 /** Exact conversion of a finite JS number via its IEEE-754 bits — no rounding, no quantum. */
-export function ratFromNumber(value: number): Rational {
+export function ratFromNumber(value: number): ExactRational {
   if (!Number.isFinite(value)) throw new Error('ratFromNumber: non-finite input')
   if (Number.isInteger(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER) return ratFromInt(value)
   const view = new DataView(new ArrayBuffer(8))
@@ -44,26 +53,26 @@ export function ratFromNumber(value: number): Rational {
     : rational(sign * mantissa, ONE << BigInt(-shift))
 }
 
-export const ratAdd = (a: Rational, b: Rational): Rational => rational(a.n * b.d + b.n * a.d, a.d * b.d)
-export const ratSub = (a: Rational, b: Rational): Rational => rational(a.n * b.d - b.n * a.d, a.d * b.d)
-export const ratMul = (a: Rational, b: Rational): Rational => rational(a.n * b.n, a.d * b.d)
-export const ratDiv = (a: Rational, b: Rational): Rational => rational(a.n * b.d, a.d * b.n)
-export const ratNeg = (a: Rational): Rational => ({ n: -a.n, d: a.d })
-export const ratSq = (a: Rational): Rational => rational(a.n * a.n, a.d * a.d)
+export const ratAdd = (a: ExactRational, b: ExactRational): ExactRational => rational(a.n * b.d + b.n * a.d, a.d * b.d)
+export const ratSub = (a: ExactRational, b: ExactRational): ExactRational => rational(a.n * b.d - b.n * a.d, a.d * b.d)
+export const ratMul = (a: ExactRational, b: ExactRational): ExactRational => rational(a.n * b.n, a.d * b.d)
+export const ratDiv = (a: ExactRational, b: ExactRational): ExactRational => rational(a.n * b.d, a.d * b.n)
+export const ratNeg = (a: ExactRational): ExactRational => ({ n: -a.n, d: a.d })
+export const ratSq = (a: ExactRational): ExactRational => rational(a.n * a.n, a.d * a.d)
 
 /** Exact three-way comparison — the only ordering the law layer may consume. */
-export function compareExact(a: Rational, b: Rational): -1 | 0 | 1 {
+export function compareExact(a: ExactRational, b: ExactRational): -1 | 0 | 1 {
   const left = a.n * b.d
   const right = b.n * a.d
   return left < right ? -1 : left > right ? 1 : 0
 }
 
-export const ratSign = (a: Rational): -1 | 0 | 1 => (a.n < ZERO ? -1 : a.n > ZERO ? 1 : 0)
-export const ratMin = (a: Rational, b: Rational): Rational => (compareExact(a, b) <= 0 ? a : b)
-export const ratMax = (a: Rational, b: Rational): Rational => (compareExact(a, b) >= 0 ? a : b)
+export const ratSign = (a: ExactRational): -1 | 0 | 1 => (a.n < ZERO ? -1 : a.n > ZERO ? 1 : 0)
+export const ratMin = (a: ExactRational, b: ExactRational): ExactRational => (compareExact(a, b) <= 0 ? a : b)
+export const ratMax = (a: ExactRational, b: ExactRational): ExactRational => (compareExact(a, b) >= 0 ? a : b)
 
 /** Report-only decimal — never enters a verdict. */
-export const ratToNumber = (a: Rational): number => Number(a.n) / Number(a.d)
+export const ratToNumber = (a: ExactRational): number => Number(a.n) / Number(a.d)
 
 /** Floor integer square root. */
 export const isqrt = (v: bigint): bigint => {
@@ -82,7 +91,7 @@ export const isqrt = (v: bigint): bigint => {
  * Directed integer square roots on a scaled numerator — never a float path.
  */
 const DEFAULT_SQRT_SCALE = BigInt('1000000000000')
-export function sqrtInterval(q: Rational, scale: bigint = DEFAULT_SQRT_SCALE): { lo: Rational; hi: Rational } {
+export function sqrtInterval(q: ExactRational, scale: bigint = DEFAULT_SQRT_SCALE): { lo: ExactRational; hi: ExactRational } {
   if (ratSign(q) < 0) throw new Error('sqrtInterval: negative operand')
   if (q.n === ZERO) return { lo: ratFromInt(0), hi: ratFromInt(0) }
   // √(n/d) = √(n·d)/d — one integer radicand, scaled for precision.

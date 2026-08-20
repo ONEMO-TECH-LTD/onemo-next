@@ -5,17 +5,17 @@
 // expression decides exactly; an expression the bounds cannot separate is reported undecided —
 // never rounded into a verdict.
 
-import type { Rational } from '../spec'
+import type { ExactRational } from './exact-real'
 import { compareExact, isqrt, ratFromInt, ratSign, rational, sqrtInterval } from './exact-real'
 
 export type CReal =
-  | { readonly k: 'rat'; readonly v: Rational }
+  | { readonly k: 'rat'; readonly v: ExactRational }
   | { readonly k: 'add' | 'sub' | 'mul' | 'div'; readonly a: CReal; readonly b: CReal }
   | { readonly k: 'neg' | 'sqrt'; readonly a: CReal }
 
-export interface Interval { readonly lo: Rational; readonly hi: Rational }
+export interface Interval { readonly lo: ExactRational; readonly hi: ExactRational }
 
-export const cRat = (v: Rational): CReal => ({ k: 'rat', v })
+export const cRat = (v: ExactRational): CReal => ({ k: 'rat', v })
 export const cInt = (v: bigint | number): CReal => cRat(ratFromInt(v))
 export const cAdd = (a: CReal, b: CReal): CReal => ({ k: 'add', a, b })
 export const cSub = (a: CReal, b: CReal): CReal => ({ k: 'sub', a, b })
@@ -50,7 +50,7 @@ export function isRationalExpr(e: CReal): boolean {
 }
 
 /** Exact value of a rational-only expression. */
-export function exactRational(e: CReal): Rational {
+export function exactRational(e: CReal): ExactRational {
   switch (e.k) {
     case 'rat': return e.v
     case 'neg': { const v = exactRational(e.a); return { n: -v.n, d: v.d } }
@@ -66,25 +66,25 @@ export function exactRational(e: CReal): Rational {
 }
 
 // Directed rounding to the dyadic grid 2^-bits: lower bound floors, upper bound ceils.
-const floorDyadic = (r: Rational, bits: bigint): Rational => {
+const floorDyadic = (r: ExactRational, bits: bigint): ExactRational => {
   const scale = BigInt(1) << bits
   let q = (r.n * scale) / r.d
   if (r.n < BigInt(0) && (r.n * scale) % r.d !== BigInt(0)) q -= BigInt(1)
   return rational(q, scale)
 }
-const ceilDyadic = (r: Rational, bits: bigint): Rational => {
+const ceilDyadic = (r: ExactRational, bits: bigint): ExactRational => {
   const scale = BigInt(1) << bits
   let q = (r.n * scale) / r.d
   if (r.n > BigInt(0) && (r.n * scale) % r.d !== BigInt(0)) q += BigInt(1)
   return rational(q, scale)
 }
-const iv = (lo: Rational, hi: Rational, bits: bigint): Interval => ({ lo: floorDyadic(lo, bits), hi: ceilDyadic(hi, bits) })
-const add = (a: Rational, b: Rational) => rational(a.n * b.d + b.n * a.d, a.d * b.d)
-const sub = (a: Rational, b: Rational) => rational(a.n * b.d - b.n * a.d, a.d * b.d)
-const mul = (a: Rational, b: Rational) => rational(a.n * b.n, a.d * b.d)
-const div = (a: Rational, b: Rational) => rational(a.n * b.d, a.d * b.n)
-const minR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
-const maxR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
+const iv = (lo: ExactRational, hi: ExactRational, bits: bigint): Interval => ({ lo: floorDyadic(lo, bits), hi: ceilDyadic(hi, bits) })
+const add = (a: ExactRational, b: ExactRational) => rational(a.n * b.d + b.n * a.d, a.d * b.d)
+const sub = (a: ExactRational, b: ExactRational) => rational(a.n * b.d - b.n * a.d, a.d * b.d)
+const mul = (a: ExactRational, b: ExactRational) => rational(a.n * b.n, a.d * b.d)
+const div = (a: ExactRational, b: ExactRational) => rational(a.n * b.d, a.d * b.n)
+const minR = (...xs: ExactRational[]) => xs.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
+const maxR = (...xs: ExactRational[]) => xs.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
 
 // Memo tables. An expression node is immutable, so its enclosure at a given precision and its
 // quadratic normal form are functions of the node alone — identical values, computed once. The
@@ -154,12 +154,12 @@ function evaluateUncached(e: CReal, bits: bigint): Interval {
 const PRECISIONS = [BigInt(64), BigInt(128), BigInt(256), BigInt(512), BigInt(1024)]
 
 /** A value in one quadratic field: a + b·√k with a, b rational and k a positive integer. */
-export interface Quadratic { readonly a: Rational; readonly b: Rational; readonly k: bigint }
+export interface Quadratic { readonly a: ExactRational; readonly b: ExactRational; readonly k: bigint }
 
-const qAdd = (x: Rational, y: Rational) => rational(x.n * y.d + y.n * x.d, x.d * y.d)
-const qSub = (x: Rational, y: Rational) => rational(x.n * y.d - y.n * x.d, x.d * y.d)
-const qMul = (x: Rational, y: Rational) => rational(x.n * y.n, x.d * y.d)
-const qDiv = (x: Rational, y: Rational) => rational(x.n * y.d, x.d * y.n)
+const qAdd = (x: ExactRational, y: ExactRational) => rational(x.n * y.d + y.n * x.d, x.d * y.d)
+const qSub = (x: ExactRational, y: ExactRational) => rational(x.n * y.d - y.n * x.d, x.d * y.d)
+const qMul = (x: ExactRational, y: ExactRational) => rational(x.n * y.n, x.d * y.d)
+const qDiv = (x: ExactRational, y: ExactRational) => rational(x.n * y.d, x.d * y.n)
 const qZero = ratFromInt(0)
 const sameField = (p: Quadratic, q: Quadratic): bigint | null =>
   p.b.n === BigInt(0) ? q.k : q.b.n === BigInt(0) ? p.k : p.k === q.k ? p.k : null
@@ -239,11 +239,11 @@ export function quadraticSign(q: Quadratic): -1 | 0 | 1 {
  * encodes against that finished basis. Nothing can reinterpret an index after it is written, which
  * is the entire class of bug that a mutable, self-splitting basis invites.
  */
-type RadicalTerms = Map<string, Rational>
+type RadicalTerms = Map<string, ExactRational>
 
 const RADICAL_TERM_LIMIT = 96
 
-const addTerm = (terms: RadicalTerms, key: string, value: Rational) => {
+const addTerm = (terms: RadicalTerms, key: string, value: ExactRational) => {
   const prior = terms.get(key)
   const sum = prior ? rational(prior.n * value.d + value.n * prior.d, prior.d * value.d) : value
   if (sum.n === BigInt(0)) terms.delete(key); else terms.set(key, sum)
@@ -254,7 +254,7 @@ const bgcd = (a: bigint, b: bigint): bigint => { let x = a < BigInt(0) ? -a : a,
 const isSquare = (v: bigint) => { const root = isqrt(v); return root * root === v }
 
 /** Exact rational value of a radical-free expression; null as soon as a root appears. */
-function rationalOnly(e: CReal): Rational | null {
+function rationalOnly(e: CReal): ExactRational | null {
   switch (e.k) {
     case 'rat': return e.v
     case 'sqrt': return null
@@ -338,7 +338,7 @@ function decompose(atoms: readonly bigint[], radicand: bigint): { coeff: bigint;
   return k === BigInt(1) ? { coeff, idx } : null
 }
 
-const rationalTerms = (value: Rational): RadicalTerms => (value.n === BigInt(0) ? new Map() : new Map([['', value]]))
+const rationalTerms = (value: ExactRational): RadicalTerms => (value.n === BigInt(0) ? new Map() : new Map([['', value]]))
 const isRationalTerms = (terms: RadicalTerms) => [...terms.keys()].every((key) => key === '')
 
 function combine(a: RadicalTerms, b: RadicalTerms, negate: boolean): RadicalTerms {

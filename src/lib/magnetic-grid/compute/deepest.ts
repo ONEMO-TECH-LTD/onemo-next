@@ -7,7 +7,7 @@
 // exceeds every other candidate's and every unexplored cell's upper bound; exactly equal maxima
 // are returned as an explicit tie; a question the bounds cannot settle is unresolved.
 
-import type { Rational } from '../spec'
+import type { ExactRational } from './exact-real'
 import { approx, cAdd, cDiv, cInt, cMul, cNeg, cRat, cSqrt, cSub, compareCReal, evaluate, signOf, type CReal } from './certified-real'
 import { insideContour, nearestDist2, type ExactContour, type ExactSegment } from './clearance'
 import { compareExact, ratAdd, ratFromInt, ratMul, ratSub, rational, sqrtInterval } from './exact-real'
@@ -20,8 +20,8 @@ export interface Candidate {
   readonly p: P2
   /** exact squared clearance */
   readonly d2: CReal
-  readonly lo: Rational
-  readonly hi: Rational
+  readonly lo: ExactRational
+  readonly hi: ExactRational
   readonly features: readonly Feature[]
 }
 
@@ -37,8 +37,8 @@ export interface Plateau {
   readonly mid: P2
   /** the exact squared clearance held along the whole branch */
   readonly d2: CReal
-  readonly lo: Rational
-  readonly hi: Rational
+  readonly lo: ExactRational
+  readonly hi: ExactRational
   readonly features: readonly [Feature, Feature]
 }
 
@@ -51,7 +51,7 @@ export interface Plateau {
 export type ClearanceMaximum =
   | { readonly status: 'certified'; readonly best: Candidate; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
   | { readonly status: 'tie'; readonly candidates: readonly [Candidate, Candidate, ...Candidate[]]; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
-  | { readonly status: 'plateau'; readonly branches: readonly [Plateau, ...Plateau[]]; readonly clearanceLo: Rational; readonly clearanceHi: Rational; readonly d2: CReal; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
+  | { readonly status: 'plateau'; readonly branches: readonly [Plateau, ...Plateau[]]; readonly clearanceLo: ExactRational; readonly clearanceHi: ExactRational; readonly d2: CReal; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
   | { readonly status: 'unresolved'; readonly reasons: readonly string[]; readonly cellsEvaluated: number }
 
 const TWO = BigInt(2)
@@ -168,7 +168,7 @@ function equidistant(f1: Feature, f2: Feature, f3: Feature): P2[] | 'undecidable
   return solveOnLine(P0, D, same, odd)
 }
 
-interface Cell { x: bigint; y: bigint; half: bigint; inside: boolean; d2: Rational }
+interface Cell { x: bigint; y: bigint; half: bigint; inside: boolean; d2: ExactRational }
 
 /** The clearance maximum of one region. `rUnits` is the region's own level (spot radius or mass depth). */
 export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: bigint): ClearanceMaximum {
@@ -178,8 +178,8 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
 
   // Root cell over certified extents of every traversed endpoint AND every arc's full extent —
   // a piece midpoint is not an extent, and an acute or long piece would otherwise fall outside.
-  let minX: Rational | null = null, minY: Rational | null = null, maxX: Rational | null = null, maxY: Rational | null = null
-  const widen = (x: Rational, y: Rational) => {
+  let minX: ExactRational | null = null, minY: ExactRational | null = null, maxX: ExactRational | null = null, maxY: ExactRational | null = null
+  const widen = (x: ExactRational, y: ExactRational) => {
     minX = minX === null || compareExact(x, minX) < 0 ? x : minX; maxX = maxX === null || compareExact(x, maxX) > 0 ? x : maxX
     minY = minY === null || compareExact(y, minY) < 0 ? y : minY; maxY = maxY === null || compareExact(y, maxY) > 0 ? y : maxY
   }
@@ -195,8 +195,8 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
     }
   }
   if (!minX || !minY || !maxX || !maxY) return { status: 'unresolved', reasons: ['empty region'], cellsEvaluated: 0 }
-  const floorInt = (r: Rational) => (r.n >= BigInt(0) ? r.n / r.d : -((-r.n + r.d - BigInt(1)) / r.d))
-  const ceilInt = (r: Rational) => (r.n >= BigInt(0) ? (r.n + r.d - BigInt(1)) / r.d : -((-r.n) / r.d))
+  const floorInt = (r: ExactRational) => (r.n >= BigInt(0) ? r.n / r.d : -((-r.n + r.d - BigInt(1)) / r.d))
+  const ceilInt = (r: ExactRational) => (r.n >= BigInt(0) ? (r.n + r.d - BigInt(1)) / r.d : -((-r.n) / r.d))
   const x0 = floorInt(minX) - rUnits, x1 = ceilInt(maxX) + rUnits, y0 = floorInt(minY) - rUnits, y1 = ceilInt(maxY) + rUnits
   let half = BigInt(1)
   while (half * TWO < (x1 - x0 > y1 - y0 ? x1 - x0 : y1 - y0)) half *= TWO
@@ -216,7 +216,7 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
   let cells: Cell[] = [make(cx0, cy0, half)]
   const candidates: Candidate[] = []
   const seenTriples = new Set<string>()
-  let bestLo: Rational = ratFromInt(-1)
+  let bestLo: ExactRational = ratFromInt(-1)
   const considerCandidate = (cand: Candidate) => {
     candidates.push(cand)
     if (compareExact(cand.lo, bestLo) > 0) bestLo = cand.lo
@@ -533,7 +533,7 @@ export function clearanceMaximum(c: ExactContour, region: ExactRegion, rUnits: b
   return { status: 'certified', best, reasons, cellsEvaluated: evaluated }
 }
 
-function nearestDist2ToSeg(px: bigint, py: bigint, s: ExactSegment): Rational {
+function nearestDist2ToSeg(px: bigint, py: bigint, s: ExactSegment): ExactRational {
   const dx = s.bx - s.ax, dy = s.by - s.ay, len2 = dx * dx + dy * dy
   const wx = px - s.ax, wy = py - s.ay
   if (len2 === BigInt(0)) return rational(wx * wx + wy * wy, BigInt(1))

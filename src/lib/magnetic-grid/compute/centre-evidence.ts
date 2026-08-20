@@ -10,12 +10,13 @@
 // sample), so its answers move as the shape scales, while these are exact and anything the bounds
 // cannot settle is reported unresolved rather than rounded into a branch.
 
-import type { CentreMeasurements, CentreRegionRef, Contour, Pt, Rational, RegionMeasurement } from '../spec'
+import type { CentreMeasurements, CentreRegionRef, Contour, MassMeasurement, Pt, RegionMeasurement } from '../spec'
+import type { ExactRational } from './exact-real'
 import { MASS_DEPTH_MM, SPOT_RADIUS_MM } from '../spec'
 import { compareCReal, evaluate, type CReal, type Interval } from './certified-real'
 import { type ExactContour, toUnits } from './clearance'
 import { clearanceMaximum, type ClearanceMaximum } from './deepest'
-import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSub, rational } from './exact-real'
+import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSub, ratToNumber, rational } from './exact-real'
 import { compareCertifiedSum, exactRegions, regionContains, regionIdentity, type ExactRegion } from './region'
 import { bbox } from './seat'
 
@@ -132,13 +133,13 @@ export interface ExactCentreEvidence {
    * input yields the identical id.
    */
   readonly id: string
-  readonly box: { x: Rational; y: Rational }
+  readonly box: { x: ExactRational; y: ExactRational }
   /** material weight centre — the exact shoelace centroid of the supplied outer ring */
-  readonly weight: { x: Rational; y: Rational }
+  readonly weight: { x: ExactRational; y: ExactRational }
   /** area-weighted mean of the island means — the donor's `core` */
   readonly core: { x: Interval; y: Interval } | null
   readonly islands: readonly ExactIsland[]
-  readonly midY: Rational
+  readonly midY: ExactRational
   readonly unresolved: boolean
   readonly reasons: readonly string[]
 }
@@ -177,7 +178,7 @@ const iDivPos = (num: Interval, den: Interval): Interval => {
 const IZERO: Interval = { lo: ratFromInt(0), hi: ratFromInt(0) }
 
 /** Exact bbox midpoint of the supplied contour, in mm. */
-export function exactBoxCentre(c: ExactContour): { x: Rational; y: Rational } {
+export function exactBoxCentre(c: ExactContour): { x: ExactRational; y: ExactRational } {
   return {
     x: rational(c.minX + c.maxX, BigInt(2) * c.unit),
     y: rational(c.minY + c.maxY, BigInt(2) * c.unit),
@@ -190,7 +191,7 @@ export function exactBoxCentre(c: ExactContour): { x: Rational; y: Rational } {
  * would move the answer on every holed shape, which is a ruled product change, not a repair. A
  * degenerate ring (zero signed area) falls back to the vertex mean, exactly as the donor does.
  */
-export function exactWeightCentre(c: ExactContour): { x: Rational; y: Rational } {
+export function exactWeightCentre(c: ExactContour): { x: ExactRational; y: ExactRational } {
   const outer = c.segments.filter((s) => s.ring === 0)
   let a2 = BigInt(0), sx = BigInt(0), sy = BigInt(0)
   for (const s of outer) {
@@ -253,7 +254,7 @@ function classify<T>(items: readonly T[], equal: (a: T, b: T) => boolean | null,
 function measure(c: ExactContour, region: ExactRegion, level: bigint): MeasuredRegion {
   const deepest = clearanceMaximum(c, region, level)
   const perUnit = ratFromInt(c.unit)
-  const clearanceOf = (lo: Rational, hi: Rational): Interval => ({ lo: ratDiv(lo, perUnit), hi: ratDiv(hi, perUnit) })
+  const clearanceOf = (lo: ExactRational, hi: ExactRational): Interval => ({ lo: ratDiv(lo, perUnit), hi: ratDiv(hi, perUnit) })
   // A co-maximal ridge has no single point; a tie has several. Both are named rather than reduced
   // to one sample, which is precisely what the 2mm mesh used to do.
   const centre = deepest.status === 'certified' ? pointMM(deepest.best.p, c.unit) : null

@@ -3,7 +3,8 @@
 // rounding, no policy quantum). Squared distances are then exact integers; sign and ordering
 // decisions never touch a float.
 
-import type { Contour, Pt, Rational } from '../spec'
+import type { Contour, Pt } from '../spec'
+import type { ExactRational } from './exact-real'
 import { rational } from './exact-real'
 
 export interface ExactSegment {
@@ -85,13 +86,13 @@ export const toUnits = (mm: number, c: ExactContour): bigint => {
 }
 
 /** integer units → exact rational mm. */
-export const toMM = (units: bigint, c: ExactContour): Rational => rational(units, c.unit)
+export const toMM = (units: bigint, c: ExactContour): ExactRational => rational(units, c.unit)
 
 /**
  * Exact squared distance from an integer point to a segment, as a rational
  * (the foot of the perpendicular is rational in the segment parameter).
  */
-export function segmentDist2(px: bigint, py: bigint, s: ExactSegment): Rational {
+export function segmentDist2(px: bigint, py: bigint, s: ExactSegment): ExactRational {
   const dx = s.bx - s.ax, dy = s.by - s.ay
   const len2 = dx * dx + dy * dy
   const wx = px - s.ax, wy = py - s.ay
@@ -105,8 +106,8 @@ export function segmentDist2(px: bigint, py: bigint, s: ExactSegment): Rational 
 }
 
 /** Exact squared distance to the nearest boundary feature, plus which segments bind it. */
-export function nearestDist2(px: bigint, py: bigint, c: ExactContour): { d2: Rational; binding: ExactSegment[] } {
-  let best: Rational | null = null
+export function nearestDist2(px: bigint, py: bigint, c: ExactContour): { d2: ExactRational; binding: ExactSegment[] } {
+  let best: ExactRational | null = null
   let binding: ExactSegment[] = []
   for (const s of c.segments) {
     // Exact prescreen: the segment's bbox is at least this far — skip when provably farther than best.

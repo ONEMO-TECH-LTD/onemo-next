@@ -10,7 +10,7 @@
 import {
   approx, cAdd, cDiv, cInt, cMul, cNeg, cRat, cSqrt, cSub, compareCReal, evaluate, signOf, type CReal,
 } from './certified-real'
-import type { Rational } from '../spec'
+import type { ExactRational } from './exact-real'
 import { nearSegments, segmentIndex, type ExactContour, type ExactSegment } from './clearance'
 import { compareExact, ratAdd, ratFromInt, ratSub, rational } from './exact-real'
 
@@ -322,7 +322,7 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
   // distance r from the supporting line while being farther than r from the finite segment
   // (Grid-Meta). The extents are directed rational bounds, never floats, and an arc's extent is its
   // centre box at radius r.
-  type Box = { minX: Rational; minY: Rational; maxX: Rational; maxY: Rational }
+  type Box = { minX: ExactRational; minY: ExactRational; maxX: ExactRational; maxY: ExactRational }
   const rr = ratFromInt(r)
   const extent = (e: Elem): Box => {
     if (e.kind === 'arc') {
@@ -334,8 +334,8 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
       y: evaluate(cAdd(e.a.y, cMul(t, cBig(e.dy))), BigInt(24)),
     })
     const s0 = at(e.t0), s1 = at(e.t1)
-    const lo = (v: Rational[]) => v.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
-    const hi = (v: Rational[]) => v.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
+    const lo = (v: ExactRational[]) => v.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
+    const hi = (v: ExactRational[]) => v.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
     return {
       minX: lo([s0.x.lo, s1.x.lo]), maxX: hi([s0.x.hi, s1.x.hi]),
       minY: lo([s0.y.lo, s1.y.lo]), maxY: hi([s0.y.hi, s1.y.hi]),
@@ -448,8 +448,8 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     const candidatesNear = (p: P2): readonly ExactSegment[] | null => {
       if (!pruningOn) return feats
       const ix = evaluate(p.x, BigInt(16)), iy = evaluate(p.y, BigInt(16))
-      const floorI = (v: Rational) => (v.n >= BigInt(0) ? v.n / v.d : -((-v.n + v.d - BigInt(1)) / v.d))
-      const ceilI = (v: Rational) => (v.n >= BigInt(0) ? (v.n + v.d - BigInt(1)) / v.d : -((-v.n) / v.d))
+      const floorI = (v: ExactRational) => (v.n >= BigInt(0) ? v.n / v.d : -((-v.n + v.d - BigInt(1)) / v.d))
+      const ceilI = (v: ExactRational) => (v.n >= BigInt(0) ? (v.n + v.d - BigInt(1)) / v.d : -((-v.n) / v.d))
       return nearSegments(index, floorI(ix.lo) - BigInt(1), floorI(iy.lo) - BigInt(1), ceilI(ix.hi) + BigInt(1), ceilI(iy.hi) + BigInt(1), r)
     }
     // Existential, and three-valued in the same way: the question is whether ANY feature is nearer

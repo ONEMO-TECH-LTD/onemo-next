@@ -5,7 +5,7 @@
 // the sign of the area — tells an island boundary from a hole boundary; holes are assigned to
 // their island by exact ray parity.
 
-import type { Rational } from '../spec'
+import type { ExactRational } from './exact-real'
 import { angleBetween } from './angle'
 import { cAdd, cDiv, cInt, cMul, cNeg, cSqrt, cSub, evaluate, signOf, type CReal, type Interval } from './certified-real'
 import type { ExactContour } from './clearance'
@@ -149,10 +149,10 @@ export function regionContains(region: ExactRegion, p: P2, r: bigint): boolean |
 }
 
 const BITS = BigInt(64)
-const I = (lo: Rational, hi: Rational): Interval => ({ lo, hi })
+const I = (lo: ExactRational, hi: ExactRational): Interval => ({ lo, hi })
 const iAdd = (a: Interval, b: Interval): Interval => I(ratAdd(a.lo, b.lo), ratAdd(a.hi, b.hi))
 const iSub = (a: Interval, b: Interval): Interval => I(ratSub(a.lo, b.hi), ratSub(a.hi, b.lo))
-const iScale = (a: Interval, k: Rational): Interval => (ratSign(k) >= 0 ? I(ratMul(a.lo, k), ratMul(a.hi, k)) : I(ratMul(a.hi, k), ratMul(a.lo, k)))
+const iScale = (a: Interval, k: ExactRational): Interval => (ratSign(k) >= 0 ? I(ratMul(a.lo, k), ratMul(a.hi, k)) : I(ratMul(a.hi, k), ratMul(a.lo, k)))
 const iOf = (e: CReal): Interval => evaluate(e, BITS)
 const ZERO = I(ratFromInt(0), ratFromInt(0))
 const half = (e: CReal) => cDiv(e, cInt(2))
