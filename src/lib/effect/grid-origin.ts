@@ -30,6 +30,7 @@ import {
   pointInMass,
   safeSegments,
   spotRadiusOf,
+  TANGENT_GUARD_MM,
   type SafeSegment,
 } from './grid-origin-compute'
 import {
@@ -108,6 +109,8 @@ export interface GridResult {
   contactsMM: Pt[]
   /** LAW mode: the worst belt disc's gap beyond the allowance — 0 when the wrap law holds. */
   pressMM?: number
+  /** LAW mode: false when no parity-lawful candidate seated — the centre law is conceded. */
+  parityTrue?: boolean
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
   /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
@@ -155,6 +158,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
+  let parityTrue = true
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search.
     bestOx = mod(cfg.forcePhaseMM[0], pitch)
@@ -208,22 +212,38 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
     const otherX = canX === bxc ? bxc + half : bxc
     const otherY = canY === byc ? byc + half : byc
-    const cands: Array<[number, number]> = [[canX, canY], [otherX, canY], [canX, otherY], [otherX, otherY]]
-    let bl: { count: number; pressQ: number; vertical: boolean } | null = null
-    for (const [px, py] of cands) {
+    const cands: Array<[boolean, number, number]> = [
+      [true, canX, canY], [false, otherX, canY], [false, canX, otherY], [false, otherX, otherY],
+    ]
+    // THE CENTRE LAW IS A LAW (Meta F2): a candidate is lawful only when each axis's seated
+    // line-count parity matches its placement — odd lines → the node IS on the centre, even →
+    // the gap IS on it. Lawful candidates outrank everything; wrap can never trade the centre
+    // away. An unlawful winner is a CONCESSION (parityTrue=false) — free-mode display only;
+    // the band walk refuses it and lets size reconcile.
+    let bl: { lawful: boolean; count: number; pressQ: number; vertical: boolean } | null = null
+    let bestLawful = false
+    for (const [isCanX, px, py] of cands) {
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
+      const xs = new Set(seat.map((s) => Math.round(s[0] / QUANTUM_KEY_MM))).size
+      const ys = new Set(seat.map((s) => Math.round(s[1] / QUANTUM_KEY_MM))).size
+      const nodeX = mod(px - bxc, pitch) < pitch / 4 || mod(px - bxc, pitch) > pitch * 3 / 4
+      const nodeY = mod(py - byc, pitch) < pitch / 4 || mod(py - byc, pitch) > pitch * 3 / 4
+      const lawful = (xs % 2 === 1) === nodeX && (ys % 2 === 1) === nodeY
+      void isCanX
       const belt = applyCoverage(seat, perimeterOnly, pitch).seated
       const pressQ = Math.round(Math.max(0, maxPressMM(outer, belt, reach)) / QUANTUM_KEY_MM)
       const sb = bbox(seat)
       const vertical = sb.maxY - sb.minY >= sb.maxX - sb.minX
       const wins = !bl
-        || belt.length > bl.count
-        || (belt.length === bl.count && pressQ < bl.pressQ)
-        || (belt.length === bl.count && pressQ === bl.pressQ && vertical && !bl.vertical)
-      if (wins) { bl = { count: belt.length, pressQ, vertical }; bestSeated = seat; bestOx = ox; bestOy = oy }
+        || (lawful && !bl.lawful)
+        || (lawful === bl.lawful && belt.length > bl.count)
+        || (lawful === bl.lawful && belt.length === bl.count && pressQ < bl.pressQ)
+        || (lawful === bl.lawful && belt.length === bl.count && pressQ === bl.pressQ && vertical && !bl.vertical)
+      if (wins) { bl = { lawful, count: belt.length, pressQ, vertical }; bestSeated = seat; bestOx = ox; bestOy = oy; bestLawful = lawful }
     }
+    parityTrue = bestLawful
     mainCentre = ruleTarget
   } else if (fits) {
     // Phases: ONE full ladder swept from the first centre, plus each further mass centre's
@@ -297,10 +317,11 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
   return {
     anchors,
-    // Tangency made visible: where each disc meets the outline, within one size step's slack.
-    contactsMM: contactPointsMM(outer, coverage.seated, reach, SNAP_STEP_MM),
+    // THE TRUTH DOT (Dan: "the dot shows touch but lies"): a dot means the DISC touches the
+    // edge — spot radius only, exact-tangency slack. The amber ring tells the allowance story.
+    contactsMM: contactPointsMM(outer, coverage.seated, spotRadiusOf(pad), TANGENT_GUARD_MM),
     ...(positioning === 2 && coverage.seated.length
-      ? { pressMM: Math.max(0, maxPressMM(outer, coverage.seated, reach)) }
+      ? { pressMM: Math.max(0, maxPressMM(outer, applyCoverage(coverage.seated, true, pitch).seated, reach)), parityTrue }
       : {}),
     pitchCentreMM: pitch,
     lattice,
@@ -369,8 +390,12 @@ function bandWalk(
     // A count whose layout leaves a disc floating past that is NOT an option here;
     // Auto mode adapts the allowance instead.
     const contour = sized(mm)
+    // Wrap is BELT-scoped (interior discs can never touch) and the centre law must be TRUE —
+    // a parity-conceded layout is never a rung; size reconciles (the keystone).
+    const beltAnchors = applyCoverage(grid.anchors.map((a) => a.p), true, cfg.pitchMM ?? DEFAULT_PITCH_MM).seated
     const rigid = count >= 1
-      && maxPressMM(contour.outer.pts, grid.anchors.map((a) => a.p), reach) <= stepMM
+      && (grid.parityTrue ?? true)
+      && maxPressMM(contour.outer.pts, beltAnchors, reach) <= stepMM
     if (rigid && !seen.has(count)) {
       seen.add(count)
       points.push({ sizeMM: mm, count })

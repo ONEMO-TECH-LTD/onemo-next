@@ -5,6 +5,9 @@ import { pointInPolygon } from './attachment'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './grid-origin-spec'
 
+/** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
+export const TANGENT_GUARD_MM = 0.05
+
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
 const KEY_QUANTUM_MM = 0.01
 

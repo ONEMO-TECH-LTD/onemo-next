@@ -121,7 +121,11 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // A stepped rung renders the layout that QUALIFIED it: reach AND margin at the
       // auto-chosen allowance, never the dial (F1 — Meta QA, verified).
       const effFlap = Math.max(0, autoFlapMM ?? cfg.flapMM ?? 0)
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, flapMM: effFlap, seatMarginMM: effFlap })
+      // LAW carries no seat inflation anywhere (Meta F3) — a clicked rung must render the
+      // exact layout that qualified it.
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), (cfg.positioning ?? 0) === 2
+        ? { ...cfg, flapMM: effFlap }
+        : { ...cfg, flapMM: effFlap, seatMarginMM: effFlap })
       const contour = sized(eff)
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM } })
     } else {
