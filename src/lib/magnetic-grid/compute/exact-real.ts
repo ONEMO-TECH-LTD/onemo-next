@@ -65,8 +65,7 @@ export const ratMax = (a: Rational, b: Rational): Rational => (compareExact(a, b
 /** Report-only decimal — never enters a verdict. */
 export const ratToNumber = (a: Rational): number => Number(a.n) / Number(a.d)
 
-/** Floor integer square root. */
-export const isqrt = (v: bigint): bigint => {
+const isqrt = (v: bigint): bigint => {
   if (v < ZERO) throw new Error('isqrt: negative')
   if (v < 2n) return v
   let x = ONE << BigInt(Math.ceil(v.toString(2).length / 2))
