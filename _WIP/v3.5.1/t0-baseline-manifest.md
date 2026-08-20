@@ -34,7 +34,11 @@ Only bodies reachable from `positioning===1` may seed the Law centre layer. Voti
 | `centroidOf` | `grid-origin-compute.ts:540-558` | MOVE-BODY | `1236d29cb8f2924badec11077bda11a728d0e7da34214b01fb50698d781f2427` | current primitive fixture unchanged |
 | `scaleContour` | `grid-origin-compute.ts:583-600` | MOVE-BODY | `e04e9f1a41a448ae209b7c0d805097e3a5fe90eb59832da3cd93c1d9135a052f` | current primitive fixture unchanged |
 
-Every other tracked body is classified by the contract's untangle table. In particular: `safeSegments` is ADAPT then old mesh DELETE; `splitPerimeter` is ADAPT measurement/policy separation; `assignSizes` is ADAPT measurement/policy separation; old in-place Law walk/ranking is fixture donor only; `panMM`, `bestKx`, `bestKy`, tolerance gates, decimation constants, scoring, worker duplication, and comparator persistence are DELETE-LATER after Dan's comparison gate.
+The executable inventory in `grid-origin-inventory.test.ts` classifies every remaining callable body and top-level symbol individually. Its committed snapshot records every public export/re-export, runtime/test/build consumer, persisted key/default field, worker request/response/model field, queue rule, cache shape/cap/invalidation rule, and every tracked artifact under `grid-origin*` and `src/lib/grid-engine/**` with hash, active owner, destination, generated-source owner, legal disposition, and current deletion-proof state. The test fails if a callable body or top-level symbol is unclassified, if any inventory entry changes, or if a new consumer/artifact appears without a reviewed snapshot update.
+
+The executable gate asserts that no duplicate inventory verifier or overlapping snapshot exists; `grid-origin-inventory.test.ts` is the sole inventory verifier.
+
+No deletion is currently proved. Comparator files are preserved through T5; active-lane artifacts remain blocked on Dan's lane-precedence ruling; provider deletion later requires migrated consumers plus a zero-consumer trace.
 
 ## Characterization baseline
 

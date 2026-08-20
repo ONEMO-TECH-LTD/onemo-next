@@ -66,12 +66,14 @@ async function cutout(name: string): Promise<Contour> {
   return contour
 }
 
-function rounded(value: number): number {
-  return Number(value.toFixed(6))
+function float64Hex(value: number): string {
+  const bytes = new ArrayBuffer(8)
+  new DataView(bytes).setFloat64(0, value, false)
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function point(point: Pt): Pt {
-  return [rounded(point[0]), rounded(point[1])]
+function pointBits(point: Pt): readonly [string, string] {
+  return [float64Hex(point[0]), float64Hex(point[1])]
 }
 
 function digest(value: unknown): string {
@@ -79,6 +81,13 @@ function digest(value: unknown): string {
 }
 
 describe('v3.5 Centre-rules characterization baseline', () => {
+  it('detects coordinate changes far below one micrometre', () => {
+    const belowMicrometreMM = 2 ** -40
+    expect(belowMicrometreMM).toBeLessThan(0.000001)
+    expect(float64Hex(1 + belowMicrometreMM)).not.toBe(float64Hex(1))
+    expect(digest(pointBits([1 + belowMicrometreMM, 2]))).not.toBe(digest(pointBits([1, 2])))
+  })
+
   it('pins all nine centre policies across the B1-B4 comparison matrix', async () => {
     const shapes: ReadonlyArray<{ id: string; contour: Contour; circle?: boolean }> = [
       { id: 'square', contour: rect(1, 1) },
@@ -103,12 +112,12 @@ describe('v3.5 Centre-rules characterization baseline', () => {
         shape: shape.id,
         scaleMM,
         policy: policy.id,
-        centreMainMM: point(result.centreMainMM),
+        centreMainIEEE754: pointBits(result.centreMainMM),
         centreEvidenceCount: result.centresMM.length,
-        centreEvidenceSha256: digest(result.centresMM.map(point)),
-        phaseMM: point(result.phaseMM),
+        centreEvidenceSha256: digest(result.centresMM.map(pointBits)),
+        phaseIEEE754: pointBits(result.phaseMM),
         anchorCount: result.anchors.length,
-        anchorsSha256: digest(result.anchors.map((anchor) => point(anchor.p))),
+        anchorsSha256: digest(result.anchors.map((anchor) => pointBits(anchor.p))),
       }
     })))
 
