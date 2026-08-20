@@ -1,0 +1,27 @@
+# Deployment payload trim — none of this is runtime code.
+# The repo tracks ~1.2 GB, which fails Vercel's deploy step (build succeeds, upload does not).
+
+# Research / scratch / archive trees
+_WIP
+_prototypes
+?archive
+output
+docs
+.playwright-cli
+
+# Design-tool workspaces (not imported by the app)
+studio
+studio-v2
+asset-library
+
+# Generated-component asset dupes: one 3.5 MB PNG copied 165× (~578 MB), referenced by no code.
+src/components/generated/**/assets
+
+# Agent-vendor surfaces carry symlinks into the brain repo — Vercel rejects broken symlinks
+# ("is not a valid symlink"), which is what has failed every preview on this project.
+.claude
+.codex
+.cursor
+.gemini
+.grok
+.agents
