@@ -41,7 +41,7 @@ describe('magnetic-grid T1 separation', () => {
       'compute/seat.ts': ['../spec'],
       'compute/identity.ts': ['../spec', './exact-real'],
       'compute/polynomial.ts': ['./exact-real'],
-      'compute/exact-value.ts': ['../spec', './exact-real', './polynomial'],
+      'compute/exact-value.ts': ['../spec', './certified-real', './exact-real', './identity', './polynomial', './region'],
       'compute/centre-evidence.ts': ['../spec', './exact-real', './certified-real', './clearance', './deepest', './region', './seat'],
       'logic.ts': ['./spec'],
       'engine.ts': ['./compute', './logic', './spec'],

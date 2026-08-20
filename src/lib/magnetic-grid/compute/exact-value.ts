@@ -2,12 +2,15 @@
 // Certificates are validated from their polynomial, isolating interval and real-root index before
 // use. Equality is polynomial GCD evidence; ordering is certified interval refinement.
 
-import type { AlgebraicReal, Rational } from '../spec'
+import type { AlgebraicReal, CertifiedExpressionReal, Rational } from '../spec'
+import { cAdd, cDiv, cMul, cNeg, cRat, cSqrt, cSub, type CReal } from './certified-real'
 import { compareExact, ratFromInt, rational, type ExactRational } from './exact-real'
+import { encodeCertifiedExpression } from './identity'
 import {
   countRealRoots, evaluatePolynomial, polynomialGcd, primitivePolynomial, refineIsolatingInterval,
   isSquareFreePolynomial,
 } from './polynomial'
+import { evaluateSum, publishCertifiedSum, type ArcSweep, type CertifiedSum } from './region'
 
 interface AlgebraicCertificate {
   polynomial: bigint[]
@@ -93,4 +96,106 @@ export function compareAlgebraicReal(leftValue: AlgebraicReal, rightValue: Algeb
     left = { ...left, interval: nextLeft }
     right = { ...right, interval: nextRight }
   }
+}
+
+class ExpressionParser {
+  private offset = 0
+  constructor(private readonly source: string) {}
+
+  private take(value: string) {
+    if (!this.source.startsWith(value, this.offset)) throw new Error(`expected ${value}`)
+    this.offset += value.length
+  }
+  private integer(): bigint {
+    const match = /^-?\d+/.exec(this.source.slice(this.offset))
+    if (!match) throw new Error('expected integer')
+    this.offset += match[0].length
+    return BigInt(match[0])
+  }
+  expression(): CReal {
+    if (this.source.startsWith('rat(', this.offset)) {
+      this.take('rat('); const numerator = this.integer(); this.take('/'); const denominator = this.integer(); this.take(')')
+      return cRat(rational(numerator, denominator))
+    }
+    for (const unary of ['neg', 'sqrt'] as const) {
+      if (!this.source.startsWith(`${unary}(`, this.offset)) continue
+      this.take(`${unary}(`); const value = this.expression(); this.take(')')
+      return unary === 'neg' ? cNeg(value) : cSqrt(value)
+    }
+    for (const operation of ['add', 'mul'] as const) {
+      if (!this.source.startsWith(`${operation}(`, this.offset)) continue
+      this.take(`${operation}(`)
+      const values = [this.expression()]
+      while (this.source[this.offset] === ',') { this.take(','); values.push(this.expression()) }
+      this.take(')')
+      if (values.length < 2) throw new Error(`${operation} needs two operands`)
+      return values.slice(1).reduce((left, right) => operation === 'add' ? cAdd(left, right) : cMul(left, right), values[0])
+    }
+    for (const operation of ['sub', 'div'] as const) {
+      if (!this.source.startsWith(`${operation}(`, this.offset)) continue
+      this.take(`${operation}(`); const left = this.expression(); this.take(','); const right = this.expression(); this.take(')')
+      return operation === 'sub' ? cSub(left, right) : cDiv(left, right)
+    }
+    throw new Error('unsupported expression token')
+  }
+  point(): { x: CReal; y: CReal } {
+    const x = this.expression(); this.take(','); const y = this.expression()
+    return { x, y }
+  }
+  done() { return this.offset === this.source.length }
+}
+
+const parseExpression = (source: string): CReal | null => {
+  try { const parser = new ExpressionParser(source); const value = parser.expression(); return parser.done() ? value : null } catch { return null }
+}
+const parsePoint = (source: string): { x: CReal; y: CReal } | null => {
+  try { const parser = new ExpressionParser(source); const value = parser.point(); return parser.done() ? value : null } catch { return null }
+}
+
+function parseAngle(token: string): { weight: CReal; sweep: ArcSweep } | null {
+  if (!token.startsWith('angle:')) return null
+  const separator = token.indexOf('@', 6)
+  if (separator < 0) return null
+  const weight = parseExpression(token.slice(6, separator))
+  const fields = token.slice(separator + 1).split('|')
+  if (!weight || fields.length !== 5) return null
+  try {
+    const from = parsePoint(fields[3]), to = parsePoint(fields[4])
+    if (!from || !to) return null
+    return { weight, sweep: { cx: BigInt(fields[0]), cy: BigInt(fields[1]), r: BigInt(fields[2]), from, to } }
+  } catch { return null }
+}
+
+/** Strict reconstruction of the full canonical expression tokens; malformed proofs refuse. */
+export function decodeCertifiedExpression(value: CertifiedExpressionReal): CertifiedSum | null {
+  const tokens = value.expression.map(String)
+  if (tokens.length < 3 || tokens[0] !== 'certified-sum-v1' || !tokens[1].startsWith('exact:')) return null
+  const angleTokens = tokens.slice(2)
+  if (angleTokens.some((token, index) => index > 0 && angleTokens[index - 1] > token)) return null
+  let isolating: readonly [ExactRational, ExactRational]
+  try { isolating = [decode(value.isolating[0]), decode(value.isolating[1])] } catch { return null }
+  const identity = encodeCertifiedExpression({ expression: tokens, isolating })
+  if (!identity || identity.expressionHash !== value.expressionHash || identity.proofId !== value.proofId) return null
+  const exact = parseExpression(tokens[1].slice(6))
+  const angles = angleTokens.map(parseAngle)
+  if (!exact || angles.some((term) => term === null)) return null
+  const sum: CertifiedSum = { exact, angles: angles as Array<{ weight: CReal; sweep: ArcSweep }> }
+  const canonical = publishCertifiedSum(sum)
+  if (!canonical || canonical.expression.length !== tokens.length
+    || canonical.expression.some((token, index) => token !== tokens[index])) return null
+  const enclosure = evaluateSum(sum, BigInt(128))
+  if (compareExact(enclosure.lo, isolating[0]) < 0 || compareExact(enclosure.hi, isolating[1]) > 0) return null
+  return sum
+}
+
+/** Re-evaluate a validated certificate at the requested precision; identity never participates. */
+export function evaluateCertifiedExpression(
+  value: CertifiedExpressionReal,
+  bits: bigint,
+): readonly [ExactRational, ExactRational] | null {
+  if (bits <= BigInt(0)) return null
+  const sum = decodeCertifiedExpression(value)
+  if (!sum) return null
+  const enclosure = evaluateSum(sum, bits)
+  return compareExact(enclosure.lo, enclosure.hi) <= 0 ? [enclosure.lo, enclosure.hi] : null
 }
