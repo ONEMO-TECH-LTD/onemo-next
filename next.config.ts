@@ -6,6 +6,17 @@ const nextConfig: NextConfig = {
   // LAN IPs are allowed too so mobile devices on the same Wi-Fi can hydrate the dev probes.
   allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.*", "10.*"],
   outputFileTracingRoot: process.cwd(),
+  // Vercel's deploy step rejects the agent-vendor dirs' symlinks ("is not a valid symlink") —
+  // every preview on this project failed on it. They are not runtime code; keep them out of
+  // every serverless function's traced output. The grid bench's asset-lib routes DO read
+  // _WIP/v3.5 from disk at runtime, so those routes explicitly trace their libraries in.
+  outputFileTracingExcludes: {
+    "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**"],
+  },
+  outputFileTracingIncludes: {
+    "/effect-creator/grid-origin/asset-lib": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
+    "/effect-creator/grid-origin/asset-lib/[file]": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
+  },
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
   // WebGPU falls back to SINGLE-threaded wasm — historically a 30–60 s page freeze per Magic run.
