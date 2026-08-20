@@ -109,21 +109,33 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        `holds()` already uses, extended from "≥ radius" (inside) to the equality case
        (coincidence). Float `maxPressMM` remains a REPORTING measure only; it never gates.
 
-    c. THE RUNG SIZE (`grid-origin.ts` bandWalk): the size that satisfies the contact
-       equation is in general irrational, so the law is enforced by BRACKETING, never by
-       tolerance: refine the size until two adjacent representable sizes bracket the exact
-       predicate's transition, and take the TIGHT side — the largest size at which the
-       binding disc is not yet loose by the exact test. No configuration on the loose side
-       is ever accepted; the residual is the number system's unit, not granted slack, and
-       the contract states that distinction in the status line's own words.
+    c. THE RUNG SIZE IS SOLVED, NEVER SEARCHED (Dan, 2026-08-20 — and the correction that
+       dissolved the whole tolerance question): tangency is an EQUATION, not a test. For a
+       placement, the binding contact is one disc against one outline element, so the scale
+       at which they coincide is a closed-form root: for a segment, the quadratic in the
+       scale s of `dist(anchor(s), segment(s)) = spot + allowance`; for an analytic arc, the
+       same equation in radial form. Solve it per candidate element, take the smallest root
+       that keeps the count and the parity law, and THAT root IS the rung's size. The disc
+       touches by construction — nothing is accepted against a threshold, so no tolerance,
+       no bracketing and no acceptance band exists anywhere in the engine.
+       Proven before writing this clause (lead probes): SOLVED gives gap 0.000e+0 for the
+       circle 2×2 (size 91.882250993909) and for a polygon edge; SEARCHING the same case on
+       a micron grid gives 3.7e-4 — the residue was always the method, never the geometry.
+       The only remaining inexactness is writing the root down (~1e-13 mm in the number
+       system, 10^10 times finer than the engine's micron unit) and it is representation,
+       not granted slack.
+       Consequence: `bandWalk`'s size loop becomes a CANDIDATE GENERATOR only — it finds
+       which counts are reachable; each rung's size then comes from the solved root, and a
+       count whose root fails the count/parity check simply has no rung.
 
     d. `grid-origin-spec.ts` — DELETE `CONTACT_TOLERANCE_MM`, and `TANGENT_GUARD_MM` loses
        its gate role: the truth dot is drawn from the SAME exact contact predicate (b), so
        one definition of touch serves both the law and the picture. No tolerance constant
        survives anywhere in the engine.
 
-    e. Fixtures: square 24/72/120 and circle B1/B2 rungs satisfy the exact predicate (b);
-       a layout one representable unit loose is NOT a rung; the same exactness holds at
+    e. Fixtures: every rung's size equals the solved root and its binding gap is 0 at the
+       number system's own resolution (square 24/72/120 and circle B1/B2 — the circle's
+       2×2 must land 91.882250993909, gap 0.000e+0, NOT a micron-grid neighbour); the same exactness holds at
        flap 1, 4, 12 — the allowance shifts the coincidence line, never widens it; and the
        centre refinement (a) is deterministic across repeated runs and mesh origins.
 
