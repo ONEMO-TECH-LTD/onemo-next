@@ -1,103 +1,91 @@
 # THE LAW ENGINE — final rebuild plan (v3.5 grid-origin)
 
-Status: FINAL · consolidates every ruling through 2026-08-20 · supersedes all earlier drafts
-(the drafts' audit trails live in git history). Verified by: lead full-codebase read (2,558
-lines), Meta adversarial audit round 1 (4 gaps folded), Meta verification of this final
-(pending below).
+Status: FINAL. Supersedes all earlier drafts (their audit history is in git). Strategy is
+Dan's ruling: CLONE-COMPARE-DELETE — the new engine was built as a third positioning mode
+("Law") beside Voting and Centre rules; the old modes are deleted only after Dan calls the
+comparison proven. Phase 1 is DONE and live; this document is the contract for the rest.
 
-## Dan's governing rulings (verbatim anchors)
+## Dan's directive set (verbatim anchors, 2026-08-19/20)
 
 - "There must be no scoring logic — all rigid law; scoring on top only as an option to
-  resolve conflicts."
-- "Wrap / center / magnet count all three are absolute requirements … enforce equally
+  resolve conflicts." · "Every control true — flap 0 means 0."
+- "Wrap / center / magnet count all three are absolute requirements" · "enforce equally
   center = wrap = magnets within band variants."
-- "Flap law must be enforced rigid … 0 = no touch impossible, 1mm possible with 1mm space.
-  Auto mode may allow adapting."
-- "The centering algorithm must set the center and place rigid on it or on the centering
-  lines in pairs and other magnet numbers."
-- "Magnet-quantity based scaling — growing only to the next number that snaps and adds at
-  least one more magnet … each band is the range where you identify every instance where
-  minimum and maximum magnets fit the shape in wrapped and centered state."
-- "Vertical pairs must be preferred to horizontal due to the gravity law."
-- "Every control is true — flap 0 means 0."
-- "Build as a separate module so we can compare, and delete centering and prior voting
-  modules only when we prove it works — like we did when adding the centering."
-- Band slider = continuous manual scale within the band. Touch markers must be true.
-  Mobile-first performance.
+- Centre rules mode is correct and kept as the base: "the centering algorithm must set the
+  center and place rigid on it or on the centering lines in pairs and other magnet numbers."
+- The two missing siblings: "(1) wrap — flap-managed tolerance to touching the edges, and
+  (2) magnet-quantity based scaling — growing only to the next number that snaps and adds at
+  least one more magnet." Each band = the range holding every instance, minimum to maximum
+  magnets, in the wrapped-and-centered state.
+- "Vertical pairs must be preferred to horizontal (gravity law); a circle must rotate to
+  vertical." · Rigid law in normal mode (0 = touch impossible to violate; 1 = 1mm space);
+  AUTO flap is the adaptive mode. · Touch markers must be true. · The band slider is a
+  continuous manual scale within the band. · Mobile-first performance.
+- Build strategy: "clone centering and build a 3rd mode that will become the final correct
+  engine mode … as a separate module so we can compare, and delete centering and prior
+  voting module only when we prove it works."
 
-## The engine (per solve — four steps, no scores)
+## The machine (as built — Phase 1, live at commit 28780df6 + cache fix)
 
-1. CENTRE — derived from the mass map alone (centre mode + governor), before any magnet
-   exists. Never seat-derived (the voting engine's centre was; that circularity is the
-   root Dan caught on the bot).
-2. PLACEMENT — the grid sits ON the centre by canon parity: odd magnet count → node on the
-   centre; even → the centre on the pair-line/gap. Four lawful placements; nothing slides,
-   nothing is searched.
-3. THE THREE EQUAL LAWS — measured per placement, each true to its dial:
-   · MAGNETS — seat count after the perimeter belt (the band's step axis).
-   · WRAP — the worst BELT disc's gap past spot+allowance (0 = touch, 1 = 1mm). Belt-scoped:
-     interior discs of a Full-grid layout can never reach an edge (Meta G1, probe-proven).
-   · CENTRE — held by construction; never a score.
-4. GRAVITY — between placements equal on count, wrap and parity class (micron-quantized),
-   vertical beats horizontal. The circle's pair stands upright.
+Per solve, positioning mode 2 ("Law"):
+1. CENTRE — derived seat-free: centre mode + governor pick the governed point from the mass
+   map alone (`governMass` over all masses). `centreMainMM` IS this point, always.
+2. PLACEMENT — derived, never searched: the four parity candidates on the governed centre
+   (node ON it / pair-line ON it per axis, canon §4/§6, parity from the bbox axis classes).
+3. RANK — pure lexicographic law, no weights: magnet count (post-belt, the band's step
+   axis) → wrap (worst BELT disc's gap beyond spot + allowance; interior discs exempt — they
+   can never touch, Meta G1) → gravity (vertical beats horizontal when count, wrap and
+   parity all tie; tie quantized at a micron).
+4. BANDS — Dan's keystone: a rung exists per count at the smallest size where the placed,
+   counted layout also wraps (worst gap ≤ allowance + one walk-step of quantization). Size
+   is the reconciler; no conflict logic inside bands. Counts lawful below the band belong
+   below. AUTO flap scans the allowance upward instead (adaptive mode, unchanged).
+5. CONCESSIONS — `GridResult.pressMM` carries the worst wrap gap; any shown layout past the
+   allowance (manual slider, fallback) prints "wrap conceded N.Nmm". Nothing bends silently.
+6. The walk and display under Law carry NO seat inflation (`seatMarginMM`) — the contact-law
+   margin demanded gap ≥ allowance while the wrap law demands ≤; the knife edge emptied
+   ladders (found live, fixed; prefetcher mirrors the same rule or it poisons caches).
 
-BANDS (the keystone): the three laws are equal and absolute; SIZE reconciles them. Per
-magnet count, the rung is the smallest size where the centred placement carries the count
-with every belt disc inside the allowance. A count with no such size is not offered.
-Counts lawful below the band belong to the band below. Auto flap = the adaptive mode
-(scans the allowance up within the dial). Fallback stays explicit and labelled.
+Proven at build: squares 24→1 / 72→4 / 120→8, centre 0.0, press 0.00 at flap 0 · circle
+pairs VERTICAL at 80/90mm · bot cutout(4) B2 honest — flap 0 fallback (its rigid-centred
+pair physically needs 4mm), flap ≥4 rung 107/2⌾ press 0.00 · solve ~0.02s (mobile-class) ·
+suite 438/438 · live bench gate screenshot delivered to Dan.
 
-FREE MODE / MANUAL: same laws at the held size; whatever cannot hold is REPORTED as a
-measured concession ("wrap conceded N.Nmm") — nothing bends silently. The conflict-order
-option (orders + Balanced = minimize the largest concession) applies here only; bands
-never need it.
+## Phase 2 — PROVE (current phase)
 
-## Build phases — clone, prove, delete
+1. Truth dot: contact markers tighten from 1mm slack to the exact-tangency guard band
+   (0.05mm, the seat predicate's own tolerance) — dots appear ONLY at true touches; Law
+   rungs keep their dots (press 0.00), scored-mode near-misses lose theirs. Honest by
+   construction.
+2. Guard fixtures added BEFORE any deletion: Law determinism · square standards under Law ·
+   gravity fixture (circle pair vertical) · truth-dot fixture (no dot where gap > 0.05) ·
+   G1 fixture (Full-coverage square still rungs — belt-scoped wrap) · CONTROL-TRUTH sweep
+   (one probe per dial proving each control does what its label says under Law).
+3. Comparison matrix for Dan: same shapes (square, circle, duck, bot) × bands B1–B3 ×
+   Law / Centre rules / Voting, screenshots with press + centre readouts — the instrument
+   for his "proven" call.
+4. Meta adversarial QA of the Law mode in its own checkout (equivalence probes on the four
+   parity candidates, the belt-scoped gate, gravity, cache mirroring), lead re-verifies.
 
-PHASE 1 — BUILT (commits 28780df6 + cache fix). The LAW mode ships as positioning mode 2,
-beside Voting and Centre rules, sharing compute primitives, zero scoring in its path:
-count → wrap → gravity lexicographic over the four parity placements. `pressMM` concession
-in the result; status line prints concessions; walk gates on the wrap law (seat-inflation
-decoupled — the contact-law margin and the wrap law were a knife edge, fixed; the worker
-prefetcher mirrors the Law walk so caches can't be margin-poisoned).
-Probes already green: squares 24→1 / 72→4 / 120→8 at press 0.00, centre exact; circle
-pairs VERTICAL; bot B2 honest (flap 0 fallback — physically needs 4mm; 107mm/2⌾ press
-0.00 from flap 4).
+## Phase 3 — DELETE (only on Dan's "proven")
 
-PHASE 2 — PROVE (next):
-- Truth dot: contact markers tighten from 1mm slack to the exact-tangency guard band
-  (0.05mm — the seat predicate's own GUARD; no invented value). Dots then appear only on
-  true touches, in every mode.
-- Guard fixtures added to the suite: Law square standards · gravity (circle pair vertical)
-  · Law determinism · centre seat-independence (same centre across magnet plans/coverage)
-  · G1 (Full-coverage square still rungs) · truth-dot (no dot where gap > guard).
-- CONTROL-TRUTH sweep: one probe per dial proving each control does what its label says
-  under Law (flap 0 vs 1 distinguishable; governor moves the centre; mass depth changes
-  masses; padding moves seats).
-- Proof matrix for Dan: same shapes (square, circle, duck, bot, cutout 9) × B1–B3 ×
-  Law vs Centre rules vs Voting, screenshots side by side, concessions visible.
-- Meta adversarial QA of the Law build in its own checkout; lead re-verifies; then Dan
-  judges on the matrix.
+- Voting mode: the sweep, two-pass machinery, fits memo, `registrationScore`, `ORDERS`,
+  `VotingOrder`, spec weights (SEAT/FLAP/BALANCE_WEIGHT, VOTING_ORDER), `pressExcessMM`,
+  `centeringRef` (the seat-dependent centre — the corruption root), the Voting-law card.
+- Old Centre-rules branch (subsumed by Law), the Positioning toggle (Law becomes the only
+  engine; POSITIONING spec value dies), the placement-step dial + its enable.
+- `seatMarginMM` config, `bandSnapPoints` + compute `dist` exports (zero consumers).
+- Worker caches + prefetcher: measure at Law speeds, delete what no longer earns its place.
+- Browser-dial namespace versioned (grid-origin.v2.*) so scoring-era persisted dials die.
+- v3.5-architecture.md refreshed and stamped as the close-out, before final QA reads it.
 
-PHASE 3 — DELETE (only on Dan's "proven"):
-- Voting branch + registrationScore/ORDERS/weights (SEAT/FLAP/BALANCE_WEIGHT, VOTING_ORDER
-  repurposed or dropped) + two-pass sweep + phases ladder + fitsM memo + pressExcessMM +
-  centeringRef + placement-step dial & enable + Positioning toggle (Law becomes the only
-  engine; the button row dies) + seatMarginMM config + dead exports (bandSnapPoints, dist).
-- Versioned dial namespace (grid-origin.v2.*) so scoring-era browser dials cannot leak.
-- Worker caches + prefetcher: measure at Law speeds (~0.02s solves), delete what no longer
-  earns its place.
-- Guard gains the no-weights check (no scoring constant anywhere).
-- v3.5-architecture.md refreshed and stamped to the final engine before QA reads it.
+## Phase 4 — CLOSE
 
-PHASE 4 — CLOSE: full suite + guard · live gates on the bench · Meta closing verdict
-(engineering close per the peer chain) · then the deferred product items (default governor,
-Balanced default, mobile deploy) go to Dan as decisions.
+Full suite + guard green · live matrix re-shot on the single-engine build · Meta closing
+verdict (the engineering close) · Dan's product sign-off on the final behaviour.
 
-## Open Dan decisions (parked, not blocking phases 2–3)
+## Open Dan decisions (pending, not blocking Phase 2)
 
-1. Governor factory default (Smallest today; Top-small recommended — the sliver-hijack
-   returns through Smallest).
-2. Free-mode conflict order default (Magnets > Wrap > Centring recommended) and whether
-   BALANCED ships in the order list.
-3. The word "proven" — Dan calls it after the proof matrix; deletion waits for it.
+1. Governor factory default (Smallest today; Top-small recommended — kills sliver rule).
+2. Free-mode conflict layer: Balanced option + default order (Free holds size fixed, so a
+   law may bend; bends always printed). Bands need none of this.
