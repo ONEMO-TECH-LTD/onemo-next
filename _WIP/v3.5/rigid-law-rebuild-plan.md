@@ -88,23 +88,49 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
 
 ## Phase 2 — PROVE · the contract (current phase)
 
-2.0 EXACTNESS (Dan's ruling — the first build item, closes F2 with no unruled value):
-    a. `grid-origin-compute.ts` — refine every mass/island centre below the measurement
-       mesh: apply the existing Newton step (`snapToIso`'s machinery) to the clearance
-       field's maximum so `centreMM` is the true deepest point, not its nearest 2mm sample.
-       The mesh stays the finder; the refinement makes the answer exact.
-    b. `grid-origin-spec.ts` — DELETE `CONTACT_TOLERANCE_MM`. No tolerance constant exists
-       in the engine after this step.
-    c. `grid-origin.ts` (bandWalk) — the rung gate becomes exact coincidence: refine the
-       size to the engine's arithmetic unit (micron) and require the binding belt disc's
-       gap to be zero at that unit; a size that cannot reach coincidence is not a rung.
-    d. Fixture: square 24/72/120 and circle B1/B2 rungs all report gap 0 at the arithmetic
-       unit; a synthetic layout 0.05mm off is NOT a rung.
-    e. Verify the same exactness holds at flap 1, 4, 12 — the allowance shifts the
-       coincidence line, it never widens it.
+2.0 EXACTNESS (Dan's ruling — the first build item; closes F2 with no unruled value).
+    Two instruments, each named, each certified — no epsilon, no policy constant:
 
-2.1 TRUTH DOT — DONE with Phase 1's reopen (see F4 above): dots measure edge tangency
-    (spot only, TANGENT_GUARD_MM), never the allowance ring.
+    a. THE CENTRE, deterministic and refined (replaces the 2mm mesh sample; my earlier
+       `snapToIso` reference was WRONG — that step converges to a level BOUNDARY, and the
+       clearance maximum has zero gradient, so a boundary-Newton cannot find it):
+       implement POLE OF INACCESSIBILITY by hierarchical cell subdivision (polylabel):
+       priority-queue cells by upper bound `clearance(centre) + halfDiagonal`, subdivide the
+       best cell, stop when the bound margin is below the representable unit. Certified:
+       the bound proves no unexplored cell can beat the answer. Deterministic tie-break:
+       lowest (x, y) in the engine's integer unit wins; ties beyond that are impossible
+       because the unit is the resolution. Mass/island `centreMM` becomes this point.
+       (Modes with an ANALYTIC centre — Box, Weight — already return exact points and are
+       untouched; the probe that isolated the defect used them as the control.)
+
+    b. THE CONTACT PREDICATE, exact (replaces every float comparison in the gate): contact
+       is `squaredDistance(anchor, nearestEdgeSegment) == (spot + allowance)²` evaluated in
+       EXACT INTEGER arithmetic on the engine's micron grid — the same representation
+       `holds()` already uses, extended from "≥ radius" (inside) to the equality case
+       (coincidence). Float `maxPressMM` remains a REPORTING measure only; it never gates.
+
+    c. THE RUNG SIZE (`grid-origin.ts` bandWalk): the size that satisfies the contact
+       equation is in general irrational, so the law is enforced by BRACKETING, never by
+       tolerance: refine the size until two adjacent representable sizes bracket the exact
+       predicate's transition, and take the TIGHT side — the largest size at which the
+       binding disc is not yet loose by the exact test. No configuration on the loose side
+       is ever accepted; the residual is the number system's unit, not granted slack, and
+       the contract states that distinction in the status line's own words.
+
+    d. `grid-origin-spec.ts` — DELETE `CONTACT_TOLERANCE_MM`, and `TANGENT_GUARD_MM` loses
+       its gate role: the truth dot is drawn from the SAME exact contact predicate (b), so
+       one definition of touch serves both the law and the picture. No tolerance constant
+       survives anywhere in the engine.
+
+    e. Fixtures: square 24/72/120 and circle B1/B2 rungs satisfy the exact predicate (b);
+       a layout one representable unit loose is NOT a rung; the same exactness holds at
+       flap 1, 4, 12 — the allowance shifts the coincidence line, never widens it; and the
+       centre refinement (a) is deterministic across repeated runs and mesh origins.
+
+2.1 TRUTH DOT — dots are drawn from the exact contact predicate (2.0b): a dot means the
+    disc's outer line coincides with the outline, never the allowance ring, never a
+    tolerance band. Phase 1 already moved the dot off the allowance ring; 2.0d removes its
+    remaining guard constant so law and picture share one definition of touch.
 2.2 LAW GUARD. New `src/lib/effect/__tests__/grid-origin-law.test.ts`, fixtures:
     a. determinism — two identical Law solves, JSON-equal anchors+phase;
     b. standards — square 24/72/120 → 1/4/8, `centreMainMM` = origin, `pressMM` = 0;
@@ -116,8 +142,8 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        changes the mass count. One probe per dial, each proving its label.
     g0. MANUAL TRUTH (F1) — a forced off-centre phase yields `parityTrue === false`, and a
        forced lawful phase yields true.
-    g1. EXACT GATE (F2) — every flap-0 rung's worst belt gap ≤ CONTACT_TOLERANCE_MM; a
-       synthetic layout 0.5mm off contact is NOT a rung.
+    g1. EXACT GATE (F2) — every rung satisfies the exact contact predicate (2.0b); a
+       layout one representable unit loose is NOT a rung, at flap 0 and at flap 1/4/12.
     g2. AUTO MINIMAL (F3) — auto's chosen allowance is the smallest whole mm whose ladder is
        non-empty; Free's implied allowance equals the worst-belt requirement, not the first
        disc's gap.
@@ -142,7 +168,8 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
     desktop, measured and recorded in the matrix; phones verified on the deployed preview.
 2.6 META QA of the driver in its own checkout (parity candidates vs spec, belt scoping,
     gravity ties, cache mirroring); lead re-verifies every finding before Dan sees it.
-Gate: all of 2.1–2.4 green → Dan judges the matrix → his word "proven" opens Phase 3.
+Gate: 2.0 first (exactness — nothing downstream is judged on a tolerant engine), then
+2.1–2.6 green → Dan judges the B1–B5 matrix → his word "proven" opens Phase 3.
 
 ## Phase 3 — DELETE THE OLD ENGINES · the contract (only on Dan's "proven")
 
@@ -183,8 +210,9 @@ Full suite + guard green · matrix re-shot on the single-engine build · Meta cl
 
 ## Necessity / sufficiency (self-verdict, for Meta to attack)
 
-- Necessity: every Phase-3 deletion is consumer-traced; Phase-2 adds only fixtures and one
-  exported tolerance constant — no new machinery, no speculative options.
+- Necessity: every Phase-3 deletion is consumer-traced; Phase 2 adds fixtures plus exactly
+  two instruments Dan's exactness ruling requires (a certified centre maximiser, an exact
+  contact predicate) and DELETES both tolerance constants — no speculative options.
 - Sufficiency: every clause of the GOAL maps to a numbered contract step; nothing of Dan's
   directive set is uncovered (centre 1→Phase 1.1, wrap 2→1+2.2f, scaling 3→walk law+2.2f,
   gravity→2.2c, truth controls→2.2f, truth dot→2.1, clone-compare-delete→phase gates).
