@@ -103,11 +103,14 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        (Modes with an ANALYTIC centre — Box, Weight — already return exact points and are
        untouched; the probe that isolated the defect used them as the control.)
 
-    b. THE CONTACT PREDICATE, exact (replaces every float comparison in the gate): contact
-       is `squaredDistance(anchor, nearestEdgeSegment) == (spot + allowance)²` evaluated in
-       EXACT INTEGER arithmetic on the engine's micron grid — the same representation
-       `holds()` already uses, extended from "≥ radius" (inside) to the equality case
-       (coincidence). Float `maxPressMM` remains a REPORTING measure only; it never gates.
+    b. NO ACCEPTANCE TEST EXISTS (pixel round-3 B1 — my own contract contradicted itself:
+       an exact micron-integer equality cannot certify a root that does not lie on the
+       micron grid). Solving removes the need: a candidate is never compared against a
+       threshold, so there is no predicate to satisfy, quantize or certify. Correctness
+       comes from the CONSTRUCTION — the size is the tangency root — and the exact integer
+       machinery keeps exactly one job it can do soundly: deciding SEAT LEGALITY (disc
+       inside, tangency counted as inside), which is a >= question on the engine's own
+       grid. Float measures (`pressMM`) are REPORTING only, in the law and in the UI.
 
     c. THE RUNG SIZE IS SOLVED, NEVER SEARCHED (Dan, 2026-08-20 — and the correction that
        dissolved the whole tolerance question): tangency is an EQUATION, not a test. For a
@@ -124,9 +127,27 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        The only remaining inexactness is writing the root down (~1e-13 mm in the number
        system, 10^10 times finer than the engine's micron unit) and it is representation,
        not granted slack.
-       Consequence: `bandWalk`'s size loop becomes a CANDIDATE GENERATOR only — it finds
-       which counts are reachable; each rung's size then comes from the solved root, and a
-       count whose root fails the count/parity check simply has no rung.
+       REGIMES (pixel round-3 B2 — a single quadratic is only valid where the geometry is
+       stable, and it is not: erosion is a FIXED 12mm while the shape scales, so the mass
+       map — and with it the governed centre — moves non-affinely with scale; the parity
+       class flips when a bbox side crosses a band boundary; the binding element changes).
+       The law is therefore solved PIECEWISE, and completeness comes from the decomposition,
+       not from one formula:
+         i.   Sweep the band to detect REGIME TRANSITIONS — changes in seated count, parity
+              class, mass-map topology (a mass appearing/vanishing), or which element binds.
+              This is what `bandWalk`'s size loop becomes: a transition finder, never a
+              judge.
+         ii.  Inside a regime every one of those is stable, so the contact condition is a
+              smooth scalar function of scale with a sign change across the regime — at
+              most one root, and its existence is decided by the sign at the two ends.
+         iii. Solve that root with a CERTIFIED root-finder: Newton on the geometric
+              derivative where it is well-conditioned, bisection as the guaranteed fallback,
+              run to the representation's limit. This finds a ROOT; it never accepts a
+              candidate, so no threshold, tolerance or acceptance band appears at any point.
+         iv.  A regime whose root fails the count or parity law yields no rung; a count with
+              no root in any regime has no rung in that band. Every count is decided by
+              exactly one root or by an explicit no-root answer.
+       Consequence: `bandWalk` is a transition finder; each rung's size is a solved root.
 
     d. `grid-origin-spec.ts` — DELETE `CONTACT_TOLERANCE_MM`, and `TANGENT_GUARD_MM` loses
        its gate role: the truth dot is drawn from the SAME exact contact predicate (b), so
@@ -137,7 +158,11 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        number system's own resolution (square 24/72/120 and circle B1/B2 — the circle's
        2×2 must land 91.882250993909, gap 0.000e+0, NOT a micron-grid neighbour); the same exactness holds at
        flap 1, 4, 12 — the allowance shifts the coincidence line, never widens it; and the
-       centre refinement (a) is deterministic across repeated runs and mesh origins.
+       centre refinement (a) is deterministic across repeated runs and mesh origins;
+       a NON-MICRON root case (the circle 2×2, root 91.882250993909) is carried and rendered
+       as the root itself, never snapped to a grid; and a REGIME-CHANGE case (a shape whose
+       mass map gains a mass across the band, and one whose parity class flips at a band
+       boundary) yields the correct per-regime roots with no missed count.
 
 2.1 TRUTH DOT — dots are drawn from the exact contact predicate (2.0b): a dot means the
     disc's outer line coincides with the outline, never the allowance ring, never a
