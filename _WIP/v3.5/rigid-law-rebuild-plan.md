@@ -157,19 +157,28 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
               such an interval provably holds no root. What survives isolates every root,
               double roots and equal-end-sign pairs included. Bisection is then used only
               INSIDE an isolated bracket, where a sign change is proven to exist.
-         iii. EXISTENCE IS CERTIFIED, NOT INFERRED (closing QA: pruning proves absence
-              only, and a DOUBLE root touches zero without a sign change, so no bisection
-              can certify it). Each surviving interval is put to the interval-Newton /
-              Krawczyk test: with K(X) computed from the interval extensions of the contact
-              function and its scale-derivative, `K(X) ⊆ X` PROVES a root exists and is
-              unique in X — sign changes are no longer required, so tangential double roots
-              are certified like any other. Certified intervals are then refined to the
-              representation's limit (Newton inside, bisection as fallback).
-              FAIL-CLOSED: if an interval is neither proven root-free nor proven to contain
-              a root at the representation's limit (the near-zero / no-root ambiguity), the
-              engine reports that count as UNDECIDED for that band and shows no rung — it
-              never invents one, and never silently drops it either; the undecided case is
-              surfaced, the same way a concession is.
+         iii. EXISTENCE IS CERTIFIED, AND MULTIPLICITY-AWARE (closing QA: pruning proves
+              absence only; and the Krawczyk/interval-Newton inclusion needs a NONSINGULAR
+              derivative, which a tangential double root does not have — f'(r) = 0 there, so
+              the standard test cannot certify it and a lawful double-contact rung would be
+              lost to UNDECIDED). Two tests, chosen by what the interval shows:
+                · SIMPLE ROOT — the derivative's interval enclosure excludes zero, so the
+                  Krawczyk test applies: `K(X) ⊆ X` proves a unique root exists in X.
+                · TANGENTIAL (DOUBLE) ROOT — the derivative's enclosure contains zero, so
+                  the problem is DEFLATED one order: certify a root s* of the DERIVATIVE
+                  (where it is itself simple, so Krawczyk applies), then evaluate the
+                  contact function in interval arithmetic at s*. This separates the three
+                  cases the law must distinguish, without conflating them:
+                    – enclosure of f(s*) contains zero and its width is at the
+                      representation's limit → CERTIFIED TANGENTIAL CONTACT; it rungs.
+                    – enclosure of f(s*) strictly excludes zero → CERTIFIED NEAR-MISS; no
+                      rung, and it is not undecided — the engine knows.
+                    – enclosure straddles zero wider than the limit → UNDECIDED.
+              Certified intervals are then refined to the representation's limit (Newton
+              inside, bisection as fallback).
+              FAIL-CLOSED: only the third case is undecided — the engine shows no rung for
+              that count, never invents one, never silently drops it; the undecided verdict
+              is surfaced like a concession, with the count and band named.
          iv.  The rung is the EARLIEST root, in increasing size, that satisfies the count and
               parity laws; a count with no such root in any regime of the band has no rung —
               an explicit answer, never a silent omission.
@@ -190,6 +199,19 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
        as the root itself, never snapped to a grid; and a REGIME-CHANGE case (a shape whose
        mass map gains a mass across the band, and one whose parity class flips at a band
        boundary) yields the correct per-regime roots with no missed count.
+       And the completeness cases the closing QA named, each asserted explicitly:
+         · NARROW REGIME — a regime whose width is orders below any sampling step is still
+           found (boundaries are solved, not sampled) and its rung appears.
+         · TWO ROOTS, EQUAL END SIGNS — both roots isolated; the earliest lawful one rungs.
+         · BRANCH SWAP UNDER UNCHANGED TOPOLOGY — two masses cross in area with the mass map
+           unchanged, so the governor switches which rules: the regime split occurs there and
+           the per-regime roots are correct.
+         · CERTIFIED TANGENTIAL DOUBLE ROOT — a contact curve that touches zero without
+           crossing rungs, certified through the deflation path, NOT reported undecided.
+         · NEAR-ZERO NO-ROOT CONTROL — a contact curve approaching zero without reaching it
+           yields NO rung AND NO undecided verdict (certified near-miss).
+         · UNDECIDED SURFACING — a synthetic case at the representation's limit reports the
+           count as undecided, visibly, and rungs nothing.
 
 2.1 TRUTH DOT — dots are drawn from the exact contact predicate (2.0b): a dot means the
     disc's outer line coincides with the outline, never the allowance ring, never a
