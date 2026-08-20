@@ -36,7 +36,7 @@ export const cSqrt = (a: CReal): CReal => {
 }
 
 export function isRationalExpr(e: CReal): boolean {
-  const hit = ratMemo.get(e)
+  const hit = memoOn ? ratMemo.get(e) : undefined
   if (hit !== undefined) return hit
   let value: boolean
   switch (e.k) {
@@ -45,7 +45,7 @@ export function isRationalExpr(e: CReal): boolean {
     case 'neg': value = isRationalExpr(e.a); break
     default: value = isRationalExpr(e.a) && isRationalExpr(e.b)
   }
-  ratMemo.set(e, value)
+  if (memoOn) ratMemo.set(e, value)
   return value
 }
 
@@ -90,12 +90,30 @@ const maxR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) > 0 
 // quadratic normal form are functions of the node alone — identical values, computed once. The
 // certified construction shares subtrees heavily (one branch's base point feeds every clip root),
 // so without this the same subtree is re-walked thousands of times per region.
-const evalMemo = new WeakMap<object, Map<string, Interval>>()
-const ratMemo = new WeakMap<object, boolean>()
+// R14 §7.3: reuse changes cost only — certificates and results must be byte-identical with caches
+// disabled. `certifiedMemo` makes that falsifiable rather than asserted: switched off, every lookup
+// and store is bypassed and each value is recomputed from the node; the fixtures compare both modes.
+let evalMemo = new WeakMap<object, Map<string, Interval>>()
+let ratMemo = new WeakMap<object, boolean>()
+let memoOn = true
+
+/** Neutral cache control. Disabling it changes cost, never a value. */
+export function certifiedMemo(enabled: boolean): void {
+  memoOn = enabled
+  resetCertifiedMemo()
+}
+
+/** Drop every memoized enclosure/normal form, so a later call recomputes from the node. */
+export function resetCertifiedMemo(): void {
+  evalMemo = new WeakMap()
+  ratMemo = new WeakMap()
+  quadMemo = new WeakMap()
+}
 
 /** Certified enclosure of the expression at `bits` of dyadic precision. A rational-only
  *  expression is returned exactly, zero-width — rounding is only for radicals. */
 export function evaluate(e: CReal, bits: bigint): Interval {
+  if (!memoOn) return evaluateUncached(e, bits)
   const key = bits.toString()
   let table = evalMemo.get(e)
   const hit = table?.get(key)
@@ -146,13 +164,14 @@ const qZero = ratFromInt(0)
 const sameField = (p: Quadratic, q: Quadratic): bigint | null =>
   p.b.n === BigInt(0) ? q.k : q.b.n === BigInt(0) ? p.k : p.k === q.k ? p.k : null
 
-const quadMemo = new WeakMap<object, { q: Quadratic | null }>()
+let quadMemo = new WeakMap<object, { q: Quadratic | null }>()
 
 /**
  * Exact normal form when the expression lives in a single quadratic field (at most one distinct
  * square root). Nested or mixed radicals return null and fall back to certified enclosures.
  */
 export function asQuadratic(e: CReal): Quadratic | null {
+  if (!memoOn) return asQuadraticUncached(e)
   const hit = quadMemo.get(e)
   if (hit) return hit.q
   const q = asQuadraticUncached(e)
