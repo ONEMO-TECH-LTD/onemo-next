@@ -68,6 +68,11 @@ press 0.00 · solve ~0.02s · suite 438/438 · live bench screenshot delivered.
     f. CONTROL-TRUTH sweep — flap 0 vs 4 produce different B2 rung sets on the bot base;
        governor 0 vs 3 move `centreMainMM` on a two-mass fixture; mass-depth 12 vs 24
        changes the mass count. One probe per dial, each proving its label.
+    g. SCALING LAW (the third driver — pixel Meta M2/M3): across two adjacent bands on a
+       fixture shape, the ladder carries UNIQUE, STRICTLY INCREASING counts; each rung is
+       the FIRST size where its count seats lawful (parity-true) + wrapped; and no count
+       lawful in the band below reappears above worn loose. Duplicate, skipped-first-size
+       and cross-band-repeat cases each asserted.
 2.3 COMPARISON MATRIX (Dan's instrument): scripted bench screenshots — square, circle,
     duck cutout(5), bot cutout(4) × B1–B3 × Law / Centre rules / Voting, each frame showing
     press + centre readouts. Delivered as images, not a doc.
