@@ -27,7 +27,7 @@ export const cNeg = (a: CReal): CReal => ({ k: 'neg', a })
 export const cSqrt = (a: CReal): CReal => {
   if (isRationalExpr(a)) {
     const v = exactRational(a)
-    if (v.n >= 0n) {
+    if (v.n >= BigInt(0)) {
       const rn = isqrt(v.n), rd = isqrt(v.d)
       if (rn * rn === v.n && rd * rd === v.d) return cRat(rational(rn, rd))
     }
@@ -36,10 +36,12 @@ export const cSqrt = (a: CReal): CReal => {
 }
 
 export function isRationalExpr(e: CReal): boolean {
-  if (e.k === 'rat') return true
-  if (e.k === 'neg') return isRationalExpr(e.a)
-  if (e.k === 'sqrt') return false
-  return isRationalExpr(e.a) && isRationalExpr(e.b)
+  switch (e.k) {
+    case 'rat': return true
+    case 'sqrt': return false
+    case 'neg': return isRationalExpr(e.a)
+    default: return isRationalExpr(e.a) && isRationalExpr(e.b)
+  }
 }
 
 /** Exact value of a rational-only expression. */
@@ -60,15 +62,15 @@ export function exactRational(e: CReal): Rational {
 
 // Directed rounding to the dyadic grid 2^-bits: lower bound floors, upper bound ceils.
 const floorDyadic = (r: Rational, bits: bigint): Rational => {
-  const scale = 1n << bits
+  const scale = BigInt(1) << bits
   let q = (r.n * scale) / r.d
-  if (r.n < 0n && (r.n * scale) % r.d !== 0n) q -= 1n
+  if (r.n < BigInt(0) && (r.n * scale) % r.d !== BigInt(0)) q -= BigInt(1)
   return rational(q, scale)
 }
 const ceilDyadic = (r: Rational, bits: bigint): Rational => {
-  const scale = 1n << bits
+  const scale = BigInt(1) << bits
   let q = (r.n * scale) / r.d
-  if (r.n > 0n && (r.n * scale) % r.d !== 0n) q += 1n
+  if (r.n > BigInt(0) && (r.n * scale) % r.d !== BigInt(0)) q += BigInt(1)
   return rational(q, scale)
 }
 const iv = (lo: Rational, hi: Rational, bits: bigint): Interval => ({ lo: floorDyadic(lo, bits), hi: ceilDyadic(hi, bits) })
@@ -89,8 +91,8 @@ export function evaluate(e: CReal, bits: bigint): Interval {
     case 'sqrt': {
       const a = evaluate(e.a, bits)
       if (ratSign(a.hi) < 0) throw new Error('evaluate: sqrt of a negative enclosure')
-      const lo = ratSign(a.lo) < 0 ? ratFromInt(0) : sqrtInterval(a.lo, 1n << bits).lo
-      const hi = sqrtInterval(a.hi, 1n << bits).hi
+      const lo = ratSign(a.lo) < 0 ? ratFromInt(0) : sqrtInterval(a.lo, BigInt(1) << bits).lo
+      const hi = sqrtInterval(a.hi, BigInt(1) << bits).hi
       return iv(lo, hi, bits)
     }
     default: {
@@ -108,7 +110,7 @@ export function evaluate(e: CReal, bits: bigint): Interval {
   }
 }
 
-const PRECISIONS = [64n, 128n, 256n, 512n, 1024n]
+const PRECISIONS = [BigInt(64), BigInt(128), BigInt(256), BigInt(512), BigInt(1024)]
 
 /** A value in one quadratic field: a + b·√k with a, b rational and k a positive integer. */
 export interface Quadratic { readonly a: Rational; readonly b: Rational; readonly k: bigint }
@@ -119,7 +121,7 @@ const qMul = (x: Rational, y: Rational) => rational(x.n * y.n, x.d * y.d)
 const qDiv = (x: Rational, y: Rational) => rational(x.n * y.d, x.d * y.n)
 const qZero = ratFromInt(0)
 const sameField = (p: Quadratic, q: Quadratic): bigint | null =>
-  p.b.n === 0n ? q.k : q.b.n === 0n ? p.k : p.k === q.k ? p.k : null
+  p.b.n === BigInt(0) ? q.k : q.b.n === BigInt(0) ? p.k : p.k === q.k ? p.k : null
 
 /**
  * Exact normal form when the expression lives in a single quadratic field (at most one distinct
@@ -127,16 +129,16 @@ const sameField = (p: Quadratic, q: Quadratic): bigint | null =>
  */
 export function asQuadratic(e: CReal): Quadratic | null {
   switch (e.k) {
-    case 'rat': return { a: e.v, b: qZero, k: 1n }
+    case 'rat': return { a: e.v, b: qZero, k: BigInt(1) }
     case 'neg': { const q = asQuadratic(e.a); return q && { a: { n: -q.a.n, d: q.a.d }, b: { n: -q.b.n, d: q.b.d }, k: q.k } }
     case 'sqrt': {
       const q = asQuadratic(e.a)
-      if (!q || q.b.n !== 0n || q.a.n < 0n) return null
+      if (!q || q.b.n !== BigInt(0) || q.a.n < BigInt(0)) return null
       // √(n/d) = √(n·d) / d
       const rad = q.a.n * q.a.d
       const root = isqrt(rad)
-      if (root * root === rad) return { a: rational(root, q.a.d), b: qZero, k: 1n }
-      return { a: qZero, b: rational(1n, q.a.d), k: rad }
+      if (root * root === rad) return { a: rational(root, q.a.d), b: qZero, k: BigInt(1) }
+      return { a: qZero, b: rational(BigInt(1), q.a.d), k: rad }
     }
     default: {
       const p = asQuadratic(e.a), q = asQuadratic(e.b)
@@ -148,7 +150,7 @@ export function asQuadratic(e: CReal): Quadratic | null {
       if (e.k === 'mul') return { a: qAdd(qMul(p.a, q.a), qMul(qMul(p.b, q.b), ratFromInt(k))), b: qAdd(qMul(p.a, q.b), qMul(p.b, q.a)), k }
       // division: multiply by the conjugate; denominator a² − b²k is rational and non-zero unless q = 0
       const den = qSub(qMul(q.a, q.a), qMul(qMul(q.b, q.b), ratFromInt(k)))
-      if (den.n === 0n) return null
+      if (den.n === BigInt(0)) return null
       const num = { a: qSub(qMul(p.a, q.a), qMul(qMul(p.b, q.b), ratFromInt(k))), b: qSub(qMul(p.b, q.a), qMul(p.a, q.b)) }
       return { a: qDiv(num.a, den), b: qDiv(num.b, den), k }
     }
@@ -187,6 +189,6 @@ export const compareCReal = (a: CReal, b: CReal): -1 | 0 | 1 | null => signOf(cS
 
 /** Report-only decimal from a 64-bit enclosure midpoint. */
 export function approx(e: CReal): number {
-  const { lo, hi } = evaluate(e, 64n)
+  const { lo, hi } = evaluate(e, BigInt(64))
   return (Number(lo.n) / Number(lo.d) + Number(hi.n) / Number(hi.d)) / 2
 }

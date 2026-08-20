@@ -29,7 +29,7 @@ describe('clearance kernel ≡ donor seat predicate (ADAPT equivalence)', () => 
       let checked = 0
       for (let x = -2; x <= 92; x += 1) for (let y = -2; y <= 74; y += 1) {
         // donor treats boundary ('ON') as inside; the kernel's parity test does not — compare where the donor is IN/OUT strictly
-        const onBoundary = nearestDist2(toUnits(x, exactContour(contour)), toUnits(y, exactContour(contour)), exactContour(contour)).d2.n === 0n
+        const onBoundary = nearestDist2(toUnits(x, exactContour(contour)), toUnits(y, exactContour(contour)), exactContour(contour)).d2.n === BigInt(0)
         if (onBoundary) continue
         expect(seatsExact(contour, x, y, 12), `${name} (${x},${y})`).toBe(holds(donor, [x, y], 12))
         checked++

@@ -8,15 +8,15 @@ describe('certified reals', () => {
     const e = cSub(cMul(third, cInt(3)), cInt(1)) // (1/3)·3 − 1 = 0 exactly
     expect(isRationalExpr(e)).toBe(true)
     expect(signOf(e)).toBe(0)
-    expect(compareExact(exactRational(cAdd(third, third)), rational(2n, 3n))).toBe(0)
+    expect(compareExact(exactRational(cAdd(third, third)), rational(BigInt(2), BigInt(3)))).toBe(0)
   })
 
   it('separates irrational values by refining certified enclosures', () => {
     const root2 = cSqrt(cInt(2))
     // √2 > 1.4142135623 and < 1.4142135624 — both decided by enclosure, no float
-    expect(compareCReal(root2, cRat(rational(14142135623n, 10000000000n)))).toBe(1)
-    expect(compareCReal(root2, cRat(rational(14142135624n, 10000000000n)))).toBe(-1)
-    const { lo, hi } = evaluate(root2, 128n)
+    expect(compareCReal(root2, cRat(rational(BigInt(14142135623), BigInt(10000000000))))).toBe(1)
+    expect(compareCReal(root2, cRat(rational(BigInt(14142135624), BigInt(10000000000))))).toBe(-1)
+    const { lo, hi } = evaluate(root2, BigInt(128))
     expect(compareExact(lo, hi)).toBeLessThan(0)
     expect(Math.abs(approx(root2) - Math.SQRT2)).toBeLessThan(1e-15)
   })
@@ -32,8 +32,8 @@ describe('certified reals', () => {
 
   it('enclosures are directed: lower bound floors, upper bound ceils', () => {
     const e = cDiv(cInt(1), cInt(3))
-    const coarse = evaluate(cAdd(cSqrt(cInt(2)), e), 8n)
-    const fine = evaluate(cAdd(cSqrt(cInt(2)), e), 64n)
+    const coarse = evaluate(cAdd(cSqrt(cInt(2)), e), BigInt(8))
+    const fine = evaluate(cAdd(cSqrt(cInt(2)), e), BigInt(64))
     expect(compareExact(coarse.lo, fine.lo)).toBeLessThanOrEqual(0)
     expect(compareExact(coarse.hi, fine.hi)).toBeGreaterThanOrEqual(0)
   })

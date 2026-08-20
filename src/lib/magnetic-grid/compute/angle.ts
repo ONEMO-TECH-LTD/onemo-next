@@ -8,15 +8,15 @@ import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, rati
 import { evaluate, type CReal, type Interval } from './certified-real'
 
 const floorD = (r: Rational, bits: bigint): Rational => {
-  const s = 1n << bits
+  const s = BigInt(1) << bits
   let q = (r.n * s) / r.d
-  if (r.n < 0n && (r.n * s) % r.d !== 0n) q -= 1n
+  if (r.n < BigInt(0) && (r.n * s) % r.d !== BigInt(0)) q -= BigInt(1)
   return rational(q, s)
 }
 const ceilD = (r: Rational, bits: bigint): Rational => {
-  const s = 1n << bits
+  const s = BigInt(1) << bits
   let q = (r.n * s) / r.d
-  if (r.n > 0n && (r.n * s) % r.d !== 0n) q += 1n
+  if (r.n > BigInt(0) && (r.n * s) % r.d !== BigInt(0)) q += BigInt(1)
   return rational(q, s)
 }
 const out = (lo: Rational, hi: Rational, bits: bigint): Interval => ({ lo: floorD(lo, bits), hi: ceilD(hi, bits) })
@@ -36,7 +36,7 @@ function atanSmall(x: Rational, bits: bigint): Interval {
   const tailFactor = ratDiv(q, ratSub(ratFromInt(1), q))
   let term = ratDiv(x, onePlus) // k = 0
   let sum = term
-  const target = rational(1n, 1n << (bits + 4n))
+  const target = rational(BigInt(1), BigInt(1) << (bits + BigInt(4)))
   for (let k = 1; k < 100000; k++) {
     // term_k = term_{k−1} · (2k / (2k+1)) · q
     term = ratMul(term, ratMul(rational(BigInt(2 * k), BigInt(2 * k + 1)), q))
@@ -49,8 +49,8 @@ function atanSmall(x: Rational, bits: bigint): Interval {
 
 /** π by Machin: π = 16·atan(1/5) − 4·atan(1/239). */
 export function piInterval(bits: bigint): Interval {
-  const a = atanSmall(rational(1n, 5n), bits + 6n)
-  const b = atanSmall(rational(1n, 239n), bits + 6n)
+  const a = atanSmall(rational(BigInt(1), BigInt(5)), bits + BigInt(6))
+  const b = atanSmall(rational(BigInt(1), BigInt(239)), bits + BigInt(6))
   const lo = ratSub(ratMul(ratFromInt(16), a.lo), ratMul(ratFromInt(4), b.hi))
   const hi = ratSub(ratMul(ratFromInt(16), a.hi), ratMul(ratFromInt(4), b.lo))
   return out(lo, hi, bits)
@@ -65,8 +65,8 @@ export function atanInterval(x: Rational, bits: bigint): Interval {
   if (compareExact(ax, ratFromInt(1)) <= 0) r = atanSmall(ax, bits)
   else {
     // atan(x) = π/2 − atan(1/x) for x > 0
-    const pi = piInterval(bits + 2n)
-    const inner = atanSmall(ratDiv(ratFromInt(1), ax), bits + 2n)
+    const pi = piInterval(bits + BigInt(2))
+    const inner = atanSmall(ratDiv(ratFromInt(1), ax), bits + BigInt(2))
     r = out(ratSub(ratDiv(pi.lo, ratFromInt(2)), inner.hi), ratSub(ratDiv(pi.hi, ratFromInt(2)), inner.lo), bits)
   }
   return s < 0 ? { lo: { n: -r.hi.n, d: r.hi.d }, hi: { n: -r.lo.n, d: r.lo.d } } : r
@@ -77,8 +77,8 @@ export function atanInterval(x: Rational, bits: bigint): Interval {
  * (certified) cross and dot products of the two directions. Angle = atan2(cross, dot).
  */
 export function angleBetween(cross: CReal, dot: CReal, bits: bigint): Interval | null {
-  const c = evaluate(cross, bits + 8n), d = evaluate(dot, bits + 8n)
-  const pi = piInterval(bits + 2n)
+  const c = evaluate(cross, bits + BigInt(8)), d = evaluate(dot, bits + BigInt(8))
+  const pi = piInterval(bits + BigInt(2))
   const half = (i: Interval): Interval => ({ lo: ratDiv(i.lo, ratFromInt(2)), hi: ratDiv(i.hi, ratFromInt(2)) })
   // dot strictly positive: atan(cross/dot), monotone in cross and in 1/dot — enclose by corners
   if (ratSign(d.lo) > 0) {

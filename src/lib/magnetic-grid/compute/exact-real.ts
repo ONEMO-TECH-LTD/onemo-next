@@ -3,8 +3,8 @@
 
 import type { Rational } from '../spec'
 
-const ZERO = 0n
-const ONE = 1n
+const ZERO = BigInt(0)
+const ONE = BigInt(1)
 
 const babs = (v: bigint): bigint => (v < ZERO ? -v : v)
 
@@ -33,11 +33,11 @@ export function ratFromNumber(value: number): Rational {
   const view = new DataView(new ArrayBuffer(8))
   view.setFloat64(0, value)
   const bits = view.getBigUint64(0)
-  const sign = bits >> 63n === ONE ? -ONE : ONE
-  const exponent = Number((bits >> 52n) & 0x7ffn)
-  const fraction = bits & 0xfffffffffffffn
+  const sign = bits >> BigInt(63) === ONE ? -ONE : ONE
+  const exponent = Number((bits >> BigInt(52)) & BigInt('0x7ff'))
+  const fraction = bits & BigInt('0xfffffffffffff')
   // subnormal: value = ±fraction × 2^-1074 · normal: ±(2^52+fraction) × 2^(exponent-1075)
-  const mantissa = exponent === 0 ? fraction : (ONE << 52n) | fraction
+  const mantissa = exponent === 0 ? fraction : (ONE << BigInt(52)) | fraction
   const shift = exponent === 0 ? -1074 : exponent - 1075
   return shift >= 0
     ? rational(sign * mantissa * (ONE << BigInt(shift)), ONE)
@@ -68,10 +68,10 @@ export const ratToNumber = (a: Rational): number => Number(a.n) / Number(a.d)
 /** Floor integer square root. */
 export const isqrt = (v: bigint): bigint => {
   if (v < ZERO) throw new Error('isqrt: negative')
-  if (v < 2n) return v
+  if (v < BigInt(2)) return v
   let x = ONE << BigInt(Math.ceil(v.toString(2).length / 2))
   for (;;) {
-    const step = (x + v / x) >> 1n
+    const step = (x + v / x) >> BigInt(1)
     if (step >= x) return x
     x = step
   }
@@ -81,7 +81,8 @@ export const isqrt = (v: bigint): bigint => {
  * Certified enclosure of √q: rational [lo, hi] with lo² ≤ q ≤ hi², width ≤ 1/scale.
  * Directed integer square roots on a scaled numerator — never a float path.
  */
-export function sqrtInterval(q: Rational, scale: bigint = 1_000_000_000_000n): { lo: Rational; hi: Rational } {
+const DEFAULT_SQRT_SCALE = BigInt('1000000000000')
+export function sqrtInterval(q: Rational, scale: bigint = DEFAULT_SQRT_SCALE): { lo: Rational; hi: Rational } {
   if (ratSign(q) < 0) throw new Error('sqrtInterval: negative operand')
   if (q.n === ZERO) return { lo: ratFromInt(0), hi: ratFromInt(0) }
   // √(n/d) = √(n·d)/d — one integer radicand, scaled for precision.

@@ -80,7 +80,7 @@ function dist2ToSegment(p: P2, s: ExactSegment): CReal | null {
   const dx = s.bx - s.ax, dy = s.by - s.ay
   const len2 = dx * dx + dy * dy
   const w = sub2(p, pInt(s.ax, s.ay))
-  if (len2 === 0n) return dot2(w, w)
+  if (len2 === BigInt(0)) return dot2(w, w)
   const t = cAdd(cMul(w.x, cBig(dx)), cMul(w.y, cBig(dy))) // t·len2
   const sT = signOf(t)
   if (sT === null) return null
@@ -95,7 +95,7 @@ function dist2ToSegment(p: P2, s: ExactSegment): CReal | null {
 // ---- element construction -------------------------------------------------------------------
 
 function signedArea2(pts: Array<[bigint, bigint]>): bigint {
-  let a = 0n
+  let a = BigInt(0)
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
   return a
 }
@@ -109,7 +109,7 @@ function orientedRings(c: ExactContour): Array<{ ring: number; pts: Array<[bigin
     const pts: Array<[bigint, bigint]> = segs.sort((a, b) => a.edge - b.edge).map((s) => [s.bx, s.by])
     const area = signedArea2(pts)
     const wantCCW = ring === 0
-    if ((area > 0n) !== wantCCW) pts.reverse()
+    if ((area > BigInt(0)) !== wantCCW) pts.reverse()
     rings.push({ ring, pts })
   }
   return rings
@@ -140,7 +140,7 @@ function buildElements(c: ExactContour, r: bigint, nextVertexId: () => number): 
     for (let i = 0; i < n; i++) {
       const incoming = edgeSeg[(i + n - 1) % n], outgoing = edgeSeg[i]
       const turn = (incoming.bx - incoming.ax) * (outgoing.by - outgoing.ay) - (incoming.by - incoming.ay) * (outgoing.bx - outgoing.ax)
-      if (turn >= 0n) continue // convex (or straight): offset lines meet, no arc
+      if (turn >= BigInt(0)) continue // convex (or straight): offset lines meet, no arc
       // reflex vertex: arc of radius r from the incoming edge's left normal to the outgoing edge's, clockwise
       const [vx, vy] = pts[i]
       const n1 = pInt(-(incoming.by - incoming.ay), incoming.bx - incoming.ax)
@@ -186,7 +186,7 @@ type Hit = { p: P2; tA?: CReal; tB?: CReal } // parameters where defined (segmen
 
 function segSeg(a: SegElem, b: SegElem): Hit[] | null {
   const det = a.dx * b.dy - a.dy * b.dx
-  if (det === 0n) return []
+  if (det === BigInt(0)) return []
   // a.a + t·da = b.a + u·db  → solve by Cramer on certified coordinates
   const w = sub2(b.a, a.a)
   const t = cDiv(cSub(cMul(w.x, cBig(b.dy)), cMul(w.y, cBig(b.dx))), cBig(det))
@@ -222,13 +222,13 @@ function segArc(seg: SegElem, arc: ArcElem, r: bigint): Hit[] | null {
 function arcArc(a: ArcElem, b: ArcElem, r: bigint): Hit[] | null {
   const dx = b.cx - a.cx, dy = b.cy - a.cy
   const d2 = dx * dx + dy * dy
-  if (d2 === 0n || d2 > 4n * r * r) return []
+  if (d2 === BigInt(0) || d2 > BigInt(4) * r * r) return []
   // equal radii: radical line at the midpoint, half-chord h = √(r² − d²/4)
-  const h2 = cSub(R2(r), cRat(rational(d2, 4n)))
+  const h2 = cSub(R2(r), cRat(rational(d2, BigInt(4))))
   const sh = signOf(h2)
   if (sh === null) return null
   if (sh < 0) return []
-  const mx = cRat(rational(2n * a.cx + dx, 2n)), my = cRat(rational(2n * a.cy + dy, 2n))
+  const mx = cRat(rational(BigInt(2) * a.cx + dx, BigInt(2))), my = cRat(rational(BigInt(2) * a.cy + dy, BigInt(2)))
   const len = cSqrt(cBig(d2))
   const hits: Hit[] = []
   const offsets = sh === 0 ? [cInt(0)] : [cSqrt(h2), cNeg(cSqrt(h2))]
@@ -268,7 +268,7 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
       const cx = ratFromInt(e.cx), cy = ratFromInt(e.cy)
       return { minX: ratSub(cx, rr), maxX: ratAdd(cx, rr), minY: ratSub(cy, rr), maxY: ratAdd(cy, rr) }
     }
-    const ax = evaluate(e.a.x, 16n), ay = evaluate(e.a.y, 16n)
+    const ax = evaluate(e.a.x, BigInt(16)), ay = evaluate(e.a.y, BigInt(16))
     const dx = ratFromInt(e.dx), dy = ratFromInt(e.dy)
     const xs = [ax.lo, ax.hi, ratAdd(ax.lo, dx), ratAdd(ax.hi, dx)]
     const ys = [ay.lo, ay.hi, ratAdd(ay.lo, dy), ratAdd(ay.hi, dy)]
@@ -285,9 +285,10 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     // an arc and its two adjacent offset segments meet only at their built junctions (tangency)
     if (a.kind === 'arc' && (a.prevSeg === b.id || a.nextSeg === b.id)) continue
     if (b.kind === 'arc' && (b.prevSeg === a.id || b.nextSeg === a.id)) continue
-    const hits = a.kind === 'seg' && b.kind === 'seg' ? segSeg(a, b)
+    const arcSegHits = a.kind === 'arc' && b.kind === 'seg' ? segArc(b, a, r) : null
+    const hits: Hit[] | null = a.kind === 'seg' && b.kind === 'seg' ? segSeg(a, b)
       : a.kind === 'seg' && b.kind === 'arc' ? segArc(a, b, r)
-        : a.kind === 'arc' && b.kind === 'seg' ? segArc(b, a, r)?.map((h) => ({ p: h.p, tB: h.tA }))
+        : a.kind === 'arc' && b.kind === 'seg' ? (arcSegHits === null ? null : arcSegHits.map((h) => ({ p: h.p, tB: h.tA })))
           : arcArc(a as ArcElem, b as ArcElem, r)
     if (hits === null) { fail(`intersection ${a.kind}${a.id}×${b.kind}${b.id} undecidable`); continue }
     for (const hit of hits) {
@@ -369,7 +370,7 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     let closed = false
     while (cur && !used.has(cur)) {
       used.add(cur)
-      const reversed = cur.from !== enter
+      const reversed: boolean = cur.from !== enter
       loop.push({ piece: cur, reversed })
       const exit: SharedVertex | null = reversed ? cur.from : cur.to
       if (!exit) break
@@ -416,7 +417,7 @@ export function boundaryFeatures(c: ExactContour): { edges: ExactSegment[]; refl
     for (let i = 0; i < n; i++) {
       const [px, py] = pts[(i + n - 1) % n], [vx, vy] = pts[i], [qx, qy] = pts[(i + 1) % n]
       const turn = (vx - px) * (qy - vy) - (vy - py) * (qx - vx)
-      if (turn < 0n) reflex.push({ x: vx, y: vy })
+      if (turn < BigInt(0)) reflex.push({ x: vx, y: vy })
     }
   }
   return { edges, reflex }

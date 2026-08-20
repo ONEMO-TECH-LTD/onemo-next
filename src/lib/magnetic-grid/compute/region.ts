@@ -49,7 +49,7 @@ export function regionContains(region: ExactRegion, p: P2, r: bigint): boolean |
   return true
 }
 
-const BITS = 64n
+const BITS = BigInt(64)
 const I = (lo: Rational, hi: Rational): Interval => ({ lo, hi })
 const iAdd = (a: Interval, b: Interval): Interval => I(ratAdd(a.lo, b.lo), ratAdd(a.hi, b.hi))
 const iSub = (a: Interval, b: Interval): Interval => I(ratSub(a.lo, b.hi), ratSub(a.hi, b.lo))

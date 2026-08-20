@@ -23,18 +23,18 @@ export interface ExactContour {
 
 const floatParts = (value: number): { mantissa: bigint; exponent: number } => {
   if (!Number.isFinite(value)) throw new Error('exact contour: non-finite coordinate')
-  if (value === 0) return { mantissa: 0n, exponent: 0 }
+  if (value === 0) return { mantissa: BigInt(0), exponent: 0 }
   const view = new DataView(new ArrayBuffer(8))
   view.setFloat64(0, value)
   const bits = view.getBigUint64(0)
-  const sign = bits >> 63n === 1n ? -1n : 1n
-  const exp = Number((bits >> 52n) & 0x7ffn)
-  const frac = bits & 0xfffffffffffffn
-  const mantissa = exp === 0 ? frac : (1n << 52n) | frac
+  const sign = bits >> BigInt(63) === BigInt(1) ? -BigInt(1) : BigInt(1)
+  const exp = Number((bits >> BigInt(52)) & BigInt('0x7ff'))
+  const frac = bits & BigInt('0xfffffffffffff')
+  const mantissa = exp === 0 ? frac : (BigInt(1) << BigInt(52)) | frac
   const exponent = exp === 0 ? -1074 : exp - 1075
   // strip trailing zero bits so the common shift stays small
   let m = mantissa, e = exponent
-  while (m !== 0n && (m & 1n) === 0n) { m >>= 1n; e += 1 }
+  while (m !== BigInt(0) && (m & BigInt(1)) === BigInt(0)) { m >>= BigInt(1); e += 1 }
   return { mantissa: sign * m, exponent: e }
 }
 
@@ -47,13 +47,13 @@ export function exactContour(contour: Contour): ExactContour {
   for (const ring of rings) for (const [x, y] of ring.pts) {
     shift = Math.max(shift, -floatParts(x).exponent, -floatParts(y).exponent)
   }
-  const unit = 1n << BigInt(shift)
+  const unit = BigInt(1) << BigInt(shift)
   const lift = (v: number): bigint => {
     const { mantissa, exponent } = floatParts(v)
-    return mantissa * (1n << BigInt(exponent + shift))
+    return mantissa * (BigInt(1) << BigInt(exponent + shift))
   }
   const segments: ExactSegment[] = []
-  let minX = 0n, minY = 0n, maxX = 0n, maxY = 0n
+  let minX = BigInt(0), minY = BigInt(0), maxX = BigInt(0), maxY = BigInt(0)
   let first = true
   rings.forEach((ring, ringIndex) => {
     const pts = ring.pts
@@ -81,7 +81,7 @@ export const toUnits = (mm: number, c: ExactContour): bigint => {
   const { mantissa, exponent } = floatParts(mm)
   const e = exponent + c.shift
   if (e < 0) throw new Error('toUnits: value finer than the contour unit')
-  return mantissa * (1n << BigInt(e))
+  return mantissa * (BigInt(1) << BigInt(e))
 }
 
 /** integer units → exact rational mm. */
@@ -95,10 +95,10 @@ export function segmentDist2(px: bigint, py: bigint, s: ExactSegment): Rational 
   const dx = s.bx - s.ax, dy = s.by - s.ay
   const len2 = dx * dx + dy * dy
   const wx = px - s.ax, wy = py - s.ay
-  if (len2 === 0n) return rational(wx * wx + wy * wy, 1n)
+  if (len2 === BigInt(0)) return rational(wx * wx + wy * wy, BigInt(1))
   const t = wx * dx + wy * dy // parameter numerator; t/len2 ∈ [0,1] means foot is interior
-  if (t <= 0n) return rational(wx * wx + wy * wy, 1n)
-  if (t >= len2) { const ex = px - s.bx, ey = py - s.by; return rational(ex * ex + ey * ey, 1n) }
+  if (t <= BigInt(0)) return rational(wx * wx + wy * wy, BigInt(1))
+  if (t >= len2) { const ex = px - s.bx, ey = py - s.by; return rational(ex * ex + ey * ey, BigInt(1)) }
   // perpendicular distance² = cross² / len2, exact
   const cross = wx * dy - wy * dx
   return rational(cross * cross, len2)
@@ -111,8 +111,8 @@ export function nearestDist2(px: bigint, py: bigint, c: ExactContour): { d2: Rat
   for (const s of c.segments) {
     // Exact prescreen: the segment's bbox is at least this far — skip when provably farther than best.
     if (best) {
-      const dx = px < s.minX ? s.minX - px : px > s.maxX ? px - s.maxX : 0n
-      const dy = py < s.minY ? s.minY - py : py > s.maxY ? py - s.maxY : 0n
+      const dx = px < s.minX ? s.minX - px : px > s.maxX ? px - s.maxX : BigInt(0)
+      const dy = py < s.minY ? s.minY - py : py > s.maxY ? py - s.maxY : BigInt(0)
       if ((dx * dx + dy * dy) * best.d > best.n) continue
     }
     const d2 = segmentDist2(px, py, s)
@@ -121,7 +121,7 @@ export function nearestDist2(px: bigint, py: bigint, c: ExactContour): { d2: Rat
     if (l < r) { best = d2; binding = [s] }
     else if (l === r) binding.push(s)
   }
-  return { d2: best ?? rational(0n, 1n), binding }
+  return { d2: best ?? rational(BigInt(0), BigInt(1)), binding }
 }
 
 /** Even-odd ray parity against all rings — exact integer crossing test. */
@@ -134,7 +134,7 @@ export function insideContour(px: bigint, py: bigint, c: ExactContour): boolean 
     const num = (py - ay) * (bx - ax)
     const den = by - ay
     const lhs = (px - ax) * den
-    const crosses = den > 0n ? lhs < num : lhs > num
+    const crosses = den > BigInt(0) ? lhs < num : lhs > num
     if (crosses) inside = !inside
   }
   return inside
