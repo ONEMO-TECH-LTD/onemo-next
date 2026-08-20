@@ -36,12 +36,17 @@ export const cSqrt = (a: CReal): CReal => {
 }
 
 export function isRationalExpr(e: CReal): boolean {
+  const hit = ratMemo.get(e)
+  if (hit !== undefined) return hit
+  let value: boolean
   switch (e.k) {
-    case 'rat': return true
-    case 'sqrt': return false
-    case 'neg': return isRationalExpr(e.a)
-    default: return isRationalExpr(e.a) && isRationalExpr(e.b)
+    case 'rat': value = true; break
+    case 'sqrt': value = false; break
+    case 'neg': value = isRationalExpr(e.a); break
+    default: value = isRationalExpr(e.a) && isRationalExpr(e.b)
   }
+  ratMemo.set(e, value)
+  return value
 }
 
 /** Exact value of a rational-only expression. */
@@ -81,9 +86,27 @@ const div = (a: Rational, b: Rational) => rational(a.n * b.d, a.d * b.n)
 const minR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) < 0 ? x : m))
 const maxR = (...xs: Rational[]) => xs.reduce((m, x) => (compareExact(x, m) > 0 ? x : m))
 
+// Memo tables. An expression node is immutable, so its enclosure at a given precision and its
+// quadratic normal form are functions of the node alone — identical values, computed once. The
+// certified construction shares subtrees heavily (one branch's base point feeds every clip root),
+// so without this the same subtree is re-walked thousands of times per region.
+const evalMemo = new WeakMap<object, Map<string, Interval>>()
+const ratMemo = new WeakMap<object, boolean>()
+
 /** Certified enclosure of the expression at `bits` of dyadic precision. A rational-only
  *  expression is returned exactly, zero-width — rounding is only for radicals. */
 export function evaluate(e: CReal, bits: bigint): Interval {
+  const key = bits.toString()
+  let table = evalMemo.get(e)
+  const hit = table?.get(key)
+  if (hit) return hit
+  const value = evaluateUncached(e, bits)
+  if (!table) { table = new Map(); evalMemo.set(e, table) }
+  table.set(key, value)
+  return value
+}
+
+function evaluateUncached(e: CReal, bits: bigint): Interval {
   if (e.k !== 'rat' && isRationalExpr(e)) { const v = exactRational(e); return { lo: v, hi: v } }
   switch (e.k) {
     case 'rat': return { lo: e.v, hi: e.v }
@@ -123,11 +146,21 @@ const qZero = ratFromInt(0)
 const sameField = (p: Quadratic, q: Quadratic): bigint | null =>
   p.b.n === BigInt(0) ? q.k : q.b.n === BigInt(0) ? p.k : p.k === q.k ? p.k : null
 
+const quadMemo = new WeakMap<object, { q: Quadratic | null }>()
+
 /**
  * Exact normal form when the expression lives in a single quadratic field (at most one distinct
  * square root). Nested or mixed radicals return null and fall back to certified enclosures.
  */
 export function asQuadratic(e: CReal): Quadratic | null {
+  const hit = quadMemo.get(e)
+  if (hit) return hit.q
+  const q = asQuadraticUncached(e)
+  quadMemo.set(e, { q })
+  return q
+}
+
+function asQuadraticUncached(e: CReal): Quadratic | null {
   switch (e.k) {
     case 'rat': return { a: e.v, b: qZero, k: BigInt(1) }
     case 'neg': { const q = asQuadratic(e.a); return q && { a: { n: -q.a.n, d: q.a.d }, b: { n: -q.b.n, d: q.b.d }, k: q.k } }
