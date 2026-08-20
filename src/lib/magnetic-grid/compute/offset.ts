@@ -381,13 +381,20 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     // at a parameter where nothing about its validity changes. Requiring the hit on BOTH spans
     // removes those spurious vertices; it cannot remove a real one, because a genuine crossing lies
     // on both curves by definition.
+    // Three-valued on purpose. A point is outside the span as soon as EITHER end proves it outside,
+    // whatever the other end does — so a decisive negative is never discarded because its partner
+    // could not be settled. Only a point with no decisive answer and at least one unknown is
+    // reported unknown. (Every remaining refusal on a traced outline was this: one bound said
+    // "before the span start" outright while the other straddled zero at a near-concurrent corner.)
     const onSpan = (e: Elem, hit: Hit, which: 'A' | 'B'): boolean | null => {
       if (e.kind === 'seg') {
         const t = which === 'A' ? hit.tA : hit.tB
         if (!t) return null
         const lo = signOf(cSub(t, e.t0)), hi = signOf(cSub(e.t1, t))
+        if (lo !== null && lo < 0) return false
+        if (hi !== null && hi < 0) return false
         if (lo === null || hi === null) return null
-        return lo >= 0 && hi >= 0
+        return true
       }
       return onSweep(e, dirOn(e, hit.p))
     }
@@ -440,18 +447,23 @@ export function offsetArrangement(c: ExactContour, r: bigint): OffsetArrangement
     const ceilI = (v: Rational) => (v.n >= BigInt(0) ? (v.n + v.d - BigInt(1)) / v.d : -((-v.n) / v.d))
     return nearSegments(index, floorI(ix.lo) - BigInt(1), floorI(iy.lo) - BigInt(1), ceilI(ix.hi) + BigInt(1), ceilI(iy.hi) + BigInt(1), r)
   }
+  // Existential, and three-valued in the same way: the question is whether ANY feature is nearer
+  // than r, so one certified violation answers it no matter how many other comparisons are unknown.
+  // The scan therefore runs to the end, remembers whether anything stayed unknown, and reports
+  // unknown only when nothing was found nearer.
   const valid = (p: P2, own: readonly ExactSegment[]): boolean | null => {
     const scope = candidatesNear(p)
     if (scope === null) return null
+    let unknown = false
     for (const f of scope) {
       if (own.includes(f)) continue
       const d2 = dist2ToSegment(p, f)
-      if (d2 === null) return null
+      if (d2 === null) { unknown = true; continue }
       const s = signOf(cSub(d2, R2(r)))
-      if (s === null) return null
+      if (s === null) { unknown = true; continue }
       if (s < 0) return false
     }
-    return true
+    return unknown ? null : true
   }
   const pieces: Piece[] = []
   for (const e of elems) {
