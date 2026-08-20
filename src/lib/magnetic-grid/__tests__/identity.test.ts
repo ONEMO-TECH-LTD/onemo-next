@@ -129,4 +129,38 @@ describe('§6.1 canonical serialization of certified integral expressions', () =
     expect(refined.proofId).toBe(coarse.proofId)
     expect(refined.isolating).not.toEqual(coarse.isolating)
   })
+
+  it('routes zero or cancelling angle residue away from CertifiedExpressionReal', () => {
+    const sum = source()
+    const sweep = sum.angles[0].sweep
+    expect(publishCertifiedSum({ exact: cInt(7), angles: [{ weight: cInt(0), sweep }] })).toBeNull()
+    expect(publishCertifiedSum({
+      exact: cInt(7),
+      angles: [{ weight: cInt(3), sweep }, { weight: cInt(-3), sweep }],
+    })).toBeNull()
+  })
+
+  it('proves distinct signed quarter-turn cancellation but retains a full turn', () => {
+    const point = (x: number, y: number) => ({ x: cInt(x), y: cInt(y) })
+    const plus = { cx: BigInt(0), cy: BigInt(0), r: BigInt(1), from: point(1, 0), to: point(0, 1) }
+    const minus = { cx: BigInt(10), cy: BigInt(0), r: BigInt(1), from: point(10, 1), to: point(11, 0) }
+    expect(publishCertifiedSum({
+      exact: cInt(7),
+      angles: [{ weight: cInt(1), sweep: plus }, { weight: cInt(1), sweep: minus }],
+    })).toBeNull()
+
+    const fullTurn = [0, 10, 20, 30].map((cx) => ({
+      weight: cInt(1),
+      sweep: { cx: BigInt(cx), cy: BigInt(0), r: BigInt(1), from: point(cx + 1, 0), to: point(cx, 1) },
+    }))
+    expect(publishCertifiedSum({ exact: cInt(7), angles: fullTurn })).not.toBeNull()
+  })
+
+  it('retains the actual holed-square π residue and routes a no-hole square to Rational', () => {
+    expect(publishCertifiedSum(source())).not.toBeNull()
+    const contour = exactContour({ outer: { pts: [[0, 0], [72, 0], [72, 72], [0, 72]] }, holes: [] })
+    const rationalArea = exactRegions(contour, toUnits(12, contour)).regions[0].areaExpr
+    expect(rationalArea.angles).toEqual([])
+    expect(publishCertifiedSum(rationalArea)).toBeNull()
+  })
 })

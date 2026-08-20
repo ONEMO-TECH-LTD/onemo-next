@@ -7,7 +7,7 @@
 
 import type { ExactRational } from './exact-real'
 import type { CertifiedExpressionReal } from '../spec'
-import { angleBetween } from './angle'
+import { angleBetween, piInterval } from './angle'
 import { cAdd, cDiv, cInt, cMul, cNeg, cSqrt, cSub, evaluate, signOf, type CReal, type Interval } from './certified-real'
 import type { ExactContour } from './clearance'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSign, ratSub, ratToNumber } from './exact-real'
@@ -74,12 +74,58 @@ const canonicalSweep = (sweep: ArcSweep) => [
  */
 export function publishCertifiedSum(sum: CertifiedSum): CertifiedExpressionReal | null {
   if (!sum.angles.length) return null
+  const parent = sum.angles.map((_, index) => index)
+  const find = (index: number): number => (parent[index] === index ? index : (parent[index] = find(parent[index])))
+  for (let left = 0; left < sum.angles.length; left++) for (let right = left + 1; right < sum.angles.length; right++) {
+    const equal = sweepsAgree(sum.angles[left].sweep, sum.angles[right].sweep)
+    if (equal === null) return null
+    if (equal) parent[find(left)] = find(right)
+  }
+  const groups = new Map<number, Array<(typeof sum.angles)[number]>>()
+  sum.angles.forEach((term, index) => {
+    const root = find(index)
+    const known = groups.get(root)
+    if (known) known.push(term); else groups.set(root, [term])
+  })
+  const normalized: Array<{ weight: CReal; sweep: ArcSweep }> = []
+  for (const terms of groups.values()) {
+    const weight = terms.slice(1).reduce((total, term) => cAdd(total, term.weight), terms[0].weight)
+    const sign = signOf(weight)
+    if (sign === null) return null
+    if (sign === 0) continue
+    const sweep = [...terms].sort((a, b) => canonicalSweep(a.sweep).localeCompare(canonicalSweep(b.sweep)))[0].sweep
+    normalized.push({ weight, sweep })
+  }
+  if (!normalized.length) return null
+  const weightParent = normalized.map((_, index) => index)
+  const weightFind = (index: number): number => (weightParent[index] === index ? index : (weightParent[index] = weightFind(weightParent[index])))
+  for (let left = 0; left < normalized.length; left++) for (let right = left + 1; right < normalized.length; right++) {
+    const equal = signOf(cSub(normalized[left].weight, normalized[right].weight))
+    if (equal === null) return null
+    if (equal === 0) weightParent[weightFind(left)] = weightFind(right)
+  }
+  const weightGroups = new Map<number, Array<(typeof normalized)[number]>>()
+  normalized.forEach((term, index) => {
+    const root = weightFind(index)
+    const known = weightGroups.get(root)
+    if (known) known.push(term); else weightGroups.set(root, [term])
+  })
+  const cancelled = new Set<(typeof normalized)[number]>()
+  for (const terms of weightGroups.values()) {
+    if (terms.length < 2) continue
+    const zero = aggregateSweepIsZero(terms.map((term) => term.sweep))
+    if (zero === null) return null
+    if (zero) for (const term of terms) cancelled.add(term)
+  }
+  const residue = normalized.filter((term) => !cancelled.has(term))
+  if (!residue.length) return null
   const expression = [
     'certified-sum-v1',
     `exact:${canonicalExpression(sum.exact)}`,
-    ...sum.angles.map(({ weight, sweep }) => `angle:${canonicalExpression(weight)}@${canonicalSweep(sweep)}`).sort(),
+    ...residue.map(({ weight, sweep }) => `angle:${canonicalExpression(weight)}@${canonicalSweep(sweep)}`).sort(),
   ]
-  const isolating = evaluateSum(sum, BigInt(128))
+  const canonicalSum: CertifiedSum = { exact: sum.exact, angles: residue }
+  const isolating = evaluateSum(canonicalSum, BigInt(128))
   return encodeCertifiedExpression({ expression, isolating: [isolating.lo, isolating.hi] })
 }
 
@@ -458,16 +504,43 @@ export function compareCertifiedSum(a: CertifiedSum, b: CertifiedSum): -1 | 0 | 
 }
 
 /** Do two sweeps subtend exactly the same signed angle? Decided by exact algebra, never by value. */
-function sweepsAgree(a: ArcSweep, b: ArcSweep): boolean | null {
-  const parts = (sweep: ArcSweep) => {
-    const u1 = { x: cSub(sweep.from.x, cInt(sweep.cx)), y: cSub(sweep.from.y, cInt(sweep.cy)) }
-    const u2 = { x: cSub(sweep.to.x, cInt(sweep.cx)), y: cSub(sweep.to.y, cInt(sweep.cy)) }
-    return {
-      cross: cSub(cMul(u1.x, u2.y), cMul(u1.y, u2.x)),
-      dot: cAdd(cMul(u1.x, u2.x), cMul(u1.y, u2.y)),
-    }
+function sweepParts(sweep: ArcSweep) {
+  const u1 = { x: cSub(sweep.from.x, cInt(sweep.cx)), y: cSub(sweep.from.y, cInt(sweep.cy)) }
+  const u2 = { x: cSub(sweep.to.x, cInt(sweep.cx)), y: cSub(sweep.to.y, cInt(sweep.cy)) }
+  return {
+    cross: cSub(cMul(u1.x, u2.y), cMul(u1.y, u2.x)),
+    dot: cAdd(cMul(u1.x, u2.x), cMul(u1.y, u2.y)),
   }
-  const first = parts(a), second = parts(b)
+}
+
+/** Exact zero signed rotation: complex product 1 plus winding certified inside (−π,π). */
+function aggregateSweepIsZero(sweeps: readonly ArcSweep[]): boolean | null {
+  let real: CReal = cInt(1), imaginary: CReal = cInt(0)
+  let total: Interval = { lo: ratFromInt(0), hi: ratFromInt(0) }
+  const bits = BigInt(128)
+  for (const sweep of sweeps) {
+    const { cross, dot } = sweepParts(sweep)
+    const radius2 = cInt(sweep.r * sweep.r)
+    const rotationReal = cDiv(dot, radius2), rotationImaginary = cDiv(cross, radius2)
+    const nextReal = cSub(cMul(real, rotationReal), cMul(imaginary, rotationImaginary))
+    const nextImaginary = cAdd(cMul(real, rotationImaginary), cMul(imaginary, rotationReal))
+    real = nextReal; imaginary = nextImaginary
+    const angle = angleBetween(cross, dot, bits)
+    if (!angle) return null
+    total = { lo: ratAdd(total.lo, angle.lo), hi: ratAdd(total.hi, angle.hi) }
+  }
+  const realOne = signOf(cSub(real, cInt(1))), imaginaryZero = signOf(imaginary)
+  if (realOne === null || imaginaryZero === null) return null
+  if (realOne !== 0 || imaginaryZero !== 0) return false
+  const pi = piInterval(bits)
+  const aboveNegativePi = compareExact(total.lo, { n: -pi.lo.n, d: pi.lo.d }) > 0
+  const belowPositivePi = compareExact(total.hi, pi.lo) < 0
+  const containsZero = ratSign(total.lo) <= 0 && ratSign(total.hi) >= 0
+  return aboveNegativePi && belowPositivePi && containsZero
+}
+
+function sweepsAgree(a: ArcSweep, b: ArcSweep): boolean | null {
+  const first = sweepParts(a), second = sweepParts(b)
   // atan2(c1,d1) = atan2(c2,d2) ⟺ c1·d2 = c2·d1 with the same quadrant, i.e. matching signs
   const crossProduct = signOf(cSub(cMul(first.cross, second.dot), cMul(second.cross, first.dot)))
   if (crossProduct === null) return null

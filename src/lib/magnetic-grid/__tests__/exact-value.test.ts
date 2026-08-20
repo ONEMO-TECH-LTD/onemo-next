@@ -81,7 +81,22 @@ describe('R14 §7.1b.4 CertifiedExpression reconstruction and refinement', () =>
       isolating: [decodeRational(value.isolating[0]), decodeRational(value.isolating[1])],
     })!
     expect(decodeCertifiedExpression(forged([...value.expression.slice(0, 2), 'angle:not-valid']))).toBeNull()
-    expect(decodeCertifiedExpression(forged([value.expression[0], value.expression[1], ...value.expression.slice(2).reverse()]))).toBeNull()
+    const point = (x: number, y: number) => ({ x: cInt(x), y: cInt(y) })
+    const twoTerm = publishCertifiedSum({
+      exact: cInt(7),
+      angles: [
+        { weight: cInt(1), sweep: { cx: BigInt(0), cy: BigInt(0), r: BigInt(1), from: point(1, 0), to: point(0, 1) } },
+        { weight: cInt(1), sweep: { cx: BigInt(10), cy: BigInt(0), r: BigInt(5), from: point(15, 0), to: point(13, 4) } },
+      ],
+    })!
+    expect(twoTerm.expression).toHaveLength(4)
+    expect(decodeCertifiedExpression(twoTerm)).not.toBeNull()
+    const reversedAngles = twoTerm.expression.slice(2).reverse().map(String)
+    const reversedCertificate = encodeCertifiedExpression({
+      expression: [twoTerm.expression[0], twoTerm.expression[1], ...reversedAngles].map(String),
+      isolating: [decodeRational(twoTerm.isolating[0]), decodeRational(twoTerm.isolating[1])],
+    })!
+    expect(decodeCertifiedExpression(reversedCertificate)).toBeNull()
     const noncanonical = value.expression.map((token, index) => index === 1
       ? token.replace(/\/(\d+)/, (_match, digits: string) => `/0${digits}`)
       : token)
