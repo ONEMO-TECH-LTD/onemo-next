@@ -125,3 +125,21 @@ GATES (added):
   changes only conflict outcomes) — Dan's "verify every control is true".
 - CIRCULARITY check in the guard: centreMainMM identical across magnet plans/coverage for
   the same shape+mode (seat-independence proven, not asserted).
+
+## Meta audit round 2 (verified by lead, 2026-08-20)
+
+- G1 PROBE-CONFIRMED: wrap-law scope = THE PERIMETER BELT. Interior magnets of a Full-grid
+  layout can never touch an edge by definition — the law binds every BELT disc; interior
+  discs are exempt. (Lead re-probe: 120sq B3 at flap 0 — belt coverage rung [120/8], Full
+  coverage EMPTY.) Guard gains the G1 fixture: Full-coverage square must still rung.
+- G2: version the browser-dial namespace (grid-origin.v2.*) — stale persisted dials from the
+  scoring era must not leak into the law engine. Reset-to-default migrates.
+- G3: governor factory default → Dan question #4 (Smallest is still the spec default; the
+  sliver-hijack keeps returning through it).
+- G4: gravity's "otherwise equal" DEFINED: same magnet count, same wrap satisfaction, same
+  parity class — only then does vertical beat horizontal.
+- Shrinks adopted: pressExcessMM (already on the kill list) · all three worker caches are
+  measure-then-delete once solves are 4-candidate · bandSnapPoints and compute's `dist`
+  exports have zero external consumers — deleted with the sweep.
+- Deslop: `v3.5-architecture.md` is stale on the surfaces Dan tests — refreshed and stamped
+  as a BUILD-phase close-out task, before QA reads it.
