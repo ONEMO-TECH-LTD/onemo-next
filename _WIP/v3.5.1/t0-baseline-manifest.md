@@ -22,23 +22,31 @@ Frozen donor: `8d17780c`. Contract: `a626598fada3e908f848440b369e08e0fc36532726f
 
 Only bodies reachable from `positioning===1` may seed the Law centre layer. Voting-only symbols are `DELETE-LATER / NOT-A-LAW-DONOR`: `registrationScore`, `ORDERS`, `VOTING_ORDER`, `centeringRef`, phase sweep, voting weights, and voting persisted config.
 
-| Body | Source lines | Disposition | Body SHA-256 | Proof |
-|---|---:|---|---|---|
-| `governMass` | `grid-origin-logic.ts:51-68` | ADAPT representation only | `f9c2a1e6a091a710f15348d39aa7a507662f2065956a9466147e4c10a9e0525e` | all nine-policy characterization; identical branch decisions required |
-| `centeringAnchors` | `grid-origin-logic.ts:75-105` | ADAPT accepted policy behavior; DELETE mesh-derived ruler | `552b359e8e549262bb89d42a943a0dc155459b2f38f39b37667c2f109211c46c` | all nine-policy characterization; only named ruler defects may differ |
-| `parityHolds` | `grid-origin.ts:134-143` | ADAPT/RE-ROOM | `bea5685bb4bdc1f351e3f1f32f1c69d09cf2bc7f629816a4ba357a8aba2203e0` | node/gap parity fixture |
-| Centre-rules four placements and ranking | `grid-origin.ts:190-220` | ADAPT/RE-ROOM | `df311380469ea8f0b93c60b20b391ef22c76298e9b932005cc7fc61a123c9b1b` | pre-room/post-room characterization equality |
-| `bbox` | `grid-origin-compute.ts:16-24` | MOVE-BODY | `64e353985eca429749f422857314fa428eb9faac5f3691b5500b4d50c671cfbd` | current primitive fixture unchanged |
-| `latticeAt` | `grid-origin-compute.ts:46-65` | MOVE-BODY | `5ac8a286b8cd3f497f353b84375813a77302e33da6202291a2228aad9c76ac02` | current primitive fixture unchanged |
-| segment seat predicate | `grid-origin-compute.ts:182-236` | ADAPT into exact neutral kernel | `97cc15c6f42fccb8c0646ae7e15a0997ebf40a5d37320a51d7d43ed1c52caf4c` | equivalence on accepted non-defect cases; exact boundary owns differences |
-| `centroidOf` | `grid-origin-compute.ts:540-558` | MOVE-BODY | `1236d29cb8f2924badec11077bda11a728d0e7da34214b01fb50698d781f2427` | current primitive fixture unchanged |
-| `scaleContour` | `grid-origin-compute.ts:583-600` | MOVE-BODY | `e04e9f1a41a448ae209b7c0d805097e3a5fe90eb59832da3cd93c1d9135a052f` | current primitive fixture unchanged |
+| Body | Source lines | Disposition | Proof |
+|---|---:|---|---|
+| `governMass` | `grid-origin-logic.ts:51-68` | ADAPT representation only | all nine-policy characterization; identical branch decisions required |
+| `centeringAnchors` | `grid-origin-logic.ts:75-105` | ADAPT accepted policy behavior; DELETE mesh-derived ruler | all nine-policy characterization; only named ruler defects may differ |
+| `parityHolds` | `grid-origin.ts:134-143` | ADAPT/RE-ROOM | node/gap parity fixture |
+| Centre-rules four placements and ranking | `grid-origin.ts:190-220` | ADAPT/RE-ROOM | pre-room/post-room characterization equality |
+| `bbox` | `grid-origin-compute.ts:16-20` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + neutral fixture |
+| `axisFrom` | `grid-origin-compute.ts:36-43` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + lattice fixture |
+| `latticeAt` | `grid-origin-compute.ts:46-51` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + lattice fixture |
+| `latticeOver` | `grid-origin-compute.ts:54-56` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + lattice fixture |
+| segment seat predicate | `grid-origin-compute.ts:182-207` | ADAPT into exact neutral kernel | equivalence on accepted non-defect cases; exact boundary owns differences |
+| `centroidOf` | `grid-origin-compute.ts:540-554` | MOVE-VERBATIM → `compute/centre-evidence.ts` | executable AST hash + centroid fixture |
+| `scaleContour` | `grid-origin-compute.ts:583-585` | MOVE-VERBATIM → `compute/seat.ts` as public `scaleBoundary` | executable AST hash + contour-scale fixture |
 
 The executable inventory in `grid-origin-inventory.test.ts` classifies every remaining callable body and top-level symbol individually. Its committed snapshot records every public export/re-export, runtime/test/build consumer, persisted key/default field, worker request/response/model field, queue rule, cache shape/cap/invalidation rule, and every tracked artifact under `grid-origin*` and `src/lib/grid-engine/**` with hash, active owner, destination, generated-source owner, legal disposition, and current deletion-proof state. The test fails if a callable body or top-level symbol is unclassified, if any inventory entry changes, or if a new consumer/artifact appears without a reviewed snapshot update.
 
+The executable AST extractor and its snapshot are the sole MOVE-body hash authority. T1 must use the same extractor to assert donor body hash equals copied body hash; prose does not duplicate hash values.
+
 The executable gate asserts that no duplicate inventory verifier or overlapping snapshot exists; `grid-origin-inventory.test.ts` is the sole inventory verifier.
 
-No deletion is currently proved. Comparator files are preserved through T5; active-lane artifacts remain blocked on Dan's lane-precedence ruling; provider deletion later requires migrated consumers plus a zero-consumer trace.
+One concurrent untracked `grid-origin-t0-inventory.test.ts` briefly appeared during T0 and disappeared before ownership could be identified. Grid-Meta confirmed it neither created nor removed the duplicate, and also did not modify the surviving verifier. Ownership is recorded as unknown; the duplicate is not an authority.
+
+The surviving verifier also received concurrent disposition edits whose owner could not be identified. They were accepted only after an independent R14/current-source check: rejected mesh/tolerance/alternate-circle bodies delete; corrected worst-belt and belt semantics adapt; comparator shape adapters remain comparator-only; the Law bridge retains only pass-through sizing and field-view behavior.
+
+No deletion is currently proved. Comparator files and their T0 test consumers are preserved through T5. At T7/T8 the old-provider tests/snapshots must migrate to canonical-package tests or be deleted before the providers can die; a zero-consumer trace is mandatory. Active-lane artifacts remain blocked on Dan's lane-precedence ruling.
 
 ## Characterization baseline
 

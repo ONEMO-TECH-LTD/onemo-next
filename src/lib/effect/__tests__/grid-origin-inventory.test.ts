@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { bbox, centroidOf, latticeAt, scaleContour } from '../grid-origin-compute'
+import { canonicalCallableBodySha256 } from './grid-origin-function-text'
 
 const ROOT = process.cwd()
 const ACTIVE_LANE = 'session62-task/s62-kai-lead-v3.2-rv-t3'
@@ -94,25 +95,12 @@ function callableBodies(file: string): string[] {
   return [...found].sort()
 }
 
-function bodyText(file: string, name: string): string {
-  const parsed = source(file)
-  let found = ''
-  const walk = (node: ts.Node) => {
-    if (found) return
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = node.getText(parsed)
-    if (ts.isVariableDeclaration(node) && node.name.getText(parsed) === name && node.initializer
-      && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
-      found = node.getText(parsed)
-    }
-    ts.forEachChild(node, walk)
-  }
-  walk(parsed)
-  if (!found) throw new Error(`missing callable body ${file}#${name}`)
-  return found
-}
-
 function bodyDestination(id: string, disposition: Disposition): string {
-  if (disposition === 'MOVE-VERBATIM') return 'src/lib/magnetic-grid/compute/seat.ts'
+  if (disposition === 'MOVE-VERBATIM') {
+    if (/#centroidOf$/.test(id)) return 'src/lib/magnetic-grid/compute/centre-evidence.ts'
+    if (/#scaleContour$/.test(id)) return 'src/lib/magnetic-grid/compute/seat.ts as scaleBoundary, re-exported by compute.ts'
+    return 'src/lib/magnetic-grid/compute/seat.ts'
+  }
   if (disposition === 'PRESERVE-COMPARATOR') return 'current comparator only; no Law destination'
   if (disposition === 'PROVEN-UNRELATED') return 'existing dev-loader owner'
   if (disposition === 'DELETE-LATER') return 'no Law destination'
@@ -232,6 +220,27 @@ function workerPostMessageShapes(file: string): { response: string[]; model: str
   return { response: [...response].sort(), model: [...model].sort() }
 }
 
+function persistedDefaultObjects(file: string): { save: string[]; reset: string[] } {
+  const parsed = source(file)
+  const names = (object: ts.ObjectLiteralExpression) => object.properties
+    .map((property) => property.name?.getText(parsed) ?? '')
+    .filter(Boolean)
+  let save: string[] = []
+  let reset: string[] = []
+  const walk = (node: ts.Node) => {
+    if (ts.isVariableDeclaration(node) && node.name.getText(parsed) === 'd'
+      && node.initializer && ts.isObjectLiteralExpression(node.initializer)) reset = names(node.initializer)
+    if (ts.isCallExpression(node) && node.expression.getText(parsed) === 'JSON.stringify') {
+      const argument = node.arguments[0]
+      if (argument && ts.isObjectLiteralExpression(argument)) save = names(argument)
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(parsed)
+  if (!save.length || !reset.length) throw new Error('grid-origin.defaults save/reset object not found')
+  return { save, reset }
+}
+
 function consumerLines(): Array<{ file: string; line: number; kind: 'runtime' | 'test' | 'build'; target: string; text: string }> {
   const candidates = trackedFiles('src', 'scripts', 'next.config.ts')
     .filter((file) => /\.(?:ts|tsx|js|mjs|cjs)$/.test(file))
@@ -277,12 +286,25 @@ describe('v3.5 T0 inventory is exhaustive', () => {
         disposition,
         destination: bodyDestination(id, disposition),
         proof: bodyProof(id, disposition),
-        functionTextSha256: disposition === 'MOVE-VERBATIM' ? sha256(bodyText(file, name)) : null,
+        functionTextSha256: disposition === 'MOVE-VERBATIM'
+          ? canonicalCallableBodySha256(join(ROOT, file), name)
+          : null,
       }
     })).toMatchSnapshot()
   })
 
   it('pins neutral MOVE candidates by behavior as well as exact function text', () => {
+    const moveDestinations = Object.fromEntries([...bodyDispositions.entries()]
+      .filter(([, disposition]) => disposition === 'MOVE-VERBATIM')
+      .map(([id, disposition]) => [id.split('#')[1], bodyDestination(id, disposition)]))
+    expect(moveDestinations).toEqual({
+      bbox: 'src/lib/magnetic-grid/compute/seat.ts',
+      axisFrom: 'src/lib/magnetic-grid/compute/seat.ts',
+      latticeAt: 'src/lib/magnetic-grid/compute/seat.ts',
+      latticeOver: 'src/lib/magnetic-grid/compute/seat.ts',
+      centroidOf: 'src/lib/magnetic-grid/compute/centre-evidence.ts',
+      scaleContour: 'src/lib/magnetic-grid/compute/seat.ts as scaleBoundary, re-exported by compute.ts',
+    })
     expect(bbox([[3, -2], [-4, 8], [1, 5]])).toEqual({ minX: -4, minY: -2, maxX: 3, maxY: 8 })
     expect(latticeAt({ minX: 0, minY: 0, maxX: 48, maxY: 48 }, 48, 24, 24)).toEqual([[24, 24]])
     expect(centroidOf([[0, 0], [6, 0], [0, 6]])).toEqual([2, 2])
@@ -307,7 +329,8 @@ describe('v3.5 T0 inventory is exhaustive', () => {
     const page = readFileSync(join(ROOT, RUNTIME_FILES[6]), 'utf8')
     const persistedKeys = [...page.matchAll(/usePersisted\('([^']+)'/g)].map((match) => `grid-origin.${match[1]}`).sort()
     persistedKeys.push('grid-origin.defaults')
-    const persistedDefaultFields = ['pad', 'flap', 'phaseStep', 'massDepth', 'centreMode', 'positioning', 'governor', 'votingOrder', 'snapStep', 'sizeMin', 'sizeMax']
+    const persistedDefaults = persistedDefaultObjects(RUNTIME_FILES[6])
+    expect(persistedDefaults.save).toEqual(persistedDefaults.reset)
     const workerState = {
       request: ['id', 'base', 'offsetMM', 'cfg', 'mode', 'sizeMM', 'snapStep', 'stepSel', 'autoFlapMaxMM'],
       response: ['id', 'model', 'error'],
@@ -331,7 +354,7 @@ describe('v3.5 T0 inventory is exhaustive', () => {
     expect(workerSource).toContain('const FREE_CAP = 400')
     expect(workerSource).toContain('const WALK_CAP = 10')
     expect(workerSource).toContain('const FITS_CAP = 12')
-    expect({ persistedKeys: persistedKeys.sort(), persistedDefaultFields, workerState }).toMatchSnapshot()
+    expect({ persistedKeys: persistedKeys.sort(), persistedDefaultFields: persistedDefaults.save, workerState }).toMatchSnapshot()
   })
 
   it('records every grid-origin and active grid-engine artifact with owner and destination', () => {
@@ -341,7 +364,11 @@ describe('v3.5 T0 inventory is exhaustive', () => {
       .map((file) => ({
         file,
         sha256: /grid-origin-inventory\.test\.ts(?:\.snap)?$/.test(file) ? 'SELF-MANIFEST' : sha256(readFileSync(join(ROOT, file))),
-        disposition: /asset-lib|next\.config|grid-origin-(?:centre-baseline|inventory)\.test/.test(file) ? 'PROVEN-UNRELATED' : 'MIGRATE-CONSUMER-THEN-DELETE',
+        disposition: /asset-lib|next\.config/.test(file)
+          ? 'PROVEN-UNRELATED'
+          : /__tests__/.test(file)
+            ? 'KEEP-FLAGGED-THROUGH-T5-THEN-MIGRATE-OR-DELETE'
+            : 'MIGRATE-CONSUMER-THEN-DELETE',
         owner: 'session62-task/grid-v3.5',
         destination: /asset-lib|next\.config/.test(file)
           ? 'existing dev-loader owner'
@@ -349,9 +376,11 @@ describe('v3.5 T0 inventory is exhaustive', () => {
             ? 'T0 characterization/proof owner'
             : 'src/lib/magnetic-grid or magnetic-grid bridge',
         generatedSourceOwner: /__snapshots__/.test(file) ? file.replace('/__snapshots__/', '/').replace('.snap', '') : 'hand-authored tracked source',
-        deletionProof: /asset-lib|next\.config|grid-origin-(?:centre-baseline|inventory)\.test/.test(file)
-          ? 'not a magnetic-grid runtime authority; retained under its existing dev/proof owner'
-          : 'NOT YET PROVEN: T7 requires migrated consumers plus a zero-consumer trace',
+        deletionProof: /asset-lib|next\.config/.test(file)
+          ? 'not a magnetic-grid authority; retained under the existing dev-loader owner'
+          : /__tests__/.test(file)
+            ? 'NOT YET PROVEN: retained through T5; T7/T8 must migrate to canonical tests or delete, then prove zero old-provider consumers'
+            : 'NOT YET PROVEN: T7 requires migrated consumers plus a zero-consumer trace',
       }))
     const activeLaneArtifacts = trackedFiles('src/lib/grid-engine')
       .map((file) => ({
