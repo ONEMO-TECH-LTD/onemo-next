@@ -55,7 +55,9 @@ describe('real supplied cutouts resolve exactly', () => {
         expect(measured[index], `${cutout.file} island ${index}`).toBeCloseTo(expected[index], 1)
       }
       for (const region of regions) {
-        // every certificate is a genuine enclosure, and every island holds a real magnet seat
+        // every certificate is a genuine enclosure — narrower than a micron — around a positive
+        // area. Whether a 24mm disc actually seats in each island is a SEAT question, and it is
+        // asserted where that predicate lives, not implied from area here.
         expect(ratToNumber(region.areaMM2.hi) - ratToNumber(region.areaMM2.lo)).toBeLessThan(1e-6)
         expect(region.areaApproxMM2).toBeGreaterThan(0)
       }

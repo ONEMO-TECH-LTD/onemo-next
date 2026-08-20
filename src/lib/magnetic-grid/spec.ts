@@ -96,3 +96,83 @@ export interface CentreBaselineResult {
   seated: readonly Pt[]
   canonAxes: 0 | 1 | 2
 }
+
+// ---- exact centre law contracts ---------------------------------------------------------------
+
+/** A certified enclosure of a rational quantity, as compute publishes it. */
+export interface Bounds { readonly lo: Rational; readonly hi: Rational }
+export interface BoundedPoint { readonly x: Bounds; readonly y: Bounds }
+
+/** What kind of evidence a region's clearance maximum turned out to be. */
+export type MaximumKind = 'certified' | 'tie' | 'plateau' | 'unresolved'
+
+/**
+ * One selectable branch, reduced to what selection needs and nothing else. `centre` is present only
+ * for a certified single point; a ridge or a tie names none, and `maximum` says which it was so the
+ * co-maximal evidence can be recovered rather than flattened into a refusal.
+ */
+export interface CentreBranchEvidence {
+  readonly islandIndex: number
+  readonly massIndex: number | null
+  readonly area: Bounds
+  readonly peakClear: Bounds | null
+  readonly centre: BoundedPoint | null
+  readonly maximum: MaximumKind
+  /**
+   * The finitely many co-equal maxima of this branch, when its maximum is a tie. A ridge has no
+   * finite set and leaves this empty — the distinction matters, because a finite tie can be an
+   * enumerated CentreTie a grid can still be placed on, and a continuum cannot.
+   */
+  readonly coEqual: readonly BoundedPoint[]
+}
+
+export interface ExactCentreInput {
+  /** content identity of the measured evidence these branches came from */
+  readonly evidenceId: string
+  /**
+   * Anything the region construction could not settle. It travels as PROVENANCE, not as a verdict:
+   * whether it matters depends on the policy — a box or weight centre is read from the shape alone
+   * and is unaffected by an unresolved island. Only the law may decide that.
+   */
+  readonly unresolved: readonly string[]
+  readonly box: BoundedPoint
+  readonly weight: BoundedPoint
+  readonly core: BoundedPoint | null
+  readonly islands: readonly CentreBranchEvidence[]
+  readonly masses: readonly CentreBranchEvidence[]
+  readonly midY: Rational
+}
+
+export type CentreRefusalCode =
+  | 'NO_SAFE_CORE'
+  | 'NO_CENTRE'
+  | 'CENTRE_EVIDENCE_UNRESOLVED'
+  | 'CENTRE_TIE_UNRESOLVED'
+
+export type CentreBranchName = 'box' | 'core' | 'weight' | 'deep' | 'top' | 'mass'
+
+/**
+ * One governed centre. It names the branch that produced it, so a tie is a set of real decisions
+ * rather than bare coordinates. Branch indices locate a decision WITHIN an evidence set; they are
+ * not identity on their own — `(0, null)` is the first island of every contour at every scale — so
+ * the verdict also carries the evidence id and the applied policy, once each, because one evidence
+ * set and one policy produced every decision in it. Downstream this becomes cache and result
+ * identity, and either omission would make two different decisions indistinguishable.
+ */
+export interface CentreChoice {
+  readonly target: BoundedPoint
+  readonly branch: CentreBranchName
+  readonly islandIndex: number | null
+  readonly massIndex: number | null
+}
+
+/**
+ * The three outcomes R14 §6.1 authorizes, and no fourth. Either one governed centre, or an explicit
+ * tie of finitely many co-equal centres a grid can still be placed on, or a typed refusal.
+ * A co-maximal CONTINUUM is not a result: it establishes no unique governed centre and no finite
+ * set, so it refuses — carrying the plateau in its reason rather than pretending to be an answer.
+ */
+export type ExactCentreVerdict =
+  | { readonly status: 'decided'; readonly policy: CentrePolicy; readonly evidenceId: string; readonly decision: CentreChoice }
+  | { readonly status: 'tie'; readonly policy: CentrePolicy; readonly evidenceId: string; readonly decisions: readonly [CentreChoice, CentreChoice, ...CentreChoice[]] }
+  | { readonly status: 'refused'; readonly policy: CentrePolicy; readonly evidenceId: string; readonly code: CentreRefusalCode; readonly reason: string }

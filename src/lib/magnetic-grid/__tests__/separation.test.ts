@@ -27,7 +27,7 @@ describe('magnetic-grid T1 separation', () => {
   it('is portable and imports only along the declared DAG', () => {
     const allowed: Record<(typeof FILES)[number], readonly string[]> = {
       'spec.ts': [],
-      'compute.ts': ['./compute/seat', './compute/centre-evidence'],
+      'compute.ts': ['./compute/seat', './compute/centre-evidence', './compute/clearance', './compute/exact-real'],
       'compute/exact-real.ts': ['../spec'],
       'compute/certified-real.ts': ['../spec', './exact-real'],
       'compute/angle.ts': ['../spec', './exact-real', './certified-real'],
@@ -37,7 +37,7 @@ describe('magnetic-grid T1 separation', () => {
       'compute/deepest.ts': ['../spec', './certified-real', './clearance', './exact-real', './offset', './region'],
       'compute/seat.ts': ['../spec'],
       'compute/centre-evidence.ts': ['../spec', './certified-real', './clearance', './deepest', './exact-real', './region', './seat'],
-      'logic.ts': ['./spec'],
+      'logic.ts': ['./compute', './spec'],
       'engine.ts': ['./compute', './logic', './spec'],
     }
     for (const file of FILES) {

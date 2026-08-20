@@ -12,7 +12,7 @@
 
 import type { CentreMeasurements, CentreRegionRef, Contour, Pt, Rational, RegionMeasurement } from '../spec'
 import { MASS_DEPTH_MM, SPOT_RADIUS_MM } from '../spec'
-import type { Interval } from './certified-real'
+import { evaluate, type CReal, type Interval } from './certified-real'
 import { type ExactContour, toUnits } from './clearance'
 import { clearanceMaximum, type ClearanceMaximum } from './deepest'
 import { compareExact, ratAdd, ratDiv, ratFromInt, ratMul, ratSub, rational } from './exact-real'
@@ -75,7 +75,20 @@ export function allMasses(regions: readonly RegionMeasurement[]): readonly Centr
 // ---- exact construction of the same branches -------------------------------------------------
 
 
-/** A measured region: the certified integrals of §7.1b item 4 plus the maximum of item 5. */
+/**
+ * A measured region: the certified integrals of §7.1b item 4 plus the maximum of item 5, together
+ * with the NEUTRAL SELECTION RECORD the law layer chooses from.
+ *
+ * The record exists because selection is policy and measurement is not. Logic ranks islands and
+ * masses by area, by depth and by height, and under the import law its only arithmetic is
+ * `compareExact` on rationals — it may not reach into geometry to find a y coordinate. So compute
+ * publishes those three quantities as certified rational enclosures and keeps the geometry opaque:
+ * logic decides WHICH branch governs, never where anything is.
+ *
+ * `centre` is null exactly when the deepest evidence names no single point — a co-maximal ridge or
+ * an unresolved maximum. The donor's mesh always produced a point there because it sampled; naming
+ * that absence is the honest form of the same evidence, and it is what lets a tie stay a tie.
+ */
 export interface MeasuredRegion {
   readonly region: ExactRegion
   readonly areaMM2: Interval
@@ -83,6 +96,12 @@ export interface MeasuredRegion {
   readonly meanMM: { x: Interval; y: Interval }
   /** the deepest-point evidence — the donor's `centreMM`/`peakClearMM`, as typed evidence */
   readonly deepest: ClearanceMaximum
+  /** the governed point, when one exists: certified maximum, or the single point of a tie set */
+  readonly centre: { x: Interval; y: Interval } | null
+  /** peak clearance — the donor's `peakClearMM` — certified, or null when the maximum is unresolved */
+  readonly peakClear: Interval | null
+  /** the finitely many co-equal maxima when the maximum is a tie; empty for a ridge, which has none */
+  readonly coEqual: readonly { x: Interval; y: Interval }[]
 }
 
 export interface ExactIsland extends MeasuredRegion {
@@ -91,6 +110,19 @@ export interface ExactIsland extends MeasuredRegion {
 }
 
 export interface ExactCentreEvidence {
+  /**
+   * Content identity of this measured evidence set. Branch indices are NOT identity — `(0, null)`
+   * is the first island of every contour at every scale — so a decision travelling with indices
+   * alone could not be told apart downstream, where it becomes cache and result identity.
+   *
+   * It is derived from EXACT, PRECISION-FREE inputs only: the supplied geometry as exact integer
+   * units, the two ruled clearance levels, and each region's own generating features. Deliberately
+   * NOT from enclosure bounds, array positions or message order — an id that moved when a bound was
+   * refined, or when the same outline arrived with its points rotated, would be an id of the
+   * traversal rather than of the evidence. Every key is sorted by exact geometry, so a permuted
+   * input yields the identical id.
+   */
+  readonly id: string
   readonly box: { x: Rational; y: Rational }
   /** material weight centre — the exact shoelace centroid of the supplied outer ring */
   readonly weight: { x: Rational; y: Rational }
@@ -100,6 +132,40 @@ export interface ExactCentreEvidence {
   readonly midY: Rational
   readonly unresolved: boolean
   readonly reasons: readonly string[]
+}
+
+/** Deterministic 64-bit FNV-1a over a canonical rendering — no host crypto, identical everywhere. */
+function contentId(parts: readonly string[]): string {
+  let hash = BigInt('0xcbf29ce484222325')
+  const prime = BigInt('0x100000001b3')
+  const mask = (BigInt(1) << BigInt(64)) - BigInt(1)
+  for (const part of parts) {
+    for (let index = 0; index < part.length; index++) {
+      hash = ((hash ^ BigInt(part.charCodeAt(index))) * prime) & mask
+    }
+    hash = ((hash ^ BigInt(31)) * prime) & mask
+  }
+  return hash.toString(16).padStart(16, '0')
+}
+
+/** Exact geometric key of one supplied segment, independent of which ring index or direction it
+ *  arrived with: the two endpoints in integer units, ordered canonically between themselves. */
+function segmentKey(segment: { ax: bigint; ay: bigint; bx: bigint; by: bigint }): string {
+  const a = `${segment.ax},${segment.ay}`
+  const b = `${segment.bx},${segment.by}`
+  return a <= b ? `${a}|${b}` : `${b}|${a}`
+}
+
+/** A region's exact identity: the sorted set of boundary features that generate it. */
+function regionIdentity(region: ExactRegion): string {
+  const features: string[] = []
+  for (const loop of [region.outer, ...region.holes]) {
+    for (const { piece } of loop.pieces) {
+      const element = piece.elem
+      features.push(element.kind === 'seg' ? `s:${segmentKey(element.feat)}` : `a:${element.cx},${element.cy}`)
+    }
+  }
+  return [...new Set(features)].sort().join(';')
 }
 
 const iAdd = (a: Interval, b: Interval): Interval => ({ lo: ratAdd(a.lo, b.lo), hi: ratAdd(a.hi, b.hi) })
@@ -146,13 +212,29 @@ export function exactWeightCentre(c: ExactContour): { x: Rational; y: Rational }
   return { x: rational(sx, BigInt(3) * a2 * c.unit), y: rational(sy, BigInt(3) * a2 * c.unit) }
 }
 
-function measure(c: ExactContour, region: ExactRegion, level: bigint): MeasuredRegion {
+/** Certified enclosure of a certified point's coordinates, in mm. */
+function pointMM(p: { x: CReal; y: CReal }, unit: bigint): { x: Interval; y: Interval } {
+  const perUnit = ratFromInt(unit)
+  const x = evaluate(p.x, BigInt(64)), y = evaluate(p.y, BigInt(64))
   return {
-    region,
-    areaMM2: region.areaMM2,
-    meanMM: region.centroidMM,
-    deepest: clearanceMaximum(c, region, level),
+    x: { lo: ratDiv(x.lo, perUnit), hi: ratDiv(x.hi, perUnit) },
+    y: { lo: ratDiv(y.lo, perUnit), hi: ratDiv(y.hi, perUnit) },
   }
+}
+
+function measure(c: ExactContour, region: ExactRegion, level: bigint): MeasuredRegion {
+  const deepest = clearanceMaximum(c, region, level)
+  const perUnit = ratFromInt(c.unit)
+  const clearanceOf = (lo: Rational, hi: Rational): Interval => ({ lo: ratDiv(lo, perUnit), hi: ratDiv(hi, perUnit) })
+  // A co-maximal ridge has no single point; a tie has several. Both are named rather than reduced
+  // to one sample, which is precisely what the 2mm mesh used to do.
+  const centre = deepest.status === 'certified' ? pointMM(deepest.best.p, c.unit) : null
+  const peakClear = deepest.status === 'certified' ? clearanceOf(deepest.best.lo, deepest.best.hi)
+    : deepest.status === 'tie' ? clearanceOf(deepest.candidates[0].lo, deepest.candidates[0].hi)
+      : deepest.status === 'plateau' ? clearanceOf(deepest.clearanceLo, deepest.clearanceHi)
+        : null
+  const coEqual = deepest.status === 'tie' ? deepest.candidates.map((cand) => pointMM(cand.p, c.unit)) : []
+  return { region, areaMM2: region.areaMM2, meanMM: region.centroidMM, deepest, centre, peakClear, coEqual }
 }
 
 /**
@@ -235,9 +317,24 @@ export function exactCentreEvidence(
   }
 
   const box = exactBoxCentre(c)
+  const weight = exactWeightCentre(c)
+  // Sorted, so the same shape identifies identically however its points were ordered on the way in.
+  const regionKeys = ordered.map((island) => {
+    const masses = island.masses.map((mass) => `${regionIdentity(mass.region)}#${mass.deepest.status}`).sort()
+    return `${regionIdentity(island.region)}#${island.deepest.status}[${masses.join('+')}]`
+  }).sort()
+  const id = contentId([
+    'centre-evidence-v1',
+    `geometry:${[...c.segments].map(segmentKey).sort().join(';')}`,
+    `unit:${c.unit}`,
+    `levels:${spot},${depth}`,
+    ...regionKeys,
+    `unresolved:${[...reasons].sort().join('~')}`,
+  ])
   return {
+    id,
     box,
-    weight: exactWeightCentre(c),
+    weight,
     core,
     islands: ordered,
     midY: box.y,
