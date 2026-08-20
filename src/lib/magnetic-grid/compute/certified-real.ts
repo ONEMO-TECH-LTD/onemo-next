@@ -6,7 +6,7 @@
 // never rounded into a verdict.
 
 import type { Rational } from '../spec'
-import { compareExact, ratFromInt, ratSign, rational, sqrtInterval } from './exact-real'
+import { compareExact, isqrt, ratFromInt, ratSign, rational, sqrtInterval } from './exact-real'
 
 export type CReal =
   | { readonly k: 'rat'; readonly v: Rational }
@@ -22,7 +22,18 @@ export const cSub = (a: CReal, b: CReal): CReal => ({ k: 'sub', a, b })
 export const cMul = (a: CReal, b: CReal): CReal => ({ k: 'mul', a, b })
 export const cDiv = (a: CReal, b: CReal): CReal => ({ k: 'div', a, b })
 export const cNeg = (a: CReal): CReal => ({ k: 'neg', a })
-export const cSqrt = (a: CReal): CReal => ({ k: 'sqrt', a })
+/** Square root — stays exact when the operand is a rational perfect square (axis-aligned and
+ *  Pythagorean edge lengths), so tangencies between such elements decide exactly. */
+export const cSqrt = (a: CReal): CReal => {
+  if (isRationalExpr(a)) {
+    const v = exactRational(a)
+    if (v.n >= 0n) {
+      const rn = isqrt(v.n), rd = isqrt(v.d)
+      if (rn * rn === v.n && rd * rd === v.d) return cRat(rational(rn, rd))
+    }
+  }
+  return { k: 'sqrt', a }
+}
 
 export function isRationalExpr(e: CReal): boolean {
   if (e.k === 'rat') return true
