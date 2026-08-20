@@ -93,3 +93,34 @@ export interface CentreBaselineResult {
   seated: readonly Pt[]
   canonAxes: 0 | 1 | 2
 }
+
+// ---- §6.1 exact value contracts ----------------------------------------------------------------
+// Declared as the contract writes them. These are the transport and identity forms: §6.1 states
+// their purpose is that "Node/browser/worker/cache bytes agree", and §6.4 canonicalizes identity
+// with the same decimal-string integers. Compute keeps BigInt arithmetic internally (§6.2) and
+// converts here.
+
+/** Exact values serialize with decimal-string integers so Node/browser/worker/cache bytes agree. */
+export type ExactInteger = string
+export interface Rational { numerator: ExactInteger; denominator: ExactInteger }
+export interface AlgebraicReal {
+  polynomial: readonly ExactInteger[]
+  isolating: readonly [Rational, Rational]
+  rootIndex: number
+}
+export interface CertifiedExpressionReal {
+  expressionHash: string
+  expression: readonly (ExactInteger | string)[]
+  isolating: readonly [Rational, Rational]
+  proofId: string
+}
+export type ExactReal = Rational | AlgebraicReal | CertifiedExpressionReal
+export interface ExactScale {
+  exact: ExactReal
+  approximateMM: number // report/render only; never gates law
+}
+export interface ExactPoint {
+  x: ExactReal
+  y: ExactReal
+  approximateMM: PointMM // report/render only
+}
