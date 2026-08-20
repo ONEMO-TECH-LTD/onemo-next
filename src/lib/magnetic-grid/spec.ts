@@ -4,6 +4,10 @@ export type Pt = [number, number]
 export type PointMM = readonly [number, number]
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
+/** Exact rational value — BigInt terms, normalized by compute/exact-real. */
+export interface Rational { readonly n: bigint; readonly d: bigint }
+export interface ExactPoint { readonly x: Rational; readonly y: Rational }
+
 export interface Ring { pts: Pt[] }
 export interface Contour { outer: Ring; holes: Ring[] }
 

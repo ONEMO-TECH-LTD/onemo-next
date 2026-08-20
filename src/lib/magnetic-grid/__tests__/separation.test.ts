@@ -8,6 +8,7 @@ const ROOT = join(process.cwd(), 'src/lib/magnetic-grid')
 const FILES = [
   'spec.ts',
   'compute.ts',
+  'compute/exact-real.ts',
   'compute/seat.ts',
   'compute/centre-evidence.ts',
   'logic.ts',
@@ -21,6 +22,7 @@ describe('magnetic-grid T1 separation', () => {
     const allowed: Record<(typeof FILES)[number], readonly string[]> = {
       'spec.ts': [],
       'compute.ts': ['./compute/seat', './compute/centre-evidence'],
+      'compute/exact-real.ts': ['../spec'],
       'compute/seat.ts': ['../spec'],
       'compute/centre-evidence.ts': ['../spec', './seat'],
       'logic.ts': ['./spec'],
