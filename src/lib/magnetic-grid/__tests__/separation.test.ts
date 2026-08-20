@@ -36,7 +36,7 @@ describe('magnetic-grid T1 separation', () => {
       'compute/region.ts': ['../spec', './angle', './certified-real', './clearance', './exact-real', './offset'],
       'compute/deepest.ts': ['../spec', './certified-real', './clearance', './exact-real', './offset', './region'],
       'compute/seat.ts': ['../spec'],
-      'compute/centre-evidence.ts': ['../spec', './seat'],
+      'compute/centre-evidence.ts': ['../spec', './certified-real', './clearance', './deepest', './exact-real', './region', './seat'],
       'logic.ts': ['./spec'],
       'engine.ts': ['./compute', './logic', './spec'],
     }
