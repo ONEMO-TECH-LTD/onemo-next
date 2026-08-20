@@ -87,3 +87,41 @@ manual scale within the band; auto flap = the adaptive mode; touch markers must 
    (per-solve and per-walk, before/after).
 5. QA — Meta adversarial pass (own checkout, equivalence + law probes), lead re-verifies,
    then Dan sees the verified report.
+
+## Full-codebase audit deltas (2,558 lines read, 2026-08-20) — gaps the first draft missed
+
+NECESSITY (more must die than the draft named):
+- `centeringRef` (logic) — the seat-dependent centring reference IS the circularity Dan
+  condemned; the governed target already exists seat-free (`governMass` over all masses).
+  DELETE, and `centreMainMM` becomes the governed target always — every mode/governor
+  observable, in every path.
+- `pressExcessMM` (mean-press force) — a score in disguise; concessions need only
+  `maxPressMM` + the centre offset. DELETE.
+- `seatMarginMM` config — duplicates `flapMM` once the law engine folds margin into the wrap
+  law. DELETE the field; the walk passes `flapMM` alone.
+- The PLACEMENT-STEP dial + its enable (page) — nothing slides in the law engine; the dial is
+  a sweep-era organ. DELETE (manual drag calibration stays).
+- The POSITIONING toggle + persisted key, `votingOrder` 2-option dropdown → replaced by the
+  single order control (orders + Balanced), Free-mode-scoped.
+- Slider `wide` prop + `.gl-num-wide` CSS — orphaned by the weight-dial deletion. DELETE.
+
+SUFFICIENCY (details the draft under-specified):
+- `below` baseline (bandWalk) must test the SAME three-law rung predicate, not bare count —
+  a count lawful only below the band belongs below.
+- Auto flap: unchanged semantics on top of the law engine (scan allowances, per-allowance
+  caches via `cacheFor`); free-mode implied readout stays.
+- Rung quantization honesty: at snap step N the contact residual is < N mm by construction;
+  the status line states the measured worst gap, and an optional sub-step bisection refine
+  (size only, laws re-checked) is listed as a follow-up, not silently added.
+- Manual paths (drag calibration, band manual-scale slider) solve under the same laws and
+  REPORT concessions — the slider becomes the verification instrument Dan asked for.
+- Rung counts stay post-belt (the belt is law-neutral; counts must match the canvas).
+- Circle keeps its analytic seat predicate; gravity picks among parity candidates only when
+  laws tie (canon parity still rules the axes).
+
+GATES (added):
+- CONTROL-TRUTH sweep: for every dial, a probe that proves the control does exactly what its
+  name says (flap 0 vs 1 distinguishable; governor switch moves the centre; order switch
+  changes only conflict outcomes) — Dan's "verify every control is true".
+- CIRCULARITY check in the guard: centreMainMM identical across magnet plans/coverage for
+  the same shape+mode (seat-independence proven, not asserted).
