@@ -14,13 +14,16 @@ import {
   PADDING_FLOOR_MM,
   PHASE_STEP_MM,
   POSITIONING,
+  SNAP_STEP_MM,
   VOTING_ORDER,
 } from './grid-origin-spec'
 import {
   bbox,
   centroidOf,
   fieldSpanMM,
-  flapExcessMM,
+  contactPointsMM,
+  maxPressMM,
+  pressExcessMM,
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
@@ -101,6 +104,8 @@ export interface GridResult {
   panMM: Pt
   /** The spot radius the erosion used — the padding, centre-measured. */
   spotRadiusMM: number
+  /** Outline points where a disc touches (within one snap step of its margined edge). */
+  contactsMM: Pt[]
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
   /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
@@ -178,7 +183,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
-      const excess = flapExcessMM(outer, seat, reach, pitch)
+      const excess = pressExcessMM(outer, seat, reach)
       const wins = !best
         || seat.length > best.seats
         || (seat.length === best.seats && canon > best.canon)
@@ -209,7 +214,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // on top take the exact single-pass road instead.
     const pyList = phases(centres.map((a) => a[1] - bb.minY))
     const pxList = phases(centres.map((a) => a[0] - bb.minX))
-    const seatsFirst = (cfg.votingOrder ?? VOTING_ORDER) <= 1
     // Legality memo — every grid point is judged once; pass 2 re-reads, never re-measures.
     const memo = new Map<number, boolean>()
     const fitsM = (p: Pt): boolean => {
@@ -222,24 +226,22 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       return v
     }
     let maxCount = 0
-    const counts = seatsFirst ? new Int32Array(pyList.length * pxList.length) : null
-    if (counts) {
-      for (let yi = 0; yi < pyList.length; yi++) for (let xi = 0; xi < pxList.length; xi++) {
-        let n = 0
-        for (const p of latticeAt(bb, pitch, pxList[xi].p, pyList[yi].p)) if (fitsM(p)) n++
-        counts[yi * pxList.length + xi] = n
-        if (n > maxCount) maxCount = n
-      }
+    const counts = new Int32Array(pyList.length * pxList.length)
+    for (let yi = 0; yi < pyList.length; yi++) for (let xi = 0; xi < pxList.length; xi++) {
+      let n = 0
+      for (const p of latticeAt(bb, pitch, pxList[xi].p, pyList[yi].p)) if (fitsM(p)) n++
+      counts[yi * pxList.length + xi] = n
+      if (n > maxCount) maxCount = n
     }
     let bestScore = -Infinity
     for (let yi = 0; yi < pyList.length; yi++) {
       const py = pyList[yi]
       for (let xi = 0; xi < pxList.length; xi++) {
-        if (counts && counts[yi * pxList.length + xi] !== maxCount) continue
+        if (counts[yi * pxList.length + xi] !== maxCount) continue
         const px = pxList[xi]
         const seat = latticeAt(bb, pitch, px.p, py.p).filter(fitsM)
         if (!seat.length) continue
-        const excess = flapExcessMM(outer, seat, reach, pitch)
+        const excess = pressExcessMM(outer, seat, reach)
         // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
         // containment against the mass's real outline; other modes → the mode's single centre.
         const ref = mode === 2 ? centeringRef(segments, seat, pointInMass, governor, midY) : null
@@ -261,6 +263,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
   return {
     anchors,
+    // Tangency made visible: where each disc meets the outline, within one size step's slack.
+    contactsMM: contactPointsMM(outer, coverage.seated, reach, SNAP_STEP_MM),
     pitchCentreMM: pitch,
     lattice,
     phaseMM: [bestOx, bestOy],
@@ -312,12 +316,20 @@ function bandWalk(
   const points: BandSnapPoint[] = []
   const seen = new Set<number>()
   for (let c = 1; c <= below; c++) seen.add(c)
+  const reach = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)) + margin
   let bestSeatedMM = lo, bestSeats = -1
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = solve(mm)
     const count = grid.anchors.length
     if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
-    if (count >= 1 && !seen.has(count)) {
+    // THE RIGID GATE (Dan): every disc must touch within the allowance — 0 = touch,
+    // 1 = 1mm space — measured with one size-step of slack (the walk's own resolution).
+    // A count whose layout leaves a disc floating past that is NOT an option here;
+    // Auto mode adapts the allowance instead.
+    const contour = sized(mm)
+    const rigid = count >= 1
+      && maxPressMM(contour.outer.pts, grid.anchors.map((a) => a.p), reach) <= stepMM
+    if (rigid && !seen.has(count)) {
       seen.add(count)
       points.push({ sizeMM: mm, count })
     }

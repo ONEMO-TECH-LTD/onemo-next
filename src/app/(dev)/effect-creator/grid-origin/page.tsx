@@ -403,15 +403,6 @@ export default function GridLab() {
               </div>}
               {(() => {
                 const b = BANDS.find((x) => x.id === mode)!
-                // Dan's law: the band slider SNAPS between the qualifying variants — sizes
-                // between rungs fail the selection law and are not stops. Continuous scale
-                // exists only in the fallback, where no variant qualifies to snap to.
-                if (model && model.ladder.length > 0) {
-                  return <Slider label={`Band variant · snaps between the ${model.ladder.length} that qualify`} unit="#"
-                    v={model.idx + 1}
-                    set={(n) => { setStepSel(Math.min(model.ladder.length, Math.max(1, n)) - 1); setBandScale(null) }}
-                    min={1} max={model.ladder.length} />
-                }
                 return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
                   v={Math.round(bandScale ?? (effSizeRef.current || b.minMM))}
                   set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}
@@ -527,16 +518,12 @@ export default function GridLab() {
           </Fold>
           {positioning === 0 && <Fold title="Voting law">
             <div className="gl-magic-note">
-              Three forces vote on every placement — magnet count, wrap (least loose material), centring. The order is strict dominance: the top force always wins; the next only breaks its ties.
+              Magnet count always governs. Between equal counts the order decides: Wrap presses every disc against the edge; Centring holds the centre. The flap dial is the rigid law — a layout with a disc floating past it is not shown (Auto adapts instead).
             </div>
             <div className="gl-field"><span>Priority · which force rules</span>
               <select value={votingOrder} onChange={(e) => setVotingOrder(+e.target.value)}>
                 <option value={0}>Magnets &gt; Wrap &gt; Centring (default)</option>
                 <option value={1}>Magnets &gt; Centring &gt; Wrap</option>
-                <option value={2}>Wrap &gt; Magnets &gt; Centring</option>
-                <option value={3}>Centring &gt; Magnets &gt; Wrap</option>
-                <option value={4}>Wrap &gt; Centring &gt; Magnets</option>
-                <option value={5}>Centring &gt; Wrap &gt; Magnets</option>
               </select>
             </div>
           </Fold>}
@@ -738,6 +725,11 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
           <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill={a.dia === 8 ? 'var(--mag8)' : 'var(--magnet)'} />
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
+      })}
+      {/* Tangency made visible: where a disc touches the outline within the allowance. */}
+      {grid.contactsMM.map((c, i) => {
+        const p = fy(c)
+        return <circle key={'t' + i} cx={p[0]} cy={p[1]} r={0.9} fill="var(--pass)" stroke="var(--panel)" strokeWidth={0.3} />
       })}
       </g>
     </svg>

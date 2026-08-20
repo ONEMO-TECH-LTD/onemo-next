@@ -227,49 +227,49 @@ function distToSeg(v: Pt, a: Pt, b: Pt): number {
   return Math.hypot(v[0] - a[0] - t * dx, v[1] - a[1] - t * dy)
 }
 
-/** THE FLAP LAW (spec: "how far material may extend past a spot's edge"): material is held
- *  near a magnet's spot, or along the SPAN between two lattice-adjacent seated magnets —
- *  never over empty cells an L or diagonal layout happens to box in. Seats always lie on the
- *  pitch lattice, so the nearest disk/span is found by an expanding ring walk over a seat
- *  hash — exact minimum, a handful of cells per query instead of every seat. */
-interface SeatGrid { set: Map<number, Pt>; x0: number; y0: number; pitch: number }
-function seatGridOf(seated: ReadonlyArray<Pt>, pitchMM: number): SeatGrid {
-  const x0 = seated[0][0], y0 = seated[0][1]
-  const set = new Map<number, Pt>()
-  for (const s of seated) set.set(Math.round((s[0] - x0) / pitchMM) * 65536 + Math.round((s[1] - y0) / pitchMM), s)
-  return { set, x0, y0, pitch: pitchMM }
-}
-function heldExcess(v: Pt, g: SeatGrid, reach: number): number {
-  const ci = Math.round((v[0] - g.x0) / g.pitch), cj = Math.round((v[1] - g.y0) / g.pitch)
-  let nd = Infinity
-  for (let r = 0; r <= 64; r++) {
-    // Every yet-unseen disk or span lies at least (r-1)·pitch away — spans are evaluated from
-    // their lower/left seat, so anything anchored in earlier rings is already measured.
-    if (r > 0 && (r - 1) * g.pitch >= nd) break
-    for (let di = -r; di <= r; di++) for (let dj = -r; dj <= r; dj++) {
-      if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue
-      const s = g.set.get((ci + di) * 65536 + (cj + dj))
-      if (!s) continue
-      const d = dist(v, s)
-      if (d < nd) nd = d
-      const rx = g.set.get((ci + di + 1) * 65536 + (cj + dj))
-      if (rx) { const ds = distToSeg(v, s, rx); if (ds < nd) nd = ds }
-      const uy = g.set.get((ci + di) * 65536 + (cj + dj + 1))
-      if (uy) { const ds = distToSeg(v, s, uy); if (ds < nd) nd = ds }
-      if (nd <= reach) return 0
-    }
-  }
-  return Math.max(0, nd - reach)
+/** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
+ *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
+ *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
+ *  Enforced through the dominance tiers, not preferred. */
+export function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+  if (!seated.length) return 0
+  let sum = 0
+  for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)
+  return sum / seated.length
 }
 
-/** Mean distance silhouette vertices sit past reach, mm. 0 = held within the allowance.
- *  Graded, so a placement leaving less material loose scores better. */
-export function flapExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, pitchMM: number = DEFAULT_PITCH_MM): number {
-  if (!outer.length || !seated.length) return 0
-  const g = seatGridOf(seated, pitchMM)
-  let sum = 0
-  for (const v of outer) sum += heldExcess(v, g, reach)
-  return sum / outer.length
+/** THE RIGID GATE (Dan, 2026-08-20): the worst disc's gap past its margined edge. A layout
+ *  qualifies only when EVERY disc touches within the allowance — 0 = touch, 1 = 1mm space.
+ *  Normal mode enforces this; Auto mode adapts the allowance instead. */
+export function maxPressMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+  let m = 0
+  for (const s of seated) { const g = edgeDistMM(outer, s) - reach; if (g > m) m = g }
+  return m
+}
+
+/** Where discs actually touch: for each seated disc within `slackMM` of its margined edge,
+ *  the nearest point on the outline — drawn so tangency is visible, never guessed. */
+export function contactPointsMM(
+  outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, slackMM: number,
+): Pt[] {
+  const out: Pt[] = []
+  for (const s of seated) {
+    if (edgeDistMM(outer, s) - reach > slackMM) continue
+    // nearest outline point: brute over segments (few contacts per solve — cost immaterial)
+    let best: Pt = outer[0], bd = Infinity
+    for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+      const [ax, ay] = outer[j], [bx, by] = outer[i]
+      const dx = bx - ax, dy = by - ay
+      const len2 = dx * dx + dy * dy
+      let t = len2 > 0 ? ((s[0] - ax) * dx + (s[1] - ay) * dy) / len2 : 0
+      t = Math.max(0, Math.min(1, t))
+      const px = ax + t * dx, py = ay + t * dy
+      const d = Math.hypot(s[0] - px, s[1] - py)
+      if (d < bd) { bd = d; best = [px, py] }
+    }
+    out.push(best)
+  }
+  return out
 }
 
 /** The allowance a solved layout IMPLIES at its size — the binding gap between the discs and

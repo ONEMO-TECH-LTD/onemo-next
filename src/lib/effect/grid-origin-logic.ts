@@ -25,27 +25,18 @@ export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
-/** Registration score — the BLESSED voting order (perfect-slow/perfect-fast builds): seats
- *  above all, then UNCOVERED MATERIAL (the flap dial's placement power — it pulls magnets
- *  toward material), then balance to the centre as the tie-break. Exact centring is the
- *  CENTRE-RULES law's job, not this score's — the two positioning laws split the principles. */
-/** The six dominance orders — index of the tier each force sits on: [seats, wrap, centring].
- *  Order 0 is the blessed law: magnets above all, wrap next, centring the tie-break. */
-export type VotingOrder = 0 | 1 | 2 | 3 | 4 | 5
-const TIERS = [SEAT_WEIGHT, FLAP_WEIGHT, BALANCE_WEIGHT] as const
-const ORDERS: ReadonlyArray<readonly [number, number, number]> = [
-  [0, 1, 2], // magnets > wrap > centring (blessed)
-  [0, 2, 1], // magnets > centring > wrap
-  [1, 0, 2], // wrap > magnets > centring
-  [2, 0, 1], // centring > magnets > wrap
-  [1, 2, 0], // wrap > centring > magnets
-  [2, 1, 0], // centring > wrap > magnets
+/** Magnet count always governs — it is the band's step axis (Dan). The order only decides
+ *  which force places the layout among equal counts: press-the-discs first, or centre first. */
+export type VotingOrder = 0 | 1
+const ORDERS: ReadonlyArray<readonly [number, number]> = [
+  [FLAP_WEIGHT, BALANCE_WEIGHT], // magnets > wrap (press) > centring — default
+  [BALANCE_WEIGHT, FLAP_WEIGHT], // magnets > centring > wrap (press)
 ]
 export function registrationScore(
-  seats: number, flapExcessMM: number, balanceMM: number, order?: VotingOrder,
+  seats: number, pressMM: number, balanceMM: number, order?: VotingOrder,
 ): number {
-  const [si, fi, bi] = ORDERS[order ?? (VOTING_ORDER as VotingOrder)]
-  return seats * TIERS[si] - flapExcessMM * TIERS[fi] - balanceMM * TIERS[bi]
+  const [pw, bw] = ORDERS[order ?? (VOTING_ORDER as VotingOrder)] ?? ORDERS[0]
+  return seats * SEAT_WEIGHT - pressMM * pw - balanceMM * bw
 }
 
 
