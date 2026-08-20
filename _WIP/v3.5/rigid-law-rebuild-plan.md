@@ -164,16 +164,25 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
               lost to UNDECIDED). Two tests, chosen by what the interval shows:
                 · SIMPLE ROOT — the derivative's interval enclosure excludes zero, so the
                   Krawczyk test applies: `K(X) ⊆ X` proves a unique root exists in X.
-                · TANGENTIAL (DOUBLE) ROOT — the derivative's enclosure contains zero, so
-                  the problem is DEFLATED one order: certify a root s* of the DERIVATIVE
-                  (where it is itself simple, so Krawczyk applies), then evaluate the
-                  contact function in interval arithmetic at s*. This separates the three
-                  cases the law must distinguish, without conflating them:
-                    – enclosure of f(s*) contains zero and its width is at the
-                      representation's limit → CERTIFIED TANGENTIAL CONTACT; it rungs.
-                    – enclosure of f(s*) strictly excludes zero → CERTIFIED NEAR-MISS; no
-                      rung, and it is not undecided — the engine knows.
-                    – enclosure straddles zero wider than the limit → UNDECIDED.
+                · TANGENTIAL (DOUBLE) ROOT — the derivative's enclosure contains zero.
+                  Here the law REFUSES rather than guesses (closing QA, and the refusal is
+                  the point): containment of zero in a finite-width enclosure of f(s*) does
+                  NOT prove f(s*) = 0 — a near-miss extremum produces the same containment,
+                  so accepting it would render a magnet that does not touch as a lawful fit.
+                  That is the one error this engine exists to prevent, so the outcome is
+                  asymmetric by design:
+                    – enclosure of f(s*) strictly EXCLUDES zero → CERTIFIED NEAR-MISS: no
+                      rung, and the engine knows it is a miss, not a doubt.
+                    – enclosure CONTAINS zero → UNDECIDED. No rung is created. The count is
+                      surfaced as undecided for that band, named, never silently dropped and
+                      never rendered as a fit.
+                  EXACT ESCAPE HATCH, where the geometry allows it: when the outline is a
+                  rational polygon AND the centre is analytic (Box / Weight modes, whose
+                  centres are closed-form), the contact function is algebraic in the scale,
+                  so exact resultant-based isolation decides multiplicity EXACTLY and a
+                  genuine tangential contact rungs with proof. Undecided is therefore the
+                  answer only where no exact route exists — and it is a stated answer, not a
+                  silent one.
               Certified intervals are then refined to the representation's limit (Newton
               inside, bisection as fallback).
               FAIL-CLOSED: only the third case is undecided — the engine shows no rung for
@@ -206,8 +215,10 @@ B2 92.0/4 (p0.064) · manual off-centre now reports parityTrue=false · suite 43
          · BRANCH SWAP UNDER UNCHANGED TOPOLOGY — two masses cross in area with the mass map
            unchanged, so the governor switches which rules: the regime split occurs there and
            the per-regime roots are correct.
-         · CERTIFIED TANGENTIAL DOUBLE ROOT — a contact curve that touches zero without
-           crossing rungs, certified through the deflation path, NOT reported undecided.
+         · TANGENTIAL DOUBLE ROOT — under the numeric path it is reported UNDECIDED and
+           rungs NOTHING (a false rung is the one unacceptable outcome); under the exact
+           algebraic path (rational polygon + analytic centre) the same case rungs with
+           proof. Both halves asserted.
          · NEAR-ZERO NO-ROOT CONTROL — a contact curve approaching zero without reaching it
            yields NO rung AND NO undecided verdict (certified near-miss).
          · UNDECIDED SURFACING — a synthetic case at the representation's limit reports the
