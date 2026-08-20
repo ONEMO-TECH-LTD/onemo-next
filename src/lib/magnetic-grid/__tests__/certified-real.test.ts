@@ -21,10 +21,13 @@ describe('certified reals', () => {
     expect(Math.abs(approx(root2) - Math.SQRT2)).toBeLessThan(1e-15)
   })
 
-  it('refuses to decide an exact-zero irrational identity rather than guessing', () => {
-    // √2·√2 − 2 is exactly zero; enclosures shrink but never exclude zero → null, honestly
-    const e = cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(2))), cInt(2))
-    expect(signOf(e)).toBeNull()
+  it('decides single-radical identities exactly and refuses mixed-radical ones rather than guessing', () => {
+    // √2·√2 − 2 lives in one quadratic field: exactly zero, certified
+    expect(signOf(cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(2))), cInt(2)))).toBe(0)
+    // √2·√3 − √6 is also zero, but spans two fields: enclosures never exclude zero → null, honestly
+    expect(signOf(cSub(cMul(cSqrt(cInt(2)), cSqrt(cInt(3))), cSqrt(cInt(6))))).toBeNull()
+    // and a genuine single-field ordering: 3√2 vs 4 → 3√2 > 4 because 18 > 16
+    expect(signOf(cSub(cMul(cInt(3), cSqrt(cInt(2))), cInt(4)))).toBe(1)
   })
 
   it('enclosures are directed: lower bound floors, upper bound ceils', () => {
