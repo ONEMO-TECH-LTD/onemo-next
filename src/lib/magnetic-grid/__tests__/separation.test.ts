@@ -86,7 +86,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   ],
   'magnetic-grid/compute/centre-evidence.ts': [
     'safeSegments', 'centroidOf', 'measureCentreBranches',
-    'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient', 'buildExactOffsetFeatures',
+    'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient', 'compareExactPointTuple', 'compareExactPointSequence', 'normalizeExactRing', 'buildExactOffsetFeatures',
     'lineRightSide', 'scaleAffineRadical', 'addAffineRadical', 'evaluateAffineRadicalBounds',
     'exactExpression', 'binaryExpression', 'sqrtExpression', 'affineRadicalExpression',
     'canonicalOffsetExpression', 'evaluateOffsetExpressionBounds', 'compareOffsetExpressions',

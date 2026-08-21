@@ -324,7 +324,7 @@ export function exactWeightTargetCoefficient(contour: Contour): ExactCentrePoint
 export interface ExactOffsetLineFeature {
   kind: 'offset-line'
   id: string
-  ring: 'outer' | `hole:${number}`
+  ring: string
   scale: ExactReal
   a: readonly [ExactReal, ExactReal]
   b: readonly [ExactReal, ExactReal]
@@ -338,7 +338,7 @@ export interface ExactOffsetLineFeature {
 export interface ExactOffsetArcFeature {
   kind: 'offset-arc'
   id: string
-  ring: 'outer' | `hole:${number}`
+  ring: string
   centre: readonly [ExactReal, ExactReal]
   clearance: Rational
   startDirectionNumerator: readonly [Rational, Rational]
@@ -354,6 +354,10 @@ export interface ExactOffsetFeatures {
   lines: readonly ExactOffsetLineFeature[]
   arcs: readonly ExactOffsetArcFeature[]
 }
+
+const compareExactPointTuple=(a:Pt,b:Pt):number=>{const x=compareRational(rationalFromNumber(a[0]),rationalFromNumber(b[0]));return x||compareRational(rationalFromNumber(a[1]),rationalFromNumber(b[1]))}
+const compareExactPointSequence=(a:readonly Pt[],b:readonly Pt[]):number=>{for(let index=0;index<Math.min(a.length,b.length);index++){const compared=compareExactPointTuple(a[index],b[index]);if(compared)return compared}return a.length-b.length}
+const normalizeExactRing=(ring:Contour['outer'],role:'outer'|'hole'):Contour['outer']=>{let points=[...ring.pts];let area=rational(0);for(let i=0,j=points.length-1;i<points.length;j=i++)area=addRational(area,subtractRational(multiplyRational(rationalFromNumber(points[j][0]),rationalFromNumber(points[i][1])),multiplyRational(rationalFromNumber(points[i][0]),rationalFromNumber(points[j][1]))));const desired=role==='outer'?1:-1;if(compareRational(area,rational(0))!==desired)points=points.reverse();let best=points;for(let start=1;start<points.length;start++){const candidate=[...points.slice(start),...points.slice(0,start)];if(compareExactPointSequence(candidate,best)<0)best=candidate}return{pts:best}}
 
 interface RadicalTerm { coefficient: Rational; radicand: Rational }
 export interface ExactAffineRadical {
@@ -384,9 +388,11 @@ export function buildExactOffsetFeatures(
 ): ExactOffsetFeatures {
   const lines: ExactOffsetLineFeature[] = []
   const arcs: ExactOffsetArcFeature[] = []
-  const rings = [contour.outer, ...contour.holes]
-  rings.forEach((ring, ringIndex) => {
-    const ringId: 'outer' | `hole:${number}` = ringIndex === 0 ? 'outer' : `hole:${ringIndex - 1}`
+  const outer=normalizeExactRing(contour.outer,'outer'),holes=contour.holes.map(hole=>normalizeExactRing(hole,'hole')).sort((a,b)=>compareExactPointSequence(a.pts,b.pts)),occurrences=new Map<string,number>()
+  const rings=[{ring:outer,role:'outer' as const,occurrence:0},...holes.map(ring=>{const content=JSON.stringify(ring.pts.map(([x,y])=>[canonicalExact(rationalFromNumber(x)),canonicalExact(rationalFromNumber(y))])),occurrence=occurrences.get(content)??0;occurrences.set(content,occurrence+1);return{ring,role:'hole' as const,occurrence}})]
+  rings.forEach(({ring,role,occurrence}) => {
+    const ringContent=ring.pts.map(([x,y])=>[canonicalExact(rationalFromNumber(x)),canonicalExact(rationalFromNumber(y))])
+    const ringId = `${role}:${JSON.stringify(ringContent)}:${occurrence}`
     const points = ring.pts.map(([x, y]) => [rationalFromNumber(x), rationalFromNumber(y)] as const)
     let area2 = rational(0)
     for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
@@ -396,7 +402,7 @@ export function buildExactOffsetFeatures(
       ))
     }
     const orientation = compareRational(area2, rational(0)) >= 0 ? 1 : -1
-    const materialSide = ringIndex === 0 ? orientation : -orientation
+    const materialSide = role === 'outer' ? orientation : -orientation
     for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
       const a = points[previous], b = points[index]
       const dx = subtractRational(b[0], a[0]), dy = subtractRational(b[1], a[1])
