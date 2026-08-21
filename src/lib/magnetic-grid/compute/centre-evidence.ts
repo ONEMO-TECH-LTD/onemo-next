@@ -575,3 +575,35 @@ export function buildExactOffsetArrangement(features:ExactOffsetFeatures):ExactO
   const loops:number[][]=[],used=new Set<string>();if(!badOrder)for(const edge of edges)for(const[start,nextStart]of[[edge.from,edge.to],[edge.to,edge.from]]as const){if(used.has(`${start}:${nextStart}`))continue;const loop=[start];let previous=start,current=nextStart;while(loop.length<=edges.length*2+1){used.add(`${previous}:${current}`);loop.push(current);const neighbors=adjacency.get(current)??[],reverse=neighbors.indexOf(previous);if(reverse<0||!neighbors.length)break;const next=neighbors[(reverse-1+neighbors.length)%neighbors.length];previous=current;current=next;if(previous===start&&current===nextStart){loops.push(loop.slice(0,-1));break}}}
   return{vertices,edges,loops,unresolved}
 }
+
+const scaledBasePoint=(point:Pt,scale:ExactReal)=>[mul(exactExpression(scale),rationalFromNumber(point[0])),mul(exactExpression(scale),rationalFromNumber(point[1]))]as const
+const expressionDot=(a:readonly[ExactOffsetExpression,ExactOffsetExpression],b:readonly[ExactOffsetExpression,ExactOffsetExpression])=>addE(binaryExpression('multiply',a[0],b[0]),binaryExpression('multiply',a[1],b[1]))
+const expressionCross=(a:readonly[ExactOffsetExpression,ExactOffsetExpression],b:readonly[ExactOffsetExpression,ExactOffsetExpression])=>subE(binaryExpression('multiply',a[0],b[1]),binaryExpression('multiply',a[1],b[0]))
+const expressionVector=(a:readonly[ExactOffsetExpression,ExactOffsetExpression],b:readonly[ExactOffsetExpression,ExactOffsetExpression])=>[subE(b[0],a[0]),subE(b[1],a[1])]as const
+
+const exactRingLocation=(point:ExactOffsetIntersection['point'],ring:Contour['outer'],scale:ExactReal):'IN'|'OUT'|'ON'|null=>{let winding=0;for(let i=0,j=ring.pts.length-1;i<ring.pts.length;j=i++){const a=scaledBasePoint(ring.pts[j],scale),b=scaledBasePoint(ring.pts[i],scale),ap=expressionVector(a,point),ab=expressionVector(a,b),turn=compareOffsetExpressions(expressionCross(ab,ap),re(rational(0))),ay=compareOffsetExpressions(a[1],point[1]),by=compareOffsetExpressions(b[1],point[1]);if(turn===null||ay===null||by===null)return null;const projection=compareOffsetExpressions(expressionDot(ap,ab),re(rational(0))),length=compareOffsetExpressions(expressionDot(ap,ab),expressionDot(ab,ab));if(projection===null||length===null)return null;if(turn===0&&projection>=0&&length<=0)return'ON';if(ay<=0&&by>0&&turn>0)winding++;else if(ay>0&&by<=0&&turn<0)winding--}return winding===0?'OUT':'IN'}
+
+const exactSegmentDistanceSquared=(point:ExactOffsetIntersection['point'],a:readonly[ExactOffsetExpression,ExactOffsetExpression],b:readonly[ExactOffsetExpression,ExactOffsetExpression]):ExactOffsetExpression|null=>{const ab=expressionVector(a,b),ap=expressionVector(a,point),projection=expressionDot(ap,ab),length=expressionDot(ab,ab),before=compareOffsetExpressions(projection,re(rational(0))),after=compareOffsetExpressions(projection,length);if(before===null||after===null)return null;if(before<=0)return expressionDot(ap,ap);if(after>=0){const bp=expressionVector(b,point);return expressionDot(bp,bp)}return divE(binaryExpression('multiply',expressionCross(ab,ap),expressionCross(ab,ap)),length)}
+
+export function exactMaterialClearance(
+  point:ExactOffsetIntersection['point'],contour:Contour,scale:ExactReal,clearance:Rational,
+):boolean|null{
+  const outer=exactRingLocation(point,contour.outer,scale);if(outer===null)return null;if(outer==='OUT')return false
+  for(const hole of contour.holes){const location=exactRingLocation(point,hole,scale);if(location===null)return null;if(location!=='OUT')return false}
+  const threshold=re(multiplyRational(clearance,clearance))
+  for(const ring of [contour.outer,...contour.holes])for(let i=0,j=ring.pts.length-1;i<ring.pts.length;j=i++){const d=exactSegmentDistanceSquared(point,scaledBasePoint(ring.pts[j],scale),scaledBasePoint(ring.pts[i],scale));if(!d)return null;const comparison=compareOffsetExpressions(d,threshold);if(comparison===null)return null;if(comparison<0)return false}
+  return true
+}
+
+const midpointPoint=(a:ExactOffsetIntersection['point'],b:ExactOffsetIntersection['point'])=>[
+  divE(addE(a[0],b[0]),re(rational(2))),
+  divE(addE(a[1],b[1]),re(rational(2))),
+]as const
+
+const filterLegalArrangementEdges=(
+  arrangement:ExactOffsetArrangement,contour:Contour,scale:ExactReal,clearance:Rational,
+):{edges:ExactOffsetArrangementEdge[];unresolved:ExactOffsetUnresolved[]}=>{
+  const edges:ExactOffsetArrangementEdge[]=[],unresolved=[...arrangement.unresolved]
+  for(const edge of arrangement.edges){const probe=midpointPoint(arrangement.vertices[edge.from],arrangement.vertices[edge.to]),legal=exactMaterialClearance(probe,contour,scale,clearance);if(legal===null)unresolved.push({featureIds:[edge.featureId],reason:'EXACT_PREDICATE_UNRESOLVED'});else if(legal)edges.push(edge)}
+  return{edges,unresolved}
+}

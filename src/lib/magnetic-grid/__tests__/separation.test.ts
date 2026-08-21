@@ -92,6 +92,9 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'canonicalOffsetExpression', 'evaluateOffsetExpressionBounds', 'compareOffsetExpressions',
     're','mul','addE','subE','divE','lineEndpoint','lineSpan','crossDir','arcSweep','lineCircle','circleCircle','solveExactOffsetIntersections',
     'samePoint','vectorOrder','buildExactOffsetArrangement',
+    'scaledBasePoint','expressionDot','expressionCross','expressionVector','exactRingLocation',
+    'exactSegmentDistanceSquared','exactMaterialClearance',
+    'midpointPoint','filterLegalArrangementEdges',
     'solveExactOffsetLineIntersections',
   ],
   'magnetic-grid/logic.ts': [
