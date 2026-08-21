@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { approximateExact, compareExactToRational, rational } from '../compute/exact-real'
-import { boxTargetCoefficient, enumerateAffineContactEvents, latticeOffsets } from '../compute/regimes'
+import { boxTargetCoefficient, enumerateAffineContactEvents, enumerateParityClassEvents, latticeOffsets } from '../compute/regimes'
 import type { Band, Contour } from '../spec'
 
 const diamond: Contour = {
@@ -25,5 +25,18 @@ describe('exact scaling regime events', () => {
     expect(root!.equation).toEqual(['1', '-192', '8064'])
     expect(compareExactToRational(root!.scale, rational(129))).toBe(1)
     expect(compareExactToRational(root!.scale, rational(130))).toBe(-1)
+  })
+
+  it('enumerates aspect-dependent parity boundaries without stepping', () => {
+    const rectangle: Contour = { outer: { pts: [[0, 0], [1, 0], [1, .5], [0, .5]] }, holes: [] }
+    const bands: Band[] = [
+      { id: 1, minMM: 24, maxMM: 71 },
+      { id: 2, minMM: 72, maxMM: 119 },
+      { id: 3, minMM: 120, maxMM: 167 },
+      { id: 4, minMM: 168, maxMM: 215 },
+    ]
+    const events = enumerateParityClassEvents(rectangle, bands)
+    expect(events.some((event) => event.axis === 1 && event.boundaryMM === 72 && event.scale.numerator === '144')).toBe(true)
+    expect(events.every((event) => event.kind === 'PARITY_CLASS')).toBe(true)
   })
 })

@@ -34,6 +34,14 @@ export interface ContactScaleEvent {
   equation: readonly string[]
 }
 
+export interface ParityClassEvent {
+  id: string
+  kind: 'PARITY_CLASS'
+  axis: 0 | 1
+  boundaryMM: number
+  scale: Rational
+}
+
 const qPoint = ([x, y]: Pt): QPoint => [rationalFromNumber(x), rationalFromNumber(y)]
 const subtract = (a: QPoint, b: QPoint): QPoint => [subtractRational(a[0], b[0]), subtractRational(a[1], b[1])]
 const dot = (a: QPoint, b: QPoint): Rational => addRational(multiplyRational(a[0], b[0]), multiplyRational(a[1], b[1]))
@@ -141,3 +149,27 @@ export function enumerateAffineContactEvents(
 }
 
 export const boxTargetCoefficient = exactBoxTargetCoefficient
+
+/** Exact scales where either normalized bbox side crosses a released B1-B4 parity boundary. */
+export function enumerateParityClassEvents(contour: Contour, bands: readonly Band[]): ParityClassEvent[] {
+  const points = contour.outer.pts.map(qPoint)
+  let minX = points[0][0], maxX = points[0][0], minY = points[0][1], maxY = points[0][1]
+  for (const [x, y] of points) {
+    if (compareRational(x, minX) < 0) minX = x
+    if (compareRational(x, maxX) > 0) maxX = x
+    if (compareRational(y, minY) < 0) minY = y
+    if (compareRational(y, maxY) > 0) maxY = y
+  }
+  const sides = [subtractRational(maxX, minX), subtractRational(maxY, minY)] as const
+  const boundaries = [...new Set(bands.flatMap((band) => [band.minMM, band.maxMM + 1]))].sort((a, b) => a - b)
+  const events: ParityClassEvent[] = []
+  sides.forEach((side, axis) => {
+    if (compareRational(side, rational(0)) <= 0) return
+    for (const boundaryMM of boundaries) {
+      const scale = divideRational(rational(boundaryMM), side)
+      events.push({ id: `parity:${axis}:${boundaryMM}:${canonicalExact(scale)}`, kind: 'PARITY_CLASS', axis: axis as 0 | 1, boundaryMM, scale })
+    }
+  })
+  events.sort((a, b) => compareRational(a.scale, b.scale))
+  return events
+}
