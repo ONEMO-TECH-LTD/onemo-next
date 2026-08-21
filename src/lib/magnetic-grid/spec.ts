@@ -189,6 +189,49 @@ export interface GeneratorEliminationStepProof {
   removedIntegerContent: readonly string[]
   commonFactorDisposition: 'NONE' | 'DECOMPOSED' | 'IDENTICALLY_ZERO'
 }
+
+export interface BackSubstitutionDerivativeProof {
+  order: number
+  derivativeIdentity: string
+  exactValueIdentity: string
+  disposition: 'ZERO' | 'NONZERO'
+}
+
+export interface CandidateBackSubstitutionProof {
+  candidateRootId: string
+  originalPredicateIdentity: string
+  representedGeneratorIds: readonly string[]
+  resultantMultiplicity: number
+  disposition: 'VALID_ROOT' | 'EXTRANEOUS_ROOT' | 'IDENTICALLY_ZERO_BRANCH'
+  trueMultiplicity: number | null
+  derivativeProofs: readonly BackSubstitutionDerivativeProof[]
+}
+
+export interface RationalUnivariateCoordinateProof {
+  valueIdentity: string
+  numerator: readonly string[]
+  denominator: readonly string[]
+}
+
+export interface AlgebraicTupleProof {
+  tupleIdentity: string
+  orderedValueIdentities: readonly string[]
+  primitiveCoefficients: readonly Rational[]
+  primitiveMinimalPolynomial: readonly string[]
+  primitiveRootIndex: number
+  primitiveIsolating: readonly [Rational, Rational]
+  coordinates: readonly RationalUnivariateCoordinateProof[]
+  constructionProofId: string
+}
+
+export interface AlgebraicTupleValueProof {
+  tupleIdentity: string
+  expressionIdentity: string
+  reducedNumerator: readonly string[]
+  reducedDenominator: readonly string[]
+  disposition: 'ZERO' | 'NONZERO'
+  proofId: string
+}
 export interface WrapMeasurement {
   scale: ExactScale
   boundaryTruth: BoundaryTruth

@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   algebraicGeneratorProofs,
+  certifyAlgebraicTuple,
+  certifyAlgebraicTupleValue,
+  certifyCandidateBackSubstitution,
   certifySqrtQuadraticExpression,
   contourIdentity,
   sha256Text,
   validateCertifiedExpressionIdentity,
+  mergeCandidateBackSubstitutionProofs,
 } from '../compute/identity'
 import {
   approximateExact,
   compareExactToRational,
   quadraticRootsWithin,
   rational,
+  constructRawAlgebraicTuple,
 } from '../compute/exact-real'
 import type { Contour } from '../spec'
 
@@ -154,6 +159,213 @@ describe('Wrap canonical identity', () => {
     expect(samePositive.representedIsolating).not.toEqual(refined.representedIsolating)
 
     expect(new Set(forward.map((proof) => proof.generatorIdentity)).size).toBe(3)
+  })
+
+  it('evaluates dependent algebraic tuple coordinates exactly', () => {
+    const generators = algebraicGeneratorProofs([
+      sqrt2('a', true),
+      {
+        semanticSourceIdentity: 'b', definingPolynomial: ['1', '0', '-8'],
+        representedRootIndex: 1, representedIsolating: [rational(2), rational(3)],
+      },
+    ])
+    const values = generators.map((proof) => ({
+      valueIdentity: proof.generatorIdentity,
+      exact: {
+        polynomial: proof.representedMinimalPolynomial,
+        rootIndex: proof.representedRootIndex,
+        isolating: proof.representedIsolating,
+      },
+      proof,
+    }))
+    const tuple = certifyAlgebraicTuple(values)
+    expect(tuple.status).toBe('resolved')
+    if (tuple.status !== 'resolved') return
+    const identities = generators.map((proof) => proof.generatorIdentity)
+    const reorderedTuple = certifyAlgebraicTuple([...values].reverse())
+    expect(reorderedTuple).toEqual(tuple)
+
+    const forgedCoordinate = {
+      ...tuple.proof,
+      coordinates: tuple.proof.coordinates.map((coordinate, index) => index === 0
+        ? { ...coordinate, numerator: ['999'] }
+        : coordinate),
+    }
+    expect(certifyAlgebraicTupleValue(
+      forgedCoordinate,
+      values,
+      'forged-coordinate',
+      [{ coefficient: '-2', powers: [1, 0] }, { coefficient: '1', powers: [0, 1] }],
+      identities,
+    )).toBeNull()
+
+    const zeroDenominator = {
+      ...tuple.proof,
+      coordinates: tuple.proof.coordinates.map((coordinate, index) => index === 0
+        ? { ...coordinate, denominator: ['0'] }
+        : coordinate),
+    }
+    expect(certifyAlgebraicTupleValue(
+      zeroDenominator,
+      values,
+      'zero-denominator',
+      [{ coefficient: '1', powers: [1, 0] }],
+      identities,
+    )).toBeNull()
+    const zero = certifyAlgebraicTupleValue(
+      tuple.proof, values, 'b-minus-2a',
+      [{ coefficient: '-2', powers: [1, 0] }, { coefficient: '1', powers: [0, 1] }],
+      identities,
+    )
+    expect(zero?.disposition).toBe('ZERO')
+  })
+
+  it('distinguishes opposite conjugates and algebraic parameter tuples', () => {
+    const conjugates = algebraicGeneratorProofs([sqrt2('a', true), sqrt2('b', false)])
+    const conjugateValues = conjugates.map((proof) => ({
+      valueIdentity: proof.generatorIdentity,
+      exact: { polynomial: proof.representedMinimalPolynomial, rootIndex: proof.representedRootIndex, isolating: proof.representedIsolating },
+      proof,
+    }))
+    const conjugateTuple = certifyAlgebraicTuple(conjugateValues)
+    expect(conjugateTuple.status).toBe('resolved')
+    if (conjugateTuple.status !== 'resolved') return
+    const ids = conjugates.map((proof) => proof.generatorIdentity)
+    expect(certifyAlgebraicTupleValue(conjugateTuple.proof, conjugateValues, 'sum', [
+      { coefficient: '1', powers: [1, 0] }, { coefficient: '1', powers: [0, 1] },
+    ], ids)?.disposition).toBe('ZERO')
+    expect(certifyAlgebraicTupleValue(conjugateTuple.proof, conjugateValues, 'difference', [
+      { coefficient: '1', powers: [1, 0] }, { coefficient: '-1', powers: [0, 1] },
+    ], ids)?.disposition).toBe('NONZERO')
+
+    const root3 = quadraticRootsWithin(rational(1), rational(0), rational(-3), rational(1), rational(2))[0]
+    const sqrt2Proof = algebraicGeneratorProofs([sqrt2('a', true)])[0]
+    const back = certifyCandidateBackSubstitution(
+      'sqrt3', root3, 1, 'zero-sum',
+      [
+        { coefficient: '1', powers: [2, 0] }, { coefficient: '-3', powers: [0, 0] },
+        { coefficient: '1', powers: [0, 2] }, { coefficient: '-2', powers: [0, 0] },
+      ],
+      [sqrt2Proof],
+    )
+    expect(back.status).toBe('resolved')
+    if (back.status === 'resolved') expect(back.proof.disposition).toBe('VALID_ROOT')
+    const candidateProof = algebraicGeneratorProofs([{
+      semanticSourceIdentity: 'sqrt3', definingPolynomial: ['1', '0', '-3'],
+      representedRootIndex: 1, representedIsolating: [rational(1), rational(2)],
+    }])[0]
+    const tupleValues = [
+      { valueIdentity: candidateProof.generatorIdentity, exact: root3, proof: candidateProof },
+      { valueIdentity: sqrt2Proof.generatorIdentity, exact: {
+        polynomial: sqrt2Proof.representedMinimalPolynomial,
+        rootIndex: sqrt2Proof.representedRootIndex,
+        isolating: sqrt2Proof.representedIsolating,
+      }, proof: sqrt2Proof },
+    ]
+    const algebraicTuple = certifyAlgebraicTuple(tupleValues)
+    expect(algebraicTuple.status).toBe('resolved')
+    if (algebraicTuple.status === 'resolved') {
+      expect(certifyAlgebraicTupleValue(
+        algebraicTuple.proof, tupleValues, 'x-minus-a',
+        [{ coefficient: '1', powers: [1, 0] }, { coefficient: '-1', powers: [0, 1] }],
+        [candidateProof.generatorIdentity, sqrt2Proof.generatorIdentity],
+      )?.disposition).toBe('NONZERO')
+    }
+  })
+
+  it('records rejected primitive vectors and fails closed on a zero coordinate denominator', () => {
+    const generators = algebraicGeneratorProofs([sqrt2('a', true), sqrt2('b', false)])
+    const values = generators.map((proof) => ({
+      valueIdentity: proof.generatorIdentity,
+      exact: { polynomial: proof.representedMinimalPolynomial, rootIndex: proof.representedRootIndex, isolating: proof.representedIsolating },
+      proof,
+    }))
+    const raw = constructRawAlgebraicTuple(values)
+    expect(raw).not.toBeNull()
+    expect(raw!.rejectedCoefficientVectors.length).toBeGreaterThan(0)
+    const tuple = certifyAlgebraicTuple(values)
+    expect(tuple.status).toBe('resolved')
+    if (tuple.status !== 'resolved') return
+    const invalid = {
+      ...tuple.proof,
+      coordinates: tuple.proof.coordinates.map((coordinate, index) => index === 0
+        ? { ...coordinate, denominator: tuple.proof.primitiveMinimalPolynomial }
+        : coordinate),
+    }
+    expect(certifyAlgebraicTupleValue(
+      invalid, values, 'denominator-mutation', [{ coefficient: '1', powers: [1, 0] }],
+      generators.map((proof) => proof.generatorIdentity),
+    )).toBeNull()
+  })
+
+  it('records and skips a non-separating primitive coefficient vector', () => {
+    const conjugates = algebraicGeneratorProofs([sqrt2('left', true), sqrt2('right', false)])
+    const values = conjugates.map((proof) => ({
+      valueIdentity: proof.generatorIdentity,
+      exact: {
+        polynomial: proof.representedMinimalPolynomial,
+        rootIndex: proof.representedRootIndex,
+        isolating: proof.representedIsolating,
+      },
+      proof,
+    }))
+    const raw = constructRawAlgebraicTuple(values)
+    expect(raw).not.toBeNull()
+    expect(raw!.rejectedCoefficientVectors.length).toBeGreaterThan(0)
+  })
+
+  it('proves true multiplicity from original derivatives, not resultant multiplicity', () => {
+    const generator = algebraicGeneratorProofs([sqrt2('g', true)])[0]
+    const simple = certifyCandidateBackSubstitution(
+      'x-zero', rational(0), 2, 'x-times-g-minus-3',
+      [{ coefficient: '1', powers: [1, 1] }, { coefficient: '-3', powers: [1, 0] }],
+      [generator],
+    )
+    expect(simple.status).toBe('resolved')
+    if (simple.status === 'resolved') {
+      expect(simple.proof.disposition).toBe('VALID_ROOT')
+      expect(simple.proof.resultantMultiplicity).toBe(2)
+      expect(simple.proof.trueMultiplicity).toBe(1)
+    }
+    const extraneous = certifyCandidateBackSubstitution(
+      'x-zero', rational(0), 1, 'g-minus-3',
+      [{ coefficient: '1', powers: [0, 1] }, { coefficient: '-3', powers: [0, 0] }],
+      [generator],
+    )
+    expect(extraneous.status).toBe('resolved')
+    if (extraneous.status === 'resolved') expect(extraneous.proof.disposition).toBe('EXTRANEOUS_ROOT')
+    const double = certifyCandidateBackSubstitution(
+      'x-zero', rational(0), 4, 'x-squared', [{ coefficient: '1', powers: [2] }], [],
+    )
+    expect(double.status).toBe('resolved')
+    if (double.status === 'resolved') expect(double.proof.trueMultiplicity).toBe(2)
+    const branch = certifyCandidateBackSubstitution(
+      'x-zero', rational(0), 2, 'x-times-minimal',
+      [{ coefficient: '1', powers: [1, 2] }, { coefficient: '-2', powers: [1, 0] }],
+      [generator],
+    )
+    expect(branch.status).toBe('resolved')
+    if (branch.status === 'resolved') expect(branch.proof.disposition).toBe('IDENTICALLY_ZERO_BRANCH')
+  })
+
+  it('merges agreeing duplicate roots and refuses disagreement without partial proofs', () => {
+    const first = certifyCandidateBackSubstitution(
+      'same-root', rational(0), 2, 'x', [{ coefficient: '1', powers: [1] }], [],
+    )
+    const second = certifyCandidateBackSubstitution(
+      'same-root', rational(0), 3, 'x', [{ coefficient: '1', powers: [1] }], [],
+    )
+    const merged = mergeCandidateBackSubstitutionProofs([first, second])
+    expect(merged.status).toBe('resolved')
+    if (merged.status === 'resolved') expect(merged.proofs).toHaveLength(1)
+    if (first.status !== 'resolved') return
+    const conflict = mergeCandidateBackSubstitutionProofs([
+      first,
+      { status: 'resolved', proof: { ...first.proof, trueMultiplicity: 2 }, proofId: 'conflict' },
+    ])
+    expect(conflict).toEqual({
+      status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED', proofs: [],
+    })
   })
 
   it('rejects a repeated-factor defining polynomial instead of choosing a root', () => {

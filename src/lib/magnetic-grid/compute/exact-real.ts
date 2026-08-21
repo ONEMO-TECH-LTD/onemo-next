@@ -1,4 +1,4 @@
-import type { AlgebraicReal, CertifiedExpressionReal, ExactReal, Rational } from '../spec'
+import type { AlgebraicGeneratorProof, AlgebraicReal, CertifiedExpressionReal, ExactReal, Rational } from '../spec'
 
 type Q = { n: bigint; d: bigint }
 
@@ -668,7 +668,391 @@ export function pseudoRemainderSparseIntegerPolynomial(dividend:SparseIntegerPol
 const sparseIsZero=(value:SparseIntegerPolynomial)=>value.length===0||(value.length===1&&value[0].coefficient==='0')
 const divideSparseIntegerPolynomialExact=(dividend:SparseIntegerPolynomial,divisor:SparseIntegerPolynomial):SparseIntegerTerm[]=>{let remainder=normalizeSparseIntegerPolynomial(dividend);const target=normalizeSparseIntegerPolynomial(divisor);if(sparseIsZero(target))throw new RangeError('zero sparse divisor');const quotient:SparseIntegerTerm[]=[];while(!sparseIsZero(remainder)){const leadR=remainder[0],leadD=target[0],powers=leadR.powers.map((power,index)=>power-(leadD.powers[index]??0));if(powers.some(power=>power<0)||BigInt(leadR.coefficient)%BigInt(leadD.coefficient)!==BigInt(0))throw new RangeError('sparse division is not exact');const term={coefficient:(BigInt(leadR.coefficient)/BigInt(leadD.coefficient)).toString(),powers};quotient.push(term);remainder=subtractSparseIntegerPolynomials(remainder,multiplySparseIntegerPolynomials([term],target))}return normalizeSparseIntegerPolynomial(quotient)}
 const sparseConstant=(value:bigint,arity:number):SparseIntegerTerm[]=>[{coefficient:value.toString(),powers:Array(arity).fill(0)}]
-export interface SparseCommonComponentProof{gcd:string[];predicateCofactor:string[];definingCofactor:string[];backSubstitutionDisposition:'PENDING'}
+export interface SparseCommonComponentProof{
+  gcd:string[]
+  predicateCofactor:string[]
+  definingCofactor:string[]
+  backSubstitutionDisposition:'PENDING'|'REPRESENTED_ROOT_COMPONENT'|'EXTRANEOUS_COMPONENT_REJECTED'
+  continuationResultant?:string[]
+}
 export interface SparseSubresultantElimination{normalizedSubresultants:string[][];normalizedResultant:string[]|null;removedIntegerContent:string[];commonFactorDisposition:'NONE'|'DECOMPOSED'|'IDENTICALLY_ZERO';commonComponentProofs:SparseCommonComponentProof[];zeroPolynomialProofSource:string[]|null;resolved:boolean;unresolved:boolean}
 export function eliminateSparseGeneratorBySubresultants(predicate:SparseIntegerPolynomial,defining:SparseIntegerPolynomial,variable:number,arity:number):SparseSubresultantElimination{const empty={normalizedSubresultants:[]as string[][],normalizedResultant:null,removedIntegerContent:[]as string[],commonComponentProofs:[]as SparseCommonComponentProof[],zeroPolynomialProofSource:null as string[]|null};try{let previous=normalizeSparseIntegerPolynomial(predicate),current=normalizeSparseIntegerPolynomial(defining);if(sparseIsZero(previous))return{...empty,commonFactorDisposition:'IDENTICALLY_ZERO',zeroPolynomialProofSource:[],resolved:true,unresolved:false};const originalPredicate=previous,originalDefining=current;if(sparseDegree(previous,variable)<sparseDegree(current,variable))[previous,current]=[current,previous];let deltaPrevious=sparseDegree(previous,variable)-sparseDegree(current,variable),beta=sparseConstant((deltaPrevious+1)%2===0?BigInt(1):-BigInt(1),arity),psi=sparseConstant(-BigInt(1),arity);const records:string[][]=[],removed:string[]=[];for(;;){const prem=pseudoRemainderSparseIntegerPolynomial(previous,current,variable);if(sparseIsZero(prem)){const degree=sparseDegree(current,variable);if(degree===0)return{...empty,normalizedSubresultants:records,normalizedResultant:encodeNormalizedSparseEliminationStep(current,arity).tokens,removedIntegerContent:removed,commonFactorDisposition:'NONE',resolved:true,unresolved:false};const gcd=encodeNormalizedSparseEliminationStep(current,arity).tokens,predicateCofactor=encodeCanonicalMultivariatePolynomial(divideSparseIntegerPolynomialExact(originalPredicate,current),arity),definingCofactor=encodeCanonicalMultivariatePolynomial(divideSparseIntegerPolynomialExact(originalDefining,current),arity);return{...empty,normalizedSubresultants:records,removedIntegerContent:removed,commonFactorDisposition:'DECOMPOSED',commonComponentProofs:[{gcd,predicateCofactor,definingCofactor,backSubstitutionDisposition:'PENDING'}],resolved:false,unresolved:false}}const next=divideSparseIntegerPolynomialExact(negateSparseIntegerPolynomial(prem),beta),normalized=encodeNormalizedSparseEliminationStep(next,arity);records.push(normalized.tokens);removed.push(...normalized.removedIntegerContent);const degree=sparseDegree(next,variable);if(degree===0)return{...empty,normalizedSubresultants:records,normalizedResultant:normalized.tokens,removedIntegerContent:removed,commonFactorDisposition:'NONE',resolved:true,unresolved:false};const delta=sparseDegree(current,variable)-degree,negativeLeading=negateSparseIntegerPolynomial(sparseLeadingCoefficient(current,variable)),psiNumerator=powSparseIntegerPolynomial(negativeLeading,deltaPrevious),psiDenominator=powSparseIntegerPolynomial(psi,Math.max(0,deltaPrevious-1)),psiNext=divideSparseIntegerPolynomialExact(psiNumerator,psiDenominator),betaNext=negateSparseIntegerPolynomial(multiplySparseIntegerPolynomials(sparseLeadingCoefficient(current,variable),powSparseIntegerPolynomial(psiNext,delta)));previous=current;current=next;deltaPrevious=delta;psi=psiNext;beta=betaNext}}
 catch{return{...empty,commonFactorDisposition:'NONE',resolved:false,unresolved:true}}}
+
+const sparseDerivativeInParameter = (value: SparseIntegerPolynomial): SparseIntegerTerm[] =>
+  normalizeSparseIntegerPolynomial(value.flatMap((term) => {
+    const power = term.powers[0] ?? 0
+    if (power === 0) return []
+    const powers = [...term.powers]
+    powers[0] = power - 1
+    return [{ coefficient: (BigInt(term.coefficient) * BigInt(power)).toString(), powers }]
+  }))
+
+export const differentiateSparseParameter = sparseDerivativeInParameter
+
+type RationalVector = Rational[]
+type RationalMatrix = Rational[][]
+
+const zeroVector = (length: number): RationalVector =>
+  Array.from({ length }, () => rational(0))
+
+const identityMatrix = (size: number): RationalMatrix =>
+  Array.from({ length: size }, (_, row) =>
+    Array.from({ length: size }, (_, column) => rational(row === column ? 1 : 0)))
+
+const addMatrices = (left: RationalMatrix, right: RationalMatrix): RationalMatrix =>
+  left.map((row, i) => row.map((value, j) => addRational(value, right[i][j])))
+
+const multiplyMatrices = (left: RationalMatrix, right: RationalMatrix): RationalMatrix =>
+  left.map((row) => right[0].map((_, column) => row.reduce(
+    (sum, value, index) => addRational(sum, multiplyRational(value, right[index][column])),
+    rational(0),
+  )))
+
+const scaleMatrix = (value: RationalMatrix, scale: Rational): RationalMatrix =>
+  value.map((row) => row.map((entry) => multiplyRational(entry, scale)))
+
+const matrixVector = (matrix: RationalMatrix, vector: RationalVector): RationalVector =>
+  matrix.map((row) => row.reduce(
+    (sum, entry, index) => addRational(sum, multiplyRational(entry, vector[index])),
+    rational(0),
+  ))
+
+const characteristicPolynomial = (matrix: RationalMatrix): string[] => {
+  const size = matrix.length
+  let auxiliary = identityMatrix(size)
+  const coefficients: Rational[] = [rational(1)]
+  for (let order = 1; order <= size; order++) {
+    const product = multiplyMatrices(matrix, auxiliary)
+    const trace = product.reduce((sum, row, index) => addRational(sum, row[index]), rational(0))
+    const coefficient = multiplyRational(rational(-1, order), trace)
+    coefficients.push(coefficient)
+    auxiliary = addMatrices(product, scaleMatrix(identityMatrix(size), coefficient))
+  }
+  return rationalPolynomialPrimitive(coefficients)
+}
+
+const polynomialExtendedGcd = (
+  left: RationalPolynomial, right: RationalPolynomial,
+): { gcd: RationalPolynomial; left: RationalPolynomial; right: RationalPolynomial } => {
+  let oldR = trimPolynomial(left), r = trimPolynomial(right)
+  let oldS: RationalPolynomial = [rational(1)], s: RationalPolynomial = [rational(0)]
+  let oldT: RationalPolynomial = [rational(0)], t: RationalPolynomial = [rational(1)]
+  const addPolynomial = (a: RationalPolynomial, b: RationalPolynomial, sign = 1) => {
+    const length = Math.max(a.length, b.length)
+    const padded = (value: RationalPolynomial) => [
+      ...Array.from({ length: length - value.length }, () => rational(0)), ...value,
+    ]
+    const aa = padded(a), bb = padded(b)
+    return trimPolynomial(aa.map((value, index) =>
+      sign > 0 ? addRational(value, bb[index]) : subtractRational(value, bb[index])))
+  }
+  const multiplyPolynomial = (a: RationalPolynomial, b: RationalPolynomial) => {
+    const out = Array.from({ length: a.length + b.length - 1 }, () => rational(0))
+    for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++) {
+      out[i + j] = addRational(out[i + j], multiplyRational(a[i], b[j]))
+    }
+    return trimPolynomial(out)
+  }
+  while (!(r.length === 1 && compareRational(r[0], rational(0)) === 0)) {
+    const divided = polynomialDivRem(oldR, r)
+    ;[oldR, r] = [r, divided.remainder]
+    ;[oldS, s] = [s, addPolynomial(oldS, multiplyPolynomial(divided.quotient, s), -1)]
+    ;[oldT, t] = [t, addPolynomial(oldT, multiplyPolynomial(divided.quotient, t), -1)]
+  }
+  const leading = oldR[0]
+  return {
+    gcd: oldR.map((value) => divideRational(value, leading)),
+    left: oldS.map((value) => divideRational(value, leading)),
+    right: oldT.map((value) => divideRational(value, leading)),
+  }
+}
+
+const polynomialMatrixValue = (coefficients: RationalPolynomial, matrix: RationalMatrix): RationalMatrix => {
+  let value = scaleMatrix(identityMatrix(matrix.length), coefficients[0])
+  for (const coefficient of coefficients.slice(1)) {
+    value = addMatrices(
+      multiplyMatrices(value, matrix),
+      scaleMatrix(identityMatrix(matrix.length), coefficient),
+    )
+  }
+  return value
+}
+
+const multiplyRationalPolynomials = (left: RationalPolynomial, right: RationalPolynomial) => {
+  const product = Array.from({ length: left.length + right.length - 1 }, () => rational(0))
+  for (let i = 0; i < left.length; i++) for (let j = 0; j < right.length; j++) {
+    product[i + j] = addRational(product[i + j], multiplyRational(left[i], right[j]))
+  }
+  return trimPolynomial(product)
+}
+
+const rationalCoordinatePolynomials = (value: RationalPolynomial) => {
+  const denominator = value.reduce(
+    (product, coefficient) => product * BigInt(coefficient.denominator), BigInt(1),
+  )
+  return {
+    numerator: value.map((coefficient) =>
+      (BigInt(coefficient.numerator) * (denominator / BigInt(coefficient.denominator))).toString()),
+    denominator: [denominator.toString()],
+  }
+}
+
+const solveLinearColumns = (columns: RationalVector[], target: RationalVector): RationalVector | null => {
+  const rows = target.length, width = columns.length
+  const augmented = Array.from({ length: rows }, (_, row) => [
+    ...columns.map((column) => column[row]), target[row],
+  ])
+  let pivotRow = 0
+  const pivots: number[] = []
+  for (let column = 0; column < width && pivotRow < rows; column++) {
+    const found = augmented.findIndex((row, index) =>
+      index >= pivotRow && compareRational(row[column], rational(0)) !== 0)
+    if (found < 0) continue
+    ;[augmented[pivotRow], augmented[found]] = [augmented[found], augmented[pivotRow]]
+    const pivot = augmented[pivotRow][column]
+    augmented[pivotRow] = augmented[pivotRow].map((value) => divideRational(value, pivot))
+    for (let row = 0; row < rows; row++) {
+      if (row === pivotRow) continue
+      const scale = augmented[row][column]
+      if (compareRational(scale, rational(0)) === 0) continue
+      augmented[row] = augmented[row].map((value, index) =>
+        subtractRational(value, multiplyRational(scale, augmented[pivotRow][index])))
+    }
+    pivots[pivotRow] = column
+    pivotRow++
+  }
+  for (const row of augmented) {
+    if (row.slice(0, width).every((value) => compareRational(value, rational(0)) === 0)
+      && compareRational(row[width], rational(0)) !== 0) return null
+  }
+  const solution = zeroVector(width)
+  for (let row = 0; row < pivotRow; row++) solution[pivots[row]] = augmented[row][width]
+  return solution
+}
+
+export interface RawAlgebraicTupleValue {
+  valueIdentity: string
+  exact: ExactReal
+  proof?: AlgebraicGeneratorProof
+}
+
+export interface RawAlgebraicTuple {
+  orderedValues: readonly RawAlgebraicTupleValue[]
+  primitiveCoefficients: readonly Rational[]
+  primitiveMinimalPolynomial: readonly string[]
+  primitiveRootIndex: number
+  primitiveIsolating: readonly [Rational, Rational]
+  coordinates: readonly { valueIdentity: string; numerator: readonly string[]; denominator: readonly string[] }[]
+  rejectedCoefficientVectors: readonly (readonly Rational[])[]
+}
+
+const primitiveCoefficientVectors = function* (length: number): Generator<Rational[]> {
+  for (let height = 1; ; height++) {
+    const visit = function* (prefix: number[]): Generator<Rational[]> {
+      if (prefix.length === length) {
+        if (Math.max(...prefix.map(Math.abs)) === height) yield prefix.map((value) => rational(value))
+        return
+      }
+      for (let value = -height; value <= height; value++) yield* visit([...prefix, value])
+    }
+    yield* visit([])
+  }
+}
+
+export function constructRawAlgebraicTuple(
+  values: readonly RawAlgebraicTupleValue[],
+): RawAlgebraicTuple | null {
+  const orderedValues = [...values].sort((a, b) => a.valueIdentity.localeCompare(b.valueIdentity))
+  const algebraic = orderedValues.filter((value) => !isRational(value.exact))
+  if (algebraic.some((value) => !value.proof || !isAlgebraic(value.exact))) return null
+  if (algebraic.length === 0) {
+    return {
+      orderedValues, primitiveCoefficients: [], primitiveMinimalPolynomial: ['1', '0'],
+      primitiveRootIndex: 0, primitiveIsolating: [rational(0), rational(0)],
+      coordinates: orderedValues.map((value) => ({
+        valueIdentity: value.valueIdentity,
+        numerator: [(value.exact as Rational).numerator],
+        denominator: [(value.exact as Rational).denominator],
+      })),
+      rejectedCoefficientVectors: [],
+    }
+  }
+  const degrees = algebraic.map((value) => value.proof!.representedMinimalPolynomial.length - 1)
+  const dimension = degrees.reduce((product, degree) => product * degree, 1)
+  const strides = degrees.map((_, index) => degrees.slice(index + 1).reduce((product, degree) => product * degree, 1))
+  const coordinateMatrices = algebraic.map((value, coordinate) => {
+    const matrix = Array.from({ length: dimension }, () => zeroVector(dimension))
+    const polynomial = value.proof!.representedMinimalPolynomial.map((coefficient) => rational(coefficient))
+    for (let basis = 0; basis < dimension; basis++) {
+      const exponent = Math.floor(basis / strides[coordinate]) % degrees[coordinate]
+      if (exponent + 1 < degrees[coordinate]) {
+        matrix[basis + strides[coordinate]][basis] = rational(1)
+      } else {
+        for (let targetExponent = 0; targetExponent < degrees[coordinate]; targetExponent++) {
+          const target = basis - exponent * strides[coordinate] + targetExponent * strides[coordinate]
+          const coefficient = polynomial[polynomial.length - 1 - targetExponent]
+          matrix[target][basis] = multiplyRational(
+            rational(-1), divideRational(coefficient, polynomial[0]),
+          )
+        }
+      }
+    }
+    return matrix
+  })
+  const rejectedCoefficientVectors: Rational[][] = []
+  for (const coefficients of primitiveCoefficientVectors(algebraic.length)) {
+    let alpha = scaleMatrix(identityMatrix(dimension), rational(0))
+    let lower = rational(0), upper = rational(0)
+    for (let index = 0; index < algebraic.length; index++) {
+      alpha = addMatrices(alpha, scaleMatrix(coordinateMatrices[index], coefficients[index]))
+      const proof = algebraic[index].proof!
+      const products = proof.representedIsolating.map((bound) => multiplyRational(bound, coefficients[index]))
+      lower = addRational(lower, compareRational(products[0], products[1]) <= 0 ? products[0] : products[1])
+      upper = addRational(upper, compareRational(products[0], products[1]) <= 0 ? products[1] : products[0])
+    }
+    let characteristic: string[]
+    let factors: string[][]
+    try {
+      characteristic = normalizedSquareFreePrimitivePolynomial(characteristicPolynomial(alpha))
+      factors = factorSquareFreePrimitivePolynomialOverQ(characteristic)
+    } catch {
+      rejectedCoefficientVectors.push(coefficients)
+      continue
+    }
+    const selected = factors.filter((factor) => polynomialRootCount(factor, lower, upper) === 1)
+    if (selected.length !== 1) {
+      rejectedCoefficientVectors.push(coefficients)
+      continue
+    }
+    const primitiveMinimalPolynomial = selected[0]
+    const roots = allRealRootsOfSquareFreePolynomial(primitiveMinimalPolynomial)
+    const root = roots.find((candidate) =>
+      compareRational(candidate.isolating[1], lower) > 0
+      && compareRational(candidate.isolating[0], upper) < 0)
+    if (!root) {
+      rejectedCoefficientVectors.push(coefficients)
+      continue
+    }
+    const characteristicQ = characteristic.map((coefficient) => rational(coefficient))
+    const minimalQ = primitiveMinimalPolynomial.map((coefficient) => rational(coefficient))
+    const cofactor = polynomialDivRem(characteristicQ, minimalQ).quotient
+    const bezout = polynomialExtendedGcd(minimalQ, cofactor)
+    if (!polynomialIsOne(bezout.gcd)) {
+      rejectedCoefficientVectors.push(coefficients)
+      continue
+    }
+    const projector = polynomialMatrixValue(
+      polynomialDivRem(multiplyRationalPolynomials(bezout.right, cofactor), characteristicQ).remainder,
+      alpha,
+    )
+    const projectedOne = matrixVector(projector, [rational(1), ...zeroVector(dimension - 1)])
+    const degree = primitiveMinimalPolynomial.length - 1
+    const alphaColumns: RationalVector[] = []
+    let power = identityMatrix(dimension)
+    for (let index = 0; index < degree; index++) {
+      alphaColumns.push(matrixVector(projector, matrixVector(power, [rational(1), ...zeroVector(dimension - 1)])))
+      power = multiplyMatrices(alpha, power)
+    }
+    const coordinates = orderedValues.map((value) => {
+      if (isRational(value.exact)) return {
+        valueIdentity: value.valueIdentity,
+        ...rationalCoordinatePolynomials([value.exact]),
+      }
+      const coordinate = algebraic.findIndex((candidate) => candidate.valueIdentity === value.valueIdentity)
+      const target = matrixVector(projector, matrixVector(
+        coordinateMatrices[coordinate], [rational(1), ...zeroVector(dimension - 1)],
+      ))
+      const solved = solveLinearColumns(alphaColumns, target)
+      if (!solved) throw new RangeError('primitive coordinate recovery unresolved')
+      return {
+        valueIdentity: value.valueIdentity,
+        ...rationalCoordinatePolynomials([...solved].reverse()),
+      }
+    })
+    void projectedOne
+    return {
+      orderedValues,
+      primitiveCoefficients: coefficients,
+      primitiveMinimalPolynomial,
+      primitiveRootIndex: root.rootIndex,
+      primitiveIsolating: root.isolating,
+      coordinates,
+      rejectedCoefficientVectors,
+    }
+  }
+  return null
+}
+
+export interface RawAlgebraicTupleValueEvaluation {
+  expressionIdentity: string
+  reducedNumerator: readonly string[]
+  reducedDenominator: readonly string[]
+  disposition: 'ZERO' | 'NONZERO'
+}
+
+const powRationalPolynomial = (value: RationalPolynomial, power: number): RationalPolynomial => {
+  let result: RationalPolynomial = [rational(1)]
+  for (let index = 0; index < power; index++) result = multiplyRationalPolynomials(result, value)
+  return result
+}
+
+export function evaluateRawAlgebraicTuplePolynomial(
+  tuple: RawAlgebraicTuple,
+  expressionIdentity: string,
+  expression: SparseIntegerPolynomial,
+  variableValueIdentities: readonly string[],
+): RawAlgebraicTupleValueEvaluation | null {
+  if (expression.some((term) => term.powers.length !== variableValueIdentities.length)) return null
+  const coordinates = variableValueIdentities.map((identity) =>
+    tuple.coordinates.find((coordinate) => coordinate.valueIdentity === identity))
+  if (coordinates.some((coordinate) => !coordinate)) return null
+  const numerators = coordinates.map((coordinate) => coordinate!.numerator.map((value) => rational(value)))
+  const denominators = coordinates.map((coordinate) => coordinate!.denominator.map((value) => rational(value)))
+  const maximumPowers = variableValueIdentities.map((_, variable) =>
+    Math.max(...expression.map((term) => term.powers[variable] ?? 0), 0))
+  let cleared: RationalPolynomial = [rational(0)]
+  for (const term of expression) {
+    let substituted: RationalPolynomial = [rational(term.coefficient)]
+    for (let variable = 0; variable < variableValueIdentities.length; variable++) {
+      substituted = multiplyRationalPolynomials(
+        substituted,
+        powRationalPolynomial(numerators[variable], term.powers[variable] ?? 0),
+      )
+      substituted = multiplyRationalPolynomials(
+        substituted,
+        powRationalPolynomial(
+          denominators[variable], maximumPowers[variable] - (term.powers[variable] ?? 0),
+        ),
+      )
+    }
+    const length = Math.max(cleared.length, substituted.length)
+    const pad = (value: RationalPolynomial) => [
+      ...Array.from({ length: length - value.length }, () => rational(0)), ...value,
+    ]
+    const left = pad(cleared), right = pad(substituted)
+    cleared = trimPolynomial(left.map((value, index) => addRational(value, right[index])))
+  }
+  const denominator = denominators.reduce(
+    (product, value, index) => multiplyRationalPolynomials(
+      product, powRationalPolynomial(value, maximumPowers[index]),
+    ), [rational(1)] as RationalPolynomial,
+  )
+  const minimal = tuple.primitiveMinimalPolynomial.map((value) => rational(value))
+  if (!polynomialIsOne(polynomialGcd(denominator, minimal))) return null
+  const reducedNumeratorQ = polynomialDivRem(cleared, minimal).remainder
+  const reducedDenominatorQ = polynomialDivRem(denominator, minimal).remainder
+  const reducedNumerator = rationalCoordinatePolynomials(reducedNumeratorQ)
+  const reducedDenominator = rationalCoordinatePolynomials(reducedDenominatorQ)
+  const numeratorScale = BigInt(reducedDenominator.denominator[0])
+  const denominatorScale = BigInt(reducedNumerator.denominator[0])
+  return {
+    expressionIdentity,
+    reducedNumerator: reducedNumerator.numerator.map((value) =>
+      (BigInt(value) * numeratorScale).toString()),
+    reducedDenominator: reducedDenominator.numerator.map((value) =>
+      (BigInt(value) * denominatorScale).toString()),
+    disposition: reducedNumeratorQ.every((value) => compareRational(value, rational(0)) === 0)
+      ? 'ZERO' : 'NONZERO',
+  }
+}

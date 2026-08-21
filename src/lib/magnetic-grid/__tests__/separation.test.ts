@@ -72,6 +72,10 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'encodeCanonicalMultivariatePolynomial','decodeCanonicalMultivariatePolynomial','encodeNormalizedSparseEliminationStep','projectFinalUnivariatePolynomial',
     'negateSparseIntegerPolynomial','subtractSparseIntegerPolynomials','sparseDegree','sparseLeadingCoefficient','shiftSparseVariable','powSparseIntegerPolynomial','pseudoRemainderSparseIntegerPolynomial',
     'sparseIsZero','divideSparseIntegerPolynomialExact','sparseConstant','eliminateSparseGeneratorBySubresultants',
+    'sparseDerivativeInParameter','zeroVector','identityMatrix','addMatrices','multiplyMatrices','scaleMatrix','matrixVector',
+    'characteristicPolynomial','polynomialExtendedGcd','polynomialMatrixValue','multiplyRationalPolynomials',
+    'rationalCoordinatePolynomials','solveLinearColumns','primitiveCoefficientVectors','constructRawAlgebraicTuple',
+    'powRationalPolynomial','evaluateRawAlgebraicTuplePolynomial',
   ],
   'magnetic-grid/compute/contact-root.ts': [
     'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
@@ -82,7 +86,12 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'subtractRadiusSquared', 'exactBandDomain', 'scaleInBand', 'roots', 'polynomialOf', 'relations', 'latticeOffsets',
     'enumerateAffineContactEvents', 'enumerateParityClassEvents',
   ],
-  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression','validateCertifiedExpressionIdentity','validateExactRealIdentity','algebraicGeneratorProofs'],
+  'magnetic-grid/compute/identity.ts': [
+    'rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression',
+    'validateCertifiedExpressionIdentity','validateExactRealIdentity','algebraicGeneratorProofs','certifyAlgebraicTuple',
+    'rawTupleFromProof','validateAlgebraicTupleProof','certifyAlgebraicTupleValue','certifyCandidateBackSubstitution',
+    'mergeCandidateBackSubstitutionProofs',
+  ],
   'magnetic-grid/compute/seat.ts': [
     'exactSeatPoint', 'exactSeatMinus', 'exactSeatCross', 'exactPointInMaterial', 'exactSeatIsLegal',
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',

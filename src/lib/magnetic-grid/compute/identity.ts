@@ -1,9 +1,14 @@
-import type { AlgebraicGeneratorProof, BoundaryTruth, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
+import type { AlgebraicGeneratorProof, AlgebraicTupleProof, AlgebraicTupleValueProof, BoundaryTruth, CandidateBackSubstitutionProof, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
 import {
   addRational, canonicalExact, compareExactToRational, compareRational, divideRational,
   isAlgebraic, isRational, multiplyRational, rational, rationalFromNumber,
   sqrtRationalBounds,
   proveRepresentedMinimalFactor,
+  constructRawAlgebraicTuple,
+  differentiateSparseParameter,
+  evaluateRawAlgebraicTuplePolynomial,
+  type RawAlgebraicTupleValue,
+  type SparseIntegerPolynomial,
 } from './exact-real'
 
 const K = [
@@ -225,4 +230,225 @@ export function algebraicGeneratorProofs(
   return [...deduplicated.values()]
     .sort((a, b) => a.generatorIdentity.localeCompare(b.generatorIdentity))
     .map((generator, eliminatedAt) => ({ ...generator, eliminatedAt }))
+}
+
+export type CertifiedCandidateBackSubstitution =
+  | { status: 'resolved'; proof: CandidateBackSubstitutionProof; proofId: string }
+  | { status: 'unresolved'; code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+
+export type CertifiedAlgebraicTuple =
+  | { status: 'resolved'; proof: AlgebraicTupleProof }
+  | { status: 'unresolved'; code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+
+export function certifyAlgebraicTuple(
+  values: readonly RawAlgebraicTupleValue[],
+): CertifiedAlgebraicTuple {
+  const raw = constructRawAlgebraicTuple(values)
+  if (!raw) return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+  const orderedValueIdentities = raw.orderedValues.map((value) => value.valueIdentity)
+  const coordinates = raw.coordinates.map((coordinate) => ({ ...coordinate }))
+  const tupleIdentity = sha256Text(JSON.stringify([
+    'algebraic-tuple-v1', orderedValueIdentities, raw.primitiveCoefficients,
+    raw.primitiveMinimalPolynomial, raw.primitiveRootIndex, coordinates,
+  ]))
+  return {
+    status: 'resolved',
+    proof: {
+      tupleIdentity,
+      orderedValueIdentities,
+      primitiveCoefficients: raw.primitiveCoefficients,
+      primitiveMinimalPolynomial: raw.primitiveMinimalPolynomial,
+      primitiveRootIndex: raw.primitiveRootIndex,
+      primitiveIsolating: raw.primitiveIsolating,
+      coordinates,
+      constructionProofId: sha256Text(JSON.stringify([
+        'algebraic-tuple-construction-v1', tupleIdentity, raw.rejectedCoefficientVectors,
+      ])),
+    },
+  }
+}
+
+const rawTupleFromProof = (
+  values: readonly RawAlgebraicTupleValue[], proof: AlgebraicTupleProof,
+) => ({
+  orderedValues: [...values].sort((a, b) => a.valueIdentity.localeCompare(b.valueIdentity)),
+  primitiveCoefficients: proof.primitiveCoefficients,
+  primitiveMinimalPolynomial: proof.primitiveMinimalPolynomial,
+  primitiveRootIndex: proof.primitiveRootIndex,
+  primitiveIsolating: proof.primitiveIsolating,
+  coordinates: proof.coordinates,
+  rejectedCoefficientVectors: [],
+})
+
+export function validateAlgebraicTupleProof(
+  values: readonly RawAlgebraicTupleValue[],
+  proof: AlgebraicTupleProof,
+): boolean {
+  const rebuilt = certifyAlgebraicTuple(values)
+  return rebuilt.status === 'resolved'
+    && JSON.stringify(rebuilt.proof) === JSON.stringify(proof)
+}
+
+export function certifyAlgebraicTupleValue(
+  tuple: AlgebraicTupleProof,
+  values: readonly RawAlgebraicTupleValue[],
+  expressionIdentity: string,
+  expression: SparseIntegerPolynomial,
+  variableValueIdentities: readonly string[],
+): AlgebraicTupleValueProof | null {
+  if (!validateAlgebraicTupleProof(values, tuple)) return null
+  const raw = evaluateRawAlgebraicTuplePolynomial(
+    rawTupleFromProof(values, tuple), expressionIdentity, expression, variableValueIdentities,
+  )
+  if (!raw) return null
+  return {
+    tupleIdentity: tuple.tupleIdentity,
+    expressionIdentity,
+    reducedNumerator: raw.reducedNumerator,
+    reducedDenominator: raw.reducedDenominator,
+    disposition: raw.disposition,
+    proofId: sha256Text(JSON.stringify([
+      'algebraic-tuple-value-v1', tuple.tupleIdentity, expressionIdentity,
+      raw.reducedNumerator, raw.reducedDenominator, raw.disposition,
+    ])),
+  }
+}
+
+export function certifyCandidateBackSubstitution(
+  candidateRootId: string,
+  candidate: ExactReal,
+  resultantMultiplicity: number,
+  originalPredicateIdentity: string,
+  originalPredicate: SparseIntegerPolynomial,
+  representedGenerators: readonly AlgebraicGeneratorProof[],
+): CertifiedCandidateBackSubstitution {
+  const candidateProof = isAlgebraic(candidate)
+    ? algebraicGeneratorProofs([{
+      semanticSourceIdentity: candidateRootId,
+      definingPolynomial: candidate.polynomial,
+      representedRootIndex: candidate.rootIndex,
+      representedIsolating: candidate.isolating,
+    }])[0]
+    : undefined
+  if (!isRational(candidate) && !candidateProof) {
+    return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+  }
+  const values: RawAlgebraicTupleValue[] = [
+    { valueIdentity: candidateRootId, exact: candidate, proof: candidateProof },
+    ...representedGenerators.map((generator) => ({
+      valueIdentity: generator.generatorIdentity,
+      exact: {
+        polynomial: generator.representedMinimalPolynomial,
+        rootIndex: generator.representedRootIndex,
+        isolating: generator.representedIsolating,
+      },
+      proof: generator,
+    })),
+  ]
+  const tuple = certifyAlgebraicTuple(values)
+  if (tuple.status === 'unresolved') return tuple
+  const variableIds = [candidateRootId, ...representedGenerators.map((generator) => generator.generatorIdentity)]
+  const generatorValues = values.slice(1)
+  const generatorTuple = certifyAlgebraicTuple(generatorValues)
+  if (generatorTuple.status === 'unresolved') return generatorTuple
+  const parameterPowers = [...new Set(originalPredicate.map((term) => term.powers[0] ?? 0))]
+  let identicallyZero = true
+  for (const power of parameterPowers) {
+    const coefficient = originalPredicate
+      .filter((term) => (term.powers[0] ?? 0) === power)
+      .map((term) => ({ ...term, powers: term.powers.slice(1) }))
+    const value = certifyAlgebraicTupleValue(
+      generatorTuple.proof, generatorValues,
+      sha256Text(JSON.stringify([originalPredicateIdentity, 'coefficient', power])),
+      coefficient,
+      variableIds.slice(1),
+    )
+    if (!value) return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+    if (value.disposition === 'NONZERO') identicallyZero = false
+  }
+  if (identicallyZero) {
+    const proof: CandidateBackSubstitutionProof = {
+      candidateRootId, originalPredicateIdentity,
+      representedGeneratorIds: representedGenerators.map((generator) => generator.generatorIdentity).sort(),
+      resultantMultiplicity, disposition: 'IDENTICALLY_ZERO_BRANCH', trueMultiplicity: null,
+      derivativeProofs: [],
+    }
+    return { status: 'resolved', proof, proofId: sha256Text(JSON.stringify(proof)) }
+  }
+  const derivativeProofs: CandidateBackSubstitutionProof['derivativeProofs'][number][] = []
+  let derivative = originalPredicate
+  const degree = Math.max(...originalPredicate.map((term) => term.powers[0] ?? 0), 0)
+  let disposition: CandidateBackSubstitutionProof['disposition'] | null = null
+  let trueMultiplicity: number | null = null
+  for (let order = 0; order <= degree; order++) {
+    const derivativeIdentity = sha256Text(JSON.stringify([
+      'back-substitution-derivative-v1', originalPredicateIdentity, order,
+    ]))
+    const value = certifyAlgebraicTupleValue(
+      tuple.proof, values, derivativeIdentity, derivative, variableIds,
+    )
+    if (!value) return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+    derivativeProofs.push({
+      order,
+      derivativeIdentity: sha256Text(JSON.stringify([
+        'back-substitution-derivative-v1', originalPredicateIdentity, order,
+      ])),
+      exactValueIdentity: value.proofId,
+      disposition: value.disposition,
+    })
+    if (order === 0 && value.disposition === 'NONZERO') {
+      disposition = 'EXTRANEOUS_ROOT'
+      break
+    }
+    if (order > 0 && value.disposition === 'NONZERO') {
+      disposition = 'VALID_ROOT'
+      trueMultiplicity = order
+      break
+    }
+    derivative = differentiateSparseParameter(derivative)
+  }
+  if (!disposition) return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+  const proof: CandidateBackSubstitutionProof = {
+    candidateRootId,
+    originalPredicateIdentity,
+    representedGeneratorIds: representedGenerators.map((generator) => generator.generatorIdentity).sort(),
+    resultantMultiplicity,
+    disposition,
+    trueMultiplicity,
+    derivativeProofs,
+  }
+  return {
+    status: 'resolved',
+    proof,
+    proofId: sha256Text(JSON.stringify([
+      'candidate-back-substitution-v1',
+      candidateRootId,
+      originalPredicateIdentity,
+      proof.representedGeneratorIds,
+      derivativeProofs,
+      proof.disposition,
+      proof.trueMultiplicity,
+    ])),
+  }
+}
+
+export function mergeCandidateBackSubstitutionProofs(
+  candidates: readonly CertifiedCandidateBackSubstitution[],
+): { status: 'resolved'; proofs: readonly CandidateBackSubstitutionProof[] }
+  | { status: 'unresolved'; code: 'CENTRE_EVIDENCE_UNRESOLVED'; proofs: readonly [] } {
+  const merged = new Map<string, CandidateBackSubstitutionProof>()
+  for (const candidate of candidates) {
+    if (candidate.status === 'unresolved') {
+      return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED', proofs: [] }
+    }
+    const existing = merged.get(candidate.proof.candidateRootId)
+    if (existing && existing.trueMultiplicity !== candidate.proof.trueMultiplicity) {
+      return { status: 'unresolved', code: 'CENTRE_EVIDENCE_UNRESOLVED', proofs: [] }
+    }
+    if (!existing) merged.set(candidate.proof.candidateRootId, candidate.proof)
+  }
+  return {
+    status: 'resolved',
+    proofs: [...merged.values()].sort((a, b) => a.candidateRootId.localeCompare(b.candidateRootId)),
+  }
 }
