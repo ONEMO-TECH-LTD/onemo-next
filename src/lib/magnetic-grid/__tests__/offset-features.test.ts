@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildExactOffsetFeatures, compareOffsetExpressions, evaluateOffsetExpressionBounds, solveExactOffsetIntersections, solveExactOffsetLineIntersections, type ExactOffsetExpression } from '../compute/centre-evidence'
+import { buildExactOffsetArrangement, buildExactOffsetFeatures, compareOffsetExpressions, evaluateOffsetExpressionBounds, solveExactOffsetIntersections, solveExactOffsetLineIntersections, type ExactOffsetExpression } from '../compute/centre-evidence'
 import { approximateExact, rational } from '../compute/exact-real'
 import type { Contour } from '../spec'
 
@@ -47,4 +47,5 @@ describe('exact inward-offset primitives', () => {
   })
   it('closes semantic equality and returns unresolved instead of looping',()=>{const a:ExactOffsetExpression={op:'exact',value:rational(2)},b:ExactOffsetExpression={op:'exact',value:rational(3)},c:ExactOffsetExpression={op:'exact',value:rational(5)},zero:ExactOffsetExpression={op:'exact',value:rational(0)};expect(compareOffsetExpressions({op:'add',left:{op:'add',left:a,right:b},right:c},{op:'add',left:a,right:{op:'add',left:c,right:b}})).toBe(0);expect(compareOffsetExpressions({op:'sqrt',value:{op:'exact',value:rational(4)}},a)).toBe(0);expect(compareOffsetExpressions({op:'divide',left:zero,right:zero},a)).toBeNull()})
   it('solves and sweep-trims reflex line-circle junctions',()=>{const notch:Contour={outer:{pts:[[0,0],[1,0],[1,1],[.6,1],[.6,.5],[.4,.5],[.4,1],[0,1]]},holes:[]};const features=buildExactOffsetFeatures(notch,rational(100),rational(12));const solved=solveExactOffsetIntersections(features);expect(solved.intersections.some(x=>x.kind==='line-circle')).toBe(true);expect(solved.unresolved).toEqual([])})
+  it('builds traversal-order-invariant directed faces',()=>{const notch:Contour={outer:{pts:[[0,0],[1,0],[1,1],[.6,1],[.6,.5],[.4,.5],[.4,1],[0,1]]},holes:[]};const f=buildExactOffsetFeatures(notch,rational(100),rational(12)),a=buildExactOffsetArrangement(f),b=buildExactOffsetArrangement({lines:[...f.lines].reverse(),arcs:[...f.arcs].reverse()});expect(a.unresolved).toEqual([]);expect(b.unresolved).toEqual([]);expect(a.loops.map(x=>x.length).sort()).toEqual(b.loops.map(x=>x.length).sort())})
 })
