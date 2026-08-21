@@ -50,5 +50,7 @@ describe('exact scaling regime events', () => {
     expect(scaleInBand(rational(143, 2), bands[0], bands)).toBe(true)
     expect(scaleInBand(rational(72), bands[0], bands)).toBe(false)
     expect(scaleInBand(rational(72), bands[1], bands)).toBe(true)
+    expect(scaleInBand(rational(431, 2), bands[3], bands)).toBe(true)
+    expect(scaleInBand(rational(216), bands[3], bands)).toBe(false)
   })
 })

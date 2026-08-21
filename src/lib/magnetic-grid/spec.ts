@@ -33,14 +33,13 @@ export const MAGNET_DIA_LARGE_MM = 8
 /** Fewest seated magnets the perimeter belt may thin down to. */
 export const MIN_ANCHORS = 2
 
-/** Size bands, ends 1mm shy so no size lives in two bands. B5 keeps its ceiling. */
-export interface Band { readonly id: 1 | 2 | 3 | 4 | 5; readonly minMM: number; readonly maxMM: number }
+/** User-selectable B1-B4 horizon. Exact scaling owns the continuous domain to the next floor. */
+export interface Band { readonly id: 1 | 2 | 3 | 4; readonly minMM: number; readonly maxMM: number }
 export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 1 as const, minMM: 24, maxMM: 71 }),
   Object.freeze({ id: 2 as const, minMM: 72, maxMM: 119 }),
   Object.freeze({ id: 3 as const, minMM: 120, maxMM: 167 }),
   Object.freeze({ id: 4 as const, minMM: 168, maxMM: 215 }),
-  Object.freeze({ id: 5 as const, minMM: 216, maxMM: 264 }),
 ])
 
 /** Registration search phase step — how finely the lattice slides under the shape.
