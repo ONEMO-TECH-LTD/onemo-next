@@ -1,8 +1,9 @@
-import type { BoundaryTruth, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
+import type { AlgebraicGeneratorProof, BoundaryTruth, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
 import {
   addRational, canonicalExact, compareExactToRational, compareRational, divideRational,
   isAlgebraic, isRational, multiplyRational, rational, rationalFromNumber,
   sqrtRationalBounds,
+  normalizedPrimitivePolynomial,
 } from './exact-real'
 
 const K = [
@@ -169,3 +170,7 @@ export function validateCertifiedExpressionIdentity(value: CertifiedExpressionRe
 export function validateExactRealIdentity(value: ExactReal): void {
   if ('expressionHash' in value) validateCertifiedExpressionIdentity(value)
 }
+
+export function algebraicGeneratorProofs(
+  generators: readonly { semanticSourceIdentity:string; definingPolynomial:readonly string[] }[],
+): AlgebraicGeneratorProof[]{const deduplicated=new Map<string,{semanticSourceIdentity:string;normalizedDefiningPolynomial:string[];generatorIdentity:string}>();for(const generator of generators){const normalizedDefiningPolynomial=normalizedPrimitivePolynomial(generator.definingPolynomial),generatorIdentity=sha256Text(JSON.stringify(['algebraic-generator-v1',generator.semanticSourceIdentity,normalizedDefiningPolynomial]));if(!deduplicated.has(generatorIdentity))deduplicated.set(generatorIdentity,{semanticSourceIdentity:generator.semanticSourceIdentity,normalizedDefiningPolynomial,generatorIdentity})}return[...deduplicated.values()].sort((a,b)=>a.generatorIdentity.localeCompare(b.generatorIdentity)).map((generator,eliminatedAt)=>({...generator,eliminatedAt}))}

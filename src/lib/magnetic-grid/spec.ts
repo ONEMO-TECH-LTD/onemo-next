@@ -169,6 +169,22 @@ export interface ExactPieceIntervalCertificate {
   upper: ExactPieceParameter
   proofs: readonly PiecePredicateProof[]
 }
+
+export interface AlgebraicGeneratorProof {
+  generatorIdentity: string
+  semanticSourceIdentity: string
+  normalizedDefiningPolynomial: readonly string[]
+  eliminatedAt: number
+}
+
+export interface GeneratorEliminationStepProof {
+  generatorIdentity: string
+  eliminatedVariable: string
+  normalizedSubresultants: readonly (readonly string[])[]
+  normalizedResultant: readonly string[] | null
+  removedIntegerContent: readonly string[]
+  commonFactorDisposition: 'NONE' | 'DECOMPOSED' | 'IDENTICALLY_ZERO'
+}
 export interface WrapMeasurement {
   scale: ExactScale
   boundaryTruth: BoundaryTruth

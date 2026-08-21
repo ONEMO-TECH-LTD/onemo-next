@@ -124,6 +124,7 @@ const primitivePolynomial = (coefficients: bigint[]): string[] => {
     return normalized.map((coefficient) => (-coefficient).toString())
   return normalized.map((coefficient) => coefficient.toString())
 }
+export const normalizedPrimitivePolynomial=(coefficients:readonly string[]):string[]=>primitivePolynomial(coefficients.map(BigInt))
 
 export function allowancePolynomial(
   squaredDistance: Rational,
