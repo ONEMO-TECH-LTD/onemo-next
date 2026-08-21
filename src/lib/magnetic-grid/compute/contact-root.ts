@@ -7,6 +7,7 @@ import {
   divideRational, multiplyRational, rational, rationalFromNumber, sqrtMinusRational,
   squareRational, subtractRational,
 } from './exact-real'
+import { exactSeatIsLegal } from './seat'
 
 type ExactPoint = readonly [Rational, Rational]
 type UncertifiedWrapMeasurement=Omit<WrapMeasurement,'witnesses'>&{witnesses:Array<Omit<ContactWitness,'certificateId'>>}
@@ -17,25 +18,6 @@ const minus = (a: ExactPoint,b: ExactPoint): ExactPoint => [subtractRational(a[0
 const plus = (a: ExactPoint,b: ExactPoint): ExactPoint => [addRational(a[0],b[0]),addRational(a[1],b[1])]
 const times = (p: ExactPoint,s: Rational): ExactPoint => [multiplyRational(p[0],s),multiplyRational(p[1],s)]
 const squaredLength = (p: ExactPoint) => addRational(squareRational(p[0]),squareRational(p[1]))
-const cross = (a: ExactPoint,b: ExactPoint) => subtractRational(multiplyRational(a[0],b[1]),multiplyRational(a[1],b[0]))
-
-const locateInRing = (point: ExactPoint,ring:ReadonlyArray<Pt>):'IN'|'OUT'|'ON' => {
-  const points=ring.map(exactPoint);let winding=0
-  for(let i=0,j=points.length-1;i<points.length;j=i++){
-    const a=points[j],b=points[i],ap=minus(point,a),ab=minus(b,a),turn=compareRational(cross(ab,ap),rational(0))
-    const withinX=compareRational(point[0],compareRational(a[0],b[0])<=0?a[0]:b[0])>=0&&compareRational(point[0],compareRational(a[0],b[0])>=0?a[0]:b[0])<=0
-    const withinY=compareRational(point[1],compareRational(a[1],b[1])<=0?a[1]:b[1])>=0&&compareRational(point[1],compareRational(a[1],b[1])>=0?a[1]:b[1])<=0
-    if(turn===0&&withinX&&withinY)return'ON'
-    const ay=compareRational(a[1],point[1]),by=compareRational(b[1],point[1])
-    if(ay<=0&&by>0&&turn>0)winding++
-    else if(ay>0&&by<=0&&turn<0)winding--
-  }
-  return winding===0?'OUT':'IN'
-}
-
-const insideMaterial = (point: ExactPoint,contour:Contour) =>
-  locateInRing(point,contour.outer.pts)==='IN'&&contour.holes.every(hole=>locateInRing(point,hole.pts)==='OUT')
-
 const pointToElement = (point: ExactPoint, element: BoundaryElement) => {
   const segment = minus(element.b,element.a), relative = minus(point,element.a)
   const projection = dot(relative,segment), lengthSquared = squaredLength(segment)
@@ -78,7 +60,7 @@ export function measureWrap(prepared:PreparedContour,belt:ReadonlyArray<Pt>,spot
     let nearest=measured[0].squaredDistance
     for(const item of measured)if(compareRational(item.squaredDistance,nearest)<0)nearest=item.squaredDistance
     const allowance=sqrtMinusRational(nearest,radius),anchorId=`belt:${JSON.stringify(point)}`
-    if(!insideMaterial(point,contour)||compareRational(nearest,squareRational(radius))<0)validSeat=false
+    if(!exactSeatIsLegal(contour,anchor,nearest,squareRational(radius)))validSeat=false
     for(const item of measured.filter(candidate=>compareRational(candidate.squaredDistance,nearest)===0)){
       const equation={kind:'polynomial' as const,polynomial:allowancePolynomial(nearest,radius),rootIndex:1}
       const tangency={x:item.tangency[0],y:item.tangency[1]}

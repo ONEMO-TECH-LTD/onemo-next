@@ -12,8 +12,9 @@
 // ring and a radius and answers a geometric question.
 
 
-import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt } from '../spec'
+import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt, Rational } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
+import { compareRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
 
 /** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
 export const TANGENT_GUARD_MM = 0.05
@@ -26,6 +27,31 @@ export interface Prepared {
   /** Bounds in integer quanta. */
   readonly box: BBox
 }
+
+type ExactSeatPoint=readonly [Rational,Rational]
+const exactSeatPoint=([x,y]:Pt):ExactSeatPoint=>[rationalFromNumber(x),rationalFromNumber(y)]
+const exactSeatMinus=(a:ExactSeatPoint,b:ExactSeatPoint):ExactSeatPoint=>[subtractRational(a[0],b[0]),subtractRational(a[1],b[1])]
+const exactSeatCross=(a:ExactSeatPoint,b:ExactSeatPoint)=>subtractRational(multiplyRational(a[0],b[1]),multiplyRational(a[1],b[0]))
+
+export function exactPointInMaterial(contour:Contour,pointMM:Pt):boolean{
+  const point=exactSeatPoint(pointMM)
+  const locate=(ring:ReadonlyArray<Pt>):'IN'|'OUT'|'ON'=>{
+    const points=ring.map(exactSeatPoint);let winding=0
+    for(let i=0,j=points.length-1;i<points.length;j=i++){
+      const a=points[j],b=points[i],turn=compareRational(exactSeatCross(exactSeatMinus(b,a),exactSeatMinus(point,a)),rational(0))
+      const withinX=compareRational(point[0],compareRational(a[0],b[0])<=0?a[0]:b[0])>=0&&compareRational(point[0],compareRational(a[0],b[0])>=0?a[0]:b[0])<=0
+      const withinY=compareRational(point[1],compareRational(a[1],b[1])<=0?a[1]:b[1])>=0&&compareRational(point[1],compareRational(a[1],b[1])>=0?a[1]:b[1])<=0
+      if(turn===0&&withinX&&withinY)return'ON'
+      const ay=compareRational(a[1],point[1]),by=compareRational(b[1],point[1])
+      if(ay<=0&&by>0&&turn>0)winding++;else if(ay>0&&by<=0&&turn<0)winding--
+    }
+    return winding===0?'OUT':'IN'
+  }
+  return locate(contour.outer.pts)==='IN'&&contour.holes.every(hole=>locate(hole.pts)==='OUT')
+}
+
+export const exactSeatIsLegal=(contour:Contour,point:Pt,nearestSquared:Rational,radiusSquared:Rational):boolean=>
+  exactPointInMaterial(contour,point)&&compareRational(nearestSquared,radiusSquared)>=0
 
 const big = (n: number): bigint => BigInt(n)
 /** This project targets ES2017, where BigInt LITERALS (`0n`) do not compile. */

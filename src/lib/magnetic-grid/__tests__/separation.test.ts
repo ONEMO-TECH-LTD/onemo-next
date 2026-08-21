@@ -38,9 +38,9 @@ const OWNERS = {
   'magnetic-grid/spec.ts': [] as RegExp[],
   'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root|identity)$/],
   'magnetic-grid/compute/exact-real.ts': [/^\.\.\/spec$/],
-  'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
+  'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/, /^\.\/seat$/],
   'magnetic-grid/compute/identity.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
-  'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/],
+  'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
   'magnetic-grid/logic.ts': [/^\.\/spec$/, /^\.\/compute$/],
   'magnetic-grid/engine.ts': [/^\.\/spec$/, /^\.\/compute$/, /^\.\/logic$/],
@@ -62,11 +62,12 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'compareExactToRational', 'approximateExact', 'canonicalExact',
   ],
   'magnetic-grid/compute/contact-root.ts': [
-    'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'cross', 'locateInRing', 'insideMaterial', 'pointToElement',
+    'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
     'exactScale', 'prepareContour', 'measureWrap',
   ],
   'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness'],
   'magnetic-grid/compute/seat.ts': [
+    'exactSeatPoint', 'exactSeatMinus', 'exactSeatCross', 'exactPointInMaterial', 'exactSeatIsLegal',
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
     'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
     'measureCentrePlacements', 'edgeIdxOf', 'segDist2', 'edgeDistMM', 'pointInOuter',
@@ -231,5 +232,11 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(panel).toContain('boundaryTruth: boundaryTruth(base)')
     expect(worker).toContain('boundaryTruth.contourIdentity!==contourIdentity(base)')
     expect(worker).toContain('[boundaryTruth.contourIdentity, offsetMM]')
+  })
+  it('keeps exact seat legality in seat.ts rather than contact-root.ts',()=>{
+    const seat=readRepo('src/lib/magnetic-grid/compute/seat.ts'),contact=readRepo('src/lib/magnetic-grid/compute/contact-root.ts')
+    expect(seat).toContain('export const exactSeatIsLegal=')
+    expect(contact).toContain("import { exactSeatIsLegal } from './seat'")
+    expect(contact).not.toMatch(/locateInRing|insideMaterial/)
   })
 })
