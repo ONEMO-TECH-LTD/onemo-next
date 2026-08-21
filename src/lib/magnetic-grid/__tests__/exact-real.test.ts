@@ -10,6 +10,7 @@ import {
   rational,
   rationalFromNumber,
   signQuadraticAtExact,
+  isolatePrimitiveIntegerRoots,
   squareRational,
   sqrtMinusRational,
   subtractRational,
@@ -86,4 +87,6 @@ describe('Wrap exact-real support', () => {
     )[0]
     expect(compareExact(root, shifted)).toBe(-1)
   })
+  it('factorizes multiplicity before isolating equal-end-sign roots',()=>{const roots=isolatePrimitiveIntegerRoots(['1','-8','22','-24','9'],rational(0),rational(5));expect(roots).toHaveLength(2);expect(roots.map(root=>root.multiplicity)).toEqual([2,2])})
+  it('does not confuse an unrelated derivative critical point with multiplicity',()=>{const roots=isolatePrimitiveIntegerRoots(['1','0','-3','1'],rational(-3),rational(3));expect(roots).toHaveLength(3);expect(roots.map(root=>root.multiplicity)).toEqual([1,1,1])})
 })

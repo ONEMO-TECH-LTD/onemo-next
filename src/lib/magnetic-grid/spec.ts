@@ -124,6 +124,51 @@ export interface ContactWitness {
   regimeId: string
   certificateId: string
 }
+export type ExactPieceParameter =
+  | { kind: 'line'; t: ExactReal }
+  | { kind: 'arc'; chart: 0 | 1; q: ExactReal }
+
+export interface PiecePredicateRootCertificate {
+  predicateId: 'SPAN' | 'SWEEP' | 'WINDING' | 'PROJECTION_CLASS' | 'CLEARANCE'
+  generatorId: string
+  chart: 'line' | 0 | 1
+  primitivePolynomial: readonly string[]
+  rootIndex: number
+  isolating: readonly [Rational, Rational]
+  multiplicity: number
+  parameter: ExactPieceParameter
+  originalPredicateIdentity: string
+}
+
+export interface PiecePredicateSignCertificate {
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  generatorId: string
+  sign: -1 | 1
+  witness: ExactPieceParameter
+  lowerRootId: string | null
+  upperRootId: string | null
+}
+
+export type PiecePredicateProof =
+  | {
+      status: 'isolated-roots'
+      roots: readonly PiecePredicateRootCertificate[]
+      intervalSigns: readonly PiecePredicateSignCertificate[]
+    }
+  | {
+      status: 'identically-zero'
+      predicateId: PiecePredicateRootCertificate['predicateId']
+      generatorId: string
+      originalPredicateIdentity: string
+      zeroPolynomialProofId: string
+    }
+
+export interface ExactPieceIntervalCertificate {
+  rootsComplete: true
+  lower: ExactPieceParameter
+  upper: ExactPieceParameter
+  proofs: readonly PiecePredicateProof[]
+}
 export interface WrapMeasurement {
   scale: ExactScale
   boundaryTruth: BoundaryTruth

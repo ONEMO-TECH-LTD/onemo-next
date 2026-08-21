@@ -65,6 +65,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'lcmDenominatorPolynomial', 'primitiveQuadratic',
     'evaluateIntegerQuadratic', 'midpoint', 'isolateQuadraticRoot', 'quadraticRootsWithin',
     'approximateExact', 'canonicalExact',
+    'trimPolynomial','polynomialDerivative','polynomialDivRem','polynomialRemainder','monicPolynomial','polynomialGcd','polynomialIsOne','squareFreeFactors','rationalPolynomialPrimitive','sturmSequence','polynomialSignAt','signVariations','rootCount','isolatePrimitiveIntegerRoots',
   ],
   'magnetic-grid/compute/contact-root.ts': [
     'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
