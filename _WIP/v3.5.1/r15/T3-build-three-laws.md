@@ -822,6 +822,51 @@ If a resultant is zero, Compute does not silently discard the predicate and does
 
 After the final univariate polynomial is produced, its square-free factors are sorted by normalized coefficient sequence. Candidate roots from all factors are isolated and jointly refined until pairwise disjoint, then back-substituted through the original unsquared multi-generator predicate. Extraneous factors/roots are recorded and rejected. Valid roots are merged only by semantic exact-point root identity; representation-only generator order, resultant factors, scalar polynomial multiples or isolator refinements never enter semantic identity.
 
+```ts
+export interface BackSubstitutionDerivativeProof {
+  order: number
+  derivativeIdentity: string
+  exactValueIdentity: string
+  disposition: 'ZERO' | 'NONZERO'
+}
+
+export interface CandidateBackSubstitutionProof {
+  candidateRootId: string
+  originalPredicateIdentity: string
+  representedGeneratorIds: readonly string[]
+  resultantMultiplicity: number
+  disposition: 'VALID_ROOT' | 'EXTRANEOUS_ROOT' | 'IDENTICALLY_ZERO_BRANCH'
+  trueMultiplicity: number | null
+  derivativeProofs: readonly BackSubstitutionDerivativeProof[]
+}
+```
+
+Every isolated final-resultant root is only a candidate. Compute substitutes its certified piece parameter and every certified represented algebraic generator into the original unsquared predicate, using the same canonical generator identities and exact algebraic evaluation machinery.
+
+If the exact original predicate value is nonzero, the candidate is `EXTRANEOUS_ROOT` and is removed. If it is zero, Compute differentiates the original unsquared predicate formally with respect to the piece parameter. It evaluates derivative orders `1..degree` at the same certified parameter/generator tuple. The smallest order with a proven nonzero exact value is `trueMultiplicity`; all lower derivative values must have replayable exact-zero proofs. Resultant/factor multiplicity is recorded as provenance only and never decides `trueMultiplicity`.
+
+If exact reduction modulo every represented generator minimal polynomial proves the original predicate is the zero polynomial in the piece parameter, disposition is `IDENTICALLY_ZERO_BRANCH`, `trueMultiplicity` is `null`, and no finite split-root set is emitted for that predicate branch.
+
+If the original value, any required derivative value, generator substitution, equality/nonzero separation or zero-polynomial reduction cannot be certified, return `CENTRE_EVIDENCE_UNRESOLVED` for the whole piece result; emit no partial candidate list.
+
+Back-substitution proof identity hashes the candidate semantic root id, original predicate identity, ordered represented generator ids, every derivative identity/value disposition, final disposition and true multiplicity. Polynomial representation, elimination order and isolator refinement remain replay data and do not change this semantic proof.
+
+After all candidates are back-substituted, valid roots are merged by semantic exact-point identity. When duplicate elimination factors yield the same valid root, the independently derived `trueMultiplicity` must agree; disagreement returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+Required back-substitution mutations:
+
+28. `P(x,g)=x(g-3)`, defining `(g²-2)(g-3)`, represented `g=+√2`: resultant candidate `x²`, valid root `x=0`, `resultantMultiplicity=2`, `trueMultiplicity=1`.
+29. The conjugate/extraneous branch `g=3` is not the represented generator and cannot make a root valid.
+30. A resultant candidate whose original unsquared predicate is nonzero: `EXTRANEOUS_ROOT`, removed.
+31. A true double root: original value and first derivative zero, second derivative nonzero, `trueMultiplicity=2`.
+32. `P(x,g)=x(g²-2)`, represented `g=+√2`: exact zero polynomial in `x`, `IDENTICALLY_ZERO_BRANCH`, no fabricated finite roots.
+33. Two elimination factors produce the same semantic root and agree on true multiplicity: one merged root/proof.
+34. Duplicate factors disagree on true multiplicity or a derivative cannot be separated from zero: typed unresolved, no partial roots.
+
+Necessity: only the proof needed to enforce the already-stated original-predicate back-substitution and true-multiplicity law is added.
+
+Sufficiency contribution: exact candidate validation, extraneous rejection, derivative-order multiplicity, identically-zero branches, duplicate merge and fail-closed disagreement make back-substitution complete and replayable.
+
 The root proof record contains ordered `AlgebraicGeneratorProof[]`, ordered `GeneratorEliminationStepProof[]`, the normalized final univariate factors with multiplicity/provenance, every back-substitution disposition and the canonical semantic root ids. Any unresolved generator equality, subresultant, common-factor decomposition, factor provenance, back-substitution or global root order returns `CENTRE_EVIDENCE_UNRESOLVED` and no partial piece certificate.
 
 Required multi-generator mutations:
