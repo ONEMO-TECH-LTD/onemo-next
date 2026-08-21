@@ -119,7 +119,7 @@ export function evaluateWrap(measured: WrapMeasurement, policy: WrapPolicy): Wra
   if (compareExactToRational(measured.requiredFlap, allowed) > 0) {
     return {
       status: 'refused',
-      code: 'WRAP_EXCEEDS_ALLOWANCE',
+      code: policy.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE',
       requiredFlap: measured.requiredFlap,
       requiredFlapApproxMM: measured.requiredFlapApproxMM,
       allowedFlap: allowed,

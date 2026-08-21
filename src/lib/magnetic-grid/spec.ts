@@ -146,7 +146,7 @@ export type WrapEvaluation =
   }
   | {
     status: 'refused'
-    code: 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND'
+    code: 'WRAP_EXCEEDS_ALLOWANCE' | 'AUTO_FLAP_CAP_EXCEEDED' | 'NO_WRAPPED_LAYOUT_IN_BAND'
     reason?: 'invalid-boundary' | 'empty-belt' | 'invalid-seat'
     requiredFlap: ExactReal
     requiredFlapApproxMM: number

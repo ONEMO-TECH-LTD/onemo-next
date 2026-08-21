@@ -58,6 +58,7 @@ describe('v3.5.1 exact Wrap', () => {
 
     const refused = computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0.7 })
     expect(refused.wrap.status).toBe('refused')
+    if(refused.wrap.status==='refused')expect(refused.wrap.code).toBe('AUTO_FLAP_CAP_EXCEEDED')
   })
 
   it('measures Wrap on the perimeter belt regardless of output coverage', () => {
@@ -117,7 +118,11 @@ describe('v3.5.1 exact Wrap', () => {
     const contour=square(25),prepared=prepareContour(contour,contourBoundaryTruth(contour)),raw=measureWrap(prepared,[[0,0]],12)
     const measured={...raw,witnesses:raw.witnesses.map(certifyContactWitness)}
     const policy={mode:'fixed' as const,allowance:rational(0),allowanceApproxMM:0}
-    expect(evaluateWrap(measured,policy).status).toBe('refused')
+    const fixed=evaluateWrap(measured,policy),auto=evaluateWrap(measured,{mode:'auto',cap:rational(0),capApproxMM:0})
+    expect(fixed.status).toBe('refused')
+    if(fixed.status==='refused')expect(fixed.code).toBe('WRAP_EXCEEDS_ALLOWANCE')
+    expect(auto.status).toBe('refused')
+    if(auto.status==='refused')expect(auto.code).toBe('AUTO_FLAP_CAP_EXCEEDED')
     expect(evaluateWrap({...measured,requiredFlapApproxMM:-999},policy).status).toBe('refused')
   })
 })
