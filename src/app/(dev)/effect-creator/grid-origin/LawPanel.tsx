@@ -43,7 +43,7 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
   return [v, set]
 }
 
-export default function LawPanel({ onSelect }: { onSelect: (positioning: 0 | 1 | 2) => void }) {
+export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2) => void }) {
   const [src, setSrc] = useState<Src>('preset')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')

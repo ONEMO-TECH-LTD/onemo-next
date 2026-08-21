@@ -1,9 +1,38 @@
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
-const ROOT = join(process.cwd(), 'src/lib')
+const REPO = process.cwd()
+const ROOT = join(REPO, 'src/lib')
+
+const LAW_RUNTIME_FILES = [
+  'src/lib/magnetic-grid/spec.ts',
+  'src/lib/magnetic-grid/compute.ts',
+  'src/lib/magnetic-grid/compute/seat.ts',
+  'src/lib/magnetic-grid/compute/centre-evidence.ts',
+  'src/lib/magnetic-grid/logic.ts',
+  'src/lib/magnetic-grid/engine.ts',
+  'src/lib/effect/magnetic-grid-bridge.ts',
+  'src/app/(dev)/effect-creator/grid-origin/LawPanel.tsx',
+  'src/app/(dev)/effect-creator/grid-origin/law.worker.ts',
+] as const
+
+const FROZEN_DONORS = [
+  'src/lib/effect/grid-origin.ts',
+  'src/lib/effect/grid-origin-spec.ts',
+  'src/lib/effect/grid-origin-compute.ts',
+  'src/lib/effect/grid-origin-logic.ts',
+  'src/lib/effect/grid-origin-bridge.ts',
+  'src/app/(dev)/effect-creator/grid-origin/solve.worker.ts',
+  'src/lib/grid-engine/compute/geometry.ts',
+] as const
+
+const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex')
+const readRepo = (file: string): string => readFileSync(join(REPO, file), 'utf8')
+const donorBytes = (file: string): Buffer => execFileSync('git', ['show', `8d17780c:${file}`], { cwd: REPO })
 
 const OWNERS = {
   'magnetic-grid/spec.ts': [] as RegExp[],
@@ -64,6 +93,18 @@ const importsOf = (text: string): string[] => {
     }
   })
   return imports
+}
+
+const identifiersOf = (text: string): string[] => {
+  const identifiers: string[] = []
+  walk(parse(text), (node) => { if (ts.isIdentifier(node)) identifiers.push(node.text) })
+  return identifiers
+}
+
+const stringLiteralsOf = (text: string): string[] => {
+  const literals: string[] = []
+  walk(parse(text), (node) => { if (ts.isStringLiteralLike(node)) literals.push(node.text) })
+  return literals
 }
 
 const forbiddenImports = (file: keyof typeof OWNERS, text: string): string[] => {
@@ -138,5 +179,31 @@ describe('magnetic-grid T2 owner DAG', () => {
     expect(ownerKindViolations('magnetic-grid/logic.ts', 'export function newGeometry() {}').some((v) => v.startsWith('t2-function-set:'))).toBe(true)
     expect(ownerKindViolations('magnetic-grid/compute/seat.ts', 'type Leak = CentreMode')).toContain('compute-policy:CentreMode')
     expect(ownerKindViolations('magnetic-grid/engine.ts', 'function wrapIsLawful() { return true }').some((v) => v.startsWith('t2-function-set:'))).toBe(true)
+  })
+
+  it('keeps the Law runtime isolated from legacy engines, state and Voting', () => {
+    const forbiddenIdentifiers = /^(positioning|votingOrder|registrationScore|VOTING_ORDER)$/
+    for (const file of LAW_RUNTIME_FILES) {
+      const text = readRepo(file)
+      expect(importsOf(text).filter((source) => /grid-origin|grid-engine/.test(source)), `${file} imports a legacy engine`).toEqual([])
+      expect(identifiersOf(text).filter((name) => forbiddenIdentifiers.test(name)), `${file} carries legacy state or Voting`).toEqual([])
+    }
+    expect(stringLiteralsOf(readRepo('src/app/(dev)/effect-creator/grid-origin/LawPanel.tsx')).filter((value) => value.includes('grid-origin.')))
+      .toEqual([])
+  })
+
+  it('keeps all seven comparator donors byte-identical to 8d17780c', () => {
+    for (const file of FROZEN_DONORS) {
+      expect(sha256(readFileSync(join(REPO, file))), `${file} diverged from the frozen comparator donor`)
+        .toBe(sha256(donorBytes(file)))
+    }
+  })
+
+  it('mutation-proves the four isolation duties', () => {
+    expect(importsOf("import x from '@/lib/effect/grid-origin'").some((source) => /grid-origin|grid-engine/.test(source))).toBe(true)
+    expect(stringLiteralsOf("const key = 'grid-origin.pad'").some((value) => value.includes('grid-origin.'))).toBe(true)
+    expect(identifiersOf('const positioning = 0')).toContain('positioning')
+    const donor = donorBytes(FROZEN_DONORS[0])
+    expect(sha256(Buffer.concat([donor, Buffer.from('mutation')]))).not.toBe(sha256(donor))
   })
 })
