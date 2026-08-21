@@ -12,6 +12,8 @@ import {
   rationalFromNumber,
   signQuadraticAtExact,
   isolatePrimitiveIntegerRoots,
+  addSparseIntegerPolynomials,
+  normalizeSparseEliminationStep,
   squareRational,
   sqrtMinusRational,
   subtractRational,
@@ -91,4 +93,5 @@ describe('Wrap exact-real support', () => {
   it('factorizes multiplicity before isolating equal-end-sign roots',()=>{const roots=isolatePrimitiveIntegerRoots(['1','-8','22','-24','9'],rational(0),rational(5));expect(roots).toHaveLength(2);expect(roots.map(root=>root.multiplicity)).toEqual([2,2])})
   it('does not confuse an unrelated derivative critical point with multiplicity',()=>{const roots=isolatePrimitiveIntegerRoots(['1','0','-3','1'],rational(-3),rational(3));expect(roots).toHaveLength(3);expect(roots.map(root=>root.multiplicity)).toEqual([1,1,1])})
   it('globally orders disjoint square-free factors and exact midpoint roots',()=>{const roots=isolatePrimitiveIntegerRoots(['1','-8','23','-28','12'],rational(0),rational(5));expect(roots.map(root=>root.multiplicity)).toEqual([1,2,1]);for(let index=1;index<roots.length;index++)expect(compareRational(roots[index-1].isolating[1],roots[index].isolating[0])).toBe(-1);const midpoint=isolatePrimitiveIntegerRoots(['1','-2'],rational(0),rational(4));expect(midpoint).toHaveLength(1);expect(midpoint[0].isolating).toEqual([rational(2),rational(2)])})
+  it('preserves raw relative coefficients until elimination-step normalization',()=>{const sum=addSparseIntegerPolynomials([{coefficient:'2',powers:[1]}],[{coefficient:'4',powers:[0]}]);expect(sum).toEqual([{coefficient:'2',powers:[1]},{coefficient:'4',powers:[0]}]);expect(normalizeSparseEliminationStep(sum)).toEqual({polynomial:[{coefficient:'1',powers:[1]},{coefficient:'2',powers:[0]}],removedIntegerContent:['2','1']})})
 })
