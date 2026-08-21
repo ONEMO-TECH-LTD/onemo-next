@@ -88,6 +88,7 @@ The files below are copied byte-for-byte from `8d17780cb0efb5db896f9ac62d03b01d6
 | `src/lib/effect/grid-origin-compute.ts` | `44b5144fb493284d28be3fff6c82c1be93ff8be90bad052ba6fa0569f6ab90fc` |
 | `src/lib/effect/grid-origin-logic.ts` | `bc317ef497bbcf19d0fdd9ae56431bd9ab5aab4ded470b363008e010de54659e` |
 | `src/lib/effect/grid-origin-bridge.ts` | `4878c9934c31f8ba54fd4c7cad7b7ac4a3552eb34da268321f6906db97a14eb0` |
+| `src/lib/grid-engine/compute/geometry.ts` | `0bca7ef8e0a407779608a40e93145bc54785fa300198559d161c09113d26195e` |
 
 ## 11. Optional later acceptance audit
 

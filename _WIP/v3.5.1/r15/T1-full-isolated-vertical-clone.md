@@ -14,7 +14,7 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 - Materialize the existing third **Law** selection as a full isolated vertical clone from the embedded `8d17780c` source: cloned visible bench/tab UI, controls, local state/defaults, request builder/newest-only queue, worker execution/caches/band/replay/prefetch path, rendered Stage/evidence surface, `positioning===1` branch and its complete dependency closure. The clone uses `LawPanel.tsx`, isolated `law.worker.ts`, isolated `src/lib/magnetic-grid/` runtime files and `magnetic-grid.compare.v1.*`; it never sends a request to or imports the current worker or current `grid-origin*` runtime.
 - Use the existing three-way selector as the only page-level dispatch and add only the isolated `LawPanel` mount boundary. Voting and Centre-rules keep their original page subtree, state, request path, worker and modules byte-untouched. Selecting Centre-rules runs the frozen original; selecting Law runs the complete isolated clone. No new selector, fourth option or second page exists.
 - Build and run the full vertical clone before structural moves. Confirm the Centre-rules and Law selections both load, the Law selection uses only its isolated request/worker/runtime, and the original still runs unchanged. The minimum frozen-snapshot equivalence in the build completion is mandatory; the broader matrix/pixel suite belongs to optional §9. No Voting-only or existing `positioning===2` body is copied.
-- The cloned contour adapter accepts the shell's same already-loaded normalized contour and returns it unchanged with a content identity. Do not add Studio integration or alter current shape loaders.
+- `LawPanel.tsx` independently runs the cloned source/shape pipeline and produces its own normalized contour; the shell passes no contour. The frozen equivalence snapshot below requires the Law contour identity and ordered contour bytes to equal the legacy Centre-rules contour. Do not add Studio integration or alter current shape loaders.
 - Label the isolated selection `Law · Centre clone`. Its description names Centre only; it must not claim Wrap or scaling.
 
 #### T1 selector and state ownership
@@ -25,7 +25,7 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 | legacy comparator component inside `page.tsx` | receives `positioning: 0 | 1`, owns every other original `grid-origin.*` persisted state, Voting/Centre-rules controls, original request queue/worker and original rendered model; all bodies remain donor-identical except the named positioning prop/selector callback extraction |
 | `LawPanel.tsx` | owns an independent copy of shape/source selection, size/band/manual/display state, Centre controls, defaults, request queue, model and Stage rendering; persistence uses only `magnetic-grid.compare.v1.*` and never reads `grid-origin.*` after initialization from donor defaults |
 | `law.worker.ts` | owns only the isolated clone's request execution, caches, band replay and prefetch until T4 replaces them |
-| temporary Law runtime | owns the extracted `positioning===1` engine path and complete reached dependency closure; it accepts no `positioning` or `votingOrder` field |
+| `src/lib/magnetic-grid/centre-clone-engine.ts` | owns the extracted `positioning===1` engine path and complete reached dependency closure; it accepts no `positioning` or `votingOrder` field |
 
 The comparison is selector-based, not simultaneous: only one panel/worker is mounted at a time. The shell passes only `{ positioning: 0 | 1, onSelect(positioning: 0 | 1 | 2): void }` to the legacy panel and `{ onSelect(positioning: 0 | 1 | 2): void }` to `LawPanel`; no contour, engine control, request, result or cache object crosses that boundary.
 
@@ -35,24 +35,27 @@ The comparison is selector-based, not simultaneous: only one panel/worker is mou
 |---|---|---|
 | `page.tsx:1-34` | `LawPanel.tsx` imports/constants/types | `ADAPT-EXTRACT`: substitute isolated imports and component name only |
 | `page.tsx:35-44` | `LawPanel.tsx` persisted helper | `ADAPT-EXTRACT`: substitute `magnetic-grid.compare.v1.*` prefix only |
-| `page.tsx:46-273` | `LawPanel.tsx` complete local state, shape/source preparation, model, queue and request builder | copy all reached bodies; remove `positioning`/`votingOrder` state and fields; set isolated Centre-clone engine identity; change worker URL only |
+| `page.tsx:46-273` | `LawPanel.tsx` complete local state, shape/source preparation, model, queue and request builder | copy all reached bodies; remove `positioning`/`votingOrder` state and fields; map `grid-origin.defaults` to `magnetic-grid.compare.v1.defaults` and remove positioning/voting from that saved/default object; set isolated Centre-clone engine identity; change worker URL only |
 | `page.tsx:274-537` | `LawPanel.tsx` complete visible bench/control rendering | copy all reached JSX; `474-489` becomes selector callback + truthful Centre-clone label; exclude Voting-only `522-532` |
 | `page.tsx:539-879` | `LawPanel.tsx` Stage, evidence rendering, helpers and CSS | `MOVE-VERBATIM` |
 | `page.tsx:46-537` | existing `page.tsx` legacy component + new mount shell | move `positioning` selection to the shell prop, replace the three selector handlers with `onSelect`, and add the one-panel mount; every other legacy state/request/render body remains unchanged |
 | `solve.worker.ts:1-150` | isolated `law.worker.ts` | copy request/caches/band/replay/prefetch/onmessage; substitute imports and engine identity; preserve positioning-1 branches at `78-80` and `126-128`, including `seatMarginMM`; exclude positioning-2 alternatives |
-| `grid-origin.ts:1-143` | temporary Law runtime types/shared helpers | copy reached imports/types plus `parityHolds`; exclude Voting-only imports/fields |
-| `grid-origin.ts:145-220` + `329-352` | temporary Centre-clone `computeGrid` | `ADAPT-EXTRACT`: preserve prelude, analytic-circle predicate, `seatMarginMM`, `safeSegments`, governed centre, manual branch, full `positioning===1` branch, coverage/result assembly; remove the mode switch and set Centre-clone identity |
+| `grid-origin.ts:1-143` | `src/lib/magnetic-grid/centre-clone-engine.ts` types/shared helpers | copy reached imports/types plus `parityHolds`; exclude Voting-only imports/fields |
+| `grid-origin.ts:145-220` + `329-352` | `src/lib/magnetic-grid/centre-clone-engine.ts` `computeGrid` | `ADAPT-EXTRACT`: preserve prelude, analytic-circle predicate, `seatMarginMM`, `safeSegments`, governed centre, manual branch, full `positioning===1` branch, coverage/result assembly; remove the mode switch and set Centre-clone identity |
 | `grid-origin.ts:221-328` | no destination | `EXCLUDE`: existing Law and Voting branches |
-| `grid-origin.ts:354-483` | temporary Centre-clone band/Auto path | copy reached Centre-rules behavior, including sampled walk/tolerance and seat inflation, unchanged through T2 |
-| `grid-origin-spec.ts:1-98` | temporary Law spec | copy reached constants/types; exclude Voting weights/order and `POSITIONING`; preserve circle, flap, phase, mass, governor, band and seat-margin dependencies used by the clone |
-| `grid-origin-compute.ts:1-585` | temporary Law compute | copy complete file because the reached Centre-rules page/engine/bridge closure uses its seat, circle, lattice, ruler, contact, belt and contour helpers; no helper is repaired in T1/T2 |
-| `grid-origin-logic.ts:1-15` | temporary Law logic imports | `ADAPT-EXTRACT`: retain only imports reached by the copied logic ranges; exclude Voting weights/order |
-| `grid-origin-logic.ts:17-26`, `43-105`, `126-149` | temporary Law logic | copy `bandOf`, types, `governMass`, `centeringAnchors`, coverage and sizing; exclude Voting `28-40` score bodies and unused `centeringRef:107-124` |
-| `grid-origin-bridge.ts:1-108` | temporary Law bridge | `MOVE-VERBATIM` except isolated import paths |
+| `grid-origin.ts:354-483` | `src/lib/magnetic-grid/centre-clone-engine.ts` band/Auto path | copy reached Centre-rules behavior, including sampled walk/tolerance and seat inflation, unchanged through T2 |
+| `grid-origin-spec.ts:1-98` | `src/lib/magnetic-grid/centre-clone-spec.ts` | copy reached constants/types; exclude Voting weights/order and `POSITIONING`; preserve circle, flap, phase, mass, governor, band and seat-margin dependencies used by the clone |
+| `grid-origin-compute.ts:1-585` | `src/lib/magnetic-grid/centre-clone-compute.ts` | copy complete file because the reached Centre-rules page/engine/bridge closure uses its seat, circle, lattice, ruler, contact, belt and contour helpers; redirect `holds`/`prepare` to `centre-clone-geometry.ts`; no helper is repaired in T1/T2 |
+| `grid-engine/compute/geometry.ts:1-166` | `src/lib/magnetic-grid/centre-clone-geometry.ts` | `MOVE-VERBATIM`; supplies the exact `holds`/`prepare` dependency; no live `src/lib/grid-engine` import |
+| `grid-origin-logic.ts:1-15` | `src/lib/magnetic-grid/centre-clone-logic.ts` imports | `ADAPT-EXTRACT`: retain only imports reached by the copied logic ranges; exclude Voting weights/order |
+| `grid-origin-logic.ts:17-26`, `43-105`, `126-149` | `src/lib/magnetic-grid/centre-clone-logic.ts` | copy `bandOf`, types, `governMass`, `centeringAnchors`, coverage and sizing; exclude Voting `28-40` score bodies and unused `centeringRef:107-124` |
+| `grid-origin-bridge.ts:1-108` | `src/lib/effect/magnetic-grid-clone-bridge.ts` | `MOVE-VERBATIM` except isolated import paths |
 
 This extraction map is closed before T1 starts. No new source row, state owner, request field, helper or result field may be discovered or added during implementation without revising R15 first.
 
-Build completion: the full isolated Law clone compiles and runs in the existing third selection; Centre-rules still compiles and runs in its original selection; the clone has its own request/worker/cache/runtime and no legacy runtime edge; the same frozen input/config snapshot returns the same Centre-rules result record and rendered Centre evidence in both selections; no re-room, ruler repair, Wrap or scaling code exists yet. Commit this working state before T2.
+T1 frozen equivalence snapshot: donor default `squircle`, longest side `72mm`, `positioning=1` (Centre-rules), `pitchMM=48`, `paddingMM=12`, `flapMM=0`, `phaseStepMM=1`, `massDepthMM=16`, `centreMode=2` (Masses), `governor=0` (Smallest), `plan='all6'`, `perimeterOnly=true`, `offsetMM=0`, no forced phase, Auto flap off. Record the exact normalized contour identity and ordered contour bytes from the donor before cloning.
+
+Build completion: the full isolated Law clone compiles and runs in the existing third selection; Centre-rules still compiles and runs in its original selection; the clone has its own request/worker/cache/runtime and no legacy runtime edge; the named frozen snapshot returns byte-identical contour identity/bytes, complete Centre-rules result record and rendered Centre evidence in both selections; no re-room, ruler repair, Wrap or scaling code exists yet. Commit this working state before T2.
 
 #### T1 frozen vertical donor snapshot — `8d17780c`
 
@@ -69,6 +72,7 @@ The files below are copied byte-for-byte from `8d17780cb0efb5db896f9ac62d03b01d6
 | `src/lib/effect/grid-origin-compute.ts` | `44b5144fb493284d28be3fff6c82c1be93ff8be90bad052ba6fa0569f6ab90fc` |
 | `src/lib/effect/grid-origin-logic.ts` | `bc317ef497bbcf19d0fdd9ae56431bd9ab5aab4ded470b363008e010de54659e` |
 | `src/lib/effect/grid-origin-bridge.ts` | `4878c9934c31f8ba54fd4c7cad7b7ac4a3552eb34da268321f6906db97a14eb0` |
+| `src/lib/grid-engine/compute/geometry.ts` | `0bca7ef8e0a407779608a40e93145bc54785fa300198559d161c09113d26195e` |
 
 ##### `src/app/(dev)/effect-creator/grid-origin/page.tsx`
 
@@ -2558,6 +2562,178 @@ export function seatedSpots(grid: GridResult): FieldSpot[] {
 }
 
 ```
+##### `src/lib/grid-engine/compute/geometry.ts`
+
+```ts
+// grid-engine/compute/geometry.ts — the exact predicate, and nothing else.
+//
+// One question, answered exactly: does a disc of radius r, centred at p, lie
+// completely inside this outline? Tangency counts as inside — a disc touching
+// the boundary is legal, because the material reaches exactly that far.
+//
+// Everything is integer arithmetic on a fixed quantum. No square roots, no
+// epsilon, no tolerance. Distance comparisons are done squared, in BigInt, so
+// "exactly 12mm" compares equal instead of nearly equal.
+//
+// This module knows nothing about magnets, bands, grids or ONEMO. It takes a
+// ring and a radius and answers a geometric question.
+
+/** A point. Millimetres at the public edge, integer quanta inside. */
+export type Pt = readonly [number, number]
+
+export interface Box {
+  readonly minX: number
+  readonly minY: number
+  readonly maxX: number
+  readonly maxY: number
+}
+
+export interface Prepared {
+  /** Size of one integer step, in millimetres. */
+  readonly quantumMM: number
+  /** The ring in integer quanta, duplicate-free, at least three vertices. */
+  readonly ring: readonly Pt[]
+  /** Bounds in integer quanta. */
+  readonly box: Box
+}
+
+const big = (n: number): bigint => BigInt(n)
+/** This project targets ES2017, where BigInt LITERALS (`0n`) do not compile. */
+const ZERO = BigInt(0)
+
+/** Twice the signed area of the triangle abc. Sign gives the turn direction. */
+function orient(a: Pt, b: Pt, c: Pt): bigint {
+  return big(b[0] - a[0]) * big(c[1] - a[1]) - big(b[1] - a[1]) * big(c[0] - a[0])
+}
+
+/** p lies on the closed segment ab. */
+function onSegment(p: Pt, a: Pt, b: Pt): boolean {
+  if (orient(a, b, p) !== ZERO) return false
+  return (
+    p[0] >= Math.min(a[0], b[0]) && p[0] <= Math.max(a[0], b[0]) &&
+    p[1] >= Math.min(a[1], b[1]) && p[1] <= Math.max(a[1], b[1])
+  )
+}
+
+/**
+ * Quantise a millimetre ring to integer quanta and drop repeated vertices.
+ *
+ * Throws rather than guesses: a ring that collapses below three distinct
+ * vertices, or encloses no area, is not a shape this can answer about.
+ */
+export function prepare(ringMM: readonly Pt[], quantumMM = 0.001): Prepared {
+  if (!(quantumMM > 0) || !Number.isFinite(quantumMM)) {
+    throw new RangeError('quantum must be finite and positive')
+  }
+  const scaled: Pt[] = []
+  for (const [x, y] of ringMM) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new RangeError('outline contains a non-finite coordinate')
+    }
+    const p: Pt = [Math.round(x / quantumMM), Math.round(y / quantumMM)]
+    const last = scaled[scaled.length - 1]
+    if (!last || last[0] !== p[0] || last[1] !== p[1]) scaled.push(p)
+  }
+  const first = scaled[0]
+  const last = scaled[scaled.length - 1]
+  if (first && last && scaled.length > 1 && first[0] === last[0] && first[1] === last[1]) scaled.pop()
+  if (scaled.length < 3) throw new RangeError('outline needs at least three distinct vertices')
+
+  let twiceArea = ZERO
+  for (let i = 0; i < scaled.length; i++) {
+    const a = scaled[i]!
+    const b = scaled[(i + 1) % scaled.length]!
+    twiceArea += big(a[0]) * big(b[1]) - big(b[0]) * big(a[1])
+  }
+  if (twiceArea === ZERO) throw new RangeError('outline encloses no area')
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of scaled) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  return { quantumMM, ring: Object.freeze(scaled), box: { minX, minY, maxX, maxY } }
+}
+
+export type Location = 'IN' | 'OUT' | 'ON'
+
+/** Exact location of an integer point against the ring. Winding, no tolerance. */
+export function locate(shape: Prepared, p: Pt): Location {
+  const { ring, box } = shape
+  if (p[0] < box.minX || p[0] > box.maxX || p[1] < box.minY || p[1] > box.maxY) return 'OUT'
+  let winding = 0
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!
+    const b = ring[(i + 1) % ring.length]!
+    if (onSegment(p, a, b)) return 'ON'
+    if (a[1] <= p[1]) {
+      if (b[1] > p[1] && orient(a, b, p) > ZERO) winding++
+    } else if (b[1] <= p[1] && orient(a, b, p) < ZERO) winding--
+  }
+  return winding === 0 ? 'OUT' : 'IN'
+}
+
+/**
+ * Is the squared distance from p to segment ab at least r²?
+ *
+ * Three cases, all exact: p projects before a, after b, or onto the segment's
+ * interior — where the perpendicular distance is |cross| / |v|, so the test
+ * becomes cross² >= r²·|v|² with no division and no root.
+ */
+function atLeast(p: Pt, a: Pt, b: Pt, r2: bigint): boolean {
+  const vx = big(b[0] - a[0]), vy = big(b[1] - a[1])
+  const wx = big(p[0] - a[0]), wy = big(p[1] - a[1])
+  const dot = wx * vx + wy * vy
+  if (dot <= ZERO) return wx * wx + wy * wy >= r2
+  const len2 = vx * vx + vy * vy
+  if (dot >= len2) {
+    const ux = big(p[0] - b[0]), uy = big(p[1] - b[1])
+    return ux * ux + uy * uy >= r2
+  }
+  const cross = vx * wy - vy * wx
+  return cross * cross >= r2 * len2
+}
+
+/**
+ * Does the closed disc of radius `radius` (in quanta) centred at `p` lie wholly
+ * inside the outline?
+ *
+ * A centre exactly `radius` from the nearest edge PASSES — the disc is tangent
+ * to the boundary and every part of it is on material. This is the whole reason
+ * the arithmetic is integer: at 12.000000000mm the comparison must be equal, not
+ * nearly equal.
+ */
+export function holds(shape: Prepared, p: Pt, radius: number): boolean {
+  if (locate(shape, p) === 'OUT') return false
+  const r2 = big(radius) * big(radius)
+  const { ring } = shape
+  for (let i = 0; i < ring.length; i++) {
+    if (!atLeast(p, ring[i]!, ring[(i + 1) % ring.length]!, r2)) return false
+  }
+  return true
+}
+
+/** Uniform scale about the bounding-box centre so the longest side is `longestMM`. */
+export function scaleRing(ringMM: readonly Pt[], longestMM: number): Pt[] {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of ringMM) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  const longest = Math.max(maxX - minX, maxY - minY)
+  if (!(longest > 0)) throw new RangeError('outline has no extent')
+  const k = longestMM / longest
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
+  return ringMM.map(([x, y]) => [(x - cx) * k, (y - cy) * k] as Pt)
+}
+```
+
+
 ## 1. Product goal
 
 The engine is one portable three-rule driver:
@@ -2637,7 +2813,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds scaling | T1/T2 preserve the sampled walk and `seatMarginMM`; T3 replaces only behavior required by the live first-lawful-size implementation |
 | `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds Wrap | T1/T2 preserve the allowance scan; T3 replaces only behavior required by the live Wrap implementation |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
-| `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; RE-ROOM representation only in T2 | preserve identical governor branches/decisions; no new comparator unless live T3 code invokes Support A |
+| `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2; any `ExactReal`/`compareExact` adaptation requires a named T3 repair invoking Support A |
 | `grid-origin-logic.ts assignSizes` | ADAPT only when a live T3 result consumes it | extrema/corner measurements in `compute/seat.ts`; magnet-plan policy in `logic.ts` |
 | `grid-origin-compute.ts splitPerimeter` | ADAPT only when live Coverage/Wrap code consumes it | neighbour measurements in `compute/seat.ts`; belt classification in `logic.ts`; no speculative reach value |
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
