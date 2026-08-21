@@ -37,4 +37,13 @@ describe('Wrap admitted product contour',()=>{
     expect(scaled.holes).toHaveLength(1)
     expect(scaled.holes[0].pts).toHaveLength(4)
   })
+  it('keeps the public 12mm default, magnet-plan positions and outline identity truthful',()=>{
+    const base=normBaseContour(getShape('square',1024,1024),1024)!,plain=makeSizer(base,0)(72),offset=makeSizer(base,1)(72)
+    const all6=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all6'})
+    const all8=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all8'})
+    expect(all6.spotRadiusMM).toBe(12)
+    expect(all6.anchors.map(anchor=>anchor.p)).toEqual(all8.anchors.map(anchor=>anchor.p))
+    expect(all6.wrap.witnesses.map(witness=>witness.beltAnchorId)).toEqual(all8.wrap.witnesses.map(witness=>witness.beltAnchorId))
+    expect(contourBoundaryTruth(plain).contourIdentity).not.toBe(contourBoundaryTruth(offset).contourIdentity)
+  })
 })
