@@ -511,7 +511,7 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
               <div className="gl-seg">
                 <button aria-pressed={positioning === 0} onClick={() => onSelect(0)}>Voting</button>
                 <button aria-pressed={positioning === 1} onClick={() => onSelect(1)}>Centre rules</button>
-                <button aria-pressed={false} onClick={() => onSelect(2)}>Law</button>
+                <button aria-pressed={false} onClick={() => onSelect(2)}>v3.5.1</button>
               </div>
             </div>
             <div className="gl-magic-note">

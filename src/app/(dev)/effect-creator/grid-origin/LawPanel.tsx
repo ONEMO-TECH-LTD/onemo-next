@@ -476,10 +476,10 @@ export default function LawPanel({ onSelect }: { onSelect: (positioning: 0 | 1 |
         <aside className="gl-centercol">
           <Fold title="Centering">
             <div className="gl-field"><span>Positioning · how the centre is applied</span>
-              <div className="gl-seg">
+              <div className="gl-seg gl-wrap">
                 <button aria-pressed={false} onClick={() => onSelect(0)}>Voting</button>
                 <button aria-pressed={false} onClick={() => onSelect(1)}>Centre rules</button>
-                <button aria-pressed style={{ flex: '0 0 auto', minWidth: 112 }} onClick={() => onSelect(2)}>Law · Centre clone</button>
+                <button aria-pressed onClick={() => onSelect(2)}>v3.5.1</button>
               </div>
             </div>
             <div className="gl-magic-note">
