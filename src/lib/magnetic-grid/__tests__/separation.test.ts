@@ -58,9 +58,9 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/exact-real.ts': [
     'abs', 'gcd', 'q', 'fromPublic', 'toPublic', 'rational', 'rationalFromNumber',
     'addRational', 'subtractRational', 'multiplyRational', 'divideRational', 'squareRational',
-    'compareRational', 'integerSqrt', 'exactSquareRoot', 'primitivePolynomial', 'allowancePolynomial',
+    'compareRational', 'integerSqrt', 'exactSquareRoot', 'sqrtRationalBounds', 'primitivePolynomial', 'allowancePolynomial',
     'sqrtMinusRational', 'isRational', 'isAlgebraic', 'evaluatePolynomial', 'normalizedAlgebraicKey', 'validateAlgebraic', 'compareAlgebraicToRational',
-    'certifiedSqrtQuadraticParts', 'compareCertifiedToRational', 'compareExactToRational',
+    'certifiedSqrtQuadraticParts', 'compareCertifiedToRational', 'validateCertifiedExpressionBounds', 'compareExactToRational',
     'refineAlgebraic', 'refineCertified', 'compareExact', 'affinePolynomial', 'affineExact', 'signQuadraticAtExact',
     'lcmDenominatorPolynomial', 'primitiveQuadratic',
     'evaluateIntegerQuadratic', 'midpoint', 'isolateQuadraticRoot', 'quadraticRootsWithin',
@@ -75,7 +75,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'subtractRadiusSquared', 'exactBandDomain', 'scaleInBand', 'roots', 'polynomialOf', 'relations', 'latticeOffsets',
     'enumerateAffineContactEvents', 'enumerateParityClassEvents',
   ],
-  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression'],
+  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression','validateCertifiedExpressionIdentity'],
   'magnetic-grid/compute/seat.ts': [
     'exactSeatPoint', 'exactSeatMinus', 'exactSeatCross', 'exactPointInMaterial', 'exactSeatIsLegal',
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',

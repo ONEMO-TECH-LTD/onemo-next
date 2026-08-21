@@ -106,6 +106,16 @@ const exactSquareRoot = (value: Rational): Rational | null => {
   return sn * sn === x.n && sd * sd === x.d ? rational(sn, sd) : null
 }
 
+export function sqrtRationalBounds(value: Rational, bits = 192): readonly [Rational, Rational] {
+  const input = fromPublic(value)
+  if (input.n < BigInt(0)) throw new RangeError('square root of negative value')
+  const scale = BigInt(1) << BigInt(bits)
+  const scaledFloor = (input.n << BigInt(bits * 2)) / input.d
+  const root = integerSqrt(scaledFloor)
+  const lo = rational(root, scale)
+  return [lo, compareRational(squareRational(lo), value) === 0 ? lo : rational(root + BigInt(1), scale)]
+}
+
 const primitivePolynomial = (coefficients: bigint[]): string[] => {
   let divisor = BigInt(0)
   for (const coefficient of coefficients) divisor = gcd(divisor, coefficient)
@@ -230,6 +240,15 @@ const compareCertifiedToRational = (value: CertifiedExpressionReal, limit: Ratio
   )
 }
 
+export const validateCertifiedExpressionBounds = (value: CertifiedExpressionReal): void => {
+  const [lo, hi] = value.isolating
+  if (compareRational(lo, hi) > 0
+    || compareCertifiedToRational(value, lo) < 0
+    || compareCertifiedToRational(value, hi) > 0) {
+    throw new RangeError('certified expression bounds do not contain the value')
+  }
+}
+
 /** Total for the only comparison Wrap admits: a segment-distance root against a rational dial/cap. */
 export function compareExactToRational(
   value: ExactReal,
@@ -238,7 +257,7 @@ export function compareExactToRational(
   if (isRational(value)) return compareRational(value, limit)
   return isAlgebraic(value)
     ? compareAlgebraicToRational(value, limit)
-    : compareCertifiedToRational(value, limit)
+    : (validateCertifiedExpressionBounds(value), compareCertifiedToRational(value, limit))
 }
 
 const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
