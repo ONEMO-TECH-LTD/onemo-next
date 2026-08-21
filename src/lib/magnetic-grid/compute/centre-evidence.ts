@@ -348,6 +348,14 @@ export interface ExactOffsetFeatures {
   vertices: readonly ExactOffsetVertexFeature[]
 }
 
+export interface ExactOffsetIntersectionSystem {
+  id: string
+  kind: 'line-line' | 'line-circle' | 'circle-circle'
+  featureIds: readonly [string, string]
+  scale: ExactReal
+  clearance: Rational
+}
+
 /** Exact analytic primitives whose arrangement defines one inward material offset. */
 export function buildExactOffsetFeatures(
   contour: Contour,
@@ -401,4 +409,39 @@ export function buildExactOffsetFeatures(
     }
   })
   return { lines, vertices }
+}
+
+/** Complete exact equation-system inventory for the offset arrangement; no sampled pruning. */
+export function enumerateExactOffsetIntersectionSystems(
+  features: ExactOffsetFeatures,
+  scale: ExactReal,
+): ExactOffsetIntersectionSystem[] {
+  const systems: ExactOffsetIntersectionSystem[] = []
+  const add = (
+    kind: ExactOffsetIntersectionSystem['kind'],
+    first: { id: string; clearance: Rational },
+    second: { id: string; clearance: Rational },
+  ) => {
+    if (compareRational(first.clearance, second.clearance) !== 0) return
+    const featureIds = [first.id, second.id].sort() as [string, string]
+    systems.push({
+      id: `${kind}:${featureIds[0]}:${featureIds[1]}:${JSON.stringify(scale)}`,
+      kind,
+      featureIds,
+      scale,
+      clearance: first.clearance,
+    })
+  }
+  for (let first = 0; first < features.lines.length; first++) {
+    for (let second = first + 1; second < features.lines.length; second++) {
+      add('line-line', features.lines[first], features.lines[second])
+    }
+    for (const vertex of features.vertices) add('line-circle', features.lines[first], vertex)
+  }
+  for (let first = 0; first < features.vertices.length; first++) {
+    for (let second = first + 1; second < features.vertices.length; second++) {
+      add('circle-circle', features.vertices[first], features.vertices[second])
+    }
+  }
+  return systems
 }

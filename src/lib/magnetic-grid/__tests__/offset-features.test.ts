@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildExactOffsetFeatures } from '../compute/centre-evidence'
+import { buildExactOffsetFeatures, enumerateExactOffsetIntersectionSystems } from '../compute/centre-evidence'
 import { rational } from '../compute/exact-real'
 import type { Contour } from '../spec'
 
@@ -19,5 +19,10 @@ describe('exact inward-offset primitives', () => {
     const triple = buildExactOffsetFeatures(triangle, rational(100), rational(12))
     expect(triple.lines).toHaveLength(3)
     expect(triple.vertices).toHaveLength(3)
+    const systems = enumerateExactOffsetIntersectionSystems(triple, rational(100))
+    expect(systems.filter((system) => system.kind === 'line-line')).toHaveLength(3)
+    expect(systems.filter((system) => system.kind === 'line-circle')).toHaveLength(9)
+    expect(systems.filter((system) => system.kind === 'circle-circle')).toHaveLength(3)
+    expect(new Set(systems.map((system) => system.id)).size).toBe(systems.length)
   })
 })
