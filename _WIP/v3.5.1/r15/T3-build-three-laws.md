@@ -756,6 +756,10 @@ export interface AlgebraicGeneratorProof {
   generatorIdentity: string
   semanticSourceIdentity: string
   normalizedDefiningPolynomial: readonly string[]
+  representedMinimalPolynomial: readonly string[]
+  representedRootIndex: number
+  representedIsolating: readonly [Rational, Rational]
+  factorizationProofId: string
   eliminatedAt: number
 }
 
@@ -772,12 +776,19 @@ export interface GeneratorEliminationStepProof {
 `semanticSourceIdentity` names the geometry/algebraic source independently of coefficient scaling, isolator refinement, discovery order or runtime object identity. `generatorIdentity` hashes:
 
 ```text
-['algebraic-generator-v1',
+['algebraic-generator-v2',
  semanticSourceIdentity,
- normalized square-free primitive defining polynomial]
+ representedMinimalPolynomial,
+ representedRootIndex]
 ```
 
-Scalar-multiple defining polynomials for the same semantic source therefore deduplicate. Compute deduplicates generators by `generatorIdentity` and eliminates them in ascending `generatorIdentity` order, never discovery, feature or traversal order.
+Compute exact-factorizes the normalized square-free defining polynomial into normalized primitive irreducible factors over `Q`. It proves that exactly one factor has exactly one root inside `representedIsolating`; that factor becomes `representedMinimalPolynomial`. `factorizationProofId` hashes the normalized original polynomial, the complete ordered irreducible factorization, the selected factor and the exact root-count disposition for every factor.
+
+`representedIsolating` must contain exactly one root of `representedMinimalPolynomial`. `representedRootIndex` is that root’s global exact order within `representedMinimalPolynomial`, not within the representation-dependent original defining polynomial. Invalid or mismatched factor, isolator or root index returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+The original normalized defining polynomial, its factorization proof and isolator remain replay data but do not enter semantic identity. Scalar polynomial multiples, a defining polynomial with extra coprime factors and valid isolator refinement preserve the same generator identity when they certify the same semantic source and represented root. Different semantic sources remain distinct even when their numeric root is equal.
+
+Deduplication requires equal semantic source, represented minimal polynomial and represented root index. Back-substitution evaluates only against this certified represented root. Compute deduplicates generators by `generatorIdentity` and eliminates them in ascending `generatorIdentity` order, never discovery, feature or traversal order.
 
 After denominator clearing, the substituted predicate is one exact polynomial in the piece parameter and remaining algebraic generators over the integer multivariate polynomial ring. The ring uses a fixed variable order: piece parameter first, followed by ascending generator identity. Each generator is eliminated against its normalized defining polynomial by the exact subresultant polynomial-remainder sequence, treating coefficients as polynomials in the remaining ordered variables.
 
@@ -822,6 +833,12 @@ Required multi-generator mutations:
 15. A zero resultant with a nonzero common component: exact subresultant decomposition continues and validates the surviving component.
 16. An original predicate proven zero over the whole chart: the existing `identically-zero` proof arm, no finite/fabricated roots.
 17. A zero resultant/common factor that cannot be decomposed or validated: typed unresolved, no partial certificate.
+22. `x²-2` positive and negative roots under the same semantic source: distinct generator identities and conjugate-sensitive back-substitution.
+23. Positive `√2` defined by `x²-2` and by `(x²-2)(x-3)`: same selected minimal polynomial/root index and same generator identity.
+24. Same represented root with a refined valid isolator: same generator identity and deduplication.
+25. Isolator for one root paired with another root index: typed unresolved.
+26. Isolator containing roots from two irreducible factors: typed unresolved; no arbitrary factor selection.
+27. Same represented numeric root under different semantic sources: distinct deterministic generator identities.
 
 Necessity: canonical multivariate subresultant elimination is already implied by the approved algebraic-generator clause; square-free factorization remains only at the final univariate stage; common-factor handling prevents both false `identically-zero` claims and unnecessary refusal.
 
