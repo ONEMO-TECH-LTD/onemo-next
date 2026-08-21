@@ -14,6 +14,10 @@ import {
   isolatePrimitiveIntegerRoots,
   addSparseIntegerPolynomials,
   normalizeSparseEliminationStep,
+  decodeCanonicalMultivariatePolynomial,
+  encodeCanonicalMultivariatePolynomial,
+  encodeNormalizedSparseEliminationStep,
+  projectFinalUnivariatePolynomial,
   squareRational,
   sqrtMinusRational,
   subtractRational,
@@ -94,4 +98,6 @@ describe('Wrap exact-real support', () => {
   it('does not confuse an unrelated derivative critical point with multiplicity',()=>{const roots=isolatePrimitiveIntegerRoots(['1','0','-3','1'],rational(-3),rational(3));expect(roots).toHaveLength(3);expect(roots.map(root=>root.multiplicity)).toEqual([1,1,1])})
   it('globally orders disjoint square-free factors and exact midpoint roots',()=>{const roots=isolatePrimitiveIntegerRoots(['1','-8','23','-28','12'],rational(0),rational(5));expect(roots.map(root=>root.multiplicity)).toEqual([1,2,1]);for(let index=1;index<roots.length;index++)expect(compareRational(roots[index-1].isolating[1],roots[index].isolating[0])).toBe(-1);const midpoint=isolatePrimitiveIntegerRoots(['1','-2'],rational(0),rational(4));expect(midpoint).toHaveLength(1);expect(midpoint[0].isolating).toEqual([rational(2),rational(2)])})
   it('preserves raw relative coefficients until elimination-step normalization',()=>{const sum=addSparseIntegerPolynomials([{coefficient:'2',powers:[1]}],[{coefficient:'4',powers:[0]}]);expect(sum).toEqual([{coefficient:'2',powers:[1]},{coefficient:'4',powers:[0]}]);expect(normalizeSparseEliminationStep(sum)).toEqual({polynomial:[{coefficient:'1',powers:[1]},{coefficient:'2',powers:[0]}],removedIntegerContent:['2','1']})})
+  it('encodes source terms canonically and rejects every noncanonical proof spelling',()=>{const source=[{coefficient:'1',powers:[1,0]},{coefficient:'1',powers:[1,0]},{coefficient:'4',powers:[0,0]}];expect(encodeCanonicalMultivariatePolynomial(source,2)).toEqual(['2|1,0','4|0,0']);expect(encodeCanonicalMultivariatePolynomial([...source].reverse(),2)).toEqual(['2|1,0','4|0,0']);for(const invalid of[['+2|1,0'],['02|1,0'],['-0|1,0'],['0|1,0'],['2|1'],['4|0,0','2|1,0'],['1|1,0','1|1,0'],['0']])expect(()=>decodeCanonicalMultivariatePolynomial(invalid,2)).toThrow();expect(decodeCanonicalMultivariatePolynomial(['2|1,0','4|0,0'],2)).toEqual([{coefficient:'2',powers:[1,0]},{coefficient:'4',powers:[0,0]}]);expect(decodeCanonicalMultivariatePolynomial([],2)).toEqual([])})
+  it('normalizes only completed steps and records final projection slots',()=>{const step=encodeNormalizedSparseEliminationStep([{coefficient:'2',powers:[1,0,0]},{coefficient:'4',powers:[0,0,0]}],3);expect(step).toEqual({tokens:['1|1,0,0','2|0,0,0'],removedIntegerContent:['2','1']});expect(projectFinalUnivariatePolynomial(step.tokens,3)).toEqual({coefficients:['1','2'],removedExponentSlots:[1,2]})})
 })

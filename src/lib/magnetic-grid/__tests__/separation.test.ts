@@ -67,6 +67,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'approximateExact', 'canonicalExact',
     'trimPolynomial','polynomialDerivative','polynomialDivRem','polynomialRemainder','monicPolynomial','polynomialGcd','polynomialIsOne','squareFreeFactors','rationalPolynomialPrimitive','sturmSequence','polynomialSignAt','signVariations','rootCount','isolatePrimitiveIntegerRoots',
     'sparseKey','normalizeSparseIntegerPolynomial','normalizeSparseEliminationStep','addSparseIntegerPolynomials','multiplySparseIntegerPolynomials',
+    'encodeCanonicalMultivariatePolynomial','decodeCanonicalMultivariatePolynomial','encodeNormalizedSparseEliminationStep','projectFinalUnivariatePolynomial',
   ],
   'magnetic-grid/compute/contact-root.ts': [
     'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
