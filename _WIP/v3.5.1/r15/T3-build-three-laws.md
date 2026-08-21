@@ -1021,19 +1021,27 @@ export type RawPiecePredicateProof =
       zeroPolynomialProofId: string
     }
 
+export interface RawCandidateBackSubstitutionProof
+  extends Omit<CandidateBackSubstitutionProof, 'candidateRootId'> {
+  rootReplayKey: string
+}
+
 export interface RawPiecePredicateProofResult {
   requestIdentity: string
   rawRoots: readonly RawPiecePredicateRoot[]
   rawRootPoints: readonly RawRootPointProof[]
   rawIntervalProofs: readonly RawPiecePredicateProof[]
-  rawBackSubstitutions: readonly CandidateBackSubstitutionProof[]
+  rawBackSubstitutions: readonly RawCandidateBackSubstitutionProof[]
 }
 
 export interface FinalizedPiecePredicateRoot {
   rootId: string
+  point: { x: ExactReal; y: ExactReal }
   representative: PiecePredicateRootCertificate
   members: readonly {
     requestIdentity: string
+    directedChartOrdinal: number
+    parameterDirection: 'LOWER_TO_UPPER' | 'UPPER_TO_LOWER'
     rootReplayKey: string
     certificate: PiecePredicateRootCertificate
   }[]
@@ -1095,7 +1103,7 @@ Engine passes each batch member `CertifiedPiecePredicateSystem` to `exact-real.t
 [chart, normalized primitive polynomial, rootIndex, isolating]
 ```
 
-Exact math evaluates each canonical coordinate numerator and denominator through the approved algebraic-tuple evaluator, proves denominator nonzero, forms the exact quotient, and stores raw x/y tuple-value reductions without `proofId` beside the exact point values. It creates no SHA or semantic root/proof identity and rejects any supplied raw `proofId` field. Raw interval signs reference adjacent roots only by `lowerRootReplayKey` / `upperRootReplayKey`.
+Exact math evaluates each canonical coordinate numerator and denominator through the approved algebraic-tuple evaluator, proves denominator nonzero, forms the exact quotient, and stores raw x/y tuple-value reductions without `proofId` beside the exact point values. It creates no SHA or semantic root/proof identity and rejects any supplied raw `proofId` field. Raw interval signs and raw back-substitutions reference roots only by replay key; exact math cannot populate semantic root IDs.
 
 Engine passes the certified batch and raw batch to `identity.ts::finalizePiecePredicateProofBatch()`. Identity requires exact `batchIdentity` equality and a one-to-one mapping of member request identity to raw result. Every replay reference is scoped as `[memberRequestIdentity, rootReplayKey]`. It recomputes each replay key from its raw certificate and requires a one-to-one bijection between raw roots and raw root-point proofs inside each member. Missing, duplicate or foreign members/keys refuse.
 
@@ -1106,11 +1114,11 @@ For each root point, Identity reconstructs and validates the root algebraic tupl
  canonicalExactPoint({x,y}), multiplicity, originalPredicateIdentity]
 ```
 
-After all members validate, Identity merges roots across members only when the complete semantic preimage agrees: piece, predicate, generator, evaluated exact point, multiplicity and original predicate. Differing chart/q representations may merge; differing semantic fields do not. Each merged root retains sorted unique member records `{requestIdentity, rootReplayKey, certificate}`. Empty, foreign, duplicate or incomplete member provenance refuses.
+After all members validate, Identity merges roots across members only when the complete semantic preimage agrees: piece, predicate, generator, evaluated exact point, multiplicity and original predicate. Differing chart/q representations may merge; differing semantic fields do not. Grouped back-substitutions must agree on disposition, true multiplicity and derivative proofs. Each merged root retains the validated common exact `point` and sorted unique member records `{requestIdentity, directedChartOrdinal, parameterDirection, rootReplayKey, certificate}`. Empty, foreign, duplicate, mismatched or incomplete member provenance refuses.
 
-Identity chooses `representative` by `directedChartOrdinal`, then exact parameter under `parameterDirection`, then request identity. It sorts finalized roots by that directed order, converts every member-local interval replay-key reference into exactly one semantic root ID, canonicalizes interval/back-substitution arrays, and hashes batch/member provenance, ordered roots/members, finalized interval proofs and back-substitutions into `proofIdentity`. Member provenance is excluded from `rootId` but included in `proofIdentity`. Cross-member multiplicity/back-substitution conflict refuses.
+Identity sorts each root's members by `directedChartOrdinal`, canonical numeric local parameter ascending for `LOWER_TO_UPPER` or descending for `UPPER_TO_LOWER`, request identity, then replay key. It chooses the first as `representative`. It sorts finalized roots by the representative's directed ordinal/parameter with root ID as secondary key, converts every raw interval and back-substitution replay-key reference into exactly one semantic root ID, collapses duplicate agreeing semantic boundaries, and requires interval signs/proofs agree. It creates final `CandidateBackSubstitutionProof` records by inserting `candidateRootId`, canonicalizes arrays, and hashes batch identity, ordered member requests, ordered `[rootId, point, representative, members]`, finalized intervals and back-substitutions into `proofIdentity`. Member provenance is excluded from `rootId` but included in `proofIdentity`. Any conflict refuses.
 
-Engine returns only `FinalPiecePredicateProofResult` to `centre-evidence.ts` for named-piece splitting in ordinal/direction order. Engine does not inspect terms, geometry, proof dispositions, laws or refusals. These are private compute-stage records; no public API, callback, service object, module, duplicate SHA implementation or import-law exception is added.
+Engine returns only `FinalPiecePredicateProofResult` to `centre-evidence.ts` for named-piece splitting in ordinal/direction order. `centre-evidence.ts` consumes the retained exact point directly and never re-evaluates coordinate expressions. Engine does not inspect terms, geometry, proof dispositions, laws or refusals. These are private compute-stage records; no public API, callback, service object, module, duplicate SHA implementation or import-law exception is added.
 
 Required dataflow mutations:
 
