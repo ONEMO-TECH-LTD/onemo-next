@@ -28,7 +28,7 @@ import {
   safeSegments,
   spotRadiusOf,
   TANGENT_GUARD_MM,
-} from './centre-clone-compute'
+} from './compute'
 import {
   applyCoverage,
   assignSizes,
@@ -45,7 +45,7 @@ export {
   safeSegments,
   scaleContour,
   spotRadiusOf,
-} from './centre-clone-compute'
+} from './compute'
 export { bandOf } from './centre-clone-logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */

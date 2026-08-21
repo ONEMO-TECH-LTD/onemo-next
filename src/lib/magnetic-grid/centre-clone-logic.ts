@@ -7,7 +7,7 @@ import {
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './spec'
-import { bbox, splitPerimeter } from './centre-clone-compute'
+import { bbox, splitPerimeter } from './compute'
 
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
 export function bandOf(sizeMM: number): Band | null {

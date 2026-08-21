@@ -4,7 +4,7 @@
 import { contourFromShape } from './geometry-truth'
 import { traceContourRaw } from './contour'
 import { insetRingMM } from './offset'
-import { scaleContour } from '../magnetic-grid/centre-clone-compute'
+import { scaleContour } from '../magnetic-grid/compute'
 import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 import {
