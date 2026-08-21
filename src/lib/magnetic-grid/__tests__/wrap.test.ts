@@ -97,7 +97,14 @@ describe('v3.5.1 exact Wrap', () => {
       holes: [{ pts: [[-5,-5],[5,-5],[5,5],[-5,5]] }],
     }
     const prepared=prepareContour(holed,contourBoundaryTruth(holed))
-    expect(measureWrap(prepared,[[0,0]],4).refusal).toEqual({code:'WRAP_EXCEEDS_ALLOWANCE',reason:'invalid-seat'})
+    const invalidSeat=measureWrap(prepared,[[0,0]],4)
+    expect(invalidSeat.refusal).toEqual({code:'NO_WRAPPED_LAYOUT_IN_BAND',reason:'invalid-seat'})
+    const invalidSeatVerdict=evaluateWrap(
+      {...invalidSeat,witnesses:invalidSeat.witnesses.map(certifyContactWitness)},
+      {mode:'fixed',allowance:rational(0),allowanceApproxMM:0},
+    )
+    expect(invalidSeatVerdict.status).toBe('refused')
+    if(invalidSeatVerdict.status==='refused')expect(invalidSeatVerdict.code).toBe('NO_WRAPPED_LAYOUT_IN_BAND')
     expect(measureWrap(prepared,[],4).refusal).toEqual({code:'NO_WRAPPED_LAYOUT_IN_BAND',reason:'empty-belt'})
     const degenerate:Contour={outer:{pts:[]},holes:[]}
     expect(measureWrap(prepareContour(degenerate,contourBoundaryTruth(degenerate)),[[0,0]],4).refusal)

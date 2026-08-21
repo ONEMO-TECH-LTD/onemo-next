@@ -69,5 +69,5 @@ export function measureWrap(prepared:PreparedContour,belt:ReadonlyArray<Pt>,spot
     }
     if(!bindingDistance||compareRational(nearest,bindingDistance)>0){bindingDistance=nearest;bindingAllowance=allowance}
   })
-  return {scale,boundaryTruth:prepared.truth,requiredFlap:bindingAllowance,requiredFlapApproxMM:approximateExact(bindingAllowance),witnesses,refusal:validSeat?null:{code:'WRAP_EXCEEDS_ALLOWANCE',reason:'invalid-seat'}}
+  return {scale,boundaryTruth:prepared.truth,requiredFlap:bindingAllowance,requiredFlapApproxMM:approximateExact(bindingAllowance),witnesses,refusal:validSeat?null:{code:'NO_WRAPPED_LAYOUT_IN_BAND',reason:'invalid-seat'}}
 }
