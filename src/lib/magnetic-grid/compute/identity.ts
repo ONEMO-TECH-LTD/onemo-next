@@ -1,4 +1,4 @@
-import type { AlgebraicGeneratorProof, AlgebraicTupleProof, AlgebraicTupleValueProof, BoundaryTruth, CandidateBackSubstitutionProof, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
+import type { AlgebraicGeneratorProof, AlgebraicTupleProof, AlgebraicTupleValueProof, BoundaryTruth, CandidateBackSubstitutionProof, CertifiedExpressionReal, CertifiedPiecePredicateSystem, ContactWitness, Contour, ExactReal, PiecePredicateSystemRequest, Rational } from '../spec'
 import {
   addRational, canonicalExact, compareExactToRational, compareRational, divideRational,
   isAlgebraic, isRational, multiplyRational, rational, rationalFromNumber,
@@ -7,6 +7,8 @@ import {
   constructRawAlgebraicTuple,
   differentiateSparseParameter,
   evaluateRawAlgebraicTuplePolynomial,
+  decodeCanonicalMultivariatePolynomial,
+  encodeCanonicalMultivariatePolynomial,
   type RawAlgebraicTupleValue,
   type SparseIntegerPolynomial,
 } from './exact-real'
@@ -230,6 +232,61 @@ export function algebraicGeneratorProofs(
   return [...deduplicated.values()]
     .sort((a, b) => a.generatorIdentity.localeCompare(b.generatorIdentity))
     .map((generator, eliminatedAt) => ({ ...generator, eliminatedAt }))
+}
+
+export function certifyPiecePredicateSystemRequest(
+  request: PiecePredicateSystemRequest,
+): CertifiedPiecePredicateSystem | null {
+  try {
+    const arity = 1 + request.generatorsInPolynomialSlotOrder.length
+    const tokenSets = [
+      request.polynomialTokens,
+      request.pointCoordinates[0].numeratorTokens,
+      request.pointCoordinates[0].denominatorTokens,
+      request.pointCoordinates[1].numeratorTokens,
+      request.pointCoordinates[1].denominatorTokens,
+    ]
+    const decoded = tokenSets.map((tokens) => decodeCanonicalMultivariatePolynomial(tokens, arity))
+    if (decoded[2].length === 0 || decoded[4].length === 0) return null
+    const slotProofs = request.generatorsInPolynomialSlotOrder.map((generator) =>
+      algebraicGeneratorProofs([generator])[0])
+    const orderedGenerators = algebraicGeneratorProofs(request.generatorsInPolynomialSlotOrder)
+    const orderedIndex = new Map(orderedGenerators.map((generator, index) => [generator.generatorIdentity, index]))
+    const requestSlotToGeneratorSlot = slotProofs.map((proof) => orderedIndex.get(proof.generatorIdentity)!)
+    if (requestSlotToGeneratorSlot.some((slot) => slot === undefined)) return null
+    const rewrite = (terms: ReturnType<typeof decodeCanonicalMultivariatePolynomial>) =>
+      encodeCanonicalMultivariatePolynomial(terms.map((term) => {
+        const powers = Array.from({ length: 1 + orderedGenerators.length }, () => 0)
+        powers[0] = term.powers[0]
+        requestSlotToGeneratorSlot.forEach((target, source) => {
+          powers[1 + target] += term.powers[1 + source]
+        })
+        return { coefficient: term.coefficient, powers }
+      }), 1 + orderedGenerators.length)
+    const canonicalPolynomialTokens = rewrite(decoded[0])
+    const canonicalPointCoordinates = [
+      { numeratorTokens: rewrite(decoded[1]), denominatorTokens: rewrite(decoded[2]) },
+      { numeratorTokens: rewrite(decoded[3]), denominatorTokens: rewrite(decoded[4]) },
+    ] as const
+    const requestIdentity = sha256Text(JSON.stringify([
+      'piece-predicate-request-v2', request.pieceId, request.originalPredicateIdentity,
+      canonicalPolynomialTokens,
+      canonicalPointCoordinates[0].numeratorTokens, canonicalPointCoordinates[0].denominatorTokens,
+      canonicalPointCoordinates[1].numeratorTokens, canonicalPointCoordinates[1].denominatorTokens,
+      orderedGenerators.map((generator) => generator.generatorIdentity),
+    ]))
+    return {
+      requestIdentity,
+      pieceId: request.pieceId,
+      originalPredicateIdentity: request.originalPredicateIdentity,
+      canonicalPolynomialTokens,
+      canonicalPointCoordinates,
+      orderedGenerators,
+      requestSlotToGeneratorSlot,
+    }
+  } catch {
+    return null
+  }
 }
 
 export type CertifiedCandidateBackSubstitution =

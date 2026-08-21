@@ -4,6 +4,7 @@ import {
   certifyAlgebraicTuple,
   certifyAlgebraicTupleValue,
   certifyCandidateBackSubstitution,
+  certifyPiecePredicateSystemRequest,
   certifySqrtQuadraticExpression,
   contourIdentity,
   sha256Text,
@@ -312,6 +313,72 @@ describe('Wrap canonical identity', () => {
     const raw = constructRawAlgebraicTuple(values)
     expect(raw).not.toBeNull()
     expect(raw!.rejectedCoefficientVectors.length).toBeGreaterThan(0)
+  })
+
+  it('canonicalizes predicate generator slots without hiding caller mapping errors', () => {
+    const a = sqrt2('request-a', true)
+    const b = {
+      semanticSourceIdentity: 'request-b', definingPolynomial: ['1', '0', '-3'],
+      representedRootIndex: 1, representedIsolating: [rational(1), rational(2)] as const,
+    }
+    const coordinate = (x: readonly string[], y: readonly string[]) => [
+      { numeratorTokens: x, denominatorTokens: ['1|0,0,0'] },
+      { numeratorTokens: y, denominatorTokens: ['1|0,0,0'] },
+    ] as const
+    const forward = certifyPiecePredicateSystemRequest({
+      pieceId: 'piece', originalPredicateIdentity: 'predicate',
+      generatorsInPolynomialSlotOrder: [a, b],
+      polynomialTokens: ['1|0,1,0', '2|0,0,1'],
+      pointCoordinates: coordinate(['1|1,0,0'], ['1|0,1,0']),
+    })!
+    const reversed = certifyPiecePredicateSystemRequest({
+      pieceId: 'piece', originalPredicateIdentity: 'predicate',
+      generatorsInPolynomialSlotOrder: [b, a],
+      polynomialTokens: ['2|0,1,0', '1|0,0,1'],
+      pointCoordinates: coordinate(['1|1,0,0'], ['1|0,0,1']),
+    })!
+    expect(reversed.requestIdentity).toBe(forward.requestIdentity)
+    expect(reversed.canonicalPolynomialTokens).toEqual(forward.canonicalPolynomialTokens)
+    expect(reversed.orderedGenerators).toEqual(forward.orderedGenerators)
+    const wrong = certifyPiecePredicateSystemRequest({
+      pieceId: 'piece', originalPredicateIdentity: 'predicate',
+      generatorsInPolynomialSlotOrder: [b, a],
+      polynomialTokens: ['1|0,1,0', '2|0,0,1'],
+      pointCoordinates: coordinate(['1|1,0,0'], ['1|0,1,0']),
+    })!
+    expect(wrong.requestIdentity).not.toBe(forward.requestIdentity)
+  })
+
+  it('merges duplicate generator slots and rejects malformed request tokens', () => {
+    const a = sqrt2('duplicate', true)
+    const duplicate = certifyPiecePredicateSystemRequest({
+      pieceId: 'piece', originalPredicateIdentity: 'duplicate-slots',
+      generatorsInPolynomialSlotOrder: [a, { ...a, definingPolynomial: ['2', '0', '-4'] }],
+      polynomialTokens: ['1|0,1,1'],
+      pointCoordinates: [
+        { numeratorTokens: ['1|1,0,0'], denominatorTokens: ['1|0,0,0'] },
+        { numeratorTokens: ['1|0,1,1'], denominatorTokens: ['1|0,0,0'] },
+      ],
+    })!
+    expect(duplicate.orderedGenerators).toHaveLength(1)
+    expect(duplicate.canonicalPolynomialTokens).toEqual(['1|0,2'])
+    expect(duplicate.requestSlotToGeneratorSlot).toEqual([0, 0])
+    expect(certifyPiecePredicateSystemRequest({
+      pieceId: 'bad', originalPredicateIdentity: 'arity',
+      generatorsInPolynomialSlotOrder: [a], polynomialTokens: ['1|1'],
+      pointCoordinates: [
+        { numeratorTokens: ['1|1,0'], denominatorTokens: ['1|0,0'] },
+        { numeratorTokens: ['1|1,0'], denominatorTokens: ['1|0,0'] },
+      ],
+    })).toBeNull()
+    expect(certifyPiecePredicateSystemRequest({
+      pieceId: 'bad', originalPredicateIdentity: 'zero-denominator',
+      generatorsInPolynomialSlotOrder: [a], polynomialTokens: ['1|1,0'],
+      pointCoordinates: [
+        { numeratorTokens: ['1|1,0'], denominatorTokens: [] },
+        { numeratorTokens: ['1|1,0'], denominatorTokens: ['1|0,0'] },
+      ],
+    })).toBeNull()
   })
 
   it('proves true multiplicity from original derivatives, not resultant multiplicity', () => {

@@ -88,7 +88,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   ],
   'magnetic-grid/compute/identity.ts': [
     'rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression',
-    'validateCertifiedExpressionIdentity','validateExactRealIdentity','algebraicGeneratorProofs','certifyAlgebraicTuple',
+    'validateCertifiedExpressionIdentity','validateExactRealIdentity','algebraicGeneratorProofs','certifyPiecePredicateSystemRequest','certifyAlgebraicTuple',
     'rawTupleFromProof','validateAlgebraicTupleProof','certifyAlgebraicTupleValue','certifyCandidateBackSubstitution',
     'mergeCandidateBackSubstitutionProofs',
   ],

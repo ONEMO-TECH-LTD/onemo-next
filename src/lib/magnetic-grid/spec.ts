@@ -232,6 +232,83 @@ export interface AlgebraicTupleValueProof {
   disposition: 'ZERO' | 'NONZERO'
   proofId: string
 }
+
+export interface AlgebraicGeneratorRequest {
+  semanticSourceIdentity: string
+  definingPolynomial: readonly string[]
+  representedRootIndex: number
+  representedIsolating: readonly [Rational, Rational]
+}
+
+export interface ExactCoordinatePolynomialRequest {
+  numeratorTokens: readonly string[]
+  denominatorTokens: readonly string[]
+}
+
+export interface PiecePredicateSystemRequest {
+  pieceId: string
+  originalPredicateIdentity: string
+  generatorsInPolynomialSlotOrder: readonly AlgebraicGeneratorRequest[]
+  polynomialTokens: readonly string[]
+  pointCoordinates: readonly [ExactCoordinatePolynomialRequest, ExactCoordinatePolynomialRequest]
+}
+
+export interface CertifiedPiecePredicateSystem {
+  requestIdentity: string
+  pieceId: string
+  originalPredicateIdentity: string
+  canonicalPolynomialTokens: readonly string[]
+  canonicalPointCoordinates: readonly [ExactCoordinatePolynomialRequest, ExactCoordinatePolynomialRequest]
+  orderedGenerators: readonly AlgebraicGeneratorProof[]
+  requestSlotToGeneratorSlot: readonly number[]
+}
+
+export interface RawPiecePredicateRoot {
+  rootReplayKey: string
+  certificate: PiecePredicateRootCertificate
+}
+
+export type RawAlgebraicTupleValueProof = Omit<AlgebraicTupleValueProof, 'proofId'>
+
+export interface RawRootPointProof {
+  rootReplayKey: string
+  point: { x: ExactReal; y: ExactReal }
+  coordinateProofs: readonly [RawAlgebraicTupleValueProof, RawAlgebraicTupleValueProof]
+}
+
+export interface RawPiecePredicateSignCertificate {
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  generatorId: string
+  sign: -1 | 1
+  witness: ExactPieceParameter
+  lowerRootReplayKey: string | null
+  upperRootReplayKey: string | null
+}
+
+export type RawPiecePredicateProof =
+  | { status: 'isolated-roots'; roots: readonly RawPiecePredicateRoot[]; intervalSigns: readonly RawPiecePredicateSignCertificate[] }
+  | { status: 'identically-zero'; predicateId: PiecePredicateRootCertificate['predicateId']; generatorId: string; originalPredicateIdentity: string; zeroPolynomialProofId: string }
+
+export interface RawPiecePredicateProofResult {
+  requestIdentity: string
+  rawRoots: readonly RawPiecePredicateRoot[]
+  rawRootPoints: readonly RawRootPointProof[]
+  rawIntervalProofs: readonly RawPiecePredicateProof[]
+  rawBackSubstitutions: readonly CandidateBackSubstitutionProof[]
+}
+
+export interface FinalizedPiecePredicateRoot {
+  rootId: string
+  certificate: PiecePredicateRootCertificate
+}
+
+export interface FinalPiecePredicateProofResult {
+  requestIdentity: string
+  proofIdentity: string
+  roots: readonly FinalizedPiecePredicateRoot[]
+  intervalProofs: readonly PiecePredicateProof[]
+  backSubstitutions: readonly CandidateBackSubstitutionProof[]
+}
 export interface WrapMeasurement {
   scale: ExactScale
   boundaryTruth: BoundaryTruth
