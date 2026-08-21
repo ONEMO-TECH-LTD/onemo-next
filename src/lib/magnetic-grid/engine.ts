@@ -25,6 +25,7 @@ import {
   makeSeatPredicate,
   measureCentreBranches,
   measureCentrePlacements,
+  measureExtremeCorners,
   safeSegments,
   splitPerimeter,
   spotRadiusOf,
@@ -80,9 +81,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const centreMeasurements = measureCentreBranches(segments, [cx, cy], centroidOf(outer))
   const centres = centeringAnchors(mode, centreMeasurements)
   // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
-  const allMasses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
   const midY = (bb.minY + bb.maxY) / 2
-  const ruleTarget: Pt = mode === 2 ? (governMass(allMasses, governor, midY)?.centreMM ?? centres[0]) : centres[0]
+  const ruleTarget: Pt = mode === 2 ? (governMass(centreMeasurements.masses, governor, midY)?.centreMM ?? centres[0]) : centres[0]
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
@@ -114,7 +114,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
 
   const coverage = applyCoverage(bestSeated, perimeterOnly, splitPerimeter(bestSeated, pitch))
-  const anchors = assignSizes(coverage.seated, plan, bbox(coverage.seated))
+  const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
 
 
   return {

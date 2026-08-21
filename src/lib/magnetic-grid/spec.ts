@@ -129,6 +129,7 @@ export interface CentrePlacementMeasurement {
 export interface CentrePhaseCandidate { phaseMM: Pt; canon: number }
 
 export interface PerimeterMeasurement { belt: Pt[]; interior: Pt[] }
+export interface ExtremeCornerMeasurement { p: Pt; extremeCorner: boolean }
 
 export interface GridConfig {
   pitchMM?: number

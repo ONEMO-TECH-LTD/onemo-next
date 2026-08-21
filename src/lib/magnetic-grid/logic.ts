@@ -1,6 +1,6 @@
 // Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt } from './spec'
+import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, ExtremeCornerMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
@@ -117,12 +117,10 @@ export function applyCoverage(
 
 
 /** Per-anchor magnet size. corners8 → the large body on the extreme corners, small elsewhere. */
-export function assignSizes(seated: Pt[], plan: MagnetPlan, bb: BBox): Anchor[] {
-  if (plan === 'all8') return seated.map((p) => ({ p, dia: MAGNET_DIA_LARGE_MM }))
-  if (plan === 'all6') return seated.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM }))
-  return seated.map((p) => {
-    const ex = Math.abs(p[0] - bb.minX) < 0.6 || Math.abs(p[0] - bb.maxX) < 0.6
-    const ey = Math.abs(p[1] - bb.minY) < 0.6 || Math.abs(p[1] - bb.maxY) < 0.6
-    return { p, dia: ex && ey ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM }
+export function assignSizes(measured: ReadonlyArray<ExtremeCornerMeasurement>, plan: MagnetPlan): Anchor[] {
+  if (plan === 'all8') return measured.map(({ p }) => ({ p, dia: MAGNET_DIA_LARGE_MM }))
+  if (plan === 'all6') return measured.map(({ p }) => ({ p, dia: MAGNET_DIA_SMALL_MM }))
+  return measured.map(({ p, extremeCorner }) => {
+    return { p, dia: extremeCorner ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM }
   })
 }

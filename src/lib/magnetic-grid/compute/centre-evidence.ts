@@ -273,4 +273,3 @@ export function measureCentreBranches(
     top: top?.centreMM ?? boxCentre,
   }
 }
-/** Split seated nodes into perimeter belt and fully-surrounded interior. */

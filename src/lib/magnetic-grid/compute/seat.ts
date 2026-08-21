@@ -12,7 +12,7 @@
 // ring and a radius and answers a geometric question.
 
 
-import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, Pt } from '../spec'
+import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
 
 /** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
@@ -471,6 +471,15 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
     if (l && r && u && d) interior.push(p); else belt.push(p)
   }
   return { belt, interior }
+}
+
+/** Neutral extreme-corner measurements consumed by the magnet-plan policy. */
+export function measureExtremeCorners(seated: ReadonlyArray<Pt>, bb: BBox): ExtremeCornerMeasurement[] {
+  return seated.map((p) => {
+    const ex = Math.abs(p[0] - bb.minX) < 0.6 || Math.abs(p[0] - bb.maxX) < 0.6
+    const ey = Math.abs(p[1] - bb.minY) < 0.6 || Math.abs(p[1] - bb.maxY) < 0.6
+    return { p, extremeCorner: ex && ey }
+  })
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */
