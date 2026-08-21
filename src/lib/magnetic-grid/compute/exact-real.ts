@@ -131,12 +131,18 @@ const evaluatePolynomial = (polynomial: readonly string[], at: Rational): Ration
 }
 
 const compareAlgebraicToRational = (algebraic: AlgebraicReal, value: Rational): -1 | 0 | 1 => {
+  if (algebraic.polynomial.length !== 3
+    || BigInt(algebraic.polynomial[0]) <= BigInt(0)
+    || algebraic.rootIndex !== 1
+    || compareRational(algebraic.isolating[0], algebraic.isolating[1]) >= 0) {
+    throw new RangeError('unsupported algebraic comparison')
+  }
   const [lo, hi] = algebraic.isolating
   if (compareRational(hi, value) <= 0) return -1
   if (compareRational(lo, value) >= 0) return 1
   const sign = compareRational(evaluatePolynomial(algebraic.polynomial, value), rational(0))
   if (sign === 0) return 0
-  // Support-A segment distances use the larger root of an upward quadratic.
+  // The admitted segment-distance value is the larger root of an upward quadratic.
   return sign < 0 ? 1 : -1
 }
 

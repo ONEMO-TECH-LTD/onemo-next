@@ -26,4 +26,14 @@ describe('Wrap exact-real support', () => {
     expect(compareExactToRational(required, rational(1))).toBe(-1)
     expect(canonicalExact(required)).toBe(canonicalExact(required))
   })
+
+  it('fails closed outside the admitted upward-quadratic larger-root representation', () => {
+    const valid = sqrtMinusRational(rational(162), rational(12))
+    expect('polynomial' in valid).toBe(true)
+    if (!('polynomial' in valid)) return
+    expect(() => compareExactToRational({ ...valid, rootIndex: 0 }, rational(0))).toThrow('unsupported algebraic comparison')
+    expect(() => compareExactToRational({ ...valid, polynomial: ['-1', '0', '1'] }, rational(0))).toThrow('unsupported algebraic comparison')
+    expect(() => compareExactToRational({ ...valid, polynomial: ['1', '0', '0', '-1'] }, rational(0))).toThrow('unsupported algebraic comparison')
+    expect(() => compareExactToRational({ ...valid, isolating: [valid.isolating[1], valid.isolating[0]] }, rational(0))).toThrow('unsupported algebraic comparison')
+  })
 })
