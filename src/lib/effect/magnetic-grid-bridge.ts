@@ -1,4 +1,4 @@
-// grid-origin-bridge.ts — UI bridge: shape preparation and display lists for the bench shell.
+// Magnetic-grid bridge: shape preparation and display lists for the Law bench shell.
 // Wiring only — values from spec, geometry from compute, answers from the engine.
 
 import { contourFromShape } from './geometry-truth'
