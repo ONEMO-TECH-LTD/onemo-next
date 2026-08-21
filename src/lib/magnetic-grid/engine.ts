@@ -1,7 +1,7 @@
 // Magnetic-grid engine: orchestration over spec, compute and Logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt, SolveBandsInput, SolveBandsResult } from './spec'
+import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
 import {
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
@@ -54,10 +54,6 @@ export {
   spotRadiusOf,
 } from './compute'
 export { bandOf } from './logic'
-
-export function solveBands(_input: SolveBandsInput): SolveBandsResult {
-  throw new Error('exact scaling is not implemented')
-}
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 const mod = (v: number, m: number) => ((v % m) + m) % m
