@@ -456,5 +456,15 @@ export function measureExtremeCorners(seated: ReadonlyArray<Pt>, bb: BBox): Extr
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */
 export function scaleContour(base: Contour, longestMM: number): Contour {
-  return { outer: { pts: base.outer.pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt) }, holes: [] }
+  const scaleRing=(points:ReadonlyArray<Pt>):Pt[]=>points.map(([x,y])=>[x*longestMM,y*longestMM])
+  const outer=scaleRing(base.outer.pts),holes=base.holes.map(hole=>({pts:scaleRing(hole.pts)}))
+  if(!outer.length)return{outer:{pts:outer},holes}
+  const bb=bbox(outer),actual=Math.max(bb.maxX-bb.minX,bb.maxY-bb.minY)
+  if(actual===longestMM||actual===0)return{outer:{pts:outer},holes}
+  const correction=longestMM/actual
+  const correct=(points:ReadonlyArray<Pt>):Pt[]=>points.map(([x,y])=>[
+    (x-bb.minX)*correction,
+    (y-bb.minY)*correction,
+  ])
+  return{outer:{pts:correct(outer)},holes:holes.map(hole=>({pts:correct(hole.pts)}))}
 }

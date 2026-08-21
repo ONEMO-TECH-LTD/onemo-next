@@ -4,6 +4,7 @@ import { makeSizer,normBaseContour } from '../../effect/magnetic-grid-bridge'
 import { computeGrid } from '../engine'
 import { prepareContour } from '../compute/contact-root'
 import { contourBoundaryTruth } from '../compute/identity'
+import { canonicalExact,rational } from '../compute/exact-real'
 
 describe('Wrap admitted product contour',()=>{
   it('carries the real comparison-shell squircle bytes and witness provenance end to end',()=>{
@@ -18,5 +19,21 @@ describe('Wrap admitted product contour',()=>{
     expect(grid.wrap.witnesses[0].boundaryTruth).toEqual(truth)
     expect(grid.wrap.witnesses.every(witness=>witness.boundaryTruth.contourIdentity===truth.contourIdentity)).toBe(true)
     expect(grid.wrap.witnesses.every(witness=>prepared.boundary.some(element=>element.id===witness.outlineElementId))).toBe(true)
+  })
+  it('makes the live square24 contour contact exactly and preserves supplied holes while scaling',()=>{
+    const base=normBaseContour(getShape('square',1024,1024),1024)!,contour=makeSizer(base,0)(24)
+    const grid=computeGrid(contour,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode:0,perimeterOnly:true})
+    expect(Math.max(...contour.outer.pts.map(point=>point[0]))-Math.min(...contour.outer.pts.map(point=>point[0]))).toBe(24)
+    expect(grid.wrap.status).toBe('lawful')
+    expect(grid.wrap.requiredFlapApproxMM).toBe(0)
+    expect(grid.wrap.witnesses.length).toBeGreaterThan(0)
+    expect(canonicalExact(grid.wrap.witnesses[0].scale.exact)).toBe(canonicalExact(rational(24)))
+    const raw={outer:{pts:base.outer.pts.map(([x,y])=>[x*24,y*24] as [number,number])},holes:[]}
+    const rawGrid=computeGrid(raw,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode:0,perimeterOnly:true})
+    expect(canonicalExact(rawGrid.wrap.witnesses[0].scale.exact)).not.toBe(canonicalExact(rational(24)))
+    const holed={outer:{pts:[[0,0],[1,0],[1,1],[0,1]] as [number,number][]},holes:[{pts:[[.25,.25],[.75,.25],[.75,.75],[.25,.75]] as [number,number][]}]}
+    const scaled=makeSizer(holed,0)(24)
+    expect(scaled.holes).toHaveLength(1)
+    expect(scaled.holes[0].pts).toHaveLength(4)
   })
 })
