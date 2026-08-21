@@ -1,10 +1,7 @@
-// The centre law, cloned from the accepted centring tab and preserved verbatim. `governMass`, the
-// nine branch meanings and the winning-candidate rule are the bodies the bench's behaviour was
-// proved on, so they are not rewritten here — only the EVIDENCE they read changes, from a 2mm mesh
-// to the exact construction. Decisions stay the donor's; the ruler beneath them is what improves.
+// Centre-rules compatibility logic. No geometry construction.
 
 import type {
-  ClonedCentreDecision,
+  CentreDecision,
   CentreMeasurements,
   CentrePolicy,
   Governor,
@@ -36,11 +33,11 @@ const governorNumber = (policy: Extract<CentrePolicy, { mode: 'masses' }>): Gove
     : policy.governor === 'deepest' ? 1
       : policy.governor === 'top' ? 2 : 3
 
-function decision(policy: CentrePolicy, target: [number, number], branch: ClonedCentreDecision['branch'], regionIndex: number | null, massIndex: number | null): ClonedCentreDecision {
+function decision(policy: CentrePolicy, target: [number, number], branch: CentreDecision['branch'], regionIndex: number | null, massIndex: number | null): CentreDecision {
   return { policy, target, branch, regionIndex, massIndex }
 }
 
-export function evaluateCentrePolicy(measured: CentreMeasurements, policy: CentrePolicy): ClonedCentreDecision {
+export function evaluateCentrePolicy(measured: CentreMeasurements, policy: CentrePolicy): CentreDecision {
   if (policy.mode === 'box') return decision(policy, measured.box, 'box', null, null)
   if (policy.mode === 'weight') return decision(policy, measured.weight, 'weight', null, null)
   if (policy.mode === 'core') return decision(policy, measured.core, 'core', null, null)
