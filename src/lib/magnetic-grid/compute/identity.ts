@@ -94,10 +94,12 @@ export const contourBoundaryTruth = (contour: Contour): BoundaryTruth => ({
 })
 export const certifyContactWitness = (
   witness: Omit<ContactWitness, 'certificateId'>,
-): ContactWitness => ({
-  ...witness,
-  certificateId: sha256Text(JSON.stringify(witness)),
-})
+): ContactWitness => {
+  for (const value of [witness.scale.exact, witness.allowance, witness.tangency.x, witness.tangency.y]) {
+    validateExactRealIdentity(value)
+  }
+  return { ...witness, certificateId: sha256Text(JSON.stringify(witness)) }
+}
 
 /** Canonical certificate for `sqrt(a*s^2+b*s+c)-subtract` over one exact scale. */
 export function certifySqrtQuadraticExpression(
@@ -162,4 +164,8 @@ export function validateCertifiedExpressionIdentity(value: CertifiedExpressionRe
   }
   compareExactToRational(value, value.isolating[0])
   compareExactToRational(value, value.isolating[1])
+}
+
+export function validateExactRealIdentity(value: ExactReal): void {
+  if ('expressionHash' in value) validateCertifiedExpressionIdentity(value)
 }

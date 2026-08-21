@@ -75,7 +75,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'subtractRadiusSquared', 'exactBandDomain', 'scaleInBand', 'roots', 'polynomialOf', 'relations', 'latticeOffsets',
     'enumerateAffineContactEvents', 'enumerateParityClassEvents',
   ],
-  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression','validateCertifiedExpressionIdentity'],
+  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness','certifySqrtQuadraticExpression','validateCertifiedExpressionIdentity','validateExactRealIdentity'],
   'magnetic-grid/compute/seat.ts': [
     'exactSeatPoint', 'exactSeatMinus', 'exactSeatCross', 'exactPointInMaterial', 'exactSeatIsLegal',
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
