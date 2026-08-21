@@ -58,7 +58,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/exact-real.ts': [
     'abs', 'gcd', 'q', 'fromPublic', 'toPublic', 'rational', 'rationalFromNumber',
     'addRational', 'subtractRational', 'multiplyRational', 'divideRational', 'squareRational',
-    'compareRational', 'integerSqrt', 'exactSquareRoot', 'sqrtRationalBounds', 'primitivePolynomial', 'normalizedPrimitivePolynomial', 'allowancePolynomial',
+    'compareRational', 'integerSqrt', 'exactSquareRoot', 'sqrtRationalBounds', 'primitivePolynomial', 'normalizedPrimitivePolynomial', 'normalizedSquareFreePrimitivePolynomial', 'allowancePolynomial',
     'sqrtMinusRational', 'isRational', 'isAlgebraic', 'evaluatePolynomial', 'normalizedAlgebraicKey', 'validateAlgebraic', 'compareAlgebraicToRational',
     'certifiedSqrtQuadraticParts', 'compareCertifiedToRational', 'validateCertifiedExpressionBounds', 'compareExactToRational',
     'refineAlgebraic', 'refineCertified', 'compareExact', 'affinePolynomial', 'affineExact', 'signQuadraticAtExact',

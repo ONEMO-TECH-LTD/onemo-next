@@ -125,6 +125,7 @@ const primitivePolynomial = (coefficients: bigint[]): string[] => {
   return normalized.map((coefficient) => coefficient.toString())
 }
 export const normalizedPrimitivePolynomial=(coefficients:readonly string[]):string[]=>primitivePolynomial(coefficients.map(BigInt))
+export function normalizedSquareFreePrimitivePolynomial(coefficients:readonly string[]):string[]{const normalized=normalizedPrimitivePolynomial(coefficients),polynomial=normalized.map(value=>rational(value)),gcdValue=polynomialGcd(polynomial,polynomialDerivative(polynomial));if(!polynomialIsOne(gcdValue))throw new RangeError('algebraic defining polynomial must be square-free');return normalized}
 
 export function allowancePolynomial(
   squaredDistance: Rational,
