@@ -13,11 +13,13 @@ import {
   scaleContour,
   MIN_EFFECT_MM,
   SIZE_CEIL_MARGIN_MM,
+  type BoundaryTruth,
   type GridResult,
 } from '../magnetic-grid/engine'
 
 /** Full ordered-coordinate identity for worker/cache invalidation; no sampling or rounding. */
 export const contourIdentity = (contour: Contour): string => contourBoundaryTruth(contour).contourIdentity
+export const boundaryTruth = (contour: Contour): BoundaryTruth => contourBoundaryTruth(contour)
 
 /** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
  *  manufacturing tolerance holds at every slider size. */

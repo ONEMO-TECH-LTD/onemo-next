@@ -4,11 +4,13 @@
 import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/magnetic-grid/engine'
 import { contourIdentity, makeSizer } from '@/lib/effect/magnetic-grid-bridge'
 import type { Contour } from '@/lib/effect/types'
+import type { BoundaryTruth } from '@/lib/magnetic-grid/spec'
 
 interface SolveRequest {
   engineId: 'v351-centre-clone'
   id: number
   base: Contour
+  boundaryTruth: BoundaryTruth
   offsetMM: number
   cfg: GridConfig
   mode: number | 'free'
@@ -98,12 +100,13 @@ function schedulePrefetch(
 }
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, engineId, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, autoFlapMaxMM } = e.data
+  const { id, engineId, base, boundaryTruth, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, autoFlapMaxMM } = e.data
   gen++
   try {
     if (engineId !== 'v351-centre-clone') throw new Error('wrong engine identity')
     const sized = makeSizer(base, offsetMM)
-    const sig = JSON.stringify([contourIdentity(base), offsetMM])
+    if(boundaryTruth.contourIdentity!==contourIdentity(base))throw new Error('boundary truth does not match supplied contour')
+    const sig = JSON.stringify([boundaryTruth.contourIdentity, offsetMM])
     if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
     const cfgSig = JSON.stringify(cfg)
     if (mode !== 'free') {

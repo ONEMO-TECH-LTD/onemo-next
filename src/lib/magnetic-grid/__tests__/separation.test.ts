@@ -82,7 +82,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',
   ],
   'effect/magnetic-grid-bridge.ts': [
-    'contourIdentity', 'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',
+    'contourIdentity', 'boundaryTruth', 'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',
     'sizeRange', 'fieldSpots', 'seatedSpots',
   ],
 }
@@ -225,5 +225,11 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(identifiersOf('const positioning = 0')).toContain('positioning')
     const donor = donorBytes(FROZEN_DONORS[0])
     expect(sha256(Buffer.concat([donor, Buffer.from('mutation')]))).not.toBe(sha256(donor))
+  })
+  it('carries BoundaryTruth through the live request and validates it before caching',()=>{
+    const panel=readRepo('src/app/(dev)/effect-creator/grid-origin/LawPanel.tsx'),worker=readRepo('src/app/(dev)/effect-creator/grid-origin/law.worker.ts')
+    expect(panel).toContain('boundaryTruth: boundaryTruth(base)')
+    expect(worker).toContain('boundaryTruth.contourIdentity!==contourIdentity(base)')
+    expect(worker).toContain('[boundaryTruth.contourIdentity, offsetMM]')
   })
 })
