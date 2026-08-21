@@ -3,7 +3,7 @@ import {
   addRational, canonicalExact, compareExactToRational, compareRational, divideRational,
   isAlgebraic, isRational, multiplyRational, rational, rationalFromNumber,
   sqrtRationalBounds,
-  normalizedSquareFreePrimitivePolynomial,
+  proveRepresentedMinimalFactor,
 } from './exact-real'
 
 const K = [
@@ -172,5 +172,57 @@ export function validateExactRealIdentity(value: ExactReal): void {
 }
 
 export function algebraicGeneratorProofs(
-  generators: readonly { semanticSourceIdentity:string; definingPolynomial:readonly string[] }[],
-): AlgebraicGeneratorProof[]{const deduplicated=new Map<string,{semanticSourceIdentity:string;normalizedDefiningPolynomial:string[];generatorIdentity:string}>();for(const generator of generators){const normalizedDefiningPolynomial=normalizedSquareFreePrimitivePolynomial(generator.definingPolynomial),generatorIdentity=sha256Text(JSON.stringify(['algebraic-generator-v1',generator.semanticSourceIdentity,normalizedDefiningPolynomial]));if(!deduplicated.has(generatorIdentity))deduplicated.set(generatorIdentity,{semanticSourceIdentity:generator.semanticSourceIdentity,normalizedDefiningPolynomial,generatorIdentity})}return[...deduplicated.values()].sort((a,b)=>a.generatorIdentity.localeCompare(b.generatorIdentity)).map((generator,eliminatedAt)=>({...generator,eliminatedAt}))}
+  generators: readonly {
+    semanticSourceIdentity: string
+    definingPolynomial: readonly string[]
+    representedRootIndex: number
+    representedIsolating: readonly [Rational, Rational]
+  }[],
+): AlgebraicGeneratorProof[] {
+  const deduplicated = new Map<string, Omit<AlgebraicGeneratorProof, 'eliminatedAt'>>()
+  for (const generator of generators) {
+    const represented = proveRepresentedMinimalFactor(
+      generator.definingPolynomial,
+      generator.representedIsolating,
+      generator.representedRootIndex,
+    )
+    const generatorIdentity = sha256Text(JSON.stringify([
+      'algebraic-generator-v2',
+      generator.semanticSourceIdentity,
+      represented.representedMinimalPolynomial,
+      represented.representedRootIndex,
+    ]))
+    const factorizationProofId = sha256Text(JSON.stringify([
+      'algebraic-factorization-proof-v1',
+      represented.normalizedDefiningPolynomial,
+      represented.orderedIrreducibleFactors,
+      represented.representedMinimalPolynomial,
+      represented.rootCountsInIsolating,
+    ]))
+    const candidate: Omit<AlgebraicGeneratorProof, 'eliminatedAt'> = {
+        generatorIdentity,
+        semanticSourceIdentity: generator.semanticSourceIdentity,
+        normalizedDefiningPolynomial: represented.normalizedDefiningPolynomial,
+        representedMinimalPolynomial: represented.representedMinimalPolynomial,
+        representedRootIndex: represented.representedRootIndex,
+        representedIsolating: represented.representedIsolating,
+        factorizationProofId,
+    }
+    const existing = deduplicated.get(generatorIdentity)
+    const candidateOrder = [
+      candidate.normalizedDefiningPolynomial.length,
+      JSON.stringify(candidate.normalizedDefiningPolynomial),
+    ] as const
+    const existingOrder = existing && [
+      existing.normalizedDefiningPolynomial.length,
+      JSON.stringify(existing.normalizedDefiningPolynomial),
+    ] as const
+    if (!existing || candidateOrder[0] < existingOrder![0]
+      || (candidateOrder[0] === existingOrder![0] && candidateOrder[1] < existingOrder![1])) {
+      deduplicated.set(generatorIdentity, candidate)
+    }
+  }
+  return [...deduplicated.values()]
+    .sort((a, b) => a.generatorIdentity.localeCompare(b.generatorIdentity))
+    .map((generator, eliminatedAt) => ({ ...generator, eliminatedAt }))
+}

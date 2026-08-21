@@ -469,6 +469,184 @@ const rootCount=(sequence:RationalPolynomial[],lo:Rational,hi:Rational)=>signVar
 export interface IsolatedPolynomialRoot{primitivePolynomial:readonly string[];rootIndex:number;isolating:readonly[Rational,Rational];multiplicity:number}
 export function isolatePrimitiveIntegerRoots(coefficients:readonly string[],lo:Rational,hi:Rational):IsolatedPolynomialRoot[]{const original=primitivePolynomial(coefficients.map(BigInt)).map(value=>rational(value)),working:Array<{root:IsolatedPolynomialRoot;factor:RationalPolynomial;sequence:RationalPolynomial[]}>=[];for(const{factor,multiplicity}of squareFreeFactors(original)){const primitive=rationalPolynomialPrimitive(factor),sequence=sturmSequence(factor),total=rootCount(sequence,lo,hi);const isolate=(left:Rational,right:Rational,count:number)=>{if(!count)return;const middle=divideRational(addRational(left,right),rational(2));if(polynomialSignAt(factor,middle)===0){let nearLeft=divideRational(addRational(left,middle),rational(2)),nearRight=divideRational(addRational(middle,right),rational(2)),leftCount=rootCount(sequence,left,nearLeft),rightCount=rootCount(sequence,nearRight,right);while(leftCount+rightCount!==count-1){nearLeft=divideRational(addRational(nearLeft,middle),rational(2));nearRight=divideRational(addRational(middle,nearRight),rational(2));leftCount=rootCount(sequence,left,nearLeft);rightCount=rootCount(sequence,nearRight,right)}isolate(left,nearLeft,leftCount);working.push({root:{primitivePolynomial:primitive,rootIndex:0,isolating:[middle,middle],multiplicity},factor,sequence});isolate(nearRight,right,rightCount);return}if(count===1){working.push({root:{primitivePolynomial:primitive,rootIndex:0,isolating:[left,right],multiplicity},factor,sequence});return}const leftCount=rootCount(sequence,left,middle);isolate(left,middle,leftCount);isolate(middle,right,count-leftCount)};isolate(lo,hi,total)}const refine=(item:typeof working[number])=>{let[left,right]=item.root.isolating;if(compareRational(left,right)===0)return;const middle=divideRational(addRational(left,right),rational(2));if(polynomialSignAt(item.factor,middle)===0){item.root={...item.root,isolating:[middle,middle]};return}const leftCount=rootCount(item.sequence,left,middle);item.root={...item.root,isolating:leftCount>0?[left,middle]:[middle,right]}};for(;;){let changed=false;for(let i=0;i<working.length;i++)for(let j=i+1;j<working.length;j++){const a=working[i].root.isolating,b=working[j].root.isolating;if(compareRational(a[1],b[0])<0||compareRational(b[1],a[0])<0)continue;refine(working[i]);refine(working[j]);changed=true}if(!changed)break}working.sort((a,b)=>compareRational(a.root.isolating[0],b.root.isolating[0]));return working.map((item,rootIndex)=>({...item.root,rootIndex}))}
 
+const integerPolynomialAt = (coefficients: readonly bigint[], at: bigint): bigint => {
+  let value = BigInt(0)
+  for (const coefficient of coefficients) value = value * at + coefficient
+  return value
+}
+
+const signedDivisors = (value: bigint): bigint[] => {
+  const magnitude = abs(value)
+  if (magnitude === BigInt(0)) throw new RangeError('Kronecker point must not be a root')
+  const values: bigint[] = []
+  for (let divisor = BigInt(1); divisor * divisor <= magnitude; divisor++) {
+    if (magnitude % divisor !== BigInt(0)) continue
+    const paired = magnitude / divisor
+    values.push(divisor, -divisor)
+    if (paired !== divisor) values.push(paired, -paired)
+  }
+  return values.sort((a, b) => a < b ? -1 : a > b ? 1 : 0)
+}
+
+const interpolateIntegerPolynomial = (
+  points: readonly (readonly [bigint, bigint])[],
+): bigint[] | null => {
+  let coefficients: Rational[] = [rational(0)]
+  for (let index = 0; index < points.length; index++) {
+    let basis: Rational[] = [rational(1)]
+    let denominator = rational(1)
+    for (let other = 0; other < points.length; other++) {
+      if (other === index) continue
+      const next = Array.from({ length: basis.length + 1 }, () => rational(0))
+      for (let power = 0; power < basis.length; power++) {
+        next[power] = subtractRational(
+          next[power], multiplyRational(basis[power], rational(points[other][0])),
+        )
+        next[power + 1] = addRational(next[power + 1], basis[power])
+      }
+      basis = next
+      denominator = multiplyRational(
+        denominator, rational(points[index][0] - points[other][0]),
+      )
+    }
+    const scale = divideRational(rational(points[index][1]), denominator)
+    while (coefficients.length < basis.length) coefficients.push(rational(0))
+    for (let power = 0; power < basis.length; power++) {
+      coefficients[power] = addRational(
+        coefficients[power], multiplyRational(basis[power], scale),
+      )
+    }
+  }
+  if (coefficients.some((coefficient) => coefficient.denominator !== '1')) return null
+  while (coefficients.length > 1 && coefficients.at(-1)!.numerator === '0') coefficients.pop()
+  return coefficients.map((coefficient) => BigInt(coefficient.numerator)).reverse()
+}
+
+const exactIntegerPolynomialQuotient = (
+  dividend: readonly bigint[], divisor: readonly bigint[],
+): bigint[] | null => {
+  const divided = polynomialDivRem(
+    dividend.map((coefficient) => rational(coefficient)),
+    divisor.map((coefficient) => rational(coefficient)),
+  )
+  if (divided.remainder.some((coefficient) => compareRational(coefficient, rational(0)) !== 0)) return null
+  if (divided.quotient.some((coefficient) => coefficient.denominator !== '1')) return null
+  return primitivePolynomial(divided.quotient.map((coefficient) => BigInt(coefficient.numerator))).map(BigInt)
+}
+
+/** Exact Kronecker factorization of one primitive square-free integer polynomial over Q. */
+export function factorSquareFreePrimitivePolynomialOverQ(
+  coefficients: readonly string[],
+): string[][] {
+  const normalized = normalizedSquareFreePrimitivePolynomial(coefficients).map(BigInt)
+  const factor = (polynomial: bigint[]): bigint[][] => {
+    const degree = polynomial.length - 1
+    if (degree <= 1) return [polynomial]
+    for (let factorDegree = 1; factorDegree <= Math.floor(degree / 2); factorDegree++) {
+      const sample: bigint[] = []
+      for (let magnitude = BigInt(0); sample.length < factorDegree + 1; magnitude++) {
+        const candidates = magnitude === BigInt(0) ? [magnitude] : [magnitude, -magnitude]
+        for (const value of candidates) {
+          if (integerPolynomialAt(polynomial, value) !== BigInt(0)) sample.push(value)
+          if (sample.length === factorDegree + 1) break
+        }
+      }
+      const divisorSets = sample.map((value) => signedDivisors(integerPolynomialAt(polynomial, value)))
+      const chosen: Array<readonly [bigint, bigint]> = []
+      const search = (index: number): bigint[][] | null => {
+        if (index < sample.length) {
+          for (const divisor of divisorSets[index]) {
+            chosen.push([sample[index], divisor])
+            const found = search(index + 1)
+            chosen.pop()
+            if (found) return found
+          }
+          return null
+        }
+        const interpolated = interpolateIntegerPolynomial(chosen)
+        if (!interpolated || interpolated.length - 1 !== factorDegree) return null
+        const primitive = primitivePolynomial(interpolated).map(BigInt)
+        if (primitive.length === 1 || primitive.length === polynomial.length) return null
+        const quotient = exactIntegerPolynomialQuotient(polynomial, primitive)
+        return quotient ? [...factor(primitive), ...factor(quotient)] : null
+      }
+      const found = search(0)
+      if (found) return found
+    }
+    return [polynomial]
+  }
+  return factor(normalized)
+    .map((value) => primitivePolynomial(value))
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+}
+
+export const polynomialRootCount = (
+  coefficients: readonly string[], lo: Rational, hi: Rational,
+): number => {
+  const polynomial = coefficients.map((coefficient) => rational(coefficient))
+  return rootCount(sturmSequence(polynomial), lo, hi)
+}
+
+export const allRealRootsOfSquareFreePolynomial = (
+  coefficients: readonly string[],
+): IsolatedPolynomialRoot[] => {
+  const primitive = normalizedSquareFreePrimitivePolynomial(coefficients)
+  const leading = abs(BigInt(primitive[0]))
+  let maximum = BigInt(0)
+  for (const coefficient of primitive.slice(1)) {
+    const magnitude = abs(BigInt(coefficient))
+    const ceiling = (magnitude + leading - BigInt(1)) / leading
+    if (ceiling > maximum) maximum = ceiling
+  }
+  const bound = rational(maximum + BigInt(1))
+  return isolatePrimitiveIntegerRoots(primitive, multiplyRational(rational(-1), bound), bound)
+}
+
+export interface RepresentedMinimalFactorProof {
+  normalizedDefiningPolynomial: readonly string[]
+  orderedIrreducibleFactors: readonly (readonly string[])[]
+  representedMinimalPolynomial: readonly string[]
+  representedRootIndex: number
+  representedIsolating: readonly [Rational, Rational]
+  rootCountsInIsolating: readonly number[]
+}
+
+export function proveRepresentedMinimalFactor(
+  coefficients: readonly string[],
+  isolating: readonly [Rational, Rational],
+  representedRootIndex: number,
+): RepresentedMinimalFactorProof {
+  if (compareRational(isolating[0], isolating[1]) >= 0) {
+    throw new RangeError('represented isolator must be ordered')
+  }
+  const normalizedDefiningPolynomial = normalizedSquareFreePrimitivePolynomial(coefficients)
+  const orderedIrreducibleFactors = factorSquareFreePrimitivePolynomialOverQ(normalizedDefiningPolynomial)
+  const rootCountsInIsolating = orderedIrreducibleFactors.map((factor) =>
+    polynomialRootCount(factor, isolating[0], isolating[1]))
+  const selected = rootCountsInIsolating
+    .map((count, index) => ({ count, index }))
+    .filter(({ count }) => count === 1)
+  if (selected.length !== 1 || rootCountsInIsolating.some((count) => count > 1)) {
+    throw new RangeError('represented isolator does not select exactly one irreducible factor root')
+  }
+  const representedMinimalPolynomial = orderedIrreducibleFactors[selected[0].index]
+  const roots = allRealRootsOfSquareFreePolynomial(representedMinimalPolynomial)
+  const matching = roots.filter((root) =>
+    compareRational(root.isolating[1], isolating[0]) > 0
+    && compareRational(root.isolating[0], isolating[1]) < 0)
+  if (matching.length !== 1 || matching[0].rootIndex !== representedRootIndex) {
+    throw new RangeError('represented root index does not match isolator')
+  }
+  return {
+    normalizedDefiningPolynomial,
+    orderedIrreducibleFactors,
+    representedMinimalPolynomial,
+    representedRootIndex,
+    representedIsolating: matching[0].isolating,
+    rootCountsInIsolating,
+  }
+}
+
 export interface SparseIntegerTerm{coefficient:string;powers:readonly number[]}
 export type SparseIntegerPolynomial=readonly SparseIntegerTerm[]
 const sparseKey=(powers:readonly number[])=>powers.join(',')

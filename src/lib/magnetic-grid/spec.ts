@@ -174,6 +174,10 @@ export interface AlgebraicGeneratorProof {
   generatorIdentity: string
   semanticSourceIdentity: string
   normalizedDefiningPolynomial: readonly string[]
+  representedMinimalPolynomial: readonly string[]
+  representedRootIndex: number
+  representedIsolating: readonly [Rational, Rational]
+  factorizationProofId: string
   eliminatedAt: number
 }
 

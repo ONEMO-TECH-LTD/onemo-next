@@ -66,9 +66,12 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'evaluateIntegerQuadratic', 'midpoint', 'isolateQuadraticRoot', 'quadraticRootsWithin',
     'approximateExact', 'canonicalExact',
     'trimPolynomial','polynomialDerivative','polynomialDivRem','polynomialRemainder','monicPolynomial','polynomialGcd','polynomialIsOne','squareFreeFactors','rationalPolynomialPrimitive','sturmSequence','polynomialSignAt','signVariations','rootCount','isolatePrimitiveIntegerRoots',
+    'integerPolynomialAt','signedDivisors','interpolateIntegerPolynomial','exactIntegerPolynomialQuotient',
+    'factorSquareFreePrimitivePolynomialOverQ','polynomialRootCount','allRealRootsOfSquareFreePolynomial','proveRepresentedMinimalFactor',
     'sparseKey','normalizeSparseIntegerPolynomial','normalizeSparseEliminationStep','addSparseIntegerPolynomials','multiplySparseIntegerPolynomials',
     'encodeCanonicalMultivariatePolynomial','decodeCanonicalMultivariatePolynomial','encodeNormalizedSparseEliminationStep','projectFinalUnivariatePolynomial',
     'negateSparseIntegerPolynomial','subtractSparseIntegerPolynomials','sparseDegree','sparseLeadingCoefficient','shiftSparseVariable','powSparseIntegerPolynomial','pseudoRemainderSparseIntegerPolynomial',
+    'sparseIsZero','divideSparseIntegerPolynomialExact','sparseConstant','eliminateSparseGeneratorBySubresultants',
   ],
   'magnetic-grid/compute/contact-root.ts': [
     'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
