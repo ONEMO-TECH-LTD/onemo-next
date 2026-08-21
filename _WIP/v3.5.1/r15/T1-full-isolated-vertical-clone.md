@@ -13,10 +13,46 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 
 - Materialize the existing third **Law** selection as a full isolated vertical clone from the embedded `8d17780c` source: cloned visible bench/tab UI, controls, local state/defaults, request builder/newest-only queue, worker execution/caches/band/replay/prefetch path, rendered Stage/evidence surface, `positioning===1` branch and its complete dependency closure. The clone uses `LawPanel.tsx`, isolated `law.worker.ts`, isolated `src/lib/magnetic-grid/` runtime files and `magnetic-grid.compare.v1.*`; it never sends a request to or imports the current worker or current `grid-origin*` runtime.
 - Use the existing three-way selector as the only page-level dispatch and add only the isolated `LawPanel` mount boundary. Voting and Centre-rules keep their original page subtree, state, request path, worker and modules byte-untouched. Selecting Centre-rules runs the frozen original; selecting Law runs the complete isolated clone. No new selector, fourth option or second page exists.
-- Build and run the full vertical clone before structural moves. Confirm the Centre-rules and Law selections both load, the Law selection uses only its isolated request/worker/runtime, and the original still runs unchanged. Detailed request/result/pixel equivalence belongs to optional §9 after the code build; no Voting-only or existing `positioning===2` body is copied.
+- Build and run the full vertical clone before structural moves. Confirm the Centre-rules and Law selections both load, the Law selection uses only its isolated request/worker/runtime, and the original still runs unchanged. The minimum frozen-snapshot equivalence in the build completion is mandatory; the broader matrix/pixel suite belongs to optional §9. No Voting-only or existing `positioning===2` body is copied.
 - The cloned contour adapter accepts the shell's same already-loaded normalized contour and returns it unchanged with a content identity. Do not add Studio integration or alter current shape loaders.
+- Label the isolated selection `Law · Centre clone`. Its description names Centre only; it must not claim Wrap or scaling.
 
-Build completion: the full isolated Law clone compiles and runs in the existing third selection; Centre-rules still compiles and runs in its original selection; the clone has its own request/worker/cache/runtime and no legacy runtime edge; no re-room, ruler repair, Wrap or scaling code exists yet. Commit this working state before T2.
+#### T1 selector and state ownership
+
+| Owner | Exact responsibility |
+|---|---|
+| existing `page.tsx` shell | owns only `selection: 0 | 1 | 2`, persists it under `magnetic-grid.compare.v1.surface`, and mounts one panel at a time; first initialization may map frozen `grid-origin.positioning` 0/1 to the same selection and maps legacy 2 to Centre-rules 1. It owns no shape, contour, size, engine control, worker or result state |
+| legacy comparator component inside `page.tsx` | receives `positioning: 0 | 1`, owns every other original `grid-origin.*` persisted state, Voting/Centre-rules controls, original request queue/worker and original rendered model; all bodies remain donor-identical except the named positioning prop/selector callback extraction |
+| `LawPanel.tsx` | owns an independent copy of shape/source selection, size/band/manual/display state, Centre controls, defaults, request queue, model and Stage rendering; persistence uses only `magnetic-grid.compare.v1.*` and never reads `grid-origin.*` after initialization from donor defaults |
+| `law.worker.ts` | owns only the isolated clone's request execution, caches, band replay and prefetch until T4 replaces them |
+| temporary Law runtime | owns the extracted `positioning===1` engine path and complete reached dependency closure; it accepts no `positioning` or `votingOrder` field |
+
+The comparison is selector-based, not simultaneous: only one panel/worker is mounted at a time. The shell passes only `{ positioning: 0 | 1, onSelect(positioning: 0 | 1 | 2): void }` to the legacy panel and `{ onSelect(positioning: 0 | 1 | 2): void }` to `LawPanel`; no contour, engine control, request, result or cache object crosses that boundary.
+
+#### T1 closed ADAPT-EXTRACT map
+
+| Frozen source region | T1 destination | Disposition |
+|---|---|---|
+| `page.tsx:1-34` | `LawPanel.tsx` imports/constants/types | `ADAPT-EXTRACT`: substitute isolated imports and component name only |
+| `page.tsx:35-44` | `LawPanel.tsx` persisted helper | `ADAPT-EXTRACT`: substitute `magnetic-grid.compare.v1.*` prefix only |
+| `page.tsx:46-273` | `LawPanel.tsx` complete local state, shape/source preparation, model, queue and request builder | copy all reached bodies; remove `positioning`/`votingOrder` state and fields; set isolated Centre-clone engine identity; change worker URL only |
+| `page.tsx:274-537` | `LawPanel.tsx` complete visible bench/control rendering | copy all reached JSX; `474-489` becomes selector callback + truthful Centre-clone label; exclude Voting-only `522-532` |
+| `page.tsx:539-879` | `LawPanel.tsx` Stage, evidence rendering, helpers and CSS | `MOVE-VERBATIM` |
+| `page.tsx:46-537` | existing `page.tsx` legacy component + new mount shell | move `positioning` selection to the shell prop, replace the three selector handlers with `onSelect`, and add the one-panel mount; every other legacy state/request/render body remains unchanged |
+| `solve.worker.ts:1-150` | isolated `law.worker.ts` | copy request/caches/band/replay/prefetch/onmessage; substitute imports and engine identity; preserve positioning-1 branches at `78-80` and `126-128`, including `seatMarginMM`; exclude positioning-2 alternatives |
+| `grid-origin.ts:1-143` | temporary Law runtime types/shared helpers | copy reached imports/types plus `parityHolds`; exclude Voting-only imports/fields |
+| `grid-origin.ts:145-220` + `329-352` | temporary Centre-clone `computeGrid` | `ADAPT-EXTRACT`: preserve prelude, analytic-circle predicate, `seatMarginMM`, `safeSegments`, governed centre, manual branch, full `positioning===1` branch, coverage/result assembly; remove the mode switch and set Centre-clone identity |
+| `grid-origin.ts:221-328` | no destination | `EXCLUDE`: existing Law and Voting branches |
+| `grid-origin.ts:354-483` | temporary Centre-clone band/Auto path | copy reached Centre-rules behavior, including sampled walk/tolerance and seat inflation, unchanged through T2 |
+| `grid-origin-spec.ts:1-98` | temporary Law spec | copy reached constants/types; exclude Voting weights/order and `POSITIONING`; preserve circle, flap, phase, mass, governor, band and seat-margin dependencies used by the clone |
+| `grid-origin-compute.ts:1-585` | temporary Law compute | copy complete file because the reached Centre-rules page/engine/bridge closure uses its seat, circle, lattice, ruler, contact, belt and contour helpers; no helper is repaired in T1/T2 |
+| `grid-origin-logic.ts:1-15` | temporary Law logic imports | `ADAPT-EXTRACT`: retain only imports reached by the copied logic ranges; exclude Voting weights/order |
+| `grid-origin-logic.ts:17-26`, `43-105`, `126-149` | temporary Law logic | copy `bandOf`, types, `governMass`, `centeringAnchors`, coverage and sizing; exclude Voting `28-40` score bodies and unused `centeringRef:107-124` |
+| `grid-origin-bridge.ts:1-108` | temporary Law bridge | `MOVE-VERBATIM` except isolated import paths |
+
+This extraction map is closed before T1 starts. No new source row, state owner, request field, helper or result field may be discovered or added during implementation without revising R15 first.
+
+Build completion: the full isolated Law clone compiles and runs in the existing third selection; Centre-rules still compiles and runs in its original selection; the clone has its own request/worker/cache/runtime and no legacy runtime edge; the same frozen input/config snapshot returns the same Centre-rules result record and rendered Centre evidence in both selections; no re-room, ruler repair, Wrap or scaling code exists yet. Commit this working state before T2.
 
 #### T1 frozen vertical donor snapshot — `8d17780c`
 
@@ -2522,7 +2558,6 @@ export function seatedSpots(grid: GridResult): FieldSpot[] {
 }
 
 ```
-
 ## 1. Product goal
 
 The engine is one portable three-rule driver:
@@ -2546,8 +2581,8 @@ The contract must deliver all of these together:
 - Make every exposed control true to its label.
 - Make every concession explicit.
 - Split the implementation into portable `spec → compute → logic → engine API`; UI reaches it only through a bridge.
-- Prove the new path before removing v3.5.
-- Once proved, remove every superseded mode, score, helper, control, cache field, result field, and stale document claim. No permanent parallel engines.
+- End R15 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
+- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not R15 build tasks.
 
 ## 3. Necessity baseline — the smallest complete rebuild
 
@@ -2599,18 +2634,19 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | ADAPT only when T3 adds Wrap/scaling | `logic.ts chooseLawfulCandidate`; existing `positioning===2` is not a T1/T2 donor |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | ADAPT preserved first-count/no-repeat behavior + DELETE sampled walk/tolerance | exact contact roots in `compute/contact-root.ts`; centre/wrap/no-repeat predicates in `logic.ts`; sequencing/result assembly in `engine.ts`; equivalence on characterized integer-contact cases, named differences only for tolerance/search defects |
-| `grid-origin.ts autoFlapInBand` | ADAPT: allowance scan deleted | `logic.ts` selects the minimum exact required allowance measured by compute; characterized whole-mm cases remain equal |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds scaling | T1/T2 preserve the sampled walk and `seatMarginMM`; T3 replaces only behavior required by the live first-lawful-size implementation |
+| `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds Wrap | T1/T2 preserve the allowance scan; T3 replaces only behavior required by the live Wrap implementation |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; RE-ROOM representation only in T2 | preserve identical governor branches/decisions; no new comparator unless live T3 code invokes Support A |
 | `grid-origin-logic.ts assignSizes` | ADAPT only when a live T3 result consumes it | extrema/corner measurements in `compute/seat.ts`; magnet-plan policy in `logic.ts` |
 | `grid-origin-compute.ts splitPerimeter` | ADAPT only when live Coverage/Wrap code consumes it | neighbour measurements in `compute/seat.ts`; belt classification in `logic.ts`; no speculative reach value |
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
-| `page.tsx circle:` analytic predicate choice | DELETE from Law | supplied-contour segment domain has no alternate circle path; current comparator branch remains untouched during proof |
+| `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
+| `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
 | exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
-| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, `seatMarginMM`, `panMM`, `bestKx/bestKy`, positioning/voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
+| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
-T1/T2 may add rows only for bodies reached by the live clone. No body enters Law without one disposition; no broad pre-build inventory is required.
+The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising R15 first.
 
 ### Elements explicitly preserved
 

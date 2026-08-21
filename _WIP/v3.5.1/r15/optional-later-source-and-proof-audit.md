@@ -93,15 +93,15 @@ The files below are copied byte-for-byte from `8d17780cb0efb5db896f9ac62d03b01d6
 
 ### Product
 
-- [ ] Exactly one production engine exists.
+- [ ] Exactly three selectable comparison modes exist; Law uses one isolated new runtime and Voting/Centre-rules remain frozen legacy comparators.
 - [ ] Centre is derived from shape evidence before seats.
-- [ ] Production centre law is total: one centre or typed refusal, never an iteration-order tie-break.
+- [ ] The Law centre result is one decision, an explicit tie or a typed refusal; never an iteration-order tie-break.
 - [ ] Flap 0 rungs carry a certified spot-edge contact witness at a solved exact scale; no policy tolerance or size scan is added.
 - [ ] Auto returns the minimum exact required allowance; Free and band agree.
 - [ ] Every B1-B4 rung is the first lawful size for a unique increasing count.
 - [ ] No silent fallback or concession exists.
-- [ ] No score/weight/preference exists in production engine code.
-- [ ] Co-lawful comparison ties remain explicit until a ruled production law resolves them.
+- [ ] No score/weight/preference exists in the isolated Law runtime.
+- [ ] Co-lawful comparison ties remain explicit.
 
 ### Architecture
 

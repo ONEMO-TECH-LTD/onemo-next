@@ -12,14 +12,20 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 ### T3 — Repair Centre, then add Wrap, then Magnet-quantity scaling through the live Law tab
 
 - **Centre repair first:** keep the re-roomed Centre rule/governor/parity bodies locked. Replace only the measured-bad 2mm `safeSegments` ruler or another already-named defect. Compile and run the Law tab after every change; detailed matrix evidence is optional §9 work after the code build.
+- The Centre repair may change only the named ruler/mesh, sliver, seat-derived-centre or tie/refusal outputs; every other frozen snapshot field stays equal.
+- After the named Centre repair runs, change the label to `Law · Centre fixed`; describe Centre only.
 - Freeze the corrected Centre result before Wrap exists.
 - **Wrap second:** add the smallest implementation that makes every belt disc obey the configured allowance and makes flap 0 a proved contact. Compile and run Centre unchanged plus live Wrap behavior after every change.
+- Before scaling, demonstrate one flap-0 exact contact and one loose near-miss refusal in the running Law tab.
+- After Wrap runs, change the label to `Law · Centre + Wrap`; describe only Centre and Wrap.
 - Freeze Centre + Wrap before scaling exists.
 - **Scaling third:** add the smallest implementation that exposes each new magnet count at its first lawful size across B1-B4 without repeats. Compile and run Centre and Wrap unchanged plus live scaling behavior after every change.
+- Before T4, demonstrate B1-B4 unique increasing first-lawful counts with no cross-band repeat in the running Law tab.
+- Use plain `Law` and the full three-law description only after scaling runs.
 - Add fixed-size inspection with no implicit winner and complete three-law typed results only when their live consumer exists.
 - Before adding any support kernel from §10A, record the failing fixture or measured defect that cannot be closed by reusing/re-rooming existing code, name the minimum support task required, and remove it again if it does not close that exact failure. No support task is an automatic phase.
 
-Build completion: the live Law tab runs corrected Centre, then Wrap, then scaling in that order; each earlier law remains operational after the next is added; B1-B4 return working typed results; every support task used has a named live-code need and no unused support code remains. Commit this working engine before T4. Detailed fixtures, mutations and audits remain optional §9 work.
+Build completion: the live Law tab runs corrected Centre, then Wrap, then scaling in that order; only named Centre outputs changed; flap 0 contact and near-miss refusal work; B1-B4 return unique increasing first-lawful counts without repeats; every support task used has a named live-code need and no unused support code remains. Commit this working engine before T4. Broader fixtures, mutations and audits remain optional §9 work.
 
 ### 10A. Conditional support tasks — not automatic phases
 
@@ -60,8 +66,8 @@ The contract must deliver all of these together:
 - Make every exposed control true to its label.
 - Make every concession explicit.
 - Split the implementation into portable `spec → compute → logic → engine API`; UI reaches it only through a bridge.
-- Prove the new path before removing v3.5.
-- Once proved, remove every superseded mode, score, helper, control, cache field, result field, and stale document claim. No permanent parallel engines.
+- End R15 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
+- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not R15 build tasks.
 
 ## 3. Necessity baseline — the smallest complete rebuild
 
@@ -113,18 +119,19 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | ADAPT only when T3 adds Wrap/scaling | `logic.ts chooseLawfulCandidate`; existing `positioning===2` is not a T1/T2 donor |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | ADAPT preserved first-count/no-repeat behavior + DELETE sampled walk/tolerance | exact contact roots in `compute/contact-root.ts`; centre/wrap/no-repeat predicates in `logic.ts`; sequencing/result assembly in `engine.ts`; equivalence on characterized integer-contact cases, named differences only for tolerance/search defects |
-| `grid-origin.ts autoFlapInBand` | ADAPT: allowance scan deleted | `logic.ts` selects the minimum exact required allowance measured by compute; characterized whole-mm cases remain equal |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds scaling | T1/T2 preserve the sampled walk and `seatMarginMM`; T3 replaces only behavior required by the live first-lawful-size implementation |
+| `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds Wrap | T1/T2 preserve the allowance scan; T3 replaces only behavior required by the live Wrap implementation |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; RE-ROOM representation only in T2 | preserve identical governor branches/decisions; no new comparator unless live T3 code invokes Support A |
 | `grid-origin-logic.ts assignSizes` | ADAPT only when a live T3 result consumes it | extrema/corner measurements in `compute/seat.ts`; magnet-plan policy in `logic.ts` |
 | `grid-origin-compute.ts splitPerimeter` | ADAPT only when live Coverage/Wrap code consumes it | neighbour measurements in `compute/seat.ts`; belt classification in `logic.ts`; no speculative reach value |
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
-| `page.tsx circle:` analytic predicate choice | DELETE from Law | supplied-contour segment domain has no alternate circle path; current comparator branch remains untouched during proof |
+| `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
+| `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
 | exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
-| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, `seatMarginMM`, `panMM`, `bestKx/bestKy`, positioning/voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
+| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
-T1/T2 may add rows only for bodies reached by the live clone. No body enters Law without one disposition; no broad pre-build inventory is required.
+The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising R15 first.
 
 ### Elements explicitly preserved
 

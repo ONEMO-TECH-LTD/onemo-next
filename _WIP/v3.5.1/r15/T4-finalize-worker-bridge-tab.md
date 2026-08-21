@@ -17,7 +17,7 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 - Retain the existing third **Law** selection and `magnetic-grid.compare.v1.*`; exactly three positioning selections render. Voting and Centre-rules remain untouched comparators; the old in-place `positioning===2` branch remains outside the new runtime.
 - The final Law slot calls only `LawPanel.tsx` → bridge/API → `law.worker.ts`; it never sends `positioning===2` to the current door/worker. Show all law evidence and typed refusals.
 
-Build completion: the Law tab compiles and runs through `LawPanel.tsx` → bridge/API → transport-only `law.worker.ts`; all three laws remain operational; exactly three selections render; current Voting/Centre-rules still run unchanged. Commit this final working build. Byte-equivalence, queue suites, mutation tests and broader audits remain optional §9 work.
+Build completion: the Law tab compiles and runs through `LawPanel.tsx` → bridge/API → transport-only `law.worker.ts`; direct and worker calls return the same result; newest-only request replacement works; cache identities do not cross between legacy and Law; all three laws remain operational; exactly three selections render; current Voting/Centre-rules still run unchanged. Commit this final working build. Broader queue/mutation/audit work remains optional §9.
 
 ## 1. Product goal
 
@@ -42,8 +42,8 @@ The contract must deliver all of these together:
 - Make every exposed control true to its label.
 - Make every concession explicit.
 - Split the implementation into portable `spec → compute → logic → engine API`; UI reaches it only through a bridge.
-- Prove the new path before removing v3.5.
-- Once proved, remove every superseded mode, score, helper, control, cache field, result field, and stale document claim. No permanent parallel engines.
+- End R15 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
+- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not R15 build tasks.
 
 ## 3. Necessity baseline — the smallest complete rebuild
 
@@ -95,18 +95,19 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | ADAPT only when T3 adds Wrap/scaling | `logic.ts chooseLawfulCandidate`; existing `positioning===2` is not a T1/T2 donor |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | ADAPT preserved first-count/no-repeat behavior + DELETE sampled walk/tolerance | exact contact roots in `compute/contact-root.ts`; centre/wrap/no-repeat predicates in `logic.ts`; sequencing/result assembly in `engine.ts`; equivalence on characterized integer-contact cases, named differences only for tolerance/search defects |
-| `grid-origin.ts autoFlapInBand` | ADAPT: allowance scan deleted | `logic.ts` selects the minimum exact required allowance measured by compute; characterized whole-mm cases remain equal |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds scaling | T1/T2 preserve the sampled walk and `seatMarginMM`; T3 replaces only behavior required by the live first-lawful-size implementation |
+| `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds Wrap | T1/T2 preserve the allowance scan; T3 replaces only behavior required by the live Wrap implementation |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; RE-ROOM representation only in T2 | preserve identical governor branches/decisions; no new comparator unless live T3 code invokes Support A |
 | `grid-origin-logic.ts assignSizes` | ADAPT only when a live T3 result consumes it | extrema/corner measurements in `compute/seat.ts`; magnet-plan policy in `logic.ts` |
 | `grid-origin-compute.ts splitPerimeter` | ADAPT only when live Coverage/Wrap code consumes it | neighbour measurements in `compute/seat.ts`; belt classification in `logic.ts`; no speculative reach value |
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
-| `page.tsx circle:` analytic predicate choice | DELETE from Law | supplied-contour segment domain has no alternate circle path; current comparator branch remains untouched during proof |
+| `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
+| `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
 | exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
-| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, `seatMarginMM`, `panMM`, `bestKx/bestKy`, positioning/voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
+| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
-T1/T2 may add rows only for bodies reached by the live clone. No body enters Law without one disposition; no broad pre-build inventory is required.
+The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising R15 first.
 
 ### Elements explicitly preserved
 
@@ -351,124 +352,6 @@ export type RefusalCode =
 ```
 
 `SPOT_RADIUS_MM` defaults the public API. Slider floors/ceilings belong to the bench UI, not the engine spec.
-
-### 6.2 `compute.ts` — one geometry surface, focused internals
-
-Every export returns a measurement or certificate; it never selects a product answer. `compute.ts` is the public barrel only. Implementation is split under `compute/`: `exact-real.ts` owns rational/algebraic values and comparisons; `seat.ts` owns legality; `centre-evidence.ts` owns safe regions and centre branches; `regimes.ts` owns event enumeration; `contact-root.ts` owns contact equations/witnesses; `identity.ts` owns canonical serialization. This is a layer split inside compute, not six new public abstractions.
-
-The ruled supplied boundary is never decimated, capped or replaced by a mesh inside compute for centre, seat, contact, parity, regime or rung decisions. No internal `MAXV`, sampling step, guard or distance multiplier may exist in a law path. If a later display-only approximation is measured necessary, its parameter lives in spec, its output is typed `DisplayEvidence`, and the separation guard proves it cannot reach any law result.
-
-```ts
-export function prepareContour(input: NormalizedBoundary): PreparedContour
-export function scaleBoundary(base: NormalizedBoundary, scale: ExactScale): PreparedContour
-export function measureCentreEvidence(
-  prepared: PreparedContour,
-  scale: ExactScale,
-  spotRadius: Rational,
-  massDepth: Rational,
-): CentreEvidence
-export function enumerateRegimeEvents(
-  prepared: PreparedContour,
-  band: BandId,
-  inputs: ComputeInputs,
-): readonly RegimeEvent[]
-export function partitionRegimes(events: readonly RegimeEvent[], band: BandId): readonly Regime[]
-/** Enumerates geometry for every centre branch; it never receives or filters by CentrePolicy. */
-export function measureCentreBranches(prepared: PreparedContour, site: Regime, inputs: ComputeInputs): readonly CentreBranchMeasurement[]
-export function measureFourParityCandidates(
-  prepared: PreparedContour,
-  centre: CentreDecision,
-  site: Regime,
-  inputs: ComputeInputs,
-): readonly CandidateGeometry[]
-export function measureContactRoots(
-  prepared: PreparedContour,
-  regime: Regime,
-  measured: CandidateGeometry,
-  inputs: ComputeInputs,
-): readonly RootedCandidateGeometry[]
-/** Neutral exact ordering only; no policy, geometry lookup or acceptance semantics. */
-export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1
-/** Neutral post-policy serialization; called by engine assembly, never by Logic. */
-export function finalizeResultIdentity(candidate: LawfulCandidateMeasurement): string
-export function latticeAtCentre(
-  prepared: PreparedContour,
-  target: ExactPoint,
-  xParity: 'node' | 'gap',
-  yParity: 'node' | 'gap',
-  pitchMM: number,
-): LatticeCandidate
-export function seatCandidate(
-  prepared: PreparedContour,
-  candidate: LatticeCandidate,
-  spotRadiusMM: number,
-): SeatedCandidate
-export function perimeterBelt(points: readonly ExactPoint[], pitchMM: number): BeltResult
-export function contactWitnesses(
-  prepared: PreparedContour,
-  regime: Regime,
-  candidate: SeatedCandidate,
-  spotRadius: Rational,
-): readonly ContactWitness[]
-export function beltWithinAllowance(
-  witness: ContactWitness,
-  allowance: ExactReal,
-): boolean // exact algebraic comparison; no epsilon or guard
-export function tangencyPoint(witness: ContactWitness): ContactWitness['tangency']
-```
-
-For fixed-size inspection only, compute also reports the exact worst-belt required allowance and a report-only decimal approximation. The current v3.5 `impliedFlapMM` already uses worst-disc semantics; it is a donor measurement to certify and relocate, not an incorrect minimum-gap implementation. Truth dots come only from `ContactWitness`; there is no `guardMM` parameter anywhere in the law or drawing API.
-
-### 6.3 `logic.ts` — the three rules
-
-Logic receives self-contained measurements and returns decisions. No `Math.hypot`, polygon, lattice, edge or identity calls. Its sole math dependency is neutral `compareExact(a,b)`, used to order already-measured exact values for fixed flap, Auto minimum, scale and stable candidate ordering; the comparator knows no law or config.
-
-```ts
-export function evaluateCentreLaw(
-  measured: CentreBranchMeasurement,
-  policy: CentrePolicy,
-): CentreLawEvaluation
-
-export function parityIsLawful(
-  candidate: CandidateGeometry,
-  centre: CentreDecision,
-): boolean
-
-export function wrapIsLawful(
-  requiredFlap: ExactReal,
-  allowedFlap: ExactReal,
-): boolean
-
-export function chooseLawfulCandidate(
-  candidates: readonly LawfulCandidateMeasurement[],
-): readonly LawfulCandidateMeasurement[] | Refusal
-
-export function evaluateCandidateLaws(
-  measured: RootedCandidateGeometry,
-  config: EvaluationPolicy,
-): CandidateLawEvaluation
-
-/** Owns first-lawful count selection, cross-band ownership, conflicts and all refusal propagation. */
-export function reduceBandLadders(
-  centres: readonly CentreLawEvaluation[],
-  candidates: readonly CandidateLawEvaluation[],
-): LawReduction
-```
-
-Candidate choice is deterministic law, not score. Compute supplies both neutral populations/counts; Logic applies Coverage before grouping:
-
-1. select `seated/seatedCount` for Full or `belt/beltCount` for Perimeter; set final `coverage`, `magnetCount` and anchors from the same rooted record without mutating it;
-2. discard centre-unlawful candidates;
-3. fixed flap: refuse candidates above the allowance;
-4. Auto flap: retain only candidates at the minimum exact required allowance for that selected count, or return the typed cap refusal;
-5. vertical orientation eliminates horizontal among otherwise-equal candidates;
-6. return every candidate still tied, sorted by neutral `measuredId` for stable serialization only.
-
-Magnet count is the ladder axis, not a hidden intra-layout score. Stable order never collapses a tie set.
-
-During this build, the lossless `CentrePolicy` is selected by the comparison bench. Choosing and collapsing a later production policy is outside this engine build contract.
-
-A comparison centre selector may return `CentreTie`; the engine evaluates every tied centre and preserves the resulting lawful candidates. Iteration order and evidence id may never break a centre tie silently.
 
 ### 6.4 `engine.ts` — one portable API
 

@@ -13,9 +13,10 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 
 - Keep the complete T1 Law clone running as the comparison harness. Re-room only its cloned underlying centering bodies, incrementally, into `spec.ts`, public `compute.ts`, focused `compute/*`, `logic.ts`, `engine.ts` and the pass-through bridge under `src/lib/magnetic-grid/`, following the untangle map and MOVE/ADAPT equivalence obligations.
 - Copy only disposition-approved neutral geometry bodies from the embedded source. Rejected approximate/policy helpers remain unchanged source bodies during T2; no defect is repaired while the structure moves. The portable package has no runtime import back into current `grid-origin*` or `src/lib/grid-engine`.
-- After every semantic commit, compile and run the Law selection before continuing. The Law UI, controls, request behavior and rendered evidence remain operational while the engine bodies move underneath them; detailed equivalence fixtures remain optional §9 work after the code build.
+- After every semantic commit, compile and run the Law selection, then replay one frozen input/config snapshot and require the same result record and rendered Centre evidence before continuing. The broader matrix/mutation work remains optional §9.
+- Keep the label `Law · Centre clone` and Centre-only description throughout T2.
 
-Build completion: the re-roomed portable package compiles and drives the still-live Law clone through the declared owners; Centre-rules still runs unchanged; no ruler repair, Wrap, scaling or conditional support kernel exists yet. Commit this working state before T3.
+Build completion: the re-roomed portable package compiles and drives the still-live Law clone through the declared owners; the frozen snapshot is unchanged across every re-room commit; Centre-rules still runs unchanged; no ruler repair, Wrap, scaling or conditional support kernel exists yet. Commit this working state before T3.
 
 ## 1. Product goal
 
@@ -40,8 +41,8 @@ The contract must deliver all of these together:
 - Make every exposed control true to its label.
 - Make every concession explicit.
 - Split the implementation into portable `spec → compute → logic → engine API`; UI reaches it only through a bridge.
-- Prove the new path before removing v3.5.
-- Once proved, remove every superseded mode, score, helper, control, cache field, result field, and stale document claim. No permanent parallel engines.
+- End R15 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
+- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not R15 build tasks.
 
 ## 3. Necessity baseline — the smallest complete rebuild
 
@@ -93,18 +94,19 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | ADAPT only when T3 adds Wrap/scaling | `logic.ts chooseLawfulCandidate`; existing `positioning===2` is not a T1/T2 donor |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | ADAPT preserved first-count/no-repeat behavior + DELETE sampled walk/tolerance | exact contact roots in `compute/contact-root.ts`; centre/wrap/no-repeat predicates in `logic.ts`; sequencing/result assembly in `engine.ts`; equivalence on characterized integer-contact cases, named differences only for tolerance/search defects |
-| `grid-origin.ts autoFlapInBand` | ADAPT: allowance scan deleted | `logic.ts` selects the minimum exact required allowance measured by compute; characterized whole-mm cases remain equal |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds scaling | T1/T2 preserve the sampled walk and `seatMarginMM`; T3 replaces only behavior required by the live first-lawful-size implementation |
+| `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; ADAPT only when T3 adds Wrap | T1/T2 preserve the allowance scan; T3 replaces only behavior required by the live Wrap implementation |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; RE-ROOM representation only in T2 | preserve identical governor branches/decisions; no new comparator unless live T3 code invokes Support A |
 | `grid-origin-logic.ts assignSizes` | ADAPT only when a live T3 result consumes it | extrema/corner measurements in `compute/seat.ts`; magnet-plan policy in `logic.ts` |
 | `grid-origin-compute.ts splitPerimeter` | ADAPT only when live Coverage/Wrap code consumes it | neighbour measurements in `compute/seat.ts`; belt classification in `logic.ts`; no speculative reach value |
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
-| `page.tsx circle:` analytic predicate choice | DELETE from Law | supplied-contour segment domain has no alternate circle path; current comparator branch remains untouched during proof |
+| `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
+| `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
 | exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
-| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, `seatMarginMM`, `panMM`, `bestKx/bestKy`, positioning/voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
+| `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
-T1/T2 may add rows only for bodies reached by the live clone. No body enters Law without one disposition; no broad pre-build inventory is required.
+The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising R15 first.
 
 ### Elements explicitly preserved
 
