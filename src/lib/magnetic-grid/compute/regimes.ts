@@ -1,5 +1,5 @@
 import type { Band, Contour, ExactReal, Pt, Rational } from '../spec'
-import { FIELD_POSITIONS_PER_AXIS } from '../spec'
+import { BANDS, FIELD_POSITIONS_PER_AXIS } from '../spec'
 import { exactBoxTargetCoefficient } from './centre-evidence'
 import {
   addRational,
@@ -71,14 +71,30 @@ const subtractRadiusSquared = (distance: Quadratic, radius: Rational): Quadratic
   subtractRational(distance[2], squareRational(radius)),
 ]
 
+export const exactBandDomain = (
+  band: Band,
+  bands: readonly Band[] = BANDS,
+): { lo: Rational; hiExclusive: Rational } => {
+  const ordered = [...bands].sort((a, b) => a.minMM - b.minMM)
+  const index = ordered.findIndex((candidate) => candidate.id === band.id)
+  const next = index >= 0 ? ordered[index + 1] : undefined
+  return { lo: rational(band.minMM), hiExclusive: rational(next?.minMM ?? band.maxMM + 1) }
+}
+
+export const scaleInBand = (scale: ExactReal, band: Band, bands: readonly Band[] = BANDS): boolean => {
+  const domain = exactBandDomain(band, bands)
+  return compareExact(scale, domain.lo) >= 0 && compareExact(scale, domain.hiExclusive) < 0
+}
+
 const roots = (equation: Quadratic, band: Band): ExactReal[] => {
   const [a, b, c] = equation
+  const domain = exactBandDomain(band)
   if (compareRational(a, rational(0)) === 0) {
     if (compareRational(b, rational(0)) === 0) return []
     const root = multiplyRational(rational(-1), divideRational(c, b))
-    return compareRational(root, rational(band.minMM)) >= 0 && compareRational(root, rational(band.maxMM)) <= 0 ? [root] : []
+    return scaleInBand(root, band) ? [root] : []
   }
-  return quadraticRootsWithin(a, b, c, rational(band.minMM), rational(band.maxMM))
+  return quadraticRootsWithin(a, b, c, domain.lo, domain.hiExclusive).filter((root) => scaleInBand(root, band))
 }
 
 const polynomialOf = (scale: ExactReal): readonly string[] =>
@@ -161,7 +177,10 @@ export function enumerateParityClassEvents(contour: Contour, bands: readonly Ban
     if (compareRational(y, maxY) > 0) maxY = y
   }
   const sides = [subtractRational(maxX, minX), subtractRational(maxY, minY)] as const
-  const boundaries = [...new Set(bands.flatMap((band) => [band.minMM, band.maxMM + 1]))].sort((a, b) => a - b)
+  const boundaries = [...new Set(bands.flatMap((band) => {
+    const domain = exactBandDomain(band, bands)
+    return [Number(domain.lo.numerator) / Number(domain.lo.denominator), Number(domain.hiExclusive.numerator) / Number(domain.hiExclusive.denominator)]
+  }))].sort((a, b) => a - b)
   const events: ParityClassEvent[] = []
   sides.forEach((side, axis) => {
     if (compareRational(side, rational(0)) <= 0) return
