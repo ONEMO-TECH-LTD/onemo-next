@@ -8,6 +8,7 @@ import {
   quadraticRootsWithin,
   rational,
   rationalFromNumber,
+  signQuadraticAtExact,
   sqrtMinusRational,
 } from '../compute/exact-real'
 
@@ -54,5 +55,11 @@ describe('Wrap exact-real support', () => {
     const shifted = affineExact(roots[0], rational(1, 2), rational(-48))
     expect(approximateExact(shifted)).toBeCloseTo(12 * Math.SQRT2, 12)
     expect(compareExact(shifted, rational(0))).toBe(1)
+    expect(signQuadraticAtExact(rational(1), rational(-192), rational(8064), roots[0])).toBe(0)
+    expect(compareExact(roots[0], {
+      polynomial: ['2', '-384', '16128'],
+      isolating: [rational(129), rational(130)],
+      rootIndex: 1,
+    })).toBe(0)
   })
 })

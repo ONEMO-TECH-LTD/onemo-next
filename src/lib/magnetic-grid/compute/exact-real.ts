@@ -164,25 +164,31 @@ const evaluatePolynomial = (
   return value
 }
 
+const normalizedAlgebraicKey = (value: AlgebraicReal): string => {
+  if (value.polynomial.length !== 3 || (value.rootIndex !== 0 && value.rootIndex !== 1)) {
+    throw new RangeError('unsupported algebraic comparison')
+  }
+  return `${primitiveQuadratic(value.polynomial.map(BigInt)).join(',')}#${value.rootIndex}`
+}
+
+const validateAlgebraic = (value: AlgebraicReal): void => {
+  const [lo, hi] = value.isolating
+  if (compareRational(lo, hi) >= 0) throw new RangeError('unsupported algebraic comparison')
+  const polynomial = primitiveQuadratic(value.polynomial.map(BigInt)).map(String)
+  const loSign = compareRational(evaluatePolynomial(polynomial, lo), rational(0))
+  const hiSign = compareRational(evaluatePolynomial(polynomial, hi), rational(0))
+  const bracketed = value.rootIndex === 0
+    ? loSign >= 0 && hiSign <= 0
+    : loSign <= 0 && hiSign >= 0
+  if (!bracketed) throw new RangeError('unsupported algebraic comparison')
+}
+
 const compareAlgebraicToRational = (
   algebraic: AlgebraicReal,
   value: Rational,
 ): -1 | 0 | 1 => {
-  if (
-    algebraic.polynomial.length !== 3 ||
-    BigInt(algebraic.polynomial[0]) <= BigInt(0) ||
-    (algebraic.rootIndex !== 0 && algebraic.rootIndex !== 1) ||
-    compareRational(algebraic.isolating[0], algebraic.isolating[1]) >= 0
-  ) {
-    throw new RangeError('unsupported algebraic comparison')
-  }
+  validateAlgebraic(algebraic)
   const [lo, hi] = algebraic.isolating
-  const loSign = compareRational(evaluatePolynomial(algebraic.polynomial, lo), rational(0))
-  const hiSign = compareRational(evaluatePolynomial(algebraic.polynomial, hi), rational(0))
-  const bracketed = algebraic.rootIndex === 0
-    ? loSign >= 0 && hiSign <= 0
-    : loSign <= 0 && hiSign >= 0
-  if (!bracketed) throw new RangeError('unsupported algebraic comparison')
   if (compareRational(hi, value) <= 0) return -1
   if (compareRational(lo, value) >= 0) return 1
   const sign = compareRational(
@@ -218,7 +224,9 @@ const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
 export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1 {
   if (isRational(a)) return isRational(b) ? compareRational(a, b) : -compareExactToRational(b, a) as -1 | 0 | 1
   if (isRational(b)) return compareExactToRational(a, b)
-  if (canonicalExact(a) === canonicalExact(b)) return 0
+  validateAlgebraic(a)
+  validateAlgebraic(b)
+  if (normalizedAlgebraicKey(a) === normalizedAlgebraicKey(b)) return 0
   let left = a, right = b
   for (let iteration = 0; iteration < 384; iteration++) {
     if (compareRational(left.isolating[1], right.isolating[0]) < 0) return -1
@@ -257,6 +265,27 @@ export function affineExact(value: ExactReal, factor: Rational, offset: Rational
     isolating: compareRational(a, b) <= 0 ? [a, b] : [b, a],
     rootIndex: compareRational(factor, rational(0)) > 0 ? value.rootIndex : 1 - value.rootIndex,
   }
+}
+
+/** Exact sign of a rational quadratic evaluated at an admitted rational/quadratic real. */
+export function signQuadraticAtExact(
+  a: Rational,
+  b: Rational,
+  c: Rational,
+  value: ExactReal,
+): -1 | 0 | 1 {
+  if (isRational(value)) {
+    return compareRational(
+      addRational(multiplyRational(addRational(multiplyRational(a, value), b), value), c),
+      rational(0),
+    )
+  }
+  const [pa, pb, pc] = value.polynomial.map((coefficient) => rational(coefficient))
+  const quotient = divideRational(a, pa)
+  const linear = subtractRational(b, multiplyRational(quotient, pb))
+  const constant = subtractRational(c, multiplyRational(quotient, pc))
+  if (compareRational(linear, rational(0)) === 0) return compareRational(constant, rational(0))
+  return compareExact(affineExact(value, linear, constant), rational(0))
 }
 
 const lcmDenominatorPolynomial = (a: Rational, b: Rational, c: Rational): bigint[] => {
