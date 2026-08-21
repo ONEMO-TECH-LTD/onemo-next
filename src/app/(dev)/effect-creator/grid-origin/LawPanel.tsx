@@ -379,7 +379,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
           </Fold>
 
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Band · snap ladder</span>
+            <div className="gl-field"><span>Band · diagnostic range · scaling not implemented</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
@@ -388,14 +388,14 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
             </div>
             {mode !== 'free' && <>
               <div className="gl-snap">
-                {manual
+                {'Scaling not implemented · diagnostic candidate only · '}{manual
                   ? 'manual calibration · double-click the canvas to return to auto'
                   : bandScale !== null
                     ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
                     ? model.ladder.length
-                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
-                      : 'nothing fully fits at this flap — best seated shown'
+                      ? `candidate B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} diagnostic layouts`
+                      : 'no diagnostic candidate at this flap'
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">

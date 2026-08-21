@@ -15,7 +15,7 @@ interface SolveRequest {
   sizeMM: number
   snapStep: number
   stepSel: number | null
-  /** Auto-flap micro-module: when set, bands scan the allowance from 0 up to this max. */
+  /** Exact Auto cap; no allowance scan. */
   autoFlapMaxMM?: number | null
 }
 

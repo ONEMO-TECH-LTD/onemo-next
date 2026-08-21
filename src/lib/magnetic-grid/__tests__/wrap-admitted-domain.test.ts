@@ -19,6 +19,7 @@ describe('Wrap admitted product contour',()=>{
     expect(grid.wrap.witnesses[0].boundaryTruth).toEqual(truth)
     expect(grid.wrap.witnesses.every(witness=>witness.boundaryTruth.contourIdentity===truth.contourIdentity)).toBe(true)
     expect(grid.wrap.witnesses.every(witness=>prepared.boundary.some(element=>element.id===witness.outlineElementId))).toBe(true)
+    expect(structuredClone(grid.wrap.witnesses)).toEqual(grid.wrap.witnesses)
   })
   it('makes the live square24 contour contact exactly and preserves supplied holes while scaling',()=>{
     const base=normBaseContour(getShape('square',1024,1024),1024)!,contour=makeSizer(base,0)(24)

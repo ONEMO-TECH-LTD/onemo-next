@@ -158,13 +158,7 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
   return [fromMM, fieldSpanMM(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? RELEASED_PADDING_MM))]
 }
 
-/**
- * THE CONTACT LAW (Dan, 2026-08-19): "the scale must be scaling up and down until edges touch
- * the disc — this is zero flap." Every disc wears the allowance as an invisible margin, and a
- * band option is a magnet COUNT at its CONTACT size — the smallest size where that count still
- * seats against the margined discs. No wrap test: the seat geometry IS the law. A count whose
- * contact lies below the band belongs to the band below, not here worn loose.
- */
+/** Pre-scaling diagnostic call boundary. Exact Wrap is already measured in every returned grid. */
 export function bandSnapPoints(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): BandSnapPoint[] {
@@ -195,16 +189,13 @@ function bandWalk(
     const count = grid.anchors.length
     if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
     if (count >= 1 && !seen.has(count)) {
-      // Bisect (mm - stepMM, mm] for the smallest lawful size holding this count — its gap is
-      // minimal by construction; the law then judges THAT size.
+      // Legacy diagnostic count-transition refinement; this is not the scaling law.
       let lo2 = Math.max(MIN_EFFECT_MM, mm - stepMM), hi2 = mm
       for (let it = 0; it < 8 && hi2 - lo2 > CONTACT_TOLERANCE_MM / 2; it++) {
         const midMM = (lo2 + hi2) / 2
         const gm = computeGrid(sized(midMM), walkCfg)
         if (gm.anchors.length >= count) hi2 = midMM; else lo2 = midMM
       }
-      // Keep the refined size exact — rounding it back to a coarse grid re-introduces the
-      // very slack the bisection removed (display rounds, the law does not).
       const rungMM = hi2
       const gr = computeGrid(sized(rungMM), walkCfg)
       const ok = gr.anchors.length === count && gr.wrap.status === 'lawful'
@@ -214,11 +205,7 @@ function bandWalk(
   return { points, bestSeatedMM }
 }
 
-/**
- * Band snap under the contact law. `ladder` = one rung per magnet count at its contact size;
- * the landing pick is the smallest size at the band's maximum count. When no count reaches
- * contact inside the band, the best-seated size shows as an explicit fallback, never a fit.
- */
+/** Pre-scaling diagnostic band output; no production scaling claim is made in this phase. */
 export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
