@@ -656,6 +656,91 @@ No centre comes from a mesh, decimation, sample order, visited-cell order or sea
 
 1. **Box and material weight:** bbox midpoint and polygon area centroid are exact rational expressions over the supplied segment coordinates at the candidate scale.
 2. **Legal islands:** compute the exact inward offset arrangement at `SPOT_RADIUS_MM`: shifted segment pieces, exact vertex arcs and their intersections. Normalize winding and enumerate connected components with exact predicates. These components are the islands; no sampled occupancy grid exists.
+
+#### Item 2 executable legal-island clause
+
+##### Exact directed pieces
+
+At one exact candidate scale and clearance, Compute first normalizes every supplied ring by exact winding and canonical rotation. Canonical rotation compares every full cyclic exact-coordinate sequence and selects the lexicographically minimal complete sequence, not merely a minimal starting coordinate. If identical coordinate tuples occur more than once, their occurrence ordinal within the winning full cyclic sequence is the deterministic final discriminator. The material-preserving traversal is used consistently. Compute then constructs the material inward offset from the complete normalized outer ring and holes:
+
+- Each supplied segment produces one shifted-line primitive on the material side. Its active piece is parameter-bounded by its two adjacent joins and by every exact intersection that splits it.
+- A material-convex vertex joins adjacent shifted lines at their exact miter. It produces no circle primitive.
+- A material-reflex vertex produces one radius-clearance arc centred on the scaled supplied vertex. The arc stores exact start/end normal directions and a directed sweep. It is never treated as a full circle.
+- `featureId` derives from canonical normalized ring content plus exact feature coordinates/directions—not source indices. `pieceId` derives from `featureId`, exact scale, clearance, exact parameter interval, endpoints and sweep.
+- Every arrangement piece is a directed record `{ pieceId, featureId, kind, from, to, parameterInterval, materialSide }`. `from/to` are exact rational/algebraic/certified points. Arc pieces additionally carry exact centre, radius, start/end directions and sweep. `BoundaryTruth` remains separately carried.
+
+Necessity: without directed bounded pieces, intersections cannot be trimmed or traversed and winding is undefined. Sufficiency contribution: this names every admitted boundary primitive and excludes the previously observed convex-circle/full-line false geometry.
+
+##### Solved intersections and trimming
+
+Compute solves every line-line, line-arc and arc-arc intersection exactly. A solution enters the arrangement only when exact predicates prove:
+
+- it lies on every participating line span/parameter interval;
+- it lies inside every participating arc sweep;
+- it satisfies every participating primitive equation;
+- it is distinct from, or exactly equal to, an existing vertex under semantic exact equality.
+
+Parallel, non-real, out-of-span and out-of-sweep solutions are discarded with their exact reason. An undecidable predicate returns `CENTRE_EVIDENCE_UNRESOLVED`; it never drops the candidate, inserts it, or treats it as equality. Adjacent line/reflex-arc tangencies are constructed as their shared exact endpoint rather than rediscovered numerically.
+
+Compute enumerates every zero/event root of every legality predicate over each piece’s open parameter interval against every supplied boundary generator: span and sweep endpoints, outer/hole winding crossings, projection-class changes and clearance equalities. Every root becomes a split vertex. Only after exact root isolation proves every legality predicate has constant sign on the resulting open interval may its midpoint witness that interval’s sign. A midpoint without this constant-sign certificate is forbidden and returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+Necessity: line 658 requires actual intersections; untrimmed feature pairs create spurious topology. Sufficiency contribution: all three intersection families and every acceptance/rejection predicate are ruled.
+
+##### Full-boundary legality and face side
+
+Every constant-sign-certified split piece is checked against the complete supplied boundary, outer plus every hole. A piece remains active only when its certified interval signs prove it:
+
+- lies in material under normalized outer/hole winding;
+- has clearance at least the ruled value from every supplied segment;
+- has equality to the feature that owns the offset piece.
+
+Compute keeps the direction whose left side is material. It proves face-side legality from the owning primitive’s material normal/sweep, exact directed edge and constant-sign certificates; it never chooses whichever half-edge orientation is visited first. Exterior and illegal faces are rejected by exact material-left legality, not signed orientation, feature-name prefixes or an uncertified probe.
+
+Necessity: primitive membership alone does not prove that a face belongs to the erosion. Sufficiency contribution: every surviving piece is a boundary of the exact full-contour legal set.
+
+##### Half-edge faces and canonical identity
+
+The arrangement is a directed half-edge graph. At every vertex, outgoing half-edges are ordered by exact direction predicates. Face traversal always takes the next material-left half-edge. Degree greater than two, coincident/tangent vertices and triple concurrency are handled by this ordering; iteration or input order cannot choose a route.
+
+One canonical loop identity hashes:
+
+`['offset-loop-v1', canonicalExact(scale), canonicalExact(clearance), canonical rotation of ordered directed [pieceId, featureId, kind, from, to, parameterInterval, sweep, materialSide]]`
+
+Canonical rotation starts at the lexicographically minimal full cyclic directed-piece sequence, using the same duplicate-occurrence rule as normalized rings. Content-derived feature/piece ids make ring, vertex, feature, intersection and queue reordering identity-invariant. Raw `BoundaryTruth` is carried alongside each loop/evidence result but never enters the semantic loop or island hash because it intentionally records ordered supplied bits. Reversal is not equivalent because it changes material-left legality. Two routes sharing vertices but different pieces remain distinct. Any unresolved equality or angle order returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+Necessity: unordered vertex bags cannot represent arcs, winding or degree-greater-than-two faces. Sufficiency contribution: loops are deterministic, directed and content-complete.
+
+##### Winding, islands and holes
+
+Compute determines topological winding from ordered directed pieces. Lines use exact ray/turn predicates. Arcs use exact centre/radius/start/end/sweep predicates and exact ray–arc intersections; no chord and no item-4 Green/area integral substitutes for an arc. Winding proves geometric containment only. Legal face versus opposite half-edge face is decided independently by exact material-left legality on every piece.
+
+- A loop whose directed pieces all prove material on the left seeds a legal boundary; its opposite half-edge traversal is rejected.
+- Exact line/arc containment forms a strict partial order. Containment depth alternates outer and hole boundaries.
+- Each hole is assigned to its unique immediate containing outer: the containing legal outer at greatest containment depth with no containing outer strictly between them. No item-4 area integral is used. Zero or multiple immediate owners for a hole returns `CENTRE_EVIDENCE_UNRESOLVED`. A top-level outer has no containing owner and must not refuse for that reason.
+- Disjoint outer loops are separate islands. Nested holes and multiple islands are preserved.
+- A hole boundary with no unique immediate containing outer, or undecidable containment/depth, returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+Canonical output ordering sorts island outer loops by semantic loop identity and sorts every island’s hole list by semantic loop identity. `evidenceId` hashes `['legal-islands-v1', canonicalExact(scale), canonicalExact(clearance), ordered [outerLoopId, ordered holeLoopIds]]`. Raw `BoundaryTruth` is carried separately beside this semantic evidence and does not enter `evidenceId`.
+
+The result is `ExactLegalIslands { islands, evidenceId, boundaryTruth }`, each with one ordered material-left outer loop and its unique immediate ordered hole loops. No area/centroid/deepest value is computed until its later clause.
+
+Necessity: line 658 explicitly requires normalized winding and connected components. Sufficiency contribution: exterior rejection, multi-island separation and hole nesting are fully ruled without borrowing item 4.
+
+##### Required item-2 fixtures
+
+1. Convex triangle: three shifted-line miters, zero reflex arcs, one island.
+2. Concave L/notch: exact reflex arcs with sweep rejection; one island.
+3. Dumbbell neck: below the exact clearance event two islands; above it one; event site has one explicit disposition.
+4. Supplied off-centre hole: one island with one immediate nested hole; reversing/rotating/reindexing either ring leaves feature, piece, loop, island and semantic evidence ids byte-identical, while raw `BoundaryTruth` differs where ordered supplied bits differ and remains separately carried.
+5. Two islands plus nested outer/hole boundaries: containment depth assigns the hole to its unique immediate outer, never by area, array order or “region 0”; ambiguity refuses.
+6. Same vertices/different arc route: distinct canonical loop identities.
+7. Degree-four crossing and triple concurrency: reordered features/traversal produce byte-identical loop identities and islands.
+8. Exterior face: rejected.
+9. Tangent duplicate: one exact vertex, not two near vertices.
+10. Deliberately unresolved equality/order/containment or incomplete legality-root isolation: typed `CENTRE_EVIDENCE_UNRESOLVED`; no partial island result.
+
+Every fixture mutates its load-bearing predicate (span, sweep, material side, ordered piece identity, arc contribution, containment owner or unresolved propagation) and must fail when that predicate is removed.
+
 3. **Depth masses:** repeat the same exact offset-region construction at the ruled mass-depth clearance. Birth, death, split and merge are arrangement events and feed `SAFE_TOPOLOGY`; no `MAXV` or millimetre step exists.
 4. **Core/region centres and areas:** integrate the exact offset boundary pieces. Rational/algebraic results use those forms directly; arc/integral expressions use `CertifiedExpressionReal`, evaluated by deterministic BigInt interval arithmetic with directed bounds. The expression and proof id serialize across runtimes.
 5. **Deepest/clearance maxima:** if live Support B requires this mechanism, enumerate every generalized Voronoi/medial-axis candidate generated by two/three boundary features plus admissible endpoints. Solve candidates exactly, then run hierarchical branch-and-bound over the remaining domain using clearance's 1-Lipschitz per-cell upper bound. Equal maxima remain an explicit tie set; undecidable bounds return `CENTRE_EVIDENCE_UNRESOLVED`—never a sampled point.
