@@ -39,6 +39,7 @@ const OWNERS = {
   'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root|identity)$/],
   'magnetic-grid/compute/exact-real.ts': [/^\.\.\/spec$/],
   'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/, /^\.\/seat$/],
+  'magnetic-grid/compute/regimes.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/identity.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
@@ -67,6 +68,11 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/contact-root.ts': [
     'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
     'exactScale', 'prepareContour', 'measureWrap',
+  ],
+  'magnetic-grid/compute/regimes.ts': [
+    'qPoint', 'subtract', 'dot', 'cross', 'twice', 'endpointDistance', 'lineDistance',
+    'subtractRadiusSquared', 'roots', 'polynomialOf', 'relations', 'latticeOffsets',
+    'enumerateAffineContactEvents', 'boxTargetCoefficient',
   ],
   'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness'],
   'magnetic-grid/compute/seat.ts': [
