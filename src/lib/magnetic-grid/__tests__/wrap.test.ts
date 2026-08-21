@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalExact } from '../compute/exact-real'
+import { canonicalExact,rational } from '../compute/exact-real'
 import { measureWrap, prepareContour } from '../compute/contact-root'
 import { certifyContactWitness, contourBoundaryTruth } from '../compute/identity'
+import { evaluateWrap } from '../logic'
 import { computeGrid } from '../engine'
 import type { Contour } from '../spec'
 
@@ -111,5 +112,12 @@ describe('v3.5.1 exact Wrap', () => {
     }
     expect(map(belt)).toEqual(map([...belt].reverse() as typeof belt))
     expect(map(belt).every(([,binders])=>binders.length===2)).toBe(true)
+  })
+  it('never lets the report-only decimal decide the law',()=>{
+    const contour=square(25),prepared=prepareContour(contour,contourBoundaryTruth(contour)),raw=measureWrap(prepared,[[0,0]],12)
+    const measured={...raw,witnesses:raw.witnesses.map(certifyContactWitness)}
+    const policy={mode:'fixed' as const,allowance:rational(0),allowanceApproxMM:0}
+    expect(evaluateWrap(measured,policy).status).toBe('refused')
+    expect(evaluateWrap({...measured,requiredFlapApproxMM:-999},policy).status).toBe('refused')
   })
 })
