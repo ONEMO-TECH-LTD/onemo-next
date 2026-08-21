@@ -1103,7 +1103,7 @@ Engine passes each batch member `CertifiedPiecePredicateSystem` to `exact-real.t
 [chart, normalized primitive polynomial, rootIndex, isolating]
 ```
 
-Exact math evaluates each canonical coordinate numerator and denominator through the approved algebraic-tuple evaluator, proves denominator nonzero, forms the exact quotient, and stores raw x/y tuple-value reductions without `proofId` beside the exact point values. It creates no SHA or semantic root/proof identity and rejects any supplied raw `proofId` field. Raw interval signs and raw back-substitutions reference roots only by replay key; exact math cannot populate semantic root IDs.
+Exact math evaluates each canonical coordinate numerator and denominator through the approved algebraic-tuple evaluator, proves denominator nonzero, forms the exact quotient, and stores raw x/y tuple-value reductions without `proofId` beside the exact point values. It creates no SHA or semantic root/proof identity and rejects any supplied raw `proofId` field. Raw interval signs and raw back-substitutions reference roots only by request-scoped replay key; exact math cannot populate semantic root IDs.
 
 Engine passes the certified batch and raw batch to `identity.ts::finalizePiecePredicateProofBatch()`. Identity requires exact `batchIdentity` equality and a one-to-one mapping of member request identity to raw result. Every replay reference is scoped as `[memberRequestIdentity, rootReplayKey]`. It recomputes each replay key from its raw certificate and requires a one-to-one bijection between raw roots and raw root-point proofs inside each member. Missing, duplicate or foreign members/keys refuse.
 
@@ -1129,24 +1129,25 @@ Required dataflow mutations:
 47. Certified generator proofs mismatch requests/root certificates: refusal.
 48. Raw member/result/root point from another batch or request: refusal and no identities.
 49. Drop, duplicate or swap request-scoped rootReplayKey/root-point records: refusal.
-50. Raw interval sign references missing/duplicate/foreign request-scoped replay key: refusal.
+50. Raw interval sign or raw back-substitution references missing/duplicate/foreign request-scoped replay key: refusal.
 51. Alter x or y numerator/denominator with unchanged predicate: request identity changes; old raw result refuses.
-52. Same geometric root through chart 0 and chart 1 with differing q parameters: one semantic root whose members contain both chart request IDs/certificates.
+52. Same geometric root through chart 0 and chart 1 with differing q parameters: one semantic root whose members contain both request IDs, chart ordinals, directions, replay keys and certificates; agreeing interval boundaries collapse once.
 53. Reorder certified systems and raw root/point/interval/back-substitution arrays: one canonical batch/finalized proof.
 54. Forge coordinate tuple proof or exact point value: finalizer refuses.
 55. Remove either identity stage or add `centre-evidence -> identity` / `exact-real -> identity`: separation guard fails.
-56. Forge or omit a raw coordinate reduction, or supply a `proofId` from exact-real: finalizer refuses; removing Identity-owned tuple-value `proofId` creation fails.
+56. Duplicate semantic roots disagree on exact geometric point, predicate/generator/multiplicity, back-substitution disposition, true multiplicity, derivative proof or interval sign: typed refusal and no partial finalized proof. Different valid chart-local parameters alone are not disagreement.
 57. Reverse batch system/result order: identical batch/final proof.
-58. Missing/duplicate/foreign batch member or incomplete per-root member provenance: refusal.
+58. Missing/duplicate/foreign batch member or incomplete/mismatched per-root request/chart/direction provenance: refusal.
 59. Same replay-key string in two members but different exact points: request scoping prevents collision.
 60. Same exact point but different predicate/generator semantic preimage: distinct roots with only their own member sets.
-61. Cross-member multiplicity/back-substitution conflict for one semantic root: typed unresolved, no partial roots.
+61. Remove or alter the finalized exact point while leaving its root ID/member proofs unchanged: refusal; named-piece splitting consumes the retained point without re-evaluation.
 62. Same polynomial under line chart, arc chart or different boundary generator: distinct request/root certificates.
 63. Parameter kind/chart mismatch, equal/reversed numeric bounds, invalid exact value, empty generator ID, negative/noninteger/duplicate/noncontiguous chart ordinal or invalid parameter direction: refusal before exact evaluation.
 64. Ascending versus descending traversal over the same numeric arc domain: request identities differ, canonical roots are equal, final traversal follows ordinal+direction without changing semantic root IDs.
 65. Root exactly at lower/upper bound: absent from open roots and owned once by boundary-site evidence.
 66. Raw root/sign predicate, boundary generator, chart or domain differs from certified request: finalizer refuses.
 67. Batch mixes predicate families or boundary generators: batch certification refuses.
+68. Forge or omit a raw coordinate reduction, or supply a `proofId` from exact-real: finalizer refuses; removing Identity-owned tuple-value `proofId` creation fails.
 
 Necessity: only evidence and handoffs already required by the approved geometric root identity and ownership law are added; Engine remains neutral and surfaces remain private.
 
