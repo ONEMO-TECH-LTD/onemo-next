@@ -11,7 +11,7 @@ import {
 const QUANTUM_KEY_MM = 0.001
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
-/** The cloned Centre parity predicate, unchanged in T2. */
+/** Preserved numeric Centre predicate; intentionally unreferenced until its named T3 consumer. */
 export function parityHolds(seat: ReadonlyArray<Pt>, target: Pt, bb: BBox, pitch: number): boolean {
   if (!seat.length) return false
   const lines = (axis: 0 | 1) => new Set(seat.map((s) => Math.round(s[axis] / QUANTUM_KEY_MM))).size

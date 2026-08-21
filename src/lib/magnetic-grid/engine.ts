@@ -39,7 +39,6 @@ import {
   centeringAnchors,
   chooseCentrePlacement,
   governMass,
-  parityHolds,
 } from './logic'
 
 export * from './spec'
@@ -97,7 +96,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
     mainCentre = ruleTarget
-    void parityHolds(bestSeated, ruleTarget, bb, pitch)
   } else if (fits) {
     // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
     // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
