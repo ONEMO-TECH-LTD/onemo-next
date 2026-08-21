@@ -12,10 +12,9 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
-import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-origin-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
-import LawPanel from './LawPanel'
+import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/magnetic-grid/centre-clone-engine'
+import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/magnetic-grid/centre-clone-spec'
+import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/magnetic-grid-clone-bridge'
 
 const IMG = 1024
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
@@ -37,39 +36,14 @@ type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: stri
 function usePersisted(key: string, initial: number): [number, (n: number) => void] {
   const [v, setV] = useState(initial)
   useEffect(() => {
-    const raw = localStorage.getItem('grid-origin.' + key)
+    const raw = localStorage.getItem('magnetic-grid.compare.v1.' + key)
     if (raw !== null && Number.isFinite(+raw)) setV(+raw)
   }, [key])
-  const set = (n: number) => { setV(n); try { localStorage.setItem('grid-origin.' + key, String(n)) } catch { } }
+  const set = (n: number) => { setV(n); try { localStorage.setItem('magnetic-grid.compare.v1.' + key, String(n)) } catch { } }
   return [v, set]
 }
 
-type PositioningSelection = 0 | 1 | 2
-
-function useSurfaceSelection(): [PositioningSelection, (selection: PositioningSelection) => void] {
-  const [selection, setSelection] = useState<PositioningSelection>(0)
-  useEffect(() => {
-    const current = localStorage.getItem('magnetic-grid.compare.v1.surface')
-    if (current === '0' || current === '1' || current === '2') { setSelection(+current as PositioningSelection); return }
-    const legacy = localStorage.getItem('grid-origin.positioning')
-    if (legacy === '0' || legacy === '1') setSelection(+legacy as PositioningSelection)
-    else if (legacy === '2') setSelection(1)
-  }, [])
-  const set = (value: PositioningSelection) => {
-    setSelection(value)
-    try { localStorage.setItem('magnetic-grid.compare.v1.surface', String(value)) } catch { }
-  }
-  return [selection, set]
-}
-
-export default function GridLab() {
-  const [selection, setSelection] = useSurfaceSelection()
-  return selection === 2
-    ? <LawPanel onSelect={setSelection} />
-    : <LegacyGridPanel positioning={selection} onSelect={setSelection} />
-}
-
-function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSelect: (selection: PositioningSelection) => void }) {
+export default function LawPanel({ onSelect }: { onSelect: (positioning: 0 | 1 | 2) => void }) {
   const [src, setSrc] = useState<Src>('preset')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')
@@ -96,8 +70,6 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   /** Governor — which mass rules in Masses mode. */
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
-  /** Voting dominance order — which force rules the placement vote. */
-  const [votingOrder, setVotingOrder] = usePersisted('votingOrder', VOTING_ORDER)
   const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
@@ -126,15 +98,15 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-origin.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, governor, votingOrder, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('magnetic-grid.compare.v1.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, governor, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR, votingOrder: VOTING_ORDER, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
-    try { const raw = localStorage.getItem('grid-origin.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    try { const raw = localStorage.getItem('magnetic-grid.compare.v1.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -251,7 +223,7 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
   useEffect(() => {
     busyRef.current = false
     queuedRef.current = null
-    const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
+    const w = new Worker(new URL('./law.worker.ts', import.meta.url))
     workerRef.current = w
     w.onmessage = (e) => {
       if (queuedRef.current) {
@@ -280,13 +252,13 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
     const id = ++seqRef.current
     const msg = {
-      id, base, offsetMM, cfg,
+      id, engineId: 'v351-centre-clone' as const, base, offsetMM, cfg,
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
@@ -297,7 +269,7 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, governor, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -467,8 +439,7 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
             <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
               <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
             </label>
-            <div className={positioning !== 0 ? 'gl-lab-off' : undefined}
-              title={positioning !== 0 ? 'inactive — nothing slides in a derived mode' : undefined}>
+            <div className="gl-lab-off" title="inactive — nothing slides in a derived mode">
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
                 <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
               </LabRow>
@@ -506,15 +477,13 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
           <Fold title="Centering">
             <div className="gl-field"><span>Positioning · how the centre is applied</span>
               <div className="gl-seg">
-                <button aria-pressed={positioning === 0} onClick={() => onSelect(0)}>Voting</button>
-                <button aria-pressed={positioning === 1} onClick={() => onSelect(1)}>Centre rules</button>
-                <button aria-pressed={false} onClick={() => onSelect(2)}>Law</button>
+                <button aria-pressed={false} onClick={() => onSelect(0)}>Voting</button>
+                <button aria-pressed={false} onClick={() => onSelect(1)}>Centre rules</button>
+                <button aria-pressed onClick={() => onSelect(2)}>Law · Centre clone</button>
               </div>
             </div>
             <div className="gl-magic-note">
-              {positioning === 0
-                ? 'Voting — magnets, coverage and centring compete across every grid slide.'
-                : 'Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting.'}
+              Centre clone — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting. Wrap and scaling are not implemented yet.
             </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">
@@ -548,17 +517,6 @@ function LegacyGridPanel({ positioning, onSelect }: { positioning: 0 | 1; onSele
               <input type="checkbox" checked={segFillN !== 0} onChange={(e) => setSegFillN(e.target.checked ? 1 : 0)} />
             </label>
           </Fold>
-          {positioning === 0 && <Fold title="Voting law">
-            <div className="gl-magic-note">
-              Magnet count always governs. Between equal counts the order decides: Wrap presses every disc against the edge; Centring holds the centre. The flap dial is the rigid law — a layout with a disc floating past it is not shown (Auto adapts instead).
-            </div>
-            <div className="gl-field"><span>Priority · which force rules</span>
-              <select value={votingOrder} onChange={(e) => setVotingOrder(+e.target.value)}>
-                <option value={0}>Magnets &gt; Wrap &gt; Centring (default)</option>
-                <option value={1}>Magnets &gt; Centring &gt; Wrap</option>
-              </select>
-            </div>
-          </Fold>}
         </aside>
       </div>
     </div>
