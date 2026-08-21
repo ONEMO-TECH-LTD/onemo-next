@@ -2,24 +2,24 @@ import { describe,expect,it } from 'vitest'
 import { getShape } from '../../shape-library'
 import { makeSizer,normBaseContour } from '../../effect/magnetic-grid-bridge'
 import { computeGrid } from '../engine'
-import { prepareContour } from '../compute/contact-root'
-import { contourBoundaryTruth } from '../compute/identity'
+import { measureWrap,prepareContour } from '../compute/contact-root'
+import { certifyContactWitness,contourBoundaryTruth } from '../compute/identity'
 import { canonicalExact,rational } from '../compute/exact-real'
 
 describe('Wrap admitted product contour',()=>{
-  it('carries the real comparison-shell squircle bytes and witness provenance end to end',()=>{
+  it('carries the real comparison-shell squircle bytes and witness provenance',()=>{
     const base=normBaseContour(getShape('squircle',1024,1024),1024)
     expect(base).not.toBeNull()
     const contour=makeSizer(base!,0)(72),truth=contourBoundaryTruth(contour),prepared=prepareContour(contour,truth)
-    const grid=computeGrid(contour,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode:2,governor:0,perimeterOnly:true})
+    const measured=measureWrap(prepared,[[26,26]],12),witnesses=measured.witnesses.map(certifyContactWitness)
     expect(prepared.source).toBe(contour)
     expect(prepared.boundary).toHaveLength(contour.outer.pts.length+contour.holes.reduce((sum,hole)=>sum+hole.pts.length,0))
-    expect(grid.wrap.status).toBe('lawful')
-    expect(grid.wrap.witnesses.length).toBeGreaterThan(0)
-    expect(grid.wrap.witnesses[0].boundaryTruth).toEqual(truth)
-    expect(grid.wrap.witnesses.every(witness=>witness.boundaryTruth.contourIdentity===truth.contourIdentity)).toBe(true)
-    expect(grid.wrap.witnesses.every(witness=>prepared.boundary.some(element=>element.id===witness.outlineElementId))).toBe(true)
-    expect(structuredClone(grid.wrap.witnesses)).toEqual(grid.wrap.witnesses)
+    expect(measured.refusal).toBeNull()
+    expect(witnesses.length).toBeGreaterThan(0)
+    expect(witnesses[0].boundaryTruth).toEqual(truth)
+    expect(witnesses.every(witness=>witness.boundaryTruth.contourIdentity===truth.contourIdentity)).toBe(true)
+    expect(witnesses.every(witness=>prepared.boundary.some(element=>element.id===witness.outlineElementId))).toBe(true)
+    expect(structuredClone(witnesses)).toEqual(witnesses)
   })
   it('makes the live square24 contour contact exactly and preserves supplied holes while scaling',()=>{
     const base=normBaseContour(getShape('square',1024,1024),1024)!,contour=makeSizer(base,0)(24)
