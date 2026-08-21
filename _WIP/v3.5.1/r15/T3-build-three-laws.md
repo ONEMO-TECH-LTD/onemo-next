@@ -839,9 +839,60 @@ export interface CandidateBackSubstitutionProof {
   trueMultiplicity: number | null
   derivativeProofs: readonly BackSubstitutionDerivativeProof[]
 }
+
+export interface RationalUnivariateCoordinateProof {
+  valueIdentity: string
+  numerator: readonly string[]
+  denominator: readonly string[]
+}
+
+export interface AlgebraicTupleProof {
+  tupleIdentity: string
+  orderedValueIdentities: readonly string[]
+  primitiveCoefficients: readonly Rational[]
+  primitiveMinimalPolynomial: readonly string[]
+  primitiveRootIndex: number
+  primitiveIsolating: readonly [Rational, Rational]
+  coordinates: readonly RationalUnivariateCoordinateProof[]
+  constructionProofId: string
+}
+
+export interface AlgebraicTupleValueProof {
+  tupleIdentity: string
+  expressionIdentity: string
+  reducedNumerator: readonly string[]
+  reducedDenominator: readonly string[]
+  disposition: 'ZERO' | 'NONZERO'
+  proofId: string
+}
 ```
 
 Every isolated final-resultant root is only a candidate. Compute substitutes its certified piece parameter and every certified represented algebraic generator into the original unsquared predicate, using the same canonical generator identities and exact algebraic evaluation machinery.
+
+The candidate piece parameter and represented generators are first sorted by semantic value identity. Rational values remain exact constants. Every non-rational value contributes its represented irreducible minimal polynomial, root index and canonical isolator.
+
+Compute constructs a deterministic rational-univariate representation of the selected real tuple. It enumerates primitive-element coefficient vectors in canonical increasing integer-height/lexicographic order and sets `α=Σ cᵢaᵢ`. For each vector it uses exact resultants/subresultants to derive the polynomial of `α`, selects the factor/root intersecting the interval image of the represented isolator box, and proves that the selected tuple maps to one unique real root. If a coefficient vector does not separate the tuple/conjugates, Compute records the rejection and tries the next vector. The first proven separating vector is authoritative.
+
+Compute exact-factorizes the selected polynomial of `α`, retains the irreducible factor/root for the represented tuple, and derives for every tuple coordinate an exact rational-univariate expression `aᵢ=Nᵢ(α)/Dᵢ(α)` from the subresultant chain. It proves each denominator is nonzero at the represented primitive root and back-substitutes every coordinate expression against its original minimal polynomial/root isolator.
+
+`tupleIdentity` hashes:
+
+```text
+['algebraic-tuple-v1',
+ ordered semantic value identities,
+ primitive coefficients,
+ primitive irreducible minimal polynomial,
+ primitive root index,
+ ordered canonical coordinate numerator/denominator polynomials]
+```
+
+Input polynomial representation, isolator refinement, rejected primitive vectors and intermediate resultants remain replay proof data but do not change semantic tuple identity.
+
+To evaluate an original predicate or formal parameter derivative, Compute substitutes every rational-univariate coordinate, clears the proven-nonzero denominators, and reduces the resulting numerator modulo the primitive minimal polynomial. A zero remainder proves `ZERO`. A nonzero remainder proves `NONZERO` because the primitive polynomial is irreducible and the remainder degree is lower. The proof records the canonical reduced numerator/denominator and every substitution/reduction identity.
+
+This exact tuple evaluator is used for original-value validation, every derivative-order value, identically-zero-in-parameter coefficient tests and common-component back-substitution. No interval midpoint, native number, independent-generator assumption or per-generator remainder may decide equality.
+
+If primitive-element separation, represented-root selection, coordinate recovery, denominator nonzero proof, back-substitution or modular reduction is unresolved, Compute returns `CENTRE_EVIDENCE_UNRESOLVED` for the entire piece result and emits no partial tuple/value proof.
 
 If the exact original predicate value is nonzero, the candidate is `EXTRANEOUS_ROOT` and is removed. If it is zero, Compute differentiates the original unsquared predicate formally with respect to the piece parameter. It evaluates derivative orders `1..degree` at the same certified parameter/generator tuple. The smallest order with a proven nonzero exact value is `trueMultiplicity`; all lower derivative values must have replayable exact-zero proofs. Resultant/factor multiplicity is recorded as provenance only and never decides `trueMultiplicity`.
 
@@ -862,10 +913,22 @@ Required back-substitution mutations:
 32. `P(x,g)=x(g²-2)`, represented `g=+√2`: exact zero polynomial in `x`, `IDENTICALLY_ZERO_BRANCH`, no fabricated finite roots.
 33. Two elimination factors produce the same semantic root and agree on true multiplicity: one merged root/proof.
 34. Duplicate factors disagree on true multiplicity or a derivative cannot be separated from zero: typed unresolved, no partial roots.
+35. `a=√2`, `b=2√2`: evaluate `b-2a` as exact zero; independent minimal-polynomial reduction must fail this mutation.
+36. `a=√2`, `b=-√2`: evaluate `a+b` as exact zero and `a-b` as nonzero.
+37. Algebraic candidate parameter `x=√3` with generator `a=√2`: evaluate `(x²-3)+(a²-2)` as zero and `x-a` as nonzero.
+38. Reordered tuple inputs and refined valid isolators: byte-identical tuple identity and value proofs.
+39. First primitive coefficient vector does not separate conjugates: rejection is recorded and the next canonical vector succeeds.
+40. Coordinate denominator vanishes or cannot be proven nonzero: typed unresolved, no partial proof.
+41. Two different valid defining-polynomial representations of the same tuple values: identical semantic tuple/value identities.
+42. Exact zero/nonzero derivative sequence yields the contract true multiplicity; replacing tuple evaluation with rational-only or one-generator evaluation fails.
 
 Necessity: only the proof needed to enforce the already-stated original-predicate back-substitution and true-multiplicity law is added.
 
 Sufficiency contribution: exact candidate validation, extraneous rejection, derivative-order multiplicity, identically-zero branches, duplicate merge and fail-closed disagreement make back-substitution complete and replayable.
+
+Necessity: one canonical rational-univariate tuple representation is the smallest complete exact mechanism for algebraic candidates, multiple generators and their dependencies; it reuses the already-required resultant/subresultant/factor/root machinery.
+
+Sufficiency contribution: primitive-element selection, represented tuple isolation, coordinate recovery, exact modular zero/nonzero evaluation, canonical identity and fail-closed proof cover every candidate/derivative/back-substitution case required by the contract.
 
 The root proof record contains ordered `AlgebraicGeneratorProof[]`, ordered `GeneratorEliminationStepProof[]`, the normalized final univariate factors with multiplicity/provenance, every back-substitution disposition and the canonical semantic root ids. Any unresolved generator equality, subresultant, common-factor decomposition, factor provenance, back-substitution or global root order returns `CENTRE_EVIDENCE_UNRESOLVED` and no partial piece certificate.
 
