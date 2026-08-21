@@ -1,7 +1,7 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { autoFlapInBand, BANDS, computeGrid, FLAP_MM, fitSizeInBand, impliedFlapMM, type GridConfig, type GridResult } from '@/lib/magnetic-grid/engine'
+import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/magnetic-grid/engine'
 import { makeSizer } from '@/lib/effect/magnetic-grid-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -53,7 +53,7 @@ function bandFit(
   const band = BANDS.find((b) => b.id === bandId) ?? BANDS[0]
   let out: { fit: ReturnType<typeof fitSizeInBand>; autoFlapMM: number | null }
   if (autoFlapMaxMM != null) {
-    const cacheFor = (f: number) => sizeCacheOf(JSON.stringify({ ...cfg, flapMM: f }))
+    const cacheFor = (f: number) => sizeCacheOf(JSON.stringify({ ...cfg, wrapMode: 'auto', autoFlapCapMM: f }))
     const auto = autoFlapInBand(sized, cfg, band.minMM, snapStep, autoFlapMaxMM, cacheFor)
     out = { fit: auto.fit, autoFlapMM: auto.flapMM }
   } else {
@@ -71,11 +71,11 @@ function schedulePrefetch(
   myGen: number, sized: (mm: number) => Contour, cfg: GridConfig, cfgSig: string,
   snapStep: number, autoFlapMaxMM: number | null,
 ): void {
-  const walkFlap = autoFlapMaxMM != null ? 0 : Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const walkBase: GridConfig = autoFlapMaxMM != null ? { ...cfg, flapMM: 0 } : cfg
+  const walkBase: GridConfig = autoFlapMaxMM != null
+    ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
+    : { ...cfg, wrapMode: 'fixed' }
   const walkSig = autoFlapMaxMM != null ? JSON.stringify(walkBase) : cfgSig
-  // Must mirror the Centre-rules band walk exactly, including its seat inflation.
-  const walkCfg: GridConfig = { ...walkBase, segmentsDetail: 'light', seatMarginMM: walkFlap }
+  const walkCfg: GridConfig = { ...walkBase, segmentsDetail: 'light', seatMarginMM: 0 }
   const cache = sizeCacheOf(walkSig)
   const sizes: number[] = []
   for (const b of BANDS) for (let mm = b.minMM; mm <= b.maxMM; mm += Math.max(1, snapStep)) if (!cache.has(mm)) sizes.push(mm)
@@ -118,23 +118,27 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
       // A stepped rung renders the layout that QUALIFIED it: reach AND margin at the
-      // auto-chosen allowance, never the dial (F1 — Meta QA, verified).
-      const effFlap = Math.max(0, autoFlapMM ?? cfg.flapMM ?? 0)
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), { ...cfg, flapMM: effFlap, seatMarginMM: effFlap })
+      // auto-chosen allowance, never a scanned/rounded substitute.
+      const wrapCfg: GridConfig = autoFlapMaxMM != null
+        ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM, seatMarginMM: 0 }
+        : { ...cfg, wrapMode: 'fixed', seatMarginMM: 0 }
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), wrapCfg)
       const contour = sized(eff)
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM } })
     } else {
-      const k = cfgSig + '|' + sizeMM
+      const wrapCfg: GridConfig = autoFlapMaxMM != null
+        ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
+        : { ...cfg, wrapMode: 'fixed' }
+      const k = JSON.stringify(wrapCfg) + '|' + sizeMM
       let hit = freeCache.get(k)
       if (!hit) {
         const contour = sized(sizeMM)
-        hit = { contour, grid: computeGrid(contour, cfg) }
+        hit = { contour, grid: computeGrid(contour, wrapCfg) }
         freeCache.set(k, hit)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
-      // Free-mode auto flap: report the allowance THIS size implies — the binding disc gap.
-      const freeAuto = autoFlapMaxMM != null
-        ? Math.min(autoFlapMaxMM, Math.round(impliedFlapMM(hit.contour.outer.pts, hit.grid.anchors.map((a) => a.p), hit.grid.spotRadiusMM)))
+      const freeAuto = autoFlapMaxMM != null && hit.grid.wrap.status === 'lawful'
+        ? hit.grid.wrap.appliedFlapApproxMM
         : null
       ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, segments: hit.grid.segments, autoFlapMM: freeAuto } })
     }

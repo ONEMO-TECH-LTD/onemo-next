@@ -87,6 +87,48 @@ export const GOVERNOR = 0
 export const CENTRE_MODE = 2
 
 export type Pt = [number, number]
+export interface Rational { numerator: string; denominator: string }
+export interface AlgebraicReal {
+  polynomial: readonly string[]
+  isolating: readonly [Rational, Rational]
+  rootIndex: number
+}
+export type ExactReal = Rational | AlgebraicReal
+export interface ContactWitness {
+  anchor: Pt
+  outlineSegmentIndex: number
+  squaredDistance: Rational
+  tangency: { x: Rational; y: Rational; approximateMM: Pt }
+  requiredFlap: ExactReal
+  certificateId: string
+}
+export interface WrapMeasurement {
+  requiredFlap: ExactReal
+  requiredFlapApproxMM: number
+  witnesses: readonly ContactWitness[]
+  seatLegal: boolean
+}
+export type WrapPolicy =
+  | { mode: 'fixed'; allowance: Rational; allowanceApproxMM: number }
+  | { mode: 'auto'; cap: Rational; capApproxMM: number }
+export type WrapEvaluation =
+  | {
+    status: 'lawful'
+    requiredFlap: ExactReal
+    requiredFlapApproxMM: number
+    appliedFlap: ExactReal
+    appliedFlapApproxMM: number
+    witnesses: readonly ContactWitness[]
+  }
+  | {
+    status: 'refused'
+    code: 'WRAP_EXCEEDS_ALLOWANCE'
+    requiredFlap: ExactReal
+    requiredFlapApproxMM: number
+    allowedFlap: Rational
+    allowedFlapApproxMM: number
+    witnesses: readonly ContactWitness[]
+  }
 export interface Ring { pts: Pt[] }
 export interface Contour { outer: Ring; holes: Ring[] }
 export interface BBox { minX: number; minY: number; maxX: number; maxY: number }
@@ -146,6 +188,8 @@ export interface GridConfig {
   plan?: MagnetPlan
   perimeterOnly?: boolean
   circle?: boolean
+  wrapMode?: 'fixed' | 'auto'
+  autoFlapCapMM?: number
 }
 
 export interface GridResult {
@@ -159,6 +203,7 @@ export interface GridResult {
   segments: SafeSegment[]
   centresMM: Pt[]
   centreMainMM: Pt
+  wrap: WrapEvaluation
 }
 
 export interface BandSnapPoint { sizeMM: number; count: number }

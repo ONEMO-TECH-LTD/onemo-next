@@ -36,10 +36,12 @@ const donorBytes = (file: string): Buffer => execFileSync('git', ['show', `8d177
 
 const OWNERS = {
   'magnetic-grid/spec.ts': [] as RegExp[],
-  'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence)$/],
+  'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root)$/],
+  'magnetic-grid/compute/exact-real.ts': [/^\.\.\/spec$/],
+  'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/],
   'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
-  'magnetic-grid/logic.ts': [/^\.\/spec$/],
+  'magnetic-grid/logic.ts': [/^\.\/spec$/, /^\.\/compute$/],
   'magnetic-grid/engine.ts': [/^\.\/spec$/, /^\.\/compute$/, /^\.\/logic$/],
   'effect/magnetic-grid-bridge.ts': [
     /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/types$/,
@@ -47,12 +49,21 @@ const OWNERS = {
   ],
 } as const
 
-/** T2 phase profile. These are the reached, disposition-approved bodies after re-rooming.
- * Numeric parity/phase policy remains in Logic, and the sampled band/Auto walk remains in
- * Engine, until their explicitly named T3 adaptations. This guard must not pretend T3 landed. */
-const T2_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> = {
+/** Current phase profile: re-roomed Centre plus the live exact Wrap support/consumer only. */
+const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> = {
   'magnetic-grid/spec.ts': [],
   'magnetic-grid/compute.ts': [],
+  'magnetic-grid/compute/exact-real.ts': [
+    'abs', 'gcd', 'q', 'fromPublic', 'toPublic', 'rational', 'rationalFromNumber',
+    'addRational', 'subtractRational', 'multiplyRational', 'divideRational', 'squareRational',
+    'compareRational', 'integerSqrt', 'exactSquareRoot', 'primitivePolynomial',
+    'sqrtMinusRational', 'isRational', 'evaluatePolynomial', 'compareAlgebraicToRational',
+    'compareExactToRational', 'approximateExact', 'canonicalExact',
+  ],
+  'magnetic-grid/compute/contact-root.ts': [
+    'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToSegment',
+    'witnessForAnchor', 'measureWrap',
+  ],
   'magnetic-grid/compute/seat.ts': [
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
     'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
@@ -63,7 +74,7 @@ const T2_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> = {
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
   'magnetic-grid/logic.ts': [
     'mod', 'parityHolds', 'bandOf', 'governMass', 'centeringAnchors',
-    'centrePhaseCandidates', 'chooseCentrePlacement', 'applyCoverage', 'assignSizes',
+    'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'applyCoverage', 'assignSizes',
   ],
   'magnetic-grid/engine.ts': [
     'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',
@@ -137,10 +148,18 @@ const ownerKindViolations = (file: keyof typeof OWNERS, text: string): string[] 
     if (file.startsWith('magnetic-grid/compute/') && ts.isIdentifier(node)) {
       if (/^(CentreMode|Governor|MagnetPlan|Coverage)$/.test(node.text)) violations.push(`compute-policy:${node.text}`)
     }
+    if (file === 'magnetic-grid/logic.ts' && ts.isImportDeclaration(node)
+      && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === './compute') {
+      const imported = node.importClause?.namedBindings
+      if (!imported || !ts.isNamedImports(imported)
+        || imported.elements.some((element) => element.name.text !== 'compareExactToRational')) {
+        violations.push('logic-compute-import')
+      }
+    }
     if (file === 'magnetic-grid/engine.ts'
       && (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node))) violations.push('engine-ui')
   })
-  const expected = [...T2_TOP_LEVEL_FUNCTIONS[file]].sort()
+  const expected = [...PHASE_TOP_LEVEL_FUNCTIONS[file]].sort()
   const actual = topLevelFunctionNames(text).sort()
   if (JSON.stringify(actual) !== JSON.stringify(expected)) violations.push(`t2-function-set:${actual.join(',')}`)
   return violations
@@ -166,12 +185,11 @@ describe('magnetic-grid T2 owner DAG', () => {
       .toEqual(['../../effect/attachment'])
     expect(forbiddenImports('effect/magnetic-grid-bridge.ts', "import x from '../magnetic-grid/compute'"))
       .toEqual(['../magnetic-grid/compute'])
-    expect(forbiddenImports('magnetic-grid/logic.ts', "import x from './compute'"))
-      .toEqual(['./compute'])
+    expect(ownerKindViolations('magnetic-grid/logic.ts', "import { bbox } from './compute'")).toContain('logic-compute-import')
     expect(forbiddenImports('magnetic-grid/compute/seat.ts', "import x from '../../effect/types'"))
       .toEqual(['../../effect/types'])
-    expect(forbiddenImports('magnetic-grid/logic.ts', "const x = import('./compute')"))
-      .toEqual(['./compute'])
+    expect(forbiddenImports('magnetic-grid/logic.ts', "const x = import('./compute/seat')"))
+      .toEqual(['./compute/seat'])
   })
 
   it('rejects additions beyond the exact T2 preserved-body allowlist', () => {

@@ -1,2 +1,4 @@
+export * from './compute/exact-real'
+export * from './compute/contact-root'
 export * from './compute/seat'
 export * from './compute/centre-evidence'

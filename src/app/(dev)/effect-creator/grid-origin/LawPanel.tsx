@@ -439,6 +439,11 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
             <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
               <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
             </label>
+            {model && <div className="gl-magic-note">
+              {model.grid.wrap.status === 'lawful'
+                ? `Wrap lawful · requires ${model.grid.wrap.requiredFlapApproxMM.toFixed(6)}mm · applied ${model.grid.wrap.appliedFlapApproxMM.toFixed(6)}mm`
+                : `Wrap refused · requires ${model.grid.wrap.requiredFlapApproxMM.toFixed(6)}mm · allowed ${model.grid.wrap.allowedFlapApproxMM.toFixed(6)}mm`}
+            </div>}
             <div className="gl-lab-off" title="inactive — nothing slides in a derived mode">
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
                 <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
@@ -483,7 +488,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               </div>
             </div>
             <div className="gl-magic-note">
-              Centre clone — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting. Wrap and scaling are not implemented yet.
+              Centre + Wrap — the grid locks onto the governed centre, then every perimeter-belt disc must satisfy the exact flap allowance. No voting. Scaling is not implemented yet.
             </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">
@@ -543,7 +548,8 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
   const w = maxX - minX, h = maxY - minY, S = (VP * FIT) / Math.max(w, h)
   const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
   const fy = (p: Pt): Pt => [p[0], -p[1]]
-  const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
+  const visibleAnchors = grid.wrap.status === 'lawful' ? grid.anchors : []
+  const visibleGrid: GridResult = { ...grid, anchors: visibleAnchors }
 
   // Manual calibration gestures — the shape is FROZEN; drag pans the GRID under it (mm, engine
   // y-up), pinch scales the effect size, double-click hands registration back to the engine.
@@ -587,8 +593,8 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
 
   // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
   const spots: readonly FieldSpot[] = lattice
-    ? fieldSpots(grid, { minX: vx, minY: -(vy + spanMM), maxX: vx + spanMM, maxY: -vy })
-    : seatedSpots(grid)
+    ? fieldSpots(visibleGrid, { minX: vx, minY: -(vy + spanMM), maxX: vx + spanMM, maxY: -vy })
+    : seatedSpots(visibleGrid)
   // Rule anchor: any spot is on the lattice, so lines cross at the centres.
   const A0 = spots[0]
   const Afy: [number, number] = A0 ? [A0.x, -A0.y] : [0, 0]
@@ -709,7 +715,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
               stroke="var(--mag8)" strokeOpacity={0.55} strokeWidth={0.4} strokeDasharray="2.4 1.8" />}
         </g>
       })}
-      {grid.anchors.map((a, i) => {
+      {visibleAnchors.map((a, i) => {
         const p = fy(a.p)
         return <g key={'a' + i} opacity={0.5}>
           <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill={a.dia === 8 ? 'var(--mag8)' : 'var(--magnet)'} />

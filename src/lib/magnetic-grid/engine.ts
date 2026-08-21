@@ -7,7 +7,6 @@ import {
   DEFAULT_PITCH_MM,
   FLAP_MM,
   GOVERNOR,
-  AUTO_FLAP_STEP_MM,
   MASS_DEPTH_MM,
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
@@ -18,18 +17,17 @@ import {
   bbox,
   centroidOf,
   fieldSpanMM,
-  contactPointsMM,
-  maxPressMM,
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
   measureCentreBranches,
   measureCentrePlacements,
   measureExtremeCorners,
+  measureWrap,
+  rationalFromNumber,
   safeSegments,
   splitPerimeter,
   spotRadiusOf,
-  TANGENT_GUARD_MM,
 } from './compute'
 import {
   applyCoverage,
@@ -38,13 +36,13 @@ import {
   centrePhaseCandidates,
   centeringAnchors,
   chooseCentrePlacement,
+  evaluateWrap,
   governMass,
 } from './logic'
 
 export * from './spec'
 export {
   fieldSpanMM,
-  impliedFlapMM,
   latticeOver,
   safeSegments,
   scaleContour,
@@ -111,15 +109,27 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
 
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
 
-  const coverage = applyCoverage(bestSeated, perimeterOnly, splitPerimeter(bestSeated, pitch))
+  const split = splitPerimeter(bestSeated, pitch)
+  const belt = bestSeated.length <= 4 ? bestSeated : split.belt
+  const coverage = applyCoverage(bestSeated, perimeterOnly, split)
   const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
-
+  const wrapMeasured = measureWrap(outer, belt, spotRadiusOf(pad))
+  const wrap = cfg.wrapMode === 'auto'
+    ? evaluateWrap(wrapMeasured, {
+      mode: 'auto',
+      cap: rationalFromNumber(Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM)),
+      capApproxMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM),
+    })
+    : evaluateWrap(wrapMeasured, {
+      mode: 'fixed',
+      allowance: rationalFromNumber(Math.max(0, cfg.flapMM ?? FLAP_MM)),
+      allowanceApproxMM: Math.max(0, cfg.flapMM ?? FLAP_MM),
+    })
 
   return {
     anchors,
-    // THE TRUTH DOT (Dan: "the dot shows touch but lies"): a dot means the DISC touches the
-    // edge — spot radius only, exact-tangency slack. The amber ring tells the allowance story.
-    contactsMM: contactPointsMM(outer, coverage.seated, spotRadiusOf(pad), TANGENT_GUARD_MM),
+    // Truth dots are projections stored by exact segment witnesses; no guard/tolerance can draw one.
+    contactsMM: wrap.status === 'lawful' ? wrap.witnesses.map((witness) => witness.tangency.approximateMM) : [],
     pitchCentreMM: pitch,
     lattice,
     phaseMM: [bestOx, bestOy],
@@ -128,6 +138,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     segments,
     centresMM: [ruleTarget],
     centreMainMM: mainCentre,
+    wrap,
   }
 }
 
@@ -156,8 +167,9 @@ function bandWalk(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { points: BandSnapPoint[]; bestSeatedMM: number } {
   const [lo, hi] = snapRange(cfg, fromMM)
-  const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', seatMarginMM: margin }
+  // Interim scaling candidate generator only. Exact Wrap is evaluated by computeGrid;
+  // this sampled walk never measures or grants contact.
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', seatMarginMM: 0 }
   const solve = (mm: number): GridResult => {
     let g = cfg.solveCache?.get(mm)
     if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
@@ -168,29 +180,11 @@ function bandWalk(
   const points: BandSnapPoint[] = []
   const seen = new Set<number>()
   for (let c = 1; c <= below; c++) seen.add(c)
-  const reach = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? RELEASED_PADDING_MM)) + margin
   let bestSeatedMM = lo, bestSeats = -1
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = solve(mm)
     const count = grid.anchors.length
     if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
-    // THE RIGID GATE (Dan): every disc must touch within the allowance — 0 = touch,
-    // 1 = 1mm space — measured with one size-step of slack (the walk's own resolution).
-    // A count whose layout leaves a disc floating past that is NOT an option here;
-    // Auto mode adapts the allowance instead.
-    const contour = sized(mm)
-    // Wrap is BELT-scoped (interior discs can never touch) and the centre law must be TRUE —
-    // a parity-conceded layout is never a rung; size reconciles (the keystone).
-    // THE GATE IS THE LAW'S OWN TOLERANCE (pixel full-eval F2): `<= stepMM` granted the walk's
-    // resolution as hidden slack, so flap 0 admitted non-touching layouts. A count's rung is
-    // the SMALLEST size where it seats lawfully — refined below the walk step so true contact
-    // is found, not approximated.
-    const pressAt = (c: Contour, g: GridResult) =>
-      maxPressMM(c.outer.pts, applyCoverage(
-        g.anchors.map((a) => a.p),
-        true,
-        splitPerimeter(g.anchors.map((a) => a.p), cfg.pitchMM ?? DEFAULT_PITCH_MM),
-      ).seated, reach)
     if (count >= 1 && !seen.has(count)) {
       // Bisect (mm - stepMM, mm] for the smallest lawful size holding this count — its gap is
       // minimal by construction; the law then judges THAT size.
@@ -204,10 +198,9 @@ function bandWalk(
       // very slack the bisection removed (display rounds, the law does not).
       const rungMM = hi2
       const gr = computeGrid(sized(rungMM), walkCfg)
-      const ok = gr.anchors.length === count && pressAt(sized(rungMM), gr) <= CONTACT_TOLERANCE_MM
+      const ok = gr.anchors.length === count && gr.wrap.status === 'lawful'
       if (ok) { seen.add(count); points.push({ sizeMM: rungMM, count }) }
     }
-    void contour
   }
   return { points, bestSeatedMM }
 }
@@ -221,8 +214,7 @@ export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
-  const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const dispCfg: GridConfig = { ...cfg, seatMarginMM: margin }
+  const dispCfg: GridConfig = { ...cfg, seatMarginMM: 0 }
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const pickIdx = points.findIndex((p) => p.count === maxCount)
@@ -232,25 +224,20 @@ export function fitSizeInBand(
 }
 
 /**
- * AUTO FLAP (micro-module, Dan 2026-08-19): a band tries the snuggest law first — allowance 0 —
- * and grants itself only as much margin as it needs to produce a contact variant, scanning up
- * in AUTO_FLAP_STEP_MM steps to the dialled max. Reuses the band walk untouched; the chosen
- * allowance is reported so the panel and margin rings can show it.
+ * Exact Auto Wrap: the geometry derives its worst-belt requirement once; Logic compares it
+ * to the cap. No allowance scan or millimetre grant exists in this replacement body.
  */
 export function autoFlapInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number, maxFlapMM: number,
   cacheFor?: (flapMM: number) => Map<number, GridResult> | undefined,
 ): { flapMM: number; fit: ReturnType<typeof fitSizeInBand> } {
   const cap = Math.max(0, maxFlapMM)
-  let last: ReturnType<typeof fitSizeInBand> | null = null
-  for (let f = 0; f <= cap; f += AUTO_FLAP_STEP_MM) {
-    last = fitSizeInBand(sized, { ...cfg, flapMM: f, solveCache: cacheFor?.(f) }, fromMM, stepMM)
-    if (last.ladder.length) return { flapMM: f, fit: last }
-  }
-  if (cap % AUTO_FLAP_STEP_MM !== 0) {
-    const fit = fitSizeInBand(sized, { ...cfg, flapMM: cap, solveCache: cacheFor?.(cap) }, fromMM, stepMM)
-    if (fit.ladder.length) return { flapMM: cap, fit }
-    last = fit
-  }
-  return { flapMM: cap, fit: last! }
+  const fit = fitSizeInBand(sized, {
+    ...cfg,
+    wrapMode: 'auto',
+    autoFlapCapMM: cap,
+    solveCache: cacheFor?.(cap),
+  }, fromMM, stepMM)
+  const flapMM = fit.grid.wrap.status === 'lawful' ? fit.grid.wrap.appliedFlapApproxMM : cap
+  return { flapMM, fit }
 }

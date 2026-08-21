@@ -1,12 +1,13 @@
 // Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, ExtremeCornerMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt } from './spec'
+import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, ExtremeCornerMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './spec'
+import { compareExactToRational } from './compute'
 
 const QUANTUM_KEY_MM = 0.001
 const mod = (v: number, m: number) => ((v % m) + m) % m
@@ -102,6 +103,31 @@ export function chooseCentrePlacement(
     if (wins) best = candidate
   }
   return best
+}
+
+/** Wrap law over completed exact belt measurements; no geometry or tolerance enters Logic. */
+export function evaluateWrap(measured: WrapMeasurement, policy: WrapPolicy): WrapEvaluation {
+  const allowed = policy.mode === 'fixed' ? policy.allowance : policy.cap
+  const allowedApproxMM = policy.mode === 'fixed' ? policy.allowanceApproxMM : policy.capApproxMM
+  if (!measured.seatLegal || compareExactToRational(measured.requiredFlap, allowed) > 0) {
+    return {
+      status: 'refused',
+      code: 'WRAP_EXCEEDS_ALLOWANCE',
+      requiredFlap: measured.requiredFlap,
+      requiredFlapApproxMM: measured.requiredFlapApproxMM,
+      allowedFlap: allowed,
+      allowedFlapApproxMM: allowedApproxMM,
+      witnesses: measured.witnesses,
+    }
+  }
+  return {
+    status: 'lawful',
+    requiredFlap: measured.requiredFlap,
+    requiredFlapApproxMM: measured.requiredFlapApproxMM,
+    appliedFlap: policy.mode === 'auto' ? measured.requiredFlap : policy.allowance,
+    appliedFlapApproxMM: policy.mode === 'auto' ? measured.requiredFlapApproxMM : policy.allowanceApproxMM,
+    witnesses: measured.witnesses,
+  }
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
