@@ -19,6 +19,7 @@ import {
   encodeNormalizedSparseEliminationStep,
   projectFinalUnivariatePolynomial,
   pseudoRemainderSparseIntegerPolynomial,
+  eliminateSparseGeneratorBySubresultants,
   squareRational,
   sqrtMinusRational,
   subtractRational,
@@ -102,4 +103,5 @@ describe('Wrap exact-real support', () => {
   it('encodes source terms canonically and rejects every noncanonical proof spelling',()=>{const source=[{coefficient:'1',powers:[1,0]},{coefficient:'1',powers:[1,0]},{coefficient:'4',powers:[0,0]}];expect(encodeCanonicalMultivariatePolynomial(source,2)).toEqual(['2|1,0','4|0,0']);expect(encodeCanonicalMultivariatePolynomial([...source].reverse(),2)).toEqual(['2|1,0','4|0,0']);for(const invalid of[['+2|1,0'],['02|1,0'],['-0|1,0'],['0|1,0'],['2|1'],['4|0,0','2|1,0'],['1|1,0','1|1,0'],['0']])expect(()=>decodeCanonicalMultivariatePolynomial(invalid,2)).toThrow();expect(decodeCanonicalMultivariatePolynomial(['2|1,0','4|0,0'],2)).toEqual([{coefficient:'2',powers:[1,0]},{coefficient:'4',powers:[0,0]}]);expect(decodeCanonicalMultivariatePolynomial([],2)).toEqual([])})
   it('normalizes only completed steps and records final projection slots',()=>{const step=encodeNormalizedSparseEliminationStep([{coefficient:'2',powers:[1,0,0]},{coefficient:'4',powers:[0,0,0]}],3);expect(step).toEqual({tokens:['1|1,0,0','2|0,0,0'],removedIntegerContent:['2','1']});expect(projectFinalUnivariatePolynomial(step.tokens,3)).toEqual({coefficients:['1','2'],removedExponentSlots:[1,2]})})
   it('computes exact multivariate pseudo-remainders without normalization loss',()=>{const dividend=[{coefficient:'1',powers:[0,2]},{coefficient:'1',powers:[1,0]}],divisor=[{coefficient:'1',powers:[0,1]},{coefficient:'-1',powers:[0,0]}];expect(pseudoRemainderSparseIntegerPolynomial(dividend,divisor,1)).toEqual([{coefficient:'1',powers:[1,0]},{coefficient:'1',powers:[0,0]}])})
+  it('derives zero predicates and carries exact common-component cofactors pending back-substitution',()=>{const defining=[{coefficient:'1',powers:[0,1]},{coefficient:'-1',powers:[0,0]}],shared=[{coefficient:'1',powers:[1,1]},{coefficient:'-1',powers:[1,0]}],decomposed=eliminateSparseGeneratorBySubresultants(shared,defining,1,2);expect(decomposed.commonFactorDisposition).toBe('DECOMPOSED');expect(decomposed.commonComponentProofs).toEqual([{gcd:['1|0,1','-1|0,0'],predicateCofactor:['1|1,0'],definingCofactor:['1|0,0'],backSubstitutionDisposition:'PENDING'}]);expect(decomposed.resolved).toBe(false);expect(decomposed.unresolved).toBe(false);const zero=eliminateSparseGeneratorBySubresultants([],defining,1,2);expect(zero.commonFactorDisposition).toBe('IDENTICALLY_ZERO');expect(zero.zeroPolynomialProofSource).toEqual([]);expect(zero.resolved).toBe(true)})
 })
