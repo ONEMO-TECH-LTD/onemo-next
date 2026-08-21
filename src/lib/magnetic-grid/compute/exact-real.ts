@@ -422,13 +422,13 @@ export function quadraticRootsWithin(
   c: Rational,
   lo: Rational,
   hi: Rational,
-): ExactReal[] {
+): Array<Rational | AlgebraicReal> {
   const polynomial = primitiveQuadratic(lcmDenominatorPolynomial(a, b, c))
   if (polynomial[0] === BigInt(0)) throw new RangeError('quadratic coefficient must be nonzero')
   const discriminant = polynomial[1] * polynomial[1] - BigInt(4) * polynomial[0] * polynomial[2]
   if (discriminant < BigInt(0)) return []
   const vertex = rational(-polynomial[1], BigInt(2) * polynomial[0])
-  const roots: ExactReal[] = []
+  const roots: Array<Rational | AlgebraicReal> = []
   const leftHi = compareRational(vertex, hi) < 0 ? vertex : hi
   if (compareRational(lo, leftHi) <= 0) {
     const root = isolateQuadraticRoot(polynomial, 0, lo, leftHi)

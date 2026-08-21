@@ -1,4 +1,4 @@
-import type { Band, Contour, ExactReal, Pt, Rational } from '../spec'
+import type { AlgebraicReal, Band, Contour, ExactReal, Pt, Rational } from '../spec'
 import { BANDS, FIELD_POSITIONS_PER_AXIS } from '../spec'
 import { exactBoxTargetCoefficient } from './centre-evidence'
 import {
@@ -17,6 +17,7 @@ import {
 
 type QPoint = readonly [Rational, Rational]
 type Quadratic = readonly [Rational, Rational, Rational]
+type ContactRoot = Rational | AlgebraicReal
 
 export interface AffinePoint {
   coefficient: QPoint
@@ -59,10 +60,10 @@ const lineDistance = (anchor: AffinePoint, a: QPoint, b: QPoint): Quadratic => {
   const offset = cross(anchor.offset, segment)
   const lengthSquared = dot(segment, segment)
   return [
-    multiplyRational(coefficient, coefficient),
-    twice(multiplyRational(coefficient, offset)),
-    multiplyRational(offset, offset),
-  ].map((term) => divideRational(term, lengthSquared)) as Quadratic
+    divideRational(multiplyRational(coefficient, coefficient), lengthSquared),
+    divideRational(twice(multiplyRational(coefficient, offset)), lengthSquared),
+    divideRational(multiplyRational(offset, offset), lengthSquared),
+  ]
 }
 
 const subtractRadiusSquared = (distance: Quadratic, radius: Rational): Quadratic => [
@@ -86,7 +87,7 @@ export const scaleInBand = (scale: ExactReal, band: Band, bands: readonly Band[]
   return compareExact(scale, domain.lo) >= 0 && compareExact(scale, domain.hiExclusive) < 0
 }
 
-const roots = (equation: Quadratic, band: Band): ExactReal[] => {
+const roots = (equation: Quadratic, band: Band): ContactRoot[] => {
   const [a, b, c] = equation
   const domain = exactBandDomain(band)
   if (compareRational(a, rational(0)) === 0) {
@@ -97,7 +98,7 @@ const roots = (equation: Quadratic, band: Band): ExactReal[] => {
   return quadraticRootsWithin(a, b, c, domain.lo, domain.hiExclusive).filter((root) => scaleInBand(root, band))
 }
 
-const polynomialOf = (scale: ExactReal): readonly string[] =>
+const polynomialOf = (scale: ContactRoot): readonly string[] =>
   'polynomial' in scale ? scale.polynomial : [scale.denominator, `-${scale.numerator}`]
 
 const relations = (band: Band): ReadonlyArray<{ xGap: boolean; yGap: boolean }> => {
