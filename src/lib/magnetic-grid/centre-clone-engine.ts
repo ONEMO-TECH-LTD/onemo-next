@@ -13,9 +13,7 @@ import {
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   RELEASED_PADDING_MM,
-  PHASE_STEP_MM,
   CONTACT_TOLERANCE_MM,
-  SNAP_STEP_MM,
 } from './centre-clone-spec'
 import {
   bbox,
@@ -100,10 +98,6 @@ export interface GridResult {
   spotRadiusMM: number
   /** Outline points where a disc touches (within one snap step of its margined edge). */
   contactsMM: Pt[]
-  /** LAW mode: the worst belt disc's gap beyond the allowance — 0 when the wrap law holds. */
-  pressMM?: number
-  /** LAW mode: false when no parity-lawful candidate seated — the centre law is conceded. */
-  parityTrue?: boolean
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
   /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
@@ -137,7 +131,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? RELEASED_PADDING_MM)
   // Coverage reach from a magnet centre: the spot plus the dialled flap allowance.
   const reach = spotRadiusOf(pad) + Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const phaseStep = Math.max(1, cfg.phaseStepMM ?? PHASE_STEP_MM)
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
@@ -164,7 +157,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
-  let parityTrue = true
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search. The centre law
     // is NOT satisfied by construction here — a hand-placed grid may sit anywhere — so its
@@ -175,7 +167,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
     mainCentre = ruleTarget
-    parityTrue = parityHolds(bestSeated, ruleTarget, bb, pitch)
+    void parityHolds(bestSeated, ruleTarget, bb, pitch)
   } else if (fits) {
     // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
     // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
@@ -290,21 +282,20 @@ function bandWalk(
     // is found, not approximated.
     const pressAt = (c: Contour, g: GridResult) =>
       maxPressMM(c.outer.pts, applyCoverage(g.anchors.map((a) => a.p), true, cfg.pitchMM ?? DEFAULT_PITCH_MM).seated, reach)
-    if (count >= 1 && (grid.parityTrue ?? true) && !seen.has(count)) {
+    if (count >= 1 && !seen.has(count)) {
       // Bisect (mm - stepMM, mm] for the smallest lawful size holding this count — its gap is
       // minimal by construction; the law then judges THAT size.
       let lo2 = Math.max(MIN_EFFECT_MM, mm - stepMM), hi2 = mm
       for (let it = 0; it < 8 && hi2 - lo2 > CONTACT_TOLERANCE_MM / 2; it++) {
         const midMM = (lo2 + hi2) / 2
         const gm = computeGrid(sized(midMM), walkCfg)
-        if (gm.anchors.length >= count && (gm.parityTrue ?? true)) hi2 = midMM; else lo2 = midMM
+        if (gm.anchors.length >= count) hi2 = midMM; else lo2 = midMM
       }
       // Keep the refined size exact — rounding it back to a coarse grid re-introduces the
       // very slack the bisection removed (display rounds, the law does not).
       const rungMM = hi2
       const gr = computeGrid(sized(rungMM), walkCfg)
-      const ok = gr.anchors.length === count && (gr.parityTrue ?? true)
-        && pressAt(sized(rungMM), gr) <= CONTACT_TOLERANCE_MM
+      const ok = gr.anchors.length === count && pressAt(sized(rungMM), gr) <= CONTACT_TOLERANCE_MM
       if (ok) { seen.add(count); points.push({ sizeMM: rungMM, count }) }
     }
     void contour

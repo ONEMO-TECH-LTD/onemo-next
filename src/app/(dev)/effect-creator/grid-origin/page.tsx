@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-origin'
-import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-origin-spec'
+import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-origin-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-origin-bridge'
 import LawPanel from './LawPanel'
 
@@ -49,11 +49,14 @@ type PositioningSelection = 0 | 1 | 2
 function useSurfaceSelection(): [PositioningSelection, (selection: PositioningSelection) => void] {
   const [selection, setSelection] = useState<PositioningSelection>(0)
   useEffect(() => {
-    const current = localStorage.getItem('magnetic-grid.compare.v1.surface')
-    if (current === '0' || current === '1' || current === '2') { setSelection(+current as PositioningSelection); return }
-    const legacy = localStorage.getItem('grid-origin.positioning')
-    if (legacy === '0' || legacy === '1') setSelection(+legacy as PositioningSelection)
-    else if (legacy === '2') setSelection(1)
+    const timer = window.setTimeout(() => {
+      const current = localStorage.getItem('magnetic-grid.compare.v1.surface')
+      if (current === '0' || current === '1' || current === '2') { setSelection(+current as PositioningSelection); return }
+      const legacy = localStorage.getItem('grid-origin.positioning')
+      if (legacy === '0' || legacy === '1') setSelection(+legacy as PositioningSelection)
+      else if (legacy === '2') setSelection(1)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
   const set = (value: PositioningSelection) => {
     setSelection(value)

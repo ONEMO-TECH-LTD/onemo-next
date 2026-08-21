@@ -391,10 +391,10 @@ export default function LawPanel({ onSelect }: { onSelect: (positioning: 0 | 1 |
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
                   : bandScale !== null
-                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return${model && (model.grid.pressMM ?? 0) > 0.05 ? ` · wrap conceded ${model.grid.pressMM!.toFixed(1)}mm` : ''}`
+                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
                     ? model.ladder.length
-                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band${(model.grid.pressMM ?? 0) > 0.05 ? ` · wrap conceded ${model.grid.pressMM!.toFixed(1)}mm` : ''}`
+                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
                       : 'nothing fully fits at this flap — best seated shown'
                     : '—'}
               </div>
@@ -479,7 +479,7 @@ export default function LawPanel({ onSelect }: { onSelect: (positioning: 0 | 1 |
               <div className="gl-seg">
                 <button aria-pressed={false} onClick={() => onSelect(0)}>Voting</button>
                 <button aria-pressed={false} onClick={() => onSelect(1)}>Centre rules</button>
-                <button aria-pressed onClick={() => onSelect(2)}>Law · Centre clone</button>
+                <button aria-pressed style={{ flex: '0 0 auto', minWidth: 112 }} onClick={() => onSelect(2)}>Law · Centre clone</button>
               </div>
             </div>
             <div className="gl-magic-note">
