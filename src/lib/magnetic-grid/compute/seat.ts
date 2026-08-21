@@ -1,4 +1,4 @@
-// grid-engine/compute/geometry.ts — the exact predicate, and nothing else.
+// Magnetic-grid compute seat kernel — the exact predicate, and nothing else.
 //
 // One question, answered exactly: does a disc of radius r, centred at p, lie
 // completely inside this outline? Tangency counts as inside — a disc touching

@@ -2,7 +2,7 @@
 
 import type { BBox, Contour, Pt, SafeMass, SafeSegment } from './spec'
 import { pointInPolygon } from '../effect/attachment'
-import { holds, prepare } from './centre-clone-geometry'
+import { holds, prepare } from './compute/seat'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './spec'
 
 /** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
