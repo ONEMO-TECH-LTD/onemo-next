@@ -930,6 +930,165 @@ Necessity: one canonical rational-univariate tuple representation is the smalles
 
 Sufficiency contribution: primitive-element selection, represented tuple isolation, coordinate recovery, exact modular zero/nonzero evaluation, canonical identity and fail-closed proof cover every candidate/derivative/back-substitution case required by the contract.
 
+###### Generator identity dataflow
+
+Ownership is fixed: `centre-evidence.ts` derives geometry and symbolic predicates but does not hash or eliminate; `identity.ts` alone certifies canonical identities and hashes; `exact-real.ts` alone evaluates exact algebra and does not hash; Engine only sequences neutral calls.
+
+```ts
+export interface AlgebraicGeneratorRequest {
+  semanticSourceIdentity: string
+  definingPolynomial: readonly string[]
+  representedRootIndex: number
+  representedIsolating: readonly [Rational, Rational]
+}
+
+export interface ExactCoordinatePolynomialRequest {
+  numeratorTokens: readonly string[]
+  denominatorTokens: readonly string[]
+}
+
+export interface PiecePredicateSystemRequest {
+  pieceId: string
+  originalPredicateIdentity: string
+  generatorsInPolynomialSlotOrder: readonly AlgebraicGeneratorRequest[]
+  polynomialTokens: readonly string[]
+  pointCoordinates: readonly [
+    ExactCoordinatePolynomialRequest,
+    ExactCoordinatePolynomialRequest,
+  ]
+}
+
+export interface CertifiedPiecePredicateSystem {
+  requestIdentity: string
+  pieceId: string
+  originalPredicateIdentity: string
+  canonicalPolynomialTokens: readonly string[]
+  canonicalPointCoordinates: readonly [
+    ExactCoordinatePolynomialRequest,
+    ExactCoordinatePolynomialRequest,
+  ]
+  orderedGenerators: readonly AlgebraicGeneratorProof[]
+  requestSlotToGeneratorSlot: readonly number[]
+}
+
+export interface RawPiecePredicateRoot {
+  rootReplayKey: string
+  certificate: PiecePredicateRootCertificate
+}
+
+export type RawAlgebraicTupleValueProof = Omit<AlgebraicTupleValueProof, 'proofId'>
+
+export interface RawRootPointProof {
+  rootReplayKey: string
+  point: { x: ExactReal; y: ExactReal }
+  coordinateProofs: readonly [RawAlgebraicTupleValueProof, RawAlgebraicTupleValueProof]
+}
+
+export interface RawPiecePredicateSignCertificate {
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  generatorId: string
+  sign: -1 | 1
+  witness: ExactPieceParameter
+  lowerRootReplayKey: string | null
+  upperRootReplayKey: string | null
+}
+
+export type RawPiecePredicateProof =
+  | {
+      status: 'isolated-roots'
+      roots: readonly RawPiecePredicateRoot[]
+      intervalSigns: readonly RawPiecePredicateSignCertificate[]
+    }
+  | {
+      status: 'identically-zero'
+      predicateId: PiecePredicateRootCertificate['predicateId']
+      generatorId: string
+      originalPredicateIdentity: string
+      zeroPolynomialProofId: string
+    }
+
+export interface RawPiecePredicateProofResult {
+  requestIdentity: string
+  rawRoots: readonly RawPiecePredicateRoot[]
+  rawRootPoints: readonly RawRootPointProof[]
+  rawIntervalProofs: readonly RawPiecePredicateProof[]
+  rawBackSubstitutions: readonly CandidateBackSubstitutionProof[]
+}
+
+export interface FinalizedPiecePredicateRoot {
+  rootId: string
+  certificate: PiecePredicateRootCertificate
+}
+
+export interface FinalPiecePredicateProofResult {
+  requestIdentity: string
+  proofIdentity: string
+  roots: readonly FinalizedPiecePredicateRoot[]
+  intervalProofs: readonly PiecePredicateProof[]
+  backSubstitutions: readonly CandidateBackSubstitutionProof[]
+}
+```
+
+`centre-evidence.ts` returns `PiecePredicateSystemRequest`. Generator array order is exactly the generator-variable slot order in every polynomial token vector. `pointCoordinates` carries exact rational numerator and denominator polynomials for x and y in the same slots. It performs no hash, deduplication, slot rewrite, elimination or root evaluation.
+
+Engine passes the request to `identity.ts::certifyPiecePredicateSystemRequest()`. Identity validates token grammar and identical arity `1 + generatorsInPolynomialSlotOrder.length` for the predicate and all four coordinate numerator/denominator token arrays. Each coordinate denominator must be nonzero as a symbolic polynomial; exact nonzero at a root is proved later by exact math.
+
+Identity certifies each generator request with the approved represented-root proof, sorts/deduplicates unique generators by `generatorIdentity`, and produces `requestSlotToGeneratorSlot`. Multiple request slots may map to one generator. Identity rewrites every predicate and coordinate exponent vector into canonical slots: piece parameter remains slot 0; generator exponents mapped to the same canonical generator are summed; like terms combine; zero terms disappear; canonical encoder runs afterward. Reordering request generators and corresponding polynomial slots is invariant. Reordering generators without the corresponding polynomial-slot permutation changes the polynomial/request and cannot be hidden.
+
+`requestIdentity` hashes:
+
+```text
+['piece-predicate-request-v2', pieceId, originalPredicateIdentity,
+ canonicalPolynomialTokens,
+ canonical x numerator/denominator tokens,
+ canonical y numerator/denominator tokens,
+ ordered generator identities]
+```
+
+Engine passes only `CertifiedPiecePredicateSystem` to `exact-real.ts::evaluateCertifiedPiecePredicateSystem()`. Exact math verifies arity and performs the approved elimination, root isolation, interval, algebraic-tuple and back-substitution algorithms. For every retained root it emits one `RawPiecePredicateRoot` and exactly one `RawRootPointProof`.
+
+`rootReplayKey` is the canonical non-semantic replay tuple:
+
+```text
+[chart, normalized primitive polynomial, rootIndex, isolating]
+```
+
+Exact math evaluates each canonical coordinate numerator and denominator through the approved algebraic-tuple evaluator, proves denominator nonzero, forms the exact quotient, and stores raw x/y tuple-value reductions without `proofId` beside the exact point values. It creates no SHA or semantic root/proof identity and rejects any supplied raw `proofId` field. Raw interval signs reference adjacent roots only by `lowerRootReplayKey` / `upperRootReplayKey`.
+
+Engine passes the certified request and raw result to `identity.ts::finalizePiecePredicateProofResult()`. Identity requires exact `requestIdentity` equality. It recomputes every `rootReplayKey` from its raw root certificate and requires a one-to-one bijection between raw roots and raw root-point proofs. Missing, duplicate or foreign keys refuse.
+
+For each root point, Identity reconstructs and validates the root algebraic tuple, validates both raw coordinate reductions against the certified canonical coordinate expressions, computes each finalized `AlgebraicTupleValueProof.proofId`, validates each returned `ExactReal`, and requires the exact x/y values equal the evaluated quotients. Identity then computes the approved semantic root ID from:
+
+```text
+['piece-root-v1', pieceId, predicateId, generatorId,
+ canonicalExactPoint({x,y}), multiplicity, originalPredicateIdentity]
+```
+
+Identity wraps each certificate as `FinalizedPiecePredicateRoot`, sorts by `rootId`, and converts every raw interval replay-key reference into exactly one semantic `rootId`. Missing, duplicate or foreign interval references refuse. It canonicalizes interval/back-substitution arrays and hashes ordered `[rootId, certificate]`, finalized interval proofs and back-substitutions into `proofIdentity`.
+
+Engine returns only `FinalPiecePredicateProofResult` to `centre-evidence.ts` for named-piece splitting. Engine does not inspect terms, geometry, proof dispositions, laws or refusals. These are private compute-stage records; no public API, callback, service object, module, duplicate SHA implementation or import-law exception is added.
+
+Required dataflow mutations:
+
+43. Reverse generator discovery and every corresponding predicate/coordinate variable slot: identical canonical request and final proof.
+44. Two request slots certify the same generator: predicate and coordinate exponents merge correctly into one canonical slot.
+45. Reverse request generator order without permuting predicate/coordinate slots: changed request identity; no hidden caller error.
+46. Any predicate or coordinate token arity mismatch, zero coordinate denominator or noncanonical token: refusal before elimination.
+47. Certified generator proofs mismatch requests/root certificates: refusal.
+48. Raw result or root point from another request: refusal and no identities.
+49. Drop, duplicate or swap rootReplayKey/root-point records: refusal.
+50. Raw interval sign references missing/duplicate/foreign replay key: refusal.
+51. Alter x or y numerator/denominator with unchanged predicate: request identity changes; old raw result refuses.
+52. Same geometric root through chart/refined-isolator replay records: exact points agree and semantic root ID is equal although replay keys may differ.
+53. Reorder raw root/point/interval/back-substitution arrays: one canonical finalized proof.
+54. Forge coordinate tuple proof or exact point value: finalizer refuses.
+55. Remove either identity stage or add `centre-evidence -> identity` / `exact-real -> identity`: separation guard fails.
+56. Forge or omit a raw coordinate reduction, or supply a `proofId` from exact-real: finalizer refuses; removing Identity-owned tuple-value `proofId` creation fails.
+
+Necessity: only evidence and handoffs already required by the approved geometric root identity and ownership law are added; Engine remains neutral and surfaces remain private.
+
+Sufficiency contribution: canonical slots, rational coordinate expressions, exact point evaluation, replay-key bijection, identity-owned tuple/root/sign references and request/result binding are complete and import-law compliant.
+
 The root proof record contains ordered `AlgebraicGeneratorProof[]`, ordered `GeneratorEliminationStepProof[]`, the normalized final univariate factors with multiplicity/provenance, every back-substitution disposition and the canonical semantic root ids. Any unresolved generator equality, subresultant, common-factor decomposition, factor provenance, back-substitution or global root order returns `CENTRE_EVIDENCE_UNRESOLVED` and no partial piece certificate.
 
 Required multi-generator mutations:
