@@ -88,7 +88,13 @@ export interface AlgebraicReal {
   isolating: readonly [Rational, Rational]
   rootIndex: number
 }
-export type ExactReal = Rational | AlgebraicReal
+export interface CertifiedExpressionReal {
+  expressionHash: string
+  expression: readonly (ExactInteger | string)[]
+  isolating: readonly [Rational, Rational]
+  proofId: string
+}
+export type ExactReal = Rational | AlgebraicReal | CertifiedExpressionReal
 export interface ExactScale { exact: ExactReal; approximateMM: number }
 export interface BoundaryElement {
   kind: 'segment'

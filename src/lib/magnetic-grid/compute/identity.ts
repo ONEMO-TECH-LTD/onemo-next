@@ -1,5 +1,5 @@
-import type { BoundaryTruth, ContactWitness, Contour } from '../spec'
-import { canonicalExact, rationalFromNumber } from './exact-real'
+import type { BoundaryTruth, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
+import { addRational, approximateExact, canonicalExact, compareExactToRational, divideRational, rational, rationalFromNumber } from './exact-real'
 
 const K = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
@@ -94,3 +94,31 @@ export const certifyContactWitness = (
   ...witness,
   certificateId: sha256Text(JSON.stringify(witness)),
 })
+
+/** Canonical certificate for `sqrt(a*s^2+b*s+c)-subtract` over one exact scale. */
+export function certifySqrtQuadraticExpression(
+  scale: ExactReal,
+  coefficients: readonly [Rational, Rational, Rational],
+  subtract: Rational,
+): ExactReal {
+  const expression = [
+    'sqrt-quadratic-minus', canonicalExact(scale), canonicalExact(coefficients[0]),
+    canonicalExact(coefficients[1]), canonicalExact(coefficients[2]), canonicalExact(subtract),
+  ] as const
+  const expressionHash = sha256Text(JSON.stringify(expression))
+  const proofId = sha256Text(JSON.stringify(['sqrt-quadratic-proof-v1', expressionHash]))
+  const s = approximateExact(scale)
+  const [a, b, c] = coefficients.map(approximateExact)
+  const report = Math.sqrt(Math.max(0, (a * s + b) * s + c)) - approximateExact(subtract)
+  let lo = rational(Math.floor(report) - 1), hi = rational(Math.ceil(report) + 1)
+  let certified: CertifiedExpressionReal = { expressionHash, expression, isolating: [lo, hi], proofId }
+  for (let iteration = 0; iteration < 192; iteration++) {
+    const middle = divideRational(addRational(lo, hi), rational(2))
+    const comparison = compareExactToRational(certified, middle)
+    if (comparison === 0) return middle
+    if (comparison > 0) lo = middle
+    else hi = middle
+    certified = { ...certified, isolating: [lo, hi] }
+  }
+  return certified
+}

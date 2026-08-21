@@ -1,4 +1,4 @@
-import type { AlgebraicReal, ExactReal, Rational } from '../spec'
+import type { AlgebraicReal, CertifiedExpressionReal, ExactReal, Rational } from '../spec'
 
 type Q = { n: bigint; d: bigint }
 
@@ -153,6 +153,7 @@ export function sqrtMinusRational(
 }
 
 export const isRational = (value: ExactReal): value is Rational => 'numerator' in value
+export const isAlgebraic = (value: ExactReal): value is AlgebraicReal => 'polynomial' in value
 
 const evaluatePolynomial = (
   polynomial: readonly string[],
@@ -201,14 +202,43 @@ const compareAlgebraicToRational = (
     : (sign < 0 ? 1 : -1)
 }
 
+const certifiedSqrtQuadraticParts = (value: CertifiedExpressionReal) => {
+  const [kind, scaleToken, aToken, bToken, cToken, subtractToken] = value.expression
+  if (kind !== 'sqrt-quadratic-minus' || value.expression.length !== 6) {
+    throw new RangeError('unsupported certified expression')
+  }
+  const scale = JSON.parse(String(scaleToken)) as ExactReal
+  if (!isRational(scale) && !isAlgebraic(scale)) throw new RangeError('unsupported certified scale')
+  return {
+    scale,
+    a: JSON.parse(String(aToken)) as Rational,
+    b: JSON.parse(String(bToken)) as Rational,
+    c: JSON.parse(String(cToken)) as Rational,
+    subtract: JSON.parse(String(subtractToken)) as Rational,
+  }
+}
+
+const compareCertifiedToRational = (value: CertifiedExpressionReal, limit: Rational): -1 | 0 | 1 => {
+  const expression = certifiedSqrtQuadraticParts(value)
+  const threshold = addRational(expression.subtract, limit)
+  if (compareRational(threshold, rational(0)) < 0) return 1
+  return signQuadraticAtExact(
+    expression.a,
+    expression.b,
+    subtractRational(expression.c, squareRational(threshold)),
+    expression.scale,
+  )
+}
+
 /** Total for the only comparison Wrap admits: a segment-distance root against a rational dial/cap. */
 export function compareExactToRational(
   value: ExactReal,
   limit: Rational,
 ): -1 | 0 | 1 {
-  return isRational(value)
-    ? compareRational(value, limit)
-    : compareAlgebraicToRational(value, limit)
+  if (isRational(value)) return compareRational(value, limit)
+  return isAlgebraic(value)
+    ? compareAlgebraicToRational(value, limit)
+    : compareCertifiedToRational(value, limit)
 }
 
 const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
@@ -220,19 +250,32 @@ const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
   return { ...value, isolating: keepRight ? [middle, hi] : [lo, middle] }
 }
 
+const refineCertified = (value: CertifiedExpressionReal): CertifiedExpressionReal => {
+  const [lo, hi] = value.isolating
+  const middle = midpoint(lo, hi)
+  const comparison = compareCertifiedToRational(value, middle)
+  if (comparison === 0) return { ...value, isolating: [middle, middle] }
+  return { ...value, isolating: comparison > 0 ? [middle, hi] : [lo, middle] }
+}
+
 /** Exact ordering for the rational/quadratic real values admitted by current T3. */
 export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1 {
   if (isRational(a)) return isRational(b) ? compareRational(a, b) : -compareExactToRational(b, a) as -1 | 0 | 1
   if (isRational(b)) return compareExactToRational(a, b)
-  validateAlgebraic(a)
-  validateAlgebraic(b)
-  if (normalizedAlgebraicKey(a) === normalizedAlgebraicKey(b)) return 0
+  if (isAlgebraic(a) && isAlgebraic(b)) {
+    validateAlgebraic(a)
+    validateAlgebraic(b)
+    if (normalizedAlgebraicKey(a) === normalizedAlgebraicKey(b)) return 0
+  }
+  if (!isAlgebraic(a) && !isAlgebraic(b)
+    && a.expressionHash === b.expressionHash
+    && JSON.stringify(a.expression) === JSON.stringify(b.expression)) return 0
   let left = a, right = b
   for (;;) {
     if (compareRational(left.isolating[1], right.isolating[0]) < 0) return -1
     if (compareRational(left.isolating[0], right.isolating[1]) > 0) return 1
-    left = refineAlgebraic(left)
-    right = refineAlgebraic(right)
+    left = isAlgebraic(left) ? refineAlgebraic(left) : refineCertified(left)
+    right = isAlgebraic(right) ? refineAlgebraic(right) : refineCertified(right)
   }
 }
 
@@ -256,6 +299,7 @@ const affinePolynomial = (scale: AlgebraicReal, factor: Rational, offset: Ration
 /** Exact affine image `factor·value+offset`; used for scale-parametric points/tangencies. */
 export function affineExact(value: ExactReal, factor: Rational, offset: Rational): ExactReal {
   if (isRational(value)) return addRational(multiplyRational(factor, value), offset)
+  if (!isAlgebraic(value)) throw new RangeError('certified affine transform is not implemented')
   if (compareRational(factor, rational(0)) === 0) return offset
   const map = (endpoint: Rational) => addRational(multiplyRational(factor, endpoint), offset)
   const a = map(value.isolating[0]), b = map(value.isolating[1])
@@ -279,6 +323,7 @@ export function signQuadraticAtExact(
       rational(0),
     )
   }
+  if (!isAlgebraic(value)) throw new RangeError('certified quadratic evaluation is not implemented')
   const [pa, pb, pc] = value.polynomial.map((coefficient) => rational(coefficient))
   const quotient = divideRational(a, pa)
   const linear = subtractRational(b, multiplyRational(quotient, pb))
