@@ -1,7 +1,7 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
 import type { BBox, CentreMeasurements, Contour, ExactReal, Pt, Rational, SafeMass, SafeSegment } from '../spec'
-import { addRational, affineExact, compareRational, divideRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
+import { addRational, affineExact, compareRational, divideRational, isRational, multiplyRational, rational, rationalFromNumber, sqrtRationalBounds, subtractRational } from './exact-real'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
@@ -325,8 +325,11 @@ export interface ExactOffsetLineFeature {
   kind: 'offset-line'
   id: string
   ring: 'outer' | `hole:${number}`
+  scale: ExactReal
   a: readonly [ExactReal, ExactReal]
   b: readonly [ExactReal, ExactReal]
+  baseA: readonly [Rational, Rational]
+  baseB: readonly [Rational, Rational]
   inwardNormalNumerator: readonly [Rational, Rational]
   normalDenominatorSquared: Rational
   clearance: Rational
@@ -350,6 +353,19 @@ export interface ExactOffsetArcFeature {
 export interface ExactOffsetFeatures {
   lines: readonly ExactOffsetLineFeature[]
   arcs: readonly ExactOffsetArcFeature[]
+}
+
+interface RadicalTerm { coefficient: Rational; radicand: Rational }
+export interface ExactAffineRadical {
+  scale: ExactReal
+  scaleCoefficient: Rational
+  constant: Rational
+  radicals: readonly RadicalTerm[]
+}
+export interface ExactOffsetIntersection {
+  kind: 'line-line'
+  featureIds: readonly [string, string]
+  point: readonly [ExactAffineRadical, ExactAffineRadical]
 }
 
 
@@ -381,9 +397,11 @@ export function buildExactOffsetFeatures(
         ? [multiplyRational(rational(-1), dy), dx]
         : [dy, multiplyRational(rational(-1), dx)]
       lines.push({
-        kind: 'offset-line', id: `${ringId}:line:${index}`, ring: ringId,
+        kind: 'offset-line', id: `${ringId}:line:${index}`, ring: ringId, scale,
         a: [affineExact(scale, a[0], rational(0)), affineExact(scale, a[1], rational(0))],
         b: [affineExact(scale, b[0], rational(0)), affineExact(scale, b[1], rational(0))],
+        baseA: a,
+        baseB: b,
         inwardNormalNumerator: normal,
         normalDenominatorSquared: addRational(multiplyRational(dx, dx), multiplyRational(dy, dy)),
         clearance,
@@ -418,4 +436,65 @@ export function buildExactOffsetFeatures(
     }
   })
   return { lines, arcs }
+}
+
+const lineRightSide = (line: ExactOffsetLineFeature): ExactAffineRadical => ({
+  scale: line.scale,
+  scaleCoefficient: addRational(
+    multiplyRational(line.inwardNormalNumerator[0], line.baseA[0]),
+    multiplyRational(line.inwardNormalNumerator[1], line.baseA[1]),
+  ),
+  constant: rational(0),
+  radicals: [{ coefficient: line.clearance, radicand: line.normalDenominatorSquared }],
+})
+
+const scaleAffineRadical = (value: ExactAffineRadical, factor: Rational): ExactAffineRadical => ({
+  ...value,
+  scaleCoefficient: multiplyRational(value.scaleCoefficient, factor),
+  constant: multiplyRational(value.constant, factor),
+  radicals: value.radicals.map((term) => ({ ...term, coefficient: multiplyRational(term.coefficient, factor) })),
+})
+
+const addAffineRadical = (left: ExactAffineRadical, right: ExactAffineRadical): ExactAffineRadical => ({
+  scale: left.scale,
+  scaleCoefficient: addRational(left.scaleCoefficient, right.scaleCoefficient),
+  constant: addRational(left.constant, right.constant),
+  radicals: [...left.radicals, ...right.radicals],
+})
+
+export function evaluateAffineRadicalBounds(value: ExactAffineRadical, bits = 192): readonly [Rational, Rational] {
+  const scaleBounds = isRational(value.scale) ? [value.scale, value.scale] as const : value.scale.isolating
+  const scaleProducts = scaleBounds.map((bound) => multiplyRational(value.scaleCoefficient, bound)) as [Rational, Rational]
+  let lo = compareRational(scaleProducts[0], scaleProducts[1]) <= 0 ? scaleProducts[0] : scaleProducts[1]
+  let hi = compareRational(scaleProducts[0], scaleProducts[1]) >= 0 ? scaleProducts[0] : scaleProducts[1]
+  lo = addRational(lo, value.constant); hi = addRational(hi, value.constant)
+  for (const term of value.radicals) {
+    const root = sqrtRationalBounds(term.radicand, bits)
+    const products = root.map((bound) => multiplyRational(term.coefficient, bound)) as [Rational, Rational]
+    lo = addRational(lo, compareRational(products[0], products[1]) <= 0 ? products[0] : products[1])
+    hi = addRational(hi, compareRational(products[0], products[1]) >= 0 ? products[0] : products[1])
+  }
+  return [lo, hi]
+}
+
+/** Solved exact line-line vertices of the offset arrangement; parallel pairs are rejected. */
+export function solveExactOffsetLineIntersections(features: ExactOffsetFeatures): ExactOffsetIntersection[] {
+  const intersections: ExactOffsetIntersection[] = []
+  for (let firstIndex = 0; firstIndex < features.lines.length; firstIndex++) {
+    for (let secondIndex = firstIndex + 1; secondIndex < features.lines.length; secondIndex++) {
+      const first = features.lines[firstIndex], second = features.lines[secondIndex]
+      const [a, b] = first.inwardNormalNumerator, [c, d] = second.inwardNormalNumerator
+      const determinant = subtractRational(multiplyRational(a, d), multiplyRational(b, c))
+      if (compareRational(determinant, rational(0)) === 0) continue
+      const firstRight = lineRightSide(first), secondRight = lineRightSide(second)
+      const x = scaleAffineRadical(addAffineRadical(
+        scaleAffineRadical(firstRight, d), scaleAffineRadical(secondRight, multiplyRational(rational(-1), b)),
+      ), divideRational(rational(1), determinant))
+      const y = scaleAffineRadical(addAffineRadical(
+        scaleAffineRadical(secondRight, a), scaleAffineRadical(firstRight, multiplyRational(rational(-1), c)),
+      ), divideRational(rational(1), determinant))
+      intersections.push({ kind: 'line-line', featureIds: [first.id, second.id], point: [x, y] })
+    }
+  }
+  return intersections
 }
