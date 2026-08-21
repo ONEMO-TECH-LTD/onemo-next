@@ -332,29 +332,26 @@ export interface ExactOffsetLineFeature {
   clearance: Rational
 }
 
-export interface ExactOffsetVertexFeature {
-  kind: 'vertex-circle'
+export interface ExactOffsetArcFeature {
+  kind: 'offset-arc'
   id: string
   ring: 'outer' | `hole:${number}`
   centre: readonly [ExactReal, ExactReal]
   clearance: Rational
-  reflex: boolean
+  startDirectionNumerator: readonly [Rational, Rational]
+  startDenominatorSquared: Rational
+  endDirectionNumerator: readonly [Rational, Rational]
+  endDenominatorSquared: Rational
+  sweep: 'clockwise' | 'counter-clockwise'
   beforeLineId: string
   afterLineId: string
 }
 
 export interface ExactOffsetFeatures {
   lines: readonly ExactOffsetLineFeature[]
-  vertices: readonly ExactOffsetVertexFeature[]
+  arcs: readonly ExactOffsetArcFeature[]
 }
 
-export interface ExactOffsetIntersectionSystem {
-  id: string
-  kind: 'line-line' | 'line-circle' | 'circle-circle'
-  featureIds: readonly [string, string]
-  scale: ExactReal
-  clearance: Rational
-}
 
 /** Exact analytic primitives whose arrangement defines one inward material offset. */
 export function buildExactOffsetFeatures(
@@ -363,7 +360,7 @@ export function buildExactOffsetFeatures(
   clearance: Rational,
 ): ExactOffsetFeatures {
   const lines: ExactOffsetLineFeature[] = []
-  const vertices: ExactOffsetVertexFeature[] = []
+  const arcs: ExactOffsetArcFeature[] = []
   const rings = [contour.outer, ...contour.holes]
   rings.forEach((ring, ringIndex) => {
     const ringId: 'outer' | `hole:${number}` = ringIndex === 0 ? 'outer' : `hole:${ringIndex - 1}`
@@ -398,50 +395,27 @@ export function buildExactOffsetFeatures(
       const before = [subtractRational(point[0], previous[0]), subtractRational(point[1], previous[1])] as const
       const after = [subtractRational(next[0], point[0]), subtractRational(next[1], point[1])] as const
       const turn = subtractRational(multiplyRational(before[0], after[1]), multiplyRational(before[1], after[0]))
-      vertices.push({
-        kind: 'vertex-circle', id: `${ringId}:vertex:${index}`, ring: ringId,
+      const reflex = compareRational(turn, rational(0)) * materialSide < 0
+      if (!reflex) continue
+      const beforeNormal: readonly [Rational, Rational] = materialSide > 0
+        ? [multiplyRational(rational(-1), before[1]), before[0]]
+        : [before[1], multiplyRational(rational(-1), before[0])]
+      const afterNormal: readonly [Rational, Rational] = materialSide > 0
+        ? [multiplyRational(rational(-1), after[1]), after[0]]
+        : [after[1], multiplyRational(rational(-1), after[0])]
+      arcs.push({
+        kind: 'offset-arc', id: `${ringId}:arc:${index}`, ring: ringId,
         centre: [affineExact(scale, point[0], rational(0)), affineExact(scale, point[1], rational(0))],
         clearance,
-        reflex: compareRational(turn, rational(0)) * materialSide < 0,
+        startDirectionNumerator: beforeNormal,
+        startDenominatorSquared: addRational(multiplyRational(before[0], before[0]), multiplyRational(before[1], before[1])),
+        endDirectionNumerator: afterNormal,
+        endDenominatorSquared: addRational(multiplyRational(after[0], after[0]), multiplyRational(after[1], after[1])),
+        sweep: materialSide > 0 ? 'clockwise' : 'counter-clockwise',
         beforeLineId: `${ringId}:line:${index}`,
         afterLineId: `${ringId}:line:${(index + 1) % points.length}`,
       })
     }
   })
-  return { lines, vertices }
-}
-
-/** Complete exact equation-system inventory for the offset arrangement; no sampled pruning. */
-export function enumerateExactOffsetIntersectionSystems(
-  features: ExactOffsetFeatures,
-  scale: ExactReal,
-): ExactOffsetIntersectionSystem[] {
-  const systems: ExactOffsetIntersectionSystem[] = []
-  const add = (
-    kind: ExactOffsetIntersectionSystem['kind'],
-    first: { id: string; clearance: Rational },
-    second: { id: string; clearance: Rational },
-  ) => {
-    if (compareRational(first.clearance, second.clearance) !== 0) return
-    const featureIds = [first.id, second.id].sort() as [string, string]
-    systems.push({
-      id: `${kind}:${featureIds[0]}:${featureIds[1]}:${JSON.stringify(scale)}`,
-      kind,
-      featureIds,
-      scale,
-      clearance: first.clearance,
-    })
-  }
-  for (let first = 0; first < features.lines.length; first++) {
-    for (let second = first + 1; second < features.lines.length; second++) {
-      add('line-line', features.lines[first], features.lines[second])
-    }
-    for (const vertex of features.vertices) add('line-circle', features.lines[first], vertex)
-  }
-  for (let first = 0; first < features.vertices.length; first++) {
-    for (let second = first + 1; second < features.vertices.length; second++) {
-      add('circle-circle', features.vertices[first], features.vertices[second])
-    }
-  }
-  return systems
+  return { lines, arcs }
 }

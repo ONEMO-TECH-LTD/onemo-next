@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildExactOffsetFeatures, enumerateExactOffsetIntersectionSystems } from '../compute/centre-evidence'
+import { buildExactOffsetFeatures } from '../compute/centre-evidence'
 import { rational } from '../compute/exact-real'
 import type { Contour } from '../spec'
 
@@ -11,18 +11,16 @@ describe('exact inward-offset primitives', () => {
     }
     const features = buildExactOffsetFeatures(dumbbell, rational(100), rational(12))
     expect(features.lines).toHaveLength(16)
-    expect(features.vertices.filter((feature) => feature.reflex).length).toBeGreaterThan(0)
+    expect(features.arcs.length).toBeGreaterThan(0)
     expect(features.lines.filter((feature) => feature.ring === 'hole:0')).toHaveLength(4)
     expect(features.lines.every((feature) => feature.normalDenominatorSquared.numerator !== '0')).toBe(true)
 
     const triangle: Contour = { outer: { pts: [[0,0],[1,0],[0,1]] }, holes: [] }
     const triple = buildExactOffsetFeatures(triangle, rational(100), rational(12))
     expect(triple.lines).toHaveLength(3)
-    expect(triple.vertices).toHaveLength(3)
-    const systems = enumerateExactOffsetIntersectionSystems(triple, rational(100))
-    expect(systems.filter((system) => system.kind === 'line-line')).toHaveLength(3)
-    expect(systems.filter((system) => system.kind === 'line-circle')).toHaveLength(9)
-    expect(systems.filter((system) => system.kind === 'circle-circle')).toHaveLength(3)
-    expect(new Set(systems.map((system) => system.id)).size).toBe(systems.length)
+    expect(triple.arcs).toHaveLength(0)
+    expect(features.arcs.some((feature) => feature.ring === 'outer')).toBe(true)
+    expect(features.arcs.filter((feature) => feature.ring === 'hole:0')).toHaveLength(4)
+    expect(features.arcs.every((feature) => feature.startDenominatorSquared.numerator !== '0')).toBe(true)
   })
 })
