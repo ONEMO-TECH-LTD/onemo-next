@@ -114,7 +114,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
     if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
     const cfgSig = JSON.stringify(cfg)
     if (mode !== 'free') {
-      const { fit, autoFlapMM } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
+      const { fit } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
       // A stepped rung renders the layout that QUALIFIED it: reach AND margin at the
@@ -124,7 +124,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         : { ...cfg, wrapMode: 'fixed', seatMarginMM: 0 }
       const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), wrapCfg)
       const contour = sized(eff)
-      ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM } })
+      const reportedAuto = autoFlapMaxMM != null && grid.wrap.status === 'lawful'
+        ? grid.wrap.appliedFlapApproxMM
+        : null
+      ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM: reportedAuto } })
     } else {
       const wrapCfg: GridConfig = autoFlapMaxMM != null
         ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
