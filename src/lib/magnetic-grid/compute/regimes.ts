@@ -1,5 +1,6 @@
 import type { Band, Contour, ExactReal, Pt, Rational } from '../spec'
 import { FIELD_POSITIONS_PER_AXIS } from '../spec'
+import { exactBoxTargetCoefficient } from './centre-evidence'
 import {
   addRational,
   canonicalExact,
@@ -139,17 +140,4 @@ export function enumerateAffineContactEvents(
   return events.filter((event, index) => index === 0 || event.id !== events[index - 1].id)
 }
 
-export const boxTargetCoefficient = (contour: Contour): QPoint => {
-  const points = contour.outer.pts.map(qPoint)
-  let minX = points[0][0], maxX = points[0][0], minY = points[0][1], maxY = points[0][1]
-  for (const [x, y] of points) {
-    if (compareRational(x, minX) < 0) minX = x
-    if (compareRational(x, maxX) > 0) maxX = x
-    if (compareRational(y, minY) < 0) minY = y
-    if (compareRational(y, maxY) > 0) maxY = y
-  }
-  return [
-    multiplyRational(addRational(minX, maxX), rational(1, 2)),
-    multiplyRational(addRational(minY, maxY), rational(1, 2)),
-  ]
-}
+export const boxTargetCoefficient = exactBoxTargetCoefficient

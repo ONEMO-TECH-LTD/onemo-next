@@ -39,10 +39,10 @@ const OWNERS = {
   'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root|identity)$/],
   'magnetic-grid/compute/exact-real.ts': [/^\.\.\/spec$/],
   'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/, /^\.\/seat$/],
-  'magnetic-grid/compute/regimes.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
+  'magnetic-grid/compute/regimes.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/, /^\.\/centre-evidence$/],
   'magnetic-grid/compute/identity.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
-  'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
+  'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/, /^\.\/seat$/],
   'magnetic-grid/logic.ts': [/^\.\/spec$/, /^\.\/compute$/],
   'magnetic-grid/engine.ts': [/^\.\/spec$/, /^\.\/compute$/, /^\.\/logic$/],
   'effect/magnetic-grid-bridge.ts': [
@@ -72,7 +72,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/regimes.ts': [
     'qPoint', 'subtract', 'dot', 'cross', 'twice', 'endpointDistance', 'lineDistance',
     'subtractRadiusSquared', 'roots', 'polynomialOf', 'relations', 'latticeOffsets',
-    'enumerateAffineContactEvents', 'boxTargetCoefficient',
+    'enumerateAffineContactEvents',
   ],
   'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness'],
   'magnetic-grid/compute/seat.ts': [
@@ -83,7 +83,10 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'makeSeatPredicate', 'makeCircleSeatPredicate', 'pressExcessMM', 'maxPressMM',
     'contactPointsMM', 'impliedFlapMM', 'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
   ],
-  'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
+  'magnetic-grid/compute/centre-evidence.ts': [
+    'safeSegments', 'centroidOf', 'measureCentreBranches',
+    'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient',
+  ],
   'magnetic-grid/logic.ts': [
     'mod', 'parityHolds', 'bandOf', 'governMass', 'centeringAnchors',
     'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'applyCoverage', 'assignSizes',

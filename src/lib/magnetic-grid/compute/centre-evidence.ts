@@ -1,6 +1,7 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
-import type { BBox, CentreMeasurements, Pt, SafeMass, SafeSegment } from '../spec'
+import type { BBox, CentreMeasurements, Contour, Pt, Rational, SafeMass, SafeSegment } from '../spec'
+import { addRational, compareRational, divideRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
@@ -264,4 +265,58 @@ export function measureCentreBranches(
     masses,
     top: top?.centreMM ?? boxCentre,
   }
+}
+
+type ExactCentrePoint = readonly [Rational, Rational]
+
+/** Exact affine coefficient of the bbox centre under uniform physical scaling. */
+export function exactBoxTargetCoefficient(contour: Contour): ExactCentrePoint {
+  const points = contour.outer.pts.map(([x, y]) => [rationalFromNumber(x), rationalFromNumber(y)] as const)
+  let minX = points[0][0], maxX = points[0][0], minY = points[0][1], maxY = points[0][1]
+  for (const [x, y] of points) {
+    if (compareRational(x, minX) < 0) minX = x
+    if (compareRational(x, maxX) > 0) maxX = x
+    if (compareRational(y, minY) < 0) minY = y
+    if (compareRational(y, maxY) > 0) maxY = y
+  }
+  return [
+    multiplyRational(addRational(minX, maxX), rational(1, 2)),
+    multiplyRational(addRational(minY, maxY), rational(1, 2)),
+  ]
+}
+
+/** Exact affine coefficient of the accepted outer-ring material centroid. */
+export function exactWeightTargetCoefficient(contour: Contour): ExactCentrePoint {
+  const measureRing = (ring: Contour['outer']): { area2: Rational; sx: Rational; sy: Rational } => {
+    const points = ring.pts.map(([x, y]) => [rationalFromNumber(x), rationalFromNumber(y)] as const)
+    let area2 = rational(0), sx = rational(0), sy = rational(0)
+    for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+      const a = points[previous], b = points[index]
+      const cross = subtractRational(multiplyRational(a[0], b[1]), multiplyRational(b[0], a[1]))
+      area2 = addRational(area2, cross)
+      sx = addRational(sx, multiplyRational(addRational(a[0], b[0]), cross))
+      sy = addRational(sy, multiplyRational(addRational(a[1], b[1]), cross))
+    }
+    if (compareRational(area2, rational(0)) < 0) {
+      return {
+        area2: multiplyRational(rational(-1), area2),
+        sx: multiplyRational(rational(-1), sx),
+        sy: multiplyRational(rational(-1), sy),
+      }
+    }
+    return { area2, sx, sy }
+  }
+  const outer = measureRing(contour.outer)
+  let twiceArea = outer.area2, sx = outer.sx, sy = outer.sy
+  for (const hole of contour.holes) {
+    const measured = measureRing(hole)
+    twiceArea = subtractRational(twiceArea, measured.area2)
+    sx = subtractRational(sx, measured.sx)
+    sy = subtractRational(sy, measured.sy)
+  }
+  if (compareRational(twiceArea, rational(0)) <= 0) return exactBoxTargetCoefficient(contour)
+  return [
+    divideRational(sx, multiplyRational(rational(3), twiceArea)),
+    divideRational(sy, multiplyRational(rational(3), twiceArea)),
+  ]
 }
