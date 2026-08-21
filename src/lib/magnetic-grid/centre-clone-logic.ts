@@ -1,28 +1,19 @@
 // grid-origin-logic.ts — LOGIC: policies. Reads what compute measured; weighs with spec's values.
 
-import type { Pt } from '../effect/types'
+import type { Anchor, Band, CentreMode, Governor, MagnetDia, MagnetPlan, Pt, SafeSegment } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
-} from './centre-clone-spec'
-import { bbox, splitPerimeter, type SafeSegment } from './centre-clone-compute'
-import type { Band } from './centre-clone-spec'
+} from './spec'
+import { bbox, splitPerimeter } from './centre-clone-compute'
 
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
 export function bandOf(sizeMM: number): Band | null {
   for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
   return null
 }
-
-export type MagnetPlan = 'all6' | 'all8' | 'corners8'
-export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
-
-export interface Anchor { p: Pt; dia: MagnetDia }
-
-export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
-export type Governor = 0 | 1 | 2 | 3
 
 /** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity) ·
  *  3 top-small — RULED 2026-08-19: among masses in the shape's upper half the smallest governs;

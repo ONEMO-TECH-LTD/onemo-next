@@ -1,7 +1,7 @@
 // grid-origin.ts — the engine bridge: computeGrid and the band snap, wiring spec + compute + logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { Contour, Pt } from '../effect/types'
+import type { BBox, BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
 import {
   BANDS,
   CENTRE_MODE,
@@ -14,10 +14,9 @@ import {
   PADDING_FLOOR_MM,
   RELEASED_PADDING_MM,
   CONTACT_TOLERANCE_MM,
-} from './centre-clone-spec'
+} from './spec'
 import {
   bbox,
-  type BBox,
   centroidOf,
   fieldSpanMM,
   contactPointsMM,
@@ -29,7 +28,6 @@ import {
   safeSegments,
   spotRadiusOf,
   TANGENT_GUARD_MM,
-  type SafeSegment,
 } from './centre-clone-compute'
 import {
   applyCoverage,
@@ -37,13 +35,9 @@ import {
   bandOf,
   centeringAnchors,
   governMass,
-  type Anchor,
-  type CentreMode,
-  type Governor,
-  type MagnetPlan,
 } from './centre-clone-logic'
 
-export * from './centre-clone-spec'
+export * from './spec'
 export {
   fieldSpanMM,
   impliedFlapMM,
@@ -51,60 +45,8 @@ export {
   safeSegments,
   scaleContour,
   spotRadiusOf,
-  type SafeMass,
-  type SafeSegment,
 } from './centre-clone-compute'
-export { bandOf, type Anchor, type MagnetDia, type MagnetPlan } from './centre-clone-logic'
-
-export interface GridConfig {
-  pitchMM?: number
-  paddingMM?: number
-  /** How far material may extend past a spot's edge before it counts as a flap. 0 = edge-to-edge. */
-  flapMM?: number
-  /** How finely the lattice slides under the shape when searching registrations. */
-  phaseStepMM?: number
-  /** Manual calibration: force this registration (mm phase) instead of searching. */
-  forcePhaseMM?: Pt
-  /** Clearance a region must survive to count as a mass for centring. */
-  massDepthMM?: number
-  /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
-  centreMode?: number
-  /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */
-  governor?: number
-  /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
-  segmentsDetail?: 'full' | 'light'
-  /** CONTACT LAW margin (Dan, 2026-08-19): the flap allowance is an invisible margin worn by
-   *  every disc — seats must clear spot + margin from the edge, and a band option is the size
-   *  where the shape's edge presses against the margined disc. */
-  seatMarginMM?: number
-  /** Per-size solve reuse for band walks — owned by the caller (the worker). */
-  solveCache?: Map<number, GridResult>
-  plan?: MagnetPlan
-  perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
-  /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
-  circle?: boolean
-}
-
-export interface GridResult {
-  anchors: Anchor[]
-  pitchCentreMM: number
-  /** Every lattice position at the chosen phase, seated or not. */
-  lattice: Pt[]
-  /** The phase the search chose, mm. */
-  phaseMM: Pt
-  /** Registration offset from the canonical phase, mm per axis — the pan class. */
-  panMM: Pt
-  /** The spot radius the erosion used — the padding, centre-measured. */
-  spotRadiusMM: number
-  /** Outline points where a disc touches (within one snap step of its margined edge). */
-  contactsMM: Pt[]
-  /** The legal area's islands with depth masses — what centring anchored on. */
-  segments: SafeSegment[]
-  /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
-  centresMM: Pt[]
-  /** THE centre that governed the winning layout — the main point of the centring system. */
-  centreMainMM: Pt
-}
+export { bandOf } from './centre-clone-logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 /** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
@@ -222,9 +164,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     centreMainMM: mainCentre,
   }
 }
-
-/** One holding rung in a band: the size and its seat count. */
-export interface BandSnapPoint { sizeMM: number; count: number }
 
 /** The walk range: the band as a RANGE; above the last band, up to the derived field span. */
 function snapRange(cfg: GridConfig, fromMM: number): [number, number] {

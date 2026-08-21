@@ -1,17 +1,15 @@
 // grid-origin-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
-import type { Contour, Pt } from '../effect/types'
+import type { BBox, Contour, Pt, SafeMass, SafeSegment } from './spec'
 import { pointInPolygon } from '../effect/attachment'
 import { holds, prepare } from './centre-clone-geometry'
-import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './centre-clone-spec'
+import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './spec'
 
 /** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
 export const TANGENT_GUARD_MM = 0.05
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
 const KEY_QUANTUM_MM = 0.01
-
-export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -284,33 +282,6 @@ export function impliedFlapMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt
   let g = 0
   for (const a of seated) { const d = edgeDistMM(outer, a) - spotRadiusMM; if (d > g) g = d }
   return Math.max(0, g)
-}
-
-/** A mass inside an island — the region surviving the depth probe, with its outline. */
-export interface SafeMass {
-  areaMM2: number
-  /** The deepest point of the mass — always inside the material. */
-  centreMM: Pt
-  /** The mass's peak clearance, mm. */
-  peakClearMM: number
-  bbox: BBox
-  rings: Pt[][]
-}
-
-/** One connected island of the legal magnet-centre area, measured on a mesh. */
-export interface SafeSegment {
-  areaMM2: number
-  /** The island's deepest point — max clearance, never a concave void. */
-  centreMM: Pt
-  /** The island's area-average point — can sit in a concave void; a test-mode reference. */
-  meanMM: Pt
-  /** The island's peak clearance, mm — how deep its most buried point sits. */
-  peakClearMM: number
-  bbox: BBox
-  /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
-  rings: Pt[][]
-  /** Sub-masses at the depth probe: limbs and slivers die shallow, true masses survive. */
-  masses: SafeMass[]
 }
 
 /** Marching-squares topology: per corner-sign mask (array position), the cell-edge pairs a

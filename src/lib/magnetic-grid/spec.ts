@@ -85,3 +85,77 @@ export const GOVERNOR = 0
  *  0 box · 1 core (erosion mean) · 2 masses (adaptive, default) · 3 weight (material
  *  centroid) · 4 deep (deepest point) · 5 top (highest mass). */
 export const CENTRE_MODE = 2
+
+export type Pt = [number, number]
+export interface Ring { pts: Pt[] }
+export interface Contour { outer: Ring; holes: Ring[] }
+export interface BBox { minX: number; minY: number; maxX: number; maxY: number }
+
+export interface SafeMass {
+  areaMM2: number
+  centreMM: Pt
+  peakClearMM: number
+  bbox: BBox
+  rings: Pt[][]
+}
+
+export interface SafeSegment extends SafeMass {
+  meanMM: Pt
+  masses: SafeMass[]
+}
+
+export type MagnetPlan = 'all6' | 'all8' | 'corners8'
+export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
+export interface Anchor { p: Pt; dia: MagnetDia }
+export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
+export type Governor = 0 | 1 | 2 | 3
+
+export interface CentreMeasurements {
+  box: Pt
+  weight: Pt
+  core: Pt
+  deep: Pt
+  masses: SafeMass[]
+  top: Pt
+}
+
+export interface CentrePlacementMeasurement {
+  phaseMM: Pt
+  seated: Pt[]
+  canon: number
+  excessMM: number
+}
+
+export interface PerimeterMeasurement { belt: Pt[]; interior: Pt[] }
+
+export interface GridConfig {
+  pitchMM?: number
+  paddingMM?: number
+  flapMM?: number
+  phaseStepMM?: number
+  forcePhaseMM?: Pt
+  massDepthMM?: number
+  centreMode?: number
+  governor?: number
+  segmentsDetail?: 'full' | 'light'
+  seatMarginMM?: number
+  solveCache?: Map<number, GridResult>
+  plan?: MagnetPlan
+  perimeterOnly?: boolean
+  circle?: boolean
+}
+
+export interface GridResult {
+  anchors: Anchor[]
+  pitchCentreMM: number
+  lattice: Pt[]
+  phaseMM: Pt
+  panMM: Pt
+  spotRadiusMM: number
+  contactsMM: Pt[]
+  segments: SafeSegment[]
+  centresMM: Pt[]
+  centreMainMM: Pt
+}
+
+export interface BandSnapPoint { sizeMM: number; count: number }
