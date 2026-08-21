@@ -1,7 +1,7 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
-import type { BBox, CentreMeasurements, Contour, Pt, Rational, SafeMass, SafeSegment } from '../spec'
-import { addRational, compareRational, divideRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
+import type { BBox, CentreMeasurements, Contour, ExactReal, Pt, Rational, SafeMass, SafeSegment } from '../spec'
+import { addRational, affineExact, compareRational, divideRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
@@ -319,4 +319,86 @@ export function exactWeightTargetCoefficient(contour: Contour): ExactCentrePoint
     divideRational(sx, multiplyRational(rational(3), twiceArea)),
     divideRational(sy, multiplyRational(rational(3), twiceArea)),
   ]
+}
+
+export interface ExactOffsetLineFeature {
+  kind: 'offset-line'
+  id: string
+  ring: 'outer' | `hole:${number}`
+  a: readonly [ExactReal, ExactReal]
+  b: readonly [ExactReal, ExactReal]
+  inwardNormalNumerator: readonly [Rational, Rational]
+  normalDenominatorSquared: Rational
+  clearance: Rational
+}
+
+export interface ExactOffsetVertexFeature {
+  kind: 'vertex-circle'
+  id: string
+  ring: 'outer' | `hole:${number}`
+  centre: readonly [ExactReal, ExactReal]
+  clearance: Rational
+  reflex: boolean
+  beforeLineId: string
+  afterLineId: string
+}
+
+export interface ExactOffsetFeatures {
+  lines: readonly ExactOffsetLineFeature[]
+  vertices: readonly ExactOffsetVertexFeature[]
+}
+
+/** Exact analytic primitives whose arrangement defines one inward material offset. */
+export function buildExactOffsetFeatures(
+  contour: Contour,
+  scale: ExactReal,
+  clearance: Rational,
+): ExactOffsetFeatures {
+  const lines: ExactOffsetLineFeature[] = []
+  const vertices: ExactOffsetVertexFeature[] = []
+  const rings = [contour.outer, ...contour.holes]
+  rings.forEach((ring, ringIndex) => {
+    const ringId: 'outer' | `hole:${number}` = ringIndex === 0 ? 'outer' : `hole:${ringIndex - 1}`
+    const points = ring.pts.map(([x, y]) => [rationalFromNumber(x), rationalFromNumber(y)] as const)
+    let area2 = rational(0)
+    for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+      area2 = addRational(area2, subtractRational(
+        multiplyRational(points[previous][0], points[index][1]),
+        multiplyRational(points[index][0], points[previous][1]),
+      ))
+    }
+    const orientation = compareRational(area2, rational(0)) >= 0 ? 1 : -1
+    const materialSide = ringIndex === 0 ? orientation : -orientation
+    for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+      const a = points[previous], b = points[index]
+      const dx = subtractRational(b[0], a[0]), dy = subtractRational(b[1], a[1])
+      const normal: readonly [Rational, Rational] = materialSide > 0
+        ? [multiplyRational(rational(-1), dy), dx]
+        : [dy, multiplyRational(rational(-1), dx)]
+      lines.push({
+        kind: 'offset-line', id: `${ringId}:line:${index}`, ring: ringId,
+        a: [affineExact(scale, a[0], rational(0)), affineExact(scale, a[1], rational(0))],
+        b: [affineExact(scale, b[0], rational(0)), affineExact(scale, b[1], rational(0))],
+        inwardNormalNumerator: normal,
+        normalDenominatorSquared: addRational(multiplyRational(dx, dx), multiplyRational(dy, dy)),
+        clearance,
+      })
+    }
+    for (let index = 0; index < points.length; index++) {
+      const previous = points[(index + points.length - 1) % points.length]
+      const point = points[index], next = points[(index + 1) % points.length]
+      const before = [subtractRational(point[0], previous[0]), subtractRational(point[1], previous[1])] as const
+      const after = [subtractRational(next[0], point[0]), subtractRational(next[1], point[1])] as const
+      const turn = subtractRational(multiplyRational(before[0], after[1]), multiplyRational(before[1], after[0]))
+      vertices.push({
+        kind: 'vertex-circle', id: `${ringId}:vertex:${index}`, ring: ringId,
+        centre: [affineExact(scale, point[0], rational(0)), affineExact(scale, point[1], rational(0))],
+        clearance,
+        reflex: compareRational(turn, rational(0)) * materialSide < 0,
+        beforeLineId: `${ringId}:line:${index}`,
+        afterLineId: `${ringId}:line:${(index + 1) % points.length}`,
+      })
+    }
+  })
+  return { lines, vertices }
 }

@@ -86,7 +86,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   ],
   'magnetic-grid/compute/centre-evidence.ts': [
     'safeSegments', 'centroidOf', 'measureCentreBranches',
-    'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient',
+    'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient', 'buildExactOffsetFeatures',
   ],
   'magnetic-grid/logic.ts': [
     'mod', 'parityHolds', 'bandOf', 'governMass', 'centeringAnchors',
