@@ -949,6 +949,13 @@ export interface ExactCoordinatePolynomialRequest {
 
 export interface PiecePredicateSystemRequest {
   pieceId: string
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  boundaryGeneratorId: string
+  chart: 'line' | 0 | 1
+  lower: ExactPieceParameter
+  upper: ExactPieceParameter
+  directedChartOrdinal: number
+  parameterDirection: 'LOWER_TO_UPPER' | 'UPPER_TO_LOWER'
   originalPredicateIdentity: string
   generatorsInPolynomialSlotOrder: readonly AlgebraicGeneratorRequest[]
   polynomialTokens: readonly string[]
@@ -961,6 +968,13 @@ export interface PiecePredicateSystemRequest {
 export interface CertifiedPiecePredicateSystem {
   requestIdentity: string
   pieceId: string
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  boundaryGeneratorId: string
+  chart: 'line' | 0 | 1
+  lower: ExactPieceParameter
+  upper: ExactPieceParameter
+  directedChartOrdinal: number
+  parameterDirection: 'LOWER_TO_UPPER' | 'UPPER_TO_LOWER'
   originalPredicateIdentity: string
   canonicalPolynomialTokens: readonly string[]
   canonicalPointCoordinates: readonly [
@@ -1017,15 +1031,35 @@ export interface RawPiecePredicateProofResult {
 
 export interface FinalizedPiecePredicateRoot {
   rootId: string
-  certificate: PiecePredicateRootCertificate
+  representative: PiecePredicateRootCertificate
+  members: readonly {
+    requestIdentity: string
+    rootReplayKey: string
+    certificate: PiecePredicateRootCertificate
+  }[]
 }
 
 export interface FinalPiecePredicateProofResult {
-  requestIdentity: string
+  batchIdentity: string
+  memberRequestIdentities: readonly string[]
   proofIdentity: string
   roots: readonly FinalizedPiecePredicateRoot[]
   intervalProofs: readonly PiecePredicateProof[]
   backSubstitutions: readonly CandidateBackSubstitutionProof[]
+}
+
+export interface CertifiedPiecePredicateBatch {
+  batchIdentity: string
+  pieceId: string
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  boundaryGeneratorId: string
+  originalPredicateIdentity: string
+  systems: readonly CertifiedPiecePredicateSystem[]
+}
+
+export interface RawPiecePredicateProofBatch {
+  batchIdentity: string
+  results: readonly RawPiecePredicateProofResult[]
 }
 ```
 
@@ -1033,19 +1067,27 @@ export interface FinalPiecePredicateProofResult {
 
 Engine passes the request to `identity.ts::certifyPiecePredicateSystemRequest()`. Identity validates token grammar and identical arity `1 + generatorsInPolynomialSlotOrder.length` for the predicate and all four coordinate numerator/denominator token arrays. Each coordinate denominator must be nonzero as a symbolic polynomial; exact nonzero at a root is proved later by exact math.
 
+Identity requires `predicateId` be one declared predicate family and `boundaryGeneratorId` be a nonempty canonical supplied-boundary feature identity; neither is parsed from another ID. For `chart:'line'`, both bounds are `{kind:'line'}`. For chart `0|1`, both are `{kind:'arc'}` with the same chart. Identity validates both exact values and requires numeric `lower < upper`. `parameterDirection` records directed traversal; `directedChartOrdinal` is a nonnegative integer assigned sequentially across pole-split intervals.
+
+Identity owns `canonicalPieceParameter(parameter)`: line serializes as `['line', canonicalExact(parameter.t)]`; arc serializes as `['arc', parameter.chart, canonicalExact(parameter.q)]`. Parameter records are never passed directly to `canonicalExact`.
+
 Identity certifies each generator request with the approved represented-root proof, sorts/deduplicates unique generators by `generatorIdentity`, and produces `requestSlotToGeneratorSlot`. Multiple request slots may map to one generator. Identity rewrites every predicate and coordinate exponent vector into canonical slots: piece parameter remains slot 0; generator exponents mapped to the same canonical generator are summed; like terms combine; zero terms disappear; canonical encoder runs afterward. Reordering request generators and corresponding polynomial slots is invariant. Reordering generators without the corresponding polynomial-slot permutation changes the polynomial/request and cannot be hidden.
 
 `requestIdentity` hashes:
 
 ```text
-['piece-predicate-request-v2', pieceId, originalPredicateIdentity,
+['piece-predicate-request-v3', pieceId, predicateId, boundaryGeneratorId,
+ chart, canonicalPieceParameter(lower), canonicalPieceParameter(upper),
+ directedChartOrdinal, parameterDirection, originalPredicateIdentity,
  canonicalPolynomialTokens,
  canonical x numerator/denominator tokens,
  canonical y numerator/denominator tokens,
  ordered generator identities]
 ```
 
-Engine passes only `CertifiedPiecePredicateSystem` to `exact-real.ts::evaluateCertifiedPiecePredicateSystem()`. Exact math verifies arity and performs the approved elimination, root isolation, interval, algebraic-tuple and back-substitution algorithms. For every retained root it emits one `RawPiecePredicateRoot` and exactly one `RawRootPointProof`.
+All systems for one piece/predicate/boundary generator are certified individually, then passed to `identity.ts::certifyPiecePredicateBatch()`. Identity requires common `pieceId`, `predicateId`, `boundaryGeneratorId` and `originalPredicateIdentity`, unique contiguous chart ordinals from zero, and no duplicate member request IDs. Systems sort by directed chart ordinal then request identity. Batch identity hashes the four shared fields plus ordered member request identities.
+
+Engine passes each batch member `CertifiedPiecePredicateSystem` to `exact-real.ts::evaluateCertifiedPiecePredicateSystem()` and assembles `RawPiecePredicateProofBatch` without inspecting results. Exact math verifies arity and the numeric open domain, performs the approved elimination, root isolation, interval, algebraic-tuple and back-substitution algorithms, and copies predicate/boundary/chart/domain fields into raw evidence. For every retained root it emits one `RawPiecePredicateRoot` and exactly one `RawRootPointProof`. Roots equal to either numeric bound are excluded from open roots and remain boundary-site evidence.
 
 `rootReplayKey` is the canonical non-semantic replay tuple:
 
@@ -1055,7 +1097,7 @@ Engine passes only `CertifiedPiecePredicateSystem` to `exact-real.ts::evaluateCe
 
 Exact math evaluates each canonical coordinate numerator and denominator through the approved algebraic-tuple evaluator, proves denominator nonzero, forms the exact quotient, and stores raw x/y tuple-value reductions without `proofId` beside the exact point values. It creates no SHA or semantic root/proof identity and rejects any supplied raw `proofId` field. Raw interval signs reference adjacent roots only by `lowerRootReplayKey` / `upperRootReplayKey`.
 
-Engine passes the certified request and raw result to `identity.ts::finalizePiecePredicateProofResult()`. Identity requires exact `requestIdentity` equality. It recomputes every `rootReplayKey` from its raw root certificate and requires a one-to-one bijection between raw roots and raw root-point proofs. Missing, duplicate or foreign keys refuse.
+Engine passes the certified batch and raw batch to `identity.ts::finalizePiecePredicateProofBatch()`. Identity requires exact `batchIdentity` equality and a one-to-one mapping of member request identity to raw result. Every replay reference is scoped as `[memberRequestIdentity, rootReplayKey]`. It recomputes each replay key from its raw certificate and requires a one-to-one bijection between raw roots and raw root-point proofs inside each member. Missing, duplicate or foreign members/keys refuse.
 
 For each root point, Identity reconstructs and validates the root algebraic tuple, validates both raw coordinate reductions against the certified canonical coordinate expressions, computes each finalized `AlgebraicTupleValueProof.proofId`, validates each returned `ExactReal`, and requires the exact x/y values equal the evaluated quotients. Identity then computes the approved semantic root ID from:
 
@@ -1064,9 +1106,11 @@ For each root point, Identity reconstructs and validates the root algebraic tupl
  canonicalExactPoint({x,y}), multiplicity, originalPredicateIdentity]
 ```
 
-Identity wraps each certificate as `FinalizedPiecePredicateRoot`, sorts by `rootId`, and converts every raw interval replay-key reference into exactly one semantic `rootId`. Missing, duplicate or foreign interval references refuse. It canonicalizes interval/back-substitution arrays and hashes ordered `[rootId, certificate]`, finalized interval proofs and back-substitutions into `proofIdentity`.
+After all members validate, Identity merges roots across members only when the complete semantic preimage agrees: piece, predicate, generator, evaluated exact point, multiplicity and original predicate. Differing chart/q representations may merge; differing semantic fields do not. Each merged root retains sorted unique member records `{requestIdentity, rootReplayKey, certificate}`. Empty, foreign, duplicate or incomplete member provenance refuses.
 
-Engine returns only `FinalPiecePredicateProofResult` to `centre-evidence.ts` for named-piece splitting. Engine does not inspect terms, geometry, proof dispositions, laws or refusals. These are private compute-stage records; no public API, callback, service object, module, duplicate SHA implementation or import-law exception is added.
+Identity chooses `representative` by `directedChartOrdinal`, then exact parameter under `parameterDirection`, then request identity. It sorts finalized roots by that directed order, converts every member-local interval replay-key reference into exactly one semantic root ID, canonicalizes interval/back-substitution arrays, and hashes batch/member provenance, ordered roots/members, finalized interval proofs and back-substitutions into `proofIdentity`. Member provenance is excluded from `rootId` but included in `proofIdentity`. Cross-member multiplicity/back-substitution conflict refuses.
+
+Engine returns only `FinalPiecePredicateProofResult` to `centre-evidence.ts` for named-piece splitting in ordinal/direction order. Engine does not inspect terms, geometry, proof dispositions, laws or refusals. These are private compute-stage records; no public API, callback, service object, module, duplicate SHA implementation or import-law exception is added.
 
 Required dataflow mutations:
 
@@ -1075,15 +1119,26 @@ Required dataflow mutations:
 45. Reverse request generator order without permuting predicate/coordinate slots: changed request identity; no hidden caller error.
 46. Any predicate or coordinate token arity mismatch, zero coordinate denominator or noncanonical token: refusal before elimination.
 47. Certified generator proofs mismatch requests/root certificates: refusal.
-48. Raw result or root point from another request: refusal and no identities.
-49. Drop, duplicate or swap rootReplayKey/root-point records: refusal.
-50. Raw interval sign references missing/duplicate/foreign replay key: refusal.
+48. Raw member/result/root point from another batch or request: refusal and no identities.
+49. Drop, duplicate or swap request-scoped rootReplayKey/root-point records: refusal.
+50. Raw interval sign references missing/duplicate/foreign request-scoped replay key: refusal.
 51. Alter x or y numerator/denominator with unchanged predicate: request identity changes; old raw result refuses.
-52. Same geometric root through chart/refined-isolator replay records: exact points agree and semantic root ID is equal although replay keys may differ.
-53. Reorder raw root/point/interval/back-substitution arrays: one canonical finalized proof.
+52. Same geometric root through chart 0 and chart 1 with differing q parameters: one semantic root whose members contain both chart request IDs/certificates.
+53. Reorder certified systems and raw root/point/interval/back-substitution arrays: one canonical batch/finalized proof.
 54. Forge coordinate tuple proof or exact point value: finalizer refuses.
 55. Remove either identity stage or add `centre-evidence -> identity` / `exact-real -> identity`: separation guard fails.
 56. Forge or omit a raw coordinate reduction, or supply a `proofId` from exact-real: finalizer refuses; removing Identity-owned tuple-value `proofId` creation fails.
+57. Reverse batch system/result order: identical batch/final proof.
+58. Missing/duplicate/foreign batch member or incomplete per-root member provenance: refusal.
+59. Same replay-key string in two members but different exact points: request scoping prevents collision.
+60. Same exact point but different predicate/generator semantic preimage: distinct roots with only their own member sets.
+61. Cross-member multiplicity/back-substitution conflict for one semantic root: typed unresolved, no partial roots.
+62. Same polynomial under line chart, arc chart or different boundary generator: distinct request/root certificates.
+63. Parameter kind/chart mismatch, equal/reversed numeric bounds, invalid exact value, empty generator ID, negative/noninteger/duplicate/noncontiguous chart ordinal or invalid parameter direction: refusal before exact evaluation.
+64. Ascending versus descending traversal over the same numeric arc domain: request identities differ, canonical roots are equal, final traversal follows ordinal+direction without changing semantic root IDs.
+65. Root exactly at lower/upper bound: absent from open roots and owned once by boundary-site evidence.
+66. Raw root/sign predicate, boundary generator, chart or domain differs from certified request: finalizer refuses.
+67. Batch mixes predicate families or boundary generators: batch certification refuses.
 
 Necessity: only evidence and handoffs already required by the approved geometric root identity and ownership law are added; Engine remains neutral and surfaces remain private.
 
