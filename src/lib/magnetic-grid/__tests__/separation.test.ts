@@ -36,9 +36,10 @@ const donorBytes = (file: string): Buffer => execFileSync('git', ['show', `8d177
 
 const OWNERS = {
   'magnetic-grid/spec.ts': [] as RegExp[],
-  'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root)$/],
+  'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root|identity)$/],
   'magnetic-grid/compute/exact-real.ts': [/^\.\.\/spec$/],
   'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
+  'magnetic-grid/compute/identity.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
   'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/],
   'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
   'magnetic-grid/logic.ts': [/^\.\/spec$/, /^\.\/compute$/],
@@ -56,14 +57,15 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/exact-real.ts': [
     'abs', 'gcd', 'q', 'fromPublic', 'toPublic', 'rational', 'rationalFromNumber',
     'addRational', 'subtractRational', 'multiplyRational', 'divideRational', 'squareRational',
-    'compareRational', 'integerSqrt', 'exactSquareRoot', 'primitivePolynomial',
+    'compareRational', 'integerSqrt', 'exactSquareRoot', 'primitivePolynomial', 'allowancePolynomial',
     'sqrtMinusRational', 'isRational', 'evaluatePolynomial', 'compareAlgebraicToRational',
     'compareExactToRational', 'approximateExact', 'canonicalExact',
   ],
   'magnetic-grid/compute/contact-root.ts': [
-    'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToSegment',
-    'witnessForAnchor', 'measureWrap',
+    'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'cross', 'locateInRing', 'insideMaterial', 'pointToElement',
+    'exactScale', 'prepareContour', 'measureWrap',
   ],
+  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness'],
   'magnetic-grid/compute/seat.ts': [
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
     'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
@@ -80,7 +82,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',
   ],
   'effect/magnetic-grid-bridge.ts': [
-    'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',
+    'contourIdentity', 'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',
     'sizeRange', 'fieldSpots', 'seatedSpots',
   ],
 }
@@ -165,7 +167,7 @@ const ownerKindViolations = (file: keyof typeof OWNERS, text: string): string[] 
   return violations
 }
 
-describe('magnetic-grid T2 owner DAG', () => {
+describe('magnetic-grid current-phase owner DAG', () => {
   it('every final owner imports only its contracted dependencies', () => {
     for (const file of Object.keys(OWNERS) as Array<keyof typeof OWNERS>) {
       const bad = forbiddenImports(file, readFileSync(join(ROOT, file), 'utf8'))
@@ -176,7 +178,7 @@ describe('magnetic-grid T2 owner DAG', () => {
   it('every final owner matches the explicit T2 phase profile', () => {
     for (const file of Object.keys(OWNERS) as Array<keyof typeof OWNERS>) {
       const bad = ownerKindViolations(file, readFileSync(join(ROOT, file), 'utf8'))
-      expect(bad, `${file} diverges from its T2 owner/profile allowlist`).toEqual([])
+      expect(bad, `${file} diverges from its current owner/profile allowlist`).toEqual([])
     }
   })
 
@@ -192,7 +194,7 @@ describe('magnetic-grid T2 owner DAG', () => {
       .toEqual(['./compute/seat'])
   })
 
-  it('rejects additions beyond the exact T2 preserved-body allowlist', () => {
+  it('rejects additions beyond the exact current-phase body allowlist', () => {
     expect(ownerKindViolations('magnetic-grid/spec.ts', 'export const derived = () => 1 + 1')).toContain('spec-function')
     expect(ownerKindViolations('magnetic-grid/logic.ts', 'export function newGeometry() {}').some((v) => v.startsWith('t2-function-set:'))).toBe(true)
     expect(ownerKindViolations('magnetic-grid/compute/seat.ts', 'type Leak = CentreMode')).toContain('compute-policy:CentreMode')

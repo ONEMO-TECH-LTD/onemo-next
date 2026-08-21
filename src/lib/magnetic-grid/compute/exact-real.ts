@@ -94,23 +94,29 @@ const primitivePolynomial = (coefficients: bigint[]): string[] => {
   return normalized.map((coefficient) => coefficient.toString())
 }
 
+export function allowancePolynomial(squaredDistance: Rational, radius: Rational): string[] {
+  const distance = fromPublic(squaredDistance)
+  const r = fromPublic(radius)
+  return primitivePolynomial([
+    distance.d * r.d * r.d,
+    BigInt(2) * distance.d * r.n * r.d,
+    distance.d * r.n * r.n - distance.n * r.d * r.d,
+  ])
+}
+
 /** Exact `sqrt(squaredDistance) - radius`; irrational results carry a certified dyadic isolating interval. */
 export function sqrtMinusRational(squaredDistance: Rational, radius: Rational): ExactReal {
   const exactRoot = exactSquareRoot(squaredDistance)
   if (exactRoot) return subtractRational(exactRoot, radius)
   const distance = fromPublic(squaredDistance)
   if (distance.n < BigInt(0)) throw new RangeError('negative squared distance')
-  const r = fromPublic(radius)
   const bits = 128
   const scale = BigInt(1) << BigInt(bits)
   const scaledFloor = (distance.n << BigInt(bits * 2)) / distance.d
   const lowerRoot = rational(integerSqrt(scaledFloor), scale)
   const upperRoot = addRational(lowerRoot, rational(1, scale))
-  const a = distance.d * r.d * r.d
-  const b = BigInt(2) * distance.d * r.n * r.d
-  const c = distance.d * r.n * r.n - distance.n * r.d * r.d
   return {
-    polynomial: primitivePolynomial([a, b, c]),
+    polynomial: allowancePolynomial(squaredDistance, radius),
     isolating: [subtractRational(lowerRoot, radius), subtractRational(upperRoot, radius)],
     rootIndex: 1,
   }

@@ -24,6 +24,10 @@ import {
   measureCentrePlacements,
   measureExtremeCorners,
   measureWrap,
+  approximateExact,
+  certifyContactWitness,
+  contourBoundaryTruth,
+  prepareContour,
   rationalFromNumber,
   safeSegments,
   splitPerimeter,
@@ -43,6 +47,7 @@ import {
 export * from './spec'
 export {
   fieldSpanMM,
+  contourBoundaryTruth,
   latticeOver,
   safeSegments,
   scaleContour,
@@ -113,7 +118,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const belt = bestSeated.length <= 4 ? bestSeated : split.belt
   const coverage = applyCoverage(bestSeated, perimeterOnly, split)
   const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
-  const wrapMeasured = measureWrap(outer, belt, spotRadiusOf(pad))
+  const preparedWrap=prepareContour(contourMM,contourBoundaryTruth(contourMM))
+  const wrapGeometry=measureWrap(preparedWrap,belt,spotRadiusOf(pad))
+  const wrapMeasured={...wrapGeometry,witnesses:wrapGeometry.witnesses.map(certifyContactWitness)}
   const wrap = cfg.wrapMode === 'auto'
     ? evaluateWrap(wrapMeasured, {
       mode: 'auto',
@@ -129,7 +136,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   return {
     anchors,
     // Truth dots are projections stored by exact segment witnesses; no guard/tolerance can draw one.
-    contactsMM: wrap.status === 'lawful' ? wrap.witnesses.map((witness) => witness.tangency.approximateMM) : [],
+    contactsMM: wrap.status === 'lawful' ? wrap.witnesses.map((witness) => [
+      approximateExact(witness.tangency.x), approximateExact(witness.tangency.y),
+    ] as Pt) : [],
     pitchCentreMM: pitch,
     lattice,
     phaseMM: [bestOx, bestOy],

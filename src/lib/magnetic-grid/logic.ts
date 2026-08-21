@@ -109,7 +109,14 @@ export function chooseCentrePlacement(
 export function evaluateWrap(measured: WrapMeasurement, policy: WrapPolicy): WrapEvaluation {
   const allowed = policy.mode === 'fixed' ? policy.allowance : policy.cap
   const allowedApproxMM = policy.mode === 'fixed' ? policy.allowanceApproxMM : policy.capApproxMM
-  if (!measured.seatLegal || compareExactToRational(measured.requiredFlap, allowed) > 0) {
+  if (measured.refusal) {
+    return {
+      status: 'refused', code: measured.refusal.code, reason: measured.refusal.reason,
+      requiredFlap: measured.requiredFlap, requiredFlapApproxMM: measured.requiredFlapApproxMM,
+      allowedFlap: allowed, allowedFlapApproxMM: allowedApproxMM, witnesses: measured.witnesses,
+    }
+  }
+  if (compareExactToRational(measured.requiredFlap, allowed) > 0) {
     return {
       status: 'refused',
       code: 'WRAP_EXCEEDS_ALLOWANCE',

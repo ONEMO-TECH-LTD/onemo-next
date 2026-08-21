@@ -87,26 +87,55 @@ export const GOVERNOR = 0
 export const CENTRE_MODE = 2
 
 export type Pt = [number, number]
-export interface Rational { numerator: string; denominator: string }
+export type ExactInteger = string
+export interface Rational { numerator: ExactInteger; denominator: ExactInteger }
 export interface AlgebraicReal {
   polynomial: readonly string[]
   isolating: readonly [Rational, Rational]
   rootIndex: number
 }
 export type ExactReal = Rational | AlgebraicReal
+export interface ExactScale { exact: ExactReal; approximateMM: number }
+export interface BoundaryElement {
+  kind: 'segment'
+  id: string
+  a: readonly [Rational, Rational]
+  b: readonly [Rational, Rational]
+}
+export interface BoundaryTruth {
+  rule: 'supplied-final-contour'
+  contourIdentity: string
+}
+export interface PreparedContour {
+  source: Contour
+  boundary: readonly BoundaryElement[]
+  truth: BoundaryTruth
+  identity: string
+}
 export interface ContactWitness {
-  anchor: Pt
-  outlineSegmentIndex: number
-  squaredDistance: Rational
-  tangency: { x: Rational; y: Rational; approximateMM: Pt }
-  requiredFlap: ExactReal
+  scale: ExactScale
+  boundaryTruth: BoundaryTruth
+  beltAnchorId: string
+  outlineElementId: string
+  outlineElementKind: 'segment'
+  allowance: ExactReal
+  equation:
+    | { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
+    | { kind: 'certified-scalar-root'; expressionHash: string; isolating: readonly [Rational, Rational]; proofId: string }
+  tangency: { x: ExactReal; y: ExactReal }
+  regimeId: string
   certificateId: string
 }
 export interface WrapMeasurement {
+  scale: ExactScale
+  boundaryTruth: BoundaryTruth
   requiredFlap: ExactReal
   requiredFlapApproxMM: number
   witnesses: readonly ContactWitness[]
-  seatLegal: boolean
+  refusal: null | {
+    code: 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND'
+    reason: 'invalid-boundary' | 'empty-belt' | 'invalid-seat'
+  }
 }
 export type WrapPolicy =
   | { mode: 'fixed'; allowance: Rational; allowanceApproxMM: number }
@@ -122,7 +151,8 @@ export type WrapEvaluation =
   }
   | {
     status: 'refused'
-    code: 'WRAP_EXCEEDS_ALLOWANCE'
+    code: 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND'
+    reason?: 'invalid-boundary' | 'empty-belt' | 'invalid-seat'
     requiredFlap: ExactReal
     requiredFlapApproxMM: number
     allowedFlap: Rational

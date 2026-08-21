@@ -2,7 +2,7 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/magnetic-grid/engine'
-import { makeSizer } from '@/lib/effect/magnetic-grid-bridge'
+import { contourIdentity, makeSizer } from '@/lib/effect/magnetic-grid-bridge'
 import type { Contour } from '@/lib/effect/types'
 
 interface SolveRequest {
@@ -103,14 +103,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
   try {
     if (engineId !== 'v351-centre-clone') throw new Error('wrong engine identity')
     const sized = makeSizer(base, offsetMM)
-    const pts = base.outer.pts
-    // Full-content hash — sampling (length + two points) collided across shapes (F2, Meta QA).
-    let h = 0
-    for (let i = 0; i < pts.length; i++) {
-      h = (Math.imul(h, 31) + Math.round(pts[i][0] * 1000)) | 0
-      h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
-    }
-    const sig = JSON.stringify([offsetMM, pts.length, h])
+    const sig = JSON.stringify([contourIdentity(base), offsetMM])
     if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
     const cfgSig = JSON.stringify(cfg)
     if (mode !== 'free') {
