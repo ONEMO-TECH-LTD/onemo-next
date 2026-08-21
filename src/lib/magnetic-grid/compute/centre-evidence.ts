@@ -1,7 +1,6 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
 import type { BBox, CentreMeasurements, Pt, SafeMass, SafeSegment } from '../spec'
-import { pointInPolygon } from '../../effect/attachment'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
@@ -243,13 +242,6 @@ export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
     return [mx / pts.length, my / pts.length]
   }
   return [sx / (3 * a2), sy / (3 * a2)]
-}
-
-/** Is a point inside a mass's real outline? Box prescreen, then the traced ring. */
-export function pointInMass(p: Pt, mass: { bbox: BBox; rings: Pt[][] }): boolean {
-  if (p[0] < mass.bbox.minX || p[0] > mass.bbox.maxX || p[1] < mass.bbox.minY || p[1] > mass.bbox.maxY) return false
-  if (!mass.rings.length) return true
-  return mass.rings.some((ring) => pointInPolygon(p, ring as Pt[]))
 }
 
 /** Neutral measurements consumed by the Centre policy; no mode or governor reaches compute. */

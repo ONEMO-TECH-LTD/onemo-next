@@ -145,30 +145,11 @@ export function holds(shape: Prepared, p: Pt, radius: number): boolean {
   return true
 }
 
-/** Uniform scale about the bounding-box centre so the longest side is `longestMM`. */
-export function scaleRing(ringMM: readonly Pt[], longestMM: number): Pt[] {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const [x, y] of ringMM) {
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-  }
-  const longest = Math.max(maxX - minX, maxY - minY)
-  if (!(longest > 0)) throw new RangeError('outline has no extent')
-  const k = longestMM / longest
-  const cx = (minX + maxX) / 2
-  const cy = (minY + maxY) / 2
-  return ringMM.map(([x, y]) => [(x - cx) * k, (y - cy) * k] as Pt)
-}
-
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   return { minX, minY, maxX, maxY }
 }
-
-export function dist(a: Pt, b: Pt): number { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
 /** Spot radius = the padding, measured from the magnet centre. */
 export function spotRadiusOf(padMM: number): number {
@@ -385,15 +366,6 @@ export function makeCircleSeatPredicate(
     const dx = q(pt[0]) - cqx, dy = q(pt[1]) - cqy
     return dx * dx + dy * dy <= s2
   }
-}
-
-/** Distance from a point to the segment ab. */
-function distToSeg(v: Pt, a: Pt, b: Pt): number {
-  const dx = b[0] - a[0], dy = b[1] - a[1]
-  const len2 = dx * dx + dy * dy
-  let t = len2 > 0 ? ((v[0] - a[0]) * dx + (v[1] - a[1]) * dy) / len2 : 0
-  t = Math.max(0, Math.min(1, t))
-  return Math.hypot(v[0] - a[0] - t * dx, v[1] - a[1] - t * dy)
 }
 
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
