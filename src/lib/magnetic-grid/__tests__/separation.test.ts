@@ -59,7 +59,9 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'addRational', 'subtractRational', 'multiplyRational', 'divideRational', 'squareRational',
     'compareRational', 'integerSqrt', 'exactSquareRoot', 'primitivePolynomial', 'allowancePolynomial',
     'sqrtMinusRational', 'isRational', 'evaluatePolynomial', 'compareAlgebraicToRational',
-    'compareExactToRational', 'approximateExact', 'canonicalExact',
+    'compareExactToRational', 'lcmDenominatorPolynomial', 'primitiveQuadratic',
+    'evaluateIntegerQuadratic', 'midpoint', 'isolateQuadraticRoot', 'quadraticRootsWithin',
+    'approximateExact', 'canonicalExact',
   ],
   'magnetic-grid/compute/contact-root.ts': [
     'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
@@ -80,7 +82,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'applyCoverage', 'assignSizes',
   ],
   'magnetic-grid/engine.ts': [
-    'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',
+    'solveBands', 'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',
   ],
   'effect/magnetic-grid-bridge.ts': [
     'contourIdentity', 'boundaryTruth', 'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',

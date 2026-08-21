@@ -35,6 +35,7 @@ export const MIN_ANCHORS = 2
 
 /** Size bands, ends 1mm shy so no size lives in two bands. B5 keeps its ceiling. */
 export interface Band { readonly id: 1 | 2 | 3 | 4 | 5; readonly minMM: number; readonly maxMM: number }
+export type BandId = 1 | 2 | 3 | 4
 export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 1 as const, minMM: 24, maxMM: 71 }),
   Object.freeze({ id: 2 as const, minMM: 72, maxMM: 119 }),
@@ -230,3 +231,48 @@ export interface GridResult {
 }
 
 export interface BandSnapPoint { sizeMM: number; count: number }
+
+export interface FirstLawfulEvidence {
+  id: string
+  band: BandId
+  magnetCount: number
+  scale: ExactScale
+  verdict: 'absent' | 'unlawful'
+  reason: string
+}
+
+export interface FirstLawfulCertificate {
+  regimeId: string
+  priorEvidenceIds: readonly string[]
+  contact: ContactWitness
+}
+
+export interface ScalingLayout {
+  layoutId: string
+  anchors: readonly Anchor[]
+  contacts: readonly ContactWitness[]
+  phaseMM: Pt
+}
+
+export interface LawfulRung {
+  band: BandId
+  scale: ExactScale
+  magnetCount: number
+  firstLawful: FirstLawfulCertificate
+  layouts: readonly ScalingLayout[]
+}
+
+export interface ScalingBandResult {
+  band: BandId
+  rungs: readonly LawfulRung[]
+}
+
+export interface SolveBandsInput {
+  contour: Contour
+  config: GridConfig
+}
+
+export interface SolveBandsResult {
+  bands: readonly ScalingBandResult[]
+  firstLawfulEvidenceById: Readonly<Record<string, FirstLawfulEvidence>>
+}

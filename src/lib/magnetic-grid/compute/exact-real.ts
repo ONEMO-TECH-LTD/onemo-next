@@ -152,7 +152,7 @@ export function sqrtMinusRational(
   }
 }
 
-const isRational = (value: ExactReal): value is Rational => 'numerator' in value
+export const isRational = (value: ExactReal): value is Rational => 'numerator' in value
 
 const evaluatePolynomial = (
   polynomial: readonly string[],
@@ -171,12 +171,18 @@ const compareAlgebraicToRational = (
   if (
     algebraic.polynomial.length !== 3 ||
     BigInt(algebraic.polynomial[0]) <= BigInt(0) ||
-    algebraic.rootIndex !== 1 ||
+    (algebraic.rootIndex !== 0 && algebraic.rootIndex !== 1) ||
     compareRational(algebraic.isolating[0], algebraic.isolating[1]) >= 0
   ) {
     throw new RangeError('unsupported algebraic comparison')
   }
   const [lo, hi] = algebraic.isolating
+  const loSign = compareRational(evaluatePolynomial(algebraic.polynomial, lo), rational(0))
+  const hiSign = compareRational(evaluatePolynomial(algebraic.polynomial, hi), rational(0))
+  const bracketed = algebraic.rootIndex === 0
+    ? loSign >= 0 && hiSign <= 0
+    : loSign <= 0 && hiSign >= 0
+  if (!bracketed) throw new RangeError('unsupported algebraic comparison')
   if (compareRational(hi, value) <= 0) return -1
   if (compareRational(lo, value) >= 0) return 1
   const sign = compareRational(
@@ -184,8 +190,9 @@ const compareAlgebraicToRational = (
     rational(0),
   )
   if (sign === 0) return 0
-  // The admitted segment-distance value is the larger root of an upward quadratic.
-  return sign < 0 ? 1 : -1
+  return algebraic.rootIndex === 0
+    ? (sign > 0 ? 1 : -1)
+    : (sign < 0 ? 1 : -1)
 }
 
 /** Total for the only comparison Wrap admits: a segment-distance root against a rational dial/cap. */
@@ -196,6 +203,95 @@ export function compareExactToRational(
   return isRational(value)
     ? compareRational(value, limit)
     : compareAlgebraicToRational(value, limit)
+}
+
+const lcmDenominatorPolynomial = (a: Rational, b: Rational, c: Rational): bigint[] => {
+  const qa = fromPublic(a), qb = fromPublic(b), qc = fromPublic(c)
+  return [
+    qa.n * qb.d * qc.d,
+    qb.n * qa.d * qc.d,
+    qc.n * qa.d * qb.d,
+  ]
+}
+
+const primitiveQuadratic = (coefficients: bigint[]): bigint[] => {
+  let divisor = BigInt(0)
+  for (const coefficient of coefficients) divisor = gcd(divisor, coefficient)
+  const normalized = coefficients.map((coefficient) => coefficient / divisor)
+  return normalized[0] < BigInt(0)
+    ? normalized.map((coefficient) => -coefficient)
+    : normalized
+}
+
+const evaluateIntegerQuadratic = (polynomial: readonly bigint[], at: Rational): Rational =>
+  addRational(
+    multiplyRational(
+      addRational(multiplyRational(rational(polynomial[0]), at), rational(polynomial[1])),
+      at,
+    ),
+    rational(polynomial[2]),
+  )
+
+const midpoint = (a: Rational, b: Rational): Rational =>
+  divideRational(addRational(a, b), rational(2))
+
+const isolateQuadraticRoot = (
+  polynomial: readonly bigint[],
+  rootIndex: 0 | 1,
+  lo: Rational,
+  hi: Rational,
+): Rational | AlgebraicReal | null => {
+  let left = lo, right = hi
+  let leftSign = compareRational(evaluateIntegerQuadratic(polynomial, left), rational(0))
+  let rightSign = compareRational(evaluateIntegerQuadratic(polynomial, right), rational(0))
+  if (leftSign === 0) return left
+  if (rightSign === 0) return right
+  if (leftSign === rightSign) return null
+  for (let iteration = 0; iteration < 192; iteration++) {
+    const middle = midpoint(left, right)
+    const middleSign = compareRational(evaluateIntegerQuadratic(polynomial, middle), rational(0))
+    if (middleSign === 0) return middle
+    if (middleSign === leftSign) {
+      left = middle
+      leftSign = middleSign
+    } else {
+      right = middle
+      rightSign = middleSign
+    }
+  }
+  void rightSign
+  return {
+    polynomial: polynomial.map(String),
+    isolating: [left, right],
+    rootIndex,
+  }
+}
+
+/** Every exact real root of `a·s²+b·s+c=0` inside the closed rational interval. */
+export function quadraticRootsWithin(
+  a: Rational,
+  b: Rational,
+  c: Rational,
+  lo: Rational,
+  hi: Rational,
+): ExactReal[] {
+  const polynomial = primitiveQuadratic(lcmDenominatorPolynomial(a, b, c))
+  if (polynomial[0] === BigInt(0)) throw new RangeError('quadratic coefficient must be nonzero')
+  const discriminant = polynomial[1] * polynomial[1] - BigInt(4) * polynomial[0] * polynomial[2]
+  if (discriminant < BigInt(0)) return []
+  const vertex = rational(-polynomial[1], BigInt(2) * polynomial[0])
+  const roots: ExactReal[] = []
+  const leftHi = compareRational(vertex, hi) < 0 ? vertex : hi
+  if (compareRational(lo, leftHi) <= 0) {
+    const root = isolateQuadraticRoot(polynomial, 0, lo, leftHi)
+    if (root) roots.push(root)
+  }
+  const rightLo = compareRational(vertex, lo) > 0 ? vertex : lo
+  if (compareRational(rightLo, hi) <= 0) {
+    const root = isolateQuadraticRoot(polynomial, 1, rightLo, hi)
+    if (root && !roots.some((candidate) => canonicalExact(candidate) === canonicalExact(root))) roots.push(root)
+  }
+  return roots
 }
 
 export const approximateExact = (value: ExactReal): number => {

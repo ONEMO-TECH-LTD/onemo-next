@@ -3,6 +3,7 @@ import {
   approximateExact,
   canonicalExact,
   compareExactToRational,
+  quadraticRootsWithin,
   rational,
   rationalFromNumber,
   sqrtMinusRational,
@@ -35,5 +36,18 @@ describe('Wrap exact-real support', () => {
     expect(() => compareExactToRational({ ...valid, polynomial: ['-1', '0', '1'] }, rational(0))).toThrow('unsupported algebraic comparison')
     expect(() => compareExactToRational({ ...valid, polynomial: ['1', '0', '0', '-1'] }, rational(0))).toThrow('unsupported algebraic comparison')
     expect(() => compareExactToRational({ ...valid, isolating: [valid.isolating[1], valid.isolating[0]] }, rational(0))).toThrow('unsupported algebraic comparison')
+  })
+
+  it('isolates the exact non-integer diamond scale event inside B3', () => {
+    const roots = quadraticRootsWithin(rational(1), rational(-192), rational(8064), rational(120), rational(167))
+    expect(roots).toHaveLength(1)
+    expect(roots[0]).toEqual({
+      polynomial: ['1', '-192', '8064'],
+      isolating: expect.any(Array),
+      rootIndex: 1,
+    })
+    expect(approximateExact(roots[0])).toBeCloseTo(96 + 24 * Math.SQRT2, 12)
+    expect(compareExactToRational(roots[0], rational(129))).toBe(1)
+    expect(compareExactToRational(roots[0], rational(130))).toBe(-1)
   })
 })
