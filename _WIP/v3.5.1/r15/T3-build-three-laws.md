@@ -9,23 +9,22 @@ Scope: code reconstruction of the portable engine and live comparison tab only.
 
 Every semantic code change is one rollback commit and compiles/runs before the next code change. T1-T4 build the working code first. The optional §9 proof/audit work may follow after the build and does not authorize extra engine infrastructure. No push/merge/publication is implied.
 
-### T3 — Repair Centre, then add Wrap, then Magnet-quantity scaling through the live Law tab
+### T3 — Build Wrap, then Magnet-quantity scaling, then repair Centre only if the completed engine proves it is required
 
-- **Centre repair first:** keep the re-roomed Centre rule/governor/parity bodies locked. Replace only the measured-bad 2mm `safeSegments` ruler or another already-named defect. Compile and run the Law tab after every change; detailed matrix evidence is optional §9 work after the code build.
-- The Centre repair may change only the named ruler/mesh, sliver, seat-derived-centre or tie/refusal outputs; every other frozen snapshot field stays equal.
-- After the named Centre repair runs, change the label to `Law · Centre fixed`; describe Centre only.
-- Freeze the corrected Centre result before Wrap exists.
-- **Wrap second:** add the smallest implementation that makes every belt disc obey the configured allowance and makes flap 0 a proved contact. Compile and run Centre unchanged plus live Wrap behavior after every change.
+- **Freeze Centre first:** the Meta-cleared T2 Centre rule, governor, parity, four placements, 2mm `safeSegments` ruler and frozen Centre hashes are an untouchable baseline while Wrap and scaling are built. After every semantic commit, replay the named squircle/72mm snapshot and require identical contour, complete result and Centre evidence except for fields explicitly introduced by the active Wrap/scaling increment.
+- **Wrap first:** add the smallest implementation that makes every belt disc obey the configured allowance and makes flap 0 a proved contact. Do not edit Centre code. Compile and run the live Law tab after every change.
 - Before scaling, demonstrate one flap-0 exact contact and one loose near-miss refusal in the running Law tab.
 - After Wrap runs, change the label to `Law · Centre + Wrap`; describe only Centre and Wrap.
 - Freeze Centre + Wrap before scaling exists.
-- **Scaling third:** add the smallest implementation that exposes each new magnet count at its first lawful size across B1-B4 without repeats. Compile and run Centre and Wrap unchanged plus live scaling behavior after every change.
-- Before T4, demonstrate B1-B4 unique increasing first-lawful counts with no cross-band repeat in the running Law tab.
+- **Scaling second:** add the smallest implementation that exposes each new magnet count at its first lawful size across B1-B4 without repeats. Do not edit Centre or Wrap code. Compile and run the frozen Centre + Wrap behavior plus live scaling after every change.
+- Demonstrate B1-B4 unique increasing first-lawful counts with no cross-band repeat in the running Law tab.
 - Use plain `Law` and the full three-law description only after scaling runs.
 - Add fixed-size inspection with no implicit winner and complete three-law typed results only when their live consumer exists.
+- **Full-system gate third:** run Centre + Wrap + scaling together on the live Law tab. Fix only failures observed in this completed path; no speculative hardening or broad audit may precede this gate.
+- **Centre repair last and conditional:** evaluate the already-named 2mm-ruler case against the completed three-law engine. Repair only `safeSegments` or another already-named Centre defect if the measurement proves it materially changes a required law result. The repair may change only the named ruler/mesh, sliver, seat-derived-centre or tie/refusal outputs; every other frozen field stays equal. If the case does not block the completed product behavior, record that evidence and leave Centre code unchanged.
 - Before adding any support kernel from §10A, record the failing fixture or measured defect that cannot be closed by reusing/re-rooming existing code, name the minimum support task required, and remove it again if it does not close that exact failure. No support task is an automatic phase.
 
-Build completion: the live Law tab runs corrected Centre, then Wrap, then scaling in that order; only named Centre outputs changed; flap 0 contact and near-miss refusal work; B1-B4 return unique increasing first-lawful counts without repeats; every support task used has a named live-code need and no unused support code remains. Commit this working engine before T4. Broader fixtures, mutations and audits remain optional §9 work.
+Build completion: the live Law tab runs the frozen Centre baseline with Wrap and scaling; flap-0 contact and near-miss refusal work; B1-B4 return unique increasing first-lawful counts without repeats; Centre changes only if the final measured gate proves the named repair necessary; every support task used has a named live-code need and no unused support code remains. Commit this working engine before T4. Broader fixtures, mutations and audits remain optional §9 work.
 
 ### 10A. Conditional support tasks — not automatic phases
 
