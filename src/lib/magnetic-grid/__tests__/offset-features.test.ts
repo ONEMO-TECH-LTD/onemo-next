@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildExactOffsetFeatures, evaluateAffineRadicalBounds, solveExactOffsetLineIntersections } from '../compute/centre-evidence'
+import { buildExactOffsetFeatures, compareOffsetExpressions, evaluateOffsetExpressionBounds, solveExactOffsetLineIntersections, type ExactOffsetExpression } from '../compute/centre-evidence'
 import { approximateExact, rational } from '../compute/exact-real'
 import type { Contour } from '../spec'
 
@@ -25,8 +25,8 @@ describe('exact inward-offset primitives', () => {
     const intersections = solveExactOffsetLineIntersections(triple)
     expect(intersections).toHaveLength(3)
     for (const intersection of intersections) {
-      const x = evaluateAffineRadicalBounds(intersection.point[0])
-      const y = evaluateAffineRadicalBounds(intersection.point[1])
+      const x = evaluateOffsetExpressionBounds(intersection.point[0])
+      const y = evaluateOffsetExpressionBounds(intersection.point[1])
       expect(approximateExact(x[0])).toBeCloseTo(approximateExact(x[1]), 12)
       expect(approximateExact(y[0])).toBeCloseTo(approximateExact(y[1]), 12)
     }
@@ -38,11 +38,12 @@ describe('exact inward-offset primitives', () => {
     const corner = solveExactOffsetLineIntersections(features).find((intersection) =>
       intersection.featureIds.includes('outer:line:0') && intersection.featureIds.includes('outer:line:1'))
     expect(corner).toBeDefined()
-    const x = evaluateAffineRadicalBounds(corner!.point[0])
-    const y = evaluateAffineRadicalBounds(corner!.point[1])
+    const x = evaluateOffsetExpressionBounds(corner!.point[0])
+    const y = evaluateOffsetExpressionBounds(corner!.point[1])
     expect(approximateExact(x[0])).toBeCloseTo(21, 12)
     expect(approximateExact(x[1])).toBeCloseTo(21, 12)
     expect(approximateExact(y[0])).toBeCloseTo(31, 12)
     expect(approximateExact(y[1])).toBeCloseTo(31, 12)
   })
+  it('closes semantic equality and returns unresolved instead of looping',()=>{const a:ExactOffsetExpression={op:'exact',value:rational(2)},b:ExactOffsetExpression={op:'exact',value:rational(3)},c:ExactOffsetExpression={op:'exact',value:rational(5)},zero:ExactOffsetExpression={op:'exact',value:rational(0)};expect(compareOffsetExpressions({op:'add',left:{op:'add',left:a,right:b},right:c},{op:'add',left:a,right:{op:'add',left:c,right:b}})).toBe(0);expect(compareOffsetExpressions({op:'sqrt',value:{op:'exact',value:rational(4)}},a)).toBe(0);expect(compareOffsetExpressions({op:'divide',left:zero,right:zero},a)).toBeNull()})
 })

@@ -88,6 +88,8 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'safeSegments', 'centroidOf', 'measureCentreBranches',
     'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient', 'buildExactOffsetFeatures',
     'lineRightSide', 'scaleAffineRadical', 'addAffineRadical', 'evaluateAffineRadicalBounds',
+    'exactExpression', 'binaryExpression', 'sqrtExpression', 'affineRadicalExpression',
+    'canonicalOffsetExpression', 'evaluateOffsetExpressionBounds', 'compareOffsetExpressions',
     'solveExactOffsetLineIntersections',
   ],
   'magnetic-grid/logic.ts': [

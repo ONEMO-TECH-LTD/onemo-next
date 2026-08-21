@@ -1,7 +1,7 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
 import type { BBox, CentreMeasurements, Contour, ExactReal, Pt, Rational, SafeMass, SafeSegment } from '../spec'
-import { addRational, affineExact, compareRational, divideRational, isRational, multiplyRational, rational, rationalFromNumber, sqrtRationalBounds, subtractRational } from './exact-real'
+import { addRational, affineExact, canonicalExact, compareRational, divideRational, isRational, multiplyRational, rational, rationalFromNumber, sqrtRationalBounds, subtractRational } from './exact-real'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
@@ -365,8 +365,13 @@ export interface ExactAffineRadical {
 export interface ExactOffsetIntersection {
   kind: 'line-line'
   featureIds: readonly [string, string]
-  point: readonly [ExactAffineRadical, ExactAffineRadical]
+  point: readonly [ExactOffsetExpression, ExactOffsetExpression]
 }
+export type ExactOffsetExpression =
+  | { op: 'exact'; value: ExactReal }
+  | { op: 'add' | 'subtract' | 'multiply' | 'divide'; left: ExactOffsetExpression; right: ExactOffsetExpression }
+  | { op: 'sqrt'; value: ExactOffsetExpression }
+export interface ExactOffsetUnresolved { featureIds: readonly string[]; reason: 'EXACT_PREDICATE_UNRESOLVED' }
 
 
 /** Exact analytic primitives whose arrangement defines one inward material offset. */
@@ -477,6 +482,40 @@ export function evaluateAffineRadicalBounds(value: ExactAffineRadical, bits = 19
   return [lo, hi]
 }
 
+const exactExpression = (value: ExactReal): ExactOffsetExpression => ({ op: 'exact', value })
+const binaryExpression = (op: 'add'|'subtract'|'multiply'|'divide', left: ExactOffsetExpression, right: ExactOffsetExpression): ExactOffsetExpression => ({ op, left, right })
+const sqrtExpression = (value: ExactOffsetExpression): ExactOffsetExpression => ({ op: 'sqrt', value })
+const affineRadicalExpression = (value: ExactAffineRadical): ExactOffsetExpression => {
+  let out = binaryExpression('add', binaryExpression('multiply', exactExpression(value.scale), exactExpression(value.scaleCoefficient)), exactExpression(value.constant))
+  for (const term of value.radicals) out = binaryExpression('add', out, binaryExpression('multiply', exactExpression(term.coefficient), sqrtExpression(exactExpression(term.radicand))))
+  return out
+}
+const canonicalOffsetExpression = (value: ExactOffsetExpression): string => {
+  if (value.op === 'exact') return `e:${canonicalExact(value.value)}`
+  if (value.op === 'sqrt') return `s(${canonicalOffsetExpression(value.value)})`
+  if (value.op === 'subtract' && canonicalOffsetExpression(value.left) === canonicalOffsetExpression(value.right)) return `e:${canonicalExact(rational(0))}`
+  if (value.op === 'add' || value.op === 'multiply') {
+    const collect = (node: ExactOffsetExpression): string[] => node.op === value.op ? [...collect(node.left), ...collect(node.right)] : [canonicalOffsetExpression(node)]
+    return `${value.op}(${collect(value).sort().join('|')})`
+  }
+  return `${value.op}(${canonicalOffsetExpression(value.left)},${canonicalOffsetExpression(value.right)})`
+}
+export function evaluateOffsetExpressionBounds(value: ExactOffsetExpression, bits=192): readonly [Rational,Rational] {
+  if (value.op === 'exact') return isRational(value.value) ? [value.value,value.value] : value.value.isolating
+  if (value.op === 'sqrt') { const x=evaluateOffsetExpressionBounds(value.value,bits); if(compareRational(x[0],rational(0))<0)throw new RangeError('negative'); return [sqrtRationalBounds(x[0],bits)[0],sqrtRationalBounds(x[1],bits)[1]] }
+  const a=evaluateOffsetExpressionBounds(value.left,bits),b=evaluateOffsetExpressionBounds(value.right,bits)
+  if(value.op==='add')return[addRational(a[0],b[0]),addRational(a[1],b[1])]
+  if(value.op==='subtract')return[subtractRational(a[0],b[1]),subtractRational(a[1],b[0])]
+  const terms=value.op==='multiply'?[multiplyRational(a[0],b[0]),multiplyRational(a[0],b[1]),multiplyRational(a[1],b[0]),multiplyRational(a[1],b[1])]:[divideRational(a[0],b[0]),divideRational(a[0],b[1]),divideRational(a[1],b[0]),divideRational(a[1],b[1])]
+  if(value.op==='divide'&&compareRational(b[0],rational(0))<=0&&compareRational(b[1],rational(0))>=0)throw new RangeError('zero')
+  return[terms.reduce((x,y)=>compareRational(y,x)<0?y:x),terms.reduce((x,y)=>compareRational(y,x)>0?y:x)]
+}
+export function compareOffsetExpressions(a:ExactOffsetExpression,b:ExactOffsetExpression):-1|0|1|null{
+  if(canonicalOffsetExpression(a)===canonicalOffsetExpression(b))return 0
+  let previous=''
+  for(let bits=64;;bits*=2){let x,y;try{x=evaluateOffsetExpressionBounds(a,bits);y=evaluateOffsetExpressionBounds(b,bits)}catch{return null}if(compareRational(x[1],y[0])<0)return-1;if(compareRational(x[0],y[1])>0)return 1;if(compareRational(x[0],x[1])===0&&compareRational(y[0],y[1])===0&&compareRational(x[0],y[0])===0)return 0;const state=JSON.stringify([x,y]);if(state===previous)return null;previous=state}
+}
+
 /** Solved exact line-line vertices of the offset arrangement; parallel pairs are rejected. */
 export function solveExactOffsetLineIntersections(features: ExactOffsetFeatures): ExactOffsetIntersection[] {
   const intersections: ExactOffsetIntersection[] = []
@@ -493,7 +532,7 @@ export function solveExactOffsetLineIntersections(features: ExactOffsetFeatures)
       const y = scaleAffineRadical(addAffineRadical(
         scaleAffineRadical(secondRight, a), scaleAffineRadical(firstRight, multiplyRational(rational(-1), c)),
       ), divideRational(rational(1), determinant))
-      intersections.push({ kind: 'line-line', featureIds: [first.id, second.id], point: [x, y] })
+      intersections.push({ kind: 'line-line', featureIds: [first.id, second.id], point: [affineRadicalExpression(x), affineRadicalExpression(y)] })
     }
   }
   return intersections
