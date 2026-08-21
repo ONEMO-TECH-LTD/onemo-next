@@ -684,6 +684,106 @@ Parallel, non-real, out-of-span and out-of-sweep solutions are discarded with th
 
 Compute enumerates every zero/event root of every legality predicate over each piece’s open parameter interval against every supplied boundary generator: span and sweep endpoints, outer/hole winding crossings, projection-class changes and clearance equalities. Every root becomes a split vertex. Only after exact root isolation proves every legality predicate has constant sign on the resulting open interval may its midpoint witness that interval’s sign. A midpoint without this constant-sign certificate is forbidden and returns `CENTRE_EVIDENCE_UNRESOLVED`.
 
+###### Predicate-root certificate
+
+```ts
+export type ExactPieceParameter =
+  | { kind: 'line'; t: ExactReal }
+  | { kind: 'arc'; chart: 0 | 1; q: ExactReal }
+
+export interface PiecePredicateRootCertificate {
+  predicateId: 'SPAN' | 'SWEEP' | 'WINDING' | 'PROJECTION_CLASS' | 'CLEARANCE'
+  generatorId: string
+  chart: 'line' | 0 | 1
+  primitivePolynomial: readonly string[]
+  rootIndex: number
+  isolating: readonly [Rational, Rational]
+  multiplicity: number
+  parameter: ExactPieceParameter
+  originalPredicateIdentity: string
+}
+
+export interface PiecePredicateSignCertificate {
+  predicateId: PiecePredicateRootCertificate['predicateId']
+  generatorId: string
+  sign: -1 | 1
+  witness: ExactPieceParameter
+  lowerRootId: string | null
+  upperRootId: string | null
+}
+
+export type PiecePredicateProof =
+  | {
+      status: 'isolated-roots'
+      roots: readonly PiecePredicateRootCertificate[]
+      intervalSigns: readonly PiecePredicateSignCertificate[]
+    }
+  | {
+      status: 'identically-zero'
+      predicateId: PiecePredicateRootCertificate['predicateId']
+      generatorId: string
+      originalPredicateIdentity: string
+      zeroPolynomialProofId: string
+    }
+
+export interface ExactPieceIntervalCertificate {
+  rootsComplete: true
+  lower: ExactPieceParameter
+  upper: ExactPieceParameter
+  proofs: readonly PiecePredicateProof[]
+}
+```
+
+Every line piece uses `p(t)=from+t(to-from)`, `t∈(0,1)`.
+
+Every arc piece is split at the stereographic chart pole when that pole lies in its directed sweep. Within each resulting chart it uses the exact rational unit-circle parameter:
+
+```text
+chart 0: u=(1-q²)/(1+q²), v=2q/(1+q²), q=v/(1+u)
+chart 1: u=(q²-1)/(1+q²), v=2q/(1+q²), q=v/(1-u)
+transition on overlap: q1=1/q0
+p(q)=centre+radius·(u(q),v(q))
+```
+
+Start/end direction and sweep choose directed intervals in either chart by exact substitution. A chart pole inside the sweep is a boundary site and splits the arc; it is never an open-interval root. The two charts cover the complete directed sweep without infinity. No floating angle or trigonometric approximation enters ordering or membership.
+
+For every supplied segment and every named predicate family, Compute substitutes `p(t)` or `p(q)` into the original exact predicate. It clears rational denominators. When coefficients contain admitted algebraic scale values, it eliminates those algebraic generators against their defining primitive polynomials and produces one primitive integer polynomial. Every candidate root is back-substituted into the original, unsquared predicate; extraneous roots are rejected explicitly.
+
+Projection-class roots are isolated first and split the parameter domain before point-to-segment clearance polynomials are selected. The original polynomial and `gcd(p,p')` determine multiplicity before the square-free factors are isolated. All real roots in the open directed interval are isolated and ordered exactly. Equal-end-sign pairs and even-multiplicity tangencies are therefore retained; endpoint signs never establish completeness.
+
+If exact symbolic reduction of the original unsquared predicate produces the zero polynomial on the whole chart interval, Compute emits the `identically-zero` proof arm and no split roots. Any predicate/generator pair that is neither proven finite-root nor proven identically-zero returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+The ordered union of piece endpoints, chart-pole splits and every certified predicate root defines the only permitted split intervals. Each root-free open interval receives a canonical dyadic-rational witness chosen inside its exact isolating bounds. Compute evaluates every nonzero original predicate against every generator at that witness and stores the exact nonzero signs plus the adjacent semantic root ids. Every predicate/generator pair has exactly one completed proof arm.
+
+`rootsComplete:true` is emitted only after every predicate/generator pair has a completed elimination, isolation, back-substitution, multiplicity, interval-membership and ordering proof. Any unresolved step returns `CENTRE_EVIDENCE_UNRESOLVED` for the whole legal-island result; it emits no partial piece set and no boolean completeness label.
+
+Root identity hashes:
+
+```text
+['piece-root-v1', pieceId, predicateId, generatorId,
+ canonicalExactPoint(parameterSubstitution(parameter)),
+ multiplicity, originalPredicateIdentity]
+```
+
+Chart, normalized primitive polynomial, root index and isolating interval remain in the replay proof record but do not enter semantic root identity. Equal semantic points obtained through either chart, scalar-multiple polynomials or refined valid isolators hash identically. Distinct roots remain distinct by exact point identity. Root ordering, interval witnesses, proof arrays and semantic identities use canonical exact ordering and are input/traversal invariant.
+
+Required mutations:
+
+1. A line piece whose non-owning segment projection changes from interior to endpoint strictly inside the piece.
+2. A line piece with two clearance roots, lawful endpoints and unlawful middle.
+3. An arc piece with two clearance roots and equal endpoint signs.
+4. An arc tangency with an even-multiplicity root.
+5. A chart pole inside a directed arc sweep; the root set is identical after using the other chart.
+6. A root exactly at a sweep endpoint; it is owned once as a boundary vertex, never duplicated in the open interval.
+7. A squared/eliminated extraneous root that fails original-predicate back-substitution.
+8. An unresolved elimination, multiplicity or root-order case; typed refusal and no partial geometry.
+9. The same geometric arc root through chart 0/chart 1, scalar-multiple polynomials and refined valid isolators: identical semantic root id.
+10. An owning clearance predicate: `identically-zero`, no infinite/fabricated roots; deleting its zero-polynomial proof refuses.
+
+Necessity: the two rational charts avoid a generic angular/transcendental kernel; semantic identity excludes representation-only proof data; the zero-polynomial arm is required for owning/coincident predicates; every field replays a proof explicitly required by line 658.
+
+Sufficiency contribution: complete line and full-arc parameter coverage, algebraic coefficient elimination, every finite root and multiplicity, identically-zero predicates, extraneous-root rejection, exact ordering/sign evidence, chart/refinement-invariant identity and fail-closed unresolved behavior.
+
 Necessity: line 658 requires actual intersections; untrimmed feature pairs create spurious topology. Sufficiency contribution: all three intersection families and every acceptance/rejection predicate are ruled.
 
 ##### Full-boundary legality and face side
