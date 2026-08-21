@@ -781,6 +781,23 @@ Scalar-multiple defining polynomials for the same semantic source therefore dedu
 
 After denominator clearing, the substituted predicate is one exact polynomial in the piece parameter and remaining algebraic generators over the integer multivariate polynomial ring. The ring uses a fixed variable order: piece parameter first, followed by ascending generator identity. Each generator is eliminated against its normalized defining polynomial by the exact subresultant polynomial-remainder sequence, treating coefficients as polynomials in the remaining ordered variables.
 
+Every multivariate polynomial stored in a `readonly string[]` uses canonical term tokens. One token is `coefficient|e0,e1,...,en`, where `coefficient` is a base-10 signed primitive integer with no leading `+` or zero padding, and the exponent vector has exactly one non-negative base-10 integer for each variable in the fixed order `[pieceParameter, ...ascending generatorIdentity]`. Terms with equal exponent vectors are combined exactly; zero coefficients are removed. Terms sort by descending lexicographic exponent vector. The zero polynomial is represented by the empty array `[]`, never `['0']`. A nonzero normalized step/resultant removes positive integer content, fixes the first coefficient positive, and records the removed content separately. Parsing then serializing any proof polynomial must be byte-identical.
+
+The source encoder accepts exact integer terms and emits the one canonical token sequence. The proof decoder accepts only canonical tokens and requires decode-then-encode byte equality; shuffled terms, split like terms, leading plus, zero padding, negative zero, zero-coefficient terms, wrong exponent arity/order, and `['0']` reject rather than normalize on ingress.
+
+When one generator is eliminated, its exponent slot remains present with exponent zero in stored subresultants/resultants until the complete elimination proof is assembled. Only the final univariate projection may omit eliminated zero slots and serialize as the existing primitive coefficient sequence, with the conversion recorded in provenance.
+
+Required token mutations:
+
+18. Encoder permutations/split terms produce one canonical byte sequence; each noncanonical serialized spelling is independently rejected by the decoder.
+19. Two remaining generators with swapped discovery order: exponent slots follow sorted generator identity and proof bytes remain equal.
+20. Zero resultant: `[]`; `['0']` and a missing exponent slot reject.
+21. Normalize only completed step/resultant: raw intermediate `2*x + 4` retains coefficients until step normalization records content `2`.
+
+Necessity: only the missing serialization grammar required by existing proof fields and replay invariance is added.
+
+Sufficiency contribution: coefficients, variables, exponents, zero, term order, strict ingress, normalization boundary and final-univariate conversion are deterministic and executable without changing the approved algorithm.
+
 After every elimination step, Compute:
 
 1. removes integer content;
