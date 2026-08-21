@@ -33,7 +33,7 @@ describe('v3.5.1 exact Wrap', () => {
       expect(witness.boundaryTruth.contourIdentity).toMatch(/^[0-9a-f]{64}$/)
       expect(witness.outlineElementKind).toBe('segment')
       expect(witness.equation.kind).toBe('polynomial')
-      if(witness.equation.kind==='polynomial')expect(witness.equation.polynomial.length).toBeGreaterThan(0)
+      expect(witness.equation.polynomial.length).toBeGreaterThan(0)
       expect(witness.regimeId).toBe('fixed-size')
       expect(witness.certificateId).toMatch(/^[0-9a-f]{64}$/)
     }

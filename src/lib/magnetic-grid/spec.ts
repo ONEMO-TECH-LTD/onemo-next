@@ -114,9 +114,7 @@ export interface ContactWitness {
   outlineElementId: string
   outlineElementKind: 'segment'
   allowance: ExactReal
-  equation:
-    | { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
-    | { kind: 'certified-scalar-root'; expressionHash: string; isolating: readonly [Rational, Rational]; proofId: string }
+  equation: { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
   tangency: { x: ExactReal; y: ExactReal }
   regimeId: string
   certificateId: string
