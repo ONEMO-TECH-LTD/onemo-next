@@ -13,7 +13,7 @@ import {
   MIN_EFFECT_MM,
   SIZE_CEIL_MARGIN_MM,
   type GridResult,
-} from '../magnetic-grid/centre-clone-engine'
+} from '../magnetic-grid/engine'
 
 /** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
  *  manufacturing tolerance holds at every slider size. */

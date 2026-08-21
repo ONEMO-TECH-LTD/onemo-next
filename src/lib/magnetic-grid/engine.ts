@@ -1,7 +1,7 @@
-// grid-origin.ts — the engine bridge: computeGrid and the band snap, wiring spec + compute + logic.
+// Magnetic-grid engine: orchestration over spec, compute and Logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { BBox, BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
+import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
 import {
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
@@ -38,6 +38,7 @@ import {
   centeringAnchors,
   chooseCentrePlacement,
   governMass,
+  parityHolds,
 } from './logic'
 
 export * from './spec'
@@ -52,24 +53,7 @@ export {
 export { bandOf } from './logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
-/** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
-const QUANTUM_KEY_MM = 0.001
-
 const mod = (v: number, m: number) => ((v % m) + m) % m
-
-/** THE CENTRE LAW as a predicate: per axis, an odd count of seated lines must put a NODE on
- *  the governed centre, an even count must put the GAP on it. Used to rank lawful placements
- *  and to MEASURE the truth of a hand-forced registration. */
-function parityHolds(seat: ReadonlyArray<Pt>, target: Pt, bb: BBox, pitch: number): boolean {
-  if (!seat.length) return false
-  const lines = (axis: 0 | 1) => new Set(seat.map((s) => Math.round(s[axis] / QUANTUM_KEY_MM))).size
-  const onNode = (axis: 0 | 1) => {
-    const off = mod(seat[0][axis] - target[axis], pitch)
-    return off < pitch / 4 || off > pitch * 3 / 4
-  }
-  void bb
-  return (lines(0) % 2 === 1) === onNode(0) && (lines(1) % 2 === 1) === onNode(1)
-}
 
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
