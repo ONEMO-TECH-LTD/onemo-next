@@ -749,6 +749,67 @@ Start/end direction and sweep choose directed intervals in either chart by exact
 
 For every supplied segment and every named predicate family, Compute substitutes `p(t)` or `p(q)` into the original exact predicate. It clears rational denominators. When coefficients contain admitted algebraic scale values, it eliminates those algebraic generators against their defining primitive polynomials and produces one primitive integer polynomial. Every candidate root is back-substituted into the original, unsquared predicate; extraneous roots are rejected explicitly.
 
+Every algebraic generator has:
+
+```ts
+export interface AlgebraicGeneratorProof {
+  generatorIdentity: string
+  semanticSourceIdentity: string
+  normalizedDefiningPolynomial: readonly string[]
+  eliminatedAt: number
+}
+
+export interface GeneratorEliminationStepProof {
+  generatorIdentity: string
+  eliminatedVariable: string
+  normalizedSubresultants: readonly (readonly string[])[]
+  normalizedResultant: readonly string[] | null
+  removedIntegerContent: readonly string[]
+  commonFactorDisposition: 'NONE' | 'DECOMPOSED' | 'IDENTICALLY_ZERO'
+}
+```
+
+`semanticSourceIdentity` names the geometry/algebraic source independently of coefficient scaling, isolator refinement, discovery order or runtime object identity. `generatorIdentity` hashes:
+
+```text
+['algebraic-generator-v1',
+ semanticSourceIdentity,
+ normalized square-free primitive defining polynomial]
+```
+
+Scalar-multiple defining polynomials for the same semantic source therefore deduplicate. Compute deduplicates generators by `generatorIdentity` and eliminates them in ascending `generatorIdentity` order, never discovery, feature or traversal order.
+
+After denominator clearing, the substituted predicate is one exact polynomial in the piece parameter and remaining algebraic generators over the integer multivariate polynomial ring. The ring uses a fixed variable order: piece parameter first, followed by ascending generator identity. Each generator is eliminated against its normalized defining polynomial by the exact subresultant polynomial-remainder sequence, treating coefficients as polynomials in the remaining ordered variables.
+
+After every elimination step, Compute:
+
+1. removes integer content;
+2. normalizes the leading coefficient positive under the fixed monomial order;
+3. canonically orders terms and variables;
+4. records every normalized subresultant, resultant, removed content and retained component.
+
+Intermediate multivariate resultants are not square-free-factorized and do not decide multiplicity. Multiplicity is determined only after all generators have been eliminated and the final univariate parameter polynomial exists, using the already-ruled `gcd(p,p')` square-free factorization.
+
+If a resultant is zero, Compute does not silently discard the predicate and does not immediately claim `identically-zero`. It uses the subresultant chain to decompose the exact common factor/component in the eliminated generator, carries each surviving component forward with provenance, and later back-substitutes it through the original unsquared predicate. `IDENTICALLY_ZERO` is permitted only when exact symbolic reduction proves the original unsquared predicate is zero over the whole piece chart interval. Any common component that cannot be decomposed and validated returns `CENTRE_EVIDENCE_UNRESOLVED`.
+
+After the final univariate polynomial is produced, its square-free factors are sorted by normalized coefficient sequence. Candidate roots from all factors are isolated and jointly refined until pairwise disjoint, then back-substituted through the original unsquared multi-generator predicate. Extraneous factors/roots are recorded and rejected. Valid roots are merged only by semantic exact-point root identity; representation-only generator order, resultant factors, scalar polynomial multiples or isolator refinements never enter semantic identity.
+
+The root proof record contains ordered `AlgebraicGeneratorProof[]`, ordered `GeneratorEliminationStepProof[]`, the normalized final univariate factors with multiplicity/provenance, every back-substitution disposition and the canonical semantic root ids. Any unresolved generator equality, subresultant, common-factor decomposition, factor provenance, back-substitution or global root order returns `CENTRE_EVIDENCE_UNRESOLVED` and no partial piece certificate.
+
+Required multi-generator mutations:
+
+11. The same two-generator predicate with opposite discovery order: byte-identical generator order, elimination proof and semantic roots.
+12. Scalar-multiple defining polynomials for the same semantic source: one deduplicated generator identity.
+13. Different semantic sources with the same defining polynomial: distinct generator identities and deterministic order.
+14. Elimination introduces an extraneous/repeated factor: provenance records it; original-predicate back-substitution rejects only the extraneous roots without changing true-root multiplicity.
+15. A zero resultant with a nonzero common component: exact subresultant decomposition continues and validates the surviving component.
+16. An original predicate proven zero over the whole chart: the existing `identically-zero` proof arm, no finite/fabricated roots.
+17. A zero resultant/common factor that cannot be decomposed or validated: typed unresolved, no partial certificate.
+
+Necessity: canonical multivariate subresultant elimination is already implied by the approved algebraic-generator clause; square-free factorization remains only at the final univariate stage; common-factor handling prevents both false `identically-zero` claims and unnecessary refusal.
+
+Sufficiency contribution: deterministic generator identity/order, exact normalized elimination, common-component disposition, final factor/multiplicity isolation, back-substitution, semantic root merge and fail-closed unresolved behavior make the approved clause executable and replay-invariant.
+
 Projection-class roots are isolated first and split the parameter domain before point-to-segment clearance polynomials are selected. The original polynomial and `gcd(p,p')` determine multiplicity before the square-free factors are isolated. All real roots in the open directed interval are isolated and ordered exactly. Equal-end-sign pairs and even-multiplicity tangencies are therefore retained; endpoint signs never establish completeness.
 
 If exact symbolic reduction of the original unsquared predicate produces the zero polynomial on the whole chart interval, Compute emits the `identically-zero` proof arm and no split roots. Any predicate/generator pair that is neither proven finite-root nor proven identically-zero returns `CENTRE_EVIDENCE_UNRESOLVED`.
