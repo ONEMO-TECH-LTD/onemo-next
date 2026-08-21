@@ -205,6 +205,60 @@ export function compareExactToRational(
     : compareAlgebraicToRational(value, limit)
 }
 
+const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
+  const [lo, hi] = value.isolating
+  const middle = midpoint(lo, hi)
+  const sign = compareRational(evaluatePolynomial(value.polynomial, middle), rational(0))
+  if (sign === 0) return { ...value, isolating: [middle, middle] }
+  const keepRight = value.rootIndex === 0 ? sign > 0 : sign < 0
+  return { ...value, isolating: keepRight ? [middle, hi] : [lo, middle] }
+}
+
+/** Exact ordering for the rational/quadratic real values admitted by current T3. */
+export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1 {
+  if (isRational(a)) return isRational(b) ? compareRational(a, b) : -compareExactToRational(b, a) as -1 | 0 | 1
+  if (isRational(b)) return compareExactToRational(a, b)
+  if (canonicalExact(a) === canonicalExact(b)) return 0
+  let left = a, right = b
+  for (let iteration = 0; iteration < 384; iteration++) {
+    if (compareRational(left.isolating[1], right.isolating[0]) < 0) return -1
+    if (compareRational(left.isolating[0], right.isolating[1]) > 0) return 1
+    left = refineAlgebraic(left)
+    right = refineAlgebraic(right)
+  }
+  throw new RangeError('exact algebraic ordering unresolved')
+}
+
+const affinePolynomial = (scale: AlgebraicReal, factor: Rational, offset: Rational): string[] => {
+  const [pa, pb, pc] = scale.polynomial.map((coefficient) => rational(coefficient))
+  const a = pa
+  const b = addRational(
+    multiplyRational(rational(-2), multiplyRational(pa, offset)),
+    multiplyRational(pb, factor),
+  )
+  const c = addRational(
+    subtractRational(
+      multiplyRational(pa, squareRational(offset)),
+      multiplyRational(multiplyRational(pb, factor), offset),
+    ),
+    multiplyRational(pc, squareRational(factor)),
+  )
+  return primitiveQuadratic(lcmDenominatorPolynomial(a, b, c)).map(String)
+}
+
+/** Exact affine image `factor·value+offset`; used for scale-parametric points/tangencies. */
+export function affineExact(value: ExactReal, factor: Rational, offset: Rational): ExactReal {
+  if (isRational(value)) return addRational(multiplyRational(factor, value), offset)
+  if (compareRational(factor, rational(0)) === 0) return offset
+  const map = (endpoint: Rational) => addRational(multiplyRational(factor, endpoint), offset)
+  const a = map(value.isolating[0]), b = map(value.isolating[1])
+  return {
+    polynomial: affinePolynomial(value, factor, offset),
+    isolating: compareRational(a, b) <= 0 ? [a, b] : [b, a],
+    rootIndex: compareRational(factor, rational(0)) > 0 ? value.rootIndex : 1 - value.rootIndex,
+  }
+}
+
 const lcmDenominatorPolynomial = (a: Rational, b: Rational, c: Rational): bigint[] => {
   const qa = fromPublic(a), qb = fromPublic(b), qc = fromPublic(c)
   return [

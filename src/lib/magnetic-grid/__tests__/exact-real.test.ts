@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   approximateExact,
+  affineExact,
   canonicalExact,
+  compareExact,
   compareExactToRational,
   quadraticRootsWithin,
   rational,
@@ -49,5 +51,8 @@ describe('Wrap exact-real support', () => {
     expect(approximateExact(roots[0])).toBeCloseTo(96 + 24 * Math.SQRT2, 12)
     expect(compareExactToRational(roots[0], rational(129))).toBe(1)
     expect(compareExactToRational(roots[0], rational(130))).toBe(-1)
+    const shifted = affineExact(roots[0], rational(1, 2), rational(-48))
+    expect(approximateExact(shifted)).toBeCloseTo(12 * Math.SQRT2, 12)
+    expect(compareExact(shifted, rational(0))).toBe(1)
   })
 })
