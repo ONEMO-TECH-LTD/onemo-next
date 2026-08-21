@@ -5,11 +5,14 @@ import {
   canonicalExact,
   compareExact,
   compareExactToRational,
+  multiplyRational,
   quadraticRootsWithin,
   rational,
   rationalFromNumber,
   signQuadraticAtExact,
+  squareRational,
   sqrtMinusRational,
+  subtractRational,
 } from '../compute/exact-real'
 
 describe('Wrap exact-real support', () => {
@@ -56,10 +59,31 @@ describe('Wrap exact-real support', () => {
     expect(approximateExact(shifted)).toBeCloseTo(12 * Math.SQRT2, 12)
     expect(compareExact(shifted, rational(0))).toBe(1)
     expect(signQuadraticAtExact(rational(1), rational(-192), rational(8064), roots[0])).toBe(0)
+    const differentlyIsolated = quadraticRootsWithin(
+      rational(2), rational(-384), rational(16128), rational(129), rational(131),
+    )[0]
+    expect('polynomial' in differentlyIsolated).toBe(true)
+    if (!('polynomial' in differentlyIsolated)) return
+    expect(canonicalExact(differentlyIsolated)).not.toBe(canonicalExact(roots[0]))
+    expect(compareExactToRational(differentlyIsolated, rational(129))).toBe(1)
+    expect(compareExactToRational(differentlyIsolated, rational(131))).toBe(-1)
     expect(compareExact(roots[0], {
       polynomial: ['2', '-384', '16128'],
-      isolating: [rational(129), rational(130)],
+      isolating: differentlyIsolated.isolating,
       rootIndex: 1,
     })).toBe(0)
+  })
+
+  it('refines beyond any fixed precision cap for close distinct roots', () => {
+    const epsilon = rational(1, BigInt(1) << BigInt(420))
+    const root = quadraticRootsWithin(rational(1), rational(0), rational(-2), rational(1), rational(2))[0]
+    const shifted = quadraticRootsWithin(
+      rational(1),
+      multiplyRational(rational(-2), epsilon),
+      subtractRational(squareRational(epsilon), rational(2)),
+      rational(1),
+      rational(2),
+    )[0]
+    expect(compareExact(root, shifted)).toBe(-1)
   })
 })

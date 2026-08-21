@@ -228,13 +228,12 @@ export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1 {
   validateAlgebraic(b)
   if (normalizedAlgebraicKey(a) === normalizedAlgebraicKey(b)) return 0
   let left = a, right = b
-  for (let iteration = 0; iteration < 384; iteration++) {
+  for (;;) {
     if (compareRational(left.isolating[1], right.isolating[0]) < 0) return -1
     if (compareRational(left.isolating[0], right.isolating[1]) > 0) return 1
     left = refineAlgebraic(left)
     right = refineAlgebraic(right)
   }
-  throw new RangeError('exact algebraic ordering unresolved')
 }
 
 const affinePolynomial = (scale: AlgebraicReal, factor: Rational, offset: Rational): string[] => {
