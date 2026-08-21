@@ -126,6 +126,8 @@ export interface CentrePlacementMeasurement {
   excessMM: number
 }
 
+export interface CentrePhaseCandidate { phaseMM: Pt; canon: number }
+
 export interface PerimeterMeasurement { belt: Pt[]; interior: Pt[] }
 
 export interface GridConfig {

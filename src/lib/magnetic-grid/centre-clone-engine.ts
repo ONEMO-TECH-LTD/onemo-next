@@ -3,7 +3,6 @@
 
 import type { BBox, BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
 import {
-  BANDS,
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
   FLAP_MM,
@@ -21,11 +20,13 @@ import {
   fieldSpanMM,
   contactPointsMM,
   maxPressMM,
-  pressExcessMM,
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
+  measureCentreBranches,
+  measureCentrePlacements,
   safeSegments,
+  splitPerimeter,
   spotRadiusOf,
   TANGENT_GUARD_MM,
 } from './compute'
@@ -33,9 +34,11 @@ import {
   applyCoverage,
   assignSizes,
   bandOf,
+  centrePhaseCandidates,
   centeringAnchors,
+  chooseCentrePlacement,
   governMass,
-} from './centre-clone-logic'
+} from './logic'
 
 export * from './spec'
 export {
@@ -46,7 +49,7 @@ export {
   scaleContour,
   spotRadiusOf,
 } from './compute'
-export { bandOf } from './centre-clone-logic'
+export { bandOf } from './logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 /** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
@@ -90,7 +93,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // point anchors the slide walk; single-target modes also fix the balance target.
   const mode = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
   const governor = (cfg.governor ?? GOVERNOR) as Governor
-  const centres = centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
+  const centreMeasurements = measureCentreBranches(segments, [cx, cy], centroidOf(outer))
+  const centres = centeringAnchors(mode, centreMeasurements)
   // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
   const allMasses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
   const midY = (bb.minY + bb.maxY) / 2
@@ -117,36 +121,16 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // whose centre IS the governed centre. Magnets still govern first: a parity seating more
     // wins; at EQUAL seats the canonical frame parity always beats the rest, and coverage
     // only sorts the non-canonical remainder. Centring is exact by construction.
-    const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
-    const half = pitch / 2
-    const clsOf = (side: number) => bandOf(side)?.id ?? BANDS[BANDS.length - 1].id
-    const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
-    const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
-    const otherX = canX === bxc ? bxc + half : bxc
-    const otherY = canY === byc ? byc + half : byc
-    // canon = how many axes carry their class-derived parity (2 = the full canonical frame).
-    const cands: Array<[number, number, number]> = [
-      [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
-    ]
-    let best: { seats: number; canon: number; excess: number } | null = null
-    for (const [px, py, canon] of cands) {
-      const ox = mod(px, pitch), oy = mod(py, pitch)
-      const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
-      if (!seat.length) continue
-      const excess = pressExcessMM(outer, seat, reach)
-      const wins = !best
-        || seat.length > best.seats
-        || (seat.length === best.seats && canon > best.canon)
-        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
-      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
-    }
+    const measured = measureCentrePlacements(bb, pitch, centrePhaseCandidates(ruleTarget, bb, pitch), fits, outer, reach)
+    const best = chooseCentrePlacement(measured)
+    if (best) { bestSeated = best.seated; bestOx = best.phaseMM[0]; bestOy = best.phaseMM[1] }
     mainCentre = ruleTarget
   }
 
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
 
-  const coverage = applyCoverage(bestSeated, perimeterOnly, pitch)
-  const anchors = assignSizes(coverage.seated, plan)
+  const coverage = applyCoverage(bestSeated, perimeterOnly, splitPerimeter(bestSeated, pitch))
+  const anchors = assignSizes(coverage.seated, plan, bbox(coverage.seated))
 
 
   return {
@@ -220,7 +204,11 @@ function bandWalk(
     // the SMALLEST size where it seats lawfully — refined below the walk step so true contact
     // is found, not approximated.
     const pressAt = (c: Contour, g: GridResult) =>
-      maxPressMM(c.outer.pts, applyCoverage(g.anchors.map((a) => a.p), true, cfg.pitchMM ?? DEFAULT_PITCH_MM).seated, reach)
+      maxPressMM(c.outer.pts, applyCoverage(
+        g.anchors.map((a) => a.p),
+        true,
+        splitPerimeter(g.anchors.map((a) => a.p), cfg.pitchMM ?? DEFAULT_PITCH_MM),
+      ).seated, reach)
     if (count >= 1 && !seen.has(count)) {
       // Bisect (mm - stepMM, mm] for the smallest lawful size holding this count — its gap is
       // minimal by construction; the law then judges THAT size.

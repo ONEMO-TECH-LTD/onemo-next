@@ -1,13 +1,12 @@
-// grid-origin-logic.ts — LOGIC: policies. Reads what compute measured; weighs with spec's values.
+// Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, Band, CentreMode, Governor, MagnetDia, MagnetPlan, Pt, SafeSegment } from './spec'
+import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './spec'
-import { bbox, splitPerimeter } from './compute'
 
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
 export function bandOf(sizeMM: number): Band | null {
@@ -46,54 +45,66 @@ export function governMass<M extends { areaMM2: number; centreMM: Pt; peakClearM
  */
 export function centeringAnchors(
   mode: CentreMode,
-  segments: ReadonlyArray<SafeSegment>,
-  boxCentre: Pt,
-  weightCentre: Pt,
+  measured: CentreMeasurements,
 ): Pt[] {
-  if (mode === 0) return [boxCentre]
-  if (mode === 3) return [weightCentre]
-  if (!segments.length) return [boxCentre]
-  if (mode === 1) {
-    // The whole erosion area's centre — area-weighted mean of the islands' means.
-    let n = 0, sx = 0, sy = 0
-    for (const seg of segments) { n += seg.areaMM2; sx += seg.meanMM[0] * seg.areaMM2; sy += seg.meanMM[1] * seg.areaMM2 }
-    return [[sx / n, sy / n]]
-  }
-  if (mode === 4) {
-    // The single most buried point of the shape.
-    let best = segments[0]
-    for (const seg of segments) if (seg.peakClearMM > best.peakClearMM) best = seg
-    return [best.centreMM]
-  }
-  const masses = segments.flatMap((seg) => (seg.masses.length ? seg.masses : [seg]))
-  if (mode === 5) {
-    // Gravity: the highest mass governs.
-    let top = masses[0]
-    for (const m of masses) if (m.centreMM[1] > top.centreMM[1]) top = m
-    return [top.centreMM]
-  }
+  if (mode === 0) return [measured.box]
+  if (mode === 3) return [measured.weight]
+  if (mode === 1) return [measured.core]
+  if (mode === 4) return [measured.deep]
+  if (mode === 5) return [measured.top]
   // Mode 2 — adaptive: every mass centre anchors; scoring chooses between them.
-  return masses.map((m) => m.centreMM)
+  return measured.masses.length ? measured.masses.map((m) => m.centreMM) : [measured.box]
+}
+
+/** The four class-derived Centre phases. Geometry is measured later by compute. */
+export function centrePhaseCandidates(target: Pt, bb: BBox, pitch: number): CentrePhaseCandidate[] {
+  const bxc = target[0] - bb.minX, byc = target[1] - bb.minY
+  const half = pitch / 2
+  const clsOf = (side: number) => bandOf(side)?.id ?? BANDS[BANDS.length - 1].id
+  const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
+  const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
+  const otherX = canX === bxc ? bxc + half : bxc
+  const otherY = canY === byc ? byc + half : byc
+  return [
+    { phaseMM: [canX, canY], canon: 2 },
+    { phaseMM: [otherX, canY], canon: 1 },
+    { phaseMM: [canX, otherY], canon: 1 },
+    { phaseMM: [otherX, otherY], canon: 0 },
+  ]
+}
+
+/** Centre-rules ordering over completed neutral placement measurements. */
+export function chooseCentrePlacement(
+  candidates: ReadonlyArray<CentrePlacementMeasurement>,
+): CentrePlacementMeasurement | null {
+  let best: CentrePlacementMeasurement | null = null
+  for (const candidate of candidates) {
+    if (!candidate.seated.length) continue
+    const wins = !best
+      || candidate.seated.length > best.seated.length
+      || (candidate.seated.length === best.seated.length && candidate.canon > best.canon)
+      || (candidate.seated.length === best.seated.length && candidate.canon === best.canon && candidate.excessMM < best.excessMM)
+    if (wins) best = candidate
+  }
+  return best
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(
   seated: Pt[],
   perimeterOnly: boolean,
-  pitch: number,
+  split: PerimeterMeasurement,
 ): { seated: Pt[]; interior: Pt[] } {
   if (!perimeterOnly || seated.length <= 4) return { seated, interior: [] }
-  const split = splitPerimeter(seated, pitch)
   if (split.belt.length >= MIN_ANCHORS) return { seated: split.belt, interior: split.interior }
   return { seated, interior: [] }
 }
 
 
 /** Per-anchor magnet size. corners8 → the large body on the extreme corners, small elsewhere. */
-export function assignSizes(seated: Pt[], plan: MagnetPlan): Anchor[] {
+export function assignSizes(seated: Pt[], plan: MagnetPlan, bb: BBox): Anchor[] {
   if (plan === 'all8') return seated.map((p) => ({ p, dia: MAGNET_DIA_LARGE_MM }))
   if (plan === 'all6') return seated.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM }))
-  const bb = bbox(seated)
   return seated.map((p) => {
     const ex = Math.abs(p[0] - bb.minX) < 0.6 || Math.abs(p[0] - bb.maxX) < 0.6
     const ey = Math.abs(p[1] - bb.minY) < 0.6 || Math.abs(p[1] - bb.maxY) < 0.6

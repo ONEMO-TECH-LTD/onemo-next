@@ -1,6 +1,6 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
-import type { BBox, Pt, SafeMass, SafeSegment } from '../spec'
+import type { BBox, CentreMeasurements, Pt, SafeMass, SafeSegment } from '../spec'
 import { pointInPolygon } from '../../effect/attachment'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
@@ -250,5 +250,27 @@ export function pointInMass(p: Pt, mass: { bbox: BBox; rings: Pt[][] }): boolean
   if (p[0] < mass.bbox.minX || p[0] > mass.bbox.maxX || p[1] < mass.bbox.minY || p[1] > mass.bbox.maxY) return false
   if (!mass.rings.length) return true
   return mass.rings.some((ring) => pointInPolygon(p, ring as Pt[]))
+}
+
+/** Neutral measurements consumed by the Centre policy; no mode or governor reaches compute. */
+export function measureCentreBranches(
+  segments: ReadonlyArray<SafeSegment>, boxCentre: Pt, weightCentre: Pt,
+): CentreMeasurements {
+  let n = 0, sx = 0, sy = 0
+  for (const seg of segments) { n += seg.areaMM2; sx += seg.meanMM[0] * seg.areaMM2; sy += seg.meanMM[1] * seg.areaMM2 }
+  const core: Pt = segments.length ? [sx / n, sy / n] : boxCentre
+  let deepest = segments[0]
+  for (const seg of segments) if (!deepest || seg.peakClearMM > deepest.peakClearMM) deepest = seg
+  const masses = segments.flatMap((seg) => (seg.masses.length ? seg.masses : [seg]))
+  let top = masses[0]
+  for (const mass of masses) if (!top || mass.centreMM[1] > top.centreMM[1]) top = mass
+  return {
+    box: boxCentre,
+    weight: weightCentre,
+    core,
+    deep: deepest?.centreMM ?? boxCentre,
+    masses,
+    top: top?.centreMM ?? boxCentre,
+  }
 }
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */

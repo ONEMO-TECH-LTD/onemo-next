@@ -12,7 +12,7 @@
 // ring and a radius and answers a geometric question.
 
 
-import type { BBox, Contour, Pt } from '../spec'
+import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, Pt } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
 
 /** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
@@ -202,6 +202,23 @@ export function latticeAt(bb: BBox, pitch: number, ox: number, oy: number): Pt[]
 /** The same lattice generator over an arbitrary region. */
 export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
   return latticeAt(region, pitch, phase[0], phase[1])
+}
+
+/** Measure already-ruled Centre phases without choosing between them. */
+export function measureCentrePlacements(
+  bb: BBox,
+  pitch: number,
+  candidates: ReadonlyArray<CentrePhaseCandidate>,
+  fits: (pt: Pt) => boolean,
+  outer: ReadonlyArray<Pt>,
+  reach: number,
+): CentrePlacementMeasurement[] {
+  return candidates.map(({ phaseMM: [px, py], canon }) => {
+    const ox = ((px % pitch) + pitch) % pitch
+    const oy = ((py % pitch) + pitch) % pitch
+    const seated = latticeAt(bb, pitch, ox, oy).filter(fits)
+    return { phaseMM: [ox, oy], seated, canon, excessMM: pressExcessMM(outer, seated, reach) }
+  })
 }
 
 /**
