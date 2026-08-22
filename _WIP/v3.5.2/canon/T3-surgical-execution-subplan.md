@@ -6,8 +6,8 @@ Status: final execution authority — R0 + G1 QA/Meta CLEAR. This revision relea
 
 Execute only from:
 
-1. `v3.5.2-master-contract.md` — 948 lines — SHA-256 `9a9c7237a4f17d4d9c080b468f823c3ad83c9644edd471dcba0be9f22260fc51`; operative content approved at `a65added` under the former v3.5.1 name.
-2. `T3-build-three-laws.md` — 756 lines — SHA-256 `a22f9ba48c0e580e9adbbb3ddd7c2fe4b8966a6b77abb484e0b84c7e07f19dd5`; operative content approved at `a65added` under the former v3.5.1 name.
+1. `v3.5.2-master-contract.md` — 948 lines — SHA-256 `73d4e29e87e385ca5ff35b1ba635b4b1f38f8abdc4a3d2e6ae9bac8601dc611e`; operative content approved at `a65added` under the former v3.5.1 name.
+2. `T3-build-three-laws.md` — 756 lines — SHA-256 `2622b9f932a84d5c7b986c2430afd12d1385a3327117d4ae89681e782fd26db5`; operative content approved at `a65added` under the former v3.5.1 name.
 3. `../supporting/T3-execution-matrix.md` — SHA-256 `f3bde325b18f1c2957d2b211b3bdc25222a7309d0aa71cc6b197f329b11a06f7`.
 4. `../supporting/T3-post-wrap-commit-audit.md` — 50 lines — SHA-256 `45c0d3f59c1ae8faafd060492c1cdd53f3798ec42d8cf0ab0c3716d2cbb6acab` — joint 34-commit recovery disposition.
 
