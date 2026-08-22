@@ -88,7 +88,13 @@ export interface AlgebraicReal {
   isolating: readonly [Rational, Rational]
   rootIndex: number
 }
-export type ExactReal = Rational | AlgebraicReal
+export interface CertifiedExpressionReal {
+  expressionHash: string
+  expression: readonly (ExactInteger | string)[]
+  isolating: readonly [Rational, Rational]
+  proofId: string
+}
+export type ExactReal = Rational | AlgebraicReal | CertifiedExpressionReal
 export interface ExactScale { exact: ExactReal; approximateMM: number }
 export interface BoundaryElement {
   kind: 'segment'
@@ -170,7 +176,7 @@ export interface SafeSegment extends SafeMass {
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
-export interface Anchor { p: Pt; dia: MagnetDia }
+export interface LegacyGridAnchor { p: Pt; dia: MagnetDia }
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
 export type Governor = 0 | 1 | 2 | 3
 
@@ -215,7 +221,7 @@ export interface GridConfig {
 }
 
 export interface GridResult {
-  anchors: Anchor[]
+  anchors: LegacyGridAnchor[]
   pitchCentreMM: number
   lattice: Pt[]
   phaseMM: Pt
@@ -229,3 +235,190 @@ export interface GridResult {
 }
 
 export interface BandSnapPoint { sizeMM: number; count: number }
+
+export type BandId = Band['id']
+export type CoverageMode = 'perimeter' | 'full'
+export type CentrePolicy =
+  | { mode: 'box' }
+  | { mode: 'core' }
+  | { mode: 'weight' }
+  | { mode: 'deep' }
+  | { mode: 'top' }
+  | { mode: 'masses'; governor: 'smallest' | 'deepest' | 'top' | 'top-small' }
+export type PointMM = readonly [number, number]
+export interface ExactPoint { x: ExactReal; y: ExactReal; approximateMM: PointMM }
+export interface NormalizedBoundary {
+  boundary: readonly BoundaryElement[]
+  truth: BoundaryTruth
+  normalizedLongestSideMM: 1
+  displayContour: Contour
+}
+export interface RegionEvidence {
+  id: string
+  centres: readonly ExactPoint[]
+  area: ExactReal
+  peakClear: ExactReal
+  rings: readonly (readonly PointMM[])[]
+}
+export interface MassEvidence extends RegionEvidence {}
+export interface Anchor { centre: ExactPoint; diameterMM: 6 | 8 }
+export interface LatticeCandidate {
+  phase: ExactPoint
+  xParity: 'node' | 'gap'
+  yParity: 'node' | 'gap'
+  nodes: readonly ExactPoint[]
+}
+export interface SeatedCandidate extends LatticeCandidate { seated: readonly ExactPoint[] }
+export interface BeltResult { belt: readonly ExactPoint[]; interior: readonly ExactPoint[] }
+export interface ParityEvidence {
+  x: { lineCount: number; centreRelation: 'node' | 'gap' }
+  y: { lineCount: number; centreRelation: 'node' | 'gap' }
+}
+export interface CentreEvidence {
+  id: string
+  box: ExactPoint
+  core: ExactPoint | null
+  weight: ExactPoint
+  deepest: readonly ExactPoint[]
+  islands: readonly RegionEvidence[]
+  masses: readonly MassEvidence[]
+}
+export interface CentreDecision { target: ExactPoint; policy: CentrePolicy; evidenceId: string }
+export interface CentreTie { status: 'tie'; decisions: readonly CentreDecision[] }
+export interface CandidateGeometry {
+  band: BandId
+  scale: ExactScale
+  phase: ExactPoint
+  xParity: 'node' | 'gap'
+  yParity: 'node' | 'gap'
+  parityEvidence: ParityEvidence
+  centre: CentreDecision
+  centreEvidence: CentreEvidence
+  seated: readonly ExactPoint[]
+  belt: readonly ExactPoint[]
+  seatedCount: number
+  beltCount: number
+  requiredFlap: ExactReal
+  requiredFlapApproxMM: number
+  orientation: 'vertical' | 'horizontal' | 'two-dimensional' | 'single'
+}
+export interface RootedCandidateGeometry extends CandidateGeometry {
+  measuredId: string
+  geometryLayoutId: string
+  regimeId: string
+  contacts: readonly [ContactWitness, ...ContactWitness[]]
+  seatedExtremeCorners: readonly boolean[]
+  beltExtremeCorners: readonly boolean[]
+  centreErrorMM: number
+  centreTrue: boolean
+}
+export interface LawfulCandidateMeasurement extends RootedCandidateGeometry {
+  anchors: readonly Anchor[]
+  coverage: CoverageMode
+  magnetCount: number
+  parityTrue: true
+  wrapTrue: true
+  appliedFlap: ExactReal
+  flapMode: FlapLaw['mode']
+  policyIdentity: string
+}
+export interface RefusalEvidence { readonly [key: string]: string | number | boolean | null }
+export type RefusalCode =
+  | 'NO_SAFE_CORE' | 'NO_CENTRE' | 'CENTRE_EVIDENCE_UNRESOLVED' | 'CENTRE_TIE_UNRESOLVED'
+  | 'NO_PARITY_LAWFUL_PLACEMENT' | 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND'
+  | 'AUTO_FLAP_CAP_EXCEEDED' | 'RUNG_CONFLICT' | 'REGIME_UNRESOLVED'
+export interface Refusal { status: 'refused'; code: RefusalCode; evidence: RefusalEvidence }
+export interface EvaluationContext { band: BandId; scale: ExactScale; regimeId: string; siteId: string }
+export interface CentreBranchMeasurement {
+  context: EvaluationContext
+  evidence: CentreEvidence
+  frozenMasses: readonly {
+    massId: string
+    stableOrder: number
+    centre: ExactPoint
+    area: ExactReal
+    peakClear: ExactReal
+    bbox: { minX: ExactReal; minY: ExactReal; maxX: ExactReal; maxY: ExactReal }
+    upperHalf: boolean
+    areaOrder: number
+    peakOrder: number
+    topOrder: number
+  }[]
+}
+export interface CentreLawEvaluation {
+  context: EvaluationContext
+  evidenceId: string
+  decisions: readonly CentreDecision[]
+  refusal: Refusal | null
+}
+export type CandidateLawEvaluation =
+  | { status: 'lawful'; candidate: LawfulCandidateMeasurement }
+  | { status: 'refused'; refusal: Refusal; measured: RootedCandidateGeometry; policyIdentity: string }
+export interface FirstLawfulCertificate { regimeId: string; priorEvidenceIds: readonly string[]; contact: ContactWitness }
+export interface LawfulRungDecision {
+  band: BandId
+  scale: ExactScale
+  magnetCount: number
+  firstLawful: FirstLawfulCertificate
+  candidates: readonly LawfulCandidateMeasurement[]
+}
+export interface BandLawDecision { band: BandId; rungs: readonly LawfulRungDecision[]; refusal: Refusal | null }
+export interface LawReduction { bands: readonly BandLawDecision[]; globalRefusal: Refusal | null }
+export type RegimeEventKind = 'SEAT_COUNT' | 'PARITY_CLASS' | 'SAFE_TOPOLOGY' | 'CENTRE_IDENTITY' | 'BINDING_ELEMENT' | 'CONTACT_MULTIPLICITY'
+export interface RegimeEvent { id: string; kind: RegimeEventKind; scale: ExactScale; evidenceId: string }
+export interface Regime { id: string; lo: ExactScale; hi: ExactScale; events: readonly RegimeEvent[] }
+export type FixedFlap = { mode: 'fixed'; allowance: Rational }
+export type AutoFlap = { mode: 'auto'; maxAllowance: Rational }
+export type FlapLaw = FixedFlap | AutoFlap
+export interface EngineConfig { flap: FlapLaw; coverage: CoverageMode; magnetPlan: MagnetPlan }
+export interface ComparisonEngineConfig extends EngineConfig { centrePolicy: CentrePolicy }
+export interface EvaluationPolicy extends ComparisonEngineConfig { readonly policyIdentity: string }
+export interface ComputeInputs { pitchMM: Rational; spotRadiusMM: Rational; massDepthMM: Rational }
+export interface SolveBandsInput { contour: NormalizedBoundary; config: ComparisonEngineConfig }
+export interface InspectFixedSizeInput {
+  contour: NormalizedBoundary
+  sizeMM: number
+  config: ComparisonEngineConfig
+  forcedPhaseMM?: PointMM
+}
+export interface LawfulRung {
+  band: BandId
+  scale: ExactScale
+  magnetCount: number
+  firstLawful: FirstLawfulCertificate
+  layouts: readonly LawfulLayout[]
+}
+export interface LawfulLayout {
+  candidateId: string
+  layoutId: string
+  anchors: readonly Anchor[]
+  belt: readonly ExactPoint[]
+  centre: CentreDecision
+  centreEvidenceId: string
+  requiredFlap: ExactReal
+  appliedFlap: ExactReal
+  contacts: readonly ContactWitness[]
+  phase: ExactPoint
+  pitchMM: number
+  spotRadiusMM: number
+}
+export interface BandResult { band: BandId; rungs: readonly LawfulRung[]; refusal?: { code: RefusalCode; evidence: RefusalEvidence } }
+export type AllBandsResult =
+  | { status: 'evaluated'; bands: readonly BandResult[]; centreEvidenceById: Readonly<Record<string, CentreEvidence>> }
+  | { status: 'refused'; refusal: Refusal; bands: readonly BandResult[]; centreEvidenceById: Readonly<Record<string, CentreEvidence>> }
+export interface FixedSizeInspection { status: 'inspection'; candidates: readonly CandidateInspection[] }
+export interface CandidateInspection {
+  anchors: readonly Anchor[]
+  magnetCount: number
+  parityTrue: boolean
+  centreErrorMM: number
+  requiredFlap: ExactReal
+  requiredFlapApproxMM: number
+  orientation: 'vertical' | 'horizontal' | 'two-dimensional' | 'single'
+  concessions: readonly ('CENTRE' | 'WRAP')[]
+}
+export interface MagneticGridEngine {
+  solveBands(input: SolveBandsInput): AllBandsResult
+  inspectFixedSize(input: InspectFixedSizeInput): FixedSizeInspection
+  policyIdentityOf(config: ComparisonEngineConfig): string
+}

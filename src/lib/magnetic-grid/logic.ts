@@ -1,13 +1,44 @@
 // Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, ExtremeCornerMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
+import type {
+  BandLawDecision,
+  Band,
+  BBox,
+  CandidateGeometry,
+  CandidateLawEvaluation,
+  CentreBranchMeasurement,
+  CentreDecision,
+  CentreLawEvaluation,
+  CentreMeasurements,
+  CentreMode,
+  CentrePhaseCandidate,
+  CentrePlacementMeasurement,
+  CentrePolicy,
+  EvaluationPolicy,
+  ExactPoint,
+  ExactReal,
+  ExtremeCornerMeasurement,
+  CandidateInspection,
+  Governor,
+  LawfulCandidateMeasurement,
+  LawReduction,
+  LegacyGridAnchor,
+  MagnetPlan,
+  PerimeterMeasurement,
+  Pt,
+  Refusal,
+  RootedCandidateGeometry,
+  WrapEvaluation,
+  WrapMeasurement,
+  WrapPolicy,
+} from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './spec'
-import { compareExactToRational } from './compute'
+import { compareExact, compareExactToRational } from './compute'
 
 const QUANTUM_KEY_MM = 0.001
 const mod = (v: number, m: number) => ((v % m) + m) % m
@@ -150,10 +181,203 @@ export function applyCoverage(
 
 
 /** Per-anchor magnet size. corners8 → the large body on the extreme corners, small elsewhere. */
-export function assignSizes(measured: ReadonlyArray<ExtremeCornerMeasurement>, plan: MagnetPlan): Anchor[] {
+export function assignSizes(measured: ReadonlyArray<ExtremeCornerMeasurement>, plan: MagnetPlan): LegacyGridAnchor[] {
   if (plan === 'all8') return measured.map(({ p }) => ({ p, dia: MAGNET_DIA_LARGE_MM }))
   if (plan === 'all6') return measured.map(({ p }) => ({ p, dia: MAGNET_DIA_SMALL_MM }))
   return measured.map(({ p, extremeCorner }) => {
     return { p, dia: extremeCorner ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM }
   })
+}
+
+const refusal = (code: Refusal['code'], evidence: Refusal['evidence']): Refusal => ({ status: 'refused', code, evidence })
+/** Centre policy over completed neutral exact evidence. */
+export function evaluateCentreLaw(measured: CentreBranchMeasurement, policy: CentrePolicy): CentreLawEvaluation {
+  const { evidence } = measured
+  const requestedPolicy = policy
+  let targets: ExactPoint[] = []
+  try {
+    if (policy.mode === 'box') targets = [evidence.box]
+    else if (policy.mode === 'weight') targets = [evidence.weight]
+    else if (policy.mode === 'core') targets = evidence.core ? [evidence.core] : []
+    else if (policy.mode === 'deep') targets = [...evidence.deepest]
+    else if (policy.mode === 'top') {
+      const best = measured.frozenMasses.find((mass) => mass.topOrder === 0)
+      if (best) targets = [best.centre]
+    } else if (measured.frozenMasses.length) {
+      let candidates = [...measured.frozenMasses]
+      if (policy.governor === 'top-small') {
+        const upper = candidates.filter((mass) => mass.upperHalf)
+        if (upper.length) candidates = upper
+        else candidates = candidates.slice().sort((left, right) => left.topOrder - right.topOrder)
+      }
+      const order = policy.governor === 'deepest' ? 'peakOrder'
+        : policy.governor === 'top' || (policy.governor === 'top-small' && !candidates.some((mass) => mass.upperHalf)) ? 'topOrder'
+          : 'areaOrder'
+      let best = candidates[0]
+      for (const mass of candidates.slice(1)) if (mass[order] < best[order]) best = mass
+      targets = [best.centre]
+    }
+  } catch {
+    return {
+      context: measured.context,
+      evidenceId: evidence.id,
+      decisions: [],
+      refusal: refusal('CENTRE_EVIDENCE_UNRESOLVED', { evidenceId: evidence.id }),
+    }
+  }
+  if (!targets.length) return {
+    context: measured.context,
+    evidenceId: evidence.id,
+    decisions: [],
+    refusal: refusal(policy.mode === 'core' ? 'NO_SAFE_CORE' : 'NO_CENTRE', { evidenceId: evidence.id }),
+  }
+  const decisions: CentreDecision[] = targets.map((target) => ({ target, policy: requestedPolicy, evidenceId: evidence.id }))
+  return { context: measured.context, evidenceId: evidence.id, decisions, refusal: null }
+}
+
+export function parityIsLawful(candidate: CandidateGeometry, centre: CentreDecision): boolean {
+  void centre
+  return (candidate.parityEvidence.x.lineCount % 2 === 1) === (candidate.parityEvidence.x.centreRelation === 'node')
+    && (candidate.parityEvidence.y.lineCount % 2 === 1) === (candidate.parityEvidence.y.centreRelation === 'node')
+}
+
+export const wrapIsLawful = (requiredFlap: ExactReal, allowedFlap: ExactReal) =>
+  compareExact(requiredFlap, allowedFlap) <= 0
+
+export function chooseLawfulCandidate(
+  candidates: readonly LawfulCandidateMeasurement[],
+): readonly LawfulCandidateMeasurement[] | Refusal {
+  if (!candidates.length) return refusal('NO_WRAPPED_LAYOUT_IN_BAND', {})
+  const vertical = candidates.filter((candidate) => candidate.orientation === 'vertical')
+  return (vertical.length ? vertical : candidates).slice().sort((a, b) => a.measuredId.localeCompare(b.measuredId))
+}
+
+export function evaluateCandidateLaws(
+  measured: RootedCandidateGeometry,
+  config: EvaluationPolicy,
+): CandidateLawEvaluation {
+  const selected = config.coverage === 'full' ? measured.seated : measured.belt
+  const lawfulParity = parityIsLawful(measured, measured.centre)
+  const allowed = config.flap.mode === 'fixed' ? config.flap.allowance : config.flap.maxAllowance
+  let lawfulWrap = false
+  try { lawfulWrap = compareExactToRational(measured.requiredFlap, allowed) <= 0 } catch { lawfulWrap = false }
+  if (!lawfulParity || !lawfulWrap) return {
+    status: 'refused',
+    refusal: refusal(!lawfulParity ? 'NO_PARITY_LAWFUL_PLACEMENT'
+      : config.flap.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE', { measuredId: measured.measuredId }),
+    measured,
+    policyIdentity: config.policyIdentity,
+  }
+  const extremes = config.coverage === 'full' ? measured.seatedExtremeCorners : measured.beltExtremeCorners
+  const diameterFor = (index: number): 6 | 8 => config.magnetPlan === 'all8' ? 8 : config.magnetPlan === 'all6' ? 6
+    : extremes[index] ? 8 : 6
+  const candidate: LawfulCandidateMeasurement = {
+    ...measured,
+    anchors: selected.map((centre, index) => ({ centre, diameterMM: diameterFor(index) })),
+    coverage: config.coverage,
+    magnetCount: selected.length,
+    parityTrue: true,
+    wrapTrue: true,
+    appliedFlap: config.flap.mode === 'auto' ? measured.requiredFlap : config.flap.allowance,
+    flapMode: config.flap.mode,
+    policyIdentity: config.policyIdentity,
+  }
+  return { status: 'lawful', candidate }
+}
+
+/** Fixed-size inspection projection; Logic alone translates measured law failures into concessions. */
+export function inspectCandidateLaws(
+  evaluation: CandidateLawEvaluation,
+  config: EvaluationPolicy,
+): CandidateInspection {
+  const measured = evaluation.status === 'lawful' ? evaluation.candidate : evaluation.measured
+  const selected = config.coverage === 'full' ? measured.seated : measured.belt
+  const extremes = config.coverage === 'full' ? measured.seatedExtremeCorners : measured.beltExtremeCorners
+  const diameterFor = (index: number): 6 | 8 => config.magnetPlan === 'all8' ? 8 : config.magnetPlan === 'all6' ? 6 : extremes[index] ? 8 : 6
+  const parityTrue = evaluation.status === 'lawful' || evaluation.refusal.code !== 'NO_PARITY_LAWFUL_PLACEMENT'
+  const wrapTrue = evaluation.status === 'lawful'
+    || (evaluation.refusal.code !== 'WRAP_EXCEEDS_ALLOWANCE'
+      && evaluation.refusal.code !== 'AUTO_FLAP_CAP_EXCEEDED'
+      && evaluation.refusal.code !== 'NO_WRAPPED_LAYOUT_IN_BAND')
+  return {
+    anchors: evaluation.status === 'lawful' ? evaluation.candidate.anchors
+      : selected.map((centre, index) => ({ centre, diameterMM: diameterFor(index) })),
+    magnetCount: selected.length,
+    parityTrue,
+    centreErrorMM: measured.centreErrorMM,
+    requiredFlap: measured.requiredFlap,
+    requiredFlapApproxMM: measured.requiredFlapApproxMM,
+    orientation: measured.orientation,
+    concessions: [
+      ...(!parityTrue || !measured.centreTrue ? ['CENTRE' as const] : []),
+      ...(!wrapTrue ? ['WRAP' as const] : []),
+    ],
+  }
+}
+
+/** First-lawful count ownership, cross-band no-repeat, tie retention and conflict propagation. */
+export function reduceBandLadders(
+  centres: readonly CentreLawEvaluation[],
+  candidates: readonly CandidateLawEvaluation[],
+): LawReduction {
+  const bands: BandLawDecision[] = BANDS.map((band) => ({ band: band.id, rungs: [], refusal: null }))
+  const owned = new Map<number, number>()
+  for (const band of bands) {
+    const lawful = candidates.filter((candidate): candidate is Extract<CandidateLawEvaluation, { status: 'lawful' }> =>
+      candidate.status === 'lawful' && candidate.candidate.band === band.band)
+    const measuredLayouts = new Map<string, string>()
+    for (const { candidate } of lawful) {
+      const prior = measuredLayouts.get(candidate.measuredId)
+      if (prior !== undefined && prior !== candidate.geometryLayoutId) {
+        band.refusal = refusal('RUNG_CONFLICT', { band: band.band, measuredId: candidate.measuredId })
+        break
+      }
+      measuredLayouts.set(candidate.measuredId, candidate.geometryLayoutId)
+    }
+    if (band.refusal) continue
+    const counts = [...new Set(lawful.map((candidate) => candidate.candidate.magnetCount))].sort((a, b) => a - b)
+    const rungs = [] as BandLawDecision['rungs'][number][]
+    for (const magnetCount of counts) {
+      if (owned.has(magnetCount)) continue
+      const forCount = lawful.filter((candidate) => candidate.candidate.magnetCount === magnetCount)
+      let scale = forCount[0].candidate.scale.exact
+      for (const candidate of forCount.slice(1)) if (compareExact(candidate.candidate.scale.exact, scale) < 0) scale = candidate.candidate.scale.exact
+      let atScale = forCount.filter((candidate) => compareExact(candidate.candidate.scale.exact, scale) === 0).map((candidate) => candidate.candidate)
+      const auto = atScale.filter((candidate) => candidate.flapMode === 'auto')
+      if (auto.length) {
+        let minimum = auto[0].requiredFlap
+        for (const candidate of auto.slice(1)) if (compareExact(candidate.requiredFlap, minimum) < 0) minimum = candidate.requiredFlap
+        atScale = atScale.filter((candidate) => compareExact(candidate.requiredFlap, minimum) === 0)
+      }
+      const chosen = chooseLawfulCandidate(atScale)
+      if (!Array.isArray(chosen) || !chosen.length) {
+        band.refusal = refusal('RUNG_CONFLICT', { band: band.band, magnetCount })
+        continue
+      }
+      const contact = chosen[0].contacts[0]
+      const earlier = candidates.filter((candidate) => {
+        const measured = candidate.status === 'lawful' ? candidate.candidate : candidate.measured
+        const count = candidate.status === 'lawful' ? candidate.candidate.magnetCount : measured.beltCount
+        return count === magnetCount && compareExact(measured.scale.exact, scale) < 0
+      })
+      rungs.push({
+        band: band.band,
+        scale: chosen[0].scale,
+        magnetCount,
+        firstLawful: { regimeId: chosen[0].regimeId, priorEvidenceIds: earlier.map((candidate) => candidate.status === 'lawful' ? candidate.candidate.measuredId : candidate.measured.measuredId), contact },
+        candidates: chosen,
+      })
+      owned.set(magnetCount, band.band)
+    }
+    ;(band as unknown as { rungs: typeof rungs }).rungs = rungs
+  }
+  const centreRefusal = centres.find((centre) => centre.refusal)?.refusal ?? null
+  const candidateRefusal = candidates.find((candidate) => candidate.status === 'refused')
+  const reductionRefusal = bands.find((band) => band.refusal)?.refusal ?? null
+  return {
+    bands,
+    globalRefusal: bands.every((band) => !band.rungs.length)
+      ? reductionRefusal ?? centreRefusal ?? (candidateRefusal?.status === 'refused' ? candidateRefusal.refusal : null)
+      : reductionRefusal,
+  }
 }

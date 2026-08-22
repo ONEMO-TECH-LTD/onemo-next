@@ -1,5 +1,17 @@
-import type { BoundaryTruth, ContactWitness, Contour } from '../spec'
-import { canonicalExact, rationalFromNumber } from './exact-real'
+import type { BoundaryTruth, CertifiedExpressionReal, ContactWitness, Contour, ExactReal, Rational } from '../spec'
+import {
+  addRational,
+  canonicalExact,
+  compareExactToRational,
+  compareRational,
+  divideRational,
+  isAlgebraic,
+  isRational,
+  multiplyRational,
+  rational,
+  rationalFromNumber,
+  sqrtRationalBounds,
+} from './exact-real'
 
 const K = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
@@ -90,7 +102,69 @@ export const contourBoundaryTruth = (contour: Contour): BoundaryTruth => ({
 })
 export const certifyContactWitness = (
   witness: Omit<ContactWitness, 'certificateId'>,
-): ContactWitness => ({
-  ...witness,
-  certificateId: sha256Text(JSON.stringify(witness)),
-})
+): ContactWitness => {
+  for (const value of [witness.scale.exact, witness.allowance, witness.tangency.x, witness.tangency.y]) validateExactRealIdentity(value)
+  return { ...witness, certificateId: sha256Text(JSON.stringify(witness)) }
+}
+
+/** Canonical certificate for `sqrt(a*s^2+b*s+c)-subtract` over one exact scale. */
+export function certifySqrtQuadraticExpression(
+  scale: ExactReal,
+  coefficients: readonly [Rational, Rational, Rational],
+  subtract: Rational,
+): ExactReal {
+  const expression = [
+    'sqrt-quadratic-minus', canonicalExact(scale), canonicalExact(coefficients[0]),
+    canonicalExact(coefficients[1]), canonicalExact(coefficients[2]), canonicalExact(subtract),
+  ] as const
+  const expressionHash = sha256Text(JSON.stringify(expression))
+  const proofId = sha256Text(JSON.stringify(['sqrt-quadratic-proof-v1', expressionHash]))
+  const scaleBounds: readonly [Rational, Rational] = isRational(scale) ? [scale, scale] : scale.isolating
+  const intervalMultiply = (
+    left: readonly [Rational, Rational], right: readonly [Rational, Rational],
+  ): readonly [Rational, Rational] => {
+    const products = [
+      multiplyRational(left[0], right[0]), multiplyRational(left[0], right[1]),
+      multiplyRational(left[1], right[0]), multiplyRational(left[1], right[1]),
+    ]
+    return [
+      products.reduce((best, value) => compareRational(value, best) < 0 ? value : best),
+      products.reduce((best, value) => compareRational(value, best) > 0 ? value : best),
+    ]
+  }
+  const intervalAdd = (
+    left: readonly [Rational, Rational], right: readonly [Rational, Rational],
+  ): readonly [Rational, Rational] => [addRational(left[0], right[0]), addRational(left[1], right[1])]
+  const constant = (value: Rational): readonly [Rational, Rational] => [value, value]
+  const squaredScale = intervalMultiply(scaleBounds, scaleBounds)
+  const distance = intervalAdd(
+    intervalAdd(intervalMultiply(constant(coefficients[0]), squaredScale), intervalMultiply(constant(coefficients[1]), scaleBounds)),
+    constant(coefficients[2]),
+  )
+  if (compareRational(distance[0], rational(0)) < 0) throw new RangeError('certified distance interval crosses negative')
+  const sqrtLo = sqrtRationalBounds(distance[0])[0], sqrtHi = sqrtRationalBounds(distance[1])[1]
+  let lo = addRational(sqrtLo, multiplyRational(rational(-1), subtract))
+  let hi = addRational(sqrtHi, multiplyRational(rational(-1), subtract))
+  let certified: CertifiedExpressionReal = { expressionHash, expression, isolating: [lo, hi], proofId }
+  for (let iteration = 0; iteration < 192; iteration++) {
+    const middle = divideRational(addRational(lo, hi), rational(2))
+    const comparison = compareExactToRational(certified, middle)
+    if (comparison === 0) return middle
+    if (comparison > 0) lo = middle
+    else hi = middle
+    certified = { ...certified, isolating: [lo, hi] }
+  }
+  return certified
+}
+
+export function validateCertifiedExpressionIdentity(value: CertifiedExpressionReal): void {
+  const expressionHash = sha256Text(JSON.stringify(value.expression))
+  const proofId = sha256Text(JSON.stringify(['sqrt-quadratic-proof-v1', expressionHash]))
+  if (value.expressionHash !== expressionHash || value.proofId !== proofId) throw new RangeError('certified expression identity mismatch')
+  compareExactToRational(value, value.isolating[0])
+  compareExactToRational(value, value.isolating[1])
+}
+
+export function validateExactRealIdentity(value: ExactReal): void {
+  if ('expressionHash' in value) validateCertifiedExpressionIdentity(value)
+}

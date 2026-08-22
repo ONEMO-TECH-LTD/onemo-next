@@ -1,5 +1,6 @@
 import type {
   BoundaryElement,
+  BoundaryTruth,
   ContactWitness,
   Contour,
   ExactReal,
@@ -11,18 +12,22 @@ import type {
 } from '../spec'
 import {
   addRational,
+  affineExact,
   allowancePolynomial,
   approximateExact,
+  canonicalExact,
   compareRational,
   divideRational,
   multiplyRational,
   rational,
   rationalFromNumber,
   sqrtMinusRational,
+  signQuadraticAtExact,
   squareRational,
   subtractRational,
 } from './exact-real'
-import { exactSeatIsLegal } from './seat'
+import { certifyContactWitness, certifySqrtQuadraticExpression, sha256Text } from './identity'
+import { exactSeatIsLegal, type ExactAffineNode } from './seat'
 
 type ExactPoint = readonly [Rational, Rational]
 type UncertifiedWrapMeasurement = Omit<WrapMeasurement, 'witnesses'> & {
@@ -203,5 +208,123 @@ export function measureWrap(
     refusal: validSeat
       ? null
       : { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'invalid-seat' },
+  }
+}
+
+type DistanceBranch = {
+  squared: readonly [Rational, Rational, Rational]
+  tangencyCoefficient: ExactPoint
+  tangencyOffset: ExactPoint
+  elementId: string
+}
+
+const exactAffineDistance = (
+  anchor: ExactAffineNode,
+  a: ExactPoint,
+  b: ExactPoint,
+  elementId: string,
+  scale: ExactReal,
+): DistanceBranch => {
+  const segment = minus(b, a)
+  const relativeCoefficient = minus(anchor.coefficient, a)
+  const projectionA = dot(relativeCoefficient, segment), projectionB = dot(anchor.offset, segment)
+  const lengthSquared = squaredLength(segment)
+  const start = signQuadraticAtExact(rational(0), projectionA, projectionB, scale)
+  const end = signQuadraticAtExact(rational(0), subtractRational(projectionA, lengthSquared), projectionB, scale)
+  if (start <= 0 || compareRational(lengthSquared, rational(0)) === 0) {
+    return {
+      squared: [squaredLength(relativeCoefficient), multiplyRational(rational(2), dot(relativeCoefficient, anchor.offset)), squaredLength(anchor.offset)],
+      tangencyCoefficient: a, tangencyOffset: [rational(0), rational(0)], elementId,
+    }
+  }
+  if (end >= 0) {
+    const coefficient = minus(anchor.coefficient, b)
+    return {
+      squared: [squaredLength(coefficient), multiplyRational(rational(2), dot(coefficient, anchor.offset)), squaredLength(anchor.offset)],
+      tangencyCoefficient: b, tangencyOffset: [rational(0), rational(0)], elementId,
+    }
+  }
+  const ratioA = divideRational(projectionA, lengthSquared), ratioB = divideRational(projectionB, lengthSquared)
+  const tangencyCoefficient = plus(a, times(segment, ratioA)), tangencyOffset = times(segment, ratioB)
+  const normalA = subtractRational(multiplyRational(relativeCoefficient[0], segment[1]), multiplyRational(relativeCoefficient[1], segment[0]))
+  const normalB = subtractRational(multiplyRational(anchor.offset[0], segment[1]), multiplyRational(anchor.offset[1], segment[0]))
+  return {
+    squared: [
+      divideRational(multiplyRational(normalA, normalA), lengthSquared),
+      divideRational(multiplyRational(rational(2), multiplyRational(normalA, normalB)), lengthSquared),
+      divideRational(multiplyRational(normalB, normalB), lengthSquared),
+    ],
+    tangencyCoefficient, tangencyOffset, elementId,
+  }
+}
+
+const compareDistanceBranches = (left: DistanceBranch, right: DistanceBranch, scale: ExactReal) =>
+  signQuadraticAtExact(
+    subtractRational(left.squared[0], right.squared[0]),
+    subtractRational(left.squared[1], right.squared[1]),
+    subtractRational(left.squared[2], right.squared[2]),
+    scale,
+  )
+
+/** Exact-scale Wrap adapter over affine anchors and the complete supplied boundary. */
+export function measureExactScaleWrap(
+  contour: Contour,
+  truth: BoundaryTruth,
+  belt: readonly ExactAffineNode[],
+  scale: ExactReal,
+  spotRadius: Rational,
+  regimeId: string,
+): WrapMeasurement {
+  const exactScaleValue: ExactScale = { exact: scale, approximateMM: approximateExact(scale) }
+  if (contour.outer.pts.length < 3) return {
+    scale: exactScaleValue, boundaryTruth: truth, requiredFlap: rational(0), requiredFlapApproxMM: 0,
+    witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'invalid-boundary' },
+  }
+  if (!belt.length) return {
+    scale: exactScaleValue, boundaryTruth: truth, requiredFlap: rational(0), requiredFlapApproxMM: 0,
+    witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' },
+  }
+  const rings = [contour.outer, ...contour.holes]
+  const perAnchor: Array<{ anchor: ExactAffineNode; worst: DistanceBranch; binders: DistanceBranch[] }> = []
+  for (const anchor of belt) {
+    const distances: DistanceBranch[] = []
+    rings.forEach((ring, ringIndex) => {
+      for (let index = 0, previous = ring.pts.length - 1; index < ring.pts.length; previous = index++) {
+        const ringId = ringIndex === 0 ? 'outer' : `hole:${ringIndex - 1}`
+        distances.push(exactAffineDistance(anchor, exactPoint(ring.pts[previous]), exactPoint(ring.pts[index]), `${ringId}:segment:${index}`, scale))
+      }
+    })
+    let nearest = distances[0]
+    for (const distance of distances.slice(1)) if (compareDistanceBranches(distance, nearest, scale) < 0) nearest = distance
+    perAnchor.push({ anchor, worst: nearest, binders: distances.filter((distance) => compareDistanceBranches(distance, nearest, scale) === 0) })
+  }
+  let worstAnchor = perAnchor[0]
+  for (const candidate of perAnchor.slice(1)) if (compareDistanceBranches(candidate.worst, worstAnchor.worst, scale) > 0) worstAnchor = candidate
+  const requiredFlap = certifySqrtQuadraticExpression(scale, worstAnchor.worst.squared, spotRadius)
+  const witnesses = perAnchor.flatMap(({ anchor, worst, binders }) => {
+    if (compareDistanceBranches(worst, worstAnchor.worst, scale) !== 0) return []
+    const beltAnchorId = sha256Text(JSON.stringify(['belt-anchor-v1', canonicalExact(anchor.point.x), canonicalExact(anchor.point.y)]))
+    return binders.map((binder) => certifyContactWitness({
+      scale: exactScaleValue,
+      boundaryTruth: truth,
+      beltAnchorId,
+      outlineElementId: binder.elementId,
+      outlineElementKind: 'segment',
+      allowance: requiredFlap,
+      equation: { kind: 'polynomial', polynomial: binder.squared.map((value) => value.numerator), rootIndex: 1 },
+      tangency: {
+        x: affineExact(scale, binder.tangencyCoefficient[0], binder.tangencyOffset[0]),
+        y: affineExact(scale, binder.tangencyCoefficient[1], binder.tangencyOffset[1]),
+      },
+      regimeId,
+    }))
+  })
+  return {
+    scale: exactScaleValue,
+    boundaryTruth: truth,
+    requiredFlap,
+    requiredFlapApproxMM: approximateExact(requiredFlap),
+    witnesses,
+    refusal: null,
   }
 }

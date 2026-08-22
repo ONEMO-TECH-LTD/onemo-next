@@ -1,4 +1,4 @@
-import type { AlgebraicReal, ExactReal, Rational } from '../spec'
+import type { AlgebraicReal, CertifiedExpressionReal, ExactReal, Rational } from '../spec'
 
 type Q = { n: bigint; d: bigint }
 
@@ -106,6 +106,16 @@ const exactSquareRoot = (value: Rational): Rational | null => {
   return sn * sn === x.n && sd * sd === x.d ? rational(sn, sd) : null
 }
 
+export function sqrtRationalBounds(value: Rational, bits = 192): readonly [Rational, Rational] {
+  const input = fromPublic(value)
+  if (input.n < BigInt(0)) throw new RangeError('square root of negative value')
+  const scale = BigInt(1) << BigInt(bits)
+  const scaledFloor = (input.n << BigInt(bits * 2)) / input.d
+  const root = integerSqrt(scaledFloor)
+  const lo = rational(root, scale)
+  return [lo, compareRational(squareRational(lo), value) === 0 ? lo : rational(root + BigInt(1), scale)]
+}
+
 const primitivePolynomial = (coefficients: bigint[]): string[] => {
   let divisor = BigInt(0)
   for (const coefficient of coefficients) divisor = gcd(divisor, coefficient)
@@ -153,6 +163,7 @@ export function sqrtMinusRational(
 }
 
 export const isRational = (value: ExactReal): value is Rational => 'numerator' in value
+export const isAlgebraic = (value: ExactReal): value is AlgebraicReal => 'polynomial' in value
 
 const evaluatePolynomial = (
   polynomial: readonly string[],
@@ -201,14 +212,48 @@ const compareAlgebraicToRational = (
     : (sign < 0 ? 1 : -1)
 }
 
+const certifiedSqrtQuadraticParts = (value: CertifiedExpressionReal) => {
+  const [kind, scaleToken, aToken, bToken, cToken, subtractToken] = value.expression
+  if (kind !== 'sqrt-quadratic-minus' || value.expression.length !== 6) throw new RangeError('unsupported certified expression')
+  const scale = JSON.parse(String(scaleToken)) as ExactReal
+  if (!isRational(scale) && !isAlgebraic(scale)) throw new RangeError('unsupported certified scale')
+  return {
+    scale,
+    a: JSON.parse(String(aToken)) as Rational,
+    b: JSON.parse(String(bToken)) as Rational,
+    c: JSON.parse(String(cToken)) as Rational,
+    subtract: JSON.parse(String(subtractToken)) as Rational,
+  }
+}
+
+const compareCertifiedToRational = (value: CertifiedExpressionReal, limit: Rational): -1 | 0 | 1 => {
+  const expression = certifiedSqrtQuadraticParts(value)
+  const threshold = addRational(expression.subtract, limit)
+  if (compareRational(threshold, rational(0)) < 0) return 1
+  return signQuadraticAtExact(
+    expression.a,
+    expression.b,
+    subtractRational(expression.c, squareRational(threshold)),
+    expression.scale,
+  )
+}
+
+export const validateCertifiedExpressionBounds = (value: CertifiedExpressionReal): void => {
+  const [lo, hi] = value.isolating
+  if (compareRational(lo, hi) > 0 || compareCertifiedToRational(value, lo) < 0 || compareCertifiedToRational(value, hi) > 0) {
+    throw new RangeError('certified expression bounds do not contain the value')
+  }
+}
+
 /** Total for the only comparison Wrap admits: a segment-distance root against a rational dial/cap. */
 export function compareExactToRational(
   value: ExactReal,
   limit: Rational,
 ): -1 | 0 | 1 {
-  return isRational(value)
-    ? compareRational(value, limit)
-    : compareAlgebraicToRational(value, limit)
+  if (isRational(value)) return compareRational(value, limit)
+  return isAlgebraic(value)
+    ? compareAlgebraicToRational(value, limit)
+    : (validateCertifiedExpressionBounds(value), compareCertifiedToRational(value, limit))
 }
 
 const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
@@ -220,13 +265,36 @@ const refineAlgebraic = (value: AlgebraicReal): AlgebraicReal => {
   return { ...value, isolating: keepRight ? [middle, hi] : [lo, middle] }
 }
 
+/** One exact rational strictly between two ordered admitted roots; refinement is uncapped. */
+export function rationalBetweenExact(leftValue: ExactReal, rightValue: ExactReal): Rational {
+  if (compareExact(leftValue, rightValue) >= 0) throw new RangeError('ordered distinct roots required')
+  if (!isRational(leftValue) && !isAlgebraic(leftValue)) throw new RangeError('unsupported left endpoint')
+  if (!isRational(rightValue) && !isAlgebraic(rightValue)) throw new RangeError('unsupported right endpoint')
+  let left = leftValue, right = rightValue
+  for (;;) {
+    const leftUpper = isRational(left) ? left : left.isolating[1]
+    const rightLower = isRational(right) ? right : right.isolating[0]
+    if (compareRational(leftUpper, rightLower) < 0) return midpoint(leftUpper, rightLower)
+    if (!isRational(left)) left = refineAlgebraic(left)
+    if (!isRational(right)) right = refineAlgebraic(right)
+  }
+}
+
 /** Exact ordering for the rational/quadratic real values admitted by current T3. */
 export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1 {
   if (isRational(a)) return isRational(b) ? compareRational(a, b) : -compareExactToRational(b, a) as -1 | 0 | 1
   if (isRational(b)) return compareExactToRational(a, b)
-  validateAlgebraic(a)
-  validateAlgebraic(b)
-  if (normalizedAlgebraicKey(a) === normalizedAlgebraicKey(b)) return 0
+  if (isAlgebraic(a) && isAlgebraic(b)) {
+    validateAlgebraic(a)
+    validateAlgebraic(b)
+    if (normalizedAlgebraicKey(a) === normalizedAlgebraicKey(b)) return 0
+  }
+  if (!isAlgebraic(a) || !isAlgebraic(b)) {
+    if (!isAlgebraic(a) && !isAlgebraic(b)
+      && a.expressionHash === b.expressionHash
+      && JSON.stringify(a.expression) === JSON.stringify(b.expression)) return 0
+    throw new RangeError('certified expressions are evidence scalars and compare only to rational bounds')
+  }
   let left = a, right = b
   for (;;) {
     if (compareRational(left.isolating[1], right.isolating[0]) < 0) return -1
@@ -256,6 +324,7 @@ const affinePolynomial = (scale: AlgebraicReal, factor: Rational, offset: Ration
 /** Exact affine image `factor·value+offset`; used for scale-parametric points/tangencies. */
 export function affineExact(value: ExactReal, factor: Rational, offset: Rational): ExactReal {
   if (isRational(value)) return addRational(multiplyRational(factor, value), offset)
+  if (!isAlgebraic(value)) throw new RangeError('certified affine transform is not implemented')
   if (compareRational(factor, rational(0)) === 0) return offset
   const map = (endpoint: Rational) => addRational(multiplyRational(factor, endpoint), offset)
   const a = map(value.isolating[0]), b = map(value.isolating[1])
@@ -279,6 +348,7 @@ export function signQuadraticAtExact(
       rational(0),
     )
   }
+  if (!isAlgebraic(value)) throw new RangeError('certified quadratic evaluation is not implemented')
   const [pa, pb, pc] = value.polynomial.map((coefficient) => rational(coefficient))
   const quotient = divideRational(a, pa)
   const linear = subtractRational(b, multiplyRational(quotient, pb))
@@ -317,11 +387,12 @@ const evaluateIntegerQuadratic = (polynomial: readonly bigint[], at: Rational): 
 const midpoint = (a: Rational, b: Rational): Rational =>
   divideRational(addRational(a, b), rational(2))
 
-const isolateQuadraticRoot = (
+const isolateQuadraticRootWithSteps = (
   polynomial: readonly bigint[],
   rootIndex: 0 | 1,
   lo: Rational,
   hi: Rational,
+  refinementSteps: number,
 ): Rational | AlgebraicReal | null => {
   let left = lo, right = hi
   let leftSign = compareRational(evaluateIntegerQuadratic(polynomial, left), rational(0))
@@ -329,7 +400,7 @@ const isolateQuadraticRoot = (
   if (leftSign === 0) return left
   if (rightSign === 0) return right
   if (leftSign === rightSign) return null
-  for (let iteration = 0; iteration < 192; iteration++) {
+  for (let iteration = 0; iteration < refinementSteps; iteration++) {
     const middle = midpoint(left, right)
     const middleSign = compareRational(evaluateIntegerQuadratic(polynomial, middle), rational(0))
     if (middleSign === 0) return middle
@@ -356,21 +427,22 @@ export function quadraticRootsWithin(
   c: Rational,
   lo: Rational,
   hi: Rational,
-): ExactReal[] {
+  refinementSteps = 192,
+): Array<Rational | AlgebraicReal> {
   const polynomial = primitiveQuadratic(lcmDenominatorPolynomial(a, b, c))
   if (polynomial[0] === BigInt(0)) throw new RangeError('quadratic coefficient must be nonzero')
   const discriminant = polynomial[1] * polynomial[1] - BigInt(4) * polynomial[0] * polynomial[2]
   if (discriminant < BigInt(0)) return []
   const vertex = rational(-polynomial[1], BigInt(2) * polynomial[0])
-  const roots: ExactReal[] = []
+  const roots: Array<Rational | AlgebraicReal> = []
   const leftHi = compareRational(vertex, hi) < 0 ? vertex : hi
   if (compareRational(lo, leftHi) <= 0) {
-    const root = isolateQuadraticRoot(polynomial, 0, lo, leftHi)
+    const root = isolateQuadraticRootWithSteps(polynomial, 0, lo, leftHi, refinementSteps)
     if (root) roots.push(root)
   }
   const rightLo = compareRational(vertex, lo) > 0 ? vertex : lo
   if (compareRational(rightLo, hi) <= 0) {
-    const root = isolateQuadraticRoot(polynomial, 1, rightLo, hi)
+    const root = isolateQuadraticRootWithSteps(polynomial, 1, rightLo, hi, refinementSteps)
     if (root && !roots.some((candidate) => canonicalExact(candidate) === canonicalExact(root))) roots.push(root)
   }
   return roots

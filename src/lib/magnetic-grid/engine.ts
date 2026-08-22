@@ -1,9 +1,15 @@
 // Magnetic-grid engine: orchestration over spec, compute and Logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
+import type {
+  AlgebraicReal, AllBandsResult, Band, BandResult, BandSnapPoint, CandidateInspection, CandidateLawEvaluation,
+  CentreBranchMeasurement, CentreMode, ComparisonEngineConfig, Contour, EvaluationPolicy, ExactReal,
+  FixedSizeInspection, Governor, GridConfig, GridResult, InspectFixedSizeInput, LawfulLayout,
+  LawfulRung, MagneticGridEngine, Pt, Rational, RootedCandidateGeometry, SolveBandsInput,
+} from './spec'
 import {
   CENTRE_MODE,
+  BANDS,
   DEFAULT_PITCH_MM,
   FLAP_MM,
   GOVERNOR,
@@ -25,11 +31,30 @@ import {
   measureExtremeCorners,
   measureWrap,
   approximateExact,
+  addRational,
+  affineExact,
+  canonicalExact,
+  compareExact,
+  divideRational,
   certifyContactWitness,
   contourBoundaryTruth,
+  enumerateAffineContactEvents,
+  enumerateAffinePointContactEvents,
+  enumerateParityClassEvents,
+  exactBandDomain,
+  measureExactAffineCandidate,
+  measureExactScaleWrap,
+  measureFrozenMeshCentreEvidence,
+  multiplyRational,
   prepareContour,
+  rational,
   rationalFromNumber,
+  quadraticRootsWithin,
+  rationalBetweenExact,
   safeSegments,
+  scaleInBand,
+  sha256Text,
+  signQuadraticAtExact,
   splitPerimeter,
   spotRadiusOf,
 } from './compute'
@@ -41,7 +66,11 @@ import {
   centeringAnchors,
   chooseCentrePlacement,
   evaluateWrap,
+  evaluateCandidateLaws,
+  evaluateCentreLaw,
   governMass,
+  inspectCandidateLaws,
+  reduceBandLadders,
 } from './logic'
 
 export * from './spec'
@@ -237,3 +266,277 @@ export function autoFlapInBand(
   const flapMM = fit.grid.wrap.status === 'lawful' ? fit.grid.wrap.appliedFlapApproxMM : cap
   return { flapMM, fit }
 }
+
+const exactScale = (exact: ExactReal) => ({ exact, approximateMM: approximateExact(exact) })
+type EventScale = Rational | AlgebraicReal
+const exactPointKey = (point: { x: ExactReal; y: ExactReal }) => `${canonicalExact(point.x)}:${canonicalExact(point.y)}`
+const policyIdentityOf = (config: ComparisonEngineConfig) => sha256Text(JSON.stringify([
+  'magnetic-grid-policy-v1', config.centrePolicy, config.coverage, config.magnetPlan, config.flap,
+]))
+const bandRelations = (band: Band) => {
+  const gap = band.id % 2 === 0
+  return [[gap, gap], [!gap, gap], [gap, !gap], [!gap, !gap]] as const
+}
+const allowedWrap = (config: ComparisonEngineConfig): Rational =>
+  config.flap.mode === 'fixed' ? config.flap.allowance : config.flap.maxAllowance
+
+const validatedNormalizedContour = (input: SolveBandsInput['contour']): Contour => {
+  const prepared = prepareContour(input.displayContour, input.truth)
+  const canonicalBoundary = (boundary: typeof input.boundary) => boundary.map((element) => [
+    element.kind, element.id,
+    canonicalExact(element.a[0]), canonicalExact(element.a[1]),
+    canonicalExact(element.b[0]), canonicalExact(element.b[1]),
+  ])
+  if (contourBoundaryTruth(input.displayContour).contourIdentity !== input.truth.contourIdentity
+    || JSON.stringify(canonicalBoundary(prepared.boundary)) !== JSON.stringify(canonicalBoundary(input.boundary))) {
+    throw new RangeError('REGIME_UNRESOLVED: normalized boundary/display provenance mismatch')
+  }
+  return prepared.source
+}
+
+const exactMeshDimensionSites = (contour: Contour, band: Band): Rational[] => {
+  const points = contour.outer.pts
+  const xs = points.map((point) => point[0]), ys = points.map((point) => point[1])
+  const spans = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]
+  const domain = exactBandDomain(band), sites: Rational[] = []
+  for (const span of spans) {
+    if (!(span > 0)) continue
+    const coefficient = rationalFromNumber(span)
+    for (let rounded = 0; ; rounded++) {
+      const site = divideRational(rational(2 * rounded + 1), coefficient)
+      if (scaleInBand(site, band)) sites.push(site)
+      if (compareExact(site, domain.hiExclusive) >= 0) break
+    }
+  }
+  return sites
+}
+
+const comparisonRoots = (
+  equation: readonly [Rational, Rational, Rational],
+  band: Band,
+): EventScale[] => {
+  const domain = exactBandDomain(band), [a, b, c] = equation
+  if (a.numerator === '0') {
+    if (b.numerator === '0') return []
+    const normalized = multiplyRational(rational(-1), divideRational(c, b))
+    return scaleInBand(normalized, band) ? [normalized] : []
+  }
+  return quadraticRootsWithin(a, b, c, domain.lo, domain.hiExclusive, 8).filter((root) => scaleInBand(root, band))
+}
+
+type ExactSiteEvaluation = {
+  centres: ReturnType<typeof evaluateCentreLaw>[]
+  candidates: CandidateLawEvaluation[]
+  evidence: CentreBranchMeasurement['evidence'] | null
+  measurement: ReturnType<typeof measureFrozenMeshCentreEvidence>
+}
+
+const evaluateExactSite = (
+  contour: Contour,
+  truth: SolveBandsInput['contour']['truth'],
+  band: Band,
+  scale: ExactReal,
+  policy: EvaluationPolicy,
+  forcedPhaseMM?: readonly [number, number],
+): ExactSiteEvaluation => {
+  const spotRadius = rational(RELEASED_PADDING_MM), massDepth = rational(MASS_DEPTH_MM)
+  const measured = measureFrozenMeshCentreEvidence(contour, scale, spotRadius, massDepth)
+  if (measured.status === 'unresolved') return { centres: [], candidates: [], evidence: null, measurement: measured }
+  const comparisonDisposition = measured.transitionComparisons.map((comparison) => [
+    comparison.kind, comparison.leftId, comparison.rightId, signQuadraticAtExact(...comparison.equation, scale),
+  ])
+  const siteId = sha256Text(JSON.stringify(['site', band.id, canonicalExact(scale), comparisonDisposition]))
+  const context = {
+    band: band.id, scale: exactScale(scale), regimeId: sha256Text(JSON.stringify(['regime', band.id, siteId])), siteId,
+  }
+  const branch: CentreBranchMeasurement = { context, evidence: measured.evidence, frozenMasses: measured.frozenMasses }
+  const centre = evaluateCentreLaw(branch, policy.centrePolicy)
+  const targets = new Map(measured.affineTargets.map((target) => [exactPointKey(target.point), target.affine]))
+  const candidates: CandidateLawEvaluation[] = []
+  for (const decision of centre.decisions) {
+    const target = targets.get(exactPointKey(decision.target))
+    if (!target) continue
+    const placements = forcedPhaseMM ? [[false, false] as const] : bandRelations(band)
+    for (const [xGap, yGap] of placements) {
+      const placementCoefficient = forcedPhaseMM ? [rational(0), rational(0)] as const : target.coefficient
+      const placementOffset = forcedPhaseMM
+        ? [rationalFromNumber(forcedPhaseMM[0]), rationalFromNumber(forcedPhaseMM[1])] as const
+        : target.offset
+      const seated = measureExactAffineCandidate(contour, placementCoefficient, placementOffset, scale, xGap, yGap, DEFAULT_PITCH_MM, spotRadius)
+      if (!seated.seated.length || !seated.affineBelt.length) continue
+      const wrap = measureExactScaleWrap(contour, truth, seated.affineBelt, scale, spotRadius, context.regimeId)
+      if (!wrap.witnesses.length) continue
+      const orientation = seated.xLineCount === 1 && seated.yLineCount === 1 ? 'single'
+        : seated.xLineCount === 1 ? 'vertical' : seated.yLineCount === 1 ? 'horizontal' : 'two-dimensional'
+      const phase = seated.nodes[Math.floor(seated.nodes.length / 2)]
+      const centreErrorMM = Math.hypot(
+        phase.approximateMM[0] - decision.target.approximateMM[0],
+        phase.approximateMM[1] - decision.target.approximateMM[1],
+      )
+      const centreTrue = compareExact(phase.x, decision.target.x) === 0 && compareExact(phase.y, decision.target.y) === 0
+      const centreRelation = centreErrorMM === 0 ? 'node' : 'gap'
+      const measuredId = sha256Text(JSON.stringify(['measured', context.siteId, decision.policy, xGap, yGap]))
+      const rooted: RootedCandidateGeometry = {
+        band: band.id, scale: context.scale, phase, xParity: xGap ? 'gap' : 'node', yParity: yGap ? 'gap' : 'node',
+        parityEvidence: {
+          x: { lineCount: seated.xLineCount, centreRelation: forcedPhaseMM ? centreRelation : xGap ? 'gap' : 'node' },
+          y: { lineCount: seated.yLineCount, centreRelation: forcedPhaseMM ? centreRelation : yGap ? 'gap' : 'node' },
+        },
+        centre: decision, centreEvidence: measured.evidence, seated: seated.seated, belt: seated.belt,
+        seatedCount: seated.seated.length, beltCount: seated.belt.length, requiredFlap: wrap.requiredFlap,
+        requiredFlapApproxMM: wrap.requiredFlapApproxMM,
+        orientation, measuredId, geometryLayoutId: sha256Text(JSON.stringify(['layout', measuredId, seated.seated.map(exactPointKey)])),
+        regimeId: context.regimeId, contacts: wrap.witnesses as RootedCandidateGeometry['contacts'],
+        seatedExtremeCorners: seated.seatedExtremeCorners, beltExtremeCorners: seated.beltExtremeCorners,
+        centreErrorMM,
+        centreTrue,
+      }
+      candidates.push(evaluateCandidateLaws(rooted, policy))
+    }
+  }
+  return { centres: [centre], candidates, evidence: measured.evidence, measurement: measured }
+}
+
+const enumerateBandSites = (contour: Contour, band: Band, config: ComparisonEngineConfig): EventScale[] => {
+  const eventKey = (site: EventScale) => 'polynomial' in site
+    ? JSON.stringify([site.polynomial, site.rootIndex])
+    : canonicalExact(site)
+  const addTo = (sites: Map<string, EventScale>, site: EventScale) => {
+    if (!scaleInBand(site, band)) return
+    sites.set(eventKey(site), site)
+  }
+  const representatives = (boundaries: EventScale[]) => {
+    const values: Rational[] = []
+    for (let index = 0; index + 1 < boundaries.length; index++) values.push(rationalBetweenExact(boundaries[index], boundaries[index + 1]))
+    const hi = exactBandDomain(band).hiExclusive, last = boundaries[boundaries.length - 1]
+    if (compareExact(last, hi) < 0) values.push(rationalBetweenExact(last, hi))
+    return values
+  }
+  const structuralSites = new Map<string, EventScale>()
+  addTo(structuralSites, exactBandDomain(band).lo)
+  for (const event of enumerateParityClassEvents(contour, BANDS)) addTo(structuralSites, event.scale)
+  for (const site of exactMeshDimensionSites(contour, band)) addTo(structuralSites, site)
+  const baseStructuralBoundaries = [...structuralSites.values()].sort((left, right) => compareExact(left, right))
+  const structuralHi = exactBandDomain(band).hiExclusive
+  for (let baseIndex = 0; baseIndex < baseStructuralBoundaries.length; baseIndex++) {
+    const lo = baseStructuralBoundaries[baseIndex]
+    const hi = baseStructuralBoundaries[baseIndex + 1] ?? structuralHi
+    if (compareExact(lo, hi) >= 0) continue
+    const intervalSites = new Map<string, EventScale>([[eventKey(lo), lo]])
+    let priorSize = -1
+    while (priorSize !== intervalSites.size) {
+      priorSize = intervalSites.size
+      const boundaries = [...intervalSites.values()].sort((left, right) => compareExact(left, right))
+      const intervalRepresentatives = boundaries.map((left, index) => {
+        const right = boundaries[index + 1] ?? hi
+        return compareExact(left, right) < 0 ? rationalBetweenExact(left, right) : null
+      }).filter((scale): scale is Rational => scale !== null)
+      for (const scale of intervalRepresentatives) {
+        const measured = measureFrozenMeshCentreEvidence(contour, scale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
+        if (measured.status === 'unresolved') continue
+        for (const { affine } of measured.transitionAnchors) {
+          for (const threshold of [rational(0), rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM)]) {
+            for (const event of enumerateAffinePointContactEvents(measured.transitionContour, affine, band, threshold, scale)) {
+              if (compareExact(event.scale, lo) > 0 && compareExact(event.scale, hi) < 0) {
+                intervalSites.set(eventKey(event.scale), event.scale)
+                structuralSites.set(eventKey(event.scale), event.scale)
+              }
+            }
+          }
+        }
+        for (const comparison of measured.transitionComparisons) {
+          for (const root of comparisonRoots(comparison.equation, band)) {
+            if (compareExact(root, lo) > 0 && compareExact(root, hi) < 0) {
+              intervalSites.set(eventKey(root), root)
+              structuralSites.set(eventKey(root), root)
+            }
+          }
+        }
+      }
+    }
+  }
+  const radius = addRational(rational(RELEASED_PADDING_MM), allowedWrap(config))
+  const lawSites = new Map(structuralSites)
+  const structuralBoundaries = [...structuralSites.values()].sort((left, right) => compareExact(left, right))
+  for (let index = 0; index < structuralBoundaries.length; index++) {
+    const lo = structuralBoundaries[index]
+    const hi = structuralBoundaries[index + 1] ?? structuralHi
+    if (compareExact(lo, hi) >= 0) continue
+    const branchScale = rationalBetweenExact(lo, hi)
+    const measured = measureFrozenMeshCentreEvidence(contour, branchScale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
+    if (measured.status === 'unresolved') continue
+    const intervalSites = new Map<string, EventScale>()
+    intervalSites.set(eventKey(lo), lo)
+    let intervalPriorSize = -1
+    while (intervalPriorSize !== intervalSites.size) {
+      intervalPriorSize = intervalSites.size
+      const localBoundaries = [...intervalSites.values()].sort((left, right) => compareExact(left, right))
+      const localRepresentatives = localBoundaries.map((left, localIndex) => {
+        const right = localBoundaries[localIndex + 1] ?? hi
+        return compareExact(left, right) < 0 ? rationalBetweenExact(left, right) : null
+      }).filter((scale): scale is Rational => scale !== null)
+      for (const scale of localRepresentatives) for (const { affine } of measured.affineTargets) {
+        for (const event of enumerateAffineContactEvents(contour, affine.coefficient, band, DEFAULT_PITCH_MM, radius, scale, affine.offset)) {
+          if (compareExact(event.scale, lo) > 0 && compareExact(event.scale, hi) < 0) {
+            intervalSites.set(eventKey(event.scale), event.scale)
+            lawSites.set(eventKey(event.scale), event.scale)
+          }
+        }
+      }
+    }
+  }
+  const boundaries = [...lawSites.values()].sort((left, right) => compareExact(left, right))
+  const complete = [...boundaries, ...representatives(boundaries)]
+  return complete.sort((left, right) => compareExact(left, right))
+}
+
+function solveBandsExact(input: SolveBandsInput): AllBandsResult {
+  let contour: Contour
+  try { contour = validatedNormalizedContour(input.contour) } catch {
+    const refusal = { status: 'refused' as const, code: 'REGIME_UNRESOLVED' as const, evidence: { boundaryTruth: input.contour.truth.contourIdentity } }
+    return { status: 'refused', refusal, bands: BANDS.map((band) => ({ band: band.id, rungs: [], refusal })), centreEvidenceById: {} }
+  }
+  const policy: EvaluationPolicy = { ...input.config, policyIdentity: policyIdentityOf(input.config) }
+  const centreEvaluations: ReturnType<typeof evaluateCentreLaw>[] = [], candidateEvaluations: CandidateLawEvaluation[] = []
+  const evidenceById: Record<string, CentreBranchMeasurement['evidence']> = {}
+  for (const band of BANDS) for (const scale of enumerateBandSites(contour, band, input.config)) {
+    const evaluated = evaluateExactSite(contour, input.contour.truth, band, scale, policy)
+    centreEvaluations.push(...evaluated.centres)
+    candidateEvaluations.push(...evaluated.candidates)
+    if (evaluated.evidence) evidenceById[evaluated.evidence.id] = evaluated.evidence
+  }
+  const reduced = reduceBandLadders(centreEvaluations, candidateEvaluations)
+  const bands: BandResult[] = reduced.bands.map((band) => ({
+    band: band.band,
+    rungs: band.rungs.map((rung): LawfulRung => ({
+      band: rung.band, scale: rung.scale, magnetCount: rung.magnetCount, firstLawful: rung.firstLawful,
+      layouts: rung.candidates.map((candidate): LawfulLayout => ({
+        candidateId: candidate.measuredId, layoutId: candidate.geometryLayoutId, anchors: candidate.anchors,
+        belt: candidate.belt, centre: candidate.centre, centreEvidenceId: candidate.centreEvidence.id,
+        requiredFlap: candidate.requiredFlap, appliedFlap: candidate.appliedFlap, contacts: candidate.contacts,
+        phase: candidate.phase, pitchMM: DEFAULT_PITCH_MM, spotRadiusMM: RELEASED_PADDING_MM,
+      })),
+    })),
+    ...(band.refusal ? { refusal: { code: band.refusal.code, evidence: band.refusal.evidence } } : {}),
+  }))
+  return reduced.globalRefusal
+    ? { status: 'refused', refusal: reduced.globalRefusal, bands, centreEvidenceById: evidenceById }
+    : { status: 'evaluated', bands, centreEvidenceById: evidenceById }
+}
+
+function inspectFixedSizeExact(input: InspectFixedSizeInput): FixedSizeInspection {
+  const scale = rationalFromNumber(input.sizeMM), contour = validatedNormalizedContour(input.contour)
+  const band = BANDS.find((candidate) => scaleInBand(scale, candidate)) ?? BANDS[BANDS.length - 1]
+  const policy: EvaluationPolicy = { ...input.config, policyIdentity: policyIdentityOf(input.config) }
+  const evaluated = evaluateExactSite(contour, input.contour.truth, band, scale, policy, input.forcedPhaseMM)
+  const candidates: CandidateInspection[] = evaluated.candidates.map((result) => inspectCandidateLaws(result, policy))
+  return { status: 'inspection', candidates }
+}
+
+export const magneticGridEngine: MagneticGridEngine = {
+  solveBands: solveBandsExact,
+  inspectFixedSize: inspectFixedSizeExact,
+  policyIdentityOf,
+}
+export const solveBands = solveBandsExact
+export const inspectFixedSize = inspectFixedSizeExact

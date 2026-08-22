@@ -12,9 +12,21 @@
 // ring and a radius and answers a geometric question.
 
 
-import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt, Rational } from '../spec'
+import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExactPoint, ExactReal, ExtremeCornerMeasurement, Pt, Rational } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
-import { compareRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
+import {
+  addRational,
+  affineExact,
+  approximateExact,
+  compareRational,
+  divideRational,
+  multiplyRational,
+  rational,
+  rationalFromNumber,
+  signQuadraticAtExact,
+  squareRational,
+  subtractRational,
+} from './exact-real'
 
 /** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
 export const TANGENT_GUARD_MM = 0.05
@@ -52,6 +64,189 @@ export function exactPointInMaterial(contour:Contour,pointMM:Pt):boolean{
 
 export const exactSeatIsLegal=(contour:Contour,point:Pt,nearestSquared:Rational,radiusSquared:Rational):boolean=>
   exactPointInMaterial(contour,point)&&compareRational(nearestSquared,radiusSquared)>=0
+
+export type ExactAffineNode = { coefficient: ExactSeatPoint; offset: ExactSeatPoint; point: ExactPoint }
+export type ExactAffinePointInput = Omit<ExactAffineNode, 'point'>
+export type SeatQuadratic = readonly [Rational, Rational, Rational]
+export interface ExactAffineCandidateMeasurement {
+  nodes: readonly ExactPoint[]
+  seated: readonly ExactPoint[]
+  belt: readonly ExactPoint[]
+  interior: readonly ExactPoint[]
+  affineSeated: readonly ExactAffineNode[]
+  affineBelt: readonly ExactAffineNode[]
+  seatedExtremeCorners: readonly boolean[]
+  beltExtremeCorners: readonly boolean[]
+  xLineCount: number
+  yLineCount: number
+}
+
+const exactSeatDot = (a: ExactSeatPoint, b: ExactSeatPoint): Rational =>
+  addRational(multiplyRational(a[0], b[0]), multiplyRational(a[1], b[1]))
+const exactSeatTwice = (value: Rational): Rational => multiplyRational(rational(2), value)
+const exactSeatPointAt = (point: ExactAffinePointInput, scale: ExactReal): ExactPoint => {
+  const x = affineExact(scale, point.coefficient[0], point.offset[0])
+  const y = affineExact(scale, point.coefficient[1], point.offset[1])
+  return { x, y, approximateMM: [approximateExact(x), approximateExact(y)] }
+}
+const exactSeatLinearSign = (coefficient: Rational, offset: Rational, scale: ExactReal) =>
+  signQuadraticAtExact(rational(0), coefficient, offset, scale)
+const exactSeatQuadraticSign = (value: SeatQuadratic, scale: ExactReal) =>
+  signQuadraticAtExact(value[0], value[1], value[2], scale)
+
+const exactAffineInRing = (ring: ReadonlyArray<Pt>, point: ExactAffinePointInput, scale: ExactReal): boolean => {
+  const points = ring.map(exactSeatPoint)
+  let winding = 0
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+    const a = points[previous], b = points[index]
+    const ay = exactSeatLinearSign(subtractRational(a[1], point.coefficient[1]), multiplyRational(rational(-1), point.offset[1]), scale)
+    const by = exactSeatLinearSign(subtractRational(b[1], point.coefficient[1]), multiplyRational(rational(-1), point.offset[1]), scale)
+    const segment = exactSeatMinus(b, a)
+    const relativeCoefficient = exactSeatMinus(point.coefficient, a)
+    const crossA = exactSeatCross(segment, relativeCoefficient)
+    const crossB = exactSeatCross(segment, point.offset)
+    const turn = exactSeatLinearSign(crossA, crossB, scale)
+    if (ay <= 0 && by > 0 && turn > 0) winding++
+    else if (ay > 0 && by <= 0 && turn < 0) winding--
+  }
+  return winding !== 0
+}
+
+const exactSeatDistance = (
+  point: ExactAffinePointInput,
+  a: ExactSeatPoint,
+  b: ExactSeatPoint,
+  radiusSquared: Rational,
+  scale: ExactReal,
+): boolean => {
+  const segment = exactSeatMinus(b, a)
+  const relativeCoefficient = exactSeatMinus(point.coefficient, a)
+  const projectionA = exactSeatDot(relativeCoefficient, segment)
+  const projectionB = exactSeatDot(point.offset, segment)
+  const lengthSquared = exactSeatDot(segment, segment)
+  const start = exactSeatLinearSign(projectionA, projectionB, scale)
+  const end = exactSeatLinearSign(subtractRational(projectionA, lengthSquared), projectionB, scale)
+  let distance: SeatQuadratic
+  if (start <= 0) {
+    distance = [exactSeatDot(relativeCoefficient, relativeCoefficient), exactSeatTwice(exactSeatDot(relativeCoefficient, point.offset)), exactSeatDot(point.offset, point.offset)]
+  } else if (end >= 0) {
+    const endCoefficient = exactSeatMinus(point.coefficient, b)
+    distance = [exactSeatDot(endCoefficient, endCoefficient), exactSeatTwice(exactSeatDot(endCoefficient, point.offset)), exactSeatDot(point.offset, point.offset)]
+  } else {
+    const crossA = exactSeatCross(relativeCoefficient, segment), crossB = exactSeatCross(point.offset, segment)
+    distance = [
+      multiplyRational(crossA, crossA),
+      exactSeatTwice(multiplyRational(crossA, crossB)),
+      subtractRational(multiplyRational(crossB, crossB), multiplyRational(radiusSquared, lengthSquared)),
+    ]
+    return exactSeatQuadraticSign(distance, scale) >= 0
+  }
+  return exactSeatQuadraticSign([distance[0], distance[1], subtractRational(distance[2], radiusSquared)], scale) >= 0
+}
+
+const compareSeatQuadratic = (left: SeatQuadratic, right: SeatQuadratic, scale: ExactReal) =>
+  exactSeatQuadraticSign([
+    subtractRational(left[0], right[0]), subtractRational(left[1], right[1]), subtractRational(left[2], right[2]),
+  ], scale)
+
+const exactSegmentSquared = (
+  point: ExactAffinePointInput,
+  a: ExactSeatPoint,
+  b: ExactSeatPoint,
+  scale: ExactReal,
+): SeatQuadratic => {
+  const segment = exactSeatMinus(b, a), relativeCoefficient = exactSeatMinus(point.coefficient, a)
+  const projectionA = exactSeatDot(relativeCoefficient, segment), projectionB = exactSeatDot(point.offset, segment)
+  const lengthSquared = exactSeatDot(segment, segment)
+  const start = exactSeatLinearSign(projectionA, projectionB, scale)
+  const end = exactSeatLinearSign(subtractRational(projectionA, lengthSquared), projectionB, scale)
+  if (start <= 0 || compareRational(lengthSquared, rational(0)) === 0) return [
+    exactSeatDot(relativeCoefficient, relativeCoefficient), exactSeatTwice(exactSeatDot(relativeCoefficient, point.offset)), exactSeatDot(point.offset, point.offset),
+  ]
+  if (end >= 0) {
+    const coefficient = exactSeatMinus(point.coefficient, b)
+    return [exactSeatDot(coefficient, coefficient), exactSeatTwice(exactSeatDot(coefficient, point.offset)), exactSeatDot(point.offset, point.offset)]
+  }
+  const crossA = exactSeatCross(relativeCoefficient, segment), crossB = exactSeatCross(point.offset, segment)
+  return [
+    divideRational(multiplyRational(crossA, crossA), lengthSquared),
+    divideRational(exactSeatTwice(multiplyRational(crossA, crossB)), lengthSquared),
+    divideRational(multiplyRational(crossB, crossB), lengthSquared),
+  ]
+}
+
+export function measureExactAffineClearance(
+  contour: Contour,
+  point: ExactAffinePointInput,
+  scale: ExactReal,
+): { inside: boolean; nearestSquared: SeatQuadratic } {
+  const inside = exactAffineInRing(contour.outer.pts, point, scale)
+    && contour.holes.every((hole) => !exactAffineInRing(hole.pts, point, scale))
+  let nearest: SeatQuadratic | null = null
+  for (const ring of [contour.outer, ...contour.holes]) {
+    for (let index = 0, previous = ring.pts.length - 1; index < ring.pts.length; previous = index++) {
+      const distance = exactSegmentSquared(point, exactSeatPoint(ring.pts[previous]), exactSeatPoint(ring.pts[index]), scale)
+      if (!nearest || compareSeatQuadratic(distance, nearest, scale) < 0) nearest = distance
+    }
+  }
+  return { inside, nearestSquared: nearest ?? [rational(0), rational(0), rational(0)] }
+}
+
+/** Exact affine lattice seating for one Centre/parity branch at one exact scale. */
+export function measureExactAffineCandidate(
+  contour: Contour,
+  targetCoefficient: ExactSeatPoint,
+  targetOffset: ExactSeatPoint,
+  scale: ExactReal,
+  xGap: boolean,
+  yGap: boolean,
+  pitchMM: number,
+  radiusMM: Rational,
+): ExactAffineCandidateMeasurement {
+  const radiusSquared = squareRational(radiusMM)
+  const first = -Math.floor(FIELD_POSITIONS_PER_AXIS / 2)
+  const entries: Array<{ ix: number; iy: number; affine: ExactAffinePointInput; point: ExactPoint; seated: boolean }> = []
+  for (let yi = 0; yi < FIELD_POSITIONS_PER_AXIS; yi++) for (let xi = 0; xi < FIELD_POSITIONS_PER_AXIS; xi++) {
+    const point: ExactAffinePointInput = {
+      coefficient: targetCoefficient,
+      offset: [
+        addRational(targetOffset[0], rationalFromNumber((first + xi + (xGap ? .5 : 0)) * pitchMM)),
+        addRational(targetOffset[1], rationalFromNumber((first + yi + (yGap ? .5 : 0)) * pitchMM)),
+      ],
+    }
+    const clearance = measureExactAffineClearance(contour, point, scale)
+    const legal = clearance.inside && exactSeatQuadraticSign([
+      clearance.nearestSquared[0], clearance.nearestSquared[1], subtractRational(clearance.nearestSquared[2], radiusSquared),
+    ], scale) >= 0
+    entries.push({ ix: xi, iy: yi, affine: point, point: exactSeatPointAt(point, scale), seated: legal })
+  }
+  const nodes = entries.map((entry) => entry.point)
+  const seatedEntries = entries.filter((entry) => entry.seated)
+  const occupied = new Set(seatedEntries.map((entry) => `${entry.ix}:${entry.iy}`))
+  const interiorEntries = seatedEntries.filter((entry) =>
+    occupied.has(`${entry.ix - 1}:${entry.iy}`) && occupied.has(`${entry.ix + 1}:${entry.iy}`)
+    && occupied.has(`${entry.ix}:${entry.iy - 1}`) && occupied.has(`${entry.ix}:${entry.iy + 1}`))
+  const interiorIds = new Set(interiorEntries.map((entry) => `${entry.ix}:${entry.iy}`))
+  const beltEntries = seatedEntries.filter((entry) => !interiorIds.has(`${entry.ix}:${entry.iy}`))
+  const extremeCorners = (population: typeof seatedEntries) => {
+    if (!population.length) return []
+    const xs = population.map((entry) => entry.ix), ys = population.map((entry) => entry.iy)
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+    return population.map((entry) => (entry.ix === minX || entry.ix === maxX) && (entry.iy === minY || entry.iy === maxY))
+  }
+  return {
+    nodes,
+    seated: seatedEntries.map((entry) => entry.point),
+    belt: beltEntries.map((entry) => entry.point),
+    interior: interiorEntries.map((entry) => entry.point),
+    affineSeated: seatedEntries.map((entry) => ({ ...entry.affine, point: entry.point })),
+    affineBelt: beltEntries.map((entry) => ({ ...entry.affine, point: entry.point })),
+    seatedExtremeCorners: extremeCorners(seatedEntries),
+    beltExtremeCorners: extremeCorners(beltEntries),
+    xLineCount: new Set(seatedEntries.map((entry) => entry.ix)).size,
+    yLineCount: new Set(seatedEntries.map((entry) => entry.iy)).size,
+  }
+}
 
 const big = (n: number): bigint => BigInt(n)
 /** This project targets ES2017, where BigInt LITERALS (`0n`) do not compile. */
