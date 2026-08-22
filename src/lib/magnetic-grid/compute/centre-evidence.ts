@@ -1,7 +1,6 @@
 // Magnetic-grid centre evidence — neutral measurements from the cloned Centre ruler.
 
-import type { BBox, CentreMeasurements, Contour, Pt, Rational, SafeMass, SafeSegment } from '../spec'
-import { addRational, compareRational, multiplyRational, rational, rationalFromNumber } from './exact-real'
+import type { BBox, CentreMeasurements, Pt, SafeMass, SafeSegment } from '../spec'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
@@ -265,22 +264,4 @@ export function measureCentreBranches(
     masses,
     top: top?.centreMM ?? boxCentre,
   }
-}
-
-type ExactCentrePoint = readonly [Rational, Rational]
-
-/** Exact affine coefficient of the bbox centre under uniform physical scaling. */
-export function exactBoxTargetCoefficient(contour: Contour): ExactCentrePoint {
-  const points = contour.outer.pts.map(([x, y]) => [rationalFromNumber(x), rationalFromNumber(y)] as const)
-  let minX = points[0][0], maxX = points[0][0], minY = points[0][1], maxY = points[0][1]
-  for (const [x, y] of points) {
-    if (compareRational(x, minX) < 0) minX = x
-    if (compareRational(x, maxX) > 0) maxX = x
-    if (compareRational(y, minY) < 0) minY = y
-    if (compareRational(y, maxY) > 0) maxY = y
-  }
-  return [
-    multiplyRational(addRational(minX, maxX), rational(1, 2)),
-    multiplyRational(addRational(minY, maxY), rational(1, 2)),
-  ]
 }

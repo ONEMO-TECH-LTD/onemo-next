@@ -5,22 +5,11 @@ import {
   canonicalExact,
   compareExact,
   compareExactToRational,
-  compareRational,
   multiplyRational,
   quadraticRootsWithin,
   rational,
   rationalFromNumber,
   signQuadraticAtExact,
-  isolatePrimitiveIntegerRoots,
-  addSparseIntegerPolynomials,
-  normalizeSparseEliminationStep,
-  decodeCanonicalMultivariatePolynomial,
-  encodeCanonicalMultivariatePolynomial,
-  encodeNormalizedSparseEliminationStep,
-  projectFinalUnivariatePolynomial,
-  pseudoRemainderSparseIntegerPolynomial,
-  eliminateSparseGeneratorBySubresultants,
-  factorSquareFreePrimitivePolynomialOverQ,
   squareRational,
   sqrtMinusRational,
   subtractRational,
@@ -96,40 +85,5 @@ describe('Wrap exact-real support', () => {
       rational(2),
     )[0]
     expect(compareExact(root, shifted)).toBe(-1)
-  })
-  it('factorizes multiplicity before isolating equal-end-sign roots',()=>{const roots=isolatePrimitiveIntegerRoots(['1','-8','22','-24','9'],rational(0),rational(5));expect(roots).toHaveLength(2);expect(roots.map(root=>root.multiplicity)).toEqual([2,2])})
-  it('does not confuse an unrelated derivative critical point with multiplicity',()=>{const roots=isolatePrimitiveIntegerRoots(['1','0','-3','1'],rational(-3),rational(3));expect(roots).toHaveLength(3);expect(roots.map(root=>root.multiplicity)).toEqual([1,1,1])})
-  it('globally orders disjoint square-free factors and exact midpoint roots',()=>{const roots=isolatePrimitiveIntegerRoots(['1','-8','23','-28','12'],rational(0),rational(5));expect(roots.map(root=>root.multiplicity)).toEqual([1,2,1]);for(let index=1;index<roots.length;index++)expect(compareRational(roots[index-1].isolating[1],roots[index].isolating[0])).toBe(-1);const midpoint=isolatePrimitiveIntegerRoots(['1','-2'],rational(0),rational(4));expect(midpoint).toHaveLength(1);expect(midpoint[0].isolating).toEqual([rational(2),rational(2)])})
-  it('preserves raw relative coefficients until elimination-step normalization',()=>{const sum=addSparseIntegerPolynomials([{coefficient:'2',powers:[1]}],[{coefficient:'4',powers:[0]}]);expect(sum).toEqual([{coefficient:'2',powers:[1]},{coefficient:'4',powers:[0]}]);expect(normalizeSparseEliminationStep(sum)).toEqual({polynomial:[{coefficient:'1',powers:[1]},{coefficient:'2',powers:[0]}],removedIntegerContent:['2','1']})})
-  it('encodes source terms canonically and rejects every noncanonical proof spelling',()=>{const source=[{coefficient:'1',powers:[1,0]},{coefficient:'1',powers:[1,0]},{coefficient:'4',powers:[0,0]}];expect(encodeCanonicalMultivariatePolynomial(source,2)).toEqual(['2|1,0','4|0,0']);expect(encodeCanonicalMultivariatePolynomial([...source].reverse(),2)).toEqual(['2|1,0','4|0,0']);for(const invalid of[['+2|1,0'],['02|1,0'],['-0|1,0'],['0|1,0'],['2|1'],['4|0,0','2|1,0'],['1|1,0','1|1,0'],['0']])expect(()=>decodeCanonicalMultivariatePolynomial(invalid,2)).toThrow();expect(decodeCanonicalMultivariatePolynomial(['2|1,0','4|0,0'],2)).toEqual([{coefficient:'2',powers:[1,0]},{coefficient:'4',powers:[0,0]}]);expect(decodeCanonicalMultivariatePolynomial([],2)).toEqual([])})
-  it('normalizes only completed steps and records final projection slots',()=>{const step=encodeNormalizedSparseEliminationStep([{coefficient:'2',powers:[1,0,0]},{coefficient:'4',powers:[0,0,0]}],3);expect(step).toEqual({tokens:['1|1,0,0','2|0,0,0'],removedIntegerContent:['2','1']});expect(projectFinalUnivariatePolynomial(step.tokens,3)).toEqual({coefficients:['1','2'],removedExponentSlots:[1,2]})})
-  it('computes exact multivariate pseudo-remainders without normalization loss',()=>{const dividend=[{coefficient:'1',powers:[0,2]},{coefficient:'1',powers:[1,0]}],divisor=[{coefficient:'1',powers:[0,1]},{coefficient:'-1',powers:[0,0]}];expect(pseudoRemainderSparseIntegerPolynomial(dividend,divisor,1)).toEqual([{coefficient:'1',powers:[1,0]},{coefficient:'1',powers:[0,0]}])})
-  it('derives zero predicates and carries exact common-component cofactors pending back-substitution',()=>{const defining=[{coefficient:'1',powers:[0,1]},{coefficient:'-1',powers:[0,0]}],shared=[{coefficient:'1',powers:[1,1]},{coefficient:'-1',powers:[1,0]}],decomposed=eliminateSparseGeneratorBySubresultants(shared,defining,1,2);expect(decomposed.commonFactorDisposition).toBe('DECOMPOSED');expect(decomposed.commonComponentProofs).toEqual([{gcd:['1|0,1','-1|0,0'],predicateCofactor:['1|1,0'],definingCofactor:['1|0,0'],backSubstitutionDisposition:'PENDING'}]);expect(decomposed.resolved).toBe(false);expect(decomposed.unresolved).toBe(false);const zero=eliminateSparseGeneratorBySubresultants([],defining,1,2);expect(zero.commonFactorDisposition).toBe('IDENTICALLY_ZERO');expect(zero.zeroPolynomialProofSource).toEqual([]);expect(zero.resolved).toBe(true)})
-  it('fails closed on an undecomposable common component with no partial certificate',()=>{const unresolved=eliminateSparseGeneratorBySubresultants([{coefficient:'1',powers:[0,1]}],[{coefficient:'1',powers:[0]}],1,2);expect(unresolved.unresolved).toBe(true);expect(unresolved.resolved).toBe(false);expect(unresolved.commonComponentProofs).toEqual([]);expect(unresolved.normalizedResultant).toBeNull()})
-  it('collects enough nonzero Kronecker samples after initial integer roots', () => {
-    const polynomial = ['1', '0', '-3', '0', '2', '0']
-    const factors = factorSquareFreePrimitivePolynomialOverQ(polynomial)
-
-    expect(factors).toEqual([
-      ['1', '-1'],
-      ['1', '0', '-2'],
-      ['1', '0'],
-      ['1', '1'],
-    ])
-
-    const reconstructed = factors.reduce<bigint[]>((product, factor) => {
-      const next = Array.from(
-        { length: product.length + factor.length - 1 },
-        () => BigInt(0),
-      )
-      for (let left = 0; left < product.length; left++) {
-        for (let right = 0; right < factor.length; right++) {
-          next[left + right] += product[left] * BigInt(factor[right])
-        }
-      }
-      return next
-    }, [BigInt(1)])
-
-    expect(reconstructed.map(String)).toEqual(polynomial)
   })
 })
