@@ -64,7 +64,7 @@ describe('Wrap exact-real support', () => {
     )[0]
     expect('polynomial' in differentlyIsolated).toBe(true)
     if (!('polynomial' in differentlyIsolated)) return
-    expect(canonicalExact(differentlyIsolated)).not.toBe(canonicalExact(roots[0]))
+    expect(canonicalExact(differentlyIsolated)).toBe(canonicalExact(roots[0]))
     expect(compareExactToRational(differentlyIsolated, rational(129))).toBe(1)
     expect(compareExactToRational(differentlyIsolated, rational(131))).toBe(-1)
     expect(compareExact(roots[0], {

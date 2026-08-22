@@ -170,6 +170,7 @@ export function enumerateAffineContactEvents(
   contactRadiusMM: Rational,
   branchScale: ContactRoot,
   targetOffset: QPoint = [rational(0), rational(0)],
+  cache?: Map<string, readonly ContactScaleEvent[]>,
 ): ContactScaleEvent[] {
   const radius = contactRadiusMM
   const events: ContactScaleEvent[] = []
@@ -202,11 +203,21 @@ export function enumerateAffineContactEvents(
       branchScale,
     ) < 0) incumbent = candidate
     if (!incumbent) continue
+    const cacheKey = JSON.stringify([
+      band.id, targetCoefficient.map(canonicalExact), targetOffset.map(canonicalExact),
+      canonicalExact(x), canonicalExact(y), canonicalExact(radius), incumbent.segmentId, incumbent.projection,
+    ])
+    const cached = cache?.get(cacheKey)
+    if (cached) {
+      events.push(...cached)
+      continue
+    }
+    const anchorEvents: ContactScaleEvent[] = []
     for (const scale of roots(subtractRadiusSquared(incumbent.distance, radius), band)) {
       if (!validAt(incumbent, scale)) continue
       const certificate = projectionCertificate(anchor, incumbent.a, incumbent.b, scale)
       const id = JSON.stringify([canonicalExact(scale), canonicalExact(x), canonicalExact(y), incumbent.segmentId, incumbent.projection])
-      events.push({
+      anchorEvents.push({
         id, scale, anchor, segmentId: incumbent.segmentId, segmentA: incumbent.a, segmentB: incumbent.b,
         projection: incumbent.projection, equation: polynomialOf(scale), projectionCertificate: certificate,
       })
@@ -222,12 +233,16 @@ export function enumerateAffineContactEvents(
         if (!validAt(incumbent, scale) || !validAt(challenger, scale)) continue
         const certificate = projectionCertificate(anchor, challenger.a, challenger.b, scale)
         const id = JSON.stringify(['nearest', canonicalExact(scale), canonicalExact(x), canonicalExact(y), incumbent.segmentId, challenger.segmentId])
-        events.push({
+        anchorEvents.push({
           id, scale, anchor, segmentId: challenger.segmentId, segmentA: challenger.a, segmentB: challenger.b,
           projection: challenger.projection, equation: polynomialOf(scale), projectionCertificate: certificate,
         })
       }
     }
+    anchorEvents.sort((a, b) => compareExact(a.scale, b.scale) || a.id.localeCompare(b.id))
+    const uniqueAnchorEvents = anchorEvents.filter((event, index) => index === 0 || event.id !== anchorEvents[index - 1].id)
+    cache?.set(cacheKey, uniqueAnchorEvents)
+    events.push(...uniqueAnchorEvents)
   }
   events.sort((a, b) => compareExact(a.scale, b.scale) || a.id.localeCompare(b.id))
   return events.filter((event, index) => index === 0 || event.id !== events[index - 1].id)

@@ -425,7 +425,7 @@ const isolateQuadraticRootWithSteps = (
   const staysOnRootSide = rootIndex === 0
     ? compareRational(integerHi, vertex) <= 0
     : compareRational(integerLo, vertex) >= 0
-  const canonicalIsolator = refinementSteps === 8 && staysOnRootSide && integerLoSign !== integerHiSign
+  const canonicalIsolator = staysOnRootSide && integerLoSign !== integerHiSign
     ? [integerLo, integerHi] as const
     : [left, right] as const
   return {
@@ -478,7 +478,13 @@ export function quadraticRootsWithin(
 export const approximateExact = (value: ExactReal): number => {
   if (isRational(value))
     return Number(value.numerator) / Number(value.denominator)
-  const [lo, hi] = value.isolating
+  if (!isAlgebraic(value)) {
+    const [lo, hi] = value.isolating
+    return (approximateExact(lo) + approximateExact(hi)) / 2
+  }
+  let refined = value
+  for (let iteration = 0; iteration < 64; iteration++) refined = refineAlgebraic(refined)
+  const [lo, hi] = refined.isolating
   return (approximateExact(lo) + approximateExact(hi)) / 2
 }
 

@@ -371,7 +371,7 @@ const evaluateExactSite = (
       if (!seated.seated.length || !seated.affineBelt.length) continue
       const wrap = measureExactScaleWrap(contour, truth, seated.affineBelt, scale, spotRadius, context.regimeId)
       if (!wrap.witnesses.length) continue
-      const orientation = seated.xLineCount === 1 && seated.yLineCount === 1 ? 'single'
+      const orientation: RootedCandidateGeometry['orientation'] = seated.xLineCount === 1 && seated.yLineCount === 1 ? 'single'
         : seated.xLineCount === 1 ? 'vertical' : seated.yLineCount === 1 ? 'horizontal' : 'two-dimensional'
       const phase = seated.nodes[Math.floor(seated.nodes.length / 2)]
       const centreErrorMM = Math.hypot(
@@ -485,6 +485,7 @@ const enumerateBandSites = (contour: Contour, band: Band, config: ComparisonEngi
   }
   const radius = addRational(rational(RELEASED_PADDING_MM), allowedWrap(config))
   const lawSites = new Map(structuralSites)
+  const lawEventCache = new Map<string, readonly ReturnType<typeof enumerateAffineContactEvents>[number][]>()
   const structuralBoundaries = sortedUniqueExact(structuralSites.values())
   for (let index = 0; index < structuralBoundaries.length; index++) {
     const lo = structuralBoundaries[index]
@@ -510,7 +511,7 @@ const enumerateBandSites = (contour: Contour, band: Band, config: ComparisonEngi
       const scale = rationalBetweenExact(left, right)
       const roots = new Map<string, EventScale>()
       for (const affine of targetAffines) {
-        for (const event of enumerateAffineContactEvents(contour, affine.coefficient, band, DEFAULT_PITCH_MM, radius, scale, affine.offset)) {
+        for (const event of enumerateAffineContactEvents(contour, affine.coefficient, band, DEFAULT_PITCH_MM, radius, scale, affine.offset, lawEventCache)) {
           if (compareExact(event.scale, left) > 0 && compareExact(event.scale, right) < 0) roots.set(eventKey(event.scale), event.scale)
         }
       }
