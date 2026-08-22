@@ -1,14 +1,13 @@
 # Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
-Status: canonical v3.5.2 phase packet
-Version: v3.5.2 — full vertical Centre-rules clone in T1
+Status: canonical v3.5.2 master contract
+Version: v3.5.2-1 — full vertical Centre-rules clone in T1; scaling simplified to discovery + exact local contact (2026-08-22)
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 
 ## 10. Engine and live-tab build sequence
 
 Every semantic code change is one rollback commit and compiles/runs before the next code change. T1-T4 build the working code first. The optional §9 proof/audit work may follow after the build and does not authorize extra engine infrastructure. No push/merge/publication is implied.
-
 ### T4 — Finalize worker, bridge and tab wiring without changing the live Law behavior
 
 - Add/finalize `magnetic-grid-bridge.ts` and `createMagneticGridSolveService()` only for the live T3 engine.
@@ -25,7 +24,7 @@ The engine is one portable three-rule driver:
 
 1. **CENTRE** — at each candidate physical scale, derive one governed centre from that scaled shape alone, before magnets exist. Place the lattice rigidly on that centre: odd line count puts a node on it; even line count puts the gap/centering line on it. The centre may change with physical scale because the safe core/masses change; it may never change because magnets landed somewhere.
 2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance. `0` means exact spot-edge tangency on the ruled source geometry; neither outline-source uncertainty nor size-walk quantum becomes hidden wrap tolerance. Auto flap returns the smallest allowance that makes the layout lawful.
-3. **MAGNET-QUANTITY SCALING** — within each band, expose every new magnet count at its first exact contact-event scale where that count is simultaneously centred and wrapped. Scale is solved from the contact equation, never searched on a millimetre grid. Counts are unique and strictly increasing. A count first lawful in a lower band never reappears above worn loose.
+3. **MAGNET-QUANTITY SCALING** — within each band, publish each next available magnet count once, at the exact scale where that count's layout is centred and wrapped. The existing band walk discovers candidate states operationally; the rung scale is solved exactly from that layout's local contact equations and validated by the full laws at that exact scale. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. The promise is exact truth for every published rung plus measured operational discovery; it is not a proof over every real scale.
 
 There is no score, weight, blended preference, silent fallback, or “best attempt” in the production driver. When no lawful layout exists, the engine returns a typed refusal. Fixed-size/manual inspection returns measured concessions; it does not invent a product winner.
 
@@ -58,10 +57,9 @@ src/lib/magnetic-grid/
   compute/
     seat.ts
     centre-evidence.ts
-    exact-real.ts      # only if Support A is invoked
-    regimes.ts         # only if Support B is invoked
-    contact-root.ts    # only if Support A/B is invoked
-    identity.ts        # only when a live result/cache consumer requires it
+    exact-real.ts      # live: rational/algebraic values, comparison, quadratic roots
+    contact-root.ts    # live: exact boundary, seat/Wrap judgement, local contact roots
+    identity.ts        # live: canonical serialization and witness certification
   logic.ts
   engine.ts
 
@@ -70,7 +68,7 @@ src/app/(dev)/effect-creator/grid-origin/law.worker.ts
 src/app/(dev)/effect-creator/grid-origin/LawPanel.tsx
 ```
 
-This is the approved maximum root, not a command to create empty or speculative modules. T1 creates only the files needed for the full isolated clone. T2 creates only the owners needed to re-room bodies that already exist. T3 creates a new module only when a live Centre/Wrap/scaling consumer or conditional Support A/B requires it. No stub, unused public surface or foundation-only file enters the build.
+This is the approved maximum root, not a command to create empty or speculative modules. T1 creates only the files needed for the full isolated clone. T2 creates only the owners needed to re-room bodies that already exist. T3 creates a new module only when a live Centre/Wrap/scaling consumer requires it. No stub, unused public surface or foundation-only file enters the build.
 
 The existing `grid-origin` page is the shared comparison shell. Its three positioning labels are currently one persisted `positioning` switch inside one shared page model, Stage, request builder and worker—not three isolated tab components. T1 materializes the existing third **Law** selection as a complete isolated vertical clone of Centre-rules: full visible tab UI, controls, local state, request assembly, worker execution/cache branch, rendered evidence surface, `positioning===1` engine branch and its dependency closure. Voting, Centre-rules, their page state, current worker and current modules remain untouched; the existing selector gains only the mount dispatch that opens the isolated `LawPanel`. The old in-place `positioning===2` branch becomes dormant evidence outside the new runtime. T2 re-rooms the cloned engine beneath that live surface; T3 adds Wrap and scaling while Centre stays frozen, then conditionally repairs Centre only if the completed engine proves it necessary; T4 replaces the cloned worker/request/UI internals with final bridge-owned orchestration and view models without changing the already-live Law behavior. No fourth tab or second page is required.
 
@@ -82,7 +80,7 @@ The existing `grid-origin` page is the shared comparison shell. Its three positi
 
 **Full vertical clone boundary:** the T1 clone begins at the current `grid-origin/page.tsx` Centre-rules experience and ends at the bodies that produce and render its result. It includes the shared visible bench surface needed to operate Centre-rules, its Centering controls and evidence display, its local state/defaults, newest-only request queue, request/config assembly, the relevant `solve.worker.ts` cache/band/replay/prefetch execution, `grid-origin.ts positioning===1`, and every reachable body in `grid-origin-spec.ts`, `grid-origin-compute.ts`, `grid-origin-logic.ts` and `grid-origin-bridge.ts`. The isolated clone substitutes only file/import names, request identity and persisted namespace; every cloned function body and JSX subtree is copied from the embedded donor snapshot before re-rooming. It imports or calls no current `grid-origin*` runtime or current worker. Voting-only bodies and the existing `positioning===2` branch are excluded. The original Centre-rules tab and isolated Law clone remain separately selectable throughout T1-T4 so every code change is immediately observable against the frozen baseline.
 
-**What centering is preserved versus repaired:** preserve `governMass` branch semantics, the governor set, centre-rule branch meanings, node/gap parity canon and all four centred placements. T1 clones the current governor body verbatim; T2 re-rooms it without behavioral change. T3 adapts only the measurement bodies proved wrong. If the live repair needs exact comparison, Support A supplies only that minimum. The known ruler defect is current `safeSegments`: it samples clearance on a fixed 2mm mesh anchored to each scaled bbox, so its argmax jumps between samples as scale changes. Measured result: mesh centre left ~0.069mm contact residue; an exactly computed centre reduced it to ~0.000055mm reporting noise. Because erosion/mass depth is a fixed physical millimetre value while the shape scales, the mass map genuinely changes per scale; computing one normalized centre and scaling it is not equivalent.
+**What centering is preserved versus repaired:** preserve `governMass` branch semantics, the governor set, centre-rule branch meanings, node/gap parity canon and all four centred placements. T1 clones the current governor body verbatim; T2 re-rooms it without behavioral change. T3 adapts only the measurement bodies proved wrong. Exact comparison comes from the live exact-real kernel. The known ruler defect is current `safeSegments`: it samples clearance on a fixed 2mm mesh anchored to each scaled bbox, so its argmax jumps between samples as scale changes. Measured result: mesh centre left ~0.069mm contact residue; an exactly computed centre reduced it to ~0.000055mm reporting noise. Because erosion/mass depth is a fixed physical millimetre value while the shape scales, the mass map genuinely changes per scale; computing one normalized centre and scaling it is not equivalent.
 
 Clone a current function body only when the embedded source and disposition table classify it for the current phase; do not alter its current consumers. The clone is temporary. Initial donor candidates are the exact segment-seat kernel, pure bbox traversal and contour scaling. The current mesh-derived centre evidence, `splitPerimeter`, float tangency/gap helpers, scoring helpers and shape adapters are source evidence—not pre-approved reuse.
 
@@ -95,7 +93,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | REFERENCE-EVIDENCE only in T3; no body reuse | Re-derive the ruled ordering from Dan's directive over new exact measurements in `logic.ts`; the existing `positioning===2` ranking body is never copied or adapted |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; DELETE+REPLACE when T3 adds scaling | T1/T2 preserve the sampled walk and `seatMarginMM`; T3 may reuse its call boundary only, never its sampled scan/gate/refinement body |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T1/T2 preserve the sampled walk; T3 keeps it as cheap candidate discovery only and removes its authority to certify contact or publish a rung: the gate becomes exact local contact roots plus full-law validation (§7.2, §7.4), and the seat-based `below` ownership is deleted |
 | `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; DELETE+REPLACE when T3 adds Wrap | T1/T2 preserve the allowance scan for equivalence only; T3 removes the scan and computes the exact worst-belt minimum directly |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2; any `ExactReal`/`compareExact` adaptation requires a named T3 repair invoking Support A |
@@ -104,7 +102,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
 | `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
 | `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
-| exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
+| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM until a named live T3 boundary defect invokes ADAPT | destination follows the import law. T3 Wrap may ADAPT contour scaling only to preserve supplied holes and make the returned exact longest side equal the requested size after the measured live 24mm float-scaling failure; the frozen governed Centre/evidence hashes must remain equal |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
 The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.
@@ -161,8 +159,7 @@ logic.ts          compute.ts
 | `compute/exact-real.ts` | `spec.ts` only |
 | `compute/seat.ts` | `spec.ts`, `compute/exact-real.ts` |
 | `compute/centre-evidence.ts` | `spec.ts`, `compute/exact-real.ts`, `compute/seat.ts` |
-| `compute/regimes.ts` | `spec.ts`, `compute/exact-real.ts`, `compute/seat.ts`, `compute/centre-evidence.ts` |
-| `compute/contact-root.ts` | `spec.ts`, `compute/exact-real.ts`, `compute/seat.ts`, `compute/centre-evidence.ts`, `compute/regimes.ts` |
+| `compute/contact-root.ts` | `spec.ts`, `compute/exact-real.ts`, `compute/seat.ts` |
 | `compute/identity.ts` | `spec.ts`, `compute/exact-real.ts` |
 | `logic.ts` | `spec.ts` types/measured records plus only `compareExact` from `compute.ts`; no geometry functions or other compute import |
 | `engine.ts` | `spec.ts`, `compute.ts`, `logic.ts` |
@@ -175,7 +172,7 @@ The separation guard parses imports and ASTs. A convention comment is not enforc
 
 ## 6. Module contracts
 
-These contracts define ownership and the maximum build API. A phase implements only the declarations required by bodies and consumers that exist in that phase. `ExactReal`, certified witnesses, regime/event surfaces and their serializers enter the runtime only when live T3 code invokes conditional Support A/B. No phase creates unused declarations merely because they appear below; every implemented declaration keeps the owner/import/behavior contract shown here.
+These contracts define ownership and the maximum build API. A phase implements only the declarations required by bodies and consumers that exist in that phase. No phase creates unused declarations merely because they appear below; every implemented declaration keeps the owner/import/behavior contract shown here.
 
 ### 6.1 `spec.ts` — values and contracts only
 
@@ -201,13 +198,7 @@ export interface AlgebraicReal {
   isolating: readonly [Rational, Rational]
   rootIndex: number
 }
-export interface CertifiedExpressionReal {
-  expressionHash: string
-  expression: readonly (ExactInteger | string)[]
-  isolating: readonly [Rational, Rational]
-  proofId: string
-}
-export type ExactReal = Rational | AlgebraicReal | CertifiedExpressionReal
+export type ExactReal = Rational | AlgebraicReal
 export interface ExactScale {
   exact: ExactReal
   approximateMM: number // report/render only; never gates law
@@ -259,7 +250,6 @@ export interface CandidateGeometry {
 export interface RootedCandidateGeometry extends CandidateGeometry {
   measuredId: string
   geometryLayoutId: string
-  regimeId: string
   contacts: readonly [ContactWitness, ...ContactWitness[]]
 }
 export interface LawfulCandidateMeasurement extends RootedCandidateGeometry {
@@ -284,13 +274,13 @@ export interface CentreDecision { target: ExactPoint; policy: CentrePolicy; evid
 export interface CentreTie { status: 'tie'; decisions: readonly CentreDecision[] }
 export interface RefusalEvidence { readonly [key: string]: string | number | boolean | null }
 export interface Refusal { status: 'refused'; code: RefusalCode; evidence: RefusalEvidence }
-export interface EvaluationContext { band: BandId; scale: ExactScale; regimeId: string; siteId: string }
+export interface EvaluationContext { band: BandId; scale: ExactScale }
 export interface CentreBranchMeasurement { context: EvaluationContext; evidence: CentreEvidence }
 export interface CentreLawEvaluation { context: EvaluationContext; evidenceId: string; decisions: readonly CentreDecision[]; refusal: Refusal | null }
 export type CandidateLawEvaluation =
   | { status: 'lawful'; candidate: LawfulCandidateMeasurement }
   | { status: 'refused'; refusal: Refusal; measured: RootedCandidateGeometry; policyIdentity: string }
-export interface LawfulRungDecision { band: BandId; scale: ExactScale; magnetCount: number; firstLawful: FirstLawfulCertificate; candidates: readonly LawfulCandidateMeasurement[] }
+export interface LawfulRungDecision { band: BandId; scale: ExactScale; magnetCount: number; candidates: readonly LawfulCandidateMeasurement[] }
 export interface BandLawDecision { band: BandId; rungs: readonly LawfulRungDecision[]; refusal: Refusal | null }
 export interface LawReduction { bands: readonly BandLawDecision[]; globalRefusal: Refusal | null }
 export interface ContactWitness {
@@ -300,17 +290,11 @@ export interface ContactWitness {
   outlineElementId: string
   outlineElementKind: 'segment'
   allowance: ExactReal
-  equation:
-    | { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
-    | { kind: 'certified-scalar-root'; expressionHash: string; isolating: readonly [Rational, Rational]; proofId: string }
+  equation: { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
   tangency: { x: ExactReal; y: ExactReal }
-  regimeId: string
+  regimeId: string // 'fixed-size' | 'rung'
   certificateId: string
 }
-export type RegimeEventKind = 'SEAT_COUNT' | 'PARITY_CLASS' | 'SAFE_TOPOLOGY' | 'CENTRE_IDENTITY' | 'BINDING_ELEMENT' | 'CONTACT_MULTIPLICITY'
-export interface RegimeEvent { id: string; kind: RegimeEventKind; scale: ExactScale; evidenceId: string }
-export interface Regime { id: string; lo: ExactScale; hi: ExactScale; events: readonly RegimeEvent[] }
-export interface FirstLawfulCertificate { regimeId: string; priorEvidenceIds: readonly string[]; contact: ContactWitness }
 
 export const GRID_PITCH_MM = 48
 export const SPOT_RADIUS_MM = 12
@@ -348,7 +332,6 @@ export type RefusalCode =
   | 'NO_WRAPPED_LAYOUT_IN_BAND'
   | 'AUTO_FLAP_CAP_EXCEEDED'
   | 'RUNG_CONFLICT'
-  | 'REGIME_UNRESOLVED'
 ```
 
 `SPOT_RADIUS_MM` defaults the public API. Slider floors/ceilings belong to the bench UI, not the engine spec.
@@ -385,7 +368,6 @@ export interface LawfulRung {
   band: BandId
   scale: ExactScale
   magnetCount: number
-  firstLawful: FirstLawfulCertificate
   layouts: readonly LawfulLayout[]
 }
 
@@ -442,7 +424,7 @@ geometryLayoutId = sha256(canonicalJson([
   'layout-v1', inputIdentity,
   canonicalExact(scale.exact), canonicalExactPoint(phase), xParity, yParity,
   sortLex(seated.map(canonicalExactPoint)),
-  sortLex(belt.map(canonicalExactPoint)), centre.evidenceId, regimeId,
+  sortLex(belt.map(canonicalExactPoint)), centre.evidenceId,
 ]))
 
 measuredId = sha256(canonicalJson([
@@ -458,7 +440,7 @@ resultId = sha256(canonicalJson([
 
 If a live result/cache consumer requires it, `compute/identity.ts` assigns neutral `geometryLayoutId` and `measuredId` to the complete rooted record before Logic sees it. Engine derives `policyIdentity` from the complete config through `policyIdentityOf`; callers cannot supply it. Logic uses `measuredId` for stable ordering and carries the opaque identity; it never hashes or reconstructs geometry. After Logic returns `LawReduction`, engine assembly calls neutral `finalizeResultIdentity()` and exposes `layoutId = geometryLayoutId`, `candidateId = resultId`. Thus two configured outputs with different Coverage, MagnetPlan, flap or centre policy cannot share a content-complete result id, while their neutral geometry identity remains comparable. A report-only decimal never enters identity.
 
-Each rung carries a `FirstLawfulCertificate`: the exact contact witness plus the ordered evidence proving every earlier regime/root candidate for that count absent or unlawful. No sampled predecessor is used as proof.
+Each rung carries its exact solved scale, accepted layout(s) and contact witnesses. Discovery bookkeeping stays private; no sampled size, quantum or report decimal decides a rung.
 
 ### 6.5 `magnetic-grid-bridge.ts` — adapters and worker service
 
@@ -495,7 +477,7 @@ export interface SolveRequestEnvelope {
 }
 ```
 
-The all-band response contains complete lawful layouts and their evidence; selecting a rung/layout is a pure lookup by `candidateId`, never another worker operation. Any exact integer coefficients and rational terms used by live Support A/B code serialize as decimal strings so structured clone and canonical JSON are byte-stable across runtimes.
+The all-band response contains complete lawful layouts and their evidence; selecting a rung/layout is a pure lookup by `candidateId`, never another worker operation. Exact integer coefficients and rational terms serialize as decimal strings so structured clone and canonical JSON are byte-stable across runtimes.
 
 ## 8. Control truth contract
 
