@@ -101,17 +101,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'contactPointsMM', 'impliedFlapMM', 'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
   ],
   'magnetic-grid/compute/centre-evidence.ts': [
-    'safeSegments', 'centroidOf', 'measureCentreBranches',
-    'exactBoxTargetCoefficient', 'exactWeightTargetCoefficient', 'compareExactPointTuple', 'compareExactPointSequence', 'normalizeExactRing', 'buildExactOffsetFeatures',
-    'lineRightSide', 'scaleAffineRadical', 'addAffineRadical', 'evaluateAffineRadicalBounds',
-    'exactExpression', 'binaryExpression', 'sqrtExpression', 'affineRadicalExpression',
-    'canonicalOffsetExpression', 'evaluateOffsetExpressionBounds', 'compareOffsetExpressions',
-    're','mul','addE','subE','divE','lineEndpoint','lineSpan','crossDir','arcSweep','lineCircle','circleCircle','solveExactOffsetIntersections',
-    'samePoint','vectorOrder','buildExactOffsetArrangement',
-    'scaledBasePoint','expressionDot','expressionCross','expressionVector','exactRingLocation',
-    'exactSegmentDistanceSquared','exactMaterialClearance',
-    'midpointPoint','filterLegalArrangementEdges',
-    'solveExactOffsetLineIntersections',
+    'safeSegments', 'centroidOf', 'measureCentreBranches', 'exactBoxTargetCoefficient',
   ],
   'magnetic-grid/logic.ts': [
     'mod', 'parityHolds', 'bandOf', 'governMass', 'centeringAnchors',
