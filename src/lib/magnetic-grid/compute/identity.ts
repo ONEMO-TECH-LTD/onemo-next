@@ -113,6 +113,7 @@ export function certifySqrtQuadraticExpression(
   coefficients: readonly [Rational, Rational, Rational],
   subtract: Rational,
 ): ExactReal {
+  const reportBits = 32
   const expression = [
     'sqrt-quadratic-minus', canonicalExact(scale), canonicalExact(coefficients[0]),
     canonicalExact(coefficients[1]), canonicalExact(coefficients[2]), canonicalExact(subtract),
@@ -142,11 +143,12 @@ export function certifySqrtQuadraticExpression(
     constant(coefficients[2]),
   )
   if (compareRational(distance[0], rational(0)) < 0) throw new RangeError('certified distance interval crosses negative')
-  const sqrtLo = sqrtRationalBounds(distance[0])[0], sqrtHi = sqrtRationalBounds(distance[1])[1]
+  const sqrtLo = sqrtRationalBounds(distance[0], reportBits)[0]
+  const sqrtHi = sqrtRationalBounds(distance[1], reportBits)[1]
   let lo = addRational(sqrtLo, multiplyRational(rational(-1), subtract))
   let hi = addRational(sqrtHi, multiplyRational(rational(-1), subtract))
   let certified: CertifiedExpressionReal = { expressionHash, expression, isolating: [lo, hi], proofId }
-  for (let iteration = 0; iteration < 192; iteration++) {
+  for (let iteration = 0; iteration < reportBits; iteration++) {
     const middle = divideRational(addRational(lo, hi), rational(2))
     const comparison = compareExactToRational(certified, middle)
     if (comparison === 0) return middle
