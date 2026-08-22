@@ -338,6 +338,25 @@ export type FrozenMeshCentreMeasurement =
     }
   | { status: 'unresolved'; reason: 'CENTRE_EVIDENCE_UNRESOLVED' }
 
+/** Policy-neutral full-outer Box/Weight branches; no frozen-mesh work enters either law. */
+export function measureFullOuterCentreEvidence(contour: Contour, scale: ExactReal): FrozenMeshCentreMeasurement {
+  const boxCoefficient = exactBoxTargetCoefficient(contour), weightCoefficient = exactWeightTargetCoefficient(contour)
+  const box = exactPointFromCoefficient(boxCoefficient, scale), weight = exactPointFromCoefficient(weightCoefficient, scale)
+  const evidence = { id: '', box, core: null, weight, deepest: [], islands: [], masses: [] } satisfies CentreEvidence
+  return {
+    status: 'measured',
+    evidence: { ...evidence, id: sha256Text(JSON.stringify(evidence)) },
+    frozenMasses: [],
+    affineTargets: [
+      { point: box, affine: { coefficient: boxCoefficient, offset: [rational(0), rational(0)] } },
+      { point: weight, affine: { coefficient: weightCoefficient, offset: [rational(0), rational(0)] } },
+    ],
+    transitionAnchors: [],
+    transitionComparisons: [],
+    transitionContour: contour,
+  }
+}
+
 const exactPointFromAffine = (point: ExactAffinePointInput, scale: ExactReal): ExactPoint => {
   const x = affineExact(scale, point.coefficient[0], point.offset[0])
   const y = affineExact(scale, point.coefficient[1], point.offset[1])

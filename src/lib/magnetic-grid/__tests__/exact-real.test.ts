@@ -74,6 +74,11 @@ describe('Wrap exact-real support', () => {
     })).toBe(0)
   })
 
+  it('publishes perfect-square quadratic roots as their canonical Rational value', () => {
+    expect(quadraticRootsWithin(rational(1), rational(-48), rational(572), rational(25), rational(27))).toEqual([rational(26)])
+    expect(quadraticRootsWithin(rational(1), rational(-28), rational(52), rational(25), rational(27))).toEqual([rational(26)])
+  })
+
   it('refines beyond any fixed precision cap for close distinct roots', () => {
     const epsilon = rational(1, BigInt(1) << BigInt(420))
     const root = quadraticRootsWithin(rational(1), rational(0), rational(-2), rational(1), rational(2))[0]
@@ -85,5 +90,15 @@ describe('Wrap exact-real support', () => {
       rational(2),
     )[0]
     expect(compareExact(root, shifted)).toBe(-1)
+  })
+
+  it('does not widen two roots sharing one integer interval across their vertex', () => {
+    const tiny = rational(2, BigInt(1) << BigInt(842))
+    const roots = quadraticRootsWithin(
+      rational(1), rational(-3), subtractRational(rational(9, 4), tiny), rational(1), rational(2), 8,
+    )
+    expect(roots).toHaveLength(2)
+    expect(roots.every((root) => 'polynomial' in root && root.isolating[0].numerator === '1' && root.isolating[1].numerator === '2')).toBe(false)
+    expect(compareExact(roots[0], roots[1])).toBe(-1)
   })
 })

@@ -323,8 +323,10 @@ export function reduceBandLadders(
   const bands: BandLawDecision[] = BANDS.map((band) => ({ band: band.id, rungs: [], refusal: null }))
   const owned = new Map<number, number>()
   for (const band of bands) {
-    const lawful = candidates.filter((candidate): candidate is Extract<CandidateLawEvaluation, { status: 'lawful' }> =>
+    const lawfulAtBand = candidates.filter((candidate): candidate is Extract<CandidateLawEvaluation, { status: 'lawful' }> =>
       candidate.status === 'lawful' && candidate.candidate.band === band.band)
+    const lawful = lawfulAtBand.filter(({ candidate }) => !lawfulAtBand.some(({ candidate: other }) =>
+      compareExact(other.scale.exact, candidate.scale.exact) === 0 && other.magnetCount > candidate.magnetCount))
     const measuredLayouts = new Map<string, string>()
     for (const { candidate } of lawful) {
       const prior = measuredLayouts.get(candidate.measuredId)
@@ -360,11 +362,21 @@ export function reduceBandLadders(
         const count = candidate.status === 'lawful' ? candidate.candidate.magnetCount : measured.beltCount
         return count === magnetCount && compareExact(measured.scale.exact, scale) < 0
       })
+      const earlierSiteIds = centres.filter((centre) =>
+        centre.context.band === band.band && compareExact(centre.context.scale.exact, scale) < 0)
+        .map((centre) => centre.context.siteId)
       rungs.push({
         band: band.band,
         scale: chosen[0].scale,
         magnetCount,
-        firstLawful: { regimeId: chosen[0].regimeId, priorEvidenceIds: earlier.map((candidate) => candidate.status === 'lawful' ? candidate.candidate.measuredId : candidate.measured.measuredId), contact },
+        firstLawful: {
+          regimeId: chosen[0].regimeId,
+          priorEvidenceIds: [...new Set([
+            ...earlierSiteIds,
+            ...earlier.map((candidate) => candidate.status === 'lawful' ? candidate.candidate.measuredId : candidate.measured.measuredId),
+          ])],
+          contact,
+        },
         candidates: chosen,
       })
       owned.set(magnetCount, band.band)

@@ -240,6 +240,8 @@ export function enumerateAffinePointContactEvents(
   band: Band,
   contactRadiusMM: Rational,
   branchScale?: ContactRoot,
+  cache?: Map<string, readonly ContactScaleEvent[]>,
+  rootCache?: Map<string, readonly ContactRoot[]>,
 ): ContactScaleEvent[] {
   const radius = contactRadiusMM, events: ContactScaleEvent[] = []
   const branches: Array<{ projection: 'a' | 'b' | 'interior'; distance: Quadratic; segmentId: string; a: QPoint; b: QPoint }> = []
@@ -258,6 +260,14 @@ export function enumerateAffinePointContactEvents(
     return branch.projection === 'a' ? certificate[0] <= 0 : branch.projection === 'b' ? certificate[1] >= 0
       : certificate[0] >= 0 && certificate[1] <= 0
   }
+  const cachedRoots = (equation: Quadratic): readonly ContactRoot[] => {
+    const key = JSON.stringify([band.id, equation.map(canonicalExact)])
+    const cached = rootCache?.get(key)
+    if (cached) return cached
+    const found = roots(equation, band)
+    rootCache?.set(key, found)
+    return found
+  }
   if (branchScale) {
     const validBranches = branches.filter((branch) => validAt(branch, branchScale))
     let incumbent = validBranches[0]
@@ -268,7 +278,17 @@ export function enumerateAffinePointContactEvents(
       branchScale,
     ) < 0) incumbent = candidate
     if (!incumbent) return []
-    for (const scale of roots(subtractRadiusSquared(incumbent.distance, radius), band)) {
+    const cacheKey = JSON.stringify([
+      band.id,
+      anchor.coefficient.map(canonicalExact),
+      anchor.offset.map(canonicalExact),
+      canonicalExact(radius),
+      incumbent.segmentId,
+      incumbent.projection,
+    ])
+    const cached = cache?.get(cacheKey)
+    if (cached) return [...cached]
+    for (const scale of cachedRoots(subtractRadiusSquared(incumbent.distance, radius))) {
       if (!validAt(incumbent, scale)) continue
       const certificate = projectionCertificate(anchor, incumbent.a, incumbent.b, scale)
       const id = JSON.stringify(['point', canonicalExact(scale), canonicalExact(anchor.offset[0]), canonicalExact(anchor.offset[1]), incumbent.segmentId, incumbent.projection])
@@ -279,7 +299,9 @@ export function enumerateAffinePointContactEvents(
     }
     if (compareRational(radius, rational(0)) !== 0) {
       events.sort((a, b) => compareExact(a.scale, b.scale) || a.id.localeCompare(b.id))
-      return events.filter((event, index) => index === 0 || event.id !== events[index - 1].id)
+      const unique = events.filter((event, index) => index === 0 || event.id !== events[index - 1].id)
+      cache?.set(cacheKey, unique)
+      return unique
     }
     for (const b of branches) {
       const a = incumbent
@@ -289,7 +311,7 @@ export function enumerateAffinePointContactEvents(
         subtractRational(a.distance[1], b.distance[1]),
         subtractRational(a.distance[2], b.distance[2]),
       ]
-      for (const scale of roots(equation, band)) {
+      for (const scale of cachedRoots(equation)) {
         if (!validAt(a, scale) || !validAt(b, scale)) continue
         const nearest = branches.every((other) => !validAt(other, scale) || signQuadraticAtExact(
           subtractRational(a.distance[0], other.distance[0]),
@@ -303,6 +325,10 @@ export function enumerateAffinePointContactEvents(
         events.push({ id, scale, anchor, segmentId: a.segmentId, segmentA: a.a, segmentB: a.b, projection: a.projection, equation: polynomialOf(scale), projectionCertificate: certificate })
       }
     }
+    events.sort((a, b) => compareExact(a.scale, b.scale) || a.id.localeCompare(b.id))
+    const unique = events.filter((event, index) => index === 0 || event.id !== events[index - 1].id)
+    cache?.set(cacheKey, unique)
+    return unique
   }
   events.sort((a, b) => compareExact(a.scale, b.scale) || a.id.localeCompare(b.id))
   return events.filter((event, index) => index === 0 || event.id !== events[index - 1].id)

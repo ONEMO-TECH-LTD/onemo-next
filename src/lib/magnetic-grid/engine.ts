@@ -41,10 +41,13 @@ import {
   enumerateAffineContactEvents,
   enumerateAffinePointContactEvents,
   enumerateParityClassEvents,
+  exactBoxTargetCoefficient,
   exactBandDomain,
+  exactWeightTargetCoefficient,
   measureExactAffineCandidate,
   measureExactScaleWrap,
   measureFrozenMeshCentreEvidence,
+  measureFullOuterCentreEvidence,
   multiplyRational,
   prepareContour,
   rational,
@@ -340,7 +343,9 @@ const evaluateExactSite = (
   forcedPhaseMM?: readonly [number, number],
 ): ExactSiteEvaluation => {
   const spotRadius = rational(RELEASED_PADDING_MM), massDepth = rational(MASS_DEPTH_MM)
-  const measured = measureFrozenMeshCentreEvidence(contour, scale, spotRadius, massDepth)
+  const measured = policy.centrePolicy.mode === 'box' || policy.centrePolicy.mode === 'weight'
+    ? measureFullOuterCentreEvidence(contour, scale)
+    : measureFrozenMeshCentreEvidence(contour, scale, spotRadius, massDepth)
   if (measured.status === 'unresolved') return { centres: [], candidates: [], evidence: null, measurement: measured }
   const comparisonDisposition = measured.transitionComparisons.map((comparison) => [
     comparison.kind, comparison.leftId, comparison.rightId, signQuadraticAtExact(...comparison.equation, scale),
@@ -405,6 +410,10 @@ const enumerateBandSites = (contour: Contour, band: Band, config: ComparisonEngi
     if (!scaleInBand(site, band)) return
     sites.set(eventKey(site), site)
   }
+  const sortedUniqueExact = (sites: Iterable<EventScale>): EventScale[] => {
+    const ordered = [...sites].sort((left, right) => compareExact(left, right))
+    return ordered.filter((site, index) => index === 0 || compareExact(ordered[index - 1], site) !== 0)
+  }
   const representatives = (boundaries: EventScale[]) => {
     const values: Rational[] = []
     for (let index = 0; index + 1 < boundaries.length; index++) values.push(rationalBetweenExact(boundaries[index], boundaries[index + 1]))
@@ -413,79 +422,105 @@ const enumerateBandSites = (contour: Contour, band: Band, config: ComparisonEngi
     return values
   }
   const structuralSites = new Map<string, EventScale>()
+  const pointEventCache = new Map<string, readonly ReturnType<typeof enumerateAffinePointContactEvents>[number][]>()
+  const pointRootCache = new Map<string, readonly EventScale[]>()
   addTo(structuralSites, exactBandDomain(band).lo)
   for (const event of enumerateParityClassEvents(contour, BANDS)) addTo(structuralSites, event.scale)
-  for (const site of exactMeshDimensionSites(contour, band)) addTo(structuralSites, site)
-  const baseStructuralBoundaries = [...structuralSites.values()].sort((left, right) => compareExact(left, right))
+  const meshCentrePolicy = config.centrePolicy.mode !== 'box' && config.centrePolicy.mode !== 'weight'
+  if (meshCentrePolicy) for (const site of exactMeshDimensionSites(contour, band)) addTo(structuralSites, site)
+  const baseStructuralBoundaries = sortedUniqueExact(structuralSites.values())
   const structuralHi = exactBandDomain(band).hiExclusive
-  for (let baseIndex = 0; baseIndex < baseStructuralBoundaries.length; baseIndex++) {
+  if (meshCentrePolicy) for (let baseIndex = 0; baseIndex < baseStructuralBoundaries.length; baseIndex++) {
     const lo = baseStructuralBoundaries[baseIndex]
     const hi = baseStructuralBoundaries[baseIndex + 1] ?? structuralHi
     if (compareExact(lo, hi) >= 0) continue
     const intervalSites = new Map<string, EventScale>([[eventKey(lo), lo]])
-    let priorSize = -1
-    while (priorSize !== intervalSites.size) {
-      priorSize = intervalSites.size
-      const boundaries = [...intervalSites.values()].sort((left, right) => compareExact(left, right))
-      const intervalRepresentatives = boundaries.map((left, index) => {
-        const right = boundaries[index + 1] ?? hi
-        return compareExact(left, right) < 0 ? rationalBetweenExact(left, right) : null
-      }).filter((scale): scale is Rational => scale !== null)
-      for (const scale of intervalRepresentatives) {
-        const measured = measureFrozenMeshCentreEvidence(contour, scale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
-        if (measured.status === 'unresolved') continue
-        for (const { affine } of measured.transitionAnchors) {
-          for (const threshold of [rational(0), rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM)]) {
-            for (const event of enumerateAffinePointContactEvents(measured.transitionContour, affine, band, threshold, scale)) {
-              if (compareExact(event.scale, lo) > 0 && compareExact(event.scale, hi) < 0) {
-                intervalSites.set(eventKey(event.scale), event.scale)
-                structuralSites.set(eventKey(event.scale), event.scale)
-              }
-            }
+    const initialScale = rationalBetweenExact(lo, hi)
+    const initialMeasured = measureFrozenMeshCentreEvidence(contour, initialScale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
+    if (initialMeasured.status === 'unresolved') continue
+    for (const { affine } of initialMeasured.transitionAnchors) {
+      const anchorQueue: Array<readonly [EventScale, EventScale]> = [[lo, hi]]
+      while (anchorQueue.length) {
+        const [left, right] = anchorQueue.shift()!
+        if (compareExact(left, right) >= 0) continue
+        const scale = rationalBetweenExact(left, right)
+        const roots = new Map<string, EventScale>()
+        for (const threshold of [rational(0), rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM)]) {
+          for (const event of enumerateAffinePointContactEvents(initialMeasured.transitionContour, affine, band, threshold, scale, pointEventCache, pointRootCache)) {
+            if (compareExact(event.scale, left) > 0 && compareExact(event.scale, right) < 0) roots.set(eventKey(event.scale), event.scale)
           }
         }
-        for (const comparison of measured.transitionComparisons) {
-          for (const root of comparisonRoots(comparison.equation, band)) {
-            if (compareExact(root, lo) > 0 && compareExact(root, hi) < 0) {
-              intervalSites.set(eventKey(root), root)
-              structuralSites.set(eventKey(root), root)
-            }
-          }
+        if (!roots.size) continue
+        const split = sortedUniqueExact([left, ...roots.values(), right])
+        for (const root of roots.values()) {
+          intervalSites.set(eventKey(root), root)
+          structuralSites.set(eventKey(root), root)
+        }
+        for (let index = 0; index + 1 < split.length; index++) anchorQueue.push([split[index], split[index + 1]])
+      }
+    }
+    const initialGovernorBoundaries = sortedUniqueExact(intervalSites.values())
+    const governorQueue = initialGovernorBoundaries.map((left, index) => [left, initialGovernorBoundaries[index + 1] ?? hi] as const)
+    while (governorQueue.length) {
+      const [left, right] = governorQueue.shift()!
+      if (compareExact(left, right) >= 0) continue
+      const scale = rationalBetweenExact(left, right)
+      const measured = measureFrozenMeshCentreEvidence(contour, scale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
+      if (measured.status === 'unresolved') continue
+      const roots = new Map<string, EventScale>()
+      for (const comparison of measured.transitionComparisons) {
+        const comparisonEventRoots = comparisonRoots(comparison.equation, band)
+        for (const root of comparisonEventRoots) {
+          if (compareExact(root, left) > 0 && compareExact(root, right) < 0) roots.set(eventKey(root), root)
         }
       }
+      if (!roots.size) continue
+      const split = sortedUniqueExact([left, ...roots.values(), right])
+      for (const root of roots.values()) {
+        intervalSites.set(eventKey(root), root)
+        structuralSites.set(eventKey(root), root)
+      }
+      for (let index = 0; index + 1 < split.length; index++) governorQueue.push([split[index], split[index + 1]])
     }
   }
   const radius = addRational(rational(RELEASED_PADDING_MM), allowedWrap(config))
   const lawSites = new Map(structuralSites)
-  const structuralBoundaries = [...structuralSites.values()].sort((left, right) => compareExact(left, right))
+  const structuralBoundaries = sortedUniqueExact(structuralSites.values())
   for (let index = 0; index < structuralBoundaries.length; index++) {
     const lo = structuralBoundaries[index]
     const hi = structuralBoundaries[index + 1] ?? structuralHi
     if (compareExact(lo, hi) >= 0) continue
     const branchScale = rationalBetweenExact(lo, hi)
-    const measured = measureFrozenMeshCentreEvidence(contour, branchScale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
-    if (measured.status === 'unresolved') continue
-    const intervalSites = new Map<string, EventScale>()
-    intervalSites.set(eventKey(lo), lo)
-    let intervalPriorSize = -1
-    while (intervalPriorSize !== intervalSites.size) {
-      intervalPriorSize = intervalSites.size
-      const localBoundaries = [...intervalSites.values()].sort((left, right) => compareExact(left, right))
-      const localRepresentatives = localBoundaries.map((left, localIndex) => {
-        const right = localBoundaries[localIndex + 1] ?? hi
-        return compareExact(left, right) < 0 ? rationalBetweenExact(left, right) : null
-      }).filter((scale): scale is Rational => scale !== null)
-      for (const scale of localRepresentatives) for (const { affine } of measured.affineTargets) {
+    const affineTargets = meshCentrePolicy
+      ? measureFrozenMeshCentreEvidence(contour, branchScale, rational(RELEASED_PADDING_MM), rational(MASS_DEPTH_MM))
+      : null
+    if (affineTargets?.status === 'unresolved') continue
+    const targetAffines = affineTargets?.status === 'measured'
+      ? affineTargets.affineTargets.map(({ affine }) => affine)
+      : [{
+          coefficient: config.centrePolicy.mode === 'weight'
+            ? exactWeightTargetCoefficient(contour)
+            : exactBoxTargetCoefficient(contour),
+          offset: [rational(0), rational(0)] as const,
+        }]
+    const lawQueue: Array<readonly [EventScale, EventScale]> = [[lo, hi]]
+    while (lawQueue.length) {
+      const [left, right] = lawQueue.shift()!
+      if (compareExact(left, right) >= 0) continue
+      const scale = rationalBetweenExact(left, right)
+      const roots = new Map<string, EventScale>()
+      for (const affine of targetAffines) {
         for (const event of enumerateAffineContactEvents(contour, affine.coefficient, band, DEFAULT_PITCH_MM, radius, scale, affine.offset)) {
-          if (compareExact(event.scale, lo) > 0 && compareExact(event.scale, hi) < 0) {
-            intervalSites.set(eventKey(event.scale), event.scale)
-            lawSites.set(eventKey(event.scale), event.scale)
-          }
+          if (compareExact(event.scale, left) > 0 && compareExact(event.scale, right) < 0) roots.set(eventKey(event.scale), event.scale)
         }
       }
+      if (!roots.size) continue
+      const split = sortedUniqueExact([left, ...roots.values(), right])
+      for (const root of roots.values()) lawSites.set(eventKey(root), root)
+      for (let splitIndex = 0; splitIndex + 1 < split.length; splitIndex++) lawQueue.push([split[splitIndex], split[splitIndex + 1]])
     }
   }
-  const boundaries = [...lawSites.values()].sort((left, right) => compareExact(left, right))
+  const boundaries = sortedUniqueExact(lawSites.values())
   const complete = [...boundaries, ...representatives(boundaries)]
   return complete.sort((left, right) => compareExact(left, right))
 }
@@ -499,11 +534,14 @@ function solveBandsExact(input: SolveBandsInput): AllBandsResult {
   const policy: EvaluationPolicy = { ...input.config, policyIdentity: policyIdentityOf(input.config) }
   const centreEvaluations: ReturnType<typeof evaluateCentreLaw>[] = [], candidateEvaluations: CandidateLawEvaluation[] = []
   const evidenceById: Record<string, CentreBranchMeasurement['evidence']> = {}
-  for (const band of BANDS) for (const scale of enumerateBandSites(contour, band, input.config)) {
-    const evaluated = evaluateExactSite(contour, input.contour.truth, band, scale, policy)
-    centreEvaluations.push(...evaluated.centres)
-    candidateEvaluations.push(...evaluated.candidates)
-    if (evaluated.evidence) evidenceById[evaluated.evidence.id] = evaluated.evidence
+  for (const band of BANDS) {
+    const sites = enumerateBandSites(contour, band, input.config)
+    for (const scale of sites) {
+      const evaluated = evaluateExactSite(contour, input.contour.truth, band, scale, policy)
+      centreEvaluations.push(...evaluated.centres)
+      candidateEvaluations.push(...evaluated.candidates)
+      if (evaluated.evidence) evidenceById[evaluated.evidence.id] = evaluated.evidence
+    }
   }
   const reduced = reduceBandLadders(centreEvaluations, candidateEvaluations)
   const bands: BandResult[] = reduced.bands.map((band) => ({

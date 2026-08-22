@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { canonicalExact, rational } from '../compute/exact-real'
 import { contourBoundaryTruth, prepareContour } from '../compute'
+import { measureFrozenMeshCentreEvidence, measureFullOuterCentreEvidence } from '../compute/centre-evidence'
 import { inspectFixedSize, solveBands } from '../engine'
 import type { ComparisonEngineConfig, Contour, NormalizedBoundary } from '../spec'
 
@@ -15,6 +16,18 @@ const config: ComparisonEngineConfig = {
 }
 
 describe('v3.5.1 exact scaling', () => {
+  it('keeps Box and Weight off the frozen-mesh transition path used by mesh-derived modes', () => {
+    const fullOuter = measureFullOuterCentreEvidence(square, rational(24))
+    const mesh = measureFrozenMeshCentreEvidence(square, rational(24), rational(12), rational(16))
+    expect(fullOuter.status).toBe('measured')
+    expect(mesh.status).toBe('measured')
+    if (fullOuter.status !== 'measured' || mesh.status !== 'measured') return
+    expect(fullOuter.transitionAnchors).toHaveLength(0)
+    expect(fullOuter.evidence.core).toBeNull()
+    expect(fullOuter.evidence.deepest).toEqual([])
+    expect(mesh.transitionAnchors.length).toBeGreaterThan(0)
+  })
+
   it('solves the irrational diamond contact event and carries predecessor evidence', () => {
     const result = solveBands({ contour: normalized(diamond), config })
     const rung = result.bands.find((band) => band.band === 3)?.rungs.find((candidate) => candidate.magnetCount === 4)

@@ -413,9 +413,24 @@ const isolateQuadraticRootWithSteps = (
     }
   }
   void rightSign
+  const leftValue = fromPublic(left)
+  let integer = leftValue.n / leftValue.d
+  if (leftValue.n < BigInt(0) && leftValue.n % leftValue.d !== BigInt(0)) integer -= BigInt(1)
+  const integerLo = rational(integer), integerHi = rational(integer + BigInt(1))
+  const vertex = rational(-polynomial[1], BigInt(2) * polynomial[0])
+  const integerLoSign = compareRational(evaluateIntegerQuadratic(polynomial, integerLo), rational(0))
+  const integerHiSign = compareRational(evaluateIntegerQuadratic(polynomial, integerHi), rational(0))
+  if (integerLoSign === 0) return integerLo
+  if (integerHiSign === 0) return integerHi
+  const staysOnRootSide = rootIndex === 0
+    ? compareRational(integerHi, vertex) <= 0
+    : compareRational(integerLo, vertex) >= 0
+  const canonicalIsolator = refinementSteps === 8 && staysOnRootSide && integerLoSign !== integerHiSign
+    ? [integerLo, integerHi] as const
+    : [left, right] as const
   return {
     polynomial: polynomial.map(String),
-    isolating: [left, right],
+    isolating: canonicalIsolator,
     rootIndex,
   }
 }
@@ -433,6 +448,18 @@ export function quadraticRootsWithin(
   if (polynomial[0] === BigInt(0)) throw new RangeError('quadratic coefficient must be nonzero')
   const discriminant = polynomial[1] * polynomial[1] - BigInt(4) * polynomial[0] * polynomial[2]
   if (discriminant < BigInt(0)) return []
+  const discriminantRoot = integerSqrt(discriminant)
+  if (discriminantRoot * discriminantRoot === discriminant) {
+    const denominator = BigInt(2) * polynomial[0]
+    const exactRoots = [
+      rational(-polynomial[1] - discriminantRoot, denominator),
+      rational(-polynomial[1] + discriminantRoot, denominator),
+    ]
+    return exactRoots.filter((root, index) =>
+      compareRational(root, lo) >= 0
+      && compareRational(root, hi) <= 0
+      && (index === 0 || compareRational(root, exactRoots[0]) !== 0))
+  }
   const vertex = rational(-polynomial[1], BigInt(2) * polynomial[0])
   const roots: Array<Rational | AlgebraicReal> = []
   const leftHi = compareRational(vertex, hi) < 0 ? vertex : hi
