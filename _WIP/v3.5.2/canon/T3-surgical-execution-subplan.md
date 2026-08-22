@@ -6,8 +6,8 @@ Status: execution authority revised 2026-08-22 to the proved bounded mechanism. 
 
 Execute only from:
 
-1. `v3.5.2-master-contract.md` — 882 lines — SHA-256 `5fb41f9d8bc86e4b641b6a90ef548511b408ec4bab12368aba813c40f9603d50` (v3.5.2-1, revised 2026-08-22).
-2. `T3-build-three-laws.md` — 687 lines — SHA-256 `87cccbb329364b0c774ffa3f7ad0e3ec2db7b16d32d45a5e73424cf9f43657b0` (regenerated from that master).
+1. `v3.5.2-master-contract.md` — 899 lines — SHA-256 `625c8a16c50e9189bbc4a9cc060912e7f8cac77374a598e7d657d126d79d9765` (v3.5.2-1, revised 2026-08-22).
+2. `T3-build-three-laws.md` — 704 lines — SHA-256 `0e048f238419c5192d6d69923c86252fd61829b303187dc5b8382a3a363d3215` (regenerated from that master).
 
 Historical evidence only, not execution authority: `../supporting/T3-execution-matrix.md` (describes product `1ccba648` and the pre-simplification mechanism; superseded) and `../supporting/T3-post-wrap-commit-audit.md` (joint 34-commit recovery disposition).
 
@@ -96,13 +96,13 @@ Allowed runtime files:
 
 Required result, in rollback commits:
 
-1. `exact-real.ts` gains the quadratic root isolator only (`quadraticRootsWithin`, `compareExact`, `affineExact` as needed); each body lands with its consumer.
-2. `centre-evidence.ts`/`engine.ts` emit `NumericSelection` from values the frozen path already computes (mesh sample indices, island sample counts and index sums, chosen placement, lattice k-indices, belt membership) without changing any Centre output or choice; deriving any of it from report decimals is forbidden. `contact-root.ts` gains the exact coordinate adapter (`exactSelectedState` → `ParametricSelectedState`, `instantiateState`), the shared judgement (`judgeState`: exact seat legality for every node, exact worst-belt Wrap over outer and holes, witnesses) and the local contact equations (`contactRoots`). `scaleContour`'s float `actual === longestMM` branch is replaced by the exact normalization rule (master §7.1b). `ContactWitness.regimeId` is renamed `path`.
+1. `exact-real.ts` gains the quadratic root isolator (`quadraticRootsWithin`, `compareExact`, `affineExact`) and the one-quadratic-field judgement arithmetic of master §6.2 (`FieldSqrtReal`, linear-form reduction by `P(s)=0`, sign comparison); each body lands with its consumer.
+2. `centre-evidence.ts`/`engine.ts` emit `NumericSelection` from values the frozen path already computes (mesh sample indices, island sample counts and index sums, chosen placement, phase cells, source scale, lattice k-indices, belt membership) without changing any Centre output or choice; deriving any of it from report decimals is forbidden. `contact-root.ts` gains the exact coordinate adapter (`exactSelectedState` → `ParametricSelectedState`, `instantiateState`), the shared judgement (`judgeState`: exact seat legality for every node, exact worst-belt Wrap over outer and holes, witnesses) and the local contact equations (`contactRoots`). `scaleContour`'s float `actual === longestMM` branch is replaced by the exact normalization rule (master §7.1b). `ContactWitness.regimeId` is renamed `path`.
 3. Fixed-size inspection (`computeGrid`) judges through `judgeState` on the exact state; the micron seat predicate remains only as a conservative float prescreen.
 4. `bandWalk` becomes cheap state discovery: at every step it observes all four neutral placements from `measureCentrePlacements` before `chooseCentrePlacement` collapses them and records every distinct (count, centre, placement, indices, belt) state with its bracket; it certifies nothing and publishes nothing; the seat-based `below` ownership is deleted.
 5. For each discovered state: solve `contactRoots` inside the bracket; at each root re-run the numeric Centre once, discard on a changed state, otherwise judge exactly and hand the rooted candidate to Logic. No recursion.
 6. Logic: next count strictly greater than the last published, earliest accepted rung owns it, cross-band duplicates suppressed, all co-lawful placements retained, gravity after centre/wrap/count/allowance tie, Fixed/Auto on the same exact requirement.
-7. `spec.ts`: `BANDS` = 1–4 with half-open exact ownership (`maxExclusiveMM`); the adapter types of master §6.1; no regime/certificate types.
+7. `spec.ts`: `BANDS` = 1–4 with half-open exact ownership (`maxExclusiveMM`); structural exact `NormalizedBoundary`/`PreparedContour` (outer + holes, flat boundary derived); `EngineConfig` carries pitch, spot radius and mass depth and `ComputeInputs` derives from it; the adapter types of master §6.1; no regime/certificate types.
 
 Required proof:
 
@@ -110,7 +110,8 @@ Required proof:
 - every Centre mode and Masses governor: exact reconstruction from the emitted `NumericSelection` equals the numeric selection (squircle 72, heart 108, squircle 120); perturbing report decimals cannot change it;
 - square 25 @ pitch 24: one exact verdict in fixed and rung paths (lawful, gap exactly 0);
 - Weight squircle 72: identical exact refusal and evidence in both paths;
-- diamond: irrational count-1 rung with exact witness, survives worker → UI;
+- diamond: irrational count-1 rung judged at the algebraic root itself (field arithmetic), exact witness, survives worker → UI;
+- pitch 24, spot radius and mass depth reach the engine through the public config and change policy identity;
 - square: 1 at 24; at 72 both the vertical pair (count 2) and the 2×2 (count 4) publish; 8 at 120; 12 at 168, all with flap-0 witnesses; 24.1 refuses; squircle publishes 8 in B4; 71.5 is owned by B1 and 72 by B2;
 - one real holed supplied cutout: exact affine hole segments, hole-overlap refused as an illegal seat, a hole segment as binding witness, fixed-vs-rung identity;
 - counts strictly increasing, no cross-band repeat, lower count survives a higher count's refusal, co-lawful placements plural;
@@ -118,7 +119,7 @@ Required proof:
 - denser-step discovery comparison on square, circle, pill, tall and wide rectangles, diamond, heart, duck, bot, batwoman and the holed cutout finds no missed count (mandatory B1 QA gate);
 - restoring approximate seat admission, or the float normalization branch, fails the fixed/rung identity fixture.
 
-Stop before code if a helper has no live rung consumer, a test demands completeness over every real scale, Centre or Wrap behaviour moves, a certificate exists for another certificate, recursion/cycle code appears without a failing fixture, or an algebraic contour/anchor set is materialized.
+Stop before code if a helper has no live rung consumer, a test demands completeness over every real scale, Centre or Wrap behaviour moves, a certificate exists for another certificate, recursion/cycle code appears without a failing fixture, or a general algebraic geometry platform appears (algebraic materialization beyond the single candidate `ExactState` consumed immediately by `judgeState`).
 
 B1 gate: builder self-audit, Grid-QA independent source/runtime QA, then Grid-Meta necessity/sufficiency/deslop/live-product audit. Continue only on both independent verdicts CLEAR.
 

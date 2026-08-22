@@ -4,7 +4,7 @@ Base: `2c043257` (checkout `onemo-next/.claude/worktrees/s62-lead-clean-2c043257
 
 ## Limitation (closed by B1)
 
-The disposable probe recovered the selection identities (mesh indices, island index sums, placement, lattice k) from report decimals by rounding, which validates the reconstruction formulas on the fixtures but not the emitted-identity dataflow. Canon B1 step 2 makes the frozen Centre path emit `NumericSelection` directly; fixture 12 re-runs these cases from the emitted identities with a report-decimal perturbation mutation as a mandatory gate. The probe also covered outer boundaries only; fixture 17 (holed exact scaling) is a mandatory B1 gate.
+The disposable probe recovered the selection identities (mesh indices, island index sums, placement, lattice k) from report decimals by rounding, which validates the reconstruction formulas on the fixtures but not the emitted-identity dataflow. Canon B1 step 2 makes the frozen Centre path emit `NumericSelection` directly; fixture 12 re-runs these cases from the emitted identities with a report-decimal perturbation mutation as a mandatory gate. The probe also covered outer boundaries only, replicated the product's float `actual !== longestMM` normalization branch rather than the declared exact rule, and judged the diamond at the rational upper bound of its root isolator rather than at the algebraic root. Exact normalization, holes and algebraic-root judgement are therefore B1 obligations proved by mandatory fixtures 12 and 17, not by this probe.
 
 ## Proof gates
 

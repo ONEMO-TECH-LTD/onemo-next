@@ -2890,6 +2890,9 @@ The separation guard parses imports and ASTs. A convention comment is not enforc
 | Control | Engine meaning | Required proof |
 |---|---|---|
 | Band B1-B4 | restrict exact contact-event scale range | every user-selectable band exercised; no cross-band repeat or boundary double-owner |
+| Grid pitch 24 / 48 / 96 | lattice pitch in `ComputeInputs`; default 48 | square 25 at pitch 24 (fixture 12); identity changes with pitch |
+| Magnet padding (spot radius) | exact spot radius in `ComputeInputs`; default 12 | 12 is the public default; a changed value changes seat, Wrap and identity |
+| Mass depth | depth probe of the frozen Centre ruler; default 16 | governed mass changes only through the frozen ruler; identity changes with depth |
 | Flap fixed | exact maximum worst-belt gap | 0 admits only a certified contact witness; no guard |
 | Flap Auto | smallest exact required allowance, capped | 1mm need returns 1mm, never 2mm |
 | Centre rule (comparison only) | chooses centre from shape evidence before seats | seat changes cannot change centre |

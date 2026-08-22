@@ -1,5 +1,7 @@
 # Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
+Status: SUPERSEDED 2026-08-22 — describes the rejected regime/Support-A/B contract; historical evidence only, not authority. The current optional audit is master §9 (v3.5.2-1).
+
 Status: supporting v3.5.2 reference; not execution authority
 Version: v3.5.2 — full vertical Centre-rules clone in T1
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`

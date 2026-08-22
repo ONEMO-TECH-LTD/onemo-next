@@ -210,21 +210,24 @@ export interface ExactPoint {
   approximateMM: PointMM // report/render only
 }
 export interface Contour { outer: { pts: readonly PointMM[] }; holes: readonly { pts: readonly PointMM[] }[] }
+/** id grammar is ruled: `outer:segment:<i>` or `hole:<n>:segment:<i>`, i = index of the segment's end vertex in its ring. */
 export interface BoundaryElement { kind: 'segment'; id: string; a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }
+export interface ExactRing { elements: readonly BoundaryElement[] }
 export interface BoundaryTruth {
   rule: 'supplied-final-contour'
   contourIdentity: string
 }
 export interface NormalizedBoundary {
-  boundary: readonly BoundaryElement[]
+  outer: ExactRing                       // exact normalized outer ring (§7.1b rule)
+  holes: readonly ExactRing[]            // exact normalized holes, same rule
   truth: BoundaryTruth
   normalizedLongestSideMM: 1
-  displayContour: Contour
+  displayContour: Contour                // report/render only; never read by a law path
 }
 export interface RegionEvidence { id: string; centres: readonly ExactPoint[]; area: ExactReal; peakClear: ExactReal; rings: readonly (readonly PointMM[])[] }
 export type MassEvidence = RegionEvidence
 export interface Anchor { centre: ExactPoint; diameterMM: 6 | 8 }
-export interface PreparedContour { source: Contour; boundary: readonly BoundaryElement[]; truth: BoundaryTruth; identity: string }
+export interface PreparedContour { outer: ExactRing; holes: readonly ExactRing[]; boundary: readonly BoundaryElement[] /* derived flat view of outer+holes */; truth: BoundaryTruth; identity: string; source: Contour /* report-only */ }
 export interface LatticeCandidate { phase: ExactPoint; xParity: 'node' | 'gap'; yParity: 'node' | 'gap'; nodes: readonly ExactPoint[] }
 export interface SeatedCandidate extends LatticeCandidate { seated: readonly ExactPoint[] }
 export interface BeltResult { belt: readonly ExactPoint[]; interior: readonly ExactPoint[] }
@@ -316,17 +319,23 @@ export interface EngineConfig {
   flap: FlapLaw
   coverage: CoverageMode
   magnetPlan: MagnetPlan
+  /** Exposed ruled geometry controls; defaults GRID_PITCH_MM / SPOT_RADIUS_MM / MASS_DEPTH_MM. */
+  pitchMM: 24 | 48 | 96
+  spotRadiusMM: number
+  massDepthMM: number
 }
 /** Comparison-only ruled input. The enum crosses the bridge; the selection function never does. */
 export interface ComparisonEngineConfig extends EngineConfig { centrePolicy: CentrePolicy }
 /** Engine-derived internal record; callers cannot supply policyIdentity. */
 export interface EvaluationPolicy extends ComparisonEngineConfig { readonly policyIdentity: string }
-/** Neutral geometry inputs assembled by engine from spec; contains no policy selector. */
+/** Neutral geometry inputs derived by engine from the config's exposed values (exact rationals); contains no policy selector. */
 export interface ComputeInputs { pitchMM: Rational; spotRadiusMM: Rational; massDepthMM: Rational }
 /** Emitted by the frozen numeric Centre path with its existing outputs; never derived from report decimals. */
 export interface NumericSelection {
   centreBranch: { kind: 'box' } | { kind: 'weight' } | { kind: 'core'; islands: readonly { sampleCount: number; sumIx: number; sumIy: number }[] } | { kind: 'sample'; ix: number; iy: number }
   placement: { xHalf: boolean; yHalf: boolean }           // which of the four parity placements was chosen
+  phaseCell: readonly [number, number]                   // integer quotients q of (centre − min [+pitch/2]) = q·pitch + phase, per axis
+  sourceScale: Rational                                  // the exact scale at which the selection was observed
   latticeK: readonly (readonly [number, number])[]       // k-indices of seated nodes relative to phase
   beltIndices: readonly number[]                         // indices into latticeK of the perimeter belt
   count: number
@@ -334,14 +343,17 @@ export interface NumericSelection {
 /** Private parametric record for one stable state: exact affine coefficients in scale s. */
 export interface ParametricSelectedState {
   numeric: NumericSelection
-  boundary: readonly BoundaryElement[]                   // normalized exact segments; scaled as A·s
-  holes: readonly (readonly BoundaryElement[])[]
+  outer: ExactRing                                       // normalized exact segments; scaled as A·s
+  holes: readonly ExactRing[]
   centre: { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }    // c(s) = a·s + b
   anchors: readonly { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }[]  // p_k(s) = a·s + b
 }
 /** The parametric state instantiated at one exact scale. */
 export interface ExactState { parametric: ParametricSelectedState; scale: ExactScale; contour: PreparedContour; centre: ExactPoint; phase: ExactPoint; anchors: readonly ExactPoint[]; belt: readonly ExactPoint[] }
-export interface StateJudgement { seatLegal: readonly boolean[]; requiredFlap: ExactReal; witnesses: readonly ContactWitness[] }
+/** Required allowance at an algebraic rung: sqrt(u + v·s) − r with s the rung's quadratic root — the radicand is the affine reduction of the disc's squared distance in the field Q(s). */
+export interface FieldSqrtReal { kind: 'field-sqrt'; u: Rational; v: Rational; root: AlgebraicReal; subtract: Rational; isolating: readonly [Rational, Rational] }
+export type RequiredAllowance = ExactReal | FieldSqrtReal
+export interface StateJudgement { seatLegal: readonly boolean[]; requiredFlap: RequiredAllowance; witnesses: readonly ContactWitness[] }
 export interface ContactRoot { scale: ExactScale; anchorIndex: number; outlineElementId: string; projection: 'endpoint' | 'interior' }
 
 export type RefusalCode =
@@ -381,6 +393,8 @@ export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1
 /** Neutral post-policy serialization; called by engine assembly, never by Logic. */
 export function finalizeResultIdentity(candidate: LawfulCandidateMeasurement): string
 ```
+
+**Exact judgement at an algebraic rung (one quadratic field, no platform).** At a rung scale `s` that is a root of the quadratic `P`, every affine point/segment squared distance `α·s² + β·s + γ` is reduced by `P(s) = 0` to the linear form `u + v·s`. Seat legality compares `u + v·s` with `r²`; fixed/Auto Wrap compares it with `(r + allowance)²`; the worst disc is the largest radicand — all three are signs of linear forms at `s`, decided exactly by the existing `signQuadraticAtExact`/`compareExact`. The published required allowance is `sqrt(u + v·s) − r` as `FieldSqrtReal` with rational isolating bounds refined from the root isolator; no degree-four polynomial, resultant or expression graph is formed. This lives in `exact-real.ts`/`contact-root.ts` and is consumed immediately by `judgeState`.
 
 The frozen Centre path gains only the emission of `NumericSelection` (data it already holds: mesh sample indices, island sample counts and index sums, the chosen placement, lattice k-indices, belt membership); its numeric outputs and choices are unchanged. `ExactState` carries the exact contour, centre, phase, anchors and belt; `StateJudgement` carries per-node seat legality, the exact worst-belt required allowance and its binding witnesses. The current micron seat predicate may remain only as a conservative float prescreen inside `judgeState`; every near-boundary answer comes from the exact supplied-coordinate predicate Wrap uses.
 
@@ -551,7 +565,7 @@ Responsibilities:
 - carry adapter provenance and any certified source-error bound as diagnostic evidence only; never add it to flap/contact allowance;
 - fixed-size scaling and optional admin outline offset;
 - full-content contour identity;
-- call public engine `policyIdentityOf(config)` for cache identity; callers cannot supply the id. It derives from schema/Law version plus every comparison config field (centre mode and Masses governor where applicable, flap mode/value/cap, coverage, magnet plan and ruled spec version), and every field mutation changes it;
+- call public engine `policyIdentityOf(config)` for cache identity; callers cannot supply the id. It derives from schema/Law version plus every comparison config field (centre mode and Masses governor where applicable, flap mode/value/cap, coverage, magnet plan, pitch, spot radius, mass depth and ruled spec version), and every field mutation changes it;
 - cache the all-band result by schema version + engine id + centre-policy id + contour bytes + complete config; derive a selected-band view without re-solving;
 - invalidate when any engine input changes;
 - ensure clicked rung returns the stored qualifying result, never a re-solve with altered config;
@@ -584,6 +598,9 @@ The all-band response contains complete lawful layouts and their evidence; selec
 | Control | Engine meaning | Required proof |
 |---|---|---|
 | Band B1-B4 | restrict exact contact-event scale range | every user-selectable band exercised; no cross-band repeat or boundary double-owner |
+| Grid pitch 24 / 48 / 96 | lattice pitch in `ComputeInputs`; default 48 | square 25 at pitch 24 (fixture 12); identity changes with pitch |
+| Magnet padding (spot radius) | exact spot radius in `ComputeInputs`; default 12 | 12 is the public default; a changed value changes seat, Wrap and identity |
+| Mass depth | depth probe of the frozen Centre ruler; default 16 | governed mass changes only through the frozen ruler; identity changes with depth |
 | Flap fixed | exact maximum worst-belt gap | 0 admits only a certified contact witness; no guard |
 | Flap Auto | smallest exact required allowance, capped | 1mm need returns 1mm, never 2mm |
 | Centre rule (comparison only) | chooses centre from shape evidence before seats | seat changes cannot change centre |
