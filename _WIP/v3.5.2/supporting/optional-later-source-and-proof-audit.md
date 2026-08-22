@@ -1,7 +1,7 @@
-# Magnetic Grid v3.5.1 — portable three-rule engine and live comparison tab build contract
+# Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
-Status: DRAFT FOR DAN REVIEW
-Contract revision: R15 — full vertical Centre-rules clone in T1
+Status: supporting v3.5.2 reference; not execution authority
+Version: v3.5.2 — full vertical Centre-rules clone in T1
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 

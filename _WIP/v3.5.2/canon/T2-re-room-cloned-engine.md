@@ -1,7 +1,7 @@
-# Magnetic Grid v3.5.1 — portable three-rule engine and live comparison tab build contract
+# Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
-Status: DRAFT FOR DAN REVIEW
-Contract revision: R15 — full vertical Centre-rules clone in T1
+Status: canonical v3.5.2 phase packet
+Version: v3.5.2 — full vertical Centre-rules clone in T1
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 
@@ -14,7 +14,7 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 - Keep the complete T1 Law clone running as the comparison harness. Re-room only its cloned underlying centering bodies, incrementally, into `spec.ts`, public `compute.ts`, focused `compute/*`, `logic.ts`, `engine.ts` and the pass-through bridge under `src/lib/magnetic-grid/`, following the untangle map and MOVE/ADAPT equivalence obligations.
 - Copy only disposition-approved neutral geometry bodies from the embedded source. Rejected approximate/policy helpers remain unchanged source bodies during T2; no defect is repaired while the structure moves. The portable package has no runtime import back into current `grid-origin*` or `src/lib/grid-engine`.
 - After every semantic commit, compile and run the Law selection, then replay the named T1 squircle/72mm snapshot and require the same contour bytes, complete result record and rendered Centre evidence before continuing. The broader matrix/mutation work remains optional §9.
-- Keep the label `v3.5.1` and the Centre-clone honesty note throughout T2; it must still state that Wrap and scaling are not implemented yet.
+- Keep the label `v3.5.2` and the Centre-clone honesty note throughout T2; it must still state that Wrap and scaling are not implemented yet.
 
 Exact T2 re-room map: `centre-clone-spec.ts` → `spec.ts`; `centre-clone-compute.ts` → public `compute.ts` plus only the reached focused `compute/*` owners; `centre-clone-geometry.ts` exact seat bodies → `compute/seat.ts`; `centre-clone-logic.ts` → `logic.ts` for policy bodies and the declared neutral compute owner for measurements; `centre-clone-engine.ts` → `engine.ts`; `magnetic-grid-clone-bridge.ts` → `magnetic-grid-bridge.ts`. Each move is committed separately, deletes the vacated temporary body in the same commit, and preserves the named T1 snapshot byte-for-byte. No temporary file survives T2.
 
@@ -36,15 +36,15 @@ Dan's separate gravity ruling is a mechanical invariant, not a hidden fourth dri
 
 The contract must deliver all of these together:
 
-- Build v3.5.1 as a separately selectable comparison path first.
+- Build v3.5.2 as a separately selectable comparison path first.
 - Treat Voting/scoring as untrusted visual comparator evidence only. Treat accepted Centre-rules centering outputs as the trusted behavioral baseline while its shared door/worker and named 2mm-ruler defects remain untrusted infrastructure. Do not modify either current path during proof.
 - Use the proved centering-tab enforcement as the behavioral base: preserve/re-room its accepted centre-rule/governor/parity canon, replace only its documented corrupt measurements/shared infrastructure, prove centre equivalence first, then add Wrap and Magnet-quantity scaling.
 - Enforce the three laws as code invariants, not UI descriptions.
 - Make every exposed control true to its label.
 - Make every concession explicit.
 - Split the implementation into portable `spec → compute → logic → engine API`; UI reaches it only through a bridge.
-- End R15 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
-- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not R15 build tasks.
+- End v3.5.2 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
+- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not v3.5.2 build tasks.
 
 ## 3. Necessity baseline — the smallest complete rebuild
 
@@ -108,7 +108,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
-The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising R15 first.
+The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.
 
 ### Elements explicitly preserved
 
@@ -594,7 +594,7 @@ Responsibilities:
 - ensure clicked rung returns the stored qualifying result, never a re-solve with altered config;
 - serialize and carry exact contact witnesses unchanged across engine, worker, cache, and UI; report-only decimals never enter a cache key or verdict;
 - convert results to field spots, rings, centre markers, concessions, and refusal copy;
-- derive every Law control label, option, bound and default from public engine/spec data and expose them as bridge view models; the page contains no engine-law constant or policy branch; the ruled `v3.5.1` tab label is the only version literal;
+- derive every Law control label, option, bound and default from public engine/spec data and expose them as bridge view models; the page contains no engine-law constant or policy branch; the ruled `v3.5.2` tab label is the only version literal;
 - expose a testable `createMagneticGridSolveService()` used by the worker.
 
 During T1-T3, `law.worker.ts` is the isolated, hash-characterized clone of the Centre-rules worker execution/cache branch so the complete cloned tab runs independently and every engine change is visible. T4 replaces that cloned orchestration with only message validation, Law bridge-service call and `postMessage`. The current worker and both comparator code paths remain byte-untouched during proof.

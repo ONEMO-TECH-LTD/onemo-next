@@ -1,6 +1,6 @@
-# T3 post-Wrap commit audit — reconciled Grid-Meta + Grid-QA
+# v3.5.2 T3 post-Wrap commit audit — reconciled Grid-Meta + Grid-QA
 
-Authority: approved master/T3 at `a65added`; [`T3-execution-matrix.md`](./T3-execution-matrix.md) SHA-256 `27bdb7b0d660e6c4e2f1158e0a9cf38b4129d4370502bd70f172204ec19323f7`. Audited product range: `2c043257..1ccba648`, 34 commits. Both reviewers read every commit patch, resulting runtime files and changed tests independently.
+Authority: v3.5.2 master/T3, preserving the operative content approved at `a65added`; [`T3-execution-matrix.md`](./T3-execution-matrix.md) SHA-256 `f3bde325b18f1c2957d2b211b3bdc25222a7309d0aa71cc6b197f329b11a06f7`. Audited product range: `2c043257..1ccba648`, 34 commits. Both reviewers read every commit patch, resulting runtime files and changed tests independently.
 
 `KEEP` means retain as a necessary recovery input, not delivered-product credit. `REWORK` means recover only the named correct portion in its first live consumer. `REVERT` means remove by history-preserving forward commit.
 

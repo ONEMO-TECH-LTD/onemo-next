@@ -1,7 +1,7 @@
-# Magnetic Grid v3.5.1 — portable three-rule engine and live comparison tab build contract
+# Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
-Status: DRAFT FOR DAN REVIEW
-Contract revision: R15 — full vertical Centre-rules clone in T1
+Status: canonical v3.5.2 phase packet
+Version: v3.5.2 — full vertical Centre-rules clone in T1
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 
@@ -15,7 +15,7 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 - Use the existing three-way selector as the only page-level dispatch and add only the isolated `LawPanel` mount boundary. Voting and Centre-rules keep their original page subtree, state, request path, worker and modules byte-untouched. Selecting Centre-rules runs the frozen original; selecting Law runs the complete isolated clone. No new selector, fourth option or second page exists.
 - Build and run the full vertical clone before structural moves. Confirm the Centre-rules and Law selections both load, the Law selection uses only its isolated request/worker/runtime, and the original still runs unchanged. The minimum frozen-snapshot equivalence in the build completion is mandatory; the broader matrix/pixel suite belongs to optional §9. No Voting-only or existing `positioning===2` body is copied.
 - `LawPanel.tsx` independently runs the cloned source/shape pipeline and produces its own normalized contour; the shell passes no contour. The frozen equivalence snapshot below requires the Law contour identity and ordered contour bytes to equal the legacy Centre-rules contour. Do not add Studio integration or alter current shape loaders.
-- Label the isolated selection `v3.5.1`. The honesty note names Centre-clone behavior only and states that Wrap and scaling are not implemented yet.
+- Label the isolated selection `v3.5.2`. The honesty note names Centre-clone behavior only and states that Wrap and scaling are not implemented yet.
 
 #### T1 selector and state ownership
 
@@ -51,7 +51,7 @@ The comparison is selector-based, not simultaneous: only one panel/worker is mou
 | `grid-origin-logic.ts:17-26`, `43-105`, `126-149` | `src/lib/magnetic-grid/centre-clone-logic.ts` | copy `bandOf`, types, `governMass`, `centeringAnchors`, coverage and sizing; exclude Voting `28-40` score bodies and unused `centeringRef:107-124` |
 | `grid-origin-bridge.ts:1-108` | `src/lib/effect/magnetic-grid-clone-bridge.ts` | `MOVE-VERBATIM` except isolated import paths |
 
-This extraction map is closed before T1 starts. No new source row, state owner, request field, helper or result field may be discovered or added during implementation without revising R15 first.
+This extraction map is closed before T1 starts. No new source row, state owner, request field, helper or result field may be discovered or added during implementation without revising the v3.5.2 contract first.
 
 T1 frozen equivalence snapshot: donor default `squircle`, longest side `72mm`, `positioning=1` (Centre-rules), `pitchMM=48`, `paddingMM=12`, `flapMM=0`, `phaseStepMM=1`, `massDepthMM=16`, `centreMode=2` (Masses), `governor=0` (Smallest), `plan='all6'`, `perimeterOnly=true`, `offsetMM=0`, no forced phase, Auto flap off. Record the exact normalized contour identity and ordered contour bytes from the donor before cloning.
 
@@ -2750,15 +2750,15 @@ Dan's separate gravity ruling is a mechanical invariant, not a hidden fourth dri
 
 The contract must deliver all of these together:
 
-- Build v3.5.1 as a separately selectable comparison path first.
+- Build v3.5.2 as a separately selectable comparison path first.
 - Treat Voting/scoring as untrusted visual comparator evidence only. Treat accepted Centre-rules centering outputs as the trusted behavioral baseline while its shared door/worker and named 2mm-ruler defects remain untrusted infrastructure. Do not modify either current path during proof.
 - Use the proved centering-tab enforcement as the behavioral base: preserve/re-room its accepted centre-rule/governor/parity canon, replace only its documented corrupt measurements/shared infrastructure, prove centre equivalence first, then add Wrap and Magnet-quantity scaling.
 - Enforce the three laws as code invariants, not UI descriptions.
 - Make every exposed control true to its label.
 - Make every concession explicit.
 - Split the implementation into portable `spec → compute → logic → engine API`; UI reaches it only through a bridge.
-- End R15 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
-- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not R15 build tasks.
+- End v3.5.2 with one isolated working Law runtime beside the frozen Voting/Centre-rules comparators.
+- Product cut-over, deletion and any one-engine migration require a separate later contract if and when Dan authorizes that work; they are not v3.5.2 build tasks.
 
 ## 3. Necessity baseline — the smallest complete rebuild
 
@@ -2822,7 +2822,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | exact segment-seat kernel, pure bbox traversal, contour scaling | candidate MOVE-VERBATIM when reached by the live clone/build | destination follows the import law; donor/copy function text remains equal |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
-The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising R15 first.
+The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.
 
 ### Elements explicitly preserved
 

@@ -1,4 +1,4 @@
-# T3 surgical execution sub-plan
+# v3.5.2 T3 surgical execution sub-plan
 
 Status: final execution authority — R0 + G1 QA/Meta CLEAR. This revision releases B1 only; B2 remains gated on B1 CLEAR.
 
@@ -6,10 +6,10 @@ Status: final execution authority — R0 + G1 QA/Meta CLEAR. This revision relea
 
 Execute only from:
 
-1. `MASTER-CONTRACT.md` (approved at `a65added` under its former filename) — 948 lines — SHA-256 `53f6a5c15a9a3268d89943315527876dbd6f0884184c9e0a2aca1ebcb6d3404a`.
-2. Original `T3-build-three-laws.md` at `a65added` — 756 lines — SHA-256 `36abad03fd946db98d1ba77729f838031f010095566b75c9098a5f58d3a036f9`.
-3. `../supporting/T3-execution-matrix.md` — SHA-256 `27bdb7b0d660e6c4e2f1158e0a9cf38b4129d4370502bd70f172204ec19323f7`.
-4. `../supporting/T3-post-wrap-commit-audit.md` — 50 lines — SHA-256 `dce3e353d4a2e1a09e67c8dd03c7330f5bb57183dcdc1570c32af4a7b6bd71ba` — joint 34-commit recovery disposition.
+1. `v3.5.2-master-contract.md` — 948 lines — SHA-256 `9a9c7237a4f17d4d9c080b468f823c3ad83c9644edd471dcba0be9f22260fc51`; operative content approved at `a65added` under the former v3.5.1 name.
+2. `T3-build-three-laws.md` — 756 lines — SHA-256 `a22f9ba48c0e580e9adbbb3ddd7c2fe4b8966a6b77abb484e0b84c7e07f19dd5`; operative content approved at `a65added` under the former v3.5.1 name.
+3. `../supporting/T3-execution-matrix.md` — SHA-256 `f3bde325b18f1c2957d2b211b3bdc25222a7309d0aa71cc6b197f329b11a06f7`.
+4. `../supporting/T3-post-wrap-commit-audit.md` — 50 lines — SHA-256 `45c0d3f59c1ae8faafd060492c1cdd53f3798ec42d8cf0ab0c3716d2cbb6acab` — joint 34-commit recovery disposition.
 
 Voting, Centre-rules, their worker/modules and the Meta-cleared fixed-size Wrap behavior remain frozen comparators.
 
@@ -201,7 +201,7 @@ Action:
 
 Proof: worker result byte-equals direct engine; changing shape/config invalidates once; band/rung selection causes no solve; stale requests never render; legacy worker hashes unchanged; Law→Centre-rules→Voting→Law remains isolated. On the provenance-bound real route, all three labels remain unclipped; every B1-B4 band renders stored exact rungs/refusals; irrational rung and ties are visible; fixed/Auto/manual concessions work; no sampled Law symbol/call remains; frozen Centre/Wrap visuals are unchanged.
 
-Commit: `feat(grid): cut v3.5.1 onto exact three-law results`.
+Commit: `feat(grid): cut v3.5.2 onto exact three-law results`.
 
 ## F1 — Completed-system gate
 
