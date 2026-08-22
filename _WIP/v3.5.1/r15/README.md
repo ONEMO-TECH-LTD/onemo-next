@@ -4,7 +4,7 @@
 
 Execute in this order:
 
-1. [`canon/v3.5.1-engine-rebuild-contract-r15.md`](./canon/v3.5.1-engine-rebuild-contract-r15.md) — master R15, 948 lines, SHA-256 `53f6a5c15a9a3268d89943315527876dbd6f0884184c9e0a2aca1ebcb6d3404a`.
+1. [`canon/MASTER-CONTRACT.md`](./canon/MASTER-CONTRACT.md) — master R15 and highest contract authority, 948 lines, SHA-256 `53f6a5c15a9a3268d89943315527876dbd6f0884184c9e0a2aca1ebcb6d3404a`.
 2. [`canon/T1-full-isolated-vertical-clone.md`](./canon/T1-full-isolated-vertical-clone.md) — T1 packet.
 3. [`canon/T2-re-room-cloned-engine.md`](./canon/T2-re-room-cloned-engine.md) — T2 packet.
 4. [`canon/T3-build-three-laws.md`](./canon/T3-build-three-laws.md) — approved 756-line T3 packet, restored from `a65added`, SHA-256 `36abad03fd946db98d1ba77729f838031f010095566b75c9098a5f58d3a036f9`.
