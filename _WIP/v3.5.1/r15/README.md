@@ -1,20 +1,24 @@
-# R15 authority and current execution state
+# R15 documentation map
 
-## Governing contract
+## Canonical authority
 
-- [`v3.5.1-engine-rebuild-contract-r15.md`](./v3.5.1-engine-rebuild-contract-r15.md) — 948 lines — SHA-256 `53f6a5c15a9a3268d89943315527876dbd6f0884184c9e0a2aca1ebcb6d3404a` — approved authority at plan commit `a65added`.
-- Original approved T3 packet — `a65added:_WIP/v3.5.1/r15/T3-build-three-laws.md` — 756 lines — SHA-256 `36abad03fd946db98d1ba77729f838031f010095566b75c9098a5f58d3a036f9`.
-- [`T3-execution-matrix.md`](./T3-execution-matrix.md) — 19 lines — SHA-256 `27bdb7b0d660e6c4e2f1158e0a9cf38b4129d4370502bd70f172204ec19323f7` — reconciled current-code execution map, independently accepted by Grid-QA.
-- [`T3-post-wrap-commit-audit.md`](./T3-post-wrap-commit-audit.md) — joint 34-commit KEEP/REWORK/REVERT recovery ledger.
+Execute in this order:
 
-## Phase packets
+1. [`canon/v3.5.1-engine-rebuild-contract-r15.md`](./canon/v3.5.1-engine-rebuild-contract-r15.md) — master R15, 948 lines, SHA-256 `53f6a5c15a9a3268d89943315527876dbd6f0884184c9e0a2aca1ebcb6d3404a`.
+2. [`canon/T1-full-isolated-vertical-clone.md`](./canon/T1-full-isolated-vertical-clone.md) — T1 packet.
+3. [`canon/T2-re-room-cloned-engine.md`](./canon/T2-re-room-cloned-engine.md) — T2 packet.
+4. [`canon/T3-build-three-laws.md`](./canon/T3-build-three-laws.md) — approved 756-line T3 packet, restored from `a65added`, SHA-256 `36abad03fd946db98d1ba77729f838031f010095566b75c9098a5f58d3a036f9`.
+5. [`canon/T3-surgical-execution-subplan.md`](./canon/T3-surgical-execution-subplan.md) — current R0/G1/B1 execution authority, SHA-256 `51ac55b4a6fbbadff5ae438a27d177e70e73158355ef8ad89b99322d38d963b7`.
+6. [`canon/T4-finalize-worker-bridge-tab.md`](./canon/T4-finalize-worker-bridge-tab.md) — T4 packet; not active during B1.
 
-- [`T1-full-isolated-vertical-clone.md`](./T1-full-isolated-vertical-clone.md)
-- [`T2-re-room-cloned-engine.md`](./T2-re-room-cloned-engine.md)
-- [`T3-build-three-laws.md`](./T3-build-three-laws.md) — current working file contains 611 post-`a65added` inserted lines. Those insertions are non-governing while recovery is active; do not execute them as contract authority.
-- [`T4-finalize-worker-bridge-tab.md`](./T4-finalize-worker-bridge-tab.md)
-- [`optional-later-source-and-proof-audit.md`](./optional-later-source-and-proof-audit.md)
+The rejected 611-line post-`a65added` T3 expansion is absent from the visible contract. Git history retains it as evidence only.
 
-## Current ruling
+## Supporting evidence
 
-Building remains stopped. Resume only from the approved master, original T3 packet and reconciled execution matrix. Any missing mechanism must be added as one bounded, approved contract block before product code; conditional Support B is not an automatic phase.
+- [`supporting/T3-execution-matrix.md`](./supporting/T3-execution-matrix.md) — five-surface current-code delivery map.
+- [`supporting/T3-post-wrap-commit-audit.md`](./supporting/T3-post-wrap-commit-audit.md) — joint KEEP/REWORK/REVERT ledger.
+- [`supporting/optional-later-source-and-proof-audit.md`](./supporting/optional-later-source-and-proof-audit.md) — optional later proof reference; not a build phase or gate.
+
+## Current gate
+
+R0 and G1 are QA/Meta CLEAR. B1 is the only released build scope and is not yet CLEAR. B2 remains gated on B1 QA and Meta CLEAR.
