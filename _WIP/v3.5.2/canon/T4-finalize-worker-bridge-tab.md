@@ -74,15 +74,15 @@ The existing `grid-origin` page is the shared comparison shell. Its three positi
 
 ### Required reuse
 
-**Baseline rule:** the isolated Law package starts from the embedded `8d17780c` Centre-rules (`positioning===1`) dependency closure. No body reachable only from Voting (`positioning===0`), `registrationScore`, scoring weights/orders, phase sweep or `centeringRef` may be moved or adapted into Law. Voting and the old in-place `positioning===2` Wrap/scaling branch are evidence only. No old Wrap/scaling function body may be copied, moved or adapted into the new law. A product invariant observed there may enter only after it is independently re-derived from Dan's directive and implemented anew over the exact T3 measurements.
+**Baseline rule:** the isolated Law package starts from the embedded `8d17780c` Centre-rules (`positioning===1`) dependency closure. No body reachable only from Voting (`positioning===0`), `registrationScore`, scoring weights/orders, phase sweep or `centeringRef` may be moved or adapted into Law. Voting and the old in-place `positioning===2` Wrap/scaling branch are evidence only. No old Wrap/scaling law-bearing body — gate, refinement, ranking, press, tolerance — may be copied, moved or adapted into the new law; the neutral sampled walk shell is ADAPT as discovery only, exactly as the untangle row below states. A product invariant observed there may enter only after it is independently re-derived from Dan's directive and implemented anew over the exact T3 measurements.
 
-**Clone-then-re-room order:** first clone the Centre-rules behavioral slice and prove it still produces the accepted centre outputs. Then re-room those same bodies into spec/compute/logic/engine under the dispositions below. Only after the re-roomed centre gate passes may the faulty centre ruler be adapted, then Wrap added, then Magnet-quantity scaling added. This is not bottom-up replacement followed by an equivalence test; the preserved implementation is the starting material.
+**Clone-then-re-room order:** first clone the Centre-rules behavioral slice and prove it still produces the accepted centre outputs. Then re-room those same bodies into spec/compute/logic/engine under the dispositions below. Only after the re-roomed centre gate passes is Wrap added, then Magnet-quantity scaling. The frozen ruler and its evidence are retained unchanged through T3; Centre repair is permitted only by a later explicit bounded amendment if the final conditional F2 gate measures a material defect. T1, T2 and Wrap are complete; T3 scaling starts from product `2c043257`. This is not bottom-up replacement followed by an equivalence test; the preserved implementation is the starting material.
 
 **Full vertical clone boundary:** the T1 clone begins at the current `grid-origin/page.tsx` Centre-rules experience and ends at the bodies that produce and render its result. It includes the shared visible bench surface needed to operate Centre-rules, its Centering controls and evidence display, its local state/defaults, newest-only request queue, request/config assembly, the relevant `solve.worker.ts` cache/band/replay/prefetch execution, `grid-origin.ts positioning===1`, and every reachable body in `grid-origin-spec.ts`, `grid-origin-compute.ts`, `grid-origin-logic.ts` and `grid-origin-bridge.ts`. The isolated clone substitutes only file/import names, request identity and persisted namespace; every cloned function body and JSX subtree is copied from the embedded donor snapshot before re-rooming. It imports or calls no current `grid-origin*` runtime or current worker. Voting-only bodies and the existing `positioning===2` branch are excluded. The original Centre-rules tab and isolated Law clone remain separately selectable throughout T1-T4 so every code change is immediately observable against the frozen baseline.
 
-**What centering is preserved versus repaired:** preserve `governMass` branch semantics, the governor set, centre-rule branch meanings, node/gap parity canon and all four centred placements. T1 clones the current governor body verbatim; T2 re-rooms it without behavioral change. T3 adapts only the measurement bodies proved wrong. Exact comparison comes from the live exact-real kernel. The known ruler defect is current `safeSegments`: it samples clearance on a fixed 2mm mesh anchored to each scaled bbox, so its argmax jumps between samples as scale changes. Measured result: mesh centre left ~0.069mm contact residue; an exactly computed centre reduced it to ~0.000055mm reporting noise. Because erosion/mass depth is a fixed physical millimetre value while the shape scales, the mass map genuinely changes per scale; computing one normalized centre and scaling it is not equivalent.
+**What centering is preserved versus repaired:** preserve `governMass` branch semantics, the governor set, centre-rule branch meanings, node/gap parity canon and all four centred placements. T1 clones the current governor body verbatim; T2 re-rooms it without behavioral change. T3 leaves every Centre measurement body unchanged; it only makes the frozen path emit its already-computed selection identities (§6.2) and reconstructs the selected coordinates exactly. Exact comparison comes from the live exact-real kernel. The known ruler defect is current `safeSegments`: it samples clearance on a fixed 2mm mesh anchored to each scaled bbox, so its argmax jumps between samples as scale changes. Measured result: mesh centre left ~0.069mm contact residue; an exactly computed centre reduced it to ~0.000055mm reporting noise. Because erosion/mass depth is a fixed physical millimetre value while the shape scales, the mass map genuinely changes per scale; computing one normalized centre and scaling it is not equivalent.
 
-Clone a current function body only when the embedded source and disposition table classify it for the current phase; do not alter its current consumers. The clone is temporary. Initial donor candidates are the exact segment-seat kernel, pure bbox traversal and contour scaling. The current mesh-derived centre evidence, `splitPerimeter`, float tangency/gap helpers, scoring helpers and shape adapters are source evidence—not pre-approved reuse.
+Clone a current function body only when the embedded source and disposition table classify it for the current phase; do not alter its current consumers. The clone is temporary. Initial donor candidates are the exact segment-seat kernel, pure bbox traversal and contour scaling. The current mesh-derived centre evidence is retained frozen as the numeric selection source and is never a law geometry; `splitPerimeter`, float tangency/gap helpers, scoring helpers and shape adapters are source evidence—not pre-approved reuse.
 
 Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERBATIM` (function text copied from the embedded donor), `ADAPT` (only the named file/import/request-identity/persisted-namespace substitution), or `EXCLUDE` (Voting-only, old-Law-only or outside the Centre-rules closure). “Where possible”, silent rewrite and unclassified code are forbidden.
 
@@ -96,13 +96,13 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T1/T2 preserve the sampled walk; T3 keeps it as cheap candidate discovery only and removes its authority to certify contact or publish a rung: the gate becomes exact local contact roots plus full-law validation (§7.2, §7.4), and the seat-based `below` ownership is deleted |
 | `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; DELETE+REPLACE when T3 adds Wrap | T1/T2 preserve the allowance scan for equivalence only; T3 removes the scan and computes the exact worst-belt minimum directly |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
-| `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2; any `ExactReal`/`compareExact` adaptation requires a named T3 repair invoking Support A |
+| `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2 or T3; the governor keeps selecting on its numeric inputs |
 | `grid-origin-logic.ts assignSizes` | ADAPT only when a live T3 result consumes it | extrema/corner measurements in `compute/seat.ts`; magnet-plan policy in `logic.ts` |
 | `grid-origin-compute.ts splitPerimeter` | ADAPT only when live Coverage/Wrap code consumes it | neighbour measurements in `compute/seat.ts`; belt classification in `logic.ts`; no speculative reach value |
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
 | `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
 | `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
-| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM until a named live T3 boundary defect invokes ADAPT | destination follows the import law. T3 Wrap may ADAPT contour scaling only to preserve supplied holes and make the returned exact longest side equal the requested size after the measured live 24mm float-scaling failure; the frozen governed Centre/evidence hashes must remain equal |
+| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM; contour scaling ADAPT at T3 to the exact normalization rule | destination follows the import law. T3 replaces the float `actual === longestMM` branch in `scaleContour` with the single exact rule of §7.1b (normalized boundary × scale); the frozen governed Centre/evidence hashes must remain equal |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
 The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.
@@ -292,18 +292,19 @@ export interface ContactWitness {
   allowance: ExactReal
   equation: { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
   tangency: { x: ExactReal; y: ExactReal }
-  regimeId: string // 'fixed-size' | 'rung'
+  path: 'fixed-size' | 'rung' // B1 renames the live `regimeId: 'fixed-size'` field
   certificateId: string
 }
 
 export const GRID_PITCH_MM = 48
 export const SPOT_RADIUS_MM = 12
 export const MASS_DEPTH_MM = 16
+/** Exact band ownership is half-open: a scale s belongs to the band with minMM <= s < maxExclusiveMM (71.5 is B1; 72 is B2). */
 export const BANDS = [
-  { id: 1, minMM: 24, maxMM: 71 },
-  { id: 2, minMM: 72, maxMM: 119 },
-  { id: 3, minMM: 120, maxMM: 167 },
-  { id: 4, minMM: 168, maxMM: 215 },
+  { id: 1, minMM: 24, maxExclusiveMM: 72 },
+  { id: 2, minMM: 72, maxExclusiveMM: 120 },
+  { id: 3, minMM: 120, maxExclusiveMM: 168 },
+  { id: 4, minMM: 168, maxExclusiveMM: 216 },
 ] as const
 
 export type FixedFlap = { mode: 'fixed'; allowance: Rational }
@@ -321,6 +322,26 @@ export interface ComparisonEngineConfig extends EngineConfig { centrePolicy: Cen
 export interface EvaluationPolicy extends ComparisonEngineConfig { readonly policyIdentity: string }
 /** Neutral geometry inputs assembled by engine from spec; contains no policy selector. */
 export interface ComputeInputs { pitchMM: Rational; spotRadiusMM: Rational; massDepthMM: Rational }
+/** Emitted by the frozen numeric Centre path with its existing outputs; never derived from report decimals. */
+export interface NumericSelection {
+  centreBranch: { kind: 'box' } | { kind: 'weight' } | { kind: 'core'; islands: readonly { sampleCount: number; sumIx: number; sumIy: number }[] } | { kind: 'sample'; ix: number; iy: number }
+  placement: { xHalf: boolean; yHalf: boolean }           // which of the four parity placements was chosen
+  latticeK: readonly (readonly [number, number])[]       // k-indices of seated nodes relative to phase
+  beltIndices: readonly number[]                         // indices into latticeK of the perimeter belt
+  count: number
+}
+/** Private parametric record for one stable state: exact affine coefficients in scale s. */
+export interface ParametricSelectedState {
+  numeric: NumericSelection
+  boundary: readonly BoundaryElement[]                   // normalized exact segments; scaled as A·s
+  holes: readonly (readonly BoundaryElement[])[]
+  centre: { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }    // c(s) = a·s + b
+  anchors: readonly { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }[]  // p_k(s) = a·s + b
+}
+/** The parametric state instantiated at one exact scale. */
+export interface ExactState { parametric: ParametricSelectedState; scale: ExactScale; contour: PreparedContour; centre: ExactPoint; phase: ExactPoint; anchors: readonly ExactPoint[]; belt: readonly ExactPoint[] }
+export interface StateJudgement { seatLegal: readonly boolean[]; requiredFlap: ExactReal; witnesses: readonly ContactWitness[] }
+export interface ContactRoot { scale: ExactScale; anchorIndex: number; outlineElementId: string; projection: 'endpoint' | 'interior' }
 
 export type RefusalCode =
   | 'NO_SAFE_CORE'

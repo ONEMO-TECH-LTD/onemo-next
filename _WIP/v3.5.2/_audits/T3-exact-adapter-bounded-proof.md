@@ -2,6 +2,10 @@
 
 Base: `2c043257` (checkout `onemo-next/.claude/worktrees/s62-lead-clean-2c043257`). Disposable probe: `evidence/exact-adapter-proof-2c043257.test.ts` (run with vitest in that checkout; no product code changed). Governing synthesis: `../_proposals/v3.5.2-1 simplify and complete proposal/s62-grid-meta-final-joint-recommendation.md` (SHA 74f03edb…).
 
+## Limitation (closed by B1)
+
+The disposable probe recovered the selection identities (mesh indices, island index sums, placement, lattice k) from report decimals by rounding, which validates the reconstruction formulas on the fixtures but not the emitted-identity dataflow. Canon B1 step 2 makes the frozen Centre path emit `NumericSelection` directly; fixture 12 re-runs these cases from the emitted identities with a report-decimal perturbation mutation as a mandatory gate. The probe also covered outer boundaries only; fixture 17 (holed exact scaling) is a mandatory B1 gate.
+
 ## Proof gates
 
 | Gate | Result | Evidence |
@@ -15,7 +19,7 @@ Base: `2c043257` (checkout `onemo-next/.claude/worktrees/s62-lead-clean-2c043257
 
 ## Product-law note (superseded as a blocker — Grid-Meta authority correction, 2026-08-22)
 
-Under bit-exact law on the supplied flattened bytes, **the reference squircle at 72 mm is refused at flap 0 in every centre mode**: its four corner discs sit `2.4e-14 mm²` inside the 12 mm clearance (`d² − 144 = −2.398e-14`). The current tab shows it lawful only because (a) seat legality rounds to 0.001 mm and (b) the float-scaled contour happens to round the other way. Whether a flattened curve is "tangent" at flap 0 is therefore decided by last-bit rounding, and it can legitimately differ between a fixed inspection (float-scaled contour) and a rung (base × s* contour) — the identity the joint recommendation requires cannot hold for curves without a declared touch rule.
+Under bit-exact law on the supplied flattened bytes, **the reference squircle at 72 mm is refused at flap 0 in every centre mode**: its four corner discs sit `2.4e-14 mm²` inside the 12 mm clearance (`d² − 144 = −2.398e-14`). The current tab shows it lawful only because (a) seat legality rounds to 0.001 mm and (b) the float-scaled contour happens to round the other way. Whether a flattened curve is "tangent" at flap 0 is therefore decided by its supplied bits. Under the revised canon both fixed inspection and rung validation consume one exact construction (normalized boundary × scale, emitted selection identities), so they cannot diverge; the float-scaled path that passes squircle 72 today is superseded evidence, not an allowed final behaviour.
 
 Disposition: master §7.1 (supplied bytes are law, no rounding or tolerance) already binds option B; the finding is recorded as expected behaviour, not a blocker. Option A remains available to Dan only as a later explicit product amendment. Options, for the record:
 - **A. Touch rule on the exact value:** lawful iff exact gap ≤ flap + `TOUCH_MM` (proposal 0.001 mm, the existing seat quantum), evaluated on unrounded geometry. Geometry stays continuous (diamond root unaffected); one rule for fixed and rung; squircle 72 lawful; a 0.002 mm gap refuses. This is a verdict tolerance, which the master currently forbids.

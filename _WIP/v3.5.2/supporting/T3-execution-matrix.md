@@ -1,5 +1,7 @@
 # v3.5.2 T3 execution matrix — reconciled Grid-Meta + Grid-QA
 
+Status: SUPERSEDED 2026-08-22 — historical evidence only, not execution authority. Describes product `1ccba648` and the pre-simplification mechanism; the current mechanism is master §7 (v3.5.2-1) and the sub-plan B1.
+
 Authority: v3.5.2 master, 948 lines; v3.5.2 T3 packet, 756 lines. Both preserve the operative content approved at `a65added` under the former v3.5.1 names. The rejected 611-line T3 expansion and interrupted finite-mesh proposal are excluded.
 
 Current product: `1ccba648fd66143154d29b4cf6602ff166b467d2`; untracked `safe-topology.test.ts`, `scaling.test.ts`. Read end-to-end: all 10 current `src/lib/magnetic-grid` runtime files / 3,907 lines, plus `magnetic-grid-bridge.ts` / 113, `law.worker.ts` / 148 and `LawPanel.tsx` / 872. No tests or product edits.
