@@ -8,6 +8,8 @@ const ROOT = join(process.cwd(), 'src/lib/magnetic-grid')
 const FILES = [
   'spec.ts',
   'compute.ts',
+  'compute/exact-real.ts',
+  'compute/centre-exact.ts',
   'compute/seat.ts',
   'compute/centre-evidence.ts',
   'logic.ts',
@@ -20,10 +22,12 @@ describe('magnetic-grid T1 separation', () => {
   it('is portable and imports only along the declared DAG', () => {
     const allowed: Record<(typeof FILES)[number], readonly string[]> = {
       'spec.ts': [],
-      'compute.ts': ['./compute/seat', './compute/centre-evidence'],
+      'compute.ts': ['./compute/exact-real', './compute/centre-exact', './compute/seat', './compute/centre-evidence'],
+      'compute/exact-real.ts': ['../spec'],
+      'compute/centre-exact.ts': ['../spec', './exact-real'],
       'compute/seat.ts': ['../spec'],
       'compute/centre-evidence.ts': ['../spec', './seat'],
-      'logic.ts': ['./spec'],
+      'logic.ts': ['./spec', './compute'],
       'engine.ts': ['./compute', './logic', './spec'],
     }
     for (const file of FILES) {

@@ -4,6 +4,45 @@ export type Pt = [number, number]
 export type PointMM = readonly [number, number]
 export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
 
+export type ExactInteger = string
+export interface Rational { numerator: ExactInteger; denominator: ExactInteger }
+export interface AlgebraicReal {
+  polynomial: readonly ExactInteger[]
+  isolating: readonly [Rational, Rational]
+  rootIndex: number
+}
+export type ExactReal = Rational | AlgebraicReal
+export interface ExactPoint { x: ExactReal; y: ExactReal; approximateMM: PointMM }
+export interface ExactCentreRegion {
+  id: string
+  centre: ExactPoint
+  area: ExactReal
+  peakClear: ExactReal
+  upperHalf: boolean
+}
+export interface ExactCentreEvidence {
+  id: string
+  box: ExactPoint
+  core: ExactPoint | null
+  weight: ExactPoint
+  regions: readonly ExactCentreRegion[]
+  masses: readonly ExactCentreRegion[]
+}
+export interface ExactCentreInput {
+  contour: Contour
+  policy: CentrePolicy
+}
+export interface ExactCentreDecision {
+  policy: CentrePolicy
+  target: ExactPoint
+  branch: 'box' | 'core' | 'weight' | 'deep' | 'top' | 'mass'
+  evidenceId: string
+  regionId: string | null
+}
+export type ExactCentreEvaluation =
+  | { status: 'lawful'; decisions: readonly [ExactCentreDecision, ...ExactCentreDecision[]] }
+  | { status: 'refused'; decisions: readonly []; code: 'CENTRE_EVIDENCE_MISSING' | 'CENTRE_EVIDENCE_UNRESOLVED' | 'CENTRE_MATERIAL_INVALID' }
+
 export interface Ring { pts: Pt[] }
 export interface Contour { outer: Ring; holes: Ring[] }
 

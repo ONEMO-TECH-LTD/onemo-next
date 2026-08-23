@@ -4,10 +4,75 @@ import type {
   CentreDecision,
   CentreMeasurements,
   CentrePolicy,
+  ExactCentreDecision,
+  ExactCentreEvaluation,
+  ExactCentreEvidence,
+  ExactCentreRegion,
   Governor,
   ParityCandidateMeasurement,
   Pt,
 } from './spec'
+import { compareExact } from './compute'
+
+function exactDecision(
+  policy: CentrePolicy,
+  target: ExactCentreDecision['target'],
+  branch: ExactCentreDecision['branch'],
+  evidenceId: string,
+  regionId: string | null,
+): ExactCentreDecision {
+  return { policy, target, branch, evidenceId, regionId }
+}
+
+function tiedExtrema(
+  values: readonly ExactCentreRegion[],
+  valueOf: (value: ExactCentreRegion) => ExactCentreRegion['area'],
+  direction: 'min' | 'max',
+): readonly ExactCentreRegion[] | null {
+  if (!values.length) return []
+  try {
+    let selected: ExactCentreRegion[] = [values[0]]
+    for (const value of values.slice(1)) {
+      const comparison = compareExact(valueOf(value), valueOf(selected[0]))
+      const wins = direction === 'min' ? comparison < 0 : comparison > 0
+      if (wins) selected = [value]
+      else if (comparison === 0) selected.push(value)
+    }
+    return selected
+  } catch {
+    return null
+  }
+}
+
+export function evaluateExactCentrePolicy(evidence: ExactCentreEvidence, policy: CentrePolicy): ExactCentreEvaluation {
+  const direct = (target: ExactCentreDecision['target'] | null, branch: ExactCentreDecision['branch']): ExactCentreEvaluation =>
+    target
+      ? { status: 'lawful', decisions: [exactDecision(policy, target, branch, evidence.id, null)] }
+      : { status: 'refused', decisions: [], code: 'CENTRE_EVIDENCE_MISSING' }
+  if (policy.mode === 'box') return direct(evidence.box, 'box')
+  if (policy.mode === 'core') return direct(evidence.core, 'core')
+  if (policy.mode === 'weight') return direct(evidence.weight, 'weight')
+
+  let candidates: readonly ExactCentreRegion[] | null
+  if (policy.mode === 'deep') candidates = tiedExtrema(evidence.regions, (region) => region.peakClear, 'max')
+  else if (policy.mode === 'top') candidates = tiedExtrema(evidence.masses, (mass) => mass.centre.y, 'max')
+  else if (policy.governor === 'smallest') candidates = tiedExtrema(evidence.masses, (mass) => mass.area, 'min')
+  else if (policy.governor === 'deepest') candidates = tiedExtrema(evidence.masses, (mass) => mass.peakClear, 'max')
+  else if (policy.governor === 'top') candidates = tiedExtrema(evidence.masses, (mass) => mass.centre.y, 'max')
+  else {
+    const upper = evidence.masses.filter((mass) => mass.upperHalf)
+    candidates = upper.length
+      ? tiedExtrema(upper, (mass) => mass.area, 'min')
+      : tiedExtrema(evidence.masses, (mass) => mass.centre.y, 'max')
+  }
+  if (candidates === null) return { status: 'refused', decisions: [], code: 'CENTRE_EVIDENCE_UNRESOLVED' }
+  if (!candidates.length) return { status: 'refused', decisions: [], code: 'CENTRE_EVIDENCE_MISSING' }
+  const branch = policy.mode === 'deep' ? 'deep' : policy.mode === 'top' ? 'top' : 'mass'
+  return {
+    status: 'lawful',
+    decisions: candidates.map((candidate) => exactDecision(policy, candidate.centre, branch, evidence.id, candidate.id)) as [ExactCentreDecision, ...ExactCentreDecision[]],
+  }
+}
 
 export function governMass<M extends { areaMM2: number; centreMM: Pt; peakClearMM?: number }>(
   masses: ReadonlyArray<M>, governor: Governor, midY?: number,
