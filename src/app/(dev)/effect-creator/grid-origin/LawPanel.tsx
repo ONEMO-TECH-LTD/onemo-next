@@ -1,10 +1,6 @@
 'use client'
 
-// grid-origin — the v3.5 magnetic-grid bench (2D vector).
-// ALL engine shape sources through contourFromShape → computeGrid, rendered true-to-scale:
-//   • Presets    — shape-library getShape() (baked vector data)
-//   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
-//   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
+// All shape sources enter through magnetic-grid-bridge; the worker calls the isolated engine; this file owns controls and rendering only.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
@@ -37,8 +33,13 @@ type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: stri
 function usePersisted(key: string, initial: number): [number, (n: number) => void] {
   const [v, setV] = useState(initial)
   useEffect(() => {
-    const raw = localStorage.getItem('magnetic-grid.compare.v1.' + key)
-    if (raw !== null && Number.isFinite(+raw)) setV(+raw)
+    let live = true
+    queueMicrotask(() => {
+      if (!live) return
+      const raw = localStorage.getItem('magnetic-grid.compare.v1.' + key)
+      if (raw !== null && Number.isFinite(+raw)) setV(+raw)
+    })
+    return () => { live = false }
   }, [key])
   const set = (n: number) => { setV(n); try { localStorage.setItem('magnetic-grid.compare.v1.' + key, String(n)) } catch { } }
   return [v, set]
@@ -568,14 +569,26 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
   // px→mm uses the RENDERED size, so gestures stay true when the canvas shrinks on a phone.
   const svgRef = useRef<SVGSVGElement>(null)
   const dragAt = useRef<{ x: number; y: number } | null>(null)
-  const [pend, setPend] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [dragging, setDragging] = useState(false)
+  const [pend, setPend] = useState({ x: 0, y: 0 })
   const pendRef = useRef(pend)
-  pendRef.current = pend
+  // The pending pan is updated synchronously in handlers (state + ref together): pointer-up or the
+  // wheel timer may commit before any effect would observe the newest delta.
+  const updatePend = (next: (p: typeof pend) => typeof pend) => {
+    const value = next(pendRef.current)
+    pendRef.current = value
+    setPend(value)
+  }
+  const resetPend = () => {
+    const zero = { x: 0, y: 0 }
+    pendRef.current = zero
+    setPend(zero)
+  }
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commit = () => {
     const p = pendRef.current
     if (p.x || p.y) onPan(p.x, p.y)
-    setPend({ x: 0, y: 0 })
+    resetPend()
   }
   const pxPerMM = (el: Element) => el.getBoundingClientRect().width / (VP / S)
   useEffect(() => {
@@ -588,7 +601,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
       e.preventDefault()
       const k = pxPerMM(svg)
       if (e.ctrlKey) { onZoom(Math.exp(-e.deltaY * 0.01)); return }
-      setPend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
+      updatePend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
       if (wheelTimer.current) clearTimeout(wheelTimer.current)
       wheelTimer.current = setTimeout(commit, 250)
     }
@@ -611,17 +624,18 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
 
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
-      style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
-      onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture?.(e.pointerId) }}
+      style={{ cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
+      onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; setDragging(true); e.currentTarget.setPointerCapture?.(e.pointerId) }}
       onPointerMove={(e) => {
         if (!dragAt.current) return
         const k = pxPerMM(e.currentTarget)
         const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
         dragAt.current = { x: e.clientX, y: e.clientY }
-        setPend((p) => ({ x: p.x + mx, y: p.y - my }))
+        updatePend((p) => ({ x: p.x + mx, y: p.y - my }))
       }}
-      onPointerUp={() => { dragAt.current = null; commit() }}
-      onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
+      onPointerUp={() => { dragAt.current = null; setDragging(false); commit() }}
+      onPointerCancel={() => { dragAt.current = null; setDragging(false); commit() }}
+      onDoubleClick={() => { resetPend(); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
@@ -718,8 +732,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
             fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
             stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
             strokeWidth={sw} />
-          {/* The allowance made visible — the invisible margin every disc wears under the
-              contact law. The edge pressing against THIS ring is what the engine calls fit. */}
+          {/* Applied allowance ring for held spots; it visualizes the granted whole-mm reach, not a contact proof. */}
           {sp.held && marginMM > 0 &&
             <circle cx={sp.x} cy={-sp.y} r={sp.r + marginMM} fill="var(--mag8)" fillOpacity={0.05}
               stroke="var(--mag8)" strokeOpacity={0.55} strokeWidth={0.4} strokeDasharray="2.4 1.8" />}
@@ -732,7 +745,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
       })}
-      {/* Tangency made visible: where a disc touches the outline within the allowance. */}
+      {/* Wrap witnesses made visible: each belt disc's nearest outline point on a lawful result. */}
       {grid.contactsMM.map((c, i) => {
         const p = fy(c)
         return <circle key={'t' + i} cx={p[0]} cy={p[1]} r={0.9} fill="var(--pass)" stroke="var(--panel)" strokeWidth={0.3} />
