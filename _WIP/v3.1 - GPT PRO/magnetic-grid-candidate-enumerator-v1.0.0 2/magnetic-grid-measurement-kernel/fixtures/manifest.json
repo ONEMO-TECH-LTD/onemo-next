@@ -1,0 +1,81 @@
+{
+  "lattice": [
+    {
+      "name": "boundary-exact",
+      "input": "inputs/disc-boundary-exact.json",
+      "expected": "expected/disc-boundary-exact.canonical.json"
+    },
+    {
+      "name": "near-tangency-minus-one",
+      "input": "inputs/disc-near-tangency-minus-one.json",
+      "expected": "expected/disc-near-tangency-minus-one.canonical.json"
+    },
+    {
+      "name": "near-tangency-plus-one",
+      "input": "inputs/disc-near-tangency-plus-one.json",
+      "expected": "expected/disc-near-tangency-plus-one.canonical.json"
+    },
+    {
+      "name": "winding-invariance",
+      "input": "inputs/disc-invariance-winding.json",
+      "expected": "expected/disc-boundary-exact.canonical.json"
+    },
+    {
+      "name": "start-index-invariance",
+      "input": "inputs/disc-invariance-start-index.json",
+      "expected": "expected/disc-boundary-exact.canonical.json"
+    },
+    {
+      "name": "source-translation-invariance",
+      "input": "inputs/disc-invariance-source-translation.json",
+      "expected": "expected/disc-boundary-exact.canonical.json"
+    },
+    {
+      "name": "concave-support",
+      "input": "inputs/disc-concave-support.json",
+      "expected": "expected/disc-concave-support.canonical.json"
+    },
+    {
+      "name": "rational-transform-and-origin",
+      "input": "inputs/disc-rational-transform.json",
+      "expected": "expected/disc-rational-transform.canonical.json"
+    }
+  ],
+  "straightCapsule": [
+    {
+      "name": "boundary-exact",
+      "input": "inputs/capsule-boundary-exact.json",
+      "expected": "expected/capsule-boundary-exact.canonical.json"
+    },
+    {
+      "name": "near-tangency-minus-one",
+      "input": "inputs/capsule-near-tangency-minus-one.json",
+      "expected": "expected/capsule-near-tangency-minus-one.canonical.json"
+    },
+    {
+      "name": "near-tangency-plus-one",
+      "input": "inputs/capsule-near-tangency-plus-one.json",
+      "expected": "expected/capsule-near-tangency-plus-one.canonical.json"
+    },
+    {
+      "name": "concave-centreline-crossing",
+      "input": "inputs/capsule-concave-crossing.json",
+      "expected": "expected/capsule-concave-crossing.canonical.json"
+    },
+    {
+      "name": "side-boundary-exact",
+      "input": "inputs/capsule-side-boundary-exact.json",
+      "expected": "expected/capsule-side-boundary-exact.canonical.json"
+    },
+    {
+      "name": "side-near-tangency-minus-one",
+      "input": "inputs/capsule-side-near-tangency-minus-one.json",
+      "expected": "expected/capsule-side-near-tangency-minus-one.canonical.json"
+    },
+    {
+      "name": "side-near-tangency-plus-one",
+      "input": "inputs/capsule-side-near-tangency-plus-one.json",
+      "expected": "expected/capsule-side-near-tangency-plus-one.canonical.json"
+    }
+  ]
+}
