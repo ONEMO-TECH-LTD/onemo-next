@@ -18,4 +18,15 @@ Builder: s62-kai-lead · 2026-08-23 · branch `session62-task/grid-v3.5.3-build`
 
 ## Contract trace
 
-§5.1 values (`SIZE_STEP_MM`, four `BANDS`), §6 "Free size · any even size (slider snaps to 2 mm)", §8 S1 row. Not in S1 by design: `CONTACT_TOLERANCE_MM`/bisection/`below` (S3).
+§5.1 values, §6 Free even-size control and §8 S1 are complete through QA remediation e3b6bc3e. Only legacy below ownership remains for S3.
+
+## QA remediation adopted
+
+Commit `e3b6bc3e` deletes `CONTACT_TOLERANCE_MM`, its import and the complete fractional bisection; the interim band path now publishes only the lawful even sample already evaluated. The biting 0.7-aspect rectangle fixture proves B1 publishes `1@36`, never the former `34.3125mm` refinement.
+
+Adopted-head gates: `tsc --noEmit` clean · `vitest src/lib/magnetic-grid`: 6 files / 28 tests pass · `eslint src/lib/magnetic-grid`: clean · diff-check/status clean.
+
+## Gate record
+
+- QA `/tmp/s62-grid-qa-s1-review.md`: blocking S1-a replaced by the deletion above (adopted exactly → `e3b6bc3e`); S1-b, S1-c approved; adopted head verified.
+- Meta `/tmp/s62-grid-meta-s1-gate.md`: QA patch accepted exactly; S1-b, S1-c approved; S2-a/b/c pre-approved with constraints (S2-b master clarification applied at plan commit `948bfa54`).
