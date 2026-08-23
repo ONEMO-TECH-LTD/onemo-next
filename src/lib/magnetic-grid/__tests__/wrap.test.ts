@@ -105,6 +105,19 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(evaluateWrap(mutated, { mode: 'fixed', allowanceMM: 0 })).toMatchObject({ requiredFlapMM: null })
   })
 
+  it('refuses a malformed or non-finite hole as an invalid complete boundary', () => {
+    const invalidHoles: Contour['holes'] = [
+      { pts: [[0, 0], [1, 0]] },
+      { pts: [[0, 0], [1, 0], [Number.NaN, 1]] },
+    ]
+    for (const hole of invalidHoles) {
+      expect(measureWrap({ ...square(24), holes: [hole] }, [[0, 0]], 48, 4).wrapMeasurement).toEqual({
+        status: 'refused', requiredFlapMM: null, witnesses: [],
+        refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'invalid-boundary' },
+      })
+    }
+  })
+
   it('Coverage changes the output population only; the seated set, belt and every witness are identical', () => {
     const perimeter = computeGrid(square(120), { ...fixed0, perimeterOnly: true })
     const full = computeGrid(square(120), { ...fixed0, perimeterOnly: false })
