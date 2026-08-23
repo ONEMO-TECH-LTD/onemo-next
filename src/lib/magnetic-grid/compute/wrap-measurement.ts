@@ -18,7 +18,10 @@ export function measureWrap(
     seated, belt: [],
     wrapMeasurement: { status: 'refused', requiredFlapMM: null, witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason } },
   })
-  if (contour.outer.pts.length < 3) return refused([], 'invalid-boundary')
+  const rings = [contour.outer, ...contour.holes]
+  if (rings.some((ring) => ring.pts.length < 3 || ring.pts.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y)))) {
+    return refused([], 'invalid-boundary')
+  }
   const records = lattice
     .map((node) => {
       const nearest = nearestOutlineMM(contour, node)
