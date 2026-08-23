@@ -36,8 +36,8 @@ function bodies(file: string, disposition: Disposition, names: readonly string[]
   for (const name of names) bodyDispositions.set(`${file}#${name}`, disposition)
 }
 
-bodies(RUNTIME_FILES[1], 'MOVE-VERBATIM', ['bbox', 'axisFrom', 'latticeAt', 'latticeOver', 'centroidOf', 'scaleContour'])
 bodies(RUNTIME_FILES[1], 'ADAPT', [
+  'bbox', 'axisFrom', 'latticeAt', 'latticeOver', 'centroidOf', 'scaleContour',
   'makeSeatPredicate', 'maxPressMM', 'impliedFlapMM', 'splitPerimeter',
 ])
 bodies(RUNTIME_FILES[1], 'DELETE-LATER', [
@@ -49,10 +49,12 @@ bodies(RUNTIME_FILES[1], 'DELETE-LATER', [
 bodies(RUNTIME_FILES[2], 'ADAPT', ['bandOf', 'governMass', 'centeringAnchors', 'applyCoverage', 'assignSizes'])
 bodies(RUNTIME_FILES[2], 'DELETE-LATER', ['registrationScore', 'centeringRef'])
 bodies(RUNTIME_FILES[3], 'ADAPT', [
-  'mod', 'parityHolds', 'lines', 'onNode', 'computeGrid', 'clsOf', 'snapRange', 'bandSnapPoints',
-  'bandWalk', 'solve', 'pressAt', 'fitSizeInBand', 'autoFlapInBand',
+  'mod', 'parityHolds', 'lines', 'onNode', 'clsOf', 'bandWalk', 'autoFlapInBand',
 ])
-bodies(RUNTIME_FILES[3], 'DELETE-LATER', ['phases', 'push', 'fitsM'])
+bodies(RUNTIME_FILES[3], 'DELETE-LATER', [
+  'computeGrid', 'snapRange', 'bandSnapPoints', 'solve', 'pressAt', 'fitSizeInBand',
+  'phases', 'push', 'fitsM',
+])
 bodies(RUNTIME_FILES[4], 'ADAPT', ['makeSizer', 'fieldSpots', 'seatedSpots'])
 bodies(RUNTIME_FILES[4], 'PRESERVE-COMPARATOR', ['bboxOf', 'normBaseContour', 'normMaskContour', 'normGeneratedRing'])
 bodies(RUNTIME_FILES[4], 'DELETE-LATER', ['sizeRange'])
@@ -65,6 +67,26 @@ bodies(RUNTIME_FILES[6], 'PRESERVE-COMPARATOR', [
 bodies(RUNTIME_FILES[7], 'PRESERVE-COMPARATOR', ['readModule', 'pageText', 'walkAst', 'go', 'importsOf', 'collect', 'findBareLawValue', 'square'])
 bodies(RUNTIME_FILES[8], 'PROVEN-UNRELATED', ['GET'])
 bodies(RUNTIME_FILES[10], 'PROVEN-UNRELATED', ['GET'])
+
+const adaptContracts = new Map<string, { destination: string; fixture: string }>()
+function adapted(file: string, names: readonly string[], destination: string, fixture: string) {
+  for (const name of names) adaptContracts.set(`${file}#${name}`, { destination, fixture })
+}
+
+adapted(RUNTIME_FILES[1], ['bbox', 'axisFrom', 'latticeAt', 'latticeOver'], 'src/lib/magnetic-grid/compute/seat.ts', 'grid-origin-adapt-baseline: bbox/lattice numeric compatibility')
+adapted(RUNTIME_FILES[1], ['centroidOf'], 'src/lib/magnetic-grid/compute/centre-evidence.ts', 'grid-origin-adapt-baseline: single-ring centroid + hole defect')
+adapted(RUNTIME_FILES[1], ['scaleContour'], 'src/lib/magnetic-grid/compute/seat.ts as scaleBoundary', 'grid-origin-adapt-baseline: scale + hole-loss defect')
+adapted(RUNTIME_FILES[1], ['makeSeatPredicate'], 'src/lib/magnetic-grid/compute/seat.ts', 'grid-origin-adapt-baseline: tangent/inside/outside seat predicate')
+adapted(RUNTIME_FILES[1], ['maxPressMM', 'impliedFlapMM'], 'src/lib/magnetic-grid/compute/contact-root.ts', 'grid-origin-adapt-baseline: worst-belt allowance equivalence')
+adapted(RUNTIME_FILES[1], ['splitPerimeter'], 'src/lib/magnetic-grid/compute/seat.ts neighbour measurement', 'grid-origin-adapt-baseline: belt/interior partition')
+adapted(RUNTIME_FILES[2], ['bandOf'], 'src/lib/magnetic-grid/logic.ts band membership', 'grid-origin-adapt-baseline: exact band boundaries')
+adapted(RUNTIME_FILES[2], ['governMass', 'centeringAnchors'], 'src/lib/magnetic-grid/logic.ts centre policy', 'grid-origin-centre-baseline: 288 raw-bit centre decisions + direct governors')
+adapted(RUNTIME_FILES[2], ['applyCoverage', 'assignSizes'], 'src/lib/magnetic-grid/logic.ts coverage/magnet policy', 'grid-origin-adapt-baseline: coverage and magnet-plan outputs')
+adapted(RUNTIME_FILES[3], ['mod', 'parityHolds', 'lines', 'onNode', 'clsOf'], 'src/lib/magnetic-grid/logic.ts parity law', 'grid-origin-centre-baseline: 288 raw-bit phase/anchor outcomes')
+adapted(RUNTIME_FILES[3], ['bandWalk'], 'compute/contact-root.ts roots + logic.ts ownership + engine.ts sequencing', 'grid-origin-adapt-baseline: first-count/no-repeat ladder behavior')
+adapted(RUNTIME_FILES[3], ['autoFlapInBand'], 'src/lib/magnetic-grid/logic.ts exact minimum allowance', 'grid-origin-adapt-baseline: Auto whole-mm compatibility')
+adapted(RUNTIME_FILES[4], ['makeSizer'], 'src/lib/effect/magnetic-grid-bridge.ts', 'grid-origin-adapt-baseline: supplied-contour scaling identity')
+adapted(RUNTIME_FILES[4], ['fieldSpots', 'seatedSpots'], 'src/lib/effect/magnetic-grid-bridge.ts view mapping', 'grid-origin-adapt-baseline: field/seated view outputs')
 
 function sha256(text: string | Buffer): string {
   return createHash('sha256').update(text).digest('hex')
@@ -96,21 +118,15 @@ function callableBodies(file: string): string[] {
 }
 
 function bodyDestination(id: string, disposition: Disposition): string {
-  if (disposition === 'MOVE-VERBATIM') {
-    if (/#centroidOf$/.test(id)) return 'src/lib/magnetic-grid/compute/centre-evidence.ts'
-    if (/#scaleContour$/.test(id)) return 'src/lib/magnetic-grid/compute/seat.ts as scaleBoundary, re-exported by compute.ts'
-    return 'src/lib/magnetic-grid/compute/seat.ts'
+  if (disposition === 'ADAPT') {
+    const contract = adaptContracts.get(id)
+    if (!contract) throw new Error(`ADAPT body lacks explicit destination ${id}`)
+    return contract.destination
   }
   if (disposition === 'PRESERVE-COMPARATOR') return 'current comparator only; no Law destination'
   if (disposition === 'PROVEN-UNRELATED') return 'existing dev-loader owner'
   if (disposition === 'DELETE-LATER') return 'no Law destination'
-  if (/grid-origin-bridge/.test(id)) return 'src/lib/effect/magnetic-grid-bridge.ts'
-  if (/grid-origin-logic/.test(id)) return 'src/lib/magnetic-grid/logic.ts; neutral arithmetic re-roomed to compute where contracted'
-  if (/safeSegments|signed|snapToIso|smoothLoop|#level|#at0|#compAt|#at$|centeringAnchors|governMass/.test(id)) return 'compute/centre-evidence.ts measurement plus logic.ts policy'
-  if (/contact|Press|Flap|bandWalk|bandSnap|fitSize|pressAt/.test(id)) return 'compute/contact-root.ts measurement plus logic.ts law plus engine.ts sequencing'
-  if (/splitPerimeter|applyCoverage|assignSizes/.test(id)) return 'compute/seat.ts measurement plus logic.ts policy'
-  if (/parityHolds|#lines|#onNode|#clsOf/.test(id)) return 'logic.ts parity law over compute evidence'
-  return 'src/lib/magnetic-grid compute/logic/engine according to the R14 untangle map'
+  throw new Error(`body lacks explicit destination ${id}`)
 }
 
 function bodyProof(id: string, disposition: Disposition): string {
@@ -118,10 +134,12 @@ function bodyProof(id: string, disposition: Disposition): string {
   if (disposition === 'PRESERVE-COMPARATOR') return 'runtime file SHA pinned through T5; no Law copy'
   if (disposition === 'PROVEN-UNRELATED') return 'asset route has no magnetic-grid law authority'
   if (disposition === 'DELETE-LATER') return 'R14 forbidden/deletion list; provider deletion waits for T7 zero-consumer proof'
-  if (/centering|governMass|parityHolds|#lines|#onNode|#clsOf|computeGrid/.test(id)) {
-    return 'raw-IEEE grid-origin-centre-baseline fixture; T1 pre-room and post-room equality; named defect allowlist only'
+  if (disposition === 'ADAPT') {
+    const contract = adaptContracts.get(id)
+    if (!contract) throw new Error(`ADAPT body lacks executable fixture ${id}`)
+    return contract.fixture
   }
-  return 'T1 characterization/equivalence fixture against this frozen donor before adapted body enters Law'
+  throw new Error(`body lacks proof ${id}`)
 }
 
 function exportedSymbols(file: string): string[] {
@@ -278,6 +296,8 @@ describe('v3.5 T0 inventory is exhaustive', () => {
     const actual = RUNTIME_FILES.flatMap((file) => callableBodies(file).map((name) => `${file}#${name}`)).sort()
     const classified = [...bodyDispositions.keys()].sort()
     expect(classified).toEqual(actual)
+    expect([...bodyDispositions.entries()].filter(([, disposition]) => disposition === 'ADAPT').map(([id]) => id).sort())
+      .toEqual([...adaptContracts.keys()].sort())
     expect(actual.map((id) => {
       const disposition = bodyDispositions.get(id)!
       const [file, name] = id.split('#')
@@ -293,23 +313,15 @@ describe('v3.5 T0 inventory is exhaustive', () => {
     })).toMatchSnapshot()
   })
 
-  it('pins neutral MOVE candidates by behavior as well as exact function text', () => {
-    const moveDestinations = Object.fromEntries([...bodyDispositions.entries()]
-      .filter(([, disposition]) => disposition === 'MOVE-VERBATIM')
-      .map(([id, disposition]) => [id.split('#')[1], bodyDestination(id, disposition)]))
-    expect(moveDestinations).toEqual({
-      bbox: 'src/lib/magnetic-grid/compute/seat.ts',
-      axisFrom: 'src/lib/magnetic-grid/compute/seat.ts',
-      latticeAt: 'src/lib/magnetic-grid/compute/seat.ts',
-      latticeOver: 'src/lib/magnetic-grid/compute/seat.ts',
-      centroidOf: 'src/lib/magnetic-grid/compute/centre-evidence.ts',
-      scaleContour: 'src/lib/magnetic-grid/compute/seat.ts as scaleBoundary, re-exported by compute.ts',
-    })
+  it('characterizes numeric donor behavior without certifying it as final MOVE', () => {
+    expect([...bodyDispositions.values()].filter((disposition) => disposition === 'MOVE-VERBATIM')).toEqual([])
     expect(bbox([[3, -2], [-4, 8], [1, 5]])).toEqual({ minX: -4, minY: -2, maxX: 3, maxY: 8 })
     expect(latticeAt({ minX: 0, minY: 0, maxX: 48, maxY: 48 }, 48, 24, 24)).toEqual([[24, 24]])
     expect(centroidOf([[0, 0], [6, 0], [0, 6]])).toEqual([2, 2])
     expect(scaleContour({ outer: { pts: [[0, 0], [1, 0], [1, 0.5]] }, holes: [] }, 96))
       .toEqual({ outer: { pts: [[0, 0], [96, 0], [96, 48]] }, holes: [] })
+    expect(scaleContour({ outer: { pts: [[0, 0], [1, 0], [1, 1]] }, holes: [{ pts: [[0.2, 0.2], [0.3, 0.2], [0.2, 0.3]] }] }, 96).holes)
+      .toEqual([])
   })
 
   it('classifies every top-level symbol and records every public export and re-export', () => {

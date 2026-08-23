@@ -28,23 +28,23 @@ Only bodies reachable from `positioning===1` may seed the Law centre layer. Voti
 | `centeringAnchors` | `grid-origin-logic.ts:75-105` | ADAPT accepted policy behavior; DELETE mesh-derived ruler | all nine-policy characterization; only named ruler defects may differ |
 | `parityHolds` | `grid-origin.ts:134-143` | ADAPT/RE-ROOM | node/gap parity fixture |
 | Centre-rules four placements and ranking | `grid-origin.ts:190-220` | ADAPT/RE-ROOM | pre-room/post-room characterization equality |
-| `bbox` | `grid-origin-compute.ts:16-20` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + neutral fixture |
-| `axisFrom` | `grid-origin-compute.ts:36-43` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + lattice fixture |
-| `latticeAt` | `grid-origin-compute.ts:46-51` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + lattice fixture |
-| `latticeOver` | `grid-origin-compute.ts:54-56` | MOVE-VERBATIM → `compute/seat.ts` | executable AST hash + lattice fixture |
+| `bbox` | `grid-origin-compute.ts:16-20` | ADAPT numeric points → exact points in `compute/seat.ts` | numeric compatibility fixture + exact replacement proof |
+| `axisFrom` | `grid-origin-compute.ts:36-43` | ADAPT: delete ±1e-6 gates; exact lattice arithmetic in `compute/seat.ts` | lattice compatibility fixture + exact boundary cases |
+| `latticeAt` | `grid-origin-compute.ts:46-51` | ADAPT to exact points in `compute/seat.ts` | lattice compatibility fixture + exact replacement proof |
+| `latticeOver` | `grid-origin-compute.ts:54-56` | ADAPT to exact points in `compute/seat.ts` | lattice compatibility fixture + exact replacement proof |
 | segment seat predicate | `grid-origin-compute.ts:182-207` | ADAPT into exact neutral kernel | equivalence on accepted non-defect cases; exact boundary owns differences |
-| `centroidOf` | `grid-origin-compute.ts:540-554` | MOVE-VERBATIM → `compute/centre-evidence.ts` | executable AST hash + centroid fixture |
-| `scaleContour` | `grid-origin-compute.ts:583-585` | MOVE-VERBATIM → `compute/seat.ts` as public `scaleBoundary` | executable AST hash + contour-scale fixture |
+| `centroidOf` | `grid-origin-compute.ts:540-554` | ADAPT: exact rational material centroid including holes in `compute/centre-evidence.ts` | single-ring compatibility + hole defect fixture |
+| `scaleContour` | `grid-origin-compute.ts:583-585` | ADAPT: exact scale preserving holes in `compute/seat.ts` as public `scaleBoundary` | scale compatibility + hole-loss defect fixture |
 
 The executable inventory in `grid-origin-inventory.test.ts` classifies every remaining callable body and top-level symbol individually. Its committed snapshot records every public export/re-export, runtime/test/build consumer, persisted key/default field, worker request/response/model field, queue rule, cache shape/cap/invalidation rule, and every tracked artifact under `grid-origin*` and `src/lib/grid-engine/**` with hash, active owner, destination, generated-source owner, legal disposition, and current deletion-proof state. The test fails if a callable body or top-level symbol is unclassified, if any inventory entry changes, or if a new consumer/artifact appears without a reviewed snapshot update.
 
-The executable AST extractor and its snapshot are the sole MOVE-body hash authority. T1 must use the same extractor to assert donor body hash equals copied body hash; prose does not duplicate hash values.
+T0 clears no numeric geometry body as final `MOVE-VERBATIM`: every candidate uses number representation, tolerance gates, single-ring assumptions, or hole loss incompatible with the final exact Law contracts. The canonical AST extractor remains the sole authority for the explicitly temporary numeric compatibility clone (`governMass`); T1 must use it for donor/copy equality before representation adaptation.
 
 The executable gate asserts that no duplicate inventory verifier or overlapping snapshot exists; `grid-origin-inventory.test.ts` is the sole inventory verifier.
 
-One concurrent untracked `grid-origin-t0-inventory.test.ts` briefly appeared during T0 and disappeared before ownership could be identified. Grid-Meta confirmed it neither created nor removed the duplicate, and also did not modify the surviving verifier. Ownership is recorded as unknown; the duplicate is not an authority.
+Gate violation record: this same `s62-grid-qa` thread launched an overlapping autonomous turn (`01a02017-f7a6-7a13-aaec-0298fa624ac8`) before clean T0. It created a duplicate verifier, then committed an out-of-order T1 batch as `3d521680` on the contaminated build branch. The duplicate disappeared; the turn was interrupted and recorded `turn_aborted`. That T1 commit is quarantined and NOT-CLEAR. This clean T0 repair branch starts at pre-T1 `bbfb2908`; its inventory and snapshots contain no product package.
 
-The surviving verifier also received concurrent disposition edits whose owner could not be identified. They were accepted only after an independent R14/current-source check: rejected mesh/tolerance/alternate-circle bodies delete; corrected worst-belt and belt semantics adapt; comparator shape adapters remain comparator-only; the Law bridge retains only pass-through sizing and field-view behavior.
+`grid-origin-adapt-baseline.test.ts` is the executable compatibility/defect fixture named by every ADAPT mapping outside the 288-case centre baseline. No ADAPT proof is future-tense prose.
 
 No deletion is currently proved. Comparator files and their T0 test consumers are preserved through T5. At T7/T8 the old-provider tests/snapshots must migrate to canonical-package tests or be deleted before the providers can die; a zero-consumer trace is mandatory. Active-lane artifacts remain blocked on Dan's lane-precedence ruling.
 
