@@ -15,16 +15,15 @@ import {
   SIZE_CEIL_MARGIN_MM,
   type BoundaryTruth,
   type GridResult,
-  type SolverConfig,
 } from '../magnetic-grid/engine'
 
 /** Full ordered-coordinate identity for worker/cache invalidation; no sampling or rounding. */
 export const contourIdentity = (contour: Contour): string => contourBoundaryTruth(contour).contourIdentity
 export const boundaryTruth = (contour: Contour): BoundaryTruth => contourBoundaryTruth(contour)
 
-/** Flatten reference and outline resolution are CALIBRATION, not constants (Dan, 2026-08-23):
- *  both change the supplied geometry and therefore the answers, so Spec owns them and the dash
- *  exposes them under Contour preparation. `SOLVER_DEFAULTS` carries the values used until now. */
+/** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
+ *  manufacturing tolerance holds at every slider size. */
+const FLATTEN_REF_MM = 250
 
 function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
@@ -33,18 +32,17 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
 }
 
 /** VShape → mm contour normalized so its longest side = 1mm, flattened at manufacturing scale. */
-export function normBaseContour(vs: VShape, maskHeightPx: number, flattenRefMM: number): Contour | null {
+export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | null {
   const rings = flattenShape(vs, 1)
   const bb = bboxOf(rings[0] ?? [])
   const L = Math.max(bb.w, bb.h, 1)
-  const c = contourFromShape(vs, { mmPerPx: flattenRefMM / L, maskHeightPx })
+  const c = contourFromShape(vs, { mmPerPx: FLATTEN_REF_MM / L, maskHeightPx })
   if (!c) return null
-  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / flattenRefMM, y / flattenRefMM] as Pt) }, holes: [] }
+  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt) }, holes: [] }
 }
 
-/** Sizer for one base contour: real-mm contour at any longest side, configured outline offset applied. */
-export function makeSizer(base: Contour, cfg: Pick<SolverConfig, 'outlineOffsetMM'>): (mm: number) => Contour {
-  const offsetMM = cfg.outlineOffsetMM
+/** Sizer for one base contour: real-mm contour at any longest side, outline offset applied. */
+export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Contour {
   return (mm: number): Contour => {
     const c = scaleContour(base, mm)
     if (!offsetMM) return c
@@ -60,10 +58,6 @@ export function makeSizer(base: Contour, cfg: Pick<SolverConfig, 'outlineOffsetM
 
 // Law surface door: UI values and types reach the tab through the bridge, never around it.
 export {
-  SOLVER_CONTROLS,
-  SOLVER_DEFAULTS,
-  validateSolverConfig,
-  type SolverControl,
   BANDS,
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
@@ -85,23 +79,22 @@ export {
   SIZE_STEP_MM,
   type BandId,
   type GridResult,
-  type SolverConfig,
   type MagnetPlan,
   type Placement,
-  type CountTier,
-  type LawLayout,
+  type Rung,
   type SafeSegment,
 } from '../magnetic-grid/engine'
 
 /** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour
  *  normalized to longest side = 1mm, y-up. No AI — the outline IS the mask's edge. */
-export function normMaskContour(mask: Uint8Array, w: number, h: number, maxVertices: number): Contour | null {
+export function normMaskContour(mask: Uint8Array, w: number, h: number): Contour | null {
   const raw = traceContourRaw(mask, w, h)
   if (!raw || raw.length < 3) return null
   // A raw half-pixel trace carries thousands of points; the engine's cost scales with them.
-  // Decimating changes the outline the laws are measured against, so the resolution is a
-  // configured value (Outline resolution), never a constant living here.
-  const k = Math.max(1, Math.ceil(raw.length / maxVertices))
+  // Decimate to the same order the AI path's flatten produces — sub-0.2mm fidelity at product
+  // sizes, ~10x cheaper solves.
+  const MAXV = 600
+  const k = Math.max(1, Math.ceil(raw.length / MAXV))
   const ring: typeof raw = []
   for (let i = 0; i < raw.length; i += k) ring.push(raw[i])
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity

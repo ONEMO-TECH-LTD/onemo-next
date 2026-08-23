@@ -51,75 +51,28 @@ const OWNERS = {
 
 /** Final v3.5.3 owner profile: frozen Centre + ruler Wrap + even-size scaling. */
 const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> = {
-  'magnetic-grid/spec.ts': ['validateSolverConfig'],
+  'magnetic-grid/spec.ts': [],
   'magnetic-grid/compute.ts': [],
   'magnetic-grid/compute/wrap-measurement.ts': ['measureWrap'],
   'magnetic-grid/compute/identity.ts': ['contourIdentity','contourBoundaryTruth'],
   'magnetic-grid/compute/seat.ts': [
-    'atLeast',
-    'axisFrom',
-    'bbox',
-    'big',
-    'centredRegistrations',
-    'edgeDistMM',
-    'edgeIdxOf',
-    'enumerateLayouts',
-    'fieldSpanMM',
-    'heldKeyOf',
-    'holds',
-    'latticeAt',
-    'latticeOver',
-    'locate',
-    'makeSeatPredicate',
-    'measureExtremeCorners',
-    'measureGroupRegion',
-    'measureOverhangs',
-    'measureParity',
-    'mod',
-    'nearestOutlineMM',
-    'onSegment',
-    'orient',
-    'pointInMaterial',
-    'pointInOuter',
-    'prepare',
-    'regionExtents',
-    'regionInMaterial',
-    'scaleContour',
-    'seatedNodesAt',
-    'segDist2',
-    'segmentsCross',
-    'splitPerimeter',
-    'spotRadiusOf',
+    'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
+    'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
+    'measureCentrePlacements', 'edgeIdxOf', 'segDist2', 'edgeDistMM', 'pointInOuter',
+    'pointInMaterial', 'nearestOutlineMM', 'makeSeatPredicate', 'pressExcessMM',
+    'measureParity', 'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
   ],
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
   'magnetic-grid/logic.ts': [
-    'bandOf',
-    'governMass',
-    'centeringAnchors',
-    'admitCentre',
-    'admitFit',
-    'recommendationRank',
-    'reduceCountTiers',
-    'applyCoverage',
-    'assignSizes',
+    'bandOf', 'governMass', 'centeringAnchors',
+    'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'inspectionConcessions', 'reduceBandLadders', 'bandRefusal', 'applyCoverage', 'assignSizes',
   ],
   'magnetic-grid/engine.ts': [
-    'computeGrid',
-    'solveBands',
-    'fitSizeInBand',
-    'mod',
+    'mod', 'computeGrid', 'wrapPolicyOf', 'solveBands', 'fitSizeInBand', 'autoFlapInBand',
   ],
   'effect/magnetic-grid-bridge.ts': [
-    'bboxOf',
-    'boundaryTruth',
-    'contourIdentity',
-    'fieldSpots',
-    'makeSizer',
-    'normBaseContour',
-    'normGeneratedRing',
-    'normMaskContour',
-    'seatedSpots',
-    'sizeRange',
+    'contourIdentity', 'boundaryTruth', 'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',
+    'sizeRange', 'fieldSpots', 'seatedSpots',
   ],
 }
 
@@ -188,28 +141,12 @@ const topLevelFunctionNames = (text: string): string[] => {
   return names
 }
 
-/** The only functions Spec may declare: the single ingress validator and its error type's members. */
-const SPEC_ALLOWED_FUNCTIONS = new Set(['validateSolverConfig'])
-/** Arrow functions are allowed only where they build the declared control catalogue. */
-const insideSpecDeclarations = (node: ts.Node): boolean => {
-  for (let cursor: ts.Node | undefined = node; cursor; cursor = cursor.parent) {
-    if (ts.isVariableDeclaration(cursor) && ts.isIdentifier(cursor.name)
-      && /^(SOLVER_CONTROLS|SOLVER_DEFAULTS)$/.test(cursor.name.text)) return true
-    if (ts.isFunctionDeclaration(cursor) && cursor.name && SPEC_ALLOWED_FUNCTIONS.has(cursor.name.text)) return true
-  }
-  return false
-}
-
 const ownerKindViolations = (file: keyof typeof OWNERS, text: string): string[] => {
   const violations: string[] = []
   walk(parse(text), (node) => {
-    // v3.5.4 (Dan, 2026-08-23): Spec is the SINGLE OWNER of every solver value — names, types,
-    // bounds, options, defaults — and therefore also owns the one strict ingress validator. It
-    // still owns no law and no geometry: the only function it may declare is the validator, and
-    // arithmetic may only derive one default from another (never judge a candidate).
     if (file === 'magnetic-grid/spec.ts') {
-      if (ts.isFunctionDeclaration(node) && node.name && !SPEC_ALLOWED_FUNCTIONS.has(node.name.text)) violations.push('spec-function')
-      if (ts.isFunctionExpression(node) || (ts.isArrowFunction(node) && !insideSpecDeclarations(node))) violations.push('spec-function')
+      if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) violations.push('spec-function')
+      if (ts.isBinaryExpression(node) && /[-+*/%]/.test(node.operatorToken.getText())) violations.push('spec-arithmetic')
     }
     if (file.startsWith('magnetic-grid/compute/') && ts.isIdentifier(node)) {
       if (/^(CentreMode|Governor|MagnetPlan|Coverage)$/.test(node.text)) violations.push(`compute-policy:${node.text}`)
@@ -290,7 +227,7 @@ describe('magnetic-grid current-phase owner DAG', () => {
     const panel=readRepo('src/app/(dev)/effect-creator/grid-origin/LawPanel.tsx'),worker=readRepo('src/app/(dev)/effect-creator/grid-origin/law.worker.ts')
     expect(panel).toContain('boundaryTruth: boundaryTruth(base)')
     expect(worker).toContain('boundaryTruth.contourIdentity!==contourIdentity(base)')
-    expect(worker).toContain('[boundaryTruth.contourIdentity, cfg.outlineOffsetMM, cfg.contourFlattenRefMM, cfg.contourMaxVertices]')
+    expect(worker).toContain('[boundaryTruth.contourIdentity, offsetMM]')
   })
   it('measures seat and Wrap from one signed clearance record in seat.ts geometry, nothing below the ruler',()=>{
     const contact=readRepo('src/lib/magnetic-grid/compute/wrap-measurement.ts'),logic=readRepo('src/lib/magnetic-grid/logic.ts')
@@ -300,9 +237,7 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(logic).not.toMatch(/compareExact|approx|toFixed/i)
   })
   it('solveBands is the only production loop over the even-size ladder; no second size walk anywhere',()=>{
-    // v3.5.4: the step is CONFIGURED, so the one loop advances by cfg.sizeStepMM — a second walk
-    // anywhere (or a re-introduced constant step) still fails this guard.
-    const loops=(text:string)=>(text.match(/\+=\s*(cfg|config)\.sizeStepMM|\+=\s*SIZE_STEP_MM/g)??[]).length
+    const loops=(text:string)=>(text.match(/\+=\s*SIZE_STEP_MM/g)??[]).length
     expect(loops(readRepo('src/lib/magnetic-grid/engine.ts'))).toBe(1)
     for(const file of LAW_RUNTIME_FILES.filter((f)=>!f.endsWith('engine.ts'))) expect(loops(readRepo(file)),`${file} walks sizes`).toBe(0)
     for(const file of LAW_RUNTIME_FILES) expect(identifiersOf(readRepo(file)).filter((n)=>/^(bandWalk|bandSnapPoints|snapRange|BandSnapPoint|solveCache|schedulePrefetch)$/.test(n)),`${file} carries a deleted walk identifier`).toEqual([])
@@ -326,9 +261,7 @@ describe('magnetic-grid current-phase owner DAG', () => {
       expect(fitIds, `fitSizeInBand calls ${forbidden}`).not.toContain(forbidden)
     }
 
-    // v3.5.4: a sub-window's belt is not the whole seated set's belt, so the engine derives it
-    // once per chosen layout, from the single Compute owner.
-    expect((engine.match(/splitPerimeter\(/g) ?? []).length, 'one belt derivation, one owner').toBe(1)
+    expect(identifiersOf(engine), 'engine recomputes the perimeter belt').not.toContain('splitPerimeter')
     expect(worker).toContain('cached.contoursBySize.get(eff)')
     expect(worker).toContain('cached.contoursBySize.get(band.minMM)')
     expect(worker).not.toMatch(/contour:\s*sized\(/)
@@ -342,20 +275,17 @@ describe('magnetic-grid current-phase owner DAG', () => {
     const idx = Function('rungSel', 'ladder', `return ${idxExpression}`)(-4, ladder)
     expect(idx).toBe(0)
     expect(Function('layoutSel', 'ladder', 'idx', `return ${layoutExpression}`)(-3, ladder, idx)).toBe(0)
-    expect(worker).toContain('const cfg = validateSolverConfig(rawCfg)')
-    expect(worker).toContain('solveBands(cachedSizer, cfg)')
+    expect(worker).toContain('autoFlapInBand(cachedSizer, cfg, autoFlapMaxMM)')
     expect(panel).toContain("model.grid.concessions.join(' + ')")
-    // v3.5.4: the panel holds ONE validated configuration and renders Spec's own control
-    // catalogue — no per-dial state, no local bound, no default of its own.
-    expect(panel).toContain('const [cfg, setField, resetConfig] = useSolverConfig()')
-    expect(panel).toContain('SOLVER_CONTROLS.filter')
-    expect(panel).toContain('validateSolverConfig({ ...SOLVER_DEFAULTS, ...JSON.parse(raw) })')
-    // the free-size limits are configuration now, and the snap reads the CONFIGURED step
-    expect(panel).toContain('const sizeMin = cfg.freeSizeMinMM')
-    expect(panel).toContain('const sizeMax = cfg.freeSizeMaxMM')
-    expect(panel).toContain("setField('freeSizeMinMM', n)")
-    expect(panel).toContain("setField('freeSizeMaxMM', n)")
-    expect(panel).toContain('Math.round(n / cfg.sizeStepMM) * cfg.sizeStepMM')
+    expect(panel).toContain("const [flapStored, setFlapStored] = usePersisted('flap', FLAP_MM)")
+    expect(panel).toContain('const flap = Math.round(flapStored)')
+    expect(panel).toContain('setFlapStored(Math.round(n))')
+    expect(panel).toContain("const [sizeMinStored, setSizeMinStored] = usePersisted('sizeMin', MIN_EFFECT_MM)")
+    expect(panel).toContain("const [sizeMaxStored, setSizeMaxStored] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)")
+    expect(panel).toContain('const sizeMin = evenMM(sizeMinStored)')
+    expect(panel).toContain('const sizeMax = evenMM(sizeMaxStored)')
+    expect(panel).toContain('setSizeMinStored(evenMM(n))')
+    expect(panel).toContain('setSizeMaxStored(evenMM(n))')
     expect(panel.match(/const n = evenMM\(\+e\.currentTarget\.value\)/g)).toHaveLength(2)
     expect(panel.match(/setSizeMM\(n\)/g)).toHaveLength(2)
     expect(panel.match(/setSizeMM\(evenMM\(n\)\)/g)).toHaveLength(1)
