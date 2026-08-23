@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { measureWrap } from '../compute/wrap-measurement'
 import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
-import { computeGrid } from '../engine'
+import { computeGrid, fitSizeInBand } from '../engine'
 import type { Contour, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
@@ -61,6 +61,15 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(miss.wrapMeasurement).toMatchObject({ status: 'refused', refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } })
   })
 
+  it('applies the same −0.49/−0.51 ruler thresholds at a hole boundary', () => {
+    const nearMiss = measureWrap(holed, [[0, 8.51]], 48, 4)
+    expect(nearMiss.seated).toEqual([[0, 8.51]])
+    expect(nearMiss.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 0 })
+    const miss = measureWrap(holed, [[0, 8.49]], 48, 4)
+    expect(miss.seated).toEqual([])
+    expect(miss.wrapMeasurement).toMatchObject({ status: 'refused', refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } })
+  })
+
   it('an anchor centre inside a hole or outside the ring is signed negative before the radius and never admitted', () => {
     const inHole = measureWrap(holed, [[0, 0]], 48, 4)
     expect(inHole.seated).toEqual([])
@@ -102,5 +111,11 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(full.anchors.length).toBeGreaterThan(perimeter.anchors.length)
     expect(full.wrap).toEqual(perimeter.wrap)
     expect(full.contactsMM).toEqual(perimeter.contactsMM)
+  })
+
+  it('the existing band caller returns the same Wrap verdict as direct fixed-size inspection', () => {
+    const sized = (side: number) => square(side)
+    const fit = fitSizeInBand(sized, fixed0, 24, 2)
+    expect(fit.grid.wrap).toEqual(computeGrid(sized(fit.sizeMM), fixed0).wrap)
   })
 })
