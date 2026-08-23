@@ -128,8 +128,11 @@ export function inspectionConcessions(parity: ParityMeasurement, wrap: WrapEvalu
  * otherwise-equal pair. No score, no fallback, no hidden winner.
  */
 export function reduceBandLadders(candidates: readonly PlacementCandidate[], policy: WrapPolicy): BandLadder[] {
-  const isHorizontal = (l: LawfulLayout) => l.candidate.placement.xHalf && !l.candidate.placement.yHalf
-  const isVertical = (l: LawfulLayout) => !l.candidate.placement.xHalf && l.candidate.placement.yHalf
+  // Orientation is what the magnets DO, not which phase moved: shifting the x phase puts the node
+  // line on the centre's x, so the magnets stack along y — a VERTICAL pair; shifting y gives a
+  // horizontal pair (F1 live finding, 2026-08-23: the first mapping was inverted).
+  const isVertical = (l: LawfulLayout) => l.candidate.placement.xHalf && !l.candidate.placement.yHalf
+  const isHorizontal = (l: LawfulLayout) => !l.candidate.placement.xHalf && l.candidate.placement.yHalf
   const gravityRank = (l: LawfulLayout) => (isVertical(l) ? 1 : isHorizontal(l) ? 2 : l.candidate.placement.xHalf ? 3 : 0)
   const ladders: BandLadder[] = []
   const owned = new Set<number>()

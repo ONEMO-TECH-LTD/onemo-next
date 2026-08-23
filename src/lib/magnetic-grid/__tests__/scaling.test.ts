@@ -43,7 +43,8 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
   })
 
   it('keeps every co-lawful placement; vertical eliminates horizontal on an otherwise-equal pair only', () => {
-    const h: Placement = { xHalf: true, yHalf: false }, v: Placement = { xHalf: false, yHalf: true }, both: Placement = { xHalf: true, yHalf: true }
+    // x-shifted phase → node line on the centre's x → magnets stack along y = VERTICAL; y-shifted = horizontal
+    const v: Placement = { xHalf: true, yHalf: false }, h: Placement = { xHalf: false, yHalf: true }, both: Placement = { xHalf: true, yHalf: true }
     const tie = reduceBandLadders([cand(72, 2, 0, { placement: h }), cand(72, 2, 0, { placement: v }), cand(72, 2, 0, { placement: both })], fixed)
     expect(tie[1].rungs[0].layouts.map((l) => l.candidate.placement)).toEqual([v, both])
     const unequal = reduceBandLadders([cand(72, 2, 0, { placement: h }), cand(72, 2, 1, { placement: v })], { mode: 'fixed', allowanceMM: 1 })
@@ -76,8 +77,10 @@ describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
   it('square: 1@24; 2 and 4@72; 8@120; 12@168 — all even, strictly increasing, no repeat', () => {
     const solved = solveBands(square, fixed0)
     expect(rungsOf(solved.bands)).toEqual([[[24, 1, 1]], [[72, 2, 1], [72, 4, 1]], [[120, 8, 1]], [[168, 12, 1]]])
-    // the 2-magnet rung is the vertical pair (horizontal eliminated by gravity)
-    expect(solved.bands[1].rungs[0].layouts[0].candidate.placement).toEqual({ xHalf: false, yHalf: true })
+    // the 2-magnet rung is the VERTICAL pair (x-shifted phase: magnets at (0, ±24)); the horizontal pair is eliminated by gravity
+    const pair = solved.bands[1].rungs[0].layouts[0].candidate
+    expect(pair.placement).toEqual({ xHalf: true, yHalf: false })
+    expect(pair.anchors.map((a) => a.p).sort((p, q) => p[1] - q[1])).toEqual([[0, -24], [0, 24]])
     expect(solved.gridsBySize.size).toBe(96)
     for (const size of solved.gridsBySize.keys()) expect(size % 2).toBe(0)
   })
