@@ -55,8 +55,12 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   // Opens on the B2 floor — the 72mm square standard (2×2), from spec.
   const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
   /** Free-slider limits — typed, persisted across reloads. */
-  const [sizeMin, setSizeMin] = usePersisted('sizeMin', MIN_EFFECT_MM)
-  const [sizeMax, setSizeMax] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
+  const [sizeMinStored, setSizeMinStored] = usePersisted('sizeMin', MIN_EFFECT_MM)
+  const [sizeMaxStored, setSizeMaxStored] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
+  const sizeMin = evenMM(sizeMinStored)
+  const sizeMax = evenMM(sizeMaxStored)
+  const setSizeMin = (n: number) => setSizeMinStored(evenMM(n))
+  const setSizeMax = (n: number) => setSizeMaxStored(evenMM(n))
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
   /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
@@ -423,11 +427,11 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>
                   <input key={'mn' + sizeMin} type="number" defaultValue={sizeMin}
-                    onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(evenMM(n)) } }}
+                    onBlur={(e) => { const n = evenMM(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(n) } }}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
                 <span className="gl-num"><i>max</i>
                   <input key={'mx' + sizeMax} type="number" defaultValue={sizeMax}
-                    onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(evenMM(n)) } }}
+                    onBlur={(e) => { const n = evenMM(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(n) } }}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
               </div>
             </div>}
