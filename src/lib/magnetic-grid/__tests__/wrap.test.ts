@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { measureWrap } from '../compute/wrap-measurement'
 import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
-import { bandSnapPoints, computeGrid, fitSizeInBand } from '../engine'
+import { computeGrid, solveBands } from '../engine'
 import type { Contour, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
@@ -127,19 +127,17 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(full.contactsMM).toEqual(perimeter.contactsMM)
   })
 
-  it('the interim band path publishes only evaluated even sizes', () => {
-    const sized = (mm: number): Contour => ({
-      outer: { pts: [[0, 0], [mm, 0], [mm, mm * 0.7], [0, mm * 0.7]] },
-      holes: [],
-    })
-    expect(bandSnapPoints(sized, {
-      pitchMM: 48, paddingMM: 12, flapMM: 4, centreMode: 0,
-    }, 24, 2)).toEqual([{ sizeMM: 36, count: 1 }])
-  })
-
-  it('the existing band caller returns the same Wrap verdict as direct fixed-size inspection', () => {
-    const sized = (side: number) => square(side)
-    const fit = fitSizeInBand(sized, fixed0, 24, 2)
-    expect(fit.grid.wrap).toEqual(computeGrid(sized(fit.sizeMM), fit.sizeMM, fixed0).wrap)
+  it('the band solve publishes only evaluated even sizes and agrees with direct fixed-size inspection', () => {
+    const sized = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm * 0.7], [0, mm * 0.7]] }, holes: [] })
+    const cfg = { pitchMM: 48, paddingMM: 12, flapMM: 4, centreMode: 0 }
+    const solved = solveBands(sized, cfg)
+    const b1 = solved.bands[0]
+    // all four placements are walked: the y-shifted placement seats the first magnet at 34 (the old single-placement walk only saw 36)
+    expect(b1.rungs.map((r) => [r.sizeMM, r.magnetCount])).toEqual([[34, 1]])
+    expect(b1.rungs[0].layouts[0].candidate.placement).toEqual({ xHalf: false, yHalf: true })
+    for (const band of solved.bands) for (const rung of band.rungs) {
+      expect(rung.sizeMM % 2).toBe(0)
+      expect(solved.gridsBySize.get(rung.sizeMM)!.wrap).toEqual(computeGrid(sized(rung.sizeMM), rung.sizeMM, cfg).wrap)
+    }
   })
 })

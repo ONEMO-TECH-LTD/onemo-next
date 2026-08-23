@@ -147,7 +147,6 @@ export interface GridConfig {
   centreMode?: number
   governor?: number
   segmentsDetail?: 'full' | 'light'
-  solveCache?: Map<number, GridResult>
   plan?: MagnetPlan
   perimeterOnly?: boolean
   wrapMode?: 'fixed' | 'auto'
@@ -194,4 +193,11 @@ export interface GridResult {
   candidates: PlacementCandidate[]
 }
 
-export interface BandSnapPoint { sizeMM: number; count: number }
+/** A placement Logic accepted: the candidate plus the one lawful Wrap verdict attached to it. */
+export interface LawfulLayout { candidate: PlacementCandidate; wrap: Extract<WrapEvaluation, { status: 'lawful' }> }
+/** One published magnet count: its band, its first accepted even size, every co-lawful layout (gravity-ordered). */
+export interface Rung { band: BandId; sizeMM: number; magnetCount: number; layouts: LawfulLayout[] }
+export type RefusalCode = 'NO_CENTRE' | 'NO_PARITY_LAWFUL_PLACEMENT' | 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND' | 'AUTO_FLAP_CAP_EXCEEDED'
+export interface BandLadder { band: BandId; rungs: Rung[]; refusal: null | { code: RefusalCode } }
+/** Every even size computed once and stored; rung selection renders from here without a solve. */
+export interface BandSolveResult { bands: BandLadder[]; gridsBySize: ReadonlyMap<number, GridResult> }

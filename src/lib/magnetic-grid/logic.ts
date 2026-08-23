@@ -1,6 +1,6 @@
 // Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Concession, ExtremeCornerMeasurement, Governor, MagnetPlan, ParityMeasurement, PerimeterMeasurement, Pt, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
+import type { Anchor, BandId, BBox, Band, BandLadder, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Concession, ExtremeCornerMeasurement, Governor, LawfulLayout, MagnetPlan, ParityMeasurement, PerimeterMeasurement, PlacementCandidate, Pt, RefusalCode, Rung, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
@@ -117,6 +117,62 @@ export function inspectionConcessions(parity: ParityMeasurement, wrap: WrapEvalu
   if (!parity.parityTrue || parity.centreErrorMM > 0) concessions.push('CENTRE')
   if (wrap.status !== 'lawful') concessions.push('WRAP')
   return concessions
+}
+
+/**
+ * MAGNET-QUANTITY SCALING over completed candidates (every even size, all four placements):
+ * a layout is accepted when it is centred (parity true, no centre miss) and wrap-lawful; each
+ * count is published once, at its smallest accepted size in the first band that accepts it,
+ * strictly greater than the last published count; every co-lawful layout at that size is kept
+ * (Auto keeps the minimum allowance and its ties); vertical eliminates horizontal on an
+ * otherwise-equal pair. No score, no fallback, no hidden winner.
+ */
+export function reduceBandLadders(candidates: readonly PlacementCandidate[], policy: WrapPolicy): BandLadder[] {
+  const isHorizontal = (l: LawfulLayout) => l.candidate.placement.xHalf && !l.candidate.placement.yHalf
+  const isVertical = (l: LawfulLayout) => !l.candidate.placement.xHalf && l.candidate.placement.yHalf
+  const gravityRank = (l: LawfulLayout) => (isVertical(l) ? 1 : isHorizontal(l) ? 2 : l.candidate.placement.xHalf ? 3 : 0)
+  const ladders: BandLadder[] = []
+  const owned = new Set<number>()
+  let lastPublished = 0
+  for (const band of BANDS) {
+    const inBand = candidates.filter((c) => c.sizeMM >= band.minMM && c.sizeMM <= band.maxMM)
+    const centred = inBand.filter((c) => c.parityTrue && c.centreErrorMM === 0)
+    const judged = centred.map((c) => ({ candidate: c, wrap: evaluateWrap(c.wrapMeasurement, policy) }))
+    const lawful: LawfulLayout[] = judged.flatMap((j) => j.wrap.status === 'lawful' ? [{ candidate: j.candidate, wrap: j.wrap }] : [])
+    const rungs: Rung[] = []
+    // Walk the band's accepted sizes in order; at each size publish every count strictly greater
+    // than the last published one, smallest first — so a count lands at its smallest accepted size.
+    const sizes = [...new Set(lawful.map((l) => l.candidate.sizeMM))].sort((a, b) => a - b)
+    for (const sizeMM of sizes) for (const magnetCount of [...new Set(lawful.filter((l) => l.candidate.sizeMM === sizeMM).map((l) => l.candidate.magnetCount))].sort((a, b) => a - b)) {
+      if (magnetCount < 1 || magnetCount <= lastPublished || owned.has(magnetCount)) continue
+      let atSize = lawful.filter((l) => l.candidate.sizeMM === sizeMM && l.candidate.magnetCount === magnetCount)
+      if (policy.mode === 'auto') {
+        const minFlap = Math.min(...atSize.map((l) => l.wrap.requiredFlapMM))
+        atSize = atSize.filter((l) => l.wrap.requiredFlapMM === minFlap)
+      }
+      const equal = (a: LawfulLayout, b: LawfulLayout) =>
+        a.candidate.centreErrorMM === b.candidate.centreErrorMM && a.wrap.requiredFlapMM === b.wrap.requiredFlapMM && a.wrap.appliedFlapMM === b.wrap.appliedFlapMM
+      const layouts = atSize
+        .filter((l) => !(isHorizontal(l) && atSize.some((v) => isVertical(v) && equal(v, l))))
+        .sort((a, b) => gravityRank(a) - gravityRank(b))
+      rungs.push({ band: band.id as BandId, sizeMM, magnetCount, layouts })
+      owned.add(magnetCount)
+      lastPublished = magnetCount
+    }
+    ladders.push({ band: band.id as BandId, rungs, refusal: rungs.length ? null : { code: bandRefusal(inBand, centred, judged.map((j) => j.wrap), lawful, policy) } })
+  }
+  return ladders
+}
+
+function bandRefusal(
+  inBand: readonly PlacementCandidate[], centred: readonly PlacementCandidate[], verdicts: readonly WrapEvaluation[],
+  lawful: readonly LawfulLayout[], policy: WrapPolicy,
+): RefusalCode {
+  if (!inBand.length || inBand.every((c) => !c.seated.length)) return 'NO_CENTRE'
+  if (!centred.length) return 'NO_PARITY_LAWFUL_PLACEMENT'
+  if (lawful.length) return 'NO_WRAPPED_LAYOUT_IN_BAND'           // lawful layouts exist, but every count is owned below
+  if (verdicts.some((v) => v.status === 'refused' && v.code !== 'NO_WRAPPED_LAYOUT_IN_BAND')) return policy.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE'
+  return 'NO_WRAPPED_LAYOUT_IN_BAND'
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

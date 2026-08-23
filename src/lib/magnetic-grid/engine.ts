@@ -1,21 +1,21 @@
 // Magnetic-grid engine: orchestration over spec, compute and Logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Placement, PlacementCandidate, Pt } from './spec'
+import type { BandId, BandSolveResult, CentreMode, Contour, Governor, GridConfig, GridResult, Placement, PlacementCandidate, Pt, WrapPolicy } from './spec'
 import {
+  BANDS,
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
   FLAP_MM,
   GOVERNOR,
   MASS_DEPTH_MM,
-  MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   RELEASED_PADDING_MM,
+  SIZE_STEP_MM,
 } from './spec'
 import {
   bbox,
   centroidOf,
-  fieldSpanMM,
   latticeAt,
   makeSeatPredicate,
   measureCentreBranches,
@@ -30,13 +30,13 @@ import {
 import {
   applyCoverage,
   assignSizes,
-  bandOf,
   centrePhaseCandidates,
   centeringAnchors,
   chooseCentrePlacement,
   evaluateWrap,
   governMass,
   inspectionConcessions,
+  reduceBandLadders,
 } from './logic'
 
 export * from './spec'
@@ -117,9 +117,7 @@ export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: Gr
   }
   const mainCentre: Pt = fits ? ruleTarget : centres[0]
 
-  const wrap = cfg.wrapMode === 'auto'
-    ? evaluateWrap(display.wrapMeasurement, { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) })
-    : evaluateWrap(display.wrapMeasurement, { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) })
+  const wrap = evaluateWrap(display.wrapMeasurement, wrapPolicyOf(cfg))
   const concessions = inspectionConcessions({ parityTrue: display.parityTrue, centreErrorMM: display.centreErrorMM }, wrap)
 
   return {
@@ -142,81 +140,51 @@ export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: Gr
   }
 }
 
-/** The walk range: the band as a RANGE; above the last band, up to the derived field span. */
-function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
-  const band = bandOf(fromMM)
-  if (band) return [band.minMM, band.maxMM]
-  return [fromMM, fieldSpanMM(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? RELEASED_PADDING_MM))]
+/** The Wrap policy the config asks for — whole millimetres, read once, handed to Logic. */
+function wrapPolicyOf(cfg: GridConfig): WrapPolicy {
+  return cfg.wrapMode === 'auto'
+    ? { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) }
+    : { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) }
 }
 
-/** Pre-scaling diagnostic call boundary. Exact Wrap is already measured in every returned grid. */
-export function bandSnapPoints(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): BandSnapPoint[] {
-  return bandWalk(sized, cfg, fromMM, stepMM).points
-}
-
-/** One pass over the band: the per-count contact sizes AND the best-seated rung (fallback). */
-function bandWalk(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { points: BandSnapPoint[]; bestSeatedMM: number } {
-  const [lo, hi] = snapRange(cfg, fromMM)
-  // Interim scaling candidate generator only. Exact Wrap is evaluated by computeGrid;
-  // this sampled walk never measures or grants contact.
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
-  const solve = (mm: number): GridResult => {
-    let g = cfg.solveCache?.get(mm)
-    if (!g) { g = computeGrid(sized(mm), mm, walkCfg); cfg.solveCache?.set(mm, g) }
-    return g
-  }
-  // Counts already seating just below the band reached contact earlier — loose here, not rungs.
-  const below = lo - stepMM >= MIN_EFFECT_MM ? solve(lo - stepMM).anchors.length : 0
-  const points: BandSnapPoint[] = []
-  const seen = new Set<number>()
-  for (let c = 1; c <= below; c++) seen.add(c)
-  let bestSeatedMM = lo, bestSeats = -1
-  for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = solve(mm)
-    const count = grid.anchors.length
-    if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
-    if (count >= 1 && !seen.has(count)) {
-      if (grid.wrap.status === 'lawful') {
-        seen.add(count)
-        points.push({ sizeMM: mm, count })
-      }
+/** MAGNET-QUANTITY SCALING: the one production loop over the even-size ladder. Every even size in
+ *  every band is computed once (all four placements) and stored; Logic reduces the candidates. */
+export function solveBands(sized: (evenSizeMM: number) => Contour, cfg: GridConfig = {}): BandSolveResult {
+  const gridsBySize = new Map<number, GridResult>()
+  const candidates: PlacementCandidate[] = []
+  for (const band of BANDS) {
+    for (let mm = band.minMM; mm <= band.maxMM; mm += SIZE_STEP_MM) {
+      const grid = computeGrid(sized(mm), mm, cfg)
+      gridsBySize.set(mm, grid)
+      candidates.push(...grid.candidates)
     }
   }
-  return { points, bestSeatedMM }
+  return { bands: reduceBandLadders(candidates, wrapPolicyOf(cfg)), gridsBySize }
 }
 
-/** Pre-scaling diagnostic band output; no production scaling claim is made in this phase. */
-export function fitSizeInBand(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
-  const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
-  if (points.length) {
-    const maxCount = Math.max(...points.map((p) => p.count))
-    const pickIdx = points.findIndex((p) => p.count === maxCount)
-    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), points[pickIdx].sizeMM, cfg), ladder: points, pickIdx }
+/** Render a stored rung layout: the cached per-size result with the chosen lawful layout overlaid.
+ *  No geometry, Centre, Wrap, Coverage, scaling or Logic call happens here. */
+export function fitSizeInBand(solved: BandSolveResult, bandId: BandId, rungIndex: number, layoutIndex: number): GridResult {
+  const ladder = solved.bands.find((b) => b.band === bandId)
+  const rung = ladder?.rungs[rungIndex]
+  const layout = rung?.layouts[layoutIndex]
+  const base = rung && solved.gridsBySize.get(rung.sizeMM)
+  if (!rung || !layout || !base) throw new Error(`no stored layout for band ${bandId} rung ${rungIndex} layout ${layoutIndex}`)
+  const { candidate, wrap } = layout
+  return {
+    ...base,
+    phaseMM: candidate.phaseMM,
+    lattice: candidate.lattice,
+    anchors: candidate.anchors,
+    wrap,
+    parityTrue: candidate.parityTrue,
+    centreErrorMM: candidate.centreErrorMM,
+    contactsMM: wrap.witnesses.map((witness) => witness.outlinePointMM),
+    concessions: [],
   }
-  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), bestSeatedMM, cfg), ladder: [], pickIdx: 0 }
 }
 
-/**
- * Exact Auto Wrap: the geometry derives its worst-belt requirement once; Logic compares it
- * to the cap. No allowance scan or millimetre grant exists in this replacement body.
- */
-export function autoFlapInBand(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number, maxFlapMM: number,
-  cacheFor?: (flapMM: number) => Map<number, GridResult> | undefined,
-): { flapMM: number; fit: ReturnType<typeof fitSizeInBand> } {
-  const cap = Math.max(0, maxFlapMM)
-  const fit = fitSizeInBand(sized, {
-    ...cfg,
-    wrapMode: 'auto',
-    autoFlapCapMM: cap,
-    solveCache: cacheFor?.(cap),
-  }, fromMM, stepMM)
-  const flapMM = fit.grid.wrap.status === 'lawful' ? fit.grid.wrap.appliedFlapMM : cap
-  return { flapMM, fit }
+/** The same solve with the Auto policy: Logic keeps the minimum whole-mm allowance within the cap; no scan. */
+export function autoFlapInBand(sized: (evenSizeMM: number) => Contour, cfg: GridConfig, capMM: number): BandSolveResult {
+  return solveBands(sized, { ...cfg, wrapMode: 'auto', autoFlapCapMM: Math.max(0, capMM) })
 }

@@ -1,7 +1,7 @@
-// solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
-// bridge/engine calls the page used to make inline, nothing computed here.
+// law.worker.ts — runs the Law engine off the main thread. Pure dispatch: the same
+// bridge/engine calls the page would make inline, nothing computed here.
 
-import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/magnetic-grid/engine'
+import { BANDS, computeGrid, fitSizeInBand, solveBands, type BandId, type BandLadder, type BandSolveResult, type GridConfig, type GridResult, type Placement, type Rung } from '@/lib/magnetic-grid/engine'
 import { contourIdentity, makeSizer } from '@/lib/effect/magnetic-grid-bridge'
 import type { Contour } from '@/lib/effect/types'
 import type { BoundaryTruth } from '@/lib/magnetic-grid/spec'
@@ -13,121 +13,70 @@ interface SolveRequest {
   boundaryTruth: BoundaryTruth
   offsetMM: number
   cfg: GridConfig
-  mode: number | 'free'
+  mode: BandId | 'free'
   sizeMM: number
-  snapStep: number
-  stepSel: number | null
-  /** Exact Auto cap; no allowance scan. */
+  /** Selected rung on the band's ladder; null = the band's last (highest-count) rung. */
+  rungSel: number | null
+  /** Selected co-lawful layout on that rung; null = the first (gravity-ordered). */
+  layoutSel: number | null
+  /** Auto cap in whole mm; null = fixed flap. */
   autoFlapMaxMM?: number | null
 }
 
+/** What the tab renders for a rung chip: the final Rung's size and count plus each co-lawful layout's placement. */
+type RungSummary = Pick<Rung, 'sizeMM' | 'magnetCount'> & { layouts: Placement[] }
+
 const ctx = self as unknown as Worker
 
-// Computed once = computed. Per-size solves are keyed by shape + config and reused across
-// free-slider moves, manual band scaling, re-walks and the idle prefetcher; a new shape
-// clears everything.
+// Computed once = computed. The whole ladder is solved once per shape + config and every rung
+// renders from that stored result; Free/manual sizes are cached per size. A new shape clears all.
 let shapeSig = ''
 const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
-const walkCaches = new Map<string, Map<number, GridResult>>()
-const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand>; autoFlapMM: number | null }>()
+const solves = new Map<string, BandSolveResult>()
 const FREE_CAP = 400
-const WALK_CAP = 10
-const FITS_CAP = 12
+const SOLVE_CAP = 6
 
-function sizeCacheOf(sig: string): Map<number, GridResult> {
-  let m = walkCaches.get(sig)
-  if (!m) {
-    m = new Map()
-    walkCaches.set(sig, m)
-    if (walkCaches.size > WALK_CAP) walkCaches.delete(walkCaches.keys().next().value!)
+function solvedFor(sized: (mm: number) => Contour, wrapCfg: GridConfig): BandSolveResult {
+  const key = JSON.stringify(wrapCfg)
+  let solved = solves.get(key)
+  if (!solved) {
+    solved = solveBands(sized, wrapCfg)
+    solves.set(key, solved)
+    if (solves.size > SOLVE_CAP) solves.delete(solves.keys().next().value!)
   }
-  return m
+  return solved
 }
 
-/** The one band-solve routine — the click path and the prefetcher share it byte for byte. */
-function bandFit(
-  sized: (mm: number) => Contour, cfg: GridConfig, cfgSig: string,
-  bandId: number, snapStep: number, autoFlapMaxMM: number | null,
-): { fit: ReturnType<typeof fitSizeInBand>; autoFlapMM: number | null } {
-  const key = JSON.stringify([cfgSig, bandId, snapStep, autoFlapMaxMM])
-  const hit = walkFits.get(key)
-  if (hit) return hit
-  const band = BANDS.find((b) => b.id === bandId) ?? BANDS[0]
-  let out: { fit: ReturnType<typeof fitSizeInBand>; autoFlapMM: number | null }
-  if (autoFlapMaxMM != null) {
-    const cacheFor = (f: number) => sizeCacheOf(JSON.stringify({ ...cfg, wrapMode: 'auto', autoFlapCapMM: f }))
-    const auto = autoFlapInBand(sized, cfg, band.minMM, snapStep, autoFlapMaxMM, cacheFor)
-    out = { fit: auto.fit, autoFlapMM: auto.flapMM }
-  } else {
-    out = { fit: fitSizeInBand(sized, { ...cfg, solveCache: sizeCacheOf(cfgSig) }, band.minMM, snapStep), autoFlapMM: null }
-  }
-  walkFits.set(key, out)
-  if (walkFits.size > FITS_CAP) walkFits.delete(walkFits.keys().next().value!)
-  return out
-}
-
-// Idle prefetch — between interactions the worker warms every band for the current shape and
-// dials, one size per macrotask so a real request always interrupts within one solve.
-let gen = 0
-function schedulePrefetch(
-  myGen: number, sized: (mm: number) => Contour, cfg: GridConfig, cfgSig: string,
-  snapStep: number, autoFlapMaxMM: number | null,
-): void {
-  const walkBase: GridConfig = autoFlapMaxMM != null
-    ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
-    : { ...cfg, wrapMode: 'fixed' }
-  const walkSig = autoFlapMaxMM != null ? JSON.stringify(walkBase) : cfgSig
-  const walkCfg: GridConfig = { ...walkBase, segmentsDetail: 'light' }
-  const cache = sizeCacheOf(walkSig)
-  const sizes: number[] = []
-  for (const b of BANDS) for (let mm = b.minMM; mm <= b.maxMM; mm += Math.max(1, snapStep)) if (!cache.has(mm)) sizes.push(mm)
-  let i = 0
-  const bandsLeft = BANDS.map((b) => b.id)
-  const step = () => {
-    if (myGen !== gen) return
-    if (i < sizes.length) {
-      const mm = sizes[i++]
-      if (!cache.has(mm)) cache.set(mm, computeGrid(sized(mm), mm, walkCfg))
-      setTimeout(step, 0)
-      return
-    }
-    const bandId = bandsLeft.shift()
-    if (bandId === undefined) return
-    bandFit(sized, cfg, cfgSig, bandId, snapStep, autoFlapMaxMM)
-    setTimeout(step, 0)
-  }
-  setTimeout(step, 0)
-}
+const summarise = (ladder: BandLadder): RungSummary[] =>
+  ladder.rungs.map((r) => ({ sizeMM: r.sizeMM, magnetCount: r.magnetCount, layouts: r.layouts.map((l) => l.candidate.placement) }))
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, engineId, base, boundaryTruth, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, autoFlapMaxMM } = e.data
-  gen++
+  const { id, engineId, base, boundaryTruth, offsetMM, cfg, mode, sizeMM, rungSel, layoutSel, autoFlapMaxMM } = e.data
   try {
     if (engineId !== 'v351-centre-clone') throw new Error('wrong engine identity')
     const sized = makeSizer(base, offsetMM)
     if(boundaryTruth.contourIdentity!==contourIdentity(base))throw new Error('boundary truth does not match supplied contour')
     const sig = JSON.stringify([boundaryTruth.contourIdentity, offsetMM])
-    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
-    const cfgSig = JSON.stringify(cfg)
+    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); solves.clear() }
+    const wrapCfg: GridConfig = autoFlapMaxMM != null
+      ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
+      : { ...cfg, wrapMode: 'fixed' }
     if (mode !== 'free') {
-      const { fit } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
-      const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
-      const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
-      // A stepped rung renders the layout that QUALIFIED it: reach AND margin at the
-      // auto-chosen allowance, never a scanned/rounded substitute.
-      const wrapCfg: GridConfig = autoFlapMaxMM != null
-        ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
-        : { ...cfg, wrapMode: 'fixed' }
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), eff, wrapCfg)
-      const contour = sized(eff)
-      const reportedAuto = autoFlapMaxMM != null && grid.wrap.status === 'lawful'
-        ? grid.wrap.appliedFlapMM
-        : null
-      ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM: reportedAuto } })
+      const solved = solvedFor(sized, wrapCfg)
+      const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      const ladder = solved.bands.find((b) => b.band === band.id)!
+      if (ladder.rungs.length) {
+        const idx = Math.min(rungSel ?? ladder.rungs.length - 1, ladder.rungs.length - 1)
+        const layoutIdx = Math.min(layoutSel ?? 0, ladder.rungs[idx].layouts.length - 1)
+        const grid = fitSizeInBand(solved, band.id, idx, layoutIdx)
+        const eff = ladder.rungs[idx].sizeMM
+        ctx.postMessage({ id, model: { contour: sized(eff), grid, effSize: eff, ladder: summarise(ladder), idx, layoutIdx, refusal: null, segments: grid.segments, autoFlapMM: autoFlapMaxMM != null && grid.wrap.status === 'lawful' ? grid.wrap.appliedFlapMM : null } })
+      } else {
+        // The band accepts nothing: show its floor size as measured, with the typed refusal.
+        const grid = solved.gridsBySize.get(band.minMM)!
+        ctx.postMessage({ id, model: { contour: sized(band.minMM), grid, effSize: band.minMM, ladder: [], idx: 0, layoutIdx: 0, refusal: ladder.refusal?.code ?? null, segments: grid.segments, autoFlapMM: null } })
+      }
     } else {
-      const wrapCfg: GridConfig = autoFlapMaxMM != null
-        ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
-        : { ...cfg, wrapMode: 'fixed' }
       const k = JSON.stringify(wrapCfg) + '|' + sizeMM
       let hit = freeCache.get(k)
       if (!hit) {
@@ -136,12 +85,9 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         freeCache.set(k, hit)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
-      const freeAuto = autoFlapMaxMM != null && hit.grid.wrap.status === 'lawful'
-        ? hit.grid.wrap.appliedFlapMM
-        : null
-      ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, segments: hit.grid.segments, autoFlapMM: freeAuto } })
+      const freeAuto = autoFlapMaxMM != null && hit.grid.wrap.status === 'lawful' ? hit.grid.wrap.appliedFlapMM : null
+      ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, layoutIdx: 0, refusal: null, segments: hit.grid.segments, autoFlapMM: freeAuto } })
     }
-    schedulePrefetch(gen, sized, cfg, cfgSig, snapStep, autoFlapMaxMM ?? null)
   } catch (err) {
     ctx.postMessage({ id, model: null, error: String((err as Error)?.message ?? err) })
   }

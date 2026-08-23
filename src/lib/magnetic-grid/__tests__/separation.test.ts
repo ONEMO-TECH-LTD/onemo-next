@@ -65,10 +65,10 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
   'magnetic-grid/logic.ts': [
     'bandOf', 'governMass', 'centeringAnchors',
-    'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'inspectionConcessions', 'applyCoverage', 'assignSizes',
+    'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'inspectionConcessions', 'reduceBandLadders', 'bandRefusal', 'applyCoverage', 'assignSizes',
   ],
   'magnetic-grid/engine.ts': [
-    'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',
+    'mod', 'computeGrid', 'wrapPolicyOf', 'solveBands', 'fitSizeInBand', 'autoFlapInBand',
   ],
   'effect/magnetic-grid-bridge.ts': [
     'contourIdentity', 'boundaryTruth', 'bboxOf', 'normBaseContour', 'makeSizer', 'normMaskContour', 'normGeneratedRing',
@@ -224,6 +224,13 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(contact).not.toMatch(/exact|Rational|toFixed|1e-|QUANTUM|GUARD/)
     expect(logic).not.toMatch(/compareExact|approx|toFixed/i)
   })
+  it('solveBands is the only production loop over the even-size ladder; no second size walk anywhere',()=>{
+    const loops=(text:string)=>(text.match(/\+=\s*SIZE_STEP_MM/g)??[]).length
+    expect(loops(readRepo('src/lib/magnetic-grid/engine.ts'))).toBe(1)
+    for(const file of LAW_RUNTIME_FILES.filter((f)=>!f.endsWith('engine.ts'))) expect(loops(readRepo(file)),`${file} walks sizes`).toBe(0)
+    for(const file of LAW_RUNTIME_FILES) expect(identifiersOf(readRepo(file)).filter((n)=>/^(bandWalk|bandSnapPoints|snapRange|BandSnapPoint|solveCache|schedulePrefetch)$/.test(n)),`${file} carries a deleted walk identifier`).toEqual([])
+  })
+
   it('asserts the deleted rocket science is absent from the Law runtime',()=>{
     const deleted=/^(ExactInteger|Rational|AlgebraicReal|ExactReal|ExactScale|ExactPoint|BoundaryElement|PreparedContour|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour)$/
     for(const file of [...LAW_RUNTIME_FILES,'src/lib/magnetic-grid/compute/wrap-measurement.ts','src/lib/magnetic-grid/compute/identity.ts']){

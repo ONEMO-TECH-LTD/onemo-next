@@ -12,7 +12,10 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/magnetic-grid/engine'
+import { DEFAULT_PITCH_MM, type BandId, type GridResult, type MagnetPlan, type Placement, type Rung, type SafeSegment } from '@/lib/magnetic-grid/engine'
+
+/** The worker's rung projection: the final Rung's size and count plus each co-lawful layout's placement. */
+type RungSummary = Pick<Rung, 'sizeMM' | 'magnetCount'> & { layouts: Placement[] }
 import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SIZE_STEP_MM } from '@/lib/magnetic-grid/spec'
 import { boundaryTruth, fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/magnetic-grid-bridge'
 
@@ -80,10 +83,12 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
-  /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
-  const [mode, setMode] = useState<number | 'free'>('free')
-  /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
-  const [stepSel, setStepSel] = useState<number | null>(null)
+  /** A band id shows that band's rung ladder; 'free' is the even-size slider. */
+  const [mode, setMode] = useState<BandId | 'free'>('free')
+  /** Selected rung on the band's ladder; null = the band's highest count. */
+  const [rungSel, setRungSel] = useState<number | null>(null)
+  /** Selected co-lawful layout on that rung; null = the first, gravity-ordered. */
+  const [layoutSel, setLayoutSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
   const [bandScale, setBandScale] = useState<number | null>(null)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
@@ -208,7 +213,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: RungSummary[]; idx: number; layoutIdx: number; refusal: string | null; segments: SafeSegment[]; autoFlapMM?: number | null }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -259,7 +264,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
       id, engineId: 'v351-centre-clone' as const, base, boundaryTruth: boundaryTruth(base), offsetMM, cfg,
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
-      snapStep: SIZE_STEP_MM, stepSel,
+      rungSel, layoutSel,
       autoFlapMaxMM: autoFlapN ? (enFlapN ? flap : FLAP_MM) : null,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
@@ -267,7 +272,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, governor, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, stepSel, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, governor, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, rungSel, layoutSel, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -377,29 +382,35 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
           </Fold>
 
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Band · diagnostic range · scaling not implemented</span>
+            <div className="gl-field"><span>Band · magnet-count ladder · even sizes</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
-                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null); setBandScale(null) }}>Free</button>
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setRungSel(null); setLayoutSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
+                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setRungSel(null); setLayoutSel(null); setManual(null); setBandScale(null) }}>Free</button>
               </div>
             </div>
             {mode !== 'free' && <>
               <div className="gl-snap">
-                {'Scaling not implemented · diagnostic candidate only · '}{manual
+                {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
                   : bandScale !== null
-                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
+                    ? `manual scale · ${Math.round(bandScale)} mm — tap a rung or the band chip to return`
                     : model
                     ? model.ladder.length
-                      ? `candidate B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} diagnostic layouts`
-                      : 'no diagnostic candidate at this flap'
+                      ? `rung B${mode}-${model.idx + 1} · ${model.effSize} mm · ${model.ladder[model.idx].magnetCount}⌾ · ${model.ladder.length} rung${model.ladder.length === 1 ? '' : 's'}${model.ladder[model.idx].layouts.length > 1 ? ` · ${model.ladder[model.idx].layouts.length} co-lawful layouts` : ''}`
+                      : `no lawful rung in B${mode}${model.refusal ? ` · ${model.refusal}` : ''}`
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
-                {model.ladder.map((pt, i) =>
-                  <button key={pt.sizeMM} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
-                    <b>B{mode}-{i + 1}</b><span>{Math.round(pt.sizeMM)} mm · {pt.count}⌾</span>
+                {model.ladder.map((rung, i) =>
+                  <button key={rung.sizeMM + '-' + rung.magnetCount} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setRungSel(i); setLayoutSel(null); setBandScale(null) }}>
+                    <b>B{mode}-{i + 1}</b><span>{rung.sizeMM} mm · {rung.magnetCount}⌾</span>
+                  </button>)}
+              </div>}
+              {model && model.ladder.length > 0 && model.ladder[model.idx].layouts.length > 1 && <div className="gl-steps">
+                {model.ladder[model.idx].layouts.map((pl, i) =>
+                  <button key={i} aria-pressed={bandScale === null && i === model.layoutIdx} onClick={() => { setLayoutSel(i); setBandScale(null) }}>
+                    <b>layout {i + 1}</b><span>{pl.xHalf && pl.yHalf ? 'both shifted' : pl.xHalf ? 'x-shifted' : pl.yHalf ? 'y-shifted' : 'canonical'}</span>
                   </button>)}
               </div>}
               {(() => {
@@ -487,7 +498,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               </div>
             </div>
             <div className="gl-magic-note">
-              Centre + Wrap — the grid locks onto the governed centre, then every perimeter-belt disc must satisfy the exact flap allowance. No voting. Scaling is not implemented yet.
+              Centre + Wrap + Scaling — the grid locks onto the governed centre, every perimeter-belt disc must wrap within the whole-millimetre flap, and each band publishes its next magnet counts at the first even size that is centred and wrapped. Three laws, no voting.
             </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">
