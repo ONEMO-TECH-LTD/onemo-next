@@ -13,7 +13,7 @@ Status: execution authority, 2026-08-23. Authority is the master v3.5.2-3 only (
 
 | # | Step | Master | Gate |
 |---|---|---|---|
-| W1 | Wrap on the ruler: all-seated legality over outer+holes + belt air on the ruler, one verdict for Free/manual/Auto/band | §5.2 `measureWrap`, §5.3 `evaluateWrap`, §5.1 types | fixture 2 (seat/Wrap opposite bounds on one measurement; square 24/26, squircle 72 all modes, diamond 34/36, 0.5 reads 1, holed cutout, Auto minimum, Free = rung) |
+| W1 | Wrap on the ruler: all-seated legality over outer+holes + belt air on the ruler, one verdict for Free/manual/Auto/band (`seat.ts` gains `pointInMaterial` and the all-ring nearest helper) | §5.2 `measureWrap`, §5.3 `evaluateWrap`, §5.1 types | fixture 2 (seat/Wrap opposite bounds on one measurement; square 24/26, squircle 72 all modes, diamond 34/36, 0.5 reads 1, holed cutout, Auto minimum, Free = rung) |
 | W2 | Delete the exact layer, circle path, dead float Wrap helpers (Centre's integer seat prescreen stays); rename `contact-root.ts` → `wrap-measurement.ts`; guard asserts absence | §3 table | fixture 4; all remaining tests green; Centre fixture 1 unchanged |
 | S1 | Even sizes, four bands, slider snaps to 2 mm; delete sub-mm constants, `seatMarginMM`, B5 | §5.1 values | tab shows four bands, even sizes only |
 | S2 | `computeGrid` returns all four placements; concessions measured | §5.4 | Free shows concessions; `candidates` length 4 |
