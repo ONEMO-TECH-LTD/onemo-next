@@ -46,10 +46,11 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   })
 
   it('diamond 34 seats with 0.02 mm of air, reads 0 and is lawful at flap 0; diamond 36 requires 1', () => {
-    const d34 = computeGrid(diamond(17), 17, fixed0)
+    const d34 = computeGrid(diamond(17), 34, fixed0)
+    expect(d34.candidates.map((candidate) => candidate.sizeMM)).toEqual([34, 34, 34, 34])
     expect(d34.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 0 })
     expect(nearestOutlineMM(diamond(17), [0, 0]).distMM).toBeGreaterThan(12)
-    expect(computeGrid(diamond(18), 18, fixed0).wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1 })
+    expect(computeGrid(diamond(18), 36, fixed0).wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1 })
   })
 
   it('signed ruler: −0.49 reads 0 and stays seated; −0.51 reads −1 and is not admitted', () => {
@@ -87,9 +88,9 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(law.wrapMeasurement.witnesses[0].outlinePointMM).toEqual([0, 5])
     expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 3 })).toMatchObject({ status: 'lawful', appliedFlapMM: 1 })
     expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 0 })).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
-    const auto = computeGrid(diamond(18), 18, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
+    const auto = computeGrid(diamond(18), 36, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
     expect(auto.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
-    expect(computeGrid(diamond(18), 18, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
+    expect(computeGrid(diamond(18), 36, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
   })
 
   it('an invalid boundary and an empty belt refuse with null allowance evidence, and Logic never invents one', () => {
