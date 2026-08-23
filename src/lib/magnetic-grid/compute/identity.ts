@@ -1,4 +1,4 @@
-import type { BoundaryTruth, ContactWitness, Contour } from '../spec'
+import type { BoundaryTruth, Contour } from '../spec'
 import { canonicalExact, rationalFromNumber } from './exact-real'
 
 const K = [
@@ -87,10 +87,4 @@ export function contourIdentity(contour: Contour): string {
 export const contourBoundaryTruth = (contour: Contour): BoundaryTruth => ({
   rule: 'supplied-final-contour',
   contourIdentity: contourIdentity(contour),
-})
-export const certifyContactWitness = (
-  witness: Omit<ContactWitness, 'certificateId'>,
-): ContactWitness => ({
-  ...witness,
-  certificateId: sha256Text(JSON.stringify(witness)),
 })

@@ -345,6 +345,32 @@ export function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
   return inside
 }
 
+/** Float point-in-material over the complete supplied boundary: inside the outer ring, outside every hole. */
+export function pointInMaterial(contour: Contour, pt: Pt): boolean {
+  return pointInOuter(pt, contour.outer.pts) && contour.holes.every((hole) => !pointInOuter(pt, hole.pts))
+}
+
+/** Nearest distance from a point to the complete boundary (outer + holes), with every distinct
+ *  outline point tied for it under the same double computation — exact native equality, no tolerance. */
+export function nearestOutlineMM(contour: Contour, pt: Pt): { distMM: number; pointsMM: Pt[] } {
+  let distMM = Infinity
+  let pointsMM: Pt[] = []
+  for (const ring of [contour.outer.pts, ...contour.holes.map((hole) => hole.pts)]) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [ax, ay] = ring[j], [bx, by] = ring[i]
+      const dx = bx - ax, dy = by - ay
+      const len2 = dx * dx + dy * dy
+      let t = len2 > 0 ? ((pt[0] - ax) * dx + (pt[1] - ay) * dy) / len2 : 0
+      if (t < 0) t = 0; else if (t > 1) t = 1
+      const px = ax + t * dx, py = ay + t * dy
+      const d = Math.hypot(pt[0] - px, pt[1] - py)
+      if (d < distMM) { distMM = d; pointsMM = [[px, py]] }
+      else if (d === distMM && !pointsMM.some(([x, y]) => x === px && y === py)) pointsMM.push([px, py])
+    }
+  }
+  return { distMM, pointsMM }
+}
+
 /**
  * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
  * tangency passing by equality (exact integer arithmetic, micron quantum).

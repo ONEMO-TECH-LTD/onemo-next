@@ -61,17 +61,14 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'sqrtMinusRational', 'isRational', 'evaluatePolynomial', 'compareAlgebraicToRational',
     'compareExactToRational', 'approximateExact', 'canonicalExact',
   ],
-  'magnetic-grid/compute/contact-root.ts': [
-    'exactPoint', 'dot', 'minus', 'plus', 'times', 'squaredLength', 'pointToElement',
-    'exactScale', 'prepareContour', 'measureWrap',
-  ],
-  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth','certifyContactWitness'],
+  'magnetic-grid/compute/contact-root.ts': ['measureWrap'],
+  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth'],
   'magnetic-grid/compute/seat.ts': [
     'exactSeatPoint', 'exactSeatMinus', 'exactSeatCross', 'exactPointInMaterial', 'exactSeatIsLegal',
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
     'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
     'measureCentrePlacements', 'edgeIdxOf', 'segDist2', 'edgeDistMM', 'pointInOuter',
-    'makeSeatPredicate', 'makeCircleSeatPredicate', 'pressExcessMM', 'maxPressMM',
+    'pointInMaterial', 'nearestOutlineMM', 'makeSeatPredicate', 'makeCircleSeatPredicate', 'pressExcessMM', 'maxPressMM',
     'contactPointsMM', 'impliedFlapMM', 'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
   ],
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
@@ -233,10 +230,11 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(worker).toContain('boundaryTruth.contourIdentity!==contourIdentity(base)')
     expect(worker).toContain('[boundaryTruth.contourIdentity, offsetMM]')
   })
-  it('keeps exact seat legality in seat.ts rather than contact-root.ts',()=>{
-    const seat=readRepo('src/lib/magnetic-grid/compute/seat.ts'),contact=readRepo('src/lib/magnetic-grid/compute/contact-root.ts')
-    expect(seat).toContain('export const exactSeatIsLegal=')
-    expect(contact).toContain("import { exactSeatIsLegal } from './seat'")
-    expect(contact).not.toMatch(/locateInRing|insideMaterial/)
+  it('measures seat and Wrap from one signed clearance record in seat.ts geometry, nothing below the ruler',()=>{
+    const contact=readRepo('src/lib/magnetic-grid/compute/contact-root.ts'),logic=readRepo('src/lib/magnetic-grid/logic.ts')
+    expect(contact).toContain("import { nearestOutlineMM, pointInMaterial, splitPerimeter } from './seat'")
+    expect(contact).toContain('Math.floor(rawClearanceMM + 0.5)')
+    expect(contact).not.toMatch(/exact|Rational|toFixed|1e-|QUANTUM|GUARD/)
+    expect(logic).not.toMatch(/compareExact|approx|toFixed/i)
   })
 })

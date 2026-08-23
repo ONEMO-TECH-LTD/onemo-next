@@ -7,8 +7,6 @@ import {
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './spec'
-import { compareExactToRational } from './compute'
-
 const QUANTUM_KEY_MM = 0.001
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
@@ -105,34 +103,25 @@ export function chooseCentrePlacement(
   return best
 }
 
-/** Wrap law over completed exact belt measurements; no geometry or tolerance enters Logic. */
+/** Wrap law over the whole-mm belt measurement; a geometry refusal passes through unchanged. */
 export function evaluateWrap(measured: WrapMeasurement, policy: WrapPolicy): WrapEvaluation {
-  const allowed = policy.mode === 'fixed' ? policy.allowance : policy.cap
-  const allowedApproxMM = policy.mode === 'fixed' ? policy.allowanceApproxMM : policy.capApproxMM
-  if (measured.refusal) {
-    return {
-      status: 'refused', code: measured.refusal.code, reason: measured.refusal.reason,
-      requiredFlap: measured.requiredFlap, requiredFlapApproxMM: measured.requiredFlapApproxMM,
-      allowedFlap: allowed, allowedFlapApproxMM: allowedApproxMM, witnesses: measured.witnesses,
-    }
+  if (measured.status === 'refused') {
+    return { status: 'refused', code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: measured.refusal.reason, requiredFlapMM: null, allowedFlapMM: null, witnesses: [] }
   }
-  if (compareExactToRational(measured.requiredFlap, allowed) > 0) {
+  const allowedFlapMM = policy.mode === 'fixed' ? policy.allowanceMM : policy.capMM
+  if (measured.requiredFlapMM > allowedFlapMM) {
     return {
       status: 'refused',
       code: policy.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE',
-      requiredFlap: measured.requiredFlap,
-      requiredFlapApproxMM: measured.requiredFlapApproxMM,
-      allowedFlap: allowed,
-      allowedFlapApproxMM: allowedApproxMM,
+      requiredFlapMM: measured.requiredFlapMM,
+      allowedFlapMM,
       witnesses: measured.witnesses,
     }
   }
   return {
     status: 'lawful',
-    requiredFlap: measured.requiredFlap,
-    requiredFlapApproxMM: measured.requiredFlapApproxMM,
-    appliedFlap: policy.mode === 'auto' ? measured.requiredFlap : policy.allowance,
-    appliedFlapApproxMM: policy.mode === 'auto' ? measured.requiredFlapApproxMM : policy.allowanceApproxMM,
+    requiredFlapMM: measured.requiredFlapMM,
+    appliedFlapMM: policy.mode === 'auto' ? measured.requiredFlapMM : policy.allowanceMM,
     witnesses: measured.witnesses,
   }
 }

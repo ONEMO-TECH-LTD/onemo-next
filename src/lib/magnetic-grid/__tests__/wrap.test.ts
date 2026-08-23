@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalExact,rational } from '../compute/exact-real'
-import { measureWrap, prepareContour } from '../compute/contact-root'
-import { certifyContactWitness, contourBoundaryTruth } from '../compute/identity'
+import { measureWrap } from '../compute/contact-root'
+import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
 import { computeGrid } from '../engine'
-import type { Contour } from '../spec'
+import type { Contour, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
   outer: { pts: [[-side / 2, -side / 2], [side / 2, -side / 2], [side / 2, side / 2], [-side / 2, side / 2]] },
@@ -16,120 +15,92 @@ const diamond = (axisRadius: number): Contour => ({
   holes: [],
 })
 
-const baseConfig = { paddingMM: 12, centreMode: 0, perimeterOnly: true } as const
+const holed: Contour = {
+  outer: { pts: [[-20, -20], [20, -20], [20, 20], [-20, 20]] },
+  holes: [{ pts: [[-5, -5], [5, -5], [5, 5], [-5, 5]] }],
+}
 
-describe('v3.5.1 exact Wrap', () => {
-  it('accepts square24 at flap 0 with a stored exact segment witness', () => {
-    const grid = computeGrid(square(24), { ...baseConfig, flapMM: 0, wrapMode: 'fixed' })
+const baseConfig = { paddingMM: 12, centreMode: 0, perimeterOnly: true } as const
+const fixed0 = { ...baseConfig, flapMM: 0, wrapMode: 'fixed' as const }
+
+describe('v3.5.3 Wrap on the 1 mm ruler', () => {
+  it('square 24 is lawful at flap 0 with four co-nearest witnesses at clearance 0', () => {
+    const grid = computeGrid(square(24), fixed0)
     expect(grid.wrap.status).toBe('lawful')
     if (grid.wrap.status !== 'lawful') return
-    expect(grid.wrap.requiredFlap).toEqual({ numerator: '0', denominator: '1' })
+    expect(grid.wrap.requiredFlapMM).toBe(0)
     expect(grid.wrap.witnesses).toHaveLength(4)
-    expect(new Set(grid.wrap.witnesses.map((witness) => witness.beltAnchorId)).size).toBe(1)
-    expect(new Set(grid.wrap.witnesses.map((witness) => witness.outlineElementId)).size).toBe(4)
-    for (const witness of grid.wrap.witnesses) {
-      expect(witness.scale.approximateMM).toBe(24)
-      expect(witness.boundaryTruth.rule).toBe('supplied-final-contour')
-      expect(witness.boundaryTruth.contourIdentity).toMatch(/^[0-9a-f]{64}$/)
-      expect(witness.outlineElementKind).toBe('segment')
-      expect(witness.equation.kind).toBe('polynomial')
-      expect(witness.equation.polynomial.length).toBeGreaterThan(0)
-      expect(witness.regimeId).toBe('fixed-size')
-      expect(witness.certificateId).toMatch(/^[0-9a-f]{64}$/)
+    expect(new Set(grid.wrap.witnesses.map((w) => JSON.stringify(w.beltAnchorMM))).size).toBe(1)
+    expect(new Set(grid.wrap.witnesses.map((w) => JSON.stringify(w.outlinePointMM))).size).toBe(4)
+    expect(grid.wrap.witnesses.every((w) => w.clearanceMM === 0)).toBe(true)
+    expect(grid.contactsMM).toEqual(grid.wrap.witnesses.map((w) => w.outlinePointMM))
+  })
+
+  it('square 26 at pitch 48 requires 1; a clearance of exactly 0.5 reads 1 and refuses flap 0', () => {
+    const s26 = computeGrid(square(26), { ...fixed0, pitchMM: 48 })
+    expect(s26.wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1, allowedFlapMM: 0 })
+    expect(s26.contactsMM).toEqual([])
+    const s25 = computeGrid(square(25), fixed0)
+    expect(s25.wrap).toMatchObject({ status: 'refused', requiredFlapMM: 1 })
+    expect(computeGrid(square(25), { ...fixed0, flapMM: 1 }).wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
+  })
+
+  it('diamond 34 seats with 0.02 mm of air, reads 0 and is lawful at flap 0; diamond 36 requires 1', () => {
+    const d34 = computeGrid(diamond(17), fixed0)
+    expect(d34.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 0 })
+    expect(nearestOutlineMM(diamond(17), [0, 0]).distMM).toBeGreaterThan(12)
+    expect(computeGrid(diamond(18), fixed0).wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1 })
+  })
+
+  it('signed ruler: −0.49 reads 0 and stays seated; −0.51 reads −1 and is not admitted', () => {
+    const nearMiss = measureWrap(square(23.02), [[0, 0]], 48, 12)
+    expect(nearMiss.seated).toEqual([[0, 0]])
+    expect(nearMiss.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 0 })
+    const miss = measureWrap(square(22.98), [[0, 0]], 48, 12)
+    expect(miss.seated).toEqual([])
+    expect(miss.wrapMeasurement).toMatchObject({ status: 'refused', refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } })
+  })
+
+  it('an anchor centre inside a hole or outside the ring is signed negative before the radius and never admitted', () => {
+    const inHole = measureWrap(holed, [[0, 0]], 48, 4)
+    expect(inHole.seated).toEqual([])
+    const outside = measureWrap(square(24), [[100, 0]], 48, 4)
+    expect(outside.seated).toEqual([])
+    // a large unsigned distance cannot rescue either: the material sign comes first
+    expect(nearestOutlineMM(square(24), [100, 0]).distMM).toBeGreaterThan(4)
+  })
+
+  it('a hole segment can be the binding witness and Auto returns the minimum within its cap', () => {
+    const law = measureWrap(holed, [[0, 10]], 48, 4)
+    expect(law.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 1 })
+    if (law.wrapMeasurement.status !== 'measured') return
+    expect(law.wrapMeasurement.witnesses).toHaveLength(1)
+    expect(law.wrapMeasurement.witnesses[0].outlinePointMM).toEqual([0, 5])
+    expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 3 })).toMatchObject({ status: 'lawful', appliedFlapMM: 1 })
+    expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 0 })).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
+    const auto = computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
+    expect(auto.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
+    expect(computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
+  })
+
+  it('an invalid boundary and an empty belt refuse with null allowance evidence, and Logic never invents one', () => {
+    const degenerate = measureWrap({ outer: { pts: [] }, holes: [] }, [[0, 0]], 48, 4).wrapMeasurement
+    expect(degenerate).toEqual({ status: 'refused', requiredFlapMM: null, witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'invalid-boundary' } })
+    const empty = measureWrap(square(24), [], 48, 12).wrapMeasurement
+    expect(empty).toMatchObject({ status: 'refused', requiredFlapMM: null, refusal: { reason: 'empty-belt' } })
+    for (const measured of [degenerate, empty]) {
+      const verdict = evaluateWrap(measured, { mode: 'fixed', allowanceMM: 0 })
+      expect(verdict).toEqual({ status: 'refused', code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: measured.refusal!.reason, requiredFlapMM: null, allowedFlapMM: null, witnesses: [] })
     }
-    expect(grid.contactsMM).toHaveLength(grid.wrap.witnesses.length)
+    const mutated = { ...degenerate, requiredFlapMM: 0 } as unknown as WrapMeasurement
+    expect(evaluateWrap(mutated, { mode: 'fixed', allowanceMM: 0 })).toMatchObject({ requiredFlapMM: null })
   })
 
-  it('refuses the square24.1 loose near-miss at flap 0', () => {
-    const grid = computeGrid(square(24.1), { ...baseConfig, flapMM: 0, wrapMode: 'fixed' })
-    expect(grid.wrap.status).toBe('refused')
-    if (grid.wrap.status !== 'refused') return
-    expect(grid.wrap.code).toBe('WRAP_EXCEEDS_ALLOWANCE')
-    expect(grid.wrap.requiredFlapApproxMM).toBeGreaterThan(0)
-    expect(grid.contactsMM).toEqual([])
-  })
-
-  it('returns the exact irrational diamond18 Auto minimum and enforces its cap', () => {
-    const lawful = computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
-    expect(lawful.wrap.status).toBe('lawful')
-    if (lawful.wrap.status !== 'lawful') return
-    expect('polynomial' in lawful.wrap.appliedFlap).toBe(true)
-    expect(lawful.wrap.appliedFlapApproxMM).toBeCloseTo(18 / Math.sqrt(2) - 12, 14)
-
-    const refused = computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0.7 })
-    expect(refused.wrap.status).toBe('refused')
-    if(refused.wrap.status==='refused')expect(refused.wrap.code).toBe('AUTO_FLAP_CAP_EXCEEDED')
-  })
-
-  it('measures Wrap on the perimeter belt regardless of output coverage', () => {
-    const perimeter = computeGrid(square(120), { ...baseConfig, flapMM: 0, wrapMode: 'fixed', perimeterOnly: true })
-    const full = computeGrid(square(120), { ...baseConfig, flapMM: 0, wrapMode: 'fixed', perimeterOnly: false })
-    expect(canonicalExact(perimeter.wrap.requiredFlap)).toBe(canonicalExact(full.wrap.requiredFlap))
-    const perimeterIds = [...new Set(perimeter.wrap.witnesses.map((witness) => witness.beltAnchorId))]
-    const fullIds = [...new Set(full.wrap.witnesses.map((witness) => witness.beltAnchorId))]
-    expect(perimeterIds).toHaveLength(perimeter.anchors.length)
-    expect(fullIds).toHaveLength(perimeter.anchors.length)
-    expect(perimeterIds).toEqual(fullIds)
-    for (const anchorId of perimeterIds) {
-      expect(perimeter.wrap.witnesses.filter((witness) => witness.beltAnchorId === anchorId).length).toBeGreaterThan(0)
-      expect(full.wrap.witnesses.filter((witness) => witness.beltAnchorId === anchorId).length).toBeGreaterThan(0)
-    }
-  })
-
-  it('uses the complete supplied boundary, including holes, and keeps the hole binder', () => {
-    const holed: Contour = {
-      outer: { pts: [[-20,-20],[20,-20],[20,20],[-20,20]] },
-      holes: [{ pts: [[-5,-5],[5,-5],[5,5],[-5,5]] }],
-    }
-    const prepared=prepareContour(holed,contourBoundaryTruth(holed))
-    const measured=measureWrap(prepared,[[0,10]],4)
-    const witnesses=measured.witnesses.map(certifyContactWitness)
-    expect(measured.refusal).toBeNull()
-    expect(measured.requiredFlapApproxMM).toBe(1)
-    expect(witnesses).toHaveLength(1)
-    expect(witnesses[0].outlineElementId).toMatch(/^hole:0:segment:/)
-    expect(witnesses[0].boundaryTruth).toEqual(prepared.truth)
-  })
-
-  it('fails closed for a hole/overlap seat, empty belt and degenerate boundary', () => {
-    const holed: Contour = {
-      outer: { pts: [[-20,-20],[20,-20],[20,20],[-20,20]] },
-      holes: [{ pts: [[-5,-5],[5,-5],[5,5],[-5,5]] }],
-    }
-    const prepared=prepareContour(holed,contourBoundaryTruth(holed))
-    const invalidSeat=measureWrap(prepared,[[0,0]],4)
-    expect(invalidSeat.refusal).toEqual({code:'NO_WRAPPED_LAYOUT_IN_BAND',reason:'invalid-seat'})
-    const invalidSeatVerdict=evaluateWrap(
-      {...invalidSeat,witnesses:invalidSeat.witnesses.map(certifyContactWitness)},
-      {mode:'fixed',allowance:rational(0),allowanceApproxMM:0},
-    )
-    expect(invalidSeatVerdict.status).toBe('refused')
-    if(invalidSeatVerdict.status==='refused')expect(invalidSeatVerdict.code).toBe('NO_WRAPPED_LAYOUT_IN_BAND')
-    expect(measureWrap(prepared,[],4).refusal).toEqual({code:'NO_WRAPPED_LAYOUT_IN_BAND',reason:'empty-belt'})
-    const degenerate:Contour={outer:{pts:[]},holes:[]}
-    expect(measureWrap(prepareContour(degenerate,contourBoundaryTruth(degenerate)),[[0,0]],4).refusal)
-      .toEqual({code:'NO_WRAPPED_LAYOUT_IN_BAND',reason:'invalid-boundary'})
-  })
-
-  it('keeps anchor and co-binding identities stable when belt enumeration reverses',()=>{
-    const contour=square(72),prepared=prepareContour(contour,contourBoundaryTruth(contour)),belt:[[number,number],[number,number]]=[[ -24,-24],[24,24]]
-    const map=(ordered:typeof belt)=>{
-      const witnesses=measureWrap(prepared,ordered,12).witnesses.map(certifyContactWitness),out=new Map<string,string[]>()
-      for(const witness of witnesses){const ids=out.get(witness.beltAnchorId)??[];ids.push(witness.outlineElementId);out.set(witness.beltAnchorId,ids.sort())}
-      return [...out.entries()].sort(([a],[b])=>a.localeCompare(b))
-    }
-    expect(map(belt)).toEqual(map([...belt].reverse() as typeof belt))
-    expect(map(belt).every(([,binders])=>binders.length===2)).toBe(true)
-  })
-  it('never lets the report-only decimal decide the law',()=>{
-    const contour=square(25),prepared=prepareContour(contour,contourBoundaryTruth(contour)),raw=measureWrap(prepared,[[0,0]],12)
-    const measured={...raw,witnesses:raw.witnesses.map(certifyContactWitness)}
-    const policy={mode:'fixed' as const,allowance:rational(0),allowanceApproxMM:0}
-    const fixed=evaluateWrap(measured,policy),auto=evaluateWrap(measured,{mode:'auto',cap:rational(0),capApproxMM:0})
-    expect(fixed.status).toBe('refused')
-    if(fixed.status==='refused')expect(fixed.code).toBe('WRAP_EXCEEDS_ALLOWANCE')
-    expect(auto.status).toBe('refused')
-    if(auto.status==='refused')expect(auto.code).toBe('AUTO_FLAP_CAP_EXCEEDED')
-    expect(evaluateWrap({...measured,requiredFlapApproxMM:-999},policy).status).toBe('refused')
+  it('Coverage changes the output population only; the seated set, belt and every witness are identical', () => {
+    const perimeter = computeGrid(square(120), { ...fixed0, perimeterOnly: true })
+    const full = computeGrid(square(120), { ...fixed0, perimeterOnly: false })
+    expect(full.anchors.length).toBeGreaterThan(perimeter.anchors.length)
+    expect(full.wrap).toEqual(perimeter.wrap)
+    expect(full.contactsMM).toEqual(perimeter.contactsMM)
   })
 })

@@ -24,11 +24,6 @@ import {
   measureCentrePlacements,
   measureExtremeCorners,
   measureWrap,
-  approximateExact,
-  certifyContactWitness,
-  contourBoundaryTruth,
-  prepareContour,
-  rationalFromNumber,
   safeSegments,
   splitPerimeter,
   spotRadiusOf,
@@ -86,7 +81,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const midY = (bb.minY + bb.maxY) / 2
   const ruleTarget: Pt = mode === 2 ? (governMass(centreMeasurements.masses, governor, midY)?.centreMM ?? centres[0]) : centres[0]
 
-  let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
   if (fits && cfg.forcePhaseMM) {
@@ -97,7 +91,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     bestOy = mod(cfg.forcePhaseMM[1], pitch)
     bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
-    bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
     mainCentre = ruleTarget
   } else if (fits) {
     // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
@@ -108,37 +101,25 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     // only sorts the non-canonical remainder. Centring is exact by construction.
     const measured = measureCentrePlacements(bb, pitch, centrePhaseCandidates(ruleTarget, bb, pitch), fits, outer, reach)
     const best = chooseCentrePlacement(measured)
-    if (best) { bestSeated = best.seated; bestOx = best.phaseMM[0]; bestOy = best.phaseMM[1] }
+    if (best) { bestOx = best.phaseMM[0]; bestOy = best.phaseMM[1] }
     mainCentre = ruleTarget
   }
 
+  // The frozen Centre prescreen above selected the phase only. The final Law population is the
+  // regenerated lattice filtered by the one signed whole-mm clearance; Coverage and the magnet
+  // plan act on that population, and the same records carry the belt and its requirement.
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
-
-  const split = splitPerimeter(bestSeated, pitch)
-  const belt = bestSeated.length <= 4 ? bestSeated : split.belt
-  const coverage = applyCoverage(bestSeated, perimeterOnly, split)
+  const law = measureWrap(contourMM, lattice, pitch, spotRadiusOf(pad))
+  const coverage = applyCoverage(law.seated, perimeterOnly, splitPerimeter(law.seated, pitch))
   const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
-  const preparedWrap=prepareContour(contourMM,contourBoundaryTruth(contourMM))
-  const wrapGeometry=measureWrap(preparedWrap,belt,spotRadiusOf(pad))
-  const wrapMeasured={...wrapGeometry,witnesses:wrapGeometry.witnesses.map(certifyContactWitness)}
   const wrap = cfg.wrapMode === 'auto'
-    ? evaluateWrap(wrapMeasured, {
-      mode: 'auto',
-      cap: rationalFromNumber(Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM)),
-      capApproxMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM),
-    })
-    : evaluateWrap(wrapMeasured, {
-      mode: 'fixed',
-      allowance: rationalFromNumber(Math.max(0, cfg.flapMM ?? FLAP_MM)),
-      allowanceApproxMM: Math.max(0, cfg.flapMM ?? FLAP_MM),
-    })
+    ? evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) })
+    : evaluateWrap(law.wrapMeasurement, { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) })
 
   return {
     anchors,
-    // Truth dots are projections stored by exact segment witnesses; no guard/tolerance can draw one.
-    contactsMM: wrap.status === 'lawful' ? wrap.witnesses.map((witness) => [
-      approximateExact(witness.tangency.x), approximateExact(witness.tangency.y),
-    ] as Pt) : [],
+    // Truth dots come only from returned witnesses on a lawful result; refusals draw none.
+    contactsMM: wrap.status === 'lawful' ? wrap.witnesses.map((witness) => witness.outlinePointMM) : [],
     pitchCentreMM: pitch,
     lattice,
     phaseMM: [bestOx, bestOy],
@@ -234,6 +215,6 @@ export function autoFlapInBand(
     autoFlapCapMM: cap,
     solveCache: cacheFor?.(cap),
   }, fromMM, stepMM)
-  const flapMM = fit.grid.wrap.status === 'lawful' ? fit.grid.wrap.appliedFlapApproxMM : cap
+  const flapMM = fit.grid.wrap.status === 'lawful' ? fit.grid.wrap.appliedFlapMM : cap
   return { flapMM, fit }
 }

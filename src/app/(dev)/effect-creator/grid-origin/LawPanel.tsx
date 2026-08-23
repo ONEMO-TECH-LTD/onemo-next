@@ -441,8 +441,10 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
             </label>
             {model && <div className="gl-magic-note">
               {model.grid.wrap.status === 'lawful'
-                ? `Wrap lawful · requires ${model.grid.wrap.requiredFlapApproxMM.toFixed(6)}mm · applied ${model.grid.wrap.appliedFlapApproxMM.toFixed(6)}mm`
-                : `Wrap refused · requires ${model.grid.wrap.requiredFlapApproxMM.toFixed(6)}mm · allowed ${model.grid.wrap.allowedFlapApproxMM.toFixed(6)}mm`}
+                ? `Wrap lawful · requires ${model.grid.wrap.requiredFlapMM}mm · applied ${model.grid.wrap.appliedFlapMM}mm`
+                : model.grid.wrap.code === 'NO_WRAPPED_LAYOUT_IN_BAND'
+                  ? `Wrap refused · ${model.grid.wrap.reason}`
+                  : `Wrap refused · requires ${model.grid.wrap.requiredFlapMM}mm · allowed ${model.grid.wrap.allowedFlapMM}mm`}
             </div>}
             <div className="gl-lab-off" title="inactive — nothing slides in a derived mode">
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>

@@ -121,7 +121,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), wrapCfg)
       const contour = sized(eff)
       const reportedAuto = autoFlapMaxMM != null && grid.wrap.status === 'lawful'
-        ? grid.wrap.appliedFlapApproxMM
+        ? grid.wrap.appliedFlapMM
         : null
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments, autoFlapMM: reportedAuto } })
     } else {
@@ -137,7 +137,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
       const freeAuto = autoFlapMaxMM != null && hit.grid.wrap.status === 'lawful'
-        ? hit.grid.wrap.appliedFlapApproxMM
+        ? hit.grid.wrap.appliedFlapMM
         : null
       ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, segments: hit.grid.segments, autoFlapMM: freeAuto } })
     }

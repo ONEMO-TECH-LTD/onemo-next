@@ -107,51 +107,19 @@ export interface PreparedContour {
   truth: BoundaryTruth
   identity: string
 }
-export interface ContactWitness {
-  scale: ExactScale
-  boundaryTruth: BoundaryTruth
-  beltAnchorId: string
-  outlineElementId: string
-  outlineElementKind: 'segment'
-  allowance: ExactReal
-  equation: { kind: 'polynomial'; polynomial: readonly ExactInteger[]; rootIndex: number }
-  tangency: { x: ExactReal; y: ExactReal }
-  regimeId: string
-  certificateId: string
-}
-export interface WrapMeasurement {
-  scale: ExactScale
-  boundaryTruth: BoundaryTruth
-  requiredFlap: ExactReal
-  requiredFlapApproxMM: number
-  witnesses: readonly ContactWitness[]
-  refusal: null | {
-    code: 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND'
-    reason: 'invalid-boundary' | 'empty-belt' | 'invalid-seat'
-  }
-}
+/** Nearest-outline witness for one belt disc; clearanceMM is on the 1 mm ruler (ruler-zero is not literal touch). */
+export interface ContactWitness { beltAnchorMM: Pt; outlinePointMM: Pt; clearanceMM: number }
+export type WrapRefusalReason = 'invalid-boundary' | 'empty-belt'
+export type WrapMeasurement =
+  | { status: 'measured'; requiredFlapMM: number; witnesses: readonly ContactWitness[]; refusal: null }
+  | { status: 'refused'; requiredFlapMM: null; witnesses: readonly []; refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND'; reason: WrapRefusalReason } }
 export type WrapPolicy =
-  | { mode: 'fixed'; allowance: Rational; allowanceApproxMM: number }
-  | { mode: 'auto'; cap: Rational; capApproxMM: number }
+  | { mode: 'fixed'; allowanceMM: number }
+  | { mode: 'auto'; capMM: number }
 export type WrapEvaluation =
-  | {
-    status: 'lawful'
-    requiredFlap: ExactReal
-    requiredFlapApproxMM: number
-    appliedFlap: ExactReal
-    appliedFlapApproxMM: number
-    witnesses: readonly ContactWitness[]
-  }
-  | {
-    status: 'refused'
-    code: 'WRAP_EXCEEDS_ALLOWANCE' | 'AUTO_FLAP_CAP_EXCEEDED' | 'NO_WRAPPED_LAYOUT_IN_BAND'
-    reason?: 'invalid-boundary' | 'empty-belt' | 'invalid-seat'
-    requiredFlap: ExactReal
-    requiredFlapApproxMM: number
-    allowedFlap: Rational
-    allowedFlapApproxMM: number
-    witnesses: readonly ContactWitness[]
-  }
+  | { status: 'lawful'; requiredFlapMM: number; appliedFlapMM: number; witnesses: readonly ContactWitness[] }
+  | { status: 'refused'; code: 'WRAP_EXCEEDS_ALLOWANCE' | 'AUTO_FLAP_CAP_EXCEEDED'; requiredFlapMM: number; allowedFlapMM: number; witnesses: readonly ContactWitness[] }
+  | { status: 'refused'; code: 'NO_WRAPPED_LAYOUT_IN_BAND'; reason: WrapRefusalReason; requiredFlapMM: null; allowedFlapMM: null; witnesses: readonly [] }
 export interface Ring { pts: Pt[] }
 export interface Contour { outer: Ring; holes: Ring[] }
 export interface BBox { minX: number; minY: number; maxX: number; maxY: number }
