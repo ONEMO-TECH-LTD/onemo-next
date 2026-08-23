@@ -2,8 +2,8 @@
 
 ## Canonical authority
 
-1. [`canon/v3.5.2-master-contract.md`](./canon/v3.5.2-master-contract.md) — master v3.5.2-3 (final state), 193 lines, SHA-256 `0ba00445ca86a96ec42871da3da204990a1c17dd686c3fc06d0a83c0248c7e55`. The only contract.
-2. [`canon/T3-surgical-execution-subplan.md`](./canon/T3-surgical-execution-subplan.md) — execution sequence W1 → W2 → S1–S5 → F1 → F2, 32 lines, SHA-256 `2e1e6a1926acccd93ce42fc44ff7a9f356f79ee31917f4fc5e2c38c90cf3d58d`.
+1. [`canon/v3.5.2-master-contract.md`](./canon/v3.5.2-master-contract.md) — master v3.5.2-3 (final state), 194 lines, SHA-256 `b899dd0ab01c06eaf617d0f79315bde9e8559139daa9b10694bf2a66cb28ee5d`. The only contract.
+2. [`canon/T3-surgical-execution-subplan.md`](./canon/T3-surgical-execution-subplan.md) — execution sequence W1 → W2 → S1–S5 → F1 → F2, 32 lines, SHA-256 `ed187e672c2281475145c3fcdd3ea5f162bc1fa6afbb34dca8bcb324297cdbc1`.
 
 Dan rulings encoded (2026-08-23): no law measurement finer than 1 mm; shape sizes even millimetres; reviews carry paste-ready fixes. Reading applied for the ruler: air below 0.5 mm reads 0 (master §1; one constant if Dan flips it).
 
