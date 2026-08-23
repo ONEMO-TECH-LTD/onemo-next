@@ -12,7 +12,7 @@
 // ring and a radius and answers a geometric question.
 
 
-import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt } from '../spec'
+import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, ParityMeasurement, Pt } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
 
 export interface Prepared {
@@ -402,6 +402,24 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
     if (l && r && u && d) interior.push(p); else belt.push(p)
   }
   return { belt, interior }
+}
+
+/** Parity evidence for a seated population against the governed centre: per axis, an odd count of
+ *  magnet lines must put a NODE on the centre, an even count the GAP. centreErrorMM is the larger
+ *  axis miss from that required line, on the 1 mm ruler (0 when the centre law holds exactly). */
+export function measureParity(seated: ReadonlyArray<Pt>, target: Pt, pitch: number): ParityMeasurement {
+  if (!seated.length || !(pitch > 0)) return { parityTrue: false, centreErrorMM: 0 }
+  let parityTrue = true, worstMM = 0
+  for (const axis of [0, 1] as const) {
+    const lines = new Set(seated.map((s) => s[axis])).size
+    const off = (((seated[0][axis] - target[axis]) % pitch) + pitch) % pitch
+    const nodeMiss = Math.min(off, pitch - off), gapMiss = Math.abs(pitch / 2 - off)
+    const onNode = off < pitch / 4 || off > pitch * 3 / 4
+    const odd = lines % 2 === 1
+    if (odd !== onNode) parityTrue = false
+    worstMM = Math.max(worstMM, odd ? nodeMiss : gapMiss)
+  }
+  return { parityTrue, centreErrorMM: Math.floor(worstMM + 0.5) }
 }
 
 /** Neutral extreme-corner measurements consumed by the magnet-plan policy. */

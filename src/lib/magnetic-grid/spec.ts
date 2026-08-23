@@ -154,6 +154,27 @@ export interface GridConfig {
   autoFlapCapMM?: number
 }
 
+/** Which parity placement: the canonical frame, or the half-pitch shift on x, y or both. */
+export interface Placement { xHalf: boolean; yHalf: boolean }
+export interface ParityMeasurement { parityTrue: boolean; centreErrorMM: number }
+export type Concession = 'CENTRE' | 'WRAP'
+
+/** One placement at one even size — render-complete for its own phase; Logic judges wrapMeasurement once. */
+export interface PlacementCandidate {
+  sizeMM: number
+  placement: Placement
+  phaseMM: Pt
+  lattice: Pt[]
+  canon: number
+  seated: Pt[]
+  belt: Pt[]
+  anchors: Anchor[]
+  magnetCount: number
+  parityTrue: boolean
+  centreErrorMM: number
+  wrapMeasurement: WrapMeasurement
+}
+
 export interface GridResult {
   anchors: Anchor[]
   pitchCentreMM: number
@@ -166,6 +187,11 @@ export interface GridResult {
   centresMM: Pt[]
   centreMainMM: Pt
   wrap: WrapEvaluation
+  parityTrue: boolean
+  centreErrorMM: number
+  concessions: Concession[]
+  /** All four parity placements at this size, measured. */
+  candidates: PlacementCandidate[]
 }
 
 export interface BandSnapPoint { sizeMM: number; count: number }

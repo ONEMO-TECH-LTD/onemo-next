@@ -60,7 +60,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
     'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
     'measureCentrePlacements', 'edgeIdxOf', 'segDist2', 'edgeDistMM', 'pointInOuter',
     'pointInMaterial', 'nearestOutlineMM', 'makeSeatPredicate', 'pressExcessMM',
-    'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
+    'measureParity', 'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
   ],
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
   'magnetic-grid/logic.ts': [

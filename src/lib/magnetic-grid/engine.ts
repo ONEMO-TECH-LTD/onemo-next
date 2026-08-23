@@ -1,7 +1,7 @@
 // Magnetic-grid engine: orchestration over spec, compute and Logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Pt } from './spec'
+import type { BandSnapPoint, CentreMode, Concession, Contour, Governor, GridConfig, GridResult, Placement, PlacementCandidate, Pt } from './spec'
 import {
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
@@ -21,6 +21,7 @@ import {
   measureCentreBranches,
   measureCentrePlacements,
   measureExtremeCorners,
+  measureParity,
   measureWrap,
   safeSegments,
   splitPerimeter,
@@ -77,54 +78,66 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const midY = (bb.minY + bb.maxY) / 2
   const ruleTarget: Pt = mode === 2 ? (governMass(centreMeasurements.masses, governor, midY)?.centreMM ?? centres[0]) : centres[0]
 
-  let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
-  let mainCentre: Pt = centres[0]
+  // One render-complete candidate per phase. The frozen Centre prescreen only SELECTS a phase;
+  // the final Law population is the regenerated lattice filtered by the one signed whole-mm
+  // clearance, Coverage and the magnet plan act on that population, and parity is measured.
+  const sizeMM = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY)
+  const candidateAt = (phaseMM: Pt, placement: Placement, canon: number): PlacementCandidate => {
+    const lattice = latticeAt(bb, pitch, phaseMM[0], phaseMM[1])
+    const law = measureWrap(contourMM, lattice, pitch, spotRadiusOf(pad))
+    const coverage = applyCoverage(law.seated, perimeterOnly, splitPerimeter(law.seated, pitch))
+    const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
+    const parity = measureParity(law.seated, ruleTarget, pitch)
+    return {
+      sizeMM, placement, phaseMM, lattice, canon, seated: law.seated, belt: law.belt, anchors, magnetCount: anchors.length,
+      parityTrue: parity.parityTrue, centreErrorMM: parity.centreErrorMM, wrapMeasurement: law.wrapMeasurement,
+    }
+  }
+  // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes: each axis's class
+  // fixes its magnet-line count, odd count puts a NODE on the centre, even count puts the GAP on
+  // it. All four parity placements are measured and returned; the display pick keeps the frozen
+  // Centre ordering (a parity seating more wins; at equal seats the canonical frame).
+  const measured = fits ? measureCentrePlacements(bb, pitch, centrePhaseCandidates(ruleTarget, bb, pitch), fits, outer, reach) : []
+  const candidates = measured.map((m, i) => candidateAt(m.phaseMM, { xHalf: i === 1 || i === 3, yHalf: i === 2 || i === 3 }, m.canon))
+  const best = chooseCentrePlacement(measured)
+  let display: PlacementCandidate
+  let bestKx = 0, bestKy = 0
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search. The centre law
     // is NOT satisfied by construction here — a hand-placed grid may sit anywhere — so its
-    // truth is MEASURED and reported (pixel full-eval F1: silence read as compliance).
-    bestOx = mod(cfg.forcePhaseMM[0], pitch)
-    bestOy = mod(cfg.forcePhaseMM[1], pitch)
-    bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
-    bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
-    mainCentre = ruleTarget
-  } else if (fits) {
-    // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
-    // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
-    // even count puts the GAP on it — so a 108x91 (class 2x2) shape is judged as a 2x2 frame
-    // whose centre IS the governed centre. Magnets still govern first: a parity seating more
-    // wins; at EQUAL seats the canonical frame parity always beats the rest, and coverage
-    // only sorts the non-canonical remainder. Centring is exact by construction.
-    const measured = measureCentrePlacements(bb, pitch, centrePhaseCandidates(ruleTarget, bb, pitch), fits, outer, reach)
-    const best = chooseCentrePlacement(measured)
-    if (best) { bestOx = best.phaseMM[0]; bestOy = best.phaseMM[1] }
-    mainCentre = ruleTarget
+    // truth is MEASURED and reported as a concession.
+    const ox = mod(cfg.forcePhaseMM[0], pitch), oy = mod(cfg.forcePhaseMM[1], pitch)
+    bestKx = mod(ox - (bb.maxX - bb.minX) / 2, pitch)
+    bestKy = mod(oy - (bb.maxY - bb.minY) / 2, pitch)
+    display = candidateAt([ox, oy], { xHalf: false, yHalf: false }, 0)
+  } else {
+    display = best ? candidates[measured.indexOf(best)] : candidateAt([0, 0], { xHalf: false, yHalf: false }, 0)
   }
+  const mainCentre: Pt = fits ? ruleTarget : centres[0]
 
-  // The frozen Centre prescreen above selected the phase only. The final Law population is the
-  // regenerated lattice filtered by the one signed whole-mm clearance; Coverage and the magnet
-  // plan act on that population, and the same records carry the belt and its requirement.
-  const lattice = latticeAt(bb, pitch, bestOx, bestOy)
-  const law = measureWrap(contourMM, lattice, pitch, spotRadiusOf(pad))
-  const coverage = applyCoverage(law.seated, perimeterOnly, splitPerimeter(law.seated, pitch))
-  const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
   const wrap = cfg.wrapMode === 'auto'
-    ? evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) })
-    : evaluateWrap(law.wrapMeasurement, { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) })
+    ? evaluateWrap(display.wrapMeasurement, { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) })
+    : evaluateWrap(display.wrapMeasurement, { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) })
+  // A centre concession is any measured miss of the centre law: wrong parity, or a whole-mm offset from the required line.
+  const concessions: Concession[] = [...(display.parityTrue && display.centreErrorMM === 0 ? [] : ['CENTRE' as const]), ...(wrap.status === 'lawful' ? [] : ['WRAP' as const])]
 
   return {
-    anchors,
+    anchors: display.anchors,
     // Truth dots come only from returned witnesses on a lawful result; refusals draw none.
     contactsMM: wrap.status === 'lawful' ? wrap.witnesses.map((witness) => witness.outlinePointMM) : [],
     pitchCentreMM: pitch,
-    lattice,
-    phaseMM: [bestOx, bestOy],
+    lattice: display.lattice,
+    phaseMM: display.phaseMM,
     panMM: [bestKx, bestKy],
     spotRadiusMM: spotRadiusOf(pad),
     segments,
     centresMM: [ruleTarget],
     centreMainMM: mainCentre,
     wrap,
+    parityTrue: display.parityTrue,
+    centreErrorMM: display.centreErrorMM,
+    concessions,
+    candidates,
   }
 }
 
