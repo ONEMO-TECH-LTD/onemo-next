@@ -97,6 +97,27 @@ describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
     expect([...calls.entries()]).toEqual(beforeSelection)
   })
 
+  it('MagnetPlan changes diameters only: ladder ownership, positions and Wrap evidence stay fixed', () => {
+    const plans = (['all6', 'all8', 'corners8'] as const).map((plan) => solveBands(square, { ...fixed0, plan }))
+    const ownership = (solved: (typeof plans)[number]) => solved.bands.map((band) =>
+      band.rungs.map((rung) => [rung.sizeMM, rung.magnetCount]))
+    expect(ownership(plans[1])).toEqual(ownership(plans[0]))
+    expect(ownership(plans[2])).toEqual(ownership(plans[0]))
+
+    const shared = plans.map((solved) => solved.bands[1].rungs.find((rung) => rung.sizeMM === 72 && rung.magnetCount === 4)!.layouts[0])
+    for (const layout of shared.slice(1)) {
+      expect(layout.candidate.phaseMM).toEqual(shared[0].candidate.phaseMM)
+      expect(layout.candidate.seated).toEqual(shared[0].candidate.seated)
+      expect(layout.candidate.belt).toEqual(shared[0].candidate.belt)
+      expect(layout.candidate.anchors.map((anchor) => anchor.p)).toEqual(shared[0].candidate.anchors.map((anchor) => anchor.p))
+      expect(layout.candidate.wrapMeasurement).toEqual(shared[0].candidate.wrapMeasurement)
+      expect(layout.wrap).toEqual(shared[0].wrap)
+    }
+    expect(shared[0].candidate.anchors.map((anchor) => anchor.dia)).toEqual([6, 6, 6, 6])
+    expect(shared[1].candidate.anchors.map((anchor) => anchor.dia)).toEqual([8, 8, 8, 8])
+    expect(shared[2].candidate.anchors.map((anchor) => anchor.dia)).not.toEqual(shared[0].candidate.anchors.map((anchor) => anchor.dia))
+  })
+
   it('square-rotated diamond: 1@34 (air 0.02 reads 0)', () => {
     const solved = solveBands((mm) => diamond(mm / 2), fixed0)
     expect(solved.bands[0].rungs[0]).toMatchObject({ sizeMM: 34, magnetCount: 1 })
