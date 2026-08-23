@@ -21,10 +21,11 @@ Kept as the contract requires: Centre's 0.001 mm integer seat prescreen (`prepar
 
 `separation.test.ts`: owner map renamed to `wrap-measurement.ts`; Logic may import `spec` only (any compute import is a violation); new test asserts every deleted identifier (`Rational`, `AlgebraicReal`, `ExactReal`, `ExactScale`, `sqrtMinusRational`, `compareExactToRational`, `certifyContactWitness`, `sha256Text`, `exactSeatIsLegal`, `exactPointInMaterial`, `makeCircleSeatPredicate`, `maxPressMM`, `contactPointsMM`, `impliedFlapMM`, `TANGENT_GUARD_MM`, `parityHolds`, `prepareContour`) is absent from every Law runtime file and that no file imports `exact-real`/`contact-root`; mutation-proved on a synthetic line.
 
-## Fixture 1 — Centre unchanged, circle preset disposition
+## Fixture 1 — Centre unchanged except the ruled circle-preset disposition
 
-- `centre-freeze.test.ts` passes unchanged (squircle 72 flap 0/4: centre, targets, evidence, phase, anchors equal to the frozen comparator).
-- **Circle preset before/after (`circle-disposition.test.ts`):** the deleted analytic predicate (embedded byte-equivalent as "before") and the supplied-segment prescreen ("after") seat the same count at every even size 24…214 — **zero differing sizes** (the preset is flattened at 192 points; its chords sit within the 0.001 mm kernel's quantum at every tested tangency). The only intended Centre-path change therefore produces no placement difference on the live preset.
+- `centre-freeze.test.ts` passes unchanged for the non-circle frozen comparator.
+- The deleted analytic circle predicate and supplied-segment predicate were replayed over all four Centre candidate lattices at every even size 24–214 (QA, `cff17f1c`). Candidate seating differs at 24/72/120/168. The selected placement differs at 24 (`[12,12]`, 1 seat → none), 72 (`[36,12]`, 2 → `[36,36]`, 1), and 120 (`[12,12]`, 5 → `[36,36]`, 4). Final Law anchors differ only at those three sizes: counts 1→0, 2→1, and 4→4 with changed positions. Every other even size selects the same placement and anchors. This is exactly the contract-authorized circle-only consequence of replacing the analytic predicate with the supplied segments.
+- Correction of my earlier claim: my original fixture compared seat counts on the phase the *new* predicate had already selected, so it could not see that the analytic predicate would have selected a different phase; "zero differing sizes" was false. QA's replay is the disposition of record.
 
 ## Headless
 
@@ -32,4 +33,4 @@ Kept as the contract requires: Centre's 0.001 mm integer seat prescreen (`prepar
 
 ## Live tab — :4031 serving `…/s62-grid-v353-build` (lsof cwd), commit `f5f85b72`
 
-`W2-*.png` beside this file, zero console errors; readings identical to W1 (squircle 72 lawful in Masses and Weight; square 24 four dots; square 26 requires 1; preset diamond 34/36 `empty-belt` — rhombus, first rung at 40, see W1 ledger). Deleting the exact layer changed nothing visible — as the contract predicts.
+`W2-*.png` beside this file, zero console errors; readings identical to W1 (squircle 72 lawful in Masses and Weight; square 24 four dots; square 26 requires 1; preset diamond 34/36 `empty-belt` — rhombus, first rung at 40, see W1 ledger). Deleting the exact layer changes nothing visible on the non-circle presets; the circle preset's authorised placement changes at 24/72/120 are recorded under Fixture 1.
