@@ -1,6 +1,6 @@
 // Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, ExtremeCornerMeasurement, Governor, MagnetPlan, PerimeterMeasurement, Pt, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
+import type { Anchor, BBox, Band, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Concession, ExtremeCornerMeasurement, Governor, MagnetPlan, ParityMeasurement, PerimeterMeasurement, Pt, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
@@ -109,6 +109,14 @@ export function evaluateWrap(measured: WrapMeasurement, policy: WrapPolicy): Wra
     appliedFlapMM: policy.mode === 'auto' ? measured.requiredFlapMM : policy.allowanceMM,
     witnesses: measured.witnesses,
   }
+}
+
+/** Fixed-size/manual inspection concessions: any measured miss of the centre law, and a refused Wrap. */
+export function inspectionConcessions(parity: ParityMeasurement, wrap: WrapEvaluation): Concession[] {
+  const concessions: Concession[] = []
+  if (!parity.parityTrue || parity.centreErrorMM > 0) concessions.push('CENTRE')
+  if (wrap.status !== 'lawful') concessions.push('WRAP')
+  return concessions
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

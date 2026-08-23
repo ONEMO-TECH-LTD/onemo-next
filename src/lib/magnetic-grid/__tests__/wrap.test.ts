@@ -25,7 +25,7 @@ const fixed0 = { ...baseConfig, flapMM: 0, wrapMode: 'fixed' as const }
 
 describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   it('square 24 is lawful at flap 0 with four co-nearest witnesses at clearance 0', () => {
-    const grid = computeGrid(square(24), fixed0)
+    const grid = computeGrid(square(24), 24, fixed0)
     expect(grid.wrap.status).toBe('lawful')
     if (grid.wrap.status !== 'lawful') return
     expect(grid.wrap.requiredFlapMM).toBe(0)
@@ -37,19 +37,19 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   })
 
   it('square 26 at pitch 48 requires 1; a clearance of exactly 0.5 reads 1 and refuses flap 0', () => {
-    const s26 = computeGrid(square(26), { ...fixed0, pitchMM: 48 })
+    const s26 = computeGrid(square(26), 26, { ...fixed0, pitchMM: 48 })
     expect(s26.wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1, allowedFlapMM: 0 })
     expect(s26.contactsMM).toEqual([])
-    const s25 = computeGrid(square(25), fixed0)
+    const s25 = computeGrid(square(25), 25, fixed0)
     expect(s25.wrap).toMatchObject({ status: 'refused', requiredFlapMM: 1 })
-    expect(computeGrid(square(25), { ...fixed0, flapMM: 1 }).wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
+    expect(computeGrid(square(25), 25, { ...fixed0, flapMM: 1 }).wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
   })
 
   it('diamond 34 seats with 0.02 mm of air, reads 0 and is lawful at flap 0; diamond 36 requires 1', () => {
-    const d34 = computeGrid(diamond(17), fixed0)
+    const d34 = computeGrid(diamond(17), 17, fixed0)
     expect(d34.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 0 })
     expect(nearestOutlineMM(diamond(17), [0, 0]).distMM).toBeGreaterThan(12)
-    expect(computeGrid(diamond(18), fixed0).wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1 })
+    expect(computeGrid(diamond(18), 18, fixed0).wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1 })
   })
 
   it('signed ruler: −0.49 reads 0 and stays seated; −0.51 reads −1 and is not admitted', () => {
@@ -87,9 +87,9 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(law.wrapMeasurement.witnesses[0].outlinePointMM).toEqual([0, 5])
     expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 3 })).toMatchObject({ status: 'lawful', appliedFlapMM: 1 })
     expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 0 })).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
-    const auto = computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
+    const auto = computeGrid(diamond(18), 18, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
     expect(auto.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
-    expect(computeGrid(diamond(18), { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
+    expect(computeGrid(diamond(18), 18, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
   })
 
   it('an invalid boundary and an empty belt refuse with null allowance evidence, and Logic never invents one', () => {
@@ -119,8 +119,8 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   })
 
   it('Coverage changes the output population only; the seated set, belt and every witness are identical', () => {
-    const perimeter = computeGrid(square(120), { ...fixed0, perimeterOnly: true })
-    const full = computeGrid(square(120), { ...fixed0, perimeterOnly: false })
+    const perimeter = computeGrid(square(120), 120, { ...fixed0, perimeterOnly: true })
+    const full = computeGrid(square(120), 120, { ...fixed0, perimeterOnly: false })
     expect(full.anchors.length).toBeGreaterThan(perimeter.anchors.length)
     expect(full.wrap).toEqual(perimeter.wrap)
     expect(full.contactsMM).toEqual(perimeter.contactsMM)
@@ -139,6 +139,6 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   it('the existing band caller returns the same Wrap verdict as direct fixed-size inspection', () => {
     const sized = (side: number) => square(side)
     const fit = fitSizeInBand(sized, fixed0, 24, 2)
-    expect(fit.grid.wrap).toEqual(computeGrid(sized(fit.sizeMM), fixed0).wrap)
+    expect(fit.grid.wrap).toEqual(computeGrid(sized(fit.sizeMM), fit.sizeMM, fixed0).wrap)
   })
 })

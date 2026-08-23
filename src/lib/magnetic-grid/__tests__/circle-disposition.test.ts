@@ -48,9 +48,9 @@ describe('circle preset disposition — the only intended Centre-path change (v3
           after: afterBest ? { phaseMM: afterBest.phaseMM, seated: afterBest.seated.length } : null,
         })
       }
-      const grid = computeGrid(contour, { paddingMM: 12, flapMM: 0, wrapMode: 'fixed', centreMode: 0, perimeterOnly: true })
+      const grid = computeGrid(contour, mm, { paddingMM: 12, flapMM: 0, wrapMode: 'fixed', centreMode: 0, perimeterOnly: true })
       expect(grid.phaseMM, `live phase at ${mm}mm`).toEqual(afterBest?.phaseMM ?? [0, 0])
-      const beforeGrid = computeGrid(contour, { paddingMM: 12, flapMM: 0, wrapMode: 'fixed', centreMode: 0, perimeterOnly: true, forcePhaseMM: beforeBest?.phaseMM ?? [0, 0] })
+      const beforeGrid = computeGrid(contour, mm, { paddingMM: 12, flapMM: 0, wrapMode: 'fixed', centreMode: 0, perimeterOnly: true, forcePhaseMM: beforeBest?.phaseMM ?? [0, 0] })
       if (JSON.stringify(beforeGrid.anchors) !== JSON.stringify(grid.anchors)) {
         anchorDifferences.push({ sizeMM: mm, before: beforeGrid.anchors.length, after: grid.anchors.length })
       }

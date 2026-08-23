@@ -1,7 +1,7 @@
 // Magnetic-grid engine: orchestration over spec, compute and Logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { BandSnapPoint, CentreMode, Concession, Contour, Governor, GridConfig, GridResult, Placement, PlacementCandidate, Pt } from './spec'
+import type { BandSnapPoint, CentreMode, Contour, Governor, GridConfig, GridResult, Placement, PlacementCandidate, Pt } from './spec'
 import {
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
@@ -36,6 +36,7 @@ import {
   chooseCentrePlacement,
   evaluateWrap,
   governMass,
+  inspectionConcessions,
 } from './logic'
 
 export * from './spec'
@@ -52,7 +53,7 @@ export { bandOf } from './logic'
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
-export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
+export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? RELEASED_PADDING_MM)
   // Coverage reach from a magnet centre: the spot plus the dialled flap allowance.
@@ -81,7 +82,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   // One render-complete candidate per phase. The frozen Centre prescreen only SELECTS a phase;
   // the final Law population is the regenerated lattice filtered by the one signed whole-mm
   // clearance, Coverage and the magnet plan act on that population, and parity is measured.
-  const sizeMM = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY)
+  // The candidate's size is the caller's requested ladder size, never the (offset) geometry's bbox.
+  const sizeMM = requestedSizeMM
   const candidateAt = (phaseMM: Pt, placement: Placement, canon: number): PlacementCandidate => {
     const lattice = latticeAt(bb, pitch, phaseMM[0], phaseMM[1])
     const law = measureWrap(contourMM, lattice, pitch, spotRadiusOf(pad))
@@ -118,8 +120,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const wrap = cfg.wrapMode === 'auto'
     ? evaluateWrap(display.wrapMeasurement, { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) })
     : evaluateWrap(display.wrapMeasurement, { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) })
-  // A centre concession is any measured miss of the centre law: wrong parity, or a whole-mm offset from the required line.
-  const concessions: Concession[] = [...(display.parityTrue && display.centreErrorMM === 0 ? [] : ['CENTRE' as const]), ...(wrap.status === 'lawful' ? [] : ['WRAP' as const])]
+  const concessions = inspectionConcessions({ parityTrue: display.parityTrue, centreErrorMM: display.centreErrorMM }, wrap)
 
   return {
     anchors: display.anchors,
@@ -165,7 +166,7 @@ function bandWalk(
   const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
   const solve = (mm: number): GridResult => {
     let g = cfg.solveCache?.get(mm)
-    if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
+    if (!g) { g = computeGrid(sized(mm), mm, walkCfg); cfg.solveCache?.set(mm, g) }
     return g
   }
   // Counts already seating just below the band reached contact earlier — loose here, not rungs.
@@ -196,9 +197,9 @@ export function fitSizeInBand(
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const pickIdx = points.findIndex((p) => p.count === maxCount)
-    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), cfg), ladder: points, pickIdx }
+    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), points[pickIdx].sizeMM, cfg), ladder: points, pickIdx }
   }
-  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), cfg), ladder: [], pickIdx: 0 }
+  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), bestSeatedMM, cfg), ladder: [], pickIdx: 0 }
 }
 
 /**

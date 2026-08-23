@@ -21,8 +21,8 @@ describe('v3.5.1 frozen Centre at nonzero flap', () => {
     expect(base).not.toBeNull()
     const contour = makeSizer(base!, 0)(72)
 
-    const flap0 = computeLaw(contour, { ...comparisonConfig, flapMM: 0 })
-    const flap4 = computeLaw(contour, { ...comparisonConfig, flapMM: 4 })
+    const flap0 = computeLaw(contour, 72, { ...comparisonConfig, flapMM: 0 })
+    const flap4 = computeLaw(contour, 72, { ...comparisonConfig, flapMM: 4 })
     expect({
       centreMainMM: flap4.centreMainMM,
       centresMM: flap4.centresMM,

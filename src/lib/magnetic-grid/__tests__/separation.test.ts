@@ -65,7 +65,7 @@ const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> 
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
   'magnetic-grid/logic.ts': [
     'bandOf', 'governMass', 'centeringAnchors',
-    'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'applyCoverage', 'assignSizes',
+    'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'inspectionConcessions', 'applyCoverage', 'assignSizes',
   ],
   'magnetic-grid/engine.ts': [
     'mod', 'computeGrid', 'snapRange', 'bandSnapPoints', 'bandWalk', 'fitSizeInBand', 'autoFlapInBand',

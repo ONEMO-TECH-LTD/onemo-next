@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { measureParity } from '../compute/seat'
-import { centrePhaseCandidates } from '../logic'
+import { centrePhaseCandidates, inspectionConcessions } from '../logic'
 import { computeGrid } from '../engine'
-import type { Contour, Pt } from '../spec'
+import type { Contour, Pt, WrapEvaluation } from '../spec'
 
 const square = (side: number): Contour => ({
   outer: { pts: [[-side / 2, -side / 2], [side / 2, -side / 2], [side / 2, side / 2], [-side / 2, side / 2]] },
@@ -12,7 +12,7 @@ const fixed0 = { paddingMM: 12, centreMode: 0, perimeterOnly: true, flapMM: 0, w
 
 describe('v3.5.3 S2 — every size solve returns all four placements, render-complete', () => {
   it('returns four candidates carrying phase, lattice, populations, count, parity, centre error and measurement', () => {
-    const grid = computeGrid(square(72), fixed0)
+    const grid = computeGrid(square(72), 72, fixed0)
     expect(grid.candidates).toHaveLength(4)
     for (const c of grid.candidates) {
       expect(c.sizeMM).toBe(72)
@@ -33,7 +33,7 @@ describe('v3.5.3 S2 — every size solve returns all four placements, render-com
 
   it('S2-c: placement labels are derived from the declared centrePhaseCandidates order — a reorder would relabel and fail here', () => {
     const contour = square(72)
-    const grid = computeGrid(contour, fixed0)
+    const grid = computeGrid(contour, 72, fixed0)
     const canonical = grid.candidates.find((c) => !c.placement.xHalf && !c.placement.yHalf)!
     const pitch = grid.pitchCentreMM
     const shifted = (a: number, b: number) => Math.abs((((a - b) % pitch) + pitch) % pitch - pitch / 2) < 1e-9
@@ -62,29 +62,47 @@ describe('v3.5.3 S2 — every size solve returns all four placements, render-com
     expect(measureParity([[0, 0]], [0.4, 0], pitch)).toEqual({ parityTrue: true, centreErrorMM: 0 })
     expect(measureParity([[0, 0]], [0.6, 0], pitch)).toEqual({ parityTrue: true, centreErrorMM: 1 })
     expect(measureParity([], [0, 0], pitch)).toEqual({ parityTrue: false, centreErrorMM: 0 })
+    // S2-QA-1: frozen 0.001 mm line identity — two nodes 0.0004 mm apart are ONE line
+    expect(measureParity([[0, 0], [0.0004, 48]], [0, 24], 48)).toEqual({ parityTrue: true, centreErrorMM: 0 })
+  })
+
+  it('S2-QA-2: Logic decides the concessions — clean, Centre-only, Wrap-only, both', () => {
+    const lawful: WrapEvaluation = { status: 'lawful', requiredFlapMM: 0, appliedFlapMM: 0, witnesses: [] }
+    const refused: WrapEvaluation = { status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 1, allowedFlapMM: 0, witnesses: [] }
+    expect(inspectionConcessions({ parityTrue: true, centreErrorMM: 0 }, lawful)).toEqual([])
+    expect(inspectionConcessions({ parityTrue: true, centreErrorMM: 3 }, lawful)).toEqual(['CENTRE'])
+    expect(inspectionConcessions({ parityTrue: false, centreErrorMM: 0 }, lawful)).toEqual(['CENTRE'])
+    expect(inspectionConcessions({ parityTrue: true, centreErrorMM: 0 }, refused)).toEqual(['WRAP'])
+    expect(inspectionConcessions({ parityTrue: false, centreErrorMM: 24 }, refused)).toEqual(['CENTRE', 'WRAP'])
+  })
+
+  it('S2-QA-3: candidate sizeMM is the requested ladder size, never the offset geometry bbox', () => {
+    const grid = computeGrid(square(82), 72, fixed0)
+    expect(grid.candidates).toHaveLength(4)
+    expect(grid.candidates.map((c) => c.sizeMM)).toEqual([72, 72, 72, 72])
   })
 
   it('concessions are measured: a hand-placed grid reports CENTRE; a refused wrap reports WRAP; the canonical square reports none', () => {
-    const clean = computeGrid(square(24), fixed0)
+    const clean = computeGrid(square(24), 24, fixed0)
     expect(clean.concessions).toEqual([])
     expect(clean.parityTrue).toBe(true)
     // hand-placed 3 mm off the centre node on a 72 square: parity still holds, the miss is reported and is a concession
-    const forced = computeGrid(square(72), { ...fixed0, forcePhaseMM: [39, 36] as Pt })
+    const forced = computeGrid(square(72), 72, { ...fixed0, forcePhaseMM: [39, 36] as Pt })
     expect(forced.anchors.length).toBeGreaterThan(0)
     expect(forced.parityTrue).toBe(true)
     expect(forced.centreErrorMM).toBe(3)
     expect(forced.concessions).toContain('CENTRE')
     // hand-placed so far that nothing seats: parity cannot hold and the concession is still reported
-    const empty = computeGrid(square(24), { ...fixed0, forcePhaseMM: [5, 0] as Pt })
+    const empty = computeGrid(square(24), 24, { ...fixed0, forcePhaseMM: [5, 0] as Pt })
     expect(empty.anchors).toEqual([])
     expect(empty.concessions).toEqual(['CENTRE', 'WRAP'])
-    const refused = computeGrid(square(26), fixed0)
+    const refused = computeGrid(square(26), 26, fixed0)
     expect(refused.concessions).toEqual(['WRAP'])
   })
 
   it('Coverage changes output anchors only — every candidate keeps its seated set, belt and measurement', () => {
-    const perimeter = computeGrid(square(120), { ...fixed0, perimeterOnly: true })
-    const full = computeGrid(square(120), { ...fixed0, perimeterOnly: false })
+    const perimeter = computeGrid(square(120), 120, { ...fixed0, perimeterOnly: true })
+    const full = computeGrid(square(120), 120, { ...fixed0, perimeterOnly: false })
     expect(full.candidates.map((c) => c.seated)).toEqual(perimeter.candidates.map((c) => c.seated))
     expect(full.candidates.map((c) => c.belt)).toEqual(perimeter.candidates.map((c) => c.belt))
     expect(full.candidates.map((c) => c.wrapMeasurement)).toEqual(perimeter.candidates.map((c) => c.wrapMeasurement))

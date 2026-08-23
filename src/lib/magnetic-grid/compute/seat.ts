@@ -407,11 +407,13 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
 /** Parity evidence for a seated population against the governed centre: per axis, an odd count of
  *  magnet lines must put a NODE on the centre, an even count the GAP. centreErrorMM is the larger
  *  axis miss from that required line, on the 1 mm ruler (0 when the centre law holds exactly). */
+const PARITY_LINE_QUANTUM_MM = 0.001 // frozen Centre line identity; not a Law tolerance
+
 export function measureParity(seated: ReadonlyArray<Pt>, target: Pt, pitch: number): ParityMeasurement {
   if (!seated.length || !(pitch > 0)) return { parityTrue: false, centreErrorMM: 0 }
   let parityTrue = true, worstMM = 0
   for (const axis of [0, 1] as const) {
-    const lines = new Set(seated.map((s) => s[axis])).size
+    const lines = new Set(seated.map((s) => Math.round(s[axis] / PARITY_LINE_QUANTUM_MM))).size
     const off = (((seated[0][axis] - target[axis]) % pitch) + pitch) % pitch
     const nodeMiss = Math.min(off, pitch - off), gapMiss = Math.abs(pitch / 2 - off)
     const onNode = off < pitch / 4 || off > pitch * 3 / 4

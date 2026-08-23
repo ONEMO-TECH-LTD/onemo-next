@@ -12,7 +12,7 @@ describe('Wrap admitted product contour',()=>{
     const contour=makeSizer(base!,0)(72)
     let sawResidue=false
     for(const centreMode of [0,1,2,3,4,5]){
-      const grid=computeGrid(contour,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode,perimeterOnly:true})
+      const grid=computeGrid(contour,72,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode,perimeterOnly:true})
       expect(grid.wrap,`centre mode ${centreMode}`).toMatchObject({status:'lawful',requiredFlapMM:0})
       expect(grid.anchors.length).toBeGreaterThan(0)
       for(const anchor of grid.anchors)if(nearestOutlineMM(contour,anchor.p).distMM<12)sawResidue=true
@@ -21,7 +21,7 @@ describe('Wrap admitted product contour',()=>{
   })
   it('makes the live square24 contour lawful at flap 0 and preserves supplied holes while scaling',()=>{
     const base=normBaseContour(getShape('square',1024,1024),1024)!,contour=makeSizer(base,0)(24)
-    const grid=computeGrid(contour,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode:0,perimeterOnly:true})
+    const grid=computeGrid(contour,24,{paddingMM:12,flapMM:0,wrapMode:'fixed',centreMode:0,perimeterOnly:true})
     expect(Math.max(...contour.outer.pts.map(point=>point[0]))-Math.min(...contour.outer.pts.map(point=>point[0]))).toBe(24)
     expect(grid.wrap).toMatchObject({status:'lawful',requiredFlapMM:0})
     expect(grid.wrap.witnesses.length).toBeGreaterThan(0)
@@ -32,9 +32,9 @@ describe('Wrap admitted product contour',()=>{
   })
   it('keeps the public 12mm default, magnet-plan positions and outline identity truthful',()=>{
     const base=normBaseContour(getShape('square',1024,1024),1024)!,plain=makeSizer(base,0)(72),offset=makeSizer(base,1)(72)
-    const all6=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all6'})
-    const all8=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all8'})
-    const corners8=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'corners8'})
+    const all6=computeGrid(plain,72,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all6'})
+    const all8=computeGrid(plain,72,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all8'})
+    const corners8=computeGrid(plain,72,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'corners8'})
     expect(all6.spotRadiusMM).toBe(12)
     for(const grid of [all8,corners8]){
       expect(grid.anchors.map(anchor=>anchor.p)).toEqual(all6.anchors.map(anchor=>anchor.p))

@@ -87,7 +87,7 @@ function schedulePrefetch(
     if (myGen !== gen) return
     if (i < sizes.length) {
       const mm = sizes[i++]
-      if (!cache.has(mm)) cache.set(mm, computeGrid(sized(mm), walkCfg))
+      if (!cache.has(mm)) cache.set(mm, computeGrid(sized(mm), mm, walkCfg))
       setTimeout(step, 0)
       return
     }
@@ -118,7 +118,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const wrapCfg: GridConfig = autoFlapMaxMM != null
         ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
         : { ...cfg, wrapMode: 'fixed' }
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), wrapCfg)
+      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), eff, wrapCfg)
       const contour = sized(eff)
       const reportedAuto = autoFlapMaxMM != null && grid.wrap.status === 'lawful'
         ? grid.wrap.appliedFlapMM
@@ -132,7 +132,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       let hit = freeCache.get(k)
       if (!hit) {
         const contour = sized(sizeMM)
-        hit = { contour, grid: computeGrid(contour, wrapCfg) }
+        hit = { contour, grid: computeGrid(contour, sizeMM, wrapCfg) }
         freeCache.set(k, hit)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
