@@ -4,7 +4,7 @@ Dan's ruling (2026-08-23): the final agreed state is versioned **v3.5.3** so wha
 
 ## Authority
 
-1. [`v3.5.3-master-contract.md`](./v3.5.3-master-contract.md) — the only contract, 204 lines, SHA-256 `44e8ec1bde0ccd7cd6c26cebffe7579a98e87985ea02b9a3ddd67bc8ccf4363e`.
+1. [`v3.5.3-master-contract.md`](./v3.5.3-master-contract.md) — the only contract, 211 lines, SHA-256 `83ffa5fba48bab47913eb359ab57c15a5b26b65dc5e51a2ae2f03c6d2dbea3bc`.
 2. [`v3.5.3-execution-plan.md`](./v3.5.3-execution-plan.md) — build order W1 → W2 → S1–S5 → F1, 31 lines, SHA-256 `5faad71dba6896fd855176de7616b3ece01f6875b6dc9b91fcb19edf25738942`.
 
 Product base: a fresh clean worktree at `2c043257`. Visible tab label stays `v3.5.1`, `engineId 'v351-centre-clone'` and the `compare.v1` namespace are preserved (product identities are Dan's; the document version is not a rename).
