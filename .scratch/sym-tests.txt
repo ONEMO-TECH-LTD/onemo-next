@@ -1,0 +1,47 @@
+
+ RUN  v4.1.10 /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-kai-lead-v3.2-39064dc3
+
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts (24 tests | 1 failed) 2720ms
+     × stops at P5 on the RELEASED budget, and canonical certifies nothing there 27ms
+ ❯ src/lib/grid-engine/__tests__/behavioural-laws.test.ts (8 tests | 1 failed) 4258ms
+     × Grok · dumbbell: band 2 spans one anchor per lobe 1250ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/grid-engine/__tests__/behavioural-laws.test.ts > behavioural laws on synthetic counterexamples > Grok · dumbbell: band 2 spans one anchor per lobe
+AssertionError: expected 3 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 3
+
+ ❯ src/lib/grid-engine/__tests__/behavioural-laws.test.ts:175:31
+    173|     const judged = solve(dumbbell())
+    174|     const b2 = judged.bands.find((b) => b.band.band === 2)!.variants[0]
+    175|     expect(b2.anchors.length).toBe(2)
+       |                               ^
+    176|     const scale = b2.sizeMM / 100
+    177|     const xs = b2.anchors.map((a) => a.p[0]).sort((a, b) => a - b)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the funnel > stops at P5 on the RELEASED budget, and canonical certifies nothing there
+AssertionError: the given combination of arguments (null and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:324:50
+    322|     for (const variant of band.variants) {
+    323|       const selection = selectionOf(variant)
+    324|       expect(selection.selectionTrace.stoppedAt).toContain('peel lever…
+       |                                                  ^
+    325|       const chainPeel = selection.selectionTrace.chain.peelLeverage
+    326|       expect(chainPeel).toBeDefined()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 8 passed (10)
+      Tests  2 failed | 173 passed (175)
+   Start at  12:25:21
+   Duration  4.65s (transform 1.50s, setup 0ms, import 2.19s, tests 8.60s, environment 1ms)
+

@@ -1,0 +1,38 @@
+
+=== rect(100,100) b2 84-108 CERT ===
+  variants=1 state=CERTIFIED_WINNER rejectionCodes=["CERTIFIED_DOMINATED"]
+   - tri-48-sw@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=11.975 R=0.025 T=0.025 B=11.975 exempted=[]
+
+=== rect(100,100) b2 96-108 CERT ===
+  variants=2 state=CERTIFIED_SET rejectionCodes=["CERTIFIED_DOMINATED"]
+   - tri-48-se@96 outcome=TRIVIAL_LIMB_EXEMPT limit=12
+     perSide L=4.000 R=20.000 T=0.026 B=23.974 exempted=[{"side":"right","reachMM":20},{"side":"bottom","reachMM":23.974000000000004}]
+   - tri-48-sw@96 outcome=TRIVIAL_LIMB_EXEMPT limit=12
+     perSide L=20.000 R=4.000 T=0.026 B=23.974 exempted=[{"side":"left","reachMM":20},{"side":"bottom","reachMM":23.974000000000004}]
+
+=== rect(100,100) b2 84-108 RELEASED ===
+  variants=7 state=UNRESOLVED_SET rejectionCodes=["CERTIFIED_DOMINATED"]
+   - pair-antidiag@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+   - pair-diag@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+   - square-48@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+   - tri-48-ne@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+   - tri-48-nw@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+   - tri-48-se@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+   - tri-48-sw@84 outcome=WITHIN_LIMIT limit=12
+     perSide L=0.025 R=11.975 T=0.025 B=11.975 exempted=[]
+
+=== rect(60,190) b4 180-192 ===
+  variants=0 state=NONE rejectionCodes=["PATTERN_POLICY_DEFERRED"]
+
+=== rect(240,240) b5 228-240 ===
+  variants=0 state=NONE rejectionCodes=["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+=== rect(24,84) b2 84-96 ===
+  variants=0 state=NONE rejectionCodes=["DECISION_INDETERMINATE"]

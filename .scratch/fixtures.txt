@@ -1,0 +1,12 @@
+
+===== A top-step =====
+  variants=4  fullChain=0  decisionState=UNRESOLVED_SET
+   (no full-chain variant)
+
+===== B right-heavy =====
+  variants=2  fullChain=0  decisionState=UNRESOLVED_SET
+   (no full-chain variant)
+
+===== C left-heavy =====
+  variants=2  fullChain=0  decisionState=UNRESOLVED_SET
+   (no full-chain variant)

@@ -1,0 +1,69 @@
+
+ RUN  v4.1.10 /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-kai-lead-v3.2-39064dc3
+
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts (15 tests | 4 failed) 286ms
+     × actually retains and chooses the canonical starting frame when it is lawful 25ms
+     × publishes the SEQUENTIALLY restricted value, not each descriptor’s independent optimum 6ms
+     × keeps two mechanically equivalent but distinct arrangements 21ms
+     × takes the snug seat of an arrangement that fits at several sizes 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the funnel > actually retains and chooses the canonical starting frame when it is lawful
+AssertionError: expected 0 to be greater than 0
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:209:30
+    207|       .map(selectionOf)
+    208|       .filter((selection) => selection.proofStatus === 'CERTIFIED')
+    209|     expect(certified.length).toBeGreaterThan(0)
+       |                              ^
+    210|
+    211|     // On a square the canonical parity origin is lawful, so at least …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the funnel > publishes the SEQUENTIALLY restricted value, not each descriptor’s independent optimum
+AssertionError: expected undefined to be defined
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:277:26
+    275|     // if the two agreed, a selector that reported six independent opt…
+    276|     const chainBalance = winner.selectionTrace.chain.balance
+    277|     expect(chainBalance).toBeDefined()
+       |                          ^
+    278|     expect(chainBalance!.status).not.toBe('DECISION_INDETERMINATE')
+    279|     expect(unrestricted.hi).toBeLessThan(chainBalance!.lo)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the approved order > keeps two mechanically equivalent but distinct arrangements
+AssertionError: expected 0 to be greater than 0
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:396:26
+    394|       ).map((b) => [a, b] as const),
+    395|     )
+    396|     expect(pairs.length).toBeGreaterThan(0)
+       |                          ^
+    397|     for (const [a, b] of pairs) {
+    398|       // Every GOVERNED mechanical priority equivalent, and equivalent…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the approved order > takes the snug seat of an arrangement that fits at several sizes
+AssertionError: expected 'INDETERMINATE' to be 'CERTIFIED' // Object.is equality
+
+Expected: "CERTIFIED"
+Received: "INDETERMINATE"
+
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:426:31
+    424|     expect(shared).toBeDefined()
+    425|     const [small, big] = shared!
+    426|     expect(small.proofStatus).toBe('CERTIFIED')
+       |                               ^
+    427|     expect(big.proofStatus).toBe('CERTIFIED')
+    428|     expect(small.identity.sizeMM).toBeLessThan(big.identity.sizeMM)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 51 passed (55)
+   Start at  01:13:18
+   Duration  565ms (transform 258ms, setup 0ms, import 334ms, tests 324ms, environment 0ms)
+

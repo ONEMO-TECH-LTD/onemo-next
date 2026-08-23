@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-kai-lead-v3.2-39064dc3
+
+
+ Test Files  2 passed (2)
+      Tests  57 passed (57)
+   Start at  01:43:21
+   Duration  622ms (transform 238ms, setup 0ms, import 326ms, tests 389ms, environment 0ms)
+

@@ -1,0 +1,99 @@
+decisionState=UNRESOLVED_SET  variants=7
+
+--- pair-antidiag  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>
+
+--- pair-diag  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>
+
+--- square-48  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>
+
+--- tri-48-ne  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>
+
+--- tri-48-nw  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>
+
+--- tri-48-se  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>
+
+--- tri-48-sw  proofStatus=INDETERMINATE
+    stoppedAt="P5 reduction of peel leverage"
+    coverage: INTERVAL lo=1 hi=1
+        proof: exact certified partition over the major support regions; argopt returned as cells and the fraction as an exact rational
+    upperHangingMass: INTERVAL lo=0.029166666666666653 hi=0.030333333347222234
+        proof: exact by proved monotonicity in t_y; the returned one-quantum strip is the complete equivalent set and its interval covers every point in it
+    unsupportedExtent: INTERVAL lo=11.973999999999998 hi=11.975000000000001
+        proof: certified on the 1µm lattice: the sublevel set is an axis-aligned rectangle, bisected against an exact Clipper intersection, reported as the one-quantum bracket the bisection proves
+    peelLeverage: DECISION_INDETERMINATE lo=NaN hi=NaN
+        proof: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+    distribution: <absent — chain never reached it>
+    distributionVariance: <absent — chain never reached it>
+    balance: <absent — chain never reached it>

@@ -1,0 +1,45 @@
+
+ RUN  v4.1.10 /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-kai-lead-v3.2-39064dc3
+
+ ❯ src/lib/grid-engine/__tests__/separation.test.ts (20 tests | 1 failed) 93ms
+     × SUB 2 — the spec is the feed, not the calculator 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/grid-engine/__tests__/separation.test.ts > the two subs stay apart > SUB 2 — the spec is the feed, not the calculator
+AssertionError: spec.ts computes: arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce · arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce · arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce · arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce · arithmetic: 'PB §8 names strong and marginal regions but releases no thr · arithmetic: 'PB §8 names strong and marginal regions but releases no thr · arithmetic: 'PB §8 names strong and marginal regions but releases no thr · arithmetic: 'PB §8 names strong and marginal regions but releases no thr · arithmetic: 'Logic Spec P4 releases a per-side unsupported-extent switch · arithmetic: 'Logic Spec P4 releases a per-side unsupported-extent switch · arithmetic: 'Logic Spec P4 releases a per-side unsupported-extent switch: expected [ …(11) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce",
++   "arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce",
++   "arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce",
++   "arithmetic: 'Keyed by axis class x axis class x BAND. Every populated ce",
++   "arithmetic: 'PB §8 names strong and marginal regions but releases no thr",
++   "arithmetic: 'PB §8 names strong and marginal regions but releases no thr",
++   "arithmetic: 'PB §8 names strong and marginal regions but releases no thr",
++   "arithmetic: 'PB §8 names strong and marginal regions but releases no thr",
++   "arithmetic: 'Logic Spec P4 releases a per-side unsupported-extent switch",
++   "arithmetic: 'Logic Spec P4 releases a per-side unsupported-extent switch",
++   "arithmetic: 'Logic Spec P4 releases a per-side unsupported-extent switch",
++ ]
+
+ ❯ src/lib/grid-engine/__tests__/separation.test.ts:363:59
+    361|       }
+    362|     })
+    363|     expect(hits, `spec.ts computes: ${hits.join(' · ')}`).toEqual([])
+       |                                                           ^
+    364|   })
+    365|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 9 passed (10)
+      Tests  1 failed | 170 passed (171)
+   Start at  08:23:27
+   Duration  4.41s (transform 1.66s, setup 0ms, import 2.74s, tests 6.18s, environment 1ms)
+

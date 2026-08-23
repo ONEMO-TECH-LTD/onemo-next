@@ -1,0 +1,537 @@
+{
+  "schema": "grid-backend-probe-t3-v3",
+  "verdict": "SELECTED",
+  "selectedBackend": "typescript-clipper2-bvh-y-interval",
+  "failedDuties": [],
+  "subject": {
+    "seam": "src/lib/grid-engine/compute/continuous-feasibility.ts#computeContinuousFeasibleSet",
+    "note": "the probe carries no geometry implementation of its own; every result below is the product's own T4 output"
+  },
+  "productionOperation": {
+    "name": "one continuous feasible-set solve for one page.tsx caller contour at the 12mm effective radius",
+    "steps": [
+      "engineOutline RDP in normalized coordinates — the caller's own simplification",
+      "scale the caller outline to the fixture box in millimetres, exactly as page.tsx does",
+      "computeContinuousFeasibleSet over the contour bounding box as permitted domain, r = 12mm, single-node pattern"
+    ]
+  },
+  "sourceApproximation": {
+    "carriedErrorSupplied": false,
+    "scope": "every correctness claim in this report is scoped to the exact caller polygon passed into T4",
+    "reason": "T4's carried-error parameter states a certified symmetric boundary error; the caller's RDP guarantees a one-way bound only, so no value is asserted here and the raw-trace-to-RDP relation is not certified by this probe",
+    "bboxFalsification": "every measured contour prints its bbox; INFEASIBLE_CERTIFIED is only reachable below 2r = 24mm"
+  },
+  "namedCorpus": [
+    {
+      "name": "tangency",
+      "duty": "a disc touching the boundary exactly is legal and is retained",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          12,
+          40
+        ]
+      ],
+      "status": "PROVED_FEASIBLE",
+      "components": 1,
+      "componentVertices": 4,
+      "retainedWitnessesMM": [
+        [
+          12,
+          40
+        ]
+      ],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "oneQuantumIntrusion",
+      "duty": "one registration quantum inside the boundary is illegal and is not retained",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          11.999,
+          12
+        ]
+      ],
+      "status": "INFEASIBLE_CERTIFIED",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "splitSafeRegions",
+      "duty": "an erosion that splits into two masses keeps both, never the largest ring alone",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [],
+      "status": "PROVED_FEASIBLE",
+      "components": 2,
+      "componentVertices": 24,
+      "retainedWitnessesMM": [],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "zeroWidthCorridor",
+      "duty": "a one-dimensional feasible set survives as a supplied exact witness",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          12,
+          30
+        ]
+      ],
+      "status": "PROVED_FEASIBLE",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [
+        [
+          12,
+          30
+        ]
+      ],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "isolatedLegalWitness",
+      "duty": "a zero-dimensional feasible set survives as a supplied exact witness",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          12,
+          12
+        ]
+      ],
+      "status": "PROVED_FEASIBLE",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [
+        [
+          12,
+          12
+        ]
+      ],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "starvedRefinement",
+      "duty": "area thinner than the guarded inset is not lost when a witness proves it",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          12.02,
+          30
+        ]
+      ],
+      "status": "PROVED_FEASIBLE",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [
+        [
+          12.02,
+          30
+        ]
+      ],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "hairlineFeasibility",
+      "duty": "a hairline-feasible contour is still feasible",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          12.005,
+          30
+        ]
+      ],
+      "status": "PROVED_FEASIBLE",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [
+        [
+          12.005,
+          30
+        ]
+      ],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "lowerDimensionalWithoutWitness",
+      "duty": "an empty approximation with no witness is indeterminate, never certified infeasible",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [],
+      "status": "INDETERMINATE_WITHIN_TOLERANCE",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "justTooNarrow",
+      "duty": "a contour narrower than the disc is certified infeasible from bbox separation",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [],
+      "status": "INFEASIBLE_CERTIFIED",
+      "components": 0,
+      "componentVertices": 0,
+      "retainedWitnessesMM": [],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    },
+    {
+      "name": "concaveNotchFalseSeat",
+      "duty": "a seat inside the material but too near a notch wall is rejected",
+      "radiusMM": 12,
+      "suppliedWitnessesMM": [
+        [
+          30,
+          40
+        ]
+      ],
+      "status": "PROVED_FEASIBLE",
+      "components": 1,
+      "componentVertices": 64,
+      "retainedWitnessesMM": [],
+      "envelope": {
+        "quantumMM": 0.001,
+        "arcErrorMM": 0.005,
+        "projectionErrorMM": 0.0007071067811865476,
+        "sourceApproximationErrorMM": 0,
+        "conservativeGuardMM": 0.025,
+        "omissionBoundMM": 0.05,
+        "relation": "F_INSET_BY_EPSILON_SUBSET_APPROX_SUBSET_F"
+      },
+      "passed": true,
+      "mismatches": []
+    }
+  ],
+  "deterministicEvidence": {
+    "runs": 4,
+    "sha256": "2b9a026e555265f1b69db9a60f3af9a9c58b53f78f2d6bad1468d6c33c88e482",
+    "distinctHashes": 1,
+    "passed": true
+  },
+  "productionCallerBudget": {
+    "observedMaxVertices": 104,
+    "contours": [
+      {
+        "name": "bat",
+        "inputVertices": 54,
+        "bboxWidthMM": 115.086,
+        "bboxHeightMM": 119.942,
+        "status": "PROVED_FEASIBLE",
+        "components": 1
+      },
+      {
+        "name": "duck",
+        "inputVertices": 89,
+        "bboxWidthMM": 77.761,
+        "bboxHeightMM": 119.812,
+        "status": "PROVED_FEASIBLE",
+        "components": 2
+      },
+      {
+        "name": "butterfly",
+        "inputVertices": 102,
+        "bboxWidthMM": 119.77,
+        "bboxHeightMM": 98.276,
+        "status": "PROVED_FEASIBLE",
+        "components": 1
+      },
+      {
+        "name": "bot",
+        "inputVertices": 104,
+        "bboxWidthMM": 88.822,
+        "bboxHeightMM": 119.9,
+        "status": "PROVED_FEASIBLE",
+        "components": 1
+      },
+      {
+        "name": "pill",
+        "inputVertices": 33,
+        "bboxWidthMM": 118.119,
+        "bboxHeightMM": 119.874,
+        "status": "PROVED_FEASIBLE",
+        "components": 1
+      },
+      {
+        "name": "poke1",
+        "inputVertices": 63,
+        "bboxWidthMM": 101.504,
+        "bboxHeightMM": 119.924,
+        "status": "PROVED_FEASIBLE",
+        "components": 1
+      },
+      {
+        "name": "poke2",
+        "inputVertices": 61,
+        "bboxWidthMM": 85.943,
+        "bboxHeightMM": 119.615,
+        "status": "PROVED_FEASIBLE",
+        "components": 1
+      }
+    ],
+    "note": "real-contour status is observed evidence; the no-indeterminate product gate belongs to the replacement gate, not to this probe"
+  },
+  "runtimeGate": {
+    "operation": "one production caller contour through engineOutline, millimetre conversion and one computeContinuousFeasibleSet solve",
+    "selectedThresholdMs": 7,
+    "provenance": "fixed during the T3 selection calibration and unchanged since; this run measures the T4 seam against that already-recorded number rather than re-deriving one",
+    "calibration": {
+      "contours": [
+        {
+          "name": "bat",
+          "samples": 12,
+          "medianMs": 1.466,
+          "p95Ms": 2.082,
+          "maxMs": 2.082
+        },
+        {
+          "name": "duck",
+          "samples": 12,
+          "medianMs": 2.296,
+          "p95Ms": 4.869,
+          "maxMs": 4.869
+        },
+        {
+          "name": "butterfly",
+          "samples": 12,
+          "medianMs": 3.088,
+          "p95Ms": 3.842,
+          "maxMs": 3.842
+        },
+        {
+          "name": "bot",
+          "samples": 12,
+          "medianMs": 3.358,
+          "p95Ms": 3.739,
+          "maxMs": 3.739
+        },
+        {
+          "name": "pill",
+          "samples": 12,
+          "medianMs": 0.584,
+          "p95Ms": 0.733,
+          "maxMs": 0.733
+        },
+        {
+          "name": "poke1",
+          "samples": 12,
+          "medianMs": 1.473,
+          "p95Ms": 1.76,
+          "maxMs": 1.76
+        },
+        {
+          "name": "poke2",
+          "samples": 12,
+          "medianMs": 1.464,
+          "p95Ms": 1.736,
+          "maxMs": 1.736
+        }
+      ],
+      "corpus": {
+        "samples": 12,
+        "medianMs": 14.337,
+        "p95Ms": 17.861,
+        "maxMs": 17.861
+      }
+    },
+    "validation": {
+      "contours": [
+        {
+          "name": "bat",
+          "samples": 40,
+          "medianMs": 1.307,
+          "p95Ms": 1.585,
+          "maxMs": 3.361
+        },
+        {
+          "name": "duck",
+          "samples": 40,
+          "medianMs": 2.202,
+          "p95Ms": 2.446,
+          "maxMs": 2.889
+        },
+        {
+          "name": "butterfly",
+          "samples": 40,
+          "medianMs": 2.972,
+          "p95Ms": 3.287,
+          "maxMs": 3.421
+        },
+        {
+          "name": "bot",
+          "samples": 40,
+          "medianMs": 3.046,
+          "p95Ms": 3.518,
+          "maxMs": 7.165
+        },
+        {
+          "name": "pill",
+          "samples": 40,
+          "medianMs": 0.535,
+          "p95Ms": 0.743,
+          "maxMs": 0.967
+        },
+        {
+          "name": "poke1",
+          "samples": 40,
+          "medianMs": 1.37,
+          "p95Ms": 1.576,
+          "maxMs": 1.692
+        },
+        {
+          "name": "poke2",
+          "samples": 40,
+          "medianMs": 1.351,
+          "p95Ms": 1.618,
+          "maxMs": 2.157
+        }
+      ],
+      "corpus": {
+        "samples": 40,
+        "medianMs": 13.213,
+        "p95Ms": 14.442,
+        "maxMs": 17.96
+      }
+    },
+    "validationWorstP95Ms": 3.518,
+    "passed": true
+  },
+  "memoryGate": {
+    "operation": "100 complete T4 corpora over the production caller contours after one warm corpus; forced GC after each 10-corpus batch",
+    "calibration": {
+      "samples": [
+        15430208,
+        15014800,
+        15013776,
+        15013680,
+        15013680,
+        15013680,
+        15013680,
+        15013680
+      ],
+      "observedNoiseSpreadBytes": 416528
+    },
+    "selectedGate": {
+      "retainedHeapBytes": 2359296,
+      "slopeBytesPerCorpusRun": 23592.96,
+      "provenance": "fixed during the T3 selection calibration and unchanged since; this run measures the T4 seam against that already-recorded number rather than re-deriving one"
+    },
+    "validation": {
+      "batches": 10,
+      "runsPerBatch": 10,
+      "totalRuns": 100,
+      "baselineBytes": 15013680,
+      "postBatchBytes": [
+        15219312,
+        15256456,
+        15232088,
+        15248848,
+        15256328,
+        15247816,
+        15272088,
+        15255232,
+        15267432,
+        15274296
+      ],
+      "retainedPeakGrowthBytes": 260616,
+      "observedSlopeBytesPerCorpusRun": 453.707
+    },
+    "passed": true
+  },
+  "environment": {
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.5.0",
+    "cpu": "Apple M1 Max"
+  }
+}

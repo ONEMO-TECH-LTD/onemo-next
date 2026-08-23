@@ -1,0 +1,26 @@
+
+ RUN  v4.1.10 /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-kai-lead-v3.2-39064dc3
+
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts (21 tests | 1 failed) 353ms
+     × lets size seat an arrangement only after the mechanics have tied 19ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the approved order > lets size seat an arrangement only after the mechanics have tied
+AssertionError: expected 0 to be greater than 0
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:671:27
+    669|     const larger = atSize(96)
+    670|     expect(smaller.length).toBeGreaterThan(0)
+    671|     expect(larger.length).toBeGreaterThan(0)
+       |                           ^
+    672|
+    673|     const shared = smaller
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 70 passed (71)
+   Start at  01:56:33
+   Duration  638ms (transform 381ms, setup 0ms, import 519ms, tests 510ms, environment 0ms)
+

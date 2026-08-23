@@ -1,0 +1,63 @@
+▲ Next.js 16.2.12 (webpack)
+- Local:         http://localhost:3072
+- Network:       http://192.168.4.67:3072
+- Environments: .env.local
+✓ Ready in 295ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (133kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ GET /grid-engine 200 in 2.5s (next.js: 2.2s, proxy.ts: 106ms, application-code: 162ms)
+ GET /grid-engine 200 in 62ms (next.js: 4ms, proxy.ts: 13ms, application-code: 44ms)
+ GET /grid-engine 200 in 47ms (next.js: 3ms, proxy.ts: 5ms, application-code: 39ms)
+ GET /grid-engine 200 in 45ms (next.js: 8ms, proxy.ts: 4ms, application-code: 33ms)
+ GET /grid-engine 200 in 35ms (next.js: 1965µs, proxy.ts: 4ms, application-code: 29ms)
+ GET /grid-engine 200 in 216ms (next.js: 77ms, proxy.ts: 18ms, application-code: 122ms)
+ GET /grid-engine 200 in 42ms (next.js: 2ms, proxy.ts: 7ms, application-code: 33ms)
+ GET /grid-engine 200 in 189ms (next.js: 67ms, proxy.ts: 9ms, application-code: 113ms)
+⚠ ./src/lib/grid-engine/logic/judgement.ts
+Attempted import error: 'nearestAnchorPair' is not exported from '../compute/grid-core' (imported as 'nearestAnchorPair').
+
+Import trace for requested module:
+./src/lib/grid-engine/logic/judgement.ts
+./src/lib/grid-engine/bridge.ts
+./src/app/(dev)/grid-engine/page.tsx
+
+./src/lib/grid-engine/logic/judgement.ts
+Attempted import error: 'scaleContour' is not exported from '../compute/grid-core' (imported as 'scaleContour').
+
+Import trace for requested module:
+./src/lib/grid-engine/logic/judgement.ts
+./src/lib/grid-engine/bridge.ts
+./src/app/(dev)/grid-engine/page.tsx
+
+./src/lib/grid-engine/ui/trace-cutout.ts
+Attempted import error: 'DEFAULT_LAW' is not exported from '@/lib/grid-engine/compute/grid-core' (imported as 'DEFAULT_LAW').
+
+Import trace for requested module:
+./src/lib/grid-engine/ui/trace-cutout.ts
+./src/app/(dev)/grid-engine/page.tsx
+
+./src/lib/grid-engine/logic/judgement.ts
+Attempted import error: 'nearestAnchorPair' is not exported from '../compute/grid-core' (imported as 'nearestAnchorPair').
+
+Import trace for requested module:
+./src/lib/grid-engine/logic/judgement.ts
+./src/lib/grid-engine/bridge.ts
+./src/app/(dev)/grid-engine/page.tsx
+
+./src/lib/grid-engine/logic/judgement.ts
+Attempted import error: 'scaleContour' is not exported from '../compute/grid-core' (imported as 'scaleContour').
+
+Import trace for requested module:
+./src/lib/grid-engine/logic/judgement.ts
+./src/lib/grid-engine/bridge.ts
+./src/app/(dev)/grid-engine/page.tsx
+
+./src/lib/grid-engine/ui/trace-cutout.ts
+Attempted import error: 'DEFAULT_LAW' is not exported from '@/lib/grid-engine/compute/grid-core' (imported as 'DEFAULT_LAW').
+
+Import trace for requested module:
+./src/lib/grid-engine/ui/trace-cutout.ts
+./src/app/(dev)/grid-engine/page.tsx
+ GET /grid-engine 200 in 193ms (next.js: 67ms, proxy.ts: 11ms, application-code: 116ms)
+ GET /grid-engine 200 in 60ms (next.js: 3ms, proxy.ts: 24ms, application-code: 33ms)

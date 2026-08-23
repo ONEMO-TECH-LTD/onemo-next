@@ -1,0 +1,99 @@
+
+### bat — 54 vertices
+  B1 [unreleased] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      single@58 geom=a5832fef05da755c prof=c789c0cb19120c34 ev=cc23efaad27c8ee8 res=5d178724685c3069
+  B2 [released] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      tri-48-sw@98 geom=a5832fef05da755c prof=c789c0cb19120c34 ev=0da5419c0d26c5bc res=61117168b563baf1
+  B3 [released] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      tri-96-up@144 geom=a5832fef05da755c prof=c789c0cb19120c34 ev=805a41c1023b9d89 res=f91a4d9a318963ed
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### duck — 89 vertices
+  B1 [unreleased] UNRESOLVED_SET offers=1 proof=["INDETERMINATE"] stoppedAt=["P5 reduction of peel leverage"] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      single@62 geom=0383352445bd75fa prof=c789c0cb19120c34 ev=4689c30a236e64d5 res=1d99bcb2576a8d9b
+  B2 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B3 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### butterfly — 102 vertices
+  B1 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B2 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B3 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### bot — 104 vertices
+  B1 [unreleased] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      single@44 geom=ab5afb366d8ba9cc prof=c789c0cb19120c34 ev=de5abbf27a5ab679 res=f2f643e6ea0f17cc
+  B2 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B3 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### pill — 33 vertices
+  B1 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B2 [released] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["WITHIN_LIMIT"]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      pair-antidiag@84 geom=8aaad92f9931a778 prof=c789c0cb19120c34 ev=f1625a0dcd2baa2a res=0d92b4a2897581d8
+  B3 [released] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["WITHIN_LIMIT"]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+      run-antidiag-3@134 geom=8aaad92f9931a778 prof=c789c0cb19120c34 ev=7d9b715b91b57fc7 res=a6656aa433596bbc
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### poke1 — 63 vertices
+  B1 [unreleased] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      single@42 geom=4971e18089a8f712 prof=c789c0cb19120c34 ev=65f81c1c620b4ff9 res=94e2545a261d77fb
+  B2 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B3 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### poke2 — 61 vertices
+  B1 [unreleased] CERTIFIED_WINNER offers=1 proof=["CERTIFIED"] stoppedAt=[null] P4=["TRIVIAL_LIMB_EXEMPT"]
+      refusals: ["AXIS_CLASS_UNRESOLVED","DECISION_INDETERMINATE","EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+      single@50 geom=1b0e11aaf94d4440 prof=c789c0cb19120c34 ev=c559c3c765885b6f res=d01ab9ac1bb8f4ad
+  B2 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B3 [released] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_LAWFUL_REGISTRATION","EXCESSIVE_UNSUPPORTED_EXTENT"]
+  B4 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+  B5 [unreleased] NONE offers=0 proof=[] stoppedAt=[] P4=[]
+      refusals: ["NO_TEMPLATE_FOR_PERMITTED_FRAME"]
+
+### SUMMARY
+contours=7 maxVertices=104
+released band-answers=14  CERTIFIED_WINNER=4  CERTIFIED_SET=0  UNRESOLVED_SET=0  NONE=10
+DETERMINISM: run1=01d79a1aa97a5cdf run2=01d79a1aa97a5cdf identical=true
+T7 GATE "no affected real contour is indeterminate": PASS

@@ -1,0 +1,25 @@
+
+=== square 100x100 b2 84-108 CERT ===
+  variants=1 state=CERTIFIED_WINNER codes=["EXCESSIVE_UNSUPPORTED_EXTENT","CERTIFIED_DOMINATED"]
+   - tri-48-sw@84 WITHIN_LIMIT L=11.975 R=0.025 T=0.025 B=11.975 exempt=[]
+
+=== square 100x100 b2 96-108 CERT ===
+  variants=0 state=NONE codes=["EXCESSIVE_UNSUPPORTED_EXTENT"]
+
+=== square 100x100 b2 84-108 RELEASED ===
+  variants=7 state=UNRESOLVED_SET codes=["EXCESSIVE_UNSUPPORTED_EXTENT"]
+   - pair-antidiag@84 WITHIN_LIMIT L=0.025 R=11.975 T=0.025 B=11.975 exempt=[]
+   - pair-diag@84 WITHIN_LIMIT L=0.025 R=11.975 T=0.025 B=11.975 exempt=[]
+   - square-48@84 WITHIN_LIMIT L=0.025 R=11.975 T=0.025 B=11.975 exempt=[]
+
+=== body+limb b2 84-108 CERT ===
+  variants=7 state=UNRESOLVED_SET codes=["NO_LAWFUL_REGISTRATION"]
+   - pair-antidiag@96 TRIVIAL_LIMB_EXEMPT L=0.025 R=1.821 T=0.025 B=23.975 exempt=[{"side":"bottom","reachMM":23.974999999999994}]
+   - pair-diag@96 TRIVIAL_LIMB_EXEMPT L=0.025 R=1.821 T=0.025 B=23.975 exempt=[{"side":"bottom","reachMM":23.974999999999994}]
+   - square-48@96 TRIVIAL_LIMB_EXEMPT L=0.025 R=1.821 T=0.025 B=23.975 exempt=[{"side":"bottom","reachMM":23.974999999999994}]
+
+=== body+limb b2 84-108 RELEASED ===
+  variants=7 state=UNRESOLVED_SET codes=["NO_LAWFUL_REGISTRATION"]
+   - pair-antidiag@96 TRIVIAL_LIMB_EXEMPT L=0.025 R=1.821 T=0.025 B=23.975 exempt=[{"side":"bottom","reachMM":23.974999999999994}]
+   - pair-diag@96 TRIVIAL_LIMB_EXEMPT L=0.025 R=1.821 T=0.025 B=23.975 exempt=[{"side":"bottom","reachMM":23.974999999999994}]
+   - square-48@96 TRIVIAL_LIMB_EXEMPT L=0.025 R=1.821 T=0.025 B=23.975 exempt=[{"side":"bottom","reachMM":23.974999999999994}]

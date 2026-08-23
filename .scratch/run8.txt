@@ -1,0 +1,26 @@
+
+ RUN  v4.1.10 /Users/daniilsolopov/Dev/onemo-dev/onemo-next/.claude/worktrees/s62-kai-lead-v3.2-39064dc3
+
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts (21 tests | 1 failed) 369ms
+     × lets size seat an arrangement only after the mechanics have tied 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/grid-engine/__tests__/selection-funnel.test.ts > the approved order > lets size seat an arrangement only after the mechanics have tied
+AssertionError: expected undefined to be defined
+ ❯ src/lib/grid-engine/__tests__/selection-funnel.test.ts:678:20
+    676|       .map((small) => [small, larger.find((big) => arrangementKey(big)…
+    677|       .find((pair): pair is readonly [SelectorResult, SelectorResult] …
+    678|     expect(shared).toBeDefined()
+       |                    ^
+    679|     const [small, big] = shared!
+    680|     expect(small.proofStatus).toBe('CERTIFIED')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 70 passed (71)
+   Start at  01:57:35
+   Duration  651ms (transform 379ms, setup 0ms, import 510ms, tests 525ms, environment 0ms)
+

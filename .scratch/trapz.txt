@@ -1,0 +1,36 @@
+
+===== peelToleranceMM3=50 =====
+  variants=4  decisionState=UNRESOLVED_SET
+   - pair-antidiag  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - pair-diag  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - tri-48-se  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - tri-48-sw  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+  no full-chain variant at this tolerance
+
+===== peelToleranceMM3=500 =====
+  variants=4  decisionState=UNRESOLVED_SET
+   - pair-antidiag  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - pair-diag  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - tri-48-se  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - tri-48-sw  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+  no full-chain variant at this tolerance
+
+===== peelToleranceMM3=5000 =====
+  variants=4  decisionState=UNRESOLVED_SET
+   - pair-antidiag  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - pair-diag  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - tri-48-se  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+   - tri-48-sw  stoppedAt="P5 reduction of peel leverage"  chain.balance=ABSENT
+     P5: DECISION_INDETERMINATE :: the certified sublevel set meets a component along a segment, and a segment is not a finite equivalent set this descriptor can return
+  no full-chain variant at this tolerance
