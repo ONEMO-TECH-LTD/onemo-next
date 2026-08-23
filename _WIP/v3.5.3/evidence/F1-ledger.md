@@ -32,3 +32,8 @@ The square's 2-magnet rung rendered a **horizontal** pair (`F1-square-B2-chip1.p
 1. At fixed flap 0 only shapes whose belt discs read 0 mm air at an even size get rungs (squares, the squircle, the circle); organic cutouts get theirs under Auto with a non-zero cap.
 2. The library diamond is a rhombus — 1@38 with Masses, not the contract's 34 (that is the square-rotated test diamond).
 3. The circle preset's placements changed at 24/72/120 when the analytic circle path was deleted (contract-authorised; recorded in the W2 disposition).
+
+## Gate record — WHOLE PRODUCT CLOSED
+
+- QA verified `64d73365` and the F1 evidence; Meta rebound independently (`:4031` PID 18151, cwd the build worktree, HEAD `64d73365`): own headed capture — three tabs, three-law copy, square B2-1 vertical pair, real cutout whole solve 1.30 s with typed refusals, squircle 0.72 s and 8@168, console 0 errors / 0 warnings; all-nine Centre replay green, no Centre-caused rung delta, no amendment.
+- Engineering Meta gate CLOSED at product `64d73365` / plan `e7462dcc`. Push, PR and merge are Dan-authorised shipping scope (not yet done).
