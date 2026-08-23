@@ -10,7 +10,7 @@ Builder: s62-kai-lead · 2026-08-23 · branch `session62-task/grid-v3.5.3-build`
 
 ## Headless
 
-`tsc --noEmit` clean · `vitest src/lib/magnetic-grid`: 6 files, 24 tests pass · eslint: the 3 pre-existing LawPanel `react-hooks/refs` errors only.
+`tsc --noEmit` clean · `vitest src/lib/magnetic-grid`: 6 files, 24 tests pass · eslint: 3 pre-existing LawPanel hook errors (1 set-state-in-effect, 2 refs); no S1-new lint finding.
 
 ## Live tab — :4031 serving `…/s62-grid-v353-build` (lsof cwd), commit `f0d7853a`
 
