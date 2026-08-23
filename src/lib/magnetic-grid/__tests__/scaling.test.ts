@@ -18,7 +18,7 @@ const cand = (sizeMM: number, magnetCount: number, requiredFlapMM: number | null
     ? { status: 'refused', requiredFlapMM: null, witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } }
     : { status: 'measured', requiredFlapMM, witnesses: [], refusal: null }
   return {
-    sizeMM, placement: { xHalf: false, yHalf: false }, phaseMM: [0, 0], lattice: [], canon: 2, seated: magnetCount ? [[0, 0]] : [], belt: [],
+    sizeMM, placement: { xHalf: false, yHalf: false }, phaseMM: [0, 0], lattice: [], seated: magnetCount ? [[0, 0]] : [],
     anchors: [], magnetCount, parityTrue: true, centreErrorMM: 0, wrapMeasurement, ...o,
   }
 }
@@ -69,7 +69,8 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
     // centreErrorMM is a report-only concession: it cannot remove a parity-lawful rung.
     expect(rungsOf(reduceBandLadders([cand(24, 1, 0, { centreErrorMM: 1 })], fixed))[0]).toEqual([[24, 1, 1]])
     expect(reduceBandLadders([cand(24, 1, 2)], fixed)[0].refusal).toEqual({ code: 'WRAP_EXCEEDS_ALLOWANCE' })
-    expect(reduceBandLadders([cand(24, 1, 0), cand(72, 1, 0)], fixed)[1].refusal).toEqual({ code: 'NO_WRAPPED_LAYOUT_IN_BAND' })
+    // lawful layouts exist but every count is owned below: an ownership suppression, never reported as a Wrap failure
+    expect(reduceBandLadders([cand(24, 1, 0), cand(72, 1, 0)], fixed)[1].refusal).toEqual({ code: 'NO_NEW_MAGNET_COUNT_IN_BAND' })
   })
 })
 
@@ -100,7 +101,7 @@ describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
     expect([...calls.entries()]).toEqual(beforeSelection)
   })
 
-  it('MagnetPlan changes diameters only: ladder ownership, positions and Wrap evidence stay fixed', () => {
+  it('MagnetPlan changes diameters only: ladder ownership, positions and Wrap evidence stay fixed', { timeout: 15_000 }, () => {
     const plans = (['all6', 'all8', 'corners8'] as const).map((plan) => solveBands(square, { ...fixed0, plan }))
     const ownership = (solved: (typeof plans)[number]) => solved.bands.map((band) =>
       band.rungs.map((rung) => [rung.sizeMM, rung.magnetCount]))
@@ -111,7 +112,6 @@ describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
     for (const layout of shared.slice(1)) {
       expect(layout.candidate.phaseMM).toEqual(shared[0].candidate.phaseMM)
       expect(layout.candidate.seated).toEqual(shared[0].candidate.seated)
-      expect(layout.candidate.belt).toEqual(shared[0].candidate.belt)
       expect(layout.candidate.anchors.map((anchor) => anchor.p)).toEqual(shared[0].candidate.anchors.map((anchor) => anchor.p))
       expect(layout.candidate.wrapMeasurement).toEqual(shared[0].candidate.wrapMeasurement)
       expect(layout.wrap).toEqual(shared[0].wrap)

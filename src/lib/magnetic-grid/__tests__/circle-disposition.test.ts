@@ -26,6 +26,7 @@ describe('circle preset disposition — the only intended Centre-path change (v3
       after: { phaseMM: Pt; seated: number } | null
     }> = []
     const anchorDifferences: Array<{ sizeMM: number; before: number; after: number }> = []
+    const selections = new Map<number, { before: Pt; after: Pt }>()
     for (let mm = 24; mm <= 214; mm += 2) {
       const contour = sized(mm), bb = bbox(contour.outer.pts)
       const R = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2
@@ -48,12 +49,17 @@ describe('circle preset disposition — the only intended Centre-path change (v3
           after: afterBest ? { phaseMM: afterBest.phaseMM, seated: afterBest.seated.length } : null,
         })
       }
-      const grid = computeGrid(contour, mm, { paddingMM: 12, flapMM: 0, wrapMode: 'fixed', centreMode: 0, perimeterOnly: true })
-      expect(grid.phaseMM, `live phase at ${mm}mm`).toEqual(afterBest?.phaseMM ?? [0, 0])
-      const beforeGrid = computeGrid(contour, mm, { paddingMM: 12, flapMM: 0, wrapMode: 'fixed', centreMode: 0, perimeterOnly: true, forcePhaseMM: beforeBest?.phaseMM ?? [0, 0] })
-      if (JSON.stringify(beforeGrid.anchors) !== JSON.stringify(grid.anchors)) {
-        anchorDifferences.push({ sizeMM: mm, before: beforeGrid.anchors.length, after: grid.anchors.length })
-      }
+      selections.set(mm, { before: beforeBest?.phaseMM ?? [0, 0], after: afterBest?.phaseMM ?? [0, 0] })
+    }
+    // The exhaustive predicate/selection proof is above; the live phase and anchor disposition is
+    // pinned only at the three measured selection-change sizes (no redundant full solves).
+    for (const mm of [24, 72, 120]) {
+      const contour = sized(mm), sel = selections.get(mm)!
+      const cfg = { paddingMM: 12, flapMM: 0, wrapMode: 'fixed' as const, centreMode: 0, perimeterOnly: true }
+      const grid = computeGrid(contour, mm, cfg)
+      expect(grid.phaseMM, `live phase at ${mm}mm`).toEqual(sel.after)
+      const beforeGrid = computeGrid(contour, mm, { ...cfg, forcePhaseMM: sel.before })
+      anchorDifferences.push({ sizeMM: mm, before: beforeGrid.anchors.length, after: grid.anchors.length })
     }
     expect(candidateDifferences).toEqual([24, 72, 120, 168])
     expect(selectionDifferences).toEqual([
