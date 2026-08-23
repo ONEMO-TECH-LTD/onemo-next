@@ -104,7 +104,8 @@ describe('v3.5.3 S2 — every size solve returns all four placements, render-com
     const perimeter = computeGrid(square(120), 120, { ...fixed0, perimeterOnly: true })
     const full = computeGrid(square(120), 120, { ...fixed0, perimeterOnly: false })
     expect(full.candidates.map((c) => c.seated)).toEqual(perimeter.candidates.map((c) => c.seated))
-    expect(full.candidates.map((c) => c.belt)).toEqual(perimeter.candidates.map((c) => c.belt))
+    const beltAnchors = (c: (typeof full.candidates)[number]) => [...new Set(c.wrapMeasurement.witnesses.map((w) => JSON.stringify(w.beltAnchorMM)))]
+    expect(full.candidates.map(beltAnchors)).toEqual(perimeter.candidates.map(beltAnchors))
     expect(full.candidates.map((c) => c.wrapMeasurement)).toEqual(perimeter.candidates.map((c) => c.wrapMeasurement))
     expect(full.anchors.length).toBeGreaterThan(perimeter.anchors.length)
   })

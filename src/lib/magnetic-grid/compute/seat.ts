@@ -1,21 +1,10 @@
-// Magnetic-grid compute seat kernel — the exact predicate, and nothing else.
-//
-// One question, answered exactly: does a disc of radius r, centred at p, lie
-// completely inside this outline? Tangency counts as inside — a disc touching
-// the boundary is legal, because the material reaches exactly that far.
-//
-// Everything is integer arithmetic on a fixed quantum. No square roots, no
-// epsilon, no tolerance. Distance comparisons are done squared, in BigInt, so
-// "exactly 12mm" compares equal instead of nearly equal.
-//
-// This module knows nothing about magnets, bands, grids or ONEMO. It takes a
-// ring and a radius and answers a geometric question.
-
+// Magnetic-grid Compute geometry: frozen Centre seat kernel, lattice/nearest-boundary measurements, parity and perimeter helpers.
+// The 0.001 mm BigInt path is only the frozen Centre phase prescreen; final Law seat/Wrap admission lives in wrap-measurement.ts on the 1 mm ruler.
 
 import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, ParityMeasurement, Pt } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
 
-export interface Prepared {
+interface Prepared {
   /** Size of one integer step, in millimetres. */
   readonly quantumMM: number
   /** The ring in integer quanta, duplicate-free, at least three vertices. */
@@ -48,7 +37,7 @@ function onSegment(p: Pt, a: Pt, b: Pt): boolean {
  * Throws rather than guesses: a ring that collapses below three distinct
  * vertices, or encloses no area, is not a shape this can answer about.
  */
-export function prepare(ringMM: readonly Pt[], quantumMM = 0.001): Prepared {
+function prepare(ringMM: readonly Pt[], quantumMM = 0.001): Prepared {
   if (!(quantumMM > 0) || !Number.isFinite(quantumMM)) {
     throw new RangeError('quantum must be finite and positive')
   }
@@ -84,10 +73,10 @@ export function prepare(ringMM: readonly Pt[], quantumMM = 0.001): Prepared {
   return { quantumMM, ring: Object.freeze(scaled), box: { minX, minY, maxX, maxY } }
 }
 
-export type Location = 'IN' | 'OUT' | 'ON'
+type Location = 'IN' | 'OUT' | 'ON'
 
 /** Exact location of an integer point against the ring. Winding, no tolerance. */
-export function locate(shape: Prepared, p: Pt): Location {
+function locate(shape: Prepared, p: Pt): Location {
   const { ring, box } = shape
   if (p[0] < box.minX || p[0] > box.maxX || p[1] < box.minY || p[1] > box.maxY) return 'OUT'
   let winding = 0
@@ -132,7 +121,7 @@ function atLeast(p: Pt, a: Pt, b: Pt, r2: bigint): boolean {
  * the arithmetic is integer: at 12.000000000mm the comparison must be equal, not
  * nearly equal.
  */
-export function holds(shape: Prepared, p: Pt, radius: number): boolean {
+function holds(shape: Prepared, p: Pt, radius: number): boolean {
   if (locate(shape, p) === 'OUT') return false
   const r2 = big(radius) * big(radius)
   const { ring } = shape
@@ -372,19 +361,13 @@ export function makeSeatPredicate(
   }
 }
 
-/** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
- *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
- *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
- *  Enforced through the dominance tiers, not preferred. */
-export function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+/** Frozen Centre display tie-break: mean nonnegative gap beyond reach over the prescreen-seated population. This is not the final Wrap law. */
+function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
   if (!seated.length) return 0
   let sum = 0
   for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)
   return sum / seated.length
 }
-
-/** Marching-squares topology: per corner-sign mask (array position), the cell-edge pairs a
- *  contour crosses. Edges 0=top 1=right 2=bottom 3=left. */
 
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45

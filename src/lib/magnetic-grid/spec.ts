@@ -75,7 +75,7 @@ export interface BoundaryTruth {
 }
 /** Nearest-outline witness for one belt disc; clearanceMM is on the 1 mm ruler (ruler-zero is not literal touch). */
 export interface ContactWitness { beltAnchorMM: Pt; outlinePointMM: Pt; clearanceMM: number }
-export type WrapRefusalReason = 'invalid-boundary' | 'empty-belt'
+type WrapRefusalReason = 'invalid-boundary' | 'empty-belt'
 export type WrapMeasurement =
   | { status: 'measured'; requiredFlapMM: number; witnesses: readonly ContactWitness[]; refusal: null }
   | { status: 'refused'; requiredFlapMM: null; witnesses: readonly []; refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND'; reason: WrapRefusalReason } }
@@ -86,7 +86,7 @@ export type WrapEvaluation =
   | { status: 'lawful'; requiredFlapMM: number; appliedFlapMM: number; witnesses: readonly ContactWitness[] }
   | { status: 'refused'; code: 'WRAP_EXCEEDS_ALLOWANCE' | 'AUTO_FLAP_CAP_EXCEEDED'; requiredFlapMM: number; allowedFlapMM: number; witnesses: readonly ContactWitness[] }
   | { status: 'refused'; code: 'NO_WRAPPED_LAYOUT_IN_BAND'; reason: WrapRefusalReason; requiredFlapMM: null; allowedFlapMM: null; witnesses: readonly [] }
-export interface Ring { pts: Pt[] }
+interface Ring { pts: Pt[] }
 export interface Contour { outer: Ring; holes: Ring[] }
 export interface BBox { minX: number; minY: number; maxX: number; maxY: number }
 
@@ -104,7 +104,7 @@ export interface SafeSegment extends SafeMass {
 }
 
 export type MagnetPlan = 'all6' | 'all8' | 'corners8'
-export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
+type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 export interface Anchor { p: Pt; dia: MagnetDia }
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
 export type Governor = 0 | 1 | 2 | 3
@@ -127,7 +127,6 @@ export interface CentrePlacementMeasurement {
 
 export interface CentrePhaseCandidate { phaseMM: Pt; canon: number }
 
-export interface PerimeterMeasurement { belt: Pt[]; interior: Pt[] }
 export interface ExtremeCornerMeasurement { p: Pt; extremeCorner: boolean }
 
 export interface GridConfig {
@@ -138,7 +137,6 @@ export interface GridConfig {
   massDepthMM?: number
   centreMode?: number
   governor?: number
-  segmentsDetail?: 'full' | 'light'
   plan?: MagnetPlan
   perimeterOnly?: boolean
   wrapMode?: 'fixed' | 'auto'
@@ -156,9 +154,7 @@ export interface PlacementCandidate {
   placement: Placement
   phaseMM: Pt
   lattice: Pt[]
-  canon: number
   seated: Pt[]
-  belt: Pt[]
   anchors: Anchor[]
   magnetCount: number
   parityTrue: boolean
@@ -171,7 +167,6 @@ export interface GridResult {
   pitchCentreMM: number
   lattice: Pt[]
   phaseMM: Pt
-  panMM: Pt
   spotRadiusMM: number
   contactsMM: Pt[]
   segments: SafeSegment[]
@@ -189,7 +184,13 @@ export interface GridResult {
 export interface LawfulLayout { candidate: PlacementCandidate; wrap: Extract<WrapEvaluation, { status: 'lawful' }> }
 /** One published magnet count: its band, its first accepted even size, every co-lawful layout (gravity-ordered). */
 export interface Rung { band: BandId; sizeMM: number; magnetCount: number; layouts: LawfulLayout[] }
-export type RefusalCode = 'NO_CENTRE' | 'NO_PARITY_LAWFUL_PLACEMENT' | 'WRAP_EXCEEDS_ALLOWANCE' | 'NO_WRAPPED_LAYOUT_IN_BAND' | 'AUTO_FLAP_CAP_EXCEEDED'
+export type RefusalCode =
+  | 'NO_CENTRE'
+  | 'NO_PARITY_LAWFUL_PLACEMENT'
+  | 'WRAP_EXCEEDS_ALLOWANCE'
+  | 'NO_WRAPPED_LAYOUT_IN_BAND'
+  | 'AUTO_FLAP_CAP_EXCEEDED'
+  | 'NO_NEW_MAGNET_COUNT_IN_BAND'
 export interface BandLadder { band: BandId; rungs: Rung[]; refusal: null | { code: RefusalCode } }
 /** Every even size computed once and stored; rung selection renders from here without a solve. */
 export interface BandSolveResult { bands: BandLadder[]; gridsBySize: ReadonlyMap<number, GridResult> }

@@ -49,7 +49,7 @@ const OWNERS = {
   ],
 } as const
 
-/** Current phase profile: re-roomed Centre plus the live exact Wrap support/consumer only. */
+/** Final v3.5.3 owner profile: frozen Centre + ruler Wrap + even-size scaling. */
 const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> = {
   'magnetic-grid/spec.ts': [],
   'magnetic-grid/compute.ts': [],
@@ -261,6 +261,7 @@ describe('magnetic-grid current-phase owner DAG', () => {
       expect(fitIds, `fitSizeInBand calls ${forbidden}`).not.toContain(forbidden)
     }
 
+    expect(identifiersOf(engine), 'engine recomputes the perimeter belt').not.toContain('splitPerimeter')
     expect(worker).toContain('cached.contoursBySize.get(eff)')
     expect(worker).toContain('cached.contoursBySize.get(band.minMM)')
     expect(worker).not.toMatch(/contour:\s*sized\(/)
@@ -297,7 +298,7 @@ describe('magnetic-grid current-phase owner DAG', () => {
   })
 
   it('asserts the deleted rocket science is absent from the Law runtime',()=>{
-    const deleted=/^(ExactInteger|Rational|AlgebraicReal|ExactReal|ExactScale|ExactPoint|BoundaryElement|PreparedContour|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour|PHASE_STEP_MM|PHASE_STEP_FLOOR_MM|phaseStepMM)$/
+    const deleted=/^(ExactInteger|Rational|AlgebraicReal|ExactReal|ExactScale|ExactPoint|BoundaryElement|PreparedContour|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour|PHASE_STEP_MM|PHASE_STEP_FLOOR_MM|phaseStepMM|segmentsDetail|panMM|PerimeterMeasurement)$/
     for(const file of [...LAW_RUNTIME_FILES,'src/lib/magnetic-grid/compute/wrap-measurement.ts','src/lib/magnetic-grid/compute/identity.ts']){
       const text=readRepo(file)
       expect(identifiersOf(text).filter((name)=>deleted.test(name)),`${file} still carries a deleted identifier`).toEqual([])

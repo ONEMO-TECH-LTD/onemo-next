@@ -1,6 +1,6 @@
 // Magnetic-grid Logic: Centre policy over completed neutral measurements.
 
-import type { Anchor, BandId, BBox, Band, BandLadder, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Concession, ExtremeCornerMeasurement, Governor, LawfulLayout, MagnetPlan, ParityMeasurement, PerimeterMeasurement, PlacementCandidate, Pt, RefusalCode, Rung, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
+import type { Anchor, BandId, BBox, Band, BandLadder, CentreMeasurements, CentreMode, CentrePhaseCandidate, CentrePlacementMeasurement, Concession, ExtremeCornerMeasurement, Governor, LawfulLayout, MagnetPlan, ParityMeasurement, PlacementCandidate, Pt, RefusalCode, Rung, WrapEvaluation, WrapMeasurement, WrapPolicy } from './spec'
 import {
   BANDS,
   MAGNET_DIA_LARGE_MM,
@@ -8,7 +8,7 @@ import {
   MIN_ANCHORS,
 } from './spec'
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
-export function bandOf(sizeMM: number): Band | null {
+function bandOf(sizeMM: number): Band | null {
   for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
   return null
 }
@@ -175,20 +175,15 @@ function bandRefusal(
   if (!inBand.length) return 'NO_CENTRE'
   if (inBand.every((c) => !c.seated.length)) return 'NO_WRAPPED_LAYOUT_IN_BAND'
   if (!centred.length) return 'NO_PARITY_LAWFUL_PLACEMENT'
-  if (lawful.length) return 'NO_WRAPPED_LAYOUT_IN_BAND'           // lawful layouts exist, but every count is owned below
+  if (lawful.length) return 'NO_NEW_MAGNET_COUNT_IN_BAND'         // lawful layouts exist, but every count is owned below
   if (verdicts.some((v) => v.status === 'refused' && v.code !== 'NO_WRAPPED_LAYOUT_IN_BAND')) return policy.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE'
   return 'NO_WRAPPED_LAYOUT_IN_BAND'
 }
 
-/** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
-export function applyCoverage(
-  seated: Pt[],
-  perimeterOnly: boolean,
-  split: PerimeterMeasurement,
-): { seated: Pt[]; interior: Pt[] } {
-  if (!perimeterOnly || seated.length <= 4) return { seated, interior: [] }
-  if (split.belt.length >= MIN_ANCHORS) return { seated: split.belt, interior: split.interior }
-  return { seated, interior: [] }
+/** Perimeter coverage: with >4 seated, the output population is the measured Wrap belt, never below the minimum. */
+export function applyCoverage(seated: Pt[], perimeterOnly: boolean, belt: Pt[]): Pt[] {
+  if (!perimeterOnly || seated.length <= 4) return seated
+  return belt.length >= MIN_ANCHORS ? belt : seated
 }
 
 

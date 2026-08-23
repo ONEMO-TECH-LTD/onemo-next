@@ -22,10 +22,7 @@ const MS_CASES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
  * Centres are DEEPEST POINTS, so a crescent's centre sits in its arc, never the void.
  * A MEASUREMENT for display and scoring — magnet legality stays the exact per-point test.
  */
-export function safeSegments(
-  outer: ReadonlyArray<Pt>, spotRadiusMM: number, massDepthMM: number,
-  detail: 'full' | 'light' = 'full',
-): SafeSegment[] {
+export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, massDepthMM: number): SafeSegment[] {
   if (outer.length < 3) return []
   // Dense traced outlines are decimated for this measurement — display grain, not legality.
   const MAXV = 800
@@ -111,23 +108,7 @@ export function safeSegments(
       }
     }
     // Level-crossing segments per mesh cell, lerped; chained into closed rings.
-    // 'light' skips outlines entirely — scoring needs centres/areas/boxes, only display needs rings.
     const segs: Array<[Pt, Pt]> = []
-    if (detail === 'light') {
-      const at0 = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
-      return {
-        comp,
-        items: accs.map((a) => ({
-          areaMM2: a.n * step * step,
-          centreMM: at0(a.deepIdx),
-          meanMM: [a.sx / a.n, a.sy / a.n] as Pt,
-          peakClearMM: a.deepS + r + thr,
-          bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
-          rings: [],
-          deepIdx: a.deepIdx,
-        })),
-      }
-    }
     for (let iy = 0; iy < ny - 1; iy++) {
       for (let ix = 0; ix < nx - 1; ix++) {
         const i00 = iy * nx + ix, i10 = i00 + 1, i01 = i00 + nx, i11 = i01 + 1

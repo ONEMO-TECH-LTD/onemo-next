@@ -9,7 +9,7 @@ import type { ContactWitness, Contour, Pt, WrapMeasurement } from '../spec'
 import { nearestOutlineMM, pointInMaterial, splitPerimeter } from './seat'
 
 /** The private Compute result: populations and the policy-facing measurement from one pass. */
-export interface WrapResult { seated: Pt[]; belt: Pt[]; wrapMeasurement: WrapMeasurement }
+interface WrapResult { seated: Pt[]; belt: Pt[]; wrapMeasurement: WrapMeasurement }
 
 export function measureWrap(
   contour: Contour, lattice: ReadonlyArray<Pt>, pitchMM: number, spotRadiusMM: number,

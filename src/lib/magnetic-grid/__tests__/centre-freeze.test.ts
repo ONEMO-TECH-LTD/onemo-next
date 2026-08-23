@@ -3,6 +3,8 @@ import { getShape } from '../../shape-library'
 import { makeSizer, normBaseContour } from '../../effect/magnetic-grid-bridge'
 import { computeGrid as computeLegacy } from '../../effect/grid-origin'
 import { computeGrid as computeLaw } from '../engine'
+import { bbox, makeSeatPredicate, measureCentrePlacements } from '../compute/seat'
+import { centrePhaseCandidates, chooseCentrePlacement } from '../logic'
 
 const comparisonConfig = {
   pitchMM: 48,
@@ -67,5 +69,22 @@ describe('v3.5.1 frozen Centre at nonzero flap', () => {
 
     // The fixture must bite the removed legacy path, not merely compare two identical donors.
     expect(doubleCountDeltas.length).toBeGreaterThan(0)
+  })
+
+  it('M1: a positive Wrap allowance cannot enter Centre selection — star 128 Box is identical at flap 0 and flap 4', () => {
+    const base = normBaseContour(getShape('star', 1024, 1024), 1024)!
+    const contour = makeSizer(base, 0)(128)
+    const cfg = { pitchMM: 48, paddingMM: 12, centreMode: 0, perimeterOnly: true }
+    const flap0 = computeLaw(contour, 128, { ...cfg, flapMM: 0 })
+    const flap4 = computeLaw(contour, 128, { ...cfg, flapMM: 4 })
+    expect(flap4.centreMainMM).toEqual(flap0.centreMainMM)
+    expect(flap4.phaseMM).toEqual(flap0.phaseMM)
+    expect(flap4.anchors).toEqual(flap0.anchors)
+    // the mutation bites: feeding spot + flap into the frozen tie-break would move the selected phase
+    const outer = contour.outer.pts, bb = bbox(outer), fits = makeSeatPredicate(outer, 12)!
+    const target = flap0.centreMainMM
+    const pick = (reach: number) => chooseCentrePlacement(measureCentrePlacements(bb, 48, centrePhaseCandidates(target, bb, 48), fits, outer, reach))!.phaseMM
+    expect(pick(12)).toEqual(flap0.phaseMM)
+    expect(pick(12 + 4)).not.toEqual(flap0.phaseMM)
   })
 })

@@ -24,7 +24,6 @@ import {
   measureParity,
   measureWrap,
   safeSegments,
-  splitPerimeter,
   spotRadiusOf,
 } from './compute'
 import {
@@ -44,30 +43,27 @@ export {
   fieldSpanMM,
   contourBoundaryTruth,
   latticeOver,
-  safeSegments,
   scaleContour,
-  spotRadiusOf,
 } from './compute'
-export { bandOf } from './logic'
 
-/** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
+/** Assemble one fixed-size inspection from frozen Centre placements and the final seat/Wrap measurement. */
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
 export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? RELEASED_PADDING_MM)
-  // Coverage reach from a magnet centre: the spot plus the dialled flap allowance.
-  const reach = spotRadiusOf(pad) + Math.max(0, cfg.flapMM ?? FLAP_MM)
+  // The spot radius is the only reach Centre ever sees; the flap allowance reaches Wrap policy alone.
+  const spotRadiusMM = spotRadiusOf(pad)
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
   const bb = bbox(outer)
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
-  const fits = makeSeatPredicate(outer, spotRadiusOf(pad))
+  const fits = makeSeatPredicate(outer, spotRadiusMM)
 
-  const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
-  const segments = safeSegments(outer, spotRadiusOf(pad), massDepth, cfg.segmentsDetail ?? 'full')
+  const massDepth = Math.max(spotRadiusMM, cfg.massDepthMM ?? MASS_DEPTH_MM)
+  const segments = safeSegments(outer, spotRadiusMM, massDepth)
 
   // THE shape's centres — chosen by the centre-mode switch (logic's table). Every returned
   // point anchors the slide walk; single-target modes also fix the balance target.
@@ -84,14 +80,14 @@ export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: Gr
   // clearance, Coverage and the magnet plan act on that population, and parity is measured.
   // The candidate's size is the caller's requested ladder size, never the (offset) geometry's bbox.
   const sizeMM = requestedSizeMM
-  const candidateAt = (phaseMM: Pt, placement: Placement, canon: number): PlacementCandidate => {
+  const candidateAt = (phaseMM: Pt, placement: Placement): PlacementCandidate => {
     const lattice = latticeAt(bb, pitch, phaseMM[0], phaseMM[1])
-    const law = measureWrap(contourMM, lattice, pitch, spotRadiusOf(pad))
-    const coverage = applyCoverage(law.seated, perimeterOnly, splitPerimeter(law.seated, pitch))
-    const anchors = assignSizes(measureExtremeCorners(coverage.seated, bbox(coverage.seated)), plan)
+    const law = measureWrap(contourMM, lattice, pitch, spotRadiusMM)
+    const output = applyCoverage(law.seated, perimeterOnly, law.belt)
+    const anchors = assignSizes(measureExtremeCorners(output, bbox(output)), plan)
     const parity = measureParity(law.seated, ruleTarget, pitch)
     return {
-      sizeMM, placement, phaseMM, lattice, canon, seated: law.seated, belt: law.belt, anchors, magnetCount: anchors.length,
+      sizeMM, placement, phaseMM, lattice, seated: law.seated, anchors, magnetCount: anchors.length,
       parityTrue: parity.parityTrue, centreErrorMM: parity.centreErrorMM, wrapMeasurement: law.wrapMeasurement,
     }
   }
@@ -99,21 +95,17 @@ export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: Gr
   // fixes its magnet-line count, odd count puts a NODE on the centre, even count puts the GAP on
   // it. All four parity placements are measured and returned; the display pick keeps the frozen
   // Centre ordering (a parity seating more wins; at equal seats the canonical frame).
-  const measured = fits ? measureCentrePlacements(bb, pitch, centrePhaseCandidates(ruleTarget, bb, pitch), fits, outer, reach) : []
-  const candidates = measured.map((m, i) => candidateAt(m.phaseMM, { xHalf: i === 1 || i === 3, yHalf: i === 2 || i === 3 }, m.canon))
+  const measured = fits ? measureCentrePlacements(bb, pitch, centrePhaseCandidates(ruleTarget, bb, pitch), fits, outer, spotRadiusMM) : []
+  const candidates = measured.map((m, i) => candidateAt(m.phaseMM, { xHalf: i === 1 || i === 3, yHalf: i === 2 || i === 3 }))
   const best = chooseCentrePlacement(measured)
   let display: PlacementCandidate
-  let bestKx = 0, bestKy = 0
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search. The centre law
     // is NOT satisfied by construction here — a hand-placed grid may sit anywhere — so its
     // truth is MEASURED and reported as a concession.
-    const ox = mod(cfg.forcePhaseMM[0], pitch), oy = mod(cfg.forcePhaseMM[1], pitch)
-    bestKx = mod(ox - (bb.maxX - bb.minX) / 2, pitch)
-    bestKy = mod(oy - (bb.maxY - bb.minY) / 2, pitch)
-    display = candidateAt([ox, oy], { xHalf: false, yHalf: false }, 0)
+    display = candidateAt([mod(cfg.forcePhaseMM[0], pitch), mod(cfg.forcePhaseMM[1], pitch)], { xHalf: false, yHalf: false })
   } else {
-    display = best ? candidates[measured.indexOf(best)] : candidateAt([0, 0], { xHalf: false, yHalf: false }, 0)
+    display = best ? candidates[measured.indexOf(best)] : candidateAt([0, 0], { xHalf: false, yHalf: false })
   }
   const mainCentre: Pt = fits ? ruleTarget : centres[0]
 
@@ -127,8 +119,7 @@ export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: Gr
     pitchCentreMM: pitch,
     lattice: display.lattice,
     phaseMM: display.phaseMM,
-    panMM: [bestKx, bestKy],
-    spotRadiusMM: spotRadiusOf(pad),
+    spotRadiusMM,
     segments,
     centresMM: [ruleTarget],
     centreMainMM: mainCentre,

@@ -1,5 +1,6 @@
 import { describe,expect,it } from 'vitest'
-import { contourIdentity } from '../compute/identity'
+import { contourBoundaryTruth } from '../compute/identity'
+const contourIdentity=(c:Contour)=>contourBoundaryTruth(c).contourIdentity
 import type { Contour } from '../spec'
 const contour=(points:[number,number][],holes:Contour['holes']=[]):Contour=>({outer:{pts:points},holes})
 describe('contour identity',()=>{
