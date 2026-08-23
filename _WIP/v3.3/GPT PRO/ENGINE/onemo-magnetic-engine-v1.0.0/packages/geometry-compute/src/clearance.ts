@@ -18,12 +18,13 @@ export function clearanceAtPoint(polygon:PreparedPolygon,point:Point):ClearanceR
     const clearance=Math.sqrt(best),signed=location==='OUTSIDE'?-clearance:location==='BOUNDARY'?0:clearance;
     return{point,location,signedClearanceMm:signed,clearanceMm:clearance,nearestBoundaryPoint:bestPoint,nearestEdgeIndex:bestIndex,exactness:'CERTIFIED_APPROXIMATE'};
   }
-  const bins=polygon.edgeIndex.bins.map((_,index)=>index).sort((left,right)=>{
-    const distance=(bin:number)=>{const min=polygon.edgeIndex.minY+bin*polygon.edgeIndex.binHeight,max=min+polygon.edgeIndex.binHeight;return point.y<min?min-point.y:point.y>max?point.y-max:0;};
-    return distance(left)-distance(right)||left-right;
-  });
+  const binDistance=(bin:number)=>{const min=polygon.edgeIndex.minY+bin*polygon.edgeIndex.binHeight,max=min+polygon.edgeIndex.binHeight;return point.y<min?min-point.y:point.y>max?point.y-max:0;};
+  const count=polygon.edgeIndex.bins.length,origin=Math.max(0,Math.min(count-1,Math.floor((point.y-polygon.edgeIndex.minY)/polygon.edgeIndex.binHeight)));
+  let below=origin,above=origin+1;
   const seen=new Set<number>();
-  for(const bin of bins){
+  while(below>=0||above<count){
+    const belowDistance=below>=0?binDistance(below):Infinity,aboveDistance=above<count?binDistance(above):Infinity;
+    const bin=belowDistance<=aboveDistance?below--:above++;
     const minY=polygon.edgeIndex.minY+bin*polygon.edgeIndex.binHeight,maxY=minY+polygon.edgeIndex.binHeight;
     const verticalDistance=point.y<minY?minY-point.y:point.y>maxY?point.y-maxY:0;
     if(verticalDistance*verticalDistance>best)break;

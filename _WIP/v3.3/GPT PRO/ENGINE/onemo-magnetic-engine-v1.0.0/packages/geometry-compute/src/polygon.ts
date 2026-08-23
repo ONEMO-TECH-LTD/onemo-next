@@ -153,13 +153,14 @@ export function preparePolygon(input:readonly Point[],options:{quantumMm:number;
   return Object.freeze({kind:'PreparedPolygon',quantumMm:options.quantumMm,ringInt:Object.freeze(ringInt),ringMm:Object.freeze(ringMm),edges:Object.freeze(edges),edgeIndex,metrics:Object.freeze(metrics),geometryHash,artifactHash:COMPUTE_ARTIFACT_HASH});
 }
 
-export function edgeIndicesNearY(polygon:PreparedPolygon,y:number,maxDistance=Infinity):number[]{
+export function edgeIndicesNearY(polygon:PreparedPolygon,y:number,maxDistance=Infinity):readonly number[]{
   const index=polygon.edgeIndex;
   if(!Number.isFinite(maxDistance))return polygon.edges.map(edge=>edge.index);
   const min=y-maxDistance,max=y+maxDistance;
   if(max<index.minY||min>index.maxY)return[];
   const first=Math.max(0,Math.min(index.bins.length-1,Math.floor((min-index.minY)/index.binHeight)));
   const last=Math.max(0,Math.min(index.bins.length-1,Math.floor((max-index.minY)/index.binHeight)));
+  if(maxDistance===0)return index.bins[first]!;
   const found=new Set<number>();for(let bin=first;bin<=last;bin++)for(const edge of index.bins[bin]!)found.add(edge);
   return [...found].sort((a,b)=>a-b);
 }

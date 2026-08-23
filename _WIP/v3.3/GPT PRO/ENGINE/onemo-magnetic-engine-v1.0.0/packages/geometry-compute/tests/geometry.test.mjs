@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, capMoment, clearCapMomentCache, clearComponentHierarchyCache, clearCriterionCaches, clearProjectionCache, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
+  adaptiveFeasibleTranslations, buildComponentHierarchy, canonicalHash, capMoment, clearanceAtPoint, clearCapMomentCache, clearComponentHierarchyCache, clearCriterionCaches, clearProjectionCache, compareCertifiedScores, componentToRegionEvidence, computeGlobalAnchor,
   criticalTranslationCandidates, discContainedExact, finalRegistrationTieBreak, generateLattice, possiblyEquivalentToAnchor,
-  evaluateCriterionOnBox, evaluateRegionCriterionOnBoxes, optimizeCriterion, preparePolygon, projectRing, scaleToDominantDimension
+  evaluateCriterionOnBox, evaluateRegionCriterionOnBoxes, optimizeCriterion, pointLocationNumber, preparePolygon, projectRing, scaleToDominantDimension
 } from '../dist/src/index.js';
 
 const q=0.01;
@@ -44,6 +44,12 @@ test('accelerated validation preserves high-vertex geometry and rejects distant 
   assert.throws(()=>preparePolygon([{x:-10,y:-10},{x:10,y:10},{x:-10,y:10},{x:10,y:-10}],{quantumMm:q}),/simple polygon/);
 });
 
+test('accelerated location and nearest-first clearance equal brute-force geometry',()=>{
+  const ring=Array.from({length:1024},(_,index)=>{const angle=2*Math.PI*index/1024;return{x:100*Math.cos(angle),y:70*Math.sin(angle)};}),polygon=preparePolygon(ring,{quantumMm:q,maxVertices:4096});
+  const brute=point=>{let best=Infinity,index=-1;for(const edge of polygon.edges){const dx=edge.b.x-edge.a.x,dy=edge.b.y-edge.a.y,len2=dx*dx+dy*dy,t=Math.max(0,Math.min(1,((point.x-edge.a.x)*dx+(point.y-edge.a.y)*dy)/len2)),x=edge.a.x+t*dx,y=edge.a.y+t*dy,d=(point.x-x)**2+(point.y-y)**2;if(d<best){best=d;index=edge.index;}}return{clearance:Math.sqrt(best),index};};
+  for(const point of [{x:0,y:0},{x:80,y:0},{x:0,y:80},{x:100,y:0},{x:-37.25,y:19.75}]){const expected=brute(point),actual=clearanceAtPoint(polygon,point);assert.equal(actual.location,pointLocationNumber(polygon.ringMm,point));assert.ok(Math.abs(actual.clearanceMm-expected.clearance)<=1e-12);assert.equal(actual.nearestEdgeIndex,expected.index);}
+});
+
 test('adaptive translation preserves continuous vertical pair feasibility',()=>{
   const p=preparePolygon([{x:-20,y:-50},{x:20,y:-50},{x:20,y:50},{x:-20,y:50}],{quantumMm:q});
   const set=adaptiveFeasibleTranslations(p,[{x:0,y:-24},{x:0,y:24}],12,{minX:-24,minY:-24,maxX:24,maxY:24},{toleranceMm:0.05,maxCells:20000,quantumMm:q});
@@ -51,6 +57,12 @@ test('adaptive translation preserves continuous vertical pair feasibility',()=>{
   assert.equal(set.exactness,'EXACT');assert.equal(set.cellsVisited,1);
   assert.deepEqual(set.insideBoxes.map(({minX,minY,maxX,maxY})=>({minX,minY,maxX,maxY})),[{minX:-8,minY:-14,maxX:8,maxY:14}]);
   assert.ok(set.witnessPoints.some(point=>Math.abs(point.x)<q&&Math.abs(point.y)<q));
+});
+
+test('boundary-only tangent feasibility retains one exact witness',()=>{
+  const p=preparePolygon([{x:-12,y:-12},{x:0,y:-12},{x:12,y:-12},{x:12,y:12},{x:-12,y:12}],{quantumMm:q});
+  const set=adaptiveFeasibleTranslations(p,[{x:0,y:0}],12,{minX:-1,minY:-1,maxX:1,maxY:1},{toleranceMm:0.01,maxCells:20000,maxDepth:20,witnessIterations:20,quantumMm:q});
+  assert.equal(set.insideBoxes.length,0);assert.equal(set.status,'FEASIBLE');assert.equal(set.witnessPoints.length,1);assert.ok(Math.abs(set.witnessPoints[0].x)<q&&Math.abs(set.witnessPoints[0].y)<q);
 });
 
 test('axis-aligned mechanics use exact closed-form optimum restrictions',()=>{
@@ -88,12 +100,50 @@ test('multi-clearance hierarchy removes narrow branches before broad mass',()=>{
   assert.ok(hierarchy.components.filter(c=>c.levelIndex===2).length<=hierarchy.components.filter(c=>c.levelIndex===0).length);
 });
 
-test('stable exact erosion partition certifies a sampled concave component',()=>{
+test('persistent inner core tightens major-region evidence without certifying exact topology',()=>{
   const p=preparePolygon([{x:-40,y:-30},{x:40,y:-30},{x:40,y:30},{x:8,y:30},{x:8,y:70},{x:-8,y:70},{x:-8,y:30},{x:-40,y:30}],{quantumMm:q});
-  const hierarchy=buildComponentHierarchy(p,[12],6);
-  assert.equal(hierarchy.components.length,1);
-  assert.equal(hierarchy.components[0].topologyCertified,true);
-  assert.equal(hierarchy.exactness,'CERTIFIED_APPROXIMATE');
+  const hierarchy=buildComponentHierarchy(p,[12,16,20],6,.0025);
+  const base=hierarchy.components.filter(component=>component.levelIndex===0);
+  assert.equal(base.length,1);
+  assert.equal(base[0].topologyCertified,false);
+  assert.deepEqual(base[0].persistenceLevelInterval,{lower:3,upper:3});
+  assert.ok(base[0].areaBoundsMm2.lower<=base[0].areaBoundsMm2.upper);
+  assert.equal(hierarchy.exactness,'INDETERMINATE');
+});
+
+test('certified inner persistence maps through a possible cell when no sample centre lies in the deeper core',()=>{
+  const p=preparePolygon([{x:-17,y:-17},{x:17,y:-17},{x:17,y:17},{x:-17,y:17}],{quantumMm:q});
+  const hierarchy=buildComponentHierarchy(p,[12,16,20,24],6,.0025),base=hierarchy.components.find(component=>component.levelIndex===0);
+  assert.deepEqual(base.persistenceLevelInterval,{lower:2,upper:2});
+  assert.equal(hierarchy.cells.some(cell=>cell.centre.x>=-1&&cell.centre.x<=1&&cell.centre.y>=-1&&cell.centre.y<=1),false);
+});
+
+test('kernel connectivity certificate keeps its exact positive and negative boundary',()=>{
+  const star=[{x:-40,y:-30},{x:40,y:-30},{x:40,y:30},{x:8,y:30},{x:8,y:70},{x:-8,y:70},{x:-8,y:30},{x:-40,y:30}];
+  const positive=buildComponentHierarchy(preparePolygon(star,{quantumMm:q}),[5],2,.0025);
+  const reversed=buildComponentHierarchy(preparePolygon([...star].reverse(),{quantumMm:q}),[5],2,.0025);
+  assert.equal(positive.components[0].topologyCertified,true);assert.equal(reversed.components[0].topologyCertified,true);
+  assert.equal(buildComponentHierarchy(preparePolygon(dumbbell,{quantumMm:q}),[12],6,.0025).components[0].topologyCertified,false);
+  assert.equal(buildComponentHierarchy(preparePolygon([{x:-5,y:-5},{x:5,y:-5},{x:5,y:5},{x:-5,y:5}],{quantumMm:q}),[12],6,.0025).components.length,0);
+});
+
+test('compensated envelopes keep ordered area bounds at acute, reflex and split boundaries',()=>{
+  const fixtures=[
+    [{x:0,y:40},{x:-2,y:-40},{x:2,y:-40}],
+    [{x:-40,y:-40},{x:40,y:-40},{x:40,y:40},{x:10,y:40},{x:10,y:5},{x:-10,y:5},{x:-10,y:40},{x:-40,y:40}],
+    dumbbell,
+  ];
+  for(const ring of fixtures){
+    const polygon=preparePolygon(ring,{quantumMm:q}),hierarchy=buildComponentHierarchy(polygon,[2,4],2,.0025);
+    for(const component of hierarchy.components){
+      assert.ok(component.areaBoundsMm2.lower<=component.areaBoundsMm2.upper);
+      const region=componentToRegionEvidence(hierarchy,component);
+      for(const cellKey of region.definitelyOccupiedCellKeys){
+        const [ix,iy]=cellKey.split(',').map(Number),cell=hierarchy.cells.find(candidate=>candidate.ix===ix&&candidate.iy===iy);
+        for(const point of [{x:cell.centre.x-1,y:cell.centre.y-1},{x:cell.centre.x+1,y:cell.centre.y-1},{x:cell.centre.x+1,y:cell.centre.y+1},{x:cell.centre.x-1,y:cell.centre.y+1}])assert.equal(discContainedExact(polygon,point,component.radiusMm).legal,true);
+      }
+    }
+  }
 });
 
 test('component hierarchy cache is bounded intermediate evidence and explicitly clearable',()=>{
@@ -110,7 +160,8 @@ test('lower-dimensional safe point remains explicit in the component hierarchy',
   assert.equal(hierarchy.components.length,1);
   const component=hierarchy.components[0];
   assert.ok(component.exactWitnessPoints.some(point=>point.x===0&&point.y===0));
-  assert.deepEqual(component.areaBoundsMm2,{lower:0,upper:144});
+  assert.equal(component.areaBoundsMm2.lower,0);
+  assert.ok(component.areaBoundsMm2.upper>=0&&component.areaBoundsMm2.upper<q*q);
   assert.deepEqual(component.persistenceLevelInterval,{lower:1,upper:1});
   assert.equal(hierarchy.exactness,'INDETERMINATE');
   assert.equal(component.perimeterMm,null);

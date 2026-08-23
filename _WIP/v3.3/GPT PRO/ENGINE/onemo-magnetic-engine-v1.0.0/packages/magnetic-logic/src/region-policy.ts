@@ -12,10 +12,11 @@ export function buildStructuralEvidence(polygon:PreparedPolygon,profile:Register
   const cacheKey=`${polygon.geometryHash}:${profile.profileHash}`;const cached=structuralCache.get(cacheKey);
   if(cached){structuralCache.delete(cacheKey);structuralCache.set(cacheKey,cached);return cached;}
   const levels=profile.structural.clearanceSurplusLevelsMm.map(x=>profile.safety.effectiveVerificationRadiusMm+x);
-  const hierarchy=buildComponentHierarchy(polygon,levels,profile.structural.sampleStepMm);
+  const hierarchy=buildComponentHierarchy(polygon,levels,profile.structural.sampleStepMm,profile.numeric.approximationToleranceMm);
   const base=hierarchy.components.filter(c=>c.levelIndex===0);
   const discArea=Math.PI*profile.safety.effectiveVerificationRadiusMm**2;
-  const certifiedLargestId=base.filter(component=>component.topologyCertified&&base.every(other=>other.id===component.id||component.areaBoundsMm2.lower>=other.areaBoundsMm2.upper)).map(component=>component.id).sort()[0];
+  const couldQualify=(areaMm2:number,persistenceUpper:number)=>(areaMm2/discArea>=profile.structural.majorMinAreaDiscRatio||areaMm2/polygon.metrics.area>=profile.structural.majorMinAreaShapeFraction)&&persistenceUpper>=profile.structural.majorMinPersistenceLevels;
+  const certifiedLargestId=base.filter(component=>component.persistenceLevelInterval.lower>=profile.structural.majorMinPersistenceLevels&&base.every(other=>other.id===component.id||component.areaBoundsMm2.lower>=other.areaBoundsMm2.upper)&&(!component.topologyCertified?!couldQualify(Math.max(0,component.areaBoundsMm2.upper-component.areaBoundsMm2.lower),component.persistenceLevelInterval.upper):true)).map(component=>component.id).sort()[0];
   const classifications:RegionClassification[]=base.map(component=>{
     const persistence=component.persistenceLevelInterval;
     const areaDiscRatio={lower:component.areaBoundsMm2.lower/discArea,upper:component.areaBoundsMm2.upper/discArea};
@@ -23,10 +24,11 @@ export function buildStructuralEvidence(polygon:PreparedPolygon,profile:Register
     const definitelyMajor=(areaDiscRatio.lower>=profile.structural.majorMinAreaDiscRatio||areaShapeFraction.lower>=profile.structural.majorMinAreaShapeFraction)&&persistence.lower>=profile.structural.majorMinPersistenceLevels;
     const definitelyMarginal=(areaDiscRatio.upper<profile.structural.majorMinAreaDiscRatio&&areaShapeFraction.upper<profile.structural.majorMinAreaShapeFraction)||persistence.upper<profile.structural.majorMinPersistenceLevels;
     let cls:RegionClassification['class'];
-    if(!component.topologyCertified)cls='UNCLASSIFIED_NEAR_TOLERANCE';
-    else if(profile.structural.forceLargestComponentMajor&&component.id===certifiedLargestId)cls='MAJOR';
-    else if(definitelyMajor)cls='MAJOR';
+    const unresolvedCouldBeMajor=!component.topologyCertified&&couldQualify(Math.max(0,component.areaBoundsMm2.upper-component.areaBoundsMm2.lower),persistence.upper);
+    if(profile.structural.forceLargestComponentMajor&&component.id===certifiedLargestId)cls='MAJOR';
+    else if(definitelyMajor&&!unresolvedCouldBeMajor)cls='MAJOR';
     else if(definitelyMarginal)cls='MARGINAL';
+    else if(!component.topologyCertified)cls='UNCLASSIFIED_NEAR_TOLERANCE';
     else cls='UNCLASSIFIED_NEAR_TOLERANCE';
     return{component,class:cls,persistenceLevels:persistence,areaDiscRatio,areaShapeFraction};
   });

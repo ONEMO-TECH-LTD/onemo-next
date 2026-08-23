@@ -318,7 +318,7 @@ export default function GridEnginePage() {
     // fractions of DIFFERENT sides, and feeding them raw squashed the shape (locked-aspect law).
     const { w: boxW, h: boxH } = box
     setPicked(null)
-    setSubmittedOutline(toMagneticStudioOutline(outline, { w: boxW, h: boxH }))
+    setSubmittedOutline(toMagneticStudioOutline(outline, { w: boxW, h: boxH }, profile.numeric))
   }
 
   const pickBand = async (band: string) => {
