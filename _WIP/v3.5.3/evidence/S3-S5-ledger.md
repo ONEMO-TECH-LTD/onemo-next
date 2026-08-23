@@ -37,3 +37,13 @@ Builder: s62-kai-lead · 2026-08-23 · branch `session62-task/grid-v3.5.3-build`
 `scaling.test.ts` (11): synthetic reducer — ownership/strictly-increasing/no-repeat, lower count survives, ties + gravity, Auto minimum/ties/cap refusal, typed refusals; real shapes — square ladder 1@24 / 2&4@72 / 8@120 / 12@168 (96 even sizes stored), diamond 1@34, squircle 8 in B4, Auto solve; stored rendering — zero `computeGrid` calls on `fitSizeInBand` with offset contour, requested size on every stored candidate, invalid index throws, diamond B3 130/4 two distinct co-lawful layouts each equal to its stored candidate. `wrap.test.ts`: band solve publishes only even sizes and equals direct inspection at every rung. `separation.test.ts`: one size loop, walk identifiers absent.
 
 Not measured yet (F1): fixture 5 timing per band; live tab.
+
+## Fixture 5 — early headless measurement (at `7bcca659`, Masses mode, flap 0, pitch 48)
+
+| Shape (pts) | B1 | B2 | B3 | B4 | full `solveBands` | rungs |
+|---|---|---|---|---|---|---|
+| squircle (132) | 47 ms | 112 ms | 236 ms | 384 ms | 713 ms | 1@24 · 2&4@72 · — · 8@168 |
+| heart (198) | 41 ms | 121 ms | 230 ms | 362 ms | 772 ms | 1@38 · — · — · — |
+| blob generator (96) | 29 ms | 101 ms | 234 ms | 335 ms | 672 ms | none at flap 0 |
+
+Every band is far under the 2 s gate. Product observation for F1 (law, not defect): at fixed flap 0 only shapes whose belt discs all read 0 mm air at an even size publish rungs — organic shapes mostly publish under Auto. The real-cutout timing and the live tab are measured at F1 (`shot-f1.mjs`).
