@@ -121,7 +121,7 @@ export function inspectionConcessions(parity: ParityMeasurement, wrap: WrapEvalu
 
 /**
  * MAGNET-QUANTITY SCALING over completed candidates (every even size, all four placements):
- * a layout is accepted when it is centred (parity true, no centre miss) and wrap-lawful; each
+ * a layout is accepted when it is centred (parity true) and wrap-lawful; each
  * count is published once, at its smallest accepted size in the first band that accepts it,
  * strictly greater than the last published count; every co-lawful layout at that size is kept
  * (Auto keeps the minimum allowance and its ties); vertical eliminates horizontal on an
@@ -136,7 +136,8 @@ export function reduceBandLadders(candidates: readonly PlacementCandidate[], pol
   let lastPublished = 0
   for (const band of BANDS) {
     const inBand = candidates.filter((c) => c.sizeMM >= band.minMM && c.sizeMM <= band.maxMM)
-    const centred = inBand.filter((c) => c.parityTrue && c.centreErrorMM === 0)
+    // centreErrorMM is report-only. The frozen parity verdict is the Centre law.
+    const centred = inBand.filter((c) => c.parityTrue)
     const judged = centred.map((c) => ({ candidate: c, wrap: evaluateWrap(c.wrapMeasurement, policy) }))
     const lawful: LawfulLayout[] = judged.flatMap((j) => j.wrap.status === 'lawful' ? [{ candidate: j.candidate, wrap: j.wrap }] : [])
     const rungs: Rung[] = []
@@ -151,7 +152,7 @@ export function reduceBandLadders(candidates: readonly PlacementCandidate[], pol
         atSize = atSize.filter((l) => l.wrap.requiredFlapMM === minFlap)
       }
       const equal = (a: LawfulLayout, b: LawfulLayout) =>
-        a.candidate.centreErrorMM === b.candidate.centreErrorMM && a.wrap.requiredFlapMM === b.wrap.requiredFlapMM && a.wrap.appliedFlapMM === b.wrap.appliedFlapMM
+        a.wrap.requiredFlapMM === b.wrap.requiredFlapMM && a.wrap.appliedFlapMM === b.wrap.appliedFlapMM
       const layouts = atSize
         .filter((l) => !(isHorizontal(l) && atSize.some((v) => isVertical(v) && equal(v, l))))
         .sort((a, b) => gravityRank(a) - gravityRank(b))
@@ -168,7 +169,8 @@ function bandRefusal(
   inBand: readonly PlacementCandidate[], centred: readonly PlacementCandidate[], verdicts: readonly WrapEvaluation[],
   lawful: readonly LawfulLayout[], policy: WrapPolicy,
 ): RefusalCode {
-  if (!inBand.length || inBand.every((c) => !c.seated.length)) return 'NO_CENTRE'
+  if (!inBand.length) return 'NO_CENTRE'
+  if (inBand.every((c) => !c.seated.length)) return 'NO_WRAPPED_LAYOUT_IN_BAND'
   if (!centred.length) return 'NO_PARITY_LAWFUL_PLACEMENT'
   if (lawful.length) return 'NO_WRAPPED_LAYOUT_IN_BAND'           // lawful layouts exist, but every count is owned below
   if (verdicts.some((v) => v.status === 'refused' && v.code !== 'NO_WRAPPED_LAYOUT_IN_BAND')) return policy.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE'

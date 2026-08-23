@@ -47,9 +47,40 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
     const c = scaleContour(base, mm)
     if (!offsetMM) return c
     const o = insetRingMM(c.outer.pts, offsetMM, 'round')
-    return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
+    if (!o || o.length < 3) return c
+    const holes = c.holes.flatMap((hole) => {
+      const offset = insetRingMM(hole.pts, -offsetMM, 'round')
+      return offset && offset.length >= 3 ? [{ pts: offset }] : []
+    })
+    return { outer: { pts: o }, holes }
   }
 }
+
+// Law surface door: UI values and types reach the tab through the bridge, never around it.
+export {
+  BANDS,
+  CENTRE_MODE,
+  DEFAULT_PITCH_MM,
+  FLAP_CEIL_MM,
+  FLAP_FLOOR_MM,
+  FLAP_MM,
+  GOVERNOR,
+  MASS_DEPTH_CEIL_MM,
+  MASS_DEPTH_FLOOR_MM,
+  MASS_DEPTH_MM,
+  MIN_EFFECT_MM,
+  PADDING_CEIL_MM,
+  PADDING_FLOOR_MM,
+  RELEASED_PADDING_MM,
+  RELEASED_PITCHES_MM,
+  SIZE_STEP_MM,
+  type BandId,
+  type GridResult,
+  type MagnetPlan,
+  type Placement,
+  type Rung,
+  type SafeSegment,
+} from '../magnetic-grid/engine'
 
 /** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour
  *  normalized to longest side = 1mm, y-up. No AI — the outline IS the mask's edge. */

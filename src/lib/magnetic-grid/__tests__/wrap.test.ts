@@ -3,6 +3,7 @@ import { measureWrap } from '../compute/wrap-measurement'
 import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
 import { computeGrid, solveBands } from '../engine'
+import { makeSizer } from '../../effect/magnetic-grid-bridge'
 import type { Contour, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
@@ -93,6 +94,22 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(computeGrid(diamond(18), 36, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
   })
 
+  it('outline offset preserves and oppositely offsets holes, so Wrap still sees the complete boundary', () => {
+    const base: Contour = {
+      outer: { pts: [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]] },
+      holes: [{ pts: [[-0.125, -0.125], [0.125, -0.125], [0.125, 0.125], [-0.125, 0.125]] }],
+    }
+    const contour = makeSizer(base, 1)(40)
+    expect(contour.holes).toHaveLength(1)
+    const holeXs = contour.holes[0].pts.map(([x]) => x)
+    expect(Math.max(...holeXs) - Math.min(...holeXs)).toBe(8)
+    const law = measureWrap(contour, [[0, 8.5]], 48, 4)
+    expect(law.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 1 })
+    if (law.wrapMeasurement.status === 'measured') {
+      expect(law.wrapMeasurement.witnesses[0].outlinePointMM).toEqual([0, 4])
+    }
+  })
+
   it('an invalid boundary and an empty belt refuse with null allowance evidence, and Logic never invents one', () => {
     const degenerate = measureWrap({ outer: { pts: [] }, holes: [] }, [[0, 0]], 48, 4).wrapMeasurement
     expect(degenerate).toEqual({ status: 'refused', requiredFlapMM: null, witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'invalid-boundary' } })
@@ -127,7 +144,7 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(full.contactsMM).toEqual(perimeter.contactsMM)
   })
 
-  it('the band solve publishes only evaluated even sizes and agrees with direct fixed-size inspection', () => {
+  it('the band reuses each inspected candidate verdict without replacing the frozen Free display placement', () => {
     const sized = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm * 0.7], [0, mm * 0.7]] }, holes: [] })
     const cfg = { pitchMM: 48, paddingMM: 12, flapMM: 4, centreMode: 0 }
     const solved = solveBands(sized, cfg)
@@ -135,9 +152,24 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     // all four placements are walked: the y-shifted placement seats the first magnet at 34 (the old single-placement walk only saw 36)
     expect(b1.rungs.map((r) => [r.sizeMM, r.magnetCount])).toEqual([[34, 1]])
     expect(b1.rungs[0].layouts[0].candidate.placement).toEqual({ xHalf: false, yHalf: true })
-    for (const band of solved.bands) for (const rung of band.rungs) {
+
+    // Free/manual inspection keeps the frozen donor display pick; scaling may publish another
+    // lawful placement from the same four measured candidates without inventing a new verdict.
+    const free34 = solved.gridsBySize.get(34)!
+    expect(free34.phaseMM).toEqual([0, 0])
+    expect(free34.anchors).toEqual([])
+    expect(free34.wrap.status).toBe('refused')
+    expect(b1.rungs[0].layouts[0].wrap.status).toBe('lawful')
+
+    for (const band of solved.bands) for (const rung of band.rungs) for (const layout of rung.layouts) {
       expect(rung.sizeMM % 2).toBe(0)
-      expect(solved.gridsBySize.get(rung.sizeMM)!.wrap).toEqual(computeGrid(sized(rung.sizeMM), rung.sizeMM, cfg).wrap)
+      const inspected = solved.gridsBySize.get(rung.sizeMM)!.candidates.find((candidate) =>
+        candidate.placement.xHalf === layout.candidate.placement.xHalf
+        && candidate.placement.yHalf === layout.candidate.placement.yHalf)
+      expect(inspected).toBeDefined()
+      expect(inspected).toEqual(layout.candidate)
+      expect(inspected!.wrapMeasurement).toEqual(layout.candidate.wrapMeasurement)
+      expect(evaluateWrap(inspected!.wrapMeasurement, { mode: 'fixed', allowanceMM: 4 })).toEqual(layout.wrap)
     }
   })
 })

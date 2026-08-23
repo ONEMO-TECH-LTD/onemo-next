@@ -7,7 +7,6 @@ import { computeGrid as computeLaw } from '../engine'
 const comparisonConfig = {
   pitchMM: 48,
   paddingMM: 12,
-  phaseStepMM: 1,
   massDepthMM: 16,
   centreMode: 2,
   governor: 0,

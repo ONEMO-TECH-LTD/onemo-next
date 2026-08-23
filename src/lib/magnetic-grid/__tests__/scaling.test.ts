@@ -1,9 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { getShape } from '../../shape-library'
 import { makeSizer, normBaseContour } from '../../effect/magnetic-grid-bridge'
 import { reduceBandLadders } from '../logic'
-import * as engine from '../engine'
-import { autoFlapInBand, computeGrid, fitSizeInBand, solveBands } from '../engine'
+import { autoFlapInBand, fitSizeInBand, solveBands } from '../engine'
 import type { Contour, Placement, PlacementCandidate, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
@@ -49,6 +48,11 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
     expect(tie[1].rungs[0].layouts.map((l) => l.candidate.placement)).toEqual([v, both])
     const unequal = reduceBandLadders([cand(72, 2, 0, { placement: h }), cand(72, 2, 1, { placement: v })], { mode: 'fixed', allowanceMM: 1 })
     expect(unequal[1].rungs[0].layouts.map((l) => l.candidate.placement)).toEqual([v, h])
+    const reportOnlyMiss = reduceBandLadders([
+      cand(72, 2, 0, { placement: h, centreErrorMM: 0 }),
+      cand(72, 2, 0, { placement: v, centreErrorMM: 1 }),
+    ], fixed)
+    expect(reportOnlyMiss[1].rungs[0].layouts.map((l) => l.candidate.placement)).toEqual([v])
   })
 
   it('Auto keeps the minimum whole-mm allowance and its ties within the cap; the cap refuses typed', () => {
@@ -58,9 +62,11 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
   })
 
   it('refusals are typed: nothing seated, nothing centred, nothing wrapped, or every count already owned', () => {
-    expect(reduceBandLadders([cand(24, 0, null)], fixed)[0].refusal).toEqual({ code: 'NO_CENTRE' })
+    expect(reduceBandLadders([], fixed)[0].refusal).toEqual({ code: 'NO_CENTRE' })
+    expect(reduceBandLadders([cand(24, 0, null)], fixed)[0].refusal).toEqual({ code: 'NO_WRAPPED_LAYOUT_IN_BAND' })
     expect(reduceBandLadders([cand(24, 1, 0, { parityTrue: false })], fixed)[0].refusal).toEqual({ code: 'NO_PARITY_LAWFUL_PLACEMENT' })
-    expect(reduceBandLadders([cand(24, 1, 0, { centreErrorMM: 1 })], fixed)[0].refusal).toEqual({ code: 'NO_PARITY_LAWFUL_PLACEMENT' })
+    // centreErrorMM is a report-only concession: it cannot remove a parity-lawful rung.
+    expect(rungsOf(reduceBandLadders([cand(24, 1, 0, { centreErrorMM: 1 })], fixed))[0]).toEqual([[24, 1, 1]])
     expect(reduceBandLadders([cand(24, 1, 2)], fixed)[0].refusal).toEqual({ code: 'WRAP_EXCEEDS_ALLOWANCE' })
     expect(reduceBandLadders([cand(24, 1, 0), cand(72, 1, 0)], fixed)[1].refusal).toEqual({ code: 'NO_WRAPPED_LAYOUT_IN_BAND' })
   })
@@ -74,6 +80,21 @@ describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
     expect(solved.bands[1].rungs[0].layouts[0].candidate.placement).toEqual({ xHalf: false, yHalf: true })
     expect(solved.gridsBySize.size).toBe(96)
     for (const size of solved.gridsBySize.keys()) expect(size % 2).toBe(0)
+  })
+
+  it('calls the supplied sizer exactly once for each of the 96 ruled even sizes', () => {
+    const calls = new Map<number, number>()
+    const solved = solveBands((mm) => {
+      calls.set(mm, (calls.get(mm) ?? 0) + 1)
+      return square(mm)
+    }, fixed0)
+    expect(solved.gridsBySize.size).toBe(96)
+    expect([...calls.values()]).toHaveLength(96)
+    expect([...calls.values()].every((count) => count === 1)).toBe(true)
+    const beforeSelection = [...calls.entries()]
+    fitSizeInBand(solved, 1, 0, 0)
+    fitSizeInBand(solved, 1, 0, 0)
+    expect([...calls.entries()]).toEqual(beforeSelection)
   })
 
   it('square-rotated diamond: 1@34 (air 0.02 reads 0)', () => {
@@ -100,13 +121,10 @@ describe('v3.5.3 scaling — stored rendering (fixture 6)', () => {
     const base = normBaseContour(getShape('square', 1024, 1024), 1024)!
     const sized = makeSizer(base, 1)                         // outline offset 1 mm: the solved contour is the offset one
     const solved = solveBands(sized, fixed0)
-    const spy = vi.spyOn(engine, 'computeGrid')
     const b2 = solved.bands[1]
     expect(b2.rungs.length).toBeGreaterThan(0)
     const rung = b2.rungs[0]
     const grids = rung.layouts.map((_, i) => fitSizeInBand(solved, 2, 0, i))
-    expect(spy).not.toHaveBeenCalled()
-    spy.mockRestore()
     for (const [i, g] of grids.entries()) {
       expect(g.phaseMM).toEqual(rung.layouts[i].candidate.phaseMM)
       expect(g.lattice).toEqual(rung.layouts[i].candidate.lattice)

@@ -1,10 +1,9 @@
 // law.worker.ts — runs the Law engine off the main thread. Pure dispatch: the same
 // bridge/engine calls the page would make inline, nothing computed here.
 
-import { BANDS, computeGrid, fitSizeInBand, solveBands, type BandId, type BandLadder, type BandSolveResult, type GridConfig, type GridResult, type Placement, type Rung } from '@/lib/magnetic-grid/engine'
+import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, solveBands, type BandId, type BandLadder, type BandSolveResult, type BoundaryTruth, type GridConfig, type GridResult, type Placement, type Rung } from '@/lib/magnetic-grid/engine'
 import { contourIdentity, makeSizer } from '@/lib/effect/magnetic-grid-bridge'
 import type { Contour } from '@/lib/effect/types'
-import type { BoundaryTruth } from '@/lib/magnetic-grid/spec'
 
 interface SolveRequest {
   engineId: 'v351-centre-clone'
@@ -32,19 +31,30 @@ const ctx = self as unknown as Worker
 // renders from that stored result; Free/manual sizes are cached per size. A new shape clears all.
 let shapeSig = ''
 const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
-const solves = new Map<string, BandSolveResult>()
+interface CachedBandSolve { result: BandSolveResult; contoursBySize: Map<number, Contour> }
+const solves = new Map<string, CachedBandSolve>()
 const FREE_CAP = 400
 const SOLVE_CAP = 6
 
-function solvedFor(sized: (mm: number) => Contour, wrapCfg: GridConfig): BandSolveResult {
+function solvedFor(
+  rawSizer: (mm: number) => Contour,
+  wrapCfg: GridConfig,
+  solve: (sized: (mm: number) => Contour) => BandSolveResult,
+): CachedBandSolve {
   const key = JSON.stringify(wrapCfg)
-  let solved = solves.get(key)
-  if (!solved) {
-    solved = solveBands(sized, wrapCfg)
-    solves.set(key, solved)
+  let cached = solves.get(key)
+  if (!cached) {
+    const contoursBySize = new Map<number, Contour>()
+    const sized = (mm: number): Contour => {
+      let contour = contoursBySize.get(mm)
+      if (!contour) { contour = rawSizer(mm); contoursBySize.set(mm, contour) }
+      return contour
+    }
+    cached = { result: solve(sized), contoursBySize }
+    solves.set(key, cached)
     if (solves.size > SOLVE_CAP) solves.delete(solves.keys().next().value!)
   }
-  return solved
+  return cached
 }
 
 const summarise = (ladder: BandLadder): RungSummary[] =>
@@ -62,19 +72,22 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
       : { ...cfg, wrapMode: 'fixed' }
     if (mode !== 'free') {
-      const solved = solvedFor(sized, wrapCfg)
+      const cached = solvedFor(sized, wrapCfg, (cachedSizer) => autoFlapMaxMM != null
+        ? autoFlapInBand(cachedSizer, cfg, autoFlapMaxMM)
+        : solveBands(cachedSizer, wrapCfg))
+      const solved = cached.result
       const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
       const ladder = solved.bands.find((b) => b.band === band.id)!
       if (ladder.rungs.length) {
-        const idx = Math.min(rungSel ?? ladder.rungs.length - 1, ladder.rungs.length - 1)
-        const layoutIdx = Math.min(layoutSel ?? 0, ladder.rungs[idx].layouts.length - 1)
+        const idx = Math.max(0, Math.min(rungSel ?? ladder.rungs.length - 1, ladder.rungs.length - 1))
+        const layoutIdx = Math.max(0, Math.min(layoutSel ?? 0, ladder.rungs[idx].layouts.length - 1))
         const grid = fitSizeInBand(solved, band.id, idx, layoutIdx)
         const eff = ladder.rungs[idx].sizeMM
-        ctx.postMessage({ id, model: { contour: sized(eff), grid, effSize: eff, ladder: summarise(ladder), idx, layoutIdx, refusal: null, segments: grid.segments, autoFlapMM: autoFlapMaxMM != null && grid.wrap.status === 'lawful' ? grid.wrap.appliedFlapMM : null } })
+        ctx.postMessage({ id, model: { contour: cached.contoursBySize.get(eff)!, grid, effSize: eff, ladder: summarise(ladder), idx, layoutIdx, refusal: null, segments: grid.segments, autoFlapMM: autoFlapMaxMM != null && grid.wrap.status === 'lawful' ? grid.wrap.appliedFlapMM : null } })
       } else {
         // The band accepts nothing: show its floor size as measured, with the typed refusal.
         const grid = solved.gridsBySize.get(band.minMM)!
-        ctx.postMessage({ id, model: { contour: sized(band.minMM), grid, effSize: band.minMM, ladder: [], idx: 0, layoutIdx: 0, refusal: ladder.refusal?.code ?? null, segments: grid.segments, autoFlapMM: null } })
+        ctx.postMessage({ id, model: { contour: cached.contoursBySize.get(band.minMM)!, grid, effSize: band.minMM, ladder: [], idx: 0, layoutIdx: 0, refusal: ladder.refusal?.code ?? null, segments: grid.segments, autoFlapMM: null } })
       }
     } else {
       const k = JSON.stringify(wrapCfg) + '|' + sizeMM
