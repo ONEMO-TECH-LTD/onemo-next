@@ -34,3 +34,9 @@ Screenshots `W1-*.png` beside this file; zero console errors.
 ## Contract trace
 
 Fixture 2 lines covered: square 24 four witnesses at 0 ✓ · square 26 requires 1 ✓ · Weight squircle residue reads 0, all six modes lawful ✓ · −0.49 seated / −0.51 refused ✓ · outside/hole anchor signed negative ✓ · diamond 34/36 ✓ · 0.5 reads 1 ✓ · hole as binding witness ✓ · Auto minimum + cap ✓ · invalid-boundary / empty-belt null evidence, Logic never invents ✓ · Coverage invariance ✓ · MagnetPlan invariance ✓. Not yet in W1 (later steps): rung-walk agreement (S3/S4), mutation of the 0.001 prescreen (S-fixtures), instrumented guards (F1).
+
+## Gate record
+
+- QA verdict `/tmp/s62-grid-qa-w1-verdict.md`: runtime correct; W1-a..d approved; two fixes shipped as commits and adopted unchanged by cherry-pick: `6c289939` → `6ff380ca` (hole-side −0.49/−0.51, corners8 invariance, band-path = direct Wrap) and `73d1ba8f` → `dc6e9b15` (every ring needs ≥3 finite points or `invalid-boundary`).
+- Meta gate `/tmp/s62-grid-meta-w1-gate.md`: both commits accepted unchanged; W1-a..d approved; diamond-34 canon number corrected at plan commit `995f0a66`.
+- Adopted head `dc6e9b15`: tsc clean, 27 tests pass. Awaiting QA adopted-head verification and Meta live/source closure.
