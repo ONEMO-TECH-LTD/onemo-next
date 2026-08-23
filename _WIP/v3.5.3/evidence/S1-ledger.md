@@ -1,6 +1,6 @@
 # S1 — even sizes — build ledger
 
-Builder: s62-kai-lead · 2026-08-23 · branch `session62-task/grid-v3.5.3-build` · commit `f0d7853a` (6 files).
+Builder: s62-kai-lead · 2026-08-23 · branch `session62-task/grid-v3.5.3-build` · commit `f0d7853a` (4 files: `spec.ts`, `engine.ts`, `law.worker.ts`, `LawPanel.tsx`; +35 −40).
 
 ## What changed
 
