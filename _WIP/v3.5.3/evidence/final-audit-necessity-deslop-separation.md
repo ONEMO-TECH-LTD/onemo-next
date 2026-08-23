@@ -55,3 +55,14 @@ Enforced mechanically by `separation.test.ts` (import allow-lists per owner; Log
 - **Sufficiency:** delivers the directive in full.
 - **Separation:** in force; no re-rooming required.
 - **Production:** ready on the engine; blocked on the decision for P1 (inherited lint) and the N1/N2 kill-list — both need QA+Meta dispositions before any deletion.
+
+## Team patch adopted (QA + Meta cross-accepted) — product `50174b59` · `64db807c` · `fe7787bb`
+
+- **M1 (Meta, critical):** `reach = spot + flap` was feeding the frozen Centre display tie-break — measured: preset star 128 Box changed phase between flap 0 and flap 4 while the governed centre stayed put. Deleted; flap reaches `wrapPolicyOf` only. Biting fixture: star 128 Box identical at flap 0/4; the tie-break with `12 + 4` picks a different phase.
+- **M2:** ownership-only suppression now returns `NO_NEW_MAGNET_COUNT_IN_BAND` (was reported as a Wrap failure).
+- **N1/N2/N5 (QA):** `segmentsDetail` + `'light'` branch, `panMM`, `PerimeterMeasurement` and Engine's duplicate `splitPerimeter` deleted; `applyCoverage(seated, perimeterOnly, belt) → Pt[]`; `measureWrap`'s ≤4 belt rule kept.
+- **M3:** dead `PlacementCandidate.canon`/`.belt` removed; 14 private symbols un-exported (QA's ten + `contourIdentity`, `bandOf`, Engine re-exports of `safeSegments`/`spotRadiusOf`).
+- **N4:** seven comment corrections (seat header, `pressExcessMM`, orphan MS paragraph, engine header, guard profile, LawPanel owner and witness comments).
+- **M4:** LawPanel hook lint fixed as bounded (microtask hydration with cleanup; synchronous pending-pan update; `dragging` state for the cursor). Scoped eslint: 0 problems.
+- **M5:** circle disposition fixture no longer solves 96 sizes twice; MagnetPlan ladder fixture has an explicit 15 s timeout. Full `vitest run`: 69 files / 666 tests pass in 15 s.
+- Gates at `fe7787bb`: tsc clean · magnetic-grid 8 files / 51 tests · scoped lint 0 · full suite green.
