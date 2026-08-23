@@ -34,3 +34,9 @@ Kept as the contract requires: Centre's 0.001 mm integer seat prescreen (`prepar
 ## Live tab — :4031 serving `…/s62-grid-v353-build` (lsof cwd), commit `f5f85b72`
 
 `W2-*.png` beside this file, zero console errors; readings identical to W1 (squircle 72 lawful in Masses and Weight; square 24 four dots; square 26 requires 1; preset diamond 34/36 `empty-belt` — rhombus, first rung at 40, see W1 ledger). Deleting the exact layer changes nothing visible on the non-circle presets; the circle preset's authorised placement changes at 24/72/120 are recorded under Fixture 1.
+
+## Gate record
+
+- QA `/tmp/s62-grid-qa-w2-verdict.md`: deletion correct and minimal; W2-a (with patch), W2-b, W2-c approved; patch `cff17f1c` (full four-lattice circle replay + extended absence guard) adopted unchanged → `9cda9ba0`.
+- Meta `/tmp/s62-grid-meta-w2-gate.md`: patch and corrected ledger accepted; W2-a..c approved; production build, typecheck, lint, diff/status clean.
+- Adopted head `9cda9ba0`: tsc clean, 27 tests pass. Awaiting QA adopted-head verification and Meta closure.
