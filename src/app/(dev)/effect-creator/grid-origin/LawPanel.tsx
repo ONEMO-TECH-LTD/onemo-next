@@ -8,7 +8,7 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SIZE_STEP_MM, boundaryTruth, fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type BandId, type FieldSpot, type GridResult, type MagnetPlan, type Placement, type Rung, type SafeSegment } from '@/lib/effect/magnetic-grid-bridge'
+import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, MIN_TOUCH, MIN_TOUCH_CEIL, MIN_TOUCH_FLOOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SIZE_STEP_MM, boundaryTruth, fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type BandId, type FieldSpot, type GridResult, type MagnetPlan, type Placement, type Rung, type SafeSegment } from '@/lib/effect/magnetic-grid-bridge'
 
 /** The worker's rung projection: the final Rung's size and count plus each co-lawful layout's placement. */
 type RungSummary = Pick<Rung, 'sizeMM' | 'magnetCount'> & { layouts: Placement[] }
@@ -68,6 +68,8 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   const [flapStored, setFlapStored] = usePersisted('flap', FLAP_MM)
   const flap = Math.round(flapStored)
   const setFlap = (n: number) => setFlapStored(Math.round(n))
+  /** Minimum touch — how many belt magnets must wrap within the flap; the rest may carry air. */
+  const [minTouch, setMinTouch] = usePersisted('minTouch', MIN_TOUCH)
   /** Auto flap micro-module — the flap dial becomes the RANGE: auto works within it. */
   const [autoFlapN, setAutoFlapN] = usePersisted('autoFlap', 0)
   /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
@@ -103,15 +105,15 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('magnetic-grid.compare.v1.defaults', JSON.stringify({ pad, flap, massDepth, centreMode, governor, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('magnetic-grid.compare.v1.defaults', JSON.stringify({ pad, flap, minTouch, massDepth, centreMode, governor, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, minTouch: MIN_TOUCH, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('magnetic-grid.compare.v1.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setFlap(d.flap); setMinTouch(d.minTouch); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -257,7 +259,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), massDepthMM: massDepth, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter' }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), minTouch, massDepthMM: massDepth, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
@@ -274,7 +276,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, massDepth, centreMode, governor, manual, bandScale, enFlapN, autoFlapN, plan, mode, rungSel, layoutSel, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, minTouch, massDepth, centreMode, governor, manual, bandScale, enFlapN, autoFlapN, plan, mode, rungSel, layoutSel, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -446,6 +448,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
             <LabRow on={enFlapN !== 0} set={(b) => setEnFlapN(b ? 1 : 0)}>
               <Slider label={autoFlapN ? 'Flap allowance · auto works within this' : 'Flap allowance · past spot edge'} unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
             </LabRow>
+            <Slider label="Minimum touch · belt magnets that must wrap" v={minTouch} set={setMinTouch} min={MIN_TOUCH_FLOOR} max={MIN_TOUCH_CEIL} />
             <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
               <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
             </label>
@@ -496,7 +499,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               </div>
             </div>
             <div className="gl-magic-note">
-              Centre + Wrap + Scaling — the grid locks onto the governed centre, every perimeter-belt disc must wrap within the whole-millimetre flap, and each band publishes its next magnet counts at the first even size that is centred and wrapped. Three laws, no voting.
+              Centre + Wrap + Scaling — the grid locks onto the governed centre, at least the minimum-touch number of perimeter-belt discs must wrap within the whole-millimetre flap (the rest may carry air), and each band publishes its next magnet counts at the first even size that is centred and wrapped. Three laws, no voting.
             </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">

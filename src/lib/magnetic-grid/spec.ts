@@ -53,6 +53,12 @@ export const FLAP_MM = 0
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
+/** Minimum touch (Dan, 2026-08-23): how many perimeter-belt discs must wrap within the flap; the
+ *  rest may carry air — shape imperfection is allowed. Admin dial, default 1. */
+export const MIN_TOUCH = 1
+export const MIN_TOUCH_FLOOR = 1
+export const MIN_TOUCH_CEIL = 8
+
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
 export const MASS_DEPTH_MM = 16
@@ -77,11 +83,9 @@ export interface BoundaryTruth {
 export interface ContactWitness { beltAnchorMM: Pt; outlinePointMM: Pt; clearanceMM: number }
 type WrapRefusalReason = 'invalid-boundary' | 'empty-belt'
 export type WrapMeasurement =
-  | { status: 'measured'; requiredFlapMM: number; witnesses: readonly ContactWitness[]; refusal: null }
+  | { status: 'measured'; beltClearancesMM: readonly number[]; witnesses: readonly ContactWitness[]; refusal: null }
   | { status: 'refused'; requiredFlapMM: null; witnesses: readonly []; refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND'; reason: WrapRefusalReason } }
-export type WrapPolicy =
-  | { mode: 'fixed'; allowanceMM: number }
-  | { mode: 'auto'; capMM: number }
+export type WrapPolicy = ({ mode: 'fixed'; allowanceMM: number } | { mode: 'auto'; capMM: number }) & { minTouch: number }
 export type WrapEvaluation =
   | { status: 'lawful'; requiredFlapMM: number; appliedFlapMM: number; witnesses: readonly ContactWitness[] }
   | { status: 'refused'; code: 'WRAP_EXCEEDS_ALLOWANCE' | 'AUTO_FLAP_CAP_EXCEEDED'; requiredFlapMM: number; allowedFlapMM: number; witnesses: readonly ContactWitness[] }
@@ -141,6 +145,7 @@ export interface GridConfig {
   perimeterOnly?: boolean
   wrapMode?: 'fixed' | 'auto'
   autoFlapCapMM?: number
+  minTouch?: number
 }
 
 /** Which parity placement: the canonical frame, or the half-pitch shift on x, y or both. */

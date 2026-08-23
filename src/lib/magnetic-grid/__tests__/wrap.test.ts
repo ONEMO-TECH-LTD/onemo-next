@@ -3,7 +3,8 @@ import { measureWrap } from '../compute/wrap-measurement'
 import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
 import { computeGrid, solveBands } from '../engine'
-import { makeSizer } from '../../effect/magnetic-grid-bridge'
+import { makeSizer, normBaseContour } from '../../effect/magnetic-grid-bridge'
+import { getShape } from '../../shape-library'
 import type { Contour, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
@@ -57,7 +58,7 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   it('signed ruler: −0.49 reads 0 and stays seated; −0.51 reads −1 and is not admitted', () => {
     const nearMiss = measureWrap(square(23.02), [[0, 0]], 48, 12)
     expect(nearMiss.seated).toEqual([[0, 0]])
-    expect(nearMiss.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 0 })
+    expect(nearMiss.wrapMeasurement).toMatchObject({ status: 'measured', beltClearancesMM: [0] })
     const miss = measureWrap(square(22.98), [[0, 0]], 48, 12)
     expect(miss.seated).toEqual([])
     expect(miss.wrapMeasurement).toMatchObject({ status: 'refused', refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } })
@@ -66,7 +67,7 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
   it('applies the same −0.49/−0.51 ruler thresholds at a hole boundary', () => {
     const nearMiss = measureWrap(holed, [[0, 8.51]], 48, 4)
     expect(nearMiss.seated).toEqual([[0, 8.51]])
-    expect(nearMiss.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 0 })
+    expect(nearMiss.wrapMeasurement).toMatchObject({ status: 'measured', beltClearancesMM: [0] })
     const miss = measureWrap(holed, [[0, 8.49]], 48, 4)
     expect(miss.seated).toEqual([])
     expect(miss.wrapMeasurement).toMatchObject({ status: 'refused', refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } })
@@ -83,12 +84,12 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
 
   it('a hole segment can be the binding witness and Auto returns the minimum within its cap', () => {
     const law = measureWrap(holed, [[0, 10]], 48, 4)
-    expect(law.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 1 })
+    expect(law.wrapMeasurement).toMatchObject({ status: 'measured', beltClearancesMM: [1] })
     if (law.wrapMeasurement.status !== 'measured') return
     expect(law.wrapMeasurement.witnesses).toHaveLength(1)
     expect(law.wrapMeasurement.witnesses[0].outlinePointMM).toEqual([0, 5])
-    expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 3 })).toMatchObject({ status: 'lawful', appliedFlapMM: 1 })
-    expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 0 })).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
+    expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 3, minTouch: 1 })).toMatchObject({ status: 'lawful', appliedFlapMM: 1 })
+    expect(evaluateWrap(law.wrapMeasurement, { mode: 'auto', capMM: 0, minTouch: 1 })).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
     const auto = computeGrid(diamond(18), 36, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 1 })
     expect(auto.wrap).toMatchObject({ status: 'lawful', requiredFlapMM: 1, appliedFlapMM: 1 })
     expect(computeGrid(diamond(18), 36, { ...baseConfig, wrapMode: 'auto', autoFlapCapMM: 0 }).wrap).toMatchObject({ status: 'refused', code: 'AUTO_FLAP_CAP_EXCEEDED' })
@@ -104,7 +105,7 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     const holeXs = contour.holes[0].pts.map(([x]) => x)
     expect(Math.max(...holeXs) - Math.min(...holeXs)).toBe(8)
     const law = measureWrap(contour, [[0, 8.5]], 48, 4)
-    expect(law.wrapMeasurement).toMatchObject({ status: 'measured', requiredFlapMM: 1 })
+    expect(law.wrapMeasurement).toMatchObject({ status: 'measured', beltClearancesMM: [1] })
     if (law.wrapMeasurement.status === 'measured') {
       expect(law.wrapMeasurement.witnesses[0].outlinePointMM).toEqual([0, 4])
     }
@@ -116,11 +117,11 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     const empty = measureWrap(square(24), [], 48, 12).wrapMeasurement
     expect(empty).toMatchObject({ status: 'refused', requiredFlapMM: null, refusal: { reason: 'empty-belt' } })
     for (const measured of [degenerate, empty]) {
-      const verdict = evaluateWrap(measured, { mode: 'fixed', allowanceMM: 0 })
+      const verdict = evaluateWrap(measured, { mode: 'fixed', allowanceMM: 0, minTouch: 1 })
       expect(verdict).toEqual({ status: 'refused', code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: measured.refusal!.reason, requiredFlapMM: null, allowedFlapMM: null, witnesses: [] })
     }
     const mutated = { ...degenerate, requiredFlapMM: 0 } as unknown as WrapMeasurement
-    expect(evaluateWrap(mutated, { mode: 'fixed', allowanceMM: 0 })).toMatchObject({ requiredFlapMM: null })
+    expect(evaluateWrap(mutated, { mode: 'fixed', allowanceMM: 0, minTouch: 1 })).toMatchObject({ requiredFlapMM: null })
   })
 
   it('refuses a malformed or non-finite hole as an invalid complete boundary', () => {
@@ -169,7 +170,23 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
       expect(inspected).toBeDefined()
       expect(inspected).toEqual(layout.candidate)
       expect(inspected!.wrapMeasurement).toEqual(layout.candidate.wrapMeasurement)
-      expect(evaluateWrap(inspected!.wrapMeasurement, { mode: 'fixed', allowanceMM: 4 })).toEqual(layout.wrap)
+      expect(evaluateWrap(inspected!.wrapMeasurement, { mode: 'fixed', allowanceMM: 4, minTouch: 1 })).toEqual(layout.wrap)
     }
+  })
+
+  it('minimum touch (Dan): squircle 120 at flap 0 — the Masses pick has a 6-disc belt, 4 touch and 2 carry 24 mm; lawful up to minTouch 4, refused at 5', () => {
+    const base = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
+    const contour = makeSizer(base, 0)(120)
+    const cfg = { paddingMM: 12, flapMM: 0, wrapMode: 'fixed' as const, centreMode: 2, perimeterOnly: true }
+    for (const minTouch of [1, 2, 4]) expect(computeGrid(contour, 120, { ...cfg, minTouch }).wrap, `minTouch ${minTouch}`).toMatchObject({ status: 'lawful', requiredFlapMM: 0 })
+    const five = computeGrid(contour, 120, { ...cfg, minTouch: 5 })
+    expect(five.wrap).toMatchObject({ status: 'refused', code: 'WRAP_EXCEEDS_ALLOWANCE', requiredFlapMM: 24 })
+    expect(five.anchors).toHaveLength(6)
+    expect(five.candidates.map((c) => c.wrapMeasurement.status === 'measured' ? [...c.wrapMeasurement.beltClearancesMM].sort((a, b) => a - b) : null)).toContainEqual([0, 0, 0, 0, 24, 24])
+    // the ladder follows: under the default minimum touch B3 publishes 6@120 and 8@124 (measured 2026-08-23)
+    const solved = solveBands(makeSizer(base, 0), { ...cfg, minTouch: 1 })
+    expect(solved.bands[2].rungs.map((r) => [r.sizeMM, r.magnetCount])).toEqual([[120, 6], [124, 8]])
+    // the policy is clamped to the belt: minTouch 8 on a one-disc belt means that disc must touch
+    expect(evaluateWrap({ status: 'measured', beltClearancesMM: [0], witnesses: [], refusal: null }, { mode: 'fixed', allowanceMM: 0, minTouch: 8 })).toMatchObject({ status: 'lawful', requiredFlapMM: 0 })
   })
 })

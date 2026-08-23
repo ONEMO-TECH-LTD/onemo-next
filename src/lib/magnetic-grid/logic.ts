@@ -88,25 +88,30 @@ export function chooseCentrePlacement(
   return best
 }
 
-/** Wrap law over the whole-mm belt measurement; a geometry refusal passes through unchanged. */
+/** Wrap law over the whole-mm belt measurement (Dan, 2026-08-23: flap is not all-or-nothing — at
+ *  least `minTouch` belt discs must wrap within the flap, the rest may carry air). The required flap
+ *  is the minTouch-th smallest belt clearance; a geometry refusal passes through unchanged. */
 export function evaluateWrap(measured: WrapMeasurement, policy: WrapPolicy): WrapEvaluation {
   if (measured.status === 'refused') {
     return { status: 'refused', code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: measured.refusal.reason, requiredFlapMM: null, allowedFlapMM: null, witnesses: [] }
   }
+  const sorted = [...measured.beltClearancesMM].sort((a, b) => a - b)
+  const touch = Math.max(1, Math.min(Math.floor(policy.minTouch), sorted.length))
+  const requiredFlapMM = sorted[touch - 1]
   const allowedFlapMM = policy.mode === 'fixed' ? policy.allowanceMM : policy.capMM
-  if (measured.requiredFlapMM > allowedFlapMM) {
+  if (requiredFlapMM > allowedFlapMM) {
     return {
       status: 'refused',
       code: policy.mode === 'auto' ? 'AUTO_FLAP_CAP_EXCEEDED' : 'WRAP_EXCEEDS_ALLOWANCE',
-      requiredFlapMM: measured.requiredFlapMM,
+      requiredFlapMM,
       allowedFlapMM,
       witnesses: measured.witnesses,
     }
   }
   return {
     status: 'lawful',
-    requiredFlapMM: measured.requiredFlapMM,
-    appliedFlapMM: policy.mode === 'auto' ? measured.requiredFlapMM : policy.allowanceMM,
+    requiredFlapMM,
+    appliedFlapMM: policy.mode === 'auto' ? requiredFlapMM : policy.allowanceMM,
     witnesses: measured.witnesses,
   }
 }

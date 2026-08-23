@@ -16,13 +16,13 @@ const fixed0 = { paddingMM: 12, centreMode: 0, perimeterOnly: true, flapMM: 0, w
 const cand = (sizeMM: number, magnetCount: number, requiredFlapMM: number | null, o: Partial<PlacementCandidate> & { placement?: Placement } = {}): PlacementCandidate => {
   const wrapMeasurement: WrapMeasurement = requiredFlapMM === null
     ? { status: 'refused', requiredFlapMM: null, witnesses: [], refusal: { code: 'NO_WRAPPED_LAYOUT_IN_BAND', reason: 'empty-belt' } }
-    : { status: 'measured', requiredFlapMM, witnesses: [], refusal: null }
+    : { status: 'measured', beltClearancesMM: [requiredFlapMM], witnesses: [], refusal: null }
   return {
     sizeMM, placement: { xHalf: false, yHalf: false }, phaseMM: [0, 0], lattice: [], seated: magnetCount ? [[0, 0]] : [],
     anchors: [], magnetCount, parityTrue: true, centreErrorMM: 0, wrapMeasurement, ...o,
   }
 }
-const fixed = { mode: 'fixed' as const, allowanceMM: 0 }
+const fixed = { mode: 'fixed' as const, allowanceMM: 0, minTouch: 1 }
 const rungsOf = (bands: ReturnType<typeof reduceBandLadders>) => bands.map((b) => b.rungs.map((r) => [r.sizeMM, r.magnetCount, r.layouts.length]))
 
 describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
@@ -47,7 +47,7 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
     const v: Placement = { xHalf: true, yHalf: false }, h: Placement = { xHalf: false, yHalf: true }, both: Placement = { xHalf: true, yHalf: true }
     const tie = reduceBandLadders([cand(72, 2, 0, { placement: h }), cand(72, 2, 0, { placement: v }), cand(72, 2, 0, { placement: both })], fixed)
     expect(tie[1].rungs[0].layouts.map((l) => l.candidate.placement)).toEqual([v, both])
-    const unequal = reduceBandLadders([cand(72, 2, 0, { placement: h }), cand(72, 2, 1, { placement: v })], { mode: 'fixed', allowanceMM: 1 })
+    const unequal = reduceBandLadders([cand(72, 2, 0, { placement: h }), cand(72, 2, 1, { placement: v })], { mode: 'fixed', allowanceMM: 1, minTouch: 1 })
     expect(unequal[1].rungs[0].layouts.map((l) => l.candidate.placement)).toEqual([v, h])
     const reportOnlyMiss = reduceBandLadders([
       cand(72, 2, 0, { placement: h, centreErrorMM: 0 }),
@@ -57,9 +57,9 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
   })
 
   it('Auto keeps the minimum whole-mm allowance and its ties within the cap; the cap refuses typed', () => {
-    const auto = reduceBandLadders([cand(72, 4, 2), cand(72, 4, 1, { placement: { xHalf: true, yHalf: true } }), cand(72, 4, 1, { placement: { xHalf: false, yHalf: true } })], { mode: 'auto', capMM: 3 })
+    const auto = reduceBandLadders([cand(72, 4, 2), cand(72, 4, 1, { placement: { xHalf: true, yHalf: true } }), cand(72, 4, 1, { placement: { xHalf: false, yHalf: true } })], { mode: 'auto', capMM: 3, minTouch: 1 })
     expect(auto[1].rungs[0].layouts.map((l) => l.wrap.appliedFlapMM)).toEqual([1, 1])
-    expect(reduceBandLadders([cand(72, 4, 2)], { mode: 'auto', capMM: 1 })[1].refusal).toEqual({ code: 'AUTO_FLAP_CAP_EXCEEDED' })
+    expect(reduceBandLadders([cand(72, 4, 2)], { mode: 'auto', capMM: 1, minTouch: 1 })[1].refusal).toEqual({ code: 'AUTO_FLAP_CAP_EXCEEDED' })
   })
 
   it('refusals are typed: nothing seated, nothing centred, nothing wrapped, or every count already owned', () => {
@@ -75,9 +75,10 @@ describe('v3.5.3 scaling — reduceBandLadders (synthetic)', () => {
 })
 
 describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
-  it('square: 1@24; 2 and 4@72; 8@120; 12@168 — all even, strictly increasing, no repeat', () => {
+  it('square under minimum touch 1: 1@24; 2 and 4@72; 6 and 8@120; 10 and 12@168 — all even, strictly increasing, no repeat', () => {
     const solved = solveBands(square, fixed0)
-    expect(rungsOf(solved.bands)).toEqual([[[24, 1, 1]], [[72, 2, 1], [72, 4, 1]], [[120, 8, 1]], [[168, 12, 1]]])
+    // minimum-touch ruling (2026-08-23): the x-shifted 2×3 and 2×4 frames now wrap (corners touch, the middle pair carries air)
+    expect(rungsOf(solved.bands)).toEqual([[[24, 1, 1]], [[72, 2, 1], [72, 4, 1]], [[120, 6, 1], [120, 8, 1]], [[168, 10, 1], [168, 12, 1]]])
     // the 2-magnet rung is the VERTICAL pair (x-shifted phase: magnets at (0, ±24)); the horizontal pair is eliminated by gravity
     const pair = solved.bands[1].rungs[0].layouts[0].candidate
     expect(pair.placement).toEqual({ xHalf: true, yHalf: false })
@@ -126,10 +127,10 @@ describe('v3.5.3 scaling — fixture 3 on real shapes', () => {
     expect(solved.bands[0].rungs[0]).toMatchObject({ sizeMM: 34, magnetCount: 1 })
   })
 
-  it('squircle preset publishes 8 in B4', () => {
+  it('squircle preset under minimum touch 1: 6@120, 8@124, 10@168, 12@176', () => {
     const base = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
     const solved = solveBands(makeSizer(base, 0), { ...fixed0, centreMode: 2 })
-    expect(solved.bands[3].rungs.map((r) => r.magnetCount)).toContain(8)
+    expect(solved.bands.map((b) => b.rungs.map((r) => [r.sizeMM, r.magnetCount]))).toEqual([[[24, 1]], [[72, 2], [72, 4]], [[120, 6], [124, 8]], [[168, 10], [176, 12]]])
   })
 
   it('autoFlapInBand is the same solve under the Auto policy (no scan)', () => {

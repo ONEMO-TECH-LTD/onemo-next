@@ -9,6 +9,7 @@ import {
   FLAP_MM,
   GOVERNOR,
   MASS_DEPTH_MM,
+  MIN_TOUCH,
   PADDING_FLOOR_MM,
   RELEASED_PADDING_MM,
   SIZE_STEP_MM,
@@ -133,9 +134,10 @@ export function computeGrid(contourMM: Contour, requestedSizeMM: number, cfg: Gr
 
 /** The Wrap policy the config asks for — whole millimetres, read once, handed to Logic. */
 function wrapPolicyOf(cfg: GridConfig): WrapPolicy {
+  const minTouch = Math.max(1, Math.floor(cfg.minTouch ?? MIN_TOUCH))
   return cfg.wrapMode === 'auto'
-    ? { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM) }
-    : { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM) }
+    ? { mode: 'auto', capMM: Math.max(0, cfg.autoFlapCapMM ?? cfg.flapMM ?? FLAP_MM), minTouch }
+    : { mode: 'fixed', allowanceMM: Math.max(0, cfg.flapMM ?? FLAP_MM), minTouch }
 }
 
 /** MAGNET-QUANTITY SCALING: the one production loop over the even-size ladder. Every even size in

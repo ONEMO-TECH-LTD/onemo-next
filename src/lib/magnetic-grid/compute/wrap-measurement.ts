@@ -4,6 +4,7 @@
 // per-anchor record: nearest distance to the complete boundary, material membership, and the
 // ruled signed clearance. Seat legality, the belt and the belt's required flap are all read
 // from those same records; no distance is recomputed and nothing below the ruler decides.
+// The belt's per-disc clearances are reported as measured; how many must touch is Logic's policy.
 
 import type { ContactWitness, Contour, Pt, WrapMeasurement } from '../spec'
 import { nearestOutlineMM, pointInMaterial, splitPerimeter } from './seat'
@@ -41,7 +42,7 @@ export function measureWrap(
     belt: belt.map((record) => record.node),
     wrapMeasurement: {
       status: 'measured',
-      requiredFlapMM: Math.max(...belt.map((record) => record.clearanceMM)),
+      beltClearancesMM: belt.map((record) => record.clearanceMM),
       witnesses,
       refusal: null,
     },
