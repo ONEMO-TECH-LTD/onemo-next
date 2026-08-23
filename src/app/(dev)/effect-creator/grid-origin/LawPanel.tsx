@@ -8,10 +8,12 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, MIN_TOUCH, MIN_TOUCH_CEIL, MIN_TOUCH_FLOOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SIZE_STEP_MM, boundaryTruth, fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type BandId, type FieldSpot, type GridResult, type MagnetPlan, type Placement, type Rung, type SafeSegment } from '@/lib/effect/magnetic-grid-bridge'
+import { SOLVER_CONTROLS, SOLVER_DEFAULTS, boundaryTruth, fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, validateSolverConfig, type BandId, type FieldSpot, type GridResult, type SafeSegment, type SolverConfig, type SolverControl } from '@/lib/effect/magnetic-grid-bridge'
 
-/** The worker's rung projection: the final Rung's size and count plus each co-lawful layout's placement. */
-type RungSummary = Pick<Rung, 'sizeMM' | 'magnetCount'> & { layouts: Placement[] }
+/** The worker's tier projection: a magnet count, its first lawful size, and every distinct lawful
+ *  layout kept there — the marked one flagged, none hidden. */
+type LayoutSummary = { family: string; magnetCount: number; sizeMM: number; overhangsMM: readonly number[]; recommended: boolean }
+type RungSummary = { sizeMM: number; magnetCount: number; layouts: LayoutSummary[] }
 
 const IMG = 1024
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
@@ -45,6 +47,36 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
   return [v, set]
 }
 
+/** THE CALIBRATION (Dan, 2026-08-23): one complete configuration, every field owned by Spec.
+ *  The panel renders `SOLVER_CONTROLS` and forwards the whole object — it holds no bound, no
+ *  default, no option list and no solver number of its own. Stored values are validated on load;
+ *  anything Spec refuses falls back to the shipped defaults rather than reaching the engine. */
+const CONFIG_KEY = 'magnetic-grid.compare.v1.solver-config'
+function useSolverConfig(): [SolverConfig, <K extends keyof SolverConfig>(field: K, value: SolverConfig[K]) => void, () => void] {
+  const [cfg, setCfg] = useState<SolverConfig>(SOLVER_DEFAULTS)
+  useEffect(() => {
+    let live = true
+    queueMicrotask(() => {
+      if (!live) return
+      try {
+        const raw = localStorage.getItem(CONFIG_KEY)
+        if (raw) setCfg(validateSolverConfig({ ...SOLVER_DEFAULTS, ...JSON.parse(raw) }))
+      } catch { /* a stored config Spec refuses is discarded, never repaired */ }
+    })
+    return () => { live = false }
+  }, [])
+  const setField = <K extends keyof SolverConfig>(field: K, value: SolverConfig[K]) => {
+    setCfg((current) => {
+      const next = { ...current, [field]: value }
+      try { validateSolverConfig(next) } catch { return current }
+      try { localStorage.setItem(CONFIG_KEY, JSON.stringify(next)) } catch { }
+      return next
+    })
+  }
+  const reset = () => { setCfg(SOLVER_DEFAULTS); try { localStorage.removeItem(CONFIG_KEY) } catch { } }
+  return [cfg, setField, reset]
+}
+
 export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2) => void }) {
   const [src, setSrc] = useState<Src>('preset')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
@@ -53,33 +85,13 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   const [p2, setP2] = useState(7)  // seed / lobes / petals / blades
   const [sides, setSides] = useState(6)
   const [points, setPoints] = useState(5)
-  // Opens on the B2 floor — the 72mm square standard (2×2), from spec.
-  const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
-  /** Free-slider limits — typed, persisted across reloads. */
-  const [sizeMinStored, setSizeMinStored] = usePersisted('sizeMin', MIN_EFFECT_MM)
-  const [sizeMaxStored, setSizeMaxStored] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
-  const sizeMin = evenMM(sizeMinStored)
-  const sizeMax = evenMM(sizeMaxStored)
-  const setSizeMin = (n: number) => setSizeMinStored(evenMM(n))
-  const setSizeMax = (n: number) => setSizeMaxStored(evenMM(n))
-  const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
-  const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
-  /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
-  const [flapStored, setFlapStored] = usePersisted('flap', FLAP_MM)
-  const flap = Math.round(flapStored)
-  const setFlap = (n: number) => setFlapStored(Math.round(n))
-  /** Minimum touch — how many belt magnets must wrap within the flap; the rest may carry air. */
-  const [minTouch, setMinTouch] = usePersisted('minTouch', MIN_TOUCH)
-  /** Auto flap micro-module — the flap dial becomes the RANGE: auto works within it. */
-  const [autoFlapN, setAutoFlapN] = usePersisted('autoFlap', 0)
-  /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
-  const [massDepth, setMassDepth] = usePersisted('massDepth', MASS_DEPTH_MM)
-  /** Centre-mode switch — which centre drives anchoring and balance. */
-  const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
-  /** Governor — which mass rules in Masses mode. */
-  const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
-  const [offsetMM, setOffsetMM] = useState(0)
-  const [plan, setPlan] = useState<MagnetPlan>('all6')
+  /** Every solver value in one validated object; Spec owns each field's default and bounds. */
+  const [cfg, setField, resetConfig] = useSolverConfig()
+  // Opens on the B2 floor — the 72mm square standard (2×2), from the configured bands.
+  const [sizeMM, setSizeMM] = useState(SOLVER_DEFAULTS.bands[1].minMM)
+  const sizeMin = cfg.freeSizeMinMM
+  const sizeMax = cfg.freeSizeMaxMM
+  const evenMM = (n: number) => Math.max(0, Math.round(n / cfg.sizeStepMM) * cfg.sizeStepMM)
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
   /** Faint bounding box with per-side dimensions. */
@@ -96,25 +108,9 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   const [layoutSel, setLayoutSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
   const [bandScale, setBandScale] = useState<number | null>(null)
-  /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
+  /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick.
+   *  A per-request INPUT, never part of the calibration. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
-  const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
-  /** Per-control enables — off sends that control's field not at all, so spec default rules it. */
-  const [enFlapN, setEnFlapN] = usePersisted('en.flap', 1)
-
-  /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
-   *  the saved baseline, or spec defaults when none was saved. */
-  const saveDefaults = () => {
-    try { localStorage.setItem('magnetic-grid.compare.v1.defaults', JSON.stringify({ pad, flap, minTouch, massDepth, centreMode, governor, sizeMin, sizeMax })) } catch { }
-  }
-  const resetDefaults = () => {
-    let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, minTouch: MIN_TOUCH, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
-      sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
-    }
-    try { const raw = localStorage.getItem('magnetic-grid.compare.v1.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setMinTouch(d.minTouch); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
-  }
 
   const [magic, setMagic] = useState<MagicState>(null)
   const [magStatus, setMagStatus] = useState<string>('')   // '', 'downloading-model', 'cutting', 'error:...'
@@ -187,7 +183,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
       const data = ctx.getImageData(0, 0, cnv.width, cnv.height).data
       const mask = new Uint8Array(cnv.width * cnv.height)
       for (let i = 0; i < mask.length; i++) if (data[i * 4 + 3] > 128) mask[i] = 1
-      const c = normMaskContour(mask, cnv.width, cnv.height)
+      const c = normMaskContour(mask, cnv.width, cnv.height, cfg.contourMaxVertices)
       genMsRef.current = performance.now() - t0
       if (!c) throw new Error('no outline in this image')
       setCutC(c); setCutStatus('')
@@ -201,10 +197,10 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
       if (src === 'cut') return cutC
       if (src === 'magic') {
         if (!magic) return null
-        return normBaseContour(magic.vshape, magic.maskH)
+        return normBaseContour(magic.vshape, magic.maskH, cfg.contourFlattenRefMM)
       }
       if (src === 'preset' && hasVectorDef(preset)) {
-        return normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG)
+        return normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG, cfg.contourFlattenRefMM)
       }
       const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
         : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
@@ -214,7 +210,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
       return normGeneratedRing(ring, IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
     finally { genMsRef.current = performance.now() - t0 }
-  }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
+  }, [src, preset, gen, p1, p2, sides, points, magic, cutC, cfg.contourFlattenRefMM])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: RungSummary[]; idx: number; layoutIdx: number; refusal: string | null; segments: SafeSegment[]; autoFlapMM?: number | null }
@@ -259,24 +255,23 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), minTouch, massDepthMM: massDepth, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
     const id = ++seqRef.current
     const msg = {
-      id, engineId: 'v351-centre-clone' as const, base, boundaryTruth: boundaryTruth(base), offsetMM, cfg,
+      id, engineId: 'v351-centre-clone' as const, base, boundaryTruth: boundaryTruth(base), cfg,
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
+      forcedPhaseMM: manual ? [manual.x, manual.y] as Pt : null,
       rungSel, layoutSel,
-      autoFlapMaxMM: autoFlapN ? (enFlapN ? flap : FLAP_MM) : null,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, minTouch, massDepth, centreMode, governor, manual, bandScale, enFlapN, autoFlapN, plan, mode, rungSel, layoutSel, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, cfg, manual, bandScale, mode, rungSel, layoutSel])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -303,13 +298,13 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
-              marginMM={model.autoFlapMM ?? (enFlapN ? flap : FLAP_MM)}
+              marginMM={model.autoFlapMM ?? (cfg.flapEnabled ? cfg.flapLimitMM : 0)}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
                 if (mode === 'free') setSizeMM((s) => evenMM(Math.min(sizeMax, Math.max(sizeMin, s * f))))
                 else {
-                  const b = BANDS.find((x) => x.id === mode)!
+                  const b = cfg.bands.find((x) => x.id === mode)!
                   setBandScale((s) => evenMM(Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f))))
                 }
               }}
@@ -388,7 +383,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
           <Fold title="Grid settings">
             <div className="gl-field"><span>Band · magnet-count ladder · even sizes</span>
               <div className="gl-seg">
-                {BANDS.map((b) =>
+                {cfg.bands.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setRungSel(null); setLayoutSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
                 <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setRungSel(null); setLayoutSel(null); setManual(null); setBandScale(null) }}>Free</button>
               </div>
@@ -414,65 +409,46 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               {model && model.ladder.length > 0 && model.ladder[model.idx].layouts.length > 1 && <div className="gl-steps">
                 {model.ladder[model.idx].layouts.map((pl, i) =>
                   <button key={i} aria-pressed={bandScale === null && i === model.layoutIdx} onClick={() => { setLayoutSel(i); setBandScale(null) }}>
-                    <b>layout {i + 1}</b><span>{pl.xHalf && pl.yHalf ? 'both shifted' : pl.xHalf ? 'x-shifted' : pl.yHalf ? 'y-shifted' : 'canonical'}</span>
+                    <b>{pl.recommended ? '★ ' : ''}layout {i + 1}</b><span>{pl.family} · {pl.sizeMM} mm</span>
                   </button>)}
               </div>}
               {(() => {
-                const b = BANDS.find((x) => x.id === mode)!
+                const b = cfg.bands.find((x) => x.id === mode)!
                 return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
                   v={evenMM(bandScale ?? (effSizeRef.current || b.minMM))}
                   set={(n) => setBandScale(evenMM(Math.min(b.maxMM, Math.max(b.minMM, n))))}
-                  min={b.minMM} max={b.maxMM} step={SIZE_STEP_MM} />
+                  min={b.minMM} max={b.maxMM} step={cfg.sizeStepMM} />
               })()}
             </>}
-            {mode === 'free' && <Slider label="Effect size · longest side · even mm" unit="mm" v={evenMM(sizeMM)} set={(n) => setSizeMM(evenMM(n))} min={sizeMin} max={sizeMax} step={SIZE_STEP_MM} />}
+            {mode === 'free' && <Slider label="Effect size · longest side · even mm" unit="mm" v={evenMM(sizeMM)} set={(n) => setSizeMM(evenMM(n))} min={sizeMin} max={sizeMax} step={cfg.sizeStepMM} />}
             {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>
                   <input key={'mn' + sizeMin} type="number" defaultValue={sizeMin}
-                    onBlur={(e) => { const n = evenMM(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(n) } }}
+                    onBlur={(e) => { const n = evenMM(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setField('freeSizeMinMM', n); if (sizeMM < n) setSizeMM(n) } }}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
                 <span className="gl-num"><i>max</i>
                   <input key={'mx' + sizeMax} type="number" defaultValue={sizeMax}
-                    onBlur={(e) => { const n = evenMM(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(n) } }}
+                    onBlur={(e) => { const n = evenMM(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setField('freeSizeMaxMM', n); if (sizeMM > n) setSizeMM(n) } }}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
               </div>
             </div>}
-            <div className="gl-field"><span>Grid pitch · released tiers</span>
-              <div className="gl-seg">
-                {RELEASED_PITCHES_MM.map(({ mm, label }) =>
-                  <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
-              </div>
-            </div>
-            <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
-            <LabRow on={enFlapN !== 0} set={(b) => setEnFlapN(b ? 1 : 0)}>
-              <Slider label={autoFlapN ? 'Flap allowance · auto works within this' : 'Flap allowance · past spot edge'} unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
-            </LabRow>
-            <Slider label="Minimum touch · belt magnets that must wrap" v={minTouch} set={setMinTouch} min={MIN_TOUCH_FLOOR} max={MIN_TOUCH_CEIL} />
-            <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
-              <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
-            </label>
+            {/* Every calibration below is rendered from Spec's own catalogue: the panel holds no
+                bound, default or option list of its own (Dan, 2026-08-23). */}
+            {SOLVER_CONTROLS.filter((c) => c.group === 'grid' || c.group === 'law').map((control) =>
+              <SpecControl key={control.field} control={control} cfg={cfg} set={setField} />)}
             {model && <div className="gl-magic-note">
-              {model.grid.wrap.status === 'lawful'
-                ? `Wrap lawful · requires ${model.grid.wrap.requiredFlapMM}mm · applied ${model.grid.wrap.appliedFlapMM}mm`
-                : model.grid.wrap.code === 'NO_WRAPPED_LAYOUT_IN_BAND'
-                  ? `Wrap refused · ${model.grid.wrap.reason}`
-                  : `Wrap refused · requires ${model.grid.wrap.requiredFlapMM}mm · allowed ${model.grid.wrap.allowedFlapMM}mm`}
+              {model.grid.displaySource === 'no-lawful-layout'
+                ? 'No layout satisfies Centre and Fit at this size within the configured search.'
+                : (() => {
+                  const shown = model.grid.layouts[0]
+                  const flaps = shown ? [...shown.overhangsMM].map((mm) => Math.round(mm)).join(' / ') : '—'
+                  return `${model.grid.layouts.length} lawful layout${model.grid.layouts.length === 1 ? '' : 's'} here · outer flap L/R/T/B ${flaps} mm${shown ? ` · region ${Math.round(shown.regionMM.maxX - shown.regionMM.minX)}×${Math.round(shown.regionMM.maxY - shown.regionMM.minY)} mm` : ''}`
+                })()}
               {model.grid.concessions.length ? ` · concessions ${model.grid.concessions.join(' + ')}` : ''}
             </div>}
-            <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
-            <div className="gl-field"><span>Coverage</span>
-              <div className="gl-seg">
-                {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
-                  <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
-              </div>
-            </div>
-            <div className="gl-field"><span>Magnet plan</span>
-              <div className="gl-seg">
-                {([['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
-                  <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
-              </div>
-            </div>
+            {SOLVER_CONTROLS.filter((c) => c.group === 'output' || c.group === 'contour' || c.group === 'search').map((control) =>
+              <SpecControl key={control.field} control={control} cfg={cfg} set={setField} />)}
             <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
               <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
             </label>
@@ -483,8 +459,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               <input type="checkbox" checked={showSegs} onChange={e => setShowSegs(e.target.checked)} />
             </label>
             <div className="gl-seg">
-              <button onClick={saveDefaults}>Save as default</button>
-              <button onClick={resetDefaults}>Reset to default</button>
+              <button onClick={resetConfig}>Reset every dial to spec defaults</button>
             </div>
           </Fold>
         </aside>
@@ -501,28 +476,18 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
             <div className="gl-magic-note">
               Centre + Wrap + Scaling — the grid locks onto the governed centre, at least the minimum-touch number of perimeter-belt discs must wrap within the whole-millimetre flap (the rest may carry air), and each band publishes its next magnet counts at the first even size that is centred and wrapped. Three laws, no voting.
             </div>
-            <div className="gl-field"><span>Centre mode · what the grid aims at</span>
-              <div className="gl-seg gl-wrap">
-                {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
-                  <button key={m} aria-pressed={centreMode === m} onClick={() => setCentreMode(m)}>{l}</button>)}
-              </div>
-            </div>
+            <SpecControl control={SOLVER_CONTROLS.find((c) => c.field === 'centreMode')!} cfg={cfg} set={setField} wrap />
             <div className="gl-magic-note">
-              {centreMode === 0 ? 'Box — the bounding box centre; ignores where the material is.'
-                : centreMode === 1 ? 'Core — the centre of the whole 12mm legal area, area-weighted.'
-                  : centreMode === 2 ? 'Masses — adaptive: every mass centre anchors; the smallest mass holding a magnet governs.'
-                    : centreMode === 3 ? 'Weight — the material centroid of the silhouette.'
-                      : centreMode === 4 ? 'Deep — the single most buried point of the shape.'
+              {cfg.centreMode === 0 ? 'Box — the bounding box centre; ignores where the material is.'
+                : cfg.centreMode === 1 ? 'Core — the centre of the whole legal area, area-weighted.'
+                  : cfg.centreMode === 2 ? 'Masses — adaptive: every mass centre anchors; the smallest mass holding a magnet governs.'
+                    : cfg.centreMode === 3 ? 'Weight — the material centroid of the silhouette.'
+                      : cfg.centreMode === 4 ? 'Deep — the single most buried point of the shape.'
                         : 'Top — the highest mass governs (gravity rule).'}
             </div>
-            {centreMode === 2 && <div className="gl-field"><span>Governor · which mass rules</span>
-              <div className="gl-seg gl-wrap">
-                {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
-                  <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
-              </div>
-            </div>}
-            {(centreMode === 2 || centreMode === 5) &&
-              <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
+            {cfg.centreMode === 2 && <SpecControl control={SOLVER_CONTROLS.find((c) => c.field === 'governor')!} cfg={cfg} set={setField} wrap />}
+            {(cfg.centreMode === 2 || cfg.centreMode === 5) &&
+              <SpecControl control={SOLVER_CONTROLS.find((c) => c.field === 'massDepthMM')!} cfg={cfg} set={setField} />}
             <div className="gl-legend">
               <div><i className="gl-sw gl-sw-main" /><span><b>Main centre</b> · governs the winning layout</span></div>
               <div><i className="gl-sw" style={{ borderColor: SEG_HUES[0], background: SEG_HUES[0] + '22' }} /><span><b>Island S1</b> · smallest legal area</span></div>
@@ -538,9 +503,6 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     </div>
   )
 }
-
-/** Sizes are even millimetres: snap any requested size to the ladder. */
-function evenMM(mm: number): number { return Math.round(mm / SIZE_STEP_MM) * SIZE_STEP_MM }
 
 function dim(c: Contour, axis: 0 | 1): number {
   let lo = Infinity, hi = -Infinity
@@ -562,7 +524,9 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
   const w = maxX - minX, h = maxY - minY, S = (VP * FIT) / Math.max(w, h)
   const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
   const fy = (p: Pt): Pt => [p[0], -p[1]]
-  const visibleAnchors = grid.wrap.status === 'lawful' ? grid.anchors : []
+  // Magnets are drawn for a lawful layout, and for a hand-placed registration so Dan can see
+  // exactly what he placed — the concession line says why it is not lawful.
+  const visibleAnchors = grid.displaySource === 'no-lawful-layout' ? [] : grid.anchors
   const visibleGrid: GridResult = { ...grid, anchors: visibleAnchors }
 
   // Manual calibration gestures — the shape is FROZEN; drag pans the GRID under it (mm, engine
@@ -654,9 +618,9 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
         {/* Registration dots on every 12mm cell corner — the board's atom, phase-locked to the
             lattice so 12mm steps and centres are always visible. Dot sits at tile centre; the
             pattern origin is shifted half a tile so dots land on the corners unclipped. */}
-        <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
-          patternUnits="userSpaceOnUse" x={Afy[0] - DEFAULT_PITCH_MM / 8} y={Afy[1] - DEFAULT_PITCH_MM / 8}>
-          <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.05} fill="var(--ink)" fillOpacity={0.35} />
+        <pattern id="gl-dots" width={grid.pitchCentreMM / 4} height={grid.pitchCentreMM / 4}
+          patternUnits="userSpaceOnUse" x={Afy[0] - grid.pitchCentreMM / 8} y={Afy[1] - grid.pitchCentreMM / 8}>
+          <circle cx={grid.pitchCentreMM / 8} cy={grid.pitchCentreMM / 8} r={0.05} fill="var(--ink)" fillOpacity={0.35} />
         </pattern>
       </defs>
       <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
@@ -761,6 +725,47 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
 function Empty({ text, spin }: { text: string; spin?: boolean }) {
   return <div className="gl-empty">{spin && <span className="gl-spin" />}{text}</div>
 }
+/** One admin control, rendered entirely from its Spec declaration — label, bounds, step and
+ *  options all come from `SOLVER_CONTROLS`. A control Spec marks `retired` stays visible and
+ *  explains itself instead of disappearing (Dan: removing breaks the comparison tabs). */
+function SpecControl({ control, cfg, set, wrap }: {
+  control: SolverControl
+  cfg: SolverConfig
+  set: <K extends keyof SolverConfig>(field: K, value: SolverConfig[K]) => void
+  wrap?: boolean
+}) {
+  if (control.kind === 'bands') return null
+  const retired = control.retired
+  if (control.kind === 'toggle') {
+    return (
+      <label className="gl-toggle" style={retired ? { opacity: .45 } : undefined}>
+        <span>{control.label}{retired ? <small style={{ color: 'var(--ink-3)' }}> · {retired}</small> : null}</span>
+        <input type="checkbox" disabled={Boolean(retired)} checked={cfg[control.field]}
+          onChange={(e) => set(control.field, e.target.checked)} />
+      </label>
+    )
+  }
+  if (control.kind === 'options') {
+    const current = cfg[control.field] as number | string
+    return (
+      <div className="gl-field" style={retired ? { opacity: .45 } : undefined}><span>{control.label}{retired ? ` · ${retired}` : ''}</span>
+        <div className={wrap ? 'gl-seg gl-wrap' : 'gl-seg'}>
+          {control.options.map((option) =>
+            <button key={String(option.value)} aria-pressed={current === option.value} disabled={Boolean(retired)}
+              onClick={() => set(control.field, option.value as SolverConfig[typeof control.field])}>{option.label}</button>)}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div style={retired ? { opacity: .45, pointerEvents: 'none' } : undefined}>
+      <Slider label={retired ? `${control.label} · ${retired}` : control.label} unit={control.unit}
+        v={cfg[control.field]} set={(n) => set(control.field, n)}
+        min={control.min} max={control.max} step={control.step} />
+    </div>
+  )
+}
+
 function Slider({ label, v, set, min, max, unit, wide, step }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string; wide?: boolean; step?: number }) {
   const commit = (raw: string) => {
     const n = +raw
@@ -777,15 +782,6 @@ function Slider({ label, v, set, min, max, unit, wide, step }: { label: string; 
         </span></div>
       <input type="range" min={min} max={max} step={step ?? 1} value={v} onChange={e => set(+e.target.value)} />
     </label>
-  )
-}
-/** One lab control with its own enable — off drops the control's field, spec default rules. */
-function LabRow({ on, set, children }: { on: boolean; set: (b: boolean) => void; children: React.ReactNode }) {
-  return (
-    <div className="gl-labrow">
-      <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} />
-      <div className={`gl-labrow-body${on ? '' : ' gl-lab-off'}`}>{children}</div>
-    </div>
   )
 }
 /** Perf value in seconds — green when fast, red past the 2s comfort line. */

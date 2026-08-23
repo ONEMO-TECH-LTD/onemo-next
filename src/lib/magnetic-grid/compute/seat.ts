@@ -1,7 +1,7 @@
 // Magnetic-grid Compute geometry: frozen Centre seat kernel, lattice/nearest-boundary measurements, parity and perimeter helpers.
 // The 0.001 mm BigInt path is only the frozen Centre phase prescreen; final Law seat/Wrap admission lives in wrap-measurement.ts on the 1 mm ruler.
 
-import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, ParityMeasurement, Pt } from '../spec'
+import type { BBox, Contour, ExtremeCornerMeasurement, ParityMeasurement, Pt } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
 
 interface Prepared {
@@ -172,21 +172,6 @@ export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
 }
 
 /** Measure already-ruled Centre phases without choosing between them. */
-export function measureCentrePlacements(
-  bb: BBox,
-  pitch: number,
-  candidates: ReadonlyArray<CentrePhaseCandidate>,
-  fits: (pt: Pt) => boolean,
-  outer: ReadonlyArray<Pt>,
-  reach: number,
-): CentrePlacementMeasurement[] {
-  return candidates.map(({ phaseMM: [px, py], canon }) => {
-    const ox = ((px % pitch) + pitch) % pitch
-    const oy = ((py % pitch) + pitch) % pitch
-    const seated = latticeAt(bb, pitch, ox, oy).filter(fits)
-    return { phaseMM: [ox, oy], seated, canon, excessMM: pressExcessMM(outer, seated, reach) }
-  })
-}
 
 /**
  * Bucketed edge index — accelerates nearest-edge distance and ray parity. Results are
@@ -341,9 +326,10 @@ export function nearestOutlineMM(contour: Contour, pt: Pt): { distMM: number; po
 export function makeSeatPredicate(
   outer: ReadonlyArray<Pt>,
   spotRadiusMM: number,
+  kernel: { quantumMM: number; guardMM: number },
 ): ((pt: Pt) => boolean) | null {
-  const QUANTUM = 0.001
-  const GUARD = 0.05
+  const QUANTUM = kernel.quantumMM
+  const GUARD = kernel.guardMM
   let prep: ReturnType<typeof prepare>
   try { prep = prepare(outer, QUANTUM) } catch { return null }
   const rQ = Math.round(spotRadiusMM / QUANTUM)
@@ -361,13 +347,6 @@ export function makeSeatPredicate(
   }
 }
 
-/** Frozen Centre display tie-break: mean nonnegative gap beyond reach over the prescreen-seated population. This is not the final Wrap law. */
-function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
-  if (!seated.length) return 0
-  let sum = 0
-  for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)
-  return sum / seated.length
-}
 
 export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45
@@ -390,9 +369,8 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
 /** Parity evidence for a seated population against the governed centre: per axis, an odd count of
  *  magnet lines must put a NODE on the centre, an even count the GAP. centreErrorMM is the larger
  *  axis miss from that required line, on the 1 mm ruler (0 when the centre law holds exactly). */
-const PARITY_LINE_QUANTUM_MM = 0.001 // frozen Centre line identity; not a Law tolerance
-
-export function measureParity(seated: ReadonlyArray<Pt>, target: Pt, pitch: number): ParityMeasurement {
+export function measureParity(seated: ReadonlyArray<Pt>, target: Pt, pitch: number, lineQuantumMM: number): ParityMeasurement {
+  const PARITY_LINE_QUANTUM_MM = lineQuantumMM
   if (!seated.length || !(pitch > 0)) return { parityTrue: false, centreErrorMM: 0 }
   let parityTrue = true, worstMM = 0
   for (const axis of [0, 1] as const) {
@@ -429,4 +407,246 @@ export function scaleContour(base: Contour, longestMM: number): Contour {
     (y-bb.minY)*correction,
   ])
   return{outer:{pts:correct(outer)},holes:holes.map(hole=>({pts:correct(hole.pts)}))}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.5.4 CANDIDATE ENUMERATION AND THE RULED GROUP REGION.
+//
+// Dan's laws (grid-laws.md:743-748): "candidates are EVERY window placement on the lattice — every
+// sub-window size at every offset … Centred templates alone are not the candidate set." And the
+// region/flap rule (:381-469): the layout's region is the union of its adjacent pairs' padded
+// boxes, the shape must ENCAPSULATE it, and flap is the outline's overhang past it, per side.
+// Everything here MEASURES. Nothing here judges — Logic does that.
+
+/**
+ * THE REGISTRATIONS A CENTRED LAYOUT CAN COME FROM — derived, not guessed, and not a shortcut.
+ *
+ * A layout's region spans from its lowest to its highest node plus the padding on both sides, so
+ * its balance point is `(minNode + maxNode) / 2` = `phase + bbMin + m · pitch/2` for some integer
+ * m (m even when the node count on that axis is odd, m odd when it is even). Law 1 admits the
+ * layout only when that point meets the governed anchor within the ruler, so the phase MUST lie in
+ * one of two residue classes per axis, widened by half a ruler step. Every other registration is
+ * provably incapable of producing a centred layout — sweeping them changes nothing but the clock.
+ *
+ * The registration step still governs: the tolerance band around each residue is sampled at it.
+ */
+export function centredRegistrations(bb: BBox, pitchMM: number, anchor: Pt, rulerMM: number, stepMM: number): Pt[] {
+  const step = Math.max(stepMM, 1 / 1024)
+  const half = rulerMM / 2
+  const axis = (anchorMM: number, minMM: number): number[] => {
+    const out: number[] = []
+    const seen = new Set<number>()
+    for (const m of [0, 1]) {
+      const residue = mod(anchorMM - minMM - (m * pitchMM) / 2, pitchMM)
+      // the exact residue always, then the ruler's tolerance band sampled at the registration step
+      const offsets = [0]
+      for (let d = step; d <= half + 1e-9; d += step) offsets.push(d, -d)
+      for (const d of offsets) {
+        const value = mod(residue + d, pitchMM)
+        const key = Math.round(value * 1024)
+        if (seen.has(key)) continue
+        seen.add(key)
+        out.push(value)
+      }
+    }
+    return out
+  }
+  const xs = axis(anchor[0], bb.minX), ys = axis(anchor[1], bb.minY)
+  const out: Pt[] = []
+  for (const x of xs) for (const y of ys) out.push([x, y])
+  return out
+}
+
+const mod = (v: number, m: number): number => ((v % m) + m) % m
+
+/** A seated node addressed by its lattice indices — the identity dedupe keys on. */
+export interface SeatedNode { readonly p: Pt; readonly col: number; readonly row: number }
+
+/** Seated nodes at one registration, indexed on the lattice. */
+export function seatedNodesAt(bb: BBox, pitchMM: number, phase: Pt, fits: (pt: Pt) => boolean): SeatedNode[] {
+  const nodes: SeatedNode[] = []
+  for (const p of latticeAt(bb, pitchMM, phase[0], phase[1])) {
+    if (!fits(p)) continue
+    nodes.push({ p, col: Math.round((p[0] - bb.minX - phase[0]) / pitchMM), row: Math.round((p[1] - bb.minY - phase[1]) / pitchMM) })
+  }
+  return nodes
+}
+
+/** One candidate population: the nodes it holds, plus how it was formed (evidence, never identity). */
+export interface LayoutCandidate {
+  readonly family: 'single' | 'run' | 'rectangle-corners' | 'corner-triangle' | 'full-window'
+  readonly populationStep: number
+  readonly nodes: readonly SeatedNode[]
+  /** (population, sorted held coordinates on the whole-mm grid) — Meta's ruled dedupe key. The
+   *  population belongs in it: the same four nodes at step 1 and step 2 are DIFFERENT layouts,
+   *  because adjacency — and therefore the ruled region — differs. */
+  readonly heldKey: string
+}
+
+const heldKeyOf = (populationStep: number, nodes: ReadonlyArray<SeatedNode>): string =>
+  `p${populationStep}:` + nodes.map((n) => `${Math.round(n.p[0])},${Math.round(n.p[1])}`).sort().join('|')
+
+/**
+ * The five ruled families over one registration's seated nodes: singles · runs (horizontal,
+ * vertical and the ruled diagonal, at any whole population step) · rectangle corners ·
+ * corner triangles · full windows. Bounded by the seated set — never the power set.
+ */
+export function enumerateLayouts(nodes: ReadonlyArray<SeatedNode>, maxPopulationStep: number): LayoutCandidate[] {
+  const held = new Map<string, SeatedNode>()
+  for (const n of nodes) held.set(`${n.col},${n.row}`, n)
+  const at = (col: number, row: number) => held.get(`${col},${row}`)
+  const out: LayoutCandidate[] = []
+  const seen = new Set<string>()
+  const push = (family: LayoutCandidate['family'], populationStep: number, members: SeatedNode[]) => {
+    if (!members.length) return
+    const heldKey = heldKeyOf(populationStep, members)
+    const id = `${family}|${heldKey}`
+    if (seen.has(id)) return
+    seen.add(id)
+    out.push({ family, populationStep, nodes: members, heldKey })
+  }
+
+  for (const node of nodes) push('single', 1, [node])
+
+  for (let step = 1; step <= maxPopulationStep; step++) {
+    for (const node of nodes) {
+      for (const [dc, dr] of [[step, 0], [0, step], [step, step], [step, -step]] as const) {
+        const members: SeatedNode[] = [node]
+        for (let k = 1; ; k++) {
+          const next = at(node.col + dc * k, node.row + dr * k)
+          if (!next) break
+          members.push(next)
+          if (members.length >= 2) push('run', step, [...members])
+        }
+      }
+    }
+    // rectangle corners, corner triangles and full windows over every axis-aligned frame
+    for (const a of nodes) {
+      for (const b of nodes) {
+        const dc = b.col - a.col, dr = b.row - a.row
+        if (dc <= 0 || dr <= 0 || dc % step || dr % step) continue
+        const corners = [at(a.col, a.row), at(b.col, a.row), at(a.col, b.row), at(b.col, b.row)]
+        const present = corners.filter((c): c is SeatedNode => Boolean(c))
+        if (present.length === 4) {
+          push('rectangle-corners', step, present)
+          const window: SeatedNode[] = []
+          let full = true
+          for (let c = a.col; c <= b.col && full; c += step) for (let r = a.row; r <= b.row && full; r += step) {
+            const node = at(c, r)
+            if (!node) { full = false; break }
+            window.push(node)
+          }
+          if (full && window.length > 4) push('full-window', step, window)
+        }
+        if (present.length >= 3) {
+          for (let skip = 0; skip < 4; skip++) {
+            const triangle = corners.filter((c, i) => i !== skip && c) as SeatedNode[]
+            if (triangle.length === 3) push('corner-triangle', step, triangle)
+          }
+        }
+      }
+    }
+  }
+  return out
+}
+
+/** One padded box of the ruled region — a single node's cell, or an adjacent pair's extent. */
+export interface RegionBox { readonly minX: number; readonly minY: number; readonly maxX: number; readonly maxY: number }
+
+/**
+ * THE RULED GROUP REGION (Dan, grid-laws.md:381-469, confirmed: "measuring by joint pairs makes
+ * the model smarter"). A lone node contributes its padded cell; every adjacent pair — axial or the
+ * ruled diagonal — contributes the axis-aligned box of its two centres grown by the padding. The
+ * region is their union, so a three-point L keeps its L shape with no invented fourth corner.
+ */
+export function measureGroupRegion(layout: LayoutCandidate, paddingMM: number): RegionBox[] {
+  const nodes = layout.nodes
+  const boxOf = (a: Pt, b: Pt): RegionBox => ({
+    minX: Math.min(a[0], b[0]) - paddingMM, minY: Math.min(a[1], b[1]) - paddingMM,
+    maxX: Math.max(a[0], b[0]) + paddingMM, maxY: Math.max(a[1], b[1]) + paddingMM,
+  })
+  if (nodes.length === 1) return [boxOf(nodes[0].p, nodes[0].p)]
+  const step = layout.populationStep
+  const boxes: RegionBox[] = []
+  // A DIAGONAL pair is a ruled arrangement in its own right (Dan, 2026-08-13), so its two centres
+  // make one box. Inside a larger layout, adjacency is AXIAL only — otherwise a three-point L
+  // would acquire the fourth corner its own law forbids.
+  const diagonalAllowed = nodes.length === 2
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dc = Math.abs(nodes[i].col - nodes[j].col), dr = Math.abs(nodes[i].row - nodes[j].row)
+      const axial = (dc === step && dr === 0) || (dc === 0 && dr === step)
+      const diagonal = diagonalAllowed && dc === step && dr === step
+      if (axial || diagonal) boxes.push(boxOf(nodes[i].p, nodes[j].p))
+    }
+  }
+  // A population whose members are not pair-adjacent (a wide corner frame) still owns its members'
+  // own cells, so the region is never empty and never invents material between them.
+  if (!boxes.length) for (const node of nodes) boxes.push(boxOf(node.p, node.p))
+  return boxes
+}
+
+/** The region's outer extents — what Centre balances on and what flap is measured from. */
+export function regionExtents(boxes: ReadonlyArray<RegionBox>): BBox {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const b of boxes) {
+    if (b.minX < minX) minX = b.minX
+    if (b.minY < minY) minY = b.minY
+    if (b.maxX > maxX) maxX = b.maxX
+    if (b.maxY > maxY) maxY = b.maxY
+  }
+  return { minX, minY, maxX, maxY }
+}
+
+/** A STRICT crossing: each segment must have the other's endpoints strictly on opposite sides.
+ *  Touching at an endpoint or running along a shared edge is contact, not a crossing — containment
+ *  is closed (grid-laws.md: "the box boundary may touch the outline"). */
+const segmentsCross = (a: Pt, b: Pt, c: Pt, d: Pt): boolean => {
+  const o = (p: Pt, q: Pt, r: Pt) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+  const o1 = o(a, b, c), o2 = o(a, b, d), o3 = o(c, d, a), o4 = o(c, d, b)
+  const opposite = (u: number, v: number) => (u > 0 && v < 0) || (u < 0 && v > 0)
+  return opposite(o1, o2) && opposite(o3, o4)
+}
+
+/**
+ * L18 — THE SHAPE MUST ENCAPSULATE THE REGION, and that containment IS the computation. Closed:
+ * the boundary may touch the outline. A box lies in material when its corners are in material and
+ * no outline (or hole) edge crosses it.
+ */
+export function regionInMaterial(contour: Contour, boxes: ReadonlyArray<RegionBox>, tolMM: number): boolean {
+  const rings = [contour.outer.pts, ...contour.holes.map((hole) => hole.pts)]
+  for (const box of boxes) {
+    // Containment is CLOSED: the region's boundary may touch the outline (a 72 mm square holds its
+    // own 72 mm region exactly). A corner is accepted when it is in material OR on the boundary
+    // within the ruler; a crossing edge is a real crossing, never a shared boundary run.
+    const corners: Pt[] = [[box.minX, box.minY], [box.maxX, box.minY], [box.maxX, box.maxY], [box.minX, box.maxY]]
+    for (const corner of corners) {
+      if (pointInMaterial(contour, corner)) continue
+      if (nearestOutlineMM(contour, corner).distMM <= tolMM) continue
+      return false
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i], b = corners[(i + 1) % 4]
+      for (const ring of rings) {
+        for (let k = 0; k < ring.length; k++) {
+          if (!segmentsCross(a, b, ring[k], ring[(k + 1) % ring.length])) continue
+          // a crossing that only grazes the shared boundary is not a crossing
+          const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+          if (nearestOutlineMM(contour, mid).distMM <= tolMM) continue
+          return false
+        }
+      }
+    }
+  }
+  return true
+}
+
+/** Flap: the outline's overhang past the region, per side, clamped at zero — four subtractions. */
+export function measureOverhangs(shape: BBox, region: BBox): [number, number, number, number] {
+  return [
+    Math.max(0, region.minX - shape.minX),
+    Math.max(0, shape.maxX - region.maxX),
+    Math.max(0, region.minY - shape.minY),
+    Math.max(0, shape.maxY - region.maxY),
+  ]
 }

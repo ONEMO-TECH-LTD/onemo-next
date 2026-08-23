@@ -3,9 +3,6 @@
 import type { BBox, CentreMeasurements, Pt, SafeMass, SafeSegment } from '../spec'
 import { bbox, edgeDistMM, pointInOuter } from './seat'
 
-/** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
-const KEY_QUANTUM_MM = 0.01
-
 const MS_CASES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
   [], [[3, 0]], [[0, 1]], [[3, 1]],
   [[1, 2]], [[3, 0], [1, 2]], [[0, 2]], [[3, 2]],
@@ -22,11 +19,12 @@ const MS_CASES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
  * Centres are DEEPEST POINTS, so a crescent's centre sits in its arc, never the void.
  * A MEASUREMENT for display and scoring — magnet legality stays the exact per-point test.
  */
-export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, massDepthMM: number): SafeSegment[] {
+export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, massDepthMM: number, sampling: { maxVertices: number; meshQuantumMM: number; refineStepMM: number }): SafeSegment[] {
   if (outer.length < 3) return []
-  // Dense traced outlines are decimated for this measurement — display grain, not legality.
-  const MAXV = 800
-  const k = Math.max(1, Math.ceil(outer.length / MAXV))
+  // Dense traced outlines are decimated for this measurement. This shapes the masses the anchor
+  // is measured from, so the resolution is CONFIGURED, never a constant living here.
+  const KEY_QUANTUM_MM = sampling.meshQuantumMM
+  const k = Math.max(1, Math.ceil(outer.length / sampling.maxVertices))
   const ring: Pt[] = []
   for (let i = 0; i < outer.length; i += k) ring.push(outer[i])
   const r = spotRadiusMM
@@ -58,7 +56,7 @@ export function safeSegments(outer: ReadonlyArray<Pt>, spotRadiusMM: number, mas
     for (let it = 0; it < 2; it++) {
       const s = signed(q) - thr
       if (Math.abs(s) < 0.02) break
-      const e = 0.5
+      const e = sampling.refineStepMM
       const gx = (signed([q[0] + e, q[1]]) - signed([q[0] - e, q[1]])) / (2 * e)
       const gy = (signed([q[0], q[1] + e]) - signed([q[0], q[1] - e])) / (2 * e)
       const g2 = gx * gx + gy * gy

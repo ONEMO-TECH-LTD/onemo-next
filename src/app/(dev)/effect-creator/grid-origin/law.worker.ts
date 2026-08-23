@@ -1,7 +1,7 @@
 // law.worker.ts — runs the Law engine off the main thread. Pure dispatch: the same
 // bridge/engine calls the page would make inline, nothing computed here.
 
-import { autoFlapInBand, BANDS, computeGrid, fitSizeInBand, solveBands, type BandId, type BandLadder, type BandSolveResult, type BoundaryTruth, type GridConfig, type GridResult, type Placement, type Rung } from '@/lib/magnetic-grid/engine'
+import { computeGrid, fitSizeInBand, solveBands, validateSolverConfig, type BandId, type BandLadder, type BandSolveResult, type BoundaryTruth, type GridResult, type Pt, type CountTier, type SolverConfig } from '@/lib/magnetic-grid/engine'
 import { contourIdentity, makeSizer } from '@/lib/effect/magnetic-grid-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -10,20 +10,22 @@ interface SolveRequest {
   id: number
   base: Contour
   boundaryTruth: BoundaryTruth
-  offsetMM: number
-  cfg: GridConfig
+  /** The complete calibration, exactly as the dash set it. Validated at ingress; never repaired. */
+  cfg: SolverConfig
   mode: BandId | 'free'
   sizeMM: number
+  /** Manual registration — a per-request input, not a calibration. */
+  forcedPhaseMM: Pt | null
   /** Selected rung on the band's ladder; null = the band's last (highest-count) rung. */
   rungSel: number | null
   /** Selected co-lawful layout on that rung; null = the first (gravity-ordered). */
   layoutSel: number | null
-  /** Auto cap in whole mm; null = fixed flap. */
-  autoFlapMaxMM?: number | null
 }
 
-/** What the tab renders for a rung chip: the final Rung's size and count plus each co-lawful layout's placement. */
-type RungSummary = Pick<Rung, 'sizeMM' | 'magnetCount'> & { layouts: Placement[] }
+/** What the tab renders for a tier chip: the count, its first lawful size, and every distinct
+ *  lawful layout kept there — with the marked one named. Nothing is hidden from the surface. */
+type LayoutSummary = { family: string; magnetCount: number; sizeMM: number; overhangsMM: readonly number[]; recommended: boolean }
+type RungSummary = Pick<CountTier, 'sizeMM' | 'magnetCount'> & { layouts: LayoutSummary[] }
 
 const ctx = self as unknown as Worker
 
@@ -38,10 +40,10 @@ const SOLVE_CAP = 6
 
 function solvedFor(
   rawSizer: (mm: number) => Contour,
-  wrapCfg: GridConfig,
+  cfg: SolverConfig,
   solve: (sized: (mm: number) => Contour) => BandSolveResult,
 ): CachedBandSolve {
-  const key = JSON.stringify(wrapCfg)
+  const key = JSON.stringify(cfg)
   let cached = solves.get(key)
   if (!cached) {
     const contoursBySize = new Map<number, Contour>()
@@ -58,47 +60,53 @@ function solvedFor(
 }
 
 const summarise = (ladder: BandLadder): RungSummary[] =>
-  ladder.rungs.map((r) => ({ sizeMM: r.sizeMM, magnetCount: r.magnetCount, layouts: r.layouts.map((l) => l.candidate.placement) }))
+  ladder.rungs.map((tier) => ({
+    sizeMM: tier.sizeMM,
+    magnetCount: tier.magnetCount,
+    layouts: tier.layouts.map((layout, index) => ({
+      family: layout.family, magnetCount: layout.magnetCount, sizeMM: layout.sizeMM,
+      overhangsMM: layout.overhangsMM, recommended: index === tier.recommendedLayoutIndex,
+    })),
+  }))
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, engineId, base, boundaryTruth, offsetMM, cfg, mode, sizeMM, rungSel, layoutSel, autoFlapMaxMM } = e.data
+  const { id, engineId, base, boundaryTruth, cfg: rawCfg, mode, sizeMM, forcedPhaseMM, rungSel, layoutSel } = e.data
   try {
     if (engineId !== 'v351-centre-clone') throw new Error('wrong engine identity')
-    const sized = makeSizer(base, offsetMM)
+    // ONE ingress: the configuration is validated here or the request is refused. Nothing
+    // downstream defaults, clamps or reinterprets it (Dan, 2026-08-23 — Spec is the single owner).
+    const cfg = validateSolverConfig(rawCfg)
+    const sized = makeSizer(base, cfg)
     if(boundaryTruth.contourIdentity!==contourIdentity(base))throw new Error('boundary truth does not match supplied contour')
-    const sig = JSON.stringify([boundaryTruth.contourIdentity, offsetMM])
+    const sig = JSON.stringify([boundaryTruth.contourIdentity, cfg.outlineOffsetMM, cfg.contourFlattenRefMM, cfg.contourMaxVertices])
     if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); solves.clear() }
-    const wrapCfg: GridConfig = autoFlapMaxMM != null
-      ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
-      : { ...cfg, wrapMode: 'fixed' }
     if (mode !== 'free') {
-      const cached = solvedFor(sized, wrapCfg, (cachedSizer) => autoFlapMaxMM != null
-        ? autoFlapInBand(cachedSizer, cfg, autoFlapMaxMM)
-        : solveBands(cachedSizer, wrapCfg))
+      const cached = solvedFor(sized, cfg, (cachedSizer) => solveBands(cachedSizer, cfg))
       const solved = cached.result
-      const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      const band = cfg.bands.find((b) => b.id === mode)
+      if (!band) throw new Error(`band ${mode} is not in the configured bands`)
       const ladder = solved.bands.find((b) => b.band === band.id)!
       if (ladder.rungs.length) {
         const idx = Math.max(0, Math.min(rungSel ?? ladder.rungs.length - 1, ladder.rungs.length - 1))
         const layoutIdx = Math.max(0, Math.min(layoutSel ?? 0, ladder.rungs[idx].layouts.length - 1))
         const grid = fitSizeInBand(solved, band.id, idx, layoutIdx)
         const eff = ladder.rungs[idx].sizeMM
-        ctx.postMessage({ id, model: { contour: cached.contoursBySize.get(eff)!, grid, effSize: eff, ladder: summarise(ladder), idx, layoutIdx, refusal: null, segments: grid.segments, autoFlapMM: autoFlapMaxMM != null && grid.wrap.status === 'lawful' ? grid.wrap.appliedFlapMM : null } })
+        ctx.postMessage({ id, model: { contour: cached.contoursBySize.get(eff)!, grid, effSize: eff, ladder: summarise(ladder), idx, layoutIdx, refusal: null, segments: grid.segments, autoFlapMM: cfg.autoFlapEnabled ? Math.max(0, ...(grid.layouts[0]?.overhangsMM ?? [0])) : null } })
       } else {
         // The band accepts nothing: show its floor size as measured, with the typed refusal.
         const grid = solved.gridsBySize.get(band.minMM)!
         ctx.postMessage({ id, model: { contour: cached.contoursBySize.get(band.minMM)!, grid, effSize: band.minMM, ladder: [], idx: 0, layoutIdx: 0, refusal: ladder.refusal?.code ?? null, segments: grid.segments, autoFlapMM: null } })
       }
     } else {
-      const k = JSON.stringify(wrapCfg) + '|' + sizeMM
+      const k = JSON.stringify([cfg, forcedPhaseMM]) + '|' + sizeMM
       let hit = freeCache.get(k)
       if (!hit) {
         const contour = sized(sizeMM)
-        hit = { contour, grid: computeGrid(contour, sizeMM, wrapCfg) }
+        hit = { contour, grid: computeGrid(contour, sizeMM, cfg, forcedPhaseMM) }
         freeCache.set(k, hit)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
-      const freeAuto = autoFlapMaxMM != null && hit.grid.wrap.status === 'lawful' ? hit.grid.wrap.appliedFlapMM : null
+      const freeAuto = cfg.autoFlapEnabled ? Math.max(0, ...(hit.grid.layouts[0]?.overhangsMM ?? [0])) : null
       ctx.postMessage({ id, model: { contour: hit.contour, grid: hit.grid, effSize: sizeMM, ladder: [], idx: 0, layoutIdx: 0, refusal: null, segments: hit.grid.segments, autoFlapMM: freeAuto } })
     }
   } catch (err) {
