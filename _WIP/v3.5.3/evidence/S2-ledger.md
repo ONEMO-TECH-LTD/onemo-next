@@ -36,3 +36,5 @@ All W1/W2/S1 fixtures unchanged and green.
 
 - QA `/tmp/s62-grid-qa-s2-gate.md`: S2-QA-1/2/3 (frozen parity identity; concessions to Logic; requested-size API) — applied exactly at `a018cf1e`; dispositions a rework, b/c/e accept, d formula accept/owner rework, f replace.
 - Meta `/tmp/s62-grid-meta-s2-cross-review.md`: accepted all three exactly; authority corrections applied: master §5.2 `measureParity` row, §5.3 `inspectionConcessions`, §5.4 signatures, §8 S2 files row; execution plan S2 row/gate and worker allowed-file exception.
+- QA `/tmp/s62-grid-qa-s2-adopted-head.md`: three runtime corrections verified at `a018cf1e`; S2-QA-4 (diamond fixtures must pass the ruled sizes 34/36, candidate sizeMM asserted) adopted exactly → `a88f4596`.
+- Meta `/tmp/s62-grid-meta-s2-gate.md`: S2 CLOSED on `a88f4596` (7 files / 35 tests, typecheck, lint, diff-check, clean status).
