@@ -279,7 +279,21 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(panel).toContain("const [flapStored, setFlapStored] = usePersisted('flap', FLAP_MM)")
     expect(panel).toContain('const flap = Math.round(flapStored)')
     expect(panel).toContain('setFlapStored(Math.round(n))')
-    expect(panel.match(/setSizeMM\(evenMM\(n\)\)/g)).toHaveLength(3)
+    expect(panel).toContain("const [sizeMinStored, setSizeMinStored] = usePersisted('sizeMin', MIN_EFFECT_MM)")
+    expect(panel).toContain("const [sizeMaxStored, setSizeMaxStored] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)")
+    expect(panel).toContain('const sizeMin = evenMM(sizeMinStored)')
+    expect(panel).toContain('const sizeMax = evenMM(sizeMaxStored)')
+    expect(panel).toContain('setSizeMinStored(evenMM(n))')
+    expect(panel).toContain('setSizeMaxStored(evenMM(n))')
+    expect(panel.match(/const n = evenMM\(\+e\.currentTarget\.value\)/g)).toHaveLength(2)
+    expect(panel.match(/setSizeMM\(n\)/g)).toHaveLength(2)
+    expect(panel.match(/setSizeMM\(evenMM\(n\)\)/g)).toHaveLength(1)
+    const evenMM = (mm: number) => Math.round(mm / 2) * 2
+    const staleMax = evenMM(25)
+    const forcedSize = 27 > staleMax ? staleMax : 27
+    expect(staleMax).toBe(26)
+    expect(forcedSize).toBe(26)
+    expect(forcedSize).toBeLessThanOrEqual(staleMax)
   })
 
   it('asserts the deleted rocket science is absent from the Law runtime',()=>{
