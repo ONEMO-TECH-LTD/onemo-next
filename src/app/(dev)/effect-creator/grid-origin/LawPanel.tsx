@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/magnetic-grid/engine'
-import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/magnetic-grid/spec'
+import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SIZE_STEP_MM } from '@/lib/magnetic-grid/spec'
 import { boundaryTruth, fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/magnetic-grid-bridge'
 
 const IMG = 1024
@@ -86,8 +86,6 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
   const [bandScale, setBandScale] = useState<number | null>(null)
-  /** Snap scan step — admin-tunable for testing; default from spec. */
-  const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
@@ -98,15 +96,15 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('magnetic-grid.compare.v1.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, governor, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('magnetic-grid.compare.v1.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, governor, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('magnetic-grid.compare.v1.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -261,7 +259,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
       id, engineId: 'v351-centre-clone' as const, base, boundaryTruth: boundaryTruth(base), offsetMM, cfg,
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
-      snapStep, stepSel,
+      snapStep: SIZE_STEP_MM, stepSel,
       autoFlapMaxMM: autoFlapN ? (enFlapN ? flap : FLAP_MM) : null,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
@@ -269,7 +267,7 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, governor, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, governor, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, stepSel, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -300,10 +298,10 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
-                if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))
+                if (mode === 'free') setSizeMM((s) => evenMM(Math.min(sizeMax, Math.max(sizeMin, s * f))))
                 else {
                   const b = BANDS.find((x) => x.id === mode)!
-                  setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
+                  setBandScale((s) => evenMM(Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f))))
                 }
               }}
               onReset={() => setManual(null)} />
@@ -407,13 +405,12 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
               {(() => {
                 const b = BANDS.find((x) => x.id === mode)!
                 return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
-                  v={Math.round(bandScale ?? (effSizeRef.current || b.minMM))}
-                  set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}
-                  min={b.minMM} max={b.maxMM} />
+                  v={evenMM(bandScale ?? (effSizeRef.current || b.minMM))}
+                  set={(n) => setBandScale(evenMM(Math.min(b.maxMM, Math.max(b.minMM, n))))}
+                  min={b.minMM} max={b.maxMM} step={SIZE_STEP_MM} />
               })()}
-              <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
-            {mode === 'free' && <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />}
+            {mode === 'free' && <Slider label="Effect size · longest side · even mm" unit="mm" v={evenMM(sizeMM)} set={(n) => setSizeMM(evenMM(n))} min={sizeMin} max={sizeMax} step={SIZE_STEP_MM} />}
             {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>
@@ -529,6 +526,9 @@ export default function LawPanel({ onSelect }: { onSelect: (selection: 0 | 1 | 2
     </div>
   )
 }
+
+/** Sizes are even millimetres: snap any requested size to the ladder. */
+function evenMM(mm: number): number { return Math.round(mm / SIZE_STEP_MM) * SIZE_STEP_MM }
 
 function dim(c: Contour, axis: 0 | 1): number {
   let lo = Infinity, hi = -Infinity
@@ -737,7 +737,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
 function Empty({ text, spin }: { text: string; spin?: boolean }) {
   return <div className="gl-empty">{spin && <span className="gl-spin" />}{text}</div>
 }
-function Slider({ label, v, set, min, max, unit, wide }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string; wide?: boolean }) {
+function Slider({ label, v, set, min, max, unit, wide, step }: { label: string; v: number; set: (n: number) => void; min: number; max: number; unit?: string; wide?: boolean; step?: number }) {
   const commit = (raw: string) => {
     const n = +raw
     if (Number.isFinite(n)) set(Math.min(max, Math.max(min, Math.round(n))))
@@ -751,7 +751,7 @@ function Slider({ label, v, set, min, max, unit, wide }: { label: string; v: num
             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
           {unit ? <i>{unit}</i> : null}
         </span></div>
-      <input type="range" min={min} max={max} value={v} onChange={e => set(+e.target.value)} />
+      <input type="range" min={min} max={max} step={step ?? 1} value={v} onChange={e => set(+e.target.value)} />
     </label>
   )
 }

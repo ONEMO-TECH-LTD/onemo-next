@@ -63,7 +63,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const bb = bbox(outer)
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
-  const fits = makeSeatPredicate(outer, spotRadiusOf(pad) + Math.max(0, cfg.seatMarginMM ?? 0))
+  const fits = makeSeatPredicate(outer, spotRadiusOf(pad))
 
   const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
   const segments = safeSegments(outer, spotRadiusOf(pad), massDepth, cfg.segmentsDetail ?? 'full')
@@ -150,7 +150,7 @@ function bandWalk(
   const [lo, hi] = snapRange(cfg, fromMM)
   // Interim scaling candidate generator only. Exact Wrap is evaluated by computeGrid;
   // this sampled walk never measures or grants contact.
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', seatMarginMM: 0 }
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
   const solve = (mm: number): GridResult => {
     let g = cfg.solveCache?.get(mm)
     if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
@@ -188,13 +188,12 @@ export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
-  const dispCfg: GridConfig = { ...cfg, seatMarginMM: 0 }
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const pickIdx = points.findIndex((p) => p.count === maxCount)
-    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), dispCfg), ladder: points, pickIdx }
+    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), cfg), ladder: points, pickIdx }
   }
-  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), dispCfg), ladder: [], pickIdx: 0 }
+  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), cfg), ladder: [], pickIdx: 0 }
 }
 
 /**

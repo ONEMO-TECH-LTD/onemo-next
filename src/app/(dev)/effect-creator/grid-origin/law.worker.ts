@@ -77,7 +77,7 @@ function schedulePrefetch(
     ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
     : { ...cfg, wrapMode: 'fixed' }
   const walkSig = autoFlapMaxMM != null ? JSON.stringify(walkBase) : cfgSig
-  const walkCfg: GridConfig = { ...walkBase, segmentsDetail: 'light', seatMarginMM: 0 }
+  const walkCfg: GridConfig = { ...walkBase, segmentsDetail: 'light' }
   const cache = sizeCacheOf(walkSig)
   const sizes: number[] = []
   for (const b of BANDS) for (let mm = b.minMM; mm <= b.maxMM; mm += Math.max(1, snapStep)) if (!cache.has(mm)) sizes.push(mm)
@@ -116,8 +116,8 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // A stepped rung renders the layout that QUALIFIED it: reach AND margin at the
       // auto-chosen allowance, never a scanned/rounded substitute.
       const wrapCfg: GridConfig = autoFlapMaxMM != null
-        ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM, seatMarginMM: 0 }
-        : { ...cfg, wrapMode: 'fixed', seatMarginMM: 0 }
+        ? { ...cfg, wrapMode: 'auto', autoFlapCapMM: autoFlapMaxMM }
+        : { ...cfg, wrapMode: 'fixed' }
       const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), wrapCfg)
       const contour = sized(eff)
       const reportedAuto = autoFlapMaxMM != null && grid.wrap.status === 'lawful'

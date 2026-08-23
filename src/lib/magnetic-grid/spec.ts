@@ -33,14 +33,17 @@ export const MAGNET_DIA_LARGE_MM = 8
 /** Fewest seated magnets the perimeter belt may thin down to. */
 export const MIN_ANCHORS = 2
 
-/** Size bands, ends 1mm shy so no size lives in two bands. B5 keeps its ceiling. */
-export interface Band { readonly id: 1 | 2 | 3 | 4 | 5; readonly minMM: number; readonly maxMM: number }
+/** Shape sizes are even millimetres (Dan, 2026-08-23); the ladder steps by 2. */
+export const SIZE_STEP_MM = 2
+
+/** Size bands of even sizes, inclusive; no size lives in two bands. */
+export type BandId = 1 | 2 | 3 | 4
+export interface Band { readonly id: BandId; readonly minMM: number; readonly maxMM: number }
 export const BANDS: ReadonlyArray<Band> = Object.freeze([
-  Object.freeze({ id: 1 as const, minMM: 24, maxMM: 71 }),
-  Object.freeze({ id: 2 as const, minMM: 72, maxMM: 119 }),
-  Object.freeze({ id: 3 as const, minMM: 120, maxMM: 167 }),
-  Object.freeze({ id: 4 as const, minMM: 168, maxMM: 215 }),
-  Object.freeze({ id: 5 as const, minMM: 216, maxMM: 264 }),
+  Object.freeze({ id: 1 as const, minMM: 24, maxMM: 70 }),
+  Object.freeze({ id: 2 as const, minMM: 72, maxMM: 118 }),
+  Object.freeze({ id: 3 as const, minMM: 120, maxMM: 166 }),
+  Object.freeze({ id: 4 as const, minMM: 168, maxMM: 214 }),
 ])
 
 /** Registration search phase step — how finely the lattice slides under the shape.
@@ -57,14 +60,8 @@ export const FLAP_MM = 0
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
-/** Snap scan size step. */
-export const SNAP_STEP_MM = 1
-
-/** Legacy pre-scaling count-transition refinement only. Exact Wrap never reads this value. */
+/** Legacy walk refinement; deleted with bandWalk in S3. */
 export const CONTACT_TOLERANCE_MM = 0.1
-
-/** Legacy T2 value retained until scaling replaces its old call boundary. Exact Auto never scans it. */
-export const AUTO_FLAP_STEP_MM = 1
 
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
@@ -153,7 +150,6 @@ export interface GridConfig {
   centreMode?: number
   governor?: number
   segmentsDetail?: 'full' | 'light'
-  seatMarginMM?: number
   solveCache?: Map<number, GridResult>
   plan?: MagnetPlan
   perimeterOnly?: boolean
