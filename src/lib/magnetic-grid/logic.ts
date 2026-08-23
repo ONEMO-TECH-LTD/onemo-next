@@ -7,21 +7,6 @@ import {
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
 } from './spec'
-const QUANTUM_KEY_MM = 0.001
-const mod = (v: number, m: number) => ((v % m) + m) % m
-
-/** Preserved numeric Centre predicate; intentionally unreferenced until its named T3 consumer. */
-export function parityHolds(seat: ReadonlyArray<Pt>, target: Pt, bb: BBox, pitch: number): boolean {
-  if (!seat.length) return false
-  const lines = (axis: 0 | 1) => new Set(seat.map((s) => Math.round(s[axis] / QUANTUM_KEY_MM))).size
-  const onNode = (axis: 0 | 1) => {
-    const off = mod(seat[0][axis] - target[axis], pitch)
-    return off < pitch / 4 || off > pitch * 3 / 4
-  }
-  void bb
-  return (lines(0) % 2 === 1) === onNode(0) && (lines(1) % 2 === 1) === onNode(1)
-}
-
 /** Which band a size falls in — dominant side against the band ranges. Null above the last. */
 export function bandOf(sizeMM: number): Band | null {
   for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b

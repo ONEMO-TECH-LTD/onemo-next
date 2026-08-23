@@ -36,13 +36,12 @@ const donorBytes = (file: string): Buffer => execFileSync('git', ['show', `8d177
 
 const OWNERS = {
   'magnetic-grid/spec.ts': [] as RegExp[],
-  'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|exact-real|contact-root|identity)$/],
-  'magnetic-grid/compute/exact-real.ts': [/^\.\.\/spec$/],
-  'magnetic-grid/compute/contact-root.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/, /^\.\/seat$/],
-  'magnetic-grid/compute/identity.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
-  'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/, /^\.\/exact-real$/],
+  'magnetic-grid/compute.ts': [/^\.\/compute\/(seat|centre-evidence|wrap-measurement|identity)$/],
+  'magnetic-grid/compute/wrap-measurement.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
+  'magnetic-grid/compute/identity.ts': [/^\.\.\/spec$/],
+  'magnetic-grid/compute/seat.ts': [/^\.\.\/spec$/],
   'magnetic-grid/compute/centre-evidence.ts': [/^\.\.\/spec$/, /^\.\/seat$/],
-  'magnetic-grid/logic.ts': [/^\.\/spec$/, /^\.\/compute$/],
+  'magnetic-grid/logic.ts': [/^\.\/spec$/],
   'magnetic-grid/engine.ts': [/^\.\/spec$/, /^\.\/compute$/, /^\.\/logic$/],
   'effect/magnetic-grid-bridge.ts': [
     /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/types$/,
@@ -54,26 +53,18 @@ const OWNERS = {
 const PHASE_TOP_LEVEL_FUNCTIONS: Record<keyof typeof OWNERS, readonly string[]> = {
   'magnetic-grid/spec.ts': [],
   'magnetic-grid/compute.ts': [],
-  'magnetic-grid/compute/exact-real.ts': [
-    'abs', 'gcd', 'q', 'fromPublic', 'toPublic', 'rational', 'rationalFromNumber',
-    'addRational', 'subtractRational', 'multiplyRational', 'divideRational', 'squareRational',
-    'compareRational', 'integerSqrt', 'exactSquareRoot', 'primitivePolynomial', 'allowancePolynomial',
-    'sqrtMinusRational', 'isRational', 'evaluatePolynomial', 'compareAlgebraicToRational',
-    'compareExactToRational', 'approximateExact', 'canonicalExact',
-  ],
-  'magnetic-grid/compute/contact-root.ts': ['measureWrap'],
-  'magnetic-grid/compute/identity.ts': ['rotr','sha256Text','contourIdentity','contourBoundaryTruth'],
+  'magnetic-grid/compute/wrap-measurement.ts': ['measureWrap'],
+  'magnetic-grid/compute/identity.ts': ['contourIdentity','contourBoundaryTruth'],
   'magnetic-grid/compute/seat.ts': [
-    'exactSeatPoint', 'exactSeatMinus', 'exactSeatCross', 'exactPointInMaterial', 'exactSeatIsLegal',
     'big', 'orient', 'onSegment', 'prepare', 'locate', 'atLeast', 'holds', 'bbox',
     'spotRadiusOf', 'fieldSpanMM', 'axisFrom', 'latticeAt', 'latticeOver',
     'measureCentrePlacements', 'edgeIdxOf', 'segDist2', 'edgeDistMM', 'pointInOuter',
-    'pointInMaterial', 'nearestOutlineMM', 'makeSeatPredicate', 'makeCircleSeatPredicate', 'pressExcessMM', 'maxPressMM',
-    'contactPointsMM', 'impliedFlapMM', 'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
+    'pointInMaterial', 'nearestOutlineMM', 'makeSeatPredicate', 'pressExcessMM',
+    'splitPerimeter', 'measureExtremeCorners', 'scaleContour',
   ],
   'magnetic-grid/compute/centre-evidence.ts': ['safeSegments', 'centroidOf', 'measureCentreBranches'],
   'magnetic-grid/logic.ts': [
-    'mod', 'parityHolds', 'bandOf', 'governMass', 'centeringAnchors',
+    'bandOf', 'governMass', 'centeringAnchors',
     'centrePhaseCandidates', 'chooseCentrePlacement', 'evaluateWrap', 'applyCoverage', 'assignSizes',
   ],
   'magnetic-grid/engine.ts': [
@@ -149,12 +140,8 @@ const ownerKindViolations = (file: keyof typeof OWNERS, text: string): string[] 
       if (/^(CentreMode|Governor|MagnetPlan|Coverage)$/.test(node.text)) violations.push(`compute-policy:${node.text}`)
     }
     if (file === 'magnetic-grid/logic.ts' && ts.isImportDeclaration(node)
-      && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === './compute') {
-      const imported = node.importClause?.namedBindings
-      if (!imported || !ts.isNamedImports(imported)
-        || imported.elements.some((element) => element.name.text !== 'compareExactToRational')) {
-        violations.push('logic-compute-import')
-      }
+      && ts.isStringLiteral(node.moduleSpecifier) && /compute/.test(node.moduleSpecifier.text)) {
+      violations.push('logic-compute-import')
     }
     if (file === 'magnetic-grid/engine.ts'
       && (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node))) violations.push('engine-ui')
@@ -231,10 +218,19 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(worker).toContain('[boundaryTruth.contourIdentity, offsetMM]')
   })
   it('measures seat and Wrap from one signed clearance record in seat.ts geometry, nothing below the ruler',()=>{
-    const contact=readRepo('src/lib/magnetic-grid/compute/contact-root.ts'),logic=readRepo('src/lib/magnetic-grid/logic.ts')
+    const contact=readRepo('src/lib/magnetic-grid/compute/wrap-measurement.ts'),logic=readRepo('src/lib/magnetic-grid/logic.ts')
     expect(contact).toContain("import { nearestOutlineMM, pointInMaterial, splitPerimeter } from './seat'")
     expect(contact).toContain('Math.floor(rawClearanceMM + 0.5)')
     expect(contact).not.toMatch(/exact|Rational|toFixed|1e-|QUANTUM|GUARD/)
     expect(logic).not.toMatch(/compareExact|approx|toFixed/i)
+  })
+  it('asserts the deleted rocket science is absent from the Law runtime',()=>{
+    const deleted=/^(Rational|AlgebraicReal|ExactReal|ExactScale|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour)$/
+    for(const file of [...LAW_RUNTIME_FILES,'src/lib/magnetic-grid/compute/wrap-measurement.ts','src/lib/magnetic-grid/compute/identity.ts']){
+      const text=readRepo(file)
+      expect(identifiersOf(text).filter((name)=>deleted.test(name)),`${file} still carries a deleted identifier`).toEqual([])
+      expect(importsOf(text).filter((source)=>/exact-real|contact-root/.test(source)),`${file} imports a deleted module`).toEqual([])
+    }
+    expect(identifiersOf('const x = exactSeatIsLegal(1)').filter((name)=>deleted.test(name))).toEqual(['exactSeatIsLegal'])
   })
 })

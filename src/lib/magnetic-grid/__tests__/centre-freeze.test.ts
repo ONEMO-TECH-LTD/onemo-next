@@ -13,7 +13,6 @@ const comparisonConfig = {
   governor: 0,
   plan: 'all6' as const,
   perimeterOnly: true,
-  circle: false,
 }
 
 describe('v3.5.1 frozen Centre at nonzero flap', () => {
@@ -36,6 +35,7 @@ describe('v3.5.1 frozen Centre at nonzero flap', () => {
 
     const legacyWithoutDoubleCount = computeLegacy(contour, {
       ...comparisonConfig,
+      circle: false,
       positioning: 1,
       flapMM: 4,
       seatMarginMM: 0,
@@ -46,6 +46,7 @@ describe('v3.5.1 frozen Centre at nonzero flap', () => {
     // R15 line 129 replaces the old flap-as-seat-inflation path once Wrap is live.
     const legacyWithDoubleCount = computeLegacy(contour, {
       ...comparisonConfig,
+      circle: false,
       positioning: 1,
       flapMM: 4,
       seatMarginMM: 4,

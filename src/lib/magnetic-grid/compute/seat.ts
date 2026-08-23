@@ -12,12 +12,8 @@
 // ring and a radius and answers a geometric question.
 
 
-import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt, Rational } from '../spec'
+import type { BBox, CentrePhaseCandidate, CentrePlacementMeasurement, Contour, ExtremeCornerMeasurement, Pt } from '../spec'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../spec'
-import { compareRational, multiplyRational, rational, rationalFromNumber, subtractRational } from './exact-real'
-
-/** Exact-tangency band — the same tolerance the seat predicate treats as "at the edge". */
-export const TANGENT_GUARD_MM = 0.05
 
 export interface Prepared {
   /** Size of one integer step, in millimetres. */
@@ -27,31 +23,6 @@ export interface Prepared {
   /** Bounds in integer quanta. */
   readonly box: BBox
 }
-
-type ExactSeatPoint=readonly [Rational,Rational]
-const exactSeatPoint=([x,y]:Pt):ExactSeatPoint=>[rationalFromNumber(x),rationalFromNumber(y)]
-const exactSeatMinus=(a:ExactSeatPoint,b:ExactSeatPoint):ExactSeatPoint=>[subtractRational(a[0],b[0]),subtractRational(a[1],b[1])]
-const exactSeatCross=(a:ExactSeatPoint,b:ExactSeatPoint)=>subtractRational(multiplyRational(a[0],b[1]),multiplyRational(a[1],b[0]))
-
-export function exactPointInMaterial(contour:Contour,pointMM:Pt):boolean{
-  const point=exactSeatPoint(pointMM)
-  const locate=(ring:ReadonlyArray<Pt>):'IN'|'OUT'|'ON'=>{
-    const points=ring.map(exactSeatPoint);let winding=0
-    for(let i=0,j=points.length-1;i<points.length;j=i++){
-      const a=points[j],b=points[i],turn=compareRational(exactSeatCross(exactSeatMinus(b,a),exactSeatMinus(point,a)),rational(0))
-      const withinX=compareRational(point[0],compareRational(a[0],b[0])<=0?a[0]:b[0])>=0&&compareRational(point[0],compareRational(a[0],b[0])>=0?a[0]:b[0])<=0
-      const withinY=compareRational(point[1],compareRational(a[1],b[1])<=0?a[1]:b[1])>=0&&compareRational(point[1],compareRational(a[1],b[1])>=0?a[1]:b[1])<=0
-      if(turn===0&&withinX&&withinY)return'ON'
-      const ay=compareRational(a[1],point[1]),by=compareRational(b[1],point[1])
-      if(ay<=0&&by>0&&turn>0)winding++;else if(ay>0&&by<=0&&turn<0)winding--
-    }
-    return winding===0?'OUT':'IN'
-  }
-  return locate(contour.outer.pts)==='IN'&&contour.holes.every(hole=>locate(hole.pts)==='OUT')
-}
-
-export const exactSeatIsLegal=(contour:Contour,point:Pt,nearestSquared:Rational,radiusSquared:Rational):boolean=>
-  exactPointInMaterial(contour,point)&&compareRational(nearestSquared,radiusSquared)>=0
 
 const big = (n: number): bigint => BigInt(n)
 /** This project targets ES2017, where BigInt LITERALS (`0n`) do not compile. */
@@ -401,25 +372,6 @@ export function makeSeatPredicate(
   }
 }
 
-/**
- * Seat predicate for a TRUE CIRCLE (centre c, radius R): the disc of radius r fits iff
- * |p−c|² ≤ (R−r)² — integer microns, tangency by equality. A flattened polygon's chords sit
- * microns inside the curve and wrongly refuse the zero-margin case; the analytic form cannot.
- */
-export function makeCircleSeatPredicate(
-  cx: number, cy: number, R: number, spotRadiusMM: number,
-): ((pt: Pt) => boolean) | null {
-  const QUANTUM = 0.001
-  const q = (v: number) => Math.round(v / QUANTUM)
-  const slack = q(R) - q(spotRadiusMM)
-  if (slack < 0) return null
-  const cqx = q(cx), cqy = q(cy), s2 = slack * slack
-  return (pt: Pt) => {
-    const dx = q(pt[0]) - cqx, dy = q(pt[1]) - cqy
-    return dx * dx + dy * dy <= s2
-  }
-}
-
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
  *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
  *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
@@ -429,51 +381,6 @@ export function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt
   let sum = 0
   for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)
   return sum / seated.length
-}
-
-/** THE RIGID GATE (Dan, 2026-08-20): the worst disc's gap past its margined edge. A layout
- *  qualifies only when EVERY disc touches within the allowance — 0 = touch, 1 = 1mm space.
- *  Normal mode enforces this; Auto mode adapts the allowance instead. */
-export function maxPressMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
-  let m = 0
-  for (const s of seated) { const g = edgeDistMM(outer, s) - reach; if (g > m) m = g }
-  return m
-}
-
-/** Where discs actually touch: for each seated disc within `slackMM` of its margined edge,
- *  the nearest point on the outline — drawn so tangency is visible, never guessed. */
-export function contactPointsMM(
-  outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number, slackMM: number,
-): Pt[] {
-  const out: Pt[] = []
-  for (const s of seated) {
-    if (edgeDistMM(outer, s) - reach > slackMM) continue
-    // nearest outline point: brute over segments (few contacts per solve — cost immaterial)
-    let best: Pt = outer[0], bd = Infinity
-    for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
-      const [ax, ay] = outer[j], [bx, by] = outer[i]
-      const dx = bx - ax, dy = by - ay
-      const len2 = dx * dx + dy * dy
-      let t = len2 > 0 ? ((s[0] - ax) * dx + (s[1] - ay) * dy) / len2 : 0
-      t = Math.max(0, Math.min(1, t))
-      const px = ax + t * dx, py = ay + t * dy
-      const d = Math.hypot(s[0] - px, s[1] - py)
-      if (d < bd) { bd = d; best = [px, py] }
-    }
-    out.push(best)
-  }
-  return out
-}
-
-/** The allowance a solved layout IMPLIES at its size — the margin needed to HOLD EVERY disc
- *  (the worst gap, matching the wrap law), not merely the first one to touch. Free mode's Auto
- *  readout and the band's granting law therefore speak the same language (pixel full-eval F3).
- *  0 = every disc already tangent. */
-export function impliedFlapMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, spotRadiusMM: number): number {
-  if (!seated.length) return 0
-  let g = 0
-  for (const a of seated) { const d = edgeDistMM(outer, a) - spotRadiusMM; if (d > g) g = d }
-  return Math.max(0, g)
 }
 
 /** Marching-squares topology: per corner-sign mask (array position), the cell-edge pairs a

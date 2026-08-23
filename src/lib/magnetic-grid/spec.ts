@@ -82,30 +82,9 @@ export const GOVERNOR = 0
 export const CENTRE_MODE = 2
 
 export type Pt = [number, number]
-export type ExactInteger = string
-export interface Rational { numerator: ExactInteger; denominator: ExactInteger }
-export interface AlgebraicReal {
-  polynomial: readonly string[]
-  isolating: readonly [Rational, Rational]
-  rootIndex: number
-}
-export type ExactReal = Rational | AlgebraicReal
-export interface ExactScale { exact: ExactReal; approximateMM: number }
-export interface BoundaryElement {
-  kind: 'segment'
-  id: string
-  a: readonly [Rational, Rational]
-  b: readonly [Rational, Rational]
-}
 export interface BoundaryTruth {
   rule: 'supplied-final-contour'
   contourIdentity: string
-}
-export interface PreparedContour {
-  source: Contour
-  boundary: readonly BoundaryElement[]
-  truth: BoundaryTruth
-  identity: string
 }
 /** Nearest-outline witness for one belt disc; clearanceMM is on the 1 mm ruler (ruler-zero is not literal touch). */
 export interface ContactWitness { beltAnchorMM: Pt; outlinePointMM: Pt; clearanceMM: number }
@@ -178,7 +157,6 @@ export interface GridConfig {
   solveCache?: Map<number, GridResult>
   plan?: MagnetPlan
   perimeterOnly?: boolean
-  circle?: boolean
   wrapMode?: 'fixed' | 'auto'
   autoFlapCapMM?: number
 }

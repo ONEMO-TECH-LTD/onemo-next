@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { measureWrap } from '../compute/contact-root'
+import { measureWrap } from '../compute/wrap-measurement'
 import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
 import { computeGrid } from '../engine'
