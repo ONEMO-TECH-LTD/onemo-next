@@ -1,7 +1,7 @@
 # Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
 Status: canonical v3.5.2 master contract
-Version: v3.5.2-1 — full vertical Centre-rules clone in T1; scaling simplified to discovery + exact local contact (2026-08-22)
+Version: v3.5.2-2 — full vertical Centre-rules clone in T1; scaling = even-millimetre walk on the 1 mm ruler (Dan ruling 2026-08-23)
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 
@@ -16,15 +16,17 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 - Retain the third selection label `v3.5.2` and `magnetic-grid.compare.v1.*`; exactly three positioning selections render. Voting and Centre-rules remain untouched comparators; the old in-place `positioning===2` branch remains outside the new runtime.
 - The final Law slot calls only `LawPanel.tsx` → bridge/API → `law.worker.ts`; it never sends `positioning===2` to the current door/worker. Show all law evidence and typed refusals.
 
-Build completion: the Law tab compiles and runs through `LawPanel.tsx` → bridge/API → transport-only `law.worker.ts`; direct and worker calls return the same result; newest-only request replacement works; cache identities do not cross between legacy and Law; all three laws remain operational; exactly three selections render; current Voting/Centre-rules still run unchanged. Commit this final working build. Broader queue/mutation/audit work remains optional §9 (fixtures 10, 12 and 17 remain mandatory B1 gates).
+Build completion: the Law tab compiles and runs through `LawPanel.tsx` → bridge/API → transport-only `law.worker.ts`; direct and worker calls return the same result; newest-only request replacement works; cache identities do not cross between legacy and Law; all three laws remain operational; exactly three selections render; current Voting/Centre-rules still run unchanged. Commit this final working build. Broader queue/mutation/audit work remains optional §9 (fixtures 12 and 17 remain mandatory B1 gates).
 
 ## 1. Product goal
 
 The engine is one portable three-rule driver:
 
 1. **CENTRE** — at each candidate physical scale, derive one governed centre from that scaled shape alone, before magnets exist. Place the lattice rigidly on that centre: odd line count puts a node on it; even line count puts the gap/centering line on it. The centre may change with physical scale because the safe core/masses change; it may never change because magnets landed somewhere.
-2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance. `0` means exact spot-edge tangency on the ruled source geometry; neither outline-source uncertainty nor size-walk quantum becomes hidden wrap tolerance. Auto flap returns the smallest allowance that makes the layout lawful.
-3. **MAGNET-QUANTITY SCALING** — within each band, publish each next available magnet count once, at the exact scale where that count's layout is centred and wrapped. The existing band walk discovers candidate states operationally; the rung scale is solved exactly from that layout's local contact equations and validated by the full laws at that exact scale. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. The promise is exact truth for every published rung plus measured operational discovery; it is not a proof over every real scale.
+2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance, measured on the 1 mm ruler: a disc's air to the outline is reported as a whole millimetre (nearest); `0` means the disc fits and its air rounds to 0 mm; `1` means up to 1 mm of air. Auto flap returns the smallest whole-millimetre allowance that makes the layout lawful.
+3. **MAGNET-QUANTITY SCALING** — shape sizes are even millimetres (24, 26, 28 …), so every centre, lattice node and Centre-mesh sample lies on whole millimetres. Within each band the engine walks every even size and publishes each next available magnet count once, at the smallest even size where that count's layout is centred and wrapped. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. Every candidate size is evaluated, so coverage is complete by construction.
+
+**The ruler.** No law measurement is finer than 1 mm (Dan, 2026-08-23: "we never should follow anything less than 1 mm"). Sizes and flap are whole millimetres; a measured air is rounded to the nearest whole millimetre before any law comparison. Exact arithmetic may be used to *measure*, never to *decide* below the ruler.
 
 There is no score, weight, blended preference, silent fallback, or “best attempt” in the production driver. When no lawful layout exists, the engine returns a typed refusal. Fixed-size/manual inspection returns measured concessions; it does not invent a product winner.
 
@@ -57,9 +59,9 @@ src/lib/magnetic-grid/
   compute/
     seat.ts
     centre-evidence.ts
-    exact-real.ts      # live: rational/algebraic values, comparison, quadratic roots
-    contact-root.ts    # live: exact boundary, seat/Wrap judgement, local contact roots
-    identity.ts        # live: canonical serialization and witness certification
+    exact-real.ts      # live since Wrap: rational values and comparison (measurement only)
+    contact-root.ts    # live since Wrap: belt-disc distance measurement and witnesses
+    identity.ts        # live since Wrap: canonical serialization
   logic.ts
   engine.ts
 
@@ -93,7 +95,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | REFERENCE-EVIDENCE only in T3; no body reuse | Re-derive the ruled ordering from Dan's directive over new exact measurements in `logic.ts`; the existing `positioning===2` ranking body is never copied or adapted |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T1/T2 preserve the sampled walk; T3 keeps it as cheap candidate discovery only and removes its authority to certify contact or publish a rung: the gate becomes exact local contact roots plus full-law validation (§7.2, §7.4), and the seat-based `below` ownership is deleted |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T3 graduates it: 2 mm steps over even sizes, every placement judged, the Wrap verdict (whole-mm air ≤ flap) as the only gate, no bisection/refinement, and the seat-based `below` ownership replaced by ownership-by-acceptance (§7.2, §7.4) |
 | `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; DELETE+REPLACE when T3 adds Wrap | T1/T2 preserve the allowance scan for equivalence only; T3 removes the scan and computes the exact worst-belt minimum directly |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2 or T3; the governor keeps selecting on its numeric inputs |
@@ -102,7 +104,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
 | `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
 | `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
-| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM; contour scaling ADAPT at T3 to the exact normalization rule | destination follows the import law. T3 replaces the float `actual === longestMM` branch in `scaleContour` with the single exact rule of §7.1b (normalized boundary × scale); the frozen governed Centre/evidence hashes must remain equal |
+| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM | destination follows the import law; unchanged in T3 |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
 The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.
@@ -302,12 +304,13 @@ export interface ContactWitness {
 export const GRID_PITCH_MM = 48
 export const SPOT_RADIUS_MM = 12
 export const MASS_DEPTH_MM = 16
-/** Exact band ownership is half-open: a scale s belongs to the band with minMM <= s < maxExclusiveMM (71.5 is B1; 72 is B2). */
+/** Sizes are even millimetres; a band owns its even sizes minMM..maxMM inclusive. */
+export const SIZE_STEP_MM = 2
 export const BANDS = [
-  { id: 1, minMM: 24, maxExclusiveMM: 72 },
-  { id: 2, minMM: 72, maxExclusiveMM: 120 },
-  { id: 3, minMM: 120, maxExclusiveMM: 168 },
-  { id: 4, minMM: 168, maxExclusiveMM: 216 },
+  { id: 1, minMM: 24, maxMM: 70 },
+  { id: 2, minMM: 72, maxMM: 118 },
+  { id: 3, minMM: 120, maxMM: 166 },
+  { id: 4, minMM: 168, maxMM: 214 },
 ] as const
 
 export type FixedFlap = { mode: 'fixed'; allowance: Rational }
@@ -329,31 +332,18 @@ export interface ComparisonEngineConfig extends EngineConfig { centrePolicy: Cen
 export interface EvaluationPolicy extends ComparisonEngineConfig { readonly policyIdentity: string }
 /** Neutral geometry inputs derived by engine from the config's exposed values (exact rationals); contains no policy selector. */
 export interface ComputeInputs { pitchMM: Rational; spotRadiusMM: Rational; massDepthMM: Rational }
-/** Emitted by the frozen numeric Centre path with its existing outputs; never derived from report decimals. */
-export interface NumericSelection {
-  centreBranch: { kind: 'box' } | { kind: 'weight' } | { kind: 'core'; islands: readonly { sampleCount: number; sumIx: number; sumIy: number }[] } | { kind: 'sample'; ix: number; iy: number }
-  placement: { xHalf: boolean; yHalf: boolean }           // which of the four parity placements was chosen
-  phaseCell: readonly [number, number]                   // integer quotients q of (centre − min [+pitch/2]) = q·pitch + phase, per axis
-  sourceScale: Rational                                  // the exact scale at which the selection was observed
-  latticeK: readonly (readonly [number, number])[]       // k-indices of seated nodes relative to phase
-  beltIndices: readonly number[]                         // indices into latticeK of the perimeter belt
-  count: number
+/** One evaluated placement at one even size: what the walk judges and Logic reduces. */
+export interface PlacementCandidate {
+  sizeMM: number                 // even whole millimetres
+  placement: { xHalf: boolean; yHalf: boolean }
+  seated: readonly PointMM[]
+  belt: readonly PointMM[]
+  anchors: readonly Anchor[]     // post-Coverage output population
+  magnetCount: number
+  requiredFlapMM: number         // whole-mm air of the worst belt disc (nearest mm)
+  parityTrue: boolean
+  wrap: WrapEvaluation
 }
-/** Private parametric record for one stable state: exact affine coefficients in scale s. */
-export interface ParametricSelectedState {
-  numeric: NumericSelection
-  outer: ExactRing                                       // normalized exact segments; scaled as A·s
-  holes: readonly ExactRing[]
-  centre: { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }    // c(s) = a·s + b
-  anchors: readonly { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }[]  // p_k(s) = a·s + b
-}
-/** The parametric state instantiated at one exact scale. */
-export interface ExactState { parametric: ParametricSelectedState; scale: ExactScale; contour: PreparedContour; centre: ExactPoint; phase: ExactPoint; anchors: readonly ExactPoint[]; belt: readonly ExactPoint[] }
-/** Required allowance at an algebraic rung: sqrt(u + v·s) − r with s the rung's quadratic root — the radicand is the affine reduction of the disc's squared distance in the field Q(s). */
-export interface FieldSqrtReal { kind: 'field-sqrt'; u: Rational; v: Rational; root: AlgebraicReal; subtract: Rational; isolating: readonly [Rational, Rational] }
-export type RequiredAllowance = ExactReal | FieldSqrtReal
-export interface StateJudgement { seatLegal: readonly boolean[]; requiredFlap: RequiredAllowance; witnesses: readonly ContactWitness[] }
-export interface ContactRoot { scale: ExactScale; anchorIndex: number; outlineElementId: string; projection: 'endpoint' | 'interior' }
 
 export type RefusalCode =
   | 'NO_SAFE_CORE'
@@ -473,7 +463,7 @@ resultId = sha256(canonicalJson([
 
 If a live result/cache consumer requires it, `compute/identity.ts` assigns neutral `geometryLayoutId` and `measuredId` to the complete rooted record before Logic sees it. Engine derives `policyIdentity` from the complete config through `policyIdentityOf`; callers cannot supply it. Logic uses `measuredId` for stable ordering and carries the opaque identity; it never hashes or reconstructs geometry. After Logic returns `LawReduction`, engine assembly calls neutral `finalizeResultIdentity()` and exposes `layoutId = geometryLayoutId`, `candidateId = resultId`. Thus two configured outputs with different Coverage, MagnetPlan, flap or centre policy cannot share a content-complete result id, while their neutral geometry identity remains comparable. A report-only decimal never enters identity.
 
-Each rung carries its exact solved scale, accepted layout(s) and contact witnesses. Discovery bookkeeping stays private; no sampled size, quantum or report decimal decides a rung.
+Each rung carries its even size, accepted layout(s), whole-mm required flap and contact witnesses.
 
 ### 6.5 `magnetic-grid-bridge.ts` — adapters and worker service
 

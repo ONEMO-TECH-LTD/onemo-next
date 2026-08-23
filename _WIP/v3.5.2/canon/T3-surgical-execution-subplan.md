@@ -1,13 +1,13 @@
 # v3.5.2 T3 surgical execution sub-plan
 
-Status: execution authority revised 2026-08-22 to the proved bounded mechanism. R0 is CLEAR; G1 is superseded; B1 (exact adapter + scaling) is the released build scope; B2 remains gated on B1 CLEAR.
+Status: execution authority revised 2026-08-23 to the even-millimetre walk (Dan ruling). R0 is CLEAR; G1 is superseded; B1 (graduate the walk) is the released build scope; B2 remains gated on B1 CLEAR.
 
 ## Authority
 
 Execute only from:
 
-1. `v3.5.2-master-contract.md` — 899 lines — SHA-256 `625c8a16c50e9189bbc4a9cc060912e7f8cac77374a598e7d657d126d79d9765` (v3.5.2-1, revised 2026-08-22).
-2. `T3-build-three-laws.md` — 704 lines — SHA-256 `0e048f238419c5192d6d69923c86252fd61829b303187dc5b8382a3a363d3215` (regenerated from that master).
+1. `v3.5.2-master-contract.md` — 853 lines — SHA-256 `aa76a353c56b0d845cc6e81714e7af53d5ff0cc28eeba6dbf0fbf956180aef47` (v3.5.2-1, revised 2026-08-22).
+2. `T3-build-three-laws.md` — 658 lines — SHA-256 `3196b875b2e5e5e65ce8e124fc2cdac86bf4860251a559e01f59526691ab0bd9` (regenerated from that master).
 
 Historical evidence only, not execution authority: `../supporting/T3-execution-matrix.md` (describes product `1ccba648` and the pre-simplification mechanism; superseded) and `../supporting/T3-post-wrap-commit-audit.md` (joint 34-commit recovery disposition).
 
@@ -81,45 +81,30 @@ R0 gate: Grid-Meta and Grid-QA independently verify the resulting tree against t
 
 The Centre-site contract gap was closed by removing the requirement that created it. Scaling no longer evaluates Centre at exact sites over the continuum; the numeric Centre path selects the state and only the selected coordinates are reconstructed exactly (master §7.1b). No G1 mechanism, transition set, falsifier or `CENTRE_EVIDENCE_UNRESOLVED` site is built.
 
-## B1 — Exact coordinate adapter + bounded scaling
+## B1 — Graduate the walk on the 1 mm ruler
 
-Authority: master §6.2, §7.1b, §7.2, §7.4 and §10 T3 as revised on 2026-08-22, proved by `../_audits/T3-exact-adapter-bounded-proof.md`.
+Authority: master §1 (ruler), §6.1–§6.4, §7.1b/§7.2/§7.4 and §10 T3 as revised on 2026-08-23 (Dan: sizes even millimetres; no measurement below 1 mm).
 
-Allowed runtime files:
+Allowed runtime files: `src/lib/magnetic-grid/{spec,compute,logic,engine}.ts`, `src/lib/magnetic-grid/compute/{seat,centre-evidence,contact-root}.ts`, focused tests and the existing separation guard.
 
-- `src/lib/magnetic-grid/spec.ts`
-- `src/lib/magnetic-grid/compute.ts`
-- `src/lib/magnetic-grid/compute/{exact-real,seat,centre-evidence,contact-root,identity}.ts`
-- `src/lib/magnetic-grid/logic.ts`
-- `src/lib/magnetic-grid/engine.ts`
-- focused magnetic-grid tests and the existing separation guard
+Required result, in rollback commits (~80 lines total):
 
-Required result, in rollback commits:
-
-1. `exact-real.ts` gains the quadratic root isolator (`quadraticRootsWithin`, `compareExact`, `affineExact`) and the one-quadratic-field judgement arithmetic of master §6.2 (`FieldSqrtReal`, linear-form reduction by `P(s)=0`, sign comparison); each body lands with its consumer.
-2. `centre-evidence.ts`/`engine.ts` emit `NumericSelection` from values the frozen path already computes (mesh sample indices, island sample counts and index sums, chosen placement, phase cells, source scale, lattice k-indices, belt membership) without changing any Centre output or choice; deriving any of it from report decimals is forbidden. `contact-root.ts` gains the exact coordinate adapter (`exactSelectedState` → `ParametricSelectedState`, `instantiateState`), the shared judgement (`judgeState`: exact seat legality for every node, exact worst-belt Wrap over outer and holes, witnesses) and the local contact equations (`contactRoots`). `scaleContour`'s float `actual === longestMM` branch is replaced by the exact normalization rule (master §7.1b). `ContactWitness.regimeId` is renamed `path`.
-3. Fixed-size inspection (`computeGrid`) judges through `judgeState` on the exact state; the micron seat predicate remains only as a conservative float prescreen.
-4. `bandWalk` becomes cheap state discovery: at every step it observes all four neutral placements from `measureCentrePlacements` before `chooseCentrePlacement` collapses them and records every distinct (count, centre, placement, indices, belt) state with its bracket; it certifies nothing and publishes nothing; the seat-based `below` ownership is deleted.
-5. For each discovered state: solve `contactRoots` inside the bracket; at each root re-run the numeric Centre once, discard on a changed state, otherwise judge exactly and hand the rooted candidate to Logic. No recursion.
-6. Logic: next count strictly greater than the last published, earliest accepted rung owns it, cross-band duplicates suppressed, all co-lawful placements retained, gravity after centre/wrap/count/allowance tie, Fixed/Auto on the same exact requirement.
-7. `spec.ts`: `BANDS` = 1–4 with half-open exact ownership (`maxExclusiveMM`); structural exact `NormalizedBoundary`/`PreparedContour` (outer + holes, flat boundary derived); `EngineConfig` carries pitch, spot radius and mass depth and `ComputeInputs` derives from it; the adapter types of master §6.1; no regime/certificate types.
+1. `spec.ts`: `SIZE_STEP_MM = 2`; `BANDS` = four even-size bands (24–70, 72–118, 120–166, 168–214); `PlacementCandidate`; delete `CONTACT_TOLERANCE_MM`, `AUTO_FLAP_STEP_MM`, `SNAP_STEP_MM`.
+2. `compute`: `roundToRulerMM`; `measureWrap` unchanged; the near-boundary seat decision and Wrap judge the same scaled contour and anchors.
+3. `engine.ts computeGrid`: evaluate all four placements (Coverage, Wrap, ruler rounding) and return them as `candidates`; `chooseCentrePlacement` stays the Free-display pick.
+4. `engine.ts bandWalk`: every even size in the band; every candidate to Logic; delete bisection, `CONTACT_TOLERANCE_MM` refinement and the seat-based `below` exclusion.
+5. `logic.ts reduceBandLadders`: lawful = parity + whole-mm flap ≤ allowance (Auto: ≤ cap, minimum kept); group by output count; earliest even size; ties kept; vertical eliminates horizontal only among equals; counts strictly increasing; ownership by first acceptance across B1–B4.
+6. `fitSizeInBand`/`autoFlapInBand` publish from the reduced ladder (no re-solve, no scan).
 
 Required proof:
 
-- frozen Centre/Wrap zero- and positive-flap replay unchanged;
-- every Centre mode and Masses governor: exact reconstruction from the emitted `NumericSelection` equals the numeric selection (squircle 72, heart 108, squircle 120); perturbing report decimals cannot change it;
-- square 25 @ pitch 24: one exact verdict in fixed and rung paths (lawful, gap exactly 0);
-- Weight squircle 72: identical exact refusal and evidence in both paths;
-- diamond: irrational count-1 rung judged at the algebraic root itself (field arithmetic), exact witness, survives worker → UI;
-- pitch 24, spot radius and mass depth reach the engine through the public config and change policy identity;
-- square: 1 at 24; at 72 both the vertical pair (count 2) and the 2×2 (count 4) publish; 8 at 120; 12 at 168, all with flap-0 witnesses; 24.1 refuses; squircle publishes 8 in B4; 71.5 is owned by B1 and 72 by B2;
-- one real holed supplied cutout: exact affine hole segments, hole-overlap refused as an illegal seat, a hole segment as binding witness, fixed-vs-rung identity;
-- counts strictly increasing, no cross-band repeat, lower count survives a higher count's refusal, co-lawful placements plural;
-- per-band solve within the live-tab budget (< 2 s on the squircle);
-- denser-step discovery comparison on square, circle, pill, tall and wide rectangles, diamond, heart, duck, bot, batwoman and the holed cutout finds no missed count (mandatory B1 QA gate);
-- restoring approximate seat admission, or the float normalization branch, fails the fixed/rung identity fixture.
+- frozen Centre/Wrap zero- and positive-flap replay unchanged (Wrap verdicts at flap 0 change only where sub-ruler air now rounds to 0 — squircle 72 in every mode becomes lawful; record the diff);
+- fixture 12: seat/Wrap one geometry; fixture 17: holed cutout;
+- square: 1 at 24; 2 and 4 at 72; 8 at 120; 12 at 168; diamond: 1 at 34 (air 0.06 → flap 0); squircle 8 in B4; no cross-band repeat; lower count survives a higher count's refusal; co-lawful placements plural;
+- per-band squircle solve < 2 s;
+- a mutation that refines below 2 mm, compares sub-mm air, or judges seat and Wrap on different geometry fails.
 
-Stop before code if a helper has no live rung consumer, a test demands completeness over every real scale, Centre or Wrap behaviour moves, a certificate exists for another certificate, recursion/cycle code appears without a failing fixture, or a general algebraic geometry platform appears (algebraic materialization beyond the single candidate `ExactState` consumed immediately by `judgeState`).
+Stop before code if bisection, refinement, exact-root, adapter, algebraic or sub-millimetre law logic appears.
 
 B1 gate: builder self-audit, Grid-QA independent source/runtime QA, then Grid-Meta necessity/sufficiency/deslop/live-product audit. Continue only on both independent verdicts CLEAR.
 
@@ -130,7 +115,7 @@ Allowed files: `law.worker.ts`, `LawPanel.tsx`, `magnetic-grid-bridge.ts`, `engi
 - Keep the isolated newest-only queue, lifecycle and engine/contour identity checks. No T4 solve service or view-model migration.
 - Worker stores the complete accepted B1–B4 result once per shape/config; band/rung selection is a stored lookup; free/manual routes through fixed inspection with measured concessions.
 - Transport exact scales, witnesses and refusals unchanged; display the rounded scale, retain the exact value.
-- Remove `snapRange`, `bandSnapPoints`, `fitSizeInBand`, `autoFlapInBand`, the per-mm walk caches/prefetch and the snap-step control only once the stored result drives the tab.
+- Remove `snapRange`, `bandSnapPoints`, the per-size caches/prefetch and the snap-step control only once the stored result drives the tab.
 - Honesty note to all three laws only after the committed live result renders. Exactly three tabs; no restyle.
 
 Proof: worker result byte-equals direct engine; shape/config change invalidates once; selection causes no solve; stale requests never render; legacy worker hashes unchanged; all four bands render stored exact rungs/refusals; frozen Centre/Wrap visuals unchanged.
@@ -147,7 +132,7 @@ Run Centre + Wrap + scaling together on the real Law tab across:
 - manual fixed inspection;
 - direct engine, worker/cache replay and selected-layout lookup.
 
-Required verdict: strictly increasing counts at exact solved scales, no cross-band repeat/double owner, exact witnesses, explicit refusals/ties, no sampled law certification or rung decision (sampled discovery only), comparator hashes unchanged, real UI truthful.
+Required verdict: strictly increasing counts at exact solved scales, no cross-band repeat/double owner, exact witnesses, explicit refusals/ties, every even size evaluated, comparator hashes unchanged, real UI truthful.
 
 ## F2 — Centre repair remains last and conditional
 

@@ -1,7 +1,7 @@
 # Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
 Status: canonical v3.5.2 master contract
-Version: v3.5.2-1 — full vertical Centre-rules clone in T1; scaling simplified to discovery + exact local contact (2026-08-22)
+Version: v3.5.2-2 — full vertical Centre-rules clone in T1; scaling = even-millimetre walk on the 1 mm ruler (Dan ruling 2026-08-23)
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 
@@ -2738,8 +2738,10 @@ export function scaleRing(ringMM: readonly Pt[], longestMM: number): Pt[] {
 The engine is one portable three-rule driver:
 
 1. **CENTRE** — at each candidate physical scale, derive one governed centre from that scaled shape alone, before magnets exist. Place the lattice rigidly on that centre: odd line count puts a node on it; even line count puts the gap/centering line on it. The centre may change with physical scale because the safe core/masses change; it may never change because magnets landed somewhere.
-2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance. `0` means exact spot-edge tangency on the ruled source geometry; neither outline-source uncertainty nor size-walk quantum becomes hidden wrap tolerance. Auto flap returns the smallest allowance that makes the layout lawful.
-3. **MAGNET-QUANTITY SCALING** — within each band, publish each next available magnet count once, at the exact scale where that count's layout is centred and wrapped. The existing band walk discovers candidate states operationally; the rung scale is solved exactly from that layout's local contact equations and validated by the full laws at that exact scale. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. The promise is exact truth for every published rung plus measured operational discovery; it is not a proof over every real scale.
+2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance, measured on the 1 mm ruler: a disc's air to the outline is reported as a whole millimetre (nearest); `0` means the disc fits and its air rounds to 0 mm; `1` means up to 1 mm of air. Auto flap returns the smallest whole-millimetre allowance that makes the layout lawful.
+3. **MAGNET-QUANTITY SCALING** — shape sizes are even millimetres (24, 26, 28 …), so every centre, lattice node and Centre-mesh sample lies on whole millimetres. Within each band the engine walks every even size and publishes each next available magnet count once, at the smallest even size where that count's layout is centred and wrapped. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. Every candidate size is evaluated, so coverage is complete by construction.
+
+**The ruler.** No law measurement is finer than 1 mm (Dan, 2026-08-23: "we never should follow anything less than 1 mm"). Sizes and flap are whole millimetres; a measured air is rounded to the nearest whole millimetre before any law comparison. Exact arithmetic may be used to *measure*, never to *decide* below the ruler.
 
 There is no score, weight, blended preference, silent fallback, or “best attempt” in the production driver. When no lawful layout exists, the engine returns a typed refusal. Fixed-size/manual inspection returns measured concessions; it does not invent a product winner.
 
@@ -2772,9 +2774,9 @@ src/lib/magnetic-grid/
   compute/
     seat.ts
     centre-evidence.ts
-    exact-real.ts      # live: rational/algebraic values, comparison, quadratic roots
-    contact-root.ts    # live: exact boundary, seat/Wrap judgement, local contact roots
-    identity.ts        # live: canonical serialization and witness certification
+    exact-real.ts      # live since Wrap: rational values and comparison (measurement only)
+    contact-root.ts    # live since Wrap: belt-disc distance measurement and witnesses
+    identity.ts        # live since Wrap: canonical serialization
   logic.ts
   engine.ts
 
@@ -2808,7 +2810,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | REFERENCE-EVIDENCE only in T3; no body reuse | Re-derive the ruled ordering from Dan's directive over new exact measurements in `logic.ts`; the existing `positioning===2` ranking body is never copied or adapted |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T1/T2 preserve the sampled walk; T3 keeps it as cheap candidate discovery only and removes its authority to certify contact or publish a rung: the gate becomes exact local contact roots plus full-law validation (§7.2, §7.4), and the seat-based `below` ownership is deleted |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T3 graduates it: 2 mm steps over even sizes, every placement judged, the Wrap verdict (whole-mm air ≤ flap) as the only gate, no bisection/refinement, and the seat-based `below` ownership replaced by ownership-by-acceptance (§7.2, §7.4) |
 | `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; DELETE+REPLACE when T3 adds Wrap | T1/T2 preserve the allowance scan for equivalence only; T3 removes the scan and computes the exact worst-belt minimum directly |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2 or T3; the governor keeps selecting on its numeric inputs |
@@ -2817,7 +2819,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
 | `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
 | `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
-| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM; contour scaling ADAPT at T3 to the exact normalization rule | destination follows the import law. T3 replaces the float `actual === longestMM` branch in `scaleContour` with the single exact rule of §7.1b (normalized boundary × scale); the frozen governed Centre/evidence hashes must remain equal |
+| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM | destination follows the import law; unchanged in T3 |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
 The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.

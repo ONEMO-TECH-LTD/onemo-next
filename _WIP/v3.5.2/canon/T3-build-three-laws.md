@@ -1,7 +1,7 @@
 # Magnetic Grid v3.5.2 — portable three-rule engine and live comparison tab build contract
 
 Status: canonical v3.5.2 master contract
-Version: v3.5.2-1 — full vertical Centre-rules clone in T1; scaling simplified to discovery + exact local contact (2026-08-22)
+Version: v3.5.2-2 — full vertical Centre-rules clone in T1; scaling = even-millimetre walk on the 1 mm ruler (Dan ruling 2026-08-23)
 Source baseline: `session62-task/grid-v3.5` at `8d17780c`
 Scope: code reconstruction of the portable engine and live comparison tab only.
 
@@ -15,27 +15,29 @@ Every semantic code change is one rollback commit and compiles/runs before the n
 - Before scaling, demonstrate one flap-0 exact contact and one loose near-miss refusal in the running Law tab.
 - Keep the tab label `v3.5.2`; after Wrap runs, update only the honesty note to describe Centre + Wrap and state that scaling is not implemented yet.
 - Freeze Centre + Wrap before scaling exists.
-- **Scaling second:** implement §7.1b/§7.2/§7.4 exactly: the exact coordinate adapter consumed by fixed inspection, near-boundary seat legality, Wrap and contact construction; the frozen Centre path emitting `NumericSelection` with unchanged outputs; the existing walk adapted to cheap state discovery that observes all four placements before the winner collapse; exact normalization per §7.1b replacing the float branch in `scaleContour`; exact local contact roots over outer and holes; one full-law validation per root with a single numeric Centre re-run; next-count ownership by first acceptance; gravity after tie. Do not edit Centre or Wrap law code. Cheap discovery and exact work only at candidate roots keep each band under the live-tab budget (measured baseline: 53–86 s per band with exact Wrap per sampled millimetre is not acceptable). Delete `B5` from `BANDS` and the seat-based `below` ownership in the same increment.
-- Demonstrate B1-B4 strictly increasing counts with no cross-band repeat in the running Law tab, including the diamond's irrational rung and the squircle's count 8 in B4.
+- **Scaling second:** implement §7.2/§7.4: even sizes with `SIZE_STEP_MM = 2`; `computeGrid` evaluates and returns all four placements; `bandWalk` walks every even size and hands every `PlacementCandidate` to Logic — no bisection, refinement or contact equation; Wrap's worst air rounded to the ruler is the gate; Logic owns ownership-by-acceptance, ties and gravity. Delete `B5`, the `below` exclusion, `CONTACT_TOLERANCE_MM` and the refinement loop in the same increment. Do not edit Centre or Wrap law code. Keep each band under the live-tab budget (measure Wrap only for new candidate counts if needed).
+- Demonstrate B1-B4 strictly increasing counts with no cross-band repeat in the running Law tab, including the diamond's 1 at 34 and the squircle's count 8 in B4.
 - Keep the tab label `v3.5.2`; use the full three-law honesty note only after scaling runs.
-- Extend the existing isolated worker and tab only: store the complete accepted B1-B4 result with exact scale/witnesses, select rungs from it, display the rounded scale while retaining the exact value, render gravity-ordered co-lawful layouts and typed refusals. Fixed-size inspection reports measured concessions with no implicit winner.
+- Extend the existing isolated worker and tab only: store the complete accepted B1-B4 ladder, select rungs from it, show the even size and whole-mm flap, render gravity-ordered co-lawful layouts and typed refusals. Fixed-size inspection reports measured concessions with no implicit winner.
 - **Full-system gate third:** run Centre + Wrap + scaling together on the live Law tab. Fix only failures observed in this completed path; no speculative hardening or broad audit may precede this gate.
 - **Centre repair last and conditional:** evaluate the already-named 2mm-ruler case against the completed three-law engine. Repair only `safeSegments` or another already-named Centre defect if the measurement proves it materially changes a required law result. The repair may change only the named ruler/mesh, sliver, seat-derived-centre or tie/refusal outputs; every other frozen field stays equal. If the case does not block the completed product behavior, record that evidence and leave Centre code unchanged.
-- Stop before code if a helper has no live rung consumer, a test demands completeness over every real scale, Centre or Wrap behaviour moves, a certificate exists only for another certificate, recursion or cycle handling appears without a failing fixture, or a general algebraic geometry platform appears — algebraic materialization beyond the single candidate `ExactState` consumed immediately by `judgeState`. Fixtures 10, 12 and 17 are mandatory B1 gates; the rest of §9 stays optional.
+- Stop before code if a helper has no live rung consumer, a test demands anything finer than the 1 mm ruler, Centre or Wrap behaviour moves, recursion or bisection appears, any sub-millimetre value decides a law, or any exact-root/adapter/algebraic machinery appears. Fixtures 12 and 17 are mandatory B1 gates; the rest of §9 stays optional.
 
-Build completion: the live Law tab runs the frozen Centre baseline with Wrap and scaling; flap-0 contact and near-miss refusal work; B1-B4 return strictly increasing counts without repeats at exact solved scales; fixed inspection and rung validation share one exact geometry; Centre changes only if the final measured gate proves the named repair necessary; no unused kernel code remains. Commit this working engine. Broader fixtures, mutations and audits remain optional §9 work, except fixtures 10, 12 and 17, which are mandatory B1 gates.
+Build completion: the live Law tab runs the frozen Centre baseline with Wrap and scaling; flap-0 contact and near-miss refusal work on the ruler; B1-B4 return strictly increasing counts without repeats at even sizes; Free at a size and the rung at that size share one verdict; Centre changes only if the final measured gate proves the named repair necessary. Commit this working engine. Broader fixtures, mutations and audits remain optional §9 work, except fixtures 12 and 17, which are mandatory B1 gates.
 
 ### 10A. Support kernel — consumed, not a phase
 
-The exact-real and contact-witness kernel (`exact-real.ts`, `contact-root.ts`, `identity.ts`) is live since Wrap. Scaling adds to it only the quadratic root isolator, the exact coordinate adapter and the local contact equations, each landing in the commit that consumes it. No float, epsilon, `guardMM`, analytic shortcut or sampled size may certify contact. There is no Support B: exact Centre reconstruction, offset topology, region integrals, regime events and boundary sites are not authorized.
+The measurement kernel live since Wrap (`exact-real.ts`, `contact-root.ts`, `identity.ts`) is retained as measurement only; scaling adds nothing to it. Whether that exact layer is itself more than the 1 mm ruler needs is a separate deslop decision for Dan; it is not a T3 task. There is no Support B: exact Centre reconstruction, offset topology, regime events, contact-root solving and algebraic allowances are not authorized.
 
 ## 1. Product goal
 
 The engine is one portable three-rule driver:
 
 1. **CENTRE** — at each candidate physical scale, derive one governed centre from that scaled shape alone, before magnets exist. Place the lattice rigidly on that centre: odd line count puts a node on it; even line count puts the gap/centering line on it. The centre may change with physical scale because the safe core/masses change; it may never change because magnets landed somewhere.
-2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance. `0` means exact spot-edge tangency on the ruled source geometry; neither outline-source uncertainty nor size-walk quantum becomes hidden wrap tolerance. Auto flap returns the smallest allowance that makes the layout lawful.
-3. **MAGNET-QUANTITY SCALING** — within each band, publish each next available magnet count once, at the exact scale where that count's layout is centred and wrapped. The existing band walk discovers candidate states operationally; the rung scale is solved exactly from that layout's local contact equations and validated by the full laws at that exact scale. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. The promise is exact truth for every published rung plus measured operational discovery; it is not a proof over every real scale.
+2. **WRAP** — every perimeter-belt disc touches the outline within the configured flap allowance, measured on the 1 mm ruler: a disc's air to the outline is reported as a whole millimetre (nearest); `0` means the disc fits and its air rounds to 0 mm; `1` means up to 1 mm of air. Auto flap returns the smallest whole-millimetre allowance that makes the layout lawful.
+3. **MAGNET-QUANTITY SCALING** — shape sizes are even millimetres (24, 26, 28 …), so every centre, lattice node and Centre-mesh sample lies on whole millimetres. Within each band the engine walks every even size and publishes each next available magnet count once, at the smallest even size where that count's layout is centred and wrapped. Counts are strictly increasing (jumps larger than one are valid). A count published in a lower band never reappears above worn loose. Every candidate size is evaluated, so coverage is complete by construction.
+
+**The ruler.** No law measurement is finer than 1 mm (Dan, 2026-08-23: "we never should follow anything less than 1 mm"). Sizes and flap are whole millimetres; a measured air is rounded to the nearest whole millimetre before any law comparison. Exact arithmetic may be used to *measure*, never to *decide* below the ruler.
 
 There is no score, weight, blended preference, silent fallback, or “best attempt” in the production driver. When no lawful layout exists, the engine returns a typed refusal. Fixed-size/manual inspection returns measured concessions; it does not invent a product winner.
 
@@ -68,9 +70,9 @@ src/lib/magnetic-grid/
   compute/
     seat.ts
     centre-evidence.ts
-    exact-real.ts      # live: rational/algebraic values, comparison, quadratic roots
-    contact-root.ts    # live: exact boundary, seat/Wrap judgement, local contact roots
-    identity.ts        # live: canonical serialization and witness certification
+    exact-real.ts      # live since Wrap: rational values and comparison (measurement only)
+    contact-root.ts    # live since Wrap: belt-disc distance measurement and witnesses
+    identity.ts        # live since Wrap: canonical serialization
   logic.ts
   engine.ts
 
@@ -104,7 +106,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `grid-origin.ts parityHolds` | MOVE-VERBATIM in T1; ADAPT only during a named T3 repair | `logic.ts parityIsLawful`; preserve donor behavior until the repair step |
 | `grid-origin.ts` Centre-rules four parity placements | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2 | neutral placement measurements in compute; centre-law acceptance in logic; no ruler/Wrap/scaling change during the move |
 | `grid-origin.ts` Law ranking (`lawful → count → press → gravity`) | REFERENCE-EVIDENCE only in T3; no body reuse | Re-derive the ruled ordering from Dan's directive over new exact measurements in `logic.ts`; the existing `positioning===2` ranking body is never copied or adapted |
-| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T1/T2 preserve the sampled walk; T3 keeps it as cheap candidate discovery only and removes its authority to certify contact or publish a rung: the gate becomes exact local contact roots plus full-law validation (§7.2, §7.4), and the seat-based `below` ownership is deleted |
+| `grid-origin.ts bandWalk` gate/refinement/no-repeat | MOVE reached Centre-rules behavior through T1/T2; ADAPT at T3 scaling | T3 graduates it: 2 mm steps over even sizes, every placement judged, the Wrap verdict (whole-mm air ≤ flap) as the only gate, no bisection/refinement, and the seat-based `below` ownership replaced by ownership-by-acceptance (§7.2, §7.4) |
 | `grid-origin.ts autoFlapInBand` | MOVE reached Centre-rules behavior through T1/T2; DELETE+REPLACE when T3 adds Wrap | T1/T2 preserve the allowance scan for equivalence only; T3 removes the scan and computes the exact worst-belt minimum directly |
 | `grid-origin-logic.ts centeringAnchors` | MOVE-VERBATIM in T1; RE-ROOM without behavior change in T2; repair only named measurement defects in T3 | arithmetic owner `compute/centre-evidence.ts`; `logic.ts evaluateCentreLaw` owns the same ruled branch |
 | `grid-origin-logic.ts governMass` | MOVE-VERBATIM in T1; move the current numeric body and signature unchanged in T2 | no representation or comparison change in T2 or T3; the governor keeps selecting on its numeric inputs |
@@ -113,7 +115,7 @@ Every cloned body receives exactly one disposition while T1 is built: `MOVE-VERB
 | `solve.worker.ts` request queue/cache/band/replay/prefetch execution reachable from Centre-rules | MOVE-VERBATIM into isolated T1 `law.worker.ts` clone, then REPLACE at T4 | T4 bridge service becomes the one Law orchestration owner and final `law.worker.ts` transports only. Voting-only and `positioning===2` worker branches never enter the clone |
 | `page.tsx circle:` + `makeCircleSeatPredicate` | MOVE reached Centre-rules behavior through T1/T2 | preserve analytic-circle seating for clone/re-room equivalence; T3 may replace it only as a named boundary-law change |
 | `seatMarginMM` in page/worker/`computeGrid`/band walk | MOVE reached Centre-rules behavior through T1/T2 | preserve the worker's positioning-1 seat-inflation path; T3 may replace it only when live Centre/Wrap code supplies the replacement |
-| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM; contour scaling ADAPT at T3 to the exact normalization rule | destination follows the import law. T3 replaces the float `actual === longestMM` branch in `scaleContour` with the single exact rule of §7.1b (normalized boundary × scale); the frozen governed Centre/evidence hashes must remain equal |
+| exact segment-seat kernel, pure bbox traversal, contour scaling | MOVE-VERBATIM | destination follows the import law; unchanged in T3 |
 | `registrationScore`, `ORDERS`, weights, `centeringRef`, placement sweep, voting state | EXCLUDE from the new Law runtime | no Law destination; they belong only to the frozen comparator source |
 
 The untangle table plus T1 ADAPT-EXTRACT map is closed. No body, state owner, request/result field or dependency row may be added during T1/T2 without revising the v3.5.2 contract first.
@@ -313,12 +315,13 @@ export interface ContactWitness {
 export const GRID_PITCH_MM = 48
 export const SPOT_RADIUS_MM = 12
 export const MASS_DEPTH_MM = 16
-/** Exact band ownership is half-open: a scale s belongs to the band with minMM <= s < maxExclusiveMM (71.5 is B1; 72 is B2). */
+/** Sizes are even millimetres; a band owns its even sizes minMM..maxMM inclusive. */
+export const SIZE_STEP_MM = 2
 export const BANDS = [
-  { id: 1, minMM: 24, maxExclusiveMM: 72 },
-  { id: 2, minMM: 72, maxExclusiveMM: 120 },
-  { id: 3, minMM: 120, maxExclusiveMM: 168 },
-  { id: 4, minMM: 168, maxExclusiveMM: 216 },
+  { id: 1, minMM: 24, maxMM: 70 },
+  { id: 2, minMM: 72, maxMM: 118 },
+  { id: 3, minMM: 120, maxMM: 166 },
+  { id: 4, minMM: 168, maxMM: 214 },
 ] as const
 
 export type FixedFlap = { mode: 'fixed'; allowance: Rational }
@@ -340,31 +343,18 @@ export interface ComparisonEngineConfig extends EngineConfig { centrePolicy: Cen
 export interface EvaluationPolicy extends ComparisonEngineConfig { readonly policyIdentity: string }
 /** Neutral geometry inputs derived by engine from the config's exposed values (exact rationals); contains no policy selector. */
 export interface ComputeInputs { pitchMM: Rational; spotRadiusMM: Rational; massDepthMM: Rational }
-/** Emitted by the frozen numeric Centre path with its existing outputs; never derived from report decimals. */
-export interface NumericSelection {
-  centreBranch: { kind: 'box' } | { kind: 'weight' } | { kind: 'core'; islands: readonly { sampleCount: number; sumIx: number; sumIy: number }[] } | { kind: 'sample'; ix: number; iy: number }
-  placement: { xHalf: boolean; yHalf: boolean }           // which of the four parity placements was chosen
-  phaseCell: readonly [number, number]                   // integer quotients q of (centre − min [+pitch/2]) = q·pitch + phase, per axis
-  sourceScale: Rational                                  // the exact scale at which the selection was observed
-  latticeK: readonly (readonly [number, number])[]       // k-indices of seated nodes relative to phase
-  beltIndices: readonly number[]                         // indices into latticeK of the perimeter belt
-  count: number
+/** One evaluated placement at one even size: what the walk judges and Logic reduces. */
+export interface PlacementCandidate {
+  sizeMM: number                 // even whole millimetres
+  placement: { xHalf: boolean; yHalf: boolean }
+  seated: readonly PointMM[]
+  belt: readonly PointMM[]
+  anchors: readonly Anchor[]     // post-Coverage output population
+  magnetCount: number
+  requiredFlapMM: number         // whole-mm air of the worst belt disc (nearest mm)
+  parityTrue: boolean
+  wrap: WrapEvaluation
 }
-/** Private parametric record for one stable state: exact affine coefficients in scale s. */
-export interface ParametricSelectedState {
-  numeric: NumericSelection
-  outer: ExactRing                                       // normalized exact segments; scaled as A·s
-  holes: readonly ExactRing[]
-  centre: { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }    // c(s) = a·s + b
-  anchors: readonly { a: readonly [Rational, Rational]; b: readonly [Rational, Rational] }[]  // p_k(s) = a·s + b
-}
-/** The parametric state instantiated at one exact scale. */
-export interface ExactState { parametric: ParametricSelectedState; scale: ExactScale; contour: PreparedContour; centre: ExactPoint; phase: ExactPoint; anchors: readonly ExactPoint[]; belt: readonly ExactPoint[] }
-/** Required allowance at an algebraic rung: sqrt(u + v·s) − r with s the rung's quadratic root — the radicand is the affine reduction of the disc's squared distance in the field Q(s). */
-export interface FieldSqrtReal { kind: 'field-sqrt'; u: Rational; v: Rational; root: AlgebraicReal; subtract: Rational; isolating: readonly [Rational, Rational] }
-export type RequiredAllowance = ExactReal | FieldSqrtReal
-export interface StateJudgement { seatLegal: readonly boolean[]; requiredFlap: RequiredAllowance; witnesses: readonly ContactWitness[] }
-export interface ContactRoot { scale: ExactScale; anchorIndex: number; outlineElementId: string; projection: 'endpoint' | 'interior' }
 
 export type RefusalCode =
   | 'NO_SAFE_CORE'
@@ -382,33 +372,22 @@ export type RefusalCode =
 
 ### 6.2 `compute.ts` — one geometry surface, focused internals
 
-Every export returns a measurement or certificate; it never selects a product answer. `compute.ts` is the public barrel only. Implementation is split under `compute/`: `exact-real.ts` owns rational/algebraic values, comparison and quadratic roots; `seat.ts` owns the frozen numeric Centre ruler's seat helpers and the exact seat predicate; `centre-evidence.ts` owns the frozen 2mm `safeSegments` ruler and centre branches; `contact-root.ts` owns the exact boundary, the exact coordinate adapter, seat/Wrap judgement and local contact roots; `identity.ts` owns canonical serialization. This is a layer split inside compute, not public abstractions.
+Every export returns a measurement; it never selects a product answer. `compute.ts` is the public barrel only. Implementation stays split under `compute/`: `seat.ts` (seat legality, lattice, belt split, extreme corners, contour scaling); `centre-evidence.ts` (the frozen 2mm `safeSegments` ruler and centre branches); `contact-root.ts` (per-belt-disc distance to the complete supplied outline, outer and holes, and contact witnesses); `exact-real.ts`/`identity.ts` (the measurement arithmetic and serialization Wrap already uses). No new module.
 
-**Boundary rule.** The supplied final contour is converted to exact IEEE-754 rationals and is never retraced, decimated, rounded or reinterpreted for seat, contact, parity, Wrap or rung decisions (§7.1). The frozen Centre ruler keeps its own 2mm mesh and 800-point decimation as Centre's measurement; that mesh never judges seat, contact or a rung.
+**Boundary rule.** The supplied final contour is the judged geometry; it is never retraced, decimated or smoothed for seat or Wrap. The frozen Centre ruler keeps its own 2mm mesh as Centre's measurement.
 
-**Exact coordinate adapter (§7.1b).** The numeric Centre path selects the discrete state and emits it as `NumericSelection` — centre branch and its sample/island identities, chosen placement, lattice indices, belt membership — from values it already computes; nothing is derived from `areaMM2`, `meanMM`, `centreMainMM`, `phaseMM` or anchor decimals. Compute then builds one `ParametricSelectedState` (exact affine coefficients in scale) and instantiates it at any exact scale: contour segments `A_i·s`, centre `c(s) = a_c·s + b_c`, anchors `p_k(s) = c(s) + phase + k·pitch`. Fixed inspection and rung validation consume this same construction; there is one law geometry and no tolerance.
+**One geometry for seat and Wrap.** The near-boundary seat decision and the Wrap distance use the same predicate on the same scaled contour and anchors, so a layout cannot pass one and fail the other. The float seat predicate remains as a cheap rejection prescreen.
 
 ```ts
-export function prepareContour(input: NormalizedBoundary): PreparedContour
-/** Parametric exact record for the state the numeric Centre path selected: affine contour/centre/phase/anchor coefficients in scale. */
-export function exactSelectedState(prepared: PreparedContour, numeric: NumericSelection, inputs: ComputeInputs): ParametricSelectedState
-/** The parametric state at one exact scale (rational in fixed inspection, rational or algebraic at a rung). */
-export function instantiateState(parametric: ParametricSelectedState, scale: ExactReal): ExactState
-/** Exact seat legality of every node and exact worst-belt Wrap of the state; one function for fixed inspection and rung validation. */
-export function judgeState(state: ExactState, inputs: ComputeInputs): StateJudgement
-/** Finite local contact equations of the parametric state inside a discovery bracket: every belt disc × every supplied segment, outer and holes (endpoint and interior projection), each a quadratic in scale; returns their exact roots inside the bracket. */
-export function contactRoots(parametric: ParametricSelectedState, bracket: readonly [Rational, Rational], inputs: ComputeInputs): readonly ContactRoot[]
-/** Neutral exact ordering only; no policy, geometry lookup or acceptance semantics. */
-export function compareExact(a: ExactReal, b: ExactReal): -1 | 0 | 1
-/** Neutral post-policy serialization; called by engine assembly, never by Logic. */
-export function finalizeResultIdentity(candidate: LawfulCandidateMeasurement): string
+export function scaleContour(base: Contour, evenSizeMM: number): Contour
+export function measureCentreBranches(segments, boxCentre, weightCentre): CentreMeasurements   // unchanged
+export function measureCentrePlacements(bb, pitch, candidates, fits, outer, reach): CentrePlacementMeasurement[]   // unchanged; all four returned
+/** Worst-belt air to the outline (outer + holes) for one placement, measured exactly, reported on the 1 mm ruler. */
+export function measureWrap(prepared: PreparedContour, belt: readonly PointMM[], spotRadiusMM: number): WrapMeasurement   // unchanged
+export function roundToRulerMM(airMM: number): number     // nearest whole millimetre; the only place sub-mm becomes law
 ```
 
-**Exact judgement at an algebraic rung (one quadratic field, no platform).** At a rung scale `s` that is a root of the quadratic `P`, every affine point/segment squared distance `α·s² + β·s + γ` is reduced by `P(s) = 0` to the linear form `u + v·s`. Seat legality compares `u + v·s` with `r²`; fixed/Auto Wrap compares it with `(r + allowance)²`; the worst disc is the largest radicand — all three are signs of linear forms at `s`, decided exactly by the existing `signQuadraticAtExact`/`compareExact`. The published required allowance is `sqrt(u + v·s) − r` as `FieldSqrtReal` with rational isolating bounds refined from the root isolator; no degree-four polynomial, resultant or expression graph is formed. This lives in `exact-real.ts`/`contact-root.ts` and is consumed immediately by `judgeState`.
-
-The frozen Centre path gains only the emission of `NumericSelection` (data it already holds: mesh sample indices, island sample counts and index sums, the chosen placement, lattice k-indices, belt membership); its numeric outputs and choices are unchanged. `ExactState` carries the exact contour, centre, phase, anchors and belt; `StateJudgement` carries per-node seat legality, the exact worst-belt required allowance and its binding witnesses. The current micron seat predicate may remain only as a conservative float prescreen inside `judgeState`; every near-boundary answer comes from the exact supplied-coordinate predicate Wrap uses.
-
-For fixed-size inspection compute reports the exact worst-belt required allowance and a report-only decimal. Truth dots come only from `ContactWitness`; there is no `guardMM` parameter anywhere in the law or drawing API.
+`measureWrap` keeps its exact per-disc measurement and witnesses; `requiredFlapMM = roundToRulerMM(worst air)` is the value every law comparison uses. Truth dots come only from witnesses whose air rounds to 0.
 
 ### 6.3 `logic.ts` — the three rules
 
@@ -439,9 +418,9 @@ export function evaluateCandidateLaws(
   config: EvaluationPolicy,
 ): CandidateLawEvaluation
 
-/** Owns next-count selection, cross-band ownership, conflicts and all refusal propagation. */
+/** Owns next-count selection, cross-band ownership by acceptance, ties, gravity and all refusal propagation. */
 export function reduceBandLadders(
-  candidates: readonly CandidateLawEvaluation[],
+  candidates: readonly PlacementCandidate[],
 ): LawReduction
 ```
 
@@ -449,8 +428,8 @@ Candidate choice is deterministic law, not score. Compute supplies both neutral 
 
 1. select `seated/seatedCount` for Full or `belt/beltCount` for Perimeter; set final `coverage`, `magnetCount` and anchors from the same rooted record without mutating it;
 2. discard centre-unlawful candidates;
-3. fixed flap: refuse candidates above the allowance;
-4. Auto flap: retain only candidates at the minimum exact required allowance for that selected count, or return the typed cap refusal;
+3. fixed flap: refuse candidates whose whole-mm required flap exceeds the allowance;
+4. Auto flap: retain only candidates at the minimum whole-mm required flap for that selected count, or return the typed cap refusal;
 5. vertical orientation eliminates horizontal among otherwise-equal candidates;
 6. return every candidate still tied, sorted by neutral `measuredId` for stable serialization only.
 
@@ -564,7 +543,7 @@ resultId = sha256(canonicalJson([
 
 If a live result/cache consumer requires it, `compute/identity.ts` assigns neutral `geometryLayoutId` and `measuredId` to the complete rooted record before Logic sees it. Engine derives `policyIdentity` from the complete config through `policyIdentityOf`; callers cannot supply it. Logic uses `measuredId` for stable ordering and carries the opaque identity; it never hashes or reconstructs geometry. After Logic returns `LawReduction`, engine assembly calls neutral `finalizeResultIdentity()` and exposes `layoutId = geometryLayoutId`, `candidateId = resultId`. Thus two configured outputs with different Coverage, MagnetPlan, flap or centre policy cannot share a content-complete result id, while their neutral geometry identity remains comparable. A report-only decimal never enters identity.
 
-Each rung carries its exact solved scale, accepted layout(s) and contact witnesses. Discovery bookkeeping stays private; no sampled size, quantum or report decimal decides a rung.
+Each rung carries its even size, accepted layout(s), whole-mm required flap and contact witnesses.
 
 ### 6.5 `magnetic-grid-bridge.ts` — adapters and worker service
 
@@ -603,9 +582,9 @@ export interface SolveRequestEnvelope {
 
 The all-band response contains complete lawful layouts and their evidence; selecting a rung/layout is a pure lookup by `candidateId`, never another worker operation. Exact integer coefficients and rational terms serialize as decimal strings so structured clone and canonical JSON are byte-stable across runtimes.
 
-## 7. Exact algorithm reference — the proved bounded mechanism
+## 7. Algorithm reference — the even-millimetre walk
 
-These mechanisms were bounded-probed on `2c043257` (`_audits/T3-exact-adapter-bounded-proof.md`, 2026-08-22): reconstruction formulas for every Centre mode, the local contact root, the square-25 fixed/rung identity and the Weight-72 identical refusal. The exact normalization rule, the emitted selection identities, phase cells, holed boundaries and exact judgement at an algebraic rung are B1 obligations proved by mandatory fixtures 12 and 17, not by that probe. T3 implements the whole mechanism from the working re-roomed clone. Anything beyond them — exact Centre reconstruction, global regime/event enumeration, proof over every real scale, expression/resultant/RUR platforms, recursive stabilization — is not authorized.
+Everything below runs on code that exists at `2c043257`; T3 scaling changes ~80 lines of it. Nothing finer than the 1 mm ruler is ever decided.
 
 ### 7.1 The supplied final contour is the Law engine boundary
 
@@ -615,59 +594,34 @@ Every finite supplied coordinate is converted to its exact IEEE-754 binary ratio
 
 The admitted Law domain is exactly one primitive: line segments from the supplied contour. There is no separate analytic circle, arc or cubic path. Irrational event/contact scales still arise from segment-distance equations and are represented as real algebraic numbers: a square-free integer polynomial, a rational isolating interval containing exactly one root, and its root index. Exact comparison refines isolating intervals or uses sign determination; a displayed `number` never decides a law.
 
-### 7.1b Exact coordinate adapter — bounded, not an exact Centre engine
+### 7.1b Sizes, centre and lattice on whole millimetres
 
-The numeric Centre path stays authoritative for choosing the branch, component, governor, parity, placement, lattice indices and belt membership. After that choice, reconstruct only the chosen coordinates from their existing source identities:
+A shape size is an even whole millimetre. The centre branch (Box, Weight, Core, Deep, Top, Masses — unchanged numeric code) and the four parity placements are computed at that size exactly as today. No exact reconstruction, adapter or affine model exists: the size is the only parameter and it is an integer.
 
-- Box: rational bounding-box midpoint of the scaled supplied contour;
-- Weight: rational shoelace centroid of the supplied bytes, without forcing ideal symmetry;
-- Core: rational area-weighted mean of the already-selected 2mm mesh samples (`x0 + 2·Σix/n`);
-- Deep, Top and each governed Mass: the already-selected mesh sample coordinate `minX·s − 2 + 2·ix`;
-- phase: `(centre − min [+ pitch/2]) − q·pitch` for the chosen placement, with the integer quotient `q` per axis emitted as `phaseCell`; anchors: `min + phase + k·pitch`. The affine form holds while `phaseCell` is constant; discovery splits a bracket when a phase cell changes, exactly as for any other state change;
-- contour segments, outer and holes: the exact normalized boundary × scale. The normalized boundary is defined once from the supplied base by exact arithmetic — `(source − exact bbox min) / exact longest span` — so the longest side at scale `s` is exactly `s` and the bbox min is 0; no float `actual === longestMM` branch, rebasing or correction exists. Fixed inspection, rungs, display decimals and `displayContour` all derive from this one construction; the supplied contour identity is kept as provenance.
+### 7.2 Candidate evaluation — every even size, every placement
 
-Within one observed stable state every anchor is affine in scale, `p(s) = a·s + b`, with coefficients read from the emitted `NumericSelection`, never from report decimals. The discrete Centre decision never changes; only the chosen coordinates stop losing truth through float scaling, renormalization and lattice stepping. A nominally symmetric preset whose supplied bytes are microscopically asymmetric may correctly refuse at a requested fixed size; fixed inspection and rung validation must then return the same exact refusal and evidence.
+For each band and each even size from `minMM` to `maxMM`: run the frozen Centre path; for **each** of the four placements (`measureCentrePlacements` returns them; `chooseCentrePlacement` is the Free-display pick only) seat the lattice, apply Coverage, measure Wrap over outer and holes, round the worst air to the ruler. Every `PlacementCandidate` goes to Logic. There is no bisection, refinement, contact equation or discovery gap: every candidate size is evaluated.
 
-Bounded-probed on `2c043257` (outer rings, identities recovered by rounding, the product's float normalization branch replicated): all six Centre modes and four Masses governors reconstruct with zero error (Weight: float-centroid noise ≤ 9e-14) on squircle 72, heart 108 and squircle 120; square 25 at pitch 24 gets one exact verdict where the float path refused; Weight squircle 72 returns the identical exact refusal in both paths; the diamond's count-1 contact root is irrational and isolated below 1e-40. Everything the probe did not run is a mandatory B1 fixture.
-
-### 7.2 Candidate discovery and local contact roots
-
-A candidate's count, centre, parity class and binding element can change with scale. The engine does not enumerate those changes globally. The existing band walk steps each B1-B4 band upward through the frozen Centre path as a cheap observer. At every step it observes all four neutral parity placements from `measureCentrePlacements` before `chooseCentrePlacement` collapses them, and records every distinct state: count, selected centre identity, placement, phase cells, lattice indices and belt membership. Acceptance and ranking belong to Logic; a lower lawful count or a co-lawful placement is never lost to the walk's winner selection. For each new state and its discovery bracket, compute enumerates the finite belt-disc × supplied-segment contact equations (endpoint and interior projection, each a quadratic in scale) and solves their exact rational/quadratic roots inside the bracket and band. No sampled size, report decimal or heuristic nearest-edge cutoff decides Wrap. Coverage of discovery is measured, not proved: a denser-step comparison on square, circle, pill, tall and wide rectangles, diamond, heart, duck, bot, batwoman and one holed supplied cutout is a mandatory B1 QA gate, and a missed count is a fixture before it is a mechanism.
+Cost: Centre + seat are float; `measureWrap` runs once per placement per even size. If a band exceeds the live-tab budget on a real cutout, measure Wrap only for placements whose seat count is a new candidate count.
 
 ### 7.4 All-band solve
 
 ```ts
 function solveBands(input: SolveBandsInput): AllBandsResult {
-  const prepared = prepareContour(input.contour)
-  const inputs = computeInputsFromSpec()
-  const policy: EvaluationPolicy = { ...input.config, policyIdentity: policyIdentityOf(input.config) }
-  const verdicts: CandidateLawEvaluation[] = []
-  for (const band of BANDS) {
-    // 1. cheap discovery: the existing walk through the frozen numeric Centre path records every distinct state
-    //    (all four placements observed before the winner collapse) with its bracket
-    for (const { numeric, bracket } of discoverStates(prepared, band, policy)) {
-      const parametric = exactSelectedState(prepared, numeric, inputs)
-      // 2. construct: finite local contact roots of the parametric state inside its bracket
-      for (const root of contactRoots(parametric, bracket, inputs)) {
-        // 3. validate: numeric Centre re-run once at the root to confirm the same discrete state, then one full-law judgement
-        if (!sameSelection(reselect(prepared, root.scale, policy), numeric)) continue   // changed state → discard; no recursion
-        const state = instantiateState(parametric, root.scale)
-        verdicts.push(evaluateCandidateLaws(rootedFrom(state, judgeState(state, inputs), root), policy))
-      }
-    }
-  }
-  // 4. own: next count strictly greater than the last published, earliest accepted rung, all co-lawful placements,
-  //    cross-band duplicates suppressed, gravity applied only after centre/wrap/count/allowance tie
-  const reduced = reduceBandLadders(verdicts)
-  return assembleAllBandsResult(reduced, finalizeResultIdentity)
+  const candidates: PlacementCandidate[] = []
+  for (const band of BANDS)
+    for (let sizeMM = band.minMM; sizeMM <= band.maxMM; sizeMM += SIZE_STEP_MM)
+      candidates.push(...computeGridCandidates(scaleContour(input.base, sizeMM), input.config))   // all four placements, measured
+  const reduced = reduceBandLadders(candidates)     // Logic: lawful → group by count → earliest even size → ties → gravity → ownership
+  return assembleAllBandsResult(reduced)
 }
 ```
 
-`reduceBandLadders()` in logic considers the complete B1-B4 verdict set before assigning ownership. It owns parity/wrap enforcement, fixed/Auto-cap refusals, next-count selection (strictly greater than the last published count; larger jumps are valid), cross-band ownership by first acceptance, `RUNG_CONFLICT` and gravity. `assembleAllBandsResult()` maps already-decided candidates through neutral `finalizeResultIdentity` and attaches evidence; engine does not inspect a law flag or refusal code. Exact work happens only at candidate roots; discovery is float.
+`reduceBandLadders()` owns: centre/parity and Wrap acceptance; grouping by output count; the earliest even size per count; Auto minimum whole-mm flap with ties kept; gravity only after centre, wrap, count, size and flap tie; counts strictly increasing; a count owned by the first band that accepts it and never repeated above. Engine assembles; it inspects no law flag.
 
 ### 7.5 Auto flap
 
-Auto does not scan allowances. For each centre-lawful contact candidate it derives the exact worst-belt required allowance, compares it exactly with the cap, and retains the minimum exact value for that count. Free inspection uses the same certified worst-belt calculation. The UI may show a rounded decimal, but the returned law value and cache identity remain rational/algebraic.
+Auto does not scan allowances. For each centre-lawful candidate it takes the worst-belt air rounded to the ruler, compares it with the cap, and retains the minimum whole-mm value for that count. Free inspection uses the same measurement.
 
 ### 7.6 Manual / fixed size
 
