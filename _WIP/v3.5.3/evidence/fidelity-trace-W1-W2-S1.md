@@ -55,7 +55,11 @@ Rule: build purely by the v3.5.3 contract (`../v3.5.3-master-contract.md`, SHA 1
 - **S1-b.** The worker is handed `snapStep: SIZE_STEP_MM` so the legacy walk steps even sizes until S3; the request field is deleted in S5.
 - **S1-c.** `evenMM()` snaps pinch/slider requests with `Math.round(mm / 2) * 2` in the tab (UI convenience; the engine never sees an odd size from the tab).
 
-## Pending before S2 (parked in stash, not on the branch)
+## S2 — `65b9124f` (see `S2-ledger.md` for the clause trace)
+
+S2-a/b/c approved by QA and Meta before commit and applied as constrained. New contract-silent decisions **S2-d** (CENTRE concession = wrong parity or any whole-mm miss), **S2-e** (no seated disc → parityTrue false, centreErrorMM 0; degenerate fallback candidate at phase [0,0]) and **S2-f** (candidate sizeMM = bbox longest side, no rounding) need QA + Meta approval — full text in `S2-ledger.md`.
+
+## S2 pre-approval record (now closed)
 
 - **S2-a.** `parityTrue` must be *measured* (§5.4 "concessions measured (parityTrue, centreErrorMM)"). The deleted `logic.ts parityHolds` held the per-axis rule (odd line count → node on centre, even → gap); the contract deleted it as having no consumer. S2 needs that rule as a **compute measurement** (`seat.ts measureParity`). *This is a contract-silent re-homing of a deleted body's rule; QA + Meta must approve the rule and the home before S2 is committed.*
 - **S2-b.** `centreErrorMM` = larger axis miss from the required node/gap line, converted to whole mm with the same `floor(x + 0.5)` (§1 says concessions are whole mm; §5.2 says `measureWrap` is the only law conversion — the two clauses need one reading).
