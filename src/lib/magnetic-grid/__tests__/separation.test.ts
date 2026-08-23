@@ -225,7 +225,7 @@ describe('magnetic-grid current-phase owner DAG', () => {
     expect(logic).not.toMatch(/compareExact|approx|toFixed/i)
   })
   it('asserts the deleted rocket science is absent from the Law runtime',()=>{
-    const deleted=/^(Rational|AlgebraicReal|ExactReal|ExactScale|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour)$/
+    const deleted=/^(ExactInteger|Rational|AlgebraicReal|ExactReal|ExactScale|ExactPoint|BoundaryElement|PreparedContour|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour)$/
     for(const file of [...LAW_RUNTIME_FILES,'src/lib/magnetic-grid/compute/wrap-measurement.ts','src/lib/magnetic-grid/compute/identity.ts']){
       const text=readRepo(file)
       expect(identifiersOf(text).filter((name)=>deleted.test(name)),`${file} still carries a deleted identifier`).toEqual([])
