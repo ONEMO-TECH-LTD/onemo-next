@@ -34,9 +34,14 @@ describe('Wrap admitted product contour',()=>{
     const base=normBaseContour(getShape('square',1024,1024),1024)!,plain=makeSizer(base,0)(72),offset=makeSizer(base,1)(72)
     const all6=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all6'})
     const all8=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'all8'})
+    const corners8=computeGrid(plain,{centreMode:0,perimeterOnly:true,flapMM:0,wrapMode:'fixed',plan:'corners8'})
     expect(all6.spotRadiusMM).toBe(12)
-    expect(all6.anchors.map(anchor=>anchor.p)).toEqual(all8.anchors.map(anchor=>anchor.p))
-    expect(all6.wrap).toEqual(all8.wrap)
+    for(const grid of [all8,corners8]){
+      expect(grid.anchors.map(anchor=>anchor.p)).toEqual(all6.anchors.map(anchor=>anchor.p))
+      expect(grid.wrap).toEqual(all6.wrap)
+      expect(grid.contactsMM).toEqual(all6.contactsMM)
+    }
+    expect(corners8.anchors.map(anchor=>anchor.dia)).not.toEqual(all6.anchors.map(anchor=>anchor.dia))
     expect(contourBoundaryTruth(plain).contourIdentity).not.toBe(contourBoundaryTruth(offset).contourIdentity)
   })
 })
