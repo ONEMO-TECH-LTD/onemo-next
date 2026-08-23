@@ -98,3 +98,122 @@
 - Smallest correction: preserve both contours of the negative ribbon (or its equivalent open-stroke topology) through Vector finishing instead of routing it through the largest-loop-only subject tracer; then subtract that compound negative through the existing Paper owner. Add an interior-preservation assertion for the near-returning gesture and require the retained connected result to be the actual main remainder. Extend exact Undo/Redo proof to the default CLASSIC path.
 - Necessity: shrink the ineffective `closeFrac: 0`-only claim and the permissive node/local-diff oracle; no new geometry engine, UI, provider, GrabCut edit, or framework is justified.
 - Sufficiency: partial; ordinary boundary subtraction, one-result filtering, surviving-geometry handling, recipe/defaults, original output, and raw GrabCut pass, but near-returning ribbon topology and CLASSIC Undo exactness fail.
+
+## Superseding review — `482bac6c…` — 2026-08-11
+
+- Exact local/upstream candidate: `482bac6c6a49bcef2ea33fcd8abe34c65f14263c`; Linear is In QA review.
+- Governing visual rule: Paint erase may remove only a boundary-connected chunk from one solid blob. Internal holes, diagonal cutouts, and detached fragments are forbidden. Autotune and Mask smoothing apply to the new negative/cut boundary only; untouched main geometry remains exact. Preserve Undo/Redo, current recipes/defaults/output, and raw GrabCut.
+- Full-read all eleven changed files and the complete candidate delta. The failed Paper/vector-negative branch is deleted. `paintMask` now builds an open Autotuned swath, polishes only that negative, subtracts it from a filled zero-offset base, fills enclosed holes, and returns the prior base on an internal no-op. Paint acceptance then normalizes through the existing shape-truth owner; history captures that normalized mask before its asynchronous re-prepare.
+- Necessity checkpoint: deleting the parallel Paper subtraction owner and its tests is justified. No new framework, provider, UI, or GrabCut product edit appears.
+- Open falsification: the committed browser oracle changes Cutout offset to Paint's zero-offset recipe before capture and permits 10,000 changed pixels outside its broad edit box. This does not independently prove untouched default-CLASSIC geometry, exact locality, or the screenshot rule. QA will probe the default route directly and separately freeze holes/components, off-stroke pixels, recipe, and Undo/Redo.
+
+## Independent runtime result — `482bac6c…`
+
+- Provenance: QA production build from exact local/upstream candidate, served by this worktree on port 4017. Chromium Playwright fallback exercised the real `/cutout-lab?admin=1` route.
+- The default CLASSIC near-returning journey still changes 12,247 of 15,376 loop-interior pixels (79.6%) and visibly leaves only the car's front. The interior-loss count is identical to the rejected `d63a2a6c…` reproduction.
+- Source cause: `fillEnclosedHoles` restores only empty regions unreachable from the canvas edge. The near-returning negative is connected to the exterior, so its interior stays exterior-reachable; the later shape-truth trace then publishes the wrong surviving contour. Hole filling is not the required main-remainder/boundary-chunk rule.
+- Builder's oracle preconditions the Cutout to zero offset before erasing and permits 10,000 off-box changed pixels. It does not execute or assert the rejected default-CLASSIC near-returning case.
+- Positive gates: focused 47/47; serialized 548 pass + 10 declared skip; typecheck; scoped lint; diff check; production build; byte-exact closure `0bb0a7cc…`; Chromium/WebKit raw GrabCut, internal-no-op, output, and current route oracle pass.
+
+### Verdict on `482bac6c…`
+
+- **REVISE.** The governing screenshot case remains broken.
+- Smallest correction: keep the simpler mask-level owner, but reject/normalize any subtraction that fails to retain the intended main blob with only a local boundary carve. Add the exact default-CLASSIC near-returning gesture to the existing oracle; freeze loop-interior/main-remainder survival and exact off-boundary preservation; remove recipe preconditioning and the broad tolerance.
+- Necessity: shrink the permissive proof; no new engine, framework, UI, provider, or GrabCut edit.
+- Sufficiency: partial; internal no-op and ordinary carve pass, but the main-remainder/screenshot rule fails.
+
+## Superseding review — `95162cc8…` — 2026-08-12
+
+- Exact local/upstream candidate and live Linear authority pinned; nine changed files full-read.
+- Independent static gates pass: 36 focused tests; full 59 files / 551 pass / 10 declared skip; typecheck; scoped lint; diff check; production build; byte-exact closure `880d5a40…`.
+- Independent current-route proof on the exact production build: the rejected default-CLASSIC near-loop is an exact no-op with no history; the shallow boundary carve is visible/local; Undo backing canvas is exact; Redo Save PNG is byte-exact; raw Chromium/WebKit GrabCut remains frozen.
+- Blocking source mismatch: `paintMask` validates/drops a small detached residual in `primaryCarved`, then ignores that result and accepts the raw subtraction. The vector keeps one blob while `maskRef`, preparation, history and `exportResult` retain the hidden detached component.
+- Verdict: REVISE. Keep the current visible repair; clip the accepted source-preserving mask to the retained primary topology and prove the accepted/exported mask has one component. No new engine/UI/provider/route/GrabCut work.
+- Necessity: shrink only the mask/vector truth mismatch and missing proof. Sufficiency: partial on the one-blob portable mask contract.
+
+## Superseding review — `b2734220…` — 2026-08-12
+
+- Exact local/upstream candidate is `b2734220e08d33fc05a34a6e2325c0d52d70afe1`; Linear is In QA review.
+- Full-read the four-file delta and every changed file. The executable change is bounded to one `maskWithinTopology` helper and the `paintMask` return: the already-approved `primaryCarved` topology now gates the original accepted mask before `acceptMask` stores it. The generated closure and one focused proof are the only other changes.
+- Source trace reaches the portable result: `paintMask` returns the gated mask; `acceptMask` assigns that exact mask to `maskRef`; history clones it; `exportResult` clones and hashes the same binary plus soft bytes. Destructive split/no-op decisions remain before the gate; visible Paper subtraction is unchanged.
+- Open adversarial proof: independently verify the small detached residual is removed from binary and soft channels, surviving accepted pixels remain exact, the stored result has one component, and exact-current visible/history/GrabCut behavior remains unchanged.
+- Necessity checkpoint: no extra engine, UI, route, provider, geometry owner, or GrabCut product edit. Sufficiency remains open pending static, runtime, and visual gates.
+
+## Independent gates — `b2734220…`
+
+- Exact helper probe independently proves the retained topology removes a small detached residual from both binary and soft channels, preserves surviving binary/soft bytes exactly, and leaves one stored component. Probe: `_WIP/context/QA-space/probes/KAI-10285-mask-topology.test.ts`.
+- Focused product test: 12/12. Full serialized suite: 59 passed files + 1 skipped; 552 passed tests + 10 declared skips. Typecheck, zero-warning scoped lint, diff check and production build pass.
+- Generated closure reproduces byte-exact after the build: file SHA-256 `945716a7a1d3816e5268b3137d4f3d56867bfd3f89c5101da81cf52d6645e625`; 40 files / 350,684 source bytes.
+- All exact-current browser gates pass on port 4018: preservation, detector Chromium/WebKit, FIFO/flow, Preview/Save output Chromium/WebKit, and GrabCut/Paint Chromium/WebKit. Raw GrabCut standalone/refine-erase remains byte-exact (`25818a9a…`) in both engines.
+- Provenance: listener PID 65977 cwd is this Codex worktree; local/upstream/serving HEAD is `b2734220e08d33fc05a34a6e2325c0d52d70afe1`.
+- QA current-route visual: real `/cutout-lab?admin=1` via established Playwright Chromium fallback. Default CLASSIC accepted GrabCut plus shallow Paint erase shows one local smooth boundary notch and no fragmentation; screenshot `_WIP/context/QA-space/evidence/KAI-10285-boundary-erase-b2734220.png` SHA-256 `443040d37aaadf336618daca0723e509ba1c80c0ce0bd15425f2b427410e2e50`. Undo backing canvas is exact; Redo original-resolution Save is byte-identical (`f07385ee…`).
+- QA near-loop visual: the destructive gesture is rejected with `inside stays solid`, zero loop-interior change, disabled Undo/no history, CLASSIC retained, and no visible loss. The 455 whole-canvas sample difference is the already-observed asynchronous display-bake variance, not accepted-state mutation: source returns the cloned base before `acceptMask`, and no history is created.
+
+## Verdict — `b2734220…`
+
+- **CLEAR.** The prior hidden detached binary/soft residual is removed before the accepted mask enters preparation, history and export; the portable mask and visible one-blob shape agree.
+- Necessity: no unnecessary elements. Sufficiency: delivers the accumulated directive in full.
+- Durable verdict: `_WIP/context/QA-space/reviews/KAI-10285-b2734220-qa-clear.md`.
+
+## Superseding owner correction — monitored execution — 2026-08-12
+
+### Plan-first cadence breach
+
+- Dan required Builder and QA to agree the full execution plan before product edits resumed.
+- Builder changed product and oracle files, ran typecheck/build/runtime, and began adapting the eraser proof before presenting the corrected Paint-as-shared-`ZERO` plan for QA acceptance.
+- QA stopped Builder. The shared tree is frozen without revert or cleanup. The unapproved diff is evidence only and is not an accepted implementation.
+- Required next gate: Builder presents the current-diff inventory, governing directive set, minimal deletion/edit list, proof matrix, and explicit kill-list. QA reviews necessity and sufficiency before product work resumes.
+- Builder's first corrected plan was REVISE. Its proposed `normalizedMaskContour -> fitCubicsOpen` local replacement would create a Paint-specific vectorizer outside the shared resolver. The revised plan must splice only between baseline and candidate shapes already produced by the existing shared resolver, avoid double-applying settings, carry exact resolved state through existing history, reset source ownership explicitly on Upload/Clear, and apply full local Paint normalization rather than shave-only `healedRaw && polished`.
+
+### Non-negotiable Paint/Vector ownership
+
+- AI and GrabCut may receive the automatic Vector preset.
+- A newly created Paint shape receives the shared Vector `ZERO` preset: Detail, Offset, Simplify, Smooth, Radius = exact `0/0/0/0/0`, and the visible controls must show those true values.
+- Paint's brush geometry, loop close, Autotune, and Mask smoothing create the initial mask; that mask still enters the same shared Vector resolver used by AI and GrabCut, with `ZERO` as its active preset.
+- Any deliberate later Vector-control change, named preset, or custom setting recalculates the accepted Paint shape through that same shared resolver exactly as it does for AI/GrabCut.
+- Any implementation or proof that bypasses the shared Vector system for Paint, inherits CLASSIC, or hides Simplify 15 during fresh Paint creation is wrong.
+
+- Dan visually rejected the prior preserve-main/Paper lineage. Locked recovery: retain the `e8cf49b9…` architecture, delete the `982504db…b2734220` special eraser/vector/history path, and repair the inherited mask erase rather than wholesale-resetting later independent decisions.
+- Fresh Paint applies the real shared `ZERO` preset at exact `0/0/0/0/0`; the controls show those values and the accepted shape remains wired to the one shared Vector resolver. A deliberate later Vector/preset/custom-setting change recalculates Paint through that resolver. Paint add, erase and calibration replay retain the selected recipe; only a new base-null Paint shape resets to `ZERO`.
+- Erase starts from the exact accepted mask. It subtracts the Autotuned negative, rejects new holes/component splits/destructive loss, and splices the existing Paint smoothing result only through the actual subtraction-delta band expanded by the smoother's full influence radius. Binary and soft bytes outside that band remain exact.
+- Builder deleted the Paper subtraction, resolved-negative/finish state, mask-topology compatibility owners and erase-specific Vector path. The obsolete QA probe importing the deleted owners was retired by QA; no compatibility exports were added.
+- First current-route boundary proof failed because hard-coded gestures were internal. Builder logged the repeated harness failure. The next pixel-derived gesture also selected the global rightmost blue outline and therefore did not prove the main accepted component; Builder classified this as harness geometry and held further product edits.
+- One bounded product correction is under proof: the locally polished result is intersected with the raw carved mask so smoothing cannot heal the requested negative into a no-op. It is acceptable only with focused raw-cut-retention and exact outside-band assertions.
+- Open before handoff: target the largest connected main blue-outline component in the route oracle; pass the focused/product/static/browser gates; commit and push one superseding snapshot. QA then performs a new exact-snapshot source/runtime/visual verdict.
+
+### Corrected plan review — exact proposed solution, independently falsifiable
+
+- Builder plan at SHA-256 `7751872fbfb8ac5572faa1f644c1a15d922526e8a8632e7a98a4365b08f7217b` correctly separates Paint ownership transition from erase locality, removes the rejected parallel paths, uses shared-resolver outputs only, restores Cutout UI state through the existing transition owner, and preserves canonical pre-stroke replay truth.
+- QA did not issue blind approval. It proposed an exact implementation hypothesis for Builder to verify independently against current source and real resolver outputs.
+- Required transaction boundary: calculate candidate mask/prepared/resolved shapes, splice, topology/locality validation, and generation checks in locals; publish mask/prepared/override/settings/history only after all pass. Any failure must leave accepted state exact.
+- Required history boundary: deep-clone the resolved override into snapshots; restore prepares in locals and publishes the stored override without another resolver pass. No mutable `VShape` may be shared with live state.
+- Required first-Paint behavior: no accepted base resolves the new Paint candidate once at named ZERO; existing base plus erase resolves old and changed canonical sources once each at ZERO, then performs only the local boundary splice.
+- Builder must either source-verify these clauses or return an exact disproof/correction. The first permitted execution is the isolated generic-splice feasibility gate using real ZERO and named/CUSTOM resolver pairs. It must stop and report before any Flow/history wiring. Failure of continuity/locality is GAP, not permission for another geometry architecture.
+
+### Corrected-plan agreement — isolated seam gate authorised
+
+- Builder independently disproved six imprecise clauses; QA verified each against current source and accepted the corrections.
+- Paint add/creation may loop-close; erase always uses an open Autotuned swath plus boundary-local Mask smoothing. Topology/destruction checks validate results only.
+- First Paint ADD over an accepted base resolves the changed canonical mask once at ZERO and publishes that direct result. First ERASE resolves old and changed mask-derived prepared sources at ZERO before local splicing; a retained native detector preseg may not be compared against a rebuilt changed mask.
+- `nearestOnPath` is deterministic but approximate for cubic projection. Only the subsequent de Casteljau split is geometry-exact. The seam gate must prove coincident usable endpoints or return GAP; it may not invent a connector.
+- Current `acceptMask` is not fully atomic because prepared/native refs publish before the remaining accepted state. The final design must calculate all preparation/resolution/splice/validation locally and publish every live mutation in one no-await commit.
+- History must deep-clone every crossing `VShape`, including existing `drawn` and the new override. The cleanup is mechanism-specific, not a blind deletion by commit range.
+- QA authorised only: update the existing plan in place, then add/probe the single vector-core seam and focused real-resolver fixtures. Builder must stop after the feasibility result. Flow/history/mask-tools/oracles/closure remain frozen.
+- Necessity: no unnecessary elements in the corrected plan. Sufficiency: the full execution plan covers the directive; implementation remains contingent on the isolated feasibility result.
+
+### Isolated seam gate — claimed GAP rejected pending executable real-pair proof
+
+- Builder added only the approved vector-core seam, barrel export, focused test, plan update, and Builder error record. QA independently read all of them and reran the four focused tests plus typecheck; they pass.
+- The test named as a real Paint ZERO/TECHNO proof contains only hard-coded hashes and prior distance numbers. It never constructs the real resolved shapes or invokes the seam on them; it cannot prove infeasibility.
+- The prior Path2D measurement proves that globally re-resolving a changed mask moves geometry outside the erase band. That is the reason a local splice is needed; it does not prove whether old and changed resolved curves intersect twice inside the band.
+- The implemented seam finds where each path crosses the rectangular band boundary, then demands those independent rectangle crossings coincide. The locked design instead requires the two mutual baseline/candidate curve intersections inside the band. The current condition is stricter and can falsely return GAP.
+- QA rejected the GAP and authorised only a proof correction: deterministic mutual curve-intersection discovery inside the band, exact splits at refined parameters, and executable actual ZERO plus named/CUSTOM resolved-shape fixtures. If those actual pairs do not yield exactly two usable mutual intersections, GAP is then proven. No Flow/history/mask/oracle/closure edit is authorised.
+- The plan must also pin canonical contract SHA `c63f70e86597e7be93b6e042be4c7fa6df86356f36a9777b` plus later owner corrections.
+- Necessity: shrink the incorrect rectangle-boundary condition and assertion-only test. Sufficiency: partial until the real pairs execute through the corrected seam.
+
+### Reduced implementation monitoring — 2026-08-12
+
+- Exact current diff against `e8cf49b9…` is bounded to Flow, mask-tools, focused Paint tests, and the existing GrabCut/Paint browser oracle. The rejected splice/Paper/override/history mechanisms remain absent.
+- Focused Paint tests and typecheck pass. The first Chromium/WebKit route proof passes the accumulated recipe assertions, but its ordinary boundary-notch gesture needed deterministic targeting.
+- Builder added `foregroundTouchesCanvasEdge` plus a delta-bounds exterior-area rejection while adapting that oracle. QA froze product and found it unnecessary: the exact near-returning regression was already an exact no-op under the existing exterior/component/destructive validators; the route failure concerned finding a valid ordinary notch, not accepting the destructive gesture.
+- QA direction: delete only that unproven heuristic; retain the existing validators and near-loop regression. Run one focused/static/browser pass. Any remaining ordinary-notch targeting failure is proof-harness work only and may not produce another product rule.
