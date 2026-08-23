@@ -47,3 +47,10 @@ Not measured yet (F1): fixture 5 timing per band; live tab.
 | blob generator (96) | 29 ms | 101 ms | 234 ms | 335 ms | 672 ms | none at flap 0 |
 
 Every band is far under the 2 s gate. Product observation for F1 (law, not defect): at fixed flap 0 only shapes whose belt discs all read 0 mm air at an even size publish rungs — organic shapes mostly publish under Auto. The real-cutout timing and the live tab are measured at F1 (`shot-f1.mjs`).
+
+## Gate record
+
+- QA `/tmp/s62-grid-qa-s3s5-audit-ledger.md` (15 confirmed gaps — notably: centreErrorMM must not decide admission or gravity (S3-a replaced; parityTrue alone is the Centre law); rung selection must not re-scale the contour (worker contour cache); `autoFlapInBand` must have a live consumer (worker Auto path); concessions displayed; two-sided index clamp; biting solve-once/stored-only proofs; empty seated → `NO_WRAPPED_LAYOUT_IN_BAND` (S3-d replaced); `makeSizer` keeps holes under offset; import doors enforced (panel via bridge, worker via engine); dead `phaseStepMM` removed; whole-mm flap / even bounds at the UI boundary; MagnetPlan ladder invariance; fixture 1 across all nine policies). Meta accepted QA head `446c3b80` and all authority replacements.
+- Adopted by cherry-pick in order: `7fbc68fd` → `c2826b76`, `9dc2569e` → `229eb744`, `446c3b80` → `f0cab139` (HEAD). Gates at HEAD: tsc clean; 8 files / 50 tests pass.
+- Authority corrections applied exactly (master §5.3 identity sentence, §6 Free-size proof, fixture 2 sentence, §5.4 Engine owner rule, fixture 1 all-nine wording).
+- Dispositions: S3-a replaced (parityTrue only), S3-b/c/f/g/h/i accepted, S3-d replaced (empty seated = empty-belt class), S3-e accepted with two-sided clamp.
