@@ -121,15 +121,22 @@ describe('v3.5.3 scaling — stored rendering (fixture 6)', () => {
     expect(() => fitSizeInBand(solved, 2, 99, 0)).toThrow()
   })
 
-  it('two co-lawful placements at one rung render distinct phase and lattice', () => {
-    const solved = solveBands(square, fixed0)
-    const b2 = solved.bands[1]
-    const two = b2.rungs.find((r) => r.magnetCount === 4)!
-    expect(two.layouts).toHaveLength(1)
-    const pair = b2.rungs.find((r) => r.magnetCount === 2)!
-    const g = fitSizeInBand(solved, 2, b2.rungs.indexOf(pair), 0)
-    expect(g.anchors).toHaveLength(2)
-    expect(g.phaseMM).not.toEqual(fitSizeInBand(solved, 2, b2.rungs.indexOf(two), 0).phaseMM)
-    expect(computeGrid(square(72), 72, fixed0).wrap).toEqual(fitSizeInBand(solved, 2, b2.rungs.indexOf(two), 0).wrap)
+  it('two co-lawful placements at one rung render distinct phase and lattice, each equal to its own stored candidate', () => {
+    // measured: the square-rotated diamond publishes a B3 rung at 130 mm with count 4 and two co-lawful layouts
+    const solved = solveBands((mm) => diamond(mm / 2), fixed0)
+    const b3 = solved.bands[2]
+    const rung = b3.rungs.find((r) => r.sizeMM === 130 && r.magnetCount === 4)!
+    expect(rung).toBeDefined()
+    expect(rung.layouts).toHaveLength(2)
+    const idx = b3.rungs.indexOf(rung)
+    const a = fitSizeInBand(solved, 3, idx, 0), b = fitSizeInBand(solved, 3, idx, 1)
+    expect(a.phaseMM).not.toEqual(b.phaseMM)
+    expect(a.lattice).not.toEqual(b.lattice)
+    expect(a.phaseMM).toEqual(rung.layouts[0].candidate.phaseMM)
+    expect(a.lattice).toEqual(rung.layouts[0].candidate.lattice)
+    expect(b.phaseMM).toEqual(rung.layouts[1].candidate.phaseMM)
+    expect(b.lattice).toEqual(rung.layouts[1].candidate.lattice)
+    expect(a.anchors).toHaveLength(4)
+    expect(b.anchors).toHaveLength(4)
   })
 })
