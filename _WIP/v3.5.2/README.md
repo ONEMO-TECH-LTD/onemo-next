@@ -1,26 +1,20 @@
-# v3.5.2 documentation map
+# v3.5.2 documentation map — final state
 
 ## Canonical authority
 
-Execute in this order:
+1. [`canon/v3.5.2-master-contract.md`](./canon/v3.5.2-master-contract.md) — master v3.5.2-3 (final state), 193 lines, SHA-256 `0ba00445ca86a96ec42871da3da204990a1c17dd686c3fc06d0a83c0248c7e55`. The only contract.
+2. [`canon/T3-surgical-execution-subplan.md`](./canon/T3-surgical-execution-subplan.md) — execution sequence W1 → W2 → S1–S5 → F1 → F2, 32 lines, SHA-256 `2e1e6a1926acccd93ce42fc44ff7a9f356f79ee31917f4fc5e2c38c90cf3d58d`.
 
-1. [`canon/v3.5.2-master-contract.md`](./canon/v3.5.2-master-contract.md) — master v3.5.2-2 and highest contract authority, 853 lines, SHA-256 `aa76a353c56b0d845cc6e81714e7af53d5ff0cc28eeba6dbf0fbf956180aef47`.
-2. [`canon/T1-full-isolated-vertical-clone.md`](./canon/T1-full-isolated-vertical-clone.md) — T1 packet (regenerated from the revised master, 2026-08-22).
-3. [`canon/T2-re-room-cloned-engine.md`](./canon/T2-re-room-cloned-engine.md) — T2 packet (regenerated, 2026-08-22).
-4. [`canon/T3-build-three-laws.md`](./canon/T3-build-three-laws.md) — T3 packet regenerated from the revised master (2026-08-23), 658 lines, SHA-256 `3196b875b2e5e5e65ce8e124fc2cdac86bf4860251a559e01f59526691ab0bd9`.
-5. [`canon/T3-surgical-execution-subplan.md`](./canon/T3-surgical-execution-subplan.md) — execution authority: R0 CLEAR, G1 superseded, B1 = graduate the walk on the 1 mm ruler, SHA-256 `32212b27b7a3bc17e4295c5bb4b3ad028a450c0952c0b994a6141afe39fa1d5e`.
-6. [`canon/T4-finalize-worker-bridge-tab.md`](./canon/T4-finalize-worker-bridge-tab.md) — T4 packet (regenerated, 2026-08-22); optional later finalization, not active.
+Dan rulings encoded (2026-08-23): no law measurement finer than 1 mm; shape sizes even millimetres; reviews carry paste-ready fixes. Reading applied for the ruler: air below 0.5 mm reads 0 (master §1; one constant if Dan flips it).
 
-The rejected 611-line post-`a65added` T3 expansion is absent from the visible contract. Git history retains it as evidence only.
+## History (not authority)
 
-The superseded v3.5.1 contract is archived at [`../v3.5.1/_archive/v3.5.1-engine-rebuild-contract.md`](../v3.5.1/_archive/v3.5.1-engine-rebuild-contract.md).
-
-## Supporting evidence
-
-- [`supporting/T3-execution-matrix.md`](./supporting/T3-execution-matrix.md) — superseded 2026-08-22; historical evidence only (product `1ccba648`, pre-simplification mechanism).
-- [`supporting/T3-post-wrap-commit-audit.md`](./supporting/T3-post-wrap-commit-audit.md) — joint KEEP/REWORK/REVERT ledger.
-- [`supporting/optional-later-source-and-proof-audit.md`](./supporting/optional-later-source-and-proof-audit.md) — superseded 2026-08-22; historical evidence only.
+- `canon/_completed/` — T1 and T2 packets (completed phases), the superseded exact-scaling T3 packet and the optional T4 packet.
+- `supporting/` — execution matrix, commit audit, optional audit: all superseded evidence.
+- `_audits/` — rollback audit, contract-vs-brief audit, bounded exact-adapter proof (superseded mechanism), Centre/Wrap necessity-and-deslop audit.
+- `_proposals/` — the proposal rounds that led here.
+- `../v3.5.1/_archive/` — the original v3.5.1 contract.
 
 ## Current gate
 
-R0 is QA/Meta CLEAR. G1 is superseded. Dan ruling 2026-08-23: shape sizes are even millimetres and no law measurement is finer than 1 mm; scaling is the even-size walk (master §7). B1 (graduate the walk) is the released build scope from a fresh clean worktree at product `2c043257`; B2 remains gated on B1 QA and Meta CLEAR.
+Product base: a fresh clean worktree at `2c043257`. Next step: W1. Engineering closes on the Meta verdict of each step; Dan reviews the live tab at F1.
