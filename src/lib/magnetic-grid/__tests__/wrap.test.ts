@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { measureWrap } from '../compute/wrap-measurement'
 import { nearestOutlineMM } from '../compute/seat'
 import { evaluateWrap } from '../logic'
-import { computeGrid, fitSizeInBand } from '../engine'
+import { bandSnapPoints, computeGrid, fitSizeInBand } from '../engine'
 import type { Contour, WrapMeasurement } from '../spec'
 
 const square = (side: number): Contour => ({
@@ -124,6 +124,16 @@ describe('v3.5.3 Wrap on the 1 mm ruler', () => {
     expect(full.anchors.length).toBeGreaterThan(perimeter.anchors.length)
     expect(full.wrap).toEqual(perimeter.wrap)
     expect(full.contactsMM).toEqual(perimeter.contactsMM)
+  })
+
+  it('the interim band path publishes only evaluated even sizes', () => {
+    const sized = (mm: number): Contour => ({
+      outer: { pts: [[0, 0], [mm, 0], [mm, mm * 0.7], [0, mm * 0.7]] },
+      holes: [],
+    })
+    expect(bandSnapPoints(sized, {
+      pitchMM: 48, paddingMM: 12, flapMM: 4, centreMode: 0,
+    }, 24, 2)).toEqual([{ sizeMM: 36, count: 1 }])
   })
 
   it('the existing band caller returns the same Wrap verdict as direct fixed-size inspection', () => {

@@ -60,9 +60,6 @@ export const FLAP_MM = 0
 export const FLAP_FLOOR_MM = 0
 export const FLAP_CEIL_MM = 48
 
-/** Legacy walk refinement; deleted with bandWalk in S3. */
-export const CONTACT_TOLERANCE_MM = 0.1
-
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
 export const MASS_DEPTH_MM = 16

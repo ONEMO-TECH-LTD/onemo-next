@@ -11,7 +11,6 @@ import {
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   RELEASED_PADDING_MM,
-  CONTACT_TOLERANCE_MM,
 } from './spec'
 import {
   bbox,
@@ -167,17 +166,10 @@ function bandWalk(
     const count = grid.anchors.length
     if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
     if (count >= 1 && !seen.has(count)) {
-      // Legacy diagnostic count-transition refinement; this is not the scaling law.
-      let lo2 = Math.max(MIN_EFFECT_MM, mm - stepMM), hi2 = mm
-      for (let it = 0; it < 8 && hi2 - lo2 > CONTACT_TOLERANCE_MM / 2; it++) {
-        const midMM = (lo2 + hi2) / 2
-        const gm = computeGrid(sized(midMM), walkCfg)
-        if (gm.anchors.length >= count) hi2 = midMM; else lo2 = midMM
+      if (grid.wrap.status === 'lawful') {
+        seen.add(count)
+        points.push({ sizeMM: mm, count })
       }
-      const rungMM = hi2
-      const gr = computeGrid(sized(rungMM), walkCfg)
-      const ok = gr.anchors.length === count && gr.wrap.status === 'lawful'
-      if (ok) { seen.add(count); points.push({ sizeMM: rungMM, count }) }
     }
   }
   return { points, bestSeatedMM }
