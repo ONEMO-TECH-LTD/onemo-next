@@ -46,13 +46,6 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 4 as const, minMM: 168, maxMM: 214 }),
 ])
 
-/** Registration search phase step — how finely the lattice slides under the shape.
- *  RULED 2026-08-18: continuous 1mm registration — Dan tested the dial and locked 1mm; the
- *  per-band selection is correct for the first time with it. 12 (the cell increment) remains
- *  an admin test value, not the law. */
-export const PHASE_STEP_MM = 1
-export const PHASE_STEP_FLOOR_MM = 1
-
 /** Flap allowance — the invisible margin every disc wears (Dan's contact law): band options
  *  are the sizes where the edge presses against spot + allowance. RULED 2026-08-19: the
  *  factory default is 0 — edge-to-edge tangency; any margin is an explicit admin grant. */
@@ -141,7 +134,6 @@ export interface GridConfig {
   pitchMM?: number
   paddingMM?: number
   flapMM?: number
-  phaseStepMM?: number
   forcePhaseMM?: Pt
   massDepthMM?: number
   centreMode?: number

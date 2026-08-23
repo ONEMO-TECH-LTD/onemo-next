@@ -97,6 +97,18 @@ const importsOf = (text: string): string[] => {
   return imports
 }
 
+const namedImportsFrom = (text: string, sources: ReadonlySet<string>): string[] => {
+  const names: string[] = []
+  for (const statement of parse(text).statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+      || !sources.has(statement.moduleSpecifier.text)) continue
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    for (const element of bindings.elements) names.push(element.name.text)
+  }
+  return names
+}
+
 const identifiersOf = (text: string): string[] => {
   const identifiers: string[] = []
   walk(parse(text), (node) => { if (ts.isIdentifier(node)) identifiers.push(node.text) })
@@ -231,13 +243,53 @@ describe('magnetic-grid current-phase owner DAG', () => {
     for(const file of LAW_RUNTIME_FILES) expect(identifiersOf(readRepo(file)).filter((n)=>/^(bandWalk|bandSnapPoints|snapRange|BandSnapPoint|solveCache|schedulePrefetch)$/.test(n)),`${file} carries a deleted walk identifier`).toEqual([])
   })
 
+  it('keeps the final surface import doors and stored rung rendering mechanical', () => {
+    const panel = readRepo('src/app/(dev)/effect-creator/grid-origin/LawPanel.tsx')
+    const worker = readRepo('src/app/(dev)/effect-creator/grid-origin/law.worker.ts')
+    const engine = readRepo('src/lib/magnetic-grid/engine.ts')
+    expect(importsOf(panel).filter((source) => source.startsWith('@/lib/magnetic-grid/'))).toEqual([])
+    expect(importsOf(worker).filter((source) => source.startsWith('@/lib/magnetic-grid/')))
+      .toEqual(['@/lib/magnetic-grid/engine'])
+    expect(importsOf("import x from '@/lib/magnetic-grid/spec'").filter((source) => source.startsWith('@/lib/magnetic-grid/')))
+      .toEqual(['@/lib/magnetic-grid/spec'])
+
+    const fit = parse(engine).statements.find((statement): statement is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(statement) && statement.name?.text === 'fitSizeInBand')
+    expect(fit).toBeDefined()
+    const fitIds = identifiersOf(fit!.getText())
+    for (const forbidden of namedImportsFrom(engine, new Set(['./compute', './logic']))) {
+      expect(fitIds, `fitSizeInBand calls ${forbidden}`).not.toContain(forbidden)
+    }
+
+    expect(worker).toContain('cached.contoursBySize.get(eff)')
+    expect(worker).toContain('cached.contoursBySize.get(band.minMM)')
+    expect(worker).not.toMatch(/contour:\s*sized\(/)
+    expect(worker).toContain('Math.max(0, Math.min(rungSel')
+    expect(worker).toContain('Math.max(0, Math.min(layoutSel')
+    const idxExpression = worker.match(/const idx = (.+)/)?.[1]
+    const layoutExpression = worker.match(/const layoutIdx = (.+)/)?.[1]
+    expect(idxExpression).toBeDefined()
+    expect(layoutExpression).toBeDefined()
+    const ladder = { rungs: [{ layouts: [{}, {}] }, { layouts: [{}] }] }
+    const idx = Function('rungSel', 'ladder', `return ${idxExpression}`)(-4, ladder)
+    expect(idx).toBe(0)
+    expect(Function('layoutSel', 'ladder', 'idx', `return ${layoutExpression}`)(-3, ladder, idx)).toBe(0)
+    expect(worker).toContain('autoFlapInBand(cachedSizer, cfg, autoFlapMaxMM)')
+    expect(panel).toContain("model.grid.concessions.join(' + ')")
+    expect(panel).toContain("const [flapStored, setFlapStored] = usePersisted('flap', FLAP_MM)")
+    expect(panel).toContain('const flap = Math.round(flapStored)')
+    expect(panel).toContain('setFlapStored(Math.round(n))')
+    expect(panel.match(/setSizeMM\(evenMM\(n\)\)/g)).toHaveLength(3)
+  })
+
   it('asserts the deleted rocket science is absent from the Law runtime',()=>{
-    const deleted=/^(ExactInteger|Rational|AlgebraicReal|ExactReal|ExactScale|ExactPoint|BoundaryElement|PreparedContour|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour)$/
+    const deleted=/^(ExactInteger|Rational|AlgebraicReal|ExactReal|ExactScale|ExactPoint|BoundaryElement|PreparedContour|sqrtMinusRational|compareExactToRational|certifyContactWitness|sha256Text|exactSeatIsLegal|exactPointInMaterial|makeCircleSeatPredicate|maxPressMM|contactPointsMM|impliedFlapMM|TANGENT_GUARD_MM|parityHolds|prepareContour|PHASE_STEP_MM|PHASE_STEP_FLOOR_MM|phaseStepMM)$/
     for(const file of [...LAW_RUNTIME_FILES,'src/lib/magnetic-grid/compute/wrap-measurement.ts','src/lib/magnetic-grid/compute/identity.ts']){
       const text=readRepo(file)
       expect(identifiersOf(text).filter((name)=>deleted.test(name)),`${file} still carries a deleted identifier`).toEqual([])
       expect(importsOf(text).filter((source)=>/exact-real|contact-root/.test(source)),`${file} imports a deleted module`).toEqual([])
     }
     expect(identifiersOf('const x = exactSeatIsLegal(1)').filter((name)=>deleted.test(name))).toEqual(['exactSeatIsLegal'])
+    expect(identifiersOf('const phaseStepMM = PHASE_STEP_MM').filter((name)=>deleted.test(name))).toEqual(['phaseStepMM', 'PHASE_STEP_MM'])
   })
 })
