@@ -31,7 +31,7 @@ Rule: build purely by the v3.5.3 contract (`../v3.5.3-master-contract.md`, SHA 1
 | §3 kernel kept; `contact-root.ts` → `wrap-measurement.ts` | done |
 | §4 import law (`logic.ts` → `spec.ts` only; `identity.ts` → `spec.ts`; `wrap-measurement.ts` → `spec.ts`, `seat.ts`) | done; owner map updated |
 | §5.2 `contourIdentity` = canonical JSON of ordered coordinates; `boundaryTruth = {rule, contourIdentity}` | done |
-| §7.1 circle-preset before/after disposition fixture | `circle-disposition.test.ts`: zero differing sizes 24–214 |
+| §7.1 circle-preset before/after disposition fixture | `circle-disposition.test.ts` (QA `cff17f1c`): candidate seating differs at 24/72/120/168; selection and anchors differ at 24 (1→0), 72 (2→1), 120 (4→4 repositioned) — contract-authorised circle-only change |
 | §7.4 guard asserts every deleted identifier absent; no sub-mm comparison in Logic | `separation.test.ts` | 
 
 ### Contract-silent decisions (need QA + Meta approval)
@@ -45,7 +45,7 @@ Rule: build purely by the v3.5.3 contract (`../v3.5.3-master-contract.md`, SHA 1
 | Contract clause | Status |
 |---|---|
 | §5.1 `SIZE_STEP_MM 2`; `BANDS` 24–70/72–118/120–166/168–214 inclusive even | done |
-| §8 S1: delete B5, `CONTACT_TOLERANCE_MM`, `AUTO_FLAP_STEP_MM`, `SNAP_STEP_MM`, `seatMarginMM`, `GridConfig.circle` | all done **except `CONTACT_TOLERANCE_MM`** — still read by the legacy `bandWalk`; deleting it in S1 would mean editing the walk S3 deletes |
+| §8 S1: delete B5, `CONTACT_TOLERANCE_MM`, `AUTO_FLAP_STEP_MM`, `SNAP_STEP_MM`, `seatMarginMM`, `GridConfig.circle` | all done; `CONTACT_TOLERANCE_MM` + bisection deleted by QA remediation `e3b6bc3e` (S1-a replaced) |
 | §6 Free size any even size, slider snaps to 2 mm; no snap-step control | done |
 | §5.5 no snap-step control | done |
 
