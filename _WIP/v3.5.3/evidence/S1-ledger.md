@@ -4,13 +4,13 @@ Builder: s62-kai-lead · 2026-08-23 · branch `session62-task/grid-v3.5.3-build`
 
 ## What changed
 
-- `spec.ts` — `SIZE_STEP_MM = 2`; `BANDS` = four inclusive even bands 24–70 / 72–118 / 120–166 / 168–214 (`BandId = 1|2|3|4`); B5, `SNAP_STEP_MM`, `AUTO_FLAP_STEP_MM`, `GridConfig.seatMarginMM` deleted. `CONTACT_TOLERANCE_MM` is still declared — it is read by the legacy `bandWalk`, which S3 deletes together with it.
+- `spec.ts` — `SIZE_STEP_MM = 2`; `BANDS` = four inclusive even bands 24–70 / 72–118 / 120–166 / 168–214 (`BandId = 1|2|3|4`); B5, `SNAP_STEP_MM`, `AUTO_FLAP_STEP_MM`, `GridConfig.seatMarginMM` and `CONTACT_TOLERANCE_MM` deleted. The remediation also removes the complete fractional bisection from `bandWalk`; S3 retains only the still-live `below` ownership/reducer replacement.
 - `engine.ts`, `law.worker.ts` — every `seatMarginMM` use removed (the seat radius is the spot radius; no margin).
 - `LawPanel.tsx` — Free-size and band-scale sliders step by 2 and snap to even mm (`evenMM`); snap-step control and its persisted dial deleted; the worker is told `SIZE_STEP_MM` (the legacy walk therefore steps even sizes until S3 replaces it).
 
 ## Headless
 
-`tsc --noEmit` clean · `vitest src/lib/magnetic-grid`: 6 files, 24 tests pass · eslint: 3 pre-existing LawPanel hook errors (1 set-state-in-effect, 2 refs); no S1-new lint finding.
+`tsc --noEmit` clean · `vitest src/lib/magnetic-grid`: 6 files / 28 tests pass · `eslint src/lib/magnetic-grid`: clean. `LawPanel.tsx` is unchanged by remediation and retains its three inherited hook findings (1 set-state-in-effect, 2 refs); no S1-new lint finding.
 
 ## Live tab — :4031 serving `…/s62-grid-v353-build` (lsof cwd), commit `f0d7853a`
 
