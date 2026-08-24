@@ -1,47 +1,16 @@
 import type { NextConfig } from "next";
 
-/** Heavy trees that are never a dependency of the asset-lib file readers (see below). */
-const ASSET_LIB_TRACE_EXCLUDES = [
-  "src/components/**", "src/app/**", "public/**", "asset-library/**", "data/**",
-  "create/**", "docs/**", "certificates/**",
-  // Heavy packages a 20-line fs reader never touches. onnxruntime-node alone is 210 MB;
-  // with the icon packs and jimp they were the whole remaining 277 MB overage.
-  "node_modules/onnxruntime-node/**", "node_modules/onnxruntime-web/**",
-  "node_modules/@tabler/**", "node_modules/@solar-icons/**", "node_modules/@hugeicons/**",
-  "node_modules/@phosphor-icons/**", "node_modules/@mynaui/**", "node_modules/@jimp/**",
-  "node_modules/sharp/**", "node_modules/@img/**",
-  "node_modules/paper/**", "node_modules/opencv**/**", "node_modules/canvas/**",
-];
-
 const nextConfig: NextConfig = {
   // This repository carries required webpack aliases below, so development and production must run
   // the same bundler. Allow the loopback hostname used by local browser probes to hydrate normally.
   // LAN IPs are allowed too so mobile devices on the same Wi-Fi can hydrate the dev probes.
   allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.*", "10.*"],
   outputFileTracingRoot: process.cwd(),
-  // Vercel's deploy step rejects the agent-vendor dirs' symlinks ("is not a valid symlink") —
-  // every preview on this project failed on it. They are not runtime code; keep them out of
-  // every serverless function's traced output. The grid bench's asset-lib routes DO read
-  // _WIP/v3.5 from disk at runtime, so those routes explicitly trace their libraries in.
-  // `.next/lock` is a TRANSIENT build lock: it exists while `next build` runs and is gone by the
-  // time Vercel deploys. The tracer recorded it as a dependency of the asset-lib [file] route
-  // (whose dynamic path it cannot resolve statically, so it casts a very wide net), and the
-  // deploy step then lstat'd a file that no longer existed — "ENOENT ... /.next/lock", which
-  // failed every deployment. The build output itself is handled by the builder, never by the
-  // dependency trace, so excluding the whole directory from tracing is safe.
+  // The agent-vendor dirs carry symlinks into the brain repo; Vercel rejects broken symlinks.
+  // `.next` is build output, never a dependency — tracing it dragged in a transient `.next/lock`
+  // that no longer existed at deploy time and failed every deployment.
   outputFileTracingExcludes: {
-    "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**", ".next/**", "_prototypes/**", "studio-v2/**"],
-    // The asset-lib routes read `path.join(process.cwd(), dir, name)`. The tracer cannot resolve
-    // that at build time, so it conservatively traces the WHOLE project into the function —
-    // src/components alone is 658 MB, and the function came out at 1.14 GB against a 250 MB cap.
-    // These routes only ever read _WIP/v3.5 (kept by outputFileTracingIncludes below); nothing
-    // else in the repo is a real dependency of a 20-line file reader.
-    "/effect-creator/grid-magnet/asset-lib": ASSET_LIB_TRACE_EXCLUDES,
-    "/effect-creator/grid-magnet/asset-lib/[file]": ASSET_LIB_TRACE_EXCLUDES,
-  },
-  outputFileTracingIncludes: {
-    "/effect-creator/grid-magnet/asset-lib": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
-    "/effect-creator/grid-magnet/asset-lib/[file]": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
+    "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**", ".next/**"],
   },
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without

@@ -2,8 +2,7 @@
 # The repo tracks ~1.2 GB, which fails Vercel's deploy step (build succeeds, upload does not).
 
 # Research / scratch / archive trees
-_WIP/*
-!_WIP/v3.5
+_WIP
 _prototypes
 ?archive
 output

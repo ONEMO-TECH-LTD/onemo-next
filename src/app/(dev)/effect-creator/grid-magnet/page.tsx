@@ -16,6 +16,11 @@ import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan,
 import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
+/** Bench test libraries — static assets, listed by a committed manifest. */
+const LIB_MANIFEST = '/grid-engine/library.json'
+const LIB_RAW = '/grid-engine/asset-lib/'
+const LIB_CUT = '/grid-engine/cutouts/'
+
 const IMG = 1024
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
 const VP = 640
@@ -155,13 +160,17 @@ export default function GridLab() {
   const [cutC, setCutC] = useState<Contour | null>(null)
   const [cutStatus, setCutStatus] = useState('')
   useEffect(() => {
-    fetch('/effect-creator/grid-magnet/asset-lib?dir=raw').then((r) => r.json()).then((f) => Array.isArray(f) && setLibRaw(f)).catch(() => { })
-    fetch('/effect-creator/grid-magnet/asset-lib?dir=cut').then((r) => r.json()).then((f) => Array.isArray(f) && setLibCut(f)).catch(() => { })
+    // The bench libraries are static files under public/grid-engine, listed by a committed
+    // manifest — no server route, so they work identically on localhost and a deployment.
+    fetch(LIB_MANIFEST).then((r) => r.json()).then((m) => {
+      if (Array.isArray(m?.raw)) setLibRaw(m.raw)
+      if (Array.isArray(m?.cut)) setLibCut(m.cut)
+    }).catch(() => { })
   }, [])
   async function loadLib(name: string) {
     setSrc('magic'); setMagStatus('cutting')
     try {
-      const res = await fetch('/effect-creator/grid-magnet/asset-lib/' + encodeURIComponent(name) + '?dir=raw')
+      const res = await fetch(LIB_RAW + encodeURIComponent(name))
       if (!res.ok) throw new Error('not found')
       const blob = await res.blob()
       cutFile(new File([blob], name, { type: blob.type || 'image/png' }))
@@ -172,7 +181,7 @@ export default function GridLab() {
     setSrc('cut'); setCutStatus('tracing')
     const t0 = performance.now()
     try {
-      const res = await fetch('/effect-creator/grid-magnet/asset-lib/' + encodeURIComponent(name) + '?dir=cut')
+      const res = await fetch(LIB_CUT + encodeURIComponent(name))
       if (!res.ok) throw new Error('not found')
       const bmp = await createImageBitmap(await res.blob())
       const cnv = document.createElement('canvas')
