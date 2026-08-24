@@ -8,17 +8,29 @@ import {
   type Paths64,
 } from '@countertype/clipper2-ts'
 import { pointInPolygon } from './effect/polygon'
+import { exactPerimeterCoverage, HOLD_REACH_MM } from './effect/grid-core'
 import type { Pt } from './effect/types'
 
 export const LATTICE_PITCH_MM = 48
 export const DISK_DIAMETER_MM = 24
 export const MAX_BAG_DISKS = 1000
 
+export const BAG_BANDS = [
+  { id: 'B1', minMM: 24, maxMM: 71 },
+  { id: 'B2', minMM: 72, maxMM: 119 },
+  { id: 'B3', minMM: 120, maxMM: 167 },
+  { id: 'B4', minMM: 168, maxMM: 216 },
+] as const
+
+export type BagBandId = typeof BAG_BANDS[number]['id']
+
 const DISK_RADIUS_MM = DISK_DIAMETER_MM / 2
 const FIT_EPSILON_MM = 0.001
 const CLIPPER_SCALE = 1000
 const MAX_ROTATION_RAD = Math.PI / 4
 const ROTATION_STEP_RAD = 5 * Math.PI / 180
+const DISCOVERY_STEPS = 24
+const SAFE_REGION_CACHE = new WeakMap<ReadonlyArray<Pt>, Map<number, Paths64>>()
 
 export interface BagContact {
   disk: Pt
@@ -46,8 +58,22 @@ export interface BagFit {
   centredSizeMM: number
   centreShiftMM: number
   contacts: BagContact[]
+  peripheryGaps: Pt[]
+  uncoveredPeripheryMM: number
   option: string
   rotation: number
+}
+
+export interface BagBandResult {
+  id: BagBandId
+  minMM: number
+  maxMM: number
+  candidates: BagFit[]
+}
+
+interface BagLayout {
+  seats: Pt[]
+  label: string
 }
 
 interface GridTransform {
@@ -252,8 +278,9 @@ function fitPreparedSeats(
   localSeats: Pt[],
   option: string,
   allowRotation: boolean,
+  solver = tightFit,
 ): BagFit {
-  const fit = tightFit(prepared.outline, localSeats, allowRotation)
+  const fit = solver(prepared.outline, localSeats, allowRotation)
   const outline = scaledOutline(prepared.outline, fit.scale)
   const seats = localSeats.map((seat) => transformSeat(seat, fit.transform))
   const nearest = seats.map((disk) => {
@@ -261,6 +288,13 @@ function fitPreparedSeats(
     return { disk, outline: hit.point, clearanceMM: hit.distance - DISK_RADIUS_MM }
   })
   const minimum = Math.min(...nearest.map((contact) => Math.abs(contact.clearanceMM)))
+  const periphery = exactPerimeterCoverage(
+    { outer: { pts: outline }, holes: [] },
+    seats,
+    HOLD_REACH_MM,
+    'standard',
+    LATTICE_PITCH_MM,
+  )
   return {
     seats,
     outline,
@@ -270,9 +304,84 @@ function fitPreparedSeats(
     centredSizeMM: fit.centredScale,
     centreShiftMM: fit.centreShiftMM,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
+    peripheryGaps: periphery.gaps,
+    uncoveredPeripheryMM: periphery.uncoveredMM,
     option,
     rotation: fit.transform.rotation,
   }
+}
+
+function settleGrid(
+  outline: ReadonlyArray<Pt>,
+  localSeats: ReadonlyArray<Pt>,
+  seed: GridTransform,
+  allowRotation: boolean,
+) {
+  const transform = { ...seed }
+  for (let iteration = 0; iteration < DISCOVERY_STEPS; iteration++) {
+    let forceX = 0
+    let forceY = 0
+    let torque = 0
+    let violations = 0
+    let moment = 0
+    for (const local of localSeats) {
+      const disk = transformSeat(local, transform)
+      const hit = nearestBoundary(disk, outline)
+      const inside = pointInPolygon(disk, outline)
+      const clearance = inside ? hit.distance - DISK_RADIUS_MM : -hit.distance - DISK_RADIUS_MM
+      if (clearance >= -FIT_EPSILON_MM) continue
+      const dx = disk[0] - hit.point[0]
+      const dy = disk[1] - hit.point[1]
+      const distance = Math.hypot(dx, dy) || 1
+      const direction = inside ? 1 : -1
+      const pushX = dx / distance * -clearance * direction
+      const pushY = dy / distance * -clearance * direction
+      forceX += pushX
+      forceY += pushY
+      const armX = disk[0] - transform.x
+      const armY = disk[1] - transform.y
+      torque += armX * pushY - armY * pushX
+      moment += armX * armX + armY * armY
+      violations++
+    }
+    if (violations === 0) return transform
+    transform.x += forceX / violations * 0.72
+    transform.y += forceY / violations * 0.72
+    if (allowRotation && moment > 0) transform.rotation += torque / moment * 0.45
+  }
+  return null
+}
+
+function discoveryFit(outline: ReadonlyArray<Pt>, localSeats: ReadonlyArray<Pt>, allowRotation: boolean) {
+  let upper = DISK_DIAMETER_MM
+  let best: GridTransform = { x: 0, y: 0, rotation: 0 }
+  for (;;) {
+    const settled = settleGrid(scaledOutline(outline, upper), localSeats, best, allowRotation)
+    if (settled) {
+      best = settled
+      break
+    }
+    upper *= 1.25
+    if (upper > 100_000) throw new Error('The rigid lattice group could not fit inside the uploaded shape')
+  }
+  let lower = 0
+  for (let iteration = 0; iteration < 10; iteration++) {
+    const middle = (lower + upper) / 2
+    const settled = settleGrid(scaledOutline(outline, middle), localSeats, best, allowRotation)
+    if (settled) {
+      upper = middle
+      best = settled
+    } else {
+      lower = middle
+    }
+  }
+  const materialCentre = polygonCentroid(outline)
+  const centre = pointMean(localSeats.map((seat) => transformSeat(seat, best)))
+  const centreShiftMM = Math.hypot(
+    centre[0] - materialCentre[0] * upper,
+    centre[1] - materialCentre[1] * upper,
+  )
+  return { scale: upper, centredScale: upper, transform: best, centreShiftMM }
 }
 
 function transformSeat([x, y]: Pt, transform: GridTransform): Pt {
@@ -294,6 +403,24 @@ function clipperPath(outline: ReadonlyArray<Pt>, scale: number): Path64 {
     y: Math.round(y * scale * CLIPPER_SCALE),
   }))
   return Clipper.isPositive(path) ? path : path.reverse()
+}
+
+function safeRegions(outline: ReadonlyArray<Pt>, scale: number): Paths64 {
+  let byScale = SAFE_REGION_CACHE.get(outline)
+  if (!byScale) {
+    byScale = new Map()
+    SAFE_REGION_CACHE.set(outline, byScale)
+  }
+  const cached = byScale.get(scale)
+  if (cached) return cached
+  const safe = Clipper.inflatePaths(
+    [clipperPath(outline, scale)],
+    -DISK_RADIUS_MM * CLIPPER_SCALE,
+    JoinType.Round,
+    EndType.Polygon,
+  )
+  byScale.set(scale, safe)
+  return safe
 }
 
 function balancedFeasibleTranslation(regions: Paths64, target: Pt): Pt | null {
@@ -334,12 +461,7 @@ function feasibleTranslation(
   localSeats: ReadonlyArray<Pt>,
   rotation: number,
 ): Pt | null {
-  const safe = Clipper.inflatePaths(
-    [clipperPath(outline, scale)],
-    -DISK_RADIUS_MM * CLIPPER_SCALE,
-    JoinType.Round,
-    EndType.Polygon,
-  )
+  const safe = safeRegions(outline, scale)
   if (safe.length === 0) return null
   const cosine = Math.cos(rotation)
   const sine = Math.sin(rotation)
@@ -486,33 +608,6 @@ export function prepareBag(normalizedOutline: ReadonlyArray<Pt>): PreparedBag {
   return { outline: normalizedOutline.map((point) => [...point] as Pt) }
 }
 
-function fitBagOption(prepared: PreparedBag, count: number, optionIndex: number, allowRotation: boolean): BagFit {
-  if (!Number.isInteger(count) || count < 1 || count > MAX_BAG_DISKS) {
-    throw new Error(`Disk count must be between 1 and ${MAX_BAG_DISKS}`)
-  }
-  const localSeats = latticeSeats(count, optionIndex)
-  const fit = tightFit(prepared.outline, localSeats, allowRotation)
-  const outline = scaledOutline(prepared.outline, fit.scale)
-  const seats = localSeats.map((seat) => transformSeat(seat, fit.transform))
-  const nearest = seats.map((disk) => {
-    const hit = nearestBoundary(disk, outline)
-    return { disk, outline: hit.point, clearanceMM: hit.distance - DISK_RADIUS_MM }
-  })
-  const minimum = Math.min(...nearest.map((contact) => Math.abs(contact.clearanceMM)))
-  return {
-    seats,
-    outline,
-    centre: pointMean(seats),
-    materialCentre: polygonCentroid(outline),
-    sizeMM: fit.scale,
-    centredSizeMM: fit.centredScale,
-    centreShiftMM: fit.centreShiftMM,
-    contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
-    option: OPTION_AXES[optionIndex].label,
-    rotation: fit.transform.rotation,
-  }
-}
-
 export function fitClassifiedBag(prepared: PreparedBag, count: number, allowRotation = false): BagFit {
   if (!Number.isInteger(count) || count < 1 || count > MAX_BAG_DISKS) {
     throw new Error(`Disk count must be between 1 and ${MAX_BAG_DISKS}`)
@@ -521,7 +616,7 @@ export function fitClassifiedBag(prepared: PreparedBag, count: number, allowRota
   return fitPreparedSeats(prepared, classified.seats, classified.label, allowRotation)
 }
 
-export function fitClassifiedOptions(prepared: PreparedBag, count: number, allowRotation = false): BagFit[] {
+function classifiedLayouts(prepared: PreparedBag, count: number): BagLayout[] {
   if (!Number.isInteger(count) || count < 1 || count > MAX_BAG_DISKS) {
     throw new Error(`Disk count must be between 1 and ${MAX_BAG_DISKS}`)
   }
@@ -540,14 +635,97 @@ export function fitClassifiedOptions(prepared: PreparedBag, count: number, allow
       seen.add(identity)
       return true
     })
+}
+
+export function fitClassifiedOptions(prepared: PreparedBag, count: number, allowRotation = false): BagFit[] {
+  return classifiedLayouts(prepared, count)
     .map(({ seats, label }) => fitPreparedSeats(prepared, seats, label, allowRotation))
 }
 
 export function fitBagOptions(prepared: PreparedBag, count: number, allowRotation = false): BagFit[] {
+  return bagOptionLayouts(count)
+    .map(({ seats, label }) => fitPreparedSeats(prepared, seats, label, allowRotation))
+}
+
+function bagOptionLayouts(count: number): BagLayout[] {
+  if (!Number.isInteger(count) || count < 1 || count > MAX_BAG_DISKS) {
+    throw new Error(`Disk count must be between 1 and ${MAX_BAG_DISKS}`)
+  }
   const options = count === 1 ? [0] : OPTION_AXES.map((_, index) => index)
-  return options.map((optionIndex) => fitBagOption(prepared, count, optionIndex, allowRotation))
+  return options.map((optionIndex) => ({
+    seats: latticeSeats(count, optionIndex),
+    label: OPTION_AXES[optionIndex].label,
+  }))
 }
 
 export function fitBagCount(prepared: PreparedBag, count: number): BagFit {
   return fitBagOptions(prepared, count)[0]
+}
+
+function compareBandFits(a: BagFit, b: BagFit): number {
+  return a.uncoveredPeripheryMM - b.uncoveredPeripheryMM
+    || b.contacts.length - a.contacts.length
+    || a.centreShiftMM - b.centreShiftMM
+    || a.seats.length - b.seats.length
+    || a.sizeMM - b.sizeMM
+    || a.option.localeCompare(b.option)
+}
+
+function bandForRequiredSize(sizeMM: number) {
+  const requiredWholeMM = Math.ceil(sizeMM - FIT_EPSILON_MM)
+  return BAG_BANDS.find(({ minMM, maxMM }) => requiredWholeMM >= minMM && requiredWholeMM <= maxMM)
+}
+
+function discoveryCouldReachBand(sizeMM: number, band: typeof BAG_BANDS[number]) {
+  const requiredWholeMM = Math.ceil(sizeMM - FIT_EPSILON_MM)
+  return requiredWholeMM >= band.minMM - LATTICE_PITCH_MM
+    && requiredWholeMM <= band.maxMM + LATTICE_PITCH_MM
+}
+
+export function fitOptimalBagBands(prepared: PreparedBag, allowRotation = false): BagBandResult[] {
+  const byCount = new Map<number, Array<{ layout: BagLayout; fit: BagFit }>>()
+  const exactByLayout = new Map<string, BagFit>()
+  const discoveriesForCount = (count: number) => {
+    const cached = byCount.get(count)
+    if (cached) return cached
+    const seenLayouts = new Set<string>()
+    const layouts = [
+      ...bagOptionLayouts(count),
+      ...classifiedLayouts(prepared, count),
+    ].filter(({ seats }) => {
+      const identity = seats.map(([x, y]) => `${x},${y}`).sort().join('|')
+      if (seenLayouts.has(identity)) return false
+      seenLayouts.add(identity)
+      return true
+    })
+    const discoveries = layouts.map((layout) => ({
+      layout,
+      fit: fitPreparedSeats(prepared, layout.seats, layout.label, allowRotation, discoveryFit),
+    }))
+    byCount.set(count, discoveries)
+    return discoveries
+  }
+
+  const exactFit = (layout: BagLayout) => {
+    const identity = layout.seats.map(([x, y]) => `${x},${y}`).sort().join('|')
+    const cached = exactByLayout.get(identity)
+    if (cached) return cached
+    const fit = fitPreparedSeats(prepared, layout.seats, layout.label, allowRotation)
+    exactByLayout.set(identity, fit)
+    return fit
+  }
+
+  return BAG_BANDS.map((band) => {
+    const seatsPerAxis = Math.floor((band.maxMM - DISK_DIAMETER_MM) / LATTICE_PITCH_MM) + 1
+    const candidates: BagFit[] = []
+    for (let count = 1; count <= seatsPerAxis ** 2; count++) {
+      const atCount = discoveriesForCount(count)
+        .filter(({ fit }) => discoveryCouldReachBand(fit.sizeMM, band))
+      for (const { layout } of atCount) {
+        const fit = exactFit(layout)
+        if (bandForRequiredSize(fit.sizeMM)?.id === band.id) candidates.push(fit)
+      }
+    }
+    return { ...band, candidates: candidates.sort(compareBandFits) }
+  })
 }

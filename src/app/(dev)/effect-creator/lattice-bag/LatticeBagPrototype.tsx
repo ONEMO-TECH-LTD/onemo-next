@@ -12,9 +12,11 @@ import {
   fitClassifiedBag,
   fitClassifiedOptions,
   fitBagOptions,
+  fitOptimalBagBands,
   LATTICE_PITCH_MM,
   MAX_BAG_DISKS,
   normalizeBagOutline,
+  type BagBandResult,
   type BagFit,
   type PreparedBag,
   prepareBag,
@@ -113,15 +115,21 @@ export function LatticeBagPrototype() {
   const [fit, setFit] = useState<BagFit | null>(null)
   const [options, setOptions] = useState<BagFit[]>([])
   const [classFits, setClassFits] = useState<BagFit[]>([])
+  const [bandResults, setBandResults] = useState<BagBandResult[]>([])
   const [optionIndex, setOptionIndex] = useState(0)
   const [allowRotation, setAllowRotation] = useState(false)
   const [isFittingRotation, setIsFittingRotation] = useState(false)
-  const [mode, setMode] = useState<'auto' | 'classified'>('classified')
+  const [mode, setMode] = useState<'auto' | 'classified' | 'bands'>('classified')
   const [selectedCutout, setSelectedCutout] = useState(DEFAULT_CUTOUT_PATH)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
 
-  function fitsFor(nextPrepared: PreparedBag, count: number, rotation = allowRotation, nextMode = mode) {
+  function fitsFor(
+    nextPrepared: PreparedBag,
+    count: number,
+    rotation = allowRotation,
+    nextMode: 'auto' | 'classified' = mode === 'auto' ? 'auto' : 'classified',
+  ) {
     return nextMode === 'classified'
       ? fitClassifiedOptions(nextPrepared, count, rotation)
       : fitBagOptions(nextPrepared, count, rotation)
@@ -134,8 +142,14 @@ export function LatticeBagPrototype() {
     const nextOptions = fitsFor(nextPrepared, nextClassFits[0].seats.length)
     setClassFits(nextClassFits)
     setOptions(nextOptions)
+    const nextBands = mode === 'bands' ? fitOptimalBagBands(nextPrepared, allowRotation) : []
+    setBandResults(nextBands)
     setOptionIndex(0)
-    setFit(mode === 'classified' ? nextClassFits[0] : nextOptions[0])
+    setFit(mode === 'classified'
+      ? nextClassFits[0]
+      : mode === 'bands'
+        ? nextBands.find((band) => band.candidates.length > 0)?.candidates[0] ?? null
+        : nextOptions[0])
     setFileName(name)
   }
 
@@ -175,7 +189,7 @@ export function LatticeBagPrototype() {
   }
 
   function selectCount(count: number) {
-    if (!prepared) return
+    if (!prepared || mode === 'bands') return
     const nextOptions = fitsFor(prepared, count)
     setOptions(nextOptions)
     setOptionIndex(0)
@@ -217,18 +231,29 @@ export function LatticeBagPrototype() {
         const nextFit = fitClassifiedBag(prepared, fit.seats.length, nextRotation)
         setClassFits((current) => current.map((candidate) => candidate.seats.length === nextFit.seats.length ? nextFit : candidate))
         setFit(nextFit)
-      } else {
+      } else if (mode === 'auto') {
         const nextOptions = fitBagOptions(prepared, fit.seats.length, nextRotation)
         setOptions(nextOptions)
         setFit(nextOptions[0])
+      } else {
+        const nextBands = fitOptimalBagBands(prepared, nextRotation)
+        setBandResults(nextBands)
+        setFit(nextBands.find((band) => band.candidates.length > 0)?.candidates[0] ?? null)
       }
       setIsFittingRotation(false)
     }))
   }
 
-  function selectMode(nextMode: 'auto' | 'classified') {
+  function selectMode(nextMode: 'auto' | 'classified' | 'bands') {
     setMode(nextMode)
     if (!prepared || !fit) return
+    if (nextMode === 'bands') {
+      const nextBands = fitOptimalBagBands(prepared, allowRotation)
+      setBandResults(nextBands)
+      setOptionIndex(0)
+      setFit(nextBands.find((band) => band.candidates.length > 0)?.candidates[0] ?? null)
+      return
+    }
     const nextOptions = fitsFor(prepared, fit.seats.length, allowRotation, nextMode)
     setOptions(nextOptions)
     setOptionIndex(0)
@@ -264,11 +289,14 @@ export function LatticeBagPrototype() {
         return points
       })()
     : []
-  const navigationFits = mode === 'classified' ? classFits : options
+  const bandFits = bandResults.flatMap((band) => band.candidates.slice(0, 1))
+  const navigationFits = mode === 'classified' ? classFits : mode === 'bands' ? bandFits : options
   const navigationIndex = fit
     ? mode === 'classified'
       ? navigationFits.findIndex((candidate) => candidate.seats.length === fit.seats.length)
-      : optionIndex
+      : mode === 'bands'
+        ? navigationFits.indexOf(fit)
+        : optionIndex
     : -1
 
   useEffect(() => {
@@ -280,6 +308,7 @@ export function LatticeBagPrototype() {
       const nextOptions = fitClassifiedOptions(nextPrepared, nextClassFits[0].seats.length, false)
       setPrepared(nextPrepared)
       setClassFits(nextClassFits)
+      setBandResults([])
       setOptions(nextOptions)
       setOptionIndex(0)
       setFit(nextClassFits[0])
@@ -384,7 +413,7 @@ export function LatticeBagPrototype() {
             aria-label="Remove disk"
             title="Remove disk"
             onClick={remove}
-            disabled={!fit || fit.seats.length <= 1}
+            disabled={!fit || mode === 'bands' || fit.seats.length <= 1}
           >
             <Minus aria-hidden size={20} weight="bold" />
           </button>
@@ -393,7 +422,7 @@ export function LatticeBagPrototype() {
             aria-label="Add disk"
             title="Add disk"
             onClick={add}
-            disabled={!fit || fit.seats.length >= MAX_BAG_DISKS}
+            disabled={!fit || mode === 'bands' || fit.seats.length >= MAX_BAG_DISKS}
           >
             <Plus aria-hidden size={20} weight="bold" />
           </button>
@@ -404,6 +433,7 @@ export function LatticeBagPrototype() {
             <div className={styles.modes} aria-label="Layout solver mode">
               <button aria-pressed={mode === 'classified'} onClick={() => selectMode('classified')}>Class</button>
               <button aria-pressed={mode === 'auto'} onClick={() => selectMode('auto')}>Auto</button>
+              <button aria-pressed={mode === 'bands'} onClick={() => selectMode('bands')}>Bands</button>
             </div>
             {mode === 'auto' && (
               <button
@@ -416,18 +446,32 @@ export function LatticeBagPrototype() {
               </button>
             )}
             <div className={styles.optionTabs} aria-live="polite">
-              {navigationFits.map((candidate, index) => (
+              {(mode === 'bands' ? bandResults : navigationFits).map((entry, index) => {
+                const candidate = mode === 'bands' ? (entry as BagBandResult).candidates[0] : entry as BagFit
+                const band = mode === 'bands' ? entry as BagBandResult : null
+                return (
                 <button
                   className={styles.layoutTab}
-                  key={`${candidate.option}-${index}`}
+                  key={band?.id ?? `${candidate.option}-${index}`}
                   ref={(node) => { tabRefs.current[index] = node }}
-                  aria-pressed={index === navigationIndex}
-                  onClick={() => mode === 'classified' ? selectClassFit(index) : selectOption(index)}
+                  aria-pressed={candidate === fit}
+                  disabled={!candidate}
+                  onClick={() => {
+                    if (!candidate) return
+                    if (mode === 'classified') selectClassFit(index)
+                    else if (mode === 'bands') setFit(candidate)
+                    else selectOption(index)
+                  }}
                 >
-                  <strong>{mode === 'classified' ? `${candidate.seats.length} disks` : candidate.option}</strong>
-                  <span>{bandForSize(candidate.sizeMM)} · {candidate.sizeMM.toFixed(1)} mm</span>
+                  <strong>{band
+                    ? `${band.id} · ${candidate ? `${candidate.seats.length} disks` : 'No fit'}`
+                    : mode === 'classified' ? `${candidate.seats.length} disks` : candidate.option}</strong>
+                  <span>{candidate
+                    ? `${bandForSize(candidate.sizeMM)} · ${candidate.sizeMM.toFixed(1)} mm`
+                    : `${band?.minMM}–${band?.maxMM} mm`}</span>
                 </button>
-              ))}
+                )
+              })}
             </div>
             {mode === 'auto' && (
               <button
@@ -452,7 +496,7 @@ export function LatticeBagPrototype() {
           </nav>
         )}
         <div className={styles.status} aria-live="polite">
-          {error || (fit ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · tangent at ${fit.contacts.length} edge point${fit.contacts.length === 1 ? '' : 's'}` : 'No shape loaded')}
+          {error || (fit ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · ${fit.uncoveredPeripheryMM.toFixed(1)} mm unsupported · tangent at ${fit.contacts.length} edge point${fit.contacts.length === 1 ? '' : 's'}` : 'No shape loaded')}
         </div>
       </section>
     </main>

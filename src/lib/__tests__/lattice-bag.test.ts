@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BAG_BANDS,
   DISK_DIAMETER_MM,
   classifyBag,
   fitClassifiedBag,
   fitClassifiedOptions,
   fitBagCount,
   fitBagOptions,
+  fitOptimalBagBands,
   LATTICE_PITCH_MM,
   MAX_BAG_DISKS,
   normalizeBagOutline,
@@ -137,5 +139,37 @@ describe('lattice bag prototype', () => {
     expect(portraitOptions[0].option).toBe('Portrait rectangle · 2×3')
     expect(portraitOptions.length).toBeGreaterThan(1)
     expect(new Set(portraitOptions.map((option) => option.option)).size).toBe(portraitOptions.length)
+  })
+
+  it('keeps bands as size ranges and lets wrap fit select their disk counts', () => {
+    expect(BAG_BANDS).toEqual([
+      { id: 'B1', minMM: 24, maxMM: 71 },
+      { id: 'B2', minMM: 72, maxMM: 119 },
+      { id: 'B3', minMM: 120, maxMM: 167 },
+      { id: 'B4', minMM: 168, maxMM: 216 },
+    ])
+
+    const bands = fitOptimalBagBands(prepared)
+    expect(bands.map(({ candidates }) => candidates[0]?.seats.length)).toEqual([1, 2, 4, 6])
+    for (const band of bands) {
+      expect(band.candidates.length).toBeGreaterThan(0)
+      const best = band.candidates[0]
+      const requiredWholeMM = Math.ceil(best.sizeMM - 0.001)
+      expect(requiredWholeMM).toBeGreaterThanOrEqual(band.minMM)
+      expect(requiredWholeMM).toBeLessThanOrEqual(band.maxMM)
+      expect(best.uncoveredPeripheryMM).toBeCloseTo(
+        Math.min(...band.candidates.map((candidate) => candidate.uncoveredPeripheryMM)),
+        8,
+      )
+      expect(best.peripheryGaps.length).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('uses additional disks only when they improve the wrap inside the same range', () => {
+    const square = prepareBag(normalizeBagOutline([[-60, -60], [60, -60], [60, 60], [-60, 60]]))
+    const bands = fitOptimalBagBands(square)
+    expect(bands.map(({ candidates }) => candidates[0]?.seats.length)).toEqual([1, 4, 9, 16])
+    expect(bands.every(({ candidates }) => candidates[0].uncoveredPeripheryMM < 1e-7)).toBe(true)
+    expect(bands[1].candidates[0].seats.length).toBe(4)
   })
 })
