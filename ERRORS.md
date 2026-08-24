@@ -216,3 +216,16 @@
   restore the 10-second acceptance threshold, then rerun the final oracle on an idle server.
 - Remember: a transient timing failure must not be hidden by permanently weakening the shipped gate;
   separate golden collection from the final performance verdict.
+
+## 2026-08-24 — v3.5.5 Task 1 candidate population missed the B4 budget
+
+- Failed: repeated local mechanical optimisation tried to make the ruled B4 neutral population fit a
+  two-second band budget without changing its semantics. Direct centred construction reduced the first
+  full B4 measurement from 3.400s to 2.719s, but dense lazy seat storage and one-pass group construction
+  only reduced the final count-only run to 2.682s.
+- Worked: all 826,603 candidates and all five sorted semantic identity-set hashes stayed exact; the
+  instrumentation was corrected so identity retention, JSON serialization and hashing were outside the
+  band timer.
+- Remember: resolve candidate-population cardinality before further micro-optimisation. When the count-only
+  path remains over budget after local allocation and lookup costs are removed, do not add caches, caps or
+  approximate geometry; stop for an explicit product/search-scope decision before the next law is added.
