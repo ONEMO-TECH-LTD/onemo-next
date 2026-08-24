@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+/** Heavy trees that are never a dependency of the asset-lib file readers (see below). */
+const ASSET_LIB_TRACE_EXCLUDES = [
+  "src/components/**", "src/app/**", "public/**", "asset-library/**", "data/**",
+  "create/**", "docs/**", "certificates/**",
+];
+
 const nextConfig: NextConfig = {
   // This repository carries required webpack aliases below, so development and production must run
   // the same bundler. Allow the loopback hostname used by local browser probes to hydrate normally.
@@ -18,6 +24,13 @@ const nextConfig: NextConfig = {
   // dependency trace, so excluding the whole directory from tracing is safe.
   outputFileTracingExcludes: {
     "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**", ".next/**", "_prototypes/**", "studio-v2/**"],
+    // The asset-lib routes read `path.join(process.cwd(), dir, name)`. The tracer cannot resolve
+    // that at build time, so it conservatively traces the WHOLE project into the function —
+    // src/components alone is 658 MB, and the function came out at 1.14 GB against a 250 MB cap.
+    // These routes only ever read _WIP/v3.5 (kept by outputFileTracingIncludes below); nothing
+    // else in the repo is a real dependency of a 20-line file reader.
+    "/effect-creator/grid-magnet/asset-lib": ASSET_LIB_TRACE_EXCLUDES,
+    "/effect-creator/grid-magnet/asset-lib/[file]": ASSET_LIB_TRACE_EXCLUDES,
   },
   outputFileTracingIncludes: {
     "/effect-creator/grid-magnet/asset-lib": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
