@@ -22,7 +22,8 @@ import type { Contour, Pt } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import type { GridResult } from './grid-magnet'
 import { centroidOf, safeSegments, spotRadiusOf } from './grid-magnet-compute'
-import { centeringAnchors, governMass, type CentreMode, type Governor } from './grid-magnet-logic'
+import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from './offset'
+import { applyCoverage, centeringAnchors, governMass, type CentreMode, type Governor } from './grid-magnet-logic'
 import type { SafeSegment } from './grid-magnet-compute'
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -38,6 +39,13 @@ export interface WrapConfig {
   centreMode?: number
   governor?: number
   massDepthMM?: number
+  /** Perimeter belt — drop fully-surrounded interior seats, keeping the rim. Reused from the
+   *  voting bench. Applied to the ARRANGEMENT before the wrap is solved, so the shape still
+   *  wraps tight around exactly the magnets that remain. */
+  perimeterOnly?: boolean
+  // NO flap dial. In this engine it would be `radius = padding + flap` — one number behind two
+  // controls — and it would also shrink the legal seating area, which is exactly the job T1 says
+  // an allowance must never do. The padding IS the reach here.
 }
 
 export interface WrapAt {
@@ -83,11 +91,20 @@ function nearestDist(o: ReadonlyArray<Pt>, px: number, py: number): number {
   return Math.sqrt(bd)
 }
 
-/** Where a magnet centre may sit: the outline deflated by the disc radius. */
+/**
+ * Where a magnet centre may sit: the outline deflated by the disc radius.
+ *
+ * Deflated by radius + the arc tolerance, deliberately. A round offset is drawn as line segments
+ * that may bulge OUTWARD of the true curve by up to that tolerance, and outward here means a
+ * magnet allowed to sit nearer the edge than the padding permits — measured at 11.95mm against a
+ * 12mm law before this was added. Paying the tolerance on the deflation puts the whole error on
+ * the safe side: never closer than the padding, at most a hair further.
+ */
 function seatRegion(outer: ReadonlyArray<Pt>, radiusMM: number): Paths64 | null {
   const flat: number[] = []
   for (const [x, y] of outer) flat.push(Math.round(x * S), Math.round(y * S))
-  const region = Clipper.inflatePaths([Clipper.makePath(flat)], -radiusMM * S, JoinType.Round, EndType.Polygon, 2, 0.05 * S)
+  const tol = MANUFACTURING_OFFSET_ARC_TOLERANCE_MM
+  const region = Clipper.inflatePaths([Clipper.makePath(flat)], -(radiusMM + tol) * S, JoinType.Round, EndType.Polygon, 2, tol * S)
   return region && region.length ? region : null
 }
 
@@ -194,7 +211,10 @@ export function wrap(
         if (Math.abs(da - db) > 1e-9) return da - db
         return axis === 0 ? a[0] - b[0] || a[1] - b[1] : a[1] - b[1] || a[0] - b[0]
       })
-      groups.push(sorted.slice(0, want))
+      const picked = sorted.slice(0, want)
+      // The belt thins the arrangement BEFORE the size is solved — wrapping around magnets that
+      // were then thrown away would leave the shape loose around the ones that stayed.
+      groups.push(cfg.perimeterOnly ? applyCoverage(picked, true, pitch).seated : picked)
     }
   }
 

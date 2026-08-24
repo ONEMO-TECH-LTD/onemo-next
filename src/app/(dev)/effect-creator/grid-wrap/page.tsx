@@ -74,12 +74,18 @@ export default function GridWrapLab() {
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   /** Governor — which mass rules in Masses mode. */
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
-  const [offsetMM, setOffsetMM] = useState(0)
+  /** The traced outline is the shape — nothing grows or shrinks it before the engine sees it. */
+  const offsetMM = 0
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
   /** Faint bounding box with per-side dimensions. */
   const [showBox, setShowBox] = useState(true)
+  /** Padding is product law at 12mm. The lock is what makes that visible: open it deliberately
+   *  to test another value, and closing it returns the released number. */
+  const [padLock, setPadLock] = usePersisted('padLock', 1)
+  /** Perimeter belt — of the seats asked for, only the rim carries a magnet. */
+  const [coverage, setCoverage] = useState<'full' | 'perimeter'>('full')
   /** The material no magnet holds — drawn as hatched patches. */
   const [showPatches, setShowPatches] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
@@ -93,12 +99,12 @@ export default function GridWrapLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-wrap.defaults', JSON.stringify({ pad, massDepth, centreMode, governor })) } catch { }
+    try { localStorage.setItem('grid-wrap.defaults', JSON.stringify({ pad, padLock, massDepth, centreMode, governor })) } catch { }
   }
   const resetDefaults = () => {
-    let d = { pad: RELEASED_PADDING_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR }
+    let d = { pad: RELEASED_PADDING_MM, padLock: 1, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR }
     try { const raw = localStorage.getItem('grid-wrap.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor)
+    setPad(d.pad); setPadLock(d.padLock); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -248,6 +254,7 @@ export default function GridWrapLab() {
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
     const cfg = {
       pitchMM: pitch, paddingMM: pad, massDepthMM: massDepth, centreMode, governor, plan,
+      perimeterOnly: coverage === 'perimeter',
       circle: src === 'preset' && preset === 'circle' && offsetMM === 0,
     }
     const id = ++seqRef.current
@@ -257,7 +264,7 @@ export default function GridWrapLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, plan, count, offsetMM])
+  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, plan, coverage, count, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -360,7 +367,7 @@ export default function GridWrapLab() {
             <Stepper label="Magnets · the shape wraps around them" v={count} set={(n) => setCount(Math.max(1, n))} />
             <div className="gl-snap">
               {model
-                ? `${model.grid.anchors.length}⌾ · ${Math.round(model.effSize)} mm · `
+                ? `${model.grid.anchors.length}⌾${model.grid.anchors.length !== count ? ` of ${count} asked · belt` : ''} · ${Math.round(model.effSize)} mm · `
                   + (model.gapMM == null ? '—' : model.gapMM <= 0.6 ? 'PRESSED · 0 gap' : `NOT TOUCHING · ${model.gapMM.toFixed(1)} mm short`)
                   + ` · off-centre ${model.centreOffMM} mm`
                   + ` · ${model.unheldPct.toFixed(1)}% unheld (${Math.round(model.unheldMM2)} mm²)`
@@ -373,8 +380,15 @@ export default function GridWrapLab() {
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
             </div>
-            <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
-            <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
+            <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
+              min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
+              released={RELEASED_PADDING_MM} />
+            <div className="gl-field"><span>Coverage</span>
+              <div className="gl-seg">
+                {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
+                  <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
+              </div>
+            </div>
             <div className="gl-field"><span>Magnet plan</span>
               <div className="gl-seg">
                 {([['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
@@ -656,6 +670,29 @@ function Stepper({ label, v, set }: { label: string; v: number; set: (n: number)
   )
 }
 /** One lab control with its own enable — off drops the control's field, spec default rules. */
+/** A locked product value: typed, never dragged. Closing the lock restores the released number,
+ *  so an experiment can never be left behind by accident. */
+function LockNum({ label, unit, v, set, min, max, locked, setLocked, released }: {
+  label: string; unit?: string; v: number; set: (n: number) => void
+  min: number; max: number; locked: number; setLocked: (n: number) => void; released: number
+}) {
+  return (
+    <div className="gl-field"><span>{label}{locked ? ' · locked' : ' · unlocked for testing'}</span>
+      <div className="gl-limits">
+        <button className="gl-lock" aria-pressed={locked !== 0} title={locked ? 'locked to the released value' : 'unlocked — typed values allowed'}
+          onClick={() => { const next = locked ? 0 : 1; setLocked(next); if (next) set(released) }}>
+          {locked ? '🔒' : '🔓'}
+        </button>
+        <span className="gl-num"><i>{unit ?? ''}</i>
+          <input key={String(locked) + v} type="number" defaultValue={v} disabled={locked !== 0}
+            onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n >= min && n <= max) set(n); else e.currentTarget.value = String(v) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function Sec({ ms }: { ms?: number }) {
   if (ms == null) return <b>—</b>
   return <b className={ms > 2000 ? 'gl-slow' : ''}>{(ms * 0.001).toFixed(2)}s</b>
@@ -738,7 +775,10 @@ const CSS = `
 .gl-num-wide input{width:84px}
 .gl-num input:focus{outline:none;border-color:var(--accent)}
 .gl-num i{font:600 11px var(--mono);font-style:normal;color:var(--ink-3)}
-.gl-limits{display:flex;gap:6px}
+.gl-limits{display:flex;gap:6px;align-items:center}
+.gl-lock{width:30px;height:26px;display:grid;place-items:center;font-size:13px;line-height:1;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.gl-lock[aria-pressed="true"]{border-color:var(--accent)}
+.gl-num input:disabled{opacity:.55;cursor:not-allowed}
 .gl-limits select{flex:1;min-width:0}
 .gl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;background:var(--line);outline:none}
 .gl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px #0003;cursor:pointer}
