@@ -23,8 +23,8 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { CENTRE_MODE, GOVERNOR, MIN_EFFECT_MM, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
+import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -95,6 +95,12 @@ export default function GridWrapLab() {
 
   /** THE control: how many magnets the shape must hold. Everything else is derived. */
   const [count, setCount] = useState(2)
+  /** MANUAL OVERRIDE. Either of these being set switches the wrap solver OFF: the size and the
+   *  grid registration are Dan's, and the engine only seats the lattice and measures what is
+   *  held. Double-clicking the canvas clears both and the solver takes over again. */
+  const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
+  const [manualSizeMM, setManualSizeMM] = useState<number | null>(null)
+  const manualOn = manual !== null || manualSizeMM !== null
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
@@ -258,13 +264,18 @@ export default function GridWrapLab() {
       circle: src === 'preset' && preset === 'circle' && offsetMM === 0,
     }
     const id = ++seqRef.current
-    const msg = { id, base, offsetMM, cfg, count }
+    const msg = {
+      id, base, offsetMM, cfg, count,
+      // Manual: the solver is skipped entirely. Size and phase come from the gestures.
+      manualPhaseMM: manual ? [manual.x, manual.y] as Pt : null,
+      manualSizeMM: manualOn ? (manualSizeMM ?? effSizeRef.current ?? 120) : null,
+    }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, plan, coverage, count, offsetMM])
+  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, plan, coverage, count, offsetMM, manual, manualSizeMM, manualOn])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -291,7 +302,17 @@ export default function GridWrapLab() {
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
-              patches={showPatches ? model.patches : []} />
+              patches={showPatches ? model.patches : []}
+              onPan={(dx, dy) => setManual((m) => {
+                const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]
+                if (manualSizeMM === null) setManualSizeMM(model.effSize)
+                return { x: bx + dx, y: by + dy }
+              })}
+              onZoom={(f) => setManualSizeMM((sz) => {
+                const from = sz ?? model.effSize
+                return Math.min(sizeRange(pad).maxMM, Math.max(MIN_EFFECT_MM, from * f))
+              })}
+              onReset={() => { setManual(null); setManualSizeMM(null) }} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
                   : src === 'cut'
@@ -366,14 +387,19 @@ export default function GridWrapLab() {
           <Fold title="Grid settings">
             <Stepper label="Magnets · the shape wraps around them" v={count} set={(n) => setCount(Math.max(1, n))} />
             <div className="gl-snap">
+              {manualOn && <><b>MANUAL · wrap solver off</b> — double-click the canvas to hand it back<br /></>}
               {model
-                ? `${model.grid.anchors.length}⌾${model.grid.anchors.length !== count ? ` of ${count} asked · belt` : ''} · ${Math.round(model.effSize)} mm · `
-                  + (model.gapMM == null ? '—' : model.gapMM <= 0.6 ? 'PRESSED · 0 gap' : `NOT TOUCHING · ${model.gapMM.toFixed(1)} mm short`)
-                  + ` · off-centre ${model.centreOffMM} mm`
+                ? `${model.grid.anchors.length}⌾${!manualOn && model.grid.anchors.length !== count ? ` of ${count} asked · belt` : ''} · ${Math.round(model.effSize)} mm · `
+                  + (manualOn ? 'seated where you put the grid'
+                    : model.gapMM == null ? '—' : model.gapMM <= 0.6 ? 'PRESSED · 0 gap' : `NOT TOUCHING · ${model.gapMM.toFixed(1)} mm short`)
+                  + (manualOn ? '' : ` · off-centre ${model.centreOffMM} mm`)
                   + ` · ${model.unheldPct.toFixed(1)}% unheld (${Math.round(model.unheldMM2)} mm²)`
                   + (model.patches.length ? ` in ${model.patches.length} patch${model.patches.length > 1 ? 'es' : ''}` : '')
                 : '—'}
             </div>
+            {manualOn && <Slider label="Manual size · solver off" unit="mm"
+              v={Math.round(manualSizeMM ?? 0)} set={(n) => setManualSizeMM(n)}
+              min={MIN_EFFECT_MM} max={Math.round(sizeRange(pad).maxMM)} />}
             <div className="gl-field"><span>Grid pitch · released tiers</span>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
@@ -467,10 +493,12 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, patches }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, patches, onPan, onZoom, onReset }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
   /** The material no magnet holds — measured by the engine, drawn, never inferred here. */
   patches: { areaMM2: number; centreMM: Pt; rings: Pt[][] }[]
+  /** Manual override: drag pans the grid, pinch scales the shape, double-click hands it back. */
+  onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -479,9 +507,58 @@ function Stage({ contour, grid, lattice, box, segments, segFill, patches }: {
   const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
   const fy = (p: Pt): Pt => [p[0], -p[1]]
 
-  // NO manual gestures here: the size is an OUTPUT of the magnet count, so there is nothing
-  // to drag or pinch. The count stepper is the only control that moves this picture.
-  const pend = { x: 0, y: 0 }
+  // MANUAL OVERRIDE — drag pans the GRID under the shape (mm, engine y-up), pinch scales the
+  // shape, double-click hands it back to the engine. While manual is engaged the WRAP SOLVER IS
+  // OFF: the size and the registration are yours, and the engine only seats and measures.
+  // MANUAL MEANS NO COMPUTE (Dan's rule): while a gesture is live the grid layers shift as a
+  // pure visual transform; ONE solve commits when the gesture ends.
+  // px→mm uses the RENDERED size, so gestures stay true when the canvas shrinks on a phone.
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragAt = useRef<{ x: number; y: number } | null>(null)
+  // Touch pinch: wheel+ctrlKey is the TRACKPAD pinch convention and iOS never sends it, so a
+  // phone needs the two-pointer distance itself. Every live pointer is tracked; with two down
+  // the frame-to-frame distance ratio drives the same onZoom the trackpad uses.
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinchDist = useRef(0)
+  const [pend, setPend] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const pendRef = useRef(pend)
+  pendRef.current = pend
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const commit = () => {
+    const p = pendRef.current
+    if (p.x || p.y) onPan(p.x, p.y)
+    setPend({ x: 0, y: 0 })
+  }
+  const pxPerMM = (el: Element) => el.getBoundingClientRect().width / (VP / S)
+  useEffect(() => {
+    // Listen on the viewport wrapper, not the svg — the solving overlay sits above the svg
+    // and would otherwise swallow wheel events mid-gesture.
+    const svg = svgRef.current
+    const el = svg?.parentElement
+    if (!svg || !el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const k = pxPerMM(svg)
+      if (e.ctrlKey) { onZoom(Math.exp(-e.deltaY * 0.01)); return }
+      setPend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
+      if (wheelTimer.current) clearTimeout(wheelTimer.current)
+      wheelTimer.current = setTimeout(commit, 250)
+    }
+    // iOS Safari also raises its own gesture events for a two-finger pinch and would zoom the
+    // PAGE. Refusing them leaves the pointer handlers to scale the effect instead.
+    const stop = (e: Event) => e.preventDefault()
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('gesturestart', stop, { passive: false })
+    el.addEventListener('gesturechange', stop, { passive: false })
+    el.addEventListener('gestureend', stop, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', stop)
+      el.removeEventListener('gesturechange', stop)
+      el.removeEventListener('gestureend', stop)
+    }
+  })
+
 
   // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size.
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
@@ -497,8 +574,52 @@ function Stage({ contour, grid, lattice, box, segments, segFill, patches }: {
   const Afy: [number, number] = A0 ? [A0.x, -A0.y] : [0, 0]
 
   return (
-    <svg width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
-      style={{ touchAction: 'none', userSelect: 'none' }}>
+    <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
+      style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
+      onPointerDown={(e) => {
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+        if (pointers.current.size === 2) {
+          // Second finger down starts a pinch — the pan in progress commits first.
+          const [a, b] = [...pointers.current.values()]
+          pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y)
+          dragAt.current = null
+          commit()
+        } else if (pointers.current.size === 1) {
+          dragAt.current = { x: e.clientX, y: e.clientY }
+        }
+      }}
+      onPointerMove={(e) => {
+        if (!pointers.current.has(e.pointerId)) return
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (pointers.current.size >= 2) {
+          const [a, b] = [...pointers.current.values()]
+          const d = Math.hypot(a.x - b.x, a.y - b.y)
+          if (pinchDist.current > 0 && d > 0) onZoom(d / pinchDist.current)
+          pinchDist.current = d
+          return
+        }
+        if (!dragAt.current) return
+        const k = pxPerMM(e.currentTarget)
+        const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
+        dragAt.current = { x: e.clientX, y: e.clientY }
+        setPend((p) => ({ x: p.x + mx, y: p.y - my }))
+      }}
+      onPointerUp={(e) => {
+        pointers.current.delete(e.pointerId)
+        if (pointers.current.size < 2) pinchDist.current = 0
+        // A finger lifted out of a pinch must not resume panning from a stale anchor.
+        dragAt.current = pointers.current.size === 1
+          ? { ...[...pointers.current.values()][0] }
+          : null
+        if (pointers.current.size === 0) commit()
+      }}
+      onPointerCancel={(e) => {
+        pointers.current.delete(e.pointerId)
+        if (pointers.current.size < 2) pinchDist.current = 0
+        if (pointers.current.size === 0) { dragAt.current = null; commit() }
+      }}
+      onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
         <pattern id="gl-unheld" width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

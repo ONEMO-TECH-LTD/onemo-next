@@ -5,8 +5,8 @@
 
 import { MIN_EFFECT_MM } from '@/lib/effect/grid-magnet'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
-import { safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
-import { assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { bbox, latticeAt, makeSeatPredicate, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
+import { applyCoverage, assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { unheldOf, wrap, wrapGrid, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, MASS_DEPTH_MM } from '@/lib/effect/grid-magnet-spec'
 import type { Contour } from '@/lib/effect/types'
@@ -17,6 +17,9 @@ interface SolveRequest {
   offsetMM: number
   cfg: WrapConfig & { plan?: MagnetPlan; circle?: boolean }
   count: number
+  /** Manual override — when either is set the wrap solver is skipped entirely. */
+  manualPhaseMM: [number, number] | null
+  manualSizeMM: number | null
 }
 
 /** Twice the signed area of a ring — the shape's own area, so unheld can be a share of it. */
@@ -34,7 +37,7 @@ const cache = new Map<string, unknown>()
 const CAP = 200
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, count } = e.data
+  const { id, base, offsetMM, cfg, count, manualPhaseMM, manualSizeMM } = e.data
   try {
     const pts = base.outer.pts
     let h = 0
@@ -45,22 +48,52 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
     const sig = JSON.stringify([offsetMM, pts.length, h])
     if (sig !== shapeSig) { shapeSig = sig; cache.clear() }
 
-    const key = JSON.stringify([cfg, count])
+    const key = JSON.stringify([cfg, count, manualPhaseMM, manualSizeMM])
     const hit = cache.get(key)
     if (hit) { ctx.postMessage({ id, model: hit }); return }
 
     const sized = makeSizer(base, offsetMM)
     const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
 
-    // 1 · CENTRE + 2 · WRAP — the engine's own call. The count is the input, not a search.
-    const at = wrap(sized, cfg, count, MIN_EFFECT_MM, sizeRange(pad).maxMM)
-    if (!at) { ctx.postMessage({ id, model: null }); return }
-    const drawn = wrapGrid(sized, cfg, at)
+    // MANUAL — the solver is OFF. The size and the registration are the caller's; the engine
+    // only seats every lattice node that is legally clear at that size and measures the result.
+    // This is the bench for judging layouts by hand before any law is written from them.
+    let drawn: ReturnType<typeof wrapGrid>
+    let at: ReturnType<typeof wrap> = null
+    let manualSeated: [number, number][] | null = null
+    if (manualSizeMM != null) {
+      const contour = sized(manualSizeMM)
+      const outerM = contour.outer.pts
+      const bb = bbox(outerM)
+      const fits = makeSeatPredicate(outerM, spotRadiusOf(pad))
+      const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+      const ph = manualPhaseMM ?? [0, 0]
+      const seats = fits ? latticeAt(bb, pitch, ph[0], ph[1]).filter(fits) : []
+      manualSeated = seats as [number, number][]
+      drawn = {
+        contour,
+        grid: {
+          anchors: [], pitchCentreMM: pitch,
+          lattice: latticeAt(bb, pitch, ph[0], ph[1]),
+          phaseMM: [ph[0], ph[1]], panMM: [0, 0],
+          spotRadiusMM: spotRadiusOf(pad),
+          contactsMM: [], segments: [],
+          centresMM: [], centreMainMM: [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2],
+        },
+      }
+    } else {
+      // 1 · CENTRE + 2 · WRAP — the engine's own call. The count is the input, not a search.
+      at = wrap(sized, cfg, count, MIN_EFFECT_MM, sizeRange(pad).maxMM)
+      if (!at) { ctx.postMessage({ id, model: null }); return }
+      drawn = wrapGrid(sized, cfg, at)
+    }
     const outer = drawn.contour.outer.pts
+    const placed = manualSeated ?? at!.points
 
     // Magnet plan reused whole from the voting bench — the 6/8mm choice is a magnet question,
     // nothing to do with how the layout was found.
-    const anchors = assignSizes(at.points, cfg.plan ?? 'all6')
+    const kept = cfg.perimeterOnly && manualSeated ? applyCoverage(manualSeated, true, cfg.pitchMM ?? DEFAULT_PITCH_MM).seated : placed
+    const anchors = assignSizes(kept, cfg.plan ?? 'all6')
 
     // 3 · WHAT IT DOES NOT HOLD — the hold radius is the lattice cell's CIRCUMRADIUS,
     // pitch/√2 (33.9mm at 48). Half the pitch is the wrong choice and the picture proves it:
@@ -72,7 +105,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
     // Reported as a SHARE of the shape as well as mm², because the shape's own area grows with
     // the count: raw mm² cannot be compared between rungs of different sizes.
     const holdMM = (cfg.pitchMM ?? DEFAULT_PITCH_MM) / Math.SQRT2
-    const patches = unheldOf(outer, at.points, holdMM)
+    const patches = unheldOf(outer, kept, holdMM)
     const unheldMM2 = patches.reduce((sum, p) => sum + p.areaMM2, 0)
     const shapeMM2 = Math.abs(shoelace(outer))
     const unheldPct = shapeMM2 > 0 ? (unheldMM2 / shapeMM2) * 100 : 0
@@ -84,10 +117,11 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
     const model = {
       contour: drawn.contour,
       grid: { ...drawn.grid, anchors, segments },
-      effSize: at.sizeMM,
+      effSize: at ? at.sizeMM : manualSizeMM!,
       segments,
-      gapMM: at.gapsMM.length ? Math.min(...at.gapsMM) : null,
-      centreOffMM: at.centreOffMM,
+      gapMM: at && at.gapsMM.length ? Math.min(...at.gapsMM) : null,
+      centreOffMM: at ? at.centreOffMM : 0,
+      manual: at === null,
       unheldMM2,
       unheldPct,
       patches,
