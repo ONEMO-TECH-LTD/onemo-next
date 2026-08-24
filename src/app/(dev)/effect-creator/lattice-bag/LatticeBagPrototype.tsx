@@ -114,6 +114,7 @@ export function LatticeBagPrototype() {
   const [classFits, setClassFits] = useState<BagFit[]>([])
   const [optionIndex, setOptionIndex] = useState(0)
   const [allowRotation, setAllowRotation] = useState(false)
+  const [isFittingRotation, setIsFittingRotation] = useState(false)
   const [mode, setMode] = useState<'auto' | 'classified'>('classified')
   const [selectedCutout, setSelectedCutout] = useState('')
   const [fileName, setFileName] = useState('')
@@ -182,9 +183,8 @@ export function LatticeBagPrototype() {
 
   function selectClassFit(index: number) {
     if (!prepared) return
-    const nextFit = classFits[index]
-    const nextOptions = fitClassifiedOptions(prepared, nextFit.seats.length, allowRotation)
-    setOptions(nextOptions)
+    const nextFit = fitClassifiedBag(prepared, classFits[index].seats.length, allowRotation)
+    setClassFits((current) => current.map((candidate, candidateIndex) => candidateIndex === index ? nextFit : candidate))
     setOptionIndex(0)
     setFit(nextFit)
   }
@@ -208,15 +208,21 @@ export function LatticeBagPrototype() {
   function toggleRotation() {
     if (!prepared || !fit) return
     const nextRotation = !allowRotation
-    const nextOptions = fitsFor(prepared, fit.seats.length, nextRotation)
-    const nextClassFits = classifiedCounts(prepared).map((count) => fitClassifiedBag(prepared, count, nextRotation))
     setAllowRotation(nextRotation)
-    setClassFits(nextClassFits)
-    setOptions(nextOptions)
+    setIsFittingRotation(true)
     setOptionIndex(0)
-    setFit(mode === 'classified'
-      ? nextClassFits.find((candidate) => candidate.seats.length === fit.seats.length) ?? nextClassFits[0]
-      : nextOptions[0])
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (mode === 'classified') {
+        const nextFit = fitClassifiedBag(prepared, fit.seats.length, nextRotation)
+        setClassFits((current) => current.map((candidate) => candidate.seats.length === nextFit.seats.length ? nextFit : candidate))
+        setFit(nextFit)
+      } else {
+        const nextOptions = fitBagOptions(prepared, fit.seats.length, nextRotation)
+        setOptions(nextOptions)
+        setFit(nextOptions[0])
+      }
+      setIsFittingRotation(false)
+    }))
   }
 
   function selectMode(nextMode: 'auto' | 'classified') {
@@ -372,14 +378,16 @@ export function LatticeBagPrototype() {
               <button aria-pressed={mode === 'classified'} onClick={() => selectMode('classified')}>Class</button>
               <button aria-pressed={mode === 'auto'} onClick={() => selectMode('auto')}>Auto</button>
             </div>
-            <button
-              className={styles.cycleButton}
-              aria-label="Previous layout"
-              disabled={navigationFits.length < 2}
-              onClick={() => stepOption(-1)}
-            >
-              <CaretLeft aria-hidden size={18} weight="bold" />
-            </button>
+            {mode === 'auto' && (
+              <button
+                className={styles.cycleButton}
+                aria-label="Previous layout"
+                disabled={navigationFits.length < 2}
+                onClick={() => stepOption(-1)}
+              >
+                <CaretLeft aria-hidden size={18} weight="bold" />
+              </button>
+            )}
             <div className={styles.optionTabs} aria-live="polite">
               {navigationFits.map((candidate, index) => (
                 <button
@@ -394,19 +402,22 @@ export function LatticeBagPrototype() {
                 </button>
               ))}
             </div>
-            <button
-              className={styles.cycleButton}
-              aria-label="Next layout"
-              disabled={navigationFits.length < 2}
-              onClick={() => stepOption(1)}
-            >
-              <CaretRight aria-hidden size={18} weight="bold" />
-            </button>
+            {mode === 'auto' && (
+              <button
+                className={styles.cycleButton}
+                aria-label="Next layout"
+                disabled={navigationFits.length < 2}
+                onClick={() => stepOption(1)}
+              >
+                <CaretRight aria-hidden size={18} weight="bold" />
+              </button>
+            )}
             <button
               className={styles.rotationToggle}
               aria-label={`Rotation ${allowRotation ? 'on' : 'off'}`}
               aria-pressed={allowRotation}
               onClick={toggleRotation}
+              disabled={isFittingRotation}
             >
               <ArrowClockwise aria-hidden size={16} weight="bold" />
               <span>{allowRotation ? 'On' : 'Off'}</span>
