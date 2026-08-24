@@ -14,8 +14,8 @@ const nextConfig: NextConfig = {
     "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**"],
   },
   outputFileTracingIncludes: {
-    "/effect-creator/grid-origin/asset-lib": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
-    "/effect-creator/grid-origin/asset-lib/[file]": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
+    "/effect-creator/grid-magnet/asset-lib": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
+    "/effect-creator/grid-magnet/asset-lib/[file]": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
   },
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
