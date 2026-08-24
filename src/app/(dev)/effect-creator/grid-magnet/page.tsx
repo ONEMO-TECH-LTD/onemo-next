@@ -571,6 +571,11 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
   // px→mm uses the RENDERED size, so gestures stay true when the canvas shrinks on a phone.
   const svgRef = useRef<SVGSVGElement>(null)
   const dragAt = useRef<{ x: number; y: number } | null>(null)
+  // Touch pinch: wheel+ctrlKey is the TRACKPAD pinch convention and iOS never sends it, so a
+  // phone needs the two-pointer distance itself. Every live pointer is tracked; with two down
+  // the frame-to-frame distance ratio drives the same onZoom the trackpad uses.
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinchDist = useRef(0)
   const [pend, setPend] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const pendRef = useRef(pend)
   pendRef.current = pend
@@ -595,8 +600,19 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
       if (wheelTimer.current) clearTimeout(wheelTimer.current)
       wheelTimer.current = setTimeout(commit, 250)
     }
+    // iOS Safari also raises its own gesture events for a two-finger pinch and would zoom the
+    // PAGE. Refusing them leaves the pointer handlers to scale the effect instead.
+    const stop = (e: Event) => e.preventDefault()
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    el.addEventListener('gesturestart', stop, { passive: false })
+    el.addEventListener('gesturechange', stop, { passive: false })
+    el.addEventListener('gestureend', stop, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', stop)
+      el.removeEventListener('gesturechange', stop)
+      el.removeEventListener('gestureend', stop)
+    }
   })
 
   // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size.
@@ -615,15 +631,49 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
       style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
-      onPointerDown={(e) => { dragAt.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture?.(e.pointerId) }}
+      onPointerDown={(e) => {
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+        if (pointers.current.size === 2) {
+          // Second finger down starts a pinch — the pan in progress commits first.
+          const [a, b] = [...pointers.current.values()]
+          pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y)
+          dragAt.current = null
+          commit()
+        } else if (pointers.current.size === 1) {
+          dragAt.current = { x: e.clientX, y: e.clientY }
+        }
+      }}
       onPointerMove={(e) => {
+        if (!pointers.current.has(e.pointerId)) return
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (pointers.current.size >= 2) {
+          const [a, b] = [...pointers.current.values()]
+          const d = Math.hypot(a.x - b.x, a.y - b.y)
+          if (pinchDist.current > 0 && d > 0) onZoom(d / pinchDist.current)
+          pinchDist.current = d
+          return
+        }
         if (!dragAt.current) return
         const k = pxPerMM(e.currentTarget)
         const mx = (e.clientX - dragAt.current.x) / k, my = (e.clientY - dragAt.current.y) / k
         dragAt.current = { x: e.clientX, y: e.clientY }
         setPend((p) => ({ x: p.x + mx, y: p.y - my }))
       }}
-      onPointerUp={() => { dragAt.current = null; commit() }}
+      onPointerUp={(e) => {
+        pointers.current.delete(e.pointerId)
+        if (pointers.current.size < 2) pinchDist.current = 0
+        // A finger lifted out of a pinch must not resume panning from a stale anchor.
+        dragAt.current = pointers.current.size === 1
+          ? { ...[...pointers.current.values()][0] }
+          : null
+        if (pointers.current.size === 0) commit()
+      }}
+      onPointerCancel={(e) => {
+        pointers.current.delete(e.pointerId)
+        if (pointers.current.size < 2) pinchDist.current = 0
+        if (pointers.current.size === 0) { dragAt.current = null; commit() }
+      }}
       onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
