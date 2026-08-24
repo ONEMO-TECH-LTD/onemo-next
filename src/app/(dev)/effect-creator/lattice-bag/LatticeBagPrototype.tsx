@@ -319,10 +319,13 @@ export function LatticeBagPrototype() {
                 </g>
               ))}
               {fit.contacts.map((contact, index) => (
-                <g key={`${contact.disk[0]},${contact.disk[1]},${index}`} className={styles.contact}>
-                  <line x1={contact.disk[0]} y1={contact.disk[1]} x2={contact.outline[0]} y2={contact.outline[1]} />
-                  <circle cx={contact.outline[0]} cy={contact.outline[1]} r={2.8} />
-                </g>
+                <circle
+                  className={styles.contact}
+                  cx={contact.outline[0]}
+                  cy={contact.outline[1]}
+                  key={`${contact.outline[0]},${contact.outline[1]},${index}`}
+                  r={1.35}
+                />
               ))}
               <circle className={styles.core} cx={fit.centre[0]} cy={fit.centre[1]} r={3.2} />
             </svg>

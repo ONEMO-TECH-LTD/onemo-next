@@ -120,13 +120,13 @@
   pointer-events: none;
 }
 
-.contact line {
-  stroke: #00a16a;
-  stroke-width: 2;
+.contact {
+  fill: rgba(0, 145, 98, 0.7);
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 0.55;
   vector-effect: non-scaling-stroke;
 }
 
-.contact circle { fill: #00b978; stroke: white; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .core { fill: #315efb; stroke: white; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 
 .empty {

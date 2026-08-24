@@ -290,18 +290,36 @@ function clipperPath(outline: ReadonlyArray<Pt>, scale: number): Path64 {
   return Clipper.isPositive(path) ? path : path.reverse()
 }
 
-function centredFeasibleTranslation(regions: Paths64, target: Pt): Pt | null {
+function balancedFeasibleTranslation(regions: Paths64, target: Pt): Pt | null {
   const targetPoint = {
     x: Math.round(target[0] * CLIPPER_SCALE),
     y: Math.round(target[1] * CLIPPER_SCALE),
   }
+  let best: Pt | null = null
+  let bestDistance2 = Infinity
   const outerRegions = regions.filter((path) => Clipper.isPositive(path))
   for (const path of outerRegions.length > 0 ? outerRegions : regions) {
     if (Clipper.pointInPolygon(targetPoint, path) !== PointInPolygonResult.IsOutside) {
       return [targetPoint.x / CLIPPER_SCALE, targetPoint.y / CLIPPER_SCALE]
     }
+    for (let index = 0; index < path.length; index++) {
+      const a = path[index]
+      const b = path[(index + 1) % path.length]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const length2 = dx * dx + dy * dy
+      const t = length2 === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((targetPoint.x - a.x) * dx + (targetPoint.y - a.y) * dy) / length2))
+      const x = a.x + dx * t
+      const y = a.y + dy * t
+      const distance2 = (x - targetPoint.x) ** 2 + (y - targetPoint.y) ** 2
+      if (distance2 >= bestDistance2) continue
+      best = [x / CLIPPER_SCALE, y / CLIPPER_SCALE]
+      bestDistance2 = distance2
+    }
   }
-  return null
+  return best
 }
 
 function feasibleTranslation(
@@ -330,7 +348,7 @@ function feasibleTranslation(
     )
     if (feasible.length === 0) return null
   }
-  return centredFeasibleTranslation(feasible, targetTranslation(outline, scale, localSeats, rotation))
+  return balancedFeasibleTranslation(feasible, targetTranslation(outline, scale, localSeats, rotation))
 }
 
 function targetTranslation(

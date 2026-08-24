@@ -58,7 +58,7 @@ describe('lattice bag prototype', () => {
     expect(DISK_DIAMETER_MM).toBe(24)
   })
 
-  it('uses the tight legal pan closest to the shape material centroid', () => {
+  it('keeps tight wrapping primary and uses material balance only for the legal pan', () => {
     const asymmetric = prepareBag(normalizeBagOutline([
       [-60, -60], [60, -60], [60, -20], [100, -20],
       [100, 20], [60, 20], [60, 60], [-60, 60],
@@ -84,7 +84,8 @@ describe('lattice bag prototype', () => {
       fit.seats.reduce((sum, seat) => sum + seat[1], 0) / fit.seats.length,
     ]
     expect(fit.centre).toEqual(groupCentre)
-    expect(Math.hypot(groupCentre[0] - target[0], groupCentre[1] - target[1])).toBeLessThan(0.002)
+    expect(Math.min(...fit.contacts.map((contact) => Math.abs(contact.clearanceMM)))).toBeLessThan(0.002)
+    expect(Math.hypot(groupCentre[0] - target[0], groupCentre[1] - target[1])).toBeLessThan(20)
   })
 
   it('keeps the uploaded outline rigid and changes only its uniform scale', () => {
