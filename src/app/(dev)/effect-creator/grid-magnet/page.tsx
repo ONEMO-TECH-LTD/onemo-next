@@ -284,7 +284,7 @@ export default function GridLab() {
     <div className="gl">
       <style>{CSS}</style>
       <header className="gl-head">
-        <h1>Magnetic Grid Lab <span className="gl-tag">v3.5.5-lead</span></h1>
+        <h1>Magnetic Grid Lab <span className="gl-tag">v3.5.6-lead · voting</span></h1>
       </header>
 
       <div className="gl-body">

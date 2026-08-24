@@ -273,7 +273,7 @@ export default function GridWrapLab() {
     <div className="gl">
       <style>{CSS}</style>
       <header className="gl-head">
-        <h1>Wrap Engine <span className="gl-tag">centre · wrap · count</span></h1>
+        <h1>Wrap Engine <span className="gl-tag">v3.5.6-lead</span></h1>
       </header>
 
       <div className="gl-body">
