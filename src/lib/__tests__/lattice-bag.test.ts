@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BAG_BANDS,
   DISK_DIAMETER_MM,
-  bandForBagSize,
   classifyBag,
   fitClassifiedBag,
   fitClassifiedOptions,
   fitBagCount,
-  fitBagBands,
   fitBagOptions,
   LATTICE_PITCH_MM,
   MAX_BAG_DISKS,
@@ -140,30 +137,5 @@ describe('lattice bag prototype', () => {
     expect(portraitOptions[0].option).toBe('Portrait rectangle · 2×3')
     expect(portraitOptions.length).toBeGreaterThan(1)
     expect(new Set(portraitOptions.map((option) => option.option)).size).toBe(portraitOptions.length)
-  })
-
-  it('owns the four exact wrapped-size bands in the engine', () => {
-    expect(BAG_BANDS).toEqual([
-      { id: 'B1', minMM: 24, maxMM: 71 },
-      { id: 'B2', minMM: 72, maxMM: 119 },
-      { id: 'B3', minMM: 120, maxMM: 167 },
-      { id: 'B4', minMM: 168, maxMM: 216 },
-    ])
-    expect([23.9, 24, 71, 71.1, 72, 119, 120, 167, 168, 216, 216.1].map(bandForBagSize)).toEqual([
-      null, 'B1', 'B1', 'B1', 'B2', 'B2', 'B3', 'B3', 'B4', 'B4', null,
-    ])
-  })
-
-  it('returns a periphery-ranked classified result for every reached band', () => {
-    const portrait = prepareBag(normalizeBagOutline([[-30, -90], [30, -90], [30, 90], [-30, 90]]))
-    const bands = fitBagBands(portrait, 'classified')
-
-    expect(bands.map(({ band }) => band)).toEqual(['B2', 'B4'])
-    expect(bands.map(({ best }) => best.seats.length)).toEqual([1, 8])
-    for (const result of bands) {
-      expect(result.best).toBe(result.fits[0])
-      expect(result.fits.every((fit) => bandForBagSize(fit.sizeMM) === result.band)).toBe(true)
-      expect(result.fits.every((fit) => fit.uncoveredPeripheryMM >= result.best.uncoveredPeripheryMM)).toBe(true)
-    }
   })
 })

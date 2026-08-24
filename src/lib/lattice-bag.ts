@@ -9,20 +9,10 @@ import {
 } from '@countertype/clipper2-ts'
 import { pointInPolygon } from './effect/polygon'
 import type { Pt } from './effect/types'
-import { exactPerimeterCoverage, HOLD_REACH_MM } from './effect/grid-core'
 
 export const LATTICE_PITCH_MM = 48
 export const DISK_DIAMETER_MM = 24
 export const MAX_BAG_DISKS = 1000
-export const BAG_BANDS = [
-  { id: 'B1', minMM: 24, maxMM: 71 },
-  { id: 'B2', minMM: 72, maxMM: 119 },
-  { id: 'B3', minMM: 120, maxMM: 167 },
-  { id: 'B4', minMM: 168, maxMM: 216 },
-] as const
-
-export type BagBandId = typeof BAG_BANDS[number]['id']
-export type BagMode = 'auto' | 'classified'
 
 const DISK_RADIUS_MM = DISK_DIAMETER_MM / 2
 const FIT_EPSILON_MM = 0.001
@@ -58,14 +48,6 @@ export interface BagFit {
   contacts: BagContact[]
   option: string
   rotation: number
-  uncoveredPeripheryMM: number
-  peripheryGaps: Pt[]
-}
-
-export interface BagBandResult {
-  band: BagBandId
-  fits: BagFit[]
-  best: BagFit
 }
 
 interface GridTransform {
@@ -279,13 +261,6 @@ function fitPreparedSeats(
     return { disk, outline: hit.point, clearanceMM: hit.distance - DISK_RADIUS_MM }
   })
   const minimum = Math.min(...nearest.map((contact) => Math.abs(contact.clearanceMM)))
-  const coverage = exactPerimeterCoverage(
-    { outer: { pts: outline }, holes: [] },
-    seats,
-    HOLD_REACH_MM,
-    'standard',
-    LATTICE_PITCH_MM,
-  )
   return {
     seats,
     outline,
@@ -297,8 +272,6 @@ function fitPreparedSeats(
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option,
     rotation: fit.transform.rotation,
-    uncoveredPeripheryMM: coverage.uncoveredMM,
-    peripheryGaps: coverage.gaps,
   }
 }
 
@@ -526,13 +499,6 @@ function fitBagOption(prepared: PreparedBag, count: number, optionIndex: number,
     return { disk, outline: hit.point, clearanceMM: hit.distance - DISK_RADIUS_MM }
   })
   const minimum = Math.min(...nearest.map((contact) => Math.abs(contact.clearanceMM)))
-  const coverage = exactPerimeterCoverage(
-    { outer: { pts: outline }, holes: [] },
-    seats,
-    HOLD_REACH_MM,
-    'standard',
-    LATTICE_PITCH_MM,
-  )
   return {
     seats,
     outline,
@@ -544,8 +510,6 @@ function fitBagOption(prepared: PreparedBag, count: number, optionIndex: number,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option: OPTION_AXES[optionIndex].label,
     rotation: fit.transform.rotation,
-    uncoveredPeripheryMM: coverage.uncoveredMM,
-    peripheryGaps: coverage.gaps,
   }
 }
 
@@ -586,52 +550,4 @@ export function fitBagOptions(prepared: PreparedBag, count: number, allowRotatio
 
 export function fitBagCount(prepared: PreparedBag, count: number): BagFit {
   return fitBagOptions(prepared, count)[0]
-}
-
-export function bandForBagSize(sizeMM: number): BagBandId | null {
-  return BAG_BANDS.find(({ minMM }, index) => (
-    sizeMM >= minMM
-    && (index === BAG_BANDS.length - 1
-      ? sizeMM <= BAG_BANDS[index].maxMM + FIT_EPSILON_MM * 4
-      : sizeMM < BAG_BANDS[index + 1].minMM)
-  ))?.id ?? null
-}
-
-function compareBandFits(left: BagFit, right: BagFit): number {
-  return left.uncoveredPeripheryMM - right.uncoveredPeripheryMM
-    || left.seats.length - right.seats.length
-    || left.centreShiftMM - right.centreShiftMM
-    || left.sizeMM - right.sizeMM
-    || left.option.localeCompare(right.option)
-}
-
-export function fitBagBands(
-  prepared: PreparedBag,
-  mode: BagMode,
-  allowRotation = false,
-): BagBandResult[] {
-  const grouped = new Map<BagBandId, BagFit[]>()
-  const shapeClass = classifyBag(prepared)
-  const classifiedCounts = shapeClass === 'Portrait rectangle' || shapeClass === 'Landscape rectangle'
-    ? [1, 2, 6, 8]
-    : [1, 4, 9, 16]
-  const counts = classifiedCounts
-
-  for (const count of counts) {
-    const fits = mode === 'classified'
-      ? [fitClassifiedBag(prepared, count, allowRotation)]
-      : fitBagOptions(prepared, count, allowRotation)
-    for (const fit of fits) {
-      const band = bandForBagSize(fit.sizeMM)
-      if (!band) continue
-      const candidates = grouped.get(band) ?? []
-      candidates.push(fit)
-      grouped.set(band, candidates)
-    }
-  }
-
-  return BAG_BANDS.flatMap(({ id }) => {
-    const fits = grouped.get(id)?.sort(compareBandFits)
-    return fits?.length ? [{ band: id, fits, best: fits[0] }] : []
-  })
 }
