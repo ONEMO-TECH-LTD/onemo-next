@@ -4,6 +4,13 @@ import type { NextConfig } from "next";
 const ASSET_LIB_TRACE_EXCLUDES = [
   "src/components/**", "src/app/**", "public/**", "asset-library/**", "data/**",
   "create/**", "docs/**", "certificates/**",
+  // Heavy packages a 20-line fs reader never touches. onnxruntime-node alone is 210 MB;
+  // with the icon packs and jimp they were the whole remaining 277 MB overage.
+  "node_modules/onnxruntime-node/**", "node_modules/onnxruntime-web/**",
+  "node_modules/@tabler/**", "node_modules/@solar-icons/**", "node_modules/@hugeicons/**",
+  "node_modules/@phosphor-icons/**", "node_modules/@mynaui/**", "node_modules/@jimp/**",
+  "node_modules/@theatre/**", "node_modules/sharp/**", "node_modules/@img/**",
+  "node_modules/paper/**", "node_modules/opencv**/**", "node_modules/canvas/**",
 ];
 
 const nextConfig: NextConfig = {
