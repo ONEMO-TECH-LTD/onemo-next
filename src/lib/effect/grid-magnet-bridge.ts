@@ -90,15 +90,19 @@ export function fieldSpots(
   grid: GridResult,
   view: { minX: number; minY: number; maxX: number; maxY: number },
 ): FieldSpot[] {
-  const anchorAt = new Map(grid.anchors.map((a) => [a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2), a]))
   const A = grid.anchors[0]?.p ?? grid.lattice[0]
   if (!A) return []
   const pad = grid.spotRadiusMM
   const rgn = { minX: view.minX - pad, minY: view.minY - pad, maxX: view.maxX + pad, maxY: view.maxY + pad }
-  return latticeOver(rgn, grid.pitchCentreMM, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => {
-    const a = anchorAt.get(n[0].toFixed(2) + ',' + n[1].toFixed(2))
-    return { x: n[0], y: n[1], r: grid.spotRadiusMM, held: Boolean(a) }
-  })
+  // A spot holds a magnet when one SITS ON IT. Matching by rounded-coordinate string keys made
+  // that a knife edge: the generator steps its axis by repeated addition while the solver's
+  // anchors are origin + k·pitch, so a coordinate near a rounding boundary keyed differently the
+  // further out it sat — and a whole column of seated magnets drew as empty. Distance decides;
+  // the lattice is 48mm apart, so half a millimetre is unambiguous.
+  const near = (n: Pt) => grid.anchors.some((a) => Math.abs(a.p[0] - n[0]) < 0.5 && Math.abs(a.p[1] - n[1]) < 0.5)
+  return latticeOver(rgn, grid.pitchCentreMM, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => (
+    { x: n[0], y: n[1], r: grid.spotRadiusMM, held: near(n) }
+  ))
 }
 
 /** The seated spots alone — what a surface draws when the full field is off. */

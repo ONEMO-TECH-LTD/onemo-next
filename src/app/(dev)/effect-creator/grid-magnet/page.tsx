@@ -223,7 +223,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null; wrapGapMM?: number | null; wrapFreedomMM?: number; wrapCentreOffMM?: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null; wrapGapMM?: number | null; wrapCentreOffMM?: number }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -430,7 +430,7 @@ export default function GridLab() {
                     model.wrapGapMM == null ? '—'
                       : model.wrapGapMM <= 0.6 ? 'PRESSED · 0 gap'
                         : `NOT TOUCHING · ${model.wrapGapMM.toFixed(1)} mm short`)
-                    + ` · freedom ${model.wrapFreedomMM ?? 0} mm · off-centre ${model.wrapCentreOffMM ?? 0} mm`
+                    + ` · off-centre ${model.wrapCentreOffMM ?? 0} mm`
                   : '—'}
               </div>
             </>}

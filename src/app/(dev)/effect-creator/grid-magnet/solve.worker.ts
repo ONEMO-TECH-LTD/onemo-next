@@ -121,7 +121,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         contour: drawn.contour, grid: drawn.grid, effSize: at.sizeMM,
         ladder: [], idx: 0, segments: drawn.grid.segments, autoFlapMM: null,
         wrapGapMM: at.gapsMM.length ? Math.min(...at.gapsMM) : null,
-        wrapFreedomMM: at.freedomMM, wrapCentreOffMM: at.centreOffMM,
+        wrapCentreOffMM: at.centreOffMM,
       } })
     } else if (mode !== 'free') {
       const { fit, autoFlapMM } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)

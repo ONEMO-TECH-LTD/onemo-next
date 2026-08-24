@@ -43,9 +43,6 @@ export interface WrapConfig {
 export interface WrapAt {
   count: number
   sizeMM: number
-  /** How much room the lawful region has at this size — 0 means the wrap fully determines the
-   *  position and centring has nothing to choose between. */
-  freedomMM: number
   /** How far the group's middle ended up from the governed anchor. */
   centreOffMM: number
   points: Pt[]
@@ -247,7 +244,9 @@ export function wrap(
     return pickOrigin(valid, centred)
   }
 
-  let won: { size: number; group: Pt[]; mid: Pt } | null = null
+  // Every arrangement is solved to ITS OWN tightest wrap, so every candidate below is already a
+  // tight, fully-pressed solution — the wrap is never traded away.
+  const cands: Array<{ size: number; group: Pt[]; mid: Pt; off: number }> = []
   for (const group of groups) {
     const mid = midOf(group)
     if (!heldAt(group, mid, maxMM)) continue           // never held, at any size
@@ -258,10 +257,21 @@ export function wrap(
       const m = (lo + hi) / 2
       if (heldAt(group, mid, m)) hi = m; else lo = m
     }
-    if (!heldAt(group, mid, hi)) continue
-    if (!won || hi < won.size) won = { size: hi, group, mid }
+    const at = heldAt(group, mid, hi)
+    if (!at) continue
+    const a = anchorAt(hi)
+    cands.push({ size: hi, group, mid, off: Math.hypot(at[0] + mid[0] - a[0], at[1] + mid[1] - a[1]) })
   }
-  if (!won) return null
+  if (!cands.length) return null
+
+  // Among those tight solutions the winner is the one CLOSEST TO THE CENTROID — not the smallest
+  // shape at any centring cost. The candidates are the same group at the four lattice parities, so
+  // they differ by exactly a half-pitch shift; that half-pitch is therefore what a centring gain
+  // may cost in size. Beyond it the shape is growing for a placement it cannot justify.
+  const floor = Math.min(...cands.map((c) => c.size))
+  const inReach = cands.filter((c) => c.size <= floor + pitch / 2)
+  const won = inReach.reduce((b, c) =>
+    c.off < b.off - 0.01 || (Math.abs(c.off - b.off) <= 0.01 && c.size < b.size) ? c : b)
 
   // Settle on the exact anchor for the answer.
   const origin = heldAt(won.group, won.mid, won.size, true) ?? heldAt(won.group, won.mid, won.size)
@@ -273,7 +283,6 @@ export function wrap(
   return {
     count: pts.length,
     sizeMM: Math.round(won.size * 100) / 100,
-    freedomMM: 0,
     centreOffMM: Math.round(Math.hypot(finalMid[0] - anchor[0], finalMid[1] - anchor[1]) * 10) / 10,
     points: pts,
     originMM: origin,
@@ -313,6 +322,3 @@ export function wrapGrid(
     },
   }
 }
-
-
-/** One offerable layout: a wrapped size and the magnets that hold the shape at it. */
