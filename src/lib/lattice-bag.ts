@@ -69,6 +69,11 @@ function polygonCentroid(ring: ReadonlyArray<Pt>): Pt {
   return [x / (3 * twiceArea), y / (3 * twiceArea)]
 }
 
+function pointMean(points: ReadonlyArray<Pt>): Pt {
+  const total = points.reduce(([x, y], point) => [x + point[0], y + point[1]] as Pt, [0, 0] as Pt)
+  return [total[0] / points.length, total[1] / points.length]
+}
+
 function closestPointOnSegment(point: Pt, a: Pt, b: Pt): { point: Pt; distance: number } {
   const dx = b[0] - a[0]
   const dy = b[1] - a[1]
@@ -256,7 +261,7 @@ function fitPreparedSeats(
   return {
     seats,
     outline,
-    centre: [fit.transform.x, fit.transform.y],
+    centre: pointMean(seats),
     sizeMM: fit.scale,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option,
@@ -285,29 +290,18 @@ function clipperPath(outline: ReadonlyArray<Pt>, scale: number): Path64 {
   return Clipper.isPositive(path) ? path : path.reverse()
 }
 
-function closestFeasibleTranslation(regions: Paths64): Pt | null {
-  const origin = { x: 0, y: 0 }
-  let best: Pt | null = null
-  let bestDistance2 = Infinity
+function centredFeasibleTranslation(regions: Paths64, target: Pt): Pt | null {
+  const targetPoint = {
+    x: Math.round(target[0] * CLIPPER_SCALE),
+    y: Math.round(target[1] * CLIPPER_SCALE),
+  }
   const outerRegions = regions.filter((path) => Clipper.isPositive(path))
   for (const path of outerRegions.length > 0 ? outerRegions : regions) {
-    if (Clipper.pointInPolygon(origin, path) !== PointInPolygonResult.IsOutside) return [0, 0]
-    for (let index = 0; index < path.length; index++) {
-      const a = path[index]
-      const b = path[(index + 1) % path.length]
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const length2 = dx * dx + dy * dy
-      const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / length2))
-      const x = a.x + dx * t
-      const y = a.y + dy * t
-      const distance2 = x * x + y * y
-      if (distance2 >= bestDistance2) continue
-      best = [x / CLIPPER_SCALE, y / CLIPPER_SCALE]
-      bestDistance2 = distance2
+    if (Clipper.pointInPolygon(targetPoint, path) !== PointInPolygonResult.IsOutside) {
+      return [targetPoint.x / CLIPPER_SCALE, targetPoint.y / CLIPPER_SCALE]
     }
   }
-  return best
+  return null
 }
 
 function feasibleTranslation(
@@ -336,13 +330,32 @@ function feasibleTranslation(
     )
     if (feasible.length === 0) return null
   }
-  return closestFeasibleTranslation(feasible)
+  return centredFeasibleTranslation(feasible, targetTranslation(outline, scale, localSeats, rotation))
+}
+
+function targetTranslation(
+  outline: ReadonlyArray<Pt>,
+  scale: number,
+  localSeats: ReadonlyArray<Pt>,
+  rotation: number,
+): Pt {
+  const centroid = polygonCentroid(outline)
+  const materialCentre: Pt = pointInPolygon(centroid, outline) ? centroid : [0, 0]
+  const localCentre = pointMean(localSeats)
+  const cosine = Math.cos(rotation)
+  const sine = Math.sin(rotation)
+  const rotatedCentre: Pt = [
+    localCentre[0] * cosine - localCentre[1] * sine,
+    localCentre[0] * sine + localCentre[1] * cosine,
+  ]
+  return [materialCentre[0] * scale - rotatedCentre[0], materialCentre[1] * scale - rotatedCentre[1]]
 }
 
 function rotationAngles(allowRotation: boolean) {
   if (!allowRotation) return [0]
   const angles: number[] = []
-  for (let angle = -MAX_ROTATION_RAD; angle <= MAX_ROTATION_RAD + 1e-9; angle += ROTATION_STEP_RAD) {
+  for (let step = -9; step <= 9; step++) {
+    const angle = Math.max(-MAX_ROTATION_RAD, Math.min(MAX_ROTATION_RAD, step * ROTATION_STEP_RAD))
     angles.push(Math.abs(angle) < 1e-9 ? 0 : angle)
   }
   return angles
@@ -359,7 +372,8 @@ function feasibleTransform(
   for (const rotation of rotationAngles(allowRotation)) {
     const translation = feasibleTranslation(outline, scale, localSeats, rotation)
     if (!translation) continue
-    const distance2 = translation[0] ** 2 + translation[1] ** 2
+    const target = targetTranslation(outline, scale, localSeats, rotation)
+    const distance2 = (translation[0] - target[0]) ** 2 + (translation[1] - target[1]) ** 2
     if (distance2 >= bestDistance2) continue
     best = { x: translation[0], y: translation[1], rotation }
     bestDistance2 = distance2
@@ -413,7 +427,7 @@ function fitBagOption(prepared: PreparedBag, count: number, optionIndex: number,
   return {
     seats,
     outline,
-    centre: [fit.transform.x, fit.transform.y],
+    centre: pointMean(seats),
     sizeMM: fit.scale,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option: OPTION_AXES[optionIndex].label,

@@ -58,6 +58,35 @@ describe('lattice bag prototype', () => {
     expect(DISK_DIAMETER_MM).toBe(24)
   })
 
+  it('uses the tight legal pan closest to the shape material centroid', () => {
+    const asymmetric = prepareBag(normalizeBagOutline([
+      [-60, -60], [60, -60], [60, -20], [100, -20],
+      [100, 20], [60, 20], [60, 60], [-60, 60],
+    ]))
+    const fit = fitBagOptions(asymmetric, 2)[0]
+    let twiceArea = 0
+    let centroidX = 0
+    let centroidY = 0
+    for (let index = 0; index < asymmetric.outline.length; index++) {
+      const a = asymmetric.outline[index]
+      const b = asymmetric.outline[(index + 1) % asymmetric.outline.length]
+      const cross = a[0] * b[1] - b[0] * a[1]
+      twiceArea += cross
+      centroidX += (a[0] + b[0]) * cross
+      centroidY += (a[1] + b[1]) * cross
+    }
+    const target: [number, number] = [
+      centroidX / (3 * twiceArea) * fit.sizeMM,
+      centroidY / (3 * twiceArea) * fit.sizeMM,
+    ]
+    const groupCentre: [number, number] = [
+      fit.seats.reduce((sum, seat) => sum + seat[0], 0) / fit.seats.length,
+      fit.seats.reduce((sum, seat) => sum + seat[1], 0) / fit.seats.length,
+    ]
+    expect(fit.centre).toEqual(groupCentre)
+    expect(Math.hypot(groupCentre[0] - target[0], groupCentre[1] - target[1])).toBeLessThan(0.002)
+  })
+
   it('keeps the uploaded outline rigid and changes only its uniform scale', () => {
     const fit = fitBagCount(prepared, 2)
     const ratios = fit.outline.map(([x, y], index) => {
