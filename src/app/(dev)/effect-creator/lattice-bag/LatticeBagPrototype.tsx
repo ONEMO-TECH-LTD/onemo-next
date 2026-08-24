@@ -2,27 +2,25 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowClockwise, CaretLeft, CaretRight, Minus, Plus, UploadSimple } from '@phosphor-icons/react'
-import { maskFromImageData } from '@/lib/effect/image-shape'
-import { traceContourRaw } from '@/lib/effect/contour'
-import { pointInPolygon } from '@/lib/effect/polygon'
 import type { Pt } from '@/lib/effect/types'
 import {
+  BAG_BANDS,
   DISK_DIAMETER_MM,
-  classifyBag,
-  fitClassifiedBag,
-  fitClassifiedOptions,
-  fitBagOptions,
+  bagBandLabel,
+  buildBagView,
+  fitBagMode,
+  fitClassifiedLadder,
   LATTICE_PITCH_MM,
   MAX_BAG_DISKS,
-  normalizeBagOutline,
   type BagBandResult,
   type BagFit,
+  type BagMode,
   type PreparedBag,
   prepareBag,
 } from '@/lib/lattice-bag'
+import { outlineFromFile, outlineFromPath } from '@/lib/lattice-bag-image'
 import styles from './lattice-bag.module.css'
 
-const MAX_TRACE_POINTS = 180
 const DEFAULT_CUTOUT_PATH = '/lattice-bag/cutouts/bot.png'
 const CUTOUTS = [
   ['Batterfly', '/lattice-bag/cutouts/batterfly.png'],
@@ -37,74 +35,8 @@ const CUTOUTS = [
   ['Superman', '/lattice-bag/cutouts/superman.png'],
 ] as const
 
-function classifiedCounts(prepared: PreparedBag) {
-  const shapeClass = classifyBag(prepared)
-  return shapeClass === 'Portrait rectangle' || shapeClass === 'Landscape rectangle'
-    ? [1, 2, 6, 8]
-    : [1, 4, 9, 16]
-}
-
 function pathFrom(points: ReadonlyArray<Pt>) {
   return `M ${points.map(([x, y]) => `${x.toFixed(3)} ${y.toFixed(3)}`).join(' L ')} Z`
-}
-
-async function imageFromFile(file: File): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(file)
-  try {
-    const image = new Image()
-    image.src = url
-    await image.decode()
-    return image
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
-
-async function imageFromPath(path: string): Promise<HTMLImageElement> {
-  const image = new Image()
-  image.src = path
-  await image.decode()
-  return image
-}
-
-function outlineFromImage(image: HTMLImageElement): Pt[] {
-  const longest = Math.max(image.naturalWidth, image.naturalHeight)
-  const ratio = Math.min(1, 512 / longest)
-  const width = Math.max(1, Math.round(image.naturalWidth * ratio))
-  const height = Math.max(1, Math.round(image.naturalHeight * ratio))
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const context = canvas.getContext('2d', { willReadFrequently: true })
-  if (!context) throw new Error('This browser cannot read the uploaded shape')
-  context.drawImage(image, 0, 0, width, height)
-  const imageData = context.getImageData(0, 0, width, height)
-  const traced = traceContourRaw(maskFromImageData(imageData).mask, width, height)
-  if (!traced) throw new Error('No closed shape was found in that image')
-  const stride = Math.max(1, Math.ceil(traced.length / MAX_TRACE_POINTS))
-  return normalizeBagOutline(traced.filter((_, index) => index % stride === 0))
-}
-
-async function outlineFromFile(file: File): Promise<Pt[]> {
-  return outlineFromImage(await imageFromFile(file))
-}
-
-function boundsFor(fit: BagFit) {
-  const xs = [...fit.outline.map((point) => point[0]), ...fit.seats.map((point) => point[0])]
-  const ys = [...fit.outline.map((point) => point[1]), ...fit.seats.map((point) => point[1])]
-  const minX = Math.min(...xs) - 42
-  const minY = Math.min(...ys) - 42
-  const maxX = Math.max(...xs) + 42
-  const maxY = Math.max(...ys) + 42
-  return { minX, minY, width: maxX - minX, height: maxY - minY }
-}
-
-function bandForSize(sizeMM: number) {
-  if (sizeMM < 72) return 'B1'
-  if (sizeMM < 120) return 'B2'
-  if (sizeMM < 168) return 'B3'
-  if (sizeMM < 216) return 'B4'
-  return 'B5+'
 }
 
 export function LatticeBagPrototype() {
@@ -120,7 +52,7 @@ export function LatticeBagPrototype() {
   const [optionIndex, setOptionIndex] = useState(0)
   const [allowRotation, setAllowRotation] = useState(false)
   const [isFittingRotation, setIsFittingRotation] = useState(false)
-  const [mode, setMode] = useState<'auto' | 'classified' | 'bands'>('classified')
+  const [mode, setMode] = useState<BagMode>('classified')
   const [selectedCutout, setSelectedCutout] = useState(DEFAULT_CUTOUT_PATH)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
@@ -145,7 +77,7 @@ export function LatticeBagPrototype() {
     setBandResults([])
     setBandElapsedMs(0)
     setLastBandDurationMs(null)
-    setBandCompute({ completed: 0, total: 4, startedAt })
+    setBandCompute({ completed: 0, total: BAG_BANDS.length, startedAt })
     worker.onmessage = (event: MessageEvent<
       | { id: number; type: 'progress'; completed: number; total: number; elapsedMs: number }
       | { id: number; type: 'complete'; result: BagBandResult[]; elapsedMs: number }
@@ -183,17 +115,15 @@ export function LatticeBagPrototype() {
     nextPrepared: PreparedBag,
     count: number,
     rotation = allowRotation,
-    nextMode: 'auto' | 'classified' = mode === 'auto' ? 'auto' : 'classified',
+    nextMode: Exclude<BagMode, 'bands'> = mode === 'auto' ? 'auto' : 'classified',
   ) {
-    return nextMode === 'classified'
-      ? fitClassifiedOptions(nextPrepared, count, rotation)
-      : fitBagOptions(nextPrepared, count, rotation)
+    return fitBagMode(nextPrepared, count, nextMode, rotation)
   }
 
   function showOutline(nextOutline: Pt[], name: string) {
     const nextPrepared = prepareBag(nextOutline)
     setPrepared(nextPrepared)
-    const nextClassFits = classifiedCounts(nextPrepared).map((count) => fitClassifiedBag(nextPrepared, count, allowRotation))
+    const nextClassFits = fitClassifiedLadder(nextPrepared, allowRotation)
     const nextOptions = fitsFor(nextPrepared, nextClassFits[0].seats.length)
     setClassFits(nextClassFits)
     setOptions(nextOptions)
@@ -225,7 +155,7 @@ export function LatticeBagPrototype() {
     setError('')
     try {
       const cutout = CUTOUTS.find((candidate) => candidate[1] === path)
-      showOutline(outlineFromImage(await imageFromPath(path)), cutout?.[0] ?? path)
+      showOutline(await outlineFromPath(path), cutout?.[0] ?? path)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The cutout could not be loaded')
     }
@@ -251,7 +181,7 @@ export function LatticeBagPrototype() {
 
   function selectClassFit(index: number) {
     if (!prepared) return
-    const nextFit = fitClassifiedBag(prepared, classFits[index].seats.length, allowRotation)
+    const nextFit = fitBagMode(prepared, classFits[index].seats.length, 'classified', allowRotation)[0]
     setClassFits((current) => current.map((candidate, candidateIndex) => candidateIndex === index ? nextFit : candidate))
     setOptionIndex(0)
     setFit(nextFit)
@@ -281,11 +211,11 @@ export function LatticeBagPrototype() {
     setOptionIndex(0)
     requestAnimationFrame(() => requestAnimationFrame(() => {
       if (mode === 'classified') {
-        const nextFit = fitClassifiedBag(prepared, fit.seats.length, nextRotation)
+        const nextFit = fitBagMode(prepared, fit.seats.length, 'classified', nextRotation)[0]
         setClassFits((current) => current.map((candidate) => candidate.seats.length === nextFit.seats.length ? nextFit : candidate))
         setFit(nextFit)
       } else if (mode === 'auto') {
-        const nextOptions = fitBagOptions(prepared, fit.seats.length, nextRotation)
+        const nextOptions = fitBagMode(prepared, fit.seats.length, 'auto', nextRotation)
         setOptions(nextOptions)
         setFit(nextOptions[0])
       } else {
@@ -295,7 +225,7 @@ export function LatticeBagPrototype() {
     }))
   }
 
-  function selectMode(nextMode: 'auto' | 'classified' | 'bands') {
+  function selectMode(nextMode: BagMode) {
     setMode(nextMode)
     if (!prepared || !fit) return
     if (nextMode === 'bands') {
@@ -312,35 +242,20 @@ export function LatticeBagPrototype() {
       : nextOptions[0])
   }
 
-  const bounds = fit ? boundsFor(fit) : null
-  const gridRadius = bounds ? Math.ceil(Math.max(bounds.width, bounds.height) / LATTICE_PITCH_MM) + 2 : 0
-  const gridAxis = Array.from(
-    { length: gridRadius * 2 + 1 },
-    (_, index) => (index - gridRadius) * LATTICE_PITCH_MM,
-  )
-  const latticeOrigin = fit?.seats[0] ?? fit?.centre ?? [0, 0]
-  const ghostSeats = fit && bounds
-    ? (() => {
-        const cosine = Math.cos(fit.rotation)
-        const sine = Math.sin(fit.rotation)
-        const points: Array<{ point: Pt; inside: boolean }> = []
-        for (let y = -gridRadius; y <= gridRadius; y++) {
-          for (let x = -gridRadius; x <= gridRadius; x++) {
-            const localX = x * LATTICE_PITCH_MM
-            const localY = y * LATTICE_PITCH_MM
-            const point: Pt = [
-              latticeOrigin[0] + localX * cosine - localY * sine,
-              latticeOrigin[1] + localX * sine + localY * cosine,
-            ]
-            if (point[0] < bounds.minX || point[0] > bounds.minX + bounds.width || point[1] < bounds.minY || point[1] > bounds.minY + bounds.height) continue
-            points.push({ point, inside: pointInPolygon(point, fit.outline) })
-          }
-        }
-        return points
-      })()
-    : []
-  const bandFits = bandResults.flatMap((band) => band.candidates.slice(0, 1))
-  const navigationFits = mode === 'classified' ? classFits : mode === 'bands' ? bandFits : options
+  const view = fit ? buildBagView(fit) : null
+  const bounds = view?.bounds ?? null
+  const gridRadius = view?.gridRadius ?? 0
+  const gridAxis = view?.gridAxis ?? []
+  const latticeOrigin = view?.latticeOrigin ?? [0, 0]
+  const ghostSeats = view?.ghostSeats ?? []
+  const bandEntries = bandResults.flatMap((band) => (
+    band.candidates.map((candidate) => ({ band, candidate }))
+  ))
+  const navigationFits = mode === 'classified'
+    ? classFits
+    : mode === 'bands'
+      ? bandEntries.map(({ candidate }) => candidate)
+      : options
   const navigationIndex = fit
     ? mode === 'classified'
       ? navigationFits.findIndex((candidate) => candidate.seats.length === fit.seats.length)
@@ -351,11 +266,11 @@ export function LatticeBagPrototype() {
 
   useEffect(() => {
     let active = true
-    void imageFromPath(DEFAULT_CUTOUT_PATH).then((image) => {
+    void outlineFromPath(DEFAULT_CUTOUT_PATH).then((outline) => {
       if (!active) return
-      const nextPrepared = prepareBag(outlineFromImage(image))
-      const nextClassFits = classifiedCounts(nextPrepared).map((count) => fitClassifiedBag(nextPrepared, count, false))
-      const nextOptions = fitClassifiedOptions(nextPrepared, nextClassFits[0].seats.length, false)
+      const nextPrepared = prepareBag(outline)
+      const nextClassFits = fitClassifiedLadder(nextPrepared, false)
+      const nextOptions = fitBagMode(nextPrepared, nextClassFits[0].seats.length, 'classified', false)
       setPrepared(nextPrepared)
       setClassFits(nextClassFits)
       setBandResults([])
@@ -388,7 +303,7 @@ export function LatticeBagPrototype() {
           <div>
             <p className={styles.eyebrow}>Rigid lattice · fluid wrap prototype</p>
             <h1>Lattice bag</h1>
-            <p>The rigid 48 mm lattice settles inside the uploaded shape while its outline scales without deforming.</p>
+            <p>The rigid {LATTICE_PITCH_MM} mm lattice settles inside the uploaded shape while its outline scales without deforming.</p>
           </div>
           {fit && <div className={styles.count}><strong>{fit.seats.length}</strong><span>disks</span></div>}
         </header>
@@ -511,13 +426,13 @@ export function LatticeBagPrototype() {
               </button>
             )}
             <div className={styles.optionTabs} aria-live="polite">
-              {(mode === 'bands' ? bandResults : navigationFits).map((entry, index) => {
-                const candidate = mode === 'bands' ? (entry as BagBandResult).candidates[0] : entry as BagFit
-                const band = mode === 'bands' ? entry as BagBandResult : null
+              {(mode === 'bands' ? bandEntries : navigationFits).map((entry, index) => {
+                const candidate = mode === 'bands' ? bandEntries[index].candidate : entry as BagFit
+                const band = mode === 'bands' ? bandEntries[index].band : null
                 return (
                 <button
                   className={styles.layoutTab}
-                  key={band?.id ?? `${candidate.option}-${index}`}
+                  key={band ? `${band.id}-${candidate.seats.length}-${candidate.option}-${index}` : `${candidate.option}-${index}`}
                   ref={(node) => { tabRefs.current[index] = node }}
                   aria-pressed={candidate === fit}
                   disabled={!candidate}
@@ -529,11 +444,9 @@ export function LatticeBagPrototype() {
                   }}
                 >
                   <strong>{band
-                    ? `${band.id} · ${candidate ? `${candidate.seats.length} disks` : 'No fit'}`
+                    ? `${band.id} · ${candidate.seats.length} · ${candidate.option}`
                     : mode === 'classified' ? `${candidate.seats.length} disks` : candidate.option}</strong>
-                  <span>{candidate
-                    ? `${bandForSize(candidate.sizeMM)} · ${candidate.sizeMM.toFixed(1)} mm`
-                    : `${band?.minMM}–${band?.maxMM} mm`}</span>
+                  <span>{`${bagBandLabel(candidate.sizeMM)} · ${candidate.sizeMM.toFixed(1)} mm`}</span>
                 </button>
                 )
               })}
@@ -564,7 +477,7 @@ export function LatticeBagPrototype() {
           {error || (bandCompute
             ? `Computing B${Math.min(bandCompute.completed + 1, bandCompute.total)} of ${bandCompute.total} · ${(bandElapsedMs / 1000).toFixed(1)} s`
             : fit
-              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · ${fit.uncoveredPeripheryMM.toFixed(1)} mm unsupported · tangent at ${fit.contacts.length} edge point${fit.contacts.length === 1 ? '' : 's'}${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
+              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · snug wrap · ${fit.opposingContactPairs} opposing contact pair${fit.opposingContactPairs === 1 ? '' : 's'} · ${fit.uncoveredPeripheryMM.toFixed(1)} mm unsupported${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
               : 'No shape loaded')}
         </div>
       </section>
