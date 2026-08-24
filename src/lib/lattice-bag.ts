@@ -401,11 +401,27 @@ function feasibleTransform(
   return best
 }
 
+function centredTransform(
+  outline: ReadonlyArray<Pt>,
+  scale: number,
+  localSeats: ReadonlyArray<Pt>,
+  allowRotation: boolean,
+): GridTransform | null {
+  for (const rotation of rotationAngles(allowRotation)) {
+    const target = targetTranslation(outline, scale, localSeats, rotation)
+    const translation = feasibleTranslation(outline, scale, localSeats, rotation)
+    if (!translation) continue
+    if (Math.hypot(translation[0] - target[0], translation[1] - target[1]) > FIT_EPSILON_MM) continue
+    return { x: target[0], y: target[1], rotation }
+  }
+  return null
+}
+
 function tightFit(outline: ReadonlyArray<Pt>, localSeats: ReadonlyArray<Pt>, allowRotation: boolean) {
   let upper = DISK_DIAMETER_MM
   let best: GridTransform = { x: 0, y: 0, rotation: 0 }
   for (;;) {
-    const candidate = feasibleTransform(outline, upper, localSeats, allowRotation)
+    const candidate = centredTransform(outline, upper, localSeats, allowRotation)
     if (candidate) {
       best = candidate
       break

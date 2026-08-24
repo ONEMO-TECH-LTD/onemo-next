@@ -58,7 +58,7 @@ describe('lattice bag prototype', () => {
     expect(DISK_DIAMETER_MM).toBe(24)
   })
 
-  it('keeps tight wrapping primary and uses material balance only for the legal pan', () => {
+  it('starts on the material centroid and pans only while tightening the lawful wrap', () => {
     const asymmetric = prepareBag(normalizeBagOutline([
       [-60, -60], [60, -60], [60, -20], [100, -20],
       [100, 20], [60, 20], [60, 60], [-60, 60],
