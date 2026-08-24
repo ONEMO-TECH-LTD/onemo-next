@@ -20,6 +20,7 @@ import {
 import styles from './lattice-bag.module.css'
 
 const MAX_TRACE_POINTS = 180
+const DEFAULT_CUTOUT_PATH = '/lattice-bag/cutouts/bot.png'
 const CUTOUTS = [
   ['Batterfly', '/lattice-bag/cutouts/batterfly.png'],
   ['Batwoman', '/lattice-bag/cutouts/batwoman.png'],
@@ -98,7 +99,7 @@ export function LatticeBagPrototype() {
   const [allowRotation, setAllowRotation] = useState(false)
   const [isFittingRotation, setIsFittingRotation] = useState(false)
   const [mode, setMode] = useState<BagMode>('classified')
-  const [selectedCutout, setSelectedCutout] = useState('')
+  const [selectedCutout, setSelectedCutout] = useState(DEFAULT_CUTOUT_PATH)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
 
@@ -209,6 +210,23 @@ export function LatticeBagPrototype() {
       })()
     : []
   const navigationIndex = fit ? bandIndex : -1
+
+  useEffect(() => {
+    let active = true
+    void imageFromPath(DEFAULT_CUTOUT_PATH).then((image) => {
+      if (!active) return
+      const nextPrepared = prepareBag(outlineFromImage(image))
+      const nextBands = fitBagBands(nextPrepared, 'classified', false)
+      setPrepared(nextPrepared)
+      setBandResults(nextBands)
+      setBandIndex(0)
+      setFit(nextBands[0]?.best ?? null)
+      setFileName('Bot')
+    }).catch((caught: unknown) => {
+      if (active) setError(caught instanceof Error ? caught.message : 'The default cutout could not be loaded')
+    })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (navigationIndex >= 0) tabRefs.current[navigationIndex]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
