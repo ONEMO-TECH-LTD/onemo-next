@@ -359,8 +359,7 @@ function targetTranslation(
   localSeats: ReadonlyArray<Pt>,
   rotation: number,
 ): Pt {
-  const centroid = polygonCentroid(outline)
-  const materialCentre: Pt = pointInPolygon(centroid, outline) ? centroid : [0, 0]
+  const materialCentre = polygonCentroid(outline)
   const localCentre = pointMean(localSeats)
   const cosine = Math.cos(rotation)
   const sine = Math.sin(rotation)
@@ -379,26 +378,6 @@ function rotationAngles(allowRotation: boolean) {
     angles.push(Math.abs(angle) < 1e-9 ? 0 : angle)
   }
   return angles
-}
-
-function feasibleTransform(
-  outline: ReadonlyArray<Pt>,
-  scale: number,
-  localSeats: ReadonlyArray<Pt>,
-  allowRotation: boolean,
-): GridTransform | null {
-  let best: GridTransform | null = null
-  let bestDistance2 = Infinity
-  for (const rotation of rotationAngles(allowRotation)) {
-    const translation = feasibleTranslation(outline, scale, localSeats, rotation)
-    if (!translation) continue
-    const target = targetTranslation(outline, scale, localSeats, rotation)
-    const distance2 = (translation[0] - target[0]) ** 2 + (translation[1] - target[1]) ** 2
-    if (distance2 >= bestDistance2) continue
-    best = { x: translation[0], y: translation[1], rotation }
-    bestDistance2 = distance2
-  }
-  return best
 }
 
 function centredTransform(
@@ -432,7 +411,7 @@ function tightFit(outline: ReadonlyArray<Pt>, localSeats: ReadonlyArray<Pt>, all
   let lower = 0
   while (upper - lower > FIT_EPSILON_MM) {
     const middle = (lower + upper) / 2
-    const candidate = feasibleTransform(outline, middle, localSeats, allowRotation)
+    const candidate = centredTransform(outline, middle, localSeats, allowRotation)
     if (candidate) {
       upper = middle
       best = candidate

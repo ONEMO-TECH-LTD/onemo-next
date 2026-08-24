@@ -58,7 +58,7 @@ describe('lattice bag prototype', () => {
     expect(DISK_DIAMETER_MM).toBe(24)
   })
 
-  it('starts on the material centroid and pans only while tightening the lawful wrap', () => {
+  it('keeps the group centre on the material centroid while tightening the lawful wrap', () => {
     const asymmetric = prepareBag(normalizeBagOutline([
       [-60, -60], [60, -60], [60, -20], [100, -20],
       [100, 20], [60, 20], [60, 60], [-60, 60],
@@ -86,8 +86,9 @@ describe('lattice bag prototype', () => {
     expect(fit.centre).toEqual(groupCentre)
     expect(fit.materialCentre[0]).toBeCloseTo(target[0], 10)
     expect(fit.materialCentre[1]).toBeCloseTo(target[1], 10)
+    expect(groupCentre[0]).toBeCloseTo(target[0], 3)
+    expect(groupCentre[1]).toBeCloseTo(target[1], 3)
     expect(Math.min(...fit.contacts.map((contact) => Math.abs(contact.clearanceMM)))).toBeLessThan(0.002)
-    expect(Math.hypot(groupCentre[0] - target[0], groupCentre[1] - target[1])).toBeLessThan(20)
   })
 
   it('keeps the uploaded outline rigid and changes only its uniform scale', () => {
