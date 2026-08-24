@@ -17,7 +17,7 @@
 // safe-area islands, no voting, no coverage, no flap. Inputs are the outline, the pitch and the
 // radius. Nothing here reads a policy.
 
-import { Clipper, FillRule, JoinType, EndType, type Paths64 } from '@countertype/clipper2-ts'
+import { Clipper, FillRule, JoinType, EndType, PointInPolygonResult, type Paths64 } from '@countertype/clipper2-ts'
 import type { Contour, Pt } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import type { GridResult } from './grid-magnet'
@@ -27,6 +27,8 @@ import type { SafeSegment } from './grid-magnet-compute'
 
 /** mm → integer microns; Clipper64 is integer-robust. */
 const S = 1000
+
+
 
 export interface WrapConfig {
   pitchMM?: number
@@ -41,8 +43,16 @@ export interface WrapConfig {
 export interface WrapAt {
   count: number
   sizeMM: number
+  /** How much room the lawful region has at this size — 0 means the wrap fully determines the
+   *  position and centring has nothing to choose between. */
+  freedomMM: number
+  /** How far the group's middle ended up from the governed anchor. */
+  centreOffMM: number
   points: Pt[]
   originMM: Pt
+  /** The governed centre the Centre mode named — what the canvas should mark as the centre.
+   *  NOT the lattice origin: that sits on a magnet and is meaningless as a centre. */
+  anchorMM: Pt
   gapsMM: number[]
 }
 
@@ -103,41 +113,68 @@ function validOrigins(region: Paths64, group: ReadonlyArray<Pt>): Paths64 | null
  * whether a layout fits or how tight it wraps — it only chooses which of the valid grid origins
  * to take when there is freedom to choose.
  */
-function governedCentre(outer: ReadonlyArray<Pt>, cfg: WrapConfig): Pt {
+function governedCentre(outer: ReadonlyArray<Pt>, cfg: WrapConfig, detail: 'full' | 'light' = 'full'): Pt {
   const bb = box(outer)
   const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const r = spotRadiusOf(pad)
   const mode = (cfg.centreMode ?? 2) as CentreMode
   const gov = (cfg.governor ?? 0) as Governor
-  const segs = safeSegments(outer, r, Math.max(r, cfg.massDepthMM ?? 16))
+  const segs = safeSegments(outer, r, Math.max(r, cfg.massDepthMM ?? 16), detail)
   const cands = centeringAnchors(mode, segs, boxC, centroidOf(outer))
   if (mode !== 2) return cands[0] ?? boxC
   const masses = segs.flatMap((sg) => (sg.masses.length ? sg.masses : [sg]))
   return governMass(masses, gov, boxC[1])?.centreMM ?? cands[0] ?? boxC
 }
 
-/** A representative origin from the valid set — the one nearest a preferred point. */
+/**
+ * The lawful position closest to a target point.
+ *
+ * The valid set is a REGION, not a list of corners. If the target lies inside it, the target IS
+ * the answer — the group can sit exactly there. Only when it lies outside does the nearest point
+ * on the boundary apply, and that is a point on an EDGE, not the nearest vertex.
+ *
+ * Choosing among vertices was why centring appeared to do nothing: it returned an arbitrary
+ * corner of the lawful region instead of the lawful position nearest the centroid.
+ */
 function pickOrigin(valid: Paths64, towards: Pt): Pt {
+  const tx = Math.round(towards[0] * S), ty = Math.round(towards[1] * S)
+  for (const path of valid) {
+    if (Clipper.pointInPolygon({ x: tx, y: ty }, path) !== PointInPolygonResult.IsOutside) {
+      return towards                                   // already lawful — sit exactly on it
+    }
+  }
   let best: Pt = towards, bd = Infinity
   for (const path of valid) {
-    // vertices, plus each edge midpoint, is plenty to land inside a small valid region
     for (let i = 0; i < path.length; i++) {
       const a = path[i], b = path[(i + 1) % path.length]
-      const cands: Pt[] = [
-        [Number(a.x) / S, Number(a.y) / S],
-        [(Number(a.x) + Number(b.x)) / (2 * S), (Number(a.y) + Number(b.y)) / (2 * S)],
-      ]
-      for (const c of cands) {
-        const d = (c[0] - towards[0]) ** 2 + (c[1] - towards[1]) ** 2
-        if (d < bd) { bd = d; best = c }
-      }
+      const ax = Number(a.x) / S, ay = Number(a.y) / S
+      const bx = Number(b.x) / S, by = Number(b.y) / S
+      const dx = bx - ax, dy = by - ay
+      const len2 = dx * dx + dy * dy
+      let t = len2 > 0 ? ((towards[0] - ax) * dx + (towards[1] - ay) * dy) / len2 : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const qx = ax + t * dx, qy = ay + t * dy
+      const d = (qx - towards[0]) ** 2 + (qy - towards[1]) ** 2
+      if (d < bd) { bd = d; best = [qx, qy] }
     }
   }
   return best
 }
 
-/** Add `count` magnets and wrap the shape around them. */
+/**
+ * Add `count` magnets and wrap the shape around them.
+ *
+ * CENTRE FIRST, exactly as Centre-rules does it: the lattice is not searched, it is PINNED — the
+ * magnet group's own middle is placed on the governed centre (a single magnet's centre on it, a
+ * pair's midpoint on it, a 2x2's middle cell on it). Deviation from the centre is therefore zero
+ * by construction, not by preference.
+ *
+ * WRAP SECOND: with the group pinned, the only free variable is size. The shape is shrunk to the
+ * smallest size at which every magnet is still held — so it is centred AND wrapped, and the size
+ * is the one that achieves both. Nothing slides off the centre to buy a tighter wrap, and nothing
+ * grows past its wrap to buy centring.
+ */
 export function wrap(
   sized: (mm: number) => Contour, cfg: WrapConfig, count: number, minMM: number, maxMM: number,
 ): WrapAt | null {
@@ -146,9 +183,8 @@ export function wrap(
   const want = Math.max(1, Math.round(count))
   const half = pitch / 2
 
-  // Candidate rigid groups: the `want` seats nearest the group centre. Four lattice parities
-  // (node or gap on the centre, per axis) and both tie-break orders, so a pair can lie along
-  // either axis. Every candidate is measured; the one that wraps smallest wins.
+  // Candidate arrangements: the `want` seats nearest the group's own middle, in four lattice
+  // parities and both tie-break orders, so a pair may lie along either axis.
   const groups: Pt[][] = []
   const span = Math.ceil(Math.sqrt(want)) + 2
   for (const ox of [0, half]) for (const oy of [0, half]) {
@@ -165,41 +201,84 @@ export function wrap(
     }
   }
 
-  /** Does this group fit at this size, and if so where? */
-  // The size search only asks whether ANY valid origin exists — it never needs to choose one,
-  // so the centring system (and its mesh) is left out of the loop entirely.
-  const validAt = (group: Pt[], mm: number): Paths64 | null => {
-    const region = seatRegion(sized(mm).outer.pts, radius)
-    return region ? validOrigins(region, group) : null
+  /** The group's own middle — the point the Centre law puts on the anchor. */
+  const midOf = (group: ReadonlyArray<Pt>): Pt => {
+    const xs = group.map((g) => g[0]), ys = group.map((g) => g[1])
+    return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
   }
 
-  let won: { size: number; group: Pt[] } | null = null
-  for (const group of groups) {
-    if (!validAt(group, maxMM)) continue               // cannot hold this group at any size
-    // Smallest size that still fits — exact to 0.01 mm.
-    let lo = minMM, hi = maxMM
-    if (validAt(group, lo)) hi = lo
-    else while (hi - lo > 0.01) {
-      const mid = (lo + hi) / 2
-      if (validAt(group, mid)) hi = mid; else lo = mid
+  // The anchor moves with the shape, so it must be the anchor FOR THE SIZE BEING TESTED — a
+  // coarse cache made the pin disagree with the size and the wrap stopped short of contact.
+  // Cached per size (shared across arrangements) and taken at the cheap detail, which affects
+  // cost only: the centre point is identical either way.
+  const anchors = new Map<number, Pt>()
+  const anchorAt = (mm: number, exact = false): Pt => {
+    const k = Math.round(mm * 100)
+    const hit = anchors.get(k)
+    if (hit && !exact) return hit
+    const a = governedCentre(sized(mm).outer.pts, cfg, exact ? 'full' : 'light')
+    if (!exact) anchors.set(k, a)
+    return a
+  }
+
+  /**
+   * Is this size lawful for this arrangement, and where does the group sit if so?
+   *
+   * The group STARTS centred — its middle on the governed centroid — and shifts only as far as
+   * the wrap actually demands: the answer is the lawful position NEAREST that centred one. So the
+   * deviation is never chosen, it is whatever the tighter wrap required and no more.
+   */
+  const heldAt = (group: Pt[], mid: Pt, mm: number, exact = false): Pt | null => {
+    const outer = sized(mm).outer.pts
+    const anchor = anchorAt(mm, exact)
+    const centred: Pt = [anchor[0] - mid[0], anchor[1] - mid[1]]
+    // Centred position lawful? Then there is nothing to trade.
+    let ok = true
+    for (const [lx, ly] of group) {
+      const px = centred[0] + lx, py = centred[1] + ly
+      if (!inside(outer, px, py) || nearestDist(outer, px, py) < radius) { ok = false; break }
     }
-    if (!validAt(group, hi)) continue
-    if (!won || hi < won.size) won = { size: hi, group }
+    if (ok) return centred
+    // Otherwise the nearest lawful position — the minimum shift that buys this tighter wrap.
+    const region = seatRegion(outer, radius)
+    if (!region) return null
+    const valid = validOrigins(region, group)
+    if (!valid) return null
+    return pickOrigin(valid, centred)
+  }
+
+  let won: { size: number; group: Pt[]; mid: Pt } | null = null
+  for (const group of groups) {
+    const mid = midOf(group)
+    if (!heldAt(group, mid, maxMM)) continue           // never held, at any size
+    // Smallest size that still holds it, pinned on the centre throughout.
+    let lo = minMM, hi = maxMM
+    if (heldAt(group, mid, lo)) hi = lo
+    else while (hi - lo > 0.01) {
+      const m = (lo + hi) / 2
+      if (heldAt(group, mid, m)) hi = m; else lo = m
+    }
+    if (!heldAt(group, mid, hi)) continue
+    if (!won || hi < won.size) won = { size: hi, group, mid }
   }
   if (!won) return null
 
+  // Settle on the exact anchor for the answer.
+  const origin = heldAt(won.group, won.mid, won.size, true) ?? heldAt(won.group, won.mid, won.size)
+  if (!origin) return null
   const outer = sized(won.size).outer.pts
-  // Size settled. NOW the centring system says where the group sits among the valid origins.
-  const valid = validAt(won.group, won.size)
-  if (!valid) return null
-  const origin = pickOrigin(valid, governedCentre(outer, cfg))
+  const anchor = anchorAt(won.size, true)
   const pts = won.group.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)
+  const finalMid: Pt = [origin[0] + won.mid[0], origin[1] + won.mid[1]]
   return {
     count: pts.length,
     sizeMM: Math.round(won.size * 100) / 100,
+    freedomMM: 0,
+    centreOffMM: Math.round(Math.hypot(finalMid[0] - anchor[0], finalMid[1] - anchor[1]) * 10) / 10,
     points: pts,
     originMM: origin,
-    gapsMM: pts.map((p) => Math.max(0, nearestDist(outer, p[0], p[1]) - radius)),
+    anchorMM: anchor,
+    gapsMM: pts.map((q) => Math.max(0, nearestDist(outer, q[0], q[1]) - radius)),
   }
 }
 
@@ -229,8 +308,8 @@ export function wrapGrid(
       spotRadiusMM: radius,
       contactsMM: at.points.filter((_, i) => (at.gapsMM[i] ?? Infinity) <= 0.6),
       segments: [],
-      centresMM: [at.originMM],
-      centreMainMM: at.originMM,
+      centresMM: [at.anchorMM],
+      centreMainMM: at.anchorMM,
     },
   }
 }
