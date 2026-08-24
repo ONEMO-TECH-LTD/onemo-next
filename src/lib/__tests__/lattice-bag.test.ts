@@ -98,6 +98,7 @@ describe('lattice bag prototype', () => {
   it('permits only the minimum centroid shift justified by a tighter lawful wrap', () => {
     const fit = fitBagCount(prepared, 2)
     expect(fit.centreShiftMM).toBeGreaterThan(0)
+    expect(fit.centreShiftMM).toBeLessThanOrEqual(1.001)
     expect(fit.sizeMM).toBeLessThan(fit.centredSizeMM)
     expect(2 * fit.centreShiftMM).toBeLessThanOrEqual(fit.centredSizeMM - fit.sizeMM + 0.0011)
   })
@@ -149,11 +150,16 @@ describe('lattice bag prototype', () => {
       { id: 'B4', minMM: 168, maxMM: 216 },
     ])
 
-    const bands = fitOptimalBagBands(prepared)
-    expect(bands.map(({ candidates }) => candidates[0]?.seats.length)).toEqual([1, 2, 4, 6])
+    const progress: Array<[number, number]> = []
+    const bands = fitOptimalBagBands(prepared, false, (completed, total) => progress.push([completed, total]))
+    expect(progress).toEqual([[1, 4], [2, 4], [3, 4], [4, 4]])
+    const counts = bands.map(({ candidates }) => candidates[0]?.seats.length)
+    expect(counts[0]).toBe(1)
+    expect(counts.every((count, index) => index === 0 || count > counts[index - 1])).toBe(true)
     for (const band of bands) {
       expect(band.candidates.length).toBeGreaterThan(0)
       const best = band.candidates[0]
+      expect(best.centreShiftMM).toBeLessThanOrEqual(1.001)
       const requiredWholeMM = Math.ceil(best.sizeMM - 0.001)
       expect(requiredWholeMM).toBeGreaterThanOrEqual(band.minMM)
       expect(requiredWholeMM).toBeLessThanOrEqual(band.maxMM)

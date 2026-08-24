@@ -26,6 +26,7 @@ export type BagBandId = typeof BAG_BANDS[number]['id']
 
 const DISK_RADIUS_MM = DISK_DIAMETER_MM / 2
 const FIT_EPSILON_MM = 0.001
+const MAX_CENTRE_SHIFT_MM = 1
 const CLIPPER_SCALE = 1000
 const MAX_ROTATION_RAD = Math.PI / 4
 const ROTATION_STEP_RAD = 5 * Math.PI / 180
@@ -582,7 +583,8 @@ function tightFit(outline: ReadonlyArray<Pt>, localSeats: ReadonlyArray<Pt>, all
   }
 
   const shiftIsWorthwhile = (scale: number, centreShiftMM: number) => (
-    2 * centreShiftMM <= centredScale - scale + FIT_EPSILON_MM
+    centreShiftMM <= MAX_CENTRE_SHIFT_MM + FIT_EPSILON_MM
+    && 2 * centreShiftMM <= centredScale - scale + FIT_EPSILON_MM
   )
   if (shiftIsWorthwhile(tightest.scale, tightest.centreShiftMM)) {
     return { ...tightest, centredScale }
@@ -682,7 +684,11 @@ function discoveryCouldReachBand(sizeMM: number, band: typeof BAG_BANDS[number])
     && requiredWholeMM <= band.maxMM + LATTICE_PITCH_MM
 }
 
-export function fitOptimalBagBands(prepared: PreparedBag, allowRotation = false): BagBandResult[] {
+export function fitOptimalBagBands(
+  prepared: PreparedBag,
+  allowRotation = false,
+  onProgress?: (completed: number, total: number) => void,
+): BagBandResult[] {
   const byCount = new Map<number, Array<{ layout: BagLayout; fit: BagFit }>>()
   const exactByLayout = new Map<string, BagFit>()
   const discoveriesForCount = (count: number) => {
@@ -715,7 +721,7 @@ export function fitOptimalBagBands(prepared: PreparedBag, allowRotation = false)
     return fit
   }
 
-  return BAG_BANDS.map((band) => {
+  return BAG_BANDS.map((band, bandIndex) => {
     const seatsPerAxis = Math.floor((band.maxMM - DISK_DIAMETER_MM) / LATTICE_PITCH_MM) + 1
     const candidates: BagFit[] = []
     for (let count = 1; count <= seatsPerAxis ** 2; count++) {
@@ -726,6 +732,8 @@ export function fitOptimalBagBands(prepared: PreparedBag, allowRotation = false)
         if (bandForRequiredSize(fit.sizeMM)?.id === band.id) candidates.push(fit)
       }
     }
-    return { ...band, candidates: candidates.sort(compareBandFits) }
+    const result = { ...band, candidates: candidates.sort(compareBandFits) }
+    onProgress?.(bandIndex + 1, BAG_BANDS.length)
+    return result
   })
 }

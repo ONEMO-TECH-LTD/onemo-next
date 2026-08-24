@@ -12,7 +12,6 @@ import {
   fitClassifiedBag,
   fitClassifiedOptions,
   fitBagOptions,
-  fitOptimalBagBands,
   LATTICE_PITCH_MM,
   MAX_BAG_DISKS,
   normalizeBagOutline,
@@ -111,6 +110,8 @@ function bandForSize(sizeMM: number) {
 export function LatticeBagPrototype() {
   const fileRef = useRef<HTMLInputElement>(null)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const bandWorkerRef = useRef<Worker | null>(null)
+  const bandRequestRef = useRef(0)
   const [prepared, setPrepared] = useState<PreparedBag | null>(null)
   const [fit, setFit] = useState<BagFit | null>(null)
   const [options, setOptions] = useState<BagFit[]>([])
@@ -123,6 +124,60 @@ export function LatticeBagPrototype() {
   const [selectedCutout, setSelectedCutout] = useState(DEFAULT_CUTOUT_PATH)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
+  const [bandCompute, setBandCompute] = useState<{ completed: number; total: number; startedAt: number } | null>(null)
+  const [bandElapsedMs, setBandElapsedMs] = useState(0)
+  const [lastBandDurationMs, setLastBandDurationMs] = useState<number | null>(null)
+
+  function stopBandCompute() {
+    bandWorkerRef.current?.terminate()
+    bandWorkerRef.current = null
+    bandRequestRef.current += 1
+    setBandCompute(null)
+  }
+
+  function computeBands(nextPrepared: PreparedBag, rotation: boolean) {
+    stopBandCompute()
+    setError('')
+    const id = bandRequestRef.current
+    const worker = new Worker(new URL('../../../../lib/lattice-bag.worker.ts', import.meta.url), { type: 'module' })
+    bandWorkerRef.current = worker
+    const startedAt = performance.now()
+    setBandResults([])
+    setBandElapsedMs(0)
+    setLastBandDurationMs(null)
+    setBandCompute({ completed: 0, total: 4, startedAt })
+    worker.onmessage = (event: MessageEvent<
+      | { id: number; type: 'progress'; completed: number; total: number; elapsedMs: number }
+      | { id: number; type: 'complete'; result: BagBandResult[]; elapsedMs: number }
+      | { id: number; type: 'error'; error: string }
+    >) => {
+      if (event.data.id !== id || worker !== bandWorkerRef.current) return
+      if (event.data.type === 'progress') {
+        setBandCompute({ completed: event.data.completed, total: event.data.total, startedAt })
+        setBandElapsedMs(event.data.elapsedMs)
+        return
+      }
+      worker.terminate()
+      bandWorkerRef.current = null
+      setBandCompute(null)
+      if (event.data.type === 'error') {
+        setError(event.data.error)
+        return
+      }
+      setLastBandDurationMs(event.data.elapsedMs)
+      setBandElapsedMs(event.data.elapsedMs)
+      setBandResults(event.data.result)
+      setFit(event.data.result.find((band) => band.candidates.length > 0)?.candidates[0] ?? null)
+    }
+    worker.onerror = () => {
+      if (worker !== bandWorkerRef.current) return
+      worker.terminate()
+      bandWorkerRef.current = null
+      setBandCompute(null)
+      setError('The band solver could not finish')
+    }
+    worker.postMessage({ id, prepared: nextPrepared, allowRotation: rotation })
+  }
 
   function fitsFor(
     nextPrepared: PreparedBag,
@@ -142,15 +197,13 @@ export function LatticeBagPrototype() {
     const nextOptions = fitsFor(nextPrepared, nextClassFits[0].seats.length)
     setClassFits(nextClassFits)
     setOptions(nextOptions)
-    const nextBands = mode === 'bands' ? fitOptimalBagBands(nextPrepared, allowRotation) : []
-    setBandResults(nextBands)
+    setBandResults([])
     setOptionIndex(0)
     setFit(mode === 'classified'
       ? nextClassFits[0]
-      : mode === 'bands'
-        ? nextBands.find((band) => band.candidates.length > 0)?.candidates[0] ?? null
-        : nextOptions[0])
+      : nextOptions[0])
     setFileName(name)
+    if (mode === 'bands') computeBands(nextPrepared, allowRotation)
   }
 
   async function upload(file: File | undefined) {
@@ -236,9 +289,7 @@ export function LatticeBagPrototype() {
         setOptions(nextOptions)
         setFit(nextOptions[0])
       } else {
-        const nextBands = fitOptimalBagBands(prepared, nextRotation)
-        setBandResults(nextBands)
-        setFit(nextBands.find((band) => band.candidates.length > 0)?.candidates[0] ?? null)
+        computeBands(prepared, nextRotation)
       }
       setIsFittingRotation(false)
     }))
@@ -248,12 +299,11 @@ export function LatticeBagPrototype() {
     setMode(nextMode)
     if (!prepared || !fit) return
     if (nextMode === 'bands') {
-      const nextBands = fitOptimalBagBands(prepared, allowRotation)
-      setBandResults(nextBands)
       setOptionIndex(0)
-      setFit(nextBands.find((band) => band.candidates.length > 0)?.candidates[0] ?? null)
+      computeBands(prepared, allowRotation)
       return
     }
+    stopBandCompute()
     const nextOptions = fitsFor(prepared, fit.seats.length, allowRotation, nextMode)
     setOptions(nextOptions)
     setOptionIndex(0)
@@ -320,6 +370,14 @@ export function LatticeBagPrototype() {
   }, [])
 
   useEffect(() => {
+    if (!bandCompute) return
+    const timer = window.setInterval(() => setBandElapsedMs(performance.now() - bandCompute.startedAt), 100)
+    return () => window.clearInterval(timer)
+  }, [bandCompute])
+
+  useEffect(() => () => bandWorkerRef.current?.terminate(), [])
+
+  useEffect(() => {
     if (navigationIndex >= 0) tabRefs.current[navigationIndex]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [navigationIndex])
 
@@ -336,6 +394,13 @@ export function LatticeBagPrototype() {
         </header>
 
         <div className={styles.stage}>
+          {bandCompute && (
+            <div className={styles.computing} role="status" aria-live="polite">
+              <span className={styles.spinner} aria-hidden />
+              <strong>Computing wrap fits</strong>
+              <span>B{Math.min(bandCompute.completed + 1, bandCompute.total)} of {bandCompute.total} · {(bandElapsedMs / 1000).toFixed(1)} s</span>
+            </div>
+          )}
           {fit && bounds ? (
             <svg
               aria-label={`${fit.seats.length} rigid disks wrapped by the uploaded shape`}
@@ -488,7 +553,7 @@ export function LatticeBagPrototype() {
               aria-label={`Rotation ${allowRotation ? 'on' : 'off'}`}
               aria-pressed={allowRotation}
               onClick={toggleRotation}
-              disabled={isFittingRotation}
+              disabled={isFittingRotation || Boolean(bandCompute)}
             >
               <ArrowClockwise aria-hidden size={16} weight="bold" />
               <span>{allowRotation ? 'On' : 'Off'}</span>
@@ -496,7 +561,11 @@ export function LatticeBagPrototype() {
           </nav>
         )}
         <div className={styles.status} aria-live="polite">
-          {error || (fit ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · ${fit.uncoveredPeripheryMM.toFixed(1)} mm unsupported · tangent at ${fit.contacts.length} edge point${fit.contacts.length === 1 ? '' : 's'}` : 'No shape loaded')}
+          {error || (bandCompute
+            ? `Computing B${Math.min(bandCompute.completed + 1, bandCompute.total)} of ${bandCompute.total} · ${(bandElapsedMs / 1000).toFixed(1)} s`
+            : fit
+              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · ${fit.uncoveredPeripheryMM.toFixed(1)} mm unsupported · tangent at ${fit.contacts.length} edge point${fit.contacts.length === 1 ? '' : 's'}${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
+              : 'No shape loaded')}
         </div>
       </section>
     </main>
