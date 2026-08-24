@@ -1,8 +1,9 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { autoFlapInBand, BANDS, computeGrid, FLAP_MM, fitSizeInBand, impliedFlapMM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
-import { makeSizer } from '@/lib/effect/grid-magnet-bridge'
+import { autoFlapInBand, BANDS, computeGrid, FLAP_MM, fitSizeInBand, impliedFlapMM, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
+import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
+import { wrap, wrapGrid } from '@/lib/effect/grid-magnet-wrap-compute'
 import type { Contour } from '@/lib/effect/types'
 
 interface SolveRequest {
@@ -10,7 +11,7 @@ interface SolveRequest {
   base: Contour
   offsetMM: number
   cfg: GridConfig
-  mode: number | 'free'
+  mode: number | 'free' | 'wrap'
   sizeMM: number
   snapStep: number
   stepSel: number | null
@@ -28,6 +29,7 @@ const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
 const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand>; autoFlapMM: number | null }>()
 const FREE_CAP = 400
+
 const WALK_CAP = 10
 const FITS_CAP = 12
 
@@ -110,7 +112,17 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
     const sig = JSON.stringify([offsetMM, pts.length, h])
     if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
     const cfgSig = JSON.stringify(cfg)
-    if (mode !== 'free') {
+    if (mode === 'wrap') {
+      // One thing: wrap the shape around the asked-for number of magnets.
+      const at = wrap(sized, cfg, stepSel ?? 1, MIN_EFFECT_MM, sizeRange(cfg.paddingMM ?? 12).maxMM)
+      if (!at) { ctx.postMessage({ id, model: null }); return }
+      const drawn = wrapGrid(sized, cfg, at)
+      ctx.postMessage({ id, model: {
+        contour: drawn.contour, grid: drawn.grid, effSize: at.sizeMM,
+        ladder: [], idx: 0, segments: drawn.grid.segments, autoFlapMM: null,
+        wrapGapMM: at.gapsMM.length ? Math.min(...at.gapsMM) : null,
+      } })
+    } else if (mode !== 'free') {
       const { fit, autoFlapMM } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM

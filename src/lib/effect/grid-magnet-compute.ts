@@ -170,6 +170,18 @@ function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
 }
 
 /**
+ * SIGNED CLEARANCE — the signed distance field value at a point: how far it sits from the
+ * outline, positive inside, negative outside. This is the one primitive a fill/wrap solve
+ * needs: a disc of radius r is held at p exactly when signedClearanceMM(outer, p) >= r, and
+ * it is PRESSED when the two are equal. Uses the same bucketed edge index as the seat
+ * predicate, so a query is a lookup, not a scan.
+ */
+export function signedClearanceMM(outer: ReadonlyArray<Pt>, pt: Pt): number {
+  const d = edgeDistMM(outer, pt)
+  return pointInOuter(pt, outer) ? d : -d
+}
+
+/**
  * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
  * tangency passing by equality (exact integer arithmetic, micron quantum).
  * A float prescreen answers the clear cases; only points within a guard band of the exact

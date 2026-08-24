@@ -90,7 +90,7 @@ export default function GridLab() {
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
-  const [mode, setMode] = useState<number | 'free'>('free')
+  const [mode, setMode] = useState<number | 'free' | 'wrap'>('free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -223,7 +223,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null; wrapGapMM?: number | null }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -261,7 +261,7 @@ export default function GridLab() {
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
-    const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
+    const manualBand = mode !== 'free' && mode !== 'wrap' && (manual !== null || bandScale !== null)
     const id = ++seqRef.current
     const msg = {
       id, base, offsetMM, cfg,
@@ -315,7 +315,7 @@ export default function GridLab() {
               onReset={() => setManual(null)} />
               : src === 'magic'
                 ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
-                : src === 'cut'
+                  : src === 'cut'
                   ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
                   : <Empty text="shape unavailable" />}
           </div>
@@ -390,9 +390,10 @@ export default function GridLab() {
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
                 <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null); setBandScale(null) }}>Free</button>
+                <button aria-pressed={mode === 'wrap'} onClick={() => { setMode('wrap'); setStepSel(1); setManual(null); setBandScale(null) }}>Wrap</button>
               </div>
             </div>
-            {mode !== 'free' && <>
+            {mode !== 'free' && mode !== 'wrap' && <>
               <div className="gl-snap">
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
@@ -420,6 +421,18 @@ export default function GridLab() {
               <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
             {mode === 'free' && <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />}
+            {mode === 'wrap' && <>
+              <Stepper label="Magnets · the shape wraps around them" v={stepSel ?? 1}
+                set={(n) => setStepSel(Math.max(1, n))} />
+              <div className="gl-snap">
+                {model
+                  ? `${model.grid.anchors.length}⌾ · ${Math.round(model.effSize)} mm · ` + (
+                    model.wrapGapMM == null ? '—'
+                      : model.wrapGapMM <= 0.6 ? 'PRESSED · 0 gap'
+                        : `NOT TOUCHING · ${model.wrapGapMM.toFixed(1)} mm short`)
+                  : '—'}
+              </div>
+            </>}
             {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>
@@ -816,6 +829,21 @@ function Slider({ label, v, set, min, max, unit, wide }: { label: string; v: num
     </label>
   )
 }
+/** Magnet stepper — chevrons either side of a typed count. Forwards the number, decides nothing. */
+function Stepper({ label, v, set }: { label: string; v: number; set: (n: number) => void }) {
+  const commit = (raw: string) => { const n = Math.round(+raw); if (Number.isFinite(n)) set(Math.max(1, n)) }
+  return (
+    <div className="gl-field"><span>{label}</span>
+      <div className="gl-stepper">
+        <button aria-label="one fewer magnet" onClick={() => set(v - 1)} disabled={v <= 1}>&#8249;</button>
+        <input key={v} type="number" defaultValue={v} min={1}
+          onBlur={(e) => commit(e.currentTarget.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+        <button aria-label="one more magnet" onClick={() => set(v + 1)}>&#8250;</button>
+      </div>
+    </div>
+  )
+}
 /** One lab control with its own enable — off drops the control's field, spec default rules. */
 function LabRow({ on, set, children }: { on: boolean; set: (b: boolean) => void; children: React.ReactNode }) {
   return (
@@ -925,6 +953,13 @@ const CSS = `
 .gl-sw-main{border-color:var(--pass);background:var(--pass)}
 .gl-sw-dash{border-style:dashed;background:transparent!important}
 .gl-snap{font:600 12px var(--mono);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.gl-stepper{display:flex;align-items:center;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.gl-stepper button{flex:none;width:38px;height:34px;font:600 17px var(--sans);line-height:1;color:var(--ink-2);background:none;border:0;border-radius:7px;cursor:pointer;transition:.12s}
+.gl-stepper button:hover:not(:disabled){background:var(--accent);color:#fff}
+.gl-stepper button:disabled{opacity:.3;cursor:default}
+.gl-stepper input{flex:1;min-width:0;text-align:center;font:700 15px var(--mono);color:var(--ink);background:none;border:0;padding:4px;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+.gl-stepper input::-webkit-outer-spin-button,.gl-stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.gl-stepper input:focus{outline:none}
 .gl-steps{display:flex;flex-wrap:wrap;gap:5px}
 .gl-steps button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:550 11px var(--sans);color:var(--ink-2);
   background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;transition:.12s}
