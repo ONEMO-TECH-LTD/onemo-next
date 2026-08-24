@@ -1,12 +1,16 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowClockwise, CaretLeft, CaretRight, Minus, Plus, UploadSimple } from '@phosphor-icons/react'
 import { maskFromImageData } from '@/lib/effect/image-shape'
 import { traceContourRaw } from '@/lib/effect/contour'
 import { pointInPolygon } from '@/lib/effect/polygon'
 import type { Pt } from '@/lib/effect/types'
 import {
   DISK_DIAMETER_MM,
+  classifyBag,
+  fitClassifiedBag,
+  fitClassifiedOptions,
   fitBagOptions,
   LATTICE_PITCH_MM,
   MAX_BAG_DISKS,
@@ -18,6 +22,25 @@ import {
 import styles from './lattice-bag.module.css'
 
 const MAX_TRACE_POINTS = 180
+const CUTOUTS = [
+  ['Batterfly', '/lattice-bag/cutouts/batterfly.png'],
+  ['Batwoman', '/lattice-bag/cutouts/batwoman.png'],
+  ['Bot 2', '/lattice-bag/cutouts/bot-2.png'],
+  ['Bot', '/lattice-bag/cutouts/bot.png'],
+  ['Duck', '/lattice-bag/cutouts/duck.png'],
+  ['Pacman Pearl 2', '/lattice-bag/cutouts/pacman-pearl-2.png'],
+  ['Pacman Pearl', '/lattice-bag/cutouts/pacman-pearl.png'],
+  ['Pill', '/lattice-bag/cutouts/pill.png'],
+  ['Snowqueen', '/lattice-bag/cutouts/snowqueen.png'],
+  ['Superman', '/lattice-bag/cutouts/superman.png'],
+] as const
+
+function classifiedCounts(prepared: PreparedBag) {
+  const shapeClass = classifyBag(prepared)
+  return shapeClass === 'Portrait rectangle' || shapeClass === 'Landscape rectangle'
+    ? [1, 2, 6, 8]
+    : [1, 4, 9, 16]
+}
 
 function pathFrom(points: ReadonlyArray<Pt>) {
   return `M ${points.map(([x, y]) => `${x.toFixed(3)} ${y.toFixed(3)}`).join(' L ')} Z`
@@ -35,8 +58,14 @@ async function imageFromFile(file: File): Promise<HTMLImageElement> {
   }
 }
 
-async function outlineFromFile(file: File): Promise<Pt[]> {
-  const image = await imageFromFile(file)
+async function imageFromPath(path: string): Promise<HTMLImageElement> {
+  const image = new Image()
+  image.src = path
+  await image.decode()
+  return image
+}
+
+function outlineFromImage(image: HTMLImageElement): Pt[] {
   const longest = Math.max(image.naturalWidth, image.naturalHeight)
   const ratio = Math.min(1, 512 / longest)
   const width = Math.max(1, Math.round(image.naturalWidth * ratio))
@@ -54,6 +83,10 @@ async function outlineFromFile(file: File): Promise<Pt[]> {
   return normalizeBagOutline(traced.filter((_, index) => index % stride === 0))
 }
 
+async function outlineFromFile(file: File): Promise<Pt[]> {
+  return outlineFromImage(await imageFromFile(file))
+}
+
 function boundsFor(fit: BagFit) {
   const xs = [...fit.outline.map((point) => point[0]), ...fit.seats.map((point) => point[0])]
   const ys = [...fit.outline.map((point) => point[1]), ...fit.seats.map((point) => point[1])]
@@ -64,32 +97,68 @@ function boundsFor(fit: BagFit) {
   return { minX, minY, width: maxX - minX, height: maxY - minY }
 }
 
+function bandForSize(sizeMM: number) {
+  if (sizeMM < 72) return 'B1'
+  if (sizeMM < 120) return 'B2'
+  if (sizeMM < 168) return 'B3'
+  if (sizeMM < 216) return 'B4'
+  return 'B5+'
+}
+
 export function LatticeBagPrototype() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const [prepared, setPrepared] = useState<PreparedBag | null>(null)
   const [fit, setFit] = useState<BagFit | null>(null)
   const [options, setOptions] = useState<BagFit[]>([])
+  const [classFits, setClassFits] = useState<BagFit[]>([])
   const [optionIndex, setOptionIndex] = useState(0)
   const [allowRotation, setAllowRotation] = useState(false)
+  const [mode, setMode] = useState<'auto' | 'classified'>('classified')
+  const [selectedCutout, setSelectedCutout] = useState('')
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
+
+  function fitsFor(nextPrepared: PreparedBag, count: number, rotation = allowRotation, nextMode = mode) {
+    return nextMode === 'classified'
+      ? fitClassifiedOptions(nextPrepared, count, rotation)
+      : fitBagOptions(nextPrepared, count, rotation)
+  }
+
+  function showOutline(nextOutline: Pt[], name: string) {
+    const nextPrepared = prepareBag(nextOutline)
+    setPrepared(nextPrepared)
+    const nextClassFits = classifiedCounts(nextPrepared).map((count) => fitClassifiedBag(nextPrepared, count, allowRotation))
+    const nextOptions = fitsFor(nextPrepared, nextClassFits[0].seats.length)
+    setClassFits(nextClassFits)
+    setOptions(nextOptions)
+    setOptionIndex(0)
+    setFit(mode === 'classified' ? nextClassFits[0] : nextOptions[0])
+    setFileName(name)
+  }
 
   async function upload(file: File | undefined) {
     if (!file) return
     setError('')
     try {
-      const nextOutline = await outlineFromFile(file)
-      const nextPrepared = prepareBag(nextOutline)
-      setPrepared(nextPrepared)
-      const nextOptions = fitBagOptions(nextPrepared, 1, allowRotation)
-      setOptions(nextOptions)
-      setOptionIndex(0)
-      setFit(nextOptions[0])
-      setFileName(file.name)
+      showOutline(await outlineFromFile(file), file.name)
+      setSelectedCutout('')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The shape could not be loaded')
     } finally {
       if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  async function loadCutout(path: string) {
+    setSelectedCutout(path)
+    if (!path) return
+    setError('')
+    try {
+      const cutout = CUTOUTS.find((candidate) => candidate[1] === path)
+      showOutline(outlineFromImage(await imageFromPath(path)), cutout?.[0] ?? path)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The cutout could not be loaded')
     }
   }
 
@@ -105,10 +174,19 @@ export function LatticeBagPrototype() {
 
   function selectCount(count: number) {
     if (!prepared) return
-    const nextOptions = fitBagOptions(prepared, count, allowRotation)
+    const nextOptions = fitsFor(prepared, count)
     setOptions(nextOptions)
     setOptionIndex(0)
     setFit(nextOptions[0])
+  }
+
+  function selectClassFit(index: number) {
+    if (!prepared) return
+    const nextFit = classFits[index]
+    const nextOptions = fitClassifiedOptions(prepared, nextFit.seats.length, allowRotation)
+    setOptions(nextOptions)
+    setOptionIndex(0)
+    setFit(nextFit)
   }
 
   function selectOption(index: number) {
@@ -116,14 +194,40 @@ export function LatticeBagPrototype() {
     setFit(options[index])
   }
 
+  function stepOption(direction: -1 | 1) {
+    const navigation = mode === 'classified' ? classFits : options
+    if (navigation.length < 2 || !fit) return
+    const currentIndex = mode === 'classified'
+      ? Math.max(0, navigation.findIndex((candidate) => candidate.seats.length === fit.seats.length))
+      : optionIndex
+    const nextIndex = (currentIndex + direction + navigation.length) % navigation.length
+    if (mode === 'classified') selectClassFit(nextIndex)
+    else selectOption(nextIndex)
+  }
+
   function toggleRotation() {
     if (!prepared || !fit) return
     const nextRotation = !allowRotation
-    const nextOptions = fitBagOptions(prepared, fit.seats.length, nextRotation)
+    const nextOptions = fitsFor(prepared, fit.seats.length, nextRotation)
+    const nextClassFits = classifiedCounts(prepared).map((count) => fitClassifiedBag(prepared, count, nextRotation))
     setAllowRotation(nextRotation)
+    setClassFits(nextClassFits)
     setOptions(nextOptions)
     setOptionIndex(0)
-    setFit(nextOptions[0])
+    setFit(mode === 'classified'
+      ? nextClassFits.find((candidate) => candidate.seats.length === fit.seats.length) ?? nextClassFits[0]
+      : nextOptions[0])
+  }
+
+  function selectMode(nextMode: 'auto' | 'classified') {
+    setMode(nextMode)
+    if (!prepared || !fit) return
+    const nextOptions = fitsFor(prepared, fit.seats.length, allowRotation, nextMode)
+    setOptions(nextOptions)
+    setOptionIndex(0)
+    setFit(nextMode === 'classified'
+      ? classFits.find((candidate) => candidate.seats.length === fit.seats.length) ?? classFits[0]
+      : nextOptions[0])
   }
 
   const bounds = fit ? boundsFor(fit) : null
@@ -132,6 +236,7 @@ export function LatticeBagPrototype() {
     { length: gridRadius * 2 + 1 },
     (_, index) => (index - gridRadius) * LATTICE_PITCH_MM,
   )
+  const latticeOrigin = fit?.seats[0] ?? fit?.centre ?? [0, 0]
   const ghostSeats = fit && bounds
     ? (() => {
         const cosine = Math.cos(fit.rotation)
@@ -142,8 +247,8 @@ export function LatticeBagPrototype() {
             const localX = x * LATTICE_PITCH_MM
             const localY = y * LATTICE_PITCH_MM
             const point: Pt = [
-              fit.centre[0] + localX * cosine - localY * sine,
-              fit.centre[1] + localX * sine + localY * cosine,
+              latticeOrigin[0] + localX * cosine - localY * sine,
+              latticeOrigin[1] + localX * sine + localY * cosine,
             ]
             if (point[0] < bounds.minX || point[0] > bounds.minX + bounds.width || point[1] < bounds.minY || point[1] > bounds.minY + bounds.height) continue
             points.push({ point, inside: pointInPolygon(point, fit.outline) })
@@ -152,6 +257,16 @@ export function LatticeBagPrototype() {
         return points
       })()
     : []
+  const navigationFits = mode === 'classified' ? classFits : options
+  const navigationIndex = fit
+    ? mode === 'classified'
+      ? navigationFits.findIndex((candidate) => candidate.seats.length === fit.seats.length)
+      : optionIndex
+    : -1
+
+  useEffect(() => {
+    if (navigationIndex >= 0) tabRefs.current[navigationIndex]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [navigationIndex])
 
   return (
     <main className={styles.page}>
@@ -174,7 +289,7 @@ export function LatticeBagPrototype() {
             >
               <g
                 className={styles.grid}
-                transform={`translate(${fit.centre[0]} ${fit.centre[1]}) rotate(${fit.rotation * 180 / Math.PI})`}
+                transform={`translate(${latticeOrigin[0]} ${latticeOrigin[1]}) rotate(${fit.rotation * 180 / Math.PI})`}
               >
                 {gridAxis.map((x) => <line key={`x${x}`} x1={x} y1={-gridRadius * LATTICE_PITCH_MM} x2={x} y2={gridRadius * LATTICE_PITCH_MM} />)}
                 {gridAxis.map((y) => <line key={`y${y}`} x1={-gridRadius * LATTICE_PITCH_MM} y1={y} x2={gridRadius * LATTICE_PITCH_MM} y2={y} />)}
@@ -213,23 +328,6 @@ export function LatticeBagPrototype() {
           )}
         </div>
 
-        {options.length > 1 && (
-          <nav className={styles.options} aria-label="Lattice arrangement options">
-            {options.map((candidate, index) => (
-              <button
-                key={candidate.option}
-                aria-pressed={index === optionIndex}
-                onClick={() => selectOption(index)}
-              >
-                {candidate.option}
-              </button>
-            ))}
-            <button aria-pressed={allowRotation} onClick={toggleRotation}>
-              Rotation {allowRotation ? 'on' : 'off'}
-            </button>
-          </nav>
-        )}
-
         <footer className={styles.controls}>
           <input
             ref={fileRef}
@@ -238,10 +336,83 @@ export function LatticeBagPrototype() {
             accept="image/*,.svg"
             onChange={(event) => void upload(event.target.files?.[0])}
           />
-          <button onClick={() => fileRef.current?.click()}>Upload shape</button>
-          <button onClick={remove} disabled={!fit || fit.seats.length <= 1}>Remove disk</button>
-          <button className={styles.primary} onClick={add} disabled={!fit || fit.seats.length >= MAX_BAG_DISKS}>Add disk</button>
+          <button className={styles.iconButton} aria-label="Upload shape" title="Upload shape" onClick={() => fileRef.current?.click()}>
+            <UploadSimple aria-hidden size={20} weight="bold" />
+          </button>
+          <label className={styles.library}>
+            <span className={styles.srOnly}>Cutout preset</span>
+            <select aria-label="Cutout preset" value={selectedCutout} onChange={(event) => void loadCutout(event.target.value)}>
+              <option value="">Presets</option>
+              {CUTOUTS.map(([name, path]) => <option key={path} value={path}>{name}</option>)}
+            </select>
+          </label>
+          <button
+            className={styles.iconButton}
+            aria-label="Remove disk"
+            title="Remove disk"
+            onClick={remove}
+            disabled={!fit || fit.seats.length <= 1}
+          >
+            <Minus aria-hidden size={20} weight="bold" />
+          </button>
+          <button
+            className={`${styles.iconButton} ${styles.primary}`}
+            aria-label="Add disk"
+            title="Add disk"
+            onClick={add}
+            disabled={!fit || fit.seats.length >= MAX_BAG_DISKS}
+          >
+            <Plus aria-hidden size={20} weight="bold" />
+          </button>
         </footer>
+
+        {fit && (
+          <nav className={styles.options} aria-label="Lattice arrangement options">
+            <div className={styles.modes} aria-label="Layout solver mode">
+              <button aria-pressed={mode === 'classified'} onClick={() => selectMode('classified')}>Class</button>
+              <button aria-pressed={mode === 'auto'} onClick={() => selectMode('auto')}>Auto</button>
+            </div>
+            <button
+              className={styles.cycleButton}
+              aria-label="Previous layout"
+              disabled={navigationFits.length < 2}
+              onClick={() => stepOption(-1)}
+            >
+              <CaretLeft aria-hidden size={18} weight="bold" />
+            </button>
+            <div className={styles.optionTabs} aria-live="polite">
+              {navigationFits.map((candidate, index) => (
+                <button
+                  className={styles.layoutTab}
+                  key={`${candidate.option}-${index}`}
+                  ref={(node) => { tabRefs.current[index] = node }}
+                  aria-pressed={index === navigationIndex}
+                  onClick={() => mode === 'classified' ? selectClassFit(index) : selectOption(index)}
+                >
+                  <strong>{mode === 'classified' ? `${candidate.seats.length} disks` : candidate.option}</strong>
+                  <span>{bandForSize(candidate.sizeMM)} · {candidate.sizeMM.toFixed(1)} mm</span>
+                </button>
+              ))}
+            </div>
+            <button
+              className={styles.cycleButton}
+              aria-label="Next layout"
+              disabled={navigationFits.length < 2}
+              onClick={() => stepOption(1)}
+            >
+              <CaretRight aria-hidden size={18} weight="bold" />
+            </button>
+            <button
+              className={styles.rotationToggle}
+              aria-label={`Rotation ${allowRotation ? 'on' : 'off'}`}
+              aria-pressed={allowRotation}
+              onClick={toggleRotation}
+            >
+              <ArrowClockwise aria-hidden size={16} weight="bold" />
+              <span>{allowRotation ? 'On' : 'Off'}</span>
+            </button>
+          </nav>
+        )}
         <div className={styles.status} aria-live="polite">
           {error || (fit ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · tangent at ${fit.contacts.length} edge point${fit.contacts.length === 1 ? '' : 's'}` : 'No shape loaded')}
         </div>

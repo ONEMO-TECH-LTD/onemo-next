@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DISK_DIAMETER_MM,
+  classifyBag,
+  fitClassifiedBag,
+  fitClassifiedOptions,
   fitBagCount,
   fitBagOptions,
   LATTICE_PITCH_MM,
@@ -34,6 +37,7 @@ describe('lattice bag prototype', () => {
 
     const rotating = fitBagOptions(prepared, 2, true)
     expect(rotating.some((option) => Math.abs(option.rotation) > 1e-6)).toBe(true)
+    expect(rotating.every((option) => Math.abs(option.rotation) <= Math.PI / 4)).toBe(true)
   })
 
   it('add/remove re-settles deterministically without deforming the lattice', () => {
@@ -62,5 +66,34 @@ describe('lattice bag prototype', () => {
     }).filter(Number.isFinite)
     expect(Math.max(...ratios) - Math.min(...ratios)).toBeLessThan(1e-8)
     expect(MAX_BAG_DISKS).toBe(1000)
+  })
+
+  it('classifies and builds deterministic standard frames without changing the requested count', () => {
+    const portrait = prepareBag(normalizeBagOutline([[-30, -90], [30, -90], [30, 90], [-30, 90]]))
+    const landscape = prepareBag(normalizeBagOutline([[-90, -30], [90, -30], [90, 30], [-90, 30]]))
+    const square = prepareBag(normalizeBagOutline([[-60, -60], [60, -60], [60, 60], [-60, 60]]))
+
+    expect(classifyBag(portrait)).toBe('Portrait rectangle')
+    expect(classifyBag(landscape)).toBe('Landscape rectangle')
+    expect(classifyBag(square)).toBe('Square')
+
+    const portraitSix = fitClassifiedBag(portrait, 6)
+    const portraitEight = fitClassifiedBag(portrait, 8)
+    const landscapeSix = fitClassifiedBag(landscape, 6)
+    const squareNine = fitClassifiedBag(square, 9)
+    expect(new Set(portraitSix.seats.map(([x]) => x.toFixed(6))).size).toBe(2)
+    expect(new Set(portraitSix.seats.map(([, y]) => y.toFixed(6))).size).toBe(3)
+    expect(portraitEight.option).toBe('Portrait rectangle · 2×4')
+    expect(new Set(portraitEight.seats.map(([x]) => x.toFixed(6))).size).toBe(2)
+    expect(new Set(portraitEight.seats.map(([, y]) => y.toFixed(6))).size).toBe(4)
+    expect(new Set(landscapeSix.seats.map(([x]) => x.toFixed(6))).size).toBe(3)
+    expect(new Set(landscapeSix.seats.map(([, y]) => y.toFixed(6))).size).toBe(2)
+    expect(new Set(squareNine.seats.map(([x]) => x.toFixed(6))).size).toBe(3)
+    expect(new Set(squareNine.seats.map(([, y]) => y.toFixed(6))).size).toBe(3)
+
+    const portraitOptions = fitClassifiedOptions(portrait, 6)
+    expect(portraitOptions[0].option).toBe('Portrait rectangle · 2×3')
+    expect(portraitOptions.length).toBeGreaterThan(1)
+    expect(new Set(portraitOptions.map((option) => option.option)).size).toBe(portraitOptions.length)
   })
 })
