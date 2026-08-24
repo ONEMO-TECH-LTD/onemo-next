@@ -88,7 +88,16 @@ describe('lattice bag prototype', () => {
     expect(fit.materialCentre[1]).toBeCloseTo(target[1], 10)
     expect(groupCentre[0]).toBeCloseTo(target[0], 3)
     expect(groupCentre[1]).toBeCloseTo(target[1], 3)
+    expect(fit.centreShiftMM).toBeCloseTo(Math.hypot(groupCentre[0] - target[0], groupCentre[1] - target[1]), 3)
+    expect(2 * fit.centreShiftMM).toBeLessThanOrEqual(fit.centredSizeMM - fit.sizeMM + 0.0011)
     expect(Math.min(...fit.contacts.map((contact) => Math.abs(contact.clearanceMM)))).toBeLessThan(0.002)
+  })
+
+  it('permits only the minimum centroid shift justified by a tighter lawful wrap', () => {
+    const fit = fitBagCount(prepared, 2)
+    expect(fit.centreShiftMM).toBeGreaterThan(0)
+    expect(fit.sizeMM).toBeLessThan(fit.centredSizeMM)
+    expect(2 * fit.centreShiftMM).toBeLessThanOrEqual(fit.centredSizeMM - fit.sizeMM + 0.0011)
   })
 
   it('keeps the uploaded outline rigid and changes only its uniform scale', () => {

@@ -43,6 +43,8 @@ export interface BagFit {
   centre: Pt
   materialCentre: Pt
   sizeMM: number
+  centredSizeMM: number
+  centreShiftMM: number
   contacts: BagContact[]
   option: string
   rotation: number
@@ -265,6 +267,8 @@ function fitPreparedSeats(
     centre: pointMean(seats),
     materialCentre: polygonCentroid(outline),
     sizeMM: fit.scale,
+    centredSizeMM: fit.centredScale,
+    centreShiftMM: fit.centreShiftMM,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option,
     rotation: fit.transform.rotation,
@@ -380,46 +384,102 @@ function rotationAngles(allowRotation: boolean) {
   return angles
 }
 
+function nearestTransform(
+  outline: ReadonlyArray<Pt>,
+  scale: number,
+  localSeats: ReadonlyArray<Pt>,
+  allowRotation: boolean,
+): { transform: GridTransform; centreShiftMM: number } | null {
+  let best: { transform: GridTransform; centreShiftMM: number } | null = null
+  for (const rotation of rotationAngles(allowRotation)) {
+    const translation = feasibleTranslation(outline, scale, localSeats, rotation)
+    if (!translation) continue
+    const target = targetTranslation(outline, scale, localSeats, rotation)
+    const centreShiftMM = Math.hypot(translation[0] - target[0], translation[1] - target[1])
+    if (best && centreShiftMM >= best.centreShiftMM) continue
+    best = {
+      transform: { x: translation[0], y: translation[1], rotation },
+      centreShiftMM,
+    }
+  }
+  return best
+}
+
 function centredTransform(
   outline: ReadonlyArray<Pt>,
   scale: number,
   localSeats: ReadonlyArray<Pt>,
   allowRotation: boolean,
 ): GridTransform | null {
-  for (const rotation of rotationAngles(allowRotation)) {
-    const target = targetTranslation(outline, scale, localSeats, rotation)
-    const translation = feasibleTranslation(outline, scale, localSeats, rotation)
-    if (!translation) continue
-    if (Math.hypot(translation[0] - target[0], translation[1] - target[1]) > FIT_EPSILON_MM) continue
-    return { x: target[0], y: target[1], rotation }
-  }
-  return null
+  const candidate = nearestTransform(outline, scale, localSeats, allowRotation)
+  if (!candidate || candidate.centreShiftMM > FIT_EPSILON_MM) return null
+  const target = targetTranslation(outline, scale, localSeats, candidate.transform.rotation)
+  return { x: target[0], y: target[1], rotation: candidate.transform.rotation }
 }
 
 function tightFit(outline: ReadonlyArray<Pt>, localSeats: ReadonlyArray<Pt>, allowRotation: boolean) {
-  let upper = DISK_DIAMETER_MM
-  let best: GridTransform = { x: 0, y: 0, rotation: 0 }
+  let centredScale = DISK_DIAMETER_MM
+  let centredLower = 0
+  let centred: GridTransform = { x: 0, y: 0, rotation: 0 }
   for (;;) {
-    const candidate = centredTransform(outline, upper, localSeats, allowRotation)
+    const candidate = centredTransform(outline, centredScale, localSeats, allowRotation)
     if (candidate) {
-      best = candidate
+      centred = candidate
       break
     }
-    upper *= 1.25
-    if (upper > 100_000) throw new Error('The rigid lattice group could not fit inside the uploaded shape')
+    centredLower = centredScale
+    centredScale *= 1.25
+    if (centredScale > 100_000) throw new Error('The rigid lattice group could not fit inside the uploaded shape')
   }
-  let lower = 0
-  while (upper - lower > FIT_EPSILON_MM) {
-    const middle = (lower + upper) / 2
+
+  let centredUpper = centredScale
+  while (centredUpper - centredLower > FIT_EPSILON_MM) {
+    const middle = (centredLower + centredUpper) / 2
     const candidate = centredTransform(outline, middle, localSeats, allowRotation)
     if (candidate) {
+      centredUpper = middle
+      centred = candidate
+    } else {
+      centredLower = middle
+    }
+  }
+  centredScale = centredUpper
+
+  let lower = 0
+  let upper = centredScale
+  let tightest = { scale: centredScale, transform: centred, centreShiftMM: 0 }
+  while (upper - lower > FIT_EPSILON_MM) {
+    const middle = (lower + upper) / 2
+    const candidate = nearestTransform(outline, middle, localSeats, allowRotation)
+    if (candidate) {
       upper = middle
-      best = candidate
+      tightest = { scale: middle, ...candidate }
     } else {
       lower = middle
     }
   }
-  return { scale: upper, transform: best }
+
+  const shiftIsWorthwhile = (scale: number, centreShiftMM: number) => (
+    2 * centreShiftMM <= centredScale - scale + FIT_EPSILON_MM
+  )
+  if (shiftIsWorthwhile(tightest.scale, tightest.centreShiftMM)) {
+    return { ...tightest, centredScale }
+  }
+
+  lower = tightest.scale
+  upper = centredScale
+  let balanced = { scale: centredScale, transform: centred, centreShiftMM: 0 }
+  while (upper - lower > FIT_EPSILON_MM) {
+    const middle = (lower + upper) / 2
+    const candidate = nearestTransform(outline, middle, localSeats, allowRotation)
+    if (!candidate || !shiftIsWorthwhile(middle, candidate.centreShiftMM)) {
+      lower = middle
+      continue
+    }
+    upper = middle
+    balanced = { scale: middle, transform: candidate.transform, centreShiftMM: candidate.centreShiftMM }
+  }
+  return { ...balanced, centredScale }
 }
 
 export function prepareBag(normalizedOutline: ReadonlyArray<Pt>): PreparedBag {
@@ -445,6 +505,8 @@ function fitBagOption(prepared: PreparedBag, count: number, optionIndex: number,
     centre: pointMean(seats),
     materialCentre: polygonCentroid(outline),
     sizeMM: fit.scale,
+    centredSizeMM: fit.centredScale,
+    centreShiftMM: fit.centreShiftMM,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option: OPTION_AXES[optionIndex].label,
     rotation: fit.transform.rotation,
