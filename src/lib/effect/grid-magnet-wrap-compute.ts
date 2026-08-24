@@ -177,6 +177,75 @@ function pickOrigin(valid: Paths64, towards: Pt): Pt {
 }
 
 /**
+ * Solve ONE explicit arrangement: the tightest centred wrap for exactly these magnets.
+ *
+ * This is the core the count-driven `wrap` already ran internally for each of its candidate
+ * blocks; it is exposed because the arrangement is the thing that should be chosen — by coverage,
+ * by mass, by hand — and only then wrapped. Local offsets in, tight size and placement out.
+ *
+ * The group starts CENTRED (its middle on the governed anchor) and shifts only as far as a
+ * lawful tighter wrap demands.
+ */
+export function wrapGroup(
+  sized: (mm: number) => Contour, cfg: WrapConfig, group: ReadonlyArray<Pt>, minMM: number, maxMM: number,
+): WrapAt | null {
+  if (!group.length) return null
+  const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const g = group.map((p) => [p[0], p[1]] as Pt)
+  const xs = g.map((p) => p[0]), ys = g.map((p) => p[1])
+  const mid: Pt = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+
+  const anchors = new Map<number, Pt>()
+  const anchorAt = (mm: number, exact = false): Pt => {
+    const k = Math.round(mm * 100)
+    const hit = anchors.get(k)
+    if (hit && !exact) return hit
+    const a = governedCentre(sized(mm).outer.pts, cfg, exact ? 'full' : 'light')
+    if (!exact) anchors.set(k, a)
+    return a
+  }
+  const heldAt = (mm: number, exact = false): Pt | null => {
+    const outer = sized(mm).outer.pts
+    const anchor = anchorAt(mm, exact)
+    const centred: Pt = [anchor[0] - mid[0], anchor[1] - mid[1]]
+    let ok = true
+    for (const [lx, ly] of g) {
+      const px = centred[0] + lx, py = centred[1] + ly
+      if (!inside(outer, px, py) || nearestDist(outer, px, py) < radius) { ok = false; break }
+    }
+    if (ok) return centred
+    const region = seatRegion(outer, radius)
+    if (!region) return null
+    const valid = validOrigins(region, g)
+    if (!valid) return null
+    return pickOrigin(valid, centred)
+  }
+
+  if (!heldAt(maxMM)) return null
+  let lo = minMM, hi = maxMM
+  if (heldAt(lo)) hi = lo
+  else while (hi - lo > 0.01) {
+    const m = (lo + hi) / 2
+    if (heldAt(m)) hi = m; else lo = m
+  }
+  const origin = heldAt(hi, true) ?? heldAt(hi)
+  if (!origin) return null
+  const outer = sized(hi).outer.pts
+  const anchor = anchorAt(hi, true)
+  const pts = g.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)
+  const finalMid: Pt = [origin[0] + mid[0], origin[1] + mid[1]]
+  return {
+    count: pts.length,
+    sizeMM: Math.round(hi * 100) / 100,
+    centreOffMM: Math.round(Math.hypot(finalMid[0] - anchor[0], finalMid[1] - anchor[1]) * 10) / 10,
+    points: pts,
+    originMM: origin,
+    anchorMM: anchor,
+    gapsMM: pts.map((q) => Math.max(0, nearestDist(outer, q[0], q[1]) - radius)),
+  }
+}
+
+/**
  * Add `count` magnets and wrap the shape around them.
  *
  * CENTRE FIRST, exactly as Centre-rules does it: the lattice is not searched, it is PINNED — the
