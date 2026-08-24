@@ -10,8 +10,14 @@ const nextConfig: NextConfig = {
   // every preview on this project failed on it. They are not runtime code; keep them out of
   // every serverless function's traced output. The grid bench's asset-lib routes DO read
   // _WIP/v3.5 from disk at runtime, so those routes explicitly trace their libraries in.
+  // `.next/lock` is a TRANSIENT build lock: it exists while `next build` runs and is gone by the
+  // time Vercel deploys. The tracer recorded it as a dependency of the asset-lib [file] route
+  // (whose dynamic path it cannot resolve statically, so it casts a very wide net), and the
+  // deploy step then lstat'd a file that no longer existed — "ENOENT ... /.next/lock", which
+  // failed every deployment. The build output itself is handled by the builder, never by the
+  // dependency trace, so excluding the whole directory from tracing is safe.
   outputFileTracingExcludes: {
-    "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**"],
+    "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**", ".next/**", "_prototypes/**", "studio-v2/**"],
   },
   outputFileTracingIncludes: {
     "/effect-creator/grid-magnet/asset-lib": ["_WIP/v3.5/asset-lib/**", "_WIP/v3.5/cutouts/**"],
