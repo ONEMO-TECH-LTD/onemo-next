@@ -322,3 +322,54 @@ export function wrapGrid(
     },
   }
 }
+
+/** One region of the shape that no magnet holds: its area, its middle, and its outline(s). */
+export interface UnheldPatch {
+  areaMM2: number
+  /** The patch's own centre — the coordinate a magnet would have to occupy to hold it. */
+  centreMM: Pt
+  rings: Pt[][]
+}
+
+/**
+ * WHAT THE MAGNETS DO NOT HOLD — measured, never thresholded.
+ *
+ * The shape minus the union of every magnet's hold disc. Whatever survives is material with no
+ * magnet on it, returned as real polygons with exact areas.
+ *
+ * THE ONE NUMBER, and why it is not invented: the caller passes the lattice cell's CIRCUMRADIUS,
+ * pitch/√2 — the radius at which the four magnets around a cell exactly cover it, leaving no void
+ * between them. Two other candidates are wrong and both were tried: the 12mm spot radius is the
+ * magnet's own protected area and makes ~85% of every shape read as unheld; half the pitch leaves
+ * the diamond void between every four magnets uncovered, so material surrounded on all four sides
+ * reads as unheld. The circumradius is a fact about the board, not a dial.
+ *
+ * Nothing is compared against a constant. Two layouts are measured with the same disc, so "this
+ * one leaves less unheld than that one" is a fact about the pair.
+ *
+ * A MEASUREMENT. It decides nothing; it is the number a rule can finally be written against.
+ */
+export function unheldOf(outer: ReadonlyArray<Pt>, magnets: ReadonlyArray<Pt>, radiusMM: number): UnheldPatch[] {
+  if (outer.length < 3) return []
+  const flat: number[] = []
+  for (const [x, y] of outer) flat.push(Math.round(x * S), Math.round(y * S))
+  const shape: Paths64 = [Clipper.makePath(flat)]
+  if (!magnets.length) return ringsOf(shape)
+  const discs: Paths64 = magnets.map((m) =>
+    Clipper.ellipse({ x: Math.round(m[0] * S), y: Math.round(m[1] * S) }, Math.round(radiusMM * S), undefined, 64))
+  const held = Clipper.union(discs, FillRule.NonZero)
+  const left = Clipper.difference(shape, held, FillRule.NonZero)
+  return left && left.length ? ringsOf(left) : []
+}
+
+/** Paths64 → patches in mm, outer rings only (a hole inside a patch is not unheld material). */
+function ringsOf(paths: Paths64): UnheldPatch[] {
+  const out: UnheldPatch[] = []
+  for (const path of paths) {
+    const areaMM2 = Clipper.area(path) / (S * S)
+    if (areaMM2 <= 0) continue                       // negative area = a hole in a patch
+    const ring: Pt[] = path.map((q) => [Number(q.x) / S, Number(q.y) / S] as Pt)
+    out.push({ areaMM2, centreMM: centroidOf(ring), rings: [ring] })
+  }
+  return out.sort((a, b) => b.areaMM2 - a.areaMM2)   // biggest first: the one a magnet should take
+}
