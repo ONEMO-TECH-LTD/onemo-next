@@ -327,7 +327,11 @@ export function LatticeBagPrototype() {
                   r={1.35}
                 />
               ))}
-              <circle className={styles.core} cx={fit.centre[0]} cy={fit.centre[1]} r={3.2} />
+              <circle className={styles.core} cx={fit.centre[0]} cy={fit.centre[1]} r={1.8} />
+              <g className={styles.materialCentre} aria-label="Shape material centre">
+                <line x1={fit.materialCentre[0] - 5} y1={fit.materialCentre[1]} x2={fit.materialCentre[0] + 5} y2={fit.materialCentre[1]} />
+                <line x1={fit.materialCentre[0]} y1={fit.materialCentre[1] - 5} x2={fit.materialCentre[0]} y2={fit.materialCentre[1] + 5} />
+              </g>
             </svg>
           ) : (
             <button className={styles.empty} onClick={() => fileRef.current?.click()}>

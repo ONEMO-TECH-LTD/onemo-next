@@ -84,6 +84,8 @@ describe('lattice bag prototype', () => {
       fit.seats.reduce((sum, seat) => sum + seat[1], 0) / fit.seats.length,
     ]
     expect(fit.centre).toEqual(groupCentre)
+    expect(fit.materialCentre[0]).toBeCloseTo(target[0], 10)
+    expect(fit.materialCentre[1]).toBeCloseTo(target[1], 10)
     expect(Math.min(...fit.contacts.map((contact) => Math.abs(contact.clearanceMM)))).toBeLessThan(0.002)
     expect(Math.hypot(groupCentre[0] - target[0], groupCentre[1] - target[1])).toBeLessThan(20)
   })

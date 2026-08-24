@@ -41,6 +41,7 @@ export interface BagFit {
   seats: Pt[]
   outline: Pt[]
   centre: Pt
+  materialCentre: Pt
   sizeMM: number
   contacts: BagContact[]
   option: string
@@ -262,6 +263,7 @@ function fitPreparedSeats(
     seats,
     outline,
     centre: pointMean(seats),
+    materialCentre: polygonCentroid(outline),
     sizeMM: fit.scale,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option,
@@ -446,6 +448,7 @@ function fitBagOption(prepared: PreparedBag, count: number, optionIndex: number,
     seats,
     outline,
     centre: pointMean(seats),
+    materialCentre: polygonCentroid(outline),
     sizeMM: fit.scale,
     contacts: nearest.filter((contact) => Math.abs(contact.clearanceMM) <= minimum + 0.05),
     option: OPTION_AXES[optionIndex].label,
