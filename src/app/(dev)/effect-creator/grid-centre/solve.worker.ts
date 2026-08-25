@@ -3,7 +3,7 @@
 
 import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
-import { safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
+import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
@@ -189,7 +189,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         model = { contour: free.contour, grid: free.grid, effSize: sizeMM, ladder: [], idx: 0, segments: free.grid.segments }
       } else {
         const contour = sized(at.sizeMM)
-        const grid = computeGrid(contour, { ...cfg, forcePhaseMM: [at.originMM[0], at.originMM[1]] })
+        // computeGrid's registration phase is measured FROM THE SHAPE'S BBOX CORNER; the wrap's
+        // origin is absolute. Convert, or the lattice lands offset and nothing seats.
+        const bb = bbox(contour.outer.pts)
+        const grid = computeGrid(contour, { ...cfg, forcePhaseMM: [at.originMM[0] - bb.minX, at.originMM[1] - bb.minY] })
         model = { contour, grid, effSize: at.sizeMM, ladder: [], idx: 0, segments: grid.segments }
       }
       snapCache.set(sk, model)
