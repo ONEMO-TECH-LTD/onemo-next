@@ -16,7 +16,7 @@ const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
 const SHAPE_IDS = ['square']
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
-  shapeId: 'square', frameKey: '3x3', layoutId: 'ring',
+  shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter',
   view: { transpose: false, flipX: false, flipY: false }, ...over,
 })
 
@@ -24,8 +24,8 @@ describe('corpus completeness — removal must fail these', () => {
   it('exactly the 15 canonical frame keys', () => {
     expect(LAYOUT_LIBRARY.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
   })
-  it('exactly 14 ruled square layouts across the frames', () => {
-    expect(LAYOUT_LIBRARY.reduce((n, f) => n + f.layouts.length, 0)).toBe(14)
+  it('exactly 16 ruled square layouts across the frames', () => {
+    expect(LAYOUT_LIBRARY.reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
   })
   it('the complete ruled shape-ID set', () => {
     expect(LIBRARY_SHAPES.map((x) => x.id).sort()).toEqual([...SHAPE_IDS].sort())
@@ -42,7 +42,7 @@ describe('corpus completeness — removal must fail these', () => {
 describe('classifier goldens — declared family is the classifier verdict, not a point count', () => {
   it('every shape outline classifies as its declared family', () => {
     for (const s of LIBRARY_SHAPES) {
-      const pv = libraryPreview(sel({ shapeId: s.id, frameKey: '3x3', layoutId: 'ring' }), 48)
+      const pv = libraryPreview(sel({ shapeId: s.id, frameKey: '3x3', layoutId: 'perimeter' }), 48)
       expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(s.family)
     }
   })
@@ -63,7 +63,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
     const xs = a1.outlineMM.map((q) => q[0]), ys = a1.outlineMM.map((q) => q[1])
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(24, 6)
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(24, 6)
-    const a2 = libraryPreview(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'ring' }), 48)
+    const a2 = libraryPreview(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48)
     const xs2 = a2.outlineMM.map((q) => q[0]), ys2 = a2.outlineMM.map((q) => q[1])
     expect(Math.max(...xs2) - Math.min(...xs2)).toBeCloseTo(120, 6)
     expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(120, 6)
@@ -98,7 +98,7 @@ describe('data integrity + transforms', () => {
 describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition', () => {
   it('arrangement carries stable IDs and mm nodes', () => {
     const a = libraryArrangement(sel(), 48)
-    expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'ring', frameCols: 3, frameRows: 3 })
+    expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'perimeter', frameCols: 3, frameRows: 3 })
     expect(libraryPreview(sel(), 48)).toMatchObject({ shapeId: 'square', declaredFamily: 'square', shapeCompatible: true })
     expect(a.nodesMM.length).toBe(8)
   })
@@ -126,6 +126,22 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
     for (let i = 0; i < a48.length; i++) {
       expect(a96[i][0]).toBeCloseTo(a48[i][0] * 2, 6)
       expect(a96[i][1]).toBeCloseTo(a48[i][1] * 2, 6)
+    }
+  })
+})
+
+describe('interior rule and the belt mode', () => {
+  it('4x4 carries NO interior magnet in any layout (Dan, 08-25)', () => {
+    const f = LAYOUT_LIBRARY.find((x) => x.cols === 4 && x.rows === 4)!
+    for (const l of f.layouts) for (const [x, y] of l.nodes)
+      expect(x === 0 || x === 3 || y === 0 || y === 3, `4x4 ${l.name} interior ${x},${y}`).toBe(true)
+    expect(f.layouts.map((l) => l.name)).not.toContain('full')
+  })
+  it('belt is a spacing mode: every frame above 1x1 carries perimeter and perimeter-96', () => {
+    for (const f of LAYOUT_LIBRARY.filter((x) => x.cols > 1)) {
+      const names = f.layouts.map((l) => l.name)
+      expect(names).toContain('perimeter')
+      expect(names).toContain('perimeter-96')
     }
   })
 })

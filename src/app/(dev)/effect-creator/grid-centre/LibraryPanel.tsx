@@ -59,8 +59,8 @@ export default function LibraryPanel({
       </Fold>
       <Fold title="Layouts">
         <div className="gl-lib">
-          {frame.layouts.map((l) => (
-            <button key={l.name} aria-pressed={!edit && sel.layoutId === l.name}
+          {frame.layouts.filter((l) => l.name !== 'perimeter-96').map((l) => (
+            <button key={l.name} aria-pressed={!edit && (sel.layoutId === l.name || (l.name === 'perimeter' && sel.layoutId === 'perimeter-96'))}
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: l.name }) }}><b>{l.name}</b></button>
           ))}
           {mine.map((d) => (
@@ -71,6 +71,14 @@ export default function LibraryPanel({
           ))}
           <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
         </div>
+        {(sel.layoutId === 'perimeter' || sel.layoutId === 'perimeter-96') && !edit && (
+          <div className="gl-field" style={{ marginTop: 9 }}><span>Belt · magnet spacing</span>
+            <div className="gl-seg">
+              <button aria-pressed={sel.layoutId === 'perimeter'} onClick={() => setSel({ ...sel, layoutId: 'perimeter' })}>48 mm</button>
+              <button aria-pressed={sel.layoutId === 'perimeter-96'} onClick={() => setSel({ ...sel, layoutId: 'perimeter-96' })}>96 mm</button>
+            </div>
+          </div>
+        )}
         {edit ? (
           <div className="gl-libedit">
             <input value={edit.name} placeholder="name" onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
