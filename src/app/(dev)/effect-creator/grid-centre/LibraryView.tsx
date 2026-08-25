@@ -1,19 +1,19 @@
 'use client'
 
-// LibraryView — THE LAYOUT LIBRARY tab of the Centre Lab. Every frame and every preset
-// layout, rendered through the bench's OWN Stage canvas — same lattice, same magnets, same
-// fit-to-view — for Dan's visual review and approval. Display only: no engine, no policy.
-// Data: src/lib/effect/grid-magnet-library.ts (literal, awaiting approval).
+// LibraryView — THE LAYOUT LIBRARY MODULE's view. A separate module: it does not live in or
+// mix with the engine or the bench — the page only mounts it in the Library tab and lends it
+// the SAME Stage canvas plus the bench's pitch and padding, so the lattice is identical by
+// construction. The module's data file (grid-magnet-library.ts) is the bridge the engine
+// pipeline will consume. Display only — no engine calls, no policy.
 
 import { useMemo, useState, type ComponentType } from 'react'
 import { LAYOUT_LIBRARY } from '@/lib/effect/grid-magnet-library'
-import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM } from '@/lib/effect/grid-magnet-spec'
+import { MAGNET_DIA_SMALL_MM } from '@/lib/effect/grid-magnet-spec'
+import { spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import type { Pt } from '@/lib/effect/types'
 
-const PITCH = DEFAULT_PITCH_MM
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function LibraryView({ Stage }: { Stage: ComponentType<any> }) {
+export default function LibraryView({ Stage, pitch, padMM }: { Stage: ComponentType<any>; pitch: number; padMM: number }) {
   const [fi, setFi] = useState(4)
   const [li, setLi] = useState(0)
   const [transpose, setTranspose] = useState(false)
@@ -30,37 +30,40 @@ export default function LibraryView({ Stage }: { Stage: ComponentType<any> }) {
     if (flipX) ns = ns.map(([x, y]) => [c - 1 - x, y])
     if (flipY) ns = ns.map(([x, y]) => [x, r - 1 - y])
     // Engine space is y-up; library rows count downward from the top.
-    const pts: Pt[] = ns.map(([ix, iy]) => [ix * PITCH, (r - 1 - iy) * PITCH])
-    const m = PITCH * 0.75
-    const x0 = -m, x1 = (c - 1) * PITCH + m, y0 = -m, y1 = (r - 1) * PITCH + m
-    const outerPts: Pt[] = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+    const pts: Pt[] = ns.map(([ix, iy]) => [ix * pitch, (r - 1 - iy) * pitch])
+    const m = pitch * 0.75
+    const x0 = -m, x1 = (c - 1) * pitch + m, y0 = -m, y1 = (r - 1) * pitch + m
+    // THE FULL LATTICE, the bench's own recipe (wrapGrid): the field reaches well past the
+    // fitted view in every direction — never a window around the frame.
+    const reach = Math.ceil(Math.max(x1 - x0, y1 - y0) / pitch) + 2
+    const cx0 = Math.round((c - 1) / 2), cy0 = Math.round((r - 1) / 2)
     const lattice: Pt[] = []
-    for (let ix = -1; ix <= c; ix++) for (let iy = -1; iy <= r; iy++)
-      lattice.push([ix * PITCH, iy * PITCH])
+    for (let ix = cx0 - reach; ix <= cx0 + reach; ix++) for (let iy = cy0 - reach; iy <= cy0 + reach; iy++)
+      lattice.push([ix * pitch, iy * pitch])
     return {
       c, r,
-      contour: { outer: { pts: outerPts } },
+      contour: { outer: { pts: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] as Pt[] } },
       grid: {
         anchors: pts.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
-        pitchCentreMM: PITCH,
+        pitchCentreMM: pitch,
         lattice,
         phaseMM: [0, 0] as Pt,
         panMM: [0, 0] as Pt,
-        spotRadiusMM: PITCH / 2,
+        spotRadiusMM: spotRadiusOf(padMM),
         contactsMM: [] as Pt[],
         segments: [],
         centresMM: [] as Pt[],
-        centreMainMM: [(c - 1) * PITCH / 2, (r - 1) * PITCH / 2] as Pt,
+        centreMainMM: [(c - 1) * pitch / 2, (r - 1) * pitch / 2] as Pt,
       },
     }
-  }, [frame, layout, transpose, flipX, flipY])
+  }, [frame, layout, transpose, flipX, flipY, pitch, padMM])
 
   const noop = () => {}
   return (
     <div className="gl-body">
       <section className="gl-card gl-stage">
         <div className="gl-stage-head">
-          <span className="gl-eye"><b>{layout.name}</b> · {model.c}×{model.r} frame · {layout.nodes.length}⌾ · {(model.c - 1) * PITCH || PITCH}×{(model.r - 1) * PITCH || PITCH} mm span</span>
+          <span className="gl-eye"><b>{layout.name}</b> · {model.c}×{model.r} frame · {layout.nodes.length}⌾ · {(model.c - 1) * pitch || pitch}×{(model.r - 1) * pitch || pitch} mm span</span>
           <span className="gl-eye">LIBRARY · DRAFT — awaiting approval</span>
         </div>
         <div className="gl-vp">
