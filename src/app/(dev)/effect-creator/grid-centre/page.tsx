@@ -7,7 +7,8 @@
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import LibraryView from './LibraryView'
+import LibraryPanel from './LibraryPanel'
+import { libraryStageModel, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -86,6 +87,9 @@ export default function GridLab() {
   const [mode, setMode] = useState<number>(1)
   /** Top-level view — the bench, or the layout-library review tab. */
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
+  /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
+  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ frameIndex: 4, layoutIndex: 0, family: 'triangle', view: { transpose: false, flipX: false, flipY: false } })
+  const libraryModel = useMemo(() => tab === 'library' ? libraryStageModel(librarySel, pitch, pad) : null, [tab, librarySel, pitch, pad])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -304,8 +308,7 @@ export default function GridLab() {
         </div>
       </header>
 
-      {tab === 'library' && <LibraryView Stage={Stage} pitch={pitch} padMM={pad} />}
-      <div className="gl-body" style={tab === 'library' ? { display: 'none' } : undefined}>
+      <div className="gl-body">
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
             <span className="gl-eye gl-perf">
@@ -314,11 +317,13 @@ export default function GridLab() {
               {perf.cutMs != null ? <> · cut <Sec ms={perf.cutMs} /></> : null}
               {' · '}solve <Sec ms={perf.solveMs} />
             </span>
-            <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
+            <span className="gl-eye">{libraryModel ? libraryModel.title : model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
-            {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
+            {libraryModel ? <Stage contour={libraryModel.contour} grid={libraryModel.grid} lattice={showLattice} box={false}
+              segments={[]} segFill={false} onPan={() => {}} onZoom={() => {}} onReset={() => {}} />
+            : model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
@@ -336,6 +341,7 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
+          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} /> : <>
           <Fold title="Shape source">
             <div className="gl-seg gl-seg3">
               <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
@@ -472,9 +478,10 @@ export default function GridLab() {
               <button onClick={resetDefaults}>Reset to default</button>
             </div>
           </Fold>
+          </>}
         </aside>
 
-        <aside className="gl-centercol">
+        <aside className="gl-centercol" style={tab === 'library' ? { display: 'none' } : undefined}>
           <Fold title="Classifier">
             {model?.recog ? (() => {
               const r = model.recog

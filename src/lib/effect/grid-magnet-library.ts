@@ -4,8 +4,68 @@
 // units [ix, iy], iy = 0 at the TOP, canonical tall orientation; wide frames are the
 // transpose, mirrors are reflections — the viewer derives those for display.
 
+import type { ShapeFamily } from './grid-magnet-class'
+
 export interface LibraryLayout { name: string; nodes: ReadonlyArray<readonly [number, number]>; note?: string }
 export interface LibraryFrame { cols: number; rows: number; layouts: LibraryLayout[] }
+
+/** A display transform over a canonical (tall) layout. Pure; closed over the frame. */
+export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: boolean }
+
+/** Apply a transform. Pure integer geometry — no engine, no React. */
+export function transformLayout(
+  frame: LibraryFrame, layout: LibraryLayout, t: LibraryTransform,
+): { cols: number; rows: number; nodes: Array<[number, number]> } {
+  let c = frame.cols, r = frame.rows
+  let ns = layout.nodes.map(([x, y]) => [x, y] as [number, number])
+  if (t.transpose) { ns = ns.map(([x, y]) => [y, x]); const k = c; c = r; r = k }
+  if (t.flipX) ns = ns.map(([x, y]) => [c - 1 - x, y])
+  if (t.flipY) ns = ns.map(([x, y]) => [x, r - 1 - y])
+  return { cols: c, rows: r, nodes: ns }
+}
+
+/** Frame kind, the classifier's taxonomy (square / slim / standard) — pure. */
+export function kindOf(cols: number, rows: number): 'square' | 'slim' | 'standard' {
+  return cols === rows ? 'square' : Math.min(cols, rows) <= 2 ? 'slim' : 'standard'
+}
+export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'even' {
+  return rows > cols ? 'tall' : cols > rows ? 'wide' : 'even'
+}
+
+/** The classifier's families, and the DRAFT family -> layout applicability — data for Dan's
+ *  review in the authoring panel, never silently applied as engine policy. */
+export const LIBRARY_FAMILIES: ShapeFamily[] = ['square', 'round', 'triangle']
+export const FAMILY_APPLICABILITY_DRAFT: Record<ShapeFamily, string[]> = {
+  square: ['full', 'ring', 'block', 'chain', 'single', 'pair'],
+  round: ['full', 'ring', 'corners', 'sides', 'block', 'chain', 'single', 'pair'],
+  triangle: ['tee-L', 'tee-R', 'tee', 'double-tee', 'corners', 'ell', 'diagonal', 'stacked-pairs', 'stacked-rows', 'alternating-rows', 'U', 'single', 'pair'],
+}
+
+/** Integrity of the canonical data — every violation named; empty list = sound. */
+export function libraryIntegrity(): string[] {
+  const out: string[] = []
+  const seenFrames = new Set<string>()
+  for (const f of LAYOUT_LIBRARY) {
+    const fk = f.cols + 'x' + f.rows
+    if (seenFrames.has(fk)) out.push('duplicate frame ' + fk)
+    seenFrames.add(fk)
+    const names = new Set<string>()
+    for (const l of f.layouts) {
+      if (names.has(l.name)) out.push(fk + ': duplicate layout name ' + l.name)
+      names.add(l.name)
+      const nodes = new Set<string>()
+      for (const [x, y] of l.nodes) {
+        if (x < 0 || x >= f.cols || y < 0 || y >= f.rows) out.push(fk + ' ' + l.name + ': node out of bounds ' + x + ',' + y)
+        const k = x + ',' + y
+        if (nodes.has(k)) out.push(fk + ' ' + l.name + ': duplicate node ' + k)
+        nodes.add(k)
+      }
+      if (!l.nodes.length) out.push(fk + ' ' + l.name + ': empty layout')
+    }
+    if (!f.layouts.length) out.push(fk + ': no layouts')
+  }
+  return out
+}
 
 export const LAYOUT_LIBRARY: LibraryFrame[] = [
   { cols: 1, rows: 1, layouts: [
