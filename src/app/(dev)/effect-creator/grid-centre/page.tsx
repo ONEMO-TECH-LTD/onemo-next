@@ -1120,9 +1120,10 @@ const CSS = `
 .gl-libtab .gl-stage-head{position:absolute;inset:14px 14px auto;pointer-events:none;z-index:2}
 .gl-libtab .gl-controls{position:absolute;top:14px;right:14px;width:300px;max-height:calc(100% - 28px);
   overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
-.gl-libtab .gl-controls>*{backdrop-filter:blur(8px);background:#ffffffe8}
+.gl-libtab .gl-controls>*{backdrop-filter:blur(8px);background:color-mix(in srgb,var(--panel) 92%,transparent)}
 .gl-libbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:8px 14px;
-  width:100vw;margin-left:calc(50% - 50vw);background:#ffffffe6;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  width:100vw;margin-left:calc(50% - 50vw);background:color-mix(in srgb,var(--panel) 92%,transparent);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .gl-libbar-mode{flex:none}
 .gl-libbar-tabs{flex:1}
 .gl-libbar .gl-seg button{padding:7px 14px}
