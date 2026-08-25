@@ -189,11 +189,27 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         model = { contour: free.contour, grid: free.grid, effSize: sizeMM, ladder: [], idx: 0, segments: free.grid.segments }
       } else {
         const contour = sized(at.sizeMM)
-        // computeGrid's registration phase is measured FROM THE SHAPE'S BBOX CORNER; the wrap's
-        // origin is absolute. Convert, or the lattice lands offset and nothing seats.
-        const bb = bbox(contour.outer.pts)
-        const grid = computeGrid(contour, { ...cfg, forcePhaseMM: [at.originMM[0] - bb.minX, at.originMM[1] - bb.minY] })
-        model = { contour, grid, effSize: at.sizeMM, ladder: [], idx: 0, segments: grid.segments }
+        // computeGrid's registration phase is measured FROM THE SHAPE'S BBOX CORNER and must
+        // anchor a LATTICE NODE. The wrap's origin is the group's MIDDLE — between nodes for
+        // even layouts — so the phase comes from a real magnet position instead.
+        // The wrap's seat coordinates live in the frame of ITS size, and the shape's coordinates
+        // SCALE with size — so at any display size the anchor seat is seat0 x (eff / at.sizeMM).
+        // At exact tangency the wrap's float check and the seat test's integer arithmetic can
+        // disagree by under a micron, so step up within the seat test's 0.05mm guard band until
+        // the binding seat registers. Declared tolerance alignment, not behavior.
+        const seat0 = at.points[0]
+        let eff = at.sizeMM
+        let shown = contour
+        let grid: GridResult
+        for (let bump = 0; ; bump += 0.01) {
+          eff = at.sizeMM + bump
+          shown = bump === 0 ? contour : sized(eff)
+          const b2 = bbox(shown.outer.pts)
+          const sc = eff / at.sizeMM
+          grid = computeGrid(shown, { ...cfg, forcePhaseMM: [seat0[0] * sc - b2.minX, seat0[1] * sc - b2.minY] })
+          if (grid.anchors.length >= at.count || bump >= 0.06) break
+        }
+        model = { contour: shown, grid, effSize: eff, ladder: [], idx: 0, segments: grid.segments }
       }
       snapCache.set(sk, model)
       if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
