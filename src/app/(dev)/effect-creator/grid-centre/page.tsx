@@ -421,7 +421,7 @@ export default function GridLab() {
               const isDraft = librarySel.layoutId.startsWith('draft:')
               const d = isDraft ? drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId) : undefined
               const l = isDraft ? undefined : frame.layouts.find((x) => x.name === librarySel.layoutId)
-              setEdit({ name: d ? d.name : l ? l.name : '', nodes: (d ? d.nodes : l ? l.nodes.map(([x, y]) => [x, y] as [number, number]) : []) })
+              setEdit({ name: d ? d.name : l ? l.name + '-custom' : '', nodes: (d ? d.nodes : l ? l.nodes.map(([x, y]) => [x, y] as [number, number]) : []) })
             }}
             saveEdit={() => {
               if (!edit) return

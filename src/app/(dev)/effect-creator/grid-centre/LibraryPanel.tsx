@@ -42,13 +42,6 @@ export default function LibraryPanel({
         <b>{boxW}×{boxH}</b><span>mm</span>
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
-      <Fold title="Shape">
-        <div className="gl-lib">
-          {LIBRARY_SHAPES.filter((s) => s.family === shape.family).map((s) => (
-            <button key={s.id} aria-pressed={s.id === shape.id} onClick={() => setSel({ ...sel, shapeId: s.id })}><b>{s.id}</b></button>
-          ))}
-        </div>
-      </Fold>
       {shape.family === 'square' && (
         <Fold title="Type">
           <div className="gl-seg">
@@ -99,29 +92,29 @@ export default function LibraryPanel({
           {mine.map((d) => (
             <button key={d.id} aria-pressed={!edit && sel.layoutId === 'draft:' + d.name}
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'draft:' + d.name }) }}>
-              <b>{d.name}</b><span>mine</span>
+              <b>{d.name}</b><span>custom</span>
             </button>
           ))}
           <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
         </div>
-        {(sel.layoutId === 'perimeter' || sel.layoutId === 'perimeter-96') && !edit && (
-          <div className="gl-field" style={{ marginTop: 9 }}><span>Belt · magnet spacing</span>
-            <div className="gl-seg">
-              <button aria-pressed={sel.layoutId === 'perimeter'} onClick={() => setSel({ ...sel, layoutId: 'perimeter' })}>48 mm</button>
-              <button aria-pressed={sel.layoutId === 'perimeter-96'} onClick={() => setSel({ ...sel, layoutId: 'perimeter-96' })}>96 mm</button>
-            </div>
+        <div className="gl-field" style={{ marginTop: 9 }}><span>Spacing · 48 · 96 computed · custom by hand</span>
+          <div className="gl-seg">
+            <button aria-pressed={!edit && sel.layoutId === 'perimeter'} disabled={!frame.layouts.some((l) => l.name === 'perimeter')}
+              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter' }) }}>48 mm</button>
+            <button aria-pressed={!edit && sel.layoutId === 'perimeter-96'} disabled={!frame.layouts.some((l) => l.name === 'perimeter-96')}
+              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter-96' }) }}>96 mm</button>
+            <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
           </div>
-        )}
+        </div>
         {edit ? (
           <div className="gl-libedit">
-            <input value={edit.name} placeholder="name" onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+            <input value={edit.name} placeholder="custom name" onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
             <button onClick={saveEdit} disabled={!edit.name.trim() || !edit.nodes.length}>save</button>
             <button onClick={() => setEdit(null)}>cancel</button>
             {isDraft && <button onClick={deleteEdit}>delete</button>}
           </div>
         ) : (
           <div className="gl-libedit">
-            <button onClick={startEdit}>edit</button>
             {isDraft && <button onClick={deleteEdit}>delete</button>}
           </div>
         )}

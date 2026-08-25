@@ -85,7 +85,7 @@ export const SQUARE_FRAMES: LibraryFrame[] = [
   ] },
   { cols: 4, rows: 4, layouts: [
     { name: 'perimeter', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [3, 1], [0, 2], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]] },
-    { name: 'perimeter-96', nodes: [[0, 0], [3, 0], [0, 3], [3, 3]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [2, 0], [3, 0], [0, 2], [3, 2], [0, 3], [2, 3], [3, 3]] },
     { name: 'corners', nodes: [[0, 0], [3, 0], [0, 3], [3, 3]] },
   ] },
   { cols: 5, rows: 5, layouts: [
@@ -219,7 +219,9 @@ export function selectedRecords(sel: LibrarySelection): {
 }
 
 
-/** SANDBOX DRAFTS (Dan, 08-25): layouts authored by clicking lattice nodes on the bench.
+/** CUSTOM LAYOUTS (Dan, 08-25): hand-authored by clicking lattice nodes — a trimmed or sparse
+ *  population that no computed mode produces. The 48/96 spacing MODE is computed; anything a
+ *  human removes by hand is custom.
  *  Browser-local until exported — the canonical corpus above is never mutated at runtime.
  *  A draft is the same literal shape as a library layout, plus where it belongs. */
 export interface LibraryDraft {
