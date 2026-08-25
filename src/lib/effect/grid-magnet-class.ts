@@ -88,3 +88,22 @@ export function frameNodes(cols: AxisClass, rows: AxisClass, pitchMM: number = D
   return out
 }
 
+
+/**
+ * THE CLASS LAYOUT (Dan's pipeline, 2026-08-25): centre first, segments second, classification
+ * third, layout fourth, wrap last. The segment box's PROPORTIONS are scale-invariant, so the
+ * class needs no size: the band id IS the dominant axis's line count (band-by-frame), and the
+ * minor axis carries lines in proportion. A tall segment in B2 is a vertical pair by
+ * construction — no parity coin-flip, no discovery.
+ */
+export function classFrameNodes(
+  segW: number, segH: number, bandId: number, pitchMM: number = DEFAULT_PITCH_MM,
+): { cols: number; rows: number; nodes: Pt[] } {
+  const n = Math.max(1, Math.min(5, bandId)) as AxisClass
+  const dom = Math.max(segW, segH), min = Math.min(segW, segH)
+  const m = Math.max(1, Math.min(n, Math.round(n * (dom > 0 ? min / dom : 1)))) as AxisClass
+  const tall = segH >= segW
+  const cols = (tall ? m : n) as AxisClass
+  const rows = (tall ? n : m) as AxisClass
+  return { cols, rows, nodes: frameNodes(cols, rows, pitchMM) }
+}

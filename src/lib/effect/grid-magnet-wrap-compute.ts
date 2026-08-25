@@ -629,7 +629,7 @@ export function wrapFlap(
 }
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number }
+export interface BandRung { at: WrapAt; revealMM: number; isClass?: boolean }
 
 /**
  * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
@@ -649,6 +649,13 @@ export interface BandRung { at: WrapAt; revealMM: number }
 export function wrapBandLadder(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
   anchorAtMM?: (mm: number) => Pt,
+  /** The class-named layout for this band (Dan's pipeline step 4) — always solved and offered
+   *  first; the parity reveal stays as the discovery channel beside it. */
+  classNodes?: ReadonlyArray<Pt>,
+  /** The class frame (cols x rows). Dan's ruling 08-25: an offer that does not SPAN the frame's
+   *  dominant axis leaves the segment exposed and is DROPPED — a square block on a tall segment
+   *  is not an option; the vertical pair or the full assembly is. */
+  classFrame?: { cols: number; rows: number },
 ): BandRung[] {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
@@ -660,6 +667,18 @@ export function wrapBandLadder(
   const anchorMemo = new Map<number, Pt>()
   const seen = new Set<string>()
   const rungs: BandRung[] = []
+  const idOfPts = (pts: ReadonlyArray<Pt>): string => {
+    let mx = Infinity, my = Infinity
+    for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
+    return pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
+  }
+  if (classNodes && classNodes.length) {
+    const at = wrapGroup(sized, wcfg, classNodes, minMM, hiMM, anchorMemo)
+    if (at && at.sizeMM >= loMM - 0.005 && at.sizeMM <= hiMM + 0.005) {
+      seen.add(idOfPts(at.points))
+      rungs.push({ at, revealMM: at.sizeMM, isClass: true })
+    }
+  }
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
     const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
@@ -670,6 +689,18 @@ export function wrapBandLadder(
     const id = pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
     if (seen.has(id)) continue
     seen.add(id)
+    if (classFrame) {
+      // Class conformance: the pattern must reach both extremes of the frame's dominant axis.
+      const tall = classFrame.rows >= classFrame.cols
+      const need = (tall ? classFrame.rows : classFrame.cols) - 1
+      let lo2 = Infinity, hi2 = -Infinity
+      for (const q of pts) {
+        const v = Math.round(((tall ? q[1] : q[0]) - (tall ? my : mx)) / pitch)
+        if (v < lo2) lo2 = v
+        if (v > hi2) hi2 = v
+      }
+      if (hi2 - lo2 < need) continue                 // leaves the segment exposed — not an option
+    }
     // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
