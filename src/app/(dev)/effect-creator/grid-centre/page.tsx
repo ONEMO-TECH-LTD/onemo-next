@@ -90,7 +90,7 @@ export default function GridLab() {
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
-  const [mode, setMode] = useState<number | 'free' | 'wrap'>('free')
+  const [mode, setMode] = useState<number | 'free'>('free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -223,7 +223,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null; wrapGapMM?: number | null; wrapCentreOffMM?: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -261,7 +261,7 @@ export default function GridLab() {
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
-    const manualBand = mode !== 'free' && mode !== 'wrap' && (manual !== null || bandScale !== null)
+    const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
     const id = ++seqRef.current
     const msg = {
       id, base, offsetMM, cfg,
@@ -284,7 +284,7 @@ export default function GridLab() {
     <div className="gl">
       <style>{CSS}</style>
       <header className="gl-head">
-        <h1>Centre Wrap Lab <span className="gl-tag">v3.5.6-lead · centre+wrap</span></h1>
+        <h1>Centre Lab <span className="gl-tag">v3.5.6-lead · centre rules</span></h1>
       </header>
 
       <div className="gl-body">
@@ -390,10 +390,9 @@ export default function GridLab() {
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
                 <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null); setBandScale(null) }}>Free</button>
-                <button aria-pressed={mode === 'wrap'} onClick={() => { setMode('wrap'); setStepSel(1); setManual(null); setBandScale(null) }}>Wrap</button>
               </div>
             </div>
-            {mode !== 'free' && mode !== 'wrap' && <>
+            {mode !== 'free' && <>
               <div className="gl-snap">
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
@@ -421,19 +420,6 @@ export default function GridLab() {
               <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
             {mode === 'free' && <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />}
-            {mode === 'wrap' && <>
-              <Stepper label="Magnets · the shape wraps around them" v={stepSel ?? 1}
-                set={(n) => setStepSel(Math.max(1, n))} />
-              <div className="gl-snap">
-                {model
-                  ? `${model.grid.anchors.length}⌾ · ${Math.round(model.effSize)} mm · ` + (
-                    model.wrapGapMM == null ? '—'
-                      : model.wrapGapMM <= 0.6 ? 'PRESSED · 0 gap'
-                        : `NOT TOUCHING · ${model.wrapGapMM.toFixed(1)} mm short`)
-                    + ` · off-centre ${model.wrapCentreOffMM ?? 0} mm`
-                  : '—'}
-              </div>
-            </>}
             {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>

@@ -1,9 +1,8 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { autoFlapInBand, BANDS, centreWrapLadder, computeGrid, FLAP_MM, fitSizeInBand, impliedFlapMM, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
+import { autoFlapInBand, BANDS, computeGrid, FLAP_MM, fitSizeInBand, impliedFlapMM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
-import { wrap, wrapGrid } from '@/lib/effect/grid-magnet-wrap-compute'
 import type { Contour } from '@/lib/effect/types'
 
 interface SolveRequest {
@@ -11,7 +10,7 @@ interface SolveRequest {
   base: Contour
   offsetMM: number
   cfg: GridConfig
-  mode: number | 'free' | 'wrap'
+  mode: number | 'free'
   sizeMM: number
   snapStep: number
   stepSel: number | null
@@ -28,7 +27,6 @@ let shapeSig = ''
 const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
 const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand>; autoFlapMM: number | null }>()
-const cwCache = new Map<string, ReturnType<typeof centreWrapLadder>>()
 const FREE_CAP = 400
 
 const WALK_CAP = 10
@@ -111,44 +109,9 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
     }
     const sig = JSON.stringify([offsetMM, pts.length, h])
-    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear(); cwCache.clear() }
+    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
     const cfgSig = JSON.stringify(cfg)
-    if (mode === 'wrap') {
-      // One thing: wrap the shape around the asked-for number of magnets.
-      const at = wrap(sized, cfg, stepSel ?? 1, MIN_EFFECT_MM, sizeRange(cfg.paddingMM ?? 12).maxMM)
-      if (!at) { ctx.postMessage({ id, model: null }); return }
-      const drawn = wrapGrid(sized, cfg, at)
-      ctx.postMessage({ id, model: {
-        contour: drawn.contour, grid: drawn.grid, effSize: at.sizeMM,
-        ladder: [], idx: 0, segments: drawn.grid.segments, autoFlapMM: null,
-        wrapGapMM: at.gapsMM.length ? Math.min(...at.gapsMM) : null,
-        wrapCentreOffMM: at.centreOffMM,
-      } })
-    } else if (mode !== 'free' && cfg.positioning === 1) {
-      // CENTRE + WRAP — the band's rungs are exact contact sizes under centre-rules parity.
-      // No walk, no rigid gate; each distinct layout the material reveals is offered at the
-      // size where its binding seat sits exactly on the padding line.
-      const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
-      const key = JSON.stringify([cfgSig, band.id])
-      let cw = cwCache.get(key)
-      if (!cw) {
-        cw = centreWrapLadder(sized, cfg, band.minMM)
-        cwCache.set(key, cw)
-        if (cwCache.size > FITS_CAP) cwCache.delete(cwCache.keys().next().value!)
-      }
-      if (cw.ladder.length) {
-        const idx = Math.min(stepSel ?? 0, cw.ladder.length - 1)
-        const grid = cw.grids[idx]
-        const eff = cw.ladder[idx].sizeMM
-        const contour = sized(eff)
-        ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: cw.ladder, idx, segments: grid.segments, autoFlapMM: null } })
-        return
-      }
-      // The band produced no layout of its own — fall through to the walk's honest fallback.
-      const { fit, autoFlapMM } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
-      const contour = sized(fit.sizeMM)
-      ctx.postMessage({ id, model: { contour, grid: fit.grid, effSize: fit.sizeMM, ladder: [], idx: 0, segments: fit.grid.segments, autoFlapMM } })
-    } else if (mode !== 'free') {
+    if (mode !== 'free') {
       const { fit, autoFlapMM } = bandFit(sized, cfg, cfgSig, mode, snapStep, autoFlapMaxMM ?? null)
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
