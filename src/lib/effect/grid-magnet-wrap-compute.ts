@@ -680,8 +680,25 @@ export function wrapBandLadder(
     // WRAP IS THE LAW (Dan, 08-25): the layout starts centred and the CENTRE SHIFTS when the
     // wrap conflicts with it — never the reverse. One solve: minimal shift, tightest wrap.
     // A variant that grows the shape to stay pinned on the centre is not a wrap.
-    const at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
+    let at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
     if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
+    // THE SMALL ADJUSTMENT (Dan, 08-25: "it could have computed the small adjustment to make it
+    // wrap and be closer to centre"): probe up to a quarter pitch above contact and accept
+    // growth only while it PAYS — each mm spent must buy more than a mm of centring. 141/off11.5
+    // steps to 144/off~0 (3mm buys 11); the banned 164 case cannot return (23mm for 11 fails).
+    {
+      const probeCap = (cfg.pitchMM ?? DEFAULT_PITCH_MM) / 4
+      let best = at
+      for (let k = 1; k <= probeCap; k++) {
+        const s2 = at.sizeMM + k
+        if (s2 > hiMM + 0.005) break
+        const cand = wrapGroup(sized, wcfg, assembly, s2, s2, anchorMemo)
+        if (!cand) continue
+        const gain = at.centreOffMM - cand.centreOffMM
+        if (gain > k && cand.centreOffMM < best.centreOffMM) best = cand
+      }
+      at = best
+    }
     if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
     seen.add(idOfPts(at.points))
     rungs.push({ at, revealMM: at.sizeMM, isClass: true })
