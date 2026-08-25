@@ -445,68 +445,6 @@ export default function GridLab() {
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
             }} /></> : <>
-          <Fold title="Shape">
-            {src === 'preset' && <>
-              <div className="gl-lib">
-                {PRESETS.map((k) => (
-                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
-                ))}
-              </div>
-              {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
-              {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
-            </>}
-
-            {src === 'gen' && <>
-              <div className="gl-seg gl-wrap">
-                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
-              </div>
-              <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
-              <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
-            </>}
-
-            {src === 'cut' && <>
-              <div className="gl-lib">
-                {libCut.map((f) => (
-                  <button key={f} aria-pressed={cutSel === f} onClick={() => { setCutSel(f); loadCut(f) }}>
-                    <b>{f.replace(/\.\w+$/, '')}</b>
-                  </button>
-                ))}
-              </div>
-              <label className="gl-field" style={{ display: 'none' }}><span>Cutout library</span>
-                <select value={cutSel} onChange={(e) => { setCutSel(e.target.value); if (e.target.value) loadCut(e.target.value) }}>
-                  <option value="">— pick a cutout —</option>
-                  {libCut.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
-                </select>
-              </label>
-              <div className="gl-magic-note">
-                {cutStatus.startsWith('error') ? '⚠ ' + cutStatus.slice(6)
-                  : cutStatus === 'tracing' ? 'tracing the outline…'
-                    : cutC ? 'outline traced from the alpha edge · edit size below'
-                      : 'finished cutouts — the outline is the image’s own edge, no AI pass.'}
-              </div>
-            </>}
-
-            {src === 'magic' && <>
-              {libRaw.length > 0 && <label className="gl-field"><span>Raw library · goes through the AI cut</span>
-                <select value={libSel} onChange={(e) => { setLibSel(e.target.value); if (e.target.value) loadLib(e.target.value) }}>
-                  <option value="">— pick an image —</option>
-                  {libRaw.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
-                </select>
-              </label>}
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
-              <button className="gl-upload" onClick={() => fileRef.current?.click()}>
-                {magic ? 'Replace image' : 'Upload an image'}
-              </button>
-              <div className="gl-magic-note">
-                {magStatus === 'downloading-model' ? '↓ downloading cut-out model (one time)…'
-                  : magStatus.startsWith('cutting') ? '✂ cutting out the subject…'
-                    : magStatus.startsWith('error') ? '⚠ ' + magStatus.slice(6)
-                      : magic ? `cut by ${magic.adapter} · edit size below`
-                        : 'AI removes the background and traces the silhouette — that outline meets the grid.'}
-              </div>
-            </>}
-          </Fold>
-
           <Fold title="Grid settings">
             <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">
@@ -585,58 +523,84 @@ export default function GridLab() {
         </aside>
 
         <aside className="gl-centercol" style={tab === 'library' ? { display: 'none' } : undefined}>
-          <Fold title="Classifier">
-            {model?.recog ? (() => {
-              const r = model.recog
-              const kind = r.cols === r.rows ? 'square' : (Math.min(r.cols, r.rows) <= 2 ? 'slim' : 'standard')
-              const orient = r.rows > r.cols ? 'tall' : r.cols > r.rows ? 'wide' : 'even'
-              return <>
-                <div className="gl-legend">
-                  <div><span><b>Family</b> · {r.family}</span></div>
-                  <div><span><b>Kind</b> · {orient} {kind}</span></div>
-                  <div><span><b>Frame</b> · {r.cols}×{r.rows} ({r.cols * r.rows} nodes)</span></div>
-                  <div><span><b>Segment box</b> · {r.segWmm.toFixed(0)}×{r.segHmm.toFixed(0)} mm at this size</span></div>
-                </div>
-                <div className="gl-magic-note">Measured once per shape at the bake — scale-free. Step 1 of the pipeline: recognition only.</div>
-              </>
-            })() : <div className="gl-magic-note">No classification yet — solve a band.</div>}
+          <Fold title="Shape">
+            {src === 'preset' && <>
+              <div className="gl-lib">
+                {PRESETS.map((k) => (
+                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
+                ))}
+              </div>
+              {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
+              {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
+            </>}
+
+            {src === 'gen' && <>
+              <div className="gl-seg gl-wrap">
+                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
+              </div>
+              <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
+              <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
+            </>}
+
+            {src === 'cut' && <>
+              <div className="gl-lib">
+                {libCut.map((f) => (
+                  <button key={f} aria-pressed={cutSel === f} onClick={() => { setCutSel(f); loadCut(f) }}>
+                    <b>{f.replace(/\.\w+$/, '')}</b>
+                  </button>
+                ))}
+              </div>
+              <label className="gl-field" style={{ display: 'none' }}><span>Cutout library</span>
+                <select value={cutSel} onChange={(e) => { setCutSel(e.target.value); if (e.target.value) loadCut(e.target.value) }}>
+                  <option value="">— pick a cutout —</option>
+                  {libCut.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
+                </select>
+              </label>
+              <div className="gl-magic-note">
+                {cutStatus.startsWith('error') ? '⚠ ' + cutStatus.slice(6)
+                  : cutStatus === 'tracing' ? 'tracing the outline…'
+                    : cutC ? 'outline traced from the alpha edge · edit size below'
+                      : 'finished cutouts — the outline is the image’s own edge, no AI pass.'}
+              </div>
+            </>}
+
+            {src === 'magic' && <>
+              {libRaw.length > 0 && <label className="gl-field"><span>Raw library · goes through the AI cut</span>
+                <select value={libSel} onChange={(e) => { setLibSel(e.target.value); if (e.target.value) loadLib(e.target.value) }}>
+                  <option value="">— pick an image —</option>
+                  {libRaw.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
+                </select>
+              </label>}
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+              <button className="gl-upload" onClick={() => fileRef.current?.click()}>
+                {magic ? 'Replace image' : 'Upload an image'}
+              </button>
+              <div className="gl-magic-note">
+                {magStatus === 'downloading-model' ? '↓ downloading cut-out model (one time)…'
+                  : magStatus.startsWith('cutting') ? '✂ cutting out the subject…'
+                    : magStatus.startsWith('error') ? '⚠ ' + magStatus.slice(6)
+                      : magic ? `cut by ${magic.adapter} · edit size below`
+                        : 'AI removes the background and traces the silhouette — that outline meets the grid.'}
+              </div>
+            </>}
           </Fold>
 
+
           <Fold title="Centering">
-            <div className="gl-magic-note">
-              Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting in this build.
-            </div>
-            <div className="gl-field"><span>Centre mode · what the grid aims at</span>
+            <div className="gl-field"><span>Centre mode</span>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
                   <button key={m} aria-pressed={centreMode === m} onClick={() => setCentreMode(m)}>{l}</button>)}
               </div>
             </div>
-            <div className="gl-magic-note">
-              {centreMode === 0 ? 'Box — the bounding box centre; ignores where the material is.'
-                : centreMode === 1 ? 'Core — the centre of the whole 12mm legal area, area-weighted.'
-                  : centreMode === 2 ? 'Masses — adaptive: every mass centre anchors; the smallest mass holding a magnet governs.'
-                    : centreMode === 3 ? 'Weight — the material centroid of the silhouette.'
-                      : centreMode === 4 ? 'Deep — the single most buried point of the shape.'
-                        : 'Top — the highest mass governs (gravity rule).'}
-            </div>
-            {centreMode === 2 && <div className="gl-field"><span>Governor · which mass rules</span>
+            {centreMode === 2 && <div className="gl-field"><span>Governor</span>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
             </div>}
             {(centreMode === 2 || centreMode === 5) &&
-              <Slider label="Mass depth · clearance to count" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
-            <div className="gl-legend">
-              <div><i className="gl-sw gl-sw-main" /><span><b>Main centre</b> · governs the winning layout</span></div>
-              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[0], background: SEG_HUES[0] + '22' }} /><span><b>Island S1</b> · smallest legal area</span></div>
-              <div><i className="gl-sw" style={{ borderColor: SEG_HUES[1], background: SEG_HUES[1] + '22' }} /><span><b>Island S2</b> · next larger, per colour</span></div>
-              <div><i className="gl-sw gl-sw-dash" style={{ borderColor: SEG_HUES[0] }} /><span><b>Mass at depth</b> · the island&apos;s solid core</span></div>
-            </div>
-            <label className="gl-toggle"><span>Fill islands <small style={{ color: 'var(--ink-3)' }}>· coloured inner area</small></span>
-              <input type="checkbox" checked={segFillN !== 0} onChange={(e) => setSegFillN(e.target.checked ? 1 : 0)} />
-            </label>
+              <Slider label="Mass depth" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
           </Fold>
         </aside>
       </div>
