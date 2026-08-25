@@ -140,19 +140,18 @@ export function fitOptimalBagBands(
   const candidatesByBand = new Map(BAG_BANDS.map(({ id }) => [id, [] as BagFit[]]))
   const maximumBand = BAG_BANDS[BAG_BANDS.length - 1]
   const seatsPerAxis = Math.floor((maximumBand.maxMM - DISK_DIAMETER_MM) / LATTICE_PITCH_MM) + 1
-  for (let count = 1; count <= seatsPerAxis ** 2; count++) {
-    const layouts = uniqueLayouts([...bagOptionLayouts(count), ...classifiedLayouts(prepared, count)])
-    for (const layout of layouts) {
-      for (const exact of exactFits(layout)) {
-        const band = bandForRequiredSize(exact.sizeMM)
-        if (band) candidatesByBand.get(band.id)?.push(exact)
-      }
+  const work = Array.from({ length: seatsPerAxis ** 2 }, (_, index) => index + 1)
+    .flatMap((count) => uniqueLayouts([...bagOptionLayouts(count), ...classifiedLayouts(prepared, count)]))
+  for (const [index, layout] of work.entries()) {
+    for (const exact of exactFits(layout)) {
+      const band = bandForRequiredSize(exact.sizeMM)
+      if (band) candidatesByBand.get(band.id)?.push(exact)
     }
+    onProgress?.(index + 1, work.length)
   }
 
-  return BAG_BANDS.map((band, bandIndex) => {
+  return BAG_BANDS.map((band) => {
     const result = { ...band, candidates: (candidatesByBand.get(band.id) ?? []).sort(compareBagFits) }
-    onProgress?.(bandIndex + 1, BAG_BANDS.length)
     return result
   })
 }

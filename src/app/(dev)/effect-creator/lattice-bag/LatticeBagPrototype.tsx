@@ -313,7 +313,7 @@ export function LatticeBagPrototype() {
             <div className={styles.computing} role="status" aria-live="polite">
               <span className={styles.spinner} aria-hidden />
               <strong>Computing wrap fits</strong>
-              <span>B{Math.min(bandCompute.completed + 1, bandCompute.total)} of {bandCompute.total} · {(bandElapsedMs / 1000).toFixed(1)} s</span>
+              <span>Searching {bandCompute.completed} of {bandCompute.total} layouts · {(bandElapsedMs / 1000).toFixed(1)} s</span>
             </div>
           )}
           {fit && bounds ? (
@@ -475,7 +475,7 @@ export function LatticeBagPrototype() {
         )}
         <div className={styles.status} aria-live="polite">
           {error || (bandCompute
-            ? `Computing B${Math.min(bandCompute.completed + 1, bandCompute.total)} of ${bandCompute.total} · ${(bandElapsedMs / 1000).toFixed(1)} s`
+            ? `Searching ${bandCompute.completed} of ${bandCompute.total} layouts · ${(bandElapsedMs / 1000).toFixed(1)} s`
             : fit
               ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · snug wrap · ${fit.opposingContactPairs} opposing contact pair${fit.opposingContactPairs === 1 ? '' : 's'} · ${fit.maximumUnsupportedSpanMM.toFixed(1)} mm max unsupported span${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
               : 'No shape loaded')}
