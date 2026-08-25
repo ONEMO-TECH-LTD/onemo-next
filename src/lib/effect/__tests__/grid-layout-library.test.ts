@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   SQUARE_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
+  resolveSelection, selectedRecords, draftLayoutId, type LibraryDraft,
   type LibrarySelection,
 } from '../library'
 import { libraryArrangement, libraryPreview, libraryStageModel } from '../grid-magnet-library-bridge'
@@ -212,5 +213,55 @@ describe('diamond wrapping', () => {
       const span = Math.max(...xs) - Math.min(...xs)
       expect(span).toBeCloseTo(2 * (k * 48 + 12 * Math.SQRT2), 6)
     }
+  })
+})
+
+describe('selection resolution — one owner, no guessing in the view', () => {
+  const draft = (over: Partial<LibraryDraft> = {}): LibraryDraft => ({
+    id: 'draft:square:3x3:mine', className: 'square', frameKey: '3x3', name: 'mine',
+    nodes: [[0, 0], [2, 2]], ...over,
+  })
+
+  it('a stale cross-class layout lands on a real one instead of throwing', () => {
+    // Clicking diamond while 'perimeter' was selected on square used to throw and white-screen
+    // the tab: the diamond's 1x1 carries only 'single'.
+    const r = resolveSelection(sel({ shapeId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }))
+    expect(r.frame.layouts.some((l) => l.name === r.safeSel.layoutId)).toBe(true)
+    expect(() => selectedRecords(r.safeSel)).not.toThrow()
+  })
+
+  it('an unknown frame falls back to the class first frame, and safeSel says so', () => {
+    const r = resolveSelection(sel({ shapeId: 'square', frameKey: '9x9', layoutId: 'ring' }))
+    expect(r.safeSel.frameKey).toBe(frameKeyOf(CLASS_FRAMES.square[0]))
+    expect(() => selectedRecords(r.safeSel)).not.toThrow()
+  })
+
+  it('the strict resolver still refuses the same input — the two are not merged', () => {
+    expect(() => selectedRecords(sel({ shapeId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }))).toThrow('unknown layoutId')
+    expect(() => selectedRecords(sel({ frameKey: '9x9' }))).toThrow('unknown frameKey')
+  })
+
+  it('a draft resolves only for its own class AND frame AND name', () => {
+    const ds = [draft()]
+    const hit = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds)
+    expect(hit.draft?.id).toBe('draft:square:3x3:mine')
+    // same frame key, different class — must NOT answer for the diamond
+    const cross = resolveSelection(sel({ shapeId: 'diamond', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds)
+    expect(cross.draft).toBeNull()
+    // same class, different frame
+    const other = resolveSelection(sel({ shapeId: 'square', frameKey: '4x4', layoutId: draftLayoutId('mine') }), ds)
+    expect(other.draft).toBeNull()
+  })
+
+  it('a draft selection still hands the bridge a real corpus layout', () => {
+    const r = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), [draft()])
+    expect(r.safeSel.layoutId).toBe(r.frame.layouts[0].name)
+    expect(() => selectedRecords(r.safeSel)).not.toThrow()
+  })
+
+  it('a draft that no longer exists resolves to the corpus, not to nothing', () => {
+    const r = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [])
+    expect(r.draft).toBeNull()
+    expect(r.layout.name).toBe(r.frame.layouts[0].name)
   })
 })

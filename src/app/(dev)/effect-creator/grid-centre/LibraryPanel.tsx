@@ -6,7 +6,7 @@
 
 import type { ReactElement, ReactNode } from 'react'
 import {
-  CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, frameKeyOf, pickLayout, selectedRecords,
+  CLASS_FRAMES, CLASS_RULES, frameKeyOf, pickLayout, resolveSelection, draftLayoutId,
   type LibrarySelection, type LibraryDraft,
 } from '@/lib/effect/library'
 
@@ -31,12 +31,12 @@ export default function LibraryPanel({
   startAdd: () => void
   startEdit: () => void
 }) {
-  const { shape, frame } = selectedRecords({ ...sel, layoutId: sel.layoutId.startsWith('draft:') ? frame0(sel) : sel.layoutId })
+  const { shape, frame, draft } = resolveSelection(sel, drafts)
   const rules = CLASS_RULES[shape.family]
   const frames = CLASS_FRAMES[shape.family]
   const key = frameKeyOf(frame)
   const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family)
-  const isDraft = sel.layoutId.startsWith('draft:')
+  const isDraft = !!draft
   const sub = rules.subOf(frame.cols, frame.rows)
   const shown = rules.orientable ? { c: sel.view.transpose ? frame.rows : frame.cols, r: sel.view.transpose ? frame.cols : frame.rows } : { c: frame.cols, r: frame.rows }
   const box = rules.boxMM(shown.c, shown.r, pitch, padMM)
@@ -80,8 +80,8 @@ export default function LibraryPanel({
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: l.name }) }}><b>{l.name}</b></button>
           ))}
           {mine.map((d) => (
-            <button key={d.id} aria-pressed={!edit && sel.layoutId === 'draft:' + d.name}
-              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'draft:' + d.name }) }}>
+            <button key={d.id} aria-pressed={!edit && sel.layoutId === draftLayoutId(d.name)}
+              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: draftLayoutId(d.name) }) }}>
               <b>{d.name}</b><span>custom</span>
             </button>
           ))}
@@ -109,12 +109,4 @@ export default function LibraryPanel({
       </Fold>
     </>
   )
-}
-
-/** A draft selection still needs a real corpus layout to resolve the frame — take the first. */
-function frame0(sel: LibrarySelection): string {
-  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId) ?? LIBRARY_SHAPES[0]
-  const fs = CLASS_FRAMES[shape.family]
-  const f = fs.find((x) => frameKeyOf(x) === sel.frameKey) ?? fs[0]
-  return f.layouts[0].name
 }

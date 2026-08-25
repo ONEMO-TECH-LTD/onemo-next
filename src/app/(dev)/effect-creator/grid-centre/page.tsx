@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
+import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -107,21 +107,11 @@ export default function GridLab() {
   }
   const libraryModel = useMemo(() => {
     if (tab !== 'library') return null
-    const isDraft = librarySel.layoutId.startsWith('draft:')
-    const base = isDraft ? { ...librarySel, layoutId: '' } : librarySel
-    const fam = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
-      const frames = CLASS_FRAMES[fam]
-      const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
-    const resolved = { ...base, layoutId: isDraft ? frame.layouts[0].name : librarySel.layoutId }
-    // A stale or cross-class selection must never take the page down: the strict resolver
-    // stays strict for the pipeline; the view falls back to the frame's first layout.
-    const safe = { ...resolved, layoutId: pickLayout(frame, resolved.layoutId) }
-    if (edit) return draftStageModel(safe, edit.nodes, pitch, pad, frame.cols, frame.rows, '')
-    if (isDraft) {
-      const d = drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId)
-      if (d) return draftStageModel(safe, d.nodes, pitch, pad, frame.cols, frame.rows, '')
-    }
-    return libraryStageModel(safe, pitch, pad)
+    const { frame, safeSel, draft } = resolveSelection(librarySel, drafts)
+    const nodes = edit ? edit.nodes : draft?.nodes
+    return nodes
+      ? draftStageModel(safeSel, nodes, pitch, pad, frame.cols, frame.rows, '')
+      : libraryStageModel(safeSel, pitch, pad)
   }, [tab, librarySel, pitch, pad, edit, drafts])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
@@ -341,7 +331,7 @@ export default function GridLab() {
           </div>
           <div className="gl-seg gl-libbar-tabs">
             {LIBRARY_FAMILIES.map((fam) => {
-              const cur = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
+              const cur = resolveSelection(librarySel, drafts).shape.family
               return <button key={fam} aria-pressed={cur === fam} onClick={() => {
                 const first = LIBRARY_SHAPES.find((x) => x.family === fam)!
                 const f0 = CLASS_FRAMES[fam][0]
@@ -391,7 +381,7 @@ export default function GridLab() {
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: Math.min(6, Math.max(0.15, v.zoom * f)) })),
                     onReset: () => setLibView({ panMM: [0, 0], zoom: 0.45 }),
                     onPickNode: edit ? (pMM: Pt) => {
-                      const { frame } = selectedRecords(librarySel)
+                      const { frame } = resolveSelection(librarySel, drafts)
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
                       const n = nodeAtMM(pMM, pitch, rows)
                       if (!n) return
@@ -428,28 +418,23 @@ export default function GridLab() {
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
-              const fam = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
-      const frames = CLASS_FRAMES[fam]
-      const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
-              const isDraft = librarySel.layoutId.startsWith('draft:')
-              const d = isDraft ? drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId) : undefined
-              const l = isDraft ? undefined : frame.layouts.find((x) => x.name === librarySel.layoutId)
-              setEdit({ name: d ? d.name : l ? l.name + '-custom' : '', nodes: (d ? d.nodes : l ? l.nodes.map(([x, y]) => [x, y] as [number, number]) : []) })
+              const { layout, draft } = resolveSelection(librarySel, drafts)
+              setEdit(draft
+                ? { name: draft.name, nodes: draft.nodes.map(([x, y]) => [x, y] as [number, number]) }
+                : { name: layout.name + '-custom', nodes: layout.nodes.map(([x, y]) => [x, y] as [number, number]) })
             }}
             saveEdit={() => {
               if (!edit) return
-              const { shape, frame } = selectedRecords({ ...librarySel, layoutId: (CLASS_FRAMES[(LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family].find((f) => frameKeyOf(f) === librarySel.frameKey) ?? CLASS_FRAMES.square[0]).layouts[0].name })
-              const rec: LibraryDraft = { id: draftId(shape.family, frameKeyOf(frame), edit.name), className: shape.family, frameKey: frameKeyOf(frame), name: edit.name, nodes: edit.nodes }
+              const { shape, safeSel } = resolveSelection(librarySel, drafts)
+              const rec: LibraryDraft = { id: draftId(shape.family, safeSel.frameKey, edit.name), className: shape.family, frameKey: safeSel.frameKey, name: edit.name, nodes: edit.nodes }
               writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
               setEdit(null)
-              setLibrarySel({ ...librarySel, layoutId: 'draft:' + edit.name })
+              setLibrarySel({ ...librarySel, layoutId: draftLayoutId(edit.name) })
             }}
             deleteEdit={() => {
-              const nm = edit ? edit.name : librarySel.layoutId.replace(/^draft:/, '')
-              const fam = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
-      const frames = CLASS_FRAMES[fam]
-      const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
-              writeDrafts(drafts.filter((x) => !(x.frameKey === librarySel.frameKey && x.name === nm)))
+              const nm = edit ? edit.name : draftNameOf(librarySel.layoutId)
+              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts)
+              writeDrafts(drafts.filter((x) => !(x.className === shape.family && x.frameKey === safeSel.frameKey && x.name === nm)))
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
             }} /></> : <>
