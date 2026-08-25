@@ -400,7 +400,8 @@ export default function GridLab() {
                       })
                     } : undefined }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
-                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom },
+                    // 100% = the shape at half the board, so there is room around it (Dan).
+                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom * 0.5 },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
