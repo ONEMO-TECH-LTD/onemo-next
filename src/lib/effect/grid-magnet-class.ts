@@ -88,3 +88,57 @@ export function frameNodes(cols: AxisClass, rows: AxisClass, pitchMM: number = D
   return out
 }
 
+
+
+/**
+ * THE CLASS FRAME (Dan's pipeline): the segment box's PROPORTIONS are scale-invariant, so the
+ * class needs no size — the band id IS the dominant axis's line count (band-by-frame), and the
+ * minor axis carries lines in proportion.
+ */
+export function classFrameNodes(
+  segW: number, segH: number, bandId: number, pitchMM: number = DEFAULT_PITCH_MM,
+): { cols: number; rows: number; nodes: Pt[] } {
+  const n = Math.max(1, Math.min(5, bandId)) as AxisClass
+  const dom = Math.max(segW, segH), min = Math.min(segW, segH)
+  const m = Math.max(1, Math.min(n, Math.round(n * (dom > 0 ? min / dom : 1)))) as AxisClass
+  const tall = segH >= segW
+  const cols = (tall ? m : n) as AxisClass
+  const rows = (tall ? n : m) as AxisClass
+  return { cols, rows, nodes: frameNodes(cols, rows, pitchMM) }
+}
+
+/** The three primitive families (Dan, 08-24 23:26): SQUARE and its rectangles fill the frame;
+ *  ROUND are their rounded versions — square counts, corner padding; TRIANGLE (triangle,
+ *  diamond = double triangle, T, L, waisted) populate the frame PARTIALLY. */
+export type ShapeFamily = 'square' | 'round' | 'triangle'
+
+/**
+ * Family from the material: fill ratio separates triangle (partial box) from full box; corner
+ * occupancy separates square (material reaches its corners) from round (corners are padding).
+ * Measured on the exemplars 08-24: triangle family fills ~50-65% of its box, square/round 70%+.
+ */
+export function shapeFamilyOf(outer: ReadonlyArray<Pt>): ShapeFamily {
+  const bb = bbox(outer)
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY
+  const boxA = Math.max(1e-9, w * h)
+  let a2 = 0
+  for (let i = 0, j = outer.length - 1; i < outer.length; j = i++)
+    a2 += outer[j][0] * outer[i][1] - outer[i][0] * outer[j][1]
+  const fill = Math.abs(a2 / 2) / boxA
+  if (fill < 0.68) return 'triangle'
+  // corner occupancy: sample the four bbox corner cells for material
+  const inside = (px: number, py: number): boolean => {
+    let hit = false
+    for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+      const xi = outer[i][0], yi = outer[i][1], xj = outer[j][0], yj = outer[j][1]
+      if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) hit = !hit
+    }
+    return hit
+  }
+  const dx = w * 0.08, dy = h * 0.08
+  const corners = [
+    [bb.minX + dx, bb.minY + dy], [bb.maxX - dx, bb.minY + dy],
+    [bb.minX + dx, bb.maxY - dy], [bb.maxX - dx, bb.maxY - dy],
+  ].filter(([x, y]) => inside(x, y)).length
+  return corners >= 3 ? 'square' : 'round'
+}

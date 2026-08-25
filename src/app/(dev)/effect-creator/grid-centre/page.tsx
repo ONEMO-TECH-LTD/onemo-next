@@ -57,10 +57,7 @@ export default function GridLab() {
   const [sides, setSides] = useState(6)
   const [points, setPoints] = useState(5)
   // Opens on the B2 floor — the 72mm square standard (2×2), from spec.
-  const [sizeMM, setSizeMM] = useState(BANDS[1].minMM)
   /** Free-slider limits — typed, persisted across reloads. */
-  const [sizeMin, setSizeMin] = usePersisted('sizeMin', MIN_EFFECT_MM)
-  const [sizeMax, setSizeMax] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
   const [padLock, setPadLock] = usePersisted('padLock', 1)
@@ -85,7 +82,7 @@ export default function GridLab() {
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
-  const [mode, setMode] = useState<number | 'free'>('free')
+  const [mode, setMode] = useState<number>(1)
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -113,15 +110,14 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode, governor, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode, governor, snapStep })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
       pad: RELEASED_PADDING_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR, snapStep: SNAP_STEP_MM,
-      sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSnapStep(d.snapStep)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -229,7 +225,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number } }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -275,12 +271,13 @@ export default function GridLab() {
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning: 1, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
-    const manualBand = manual !== null || bandScale !== null
+    const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
     const id = ++seqRef.current
     const msg = {
       id, base, offsetMM: 0, cfg,
-      mode: manualBand ? 'free' : mode,
-      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
+      mode,
+      manualBand,
+      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? BANDS[0].minMM) : 0,
       snapStep, stepSel,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
@@ -288,7 +285,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage])
+  }, [base, src, preset, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -400,7 +397,7 @@ export default function GridLab() {
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
               </div>
             </div>
-            {mode !== 'free' && <>
+            {true && <>
               <div className="gl-snap">
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
@@ -470,6 +467,23 @@ export default function GridLab() {
         </aside>
 
         <aside className="gl-centercol">
+          <Fold title="Classifier">
+            {model?.recog ? (() => {
+              const r = model.recog
+              const kind = r.cols === r.rows ? 'square' : (Math.min(r.cols, r.rows) <= 2 ? 'slim' : 'standard')
+              const orient = r.rows > r.cols ? 'tall' : r.cols > r.rows ? 'wide' : 'even'
+              return <>
+                <div className="gl-legend">
+                  <div><span><b>Family</b> · {r.family}</span></div>
+                  <div><span><b>Kind</b> · {orient} {kind}</span></div>
+                  <div><span><b>Frame</b> · {r.cols}×{r.rows} ({r.cols * r.rows} nodes)</span></div>
+                  <div><span><b>Segment box</b> · {r.segWmm.toFixed(0)}×{r.segHmm.toFixed(0)} mm at this size</span></div>
+                </div>
+                <div className="gl-magic-note">Measured once per shape at the bake — scale-free. Step 1 of the pipeline: recognition only.</div>
+              </>
+            })() : <div className="gl-magic-note">No classification yet — solve a band.</div>}
+          </Fold>
+
           <Fold title="Centering">
             <div className="gl-magic-note">
               Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting in this build.
