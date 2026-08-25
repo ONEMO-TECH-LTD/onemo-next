@@ -42,6 +42,17 @@ function box96(frame: LibraryFrame, perimeter: readonly Node[]): Node[] {
   }).map(([x, y]) => [x, y] as Node)
 }
 
+/** The triangle's perimeter is three runs — the vertical leg, the base, and the slant, one
+ *  node per row. A node is sampled by the run it sits on; the vertices sit on two runs and
+ *  survive either way. */
+function tri96(frame: LibraryFrame, perimeter: readonly Node[]): Node[] {
+  const ky = sample96(frame.rows), kx = sample96(frame.cols)
+  const xmax = (y: number) => Math.floor((y * (frame.cols - 1)) / (frame.rows - 1))
+  return perimeter.filter(([x, y]) =>
+    (x === 0 && ky.has(y)) || (y === frame.rows - 1 && kx.has(x)) || (x === xmax(y) && ky.has(y)),
+  ).map(([x, y]) => [x, y] as Node)
+}
+
 /** Manhattan ring: sides run vertex to vertex with r+1 nodes; a node's place along its side
  *  is |dx| from the vertical vertex. */
 function ring96(frame: LibraryFrame, perimeter: readonly Node[]): Node[] {
@@ -62,12 +73,13 @@ export interface ClassRules {
   subs: string[]
   /** Which sub a frame belongs to. */
   subOf: (cols: number, rows: number) => string
-  /** Does this class have a portrait/landscape orientation, or is it square by nature? */
-  orientable: boolean
   /** The frame's outer box in mm — the class floor, or the wrapping rule the class needs. */
   boxMM: (cols: number, rows: number, pitchMM: number, padMM: number) => { w: number; h: number }
   /** How a frame is labelled to a human. */
   label: (cols: number, rows: number) => string
+  /** The views this class offers, in order. Empty means the class has no orientation.
+   *  A rectangle turns (transpose); a triangle points its apex at any of four corners. */
+  orientations: Array<{ id: string; view: { transpose: boolean; flipX: boolean; flipY: boolean } }>
   /** The 96mm sample of this class's perimeter — the ring geometry differs per class. */
   spacing96: (frame: LibraryFrame, perimeter: readonly Node[]) => Node[]
 }
@@ -76,30 +88,53 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
   square: {
     subs: ['box'],
     subOf: () => 'box',
-    orientable: false,
     boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
     label: (c, r) => c + '×' + r,
+    orientations: [],
     spacing96: box96,
   },
   rectangle: {
     subs: ['frame', 'banner', 'slim'],
     subOf: (c, r) => (Math.min(c, r) <= 1 ? 'slim' : Math.min(c, r) === 2 ? 'banner' : 'frame'),
-    orientable: true,
     boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
     label: (c, r) => c + '×' + r,
+    orientations: [
+      { id: 'portrait', view: { transpose: false, flipX: false, flipY: false } },
+      { id: 'landscape', view: { transpose: true, flipX: false, flipY: false } },
+    ],
     spacing96: box96,
   },
   diamond: {
     subs: ['rhomb'],
     subOf: () => 'rhomb',
-    orientable: false,
     // the outline WRAPS the ring: half-diagonal = ring radius + padding on the diagonal
     boxMM: (c, _r, pitch, pad) => {
       const span = 2 * (((c - 1) / 2) * pitch + pad * Math.SQRT2)
       return { w: span, h: span }
     },
     label: (c) => { const side = (c - 1) / 2 + 1; return side + '×' + side },
+    orientations: [],
     spacing96: ring96,
+  },
+  triangle: {
+    subs: ['wedge'],
+    subOf: () => 'wedge',
+    // The outline WRAPS the magnets: each of the three edges moves out by the padding, which
+    // for a triangle is the same triangle scaled about its incentre. Legs W and H, slant L.
+    boxMM: (c, r, pitch, pad) => {
+      const W = (c - 1) * pitch, H = (r - 1) * pitch
+      if (W === 0 || H === 0) return boxByClassFloor(c, r, pitch)
+      const L = Math.hypot(W, H)
+      return { w: pad + (pad * L + W * (H + pad)) / H, h: H + pad + (pad * (H + L)) / W }
+    },
+    label: (c, r) => c + '×' + r,
+    orientations: [
+      { id: 'apex ↖', view: { transpose: false, flipX: false, flipY: false } },
+      { id: 'apex ↗', view: { transpose: false, flipX: true, flipY: false } },
+      { id: 'apex ↙', view: { transpose: false, flipX: false, flipY: true } },
+      { id: 'apex ↘', view: { transpose: false, flipX: true, flipY: true } },
+    ],
+    spacing96: tri96,
   },
 }
 

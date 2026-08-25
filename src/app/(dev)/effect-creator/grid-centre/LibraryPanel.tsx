@@ -39,7 +39,8 @@ export default function LibraryPanel({
   const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family)
   const isDraft = !!draft
   const sub = rules.subOf(frame.cols, frame.rows)
-  const shown = rules.orientable ? { c: sel.view.transpose ? frame.rows : frame.cols, r: sel.view.transpose ? frame.cols : frame.rows } : { c: frame.cols, r: frame.rows }
+  const shown = { c: sel.view.transpose ? frame.rows : frame.cols, r: sel.view.transpose ? frame.cols : frame.rows }
+  const sameView = (v: typeof sel.view) => v.transpose === sel.view.transpose && v.flipX === sel.view.flipX && v.flipY === sel.view.flipY
   const box = rules.boxMM(shown.c, shown.r, pitch, padMM)
   const has = (n: string) => frame.layouts.some((l) => l.name === n)
   const jump = (f: typeof frame) => { setEdit(null); setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: pickLayout(f, sel.layoutId) }) }
@@ -57,11 +58,13 @@ export default function LibraryPanel({
           ))}
         </div>
       </Fold>
-      {rules.orientable && (
+      {rules.orientations.length > 0 && (
         <Fold title="Orientation">
           <div className="gl-seg">
-            <button aria-pressed={!sel.view.transpose} onClick={() => setSel({ ...sel, view: { ...sel.view, transpose: false } })}>portrait</button>
-            <button aria-pressed={sel.view.transpose} onClick={() => setSel({ ...sel, view: { ...sel.view, transpose: true } })}>landscape</button>
+            {rules.orientations.map((o) => (
+              <button key={o.id} aria-pressed={sameView(o.view)}
+                onClick={() => setSel({ ...sel, view: { ...o.view } })}>{o.id}</button>
+            ))}
           </div>
         </Fold>
       )}

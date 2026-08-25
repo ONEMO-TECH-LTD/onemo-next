@@ -7,4 +7,5 @@ export const FAMILY_APPLICABILITY_DRAFT: Record<LibraryFamily, string[]> = {
   square: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
   rectangle: ['full', 'perimeter', 'perimeter-96', 'corners'],
   diamond: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
+  triangle: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
 }

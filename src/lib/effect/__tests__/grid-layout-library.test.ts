@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, TRIANGLE_FRAMES, CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, transformLayout as tl,
   type LibraryDraft,
@@ -15,7 +15,7 @@ import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
-const SHAPE_IDS = ['square', 'rectangle', 'diamond']
+const SHAPE_IDS = ['square', 'rectangle', 'diamond', 'triangle']
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
   shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter',
@@ -49,7 +49,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
       // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
       // the engine classifier reads it as the box-filling 'square' family. The mapping is
       // asserted explicitly so the two taxonomies can never silently merge.
-      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
+      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle', triangle: 'triangle' }
       const f0 = CLASS_FRAMES[s.family][0]
       const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
       expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(ENGINE_FAMILY[s.family])
@@ -89,7 +89,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
 
 
   it('families and draft applicability stay complete', () => {
-    expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle', 'diamond'])
+    expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle', 'diamond', 'triangle'])
     for (const fam of LIBRARY_FAMILIES) expect(FAMILY_APPLICABILITY_DRAFT[fam].length).toBeGreaterThan(0)
   })
 })
@@ -272,12 +272,16 @@ describe('selection resolution — one owner, no guessing in the view', () => {
 
 describe('the 96mm spacing mode is computed policy, one rule for every class', () => {
   const key = (n: readonly [number, number]) => n[0] + ',' + n[1]
-  const extremes = (f: { cols: number; rows: number }, family: string) => family === 'diamond'
-    ? (() => { const k = (f.cols - 1) / 2; return [[k, 0], [0, k], [f.cols - 1, k], [k, f.rows - 1]] as Array<[number, number]> })()
-    : [[0, 0], [f.cols - 1, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]] as Array<[number, number]>
+  // An extreme is a vertex of the class's own outline — four for a box, four for a Manhattan
+  // ring, three for a triangle.
+  const extremes = (f: { cols: number; rows: number }, family: string): Array<[number, number]> => {
+    if (family === 'diamond') { const k = (f.cols - 1) / 2; return [[k, 0], [0, k], [f.cols - 1, k], [k, f.rows - 1]] }
+    if (family === 'triangle') return [[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
+    return [[0, 0], [f.cols - 1, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
+  }
 
   it('the corpus stores no 96mm population — it is derived, never hand-written', () => {
-    for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES])
+    for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, TRIANGLE_FRAMES])
       for (const f of frames) expect(f.layouts.map((l) => l.name)).not.toContain('perimeter-96')
   })
 
@@ -293,7 +297,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
     }
   })
 
-  it('every 96mm population keeps all four extremes — an extreme is never left bare', () => {
+  it('every 96mm population keeps every extreme — an extreme is never left bare', () => {
     for (const fam of LIBRARY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
@@ -359,5 +363,71 @@ describe('authoring under a view transform stays canonical (QA F2)', () => {
     expect(n[0]).toBeGreaterThanOrEqual(0); expect(n[0]).toBeLessThan(frame.cols)
     expect(n[1]).toBeGreaterThanOrEqual(0); expect(n[1]).toBeLessThan(frame.rows)
     expect(n).toEqual([0, 2])
+  })
+})
+
+describe('triangle class — built on the square and rectangle frames', () => {
+  const key = (n: readonly [number, number]) => n[0] + ',' + n[1]
+  const F = CLASS_FRAMES.triangle
+
+  it('carries only frames whose slant lands on lattice nodes', () => {
+    expect(F.map(frameKeyOf)).toEqual(['1x1', '2x2', '3x3', '4x4', '5x5', '2x3', '2x5', '3x5'])
+    // 3x4 and 4x5 are excluded on purpose: (rows-1) is not a whole multiple of (cols-1), so
+    // the slant would have to step half a node.
+    for (const bad of ['3x4', '4x5']) expect(F.map(frameKeyOf)).not.toContain(bad)
+  })
+
+  it('full is every node under the slant; the square frames are the triangular numbers', () => {
+    const n = (k: string) => F.find((f) => frameKeyOf(f) === k)!.layouts.find((l) => l.name === 'full')!.nodes.length
+    expect([n('2x2'), n('3x3'), n('4x4'), n('5x5')]).toEqual([3, 6, 10, 15])
+    expect([n('2x3'), n('2x5'), n('3x5')]).toEqual([4, 6, 9])
+  })
+
+  it('every node sits on or under the slant — nothing outside the triangle', () => {
+    for (const f of F.slice(1)) {
+      const xmax = (y: number) => Math.floor((y * (f.cols - 1)) / (f.rows - 1))
+      for (const l of f.layouts) for (const [x, y] of l.nodes)
+        expect(x, `${frameKeyOf(f)} ${l.name} ${key([x, y])}`).toBeLessThanOrEqual(xmax(y))
+    }
+  })
+
+  it('perimeter drops only interior nodes, corners are the three vertices', () => {
+    for (const f of F.slice(1)) {
+      const full = f.layouts.find((l) => l.name === 'full')!
+      const per = f.layouts.find((l) => l.name === 'perimeter')!
+      const fullK = new Set(full.nodes.map(key))
+      for (const n of per.nodes) expect(fullK.has(key(n))).toBe(true)
+      expect(per.nodes.length).toBeLessThanOrEqual(full.nodes.length)
+      const corners = f.layouts.find((l) => l.name === 'corners')!
+      expect(corners.nodes.map(key).sort())
+        .toEqual([[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]].map((n) => key(n as [number, number])).sort())
+    }
+  })
+
+  it('the outline wraps the magnets — every node clears the three edges by the padding', () => {
+    const pitch = 48, pad = 12
+    for (const f of F.slice(1)) {
+      const box = CLASS_RULES.triangle.boxMM(f.cols, f.rows, pitch, pad)
+      const W = (f.cols - 1) * pitch, H = (f.rows - 1) * pitch
+      // the offset triangle is similar to the magnet triangle, so its legs grow by the same
+      // ratio its box does; a node can never be closer than the padding to an edge
+      expect(box.w).toBeGreaterThan(W)
+      expect(box.h).toBeGreaterThan(H)
+      expect(box.w - W).toBeGreaterThanOrEqual(pad)
+      expect(box.h - H).toBeGreaterThanOrEqual(pad)
+    }
+  })
+
+  it('the four apex corners are the flips of one canonical layout', () => {
+    expect(CLASS_RULES.triangle.orientations.map((o) => o.id)).toEqual(['apex ↖', 'apex ↗', 'apex ↙', 'apex ↘'])
+    const f = F.find((x) => frameKeyOf(x) === '3x3')!
+    const full = f.layouts.find((l) => l.name === 'full')!
+    const seen = new Set<string>()
+    for (const o of CLASS_RULES.triangle.orientations) {
+      const t = tl(f, full, o.view)
+      expect(t.nodes.length).toBe(full.nodes.length)
+      seen.add(t.nodes.map(key).sort().join('|'))
+    }
+    expect(seen.size).toBe(4)   // four genuinely different apex corners
   })
 })
