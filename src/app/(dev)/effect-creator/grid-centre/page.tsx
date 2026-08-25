@@ -71,6 +71,8 @@ export default function GridLab() {
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
   const [engineMode, setEngineMode] = usePersisted('engineMode', 1)
+  /** The selected band — B1 by default, or the last one pushed; both modes restore it. */
+  const [bandSel, setBandSel] = usePersisted('band', 1)
   const [snapWrapN, setSnapWrapN] = usePersisted('snapWrap', 1)
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   /** Positioning law — voting vs centre-rules (parity-locked, no voting). */
@@ -87,7 +89,7 @@ export default function GridLab() {
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
-  const [mode, setMode] = useState<number | 'free'>('free')
+  const [mode, setMode] = useState<number | 'free'>(() => engineMode === 1 ? bandSel : 'free')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -218,8 +220,24 @@ export default function GridLab() {
     finally { genMsRef.current = performance.now() - t0 }
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
+  // On load, restore the pushed band (B1 by default) — usePersisted hydrates post-mount, so
+  // read storage directly here for the one decision that must be right on first paint.
+  useEffect(() => {
+    try {
+      const em = +(localStorage.getItem('grid-centre.engineMode') ?? '1') || 1
+      const bs = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
+      const b = BANDS.find((x) => x.id === bs) ?? BANDS[0]
+      if (em === 2) {
+        setMode('free')
+        setSizeMin(b.minMM); setSizeMax(b.maxMM)
+        setSizeMM((v) => Math.min(b.maxMM, Math.max(b.minMM, v)))
+      } else setMode(b.id)
+    } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; dots: [number, number][] } }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number } }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -306,7 +324,7 @@ export default function GridLab() {
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
-              segments={showSegs ? model.segments : []} segFill={segFillN !== 0} recogDots={model.recog?.dots}
+              segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
@@ -394,37 +412,31 @@ export default function GridLab() {
                 <button aria-pressed={engineMode === 1} onClick={() => {
                   setEngineMode(1); setStepSel(null); setManual(null); setBandScale(null)
                   // carry the band across: the window chip (or the size) names it; default B2
-                  const b = BANDS.find((x) => x.minMM === sizeMin && x.maxMM === sizeMax)
-                    ?? BANDS.find((x) => sizeMM >= x.minMM && sizeMM <= x.maxMM) ?? BANDS[1]
+                  const b = BANDS.find((x) => x.id === bandSel)
+                    ?? BANDS.find((x) => sizeMM >= x.minMM && sizeMM <= x.maxMM) ?? BANDS[0]
                   setMode(b.id)
                 }}>1 · Wrap ladder</button>
                 <button aria-pressed={engineMode === 2} onClick={() => {
                   setEngineMode(2); setStepSel(null); setManual(null); setBandScale(null)
                   // carry the band across: the ladder's band becomes the slider window
-                  const b = (typeof mode === 'number' ? BANDS.find((x) => x.id === mode) : undefined)
-                    ?? BANDS.find((x) => sizeMM >= x.minMM && sizeMM <= x.maxMM) ?? BANDS[1]
+                  const b = BANDS.find((x) => x.id === bandSel)
+                    ?? BANDS.find((x) => sizeMM >= x.minMM && sizeMM <= x.maxMM) ?? BANDS[0]
                   setMode('free'); setSizeMin(b.minMM); setSizeMax(b.maxMM)
                   setSizeMM(Math.min(b.maxMM, Math.max(b.minMM, sizeMM)))
                 }}>2 · Free + snap</button>
               </div>
             </div>
-            {model?.recog && (() => {
-              const r = model.recog
-              const kind = r.cols === r.rows ? 'square' : (Math.min(r.cols, r.rows) <= 2 ? 'slim' : 'standard')
-              const orient = r.rows > r.cols ? 'tall' : r.cols > r.rows ? 'wide' : ''
-              return <div className="gl-magic-note">Recognised: <b>{r.family}</b> family · {orient} {kind} · frame {r.cols}×{r.rows}</div>
-            })()}
             {engineMode === 1 && <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setBandSel(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
               </div>
             </div>}
             {engineMode === 2 && <div className="gl-field"><span>Band · slider window</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={sizeMin === b.minMM && sizeMax === b.maxMM}
-                    onClick={() => { setSizeMin(b.minMM); setSizeMax(b.maxMM); setSizeMM(Math.min(Math.max(sizeMM, b.minMM), b.maxMM)) }}>B{b.id}</button>)}
+                    onClick={() => { setBandSel(b.id); setSizeMin(b.minMM); setSizeMax(b.maxMM); setSizeMM(Math.min(Math.max(sizeMM, b.minMM), b.maxMM)) }}>B{b.id}</button>)}
                 <button aria-pressed={sizeMin === MIN_EFFECT_MM && sizeMax === sizeRange(RELEASED_PADDING_MM).maxMM}
                   onClick={() => { setSizeMin(MIN_EFFECT_MM); setSizeMax(sizeRange(RELEASED_PADDING_MM).maxMM) }}>All</button>
               </div>
@@ -529,6 +541,22 @@ export default function GridLab() {
         </aside>
 
         <aside className="gl-centercol">
+          <Fold title="Classifier">
+            {model?.recog ? (() => {
+              const r = model.recog
+              const kind = r.cols === r.rows ? 'square' : (Math.min(r.cols, r.rows) <= 2 ? 'slim' : 'standard')
+              const orient = r.rows > r.cols ? 'tall' : r.cols > r.rows ? 'wide' : 'even'
+              return <>
+                <div className="gl-legend">
+                  <div><span><b>Family</b> · {r.family}</span></div>
+                  <div><span><b>Kind</b> · {orient} {kind}</span></div>
+                  <div><span><b>Frame</b> · {r.cols}×{r.rows} ({r.cols * r.rows} nodes)</span></div>
+                  <div><span><b>Segment box</b> · {r.segWmm.toFixed(0)}×{r.segHmm.toFixed(0)} mm at this size</span></div>
+                </div>
+                <div className="gl-magic-note">Measured once per shape at the bake — scale-free. The family picks the preset layouts; the band names the frame.</div>
+              </>
+            })() : <div className="gl-magic-note">No classification yet — solve a band or move the slider.</div>}
+          </Fold>
           <Fold title="Centering">
             <div className="gl-magic-note">
               Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting in this build.
@@ -580,9 +608,8 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, recogDots, onPan, onZoom, onReset }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
-  recogDots?: [number, number][]
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -807,14 +834,6 @@ function Stage({ contour, grid, lattice, box, segments, segFill, recogDots, onPa
         return <g key={'a' + i} opacity={0.5}>
           <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill={a.dia === 8 ? 'var(--mag8)' : 'var(--magnet)'} />
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
-        </g>
-      })}
-      {/* THE RECOGNISER, validated by eye: the class frame's expected node positions. */}
-      {recogDots?.map((d: [number, number], i: number) => {
-        const p2 = fy(d)
-        return <g key={'rg' + i}>
-          <circle cx={p2[0]} cy={p2[1]} r={2.2} fill="none" stroke="var(--mag8)" strokeWidth={0.5} strokeDasharray="1.6 1.2" />
-          <circle cx={p2[0]} cy={p2[1]} r={0.7} fill="var(--mag8)" />
         </g>
       })}
       {/* Tangency made visible: where a disc touches the outline within the allowance. */}

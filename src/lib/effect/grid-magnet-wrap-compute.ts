@@ -42,6 +42,9 @@ export interface WrapConfig {
   /** Baked anchor query (anchor bake): the governed centre at any size, positions measured once
    *  on the shape and scaled — replaces per-size mesh re-measurement. In-worker only. */
   anchorAtMM?: (mm: number) => Pt
+  /** Cap on how far the group may shift off its centred start (rule 4's "only slightly").
+   *  ~0 = pure-centred solve: a size is lawful only when the centred position is lawful. */
+  maxShiftMM?: number
   /** Perimeter belt — drop fully-surrounded interior seats, keeping the rim. Reused from the
    *  voting bench. Applied to the ARRANGEMENT before the wrap is solved, so the shape still
    *  wraps tight around exactly the magnets that remain. */
@@ -226,7 +229,10 @@ export function wrapGroup(
     if (!region) return null
     const valid = validOrigins(region, g)
     if (!valid) return null
-    return pickOrigin(valid, centred)
+    const picked = pickOrigin(valid, centred)
+    if (cfg.maxShiftMM != null
+      && Math.hypot(picked[0] - centred[0], picked[1] - centred[1]) > cfg.maxShiftMM) return null
+    return picked
   }
 
   if (!heldAt(maxMM)) return null
@@ -338,7 +344,10 @@ export function wrap(
     if (!region) return null
     const valid = validOrigins(region, group)
     if (!valid) return null
-    return pickOrigin(valid, centred)
+    const picked = pickOrigin(valid, centred)
+    if (cfg.maxShiftMM != null
+      && Math.hypot(picked[0] - centred[0], picked[1] - centred[1]) > cfg.maxShiftMM) return null
+    return picked
   }
 
   // Every arrangement is solved to ITS OWN tightest wrap, so every candidate below is already a
@@ -674,12 +683,17 @@ export function wrapBandLadder(
   }
   for (const assembly of classNodes ?? []) {
     if (!assembly.length) continue
-    const at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
-    if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
-    const id = idOfPts(at.points)
-    if (seen.has(id)) continue
-    seen.add(id)
-    rungs.push({ at, revealMM: at.sizeMM, isClass: true })
+    // The pipeline's step and its exception, both offered: the PURE-CENTRED wrap (layout on the
+    // centre, the wrap grows to seal it) and the FREE-SHIFT wrap (the cove-dip, tightest
+    // possible). Rule-4 landing prefers centred within half a pitch — the BOT pair lands centred.
+    const centredAt = wrapGroup(sized, { ...wcfg, maxShiftMM: 0.5 }, assembly, minMM, hiMM, anchorMemo)
+    const freeAt = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
+    for (const at of [centredAt, freeAt]) {
+      if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
+      if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
+      seen.add(idOfPts(at.points))
+      rungs.push({ at, revealMM: at.sizeMM, isClass: true })
+    }
   }
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
@@ -692,16 +706,19 @@ export function wrapBandLadder(
     if (seen.has(id)) continue
     seen.add(id)
     if (classFrame) {
-      // Class conformance: the pattern must reach both extremes of the frame's dominant axis.
-      const tall = classFrame.rows >= classFrame.cols
-      const need = (tall ? classFrame.rows : classFrame.cols) - 1
-      let lo2 = Infinity, hi2 = -Infinity
+      // Class conformance, both halves: the pattern must SPAN the frame's dominant axis (or it
+      // leaves the segment exposed) AND FIT WITHIN the frame (band-by-frame: a 2-magnet layout
+      // does not belong in B1's 1x1, whatever its contact size).
+      let xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity
       for (const q of pts) {
-        const v = Math.round(((tall ? q[1] : q[0]) - (tall ? my : mx)) / pitch)
-        if (v < lo2) lo2 = v
-        if (v > hi2) hi2 = v
+        const vx = Math.round((q[0] - mx) / pitch), vy = Math.round((q[1] - my) / pitch)
+        if (vx < xLo) xLo = vx; if (vx > xHi) xHi = vx
+        if (vy < yLo) yLo = vy; if (vy > yHi) yHi = vy
       }
-      if (hi2 - lo2 < need) continue                 // leaves the segment exposed — not an option
+      const tall = classFrame.rows >= classFrame.cols
+      const spanDom = tall ? yHi - yLo : xHi - xLo
+      if (spanDom < (tall ? classFrame.rows : classFrame.cols) - 1) continue
+      if (xHi - xLo > classFrame.cols - 1 || yHi - yLo > classFrame.rows - 1) continue
     }
     // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])

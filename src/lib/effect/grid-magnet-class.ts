@@ -122,7 +122,10 @@ export function classAssemblies(
     [(ix - (cols - 1) / 2) * pitchMM, (iy - (rows - 1) / 2) * pitchMM]
   const out: Array<{ name: string; nodes: Pt[] }> = []
   const seen = new Set<string>()
-  const push = (name: string, nodes: Pt[]) => {
+  const push = (name: string, raw: Pt[]) => {
+    // magnets exist once per node — a degenerate assembly (apex falling on its own base) must
+    // collapse, never stack two magnets on one spot
+    const nodes = [...new Map(raw.map((q) => [q.join(','), q])).values()]
     const id = nodes.map((q) => q.join(',')).sort().join(';')
     if (nodes.length && !seen.has(id)) { seen.add(id); out.push({ name, nodes }) }
   }
