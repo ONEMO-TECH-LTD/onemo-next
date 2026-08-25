@@ -771,27 +771,58 @@ export function wrapBandLadder(
         }
       return run
     }
-    for (const r of kept) {
-      for (let round = 0; round < 3; round++) {
-        const at = r.at
-        const outer = sized(at.sizeMM).outer.pts
-        const bad = unheldOf(outer, at.points, hold)
-          .filter((q) => touchesOutline(q, outer) && edgeRunOf(q, outer) > PIN_SPAN_MM)
-          .sort((a, b) => a.centreMM[1] - b.centreMM[1])   // top first — gravity peels the top
-        if (!bad.length) break
-        const g = at.points.map((p) => [p[0] - at.originMM[0], p[1] - at.originMM[1]] as Pt)
-        const base = g[0]
-        const rel: Pt = [bad[0].centreMM[0] - at.originMM[0], bad[0].centreMM[1] - at.originMM[1]]
-        const node: Pt = [
-          base[0] + Math.round((rel[0] - base[0]) / pitch) * pitch,
-          base[1] + Math.round((rel[1] - base[1]) / pitch) * pitch,
-        ]
-        if (g.some((q) => Math.abs(q[0] - node[0]) < 0.5 && Math.abs(q[1] - node[1]) < 0.5)) break
+    const worstEdgeRuns = (at: WrapAt) => {
+      const outer = sized(at.sizeMM).outer.pts
+      return { outer, bad: unheldOf(outer, at.points, hold)
+        .filter((q) => touchesOutline(q, outer) && edgeRunOf(q, outer) > PIN_SPAN_MM)
+        .sort((a, b) => a.centreMM[1] - b.centreMM[1]) }   // top first — gravity peels the top
+    }
+    const forceNode = (at: WrapAt): WrapAt | null => {
+      const { outer, bad } = worstEdgeRuns(at)
+      if (!bad.length) return null
+      // The target is the OUTLINE point of the exposure farthest from every magnet — the worst
+      // unpinned bit of perimeter (Dan, 08-25 11:03) — never the patch's centroid, which can
+      // snap onto an already-seated node and stall the guard with the edge still bare.
+      let target: Pt | null = null, worst = -1
+      for (const ring of bad[0].rings) {
+        const step = Math.max(1, Math.floor(ring.length / 96))
+        for (let i = 0; i < ring.length; i += step) {
+          const q = ring[i]
+          if (nearestDist(outer, q[0], q[1]) > 0.75) continue
+          let dm = Infinity
+          for (const m of at.points) dm = Math.min(dm, Math.hypot(m[0] - q[0], m[1] - q[1]))
+          if (dm > worst) { worst = dm; target = q }
+        }
+      }
+      if (!target) return null
+      const g = at.points.map((p) => [p[0] - at.originMM[0], p[1] - at.originMM[1]] as Pt)
+      const base = g[0]
+      const rel: Pt = [target[0] - at.originMM[0], target[1] - at.originMM[1]]
+      const snap: Pt = [
+        base[0] + Math.round((rel[0] - base[0]) / pitch) * pitch,
+        base[1] + Math.round((rel[1] - base[1]) / pitch) * pitch,
+      ]
+      // Nearest free lattice node to the exposure — the snap first, then its neighbours.
+      const occupied = (n: Pt) => g.some((q) => Math.abs(q[0] - n[0]) < 0.5 && Math.abs(q[1] - n[1]) < 0.5)
+      const nodes: Pt[] = []
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
+        nodes.push([snap[0] + dx * pitch, snap[1] + dy * pitch])
+      nodes.sort((a, b) =>
+        Math.hypot(a[0] - rel[0], a[1] - rel[1]) - Math.hypot(b[0] - rel[0], b[1] - rel[1]))
+      for (const node of nodes.filter((n) => !occupied(n)).slice(0, 3)) {
         const cand = wrapGroup(sized, wcfg, [...g, node], minMM, hiMM, anchorMemo)
-        if (!cand || cand.sizeMM > hiMM + 0.005) break    // unfixable in this band — offer stands
+        if (cand && cand.sizeMM <= hiMM + 0.005) return cand
+      }
+      return null
+    }
+    for (const r of kept) {
+      for (let round = 0; round < 6; round++) {
+        const cand = forceNode(r.at)
+        if (!cand) break                                  // clean, or unfixable in this band
         r.at = cand
       }
     }
+    var guardHolds = (at: WrapAt): boolean => worstEdgeRuns(at).bad.length === 0
   }
   // THE FINE-TUNE (Dan, 08-25: "any center must be auto-finetune… wrap / closest to center").
   // Every offer, every centre mode: after the tightest wrap, search the smallest permitted
@@ -814,7 +845,19 @@ export function wrapBandLadder(
         hiD = d
       } else loD = d
     }
+    // A tune that re-exposes an edge the guard had covered is rejected — the anti-flap law
+    // outranks centring.
+    if (best !== at0 && guardHolds(at0) && !guardHolds(best)) continue
     r.at = best
   }
-  return kept
+  // VIOLATION DOMINANCE (Dan, 08-25: "why do we have candidates with flap on the top — the
+  // grossest violation"): an offer the guard could not bring within the 96mm law is not an
+  // option while a clean offer exists in the band. Only when NOTHING in the band is clean do
+  // the violating offers stand (the honest best-available).
+  const clean = kept.filter((r) => guardHolds(r.at))
+  const offers = clean.length ? clean : kept
+  // Dominance re-judged on FINAL sizes — the guard and fine-tune move counts and sizes, and
+  // two offers that finish at the same size with different counts collapse to the covering one.
+  return offers.filter((r) =>
+    !offers.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
 }

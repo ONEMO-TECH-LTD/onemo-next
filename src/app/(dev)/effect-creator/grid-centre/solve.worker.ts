@@ -4,7 +4,7 @@
 import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
-import { anchorBakeOf, anchorFromBake, assignSizes, centeringAnchors, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, familyAssemblies, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
@@ -42,11 +42,10 @@ const stopsCache = new Map<string, Array<{ press: number; reveal: number }>>()
 // and scaled linearly per size. Positions are shape features; only qualification is size-
 // dependent (evaluated inside anchorFromBake). Core is baked too (Dan, 08-25: "any center" —
 // the pipeline must hold under every mode; a live Core dropped the whole tab to the old walk).
-const bakeCache = new Map<string, { bake: AnchorBake; coreC: [number, number]; segW: number; segH: number; family: ShapeFamily }>()
+const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number; family: ShapeFamily }>()
 function anchorFnFor(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, cfgSig: string, shapeSig2: string,
 ): (((mm: number) => import('@/lib/effect/types').Pt) & { segW: number; segH: number; family: ShapeFamily; refMM: number }) | undefined {
-  const mode = (cfg.centreMode ?? 2) as CentreMode
   const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM, cfg.massDepthMM])
   let hit = bakeCache.get(key)
   if (!hit) {
@@ -59,9 +58,7 @@ function anchorFnFor(
     // The segment box (the legal area's bounds) — its PROPORTIONS name the class per band.
     let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity
     for (const sg of segs) { sx0 = Math.min(sx0, sg.bbox.minX); sy0 = Math.min(sy0, sg.bbox.minY); sx1 = Math.max(sx1, sg.bbox.maxX); sy1 = Math.max(sy1, sg.bbox.maxY) }
-    const boxC: [number, number] = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
-    const coreC = (centeringAnchors(1, segs, boxC, centroidOf(outer))[0] ?? boxC) as [number, number]
-    hit = { bake, coreC, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
+    hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
     bakeCache.set(key, hit)
     if (bakeCache.size > 8) bakeCache.delete(bakeCache.keys().next().value!)
   }
@@ -69,9 +66,15 @@ function anchorFnFor(
   // fixed. So the SELECTION is made once too, at full size, and that one point IS the anchor
   // at every size, scaled linearly. No per-size re-election.
   const bake = hit.bake
-  const gov = (cfg.governor ?? 0) as Governor
   const depth = Math.max(spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)), cfg.massDepthMM ?? MASS_DEPTH_MM)
-  const aRef = mode === 1 ? hit.coreC : (anchorFromBake(bake, mode, gov, depth, bake.refMM) ?? bake.boxC)
+  // CONVERGENCE (Dan, 08-25): "I don't even have to switch centering to check the correct final
+  // result — it must be the same because the fine-tune must make it so." The ladder solves
+  // against ONE canonical centre named by the classifier: multi-mass shapes (triangle family)
+  // anchor on the governed top mass — gravity first; box-filling shapes (square/round) anchor
+  // on the material centroid. The mode buttons stay as inspection surfaces; they no longer
+  // fork the offers.
+  const [cMode, cGov] = hit.family === 'triangle' ? [2, 3] : [3, 0]
+  const aRef = anchorFromBake(bake, cMode as CentreMode, cGov as Governor, depth, bake.refMM) ?? bake.boxC
   const fn = (mm: number): [number, number] => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
   return Object.assign(fn, { segW: hit.segW, segH: hit.segH, family: hit.family, refMM: bake.refMM })
 }
