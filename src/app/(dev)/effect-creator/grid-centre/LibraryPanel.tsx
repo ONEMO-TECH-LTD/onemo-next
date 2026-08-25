@@ -31,8 +31,12 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
 }) {
   const { shape, frame } = selectedRecords(sel)
   const layouts = [...frame.layouts].sort((a, b) => a.nodes.length - b.nodes.length)
+  const boxW = 24 + (frame.cols - 1) * pitch, boxH = 24 + (frame.rows - 1) * pitch
   return (
     <>
+      <div className="gl-card gl-libsize">
+        <b>{boxW}×{boxH}</b><span>mm</span>
+      </div>
       <Fold title="Shape">
         <div className="gl-lib">
           {LIBRARY_SHAPES.filter((s) => s.family === shape.family).map((s) => (
@@ -50,7 +54,7 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
                 const keep = sel.layoutId.startsWith('prim:') || f.layouts.some((l) => l.name === sel.layoutId)
                 setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : f.layouts[0].name })
               }}>
-              <b>{f.cols}×{f.rows}</b><span>{24 + (f.cols - 1) * pitch}×{24 + (f.rows - 1) * pitch} mm</span>
+              <b>{f.cols}×{f.rows}</b>
             </button>
           ))}
         </div>

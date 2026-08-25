@@ -1041,4 +1041,7 @@ const CSS = `
 .gl-lib button:hover{border-color:var(--ink-3)}
 .gl-lib button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-lib button[aria-pressed=true] b,.gl-lib button[aria-pressed=true] span{color:#fff}
+.gl-libsize{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:12px}
+.gl-libsize b{font:700 26px var(--mono);letter-spacing:.01em;color:var(--ink);font-variant-numeric:tabular-nums}
+.gl-libsize span{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 `
