@@ -1031,4 +1031,14 @@ const CSS = `
 .gl-steps button span{font:600 11px var(--mono);font-variant-numeric:tabular-nums}
 .gl-steps button:hover{color:var(--ink)}
 .gl-steps button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+/* Library panel: equal-size chips that wrap into a grid, never a ragged strip. */
+.gl-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.gl-lib button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  min-height:56px;padding:8px 6px;text-align:center;cursor:pointer;transition:.12s;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--ink-2)}
+.gl-lib button b{font:700 15px var(--mono);letter-spacing:.02em;color:var(--ink)}
+.gl-lib button span{font:600 10px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.gl-lib button:hover{border-color:var(--ink-3)}
+.gl-lib button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.gl-lib button[aria-pressed=true] b,.gl-lib button[aria-pressed=true] span{color:#fff}
 `

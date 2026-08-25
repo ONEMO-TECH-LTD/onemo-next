@@ -7,7 +7,7 @@
 
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import {
-  LAYOUT_LIBRARY, LIBRARY_SHAPES, LIBRARY_FAMILIES,
+  LAYOUT_LIBRARY, LIBRARY_SHAPES,
   frameKeyOf, selectedRecords,
   draftIntegrity, draftId,
   type LibrarySelection, type LibraryDraft,
@@ -33,26 +33,15 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
   const layouts = [...frame.layouts].sort((a, b) => a.nodes.length - b.nodes.length)
   return (
     <>
-      <div className="gl-card" style={{ padding: 12 }}>
-        <div className="gl-seg">
-          {LIBRARY_FAMILIES.map((fam) => (
-            <button key={fam} aria-pressed={shape.family === fam}
-              onClick={() => {
-                const first = LIBRARY_SHAPES.find((s) => s.family === fam)!
-                setSel({ ...sel, shapeId: first.id })
-              }}>{fam}</button>
-          ))}
-        </div>
-      </div>
       <Fold title="Shape">
-        <div className="gl-seg" style={{ flexWrap: 'wrap' }}>
+        <div className="gl-lib">
           {LIBRARY_SHAPES.filter((s) => s.family === shape.family).map((s) => (
-            <button key={s.id} aria-pressed={s.id === shape.id} onClick={() => setSel({ ...sel, shapeId: s.id })}>{s.id}</button>
+            <button key={s.id} aria-pressed={s.id === shape.id} onClick={() => setSel({ ...sel, shapeId: s.id })}><b>{s.id}</b></button>
           ))}
         </div>
       </Fold>
       <Fold title="Frame">
-        <div className="gl-steps">
+        <div className="gl-lib">
           {LAYOUT_LIBRARY.map((f) => (
             <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === frameKeyOf(frame)}
               onClick={() => {
@@ -67,7 +56,7 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
         </div>
       </Fold>
       <Fold title="Layouts">
-        <div className="gl-steps">
+        <div className="gl-lib">
           {layouts.map((l) => (
             <button key={l.name} aria-pressed={sel.layoutId === l.name} onClick={() => setSel({ ...sel, layoutId: l.name })}>
               <b>{l.name}</b>
@@ -93,7 +82,7 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
           })()}
         </> : <div className="gl-seg"><button onClick={newDraft}>New layout</button></div>}
         {drafts.length > 0 && <div className="gl-field" style={{ marginTop: 10 }}><span>Saved drafts · {drafts.length}</span>
-          <div className="gl-steps">
+          <div className="gl-lib">
             {drafts.map((d) => (
               <button key={d.id} onClick={() => openDraft(d)}>
                 <b>{d.name}</b><span>{d.className} · {d.frameKey} · {d.nodes.length}⌾</span>
