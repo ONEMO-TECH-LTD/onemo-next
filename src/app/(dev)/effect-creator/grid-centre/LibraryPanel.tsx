@@ -5,7 +5,7 @@
 // and edit state only; no engine imports — the bridge is where library records meet engine types.
 
 import type { ReactElement, ReactNode } from 'react'
-import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, rectangleSubOf, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, rectangleSubOf, RECTANGLE_SUBS, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
@@ -31,7 +31,10 @@ export default function LibraryPanel({
   const frames = CLASS_FRAMES[shape.family]
   const key = frameKeyOf(frame)
   const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family)
-  const boxW = 24 + (frame.cols - 1) * pitch, boxH = 24 + (frame.rows - 1) * pitch
+  // Orientation is the axis pair: landscape is the transpose, so the box reads swapped.
+  const oc = sel.view.transpose ? frame.rows : frame.cols
+  const orr = sel.view.transpose ? frame.cols : frame.rows
+  const boxW = 24 + (oc - 1) * pitch, boxH = 24 + (orr - 1) * pitch
   const isDraft = sel.layoutId.startsWith('draft:')
   return (
     <>
@@ -49,7 +52,7 @@ export default function LibraryPanel({
       {shape.family === 'rectangle' && (
         <Fold title="Type">
           <div className="gl-seg">
-            {(['slim', 'standard'] as const).map((sub) => (
+            {RECTANGLE_SUBS.map((sub) => (
               <button key={sub} aria-pressed={rectangleSubOf(frame.cols, frame.rows) === sub}
                 onClick={() => {
                   const f0 = frames.find((f) => rectangleSubOf(f.cols, f.rows) === sub)!
@@ -57,6 +60,14 @@ export default function LibraryPanel({
                   setSel({ ...sel, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name })
                 }}>{sub}</button>
             ))}
+          </div>
+        </Fold>
+      )}
+      {shape.family === 'rectangle' && (
+        <Fold title="Orientation">
+          <div className="gl-seg">
+            <button aria-pressed={!sel.view.transpose} onClick={() => setSel({ ...sel, view: { ...sel.view, transpose: false } })}>portrait</button>
+            <button aria-pressed={sel.view.transpose} onClick={() => setSel({ ...sel, view: { ...sel.view, transpose: true } })}>landscape</button>
           </div>
         </Fold>
       )}
