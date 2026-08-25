@@ -63,6 +63,7 @@ export default function GridLab() {
   const [sizeMax, setSizeMax] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
+  const [padLock, setPadLock] = usePersisted('padLock', 1)
   /** Placement step dial — how finely the lattice slides under the shape; 1 = continuous panning. */
   const [phaseStep, setPhaseStep] = usePersisted('phaseStep', PHASE_STEP_MM)
   /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
@@ -75,7 +76,6 @@ export default function GridLab() {
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
   /** Voting dominance order — which force rules the placement vote. */
   const [votingOrder, setVotingOrder] = usePersisted('votingOrder', VOTING_ORDER)
-  const [offsetMM, setOffsetMM] = useState(0)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
@@ -110,7 +110,7 @@ export default function GridLab() {
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -253,13 +253,13 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
     const id = ++seqRef.current
     const msg = {
-      id, base, offsetMM, cfg,
+      id, base, offsetMM: 0, cfg,
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
@@ -269,7 +269,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -431,14 +431,15 @@ export default function GridLab() {
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
             </div>
-            <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
+            <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
+              min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
+              released={RELEASED_PADDING_MM} />
             <div className={positioning === 1 ? 'gl-lab-off' : undefined}
               title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
                 <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
               </LabRow>
             </div>
-            <Slider label="Outline offset · grow / shrink" unit="mm" v={offsetMM} set={setOffsetMM} min={-15} max={15} />
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
@@ -822,6 +823,27 @@ function LabRow({ on, set, children }: { on: boolean; set: (b: boolean) => void;
   )
 }
 /** Perf value in seconds — green when fast, red past the 2s comfort line. */
+function LockNum({ label, unit, v, set, min, max, locked, setLocked, released }: {
+  label: string; unit?: string; v: number; set: (n: number) => void
+  min: number; max: number; locked: number; setLocked: (n: number) => void; released: number
+}) {
+  return (
+    <div className="gl-field"><span>{label}{locked ? ' · locked' : ' · unlocked for testing'}</span>
+      <div className="gl-limits">
+        <button className="gl-lock" aria-pressed={locked !== 0} title={locked ? 'locked to the released value' : 'unlocked — typed values allowed'}
+          onClick={() => { const next = locked ? 0 : 1; setLocked(next); if (next) set(released) }}>
+          {locked ? '🔒' : '🔓'}
+        </button>
+        <span className="gl-num"><i>{unit ?? ''}</i>
+          <input key={String(locked) + v} type="number" defaultValue={v} disabled={locked !== 0}
+            onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n >= min && n <= max) set(n); else e.currentTarget.value = String(v) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function Sec({ ms }: { ms?: number }) {
   if (ms == null) return <b>—</b>
   return <b className={ms > 2000 ? 'gl-slow' : ''}>{(ms * 0.001).toFixed(2)}s</b>
@@ -899,6 +921,7 @@ const CSS = `
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.gl-lock{width:30px;height:26px;display:grid;place-items:center;font-size:13px;line-height:1;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .gl-num{display:inline-flex;align-items:center;gap:4px}
 .gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}
 .gl-num-wide input{width:84px}
