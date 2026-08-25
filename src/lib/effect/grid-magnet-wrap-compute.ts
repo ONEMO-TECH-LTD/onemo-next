@@ -42,9 +42,6 @@ export interface WrapConfig {
   /** Baked anchor query (anchor bake): the governed centre at any size, positions measured once
    *  on the shape and scaled — replaces per-size mesh re-measurement. In-worker only. */
   anchorAtMM?: (mm: number) => Pt
-  /** Cap on how far the group may shift off its centred start (rule 4's "only slightly").
-   *  ~0 = pure-centred solve: a size is lawful only when the centred position is lawful. */
-  maxShiftMM?: number
   /** Perimeter belt — drop fully-surrounded interior seats, keeping the rim. Reused from the
    *  voting bench. Applied to the ARRANGEMENT before the wrap is solved, so the shape still
    *  wraps tight around exactly the magnets that remain. */
@@ -198,10 +195,6 @@ export function wrapGroup(
    *  solving many arrangements over the same size range recomputes the same mesh dozens of times
    *  without it — that was seconds per layout. */
   anchorMemo?: Map<number, Pt>,
-  /** Constrained wrap (the fine-tune): the group's middle may shift at most this far from the
-   *  anchor. The bisection then seals the smallest size lawful WITHIN the cap — pressed by
-   *  construction, never a forced size with slack. */
-  maxOffMM?: number,
 ): WrapAt | null {
   if (!group.length) return null
   const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -233,9 +226,7 @@ export function wrapGroup(
     if (!region) return null
     const valid = validOrigins(region, g)
     if (!valid) return null
-    const o = pickOrigin(valid, centred)
-    if (maxOffMM != null && Math.hypot(o[0] - centred[0], o[1] - centred[1]) > maxOffMM + 1e-6) return null
-    return o
+    return pickOrigin(valid, centred)
   }
 
   if (!heldAt(maxMM)) return null
@@ -638,7 +629,7 @@ export function wrapFlap(
 }
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number; isClass?: boolean; prim?: boolean; repaired?: boolean }
+export interface BandRung { at: WrapAt }
 
 /**
  * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
@@ -658,13 +649,6 @@ export interface BandRung { at: WrapAt; revealMM: number; isClass?: boolean; pri
 export function wrapBandLadder(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
   anchorAtMM?: (mm: number) => Pt,
-  /** The class-named layout for this band (Dan's pipeline step 4) — always solved and offered
-   *  first; the parity reveal stays as the discovery channel beside it. */
-  classNodes?: ReadonlyArray<ReadonlyArray<Pt>>,
-  /** The class frame (cols x rows). Dan's ruling 08-25: an offer that does not SPAN the frame's
-   *  dominant axis leaves the segment exposed and is DROPPED — a square block on a tall segment
-   *  is not an option; the vertical pair or the full assembly is. */
-  classFrame?: { cols: number; rows: number },
 ): BandRung[] {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
@@ -676,39 +660,6 @@ export function wrapBandLadder(
   const anchorMemo = new Map<number, Pt>()
   const seen = new Set<string>()
   const rungs: BandRung[] = []
-  const idOfPts = (pts: ReadonlyArray<Pt>): string => {
-    let mx = Infinity, my = Infinity
-    for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
-    return pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
-  }
-  // THE UNIVERSAL PRIMITIVES (Dan, 08-25): "the pair and single magnet must be tried no matter
-  // the class" — 1 and 2 magnets are the ruled exception to the class catalogue (centring and
-  // diagonal pair placement decide there, not the frame). Always solved in every band; band
-  // membership, dominance and the anti-flap guard still judge them like any other offer.
-  const primitives: Pt[][] = [
-    [[0, 0]],
-    [[0, 0], [pitch, 0]], [[0, 0], [0, pitch]],
-    [[0, 0], [pitch, pitch]], [[0, pitch], [pitch, 0]],
-  ]
-  const catalogued = [
-    ...primitives.map((nodes) => ({ nodes: nodes as ReadonlyArray<Pt>, prim: true })),
-    ...(classNodes ?? []).map((nodes) => ({ nodes, prim: false })),
-  ]
-  for (const { nodes: rawAssembly, prim } of catalogued) {
-    if (!rawAssembly.length) continue
-    // The Perimeter belt governs class presets exactly as it governs the reveal (Dan, 08-25:
-    // the pipeline holds everywhere) — a 3x3 frame under the belt is the 8-ring, never 9.
-    const assembly = applyCoverage(rawAssembly.map((q) => [q[0], q[1]] as Pt), cfg.perimeterOnly ?? true, pitch).seated
-    if (!assembly.length) continue
-    // WRAP IS THE LAW (Dan, 08-25): the layout starts centred and the CENTRE SHIFTS when the
-    // wrap conflicts with it — never the reverse. One solve: minimal shift, tightest wrap.
-    // A variant that grows the shape to stay pinned on the centre is not a wrap.
-    const at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
-    if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
-    if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
-    seen.add(idOfPts(at.points))
-    rungs.push({ at, revealMM: at.sizeMM, isClass: true, prim })
-  }
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
     const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
@@ -719,27 +670,6 @@ export function wrapBandLadder(
     const id = pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
     if (seen.has(id)) continue
     seen.add(id)
-    if (classFrame) {
-      // Class conformance, both halves: the pattern must SPAN the frame's dominant axis (or it
-      // leaves the segment exposed) AND FIT WITHIN the frame (band-by-frame: a 2-magnet layout
-      // does not belong in B1's 1x1, whatever its contact size).
-      let xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity
-      for (const q of pts) {
-        const vx = Math.round((q[0] - mx) / pitch), vy = Math.round((q[1] - my) / pitch)
-        if (vx < xLo) xLo = vx; if (vx > xHi) xHi = vx
-        if (vy < yLo) yLo = vy; if (vy > yHi) yHi = vy
-      }
-      // A SQUARE frame has no dominant axis (Dan, 08-25: "why the fuck is square offered a
-      // rectangle layout") — the pattern must span BOTH axes or a whole side is left exposed.
-      if (classFrame.cols === classFrame.rows) {
-        if (xHi - xLo < classFrame.cols - 1 || yHi - yLo < classFrame.rows - 1) continue
-      } else {
-        const tall = classFrame.rows >= classFrame.cols
-        const spanDom = tall ? yHi - yLo : xHi - xLo
-        if (spanDom < (tall ? classFrame.rows : classFrame.cols) - 1) continue
-      }
-      if (xHi - xLo > classFrame.cols - 1 || yHi - yLo > classFrame.rows - 1) continue
-    }
     // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
@@ -747,133 +677,8 @@ export function wrapBandLadder(
     const at = wrapGroup(sized, wcfg, group, minMM, hiMM, anchorMemo)
     if (!at) continue
     if (at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue   // another band owns it
-    rungs.push({ at, revealMM: mm })
+    rungs.push({ at })
   }
   rungs.sort((a, b) => a.at.sizeMM - b.at.sizeMM)
-  // COVERAGE DOMINANCE (Dan, ruled twice, 08-25): an offer that leaves areas unprotected is not
-  // an option when a same-size offer covers them — dropped, not outranked. "Same size" = within
-  // 1mm, the display's own resolution; more magnets at the same size is strictly more coverage.
-  // Judged at CONTACT sizes, BEFORE the fine-tune — tuning a survivor upward must never
-  // resurrect the flapped option it dominated (Dan's bat 3-diagonal, 08-25 15:28).
-  const kept = rungs.filter((r) =>
-    !rungs.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
-  // THE ANTI-FLAP GUARD (Dan, 08-25): "the class itself must be it — but if not enough, use the
-  // clipper2 fix that subtracts and ellipses, show unprotected edge perimeter and force a magnet
-  // there with relevant wrap and layout." The class layout is the guard by construction; when its
-  // WRAPPED result still leaves an exposed edge run over the 96mm perimeter law, the lattice node
-  // nearest that exposure is FORCED into the layout — top first (gravity) — and re-wrapped.
-  {
-    const hold = pitch / Math.SQRT2
-    const PIN_SPAN_MM = 96                             // Dan's perimeter law, 08-25 10:03
-    const edgeRunOf = (patch: UnheldPatch, outer: ReadonlyArray<Pt>): number => {
-      let run = 0
-      for (const ring of patch.rings)
-        for (let i = 0; i < ring.length; i++) {
-          const a = ring[i], b = ring[(i + 1) % ring.length]
-          if (nearestDist(outer, a[0], a[1]) < 0.75 && nearestDist(outer, b[0], b[1]) < 0.75)
-            run += Math.hypot(b[0] - a[0], b[1] - a[1])
-        }
-      return run
-    }
-    const worstEdgeRuns = (at: WrapAt) => {
-      const outer = sized(at.sizeMM).outer.pts
-      return { outer, bad: unheldOf(outer, at.points, hold)
-        .filter((q) => touchesOutline(q, outer) && edgeRunOf(q, outer) > PIN_SPAN_MM)
-        .sort((a, b) => a.centreMM[1] - b.centreMM[1]) }   // top first — gravity peels the top
-    }
-    const forceNode = (at: WrapAt): WrapAt | null => {
-      const { outer, bad } = worstEdgeRuns(at)
-      if (!bad.length) return null
-      // The target is the OUTLINE point of the exposure farthest from every magnet — the worst
-      // unpinned bit of perimeter (Dan, 08-25 11:03) — never the patch's centroid, which can
-      // snap onto an already-seated node and stall the guard with the edge still bare.
-      let target: Pt | null = null, worst = -1
-      for (const ring of bad[0].rings) {
-        const step = Math.max(1, Math.floor(ring.length / 96))
-        for (let i = 0; i < ring.length; i += step) {
-          const q = ring[i]
-          if (nearestDist(outer, q[0], q[1]) > 0.75) continue
-          let dm = Infinity
-          for (const m of at.points) dm = Math.min(dm, Math.hypot(m[0] - q[0], m[1] - q[1]))
-          if (dm > worst) { worst = dm; target = q }
-        }
-      }
-      if (!target) return null
-      const g = at.points.map((p) => [p[0] - at.originMM[0], p[1] - at.originMM[1]] as Pt)
-      const base = g[0]
-      const rel: Pt = [target[0] - at.originMM[0], target[1] - at.originMM[1]]
-      const snap: Pt = [
-        base[0] + Math.round((rel[0] - base[0]) / pitch) * pitch,
-        base[1] + Math.round((rel[1] - base[1]) / pitch) * pitch,
-      ]
-      // Nearest free lattice node to the exposure — the snap first, then its neighbours.
-      const occupied = (n: Pt) => g.some((q) => Math.abs(q[0] - n[0]) < 0.5 && Math.abs(q[1] - n[1]) < 0.5)
-      const nodes: Pt[] = []
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
-        nodes.push([snap[0] + dx * pitch, snap[1] + dy * pitch])
-      nodes.sort((a, b) =>
-        Math.hypot(a[0] - rel[0], a[1] - rel[1]) - Math.hypot(b[0] - rel[0], b[1] - rel[1]))
-      for (const node of nodes.filter((n) => !occupied(n)).slice(0, 3)) {
-        const cand = wrapGroup(sized, wcfg, [...g, node], minMM, hiMM, anchorMemo)
-        if (cand && cand.sizeMM <= hiMM + 0.005) return cand
-      }
-      return null
-    }
-    for (const r of kept) {
-      // THE 1-2 MAGNET EXCEPTION (Dan's standing law): centring and diagonal placement govern
-      // the single and the pair — the perimeter law does not. The guard never augments them
-      // (it was converting every pair into near-identical 3-magnet layouts and killing the
-      // pair offer entirely — BOT B2, 08-25 15:56).
-      if (r.prim) continue
-      for (let round = 0; round < 6; round++) {
-        const cand = forceNode(r.at)
-        if (!cand) break                                  // clean, or unfixable in this band
-        r.at = cand
-        r.repaired = true
-      }
-    }
-    var guardHolds = (at: WrapAt): boolean => worstEdgeRuns(at).bad.length === 0
-  }
-  // THE FINE-TUNE (Dan, 08-25: "any center must be auto-finetune… wrap / closest to center").
-  // Every offer, every centre mode: after the tightest wrap, search the smallest permitted
-  // shift cap whose CONSTRAINED CONTACT solve still pays — each mm of size spent must buy more
-  // than a mm of centring, spend capped at a quarter pitch. Every candidate is a true contact
-  // solve under its cap, so the wrap stays law — no forced size, no slack, no top gap.
-  for (const r of kept) {
-    const at0 = r.at
-    let hiD = Math.floor(at0.centreOffMM)
-    if (hiD < 2) continue
-    const g = at0.points.map((p) => [p[0] - at0.originMM[0], p[1] - at0.originMM[1]] as Pt)
-    const capMM = Math.min(hiMM, at0.sizeMM + pitch / 4)
-    let best = at0, loD = 0
-    while (hiD - loD > 1) {
-      const d = (loD + hiD) >> 1
-      const cand = wrapGroup(sized, wcfg, g, at0.sizeMM, capMM, anchorMemo, d)
-      const spend = cand ? cand.sizeMM - at0.sizeMM : Infinity
-      if (cand && at0.centreOffMM - cand.centreOffMM > spend) {
-        if (cand.centreOffMM < best.centreOffMM) best = cand
-        hiD = d
-      } else loD = d
-    }
-    // A tune that re-exposes an edge the guard had covered is rejected — the anti-flap law
-    // outranks centring.
-    if (best !== at0 && guardHolds(at0) && !guardHolds(best)) continue
-    r.at = best
-  }
-  // VIOLATION DOMINANCE (Dan, 08-25: "why do we have candidates with flap on the top — the
-  // grossest violation"): an offer the guard could not bring within the 96mm law is not an
-  // option while a clean offer exists in the band. Only when NOTHING in the band is clean do
-  // the violating offers stand (the honest best-available).
-  const clean = kept.filter((r) => r.prim || guardHolds(r.at))
-  const offers = clean.length ? clean : kept
-  // Dominance re-judged on FINAL sizes — the guard and fine-tune move counts and sizes, and
-  // two offers that finish at the same size with different counts collapse to the covering one.
-  const ordered = offers.filter((r) =>
-    !offers.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
-  // Guard augmentation can converge different seeds onto the same final layout — identical
-  // finals collapse to one offer.
-  const final: BandRung[] = []
-  for (const r of ordered)
-    if (!final.some((o) => o.at.count === r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) < 0.1)) final.push(r)
-  return final
+  return rungs
 }
