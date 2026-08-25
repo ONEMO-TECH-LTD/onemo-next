@@ -1,8 +1,7 @@
 // grid-magnet-library-bridge.ts — THE ONE NARROW BRIDGE from the pure layout-library module to
-// engine types. Two outputs around one conversion: `libraryArrangement` (stable-ID record with
-// nodes in mm — the future pipeline hands its nodesMM straight to wrapGroup) and
-// `libraryStageModel` (the Stage preview, composed from the arrangement). No solver policy,
-// no UI imports; shapes and layouts are materialised from the pure module, never generated here.
+// engine types. One conversion (`libraryArrangement` — stable IDs, truthful frame identity,
+// mm nodes ready for wrapGroup) and the Stage preview composed from it. No solver policy, no
+// UI imports; frame spans come from the classifier's own class floors, never a margin formula.
 
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
@@ -12,20 +11,28 @@ import {
   selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf,
   type LibrarySelection, type LibraryShapeId,
 } from './grid-magnet-library'
-import type { ShapeFamily } from './grid-magnet-class'
+import { classFloorMM, type AxisClass, type ShapeFamily } from './grid-magnet-class'
 
 export type { LibrarySelection } from './grid-magnet-library'
 
 export interface LibraryArrangement {
   shapeId: LibraryShapeId
   family: ShapeFamily
+  /** The canonical frame the selection named. */
+  sourceFrameKey: string
+  /** The ACTUAL frame identity after the view transform — what the pipeline must believe. */
   frameKey: string
+  frameCols: number
+  frameRows: number
+  /** 'prim:*' identity is preserved — a primitive never masquerades as a frame layout. */
   layoutId: string
-  cols: number
-  rows: number
+  layoutKind: 'frame' | 'primitive'
+  /** A square-aspect shape on a non-square frame is geometrically incompatible — marked,
+   *  never stretched and never silently re-framed. */
+  shapeCompatible: boolean
   /** Node positions in mm, engine y-up — wrapGroup-ready local geometry. */
   nodesMM: readonly Pt[]
-  /** The selected shape's outline in mm, engine y-up, spanning the frame. */
+  /** The shape outline in mm, engine y-up, spanning the frame's CLASS FLOORS. */
   outlineMM: readonly Pt[]
 }
 
@@ -35,30 +42,44 @@ export interface LibraryStageModel {
   title: string
 }
 
-/** Selected records -> stable-ID arrangement in mm. The ONE conversion. */
+/** Selected records -> stable-ID arrangement in mm. The ONE conversion. Throws on unknown IDs. */
 export function libraryArrangement(sel: LibrarySelection, pitchMM: number): LibraryArrangement {
   const { shape, frame, layout, isPrimitive } = selectedRecords(sel)
-  const t = isPrimitive
-    ? { cols: Math.max(...layout.nodes.map(([x]) => x)) + 1, rows: Math.max(...layout.nodes.map(([, y]) => y)) + 1, nodes: layout.nodes.map(([x, y]) => [x, y] as [number, number]) }
-    : transformLayout(frame, layout, sel.view)
-  // Engine space is y-up; library rows count downward from the top.
-  const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
-  // The shape spans the frame plus the margin; 'square' aspect keeps a square span.
-  const m = pitchMM * 0.75
-  const spanW = (t.cols - 1) * pitchMM + 2 * m, spanH = (t.rows - 1) * pitchMM + 2 * m
-  const side = Math.max(spanW, spanH)
-  const w = shape.aspect === 'square' ? side : spanW
-  const h = shape.aspect === 'square' ? side : spanH
-  const cx = (t.cols - 1) * pitchMM / 2, cy = (t.rows - 1) * pitchMM / 2
+  const frameCols = sel.view.transpose ? frame.rows : frame.cols
+  const frameRows = sel.view.transpose ? frame.cols : frame.rows
+  const cx = (frameCols - 1) * pitchMM / 2, cy = (frameRows - 1) * pitchMM / 2
+  let nodesMM: Pt[]
+  if (isPrimitive) {
+    // The primitive keeps its ruled geometry AND the selected frame context: its group is
+    // translated so its middle sits on the frame middle. The wrap solver re-centres the local
+    // group itself, so this translation is display placement, not engine policy (QA F2).
+    const raw: Pt[] = layout.nodes.map(([x, y]) => [x * pitchMM, y * pitchMM])
+    const xs = raw.map((q) => q[0]), ys = raw.map((q) => q[1])
+    const mx = (Math.min(...xs) + Math.max(...xs)) / 2, my = (Math.min(...ys) + Math.max(...ys)) / 2
+    nodesMM = raw.map(([x, y]) => [x - mx + cx, y - my + cy])
+  } else {
+    const t = transformLayout(frame, layout, sel.view)
+    nodesMM = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
+  }
+  // THE FRAME'S PHYSICAL SPAN IS THE CLASS FLOOR (QA F1): 24 + (lines-1)*pitch per axis — the
+  // classifier's own law, so classifyShape(outline) returns exactly the selected frame.
+  const w0 = classFloorMM(frameCols as AxisClass, pitchMM)
+  const h0 = classFloorMM(frameRows as AxisClass, pitchMM)
+  const shapeCompatible = shape.aspect === 'frame' || frameCols === frameRows
+  const w = shapeCompatible ? w0 : Math.max(w0, h0)
+  const h = shapeCompatible ? h0 : Math.max(w0, h0)
   const outlineMM: Pt[] = shape.outline.map(([ux, uy]) => [cx - w / 2 + ux * w, cy + h / 2 - uy * h])
   return {
-    shapeId: shape.id, family: shape.family, frameKey: frameKeyOf(frame), layoutId: layout.name,
-    cols: t.cols, rows: t.rows, nodesMM, outlineMM,
+    shapeId: shape.id, family: shape.family,
+    sourceFrameKey: frameKeyOf(frame), frameKey: frameCols + 'x' + frameRows,
+    frameCols, frameRows,
+    layoutId: isPrimitive ? 'prim:' + layout.name : layout.name,
+    layoutKind: isPrimitive ? 'primitive' : 'frame',
+    shapeCompatible, nodesMM, outlineMM,
   }
 }
 
-/** The Stage preview — composes the arrangement into the canvas's typed model. The lattice
- *  field stays the canvas's own (fieldSpots regenerates from anchors[0] + pitch). */
+/** The Stage preview — composes the arrangement. The lattice field stays the canvas's own. */
 export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM: number): LibraryStageModel {
   const a = libraryArrangement(sel, pitchMM)
   const contour: Contour = { outer: { pts: [...a.outlineMM] }, holes: [] }
@@ -72,9 +93,9 @@ export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM:
     contactsMM: [],
     segments: [],
     centresMM: [],
-    centreMainMM: [(a.cols - 1) * pitchMM / 2, (a.rows - 1) * pitchMM / 2],
+    centreMainMM: [(a.frameCols - 1) * pitchMM / 2, (a.frameRows - 1) * pitchMM / 2],
   }
-  const span = `${(a.cols - 1) * pitchMM || pitchMM}×${(a.rows - 1) * pitchMM || pitchMM} mm`
-  const title = `${a.shapeId} · ${a.layoutId} · ${a.cols}×${a.rows} ${orientationOf(a.cols, a.rows)} ${kindOf(a.cols, a.rows)} · ${a.family} · ${a.nodesMM.length}⌾ · ${span} · LIBRARY DRAFT`
+  const w = classFloorMM(a.frameCols as AxisClass, pitchMM), h = classFloorMM(a.frameRows as AxisClass, pitchMM)
+  const title = `${a.shapeId} · ${a.layoutId} · ${a.frameKey} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${a.family} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${a.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
   return { contour, grid, title }
 }

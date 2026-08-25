@@ -252,13 +252,19 @@ export function selectedRecords(sel: LibrarySelection): {
   layout: LibraryLayout
   isPrimitive: boolean
 } {
-  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId) ?? LIBRARY_SHAPES[0]
-  const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === sel.frameKey) ?? LAYOUT_LIBRARY[0]
+  // FAIL LOUD (QA F3): stable IDs exist so a stale or mistyped identity can never silently
+  // retarget to unrelated data — an unknown ID is an error, never a 1x1 fallback.
+  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
+  if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
+  const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === sel.frameKey)
+  if (!frame) throw new Error('library: unknown frameKey ' + sel.frameKey)
   if (sel.layoutId.startsWith('prim:')) {
     const nm = sel.layoutId.slice(5)
-    const prim = UNIVERSAL_PRIMITIVES.find((l) => l.name === nm) ?? UNIVERSAL_PRIMITIVES[0]
+    const prim = UNIVERSAL_PRIMITIVES.find((l) => l.name === nm)
+    if (!prim) throw new Error('library: unknown primitive ' + sel.layoutId)
     return { shape, frame, layout: prim, isPrimitive: true }
   }
-  const layout = frame.layouts.find((l) => l.name === sel.layoutId) ?? frame.layouts[0]
+  const layout = frame.layouts.find((l) => l.name === sel.layoutId)
+  if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
   return { shape, frame, layout, isPrimitive: false }
 }
