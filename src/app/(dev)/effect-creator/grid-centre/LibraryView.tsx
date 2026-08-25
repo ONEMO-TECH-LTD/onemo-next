@@ -1,20 +1,20 @@
 'use client'
 
-// LibraryView — THE LAYOUT LIBRARY tab of the Centre Lab. Every frame and every preset layout,
-// drawn on the real 48mm lattice, for Dan's visual review and approval. Display only:
-// no engine, no wrap, no policy — the data is src/lib/effect/grid-magnet-library.ts.
+// LibraryView — THE LAYOUT LIBRARY tab of the Centre Lab. Every frame and every preset
+// layout, rendered through the bench's OWN Stage canvas — same lattice, same magnets, same
+// fit-to-view — for Dan's visual review and approval. Display only: no engine, no policy.
+// Data: src/lib/effect/grid-magnet-library.ts (literal, awaiting approval).
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 import { LAYOUT_LIBRARY } from '@/lib/effect/grid-magnet-library'
+import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM } from '@/lib/effect/grid-magnet-spec'
+import type { Pt } from '@/lib/effect/types'
 
-const PITCH = 48
-const PX = 3.4                        // px per mm
-const SPOT = 24                       // lattice ghost radius (half pitch), as the bench draws it
-const HOLD = 24                       // hold ring
-const MAG = 6.5                      // magnet disc
+const PITCH = DEFAULT_PITCH_MM
 
-export default function LibraryView() {
-  const [fi, setFi] = useState(4)     // default 2×3 — the first interesting frame
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function LibraryView({ Stage }: { Stage: ComponentType<any> }) {
+  const [fi, setFi] = useState(4)
   const [li, setLi] = useState(0)
   const [transpose, setTranspose] = useState(false)
   const [flipX, setFlipX] = useState(false)
@@ -23,79 +23,79 @@ export default function LibraryView() {
   const frame = LAYOUT_LIBRARY[fi]
   const layout = frame.layouts[Math.min(li, frame.layouts.length - 1)]
 
-  const view = useMemo(() => {
+  const model = useMemo(() => {
     let c = frame.cols, r = frame.rows
-    let pts = layout.nodes.map(([x, y]) => [x, y] as [number, number])
-    if (transpose) { pts = pts.map(([x, y]) => [y, x]); const t = c; c = r; r = t }
-    if (flipX) pts = pts.map(([x, y]) => [c - 1 - x, y])
-    if (flipY) pts = pts.map(([x, y]) => [x, r - 1 - y])
-    return { c, r, pts }
+    let ns = layout.nodes.map(([x, y]) => [x, y] as [number, number])
+    if (transpose) { ns = ns.map(([x, y]) => [y, x]); const t = c; c = r; r = t }
+    if (flipX) ns = ns.map(([x, y]) => [c - 1 - x, y])
+    if (flipY) ns = ns.map(([x, y]) => [x, r - 1 - y])
+    // Engine space is y-up; library rows count downward from the top.
+    const pts: Pt[] = ns.map(([ix, iy]) => [ix * PITCH, (r - 1 - iy) * PITCH])
+    const m = PITCH * 0.75
+    const x0 = -m, x1 = (c - 1) * PITCH + m, y0 = -m, y1 = (r - 1) * PITCH + m
+    const outerPts: Pt[] = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+    const lattice: Pt[] = []
+    for (let ix = -1; ix <= c; ix++) for (let iy = -1; iy <= r; iy++)
+      lattice.push([ix * PITCH, iy * PITCH])
+    return {
+      c, r,
+      contour: { outer: { pts: outerPts } },
+      grid: {
+        anchors: pts.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
+        pitchCentreMM: PITCH,
+        lattice,
+        phaseMM: [0, 0] as Pt,
+        panMM: [0, 0] as Pt,
+        spotRadiusMM: PITCH / 2,
+        contactsMM: [] as Pt[],
+        segments: [],
+        centresMM: [] as Pt[],
+        centreMainMM: [(c - 1) * PITCH / 2, (r - 1) * PITCH / 2] as Pt,
+      },
+    }
   }, [frame, layout, transpose, flipX, flipY])
 
-  const { c, r, pts } = view
-  const wMM = (c + 1) * PITCH, hMM = (r + 1) * PITCH
-  const ox = PITCH, oy = PITCH
-  const key = (x: number, y: number) => `${x},${y}`
-  const on = new Set(pts.map(([x, y]) => key(x, y)))
-
+  const noop = () => {}
   return (
-    <div style={{ padding: 4 }}>
-      <div style={{ fontSize: 12, color: '#667', margin: '2px 0 14px' }}>THE LAYOUT LIBRARY · DRAFT — awaiting approval · every preset per frame on the 48mm lattice · canonical tall orientation · transpose/mirrors derived</div>
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-        <aside style={{ width: 270, background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
-          <div style={{ fontSize: 11, letterSpacing: 1, color: '#889', marginBottom: 8 }}>FRAME</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-            {LAYOUT_LIBRARY.map((f, i) => (
-              <button key={i} onClick={() => { setFi(i); setLi(0) }}
-                style={{ padding: '5px 9px', borderRadius: 7, border: '1px solid ' + (i === fi ? '#3b6ef6' : '#ccd'), background: i === fi ? '#3b6ef6' : '#fff', color: i === fi ? '#fff' : '#334', fontSize: 12, cursor: 'pointer' }}>
-                {f.cols}×{f.rows}</button>
-            ))}
+    <div className="gl-body">
+      <section className="gl-card gl-stage">
+        <div className="gl-stage-head">
+          <span className="gl-eye"><b>{layout.name}</b> · {model.c}×{model.r} frame · {layout.nodes.length}⌾ · {(model.c - 1) * PITCH || PITCH}×{(model.r - 1) * PITCH || PITCH} mm span</span>
+          <span className="gl-eye">LIBRARY · DRAFT — awaiting approval</span>
+        </div>
+        <div className="gl-vp">
+          <Stage contour={model.contour} grid={model.grid} lattice={true} box={false}
+            segments={[]} segFill={false} onPan={noop} onZoom={noop} onReset={noop} />
+        </div>
+      </section>
+      <aside className="gl-controls">
+        <div className="gl-card" style={{ padding: 14 }}>
+          <div className="gl-field"><span>Frame · cols × rows</span>
+            <div className="gl-steps">
+              {LAYOUT_LIBRARY.map((f, i) => (
+                <button key={i} aria-pressed={i === fi} onClick={() => { setFi(i); setLi(0) }}><b>{f.cols}×{f.rows}</b></button>
+              ))}
+            </div>
           </div>
-          <div style={{ fontSize: 11, letterSpacing: 1, color: '#889', marginBottom: 8 }}>LAYOUTS · {frame.layouts.length}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {frame.layouts.map((l, i) => (
-              <button key={i} onClick={() => setLi(i)}
-                style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 7, border: '1px solid ' + (i === li ? '#3b6ef6' : '#dde'), background: i === li ? '#eef3ff' : '#fff', color: '#223', fontSize: 12.5, cursor: 'pointer' }}>
-                <b>{l.name}</b><span style={{ color: '#889' }}>{l.nodes.length}⌾{l.note ? ' · !' : ''}</span></button>
-            ))}
+          <div className="gl-field"><span>Layouts · {frame.layouts.length} presets</span>
+            <div className="gl-steps">
+              {frame.layouts.map((l, i) => (
+                <button key={i} aria-pressed={i === li} onClick={() => setLi(i)}>
+                  <b>{l.name}</b><span>{l.nodes.length}⌾{l.note ? ' · Full-grid only' : ''}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div style={{ fontSize: 11, letterSpacing: 1, color: '#889', margin: '14px 0 8px' }}>VIEW</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {([['transpose', transpose, setTranspose], ['flip ↔', flipX, setFlipX], ['flip ↕', flipY, setFlipY]] as const).map(([label, v, set]) => (
-              <button key={label} onClick={() => set(!v)}
-                style={{ padding: '5px 9px', borderRadius: 7, border: '1px solid ' + (v ? '#3b6ef6' : '#ccd'), background: v ? '#3b6ef6' : '#fff', color: v ? '#fff' : '#334', fontSize: 12, cursor: 'pointer' }}>{label}</button>
-            ))}
+          <div className="gl-field"><span>View</span>
+            <div className="gl-seg">
+              <button aria-pressed={transpose} onClick={() => setTranspose(!transpose)}>transpose</button>
+              <button aria-pressed={flipX} onClick={() => setFlipX(!flipX)}>flip ↔</button>
+              <button aria-pressed={flipY} onClick={() => setFlipY(!flipY)}>flip ↕</button>
+            </div>
           </div>
-          {layout.note && <div style={{ marginTop: 12, fontSize: 12, color: '#b25a00', background: '#fff6ec', borderRadius: 7, padding: '7px 9px' }}>{layout.note}</div>}
-        </aside>
-        <section style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
-          <div style={{ fontSize: 13, marginBottom: 10 }}>
-            <b>{layout.name}</b> · {c}×{r} frame · {pts.length} magnets · {(c - 1) * PITCH || PITCH}×{(r - 1) * PITCH || PITCH} mm span
-          </div>
-          <svg width={wMM * PX} height={hMM * PX} viewBox={`0 0 ${wMM} ${hMM}`} style={{ background: '#fbfbfc', borderRadius: 8 }}>
-            {/* lattice ghosts, one ring beyond the frame */}
-            {Array.from({ length: c + 2 }, (_, gx) => Array.from({ length: r + 2 }, (_, gy) => {
-              const x = ox + (gx - 0.5) * PITCH, y = oy + (gy - 0.5) * PITCH
-              return <circle key={`g${gx}-${gy}`} cx={x} cy={y} r={SPOT} fill="#000" opacity={0.035} stroke="#889" strokeOpacity={0.25} strokeWidth={0.6} />
-            }))}
-            {/* frame nodes */}
-            {Array.from({ length: c }, (_, x) => Array.from({ length: r }, (_, y) => {
-              const cx2 = ox + x * PITCH, cy2 = oy + y * PITCH
-              return on.has(key(x, y)) ? null :
-                <circle key={`f${x}-${y}`} cx={cx2} cy={cy2} r={3} fill="none" stroke="#99a" strokeDasharray="2 2" strokeWidth={0.9} />
-            }))}
-            {/* layout magnets */}
-            {pts.map(([x, y], i) => {
-              const cx2 = ox + x * PITCH, cy2 = oy + y * PITCH
-              return <g key={i}>
-                <circle cx={cx2} cy={cy2} r={HOLD} fill="#3b6ef6" opacity={0.13} stroke="#3b6ef6" strokeWidth={1.4} />
-                <circle cx={cx2} cy={cy2} r={MAG} fill="#3c3f45" />
-                <circle cx={cx2} cy={cy2} r={1.8} fill="#2fa463" />
-              </g>
-            })}
-          </svg>
-        </section>
-      </div>
+          {layout.note && <div className="gl-magic-note">{layout.note}</div>}
+        </div>
+      </aside>
     </div>
   )
 }

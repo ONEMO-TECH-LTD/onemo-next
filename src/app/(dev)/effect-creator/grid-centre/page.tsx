@@ -304,7 +304,7 @@ export default function GridLab() {
         </div>
       </header>
 
-      {tab === 'library' && <LibraryView />}
+      {tab === 'library' && <LibraryView Stage={Stage} />}
       <div className="gl-body" style={tab === 'library' ? { display: 'none' } : undefined}>
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
