@@ -347,16 +347,16 @@ export default function GridLab() {
         </div>
       )}
       {tab === 'library' ? null : (
-        <header className="gl-head">
-          <h1>Centre Lab <span className="gl-tag">v3.5.6-lead · centre rules</span></h1>
-          <div className="gl-seg" style={{ marginLeft: 16, display: 'inline-flex' }}>
+        <div className="gl-libbar">
+          <div className="gl-seg gl-libbar-mode">
             <button aria-pressed onClick={() => setTab('bench')}>Bench</button>
             <button aria-pressed={false} onClick={() => setTab('library')}>Library</button>
           </div>
-        </header>
+          <span className="gl-eye" style={{ marginLeft: 'auto' }}>v3.5.6-lead · centre rules</span>
+        </div>
       )}
 
-      <div className={tab === 'library' ? 'gl-body gl-libtab' : 'gl-body'}>
+      <div className={tab === 'library' ? 'gl-body gl-libtab' : 'gl-body gl-benchtab'}>
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
             <span className="gl-eye gl-perf" style={tab === 'library' ? { display: 'none' } : undefined}>
@@ -1127,4 +1127,18 @@ const CSS = `
 .gl-libbar-mode{flex:none}
 .gl-libbar-tabs{flex:1}
 .gl-libbar .gl-seg button{padding:7px 14px}
+/* BENCH TAB — the same full-bleed board with floating panels. Layout only: gestures,
+   solver and readouts are untouched (scoped: .gl-benchtab). */
+.gl-benchtab{max-width:none;display:block;position:relative;height:calc(100vh - 70px);
+  width:100vw;margin-left:calc(50% - 50vw)}
+.gl-benchtab .gl-stage{height:100%;padding:0;border:0;background:none;box-shadow:none}
+.gl-benchtab .gl-vp{max-width:none;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;background:var(--panel)}
+.gl-benchtab .gl-vp svg{width:100%;height:100%;max-width:none;display:block}
+.gl-benchtab .gl-stage-head{position:absolute;inset:12px 12px auto;pointer-events:none;z-index:2}
+.gl-benchtab .gl-controls{position:absolute;top:12px;right:12px;width:320px;max-height:calc(100% - 24px);
+  overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
+.gl-benchtab .gl-centercol{position:absolute;top:12px;left:12px;width:290px;max-height:calc(100% - 24px);
+  overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
+.gl-benchtab .gl-controls>*,.gl-benchtab .gl-centercol>*{backdrop-filter:blur(8px);
+  background:color-mix(in srgb,var(--panel) 92%,transparent)}
 `
