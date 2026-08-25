@@ -180,19 +180,18 @@ describe('diamond class', () => {
   it('carries the ruled rings', () => {
     expect(CLASS_FRAMES.diamond.map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
   })
-  it('each ring is a Manhattan ring around the frame centre, axis thinning included', () => {
+  it('uses the SHARED layout vocabulary — full / perimeter / perimeter-96 / corners', () => {
     for (const f of CLASS_FRAMES.diamond.slice(1)) {
       const k = (f.cols - 1) / 2
-      const d = f.layouts.find((l) => l.name === 'diamond')!
-      expect(d.nodes.length).toBe(4 * k)
-      for (const [x, y] of d.nodes) expect(Math.abs(x - k) + Math.abs(y - k)).toBe(k)
-      // at k=1 the ring IS the four axis nodes, so no separate thinning exists there
-      const axis = f.layouts.find((l) => l.name === 'axis')
-      if (k > 1) expect(axis!.nodes.length).toBe(4)
-      else expect(axis).toBeUndefined()
-      const wc = f.layouts.find((l) => l.name === 'with-centre')!
-      expect(wc.nodes.length).toBe(4 * k + 1)
-      expect(wc.note).toContain('Full grid only')
+      const names = f.layouts.map((l) => l.name)
+      expect(names).toContain('full')
+      expect(names).toContain('perimeter')
+      const per = f.layouts.find((l) => l.name === 'perimeter')!
+      expect(per.nodes.length).toBe(4 * k)
+      for (const [x, y] of per.nodes) expect(Math.abs(x - k) + Math.abs(y - k)).toBe(k)
+      const full = f.layouts.find((l) => l.name === 'full')!
+      expect(full.nodes.length).toBe(4 * k + 1)
+      expect(full.note).toContain('Full grid only')
     }
   })
 })

@@ -38,7 +38,7 @@ export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'rectangle', 'diamon
 export const FAMILY_APPLICABILITY_DRAFT: Record<LibraryFamily, string[]> = {
   square: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
   rectangle: ['full', 'perimeter', 'perimeter-96', 'corners'],
-  diamond: ['single', 'diamond', 'axis', 'with-centre'],
+  diamond: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
 }
 
 
@@ -184,20 +184,24 @@ export const DIAMOND_FRAMES: LibraryFrame[] = [
     { name: 'single', nodes: [[0, 0]] },
   ] },
   { cols: 3, rows: 3, layouts: [
-    { name: 'diamond', nodes: [[0, 1], [1, 0], [1, 2], [2, 1]] },
-    { name: 'with-centre', nodes: [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]], note: 'interior — Full grid only' },
+    { name: 'full', nodes: [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]], note: 'interior — Full grid only' },
+    { name: 'perimeter', nodes: [[0, 1], [1, 0], [1, 2], [2, 1]] },
+    { name: 'perimeter-96', nodes: [[1, 0], [1, 2]] },
   ] },
   { cols: 5, rows: 5, layouts: [
-    { name: 'diamond', nodes: [[0, 2], [1, 1], [1, 3], [2, 0], [2, 4], [3, 1], [3, 3], [4, 2]] },
-    { name: 'axis', nodes: [[0, 2], [2, 0], [2, 4], [4, 2]] },
-    { name: 'with-centre', nodes: [[0, 2], [1, 1], [1, 3], [2, 0], [2, 2], [2, 4], [3, 1], [3, 3], [4, 2]], note: 'interior — Full grid only' },
+    { name: 'full', nodes: [[0, 2], [1, 1], [1, 3], [2, 0], [2, 2], [2, 4], [3, 1], [3, 3], [4, 2]], note: 'interior — Full grid only' },
+    { name: 'perimeter', nodes: [[0, 2], [1, 1], [1, 3], [2, 0], [2, 4], [3, 1], [3, 3], [4, 2]] },
+    { name: 'perimeter-96', nodes: [[0, 2], [2, 0], [2, 4], [4, 2]] },
+    { name: 'corners', nodes: [[0, 2], [2, 0], [2, 4], [4, 2]] },
   ] },
   { cols: 7, rows: 7, layouts: [
-    { name: 'diamond', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]] },
-    { name: 'axis', nodes: [[0, 3], [3, 0], [3, 6], [6, 3]] },
-    { name: 'with-centre', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 3], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]], note: 'interior — Full grid only' },
+    { name: 'full', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 3], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]], note: 'interior — Full grid only' },
+    { name: 'perimeter', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]] },
+    { name: 'perimeter-96', nodes: [[1, 2], [1, 4], [3, 0], [3, 6], [5, 2], [5, 4]] },
+    { name: 'corners', nodes: [[0, 3], [3, 0], [3, 6], [6, 3]] },
   ] },
 ]
+
 
 export const CLASS_FRAMES: Record<LibraryFamily, LibraryFrame[]> = {
   square: SQUARE_FRAMES,
