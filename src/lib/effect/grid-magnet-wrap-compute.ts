@@ -629,7 +629,7 @@ export function wrapFlap(
 }
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt }
+export interface BandRung { at: WrapAt; revealMM: number }
 
 /**
  * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
@@ -677,7 +677,7 @@ export function wrapBandLadder(
     const at = wrapGroup(sized, wcfg, group, minMM, hiMM, anchorMemo)
     if (!at) continue
     if (at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue   // another band owns it
-    rungs.push({ at })
+    rungs.push({ at, revealMM: mm })
   }
   rungs.sort((a, b) => a.at.sizeMM - b.at.sizeMM)
   return rungs

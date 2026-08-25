@@ -20,6 +20,8 @@ interface SolveRequest {
   stepSel: number | null
   /** Free + snap: every slider move presses the shape onto the revealed magnets. */
   snapWrap?: boolean
+  /** The slider's window when snapping — stops (distinct pressed sizes) are computed for it. */
+  snapWindow?: [number, number]
 }
 
 const ctx = self as unknown as Worker
@@ -32,6 +34,9 @@ const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
 const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand> }>()
 const rungCache = new Map<string, BandRung[]>()
+// Snap stops: the window's distinct pressed sizes — the same rungs the band ladder offers,
+// computed once per window and drawn as ticks on the slider.
+const stopsCache = new Map<string, Array<{ press: number; reveal: number }>>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
 // and scaled linearly per size. Positions are shape features; only qualification is size-
 // dependent (evaluated inside anchorFromBake). Core mode (1) is size-dependent by definition
@@ -130,7 +135,7 @@ function schedulePrefetch(
 }
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, snapWrap } = e.data
+  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, snapWrap, snapWindow } = e.data
   gen++
   try {
     const sized = makeSizer(base, offsetMM)
@@ -142,7 +147,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
     }
     const sig = JSON.stringify([offsetMM, pts.length, h])
-    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear(); rungCache.clear(); snapCache.clear() }
+    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear(); rungCache.clear(); snapCache.clear(); stopsCache.clear() }
     const cfgSig = JSON.stringify(cfg)
     if (mode !== 'free' && (cfg.positioning ?? 0) === 1) {
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
@@ -192,6 +197,19 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       //   3 · the ORIGINAL free logic again, through its own forced-registration branch, at the
       //       pressed size — so what is drawn is free mode's own picture of the wrapped state.
       const anchorFn = anchorFnFor(sized, cfg, cfgSig, sig)
+      let stops: Array<{ press: number; reveal: number }> = []
+      if (snapWindow) {
+        const wk = cfgSig + '|' + snapWindow[0] + '|' + snapWindow[1]
+        let hitS = stopsCache.get(wk)
+        if (!hitS) {
+          const raw = wrapBandLadder(sized, cfg, snapWindow[0], snapWindow[1], MIN_EFFECT_MM, anchorFn)
+            .map((r) => ({ press: r.at.sizeMM, reveal: r.revealMM }))
+          hitS = raw.filter((v, i) => i === 0 || v.press - raw[i - 1].press > 0.1)
+          stopsCache.set(wk, hitS)
+          if (stopsCache.size > FITS_CAP) stopsCache.delete(stopsCache.keys().next().value!)
+        }
+        stops = hitS
+      }
       const fk = cfgSig + '|' + sizeMM
       let free = freeCache.get(fk)
       if (!free) {
@@ -202,7 +220,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       }
       const pts = free.grid.anchors.map((a) => a.p)
       if (!pts.length) {
-        ctx.postMessage({ id, model: { contour: free.contour, grid: free.grid, effSize: sizeMM, ladder: [], idx: 0, segments: free.grid.segments } })
+        ctx.postMessage({ id, model: { contour: free.contour, grid: free.grid, effSize: sizeMM, ladder: [], idx: 0, segments: free.grid.segments, stops } })
         return
       }
       const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
@@ -211,7 +229,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const layoutId = pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
       const sk = cfgSig + '|' + layoutId
       const cached = snapCache.get(sk)
-      if (cached !== undefined) { ctx.postMessage({ id, model: cached }); return }
+      if (cached !== undefined) { ctx.postMessage({ id, model: { ...(cached as object), stops } }); return }
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
       const gx = (Math.min(...xs) + Math.max(...xs)) / 2, gy = (Math.min(...ys) + Math.max(...ys)) / 2
       const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM, anchorAtMM: anchorFn }
@@ -247,7 +265,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       }
       snapCache.set(sk, model)
       if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
-      ctx.postMessage({ id, model })
+      ctx.postMessage({ id, model: { ...(model as object), stops } })
     } else {
       const k = cfgSig + '|' + sizeMM
       let hit = freeCache.get(k)
