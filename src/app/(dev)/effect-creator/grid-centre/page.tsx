@@ -70,8 +70,6 @@ export default function GridLab() {
   const [massDepth, setMassDepth] = usePersisted('massDepth', MASS_DEPTH_MM)
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
-  const [engineMode, setEngineMode] = usePersisted('engineMode', 1)
-  const [snapWrapN, setSnapWrapN] = usePersisted('snapWrap', 1)
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   /** Positioning law — voting vs centre-rules (parity-locked, no voting). */
   /** Governor — which mass rules in Masses mode. */
@@ -105,14 +103,9 @@ export default function GridLab() {
   // first paint.
   useEffect(() => {
     try {
-      const em = +(localStorage.getItem('grid-centre.engineMode') ?? '1') || 1
       const bs = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
       const b = BANDS.find((x) => x.id === bs) ?? BANDS[0]
-      if (em === 2) {
-        setMode('free')
-        setSizeMin(b.minMM); setSizeMax(b.maxMM)
-        setSizeMM((v) => Math.min(b.maxMM, Math.max(b.minMM, v)))
-      } else setMode(b.id)
+      setMode(b.id)
     } catch { }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -282,22 +275,20 @@ export default function GridLab() {
     const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning: 1, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
-    const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
+    const manualBand = manual !== null || bandScale !== null
     const id = ++seqRef.current
     const msg = {
       id, base, offsetMM: 0, cfg,
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
-      snapWrap: !manualBand && mode === 'free' && manual === null && snapWrapN !== 0,
-      snapWindow: mode === 'free' && snapWrapN !== 0 ? [sizeMin, sizeMax] as [number, number] : undefined,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage, snapWrapN, sizeMin, sizeMax])
+  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -326,12 +317,9 @@ export default function GridLab() {
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
-                // Pinch = manual scaling. In a band it scales WITHIN the band's range.
-                if (mode === 'free') setSizeMM((s) => Math.min(sizeMax, Math.max(sizeMin, s * f)))
-                else {
-                  const b = BANDS.find((x) => x.id === mode)!
-                  setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
-                }
+                // Pinch = manual scaling WITHIN the band's range.
+                const b = BANDS.find((x) => x.id === mode)!
+                setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
               }}
               onReset={() => setManual(null)} />
               : src === 'magic'
@@ -406,40 +394,12 @@ export default function GridLab() {
           </Fold>
 
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Engine mode · compare side by side</span>
-              <div className="gl-seg">
-                <button aria-pressed={engineMode === 1} onClick={() => {
-                  setEngineMode(1); setStepSel(null); setManual(null); setBandScale(null)
-                  // carry the band across: the window chip (or the size) names it; default B2
-                  const b = BANDS.find((x) => x.minMM === sizeMin && x.maxMM === sizeMax)
-                    ?? BANDS.find((x) => sizeMM >= x.minMM && sizeMM <= x.maxMM) ?? BANDS[1]
-                  setMode(b.id)
-                }}>1 · Wrap ladder</button>
-                <button aria-pressed={engineMode === 2} onClick={() => {
-                  setEngineMode(2); setStepSel(null); setManual(null); setBandScale(null)
-                  // carry the band across: the ladder's band becomes the slider window
-                  const b = (typeof mode === 'number' ? BANDS.find((x) => x.id === mode) : undefined)
-                    ?? BANDS.find((x) => sizeMM >= x.minMM && sizeMM <= x.maxMM) ?? BANDS[1]
-                  setMode('free'); setSizeMin(b.minMM); setSizeMax(b.maxMM)
-                  setSizeMM(Math.min(b.maxMM, Math.max(b.minMM, sizeMM)))
-                }}>2 · Free + snap</button>
-              </div>
-            </div>
-            {engineMode === 1 && <div className="gl-field"><span>Band · the offer list</span>
+            <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
               </div>
-            </div>}
-            {engineMode === 2 && <div className="gl-field"><span>Band · slider window</span>
-              <div className="gl-seg">
-                {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={sizeMin === b.minMM && sizeMax === b.maxMM}
-                    onClick={() => { setSizeMin(b.minMM); setSizeMax(b.maxMM); setSizeMM(Math.min(Math.max(sizeMM, b.minMM), b.maxMM)); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
-                <button aria-pressed={sizeMin === MIN_EFFECT_MM && sizeMax === sizeRange(RELEASED_PADDING_MM).maxMM}
-                  onClick={() => { setSizeMin(MIN_EFFECT_MM); setSizeMax(sizeRange(RELEASED_PADDING_MM).maxMM) }}>All</button>
-              </div>
-            </div>}
+            </div>
             {mode !== 'free' && <>
               <div className="gl-snap">
                 {manual
@@ -467,36 +427,6 @@ export default function GridLab() {
               })()}
               <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
-            {mode === 'free' && <>
-              {snapWrapN !== 0 && model?.stops?.length
-                ? <StopStepper label="Pressed size · the shape wraps at these stops" stops={model.stops}
-                    v={model.effSize} set={setSizeMM} />
-                : <div className="gl-sizerow">
-                  <button className="gl-chev" aria-label="1mm smaller" onClick={() => setSizeMM(Math.max(sizeMin, Math.round(sizeMM) - 1))}>‹</button>
-                  <div className="gl-sizerow-slider">
-                    <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />
-                  </div>
-                  <button className="gl-chev" aria-label="1mm larger" onClick={() => setSizeMM(Math.min(sizeMax, Math.round(sizeMM) + 1))}>›</button>
-                </div>}
-              <label className="gl-toggle"><span>Snap wrap <small style={{ color: 'var(--ink-3)' }}>· every move presses the shape onto the revealed magnets</small></span>
-                <input type="checkbox" checked={snapWrapN !== 0} onChange={(e) => setSnapWrapN(e.target.checked ? 1 : 0)} />
-              </label>
-              {snapWrapN !== 0 && <div className="gl-snap">
-                {model ? `${model.grid.anchors.length}⌾ · pressed at ${model.effSize.toFixed(2)} mm${model.stops?.length ? ` · ${model.stops.length} snap stops in window` : ''}` : '—'}
-              </div>}
-            </>}
-            {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
-              <div className="gl-limits">
-                <span className="gl-num"><i>min</i>
-                  <input key={'mn' + sizeMin} type="number" defaultValue={sizeMin}
-                    onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > 0 && n < sizeMax) { setSizeMin(n); if (sizeMM < n) setSizeMM(n) } }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
-                <span className="gl-num"><i>max</i>
-                  <input key={'mx' + sizeMax} type="number" defaultValue={sizeMax}
-                    onBlur={(e) => { const n = Math.round(+e.currentTarget.value); if (Number.isFinite(n) && n > sizeMin) { setSizeMax(n); if (sizeMM > n) setSizeMM(n) } }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} /></span>
-              </div>
-            </div>}
             <div className="gl-field"><span>Grid pitch · released tiers</span>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
@@ -853,25 +783,6 @@ function Slider({ label, v, set, min, max, unit, wide }: { label: string; v: num
 /** Magnet stepper — chevrons either side of a typed count. Forwards the number, decides nothing. */
 /** The wrap engine's stepper, over the snap stops: chevrons step stop-to-stop, typing jumps to
  *  the nearest stop. The value shown IS the pressed size. */
-function StopStepper({ label, stops, v, set }: { label: string; stops: Array<{ press: number; reveal: number }>; v: number; set: (n: number) => void }) {
-  const idx = stops.reduce((b, x, i) => Math.abs(x.press - v) < Math.abs(stops[b].press - v) ? i : b, 0)
-  // Jump to the stop's REVEAL size — where the material offers that layout; the wrap presses it
-  // down to the displayed stop value. Reveal and contact are different sizes.
-  const go = (i: number) => set(stops[Math.max(0, Math.min(stops.length - 1, i))].reveal)
-  const commit = (raw: string) => { const n = +raw; if (Number.isFinite(n)) set(stops.reduce((b, x) => Math.abs(x.press - n) < Math.abs(b.press - n) ? x : b).reveal) }
-  return (
-    <div className="gl-field"><span>{label} · stop {idx + 1} of {stops.length}</span>
-      <div className="gl-stepper">
-        <button aria-label="previous stop" onClick={() => go(idx - 1)} disabled={idx <= 0}>&#8249;</button>
-        <input key={v} type="number" defaultValue={Math.round(v * 10) / 10}
-          onBlur={(e) => commit(e.currentTarget.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        <button aria-label="next stop" onClick={() => go(idx + 1)} disabled={idx >= stops.length - 1}>&#8250;</button>
-      </div>
-    </div>
-  )
-}
-
 function Stepper({ label, v, set }: { label: string; v: number; set: (n: number) => void }) {
   const commit = (raw: string) => { const n = Math.round(+raw); if (Number.isFinite(n)) set(Math.max(1, n)) }
   return (
