@@ -123,6 +123,63 @@ export function centeringRef(
   return governMass(holding, governor, midY)
 }
 
+/**
+ * ANCHOR BAKE (Dan, 2026-08-25: "measure the centre once and stick to it — unless size truly
+ * moves the inner area's centre"). A centre is a property of the SHAPE: mass deep-points, the
+ * box centre, the centroid and the global deep point are fixed relative features and scale
+ * linearly with size — re-measuring them per size only re-samples mesh noise (the 2mm grid),
+ * which is what the slider jitter was. What IS size-dependent is QUALIFICATION: clearance is
+ * fixed in real mm while the shape scales, so a mass governs only at sizes where its depth
+ * (which also scales linearly — exact, not approximated) still clears the dial. Core mode is
+ * excluded: its definition (area-weighted mean of the legal area) truly moves with size, so
+ * it stays measured live.
+ */
+export interface AnchorBake {
+  refMM: number
+  boxC: Pt
+  weightC: Pt
+  /** Deepest island's deep point at reference — the global Deep anchor. */
+  deepC: Pt
+  refMidY: number
+  masses: Array<{ centreMM: Pt; areaMM2: number; peakClearMM: number }>
+}
+
+export function anchorBakeOf(
+  segments: ReadonlyArray<SafeSegment>, boxC: Pt, weightC: Pt, refMM: number, refMidY: number,
+): AnchorBake {
+  let deep = segments[0]
+  for (const seg of segments) if (seg.peakClearMM > (deep?.peakClearMM ?? -Infinity)) deep = seg
+  const masses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
+    .map((m) => ({ centreMM: m.centreMM, areaMM2: m.areaMM2, peakClearMM: m.peakClearMM }))
+  return { refMM, boxC, weightC, deepC: deep?.centreMM ?? boxC, refMidY, masses }
+}
+
+/**
+ * The governed anchor at a size, from the bake. Null for Core (mode 1) — the caller measures
+ * that one live, per its own size-dependent definition. Positions scale linearly; the governor
+ * chooses among the masses whose scaled depth still clears the dial.
+ */
+export function anchorFromBake(
+  bake: AnchorBake, mode: CentreMode, governor: Governor, massDepthMM: number, sizeMM: number,
+): Pt | null {
+  const sc = sizeMM / bake.refMM
+  const at = (p: Pt): Pt => [p[0] * sc, p[1] * sc]
+  if (mode === 0) return at(bake.boxC)
+  if (mode === 1) return null
+  if (mode === 3) return at(bake.weightC)
+  if (mode === 4) return at(bake.deepC)
+  const qualifying = bake.masses
+    .filter((m) => m.peakClearMM * sc >= massDepthMM)
+    .map((m) => ({ centreMM: at(m.centreMM), areaMM2: m.areaMM2 * sc * sc, peakClearMM: m.peakClearMM * sc }))
+  const pool = qualifying.length ? qualifying : bake.masses.map((m) => ({ centreMM: at(m.centreMM), areaMM2: m.areaMM2 * sc * sc, peakClearMM: m.peakClearMM * sc }))
+  if (mode === 5) {
+    let top = pool[0]
+    for (const m of pool) if (m.centreMM[1] > top.centreMM[1]) top = m
+    return top?.centreMM ?? at(bake.boxC)
+  }
+  return governMass(pool, governor, bake.refMidY * sc)?.centreMM ?? at(bake.boxC)
+}
+
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(
   seated: Pt[],

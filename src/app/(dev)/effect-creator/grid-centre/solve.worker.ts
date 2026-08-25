@@ -3,8 +3,8 @@
 
 import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
-import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
-import { assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
+import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
@@ -32,6 +32,39 @@ const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
 const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand> }>()
 const rungCache = new Map<string, BandRung[]>()
+// ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
+// and scaled linearly per size. Positions are shape features; only qualification is size-
+// dependent (evaluated inside anchorFromBake). Core mode (1) is size-dependent by definition
+// and stays live — the bake returns null and the engine measures as before.
+const bakeCache = new Map<string, { bake: AnchorBake; sig: string }>()
+function anchorFnFor(
+  sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, cfgSig: string, shapeSig2: string,
+): ((mm: number) => import('@/lib/effect/types').Pt) | undefined {
+  const mode = (cfg.centreMode ?? 2) as CentreMode
+  if (mode === 1) return undefined                    // Core: live by definition
+  const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM, cfg.massDepthMM])
+  let hit = bakeCache.get(key)
+  if (!hit) {
+    const refMM = sizeRange(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)).maxMM
+    const outer = sized(refMM).outer.pts
+    const bb = bbox(outer)
+    const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
+    const segs = safeSegments(outer, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
+    const bake = anchorBakeOf(segs, [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2], centroidOf(outer), refMM, (bb.minY + bb.maxY) / 2)
+    hit = { bake, sig: key }
+    bakeCache.set(key, hit)
+    if (bakeCache.size > 8) bakeCache.delete(bakeCache.keys().next().value!)
+  }
+  // Dan, verified visually 2026-08-25: the centre does not change with scale — the shape is
+  // fixed. So the SELECTION is made once too, at full size, and that one point IS the anchor
+  // at every size, scaled linearly. No per-size re-election.
+  const bake = hit.bake
+  const gov = (cfg.governor ?? 0) as Governor
+  const depth = Math.max(spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)), cfg.massDepthMM ?? MASS_DEPTH_MM)
+  const aRef = anchorFromBake(bake, mode, gov, depth, bake.refMM) ?? bake.boxC
+  return (mm: number) => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
+}
+
 // Free+snap: one exact solve per distinct revealed layout — the plateaus of the slider.
 // The FINISHED MODEL is cached, not just the solve: inside a plateau every slider move is a
 // lookup, so it is as instant as the old free mode. The anchor mesh is shared across solves.
@@ -119,7 +152,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const key = JSON.stringify([cfgSig, band.id])
       let rungs = rungCache.get(key)
       if (!rungs) {
-        rungs = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM)
+        rungs = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, anchorFnFor(sized, cfg, cfgSig, sig))
         rungCache.set(key, rungs)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -158,11 +191,12 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       //       pressed size and the panned registration;
       //   3 · the ORIGINAL free logic again, through its own forced-registration branch, at the
       //       pressed size — so what is drawn is free mode's own picture of the wrapped state.
+      const anchorFn = anchorFnFor(sized, cfg, cfgSig, sig)
       const fk = cfgSig + '|' + sizeMM
       let free = freeCache.get(fk)
       if (!free) {
         const contour = sized(sizeMM)
-        free = { contour, grid: computeGrid(contour, cfg) }
+        free = { contour, grid: computeGrid(contour, anchorFn ? { ...cfg, centreOverrideMM: anchorFn(sizeMM) } : cfg) }
         freeCache.set(fk, free)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }
@@ -180,7 +214,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       if (cached !== undefined) { ctx.postMessage({ id, model: cached }); return }
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
       const gx = (Math.min(...xs) + Math.max(...xs)) / 2, gy = (Math.min(...ys) + Math.max(...ys)) / 2
-      const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM }
+      const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM, anchorAtMM: anchorFn }
       let memo = snapAnchors.get(cfgSig)
       if (!memo) { memo = new Map(); snapAnchors.set(cfgSig, memo); if (snapAnchors.size > 4) snapAnchors.delete(snapAnchors.keys().next().value!) }
       const at = wrapGroup(sized, wcfg, pts.map(([x, y]) => [x - gx, y - gy] as [number, number]), MIN_EFFECT_MM, sizeMM, memo)
@@ -206,7 +240,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
           shown = bump === 0 ? contour : sized(eff)
           const b2 = bbox(shown.outer.pts)
           const sc = eff / at.sizeMM
-          grid = computeGrid(shown, { ...cfg, forcePhaseMM: [seat0[0] * sc - b2.minX, seat0[1] * sc - b2.minY] })
+          grid = computeGrid(shown, { ...cfg, forcePhaseMM: [seat0[0] * sc - b2.minX, seat0[1] * sc - b2.minY], ...(anchorFn ? { centreOverrideMM: anchorFn(eff) } : {}) })
           if (grid.anchors.length >= at.count || bump >= 0.06) break
         }
         model = { contour: shown, grid, effSize: eff, ladder: [], idx: 0, segments: grid.segments }
@@ -219,7 +253,8 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       let hit = freeCache.get(k)
       if (!hit) {
         const contour = sized(sizeMM)
-        hit = { contour, grid: computeGrid(contour, cfg) }
+        const aFn = anchorFnFor(sized, cfg, cfgSig, sig)
+        hit = { contour, grid: computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg) }
         freeCache.set(k, hit)
         if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
       }

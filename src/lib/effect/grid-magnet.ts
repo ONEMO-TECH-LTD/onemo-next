@@ -72,6 +72,9 @@ export interface GridConfig {
   positioning?: number
   /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */
   governor?: number
+  /** Baked governed centre for this size (anchor bake) — skips per-size anchor derivation.
+   *  Positions are shape features and scale linearly; re-measuring per size is mesh noise. */
+  centreOverrideMM?: Pt
   /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
   segmentsDetail?: 'full' | 'light'
   /** Voting dominance order — which force rules, admin-picked; spec default when absent. */
@@ -135,11 +138,11 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const mode = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
   const positioning = cfg.positioning ?? POSITIONING
   const governor = (cfg.governor ?? GOVERNOR) as Governor
-  const centres = centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
+  const centres = cfg.centreOverrideMM ? [cfg.centreOverrideMM] : centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
   // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
   const allMasses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
   const midY = (bb.minY + bb.maxY) / 2
-  const ruleTarget: Pt = mode === 2 ? (governMass(allMasses, governor, midY)?.centreMM ?? centres[0]) : centres[0]
+  const ruleTarget: Pt = cfg.centreOverrideMM ?? (mode === 2 ? (governMass(allMasses, governor, midY)?.centreMM ?? centres[0]) : centres[0])
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0

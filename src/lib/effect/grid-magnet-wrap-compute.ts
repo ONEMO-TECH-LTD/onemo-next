@@ -39,6 +39,9 @@ export interface WrapConfig {
   centreMode?: number
   governor?: number
   massDepthMM?: number
+  /** Baked anchor query (anchor bake): the governed centre at any size, positions measured once
+   *  on the shape and scaled — replaces per-size mesh re-measurement. In-worker only. */
+  anchorAtMM?: (mm: number) => Pt
   /** Perimeter belt — drop fully-surrounded interior seats, keeping the rim. Reused from the
    *  voting bench. Applied to the ARRANGEMENT before the wrap is solved, so the shape still
    *  wraps tight around exactly the magnets that remain. */
@@ -201,6 +204,7 @@ export function wrapGroup(
 
   const anchors = anchorMemo ?? new Map<number, Pt>()
   const anchorAt = (mm: number, exact = false): Pt => {
+    if (cfg.anchorAtMM) return cfg.anchorAtMM(mm)
     const k = Math.round(mm * 100)
     const hit = anchors.get(k)
     if (hit && !exact) return hit
@@ -644,19 +648,21 @@ export interface BandRung { at: WrapAt }
  */
 export function wrapBandLadder(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
+  anchorAtMM?: (mm: number) => Pt,
 ): BandRung[] {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
   const wcfg: WrapConfig = {
     pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
     centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM,
+    anchorAtMM,
   }
   const anchorMemo = new Map<number, Pt>()
   const seen = new Set<string>()
   const rungs: BandRung[] = []
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
-    const pts = computeGrid(sized(mm), scanCfg).anchors.map((a) => a.p)
+    const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
     if (!pts.length) continue
     // Layout identity: the seated pattern in lattice units, origin-free.
     let mx = Infinity, my = Infinity
