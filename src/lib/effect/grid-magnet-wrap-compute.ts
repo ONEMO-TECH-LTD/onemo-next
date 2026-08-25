@@ -229,10 +229,7 @@ export function wrapGroup(
     if (!region) return null
     const valid = validOrigins(region, g)
     if (!valid) return null
-    const picked = pickOrigin(valid, centred)
-    if (cfg.maxShiftMM != null
-      && Math.hypot(picked[0] - centred[0], picked[1] - centred[1]) > cfg.maxShiftMM) return null
-    return picked
+    return pickOrigin(valid, centred)
   }
 
   if (!heldAt(maxMM)) return null
@@ -344,10 +341,7 @@ export function wrap(
     if (!region) return null
     const valid = validOrigins(region, group)
     if (!valid) return null
-    const picked = pickOrigin(valid, centred)
-    if (cfg.maxShiftMM != null
-      && Math.hypot(picked[0] - centred[0], picked[1] - centred[1]) > cfg.maxShiftMM) return null
-    return picked
+    return pickOrigin(valid, centred)
   }
 
   // Every arrangement is solved to ITS OWN tightest wrap, so every candidate below is already a
@@ -683,17 +677,14 @@ export function wrapBandLadder(
   }
   for (const assembly of classNodes ?? []) {
     if (!assembly.length) continue
-    // The pipeline's step and its exception, both offered: the PURE-CENTRED wrap (layout on the
-    // centre, the wrap grows to seal it) and the FREE-SHIFT wrap (the cove-dip, tightest
-    // possible). Rule-4 landing prefers centred within half a pitch — the BOT pair lands centred.
-    const centredAt = wrapGroup(sized, { ...wcfg, maxShiftMM: 0.5 }, assembly, minMM, hiMM, anchorMemo)
-    const freeAt = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
-    for (const at of [centredAt, freeAt]) {
-      if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
-      if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
-      seen.add(idOfPts(at.points))
-      rungs.push({ at, revealMM: at.sizeMM, isClass: true })
-    }
+    // WRAP IS THE LAW (Dan, 08-25): the layout starts centred and the CENTRE SHIFTS when the
+    // wrap conflicts with it — never the reverse. One solve: minimal shift, tightest wrap.
+    // A variant that grows the shape to stay pinned on the centre is not a wrap.
+    const at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
+    if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
+    if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
+    seen.add(idOfPts(at.points))
+    rungs.push({ at, revealMM: at.sizeMM, isClass: true })
   }
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
@@ -730,5 +721,9 @@ export function wrapBandLadder(
     rungs.push({ at, revealMM: mm })
   }
   rungs.sort((a, b) => a.at.sizeMM - b.at.sizeMM)
-  return rungs
+  // COVERAGE DOMINANCE (Dan, ruled twice, 08-25): an offer that leaves areas unprotected is not
+  // an option when a same-size offer covers them — dropped, not outranked. "Same size" = within
+  // 1mm, the display's own resolution; more magnets at the same size is strictly more coverage.
+  return rungs.filter((r) =>
+    !rungs.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
 }
