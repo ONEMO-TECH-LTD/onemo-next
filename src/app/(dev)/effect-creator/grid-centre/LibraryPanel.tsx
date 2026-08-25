@@ -7,8 +7,8 @@
 
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import {
-  LAYOUT_LIBRARY, LIBRARY_SHAPES, LIBRARY_FAMILIES, UNIVERSAL_PRIMITIVES,
-  FAMILY_APPLICABILITY_DRAFT, frameKeyOf, kindOf, orientationOf, selectedRecords,
+  LAYOUT_LIBRARY, LIBRARY_SHAPES, LIBRARY_FAMILIES,
+  frameKeyOf, kindOf, orientationOf, selectedRecords,
   draftIntegrity, draftId,
   type LibrarySelection, type LibraryDraft,
 } from '@/lib/effect/grid-magnet-library'
@@ -29,7 +29,6 @@ export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, draft
   exportDrafts: () => void
 }) {
   const { shape, frame } = selectedRecords(sel)
-  const applicable = FAMILY_APPLICABILITY_DRAFT[shape.family]
   const layouts = [...frame.layouts].sort((a, b) => a.nodes.length - b.nodes.length)
   return (
     <>
@@ -44,14 +43,14 @@ export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, draft
           ))}
         </div>
       </div>
-      <Fold title="Shape · this family's ruled set">
+      <Fold title="Shape">
         <div className="gl-seg" style={{ flexWrap: 'wrap' }}>
           {LIBRARY_SHAPES.filter((s) => s.family === shape.family).map((s) => (
             <button key={s.id} aria-pressed={s.id === shape.id} onClick={() => setSel({ ...sel, shapeId: s.id })}>{s.id}</button>
           ))}
         </div>
       </Fold>
-      <Fold title="Frame · size class · cols × rows">
+      <Fold title="Frame">
         <div className="gl-steps">
           {LAYOUT_LIBRARY.map((f) => (
             <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === frameKeyOf(frame)}
@@ -66,23 +65,16 @@ export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, draft
           ))}
         </div>
       </Fold>
-      <Fold title={`Layouts · ${frame.layouts.length} varieties in ${frameKeyOf(frame)}`}>
+      <Fold title={`Layouts · ${frame.layouts.length} in ${frameKeyOf(frame)}`}>
         <div className="gl-steps">
           {layouts.map((l) => (
             <button key={l.name} aria-pressed={sel.layoutId === l.name} onClick={() => setSel({ ...sel, layoutId: l.name })}>
-              <b>{l.name}</b><span>{l.nodes.length}⌾{l.note ? ' · Full-grid only' : ''}{applicable.includes(l.name) ? '' : ' · draft: other family'}</span>
+              <b>{l.name}</b><span>{l.nodes.length}⌾{l.note ? ' · full grid' : ''}</span>
             </button>
           ))}
         </div>
-        <div className="gl-field" style={{ marginTop: 10 }}><span>Universal · tried in every band (ruled)</span>
-          <div className="gl-seg" style={{ flexWrap: 'wrap' }}>
-            {UNIVERSAL_PRIMITIVES.map((l) => (
-              <button key={l.name} aria-pressed={sel.layoutId === 'prim:' + l.name} onClick={() => setSel({ ...sel, layoutId: 'prim:' + l.name })}>{l.name} · {l.nodes.length}⌾</button>
-            ))}
-          </div>
-        </div>
       </Fold>
-      <Fold title={draft ? `Authoring · ${draft.nodes.length}⌾ · click lattice spots to toggle` : 'Authoring · sandbox drafts'}>
+      <Fold title={draft ? `Authoring · ${draft.nodes.length}⌾ · click spots` : 'Authoring'}>
         {draft ? <>
           <div className="gl-limits">
             <span className="gl-num" style={{ flex: 1 }}><i>name</i>
@@ -112,14 +104,6 @@ export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, draft
             {draft !== null && <button onClick={() => deleteDraft(draftId(shape.family, frameKeyOf(frame), draft!.name))}>Delete this</button>}
           </div>
         </div>}
-      </Fold>
-      <Fold title="View">
-        <div className="gl-seg">
-          <button aria-pressed={sel.view.transpose} onClick={() => setSel({ ...sel, view: { ...sel.view, transpose: !sel.view.transpose } })}>transpose</button>
-          <button aria-pressed={sel.view.flipX} onClick={() => setSel({ ...sel, view: { ...sel.view, flipX: !sel.view.flipX } })}>flip ↔</button>
-          <button aria-pressed={sel.view.flipY} onClick={() => setSel({ ...sel, view: { ...sel.view, flipY: !sel.view.flipY } })}>flip ↕</button>
-        </div>
-        <div className="gl-magic-note">Family → layout applicability is a DRAFT for review — tags only, never engine policy.</div>
       </Fold>
     </>
   )

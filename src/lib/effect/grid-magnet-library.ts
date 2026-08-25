@@ -110,12 +110,7 @@ export const LIBRARY_SHAPES: LibraryShape[] = [
 ]
 
 
-/** THE UNIVERSAL PRIMITIVES (ruled: "the pair and single magnet must be tried no matter the
- *  class") — tagged templates available for review in EVERY band/frame; the engine's judge
- *  decides where they hold, the library never omits them. Lattice units. */
-export const UNIVERSAL_PRIMITIVES: LibraryLayout[] = [
-  { name: 'single', nodes: [[0, 0]] },
-]
+
 
 
 /** Stable-ID selection — indices are forbidden identity (pruning the draft must never silently
@@ -131,7 +126,6 @@ export function selectedRecords(sel: LibrarySelection): {
   shape: LibraryShape
   frame: LibraryFrame
   layout: LibraryLayout
-  isPrimitive: boolean
 } {
   // FAIL LOUD (QA F3): stable IDs exist so a stale or mistyped identity can never silently
   // retarget to unrelated data — an unknown ID is an error, never a 1x1 fallback.
@@ -139,15 +133,9 @@ export function selectedRecords(sel: LibrarySelection): {
   if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
   const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === sel.frameKey)
   if (!frame) throw new Error('library: unknown frameKey ' + sel.frameKey)
-  if (sel.layoutId.startsWith('prim:')) {
-    const nm = sel.layoutId.slice(5)
-    const prim = UNIVERSAL_PRIMITIVES.find((l) => l.name === nm)
-    if (!prim) throw new Error('library: unknown primitive ' + sel.layoutId)
-    return { shape, frame, layout: prim, isPrimitive: true }
-  }
   const layout = frame.layouts.find((l) => l.name === sel.layoutId)
   if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
-  return { shape, frame, layout, isPrimitive: false }
+  return { shape, frame, layout }
 }
 
 

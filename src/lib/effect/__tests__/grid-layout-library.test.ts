@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  LAYOUT_LIBRARY, LIBRARY_SHAPES, UNIVERSAL_PRIMITIVES, FAMILY_APPLICABILITY_DRAFT,
+  LAYOUT_LIBRARY, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   type LibrarySelection,
 } from '../grid-magnet-library'
@@ -14,7 +14,6 @@ import { shapeFamilyOf } from '../grid-magnet-class'
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
 const SHAPE_IDS = ['square']
-const PRIMS = ['single']
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
   shapeId: 'square', frameKey: '3x3', layoutId: 'ring',
@@ -31,14 +30,7 @@ describe('corpus completeness — removal must fail these', () => {
   it('the complete ruled shape-ID set', () => {
     expect(LIBRARY_SHAPES.map((x) => x.id).sort()).toEqual([...SHAPE_IDS].sort())
   })
-  it('the five universal primitives exist and resolve in EVERY frame', () => {
-    expect(UNIVERSAL_PRIMITIVES.map((l) => l.name)).toEqual(PRIMS)
-    for (const f of LAYOUT_LIBRARY) for (const nm of PRIMS) {
-      const a = libraryArrangement(sel({ frameKey: frameKeyOf(f), layoutId: 'prim:' + nm }), 48)
-      expect(a.layoutId).toBe('prim:' + nm)
-      expect(a.nodesMM.length).toBe(nm === 'single' ? 1 : 2)
-    }
-  })
+
   it('square class: every frame is even, 1x1..5x5, square kind', () => {
     const seen = new Set<string>()
     for (const f of LAYOUT_LIBRARY) { expect(f.cols).toBe(f.rows); seen.add(f.cols + 'x' + f.rows) }
@@ -76,33 +68,9 @@ describe('classifier goldens — declared family is the classifier verdict, not 
     expect(Math.max(...xs2) - Math.min(...xs2)).toBeCloseTo(120, 6)
     expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(120, 6)
   })
-  it('QA F2: the primitive keeps the selected frame and prim identity', () => {
-    for (const f of LAYOUT_LIBRARY) for (const nm of PRIMS) {
-      const a = libraryArrangement(sel({ frameKey: frameKeyOf(f), layoutId: 'prim:' + nm }), 48)
-      expect(a.frameKey).toBe(frameKeyOf(f))
-      expect([a.frameCols, a.frameRows]).toEqual([f.cols, f.rows])
-      expect(a.layoutId).toBe('prim:' + nm)
-      expect(a.layoutKind).toBe('primitive')
-      const xs = a.nodesMM.map((q) => q[0]), ys = a.nodesMM.map((q) => q[1])
-      expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo((f.cols - 1) * 24, 6)
-      expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo((f.rows - 1) * 24, 6)
-    }
-    const m = libraryStageModel(sel({ frameKey: '5x5', layoutId: 'prim:single' }), 48, 12)
-    expect(m.title).toContain('5x5')
-    expect(m.title).toContain('prim:single')
-  })
 
-  it('QA F4: the single primitive keeps the frame and centres on it, under every transform', () => {
-    for (const f of LAYOUT_LIBRARY)
-      for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
-        const a = libraryArrangement(sel({ frameKey: frameKeyOf(f), layoutId: 'prim:single', view: { transpose, flipX, flipY } }), 48)
-        expect(a.frameKey).toBe(frameKeyOf(f))
-        expect(a.layoutId).toBe('prim:single')
-        expect(a.nodesMM.length).toBe(1)
-        expect(a.nodesMM[0][0]).toBeCloseTo((f.cols - 1) * 24, 6)
-        expect(a.nodesMM[0][1]).toBeCloseTo((f.rows - 1) * 24, 6)
-      }
-  })
+
+
 
   it('families and draft applicability stay complete', () => {
     expect(LIBRARY_FAMILIES).toEqual(['square'])
@@ -130,14 +98,13 @@ describe('data integrity + transforms', () => {
 describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition', () => {
   it('arrangement carries stable IDs and mm nodes', () => {
     const a = libraryArrangement(sel(), 48)
-    expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'ring', layoutKind: 'frame', frameCols: 3, frameRows: 3 })
+    expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'ring', frameCols: 3, frameRows: 3 })
     expect(libraryPreview(sel(), 48)).toMatchObject({ shapeId: 'square', declaredFamily: 'square', shapeCompatible: true })
     expect(a.nodesMM.length).toBe(8)
   })
   it('unknown IDs fail loudly — no silent 1x1 retarget (QA F3)', () => {
     expect(() => libraryArrangement(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
     expect(() => libraryArrangement(sel({ layoutId: 'nope' }), 48)).toThrow('unknown layoutId')
-    expect(() => libraryArrangement(sel({ layoutId: 'prim:nope' }), 48)).toThrow('unknown primitive')
   })
   it('transpose exposes the truthful actual frame identity (QA F3)', () => {
     const a = libraryArrangement(sel({ view: { transpose: true, flipX: false, flipY: false } }), 48)

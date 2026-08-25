@@ -22,9 +22,7 @@ export interface LibraryArrangement {
   frameKey: string
   frameCols: number
   frameRows: number
-  /** 'prim:*' identity is preserved — a primitive never masquerades as a frame layout. */
   layoutId: string
-  layoutKind: 'frame' | 'primitive'
   /** Node positions in mm, engine y-up — wrapGroup-ready local geometry. */
   nodesMM: readonly Pt[]
 }
@@ -37,36 +35,16 @@ export interface LibraryStageModel {
 
 /** Selected records -> stable-ID arrangement in mm. The ONE conversion. Throws on unknown IDs. */
 export function libraryArrangement(sel: LibrarySelection, pitchMM: number): LibraryArrangement {
-  const { shape, frame, layout, isPrimitive } = selectedRecords(sel)
+  const { frame, layout } = selectedRecords(sel)
   const frameCols = sel.view.transpose ? frame.rows : frame.cols
   const frameRows = sel.view.transpose ? frame.cols : frame.rows
-  const cx = (frameCols - 1) * pitchMM / 2, cy = (frameRows - 1) * pitchMM / 2
-  let nodesMM: Pt[]
-  if (isPrimitive) {
-    // The primitive keeps its ruled geometry AND the selected frame context: the ONE transform
-    // implementation and the ONE canonical y-down -> engine y-up conversion apply exactly as
-    // for frame layouts (QA F4 — pair-diag must stay pair-diag, View must transform it), then
-    // the group is translated so its middle sits on the frame middle. The wrap solver
-    // re-centres the local group itself, so the translation is display placement, not policy.
-    const primitiveFrame = {
-      cols: Math.max(...layout.nodes.map(([x]) => x)) + 1,
-      rows: Math.max(...layout.nodes.map(([, y]) => y)) + 1,
-      layouts: [],
-    }
-    const t = transformLayout(primitiveFrame, layout, sel.view)
-    const local: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
-    const xs = local.map((q) => q[0]), ys = local.map((q) => q[1])
-    const mx = (Math.min(...xs) + Math.max(...xs)) / 2, my = (Math.min(...ys) + Math.max(...ys)) / 2
-    nodesMM = local.map(([x, y]) => [x - mx + cx, y - my + cy])
-  } else {
-    const t = transformLayout(frame, layout, sel.view)
-    nodesMM = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
-  }
+  const t = transformLayout(frame, layout, sel.view)
+  // Engine space is y-up; library rows count downward from the top.
+  const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   return {
     sourceFrameKey: frameKeyOf(frame), frameKey: frameCols + 'x' + frameRows,
     frameCols, frameRows,
-    layoutId: isPrimitive ? 'prim:' + layout.name : layout.name,
-    layoutKind: isPrimitive ? 'primitive' : 'frame',
+    layoutId: layout.name,
     nodesMM,
   }
 }
