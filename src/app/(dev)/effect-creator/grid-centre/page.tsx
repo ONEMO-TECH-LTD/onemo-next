@@ -343,7 +343,7 @@ export default function GridLab() {
                 const first = LIBRARY_SHAPES.find((x) => x.family === fam)!
                 const f0 = CLASS_FRAMES[fam][0]
                 setEdit(null)
-                setLibrarySel({ ...librarySel, shapeId: first.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name })
+                setLibrarySel({ ...librarySel, shapeId: first.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts.some((l) => l.name === 'perimeter') ? 'perimeter' : f0.layouts[0].name })
               }}>{fam}</button>
             })}
           </div>

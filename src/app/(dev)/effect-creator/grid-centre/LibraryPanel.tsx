@@ -57,7 +57,7 @@ export default function LibraryPanel({
                 onClick={() => {
                   const f0 = frames.find((f) => rectangleSubOf(f.cols, f.rows) === sub)!
                   setEdit(null)
-                  setSel({ ...sel, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name })
+                  setSel({ ...sel, frameKey: frameKeyOf(f0), layoutId: 'perimeter' })
                 }}>{sub}</button>
             ))}
           </div>
@@ -78,7 +78,7 @@ export default function LibraryPanel({
               onClick={() => {
                 const keep = f.layouts.some((l) => l.name === sel.layoutId)
                 setEdit(null)
-                setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : f.layouts[0].name })
+                setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : 'perimeter' })
               }}><b>{f.cols}×{f.rows}</b></button>
           ))}
         </div>
@@ -97,7 +97,7 @@ export default function LibraryPanel({
           ))}
           <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
         </div>
-        <div className="gl-field" style={{ marginTop: 9 }}><span>Spacing · 48 · 96 computed · custom by hand</span>
+        <div className="gl-field" style={{ marginTop: 9, opacity: (edit || sel.layoutId === 'perimeter' || sel.layoutId === 'perimeter-96') ? 1 : 0.45 }}><span>Spacing</span>
           <div className="gl-seg">
             <button aria-pressed={!edit && sel.layoutId === 'perimeter'} disabled={!frame.layouts.some((l) => l.name === 'perimeter')}
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter' }) }}>48 mm</button>
