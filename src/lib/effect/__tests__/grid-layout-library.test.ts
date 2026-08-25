@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  LAYOUT_LIBRARY, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
+  LAYOUT_LIBRARY, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   type LibrarySelection,
 } from '../grid-magnet-library'
@@ -13,7 +13,7 @@ import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
-const SHAPE_IDS = ['square']
+const SHAPE_IDS = ['square', 'rectangle']
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
   shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter',
@@ -42,12 +42,17 @@ describe('corpus completeness — removal must fail these', () => {
 describe('classifier goldens — declared family is the classifier verdict, not a point count', () => {
   it('every shape outline classifies as its declared family', () => {
     for (const s of LIBRARY_SHAPES) {
-      const pv = libraryPreview(sel({ shapeId: s.id, frameKey: '3x3', layoutId: 'perimeter' }), 48)
-      expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(s.family)
+      // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
+      // the engine classifier reads it as the box-filling 'square' family. The mapping is
+      // asserted explicitly so the two taxonomies can never silently merge.
+      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square' }
+      const f0 = CLASS_FRAMES[s.family][0]
+      const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
+      expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(ENGINE_FAMILY[s.family])
     }
   })
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
-    for (const f of LAYOUT_LIBRARY) for (const s of LIBRARY_SHAPES) {
+    for (const s of LIBRARY_SHAPES) for (const f of CLASS_FRAMES[s.family]) {
       for (const transpose of [false, true]) {
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (s.aspect === 'square' && cols !== rows) continue          // marked incompatible, not stretched
@@ -73,7 +78,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
 
 
   it('families and draft applicability stay complete', () => {
-    expect(LIBRARY_FAMILIES).toEqual(['square'])
+    expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle'])
     for (const fam of LIBRARY_FAMILIES) expect(FAMILY_APPLICABILITY_DRAFT[fam].length).toBeGreaterThan(0)
   })
 })
@@ -142,6 +147,24 @@ describe('interior rule and the belt mode', () => {
       const names = f.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       expect(names).toContain('perimeter-96')
+    }
+  })
+})
+
+describe('rectangle class', () => {
+  it('carries exactly its ruled frames', () => {
+    expect(CLASS_FRAMES.rectangle.map(frameKeyOf)).toEqual(['1x2', '1x3', '1x4', '1x5', '2x3', '2x4', '2x5', '3x4', '3x5', '4x5'])
+  })
+  it('every frame offers a perimeter, and only 3+ line frames carry an interior full', () => {
+    for (const f of CLASS_FRAMES.rectangle) {
+      const names = f.layouts.map((l) => l.name)
+      expect(names).toContain('perimeter')
+      const hasFull = names.includes('full')
+      expect(hasFull).toBe(f.cols >= 3 && f.rows >= 3)
+      for (const l of f.layouts) if (l.name !== 'full')
+        for (const [x, y] of l.nodes)
+          expect(x === 0 || x === f.cols - 1 || y === 0 || y === f.rows - 1,
+            `${frameKeyOf(f)} ${l.name} interior ${x},${y}`).toBe(true)
     }
   })
 })
