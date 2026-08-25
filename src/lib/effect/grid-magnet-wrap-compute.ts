@@ -20,7 +20,7 @@
 import { Clipper, FillRule, JoinType, EndType, PointInPolygonResult, type Paths64 } from '@countertype/clipper2-ts'
 import type { Contour, Pt } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
-import type { GridResult } from './grid-magnet'
+import { computeGrid, type GridConfig, type GridResult } from './grid-magnet'
 import { centroidOf, safeSegments, spotRadiusOf } from './grid-magnet-compute'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from './offset'
 import { applyCoverage, centeringAnchors, governMass, type CentreMode, type Governor } from './grid-magnet-logic'
@@ -622,4 +622,57 @@ export function wrapFlap(
     patches,
     edgePatches,
   }
+}
+
+/** One rung the band offers: a revealed layout at its exact contact size. */
+export interface BandRung { at: WrapAt }
+
+/**
+ * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
+ * the output. Nothing here invents a layout and nothing walks a gate:
+ *
+ *   1 · REVEAL — at each scanned size, centre-rules seating (the existing engine, positioning 1)
+ *       says which magnets the material carries. The layout is read off the material, not chosen.
+ *   2 · WRAP — each distinct revealed layout is handed WHOLE to `wrapGroup`, the proven solver:
+ *       the group starts centred on the governed anchor and shifts only the minimum a lawful
+ *       tighter wrap demands, bisected to the exact contact size. At that size the lawful region
+ *       has collapsed — the binding magnets are pressed, a gap is impossible by construction.
+ *   3 · BAND MEMBERSHIP — a layout whose contact size falls outside the band belongs to another
+ *       band and is not offered here (ruled 08-24).
+ *
+ * Composition only: computeGrid and wrapGroup are used as they are, byte-untouched.
+ */
+export function wrapBandLadder(
+  sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
+): BandRung[] {
+  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
+  const wcfg: WrapConfig = {
+    pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
+    centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM,
+  }
+  const anchorMemo = new Map<number, Pt>()
+  const seen = new Set<string>()
+  const rungs: BandRung[] = []
+  const SCAN_MM = 1
+  for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
+    const pts = computeGrid(sized(mm), scanCfg).anchors.map((a) => a.p)
+    if (!pts.length) continue
+    // Layout identity: the seated pattern in lattice units, origin-free.
+    let mx = Infinity, my = Infinity
+    for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
+    const id = pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
+    if (seen.has(id)) continue
+    seen.add(id)
+    // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+    const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
+    const at = wrapGroup(sized, wcfg, group, minMM, hiMM, anchorMemo)
+    if (!at) continue
+    if (at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue   // another band owns it
+    rungs.push({ at })
+  }
+  rungs.sort((a, b) => a.at.sizeMM - b.at.sizeMM)
+  return rungs
 }

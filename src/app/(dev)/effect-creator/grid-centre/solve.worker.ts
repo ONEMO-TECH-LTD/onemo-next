@@ -1,7 +1,11 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, computeGrid, fitSizeInBand, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
+import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
+import { wrapBandLadder, wrapGrid, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
+import { assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -25,6 +29,7 @@ let shapeSig = ''
 const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
 const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand> }>()
+const rungCache = new Map<string, BandRung[]>()
 const FREE_CAP = 400
 
 const WALK_CAP = 10
@@ -97,9 +102,41 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
     }
     const sig = JSON.stringify([offsetMM, pts.length, h])
-    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear() }
+    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear(); rungCache.clear() }
     const cfgSig = JSON.stringify(cfg)
-    if (mode !== 'free') {
+    if (mode !== 'free' && (cfg.positioning ?? 0) === 1) {
+      // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
+      // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
+      // contact size. Composition only: the wrap engine is transferred untouched.
+      const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      const key = JSON.stringify([cfgSig, band.id])
+      let rungs = rungCache.get(key)
+      if (!rungs) {
+        rungs = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM)
+        rungCache.set(key, rungs)
+        if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
+      }
+      if (rungs.length) {
+        const idx = Math.min(stepSel ?? 0, rungs.length - 1)
+        const at = rungs[idx].at
+        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined }
+        const drawn = wrapGrid(sized, wcfg, at)
+        const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+        const r = spotRadiusOf(pad)
+        const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
+        const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
+        const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count }))
+        ctx.postMessage({ id, model: {
+          contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
+          effSize: at.sizeMM, ladder, idx, segments,
+        } })
+        return
+      }
+      // The band's range revealed no layout that wraps inside it — honest walk fallback.
+      const { fit } = bandFit(sized, cfg, cfgSig, mode, snapStep)
+      const contour = sized(fit.sizeMM)
+      ctx.postMessage({ id, model: { contour, grid: fit.grid, effSize: fit.sizeMM, ladder: [], idx: 0, segments: fit.grid.segments } })
+    } else if (mode !== 'free') {
       const { fit } = bandFit(sized, cfg, cfgSig, mode, snapStep)
       const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
       const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
