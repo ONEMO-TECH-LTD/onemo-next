@@ -94,6 +94,9 @@ export default function GridLab() {
   const [edit, setEdit] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
   /** Library canvas view — pan in mm, zoom factor. Library tab only. */
   const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 0.45 })
+  /** BENCH CAMERA — a view-level zoom over the finished render. The solve, the gestures and
+   *  every readout are untouched; only what the eye sees is scaled. */
+  const [camZoom, setCamZoom] = useState(1)
   const [drafts, setDrafts] = useState<LibraryDraft[]>([])
   useEffect(() => {
     try { const raw = localStorage.getItem(DRAFT_STORE_KEY); if (raw) setDrafts(JSON.parse(raw)) } catch { }
@@ -380,7 +383,7 @@ export default function GridLab() {
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     segments: [], segFill: false,
-                    viewport: libView,
+                    viewport: { ...libView, wheelZoom: true },
                     onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: Math.min(6, Math.max(0.15, v.zoom * f)) })),
                     onReset: () => setLibView({ panMM: [0, 0], zoom: 0.45 }),
@@ -397,6 +400,7 @@ export default function GridLab() {
                       })
                     } : undefined }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
+                    viewport: camZoom === 1 ? undefined : { panMM: [0, 0] as Pt, zoom: camZoom },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
@@ -523,6 +527,14 @@ export default function GridLab() {
         </aside>
 
         <aside className="gl-centercol" style={tab === 'library' ? { display: 'none' } : undefined}>
+          <div className="gl-card gl-libsize">
+            <b>{Math.round(camZoom * 100)}%</b><span>view</span>
+            <div className="gl-seg" style={{ marginLeft: 'auto' }}>
+              <button onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.15).toFixed(2)))}>−</button>
+              <button onClick={() => setCamZoom(1)}>fit</button>
+              <button onClick={() => setCamZoom((z) => Math.min(4, +(z + 0.15).toFixed(2)))}>+</button>
+            </div>
+          </div>
           <Fold title="Shape">
             {src === 'preset' && <>
               <div className="gl-lib">
@@ -624,7 +636,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
   onPickNode?: (pMM: Pt) => void
   /** LIBRARY TAB ONLY — a free canvas: pan and zoom move the view itself and the lattice field
    *  regenerates over whatever is visible. Absent everywhere else, so the bench is untouched. */
-  viewport?: { panMM: Pt; zoom: number }
+  viewport?: { panMM: Pt; zoom: number; wheelZoom?: boolean }
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -665,7 +677,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const k = pxPerMM(svg)
-      if (e.ctrlKey || viewport) { onZoom(Math.exp(-e.deltaY * (viewport ? 0.0025 : 0.01))); return }
+      if (e.ctrlKey || viewport?.wheelZoom) { onZoom(Math.exp(-e.deltaY * (viewport?.wheelZoom ? 0.0025 : 0.01))); return }
       setPend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
       if (wheelTimer.current) clearTimeout(wheelTimer.current)
       wheelTimer.current = setTimeout(commit, 250)
