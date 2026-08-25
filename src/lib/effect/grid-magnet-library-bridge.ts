@@ -6,7 +6,7 @@
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
-import { MAGNET_DIA_SMALL_MM } from './grid-magnet-spec'
+import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf,
   type LibrarySelection, type LibraryShapeId,
@@ -51,7 +51,7 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
 
 /** Preview metadata — AUTHORING DISPLAY ONLY, never part of the pipeline arrangement (Meta M1:
  *  the declared library family must not pre-empt Step-1's open recognition-source ruling). */
-export function libraryPreview(sel: LibrarySelection, pitchMM: number): {
+export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: number = RELEASED_PADDING_MM): {
   shapeId: LibraryShapeId
   declaredFamily: string
   shapeCompatible: boolean
@@ -60,8 +60,15 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number): {
   const { shape } = selectedRecords(sel)
   const a = libraryArrangement(sel, pitchMM)
   // THE FRAME'S PHYSICAL SPAN IS THE CLASS FLOOR (QA F1): 24 + (lines-1)*pitch per axis.
-  const w0 = classFloorMM(a.frameCols as AxisClass, pitchMM)
-  const h0 = classFloorMM(a.frameRows as AxisClass, pitchMM)
+  // EXCEPT the diamond (Dan, 08-25): its outline must WRAP the magnet group, so the half
+  // diagonal is the ring radius plus the padding measured on the diagonal.
+  let w0 = classFloorMM(a.frameCols as AxisClass, pitchMM)
+  let h0 = classFloorMM(a.frameRows as AxisClass, pitchMM)
+  if (shape.family === 'diamond') {
+    const k = (a.frameCols - 1) / 2
+    const span = 2 * (k * pitchMM + padMM * Math.SQRT2)
+    w0 = span; h0 = span
+  }
   const shapeCompatible = shape.aspect === 'frame' || a.frameCols === a.frameRows
   const w = shapeCompatible ? w0 : Math.max(w0, h0)
   const h = shapeCompatible ? h0 : Math.max(w0, h0)
@@ -77,7 +84,7 @@ export function draftStageModel(
   sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number, padMM: number,
   frameCols: number, frameRows: number, title: string,
 ): LibraryStageModel {
-  const pv = libraryPreview(sel, pitchMM)
+  const pv = libraryPreview(sel, pitchMM, padMM)
   const nodesMM: Pt[] = nodes.map(([ix, iy]) => [ix * pitchMM, (frameRows - 1 - iy) * pitchMM])
   const contour: Contour = { outer: { pts: [...pv.outlineMM] }, holes: [] }
   const grid: GridResult = {
@@ -107,7 +114,7 @@ export function nodeAtMM(pMM: readonly [number, number], pitchMM: number, frameR
 
 export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM: number): LibraryStageModel {
   const a = libraryArrangement(sel, pitchMM)
-  const pv = libraryPreview(sel, pitchMM)
+  const pv = libraryPreview(sel, pitchMM, padMM)
   const contour: Contour = { outer: { pts: [...pv.outlineMM] }, holes: [] }
   const grid: GridResult = {
     anchors: a.nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),

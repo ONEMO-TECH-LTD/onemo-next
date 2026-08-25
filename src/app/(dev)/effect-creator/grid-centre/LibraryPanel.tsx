@@ -34,7 +34,11 @@ export default function LibraryPanel({
   // Orientation is the axis pair: landscape is the transpose, so the box reads swapped.
   const oc = sel.view.transpose ? frame.rows : frame.cols
   const orr = sel.view.transpose ? frame.cols : frame.rows
-  const boxW = 24 + (oc - 1) * pitch, boxH = 24 + (orr - 1) * pitch
+  // A diamond WRAPS its magnet group (Dan): half-diagonal = ring radius + padding measured on
+  // the diagonal. Every other class is the class floor.
+  const diamondSpan = 2 * ((frame.cols - 1) / 2 * pitch + 12 * Math.SQRT2)
+  const boxW = shape.family === 'diamond' ? Math.round(diamondSpan) : 24 + (oc - 1) * pitch
+  const boxH = shape.family === 'diamond' ? Math.round(diamondSpan) : 24 + (orr - 1) * pitch
   const isDraft = sel.layoutId.startsWith('draft:')
   return (
     <>

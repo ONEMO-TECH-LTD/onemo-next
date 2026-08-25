@@ -33,11 +33,12 @@ export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'ev
 /** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
  *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
  *  library must not pre-empt it. DRAFT applicability is review data, never engine policy. */
-export type LibraryFamily = 'square' | 'rectangle'
-export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'rectangle']
+export type LibraryFamily = 'square' | 'rectangle' | 'diamond'
+export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'rectangle', 'diamond']
 export const FAMILY_APPLICABILITY_DRAFT: Record<LibraryFamily, string[]> = {
   square: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
   rectangle: ['full', 'perimeter', 'perimeter-96', 'corners'],
+  diamond: ['single', 'diamond', 'axis', 'with-centre'],
 }
 
 
@@ -175,9 +176,33 @@ export const RECTANGLE_FRAMES: LibraryFrame[] = [
 ]
 
 /** The frames a class carries. */
+/** DIAMOND class — the lattice never rotates; a diamond is a node set read from a centre node
+ *  outward (Manhattan rings). D1 single · D2 four at one cell · D3 eight at two · D4 twelve at
+ *  three, each with its axis-only thinning and its centre-filled variant. */
+export const DIAMOND_FRAMES: LibraryFrame[] = [
+  { cols: 1, rows: 1, layouts: [
+    { name: 'single', nodes: [[0, 0]] },
+  ] },
+  { cols: 3, rows: 3, layouts: [
+    { name: 'diamond', nodes: [[0, 1], [1, 0], [1, 2], [2, 1]] },
+    { name: 'with-centre', nodes: [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]], note: 'interior — Full grid only' },
+  ] },
+  { cols: 5, rows: 5, layouts: [
+    { name: 'diamond', nodes: [[0, 2], [1, 1], [1, 3], [2, 0], [2, 4], [3, 1], [3, 3], [4, 2]] },
+    { name: 'axis', nodes: [[0, 2], [2, 0], [2, 4], [4, 2]] },
+    { name: 'with-centre', nodes: [[0, 2], [1, 1], [1, 3], [2, 0], [2, 2], [2, 4], [3, 1], [3, 3], [4, 2]], note: 'interior — Full grid only' },
+  ] },
+  { cols: 7, rows: 7, layouts: [
+    { name: 'diamond', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]] },
+    { name: 'axis', nodes: [[0, 3], [3, 0], [3, 6], [6, 3]] },
+    { name: 'with-centre', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 3], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]], note: 'interior — Full grid only' },
+  ] },
+]
+
 export const CLASS_FRAMES: Record<LibraryFamily, LibraryFrame[]> = {
   square: SQUARE_FRAMES,
   rectangle: RECTANGLE_FRAMES,
+  diamond: DIAMOND_FRAMES,
 }
 /** Back-compat alias — the square corpus. */
 export const LAYOUT_LIBRARY = SQUARE_FRAMES
@@ -189,7 +214,7 @@ export const LAYOUT_LIBRARY = SQUARE_FRAMES
 /** THE SHAPE LIBRARY — the ruled classification shapes, literal canonical outlines in the unit
  *  box (y down). aspect 'square' keeps a square span; 'frame' stretches to the frame's span.
  *  Pure data — the bridge materialises, never generates. */
-export type LibraryShapeId = 'square' | 'rectangle'
+export type LibraryShapeId = 'square' | 'rectangle' | 'diamond'
 export interface LibraryShape {
   id: LibraryShapeId
   family: LibraryFamily
@@ -199,6 +224,7 @@ export interface LibraryShape {
 export const LIBRARY_SHAPES: LibraryShape[] = [
   { id: 'square', family: 'square', aspect: 'square', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 1.0000], [0.0000, 1.0000]] },
   { id: 'rectangle', family: 'rectangle', aspect: 'frame', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 1.0000], [0.0000, 1.0000]] },
+  { id: 'diamond', family: 'diamond', aspect: 'square', outline: [[0.5000, 0.0000], [1.0000, 0.5000], [0.5000, 1.0000], [0.0000, 0.5000]] },
 ]
 
 

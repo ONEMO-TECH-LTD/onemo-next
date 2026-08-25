@@ -13,7 +13,7 @@ import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
-const SHAPE_IDS = ['square', 'rectangle']
+const SHAPE_IDS = ['square', 'rectangle', 'diamond']
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
   shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter',
@@ -45,7 +45,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
       // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
       // the engine classifier reads it as the box-filling 'square' family. The mapping is
       // asserted explicitly so the two taxonomies can never silently merge.
-      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square' }
+      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
       const f0 = CLASS_FRAMES[s.family][0]
       const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
       expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(ENGINE_FAMILY[s.family])
@@ -57,6 +57,9 @@ describe('classifier goldens — declared family is the classifier verdict, not 
       // library frame has no class to be read back as. The library carries it; the classifier
       // cannot express it until a sixth band is ruled.
       if (f.cols > 5 || f.rows > 5) continue
+      // The diamond's outline WRAPS its magnet group (Dan), so its box is deliberately not
+      // the frame's class floor — the frame golden does not apply to that class.
+      if (s.family === 'diamond') continue
       for (const transpose of [false, true]) {
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (s.aspect === 'square' && cols !== rows) continue          // marked incompatible, not stretched
@@ -82,7 +85,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
 
 
   it('families and draft applicability stay complete', () => {
-    expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle'])
+    expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle', 'diamond'])
     for (const fam of LIBRARY_FAMILIES) expect(FAMILY_APPLICABILITY_DRAFT[fam].length).toBeGreaterThan(0)
   })
 })
@@ -169,6 +172,39 @@ describe('rectangle class', () => {
         for (const [x, y] of l.nodes)
           expect(x === 0 || x === f.cols - 1 || y === 0 || y === f.rows - 1,
             `${frameKeyOf(f)} ${l.name} interior ${x},${y}`).toBe(true)
+    }
+  })
+})
+
+describe('diamond class', () => {
+  it('carries the ruled rings', () => {
+    expect(CLASS_FRAMES.diamond.map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
+  })
+  it('each ring is a Manhattan ring around the frame centre, axis thinning included', () => {
+    for (const f of CLASS_FRAMES.diamond.slice(1)) {
+      const k = (f.cols - 1) / 2
+      const d = f.layouts.find((l) => l.name === 'diamond')!
+      expect(d.nodes.length).toBe(4 * k)
+      for (const [x, y] of d.nodes) expect(Math.abs(x - k) + Math.abs(y - k)).toBe(k)
+      // at k=1 the ring IS the four axis nodes, so no separate thinning exists there
+      const axis = f.layouts.find((l) => l.name === 'axis')
+      if (k > 1) expect(axis!.nodes.length).toBe(4)
+      else expect(axis).toBeUndefined()
+      const wc = f.layouts.find((l) => l.name === 'with-centre')!
+      expect(wc.nodes.length).toBe(4 * k + 1)
+      expect(wc.note).toContain('Full grid only')
+    }
+  })
+})
+
+describe('diamond wrapping', () => {
+  it('the outline wraps the ring: half-diagonal = k*pitch + padding on the diagonal', () => {
+    for (const f of CLASS_FRAMES.diamond) {
+      const k = (f.cols - 1) / 2
+      const pv = libraryPreview({ shapeId: 'diamond', frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose: false, flipX: false, flipY: false } }, 48)
+      const xs = pv.outlineMM.map((q) => q[0])
+      const span = Math.max(...xs) - Math.min(...xs)
+      expect(span).toBeCloseTo(2 * (k * 48 + 12 * Math.SQRT2), 6)
     }
   })
 })
