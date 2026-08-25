@@ -7,7 +7,7 @@ import { MIN_EFFECT_MM } from '@/lib/effect/grid-magnet'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import { bbox, latticeAt, makeSeatPredicate, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { applyCoverage, assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
-import { unheldOf, wrap, wrapGrid, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { unheldOf, wrapFlap, wrapGrid, type WrapAt, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, MASS_DEPTH_MM } from '@/lib/effect/grid-magnet-spec'
 import type { Contour } from '@/lib/effect/types'
 
@@ -59,7 +59,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
     // only seats every lattice node that is legally clear at that size and measures the result.
     // This is the bench for judging layouts by hand before any law is written from them.
     let drawn: ReturnType<typeof wrapGrid>
-    let at: ReturnType<typeof wrap> = null
+    let at: WrapAt | null = null
     let manualSeated: [number, number][] | null = null
     if (manualSizeMM != null) {
       const contour = sized(manualSizeMM)
@@ -82,9 +82,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         },
       }
     } else {
-      // 1 · CENTRE + 2 · WRAP — the engine's own call. The count is the input, not a search.
-      at = wrap(sized, cfg, count, MIN_EFFECT_MM, sizeRange(pad).maxMM)
-      if (!at) { ctx.postMessage({ id, model: null }); return }
+      // THE FLAP LOOP — exposed edges place the magnets, top first; the size follows.
+      const flap = wrapFlap(sized, cfg, count, MIN_EFFECT_MM, sizeRange(pad).maxMM)
+      if (!flap) { ctx.postMessage({ id, model: null }); return }
+      at = flap.at
       drawn = wrapGrid(sized, cfg, at)
     }
     const outer = drawn.contour.outer.pts

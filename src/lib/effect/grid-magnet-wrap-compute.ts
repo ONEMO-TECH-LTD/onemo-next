@@ -633,11 +633,23 @@ export function wrapFlap(
   const hold = pitch / Math.SQRT2
   const want = Math.max(1, Math.round(count))
   const memo = new Map<number, Pt>()
+  // Solved-arrangement cache. The refinement pass revisits the same seat sets many times over,
+  // and each solve is a full binary search; without this the duck at 6 costs 36 seconds.
+  const solved = new Map<string, WrapAt | null>()
+  const gkey = (g: ReadonlyArray<Pt>) =>
+    g.map((q) => `${Math.round(q[0])},${Math.round(q[1])}`).sort().join(';')
+  const solve = (g: Pt[]): WrapAt | null => {
+    const k = gkey(g)
+    if (solved.has(k)) return solved.get(k)!
+    const r = wrapGroup(sized, cfg, g, minMM, maxMM, memo)
+    solved.set(k, r)
+    return r
+  }
 
   // Gravity seeds the first magnet: the top of the shape, not its middle (L1 — a single magnet's
   // job is to keep the top from falling). Seat parity along the way comes from the lattice.
   let group: Pt[] = [[0, 0]]
-  let at = wrapGroup(sized, cfg, group, minMM, maxMM, memo)
+  let at = solve(group)
   if (!at) return null
 
   const key = (p: Pt) => `${Math.round(p[0])},${Math.round(p[1])}`
@@ -664,7 +676,7 @@ export function wrapFlap(
         Math.hypot(a[0] - lx * pitch, a[1] - ly * pitch) - Math.hypot(b[0] - lx * pitch, b[1] - ly * pitch))
       for (const seat of cands) {
         if (used.has(key(seat))) continue
-        const trial = wrapGroup(sized, cfg, [...group, seat], minMM, maxMM, memo)
+        const trial = solve([...group, seat])
         if (!trial) continue
         group = [...group, seat]
         at = trial
@@ -701,12 +713,12 @@ export function wrapFlap(
     cands.sort((a, b) => Math.hypot(a[0] - lx * pitch, a[1] - ly * pitch) - Math.hypot(b[0] - lx * pitch, b[1] - ly * pitch))
     const used = new Set(group.map(key))
     let improved = false
-    for (const seat of cands) {
+    for (const seat of cands.slice(0, 3)) {          // the nearest seats to the exposure, no sweep
       if (used.has(key(seat))) continue
       // Move each magnet in turn onto this seat; the first move that lowers the exposure wins.
       for (let m = 0; m < group.length && !improved; m++) {
         const moved = group.map((g, i) => (i === m ? seat : g))
-        const trial = wrapGroup(sized, cfg, moved, minMM, maxMM, memo)
+        const trial = solve(moved)
         if (!trial) continue
         const j = judge(trial)
         const better = j.top < cur.top - 1 || (Math.abs(j.top - cur.top) <= 1 && j.area < cur.area - 1)
