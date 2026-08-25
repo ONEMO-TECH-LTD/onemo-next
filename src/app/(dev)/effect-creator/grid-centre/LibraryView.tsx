@@ -1,6 +1,6 @@
 'use client'
 
-// grid-library — THE LAYOUT LIBRARY VIEWER (admin). Every frame and every preset layout,
+// LibraryView — THE LAYOUT LIBRARY tab of the Centre Lab. Every frame and every preset layout,
 // drawn on the real 48mm lattice, for Dan's visual review and approval. Display only:
 // no engine, no wrap, no policy — the data is src/lib/effect/grid-magnet-library.ts.
 
@@ -13,7 +13,7 @@ const SPOT = 24                       // lattice ghost radius (half pitch), as t
 const HOLD = 24                       // hold ring
 const MAG = 6.5                      // magnet disc
 
-export default function GridLibraryPage() {
+export default function LibraryView() {
   const [fi, setFi] = useState(4)     // default 2×3 — the first interesting frame
   const [li, setLi] = useState(0)
   const [transpose, setTranspose] = useState(false)
@@ -39,9 +39,8 @@ export default function GridLibraryPage() {
   const on = new Set(pts.map(([x, y]) => key(x, y)))
 
   return (
-    <main style={{ fontFamily: 'ui-monospace, monospace', background: '#f6f7f8', minHeight: '100vh', padding: 24, color: '#1c1e21' }}>
-      <h1 style={{ fontSize: 20, marginBottom: 4 }}>Layout Library <span style={{ fontSize: 12, color: '#889', border: '1px solid #ccd', borderRadius: 6, padding: '2px 8px', marginLeft: 8 }}>v3.5.6 · DRAFT — awaiting approval</span></h1>
-      <div style={{ fontSize: 12, color: '#667', marginBottom: 16 }}>every preset per frame on the 48mm lattice · canonical tall orientation · transpose/mirrors derived</div>
+    <div style={{ padding: 4 }}>
+      <div style={{ fontSize: 12, color: '#667', margin: '2px 0 14px' }}>THE LAYOUT LIBRARY · DRAFT — awaiting approval · every preset per frame on the 48mm lattice · canonical tall orientation · transpose/mirrors derived</div>
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <aside style={{ width: 270, background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
           <div style={{ fontSize: 11, letterSpacing: 1, color: '#889', marginBottom: 8 }}>FRAME</div>
@@ -97,6 +96,6 @@ export default function GridLibraryPage() {
           </svg>
         </section>
       </div>
-    </main>
+    </div>
   )
 }

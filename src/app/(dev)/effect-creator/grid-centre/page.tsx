@@ -7,6 +7,7 @@
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import LibraryView from './LibraryView'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -83,6 +84,8 @@ export default function GridLab() {
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number>(1)
+  /** Top-level view — the bench, or the layout-library review tab. */
+  const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -295,9 +298,14 @@ export default function GridLab() {
       <style>{CSS}</style>
       <header className="gl-head">
         <h1>Centre Lab <span className="gl-tag">v3.5.6-lead · centre rules</span></h1>
+        <div className="gl-seg" style={{ marginLeft: 16, display: 'inline-flex' }}>
+          <button aria-pressed={tab === 'bench'} onClick={() => setTab('bench')}>Bench</button>
+          <button aria-pressed={tab === 'library'} onClick={() => setTab('library')}>Library</button>
+        </div>
       </header>
 
-      <div className="gl-body">
+      {tab === 'library' && <LibraryView />}
+      <div className="gl-body" style={tab === 'library' ? { display: 'none' } : undefined}>
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
             <span className="gl-eye gl-perf">
