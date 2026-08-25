@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 import {
   SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
-  resolveSelection, selectedRecords, draftLayoutId, type LibraryDraft,
+  resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, transformLayout as tl,
+  type LibraryDraft,
   type LibrarySelection,
 } from '../library'
 import { libraryArrangement, libraryPreview, libraryStageModel } from '../grid-magnet-library-bridge'
@@ -301,14 +302,31 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
     }
   })
 
-  it("square 4x4 in 96mm is the four corners — Dan's ruling, 08-25 19:40", () => {
-    // A 144mm side carries no even 96mm sample, so it keeps its corners only. This froze the
-    // ruling that a later 'the computed value is already right' edit silently reverted.
-    const f = CLASS_FRAMES.square.find((x) => x.cols === 4 && x.rows === 4)!
-    const s96 = f.layouts.find((l) => l.name === 'perimeter-96')!
-    expect(s96.nodes.map(key).sort()).toEqual(['0,0', '0,3', '3,0', '3,3'])
-    expect(CLASS_FRAMES.square.find((x) => x.cols === 3)!.layouts.find((l) => l.name === 'perimeter-96')!.nodes.length).toBe(4)
-    expect(CLASS_FRAMES.square.find((x) => x.cols === 5)!.layouts.find((l) => l.name === 'perimeter-96')!.nodes.length).toBe(8)
+  it('the sample is skip-every-other with the far end always kept (Dan, 08-25 19:55)', () => {
+    const run = (n: number) => [...sample96(n)].sort((a, b) => a - b)
+    expect(run(1)).toEqual([0])
+    expect(run(2)).toEqual([0, 1])
+    expect(run(3)).toEqual([0, 2])
+    expect(run(4)).toEqual([0, 2, 3])
+    expect(run(5)).toEqual([0, 2, 4])
+    expect(run(6)).toEqual([0, 2, 4, 5])
+  })
+
+  it('the ruled populations follow from that one rule', () => {
+    const n96 = (fam: 'square' | 'rectangle' | 'diamond', c: number, r: number) =>
+      CLASS_FRAMES[fam].find((f) => f.cols === c && f.rows === r)!
+        .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
+    // square: the computed mode, NOT the four-corner sparse population Dan moved to custom
+    expect(n96('square', 3, 3)).toBe(4)
+    expect(n96('square', 4, 4)).toBe(8)
+    expect(n96('square', 5, 5)).toBe(8)
+    expect(n96('rectangle', 1, 4)).toBe(3)
+    expect(n96('rectangle', 3, 4)).toBe(6)
+    expect(n96('rectangle', 4, 6)).toBe(10)
+    expect(n96('rectangle', 5, 6)).toBe(10)
+    // diamond: r=1 keeps every vertex (the 2-pin artefact is gone), larger rings keep theirs
+    expect(n96('diamond', 3, 3)).toBe(4)
+    expect(n96('diamond', 7, 7)).toBe(8)
   })
 
   it('the diamond vocabulary is complete on every ring, corners are exactly the vertices', () => {
@@ -318,5 +336,28 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
       const corners = f.layouts.find((l) => l.name === 'corners')!
       expect(corners.nodes.map(key).sort()).toEqual(extremes(f, 'diamond').map(key).sort())
     }
+  })
+})
+
+describe('authoring under a view transform stays canonical (QA F2)', () => {
+  const frame = CLASS_FRAMES.rectangle.find((f) => f.cols === 2 && f.rows === 3)!
+  const views = [false, true].flatMap((transpose) => [false, true].flatMap((flipX) =>
+    [false, true].map((flipY) => ({ transpose, flipX, flipY }))))
+
+  it('every canonical node round-trips through all eight transforms', () => {
+    for (const v of views) for (let y = 0; y < frame.rows; y++) for (let x = 0; x < frame.cols; x++) {
+      const shown = tl(frame, { name: 'p', nodes: [[x, y]] }, v).nodes[0]
+      expect(canonicalNode(frame, v, shown), `${x},${y} via ${JSON.stringify(v)}`).toEqual([x, y])
+    }
+  })
+
+  it('a landscape pick at the far column is a valid canonical node, not an out-of-frame one', () => {
+    // The rightmost click in landscape used to be stored as [2,0] and rejected at save: the
+    // frame is truthfully 3x2 on screen while the draft it feeds is the canonical 2x3.
+    const v = { transpose: true, flipX: false, flipY: false }
+    const n = canonicalNode(frame, v, [2, 0])
+    expect(n[0]).toBeGreaterThanOrEqual(0); expect(n[0]).toBeLessThan(frame.cols)
+    expect(n[1]).toBeGreaterThanOrEqual(0); expect(n[1]).toBeLessThan(frame.rows)
+    expect(n).toEqual([0, 2])
   })
 })

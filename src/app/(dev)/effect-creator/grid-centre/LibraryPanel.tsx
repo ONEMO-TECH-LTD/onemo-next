@@ -6,7 +6,7 @@
 
 import type { ReactElement, ReactNode } from 'react'
 import {
-  CLASS_FRAMES, CLASS_RULES, SPACING_MODES, SPACING_BASE, isSpacingMode,
+  CLASS_FRAMES, CLASS_RULES, SPACING_MODES, SPACING_BASE, isSpacingMode, spacingLabel,
   frameKeyOf, pickLayout, resolveSelection, draftLayoutId,
   type LibrarySelection, type LibraryDraft,
 } from '@/lib/effect/library'
@@ -92,7 +92,7 @@ export default function LibraryPanel({
           <div className="gl-seg">
             {SPACING_MODES.map((m) => (
               <button key={m.layoutId} aria-pressed={!edit && sel.layoutId === m.layoutId} disabled={!has(m.layoutId)}
-                onClick={() => { setEdit(null); setSel({ ...sel, layoutId: m.layoutId }) }}>{m.label}</button>
+                onClick={() => { setEdit(null); setSel({ ...sel, layoutId: m.layoutId }) }}>{spacingLabel(m.step, pitch)}</button>
             ))}
             <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
           </div>

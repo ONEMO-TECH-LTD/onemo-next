@@ -9,6 +9,7 @@ import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel, CLASS_RULES,
+  canonicalNode,
   type LibrarySelection, type LibraryShapeId, type LibraryFamily,
 } from './library'
 
@@ -78,7 +79,13 @@ export function draftStageModel(
   frameCols: number, frameRows: number, title: string,
 ): LibraryStageModel {
   const pv = libraryPreview(sel, pitchMM, padMM)
-  const nodesMM: Pt[] = nodes.map(([ix, iy]) => [ix * pitchMM, (frameRows - 1 - iy) * pitchMM])
+  // A draft is canonical data like every corpus layout, so it goes through the SAME transform
+  // and the same one y-flip — never straight to mm (QA F2).
+  const t = transformLayout(
+    { cols: frameCols, rows: frameRows, layouts: [] },
+    { name: 'draft', nodes }, sel.view,
+  )
+  const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   const contour: Contour = { outer: { pts: [...pv.outlineMM] }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
@@ -92,10 +99,12 @@ export function draftStageModel(
     contactsMM: [],
     segments: [],
     centresMM: [],
-    centreMainMM: [(frameCols - 1) * pitchMM / 2, (frameRows - 1) * pitchMM / 2],
+    centreMainMM: [(t.cols - 1) * pitchMM / 2, (t.rows - 1) * pitchMM / 2],
   }
   return { contour, grid, title }
 }
+
+export { canonicalNode }
 
 /** mm point -> lattice node index in the selected frame (y-down canon), or null off-frame.
  *  The canvas draws the infinite lattice, so a click can land anywhere: without this bound an

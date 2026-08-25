@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
-import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
+import { libraryStageModel, draftStageModel, nodeAtMM, canonicalNode, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
 import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
@@ -393,8 +393,10 @@ export default function GridLab() {
                       const { frame } = resolveSelection(librarySel, drafts)
                       const cols = librarySel.view.transpose ? frame.rows : frame.cols
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
-                      const n = nodeAtMM(pMM, pitch, cols, rows)
-                      if (!n) return
+                      const view = nodeAtMM(pMM, pitch, cols, rows)
+                      if (!view) return
+                      // The click lands in view space; drafts are canonical (QA F2).
+                      const n = canonicalNode(frame, librarySel.view, view)
                       setEdit((d) => {
                         if (!d) return d
                         const k = n[0] + ',' + n[1]

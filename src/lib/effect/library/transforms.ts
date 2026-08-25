@@ -24,3 +24,18 @@ export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'ev
 }
 
 export function frameKeyOf(f: LibraryFrame): string { return f.cols + 'x' + f.rows }
+
+/** The inverse of transformLayout for ONE node: a view-space node back to canonical.
+ *  Undo in reverse order — flipY, then flipX (both against the TRANSFORMED dimensions),
+ *  then the transpose. Authoring picks land in view space; the corpus and every draft are
+ *  canonical, and mixing the two silently corrupted layouts under landscape (QA F2). */
+export function canonicalNode(
+  frame: LibraryFrame, t: LibraryTransform, node: readonly [number, number],
+): [number, number] {
+  const c = t.transpose ? frame.rows : frame.cols
+  const r = t.transpose ? frame.cols : frame.rows
+  let [x, y] = node
+  if (t.flipY) y = r - 1 - y
+  if (t.flipX) x = c - 1 - x
+  return t.transpose ? [y, x] : [x, y]
+}

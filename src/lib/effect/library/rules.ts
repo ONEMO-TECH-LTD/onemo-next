@@ -10,20 +10,26 @@ type Node = readonly [number, number]
  *  names (Dan, 08-25: "same modes everywhere — those modes must be in the logic file"). */
 export const SPACING_BASE = 'perimeter'
 export const SPACING_96 = 'perimeter-96'
-export const SPACING_MODES: Array<{ layoutId: string; label: string }> = [
-  { layoutId: SPACING_BASE, label: '48 mm' },
-  { layoutId: SPACING_96, label: '96 mm' },
+/** The labels are the PITCH, not the words: the library inherits the bench's pitch tier, so a
+ *  hardcoded '48 mm' is physically false at 24 or 96 (QA F3). One node step, or every other. */
+export const SPACING_MODES: Array<{ layoutId: string; step: number }> = [
+  { layoutId: SPACING_BASE, step: 1 },
+  { layoutId: SPACING_96, step: 2 },
 ]
+export const spacingLabel = (step: number, pitchMM: number): string => step * pitchMM + ' mm'
 export const isSpacingMode = (name: string): boolean => SPACING_MODES.some((m) => m.layoutId === name)
 
 /** Which indices along a run of n lattice nodes survive a 96mm sample.
- *  Every other node, and the far end must land on one — otherwise the run carries no even
- *  96mm sample at all and keeps its two ends only. That is Dan's own reading of the 4x4:
- *  "a 144mm side cannot carry an even 96mm sample", 08-25 19:40. */
+ *  Dan, 08-25 19:55: "96mm is skip every 48mm logic" — every other node — and the far end is
+ *  always kept, because an unpinned extreme is the failure the belt exists to prevent.
+ *  (His earlier four-corner edit to the 4x4 he reclassified himself minutes later: "the edits
+ *  i did before to square in 4x4 is sparse ... or custom actually make it custom". Sparse is
+ *  the custom mode, not this one.) */
 export function sample96(n: number): Set<number> {
-  if (n <= 2) return new Set(Array.from({ length: n }, (_, i) => i))
-  if ((n - 1) % 2 === 0) { const s = new Set<number>(); for (let i = 0; i < n; i += 2) s.add(i); return s }
-  return new Set([0, n - 1])
+  const keep = new Set<number>()
+  for (let i = 0; i < n; i += 2) keep.add(i)
+  if (n > 0) keep.add(n - 1)
+  return keep
 }
 
 /** Axis-aligned ring: a node survives if it is an even sample along the side it sits on. */
