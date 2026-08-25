@@ -528,7 +528,12 @@ export default function GridLab() {
 
         <aside className="gl-centercol" style={tab === 'library' ? { display: 'none' } : undefined}>
           <div className="gl-card gl-libsize">
-            <b>{Math.round(camZoom * 100)}%</b><span>view</span>
+            <span className="gl-camnum">
+              <input key={'cam' + Math.round(camZoom * 100)} type="number" defaultValue={Math.round(camZoom * 100)}
+                onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n > 0) setCamZoom(Math.min(4, Math.max(0.2, n / 100))) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+              <i>%</i>
+            </span><span>view</span>
             <div className="gl-seg" style={{ marginLeft: 'auto' }}>
               <button onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.15).toFixed(2)))}>−</button>
               <button onClick={() => setCamZoom(1)}>fit</button>
@@ -1084,6 +1089,10 @@ const CSS = `
 .gl-libdim{margin-left:auto;align-self:center;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
 .gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.gl-camnum{display:inline-flex;align-items:baseline;gap:3px}
+.gl-camnum input{width:62px;font:700 22px var(--mono);color:var(--ink);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums}
+.gl-camnum i{font:600 12px var(--mono);color:var(--ink-3);font-style:normal}
 .gl-libadd b{color:var(--ink-3);font-size:16px!important}
 .gl-libedit{display:flex;align-items:center;gap:6px;margin-top:8px}
 .gl-libedit input{flex:1;min-width:0;font:600 12px var(--mono);color:var(--ink);background:var(--panel-2);
