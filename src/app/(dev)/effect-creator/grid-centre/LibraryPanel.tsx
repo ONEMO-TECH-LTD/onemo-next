@@ -8,17 +8,18 @@
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import {
   LAYOUT_LIBRARY, LIBRARY_SHAPES, LIBRARY_FAMILIES,
-  frameKeyOf, kindOf, orientationOf, selectedRecords,
+  frameKeyOf, selectedRecords,
   draftIntegrity, draftId,
   type LibrarySelection, type LibraryDraft,
 } from '@/lib/effect/grid-magnet-library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
-export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, drafts, saveDraft, deleteDraft, openDraft, newDraft, exportDrafts }: {
+export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft, drafts, saveDraft, deleteDraft, openDraft, newDraft, exportDrafts }: {
   sel: LibrarySelection
   setSel: (next: LibrarySelection) => void
   Fold: FoldComponent
+  pitch: number
   draft: { name: string; nodes: Array<[number, number]> } | null
   setDraft: (d: { name: string; nodes: Array<[number, number]> } | null) => void
   drafts: LibraryDraft[]
@@ -60,7 +61,7 @@ export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, draft
                 const keep = sel.layoutId.startsWith('prim:') || f.layouts.some((l) => l.name === sel.layoutId)
                 setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : f.layouts[0].name })
               }}>
-              <b>{f.cols}×{f.rows}</b><span>{orientationOf(f.cols, f.rows)} {kindOf(f.cols, f.rows)}</span>
+              <b>{f.cols}×{f.rows}</b><span>{24 + (f.cols - 1) * pitch}×{24 + (f.rows - 1) * pitch} mm</span>
             </button>
           ))}
         </div>

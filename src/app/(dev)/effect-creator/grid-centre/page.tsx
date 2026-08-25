@@ -380,7 +380,7 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold}
+          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
             draft={draft} setDraft={setDraft} drafts={drafts}
             newDraft={() => setDraft({ name: '', nodes: [] })}
             openDraft={(d) => { setLibrarySel({ ...librarySel, frameKey: d.frameKey }); setDraft({ name: d.name, nodes: d.nodes }) }}
