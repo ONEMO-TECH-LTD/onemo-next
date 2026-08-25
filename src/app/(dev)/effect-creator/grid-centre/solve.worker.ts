@@ -162,7 +162,19 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
       if (rungs.length) {
-        const idx = Math.min(stepSel ?? 0, rungs.length - 1)
+        // RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the
+        // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
+        // half a pitch of it, the best-centred is the default landing. All offers stay visible.
+        const half = (cfg.pitchMM ?? DEFAULT_PITCH_MM) / 2
+        const c0 = rungs[0]
+        let ruleIdx = 0
+        for (let i = 1; i < rungs.length; i++) {
+          const r = rungs[i]
+          if (r.at.count !== c0.at.count || r.at.sizeMM > c0.at.sizeMM + half) continue
+          const b = rungs[ruleIdx]
+          if (r.at.centreOffMM < b.at.centreOffMM - 0.01) ruleIdx = i
+        }
+        const idx = Math.min(stepSel ?? ruleIdx, rungs.length - 1)
         const at = rungs[idx].at
         const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined }
         const drawn = wrapGrid(sized, wcfg, at)
@@ -170,10 +182,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const r = spotRadiusOf(pad)
         const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
-        const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count }))
+        const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM }))
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
-          effSize: at.sizeMM, ladder, idx, segments,
+          effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM,
         } })
         return
       }
