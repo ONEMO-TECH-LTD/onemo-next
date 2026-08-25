@@ -2,7 +2,7 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
-import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapAt, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
@@ -33,7 +33,10 @@ const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand> }>()
 const rungCache = new Map<string, BandRung[]>()
 // Free+snap: one exact solve per distinct revealed layout — the plateaus of the slider.
-const snapCache = new Map<string, WrapAt | null>()
+// The FINISHED MODEL is cached, not just the solve: inside a plateau every slider move is a
+// lookup, so it is as instant as the old free mode. The anchor mesh is shared across solves.
+const snapCache = new Map<string, unknown>()
+const snapAnchors = new Map<string, Map<number, [number, number]>>()
 const FREE_CAP = 400
 
 const WALK_CAP = 10
@@ -160,25 +163,27 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
       const layoutId = pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
       const sk = cfgSig + '|' + layoutId
-      let at = snapCache.get(sk)
-      if (at === undefined) {
-        const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
-        const gx = (Math.min(...xs) + Math.max(...xs)) / 2, gy = (Math.min(...ys) + Math.max(...ys)) / 2
-        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM }
-        at = wrapGroup(sized, wcfg, pts.map(([x, y]) => [x - gx, y - gy] as [number, number]), MIN_EFFECT_MM, sizeMM)
-        snapCache.set(sk, at)
-        if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
-      }
-      if (!at) { ctx.postMessage({ id, model: null }); return }
+      const cached = snapCache.get(sk)
+      if (cached !== undefined) { ctx.postMessage({ id, model: cached }); return }
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
+      const gx = (Math.min(...xs) + Math.max(...xs)) / 2, gy = (Math.min(...ys) + Math.max(...ys)) / 2
+      const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM }
+      let memo = snapAnchors.get(cfgSig)
+      if (!memo) { memo = new Map(); snapAnchors.set(cfgSig, memo); if (snapAnchors.size > 4) snapAnchors.delete(snapAnchors.keys().next().value!) }
+      const at = wrapGroup(sized, wcfg, pts.map(([x, y]) => [x - gx, y - gy] as [number, number]), MIN_EFFECT_MM, sizeMM, memo)
+      if (!at) { snapCache.set(sk, null); ctx.postMessage({ id, model: null }); return }
       const drawn = wrapGrid(sized, { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM }, at)
       const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
       const r = spotRadiusOf(pad)
       const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
       const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
-      ctx.postMessage({ id, model: {
+      const model = {
         contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
         effSize: at.sizeMM, ladder: [], idx: 0, segments,
-      } })
+      }
+      snapCache.set(sk, model)
+      if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
+      ctx.postMessage({ id, model })
     } else {
       const k = cfgSig + '|' + sizeMM
       let hit = freeCache.get(k)
