@@ -332,13 +332,13 @@ export default function GridLab() {
       <div className="gl-body">
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
-            <span className="gl-eye gl-perf">
+            <span className="gl-eye gl-perf" style={tab === 'library' ? { display: 'none' } : undefined}>
               load <Sec ms={perf.loadMs} />
               {' · '}gen <Sec ms={perf.genMs} />
               {perf.cutMs != null ? <> · cut <Sec ms={perf.cutMs} /></> : null}
               {' · '}solve <Sec ms={perf.solveMs} />
             </span>
-            <span className="gl-eye">{libraryModel ? libraryModel.title : model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
+            <span className="gl-eye">{libraryModel ? '' : model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
