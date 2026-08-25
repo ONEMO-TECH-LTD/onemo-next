@@ -385,7 +385,10 @@ export default function GridWrapLab() {
           </Fold>
 
           <Fold title="Grid settings">
-            <Stepper label="Magnets · the shape wraps around them" v={count} set={(n) => setCount(Math.max(1, n))} />
+            {/* Asking for a different number of magnets is a request for the SOLVER — a manual
+                size and registration cannot answer it, so the takeover ends here. */}
+            <Stepper label="Magnets · the shape wraps around them" v={count}
+              set={(n) => { setCount(Math.max(1, n)); setManual(null); setManualSizeMM(null) }} />
             <div className="gl-snap">
               {manualOn && <><b>MANUAL · wrap solver off</b> — double-click the canvas to hand it back<br /></>}
               {model
