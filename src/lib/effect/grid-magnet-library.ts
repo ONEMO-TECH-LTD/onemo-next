@@ -36,7 +36,7 @@ export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'ev
 export type LibraryFamily = 'square'
 export const LIBRARY_FAMILIES: LibraryFamily[] = ['square']
 export const FAMILY_APPLICABILITY_DRAFT: Record<LibraryFamily, string[]> = {
-  square: ['single', 'full', 'ring', 'belt-96', 'corners'],
+  square: ['single', 'full', 'ring', 'belt', 'corners'],
 }
 
 
@@ -76,19 +76,19 @@ export const LAYOUT_LIBRARY: LibraryFrame[] = [
   { cols: 3, rows: 3, layouts: [
     { name: 'full', nodes: [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]], note: 'interior — Full grid only' },
     { name: 'ring', nodes: [[0, 0], [1, 0], [2, 0], [0, 1], [2, 1], [0, 2], [1, 2], [2, 2]] },
-    { name: 'belt-96', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] },
+    { name: 'belt', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] },
     { name: 'corners', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] },
   ] },
   { cols: 4, rows: 4, layouts: [
     { name: 'full', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]], note: 'interior — Full grid only' },
     { name: 'ring', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [3, 1], [0, 2], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]] },
-    { name: 'belt-96', nodes: [[0, 0], [2, 0], [3, 0], [0, 2], [3, 2], [0, 3], [2, 3], [3, 3]] },
+    { name: 'belt', nodes: [[0, 0], [2, 0], [3, 0], [0, 2], [3, 2], [0, 3], [2, 3], [3, 3]] },
     { name: 'corners', nodes: [[0, 0], [3, 0], [0, 3], [3, 3]] },
   ] },
   { cols: 5, rows: 5, layouts: [
     { name: 'full', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4]], note: 'interior — Full grid only' },
     { name: 'ring', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [0, 1], [4, 1], [0, 2], [4, 2], [0, 3], [4, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4]] },
-    { name: 'belt-96', nodes: [[0, 0], [2, 0], [4, 0], [0, 2], [4, 2], [0, 4], [2, 4], [4, 4]] },
+    { name: 'belt', nodes: [[0, 0], [2, 0], [4, 0], [0, 2], [4, 2], [0, 4], [2, 4], [4, 4]] },
     { name: 'corners', nodes: [[0, 0], [4, 0], [0, 4], [4, 4]] },
   ] },
 ]

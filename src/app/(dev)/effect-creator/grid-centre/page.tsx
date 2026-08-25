@@ -346,7 +346,7 @@ export default function GridLab() {
               const src2 = libraryModel ?? model
               if (!src2) return null
               const stageProps = libraryModel
-                ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: false,
+                ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     segments: [], segFill: false, onPan: () => {}, onZoom: () => {}, onReset: () => {},
                     onPickNode: draft ? (pMM: Pt) => {
                       const { frame } = selectedRecords(librarySel)
@@ -380,7 +380,7 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
+          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} showBox={showBox} setShowBox={setShowBox}
             draft={draft} setDraft={setDraft} drafts={drafts}
             newDraft={() => setDraft({ name: '', nodes: [] })}
             openDraft={(d) => { setLibrarySel({ ...librarySel, frameKey: d.frameKey }); setDraft({ name: d.name, nodes: d.nodes }) }}
@@ -1044,4 +1044,7 @@ const CSS = `
 .gl-libsize{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:12px}
 .gl-libsize b{font:700 26px var(--mono);letter-spacing:.01em;color:var(--ink);font-variant-numeric:tabular-nums}
 .gl-libsize span{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.gl-libdim{margin-left:auto;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
+.gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 `

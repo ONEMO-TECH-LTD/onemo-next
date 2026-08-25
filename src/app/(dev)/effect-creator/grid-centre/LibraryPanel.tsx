@@ -15,11 +15,13 @@ import {
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
-export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft, drafts, saveDraft, deleteDraft, openDraft, newDraft, exportDrafts }: {
+export default function LibraryPanel({ sel, setSel, Fold, pitch, showBox, setShowBox, draft, setDraft, drafts, saveDraft, deleteDraft, openDraft, newDraft, exportDrafts }: {
   sel: LibrarySelection
   setSel: (next: LibrarySelection) => void
   Fold: FoldComponent
   pitch: number
+  showBox: boolean
+  setShowBox: (v: boolean) => void
   draft: { name: string; nodes: Array<[number, number]> } | null
   setDraft: (d: { name: string; nodes: Array<[number, number]> } | null) => void
   drafts: LibraryDraft[]
@@ -36,6 +38,7 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
     <>
       <div className="gl-card gl-libsize">
         <b>{boxW}×{boxH}</b><span>mm</span>
+        <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
       <Fold title="Shape">
         <div className="gl-lib">
