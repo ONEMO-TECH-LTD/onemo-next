@@ -189,8 +189,15 @@ describe('diamond class', () => {
       const per = f.layouts.find((l) => l.name === 'perimeter')!
       expect(per.nodes.length).toBe(4 * k)
       for (const [x, y] of per.nodes) expect(Math.abs(x - k) + Math.abs(y - k)).toBe(k)
+      // 'full' means the same thing in every class: every node inside the region. On a diamond
+      // that is the whole Manhattan disc, NOT the ring plus one centre magnet — the hardcoded
+      // ring+centre left the inner nodes bare and made a class-special out of a shared word.
       const full = f.layouts.find((l) => l.name === 'full')!
-      expect(full.nodes.length).toBe(4 * k + 1)
+      const disc: string[] = []
+      for (let y = 0; y < f.rows; y++) for (let x = 0; x < f.cols; x++)
+        if (Math.abs(x - k) + Math.abs(y - k) <= k) disc.push(x + ',' + y)
+      expect(full.nodes.map(([x, y]) => x + ',' + y).sort()).toEqual(disc.sort())
+      expect(full.nodes.length).toBe(2 * k * k + 2 * k + 1)
       expect(full.note).toContain('Full grid only')
     }
   })
