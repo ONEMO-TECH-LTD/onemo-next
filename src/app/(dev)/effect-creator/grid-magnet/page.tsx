@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, FLAP_CEIL_MM, FLAP_FLOOR_MM, FLAP_MM, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -63,10 +63,6 @@ export default function GridLab() {
   const [sizeMax, setSizeMax] = usePersisted('sizeMax', sizeRange(RELEASED_PADDING_MM).maxMM)
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
-  /** Flap allowance dial — how far material may reach past a spot's edge; 0 = edge-to-edge wrap. */
-  const [flap, setFlap] = usePersisted('flap', FLAP_MM)
-  /** Auto flap micro-module — the flap dial becomes the RANGE: auto works within it. */
-  const [autoFlapN, setAutoFlapN] = usePersisted('autoFlap', 0)
   /** Placement step dial — how finely the lattice slides under the shape; 1 = continuous panning. */
   const [phaseStep, setPhaseStep] = usePersisted('phaseStep', PHASE_STEP_MM)
   /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
@@ -101,21 +97,20 @@ export default function GridLab() {
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
   /** Per-control enables — off sends that control's field not at all, so spec default rules it. */
-  const [enFlapN, setEnFlapN] = usePersisted('en.flap', 1)
   const [enPhaseN, setEnPhaseN] = usePersisted('en.phaseStep', 1)
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-magnet.defaults', JSON.stringify({ pad, flap, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-magnet.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, flap: FLAP_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, positioning: POSITIONING, governor: GOVERNOR, votingOrder: VOTING_ORDER, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, positioning: POSITIONING, governor: GOVERNOR, votingOrder: VOTING_ORDER, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-magnet.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setFlap(d.flap); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -223,7 +218,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; autoFlapMM?: number | null; wrapGapMM?: number | null; wrapCentreOffMM?: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; wrapGapMM?: number | null; wrapCentreOffMM?: number }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   const workerRef = useRef<Worker | null>(null)
@@ -258,7 +253,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enFlapN ? { flapMM: flap } : {}), ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' && offsetMM === 0 }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && mode !== 'wrap' && (manual !== null || bandScale !== null)
@@ -268,14 +263,13 @@ export default function GridLab() {
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
-      autoFlapMaxMM: autoFlapN ? (enFlapN ? flap : FLAP_MM) : null,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, flap, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enFlapN, enPhaseN, autoFlapN, plan, mode, stepSel, snapStep, coverage, offsetMM])
+  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage, offsetMM])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -302,7 +296,6 @@ export default function GridLab() {
             {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
-              marginMM={model.autoFlapMM ?? (enFlapN ? flap : FLAP_MM)}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
@@ -402,7 +395,7 @@ export default function GridLab() {
                     : model
                     ? model.ladder.length
                       ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾ · ${model.ladder.length} holding layouts in band`
-                      : 'nothing fully fits at this flap — best seated shown'
+                      : 'nothing fully fits in this band — best seated shown'
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
@@ -453,12 +446,6 @@ export default function GridLab() {
               </div>
             </div>
             <Slider label="Magnet padding · per spot" unit="mm" v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} />
-            <LabRow on={enFlapN !== 0} set={(b) => setEnFlapN(b ? 1 : 0)}>
-              <Slider label={autoFlapN ? 'Flap allowance · auto works within this' : 'Flap allowance · past spot edge'} unit="mm" v={flap} set={setFlap} min={FLAP_FLOOR_MM} max={FLAP_CEIL_MM} />
-            </LabRow>
-            <label className="gl-toggle"><span>Auto flap <small style={{ color: 'var(--ink-3)' }}>· {mode === 'free' ? 'shows what this size implies' : 'band grants only what it needs'}{autoFlapN && model?.autoFlapMM != null ? ` — ${mode === 'free' ? 'implies' : 'chose'} ${model.autoFlapMM}mm` : ''}</small></span>
-              <input type="checkbox" checked={autoFlapN !== 0} onChange={(e) => setAutoFlapN(e.target.checked ? 1 : 0)} />
-            </label>
             <div className={positioning === 1 ? 'gl-lab-off' : undefined}
               title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
@@ -541,7 +528,7 @@ export default function GridLab() {
           </Fold>
           {positioning === 0 && <Fold title="Voting law">
             <div className="gl-magic-note">
-              Magnet count always governs. Between equal counts the order decides: Wrap presses every disc against the edge; Centring holds the centre. The flap dial is the rigid law — a layout with a disc floating past it is not shown (Auto adapts instead).
+              Magnet count always governs. Between equal counts the order decides: Wrap presses every disc against the edge; Centring holds the centre.
             </div>
             <div className="gl-field"><span>Priority · which force rules</span>
               <select value={votingOrder} onChange={(e) => setVotingOrder(+e.target.value)}>
@@ -565,9 +552,8 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan, onZoom, onReset }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
-  marginMM: number
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -785,11 +771,6 @@ function Stage({ contour, grid, lattice, box, segments, segFill, marginMM, onPan
             fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
             stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
             strokeWidth={sw} />
-          {/* The allowance made visible — the invisible margin every disc wears under the
-              contact law. The edge pressing against THIS ring is what the engine calls fit. */}
-          {sp.held && marginMM > 0 &&
-            <circle cx={sp.x} cy={-sp.y} r={sp.r + marginMM} fill="var(--mag8)" fillOpacity={0.05}
-              stroke="var(--mag8)" strokeOpacity={0.55} strokeWidth={0.4} strokeDasharray="2.4 1.8" />}
         </g>
       })}
       {grid.anchors.map((a, i) => {

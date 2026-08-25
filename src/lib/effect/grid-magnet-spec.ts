@@ -50,19 +50,8 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 export const PHASE_STEP_MM = 1
 export const PHASE_STEP_FLOOR_MM = 1
 
-/** Flap allowance — the invisible margin every disc wears (Dan's contact law): band options
- *  are the sizes where the edge presses against spot + allowance. RULED 2026-08-19: the
- *  factory default is 0 — edge-to-edge tangency; any margin is an explicit admin grant. */
-export const FLAP_MM = 0
-export const FLAP_FLOOR_MM = 0
-export const FLAP_CEIL_MM = 48
-
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
-
-/** Auto flap — the micro-module's scan: allowance tried from 0 up in this step, granting only
- *  what the band needs to produce a contact variant, capped by the flap dial. */
-export const AUTO_FLAP_STEP_MM = 2
 
 /** Voting dominance tiers — strict: the top force always beats the next, never blends.
  *  VOTING_ORDER picks which force sits on which tier (0 = magnets > wrap > centring). */

@@ -6,9 +6,7 @@ import {
   BANDS,
   CENTRE_MODE,
   DEFAULT_PITCH_MM,
-  FLAP_MM,
   GOVERNOR,
-  AUTO_FLAP_STEP_MM,
   MASS_DEPTH_MM,
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
@@ -50,7 +48,6 @@ import {
 export * from './grid-magnet-spec'
 export {
   fieldSpanMM,
-  impliedFlapMM,
   latticeOver,
   safeSegments,
   scaleContour,
@@ -63,8 +60,6 @@ export { bandOf, type Anchor, type MagnetDia, type MagnetPlan } from './grid-mag
 export interface GridConfig {
   pitchMM?: number
   paddingMM?: number
-  /** How far material may extend past a spot's edge before it counts as a flap. 0 = edge-to-edge. */
-  flapMM?: number
   /** How finely the lattice slides under the shape when searching registrations. */
   phaseStepMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
@@ -79,10 +74,6 @@ export interface GridConfig {
   governor?: number
   /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
   segmentsDetail?: 'full' | 'light'
-  /** CONTACT LAW margin (Dan, 2026-08-19): the flap allowance is an invisible margin worn by
-   *  every disc — seats must clear spot + margin from the edge, and a band option is the size
-   *  where the shape's edge presses against the margined disc. */
-  seatMarginMM?: number
   /** Voting dominance order — which force rules, admin-picked; spec default when absent. */
   votingOrder?: number
   /** Per-size solve reuse for band walks — owned by the caller (the worker). */
@@ -123,8 +114,8 @@ const mod = (v: number, m: number) => ((v % m) + m) % m
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-  // Coverage reach from a magnet centre: the spot plus the dialled flap allowance.
-  const reach = spotRadiusOf(pad) + Math.max(0, cfg.flapMM ?? FLAP_MM)
+  // Coverage reach from a magnet centre: the spot IS the allowance (flap deleted as a dupe).
+  const reach = spotRadiusOf(pad)
   const phaseStep = Math.max(1, cfg.phaseStepMM ?? PHASE_STEP_MM)
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
@@ -133,8 +124,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
   const fits = cfg.circle
-    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad) + Math.max(0, cfg.seatMarginMM ?? 0))
-    : makeSeatPredicate(outer, spotRadiusOf(pad) + Math.max(0, cfg.seatMarginMM ?? 0))
+    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
+    : makeSeatPredicate(outer, spotRadiusOf(pad))
 
   const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
   const segments = safeSegments(outer, spotRadiusOf(pad), massDepth, cfg.segmentsDetail ?? 'full')
@@ -304,8 +295,7 @@ function bandWalk(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { points: BandSnapPoint[]; bestSeatedMM: number } {
   const [lo, hi] = snapRange(cfg, fromMM)
-  const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light', seatMarginMM: margin }
+  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
   const solve = (mm: number): GridResult => {
     let g = cfg.solveCache?.get(mm)
     if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
@@ -316,7 +306,7 @@ function bandWalk(
   const points: BandSnapPoint[] = []
   const seen = new Set<number>()
   for (let c = 1; c <= below; c++) seen.add(c)
-  const reach = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)) + margin
+  const reach = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
   let bestSeatedMM = lo, bestSeats = -1
   for (let mm = lo; mm <= hi; mm += stepMM) {
     const grid = solve(mm)
@@ -346,36 +336,11 @@ export function fitSizeInBand(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
 ): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
   const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
-  const margin = Math.max(0, cfg.flapMM ?? FLAP_MM)
-  const dispCfg: GridConfig = { ...cfg, seatMarginMM: margin }
+  const dispCfg: GridConfig = cfg
   if (points.length) {
     const maxCount = Math.max(...points.map((p) => p.count))
     const pickIdx = points.findIndex((p) => p.count === maxCount)
     return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), dispCfg), ladder: points, pickIdx }
   }
   return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), dispCfg), ladder: [], pickIdx: 0 }
-}
-
-/**
- * AUTO FLAP (micro-module, Dan 2026-08-19): a band tries the snuggest law first — allowance 0 —
- * and grants itself only as much margin as it needs to produce a contact variant, scanning up
- * in AUTO_FLAP_STEP_MM steps to the dialled max. Reuses the band walk untouched; the chosen
- * allowance is reported so the panel and margin rings can show it.
- */
-export function autoFlapInBand(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number, maxFlapMM: number,
-  cacheFor?: (flapMM: number) => Map<number, GridResult> | undefined,
-): { flapMM: number; fit: ReturnType<typeof fitSizeInBand> } {
-  const cap = Math.max(0, maxFlapMM)
-  let last: ReturnType<typeof fitSizeInBand> | null = null
-  for (let f = 0; f <= cap; f += AUTO_FLAP_STEP_MM) {
-    last = fitSizeInBand(sized, { ...cfg, flapMM: f, solveCache: cacheFor?.(f) }, fromMM, stepMM)
-    if (last.ladder.length) return { flapMM: f, fit: last }
-  }
-  if (cap % AUTO_FLAP_STEP_MM !== 0) {
-    const fit = fitSizeInBand(sized, { ...cfg, flapMM: cap, solveCache: cacheFor?.(cap) }, fromMM, stepMM)
-    if (fit.ladder.length) return { flapMM: cap, fit }
-    last = fit
-  }
-  return { flapMM: cap, fit: last! }
 }
