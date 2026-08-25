@@ -52,6 +52,13 @@ export interface BagContact {
   inward: Pt
 }
 
+export interface BagFlap {
+  outline: Pt[]
+  holes: Pt[][]
+  areaMM2: number
+  centroid: Pt
+}
+
 export interface PreparedBag {
   outline: Pt[]
 }
@@ -84,6 +91,11 @@ export interface BagFit {
   peripheryGaps: Pt[]
   uncoveredPeripheryMM: number
   maximumUnsupportedSpanMM: number
+  holdRadiusMM: number
+  flaps: BagFlap[]
+  unprotectedSeatCentres: Pt[]
+  unheldAreaMM2: number
+  largestFlapAreaMM2: number
   option: string
   rotation: number
 }

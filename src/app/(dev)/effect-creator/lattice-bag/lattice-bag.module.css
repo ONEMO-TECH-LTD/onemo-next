@@ -144,6 +144,24 @@
   stroke: rgba(49, 94, 251, 0.34);
 }
 
+.holds circle {
+  fill: rgba(49, 94, 251, 0.035);
+  stroke: rgba(49, 94, 251, 0.16);
+  stroke-width: 0.75;
+  vector-effect: non-scaling-stroke;
+}
+
+.flaps path {
+  fill: rgba(255, 174, 66, 0.16);
+  stroke: rgba(216, 128, 24, 0.55);
+  stroke-width: 0.9;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.flaps circle { fill: #d88018; }
+.unprotectedSeats circle { fill: #d88018; stroke: white; stroke-width: 0.75; vector-effect: non-scaling-stroke; }
+
 .disk circle {
   fill: #ff6b45;
   stroke: #a72f16;

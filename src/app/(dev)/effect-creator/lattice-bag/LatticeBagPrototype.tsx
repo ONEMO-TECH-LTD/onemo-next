@@ -174,6 +174,11 @@ export function LatticeBagPrototype() {
   function selectCount(count: number) {
     if (!prepared || mode === 'bands') return
     const nextOptions = fitsFor(prepared, count)
+    if (nextOptions.length === 0) {
+      setError(`No centred full-wrap layout exists for ${count} disks`)
+      return
+    }
+    setError('')
     setOptions(nextOptions)
     setOptionIndex(0)
     setFit(nextOptions[0])
@@ -341,6 +346,24 @@ export function LatticeBagPrototype() {
                   />
                 ))}
               </g>
+              <g className={styles.holds}>
+                {fit.seats.map(([x, y], index) => (
+                  <circle cx={x} cy={y} key={`hold-${index}`} r={fit.holdRadiusMM} />
+                ))}
+              </g>
+              <g className={styles.flaps} fillRule="evenodd">
+                {fit.flaps.map((flap, index) => (
+                  <g key={`flap-${index}`}>
+                    <path d={[flap.outline, ...flap.holes].map(pathFrom).join(' ')} />
+                    <circle cx={flap.centroid[0]} cy={flap.centroid[1]} r={1.5} />
+                  </g>
+                ))}
+              </g>
+              <g className={styles.unprotectedSeats}>
+                {fit.unprotectedSeatCentres.map(([x, y], index) => (
+                  <circle cx={x} cy={y} key={`unprotected-${index}`} r={2} />
+                ))}
+              </g>
               {fit.seats.map(([x, y], index) => (
                 <g key={`${x},${y}`} className={styles.disk}>
                   <circle cx={x} cy={y} r={DISK_DIAMETER_MM / 2} />
@@ -477,7 +500,7 @@ export function LatticeBagPrototype() {
           {error || (bandCompute
             ? `Searching ${bandCompute.completed} of ${bandCompute.total} layouts · ${(bandElapsedMs / 1000).toFixed(1)} s`
             : fit
-              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · snug wrap · ${fit.opposingContactPairs} opposing contact pair${fit.opposingContactPairs === 1 ? '' : 's'} · ${fit.maximumUnsupportedSpanMM.toFixed(1)} mm max unsupported span${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
+              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · snug wrap · ${fit.opposingContactPairs} opposing contact pair${fit.opposingContactPairs === 1 ? '' : 's'} · ${fit.flaps.length} unheld region${fit.flaps.length === 1 ? '' : 's'} / ${fit.unheldAreaMM2.toFixed(1)} mm²${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
               : 'No shape loaded')}
         </div>
       </section>

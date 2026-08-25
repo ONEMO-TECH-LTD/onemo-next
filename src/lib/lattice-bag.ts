@@ -66,14 +66,7 @@ function uniqueLayouts(layouts: ReadonlyArray<BagLayout>) {
 
 function fitLayouts(prepared: PreparedBag, layouts: ReadonlyArray<BagLayout>, allowRotation: boolean) {
   return uniqueLayouts(layouts)
-    .flatMap((layout) => {
-      const selectedByRotation = new Map<string, BagFit>()
-      for (const fit of lawfulFits(prepared, layout, allowRotation)) {
-        const key = fit.rotation.toFixed(9)
-        if (!selectedByRotation.has(key)) selectedByRotation.set(key, fit)
-      }
-      return [...selectedByRotation.values()]
-    })
+    .flatMap((layout) => lawfulFits(prepared, layout, allowRotation))
     .sort(compareBagFits)
 }
 
@@ -104,7 +97,7 @@ export function fitBagMode(
 
 export function fitClassifiedLadder(prepared: PreparedBag, allowRotation = false) {
   return CLASSIFIED_COUNTS[classifyBag(prepared)]
-    .map((count) => fitClassifiedBag(prepared, count, allowRotation))
+    .flatMap((count) => fitClassifiedOptions(prepared, count, allowRotation).slice(0, 1))
 }
 
 export function buildBagView(fit: BagFit) {

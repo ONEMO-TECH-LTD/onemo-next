@@ -1,9 +1,11 @@
 import {
   Clipper,
+  ClipType,
   EndType,
   FillRule,
   JoinType,
   PointInPolygonResult,
+  PolyTree64,
   type Path64,
   type Paths64,
 } from '@countertype/clipper2-ts'
@@ -300,13 +302,32 @@ function safeRegions(outline: ReadonlyArray<Pt>, scale: number): Paths64 {
   return safe
 }
 
+function safeMaterialCentre(outline: ReadonlyArray<Pt>, scale: number): Pt {
+  const safe = safeRegions(outline, scale)
+  let totalArea = 0
+  let weightedX = 0
+  let weightedY = 0
+  for (const path of safe) {
+    const ring = path.map(({ x, y }) => [x / BAG_SOLVER_SPEC.clipperScale, y / BAG_SOLVER_SPEC.clipperScale] as Pt)
+    const area = Math.abs(Clipper.area(path))
+    const centroid = polygonCentroid(ring)
+    totalArea += area
+    weightedX += centroid[0] * area
+    weightedY += centroid[1] * area
+  }
+  // Normalisation puts the maximal safe core at the origin. At an exact
+  // one-disk lock the eroded region collapses to that core point.
+  if (totalArea === 0) return [0, 0]
+  return [weightedX / totalArea, weightedY / totalArea]
+}
+
 function targetTranslation(
   outline: ReadonlyArray<Pt>,
   scale: number,
   localSeats: ReadonlyArray<Pt>,
   rotation: number,
 ): Pt {
-  const materialCentre = polygonCentroid(outline)
+  const materialCentre = safeMaterialCentre(outline, scale)
   const localCentre = pointMean(localSeats)
   const cosine = Math.cos(rotation)
   const sine = Math.sin(rotation)
@@ -314,7 +335,7 @@ function targetTranslation(
     localCentre[0] * cosine - localCentre[1] * sine,
     localCentre[0] * sine + localCentre[1] * cosine,
   ]
-  return [materialCentre[0] * scale - rotatedCentre[0], materialCentre[1] * scale - rotatedCentre[1]]
+  return [materialCentre[0] - rotatedCentre[0], materialCentre[1] - rotatedCentre[1]]
 }
 
 function feasibleRegion(
@@ -335,42 +356,6 @@ function feasibleRegion(
     if (feasible.length === 0) return []
   }
   return feasible
-}
-
-function candidateTranslations(regions: Paths64, target: Pt): Pt[] {
-  const scale = BAG_SOLVER_SPEC.clipperScale
-  const targetPoint = { x: Math.round(target[0] * scale), y: Math.round(target[1] * scale) }
-  const points: Pt[] = []
-  const paths = regions.filter((path) => Clipper.isPositive(path))
-  for (const path of paths.length > 0 ? paths : regions) {
-    if (Clipper.pointInPolygon(targetPoint, path) !== PointInPolygonResult.IsOutside) {
-      points.push(target)
-      continue
-    }
-    let nearest: Pt | null = null
-    let nearestDistance2 = Infinity
-    for (let index = 0; index < path.length; index++) {
-      const a = path[index]
-      const b = path[(index + 1) % path.length]
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const length2 = dx * dx + dy * dy
-      const t = length2 === 0
-        ? 0
-        : Math.max(0, Math.min(1, ((targetPoint.x - a.x) * dx + (targetPoint.y - a.y) * dy) / length2))
-      const x = a.x + dx * t
-      const y = a.y + dy * t
-      const distance2 = (x - targetPoint.x) ** 2 + (y - targetPoint.y) ** 2
-      if (distance2 < nearestDistance2) {
-        nearest = [x / scale, y / scale]
-        nearestDistance2 = distance2
-      }
-    }
-    if (nearest) points.push(nearest)
-  }
-  const unique = new Map<string, Pt>()
-  for (const point of points) unique.set(`${point[0].toFixed(3)},${point[1].toFixed(3)}`, point)
-  return [...unique.values()]
 }
 
 function rotationAngles(allowRotation: boolean) {
@@ -419,10 +404,6 @@ function smallestScale(
   return upper
 }
 
-function jointScales(first: number, centred: number) {
-  return Math.abs(centred - first) <= BAG_SOLVER_SPEC.fitEpsilonMM ? [first] : [first, centred]
-}
-
 function measureContacts(seats: ReadonlyArray<Pt>, outline: ReadonlyArray<Pt>): BagContact[] {
   const contacts: BagContact[] = []
   const seen = new Set<string>()
@@ -461,6 +442,52 @@ function minimumClearance(seats: ReadonlyArray<Pt>, outline: ReadonlyArray<Pt>) 
   }))
 }
 
+function measureFlaps(outline: ReadonlyArray<Pt>, seats: ReadonlyArray<Pt>) {
+  const scale = BAG_SOLVER_SPEC.clipperScale
+  const holds = seats.map(([x, y]) => Clipper.ellipse(
+    { x: Math.round(x * scale), y: Math.round(y * scale) },
+    Math.round(BAG_SOLVER_SPEC.peripheryReachMM * scale),
+  ))
+  const held = holds.length ? Clipper.union(holds, FillRule.NonZero) : []
+  const tree = new PolyTree64()
+  Clipper.booleanOpWithPolyTree(ClipType.Difference, [clipperPath(outline, 1)], held, tree, FillRule.NonZero)
+  const flaps = Array.from({ length: tree.count }, (_, index) => tree.child(index))
+    .filter((node) => !node.isHole && node.poly !== null)
+    .map((node) => {
+      const flapOutline = node.poly!.map(({ x, y }) => [x / scale, y / scale] as Pt)
+      const holes = Array.from({ length: node.count }, (_, holeIndex) => node.child(holeIndex).poly)
+        .filter((path): path is NonNullable<typeof path> => path !== null)
+        .map((path) => path.map(({ x, y }) => [x / scale, y / scale] as Pt))
+      const rings = [flapOutline, ...holes]
+      const weighted = rings.reduce((result, ring) => {
+        const path = ring.map(([x, y]) => ({ x: Math.round(x * scale), y: Math.round(y * scale) }))
+        const signedArea = Clipper.area(path)
+        const centroid = polygonCentroid(ring)
+        return {
+          area: result.area + signedArea,
+          x: result.x + centroid[0] * signedArea,
+          y: result.y + centroid[1] * signedArea,
+        }
+      }, { area: 0, x: 0, y: 0 })
+      return {
+        outline: flapOutline,
+        holes,
+        areaMM2: Math.abs(weighted.area) / scale ** 2,
+        centroid: [weighted.x / weighted.area, weighted.y / weighted.area] as Pt,
+      }
+    })
+  const seatRegions = Clipper.inflatePaths(
+    Clipper.difference([clipperPath(outline, 1)], held, FillRule.NonZero),
+    -DISK_RADIUS_MM * scale,
+    JoinType.Round,
+    EndType.Polygon,
+  )
+  const unprotectedSeatCentres = seatRegions
+    .filter(Clipper.isPositive)
+    .map((path) => polygonCentroid(path.map(({ x, y }) => [x / scale, y / scale] as Pt)))
+  return { flaps, unprotectedSeatCentres }
+}
+
 function measuredFit(
   prepared: PreparedBag,
   localSeats: ReadonlyArray<Pt>,
@@ -472,7 +499,7 @@ function measuredFit(
   const seats = localSeats.map((seat) => transformSeat(seat, transform))
   const contacts = measureContacts(seats, outline)
   const centre = pointMean(seats)
-  const materialCentre = polygonCentroid(outline)
+  const materialCentre = safeMaterialCentre(outline, 1)
   const periphery = exactPerimeterCoverage(
     { outer: { pts: outline }, holes: [] },
     seats,
@@ -480,6 +507,7 @@ function measuredFit(
     'standard',
     LATTICE_PITCH_MM,
   )
+  const flapMeasurement = measureFlaps(outline, seats)
   return {
     seats,
     outline,
@@ -493,6 +521,11 @@ function measuredFit(
     peripheryGaps: periphery.gaps,
     uncoveredPeripheryMM: periphery.uncoveredMM,
     maximumUnsupportedSpanMM: periphery.maximumUncoveredSpanMM,
+    holdRadiusMM: BAG_SOLVER_SPEC.peripheryReachMM,
+    flaps: flapMeasurement.flaps,
+    unprotectedSeatCentres: flapMeasurement.unprotectedSeatCentres,
+    unheldAreaMM2: flapMeasurement.flaps.reduce((area, flap) => area + flap.areaMM2, 0),
+    largestFlapAreaMM2: Math.max(0, ...flapMeasurement.flaps.map((flap) => flap.areaMM2)),
     option,
     rotation: transform.rotation,
   }
@@ -505,26 +538,15 @@ export function measureTightFits(
 ): BagFit[] {
   const fits: BagFit[] = []
   for (const rotation of rotationAngles(allowRotation)) {
-    const firstFeasibleScale = smallestScale(
-      prepared.outline,
-      layout.seats,
-      rotation,
-      (_scale, region) => region.length > 0,
-    )
     const centredScale = smallestScale(
       prepared.outline,
       layout.seats,
       rotation,
-      (scale, region) => pointInRegions(targetTranslation(prepared.outline, scale, layout.seats, rotation), region),
+      (scale, region) => region.length > 0
+        && pointInRegions(targetTranslation(prepared.outline, scale, layout.seats, rotation), region),
     )
-    for (const scale of jointScales(firstFeasibleScale, centredScale)) {
-      const region = feasibleRegion(prepared.outline, scale, layout.seats, rotation)
-      if (region.length === 0) continue
-      const target = targetTranslation(prepared.outline, scale, layout.seats, rotation)
-      for (const [x, y] of candidateTranslations(region, target)) {
-        fits.push(measuredFit(prepared, layout.seats, layout.label, scale, { x, y, rotation }))
-      }
-    }
+    const target = targetTranslation(prepared.outline, centredScale, layout.seats, rotation)
+    fits.push(measuredFit(prepared, layout.seats, layout.label, centredScale, { x: target[0], y: target[1], rotation }))
   }
   return fits
 }
