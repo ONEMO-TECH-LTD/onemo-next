@@ -837,7 +837,9 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
       {box && <rect x={minX} y={minY} width={w} height={h} fill="none" stroke="var(--ink)"
         strokeOpacity={0.22} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
       {box && (() => {
-        const fs = 11 * spanMM / VP
+        // On the free board the viewBox grows with zoom-out, so a fixed mm-height label
+        // balloons — scale it by the visible span instead.
+        const fs = (viewport ? 7 : 11) * spanMM / VP
         const lbl = { fontSize: fs, fill: 'var(--ink)', fillOpacity: 0.55, fontFamily: 'var(--mono)', fontWeight: 600 } as const
         const wTxt = `${Math.round(w)} mm`, hTxt = `${Math.round(h)} mm`
         return (<g style={{ pointerEvents: 'none' }}>
