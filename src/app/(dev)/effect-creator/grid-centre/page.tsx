@@ -21,6 +21,14 @@ import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seated
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
+
+/** THE CAMERA — one contract for both boards (Dan, 08-25: the library zoom must not be the
+ *  narrower one). 100% sits the subject at half the board; the range is the union of what the
+ *  two boards carried separately, so neither lost reach. Steps are 5%. */
+const CAM_BASE = 0.5
+const CAM_MIN = 0.2, CAM_MAX = 12
+const camClamp = (z: number) => Math.min(CAM_MAX, Math.max(CAM_MIN, +z.toFixed(2)))
+const camStep = (z: number, dir: 1 | -1) => camClamp(z + dir * 0.05)
 const LIB_RAW = '/grid-engine/asset-lib/'
 const LIB_CUT = '/grid-engine/cutouts/'
 
@@ -92,8 +100,9 @@ export default function GridLab() {
   const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter', view: { transpose: false, flipX: false, flipY: false } })
   /** Authoring — browser-local; the canonical corpus is never mutated. */
   const [edit, setEdit] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
-  /** Library canvas view — pan in mm, zoom factor. Library tab only. */
-  const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 0.45 })
+  /** Library canvas view — pan in mm, camera zoom. Same camera contract as the bench:
+   *  100% sits the subject at half the board, and both boards share one range. */
+  const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 1 })
   /** BENCH CAMERA — a view-level zoom over the finished render. The solve, the gestures and
    *  every readout are untouched; only what the eye sees is scaled. */
   const [camZoom, setCamZoom] = useState(1)
@@ -376,10 +385,10 @@ export default function GridLab() {
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     segments: [], segFill: false,
-                    viewport: { ...libView, wheelZoom: true },
+                    viewport: { panMM: libView.panMM, zoom: libView.zoom * CAM_BASE, wheelZoom: true },
                     onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
-                    onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: Math.min(6, Math.max(0.15, v.zoom * f)) })),
-                    onReset: () => setLibView({ panMM: [0, 0], zoom: 0.45 }),
+                    onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: camClamp(v.zoom * f) })),
+                    onReset: () => setLibView({ panMM: [0, 0], zoom: 1 }),
                     onPickNode: edit ? (pMM: Pt) => {
                       const { frame } = resolveSelection(librarySel, drafts)
                       const cols = librarySel.view.transpose ? frame.rows : frame.cols
@@ -395,7 +404,7 @@ export default function GridLab() {
                     } : undefined }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
                     // 100% = the shape at half the board, so there is room around it (Dan).
-                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom * 0.5 },
+                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
@@ -415,7 +424,21 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <><LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} padMM={pad}
+          {tab === 'library' ? <>
+          <div className="gl-card gl-libsize">
+            <span className="gl-camnum">
+              <input key={'libcam' + Math.round(libView.zoom * 100)} type="number" defaultValue={Math.round(libView.zoom * 100)}
+                onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n > 0) setLibView((v) => ({ ...v, zoom: camClamp(n / 100) })) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+              <i>%</i>
+            </span>
+            <div className="gl-camzoom">
+              <button aria-label="zoom out" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, -1) }))}>−</button>
+              <button aria-label="fit" onClick={() => setLibView({ panMM: [0, 0], zoom: 1 })}>fit</button>
+              <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
+            </div>
+          </div>
+          <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} padMM={pad}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
@@ -524,14 +547,14 @@ export default function GridLab() {
           <div className="gl-card gl-libsize">
             <span className="gl-camnum">
               <input key={'cam' + Math.round(camZoom * 100)} type="number" defaultValue={Math.round(camZoom * 100)}
-                onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n > 0) setCamZoom(Math.min(4, Math.max(0.2, n / 100))) }}
+                onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n > 0) setCamZoom(camClamp(n / 100)) }}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
               <i>%</i>
             </span>
             <div className="gl-camzoom">
-              <button aria-label="zoom out" onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))}>−</button>
+              <button aria-label="zoom out" onClick={() => setCamZoom((z) => camStep(z, -1))}>−</button>
               <button aria-label="fit" onClick={() => setCamZoom(1)}>fit</button>
-              <button aria-label="zoom in" onClick={() => setCamZoom((z) => Math.min(4, +(z + 0.05).toFixed(2)))}>+</button>
+              <button aria-label="zoom in" onClick={() => setCamZoom((z) => camStep(z, +1))}>+</button>
             </div>
           </div>
           <Fold title="Shape">
