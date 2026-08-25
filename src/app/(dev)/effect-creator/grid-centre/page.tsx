@@ -13,7 +13,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, POSITIONING, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM, VOTING_ORDER } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -69,13 +69,14 @@ export default function GridLab() {
   /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
   const [massDepth, setMassDepth] = usePersisted('massDepth', MASS_DEPTH_MM)
   /** Centre-mode switch — which centre drives anchoring and balance. */
+  /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
+  const [engineMode, setEngineMode] = usePersisted('engineMode', 1)
+  const [snapWrapN, setSnapWrapN] = usePersisted('snapWrap', 1)
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   /** Positioning law — voting vs centre-rules (parity-locked, no voting). */
-  const [positioning, setPositioning] = usePersisted('positioning', 1)
   /** Governor — which mass rules in Masses mode. */
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
   /** Voting dominance order — which force rules the placement vote. */
-  const [votingOrder, setVotingOrder] = usePersisted('votingOrder', VOTING_ORDER)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
@@ -102,15 +103,15 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, snapStep, sizeMin, sizeMax })) } catch { }
+    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode, governor, snapStep, sizeMin, sizeMax })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, positioning: 1, governor: GOVERNOR, votingOrder: VOTING_ORDER, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR, snapStep: SNAP_STEP_MM,
       sizeMin: MIN_EFFECT_MM, sizeMax: sizeRange(RELEASED_PADDING_MM).maxMM,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setPositioning(d.positioning); setGovernor(d.governor); setVotingOrder(d.votingOrder); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
+    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSnapStep(d.snapStep); setSizeMin(d.sizeMin); setSizeMax(d.sizeMax)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -253,7 +254,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning, governor, votingOrder, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
+    const cfg = { pitchMM: pitch, paddingMM: pad, ...(enPhaseN ? { phaseStepMM: phaseStep } : {}), massDepthMM: massDepth, centreMode, positioning: 1, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = mode !== 'free' && (manual !== null || bandScale !== null)
@@ -263,13 +264,14 @@ export default function GridLab() {
       mode: manualBand ? 'free' : mode,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? sizeMM) : sizeMM,
       snapStep, stepSel,
+      snapWrap: !manualBand && mode === 'free' && manual === null && snapWrapN !== 0,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, positioning, governor, votingOrder, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage])
+  }, [base, src, preset, sizeMM, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage, snapWrapN])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -378,13 +380,27 @@ export default function GridLab() {
           </Fold>
 
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Band · snap ladder</span>
+            <div className="gl-field"><span>Engine mode · compare side by side</span>
+              <div className="gl-seg">
+                <button aria-pressed={engineMode === 1} onClick={() => { setEngineMode(1); setMode(2); setStepSel(null); setManual(null); setBandScale(null) }}>1 · Wrap ladder</button>
+                <button aria-pressed={engineMode === 2} onClick={() => { setEngineMode(2); setMode('free'); setStepSel(null); setManual(null); setBandScale(null) }}>2 · Free + snap</button>
+              </div>
+            </div>
+            {engineMode === 1 && <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
-                <button aria-pressed={mode === 'free'} onClick={() => { setMode('free'); setStepSel(null); setManual(null); setBandScale(null) }}>Free</button>
               </div>
-            </div>
+            </div>}
+            {engineMode === 2 && <div className="gl-field"><span>Band · slider window</span>
+              <div className="gl-seg">
+                {BANDS.map((b) =>
+                  <button key={b.id} aria-pressed={sizeMin === b.minMM && sizeMax === b.maxMM}
+                    onClick={() => { setSizeMin(b.minMM); setSizeMax(b.maxMM); setSizeMM(Math.min(Math.max(sizeMM, b.minMM), b.maxMM)) }}>B{b.id}</button>)}
+                <button aria-pressed={sizeMin === MIN_EFFECT_MM && sizeMax === sizeRange(RELEASED_PADDING_MM).maxMM}
+                  onClick={() => { setSizeMin(MIN_EFFECT_MM); setSizeMax(sizeRange(RELEASED_PADDING_MM).maxMM) }}>All</button>
+              </div>
+            </div>}
             {mode !== 'free' && <>
               <div className="gl-snap">
                 {manual
@@ -412,7 +428,15 @@ export default function GridLab() {
               })()}
               <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
-            {mode === 'free' && <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />}
+            {mode === 'free' && <>
+              <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />
+              <label className="gl-toggle"><span>Snap wrap <small style={{ color: 'var(--ink-3)' }}>· every move presses the shape onto the revealed magnets</small></span>
+                <input type="checkbox" checked={snapWrapN !== 0} onChange={(e) => setSnapWrapN(e.target.checked ? 1 : 0)} />
+              </label>
+              {snapWrapN !== 0 && <div className="gl-snap">
+                {model ? `${model.grid.anchors.length}⌾ · pressed at ${model.effSize.toFixed(2)} mm` : '—'}
+              </div>}
+            </>}
             {mode === 'free' && <div className="gl-field"><span>Slider limits</span>
               <div className="gl-limits">
                 <span className="gl-num"><i>min</i>
@@ -434,8 +458,7 @@ export default function GridLab() {
             <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
               min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
               released={RELEASED_PADDING_MM} />
-            <div className={positioning === 1 ? 'gl-lab-off' : undefined}
-              title={positioning === 1 ? 'inactive under Centre rules — nothing slides' : undefined}>
+            <div className="gl-lab-off" title="inactive under Centre rules — nothing slides">
               <LabRow on={enPhaseN !== 0} set={(b) => setEnPhaseN(b ? 1 : 0)}>
                 <Slider label="Placement step · grid slide" unit="mm" v={phaseStep} set={setPhaseStep} min={PHASE_STEP_FLOOR_MM} max={MIN_EFFECT_MM} />
               </LabRow>
@@ -470,16 +493,8 @@ export default function GridLab() {
 
         <aside className="gl-centercol">
           <Fold title="Centering">
-            <div className="gl-field"><span>Positioning · how the centre is applied</span>
-              <div className="gl-seg">
-                <button aria-pressed={positioning === 0} onClick={() => setPositioning(0)}>Voting</button>
-                <button aria-pressed={positioning === 1} onClick={() => setPositioning(1)}>Centre rules</button>
-              </div>
-            </div>
             <div className="gl-magic-note">
-              {positioning === 0
-                ? 'Voting — magnets, coverage and centring compete across every grid slide.'
-                : 'Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting.'}
+              Centre rules — the grid locks onto the centre by parity (node or gap ON it); magnets only pick among the 4 parity slides. No voting in this build.
             </div>
             <div className="gl-field"><span>Centre mode · what the grid aims at</span>
               <div className="gl-seg gl-wrap">
@@ -513,17 +528,6 @@ export default function GridLab() {
               <input type="checkbox" checked={segFillN !== 0} onChange={(e) => setSegFillN(e.target.checked ? 1 : 0)} />
             </label>
           </Fold>
-          {positioning === 0 && <Fold title="Voting law">
-            <div className="gl-magic-note">
-              Magnet count always governs. Between equal counts the order decides: Wrap presses every disc against the edge; Centring holds the centre.
-            </div>
-            <div className="gl-field"><span>Priority · which force rules</span>
-              <select value={votingOrder} onChange={(e) => setVotingOrder(+e.target.value)}>
-                <option value={0}>Magnets &gt; Wrap &gt; Centring (default)</option>
-                <option value={1}>Magnets &gt; Centring &gt; Wrap</option>
-              </select>
-            </div>
-          </Fold>}
         </aside>
       </div>
     </div>

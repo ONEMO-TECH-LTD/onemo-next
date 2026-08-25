@@ -2,10 +2,10 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
-import { wrapBandLadder, wrapGrid, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapAt, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { assignSizes, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
-import { MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
+import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -18,6 +18,8 @@ interface SolveRequest {
   sizeMM: number
   snapStep: number
   stepSel: number | null
+  /** Free + snap: every slider move presses the shape onto the revealed magnets. */
+  snapWrap?: boolean
 }
 
 const ctx = self as unknown as Worker
@@ -30,6 +32,8 @@ const freeCache = new Map<string, { contour: Contour; grid: GridResult }>()
 const walkCaches = new Map<string, Map<number, GridResult>>()
 const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand> }>()
 const rungCache = new Map<string, BandRung[]>()
+// Free+snap: one exact solve per distinct revealed layout — the plateaus of the slider.
+const snapCache = new Map<string, WrapAt | null>()
 const FREE_CAP = 400
 
 const WALK_CAP = 10
@@ -90,7 +94,7 @@ function schedulePrefetch(
 }
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel } = e.data
+  const { id, base, offsetMM, cfg, mode, sizeMM, snapStep, stepSel, snapWrap } = e.data
   gen++
   try {
     const sized = makeSizer(base, offsetMM)
@@ -102,7 +106,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
     }
     const sig = JSON.stringify([offsetMM, pts.length, h])
-    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear(); rungCache.clear() }
+    if (sig !== shapeSig) { shapeSig = sig; freeCache.clear(); walkCaches.clear(); walkFits.clear(); rungCache.clear(); snapCache.clear() }
     const cfgSig = JSON.stringify(cfg)
     if (mode !== 'free' && (cfg.positioning ?? 0) === 1) {
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
@@ -143,6 +147,38 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
       const contour = sized(eff)
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments } })
+    } else if (snapWrap) {
+      // FREE + SNAP — the reversal on the continuous axis. The slider names a size; the material
+      // reveals the layout at that size (centre-rules seating, the existing engine); one wrapGroup
+      // solve presses the shape onto exactly those magnets. Between reveal thresholds every slider
+      // position collapses to the same pressed state — the shape snaps from wrap to wrap.
+      const reveal = computeGrid(sized(sizeMM), { ...cfg, positioning: 1, segmentsDetail: 'light' })
+      const pts = reveal.anchors.map((a) => a.p)
+      if (!pts.length) { ctx.postMessage({ id, model: null }); return }
+      const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+      let mx = Infinity, my = Infinity
+      for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
+      const layoutId = pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
+      const sk = cfgSig + '|' + layoutId
+      let at = snapCache.get(sk)
+      if (at === undefined) {
+        const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
+        const gx = (Math.min(...xs) + Math.max(...xs)) / 2, gy = (Math.min(...ys) + Math.max(...ys)) / 2
+        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM }
+        at = wrapGroup(sized, wcfg, pts.map(([x, y]) => [x - gx, y - gy] as [number, number]), MIN_EFFECT_MM, sizeMM)
+        snapCache.set(sk, at)
+        if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
+      }
+      if (!at) { ctx.postMessage({ id, model: null }); return }
+      const drawn = wrapGrid(sized, { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM }, at)
+      const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+      const r = spotRadiusOf(pad)
+      const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
+      const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
+      ctx.postMessage({ id, model: {
+        contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
+        effSize: at.sizeMM, ladder: [], idx: 0, segments,
+      } })
     } else {
       const k = cfgSig + '|' + sizeMM
       let hit = freeCache.get(k)
