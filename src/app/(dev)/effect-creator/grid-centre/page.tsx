@@ -400,7 +400,7 @@ export default function GridLab() {
                       })
                     } : undefined }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
-                    viewport: camZoom === 1 ? undefined : { panMM: [0, 0] as Pt, zoom: camZoom },
+                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
@@ -535,9 +535,9 @@ export default function GridLab() {
               <i>%</i>
             </span>
             <div className="gl-camzoom">
-              <button aria-label="zoom out" onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.25).toFixed(2)))}>−</button>
+              <button aria-label="zoom out" onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))}>−</button>
               <button aria-label="fit" onClick={() => setCamZoom(1)}>fit</button>
-              <button aria-label="zoom in" onClick={() => setCamZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))}>+</button>
+              <button aria-label="zoom in" onClick={() => setCamZoom((z) => Math.min(4, +(z + 0.05).toFixed(2)))}>+</button>
             </div>
           </div>
           <Fold title="Shape">
