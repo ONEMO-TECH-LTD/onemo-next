@@ -11,13 +11,16 @@ export interface LibraryDraft {
   id: string                 // 'draft:<class>:<frame>:<name>'
   className: string          // the class folder, e.g. 'square'
   frameKey: string
+  /** WHICH triangle this was drawn on. Two geometries in one frame must not answer for each
+   *  other, so the geometry is part of the identity, not a note. */
+  geometryId?: string
   name: string
   nodes: Array<[number, number]>   // lattice units, y-down, same canon as LAYOUT_LIBRARY
 }
 
 export const DRAFT_STORE_KEY = 'grid-centre.library-drafts'
-export function draftId(className: string, frameKey: string, name: string): string {
-  return 'draft:' + className + ':' + frameKey + ':' + name
+export function draftId(className: string, frameKey: string, name: string, geometryId?: string): string {
+  return 'draft:' + className + ':' + frameKey + (geometryId ? ':' + geometryId : '') + ':' + name
 }
 
 /** Reasons a draft is not saveable — empty list = sound. Pure. */

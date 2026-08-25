@@ -5,11 +5,10 @@
 import { SQUARE_FRAMES } from './corpus-square'
 import { RECTANGLE_FRAMES } from './corpus-rectangle'
 import { DIAMOND_FRAMES } from './corpus-diamond'
-import { TRIANGLE_FRAMES } from './corpus-triangle'
 import { withSpacingModes } from './rules'
 import type { LibraryFamily, LibraryFrame } from './types'
 
-export { SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, TRIANGLE_FRAMES }
+export { SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES }
 
 const compose = (family: LibraryFamily, frames: LibraryFrame[]): LibraryFrame[] =>
   frames.map((f) => withSpacingModes(family, f))
@@ -18,5 +17,6 @@ export const CLASS_FRAMES: Record<LibraryFamily, LibraryFrame[]> = {
   square: compose('square', SQUARE_FRAMES),
   rectangle: compose('rectangle', RECTANGLE_FRAMES),
   diamond: compose('diamond', DIAMOND_FRAMES),
-  triangle: compose('triangle', TRIANGLE_FRAMES),
+  // the triangle's frames come from the selected geometry — see triangle-frames.ts
+  triangle: [],
 }

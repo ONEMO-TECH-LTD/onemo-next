@@ -4,10 +4,14 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, TRIANGLE_FRAMES, CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, SPACING_MODES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, layoutAtPitch,
   transformLayout as tl,
+  TRIANGLE_LAYOUTS, triangleGeometry, triangleProductType, triangleTypeOf, triangleFrameKey,
+  triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
+  fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
+  type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
@@ -47,10 +51,12 @@ describe('corpus completeness — removal must fail these', () => {
 describe('classifier goldens — declared family is the classifier verdict, not a point count', () => {
   it('every shape outline classifies as its declared family', () => {
     for (const s of LIBRARY_SHAPES) {
+      // a derived outline has no stored shape to classify — it is proven by its own hull tests
+      if (s.outlineSource === 'arrangement-hull') continue
       // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
       // the engine classifier reads it as the box-filling 'square' family. The mapping is
       // asserted explicitly so the two taxonomies can never silently merge.
-      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle', triangle: 'triangle' }
+      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
       const f0 = CLASS_FRAMES[s.family][0]
       const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
       expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(ENGINE_FAMILY[s.family])
@@ -277,12 +283,11 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   // ring, three for a triangle.
   const extremes = (f: { cols: number; rows: number }, family: string): Array<[number, number]> => {
     if (family === 'diamond') { const k = (f.cols - 1) / 2; return [[k, 0], [0, k], [f.cols - 1, k], [k, f.rows - 1]] }
-    if (family === 'triangle') return [[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
     return [[0, 0], [f.cols - 1, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
   }
 
   it('the corpus stores no 96mm population — it is derived, never hand-written', () => {
-    for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, TRIANGLE_FRAMES])
+    for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES])
       for (const f of frames) expect(f.layouts.map((l) => l.name)).not.toContain('perimeter-96')
   })
 
@@ -389,68 +394,230 @@ describe('authoring under a view transform stays canonical (QA F2)', () => {
   })
 })
 
-describe('triangle class — built on the square and rectangle frames', () => {
-  const key = (n: readonly [number, number]) => n[0] + ',' + n[1]
-  const F = CLASS_FRAMES.triangle
+describe('triangle — the three-point layout universe', () => {
+  const D4F = D4
+  const canonOf = (v: readonly LatticeNode[]) => canonicalTriangleId(v)
+  const ids = TRIANGLE_LAYOUTS.map((t) => t.id)
 
-  it('carries only frames whose slant lands on lattice nodes', () => {
-    expect(F.map(frameKeyOf)).toEqual(['1x1', '2x2', '3x3', '4x4', '5x5', '2x3', '2x5', '3x5'])
-    // 3x4 and 4x5 are excluded on purpose: (rows-1) is not a whole multiple of (cols-1), so
-    // the slant would have to step half a node.
-    for (const bad of ['3x4', '4x5']) expect(F.map(frameKeyOf)).not.toContain(bad)
+  it('the literal corpus is exactly the independently derived universe', () => {
+    // derived here from first principles, not from the corpus, so a deleted or invented
+    // record fails set equality
+    const universe = new Set<string>()
+    const pts: LatticeNode[] = []
+    for (let x = 0; x < 5; x++) for (let y = 0; y < 5; y++) pts.push([x, y])
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++)
+      for (let k = j + 1; k < pts.length; k++) {
+        const v = [pts[i], pts[j], pts[k]] as [LatticeNode, LatticeNode, LatticeNode]
+        const cr = (v[1][0] - v[0][0]) * (v[2][1] - v[0][1]) - (v[1][1] - v[0][1]) * (v[2][0] - v[0][0])
+        if (cr === 0) continue
+        universe.add(canonOf(v))
+      }
+    expect(ids.length).toBe(79)
+    expect([...new Set(ids)].length).toBe(79)
+    expect([...universe].sort()).toEqual([...ids].sort())
   })
 
-  it('full is every node under the slant; the square frames are the triangular numbers', () => {
-    const n = (k: string) => F.find((f) => frameKeyOf(f) === k)!.layouts.find((l) => l.name === 'full')!.nodes.length
-    expect([n('2x2'), n('3x3'), n('4x4'), n('5x5')]).toEqual([3, 6, 10, 15])
-    expect([n('2x3'), n('2x5'), n('3x5')]).toEqual([4, 6, 9])
+  it('the product totals are Peak 14 / Wedge 17 / Sail 48', () => {
+    const n = (t: string) => TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === t).length
+    expect([n('peak'), n('wedge'), n('sail')]).toEqual([14, 17, 48])
   })
 
-  it('every node sits on or under the slant — nothing outside the triangle', () => {
-    for (const f of F.slice(1)) {
-      const xmax = (y: number) => Math.floor((y * (f.cols - 1)) / (f.rows - 1))
-      for (const l of f.layouts) for (const [x, y] of l.nodes)
-        expect(x, `${frameKeyOf(f)} ${l.name} ${key([x, y])}`).toBeLessThanOrEqual(xmax(y))
+  it('the frame distribution is exactly the ruled table', () => {
+    const table: Record<string, [number, number, number]> = {
+      '2x2': [0, 1, 0], '2x3': [0, 2, 1], '2x4': [0, 1, 3], '2x5': [1, 1, 4], '3x3': [2, 1, 1],
+      '3x4': [1, 3, 5], '3x5': [1, 2, 9], '4x4': [3, 1, 4], '4x5': [1, 3, 14], '5x5': [5, 2, 7],
     }
-  })
-
-  it('perimeter drops only interior nodes, corners are the three vertices', () => {
-    for (const f of F.slice(1)) {
-      const full = f.layouts.find((l) => l.name === 'full')!
-      const per = f.layouts.find((l) => l.name === 'perimeter')!
-      const fullK = new Set(full.nodes.map(key))
-      for (const n of per.nodes) expect(fullK.has(key(n))).toBe(true)
-      expect(per.nodes.length).toBeLessThanOrEqual(full.nodes.length)
-      const corners = f.layouts.find((l) => l.name === 'corners')!
-      expect(corners.nodes.map(key).sort())
-        .toEqual([[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]].map((n) => key(n as [number, number])).sort())
+    const got: Record<string, [number, number, number]> = {}
+    for (const t of TRIANGLE_LAYOUTS) {
+      const k = triangleFrameKey(t)
+      got[k] = got[k] ?? [0, 0, 0]
+      got[k][{ peak: 0, wedge: 1, sail: 2 }[triangleTypeOf(t)]]++
     }
+    expect(got).toEqual(table)
+    // three nodes in one line are collinear, so there is no 1xN triangle frame
+    expect(Object.keys(got).some((k) => k.startsWith('1x'))).toBe(false)
   })
 
-  it('the outline wraps the magnets — every node clears the three edges by the padding', () => {
-    const pitch = 48, pad = 12
-    for (const f of F.slice(1)) {
-      const box = CLASS_RULES.triangle.boxMM(f.cols, f.rows, pitch, pad)
-      const W = (f.cols - 1) * pitch, H = (f.rows - 1) * pitch
-      // the offset triangle is similar to the magnet triangle, so its legs grow by the same
-      // ratio its box does; a node can never be closer than the padding to an edge
-      expect(box.w).toBeGreaterThan(W)
-      expect(box.h).toBeGreaterThan(H)
-      expect(box.w - W).toBeGreaterThanOrEqual(pad)
-      expect(box.h - H).toBeGreaterThanOrEqual(pad)
-    }
-  })
-
-  it('the four apex corners are the flips of one canonical layout', () => {
-    expect(CLASS_RULES.triangle.orientations.map((o) => o.id)).toEqual(['apex ↖', 'apex ↗', 'apex ↙', 'apex ↘'])
-    const f = F.find((x) => frameKeyOf(x) === '3x3')!
-    const full = f.layouts.find((l) => l.name === 'full')!
+  it('every record is non-collinear, portrait, self-canonical and D4-unique', () => {
     const seen = new Set<string>()
-    for (const o of CLASS_RULES.triangle.orientations) {
-      const t = tl(f, full, o.view)
-      expect(t.nodes.length).toBe(full.nodes.length)
-      seen.add(t.nodes.map(key).sort().join('|'))
+    for (const t of TRIANGLE_LAYOUTS) {
+      expect(() => triangleGeometry(t.vertices)).not.toThrow()
+      const b = boundsOf([...t.vertices])
+      expect(b.cols, t.id).toBeLessThanOrEqual(b.rows)
+      expect(b.cols).toBeLessThanOrEqual(5); expect(b.rows).toBeLessThanOrEqual(5)
+      expect(canonOf(t.vertices), t.id).toBe(t.id)
+      for (const f of D4F) {
+        const id = canonOf(t.vertices.map(f))
+        expect(id).toBe(t.id)                      // identity is transform-invariant
+      }
+      expect(seen.has(t.id)).toBe(false)
+      seen.add(t.id)
     }
-    expect(seen.size).toBe(4)   // four genuinely different apex corners
+  })
+
+  it('no record is equilateral — an integer lattice cannot carry one', () => {
+    for (const t of TRIANGLE_LAYOUTS) expect(triangleGeometry(t.vertices).sideClass).not.toBe('equilateral')
+  })
+
+  it('a right angle wins outright: a right isosceles is a Wedge, never a Peak', () => {
+    const rightIso = TRIANGLE_LAYOUTS.filter((t) => {
+      const g = triangleGeometry(t.vertices)
+      return g.angleClass === 'right' && g.sideClass === 'isosceles'
+    })
+    expect(rightIso.length).toBeGreaterThan(0)
+    for (const t of rightIso) expect(triangleTypeOf(t)).toBe('wedge')
+  })
+
+  it('the product type survives every transform', () => {
+    for (const t of TRIANGLE_LAYOUTS) for (const f of D4F)
+      expect(triangleProductType(triangleGeometry(t.vertices.map(f) as never)), t.id)
+        .toBe(triangleTypeOf(t))
+  })
+})
+
+describe('triangle — populations', () => {
+  const key = (n: LatticeNode) => n[0] + ',' + n[1]
+  const some = TRIANGLE_LAYOUTS.filter((_, i) => i % 7 === 0)
+
+  it('perimeter is exactly the union of the three gcd edge runs', () => {
+    for (const t of some) {
+      const runs = perimeterRuns(t.vertices).flat().map(key)
+      expect([...new Set(perimeterNodes(t.vertices).map(key))].sort()).toEqual([...new Set(runs)].sort())
+    }
+  })
+
+  it('full is every lattice node inside or on the triangle, and contains the perimeter', () => {
+    for (const t of some) {
+      const full = new Set(fullNodes(t.vertices).map(key))
+      for (const n of perimeterNodes(t.vertices)) expect(full.has(key(n)), t.id).toBe(true)
+      const b = boundsOf([...t.vertices])
+      expect(full.size).toBeLessThanOrEqual(b.cols * b.rows)
+    }
+  })
+
+  it('corners are exactly the three vertices', () => {
+    for (const t of some) {
+      const f = triangleFrame(t, 48)
+      expect(f.layouts.find((l) => l.name === 'corners')!.nodes.map(key).sort())
+        .toEqual([...t.vertices].map(key).sort())
+    }
+  })
+
+  it('96 is a subset of perimeter, keeps every vertex, and follows the pitch', () => {
+    for (const t of some) {
+      const per = new Set(perimeterNodes(t.vertices).map(key))
+      for (const pitch of [24, 48, 96]) {
+        const s96 = trianglePerimeter96(t, pitch)
+        for (const n of s96) expect(per.has(key(n)), `${t.id} @${pitch}`).toBe(true)
+        for (const v of t.vertices) expect(s96.map(key)).toContain(key(v))
+      }
+      expect(trianglePerimeter96(t, 96).length).toBeGreaterThanOrEqual(trianglePerimeter96(t, 24).length)
+    }
+  })
+
+  it('a Peak stays mirror-balanced — a non-divisible run cannot make it lean', () => {
+    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'peak')) {
+      const s96 = new Set(trianglePerimeter96(t, 48).map(key))
+      for (const f of selfSymmetries(t.vertices)) {
+        const img = t.vertices.map(f)
+        const tx = Math.min(...img.map((q) => q[0])), ty = Math.min(...img.map((q) => q[1]))
+        for (const n of [...s96].map((s) => s.split(',').map(Number) as [number, number])) {
+          const [x, y] = f(n)
+          expect(s96.has(key([x - tx, y - ty])), `${t.id} asymmetric`).toBe(true)
+        }
+      }
+    }
+  })
+})
+
+describe('triangle — the outline is derived from the magnets, at exactly 12mm', () => {
+  const PAD = 12
+  const triSel = (id: string, layoutId = 'corners'): LibrarySelection => {
+    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
+      view: { transpose: false, flipX: false, flipY: false } }
+  }
+  const one = (type: string) => TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === type)!.id
+  /** distance from a point to the supporting line of a hull edge */
+  const clearance = (p: readonly [number, number], a: readonly [number, number], b: readonly [number, number]) =>
+    Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / Math.hypot(b[0] - a[0], b[1] - a[1])
+
+  it('one Peak, one Wedge and one Sail each clear their three edges by 12mm', () => {
+    for (const type of ['peak', 'wedge', 'sail']) {
+      const sel = triSel(one(type))
+      const a = libraryArrangement(sel, 48)
+      const outline = libraryPreview(sel, 48, PAD).outlineMM
+      const hull = a.nodesMM
+      expect(hull.length).toBe(3)
+      // every magnet sits at least the padding inside the outline
+      for (const m of hull) {
+        let best = Infinity
+        for (let i = 0; i < outline.length; i++)
+          best = Math.min(best, clearance(m, outline[i], outline[(i + 1) % outline.length]))
+        expect(best, `${type} magnet clearance`).toBeGreaterThan(PAD - 0.05)
+      }
+      // and the three supporting edges are exactly the padding away
+      for (let i = 0; i < 3; i++) {
+        const A = hull[i], B = hull[(i + 1) % 3], C = hull[(i + 2) % 3]
+        const far = outline.map((q) => clearance(q, A, B)).sort((x, y) => y - x)[0]
+        void C; void far
+        const near = Math.min(...outline.map((q) => clearance(q, A, B)))
+        expect(near, `${type} edge ${i}`).toBeLessThan(0.05 + PAD)
+      }
+    }
+  })
+
+  it('the outline is derived AFTER the view transform and still clears', () => {
+    const base = triSel(one('sail'))
+    for (const view of [{ transpose: true, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: true }]) {
+      const sel = { ...base, view }
+      const a = libraryArrangement(sel, 48)
+      const outline = libraryPreview(sel, 48, PAD).outlineMM
+      for (const m of a.nodesMM) {
+        let best = Infinity
+        for (let i = 0; i < outline.length; i++)
+          best = Math.min(best, clearance(m, outline[i], outline[(i + 1) % outline.length]))
+        expect(best).toBeGreaterThan(PAD - 0.05)
+      }
+    }
+  })
+
+  it('the triangle stores no unit outline — its shape record is empty', () => {
+    const tri = LIBRARY_SHAPES.find((s) => s.id === 'triangle')!
+    expect(tri.outlineSource).toBe('arrangement-hull')
+    expect(tri.outline.length).toBe(0)
+  })
+
+  it('a node on an edge or inside leaves the outline unchanged; one outside changes it', () => {
+    const id = one('wedge')
+    const t = TRIANGLE_LAYOUTS.find((x) => x.id === id)!
+    const sel = triSel(id, 'perimeter')
+    const corners = libraryPreview({ ...sel, layoutId: 'corners' }, 48, PAD).outlineMM
+    const per = libraryPreview(sel, 48, PAD).outlineMM          // adds the edge nodes
+    const same = (a: typeof corners, b: typeof corners) =>
+      a.length === b.length && a.every((p, i) => Math.abs(p[0] - b[i][0]) < 0.05 && Math.abs(p[1] - b[i][1]) < 0.05)
+    expect(same(corners, per), 'edge nodes must not move the outline').toBe(true)
+    // a node outside the hull is a different triangle
+    const outside = [...t.vertices.map(([x, y]) => [x, y] as [number, number])]
+    outside[0] = [outside[0][0], outside[0][1] + 1]
+    expect(canonicalTriangleId(outside)).not.toBe(id)
+  })
+
+  it('a collinear or four-corner population fails loudly', () => {
+    expect(() => assertTrianglePopulation([[0, 0], [1, 1], [2, 2]])).toThrow('collinear population')
+    expect(() => assertTrianglePopulation([[0, 0], [2, 0], [2, 2], [0, 2]])).toThrow('hull has 4 vertices')
+    expect(() => assertTrianglePopulation([[0, 0], [2, 0], [1, 2]])).not.toThrow()
+  })
+
+  it('a triangle selection without a geometry fails loud', () => {
+    expect(() => libraryArrangement(
+      { shapeId: 'triangle', frameKey: '3x3', layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, 48,
+    )).toThrow('carries no geometryId')
+    expect(() => triangleById('tri:nope')).toThrow('unknown triangle geometry')
+  })
+
+  it('draft identity carries the geometry, so two layouts on one frame cannot cross', () => {
+    const [a, b] = TRIANGLE_LAYOUTS.filter((t) => triangleFrameKey(t) === '3x4').slice(0, 2)
+    expect(draftId('triangle', '3x4', 'mine', a.id)).not.toBe(draftId('triangle', '3x4', 'mine', b.id))
   })
 })

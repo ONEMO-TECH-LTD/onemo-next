@@ -1,55 +1,90 @@
-// library/corpus-triangle.ts — literal layout data for this class. Written out, never generated.
+// library/corpus-triangle.ts — the literal triangle universe. Written out, never generated at
+// runtime: every non-collinear three-node layout inside a 5x5 field, deduplicated under
+// translation and the eight lattice symmetries, in canonical portrait form.
+//
+// 79 layouts — Peak 14, Wedge 17, Sail 48. The test file derives the universe independently and
+// asserts exact set equality, so a deleted or invented record fails.
 
-import type { LibraryFrame } from './types'
+import type { TriangleLayout } from './triangle-geometry'
 
-/** TRIANGLE class — built on the square and rectangle frames (Dan, 08-25). Canonical is apex
- *  top-left: the vertical leg runs down the left edge, the base along the bottom, and the slant
- *  from the apex to the far base corner. The other three apex corners are the flips, exactly as
- *  landscape is the rectangle's transpose.
- *
- *  A frame carries a triangle only where the slant lands on lattice nodes — (rows-1) a whole
- *  multiple of (cols-1). Every square frame qualifies; of the rectangles, 2x3, 2x5 and 3x5 do.
- *  3x4 and 4x5 do not: their slant would step half a node, and the lattice has nowhere to put it.
- *
- *  Same vocabulary as every class: full — every node in the triangle · perimeter — the two legs
- *  and the slant · corners — the three vertices · perimeter-96 — computed in rules.ts. */
-export const TRIANGLE_FRAMES: LibraryFrame[] = [
-  { cols: 1, rows: 1, layouts: [
-    { name: 'single', nodes: [[0, 0]] },
-  ] },
-  { cols: 2, rows: 2, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [1, 1]] },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [1, 1]] },
-    { name: 'corners', nodes: [[0, 0], [0, 1], [1, 1]] },
-  ] },
-  { cols: 3, rows: 3, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [1, 1], [0, 2], [1, 2], [2, 2]] },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [1, 1], [0, 2], [1, 2], [2, 2]] },
-    { name: 'corners', nodes: [[0, 0], [0, 2], [2, 2]] },
-  ] },
-  { cols: 4, rows: 4, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [1, 1], [0, 2], [1, 2], [2, 2], [0, 3], [1, 3], [2, 3], [3, 3]], note: 'interior — Full grid only' },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [1, 1], [0, 2], [2, 2], [0, 3], [1, 3], [2, 3], [3, 3]] },
-    { name: 'corners', nodes: [[0, 0], [0, 3], [3, 3]] },
-  ] },
-  { cols: 5, rows: 5, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [1, 1], [0, 2], [1, 2], [2, 2], [0, 3], [1, 3], [2, 3], [3, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4]], note: 'interior — Full grid only' },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [1, 1], [0, 2], [2, 2], [0, 3], [3, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4]] },
-    { name: 'corners', nodes: [[0, 0], [0, 4], [4, 4]] },
-  ] },
-  { cols: 2, rows: 3, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [0, 2], [1, 2]] },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [1, 2]] },
-    { name: 'corners', nodes: [[0, 0], [0, 2], [1, 2]] },
-  ] },
-  { cols: 2, rows: 5, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 4]] },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 4]] },
-    { name: 'corners', nodes: [[0, 0], [0, 4], [1, 4]] },
-  ] },
-  { cols: 3, rows: 5, layouts: [
-    { name: 'full', nodes: [[0, 0], [0, 1], [0, 2], [1, 2], [0, 3], [1, 3], [0, 4], [1, 4], [2, 4]] },
-    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [1, 2], [0, 3], [1, 3], [0, 4], [1, 4], [2, 4]] },
-    { name: 'corners', nodes: [[0, 0], [0, 4], [2, 4]] },
-  ] },
+export const TRIANGLE_LAYOUTS: readonly TriangleLayout[] = [
+  { id: 'tri:0,0;0,1;1,0', vertices: [[0, 0], [0, 1], [1, 0]] },
+  { id: 'tri:0,0;0,1;1,2', vertices: [[0, 0], [0, 1], [1, 2]] },
+  { id: 'tri:0,0;0,1;1,3', vertices: [[0, 0], [0, 1], [1, 3]] },
+  { id: 'tri:0,0;0,1;1,4', vertices: [[0, 0], [0, 1], [1, 4]] },
+  { id: 'tri:0,0;0,1;2,2', vertices: [[0, 0], [0, 1], [2, 2]] },
+  { id: 'tri:0,0;0,1;2,3', vertices: [[0, 0], [0, 1], [2, 3]] },
+  { id: 'tri:0,0;0,1;2,4', vertices: [[0, 0], [0, 1], [2, 4]] },
+  { id: 'tri:0,0;0,1;3,3', vertices: [[0, 0], [0, 1], [3, 3]] },
+  { id: 'tri:0,0;0,1;3,4', vertices: [[0, 0], [0, 1], [3, 4]] },
+  { id: 'tri:0,0;0,1;4,4', vertices: [[0, 0], [0, 1], [4, 4]] },
+  { id: 'tri:0,0;0,2;1,0', vertices: [[0, 0], [0, 2], [1, 0]] },
+  { id: 'tri:0,0;0,2;1,1', vertices: [[0, 0], [0, 2], [1, 1]] },
+  { id: 'tri:0,0;0,2;1,3', vertices: [[0, 0], [0, 2], [1, 3]] },
+  { id: 'tri:0,0;0,2;1,4', vertices: [[0, 0], [0, 2], [1, 4]] },
+  { id: 'tri:0,0;0,2;2,0', vertices: [[0, 0], [0, 2], [2, 0]] },
+  { id: 'tri:0,0;0,2;2,1', vertices: [[0, 0], [0, 2], [2, 1]] },
+  { id: 'tri:0,0;0,2;2,3', vertices: [[0, 0], [0, 2], [2, 3]] },
+  { id: 'tri:0,0;0,2;2,4', vertices: [[0, 0], [0, 2], [2, 4]] },
+  { id: 'tri:0,0;0,2;3,3', vertices: [[0, 0], [0, 2], [3, 3]] },
+  { id: 'tri:0,0;0,2;3,4', vertices: [[0, 0], [0, 2], [3, 4]] },
+  { id: 'tri:0,0;0,2;4,4', vertices: [[0, 0], [0, 2], [4, 4]] },
+  { id: 'tri:0,0;0,3;1,0', vertices: [[0, 0], [0, 3], [1, 0]] },
+  { id: 'tri:0,0;0,3;1,1', vertices: [[0, 0], [0, 3], [1, 1]] },
+  { id: 'tri:0,0;0,3;1,4', vertices: [[0, 0], [0, 3], [1, 4]] },
+  { id: 'tri:0,0;0,3;2,0', vertices: [[0, 0], [0, 3], [2, 0]] },
+  { id: 'tri:0,0;0,3;2,1', vertices: [[0, 0], [0, 3], [2, 1]] },
+  { id: 'tri:0,0;0,3;2,4', vertices: [[0, 0], [0, 3], [2, 4]] },
+  { id: 'tri:0,0;0,3;3,0', vertices: [[0, 0], [0, 3], [3, 0]] },
+  { id: 'tri:0,0;0,3;3,1', vertices: [[0, 0], [0, 3], [3, 1]] },
+  { id: 'tri:0,0;0,3;3,4', vertices: [[0, 0], [0, 3], [3, 4]] },
+  { id: 'tri:0,0;0,3;4,4', vertices: [[0, 0], [0, 3], [4, 4]] },
+  { id: 'tri:0,0;0,4;1,0', vertices: [[0, 0], [0, 4], [1, 0]] },
+  { id: 'tri:0,0;0,4;1,1', vertices: [[0, 0], [0, 4], [1, 1]] },
+  { id: 'tri:0,0;0,4;1,2', vertices: [[0, 0], [0, 4], [1, 2]] },
+  { id: 'tri:0,0;0,4;2,0', vertices: [[0, 0], [0, 4], [2, 0]] },
+  { id: 'tri:0,0;0,4;2,1', vertices: [[0, 0], [0, 4], [2, 1]] },
+  { id: 'tri:0,0;0,4;2,2', vertices: [[0, 0], [0, 4], [2, 2]] },
+  { id: 'tri:0,0;0,4;3,0', vertices: [[0, 0], [0, 4], [3, 0]] },
+  { id: 'tri:0,0;0,4;3,1', vertices: [[0, 0], [0, 4], [3, 1]] },
+  { id: 'tri:0,0;0,4;3,2', vertices: [[0, 0], [0, 4], [3, 2]] },
+  { id: 'tri:0,0;0,4;4,0', vertices: [[0, 0], [0, 4], [4, 0]] },
+  { id: 'tri:0,0;0,4;4,1', vertices: [[0, 0], [0, 4], [4, 1]] },
+  { id: 'tri:0,0;0,4;4,2', vertices: [[0, 0], [0, 4], [4, 2]] },
+  { id: 'tri:0,0;1,0;2,3', vertices: [[0, 0], [1, 0], [2, 3]] },
+  { id: 'tri:0,0;1,0;2,4', vertices: [[0, 0], [1, 0], [2, 4]] },
+  { id: 'tri:0,0;1,0;3,4', vertices: [[0, 0], [1, 0], [3, 4]] },
+  { id: 'tri:0,0;1,1;2,3', vertices: [[0, 0], [1, 1], [2, 3]] },
+  { id: 'tri:0,0;1,1;2,4', vertices: [[0, 0], [1, 1], [2, 4]] },
+  { id: 'tri:0,0;1,1;3,4', vertices: [[0, 0], [1, 1], [3, 4]] },
+  { id: 'tri:0,0;1,2;2,1', vertices: [[0, 0], [1, 2], [2, 1]] },
+  { id: 'tri:0,0;1,2;3,3', vertices: [[0, 0], [1, 2], [3, 3]] },
+  { id: 'tri:0,0;1,2;3,4', vertices: [[0, 0], [1, 2], [3, 4]] },
+  { id: 'tri:0,0;1,2;4,4', vertices: [[0, 0], [1, 2], [4, 4]] },
+  { id: 'tri:0,0;1,3;2,0', vertices: [[0, 0], [1, 3], [2, 0]] },
+  { id: 'tri:0,0;1,3;2,1', vertices: [[0, 0], [1, 3], [2, 1]] },
+  { id: 'tri:0,0;1,3;2,2', vertices: [[0, 0], [1, 3], [2, 2]] },
+  { id: 'tri:0,0;1,3;3,1', vertices: [[0, 0], [1, 3], [3, 1]] },
+  { id: 'tri:0,0;1,3;3,2', vertices: [[0, 0], [1, 3], [3, 2]] },
+  { id: 'tri:0,0;1,3;3,4', vertices: [[0, 0], [1, 3], [3, 4]] },
+  { id: 'tri:0,0;1,3;4,4', vertices: [[0, 0], [1, 3], [4, 4]] },
+  { id: 'tri:0,0;1,4;2,0', vertices: [[0, 0], [1, 4], [2, 0]] },
+  { id: 'tri:0,0;1,4;2,1', vertices: [[0, 0], [1, 4], [2, 1]] },
+  { id: 'tri:0,0;1,4;2,2', vertices: [[0, 0], [1, 4], [2, 2]] },
+  { id: 'tri:0,0;1,4;2,3', vertices: [[0, 0], [1, 4], [2, 3]] },
+  { id: 'tri:0,0;1,4;3,0', vertices: [[0, 0], [1, 4], [3, 0]] },
+  { id: 'tri:0,0;1,4;3,1', vertices: [[0, 0], [1, 4], [3, 1]] },
+  { id: 'tri:0,0;1,4;3,2', vertices: [[0, 0], [1, 4], [3, 2]] },
+  { id: 'tri:0,0;1,4;3,3', vertices: [[0, 0], [1, 4], [3, 3]] },
+  { id: 'tri:0,0;1,4;3,4', vertices: [[0, 0], [1, 4], [3, 4]] },
+  { id: 'tri:0,0;1,4;4,1', vertices: [[0, 0], [1, 4], [4, 1]] },
+  { id: 'tri:0,0;1,4;4,2', vertices: [[0, 0], [1, 4], [4, 2]] },
+  { id: 'tri:0,0;1,4;4,3', vertices: [[0, 0], [1, 4], [4, 3]] },
+  { id: 'tri:0,0;2,3;3,2', vertices: [[0, 0], [2, 3], [3, 2]] },
+  { id: 'tri:0,0;2,4;3,1', vertices: [[0, 0], [2, 4], [3, 1]] },
+  { id: 'tri:0,0;2,4;3,2', vertices: [[0, 0], [2, 4], [3, 2]] },
+  { id: 'tri:0,0;2,4;3,3', vertices: [[0, 0], [2, 4], [3, 3]] },
+  { id: 'tri:0,0;2,4;4,2', vertices: [[0, 0], [2, 4], [4, 2]] },
+  { id: 'tri:0,0;2,4;4,3', vertices: [[0, 0], [2, 4], [4, 3]] },
+  { id: 'tri:0,0;3,4;4,3', vertices: [[0, 0], [3, 4], [4, 3]] },
 ]

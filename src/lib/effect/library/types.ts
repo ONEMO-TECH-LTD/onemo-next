@@ -21,6 +21,9 @@ export interface LibraryShape {
   id: LibraryShapeId
   family: LibraryFamily
   aspect: 'square' | 'frame'
+  /** Where the preview outline comes from: a stored unit shape scaled into the class box, or
+   *  the arrangement's own hull outset by the padding. A derived outline stores nothing. */
+  outlineSource: 'unit-shape' | 'arrangement-hull'
   outline: ReadonlyArray<readonly [number, number]>
 }
 
@@ -30,6 +33,9 @@ export interface LibrarySelection {
   shapeId: LibraryShapeId
   frameKey: string          // 'colsxrows', e.g. '2x3'
   layoutId: string          // layout name, or 'prim:<name>' for a universal primitive
+  /** WHICH triangle. Geometry and population are different axes: the geometry names the shape
+   *  (its three vertices), layoutId names the magnets on it. Mandatory for the triangle. */
+  geometryId?: string
   view: LibraryTransform
 }
 

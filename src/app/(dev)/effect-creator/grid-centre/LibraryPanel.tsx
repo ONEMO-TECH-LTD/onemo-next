@@ -6,22 +6,22 @@
 
 import type { ReactElement, ReactNode } from 'react'
 import {
-  CLASS_FRAMES, CLASS_RULES, SPACING_MODES, SPACING_BASE, isSpacingMode,
-  frameKeyOf, pickLayout, resolveSelection, draftLayoutId,
+  CLASS_RULES, SPACING_MODES, SPACING_BASE, isSpacingMode,
+  frameKeyOf, resolveSelection, panelOptions, draftLayoutId,
   type LibrarySelection, type LibraryDraft,
 } from '@/lib/effect/library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
-  sel, setSel, Fold, pitch, padMM, showBox, setShowBox,
+  sel, setSel, Fold, pitch, boxMM, showBox, setShowBox,
   edit, setEdit, drafts, saveEdit, deleteEdit, startAdd, startEdit,
 }: {
   sel: LibrarySelection
   setSel: (next: LibrarySelection) => void
   Fold: FoldComponent
   pitch: number
-  padMM: number
+  boxMM: { w: number; h: number }
   showBox: boolean
   setShowBox: (v: boolean) => void
   edit: { name: string; nodes: Array<[number, number]> } | null
@@ -32,29 +32,27 @@ export default function LibraryPanel({
   startAdd: () => void
   startEdit: () => void
 }) {
-  const { shape, frame, draft } = resolveSelection(sel, drafts)
+  const { shape, frame, draft } = resolveSelection(sel, drafts, pitch)
   const rules = CLASS_RULES[shape.family]
-  const frames = CLASS_FRAMES[shape.family]
+  const opts = panelOptions(sel, drafts, pitch)
   const key = frameKeyOf(frame)
-  const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family)
+  const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family
+    && (d.geometryId ?? '') === (sel.geometryId ?? ''))
   const isDraft = !!draft
-  const sub = rules.subOf(frame.cols, frame.rows)
-  const shown = { c: sel.view.transpose ? frame.rows : frame.cols, r: sel.view.transpose ? frame.cols : frame.rows }
   const sameView = (v: typeof sel.view) => v.transpose === sel.view.transpose && v.flipX === sel.view.flipX && v.flipY === sel.view.flipY
-  const box = rules.boxMM(shown.c, shown.r, pitch, padMM)
   const has = (n: string) => frame.layouts.some((l) => l.name === n)
-  const jump = (f: typeof frame) => { setEdit(null); setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: pickLayout(f, sel.layoutId) }) }
+  const go = (o: { next: typeof sel }) => { setEdit(null); setSel(o.next) }
   return (
     <>
       <div className="gl-card gl-libsize">
-        <b>{Math.round(box.w)}×{Math.round(box.h)}</b><span>mm</span>
+        <b>{Math.round(boxMM.w)}×{Math.round(boxMM.h)}</b><span>mm</span>
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
       <Fold title="Type">
         <div className="gl-seg">
-          {rules.subs.map((s) => (
-            <button key={s} aria-pressed={sub === s} disabled={rules.subs.length === 1}
-              onClick={() => { const f0 = frames.find((f) => rules.subOf(f.cols, f.rows) === s); if (f0) jump(f0) }}>{s}</button>
+          {opts.types.map((o) => (
+            <button key={o.id} aria-pressed={o.active} disabled={opts.types.length === 1}
+              onClick={() => go(o)}>{o.id}</button>
           ))}
         </div>
       </Fold>
@@ -70,13 +68,27 @@ export default function LibraryPanel({
       )}
       <Fold title="Frame">
         <div className="gl-lib">
-          {frames.filter((f) => rules.subOf(f.cols, f.rows) === sub).map((f) => (
-            <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === key} onClick={() => jump(f)}>
-              <b>{rules.label(f.cols, f.rows)}</b>
-            </button>
+          {opts.frames.map((o) => (
+            <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}><b>{o.id}</b></button>
           ))}
         </div>
       </Fold>
+      {opts.geometries.length > 0 && (
+        <Fold title="Layout">
+          <div className="gl-lib gl-libgeo">
+            {opts.geometries.map((o) => (
+              <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}
+                aria-label={`layout ${o.cols}×${o.rows}`}>
+                <svg viewBox={`-0.6 -0.6 ${o.cols + 0.2} ${o.rows + 0.2}`} width="34" height="34">
+                  <polygon points={o.nodes.map(([x, y]) => `${x},${y}`).join(' ')}
+                    fill="var(--accent)" fillOpacity="0.18" stroke="var(--accent)" strokeWidth="0.09" />
+                  {o.nodes.map(([x, y]) => <circle key={`${x},${y}`} cx={x} cy={y} r="0.26" fill="var(--magnet)" />)}
+                </svg>
+              </button>
+            ))}
+          </div>
+        </Fold>
+      )}
       <Fold title="Layouts">
         <div className="gl-lib">
           {frame.layouts.filter((l) => !isSpacingMode(l.name) || l.name === SPACING_BASE).map((l) => (

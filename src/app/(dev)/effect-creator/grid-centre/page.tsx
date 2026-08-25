@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, canonicalNode, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, layoutAtPitch, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
+import { CLASS_FRAMES, CLASS_RULES, LIBRARY_FAMILIES, LIBRARY_SHAPES, firstGeometryOf, triangleFrame, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, layoutAtPitch, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -116,12 +116,19 @@ export default function GridLab() {
   }
   const libraryModel = useMemo(() => {
     if (tab !== 'library') return null
-    const { frame, safeSel, draft } = resolveSelection(librarySel, drafts)
+    const { frame, safeSel, draft } = resolveSelection(librarySel, drafts, pitch)
     const nodes = edit ? edit.nodes : draft?.nodes
     return nodes
       ? draftStageModel(safeSel, nodes, pitch, pad, frame.cols, frame.rows, '')
       : libraryStageModel(safeSel, pitch, pad)
   }, [tab, librarySel, pitch, pad, edit, drafts])
+  /** The size card reads the ACTUAL outline, so a derived shape reports what it really is. */
+  const libraryBox = useMemo(() => {
+    const pts = libraryModel?.contour.outer.pts
+    if (!pts || !pts.length) return { w: 0, h: 0 }
+    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
+    return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
+  }, [libraryModel])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -340,12 +347,18 @@ export default function GridLab() {
           </div>
           <div className="gl-seg gl-libbar-tabs">
             {LIBRARY_FAMILIES.map((fam) => {
-              const cur = resolveSelection(librarySel, drafts).shape.family
+              const cur = resolveSelection(librarySel, drafts, pitch).shape.family
               return <button key={fam} aria-pressed={cur === fam} onClick={() => {
                 const first = LIBRARY_SHAPES.find((x) => x.family === fam)!
-                const f0 = CLASS_FRAMES[fam][0]
+                // a class whose frames come from a geometry lands on that geometry's frame
+                const geo = CLASS_RULES[fam].framesFromGeometry
+                  ? firstGeometryOf(CLASS_RULES[fam].subs[0] as never) : null
+                const f0 = geo ? triangleFrame(geo, pitch) : CLASS_FRAMES[fam][0]
                 setEdit(null)
-                setLibrarySel({ ...librarySel, shapeId: first.id, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') })
+                setLibrarySel({
+                  ...librarySel, shapeId: first.id, geometryId: geo?.id,
+                  frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter'),
+                })
               }}>{fam}</button>
             })}
           </div>
@@ -390,7 +403,7 @@ export default function GridLab() {
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: camClamp(v.zoom * f) })),
                     onReset: () => setLibView({ panMM: [0, 0], zoom: 1 }),
                     onPickNode: edit ? (pMM: Pt) => {
-                      const { frame } = resolveSelection(librarySel, drafts)
+                      const { frame } = resolveSelection(librarySel, drafts, pitch)
                       const cols = librarySel.view.transpose ? frame.rows : frame.cols
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
                       const view = nodeAtMM(pMM, pitch, cols, rows)
@@ -440,11 +453,11 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} padMM={pad}
+          <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} boxMM={libraryBox}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
-              const { shape, frame, layout, draft } = resolveSelection(librarySel, drafts)
+              const { shape, frame, layout, draft } = resolveSelection(librarySel, drafts, pitch)
               // custom seeds from what is ON SCREEN at this pitch, not the canonical 48 set
               const source = draft?.nodes ?? layoutAtPitch(shape.family, frame, layout, pitch).nodes
               setEdit({
@@ -454,8 +467,12 @@ export default function GridLab() {
             }}
             saveEdit={() => {
               if (!edit) return
-              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts)
-              const rec: LibraryDraft = { id: draftId(shape.family, safeSel.frameKey, edit.name), className: shape.family, frameKey: safeSel.frameKey, name: edit.name, nodes: edit.nodes }
+              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts, pitch)
+              const rec: LibraryDraft = {
+                id: draftId(shape.family, safeSel.frameKey, edit.name, librarySel.geometryId),
+                className: shape.family, frameKey: safeSel.frameKey, geometryId: librarySel.geometryId,
+                name: edit.name, nodes: edit.nodes,
+              }
               // The corpus checks its own soundness; an authored layout gets the same gate
               // before it is persisted (QA F1) — never write a draft that breaks its frame.
               const bad = draftIntegrity(rec, frame)
@@ -466,8 +483,9 @@ export default function GridLab() {
             }}
             deleteEdit={() => {
               const nm = edit ? edit.name : draftNameOf(librarySel.layoutId)
-              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts)
-              writeDrafts(drafts.filter((x) => !(x.className === shape.family && x.frameKey === safeSel.frameKey && x.name === nm)))
+              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts, pitch)
+              writeDrafts(drafts.filter((x) => !(x.className === shape.family && x.frameKey === safeSel.frameKey
+                && (x.geometryId ?? '') === (librarySel.geometryId ?? '') && x.name === nm)))
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
             }} /></> : <>

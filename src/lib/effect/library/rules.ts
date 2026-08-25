@@ -50,19 +50,6 @@ function box96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number)
   )).map(([x, y]) => [x, y] as Node)
 }
 
-/** The triangle's perimeter is three runs — the vertical leg, the base, and the slant, one
- *  node per row. A node is sampled by the run it sits on; the vertices sit on two runs and
- *  survive either way. */
-function tri96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
-  const ky = sample96(frame.rows, pitchMM), kx = sample96(frame.cols, pitchMM)
-  const xmax = (y: number) => Math.floor((y * (frame.cols - 1)) / (frame.rows - 1))
-  return perimeter.filter(([x, y]) => (
-    (x === xmax(y) && ky.has(y))                            // slant, apex to base corner
-    || (y === frame.rows - 1 && kx.has(frame.cols - 1 - x)) // base, right to left
-    || (x === 0 && ky.has(frame.rows - 1 - y))              // leg, bottom to apex
-  )).map(([x, y]) => [x, y] as Node)
-}
-
 /** Manhattan ring: sides run vertex to vertex with r+1 nodes; a node's place along its side
  *  is |dx| from the vertical vertex. */
 function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
@@ -94,8 +81,11 @@ export interface ClassRules {
   /** How a frame is labelled to a human. */
   label: (cols: number, rows: number) => string
   /** The views this class offers, in order. Empty means the class has no orientation.
-   *  A rectangle turns (transpose); a triangle points its apex at any of four corners. */
+   *  A rectangle turns; the square and the diamond have no orientation. */
   orientations: Array<{ id: string; view: { transpose: boolean; flipX: boolean; flipY: boolean } }>
+  /** True when the class has no frame registry: its frames are materialised from the geometry
+   *  the selection names, already at the requested pitch. */
+  framesFromGeometry?: boolean
   /** The 96mm sample of this class's perimeter — the ring geometry differs per class. */
   spacing96: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
 }
@@ -133,24 +123,21 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
     spacing96: ring96,
   },
   triangle: {
-    subs: ['wedge'],
-    subOf: () => 'wedge',
-    // The outline WRAPS the magnets: each of the three edges moves out by the padding, which
-    // for a triangle is the same triangle scaled about its incentre. Legs W and H, slant L.
-    boxMM: (c, r, pitch, pad) => {
-      const W = (c - 1) * pitch, H = (r - 1) * pitch
-      if (W === 0 || H === 0) return boxByClassFloor(c, r, pitch)
-      const L = Math.hypot(W, H)
-      return { w: pad + (pad * L + W * (H + pad)) / H, h: H + pad + (pad * (H + L)) / W }
-    },
+    // The product types, in the ruled order. A triangle's frame comes from the geometry it
+    // carries, so the class holds no box formula and no stored outline.
+    subs: ['peak', 'wedge', 'sail'],
+    subOf: () => 'peak',
+    boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
     label: (c, r) => c + '×' + r,
     orientations: [
-      { id: 'apex ↖', view: { transpose: false, flipX: false, flipY: false } },
-      { id: 'apex ↗', view: { transpose: false, flipX: true, flipY: false } },
-      { id: 'apex ↙', view: { transpose: false, flipX: false, flipY: true } },
-      { id: 'apex ↘', view: { transpose: false, flipX: true, flipY: true } },
+      { id: 'up', view: { transpose: false, flipX: false, flipY: false } },
+      { id: 'right', view: { transpose: true, flipX: false, flipY: false } },
+      { id: 'mirror', view: { transpose: false, flipX: true, flipY: false } },
+      { id: 'down', view: { transpose: false, flipX: false, flipY: true } },
     ],
-    spacing96: tri96,
+    framesFromGeometry: true,
+    // materialised per geometry in triangle-frames.ts, from THIS shared sampler
+    spacing96: (frame, perimeter) => [...perimeter],
   },
 }
 
@@ -175,6 +162,8 @@ export function layoutAtPitch(
   family: LibraryFamily, frame: LibraryFrame, layout: LibraryLayout, pitchMM: number,
 ): LibraryLayout {
   if (layout.name !== SPACING_96) return layout
+  // a class that materialises its own frames already did this at the requested pitch
+  if (CLASS_RULES[family].framesFromGeometry) return layout
   const per = frame.layouts.find((l) => l.name === SPACING_BASE)
   if (!per) throw new Error('library: 96mm mode has no perimeter in ' + frame.cols + 'x' + frame.rows)
   return { name: SPACING_96, nodes: CLASS_RULES[family].spacing96(frame, per.nodes, pitchMM) }

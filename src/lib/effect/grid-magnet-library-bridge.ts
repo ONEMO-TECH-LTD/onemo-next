@@ -6,10 +6,11 @@
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
+import { insetRingMM } from './offset'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel, CLASS_RULES, layoutAtPitch,
-  canonicalNode,
+  canonicalNode, convexHull,
   type LibrarySelection, type LibraryShapeId, type LibraryFamily,
 } from './library'
 
@@ -35,7 +36,7 @@ export interface LibraryStageModel {
 
 /** Selected records -> stable-ID arrangement in mm. The ONE conversion. Throws on unknown IDs. */
 export function libraryArrangement(sel: LibrarySelection, pitchMM: number): LibraryArrangement {
-  const { shape, frame, layout } = selectedRecords(sel)
+  const { shape, frame, layout } = selectedRecords(sel, pitchMM)
   const frameCols = sel.view.transpose ? frame.rows : frame.cols
   const frameRows = sel.view.transpose ? frame.cols : frame.rows
   // 96mm is physical: the population is materialised for THIS pitch, never the canonical one.
@@ -58,8 +59,12 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
   shapeCompatible: boolean
   outlineMM: Pt[]
 } {
-  const { shape } = selectedRecords(sel)
+  const { shape } = selectedRecords(sel, pitchMM)
   const a = libraryArrangement(sel, pitchMM)
+  // A DERIVED outline is the magnets' own hull pushed out by the padding — no stored shape, no
+  // box, no re-centring. Its position is the answer, which is what makes it hug (Dan, 08-26).
+  if (shape.outlineSource === 'arrangement-hull')
+    return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible: true, outlineMM: hullOutline(a.nodesMM, padMM) }
   // The frame's physical span is CLASS POLICY — the class rules own it (the square/rectangle
   // class floor, the diamond's wrap-the-ring rule). The bridge asks; it does not re-derive.
   const box0 = CLASS_RULES[shape.family].boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
@@ -72,6 +77,18 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
   return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible, outlineMM }
 }
 
+/** THE DERIVED OUTLINE: connect the magnet centres, push the edges out by the padding. The
+ *  result's position is authoritative — it is never re-centred on the group's box, which is
+ *  exactly why the earlier stored-triangle attempt did not hug its magnets. */
+export function hullOutline(nodesMM: ReadonlyArray<Pt>, padMM: number): Pt[] {
+  const hull = convexHull(nodesMM)
+  if (hull.length < 3) throw new Error('triangle: collinear population')
+  if (hull.length !== 3) throw new Error('triangle: hull has ' + hull.length + ' vertices')
+  const out = insetRingMM(hull, padMM, 'sharp')
+  if (!out) throw new Error('triangle: 12mm outline collapsed')
+  return out
+}
+
 /** The Stage preview — composes the arrangement. The lattice field stays the canvas's own. */
 /** AUTHORING (Dan, 08-25 — sandbox drafts): a draft's own nodes drawn on the selected frame.
  *  Same conversion as the corpus path: y-down -> engine y-up, frame span from class floors. */
@@ -79,7 +96,7 @@ export function draftStageModel(
   sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number, padMM: number,
   frameCols: number, frameRows: number, title: string,
 ): LibraryStageModel {
-  const pv = libraryPreview(sel, pitchMM, padMM)
+  const { shape } = selectedRecords(sel, pitchMM)
   // A draft is canonical data like every corpus layout, so it goes through the SAME transform
   // and the same one y-flip — never straight to mm (QA F2).
   const t = transformLayout(
@@ -87,7 +104,12 @@ export function draftStageModel(
     { name: 'draft', nodes }, sel.view,
   )
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
-  const contour: Contour = { outer: { pts: [...pv.outlineMM] }, holes: [] }
+  // A derived outline follows the DRAWN magnets, so adding a node outside the hull changes the
+  // shape and adding one inside or on an edge does not.
+  const outlineMM = shape.outlineSource === 'arrangement-hull'
+    ? hullOutline(nodesMM, padMM)
+    : libraryPreview(sel, pitchMM, padMM).outlineMM
+  const contour: Contour = { outer: { pts: [...outlineMM] }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
     pitchCentreMM: pitchMM,
@@ -136,7 +158,9 @@ export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM:
     centresMM: [],
     centreMainMM: [(a.frameCols - 1) * pitchMM / 2, (a.frameRows - 1) * pitchMM / 2],
   }
-  const { w, h } = CLASS_RULES[pv.declaredFamily].boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
+  // the readout is the ACTUAL outline, never a box approximation
+  const xs = pv.outlineMM.map((q) => q[0]), ys = pv.outlineMM.map((q) => q[1])
+  const w = Math.round(Math.max(...xs) - Math.min(...xs)), h = Math.round(Math.max(...ys) - Math.min(...ys))
   const title = `${pv.shapeId} · ${a.layoutId} · ${frameLabel(pv.declaredFamily, a.frameCols, a.frameRows)} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${pv.declaredFamily} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${pv.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
   return { contour, grid, title }
 }
