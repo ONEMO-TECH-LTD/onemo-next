@@ -93,7 +93,7 @@ export default function GridLab() {
   /** Authoring — browser-local; the canonical corpus is never mutated. */
   const [edit, setEdit] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
   /** Library canvas view — pan in mm, zoom factor. Library tab only. */
-  const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 1 })
+  const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 0.45 })
   const [drafts, setDrafts] = useState<LibraryDraft[]>([])
   useEffect(() => {
     try { const raw = localStorage.getItem(DRAFT_STORE_KEY); if (raw) setDrafts(JSON.parse(raw)) } catch { }
@@ -325,13 +325,15 @@ export default function GridLab() {
   return (
     <div className="gl">
       <style>{CSS}</style>
-      <header className="gl-head">
-        <h1>Centre Lab <span className="gl-tag">v3.5.6-lead · centre rules</span></h1>
-        <div className="gl-seg" style={{ marginLeft: 16, display: 'inline-flex' }}>
-          <button aria-pressed={tab === 'bench'} onClick={() => setTab('bench')}>Bench</button>
-          <button aria-pressed={tab === 'library'} onClick={() => setTab('library')}>Library</button>
-        </div>
-      </header>
+      {tab === 'library' ? null : (
+        <header className="gl-head">
+          <h1>Centre Lab <span className="gl-tag">v3.5.6-lead · centre rules</span></h1>
+          <div className="gl-seg" style={{ marginLeft: 16, display: 'inline-flex' }}>
+            <button aria-pressed onClick={() => setTab('bench')}>Bench</button>
+            <button aria-pressed={false} onClick={() => setTab('library')}>Library</button>
+          </div>
+        </header>
+      )}
 
       <div className={tab === 'library' ? 'gl-body gl-libtab' : 'gl-body'}>
         <section className="gl-card gl-stage">
@@ -355,7 +357,7 @@ export default function GridLab() {
                     viewport: libView,
                     onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: Math.min(6, Math.max(0.15, v.zoom * f)) })),
-                    onReset: () => setLibView({ panMM: [0, 0], zoom: 1 }),
+                    onReset: () => setLibView({ panMM: [0, 0], zoom: 0.45 }),
                     onPickNode: edit ? (pMM: Pt) => {
                       const { frame } = selectedRecords(librarySel)
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
@@ -388,7 +390,12 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
+          {tab === 'library' ? <><div className="gl-card gl-libtabs">
+            <div className="gl-seg">
+              <button aria-pressed={false} onClick={() => setTab('bench')}>Bench</button>
+              <button aria-pressed onClick={() => setTab('library')}>Library</button>
+            </div>
+          </div><LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
@@ -412,7 +419,7 @@ export default function GridLab() {
               writeDrafts(drafts.filter((x) => !(x.frameKey === librarySel.frameKey && x.name === nm)))
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
-            }} /> : <>
+            }} /></> : <>
           <Fold title="Shape source">
             <div className="gl-seg gl-seg3">
               <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
@@ -1083,7 +1090,7 @@ const CSS = `
 .gl-libedit button:disabled{opacity:.4;cursor:default}
 .gl-libedit button:hover:not(:disabled){color:var(--ink)}
 /* LIBRARY TAB ONLY — full-bleed canvas with the panel floating over it (scoped: .gl-libtab). */
-.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - 120px);
+.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - 24px);
   width:100vw;margin-left:calc(50% - 50vw)}
 .gl-libtab .gl-stage{height:100%;padding:0;border:0;background:none;box-shadow:none}
 .gl-libtab .gl-vp{max-width:none;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;background:var(--panel)}
@@ -1092,4 +1099,5 @@ const CSS = `
 .gl-libtab .gl-controls{position:absolute;top:14px;right:14px;width:300px;max-height:calc(100% - 28px);
   overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
 .gl-libtab .gl-controls>*{backdrop-filter:blur(8px);background:#ffffffe8}
+.gl-libtabs{padding:6px}.gl-libtabs .gl-seg{background:none;border:0;padding:0}
 `
