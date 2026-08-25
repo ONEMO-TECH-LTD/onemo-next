@@ -219,7 +219,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; dots: [number, number][] } }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -306,7 +306,7 @@ export default function GridLab() {
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
-              segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
+              segments={showSegs ? model.segments : []} segFill={segFillN !== 0} recogDots={model.recog?.dots}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
               onZoom={(f) => {
                 // Pinch = manual scaling. In a band it scales WITHIN the band's range.
@@ -408,6 +408,12 @@ export default function GridLab() {
                 }}>2 · Free + snap</button>
               </div>
             </div>
+            {model?.recog && (() => {
+              const r = model.recog
+              const kind = r.cols === r.rows ? 'square' : (Math.min(r.cols, r.rows) <= 2 ? 'slim' : 'standard')
+              const orient = r.rows > r.cols ? 'tall' : r.cols > r.rows ? 'wide' : ''
+              return <div className="gl-magic-note">Recognised: <b>{r.family}</b> family · {orient} {kind} · frame {r.cols}×{r.rows}</div>
+            })()}
             {engineMode === 1 && <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
@@ -437,7 +443,7 @@ export default function GridLab() {
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
-                  <button key={pt.sizeMM} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
+                  <button key={i} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
                     <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
                   </button>)}
               </div>}
@@ -574,8 +580,9 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, recogDots, onPan, onZoom, onReset }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  recogDots?: [number, number][]
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
@@ -800,6 +807,14 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
         return <g key={'a' + i} opacity={0.5}>
           <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill={a.dia === 8 ? 'var(--mag8)' : 'var(--magnet)'} />
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
+        </g>
+      })}
+      {/* THE RECOGNISER, validated by eye: the class frame's expected node positions. */}
+      {recogDots?.map((d: [number, number], i: number) => {
+        const p2 = fy(d)
+        return <g key={'rg' + i}>
+          <circle cx={p2[0]} cy={p2[1]} r={2.2} fill="none" stroke="var(--mag8)" strokeWidth={0.5} strokeDasharray="1.6 1.2" />
+          <circle cx={p2[0]} cy={p2[1]} r={0.7} fill="var(--mag8)" />
         </g>
       })}
       {/* Tangency made visible: where a disc touches the outline within the allowance. */}

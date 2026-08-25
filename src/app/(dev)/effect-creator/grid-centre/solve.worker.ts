@@ -205,9 +205,16 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
         const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM }))
+        const aFnR = anchorFnFor(sized, cfg, cfgSig, sig)
+        const cfR = aFnR ? classFrameNodes(aFnR.segW, aFnR.segH, band.id, cfg.pitchMM) : undefined
+        const aAt = aFnR ? aFnR(at.sizeMM) : null
+        const recog = aFnR && cfR ? {
+          family: aFnR.family, cols: cfR.cols, rows: cfR.rows,
+          dots: aAt ? cfR.nodes.map(([x, y]) => [aAt[0] + x, aAt[1] + y] as [number, number]) : [],
+        } : undefined
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
-          effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM,
+          effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
         } })
         return
       }
@@ -231,6 +238,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       //   3 · the ORIGINAL free logic again, through its own forced-registration branch, at the
       //       pressed size — so what is drawn is free mode's own picture of the wrapped state.
       const anchorFn = anchorFnFor(sized, cfg, cfgSig, sig)
+      let snapRecog: { family: string; cols: number; rows: number; dots: [number, number][] } | undefined
       let stops: Array<{ press: number; reveal: number }> = []
       if (snapWindow) {
         const wk = cfgSig + '|' + snapWindow[0] + '|' + snapWindow[1]
@@ -238,6 +246,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         if (!hitS) {
           const bandOfWin = BANDS.find((x) => x.minMM === snapWindow[0] && x.maxMM === snapWindow[1])
           const cf2 = anchorFn && bandOfWin ? classFrameNodes(anchorFn.segW, anchorFn.segH, bandOfWin.id, cfg.pitchMM) : undefined
+          if (cf2 && anchorFn) snapRecog = { family: anchorFn.family, cols: cf2.cols, rows: cf2.rows, dots: [] }
           const asm2 = cf2 && anchorFn ? familyAssemblies(anchorFn.family, cf2.cols, cf2.rows, cfg.pitchMM).map((a) => a.nodes) : undefined
           const raw = wrapBandLadder(sized, cfg, snapWindow[0], snapWindow[1], MIN_EFFECT_MM, anchorFn, asm2, cf2)
             .map((r) => ({ press: r.at.sizeMM, reveal: r.revealMM }))
@@ -266,7 +275,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const layoutId = pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
       const sk = cfgSig + '|' + layoutId
       const cached = snapCache.get(sk)
-      if (cached !== undefined) { ctx.postMessage({ id, model: { ...(cached as object), stops } }); return }
+      if (cached !== undefined) { ctx.postMessage({ id, model: { ...(cached as object), stops, recog: snapRecog } }); return }
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
       const gx = (Math.min(...xs) + Math.max(...xs)) / 2, gy = (Math.min(...ys) + Math.max(...ys)) / 2
       const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM, anchorAtMM: anchorFn }
@@ -302,7 +311,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       }
       snapCache.set(sk, model)
       if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
-      ctx.postMessage({ id, model: { ...(model as object), stops } })
+      ctx.postMessage({ id, model: { ...(model as object), stops, recog: snapRecog } })
     } else {
       const k = cfgSig + '|' + sizeMM
       let hit = freeCache.get(k)

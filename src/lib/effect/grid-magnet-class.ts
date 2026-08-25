@@ -132,18 +132,19 @@ export function classAssemblies(
   push('frame', full)
   // corners — the extremes of the frame
   push('corners', [...new Set([0, cols - 1])].flatMap((ix) => [...new Set([0, rows - 1])].map((iy) => node(ix, iy))))
-  // tee — apex centred on the short end, full row on the base (tall: apex top, base bottom;
-  // wide: apex at one side, base column at the other)
+  // tee — apex on the short end, full row on the base. THE APEX IS A LATTICE NODE, never the
+  // geometric centre: an even-width frame has no centre node, so both mirrored tees are offered.
+  // (A half-pitch apex violated the rigid-lattice law — magnets exist only at nodes.)
   if (rows >= cols) {
-    const apex = node((cols - 1) / 2, rows - 1)
     const base: Pt[] = []
     for (let ix = 0; ix < cols; ix++) base.push(node(ix, 0))
-    push('tee', [apex, ...base])
+    for (const ax of cols % 2 === 1 ? [(cols - 1) / 2] : [cols / 2 - 1, cols / 2])
+      push('tee', [node(ax, rows - 1), ...base])
   } else {
-    const apex = node(cols - 1, (rows - 1) / 2)
     const base: Pt[] = []
     for (let iy = 0; iy < rows; iy++) base.push(node(0, iy))
-    push('tee', [apex, ...base])
+    for (const ay of rows % 2 === 1 ? [(rows - 1) / 2] : [rows / 2 - 1, rows / 2])
+      push('tee', [node(cols - 1, ay), ...base])
   }
   // ell — one full column and the base row, joined at the corner ("an L drops to 1+2 by itself")
   if (cols >= 2 && rows >= 2) {
