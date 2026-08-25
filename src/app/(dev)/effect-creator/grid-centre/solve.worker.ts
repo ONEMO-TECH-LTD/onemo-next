@@ -4,7 +4,7 @@
 import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
-import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { anchorBakeOf, anchorFromBake, assignSizes, centeringAnchors, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, familyAssemblies, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
@@ -40,14 +40,13 @@ const rungCache = new Map<string, BandRung[]>()
 const stopsCache = new Map<string, Array<{ press: number; reveal: number }>>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
 // and scaled linearly per size. Positions are shape features; only qualification is size-
-// dependent (evaluated inside anchorFromBake). Core mode (1) is size-dependent by definition
-// and stays live — the bake returns null and the engine measures as before.
-const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number; family: ShapeFamily }>()
+// dependent (evaluated inside anchorFromBake). Core is baked too (Dan, 08-25: "any center" —
+// the pipeline must hold under every mode; a live Core dropped the whole tab to the old walk).
+const bakeCache = new Map<string, { bake: AnchorBake; coreC: [number, number]; segW: number; segH: number; family: ShapeFamily }>()
 function anchorFnFor(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, cfgSig: string, shapeSig2: string,
 ): (((mm: number) => import('@/lib/effect/types').Pt) & { segW: number; segH: number; family: ShapeFamily; refMM: number }) | undefined {
   const mode = (cfg.centreMode ?? 2) as CentreMode
-  if (mode === 1) return undefined                    // Core: live by definition
   const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM, cfg.massDepthMM])
   let hit = bakeCache.get(key)
   if (!hit) {
@@ -60,7 +59,9 @@ function anchorFnFor(
     // The segment box (the legal area's bounds) — its PROPORTIONS name the class per band.
     let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity
     for (const sg of segs) { sx0 = Math.min(sx0, sg.bbox.minX); sy0 = Math.min(sy0, sg.bbox.minY); sx1 = Math.max(sx1, sg.bbox.maxX); sy1 = Math.max(sy1, sg.bbox.maxY) }
-    hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
+    const boxC: [number, number] = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
+    const coreC = (centeringAnchors(1, segs, boxC, centroidOf(outer))[0] ?? boxC) as [number, number]
+    hit = { bake, coreC, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
     bakeCache.set(key, hit)
     if (bakeCache.size > 8) bakeCache.delete(bakeCache.keys().next().value!)
   }
@@ -70,7 +71,7 @@ function anchorFnFor(
   const bake = hit.bake
   const gov = (cfg.governor ?? 0) as Governor
   const depth = Math.max(spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)), cfg.massDepthMM ?? MASS_DEPTH_MM)
-  const aRef = anchorFromBake(bake, mode, gov, depth, bake.refMM) ?? bake.boxC
+  const aRef = mode === 1 ? hit.coreC : (anchorFromBake(bake, mode, gov, depth, bake.refMM) ?? bake.boxC)
   const fn = (mm: number): [number, number] => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
   return Object.assign(fn, { segW: hit.segW, segH: hit.segH, family: hit.family, refMM: bake.refMM })
 }

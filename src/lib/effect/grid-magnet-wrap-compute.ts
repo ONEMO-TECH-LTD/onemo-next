@@ -198,6 +198,10 @@ export function wrapGroup(
    *  solving many arrangements over the same size range recomputes the same mesh dozens of times
    *  without it — that was seconds per layout. */
   anchorMemo?: Map<number, Pt>,
+  /** Constrained wrap (the fine-tune): the group's middle may shift at most this far from the
+   *  anchor. The bisection then seals the smallest size lawful WITHIN the cap — pressed by
+   *  construction, never a forced size with slack. */
+  maxOffMM?: number,
 ): WrapAt | null {
   if (!group.length) return null
   const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -229,7 +233,9 @@ export function wrapGroup(
     if (!region) return null
     const valid = validOrigins(region, g)
     if (!valid) return null
-    return pickOrigin(valid, centred)
+    const o = pickOrigin(valid, centred)
+    if (maxOffMM != null && Math.hypot(o[0] - centred[0], o[1] - centred[1]) > maxOffMM + 1e-6) return null
+    return o
   }
 
   if (!heldAt(maxMM)) return null
@@ -675,30 +681,17 @@ export function wrapBandLadder(
     for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
     return pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
   }
-  for (const assembly of classNodes ?? []) {
+  for (const rawAssembly of classNodes ?? []) {
+    if (!rawAssembly.length) continue
+    // The Perimeter belt governs class presets exactly as it governs the reveal (Dan, 08-25:
+    // the pipeline holds everywhere) — a 3x3 frame under the belt is the 8-ring, never 9.
+    const assembly = applyCoverage(rawAssembly.map((q) => [q[0], q[1]] as Pt), cfg.perimeterOnly ?? true, pitch).seated
     if (!assembly.length) continue
     // WRAP IS THE LAW (Dan, 08-25): the layout starts centred and the CENTRE SHIFTS when the
     // wrap conflicts with it — never the reverse. One solve: minimal shift, tightest wrap.
     // A variant that grows the shape to stay pinned on the centre is not a wrap.
-    let at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
+    const at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
     if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
-    // THE SMALL ADJUSTMENT (Dan, 08-25: "it could have computed the small adjustment to make it
-    // wrap and be closer to centre"): probe up to a quarter pitch above contact and accept
-    // growth only while it PAYS — each mm spent must buy more than a mm of centring. 141/off11.5
-    // steps to 144/off~0 (3mm buys 11); the banned 164 case cannot return (23mm for 11 fails).
-    {
-      const probeCap = (cfg.pitchMM ?? DEFAULT_PITCH_MM) / 4
-      let best = at
-      for (let k = 1; k <= probeCap; k++) {
-        const s2 = at.sizeMM + k
-        if (s2 > hiMM + 0.005) break
-        const cand = wrapGroup(sized, wcfg, assembly, s2, s2, anchorMemo)
-        if (!cand) continue
-        const gain = at.centreOffMM - cand.centreOffMM
-        if (gain > k && cand.centreOffMM < best.centreOffMM) best = cand
-      }
-      at = best
-    }
     if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
     seen.add(idOfPts(at.points))
     rungs.push({ at, revealMM: at.sizeMM, isClass: true })
@@ -723,9 +716,15 @@ export function wrapBandLadder(
         if (vx < xLo) xLo = vx; if (vx > xHi) xHi = vx
         if (vy < yLo) yLo = vy; if (vy > yHi) yHi = vy
       }
-      const tall = classFrame.rows >= classFrame.cols
-      const spanDom = tall ? yHi - yLo : xHi - xLo
-      if (spanDom < (tall ? classFrame.rows : classFrame.cols) - 1) continue
+      // A SQUARE frame has no dominant axis (Dan, 08-25: "why the fuck is square offered a
+      // rectangle layout") — the pattern must span BOTH axes or a whole side is left exposed.
+      if (classFrame.cols === classFrame.rows) {
+        if (xHi - xLo < classFrame.cols - 1 || yHi - yLo < classFrame.rows - 1) continue
+      } else {
+        const tall = classFrame.rows >= classFrame.cols
+        const spanDom = tall ? yHi - yLo : xHi - xLo
+        if (spanDom < (tall ? classFrame.rows : classFrame.cols) - 1) continue
+      }
       if (xHi - xLo > classFrame.cols - 1 || yHi - yLo > classFrame.rows - 1) continue
     }
     // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
@@ -741,6 +740,32 @@ export function wrapBandLadder(
   // COVERAGE DOMINANCE (Dan, ruled twice, 08-25): an offer that leaves areas unprotected is not
   // an option when a same-size offer covers them — dropped, not outranked. "Same size" = within
   // 1mm, the display's own resolution; more magnets at the same size is strictly more coverage.
-  return rungs.filter((r) =>
+  // Judged at CONTACT sizes, BEFORE the fine-tune — tuning a survivor upward must never
+  // resurrect the flapped option it dominated (Dan's bat 3-diagonal, 08-25 15:28).
+  const kept = rungs.filter((r) =>
     !rungs.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
+  // THE FINE-TUNE (Dan, 08-25: "any center must be auto-finetune… wrap / closest to center").
+  // Every offer, every centre mode: after the tightest wrap, search the smallest permitted
+  // shift cap whose CONSTRAINED CONTACT solve still pays — each mm of size spent must buy more
+  // than a mm of centring, spend capped at a quarter pitch. Every candidate is a true contact
+  // solve under its cap, so the wrap stays law — no forced size, no slack, no top gap.
+  for (const r of kept) {
+    const at0 = r.at
+    let hiD = Math.floor(at0.centreOffMM)
+    if (hiD < 2) continue
+    const g = at0.points.map((p) => [p[0] - at0.originMM[0], p[1] - at0.originMM[1]] as Pt)
+    const capMM = Math.min(hiMM, at0.sizeMM + pitch / 4)
+    let best = at0, loD = 0
+    while (hiD - loD > 1) {
+      const d = (loD + hiD) >> 1
+      const cand = wrapGroup(sized, wcfg, g, at0.sizeMM, capMM, anchorMemo, d)
+      const spend = cand ? cand.sizeMM - at0.sizeMM : Infinity
+      if (cand && at0.centreOffMM - cand.centreOffMM > spend) {
+        if (cand.centreOffMM < best.centreOffMM) best = cand
+        hiD = d
+      } else loD = d
+    }
+    r.at = best
+  }
+  return kept
 }
