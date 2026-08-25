@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -424,7 +424,7 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <><LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
+          {tab === 'library' ? <><LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} padMM={pad}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {

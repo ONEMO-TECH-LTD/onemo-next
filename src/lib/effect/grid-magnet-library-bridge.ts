@@ -10,10 +10,10 @@ import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel,
   type LibrarySelection, type LibraryShapeId,
-} from './grid-magnet-library'
+} from './library'
 import { classFloorMM, type AxisClass } from './grid-magnet-class'
 
-export type { LibrarySelection } from './grid-magnet-library'
+export type { LibrarySelection } from './library'
 
 export interface LibraryArrangement {
   /** The canonical frame the selection named. */

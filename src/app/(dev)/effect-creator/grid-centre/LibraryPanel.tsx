@@ -1,22 +1,26 @@
 'use client'
 
-// LibraryPanel — the layout-library AUTHORING panel (admin). Layouts of the selected frame are
-// the working list: pick one to view, Edit to change it, + to add one to the frame. Selection
-// and edit state only; no engine imports — the bridge is where library records meet engine types.
+// LibraryPanel — the layout-library AUTHORING panel (admin). Pure view: it asks CLASS_RULES
+// what a class offers and renders it. No class logic lives here — no "is this a diamond",
+// no box maths, no sub-type tests. Selection state in, chips out.
 
 import type { ReactElement, ReactNode } from 'react'
-import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, frameLabel, pickLayout, rectangleSubOf, RECTANGLE_SUBS, SQUARE_SUBS, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import {
+  CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, frameKeyOf, pickLayout, selectedRecords,
+  type LibrarySelection, type LibraryDraft,
+} from '@/lib/effect/library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
-  sel, setSel, Fold, pitch, showBox, setShowBox,
+  sel, setSel, Fold, pitch, padMM, showBox, setShowBox,
   edit, setEdit, drafts, saveEdit, deleteEdit, startAdd, startEdit,
 }: {
   sel: LibrarySelection
   setSel: (next: LibrarySelection) => void
   Fold: FoldComponent
   pitch: number
+  padMM: number
   showBox: boolean
   setShowBox: (v: boolean) => void
   edit: { name: string; nodes: Array<[number, number]> } | null
@@ -28,46 +32,31 @@ export default function LibraryPanel({
   startEdit: () => void
 }) {
   const { shape, frame } = selectedRecords({ ...sel, layoutId: sel.layoutId.startsWith('draft:') ? frame0(sel) : sel.layoutId })
+  const rules = CLASS_RULES[shape.family]
   const frames = CLASS_FRAMES[shape.family]
   const key = frameKeyOf(frame)
   const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family)
-  // Orientation is the axis pair: landscape is the transpose, so the box reads swapped.
-  const oc = sel.view.transpose ? frame.rows : frame.cols
-  const orr = sel.view.transpose ? frame.cols : frame.rows
-  // A diamond WRAPS its magnet group (Dan): half-diagonal = ring radius + padding measured on
-  // the diagonal. Every other class is the class floor.
-  const diamondSpan = 2 * ((frame.cols - 1) / 2 * pitch + 12 * Math.SQRT2)
-  const boxW = shape.family === 'diamond' ? Math.round(diamondSpan) : 24 + (oc - 1) * pitch
-  const boxH = shape.family === 'diamond' ? Math.round(diamondSpan) : 24 + (orr - 1) * pitch
   const isDraft = sel.layoutId.startsWith('draft:')
+  const sub = rules.subOf(frame.cols, frame.rows)
+  const shown = rules.orientable ? { c: sel.view.transpose ? frame.rows : frame.cols, r: sel.view.transpose ? frame.cols : frame.rows } : { c: frame.cols, r: frame.rows }
+  const box = rules.boxMM(shown.c, shown.r, pitch, padMM)
+  const has = (n: string) => frame.layouts.some((l) => l.name === n)
+  const jump = (f: typeof frame) => { setEdit(null); setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: pickLayout(f, sel.layoutId) }) }
   return (
     <>
       <div className="gl-card gl-libsize">
-        <b>{boxW}×{boxH}</b><span>mm</span>
+        <b>{Math.round(box.w)}×{Math.round(box.h)}</b><span>mm</span>
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
-      {shape.family === 'square' && (
-        <Fold title="Type">
-          <div className="gl-seg">
-            {SQUARE_SUBS.map((sub) => <button key={sub} aria-pressed>{sub}</button>)}
-          </div>
-        </Fold>
-      )}
-      {shape.family === 'rectangle' && (
-        <Fold title="Type">
-          <div className="gl-seg">
-            {RECTANGLE_SUBS.map((sub) => (
-              <button key={sub} aria-pressed={rectangleSubOf(frame.cols, frame.rows) === sub}
-                onClick={() => {
-                  const f0 = frames.find((f) => rectangleSubOf(f.cols, f.rows) === sub)!
-                  setEdit(null)
-                  setSel({ ...sel, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') })
-                }}>{sub}</button>
-            ))}
-          </div>
-        </Fold>
-      )}
-      {shape.family === 'rectangle' && (
+      <Fold title="Type">
+        <div className="gl-seg">
+          {rules.subs.map((s) => (
+            <button key={s} aria-pressed={sub === s} disabled={rules.subs.length === 1}
+              onClick={() => { const f0 = frames.find((f) => rules.subOf(f.cols, f.rows) === s); if (f0) jump(f0) }}>{s}</button>
+          ))}
+        </div>
+      </Fold>
+      {rules.orientable && (
         <Fold title="Orientation">
           <div className="gl-seg">
             <button aria-pressed={!sel.view.transpose} onClick={() => setSel({ ...sel, view: { ...sel.view, transpose: false } })}>portrait</button>
@@ -77,13 +66,10 @@ export default function LibraryPanel({
       )}
       <Fold title="Frame">
         <div className="gl-lib">
-          {frames.filter((f) => shape.family !== 'rectangle' || rectangleSubOf(f.cols, f.rows) === rectangleSubOf(frame.cols, frame.rows)).map((f) => (
-            <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === key}
-              onClick={() => {
-                const keep = f.layouts.some((l) => l.name === sel.layoutId)
-                setEdit(null)
-                setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : pickLayout(f, 'perimeter') })
-              }}><b>{frameLabel(shape.family, f.cols, f.rows)}</b></button>
+          {frames.filter((f) => rules.subOf(f.cols, f.rows) === sub).map((f) => (
+            <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === key} onClick={() => jump(f)}>
+              <b>{rules.label(f.cols, f.rows)}</b>
+            </button>
           ))}
         </div>
       </Fold>
@@ -103,9 +89,9 @@ export default function LibraryPanel({
         </div>
         <div className="gl-field" style={{ marginTop: 9, opacity: (edit || sel.layoutId === 'perimeter' || sel.layoutId === 'perimeter-96') ? 1 : 0.45 }}><span>Spacing</span>
           <div className="gl-seg">
-            <button aria-pressed={!edit && sel.layoutId === 'perimeter'} disabled={!frame.layouts.some((l) => l.name === 'perimeter')}
+            <button aria-pressed={!edit && sel.layoutId === 'perimeter'} disabled={!has('perimeter')}
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter' }) }}>48 mm</button>
-            <button aria-pressed={!edit && sel.layoutId === 'perimeter-96'} disabled={!frame.layouts.some((l) => l.name === 'perimeter-96')}
+            <button aria-pressed={!edit && sel.layoutId === 'perimeter-96'} disabled={!has('perimeter-96')}
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter-96' }) }}>96 mm</button>
             <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
           </div>
@@ -117,11 +103,9 @@ export default function LibraryPanel({
             <button onClick={() => setEdit(null)}>cancel</button>
             {isDraft && <button onClick={deleteEdit}>delete</button>}
           </div>
-        ) : (
-          <div className="gl-libedit">
-            {isDraft && <button onClick={deleteEdit}>delete</button>}
-          </div>
-        )}
+        ) : isDraft ? (
+          <div className="gl-libedit"><button onClick={deleteEdit}>delete</button></div>
+        ) : null}
       </Fold>
     </>
   )

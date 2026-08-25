@@ -4,10 +4,10 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  LAYOUT_LIBRARY, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
+  SQUARE_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   type LibrarySelection,
-} from '../grid-magnet-library'
+} from '../library'
 import { libraryArrangement, libraryPreview, libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
@@ -22,10 +22,10 @@ const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
 
 describe('corpus completeness — removal must fail these', () => {
   it('exactly the 15 canonical frame keys', () => {
-    expect(LAYOUT_LIBRARY.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
+    expect(SQUARE_FRAMES.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
   })
   it('exactly 16 ruled square layouts across the frames', () => {
-    expect(LAYOUT_LIBRARY.reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
+    expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
   })
   it('the complete ruled shape-ID set', () => {
     expect(LIBRARY_SHAPES.map((x) => x.id).sort()).toEqual([...SHAPE_IDS].sort())
@@ -33,7 +33,7 @@ describe('corpus completeness — removal must fail these', () => {
 
   it('square class: every frame is even, 1x1..5x5, square kind', () => {
     const seen = new Set<string>()
-    for (const f of LAYOUT_LIBRARY) { expect(f.cols).toBe(f.rows); seen.add(f.cols + 'x' + f.rows) }
+    for (const f of SQUARE_FRAMES) { expect(f.cols).toBe(f.rows); seen.add(f.cols + 'x' + f.rows) }
     for (const n of [1, 2, 3, 4, 5]) expect(seen.has(n + 'x' + n)).toBe(true)
     expect(kindOf(3, 3)).toBe('square'); expect(orientationOf(3, 3)).toBe('even')
   })
@@ -95,7 +95,7 @@ describe('data integrity + transforms', () => {
     expect(libraryIntegrity()).toEqual([])
   })
   it('transform closure keeps nodes in bounds', () => {
-    for (const f of LAYOUT_LIBRARY) for (const l of f.layouts)
+    for (const f of SQUARE_FRAMES) for (const l of f.layouts)
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
         const t = transformLayout(f, l, { transpose, flipX, flipY })
         expect(t.nodes.length).toBe(l.nodes.length)
@@ -144,13 +144,13 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
 
 describe('interior rule and the belt mode', () => {
   it('4x4 carries NO interior magnet in any layout (Dan, 08-25)', () => {
-    const f = LAYOUT_LIBRARY.find((x) => x.cols === 4 && x.rows === 4)!
+    const f = SQUARE_FRAMES.find((x) => x.cols === 4 && x.rows === 4)!
     for (const l of f.layouts) for (const [x, y] of l.nodes)
       expect(x === 0 || x === 3 || y === 0 || y === 3, `4x4 ${l.name} interior ${x},${y}`).toBe(true)
     expect(f.layouts.map((l) => l.name)).not.toContain('full')
   })
   it('belt is a spacing mode: every frame above 1x1 carries perimeter and perimeter-96', () => {
-    for (const f of LAYOUT_LIBRARY.filter((x) => x.cols > 1)) {
+    for (const f of SQUARE_FRAMES.filter((x) => x.cols > 1)) {
       const names = f.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       expect(names).toContain('perimeter-96')
