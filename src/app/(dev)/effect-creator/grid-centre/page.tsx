@@ -429,7 +429,13 @@ export default function GridLab() {
               <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
             {mode === 'free' && <>
-              <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />
+              <div className="gl-sizerow">
+                <button className="gl-chev" aria-label="1mm smaller" onClick={() => setSizeMM(Math.max(sizeMin, Math.round(sizeMM) - 1))}>‹</button>
+                <div className="gl-sizerow-slider">
+                  <Slider label="Effect size · longest side" unit="mm" v={Math.round(sizeMM)} set={setSizeMM} min={sizeMin} max={sizeMax} />
+                </div>
+                <button className="gl-chev" aria-label="1mm larger" onClick={() => setSizeMM(Math.min(sizeMax, Math.round(sizeMM) + 1))}>›</button>
+              </div>
               <label className="gl-toggle"><span>Snap wrap <small style={{ color: 'var(--ink-3)' }}>· every move presses the shape onto the revealed magnets</small></span>
                 <input type="checkbox" checked={snapWrapN !== 0} onChange={(e) => setSnapWrapN(e.target.checked ? 1 : 0)} />
               </label>
@@ -925,6 +931,7 @@ const CSS = `
 .gl-slider{display:flex;flex-direction:column;gap:6px}
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.gl-sizerow{display:flex;align-items:flex-end;gap:6px}.gl-sizerow-slider{flex:1;min-width:0}.gl-chev{width:26px;height:26px;margin-bottom:2px;display:grid;place-items:center;font-size:15px;line-height:1;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.gl-chev:active{background:var(--line)}
 .gl-lock{width:30px;height:26px;display:grid;place-items:center;font-size:13px;line-height:1;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .gl-num{display:inline-flex;align-items:center;gap:4px}
 .gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}
