@@ -534,10 +534,10 @@ export default function GridLab() {
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
               <i>%</i>
             </span><span>view</span>
-            <div className="gl-seg" style={{ marginLeft: 'auto' }}>
-              <button onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.15).toFixed(2)))}>−</button>
-              <button onClick={() => setCamZoom(1)}>fit</button>
-              <button onClick={() => setCamZoom((z) => Math.min(4, +(z + 0.15).toFixed(2)))}>+</button>
+            <div className="gl-camzoom">
+              <button aria-label="zoom out" onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.25).toFixed(2)))}>−</button>
+              <button aria-label="fit" onClick={() => setCamZoom(1)}>fit</button>
+              <button aria-label="zoom in" onClick={() => setCamZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))}>+</button>
             </div>
           </div>
           <Fold title="Shape">
@@ -1093,6 +1093,11 @@ const CSS = `
 .gl-camnum input{width:62px;font:700 22px var(--mono);color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums}
 .gl-camnum i{font:600 12px var(--mono);color:var(--ink-3);font-style:normal}
+.gl-camzoom{display:flex;gap:6px;margin-left:auto}
+.gl-camzoom button{min-width:40px;height:36px;font:700 15px var(--mono);color:var(--ink-2);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.12s}
+.gl-camzoom button:hover{color:var(--ink);border-color:var(--ink-3)}
+.gl-camzoom button:active{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-libadd b{color:var(--ink-3);font-size:16px!important}
 .gl-libedit{display:flex;align-items:center;gap:6px;margin-top:8px}
 .gl-libedit input{flex:1;min-width:0;font:600 12px var(--mono);color:var(--ink);background:var(--panel-2);
