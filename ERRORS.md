@@ -198,3 +198,16 @@
 - Remember: use `npm audit` as evidence, not as a bulk updater or a score to game. Never force a
   transitive dependency across its caller's declared major; the real gate is audit classification plus
   the affected tool running successfully.
+
+## 2026-08-25 — Lattice Bag: feasibility, total coverage and snug wrap are different facts
+
+- What did not work: the solver froze the first feasible scale before it could compare centred
+  alternatives; a later patch then made the total unsupported-perimeter length a hard admission rule.
+  The first produced off-centre duplicate variants; the second rejected default Bot despite no
+  individual disk-sized unsupported span.
+- What worked: retain joint centred and tight feasible scales, judge opposing contact separately,
+  and measure the largest continuous unsupported span. Compare that span with the 24mm disk diameter,
+  not the sum of unrelated small gaps.
+- Remember: a layout is not wrapped merely because it is contained, but total perimeter gap is not a
+  physical flap threshold either. Preserve one result per centred rigid layout; never expose raw
+  boundary translations as variants.

@@ -11,6 +11,7 @@ import { pointInPolygon } from './effect/polygon'
 import { exactPerimeterCoverage } from './effect/grid-core'
 import type { Pt } from './effect/types'
 import {
+  AUTO_LAYOUTS,
   BAG_SOLVER_SPEC,
   DISK_DIAMETER_MM,
   DISK_RADIUS_MM,
@@ -103,12 +104,11 @@ export function prepareBag(normalizedOutline: ReadonlyArray<Pt>): PreparedBag {
   return { outline: normalizedOutline.map((point) => [...point] as Pt) }
 }
 
-const OPTION_AXES = [
-  { label: 'Vertical', distance: ([x]: Pt) => Math.abs(x) },
-  { label: 'Horizontal', distance: (([, y]: Pt) => Math.abs(y)) },
-  { label: 'Diagonal ↘', distance: (([x, y]: Pt) => Math.abs(x - y)) },
-  { label: 'Diagonal ↗', distance: (([x, y]: Pt) => Math.abs(x + y)) },
-] as const
+function axisDistance([x, y]: Pt, axis: typeof AUTO_LAYOUTS[number]['axis']) {
+  if (axis === 'x') return Math.abs(x)
+  if (axis === 'y') return Math.abs(y)
+  return axis === 'descendingDiagonal' ? Math.abs(x - y) : Math.abs(x + y)
+}
 
 function latticeSeats(count: number, optionIndex: number): Pt[] {
   const radius = Math.ceil((Math.sqrt(count) - 1) / 2)
@@ -116,9 +116,9 @@ function latticeSeats(count: number, optionIndex: number): Pt[] {
   for (let y = -radius; y <= radius; y++) {
     for (let x = -radius; x <= radius; x++) seats.push([x, y])
   }
-  const axis = OPTION_AXES[optionIndex]
+  const axis = AUTO_LAYOUTS[optionIndex]
   seats.sort((a, b) => {
-    const axisFirst = axis.distance(a) - axis.distance(b)
+    const axisFirst = axisDistance(a, axis.axis) - axisDistance(b, axis.axis)
     if (axisFirst !== 0) return axisFirst
     const distance = a[0] ** 2 + a[1] ** 2 - b[0] ** 2 - b[1] ** 2
     if (distance !== 0) return distance
@@ -246,30 +246,21 @@ function assertCount(count: number) {
 
 export function bagOptionLayouts(count: number): BagLayout[] {
   assertCount(count)
-  const options = count === 1 ? [0] : OPTION_AXES.map((_, index) => index)
-  return options.map((optionIndex) => ({ seats: latticeSeats(count, optionIndex), label: OPTION_AXES[optionIndex].label }))
+  const options = count === 1 ? [0] : AUTO_LAYOUTS.map((_, index) => index)
+  return options.map((optionIndex) => ({ seats: latticeSeats(count, optionIndex), label: AUTO_LAYOUTS[optionIndex].label }))
 }
 
 export function classifiedLayouts(prepared: PreparedBag, count: number): BagLayout[] {
   assertCount(count)
-  const detected = classifyBag(prepared)
-  const classes: BagShapeClass[] = [detected, 'Square', 'Portrait rectangle', 'Landscape rectangle']
-  const layouts = classes.map((shapeClass) => classifiedSeats(prepared, count, shapeClass))
-  if (count > 1) {
-    layouts.push({ seats: latticeSeats(count, 2), label: 'Diagonal ↘ standard' })
-    layouts.push({ seats: latticeSeats(count, 3), label: 'Diagonal ↗ standard' })
-  }
-  const seen = new Set<string>()
-  return layouts.filter(({ seats }) => {
-    const identity = layoutIdentity(seats)
-    if (seen.has(identity)) return false
-    seen.add(identity)
-    return true
-  })
+  return [classifiedSeats(prepared, count, classifyBag(prepared))]
 }
 
 export function layoutIdentity(seats: ReadonlyArray<Pt>) {
-  return seats.map(([x, y]) => `${x},${y}`).sort().join('|')
+  const centre = pointMean(seats)
+  return seats
+    .map(([x, y]) => `${(x - centre[0]).toFixed(6)},${(y - centre[1]).toFixed(6)}`)
+    .sort()
+    .join('|')
 }
 
 function transformSeat([x, y]: Pt, transform: GridTransform): Pt {
@@ -352,19 +343,30 @@ function candidateTranslations(regions: Paths64, target: Pt): Pt[] {
   const points: Pt[] = []
   const paths = regions.filter((path) => Clipper.isPositive(path))
   for (const path of paths.length > 0 ? paths : regions) {
-    if (Clipper.pointInPolygon(targetPoint, path) !== PointInPolygonResult.IsOutside) points.push(target)
+    if (Clipper.pointInPolygon(targetPoint, path) !== PointInPolygonResult.IsOutside) {
+      points.push(target)
+      continue
+    }
+    let nearest: Pt | null = null
+    let nearestDistance2 = Infinity
     for (let index = 0; index < path.length; index++) {
       const a = path[index]
       const b = path[(index + 1) % path.length]
-      points.push([a.x / scale, a.y / scale])
       const dx = b.x - a.x
       const dy = b.y - a.y
       const length2 = dx * dx + dy * dy
       const t = length2 === 0
         ? 0
         : Math.max(0, Math.min(1, ((targetPoint.x - a.x) * dx + (targetPoint.y - a.y) * dy) / length2))
-      points.push([(a.x + dx * t) / scale, (a.y + dy * t) / scale])
+      const x = a.x + dx * t
+      const y = a.y + dy * t
+      const distance2 = (x - targetPoint.x) ** 2 + (y - targetPoint.y) ** 2
+      if (distance2 < nearestDistance2) {
+        nearest = [x / scale, y / scale]
+        nearestDistance2 = distance2
+      }
     }
+    if (nearest) points.push(nearest)
   }
   const unique = new Map<string, Pt>()
   for (const point of points) unique.set(`${point[0].toFixed(3)},${point[1].toFixed(3)}`, point)
@@ -385,13 +387,40 @@ function rotationAngles(allowRotation: boolean) {
   return angles
 }
 
-function hasFeasibleTransform(
+function pointInRegions(point: Pt, regions: Paths64) {
+  const scale = BAG_SOLVER_SPEC.clipperScale
+  const candidate = { x: Math.round(point[0] * scale), y: Math.round(point[1] * scale) }
+  return regions.some((region) => Clipper.pointInPolygon(candidate, region) !== PointInPolygonResult.IsOutside)
+}
+
+function smallestScale(
   outline: ReadonlyArray<Pt>,
-  scale: number,
   localSeats: ReadonlyArray<Pt>,
-  allowRotation: boolean,
+  rotation: number,
+  accepts: (scale: number, region: Paths64) => boolean,
 ) {
-  return rotationAngles(allowRotation).some((rotation) => feasibleRegion(outline, scale, localSeats, rotation).length > 0)
+  let upper = DISK_DIAMETER_MM
+  let lower = 0
+  let region = feasibleRegion(outline, upper, localSeats, rotation)
+  while (!accepts(upper, region)) {
+    lower = upper
+    upper *= BAG_SOLVER_SPEC.solveGrowthFactor
+    if (upper > BAG_SOLVER_SPEC.maximumSolveSizeMM) {
+      throw new Error('The rigid lattice group could not fit inside the uploaded shape')
+    }
+    region = feasibleRegion(outline, upper, localSeats, rotation)
+  }
+  while (upper - lower > BAG_SOLVER_SPEC.fitEpsilonMM) {
+    const middle = (lower + upper) / 2
+    region = feasibleRegion(outline, middle, localSeats, rotation)
+    if (accepts(middle, region)) upper = middle
+    else lower = middle
+  }
+  return upper
+}
+
+function jointScales(first: number, centred: number) {
+  return Math.abs(centred - first) <= BAG_SOLVER_SPEC.fitEpsilonMM ? [first] : [first, centred]
 }
 
 function measureContacts(seats: ReadonlyArray<Pt>, outline: ReadonlyArray<Pt>): BagContact[] {
@@ -463,6 +492,7 @@ function measuredFit(
     opposingContactPairs: 0,
     peripheryGaps: periphery.gaps,
     uncoveredPeripheryMM: periphery.uncoveredMM,
+    maximumUnsupportedSpanMM: periphery.maximumUncoveredSpanMM,
     option,
     rotation: transform.rotation,
   }
@@ -473,30 +503,27 @@ export function measureTightFits(
   layout: BagLayout,
   allowRotation: boolean,
 ): BagFit[] {
-  let upper = DISK_DIAMETER_MM
-  let lower = 0
-  while (!hasFeasibleTransform(prepared.outline, upper, layout.seats, allowRotation)) {
-    lower = upper
-    upper *= BAG_SOLVER_SPEC.solveGrowthFactor
-    if (upper > BAG_SOLVER_SPEC.maximumSolveSizeMM) throw new Error('The rigid lattice group could not fit inside the uploaded shape')
-  }
-  while (upper - lower > BAG_SOLVER_SPEC.fitEpsilonMM) {
-    const middle = (lower + upper) / 2
-    if (hasFeasibleTransform(prepared.outline, middle, layout.seats, allowRotation)) upper = middle
-    else lower = middle
-  }
-
-  // Keep the first feasible scale. Logic owns the configured tolerance for
-  // the integer Clipper boundary; enlarging here destroys the opposing contact
-  // that defines a snug wrap.
-  const evaluationScale = upper
   const fits: BagFit[] = []
   for (const rotation of rotationAngles(allowRotation)) {
-    const region = feasibleRegion(prepared.outline, evaluationScale, layout.seats, rotation)
-    if (region.length === 0) continue
-    const target = targetTranslation(prepared.outline, evaluationScale, layout.seats, rotation)
-    for (const [x, y] of candidateTranslations(region, target)) {
-      fits.push(measuredFit(prepared, layout.seats, layout.label, evaluationScale, { x, y, rotation }))
+    const firstFeasibleScale = smallestScale(
+      prepared.outline,
+      layout.seats,
+      rotation,
+      (_scale, region) => region.length > 0,
+    )
+    const centredScale = smallestScale(
+      prepared.outline,
+      layout.seats,
+      rotation,
+      (scale, region) => pointInRegions(targetTranslation(prepared.outline, scale, layout.seats, rotation), region),
+    )
+    for (const scale of jointScales(firstFeasibleScale, centredScale)) {
+      const region = feasibleRegion(prepared.outline, scale, layout.seats, rotation)
+      if (region.length === 0) continue
+      const target = targetTranslation(prepared.outline, scale, layout.seats, rotation)
+      for (const [x, y] of candidateTranslations(region, target)) {
+        fits.push(measuredFit(prepared, layout.seats, layout.label, scale, { x, y, rotation }))
+      }
     }
   }
   return fits

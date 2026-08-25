@@ -182,6 +182,7 @@ function thinBySpacing(pts: Pt[], minDist: number, prepared: PreparedContour, c:
 export interface PerimeterCoverage {
   gaps: Pt[]
   uncoveredMM: number
+  maximumUncoveredSpanMM: number
 }
 
 type Interval = [number, number]
@@ -333,6 +334,7 @@ export function exactPerimeterCoverage(
   const rimSpans = boundedRimSpans(contour.outer.pts, seated, pattern, pitchMM)
   const gaps: Pt[] = []
   let uncoveredMM = 0
+  let maximumUncoveredSpanMM = 0
   for (const [ringIndex, ring] of [contour.outer, ...contour.holes].entries()) {
     const pts = ring.pts
     for (let i = 0; i < pts.length; i++) {
@@ -362,16 +364,18 @@ export function exactPerimeterCoverage(
         if (lo > coveredTo + 1e-7) {
           gaps.push(gapPoint(coveredTo, lo))
           uncoveredMM += lo - coveredTo
+          maximumUncoveredSpanMM = Math.max(maximumUncoveredSpanMM, lo - coveredTo)
         }
         if (hi > coveredTo) coveredTo = hi
       }
       if (coveredTo < segLen - 1e-7) {
         gaps.push(gapPoint(coveredTo, segLen))
         uncoveredMM += segLen - coveredTo
+        maximumUncoveredSpanMM = Math.max(maximumUncoveredSpanMM, segLen - coveredTo)
       }
     }
   }
-  return { gaps, uncoveredMM }
+  return { gaps, uncoveredMM, maximumUncoveredSpanMM }
 }
 
 function neighbourStep(pitch: number, pattern: GridPattern): number {
@@ -811,7 +815,7 @@ function computePreparedGridForExtent(
   else if (seated.length < MIN_ANCHORS) issues.push(`Too small — only ${seated.length} magnet grips material. Increase the size or the max auto-grow.`)
   const coverage = seated.length
     ? exactPerimeterCoverage(contourMM, seated, HOLD_REACH_MM, pattern, pitch)
-    : { gaps: [], uncoveredMM: 0 }
+    : { gaps: [], uncoveredMM: 0, maximumUncoveredSpanMM: 0 }
   const flaps = coverage.gaps
   if (flaps.length > 0) issues.push(`Some edge areas sit outside the supported magnet spans (red edge) and could lift. Raise the size / max auto-grow.`)
 

@@ -66,7 +66,14 @@ function uniqueLayouts(layouts: ReadonlyArray<BagLayout>) {
 
 function fitLayouts(prepared: PreparedBag, layouts: ReadonlyArray<BagLayout>, allowRotation: boolean) {
   return uniqueLayouts(layouts)
-    .flatMap((layout) => lawfulFits(prepared, layout, allowRotation))
+    .flatMap((layout) => {
+      const selectedByRotation = new Map<string, BagFit>()
+      for (const fit of lawfulFits(prepared, layout, allowRotation)) {
+        const key = fit.rotation.toFixed(9)
+        if (!selectedByRotation.has(key)) selectedByRotation.set(key, fit)
+      }
+      return [...selectedByRotation.values()]
+    })
     .sort(compareBagFits)
 }
 
@@ -92,7 +99,7 @@ export function fitBagMode(
 ) {
   return mode === 'classified'
     ? fitClassifiedOptions(prepared, count, allowRotation)
-    : fitBagOptions(prepared, count, allowRotation)
+    : fitLayouts(prepared, [...bagOptionLayouts(count), ...classifiedLayouts(prepared, count)], allowRotation)
 }
 
 export function fitClassifiedLadder(prepared: PreparedBag, allowRotation = false) {
@@ -125,23 +132,26 @@ export function fitOptimalBagBands(
     const identity = layoutIdentity(layout.seats)
     const cached = exactByLayout.get(identity)
     if (cached) return cached
-    const fits = lawfulFits(prepared, layout, allowRotation)
+    const fits = fitLayouts(prepared, [layout], allowRotation)
     exactByLayout.set(identity, fits)
     return fits
   }
 
-  return BAG_BANDS.map((band, bandIndex) => {
-    const seatsPerAxis = Math.floor((band.maxMM - DISK_DIAMETER_MM) / LATTICE_PITCH_MM) + 1
-    const candidates: BagFit[] = []
-    for (let count = 1; count <= seatsPerAxis ** 2; count++) {
-      const layouts = uniqueLayouts([...bagOptionLayouts(count), ...classifiedLayouts(prepared, count)])
-      for (const layout of layouts) {
-        for (const exact of exactFits(layout)) {
-          if (bandForRequiredSize(exact.sizeMM)?.id === band.id) candidates.push(exact)
-        }
+  const candidatesByBand = new Map(BAG_BANDS.map(({ id }) => [id, [] as BagFit[]]))
+  const maximumBand = BAG_BANDS[BAG_BANDS.length - 1]
+  const seatsPerAxis = Math.floor((maximumBand.maxMM - DISK_DIAMETER_MM) / LATTICE_PITCH_MM) + 1
+  for (let count = 1; count <= seatsPerAxis ** 2; count++) {
+    const layouts = uniqueLayouts([...bagOptionLayouts(count), ...classifiedLayouts(prepared, count)])
+    for (const layout of layouts) {
+      for (const exact of exactFits(layout)) {
+        const band = bandForRequiredSize(exact.sizeMM)
+        if (band) candidatesByBand.get(band.id)?.push(exact)
       }
     }
-    const result = { ...band, candidates: candidates.sort(compareBagFits) }
+  }
+
+  return BAG_BANDS.map((band, bandIndex) => {
+    const result = { ...band, candidates: (candidatesByBand.get(band.id) ?? []).sort(compareBagFits) }
     onProgress?.(bandIndex + 1, BAG_BANDS.length)
     return result
   })

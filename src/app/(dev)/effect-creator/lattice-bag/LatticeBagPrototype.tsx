@@ -477,7 +477,7 @@ export function LatticeBagPrototype() {
           {error || (bandCompute
             ? `Computing B${Math.min(bandCompute.completed + 1, bandCompute.total)} of ${bandCompute.total} · ${(bandElapsedMs / 1000).toFixed(1)} s`
             : fit
-              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · snug wrap · ${fit.opposingContactPairs} opposing contact pair${fit.opposingContactPairs === 1 ? '' : 's'} · ${fit.uncoveredPeripheryMM.toFixed(1)} mm unsupported${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
+              ? `${fileName} · ${fit.sizeMM.toFixed(1)} mm outline · snug wrap · ${fit.opposingContactPairs} opposing contact pair${fit.opposingContactPairs === 1 ? '' : 's'} · ${fit.maximumUnsupportedSpanMM.toFixed(1)} mm max unsupported span${lastBandDurationMs === null ? '' : ` · bands computed in ${(lastBandDurationMs / 1000).toFixed(1)} s`}`
               : 'No shape loaded')}
         </div>
       </section>

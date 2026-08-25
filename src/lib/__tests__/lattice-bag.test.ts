@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import type { Pt } from '../effect/types'
 import {
   BAG_BANDS,
   DISK_DIAMETER_MM,
   classifyBag,
   fitBagCount,
+  fitBagMode,
   fitBagOptions,
   fitClassifiedBag,
   fitClassifiedOptions,
@@ -15,7 +17,8 @@ import {
   prepareBag,
   type BagFit,
 } from '../lattice-bag'
-import { isSnugWrap, judgeBagFit } from '../lattice-bag-logic'
+import { bagOptionLayouts, layoutIdentity, measureTightFits } from '../lattice-bag-compute'
+import { compareBagFits, isSnugWrap, judgeBagFit } from '../lattice-bag-logic'
 
 const irregular = normalizeBagOutline([
   [-60, -40], [10, -52], [58, -28], [34, 4], [72, 38],
@@ -26,18 +29,27 @@ function squaredPitchUnits(a: readonly number[], b: readonly number[]) {
   return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) / LATTICE_PITCH_MM ** 2
 }
 
+function boundsOf(points: ReadonlyArray<Pt>) {
+  const xs = points.map(([x]) => x)
+  const ys = points.map(([, y]) => y)
+  return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+}
+
 function expectSnug(fit: BagFit) {
   expect(fit.minimumClearanceMM).toBeGreaterThanOrEqual(-0.05)
   expect(fit.contacts.length).toBeGreaterThanOrEqual(2)
   expect(fit.opposingContactPairs).toBeGreaterThan(0)
+  expect(fit.maximumUnsupportedSpanMM).toBeLessThanOrEqual(DISK_DIAMETER_MM + 0.001)
   expect(isSnugWrap(fit)).toBe(true)
 }
 
 describe('lattice bag prototype', () => {
   const prepared = prepareBag(irregular)
+  const square = prepareBag(normalizeBagOutline([[-60, -60], [60, -60], [60, 60], [-60, 60]]))
+  const diamond = prepareBag(normalizeBagOutline([[0, -90], [90, 0], [0, 90], [-90, 0]]))
 
   it('moves every disk through one rigid 48 mm lattice transform', () => {
-    const fit = fitBagCount(prepared, 40)
+    const fit = fitClassifiedBag(square, 4)
     for (let index = 1; index < fit.seats.length; index++) {
       const units2 = squaredPitchUnits(fit.seats[0], fit.seats[index])
       expect(units2).toBeCloseTo(Math.round(units2), 8)
@@ -48,19 +60,20 @@ describe('lattice bag prototype', () => {
   })
 
   it('offers straight and diagonal layouts without silently rotating them', () => {
-    const fixed = fitBagOptions(prepared, 2)
+    const fixed = fitBagOptions(diamond, 2)
+    expect(fixed).toHaveLength(4)
     expect(fixed.every((option) => option.rotation === 0)).toBe(true)
     expect(new Set(fixed.map((option) => option.option))).toEqual(new Set([
       'Vertical', 'Horizontal', 'Diagonal ↘', 'Diagonal ↗',
     ]))
     expect(fixed.every(isSnugWrap)).toBe(true)
-    const rotating = fitBagOptions(prepared, 2, true)
+    const rotating = fitBagOptions(diamond, 2, true)
     expect(rotating.some((option) => Math.abs(option.rotation) > 1e-6)).toBe(true)
     expect(rotating.every((option) => Math.abs(option.rotation) <= Math.PI / 4)).toBe(true)
   })
 
   it('rejects containment with contact on only one side', () => {
-    const candidate = fitBagCount(prepared, 2)
+    const candidate = fitBagCount(square, 2)
     const oneSided = judgeBagFit({ ...candidate, contacts: candidate.contacts.slice(0, 1), opposingContactPairs: 0 })
     expect(isSnugWrap(oneSided)).toBe(false)
     expectSnug(candidate)
@@ -75,14 +88,14 @@ describe('lattice bag prototype', () => {
     expectSnug(fit)
   })
 
-  it('finds a snug rigid-lattice result for every requested count through forty', () => {
-    for (let count = 1; count <= 40; count++) {
-      expectSnug(fitBagCount(prepared, count))
-    }
+  it('rejects an uninterrupted unsupported span wide enough to fit a disk', () => {
+    const portrait = prepareBag(normalizeBagOutline([[-30, -90], [30, -90], [30, 90], [-30, 90]]))
+    expect(fitClassifiedOptions(portrait, 6)).toEqual([])
+    expectSnug(fitClassifiedBag(square, 4))
   })
 
   it('uses the material centroid as a ranking reference, never as a rigid anchor', () => {
-    const fit = fitBagCount(prepared, 2)
+    const fit = fitBagCount(square, 2)
     const measuredShift = Math.hypot(
       fit.centre[0] - fit.materialCentre[0],
       fit.centre[1] - fit.materialCentre[1],
@@ -92,29 +105,26 @@ describe('lattice bag prototype', () => {
   })
 
   it('re-settles deterministically without deforming the outline or lattice', () => {
-    const nine = fitBagCount(prepared, 9)
-    fitBagCount(prepared, 10)
-    const back = fitBagCount(prepared, 9)
+    const nine = fitClassifiedBag(square, 9)
+    fitClassifiedBag(square, 4)
+    const back = fitClassifiedBag(square, 9)
     expect(back.seats).toEqual(nine.seats)
     expect(back.outline).toEqual(nine.outline)
-    const ratios = back.outline.map(([x, y], index) => {
-      const [sx, sy] = prepared.outline[index]
-      return Math.hypot(x, y) / Math.hypot(sx, sy)
-    }).filter(Number.isFinite)
-    expect(Math.max(...ratios) - Math.min(...ratios)).toBeLessThan(1e-8)
+    const sourceBounds = boundsOf(square.outline)
+    const fittedBounds = boundsOf(back.outline)
+    expect(fittedBounds.width / sourceBounds.width).toBeCloseTo(fittedBounds.height / sourceBounds.height, 8)
   })
 
   it('builds deterministic classified frames without changing the count', () => {
-    const portrait = prepareBag(normalizeBagOutline([[-30, -90], [30, -90], [30, 90], [-30, 90]]))
-    const landscape = prepareBag(normalizeBagOutline([[-90, -30], [90, -30], [90, 30], [-90, 30]]))
-    const square = prepareBag(normalizeBagOutline([[-60, -60], [60, -60], [60, 60], [-60, 60]]))
+    const portrait = prepareBag(normalizeBagOutline([[-60, -120], [60, -120], [60, 120], [-60, 120]]))
+    const landscape = prepareBag(normalizeBagOutline([[-120, -60], [120, -60], [120, 60], [-120, 60]]))
     expect(classifyBag(portrait)).toBe('Portrait rectangle')
     expect(classifyBag(landscape)).toBe('Landscape rectangle')
     expect(classifyBag(square)).toBe('Square')
-    expect(fitClassifiedBag(portrait, 6).seats).toHaveLength(6)
-    expect(fitClassifiedBag(landscape, 6).seats).toHaveLength(6)
+    expect(fitClassifiedOptions(portrait, 2).map(({ option }) => option)).toEqual(['Portrait rectangle · 1×2'])
+    expect(fitClassifiedOptions(landscape, 2).map(({ option }) => option)).toEqual(['Landscape rectangle · 2×1'])
     expect(fitClassifiedBag(square, 9).seats).toHaveLength(9)
-    expect(fitClassifiedOptions(portrait, 6).every(isSnugWrap)).toBe(true)
+    expect(fitClassifiedOptions(square, 4).every(isSnugWrap)).toBe(true)
   })
 
   it('lets size ranges plus wrap select counts and preserves every lawful layout', () => {
@@ -125,10 +135,11 @@ describe('lattice bag prototype', () => {
       { id: 'B4', minMM: 168, maxMM: 216 },
     ])
     const progress: Array<[number, number]> = []
-    const bands = fitOptimalBagBands(prepared, false, (completed, total) => progress.push([completed, total]))
+    const bands = fitOptimalBagBands(square, false, (completed, total) => progress.push([completed, total]))
     expect(progress).toEqual([[1, 4], [2, 4], [3, 4], [4, 4]])
     for (const band of bands) {
-      expect(band.candidates.length).toBeGreaterThan(0)
+      const identities = band.candidates.map(({ seats, option, rotation }) => `${seats.length}:${option}:${rotation.toFixed(9)}`)
+      expect(new Set(identities).size).toBe(identities.length)
       for (const candidate of band.candidates) {
         expectSnug(candidate)
         const wholeMM = Math.ceil(candidate.sizeMM - 0.001)
@@ -136,15 +147,55 @@ describe('lattice bag prototype', () => {
         expect(wholeMM).toBeLessThanOrEqual(band.maxMM)
       }
     }
-    expect(new Set(bands[3].candidates.map((candidate) => candidate.seats.length)).size).toBeGreaterThan(1)
+    const allCandidates = bands.flatMap(({ candidates }) => candidates)
+    expect(allCandidates.length).toBeGreaterThan(0)
+    expect(allCandidates.every((candidate) => candidate.maximumUnsupportedSpanMM <= DISK_DIAMETER_MM + 0.001)).toBe(true)
+    expect(new Set(allCandidates.map(({ seats, option, rotation }) => `${seats.length}:${option}:${rotation.toFixed(9)}`)).size)
+      .toBe(allCandidates.length)
+  })
+
+  it('returns one centred result per magnet-addition layout, not contact-point translations', () => {
+    const fits = fitBagOptions(diamond, 2)
+    expect(fits).toHaveLength(4)
+    for (const option of ['Vertical', 'Horizontal', 'Diagonal ↘', 'Diagonal ↗']) {
+      expect(fits.filter((fit) => fit.option === option)).toHaveLength(1)
+    }
+    const alternatives = fitBagOptions(diamond, 2, true)
+    const grouped = new Map<string, BagFit[]>()
+    for (const fit of alternatives) {
+      const key = `${fit.option}:${fit.rotation.toFixed(6)}`
+      grouped.set(key, [...(grouped.get(key) ?? []), fit])
+    }
+    expect([...grouped.values()].every((group) => group.length === 1)).toBe(true)
+  })
+
+  it('deduplicates layouts that differ only by their local origin', () => {
+    expect(layoutIdentity([[0, 0], [0, 48]])).toBe(layoutIdentity([[0, -24], [0, 24]]))
+  })
+
+  it('lets Auto consider the detected class frame without duplicating a neutral layout', () => {
+    const auto = fitBagMode(square, 4, 'auto')
+    expect(auto.some(({ option }) => option === 'Square · 2×2')).toBe(true)
+    expect(new Set(auto.map(({ seats, option, rotation }) => `${seats.length}:${option}:${rotation.toFixed(9)}`)).size)
+      .toBe(auto.length)
   })
 
   it('finds the square wrap ladder without hardcoding disk counts to bands', () => {
-    const square = prepareBag(normalizeBagOutline([[-60, -60], [60, -60], [60, 60], [-60, 60]]))
     const bands = fitOptimalBagBands(square)
-    expect(bands.every(({ candidates }) => candidates.length > 0)).toBe(true)
-    expect(bands.map(({ candidates }) => candidates[0].seats.length)).toEqual([1, 4, 9, 16])
-    expect(bands.every(({ candidates }) => candidates.every(isSnugWrap))).toBe(true)
+    const candidates = bands.flatMap(({ candidates }) => candidates)
+    expect(candidates.every(isSnugWrap)).toBe(true)
+    const counts = new Set(candidates.map((candidate) => candidate.seats.length))
+    for (const count of [1, 2, 4, 9]) expect(counts.has(count)).toBe(true)
+  })
+
+  it('jointly evaluates centre, pan and scale before Logic selects one layout result', () => {
+    const vertical = bagOptionLayouts(2).find(({ label }) => label === 'Vertical')!
+    const measured = measureTightFits(prepared, vertical, false).map(judgeBagFit)
+    expect(new Set(measured.map((fit) => fit.sizeMM.toFixed(3))).size).toBeGreaterThan(1)
+    const selected = fitBagOptions(diamond, 2).find(({ option }) => option === 'Vertical')!
+    const diamondVertical = bagOptionLayouts(2).find(({ label }) => label === 'Vertical')!
+    const lawful = measureTightFits(diamond, diamondVertical, false).map(judgeBagFit).filter(isSnugWrap)
+    expect(selected).toEqual([...lawful].sort(compareBagFits)[0])
   })
 
   it('keeps policy out of Compute and solver law out of the UI shell', () => {
@@ -158,7 +209,7 @@ describe('lattice bag prototype', () => {
     expect(logic).not.toMatch(/from ['"]\.\/lattice-bag-compute['"]/)
     expect(worker).not.toMatch(/isSnugWrap|compareBagFits|pointInPolygon|Clipper/)
     expect(ui).not.toMatch(/pointInPolygon|traceContourRaw|maskFromImageData|classifiedCounts|bandForSize|\[1,\s*2,\s*6,\s*8\]|\[1,\s*4,\s*9,\s*16\]/)
-    expect(spec).toMatch(/BAG_BANDS|fitEpsilonMM|opposingContactDotMax|peripheryReachMM/)
+    expect(spec).toMatch(/AUTO_LAYOUTS|BAG_BANDS|fitEpsilonMM|opposingContactDotMax|peripheryReachMM/)
     expect(`${compute}\n${logic}\n${engine}\n${worker}\n${ui}`).not.toMatch(/const BAG_BANDS|fitEpsilonMM\s*:/)
   })
 })

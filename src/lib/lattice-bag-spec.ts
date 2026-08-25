@@ -12,11 +12,19 @@ export const BAG_BANDS = [
   { id: 'B4', minMM: 168, maxMM: 216 },
 ] as const
 
+export const AUTO_LAYOUTS = [
+  { label: 'Vertical', axis: 'x' },
+  { label: 'Horizontal', axis: 'y' },
+  { label: 'Diagonal ↘', axis: 'descendingDiagonal' },
+  { label: 'Diagonal ↗', axis: 'ascendingDiagonal' },
+] as const
+
 export const BAG_SOLVER_SPEC = {
   fitEpsilonMM: 0.001,
   contactToleranceMM: 0.05,
   opposingContactDotMax: -0.25,
   peripheryReachMM: 48,
+  maximumUnsupportedSpanMM: DISK_DIAMETER_MM,
   clipperScale: 1000,
   maximumSolveSizeMM: 100_000,
   solveGrowthFactor: 1.25,
@@ -75,6 +83,7 @@ export interface BagFit {
   opposingContactPairs: number
   peripheryGaps: Pt[]
   uncoveredPeripheryMM: number
+  maximumUnsupportedSpanMM: number
   option: string
   rotation: number
 }

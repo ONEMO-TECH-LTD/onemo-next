@@ -23,6 +23,7 @@ export function isSnugWrap(fit: BagFit) {
   return fit.minimumClearanceMM >= -BAG_SOLVER_SPEC.contactToleranceMM
     && fit.contacts.length >= 2
     && fit.opposingContactPairs > 0
+    && fit.maximumUnsupportedSpanMM <= BAG_SOLVER_SPEC.maximumUnsupportedSpanMM + BAG_SOLVER_SPEC.fitEpsilonMM
 }
 
 export function judgeBagFit(measured: BagFit): BagFit {
@@ -30,7 +31,8 @@ export function judgeBagFit(measured: BagFit): BagFit {
 }
 
 export function compareBagFits(a: BagFit, b: BagFit): number {
-  return a.uncoveredPeripheryMM - b.uncoveredPeripheryMM
+  return a.maximumUnsupportedSpanMM - b.maximumUnsupportedSpanMM
+    || a.uncoveredPeripheryMM - b.uncoveredPeripheryMM
     || b.opposingContactPairs - a.opposingContactPairs
     || b.contacts.length - a.contacts.length
     || a.centreShiftMM - b.centreShiftMM
