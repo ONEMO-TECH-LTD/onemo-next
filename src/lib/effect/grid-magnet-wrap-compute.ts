@@ -681,7 +681,16 @@ export function wrapBandLadder(
     for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
     return pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
   }
-  for (const rawAssembly of classNodes ?? []) {
+  // THE UNIVERSAL PRIMITIVES (Dan, 08-25): "the pair and single magnet must be tried no matter
+  // the class" — 1 and 2 magnets are the ruled exception to the class catalogue (centring and
+  // diagonal pair placement decide there, not the frame). Always solved in every band; band
+  // membership, dominance and the anti-flap guard still judge them like any other offer.
+  const primitives: Pt[][] = [
+    [[0, 0]],
+    [[0, 0], [pitch, 0]], [[0, 0], [0, pitch]],
+    [[0, 0], [pitch, pitch]], [[0, pitch], [pitch, 0]],
+  ]
+  for (const rawAssembly of [...primitives, ...(classNodes ?? [])]) {
     if (!rawAssembly.length) continue
     // The Perimeter belt governs class presets exactly as it governs the reveal (Dan, 08-25:
     // the pipeline holds everywhere) — a 3x3 frame under the belt is the 8-ring, never 9.
@@ -744,6 +753,46 @@ export function wrapBandLadder(
   // resurrect the flapped option it dominated (Dan's bat 3-diagonal, 08-25 15:28).
   const kept = rungs.filter((r) =>
     !rungs.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
+  // THE ANTI-FLAP GUARD (Dan, 08-25): "the class itself must be it — but if not enough, use the
+  // clipper2 fix that subtracts and ellipses, show unprotected edge perimeter and force a magnet
+  // there with relevant wrap and layout." The class layout is the guard by construction; when its
+  // WRAPPED result still leaves an exposed edge run over the 96mm perimeter law, the lattice node
+  // nearest that exposure is FORCED into the layout — top first (gravity) — and re-wrapped.
+  {
+    const hold = pitch / Math.SQRT2
+    const PIN_SPAN_MM = 96                             // Dan's perimeter law, 08-25 10:03
+    const edgeRunOf = (patch: UnheldPatch, outer: ReadonlyArray<Pt>): number => {
+      let run = 0
+      for (const ring of patch.rings)
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i], b = ring[(i + 1) % ring.length]
+          if (nearestDist(outer, a[0], a[1]) < 0.75 && nearestDist(outer, b[0], b[1]) < 0.75)
+            run += Math.hypot(b[0] - a[0], b[1] - a[1])
+        }
+      return run
+    }
+    for (const r of kept) {
+      for (let round = 0; round < 3; round++) {
+        const at = r.at
+        const outer = sized(at.sizeMM).outer.pts
+        const bad = unheldOf(outer, at.points, hold)
+          .filter((q) => touchesOutline(q, outer) && edgeRunOf(q, outer) > PIN_SPAN_MM)
+          .sort((a, b) => a.centreMM[1] - b.centreMM[1])   // top first — gravity peels the top
+        if (!bad.length) break
+        const g = at.points.map((p) => [p[0] - at.originMM[0], p[1] - at.originMM[1]] as Pt)
+        const base = g[0]
+        const rel: Pt = [bad[0].centreMM[0] - at.originMM[0], bad[0].centreMM[1] - at.originMM[1]]
+        const node: Pt = [
+          base[0] + Math.round((rel[0] - base[0]) / pitch) * pitch,
+          base[1] + Math.round((rel[1] - base[1]) / pitch) * pitch,
+        ]
+        if (g.some((q) => Math.abs(q[0] - node[0]) < 0.5 && Math.abs(q[1] - node[1]) < 0.5)) break
+        const cand = wrapGroup(sized, wcfg, [...g, node], minMM, hiMM, anchorMemo)
+        if (!cand || cand.sizeMM > hiMM + 0.005) break    // unfixable in this band — offer stands
+        r.at = cand
+      }
+    }
+  }
   // THE FINE-TUNE (Dan, 08-25: "any center must be auto-finetune… wrap / closest to center").
   // Every offer, every centre mode: after the tightest wrap, search the smallest permitted
   // shift cap whose CONSTRAINED CONTACT solve still pays — each mm of size spent must buy more
