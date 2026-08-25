@@ -95,6 +95,48 @@ describe('classifier goldens — declared family is the classifier verdict, not 
     expect(m.title).toContain('5x5')
     expect(m.title).toContain('prim:single')
   })
+  it('QA F4: primitive geometry obeys canonical y semantics and the View transform', () => {
+    const key = (a: ReturnType<typeof libraryArrangement>) =>
+      [...a.nodesMM].map((q) => q[0].toFixed(3) + ',' + q[1].toFixed(3)).sort().join(';')
+    const v = (transpose = false, flipX = false, flipY = false) => ({ transpose, flipX, flipY })
+    // 1 · canonical pair-diag (y-down TL->BR) in engine y-up runs upper-left -> lower-right:
+    //     the LEFT node carries the HIGHER y. pair-anti is the opposite node set.
+    const diag = libraryArrangement(sel({ frameKey: '2x3', layoutId: 'prim:pair-diag' }), 48)
+    const [dl, dr] = [...diag.nodesMM].sort((a, b) => a[0] - b[0])
+    expect(dl[1]).toBeGreaterThan(dr[1])
+    const anti = libraryArrangement(sel({ frameKey: '2x3', layoutId: 'prim:pair-anti' }), 48)
+    const [al, ar] = [...anti.nodesMM].sort((a, b) => a[0] - b[0])
+    expect(al[1]).toBeLessThan(ar[1])
+    expect(key(diag)).not.toBe(key(anti))
+    // 2 · pair-diag + flipX === unflipped pair-anti, and !== unflipped pair-diag
+    const diagFx = libraryArrangement(sel({ frameKey: '2x3', layoutId: 'prim:pair-diag', view: v(false, true, false) }), 48)
+    expect(key(diagFx)).toBe(key(anti))
+    expect(key(diagFx)).not.toBe(key(diag))
+    // 3 · pair-h + transpose becomes a vertical local pair; actual frame becomes 3x2
+    const hT = libraryArrangement(sel({ frameKey: '2x3', layoutId: 'prim:pair-h', view: v(true, false, false) }), 48)
+    expect(hT.frameKey).toBe('3x2')
+    expect(hT.nodesMM[0][0]).toBeCloseTo(hT.nodesMM[1][0], 6)
+    expect(Math.abs(hT.nodesMM[0][1] - hT.nodesMM[1][1])).toBeCloseTo(48, 6)
+    // 4 · full sweep: all five primitives x all eight transforms — truthful frame, centred
+    //     group, nodes = transformLayout + one y conversion + centring
+    for (const nm of ['single', 'pair-h', 'pair-v', 'pair-diag', 'pair-anti'])
+      for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
+        const a = libraryArrangement(sel({ frameKey: '2x3', layoutId: 'prim:' + nm, view: v(transpose, flipX, flipY) }), 48)
+        const fc = transpose ? 3 : 2, fr = transpose ? 2 : 3
+        expect(a.frameKey).toBe(fc + 'x' + fr)
+        const xs = a.nodesMM.map((q) => q[0]), ys = a.nodesMM.map((q) => q[1])
+        expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo((fc - 1) * 24, 6)
+        expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo((fr - 1) * 24, 6)
+        const prim = UNIVERSAL_PRIMITIVES.find((l) => l.name === nm)!
+        const pf = { cols: Math.max(...prim.nodes.map(([x]) => x)) + 1, rows: Math.max(...prim.nodes.map(([, y]) => y)) + 1, layouts: [] }
+        const t = transformLayout(pf, prim, v(transpose, flipX, flipY))
+        const local = t.nodes.map(([ix, iy]) => [ix * 48, (t.rows - 1 - iy) * 48] as [number, number])
+        const lx = local.map((q) => q[0]), ly = local.map((q) => q[1])
+        const mx = (Math.min(...lx) + Math.max(...lx)) / 2, my = (Math.min(...ly) + Math.max(...ly)) / 2
+        const expected = local.map(([x, y]) => [(x - mx + (fc - 1) * 24).toFixed(3), (y - my + (fr - 1) * 24).toFixed(3)].join(',')).sort().join(';')
+        expect(key(a)).toBe(expected)
+      }
+  })
   it('families and draft applicability stay complete', () => {
     expect(LIBRARY_FAMILIES).toEqual(['square', 'round', 'triangle'])
     for (const fam of LIBRARY_FAMILIES) expect(FAMILY_APPLICABILITY_DRAFT[fam].length).toBeGreaterThan(0)

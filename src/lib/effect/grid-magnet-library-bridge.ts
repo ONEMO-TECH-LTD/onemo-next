@@ -50,13 +50,21 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
   const cx = (frameCols - 1) * pitchMM / 2, cy = (frameRows - 1) * pitchMM / 2
   let nodesMM: Pt[]
   if (isPrimitive) {
-    // The primitive keeps its ruled geometry AND the selected frame context: its group is
-    // translated so its middle sits on the frame middle. The wrap solver re-centres the local
-    // group itself, so this translation is display placement, not engine policy (QA F2).
-    const raw: Pt[] = layout.nodes.map(([x, y]) => [x * pitchMM, y * pitchMM])
-    const xs = raw.map((q) => q[0]), ys = raw.map((q) => q[1])
+    // The primitive keeps its ruled geometry AND the selected frame context: the ONE transform
+    // implementation and the ONE canonical y-down -> engine y-up conversion apply exactly as
+    // for frame layouts (QA F4 — pair-diag must stay pair-diag, View must transform it), then
+    // the group is translated so its middle sits on the frame middle. The wrap solver
+    // re-centres the local group itself, so the translation is display placement, not policy.
+    const primitiveFrame = {
+      cols: Math.max(...layout.nodes.map(([x]) => x)) + 1,
+      rows: Math.max(...layout.nodes.map(([, y]) => y)) + 1,
+      layouts: [],
+    }
+    const t = transformLayout(primitiveFrame, layout, sel.view)
+    const local: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
+    const xs = local.map((q) => q[0]), ys = local.map((q) => q[1])
     const mx = (Math.min(...xs) + Math.max(...xs)) / 2, my = (Math.min(...ys) + Math.max(...ys)) / 2
-    nodesMM = raw.map(([x, y]) => [x - mx + cx, y - my + cy])
+    nodesMM = local.map(([x, y]) => [x - mx + cx, y - my + cy])
   } else {
     const t = transformLayout(frame, layout, sel.view)
     nodesMM = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
