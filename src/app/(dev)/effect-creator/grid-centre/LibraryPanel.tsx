@@ -6,7 +6,8 @@
 
 import type { ReactElement, ReactNode } from 'react'
 import {
-  CLASS_FRAMES, CLASS_RULES, frameKeyOf, pickLayout, resolveSelection, draftLayoutId,
+  CLASS_FRAMES, CLASS_RULES, SPACING_MODES, SPACING_BASE, isSpacingMode,
+  frameKeyOf, pickLayout, resolveSelection, draftLayoutId,
   type LibrarySelection, type LibraryDraft,
 } from '@/lib/effect/library'
 
@@ -75,8 +76,8 @@ export default function LibraryPanel({
       </Fold>
       <Fold title="Layouts">
         <div className="gl-lib">
-          {frame.layouts.filter((l) => l.name !== 'perimeter-96').map((l) => (
-            <button key={l.name} aria-pressed={!edit && (sel.layoutId === l.name || (l.name === 'perimeter' && sel.layoutId === 'perimeter-96'))}
+          {frame.layouts.filter((l) => !isSpacingMode(l.name) || l.name === SPACING_BASE).map((l) => (
+            <button key={l.name} aria-pressed={!edit && (sel.layoutId === l.name || (l.name === SPACING_BASE && isSpacingMode(sel.layoutId)))}
               onClick={() => { setEdit(null); setSel({ ...sel, layoutId: l.name }) }}><b>{l.name}</b></button>
           ))}
           {mine.map((d) => (
@@ -87,12 +88,12 @@ export default function LibraryPanel({
           ))}
           <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
         </div>
-        <div className="gl-field" style={{ marginTop: 9, opacity: (edit || sel.layoutId === 'perimeter' || sel.layoutId === 'perimeter-96') ? 1 : 0.45 }}><span>Spacing</span>
+        <div className="gl-field" style={{ marginTop: 9, opacity: (edit || isSpacingMode(sel.layoutId)) ? 1 : 0.45 }}><span>Spacing</span>
           <div className="gl-seg">
-            <button aria-pressed={!edit && sel.layoutId === 'perimeter'} disabled={!has('perimeter')}
-              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter' }) }}>48 mm</button>
-            <button aria-pressed={!edit && sel.layoutId === 'perimeter-96'} disabled={!has('perimeter-96')}
-              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: 'perimeter-96' }) }}>96 mm</button>
+            {SPACING_MODES.map((m) => (
+              <button key={m.layoutId} aria-pressed={!edit && sel.layoutId === m.layoutId} disabled={!has(m.layoutId)}
+                onClick={() => { setEdit(null); setSel({ ...sel, layoutId: m.layoutId }) }}>{m.label}</button>
+            ))}
             <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
           </div>
         </div>

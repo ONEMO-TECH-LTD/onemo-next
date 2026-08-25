@@ -47,16 +47,19 @@ export interface ResolvedSelection {
   draft: LibraryDraft | null
 }
 
-/** TOLERANT — the authoring view's resolver. The admin drives the panel by hand and carries a
- *  selection across class switches, so the view lands on something real instead of throwing.
- *  A draft matches on class AND frame AND name — matching on name alone let a square draft
- *  answer for a diamond of the same frame. */
+/** The authoring view's resolver. It tolerates exactly ONE thing: a layout name the frame does
+ *  not carry, because the admin deliberately carries a layout across frames and classes and
+ *  every transition helper normalises it with pickLayout. Shape and frame are NOT guessed —
+ *  an unknown one is a bug in the caller, and guessing produced a 'safe' selection that still
+ *  threw when the pipeline resolved it (QA F4). Drafts match on class AND frame AND name. */
 export function resolveSelection(
   sel: LibrarySelection, drafts: readonly LibraryDraft[] = [],
 ): ResolvedSelection {
-  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId) ?? LIBRARY_SHAPES[0]
+  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
+  if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
   const frames = CLASS_FRAMES[shape.family]
-  const frame = frames.find((f) => frameKeyOf(f) === sel.frameKey) ?? frames[0]
+  const frame = frames.find((f) => frameKeyOf(f) === sel.frameKey)
+  if (!frame) throw new Error('library: unknown frameKey ' + sel.frameKey)
   const frameKey = frameKeyOf(frame)
   const wantsDraft = isDraftLayout(sel.layoutId)
   const draft = wantsDraft

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, type LibraryDraft,
   type LibrarySelection,
@@ -25,8 +25,10 @@ describe('corpus completeness — removal must fail these', () => {
   it('exactly the 15 canonical frame keys', () => {
     expect(SQUARE_FRAMES.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
   })
-  it('exactly 16 ruled square layouts across the frames', () => {
-    expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
+  it('exactly 16 square layouts as the panel and the pipeline see them', () => {
+    // 12 literal semantic populations in the corpus + the 4 computed 96mm modes.
+    expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(12)
+    expect(CLASS_FRAMES.square.reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
   })
   it('the complete ruled shape-ID set', () => {
     expect(LIBRARY_SHAPES.map((x) => x.id).sort()).toEqual([...SHAPE_IDS].sort())
@@ -96,7 +98,7 @@ describe('data integrity + transforms', () => {
     expect(libraryIntegrity()).toEqual([])
   })
   it('transform closure keeps nodes in bounds', () => {
-    for (const f of SQUARE_FRAMES) for (const l of f.layouts)
+    for (const f of Object.values(CLASS_FRAMES).flat()) for (const l of f.layouts)
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
         const t = transformLayout(f, l, { transpose, flipX, flipY })
         expect(t.nodes.length).toBe(l.nodes.length)
@@ -152,7 +154,7 @@ describe('interior rule and the belt mode', () => {
   })
   it('belt is a spacing mode: every frame above 1x1 carries perimeter and perimeter-96', () => {
     for (const f of SQUARE_FRAMES.filter((x) => x.cols > 1)) {
-      const names = f.layouts.map((l) => l.name)
+      const names = CLASS_FRAMES.square.find((x) => x.cols === f.cols && x.rows === f.rows)!.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       expect(names).toContain('perimeter-96')
     }
@@ -230,10 +232,11 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     expect(() => selectedRecords(r.safeSel)).not.toThrow()
   })
 
-  it('an unknown frame falls back to the class first frame, and safeSel says so', () => {
-    const r = resolveSelection(sel({ shapeId: 'square', frameKey: '9x9', layoutId: 'ring' }))
-    expect(r.safeSel.frameKey).toBe(frameKeyOf(CLASS_FRAMES.square[0]))
-    expect(() => selectedRecords(r.safeSel)).not.toThrow()
+  it('unknown shape or frame is a caller bug — both resolvers refuse it (QA F4)', () => {
+    // Guessing here produced a 'safeSel' that still carried the bad shapeId and threw when the
+    // pipeline resolved it. Only the LAYOUT is carried across frames, by design.
+    expect(() => resolveSelection(sel({ shapeId: 'nope' as never }))).toThrow('unknown shapeId')
+    expect(() => resolveSelection(sel({ frameKey: '9x9' }))).toThrow('unknown frameKey')
   })
 
   it('the strict resolver still refuses the same input — the two are not merged', () => {
@@ -263,5 +266,57 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     const r = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [])
     expect(r.draft).toBeNull()
     expect(r.layout.name).toBe(r.frame.layouts[0].name)
+  })
+})
+
+describe('the 96mm spacing mode is computed policy, one rule for every class', () => {
+  const key = (n: readonly [number, number]) => n[0] + ',' + n[1]
+  const extremes = (f: { cols: number; rows: number }, family: string) => family === 'diamond'
+    ? (() => { const k = (f.cols - 1) / 2; return [[k, 0], [0, k], [f.cols - 1, k], [k, f.rows - 1]] as Array<[number, number]> })()
+    : [[0, 0], [f.cols - 1, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]] as Array<[number, number]>
+
+  it('the corpus stores no 96mm population — it is derived, never hand-written', () => {
+    for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES])
+      for (const f of frames) expect(f.layouts.map((l) => l.name)).not.toContain('perimeter-96')
+  })
+
+  it('a frame with a perimeter always offers the 96mm mode, and it is a subset of that perimeter', () => {
+    for (const fam of LIBRARY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
+      const per = f.layouts.find((l) => l.name === 'perimeter')
+      const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
+      if (!per) { expect(s96).toBeUndefined(); continue }
+      expect(s96, `${fam} ${frameKeyOf(f)}`).toBeDefined()
+      const ring = new Set(per.nodes.map(key))
+      for (const n of s96!.nodes) expect(ring.has(key(n)), `${fam} ${frameKeyOf(f)} ${key(n)}`).toBe(true)
+      expect(s96!.nodes.length).toBeLessThanOrEqual(per.nodes.length)
+    }
+  })
+
+  it('every 96mm population keeps all four extremes — an extreme is never left bare', () => {
+    for (const fam of LIBRARY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
+      const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
+      if (!s96) continue
+      const got = new Set(s96.nodes.map(key))
+      for (const e of extremes(f, fam)) expect(got.has(key(e)), `${fam} ${frameKeyOf(f)} missing ${key(e)}`).toBe(true)
+    }
+  })
+
+  it("square 4x4 in 96mm is the four corners — Dan's ruling, 08-25 19:40", () => {
+    // A 144mm side carries no even 96mm sample, so it keeps its corners only. This froze the
+    // ruling that a later 'the computed value is already right' edit silently reverted.
+    const f = CLASS_FRAMES.square.find((x) => x.cols === 4 && x.rows === 4)!
+    const s96 = f.layouts.find((l) => l.name === 'perimeter-96')!
+    expect(s96.nodes.map(key).sort()).toEqual(['0,0', '0,3', '3,0', '3,3'])
+    expect(CLASS_FRAMES.square.find((x) => x.cols === 3)!.layouts.find((l) => l.name === 'perimeter-96')!.nodes.length).toBe(4)
+    expect(CLASS_FRAMES.square.find((x) => x.cols === 5)!.layouts.find((l) => l.name === 'perimeter-96')!.nodes.length).toBe(8)
+  })
+
+  it('the diamond vocabulary is complete on every ring, corners are exactly the vertices', () => {
+    for (const f of CLASS_FRAMES.diamond.slice(1)) {
+      const names = f.layouts.map((l) => l.name)
+      for (const n of ['full', 'perimeter', 'perimeter-96', 'corners']) expect(names, frameKeyOf(f)).toContain(n)
+      const corners = f.layouts.find((l) => l.name === 'corners')!
+      expect(corners.nodes.map(key).sort()).toEqual(extremes(f, 'diamond').map(key).sort())
+    }
   })
 })

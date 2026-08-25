@@ -8,10 +8,9 @@ import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
-  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel,
-  type LibrarySelection, type LibraryShapeId,
+  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel, CLASS_RULES,
+  type LibrarySelection, type LibraryShapeId, type LibraryFamily,
 } from './library'
-import { classFloorMM, type AxisClass } from './grid-magnet-class'
 
 export type { LibrarySelection } from './library'
 
@@ -53,22 +52,16 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
  *  the declared library family must not pre-empt Step-1's open recognition-source ruling). */
 export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: number = RELEASED_PADDING_MM): {
   shapeId: LibraryShapeId
-  declaredFamily: string
+  declaredFamily: LibraryFamily
   shapeCompatible: boolean
   outlineMM: Pt[]
 } {
   const { shape } = selectedRecords(sel)
   const a = libraryArrangement(sel, pitchMM)
-  // THE FRAME'S PHYSICAL SPAN IS THE CLASS FLOOR (QA F1): 24 + (lines-1)*pitch per axis.
-  // EXCEPT the diamond (Dan, 08-25): its outline must WRAP the magnet group, so the half
-  // diagonal is the ring radius plus the padding measured on the diagonal.
-  let w0 = classFloorMM(a.frameCols as AxisClass, pitchMM)
-  let h0 = classFloorMM(a.frameRows as AxisClass, pitchMM)
-  if (shape.family === 'diamond') {
-    const k = (a.frameCols - 1) / 2
-    const span = 2 * (k * pitchMM + padMM * Math.SQRT2)
-    w0 = span; h0 = span
-  }
+  // The frame's physical span is CLASS POLICY — the class rules own it (the square/rectangle
+  // class floor, the diamond's wrap-the-ring rule). The bridge asks; it does not re-derive.
+  const box0 = CLASS_RULES[shape.family].boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
+  const w0 = box0.w, h0 = box0.h
   const shapeCompatible = shape.aspect === 'frame' || a.frameCols === a.frameRows
   const w = shapeCompatible ? w0 : Math.max(w0, h0)
   const h = shapeCompatible ? h0 : Math.max(w0, h0)
@@ -104,11 +97,16 @@ export function draftStageModel(
   return { contour, grid, title }
 }
 
-/** mm point -> lattice node index in the selected frame (y-down canon), or null off-frame. */
-export function nodeAtMM(pMM: readonly [number, number], pitchMM: number, frameRows: number): [number, number] | null {
+/** mm point -> lattice node index in the selected frame (y-down canon), or null off-frame.
+ *  The canvas draws the infinite lattice, so a click can land anywhere: without this bound an
+ *  authored layout could hold nodes outside its own frame and be saved (QA F1). */
+export function nodeAtMM(
+  pMM: readonly [number, number], pitchMM: number, frameCols: number, frameRows: number,
+): [number, number] | null {
   const ix = Math.round(pMM[0] / pitchMM)
   const iyUp = Math.round(pMM[1] / pitchMM)
   const iy = frameRows - 1 - iyUp
+  if (ix < 0 || ix >= frameCols || iy < 0 || iy >= frameRows) return null
   return [ix, iy]
 }
 
@@ -128,7 +126,7 @@ export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM:
     centresMM: [],
     centreMainMM: [(a.frameCols - 1) * pitchMM / 2, (a.frameRows - 1) * pitchMM / 2],
   }
-  const w = classFloorMM(a.frameCols as AxisClass, pitchMM), h = classFloorMM(a.frameRows as AxisClass, pitchMM)
-  const title = `${pv.shapeId} · ${a.layoutId} · ${frameLabel(pv.declaredFamily as never, a.frameCols, a.frameRows)} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${pv.declaredFamily} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${pv.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
+  const { w, h } = CLASS_RULES[pv.declaredFamily].boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
+  const title = `${pv.shapeId} · ${a.layoutId} · ${frameLabel(pv.declaredFamily, a.frameCols, a.frameRows)} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${pv.declaredFamily} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${pv.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
   return { contour, grid, title }
 }

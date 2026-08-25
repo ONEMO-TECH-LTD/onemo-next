@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
+import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -382,8 +382,9 @@ export default function GridLab() {
                     onReset: () => setLibView({ panMM: [0, 0], zoom: 0.45 }),
                     onPickNode: edit ? (pMM: Pt) => {
                       const { frame } = resolveSelection(librarySel, drafts)
+                      const cols = librarySel.view.transpose ? frame.rows : frame.cols
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
-                      const n = nodeAtMM(pMM, pitch, rows)
+                      const n = nodeAtMM(pMM, pitch, cols, rows)
                       if (!n) return
                       setEdit((d) => {
                         if (!d) return d
@@ -425,8 +426,12 @@ export default function GridLab() {
             }}
             saveEdit={() => {
               if (!edit) return
-              const { shape, safeSel } = resolveSelection(librarySel, drafts)
+              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts)
               const rec: LibraryDraft = { id: draftId(shape.family, safeSel.frameKey, edit.name), className: shape.family, frameKey: safeSel.frameKey, name: edit.name, nodes: edit.nodes }
+              // The corpus checks its own soundness; an authored layout gets the same gate
+              // before it is persisted (QA F1) — never write a draft that breaks its frame.
+              const bad = draftIntegrity(rec, frame)
+              if (bad.length) { setMagStatus('error:' + bad[0]); return }
               writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: draftLayoutId(edit.name) })
