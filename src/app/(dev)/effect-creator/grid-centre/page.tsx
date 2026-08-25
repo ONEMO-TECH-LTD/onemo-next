@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { LAYOUT_LIBRARY, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -90,8 +90,8 @@ export default function GridLab() {
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
   const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'square', frameKey: '3x3', layoutId: 'ring', view: { transpose: false, flipX: false, flipY: false } })
-  /** Sandbox drafts — browser-local authoring; the canonical corpus is never mutated. */
-  const [draft, setDraft] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
+  /** Authoring — browser-local; the canonical corpus is never mutated. */
+  const [edit, setEdit] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
   const [drafts, setDrafts] = useState<LibraryDraft[]>([])
   useEffect(() => {
     try { const raw = localStorage.getItem(DRAFT_STORE_KEY); if (raw) setDrafts(JSON.parse(raw)) } catch { }
@@ -102,15 +102,17 @@ export default function GridLab() {
   }
   const libraryModel = useMemo(() => {
     if (tab !== 'library') return null
-    if (draft) {
-      const { shape, frame } = selectedRecords(librarySel)
-      const cols = librarySel.view.transpose ? frame.rows : frame.cols
-      const rows = librarySel.view.transpose ? frame.cols : frame.rows
-      return draftStageModel(librarySel, draft.nodes, pitch, pad, cols, rows,
-        `${shape.id} · DRAFT ${draft.name || '(unnamed)'} · ${cols}x${rows} · ${draft.nodes.length}⌾ · click spots to toggle`)
+    const isDraft = librarySel.layoutId.startsWith('draft:')
+    const base = isDraft ? { ...librarySel, layoutId: '' } : librarySel
+    const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]
+    const resolved = { ...base, layoutId: isDraft ? frame.layouts[0].name : librarySel.layoutId }
+    if (edit) return draftStageModel(resolved, edit.nodes, pitch, pad, frame.cols, frame.rows, '')
+    if (isDraft) {
+      const d = drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId)
+      if (d) return draftStageModel(resolved, d.nodes, pitch, pad, frame.cols, frame.rows, '')
     }
-    return libraryStageModel(librarySel, pitch, pad)
-  }, [tab, librarySel, pitch, pad, draft])
+    return libraryStageModel(resolved, pitch, pad)
+  }, [tab, librarySel, pitch, pad, edit, drafts])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -348,12 +350,12 @@ export default function GridLab() {
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     segments: [], segFill: false, onPan: () => {}, onZoom: () => {}, onReset: () => {},
-                    onPickNode: draft ? (pMM: Pt) => {
+                    onPickNode: edit ? (pMM: Pt) => {
                       const { frame } = selectedRecords(librarySel)
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
                       const n = nodeAtMM(pMM, pitch, rows)
                       if (!n) return
-                      setDraft((d) => {
+                      setEdit((d) => {
                         if (!d) return d
                         const k = n[0] + ',' + n[1]
                         const has = d.nodes.some(([x, y]) => x + ',' + y === k)
@@ -380,20 +382,30 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} showBox={showBox} setShowBox={setShowBox}
-            draft={draft} setDraft={setDraft} drafts={drafts}
-            newDraft={() => setDraft({ name: '', nodes: [] })}
-            openDraft={(d) => { setLibrarySel({ ...librarySel, frameKey: d.frameKey }); setDraft({ name: d.name, nodes: d.nodes }) }}
-            saveDraft={() => {
-              if (!draft) return
-              const { shape, frame } = selectedRecords(librarySel)
-              const rec: LibraryDraft = { id: draftId(shape.family, frameKeyOf(frame), draft.name), className: shape.family, frameKey: frameKeyOf(frame), name: draft.name, nodes: draft.nodes }
-              writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
+          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
+            showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
+            startAdd={() => setEdit({ name: '', nodes: [] })}
+            startEdit={() => {
+              const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]
+              const isDraft = librarySel.layoutId.startsWith('draft:')
+              const d = isDraft ? drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId) : undefined
+              const l = isDraft ? undefined : frame.layouts.find((x) => x.name === librarySel.layoutId)
+              setEdit({ name: d ? d.name : l ? l.name : '', nodes: (d ? d.nodes : l ? l.nodes.map(([x, y]) => [x, y] as [number, number]) : []) })
             }}
-            deleteDraft={(id) => { writeDrafts(drafts.filter((x) => x.id !== id)); setDraft(null) }}
-            exportDrafts={() => {
-              const blob = new Blob([JSON.stringify(drafts, null, 2)], { type: 'application/json' })
-              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'library-drafts.json'; a.click()
+            saveEdit={() => {
+              if (!edit) return
+              const { shape, frame } = selectedRecords({ ...librarySel, layoutId: (LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]).layouts[0].name })
+              const rec: LibraryDraft = { id: draftId(shape.family, frameKeyOf(frame), edit.name), className: shape.family, frameKey: frameKeyOf(frame), name: edit.name, nodes: edit.nodes }
+              writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
+              setEdit(null)
+              setLibrarySel({ ...librarySel, layoutId: 'draft:' + edit.name })
+            }}
+            deleteEdit={() => {
+              const nm = edit ? edit.name : librarySel.layoutId.replace(/^draft:/, '')
+              const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]
+              writeDrafts(drafts.filter((x) => !(x.frameKey === librarySel.frameKey && x.name === nm)))
+              setEdit(null)
+              setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
             }} /> : <>
           <Fold title="Shape source">
             <div className="gl-seg gl-seg3">
@@ -1047,4 +1059,12 @@ const CSS = `
 .gl-libdim{margin-left:auto;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
 .gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.gl-libadd b{color:var(--ink-3);font-size:16px!important}
+.gl-libedit{display:flex;align-items:center;gap:6px;margin-top:8px}
+.gl-libedit input{flex:1;min-width:0;font:600 12px var(--mono);color:var(--ink);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.gl-libedit button{font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:6px 9px;cursor:pointer}
+.gl-libedit button:disabled{opacity:.4;cursor:default}
+.gl-libedit button:hover:not(:disabled){color:var(--ink)}
 `
