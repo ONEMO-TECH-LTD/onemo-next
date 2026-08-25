@@ -84,7 +84,7 @@ export const LAYOUT_LIBRARY: LibraryFrame[] = [
   ] },
   { cols: 4, rows: 4, layouts: [
     { name: 'perimeter', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [3, 1], [0, 2], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]] },
-    { name: 'perimeter-96', nodes: [[0, 0], [2, 0], [3, 0], [0, 2], [3, 2], [0, 3], [2, 3], [3, 3]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [3, 0], [0, 3], [3, 3]] },
     { name: 'corners', nodes: [[0, 0], [3, 0], [0, 3], [3, 3]] },
   ] },
   { cols: 5, rows: 5, layouts: [
