@@ -66,11 +66,11 @@ export default function LibraryPanel({ sel, setSel, Fold, pitch, draft, setDraft
           ))}
         </div>
       </Fold>
-      <Fold title={`Layouts · ${frame.layouts.length} in ${frameKeyOf(frame)}`}>
+      <Fold title="Layouts">
         <div className="gl-steps">
           {layouts.map((l) => (
             <button key={l.name} aria-pressed={sel.layoutId === l.name} onClick={() => setSel({ ...sel, layoutId: l.name })}>
-              <b>{l.name}</b><span>{l.nodes.length}⌾{l.note ? ' · full grid' : ''}</span>
+              <b>{l.name}</b>
             </button>
           ))}
         </div>
