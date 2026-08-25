@@ -294,3 +294,13 @@ export function draftIntegrity(d: LibraryDraft, frame: LibraryFrame): string[] {
 export function pickLayout(frame: LibraryFrame, preferred: string): string {
   return frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
 }
+
+/** A diamond's frame is displayed by MAGNETS PER SIDE (Dan, 08-25): the 4-ring shows 2x2, the
+ *  8-ring 3x3, the 12-ring 4x4 — the bounding lattice patch (3x3, 5x5, 7x7) stays the internal
+ *  key because the node maths lives on it. */
+export function frameLabel(family: LibraryFamily, cols: number, rows: number): string {
+  if (family !== 'diamond') return cols + '×' + rows
+  const k = (cols - 1) / 2
+  const side = k + 1
+  return side + '×' + side
+}

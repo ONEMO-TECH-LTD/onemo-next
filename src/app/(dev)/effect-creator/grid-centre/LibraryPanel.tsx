@@ -5,7 +5,7 @@
 // and edit state only; no engine imports — the bridge is where library records meet engine types.
 
 import type { ReactElement, ReactNode } from 'react'
-import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, pickLayout, rectangleSubOf, RECTANGLE_SUBS, SQUARE_SUBS, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, frameLabel, pickLayout, rectangleSubOf, RECTANGLE_SUBS, SQUARE_SUBS, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
@@ -83,7 +83,7 @@ export default function LibraryPanel({
                 const keep = f.layouts.some((l) => l.name === sel.layoutId)
                 setEdit(null)
                 setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : pickLayout(f, 'perimeter') })
-              }}><b>{f.cols}×{f.rows}</b></button>
+              }}><b>{frameLabel(shape.family, f.cols, f.rows)}</b></button>
           ))}
         </div>
       </Fold>

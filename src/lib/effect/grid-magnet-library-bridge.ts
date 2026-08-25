@@ -8,7 +8,7 @@ import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
-  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf,
+  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel,
   type LibrarySelection, type LibraryShapeId,
 } from './grid-magnet-library'
 import { classFloorMM, type AxisClass } from './grid-magnet-class'
@@ -129,6 +129,6 @@ export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM:
     centreMainMM: [(a.frameCols - 1) * pitchMM / 2, (a.frameRows - 1) * pitchMM / 2],
   }
   const w = classFloorMM(a.frameCols as AxisClass, pitchMM), h = classFloorMM(a.frameRows as AxisClass, pitchMM)
-  const title = `${pv.shapeId} · ${a.layoutId} · ${a.frameKey} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${pv.declaredFamily} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${pv.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
+  const title = `${pv.shapeId} · ${a.layoutId} · ${frameLabel(pv.declaredFamily as never, a.frameCols, a.frameRows)} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${pv.declaredFamily} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${pv.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
   return { contour, grid, title }
 }
