@@ -651,7 +651,7 @@ export function wrapBandLadder(
   anchorAtMM?: (mm: number) => Pt,
   /** The class-named layout for this band (Dan's pipeline step 4) — always solved and offered
    *  first; the parity reveal stays as the discovery channel beside it. */
-  classNodes?: ReadonlyArray<Pt>,
+  classNodes?: ReadonlyArray<ReadonlyArray<Pt>>,
   /** The class frame (cols x rows). Dan's ruling 08-25: an offer that does not SPAN the frame's
    *  dominant axis leaves the segment exposed and is DROPPED — a square block on a tall segment
    *  is not an option; the vertical pair or the full assembly is. */
@@ -672,12 +672,14 @@ export function wrapBandLadder(
     for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
     return pts.map((q) => Math.round((q[0] - mx) / pitch) + ',' + Math.round((q[1] - my) / pitch)).sort().join(';')
   }
-  if (classNodes && classNodes.length) {
-    const at = wrapGroup(sized, wcfg, classNodes, minMM, hiMM, anchorMemo)
-    if (at && at.sizeMM >= loMM - 0.005 && at.sizeMM <= hiMM + 0.005) {
-      seen.add(idOfPts(at.points))
-      rungs.push({ at, revealMM: at.sizeMM, isClass: true })
-    }
+  for (const assembly of classNodes ?? []) {
+    if (!assembly.length) continue
+    const at = wrapGroup(sized, wcfg, assembly, minMM, hiMM, anchorMemo)
+    if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
+    const id = idOfPts(at.points)
+    if (seen.has(id)) continue
+    seen.add(id)
+    rungs.push({ at, revealMM: at.sizeMM, isClass: true })
   }
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {

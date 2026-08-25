@@ -5,7 +5,7 @@ import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type
 import { wrapBandLadder, wrapGrid, wrapGroup, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
-import { classFrameNodes } from '@/lib/effect/grid-magnet-class'
+import { classFrameNodes, familyAssemblies, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
@@ -42,10 +42,10 @@ const stopsCache = new Map<string, Array<{ press: number; reveal: number }>>()
 // and scaled linearly per size. Positions are shape features; only qualification is size-
 // dependent (evaluated inside anchorFromBake). Core mode (1) is size-dependent by definition
 // and stays live — the bake returns null and the engine measures as before.
-const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number }>()
+const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number; family: ShapeFamily }>()
 function anchorFnFor(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, cfgSig: string, shapeSig2: string,
-): (((mm: number) => import('@/lib/effect/types').Pt) & { segW: number; segH: number }) | undefined {
+): (((mm: number) => import('@/lib/effect/types').Pt) & { segW: number; segH: number; family: ShapeFamily }) | undefined {
   const mode = (cfg.centreMode ?? 2) as CentreMode
   if (mode === 1) return undefined                    // Core: live by definition
   const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM, cfg.massDepthMM])
@@ -60,7 +60,7 @@ function anchorFnFor(
     // The segment box (the legal area's bounds) — its PROPORTIONS name the class per band.
     let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity
     for (const sg of segs) { sx0 = Math.min(sx0, sg.bbox.minX); sy0 = Math.min(sy0, sg.bbox.minY); sx1 = Math.max(sx1, sg.bbox.maxX); sy1 = Math.max(sy1, sg.bbox.maxY) }
-    hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0) }
+    hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
     bakeCache.set(key, hit)
     if (bakeCache.size > 8) bakeCache.delete(bakeCache.keys().next().value!)
   }
@@ -72,7 +72,7 @@ function anchorFnFor(
   const depth = Math.max(spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)), cfg.massDepthMM ?? MASS_DEPTH_MM)
   const aRef = anchorFromBake(bake, mode, gov, depth, bake.refMM) ?? bake.boxC
   const fn = (mm: number): [number, number] => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
-  return Object.assign(fn, { segW: hit.segW, segH: hit.segH })
+  return Object.assign(fn, { segW: hit.segW, segH: hit.segH, family: hit.family })
 }
 
 // Free+snap: one exact solve per distinct revealed layout — the plateaus of the slider.
@@ -166,7 +166,8 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // Dan's pipeline step 4: the class names this band's layout from the segment box's
         // proportions — generated outright, wrapped, offered first. Reveal discovers the rest.
         const cf = aFn ? classFrameNodes(aFn.segW, aFn.segH, band.id, cfg.pitchMM) : undefined
-        rungs = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, aFn, cf?.nodes, cf)
+        const assemblies = cf && aFn ? familyAssemblies(aFn.family, cf.cols, cf.rows, cfg.pitchMM).map((a) => a.nodes) : undefined
+        rungs = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, aFn, assemblies, cf)
         rungCache.set(key, rungs)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -176,7 +177,16 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // half a pitch of it, the best-centred is the default landing. All offers stay visible.
         // Landing: the class-named layout when the band has one (Dan's pipeline); rule-4
         // (same count, half a pitch, best centred) arbitrates among the rest otherwise.
-        const classIdx = rungs.findIndex((r) => r.isClass)
+        // Landing among class assemblies: the fewest magnets that still assemble the frame
+        // (tie: tightest). Duck lands corners, bat lands the tee — the material decides.
+        let classIdx = -1
+        for (let i = 0; i < rungs.length; i++) {
+          const r = rungs[i]
+          if (!r.isClass) continue
+          if (classIdx < 0) { classIdx = i; continue }
+          const b = rungs[classIdx]
+          if (r.at.count < b.at.count || (r.at.count === b.at.count && r.at.sizeMM < b.at.sizeMM)) classIdx = i
+        }
         const half = (cfg.pitchMM ?? DEFAULT_PITCH_MM) / 2
         const c0 = rungs[0]
         let ruleIdx = 0
@@ -228,7 +238,8 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         if (!hitS) {
           const bandOfWin = BANDS.find((x) => x.minMM === snapWindow[0] && x.maxMM === snapWindow[1])
           const cf2 = anchorFn && bandOfWin ? classFrameNodes(anchorFn.segW, anchorFn.segH, bandOfWin.id, cfg.pitchMM) : undefined
-          const raw = wrapBandLadder(sized, cfg, snapWindow[0], snapWindow[1], MIN_EFFECT_MM, anchorFn, cf2?.nodes, cf2)
+          const asm2 = cf2 && anchorFn ? familyAssemblies(anchorFn.family, cf2.cols, cf2.rows, cfg.pitchMM).map((a) => a.nodes) : undefined
+          const raw = wrapBandLadder(sized, cfg, snapWindow[0], snapWindow[1], MIN_EFFECT_MM, anchorFn, asm2, cf2)
             .map((r) => ({ press: r.at.sizeMM, reveal: r.revealMM }))
           hitS = raw.filter((v, i) => i === 0 || v.press - raw[i - 1].press > 0.1)
           stopsCache.set(wk, hitS)
