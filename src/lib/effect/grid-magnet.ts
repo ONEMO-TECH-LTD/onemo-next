@@ -338,6 +338,74 @@ function bandWalk(
 }
 
 /**
+ * THE WRAP under CENTRE RULES — the band's rungs solved exactly, never walked.
+ *
+ * Centre rules pins the lattice to the governed centre by parity, so at any size the seated
+ * set is DERIVED — the material reveals it, nothing searches. As the size shrinks a layout
+ * loses its binding seat, and the size at which it is about to IS that layout's wrap: the seat
+ * predicate passes tangency by equality, so at the boundary the binding disc sits exactly on
+ * the padding line. Each distinct layout the band's range produces is offered at its exact
+ * contact size, found by bisection — no snap-step walk, no rigid gate, no "no fit".
+ *
+ * A layout whose contact size falls below the band floor belongs to the band below and is not
+ * offered here (band-membership rule, 08-24).
+ */
+export function centreWrapLadder(
+  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number,
+): { ladder: BandSnapPoint[]; grids: GridResult[] } {
+  const [lo, hi] = snapRange(cfg, fromMM)
+  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
+  const dispCfg: GridConfig = { ...cfg, positioning: 1, forcePhaseMM: undefined }
+  const solves = new Map<number, GridResult>()
+  const solve = (mm: number): GridResult => {
+    const k = Math.round(mm * 100)
+    let g = solves.get(k)
+    if (!g) { g = computeGrid(sized(mm), scanCfg); solves.set(k, g) }
+    return g
+  }
+  // Layout identity: the seated pattern in lattice units, origin-free — the same arrangement at
+  // two sizes is the same layout; a seat appearing or vanishing is a new one.
+  const idOf = (g: GridResult): string => {
+    if (!g.anchors.length) return '0'
+    let mx = Infinity, my = Infinity
+    for (const a of g.anchors) { if (a.p[0] < mx) mx = a.p[0]; if (a.p[1] < my) my = a.p[1] }
+    return g.anchors
+      .map((a) => Math.round((a.p[0] - mx) / pitch) + ',' + Math.round((a.p[1] - my) / pitch))
+      .sort()
+      .join(';')
+  }
+  // Coarse scan finds which layouts the range produces; bisection then pins each one's exact
+  // contact size — the smallest size still producing it.
+  const SCAN_MM = 2
+  const seen: Array<{ id: string; atMM: number; prevMM: number }> = []
+  let prevId = '', prevMM = lo - 1
+  for (let mm = lo; mm <= hi + 1e-9; mm += SCAN_MM) {
+    const id = idOf(solve(mm))
+    if (id !== prevId && id !== '0' && !seen.some((s) => s.id === id)) seen.push({ id, atMM: mm, prevMM })
+    prevId = id; prevMM = mm
+  }
+  const ladder: BandSnapPoint[] = []
+  const grids: GridResult[] = []
+  for (const s of seen) {
+    let a = Math.max(MIN_EFFECT_MM, s.prevMM), b = s.atMM
+    if (idOf(solve(a)) === s.id) { b = a } else {
+      while (b - a > 0.01) {
+        const m = (a + b) / 2
+        if (idOf(solve(m)) === s.id) b = m; else a = m
+      }
+    }
+    const contact = Math.round(b * 100) / 100
+    if (contact < lo - 0.005) continue                 // wraps below the floor — the band below owns it
+    const grid = computeGrid(sized(contact), dispCfg)
+    if (!grid.anchors.length) continue
+    ladder.push({ sizeMM: contact, count: grid.anchors.length })
+    grids.push(grid)
+  }
+  return { ladder, grids }
+}
+
+/**
  * Band snap under the contact law. `ladder` = one rung per magnet count at its contact size;
  * the landing pick is the smallest size at the band's maximum count. When no count reaches
  * contact inside the band, the best-seated size shows as an explicit fallback, never a fit.
