@@ -1053,10 +1053,10 @@ const CSS = `
 .gl-lib button:hover{border-color:var(--ink-3)}
 .gl-lib button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-lib button[aria-pressed=true] b,.gl-lib button[aria-pressed=true] span{color:#fff}
-.gl-libsize{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:12px}
-.gl-libsize b{font:700 26px var(--mono);letter-spacing:.01em;color:var(--ink);font-variant-numeric:tabular-nums}
-.gl-libsize span{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
-.gl-libdim{margin-left:auto;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+.gl-libsize{display:flex;align-items:center;gap:6px;padding:12px 14px;min-height:52px}
+.gl-libsize b{font:700 26px var(--mono);letter-spacing:.01em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
+.gl-libsize span{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);line-height:1;align-self:center}
+.gl-libdim{margin-left:auto;align-self:center;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
 .gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-libadd b{color:var(--ink-3);font-size:16px!important}
