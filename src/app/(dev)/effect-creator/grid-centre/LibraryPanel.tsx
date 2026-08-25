@@ -5,7 +5,7 @@
 // and edit state only; no engine imports — the bridge is where library records meet engine types.
 
 import type { ReactElement, ReactNode } from 'react'
-import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, rectangleSubOf, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
@@ -46,9 +46,23 @@ export default function LibraryPanel({
           ))}
         </div>
       </Fold>
+      {shape.family === 'rectangle' && (
+        <Fold title="Type">
+          <div className="gl-seg">
+            {(['slim', 'standard'] as const).map((sub) => (
+              <button key={sub} aria-pressed={rectangleSubOf(frame.cols, frame.rows) === sub}
+                onClick={() => {
+                  const f0 = frames.find((f) => rectangleSubOf(f.cols, f.rows) === sub)!
+                  setEdit(null)
+                  setSel({ ...sel, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name })
+                }}>{sub}</button>
+            ))}
+          </div>
+        </Fold>
+      )}
       <Fold title="Frame">
         <div className="gl-lib">
-          {frames.map((f) => (
+          {frames.filter((f) => shape.family !== 'rectangle' || rectangleSubOf(f.cols, f.rows) === rectangleSubOf(frame.cols, frame.rows)).map((f) => (
             <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === key}
               onClick={() => {
                 const keep = f.layouts.some((l) => l.name === sel.layoutId)

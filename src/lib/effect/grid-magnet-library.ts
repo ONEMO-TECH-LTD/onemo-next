@@ -95,6 +95,14 @@ export const SQUARE_FRAMES: LibraryFrame[] = [
     { name: 'corners', nodes: [[0, 0], [4, 0], [0, 4], [4, 4]] },
   ] },
 ]
+/** RECTANGLE sub-types, ruled 08-24: SLIM = the minor axis carries one line (chains only);
+ *  STANDARD = the minor axis carries two or more (real 2D frames). Portrait/landscape is not a
+ *  type — it is the axis pair, i.e. the transpose. */
+export type RectangleSub = 'slim' | 'standard'
+export function rectangleSubOf(cols: number, rows: number): RectangleSub {
+  return Math.min(cols, rows) <= 1 ? 'slim' : 'standard'
+}
+
 /** RECTANGLE class — tall canonical frames; wide is the transpose. */
 export const RECTANGLE_FRAMES: LibraryFrame[] = [
   { cols: 1, rows: 2, layouts: [
