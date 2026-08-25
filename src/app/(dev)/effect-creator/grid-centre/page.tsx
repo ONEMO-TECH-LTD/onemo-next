@@ -92,6 +92,8 @@ export default function GridLab() {
   const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'square', frameKey: '3x3', layoutId: 'ring', view: { transpose: false, flipX: false, flipY: false } })
   /** Authoring — browser-local; the canonical corpus is never mutated. */
   const [edit, setEdit] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
+  /** Library canvas view — pan in mm, zoom factor. Library tab only. */
+  const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 1 })
   const [drafts, setDrafts] = useState<LibraryDraft[]>([])
   useEffect(() => {
     try { const raw = localStorage.getItem(DRAFT_STORE_KEY); if (raw) setDrafts(JSON.parse(raw)) } catch { }
@@ -331,7 +333,7 @@ export default function GridLab() {
         </div>
       </header>
 
-      <div className="gl-body">
+      <div className={tab === 'library' ? 'gl-body gl-libtab' : 'gl-body'}>
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
             <span className="gl-eye gl-perf" style={tab === 'library' ? { display: 'none' } : undefined}>
@@ -349,7 +351,11 @@ export default function GridLab() {
               if (!src2) return null
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
-                    segments: [], segFill: false, onPan: () => {}, onZoom: () => {}, onReset: () => {},
+                    segments: [], segFill: false,
+                    viewport: libView,
+                    onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
+                    onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: Math.min(6, Math.max(0.15, v.zoom * f)) })),
+                    onReset: () => setLibView({ panMM: [0, 0], zoom: 1 }),
                     onPickNode: edit ? (pMM: Pt) => {
                       const { frame } = selectedRecords(librarySel)
                       const rows = librarySel.view.transpose ? frame.cols : frame.rows
@@ -615,11 +621,14 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
+  /** LIBRARY TAB ONLY — a free canvas: pan and zoom move the view itself and the lattice field
+   *  regenerates over whatever is visible. Absent everywhere else, so the bench is untouched. */
+  viewport?: { panMM: Pt; zoom: number }
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -660,7 +669,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const k = pxPerMM(svg)
-      if (e.ctrlKey) { onZoom(Math.exp(-e.deltaY * 0.01)); return }
+      if (e.ctrlKey || viewport) { onZoom(Math.exp(-e.deltaY * (viewport ? 0.0025 : 0.01))); return }
       setPend((p) => ({ x: p.x - e.deltaX / k, y: p.y + e.deltaY / k }))
       if (wheelTimer.current) clearTimeout(wheelTimer.current)
       wheelTimer.current = setTimeout(commit, 250)
@@ -682,12 +691,17 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
 
   // Widen the viewBox to the frame at the same scale — the shape keeps its 86% size.
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
-  const spanMM = VP / S
-  const vx = cx - spanMM / 2, vy = cy - spanMM / 2
+  const zoom = viewport ? viewport.zoom : 1
+  const spanMM = VP / S / zoom
+  const vx = cx - spanMM / 2 + (viewport ? viewport.panMM[0] : 0)
+  const vy = cy - spanMM / 2 - (viewport ? viewport.panMM[1] : 0)
 
   // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
+  // On the free viewport the SVG slices to the element's aspect, so the field must be generated
+  // well past the square viewBox — the lattice is infinite, never a window.
+  const fp = viewport ? spanMM : 0
   const spots: readonly FieldSpot[] = lattice
-    ? fieldSpots(grid, { minX: vx, minY: -(vy + spanMM), maxX: vx + spanMM, maxY: -vy })
+    ? fieldSpots(grid, { minX: vx - fp, minY: -(vy + spanMM + fp), maxX: vx + spanMM + fp, maxY: -(vy - fp) })
     : seatedSpots(grid)
   // Rule anchor: any spot is on the lattice, so lines cross at the centres.
   const A0 = spots[0]
@@ -695,6 +709,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
 
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
+      preserveAspectRatio={viewport ? 'xMidYMid slice' : undefined}
       style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
       onPointerDown={(e) => {
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -760,12 +775,12 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
           <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.05} fill="var(--ink)" fillOpacity={0.35} />
         </pattern>
       </defs>
-      <rect x={vx} y={vy} width={spanMM} height={spanMM} fill="var(--panel)" />
+      <rect x={vx - fp} y={vy - fp} width={spanMM + 2 * fp} height={spanMM + 2 * fp} fill="var(--panel)" />
       {/* Grid-anchored layers shift as one rigid body while a manual gesture is live. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
-        <rect x={vx - Math.abs(pend.x)} y={vy - Math.abs(pend.y)} width={spanMM + 2 * Math.abs(pend.x)} height={spanMM + 2 * Math.abs(pend.y)} fill="url(#gl-fine)" />
-        <rect x={vx - Math.abs(pend.x)} y={vy - Math.abs(pend.y)} width={spanMM + 2 * Math.abs(pend.x)} height={spanMM + 2 * Math.abs(pend.y)} fill="url(#gl-pitch)" />
-        <rect x={vx - Math.abs(pend.x)} y={vy - Math.abs(pend.y)} width={spanMM + 2 * Math.abs(pend.x)} height={spanMM + 2 * Math.abs(pend.y)} fill="url(#gl-dots)" />
+        <rect x={vx - fp - Math.abs(pend.x)} y={vy - fp - Math.abs(pend.y)} width={spanMM + 2 * fp + 2 * Math.abs(pend.x)} height={spanMM + 2 * fp + 2 * Math.abs(pend.y)} fill="url(#gl-fine)" />
+        <rect x={vx - fp - Math.abs(pend.x)} y={vy - fp - Math.abs(pend.y)} width={spanMM + 2 * fp + 2 * Math.abs(pend.x)} height={spanMM + 2 * fp + 2 * Math.abs(pend.y)} fill="url(#gl-pitch)" />
+        <rect x={vx - fp - Math.abs(pend.x)} y={vy - fp - Math.abs(pend.y)} width={spanMM + 2 * fp + 2 * Math.abs(pend.x)} height={spanMM + 2 * fp + 2 * Math.abs(pend.y)} fill="url(#gl-dots)" />
       </g>
       {/* THE SHAPE IS ITS OUTLINE — a wash and the cut line. */}
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
@@ -1067,4 +1082,14 @@ const CSS = `
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:6px 9px;cursor:pointer}
 .gl-libedit button:disabled{opacity:.4;cursor:default}
 .gl-libedit button:hover:not(:disabled){color:var(--ink)}
+/* LIBRARY TAB ONLY — full-bleed canvas with the panel floating over it (scoped: .gl-libtab). */
+.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - 120px);
+  width:100vw;margin-left:calc(50% - 50vw)}
+.gl-libtab .gl-stage{height:100%;padding:0;border:0;background:none;box-shadow:none}
+.gl-libtab .gl-vp{max-width:none;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;background:var(--panel)}
+.gl-libtab .gl-vp svg{width:100%;height:100%;max-width:none;display:block}
+.gl-libtab .gl-stage-head{position:absolute;inset:14px 14px auto;pointer-events:none;z-index:2}
+.gl-libtab .gl-controls{position:absolute;top:14px;right:14px;width:300px;max-height:calc(100% - 28px);
+  overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
+.gl-libtab .gl-controls>*{backdrop-filter:blur(8px);background:#ffffffe8}
 `
