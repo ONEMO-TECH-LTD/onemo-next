@@ -533,7 +533,7 @@ export default function GridLab() {
                 onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n > 0) setCamZoom(Math.min(4, Math.max(0.2, n / 100))) }}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
               <i>%</i>
-            </span><span>view</span>
+            </span>
             <div className="gl-camzoom">
               <button aria-label="zoom out" onClick={() => setCamZoom((z) => Math.max(0.2, +(z - 0.25).toFixed(2)))}>−</button>
               <button aria-label="fit" onClick={() => setCamZoom(1)}>fit</button>
@@ -1083,15 +1083,17 @@ const CSS = `
 .gl-lib button:hover{border-color:var(--ink-3)}
 .gl-lib button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-lib button[aria-pressed=true] b,.gl-lib button[aria-pressed=true] span{color:#fff}
-.gl-libsize{display:flex;align-items:center;gap:6px;padding:12px 14px;min-height:52px}
+.gl-libsize{display:flex;align-items:center;gap:8px;padding:12px 14px;min-height:52px;flex-wrap:wrap}
 .gl-libsize b{font:700 26px var(--mono);letter-spacing:.01em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
 .gl-libsize span{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);line-height:1;align-self:center}
 .gl-libdim{margin-left:auto;align-self:center;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
 .gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-camnum{display:inline-flex;align-items:baseline;gap:3px}
-.gl-camnum input{width:62px;font:700 22px var(--mono);color:var(--ink);background:var(--panel-2);
-  border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums}
+.gl-camnum input{width:86px;font:700 20px var(--mono);color:var(--ink);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;padding:5px 8px;text-align:right;
+  font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+.gl-camnum input::-webkit-outer-spin-button,.gl-camnum input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .gl-camnum i{font:600 12px var(--mono);color:var(--ink-3);font-style:normal}
 .gl-camzoom{display:flex;gap:6px;margin-left:auto}
 .gl-camzoom button{min-width:40px;height:36px;font:700 15px var(--mono);color:var(--ink-2);
