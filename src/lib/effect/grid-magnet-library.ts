@@ -4,8 +4,6 @@
 // units [ix, iy], iy = 0 at the TOP, canonical tall orientation; wide frames are the
 // transpose, mirrors are reflections — the viewer derives those for display.
 
-import type { ShapeFamily } from './grid-magnet-class'
-
 export interface LibraryLayout { name: string; nodes: ReadonlyArray<readonly [number, number]>; note?: string }
 export interface LibraryFrame { cols: number; rows: number; layouts: LibraryLayout[] }
 
@@ -32,10 +30,12 @@ export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'ev
   return rows > cols ? 'tall' : cols > rows ? 'wide' : 'even'
 }
 
-/** The classifier's families, and the DRAFT family -> layout applicability — data for Dan's
- *  review in the authoring panel, never silently applied as engine policy. */
-export const LIBRARY_FAMILIES: ShapeFamily[] = ['square', 'round', 'triangle']
-export const FAMILY_APPLICABILITY_DRAFT: Record<ShapeFamily, string[]> = {
+/** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
+ *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
+ *  library must not pre-empt it. DRAFT applicability is review data, never engine policy. */
+export type LibraryFamily = 'square' | 'round' | 'triangle'
+export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'round', 'triangle']
+export const FAMILY_APPLICABILITY_DRAFT: Record<LibraryFamily, string[]> = {
   square: ['full', 'ring', 'block', 'chain', 'single', 'pair'],
   round: ['full', 'ring', 'corners', 'sides', 'block', 'chain', 'single', 'pair'],
   triangle: ['tee-L', 'tee-R', 'tee', 'double-tee', 'corners', 'ell', 'diagonal', 'stacked-pairs', 'stacked-rows', 'alternating-rows', 'U', 'single', 'pair'],
@@ -209,7 +209,7 @@ export type LibraryShapeId =
   | 'triangle' | 'diamond' | 'tee' | 'ell' | 'waisted'
 export interface LibraryShape {
   id: LibraryShapeId
-  family: ShapeFamily
+  family: LibraryFamily
   aspect: 'square' | 'frame'
   outline: ReadonlyArray<readonly [number, number]>
 }
@@ -267,4 +267,34 @@ export function selectedRecords(sel: LibrarySelection): {
   const layout = frame.layouts.find((l) => l.name === sel.layoutId)
   if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
   return { shape, frame, layout, isPrimitive: false }
+}
+
+
+/** SANDBOX DRAFTS (Dan, 08-25): layouts authored by clicking lattice nodes on the bench.
+ *  Browser-local until exported — the canonical corpus above is never mutated at runtime.
+ *  A draft is the same literal shape as a library layout, plus where it belongs. */
+export interface LibraryDraft {
+  id: string                 // 'draft:<class>:<frame>:<name>'
+  className: string          // the class folder, e.g. 'square'
+  frameKey: string
+  name: string
+  nodes: Array<[number, number]>   // lattice units, y-down, same canon as LAYOUT_LIBRARY
+}
+export const DRAFT_STORE_KEY = 'grid-centre.library-drafts'
+export function draftId(className: string, frameKey: string, name: string): string {
+  return 'draft:' + className + ':' + frameKey + ':' + name
+}
+/** Reasons a draft is not saveable — empty list = sound. Pure. */
+export function draftIntegrity(d: LibraryDraft, frame: LibraryFrame): string[] {
+  const out: string[] = []
+  if (!d.name.trim()) out.push('name required')
+  if (!d.nodes.length) out.push('at least one magnet required')
+  const seen = new Set<string>()
+  for (const [x, y] of d.nodes) {
+    if (x < 0 || x >= frame.cols || y < 0 || y >= frame.rows) out.push('node out of frame: ' + x + ',' + y)
+    const k = x + ',' + y
+    if (seen.has(k)) out.push('duplicate node ' + k)
+    seen.add(k)
+  }
+  return out
 }

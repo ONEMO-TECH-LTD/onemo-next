@@ -8,7 +8,7 @@ import {
   LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   type LibrarySelection,
 } from '../grid-magnet-library'
-import { libraryArrangement, libraryStageModel } from '../grid-magnet-library-bridge'
+import { libraryArrangement, libraryPreview, libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
 
@@ -25,7 +25,7 @@ describe('corpus completeness — removal must fail these', () => {
   it('exactly the 15 canonical frame keys', () => {
     expect(LAYOUT_LIBRARY.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
   })
-  it('exactly 100 reviewed layouts across the frames', () => {
+  it('exactly 100 draft layouts across the frames', () => {
     expect(LAYOUT_LIBRARY.reduce((n, f) => n + f.layouts.length, 0)).toBe(100)
   })
   it('the complete ruled shape-ID set', () => {
@@ -52,8 +52,8 @@ describe('corpus completeness — removal must fail these', () => {
 describe('classifier goldens — declared family is the classifier verdict, not a point count', () => {
   it('every shape outline classifies as its declared family', () => {
     for (const s of LIBRARY_SHAPES) {
-      const a = libraryArrangement(sel({ shapeId: s.id, frameKey: '3x3', layoutId: 'ring' }), 48)
-      expect(shapeFamilyOf(a.outlineMM), s.id).toBe(s.family)
+      const pv = libraryPreview(sel({ shapeId: s.id, frameKey: '3x3', layoutId: 'ring' }), 48)
+      expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(s.family)
     }
   })
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
@@ -61,19 +61,19 @@ describe('classifier goldens — declared family is the classifier verdict, not 
       for (const transpose of [false, true]) {
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (s.aspect === 'square' && cols !== rows) continue          // marked incompatible, not stretched
-        const a = libraryArrangement(sel({ shapeId: s.id, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
-        expect(a.shapeCompatible).toBe(true)
-        const c = classifyShape(a.outlineMM, 48)
+        const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
+        expect(pv.shapeCompatible).toBe(true)
+        const c = classifyShape(pv.outlineMM, 48)
         expect([c.cx, c.cy], `${s.id} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
       }
     }
   })
   it('QA F1 counterexamples: 1x1 spans 24mm and 2x3 spans 72x120mm — never one class larger', () => {
-    const a1 = libraryArrangement(sel({ shapeId: 'rectangle', frameKey: '1x1', layoutId: 'single' }), 48)
+    const a1 = libraryPreview(sel({ shapeId: 'rectangle', frameKey: '1x1', layoutId: 'single' }), 48)
     const xs = a1.outlineMM.map((q) => q[0]), ys = a1.outlineMM.map((q) => q[1])
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(24, 6)
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(24, 6)
-    const a2 = libraryArrangement(sel({ shapeId: 'rectangle', frameKey: '2x3', layoutId: 'full' }), 48)
+    const a2 = libraryPreview(sel({ shapeId: 'rectangle', frameKey: '2x3', layoutId: 'full' }), 48)
     const xs2 = a2.outlineMM.map((q) => q[0]), ys2 = a2.outlineMM.map((q) => q[1])
     expect(Math.max(...xs2) - Math.min(...xs2)).toBeCloseTo(72, 6)
     expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(120, 6)
@@ -163,7 +163,8 @@ describe('data integrity + transforms', () => {
 describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition', () => {
   it('arrangement carries stable IDs and mm nodes', () => {
     const a = libraryArrangement(sel(), 48)
-    expect(a).toMatchObject({ shapeId: 'tee', family: 'triangle', sourceFrameKey: '2x3', frameKey: '2x3', layoutId: 'tee-L', layoutKind: 'frame', frameCols: 2, frameRows: 3, shapeCompatible: true })
+    expect(a).toMatchObject({ sourceFrameKey: '2x3', frameKey: '2x3', layoutId: 'tee-L', layoutKind: 'frame', frameCols: 2, frameRows: 3 })
+    expect(libraryPreview(sel(), 48)).toMatchObject({ shapeId: 'tee', declaredFamily: 'triangle', shapeCompatible: true })
     expect(a.nodesMM.length).toBe(3)
   })
   it('unknown IDs fail loudly — no silent 1x1 retarget (QA F3)', () => {

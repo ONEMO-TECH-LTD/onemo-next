@@ -8,7 +8,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
-import { libraryStageModel, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
+import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
+import { selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -89,7 +90,27 @@ export default function GridLab() {
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
   const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'tee', frameKey: '2x3', layoutId: 'tee-L', view: { transpose: false, flipX: false, flipY: false } })
-  const libraryModel = useMemo(() => tab === 'library' ? libraryStageModel(librarySel, pitch, pad) : null, [tab, librarySel, pitch, pad])
+  /** Sandbox drafts — browser-local authoring; the canonical corpus is never mutated. */
+  const [draft, setDraft] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
+  const [drafts, setDrafts] = useState<LibraryDraft[]>([])
+  useEffect(() => {
+    try { const raw = localStorage.getItem(DRAFT_STORE_KEY); if (raw) setDrafts(JSON.parse(raw)) } catch { }
+  }, [])
+  const writeDrafts = (next: LibraryDraft[]) => {
+    setDrafts(next)
+    try { localStorage.setItem(DRAFT_STORE_KEY, JSON.stringify(next)) } catch { }
+  }
+  const libraryModel = useMemo(() => {
+    if (tab !== 'library') return null
+    if (draft) {
+      const { shape, frame } = selectedRecords(librarySel)
+      const cols = librarySel.view.transpose ? frame.rows : frame.cols
+      const rows = librarySel.view.transpose ? frame.cols : frame.rows
+      return draftStageModel(librarySel, draft.nodes, pitch, pad, cols, rows,
+        `${shape.id} · DRAFT ${draft.name || '(unnamed)'} · ${cols}x${rows} · ${draft.nodes.length}⌾ · click spots to toggle`)
+    }
+    return libraryStageModel(librarySel, pitch, pad)
+  }, [tab, librarySel, pitch, pad, draft])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -326,7 +347,19 @@ export default function GridLab() {
               if (!src2) return null
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: false,
-                    segments: [], segFill: false, onPan: () => {}, onZoom: () => {}, onReset: () => {} }
+                    segments: [], segFill: false, onPan: () => {}, onZoom: () => {}, onReset: () => {},
+                    onPickNode: draft ? (pMM: Pt) => {
+                      const { frame } = selectedRecords(librarySel)
+                      const rows = librarySel.view.transpose ? frame.cols : frame.rows
+                      const n = nodeAtMM(pMM, pitch, rows)
+                      if (!n) return
+                      setDraft((d) => {
+                        if (!d) return d
+                        const k = n[0] + ',' + n[1]
+                        const has = d.nodes.some(([x, y]) => x + ',' + y === k)
+                        return { ...d, nodes: has ? d.nodes.filter(([x, y]) => x + ',' + y !== k) : [...d.nodes, n] }
+                      })
+                    } : undefined }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
@@ -347,7 +380,21 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} /> : <>
+          {tab === 'library' ? <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold}
+            draft={draft} setDraft={setDraft} drafts={drafts}
+            newDraft={() => setDraft({ name: '', nodes: [] })}
+            openDraft={(d) => { setLibrarySel({ ...librarySel, frameKey: d.frameKey }); setDraft({ name: d.name, nodes: d.nodes }) }}
+            saveDraft={() => {
+              if (!draft) return
+              const { shape, frame } = selectedRecords(librarySel)
+              const rec: LibraryDraft = { id: draftId(shape.family, frameKeyOf(frame), draft.name), className: shape.family, frameKey: frameKeyOf(frame), name: draft.name, nodes: draft.nodes }
+              writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
+            }}
+            deleteDraft={(id) => { writeDrafts(drafts.filter((x) => x.id !== id)); setDraft(null) }}
+            exportDrafts={() => {
+              const blob = new Blob([JSON.stringify(drafts, null, 2)], { type: 'application/json' })
+              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'library-drafts.json'; a.click()
+            }} /> : <>
           <Fold title="Shape source">
             <div className="gl-seg gl-seg3">
               <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
@@ -556,9 +603,11 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
+  /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
+  onPickNode?: (pMM: Pt) => void
 }) {
   const pts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -775,11 +824,15 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
             fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
             stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
             strokeWidth={sw} />
+          {onPickNode && <circle cx={sp.x} cy={-sp.y} r={sp.r} fill="transparent" style={{ cursor: 'pointer' }}
+            onPointerDown={(e) => { e.stopPropagation(); onPickNode([sp.x, sp.y]) }} />}
         </g>
       })}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
-        return <g key={'a' + i} opacity={0.5}>
+        // While authoring, a placed magnet must not swallow its own spot's hit target —
+        // otherwise a magnet can be added but never toggled off.
+        return <g key={'a' + i} opacity={0.5} style={onPickNode ? { pointerEvents: 'none' } : undefined}>
           <circle cx={p[0]} cy={p[1]} r={a.dia / 2} fill={a.dia === 8 ? 'var(--mag8)' : 'var(--magnet)'} />
           <circle cx={p[0] - a.dia * 0.12} cy={p[1] - a.dia * 0.12} r={a.dia / 2 * 0.4} fill="var(--magnet-hi)" fillOpacity={0.5} />
         </g>
