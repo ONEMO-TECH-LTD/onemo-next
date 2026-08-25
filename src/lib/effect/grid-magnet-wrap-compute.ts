@@ -638,7 +638,7 @@ export function wrapFlap(
 }
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number; isClass?: boolean }
+export interface BandRung { at: WrapAt; revealMM: number; isClass?: boolean; prim?: boolean; repaired?: boolean }
 
 /**
  * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
@@ -690,7 +690,11 @@ export function wrapBandLadder(
     [[0, 0], [pitch, 0]], [[0, 0], [0, pitch]],
     [[0, 0], [pitch, pitch]], [[0, pitch], [pitch, 0]],
   ]
-  for (const rawAssembly of [...primitives, ...(classNodes ?? [])]) {
+  const catalogued = [
+    ...primitives.map((nodes) => ({ nodes: nodes as ReadonlyArray<Pt>, prim: true })),
+    ...(classNodes ?? []).map((nodes) => ({ nodes, prim: false })),
+  ]
+  for (const { nodes: rawAssembly, prim } of catalogued) {
     if (!rawAssembly.length) continue
     // The Perimeter belt governs class presets exactly as it governs the reveal (Dan, 08-25:
     // the pipeline holds everywhere) — a 3x3 frame under the belt is the 8-ring, never 9.
@@ -703,7 +707,7 @@ export function wrapBandLadder(
     if (!at || at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue
     if (rungs.some((r) => Math.abs(r.at.sizeMM - at.sizeMM) < 0.1 && r.at.count === at.count)) continue
     seen.add(idOfPts(at.points))
-    rungs.push({ at, revealMM: at.sizeMM, isClass: true })
+    rungs.push({ at, revealMM: at.sizeMM, isClass: true, prim })
   }
   const SCAN_MM = 1
   for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
@@ -816,10 +820,16 @@ export function wrapBandLadder(
       return null
     }
     for (const r of kept) {
+      // THE 1-2 MAGNET EXCEPTION (Dan's standing law): centring and diagonal placement govern
+      // the single and the pair — the perimeter law does not. The guard never augments them
+      // (it was converting every pair into near-identical 3-magnet layouts and killing the
+      // pair offer entirely — BOT B2, 08-25 15:56).
+      if (r.prim) continue
       for (let round = 0; round < 6; round++) {
         const cand = forceNode(r.at)
         if (!cand) break                                  // clean, or unfixable in this band
         r.at = cand
+        r.repaired = true
       }
     }
     var guardHolds = (at: WrapAt): boolean => worstEdgeRuns(at).bad.length === 0
@@ -854,10 +864,16 @@ export function wrapBandLadder(
   // grossest violation"): an offer the guard could not bring within the 96mm law is not an
   // option while a clean offer exists in the band. Only when NOTHING in the band is clean do
   // the violating offers stand (the honest best-available).
-  const clean = kept.filter((r) => guardHolds(r.at))
+  const clean = kept.filter((r) => r.prim || guardHolds(r.at))
   const offers = clean.length ? clean : kept
   // Dominance re-judged on FINAL sizes — the guard and fine-tune move counts and sizes, and
   // two offers that finish at the same size with different counts collapse to the covering one.
-  return offers.filter((r) =>
+  const ordered = offers.filter((r) =>
     !offers.some((o) => o !== r && o.at.count > r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) <= 1))
+  // Guard augmentation can converge different seeds onto the same final layout — identical
+  // finals collapse to one offer.
+  const final: BandRung[] = []
+  for (const r of ordered)
+    if (!final.some((o) => o.at.count === r.at.count && Math.abs(o.at.sizeMM - r.at.sizeMM) < 0.1)) final.push(r)
+  return final
 }
