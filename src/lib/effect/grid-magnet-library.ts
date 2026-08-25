@@ -101,6 +101,9 @@ export const SQUARE_FRAMES: LibraryFrame[] = [
  *  the axis pair (the transpose), never a type. */
 export type RectangleSub = 'frame' | 'banner' | 'slim'
 export const RECTANGLE_SUBS: RectangleSub[] = ['frame', 'banner', 'slim']
+/** SQUARE class types — one so far: BOX (Dan, 08-25). */
+export type SquareSub = 'box'
+export const SQUARE_SUBS: SquareSub[] = ['box']
 export function rectangleSubOf(cols: number, rows: number): RectangleSub {
   const minor = Math.min(cols, rows)
   return minor <= 1 ? 'slim' : minor === 2 ? 'banner' : 'frame'
