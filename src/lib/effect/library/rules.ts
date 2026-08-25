@@ -10,55 +10,71 @@ type Node = readonly [number, number]
  *  names (Dan, 08-25: "same modes everywhere — those modes must be in the logic file"). */
 export const SPACING_BASE = 'perimeter'
 export const SPACING_96 = 'perimeter-96'
-/** The labels are the PITCH, not the words: the library inherits the bench's pitch tier, so a
- *  hardcoded '48 mm' is physically false at 24 or 96 (QA F3). One node step, or every other. */
-export const SPACING_MODES: Array<{ layoutId: string; step: number }> = [
-  { layoutId: SPACING_BASE, step: 1 },
-  { layoutId: SPACING_96, step: 2 },
+/** The two spacings are PHYSICAL and fixed everywhere (Dan, 08-25): one node step, or 96mm.
+ *  The 96 population therefore changes with the pitch tier while the label does not — at 24
+ *  it takes every fourth node, at 96 every node. Arbitrary populations are custom, not this. */
+export const SPACING_MODES: Array<{ layoutId: string; label: string }> = [
+  { layoutId: SPACING_BASE, label: '48 mm' },
+  { layoutId: SPACING_96, label: '96 mm' },
 ]
-export const spacingLabel = (step: number, pitchMM: number): string => step * pitchMM + ' mm'
 export const isSpacingMode = (name: string): boolean => SPACING_MODES.some((m) => m.layoutId === name)
 
-/** Which indices along a run of n lattice nodes survive a 96mm sample.
- *  Dan, 08-25 19:55: "96mm is skip every 48mm logic" — every other node — and the far end is
- *  always kept, because an unpinned extreme is the failure the belt exists to prevent.
- *  (His earlier four-corner edit to the 4x4 he reclassified himself minutes later: "the edits
- *  i did before to square in 4x4 is sparse ... or custom actually make it custom". Sparse is
- *  the custom mode, not this one.) */
-export function sample96(n: number): Set<number> {
+/** Which indices along a run survive the 96mm mode at the given pitch. 96mm is a physical
+ *  distance, so the stride is 96/pitch nodes; the far end is always kept, because an unpinned
+ *  extreme is the failure the belt exists to prevent. A short closing interval is lawful —
+ *  Dan's hand-made sparse populations are the CUSTOM mode, never this one. */
+export function sample96(n: number, pitchMM = 48): Set<number> {
+  const stride = 96 / pitchMM
+  if (!Number.isInteger(stride) || stride < 1) throw new Error('library: 96mm mode unsupported at pitch ' + pitchMM)
   const keep = new Set<number>()
-  for (let i = 0; i < n; i += 2) keep.add(i)
+  for (let i = 0; i < n; i += stride) keep.add(i)
   if (n > 0) keep.add(n - 1)
   return keep
 }
 
-/** Axis-aligned ring: a node survives if it is an even sample along the side it sits on. */
-function box96(frame: LibraryFrame, perimeter: readonly Node[]): Node[] {
-  const kx = sample96(frame.cols), ky = sample96(frame.rows)
-  return perimeter.filter(([x, y]) => {
-    const onRow = y === 0 || y === frame.rows - 1
-    const onCol = x === 0 || x === frame.cols - 1
-    return (onRow && kx.has(x)) || (onCol && ky.has(y))
-  }).map(([x, y]) => [x, y] as Node)
+/** Axis-aligned ring, WALKED CLOCKWISE. Each side indexes from its own start, so the short
+ *  closing interval of a non-divisible run lands as rotationally balanced pairs instead of
+ *  biased to one absolute direction (Dan, 08-25: the 4x4 must pair, not lean). */
+function box96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
+  const kx = sample96(frame.cols, pitchMM), ky = sample96(frame.rows, pitchMM)
+  // A one-line frame is a chain, not a ring: its two long sides are the same nodes walked in
+  // opposite directions, and treating them as a ring would keep every node and make the 96
+  // mode identical to the perimeter. Sample the single run once.
+  if (frame.cols === 1) return perimeter.filter(([, y]) => ky.has(y)).map(([x, y]) => [x, y] as Node)
+  if (frame.rows === 1) return perimeter.filter(([x]) => kx.has(x)).map(([x, y]) => [x, y] as Node)
+  return perimeter.filter(([x, y]) => (
+    (y === 0 && kx.has(x))                                  // top, left to right
+    || (x === frame.cols - 1 && ky.has(y))                  // right, top to bottom
+    || (y === frame.rows - 1 && kx.has(frame.cols - 1 - x)) // bottom, right to left
+    || (x === 0 && ky.has(frame.rows - 1 - y))              // left, bottom to top
+  )).map(([x, y]) => [x, y] as Node)
 }
 
 /** The triangle's perimeter is three runs — the vertical leg, the base, and the slant, one
  *  node per row. A node is sampled by the run it sits on; the vertices sit on two runs and
  *  survive either way. */
-function tri96(frame: LibraryFrame, perimeter: readonly Node[]): Node[] {
-  const ky = sample96(frame.rows), kx = sample96(frame.cols)
+function tri96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
+  const ky = sample96(frame.rows, pitchMM), kx = sample96(frame.cols, pitchMM)
   const xmax = (y: number) => Math.floor((y * (frame.cols - 1)) / (frame.rows - 1))
-  return perimeter.filter(([x, y]) =>
-    (x === 0 && ky.has(y)) || (y === frame.rows - 1 && kx.has(x)) || (x === xmax(y) && ky.has(y)),
-  ).map(([x, y]) => [x, y] as Node)
+  return perimeter.filter(([x, y]) => (
+    (x === xmax(y) && ky.has(y))                            // slant, apex to base corner
+    || (y === frame.rows - 1 && kx.has(frame.cols - 1 - x)) // base, right to left
+    || (x === 0 && ky.has(frame.rows - 1 - y))              // leg, bottom to apex
+  )).map(([x, y]) => [x, y] as Node)
 }
 
 /** Manhattan ring: sides run vertex to vertex with r+1 nodes; a node's place along its side
  *  is |dx| from the vertical vertex. */
-function ring96(frame: LibraryFrame, perimeter: readonly Node[]): Node[] {
+function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
   const k = (frame.cols - 1) / 2
-  const keep = sample96(k + 1)
-  return perimeter.filter(([x]) => keep.has(Math.abs(x - k))).map(([x, y]) => [x, y] as Node)
+  const keep = sample96(k + 1, pitchMM)
+  return perimeter.filter(([x, y]) => {
+    const along = y <= k && x >= k ? x - k          // top-right side
+      : x >= k && y >= k ? y - k                    // bottom-right
+        : y >= k && x <= k ? k - x                  // bottom-left
+          : k - y                                   // top-left
+    return keep.has(along)
+  }).map(([x, y]) => [x, y] as Node)
 }
 
 /** The class floor: an n-line axis starts at 24mm and grows one pitch per extra line. */
@@ -81,7 +97,7 @@ export interface ClassRules {
    *  A rectangle turns (transpose); a triangle points its apex at any of four corners. */
   orientations: Array<{ id: string; view: { transpose: boolean; flipX: boolean; flipY: boolean } }>
   /** The 96mm sample of this class's perimeter — the ring geometry differs per class. */
-  spacing96: (frame: LibraryFrame, perimeter: readonly Node[]) => Node[]
+  spacing96: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
 }
 
 export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
@@ -145,12 +161,23 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
 export function withSpacingModes(family: LibraryFamily, frame: LibraryFrame): LibraryFrame {
   const i = frame.layouts.findIndex((l) => l.name === SPACING_BASE)
   if (i < 0) return frame
-  const nodes = CLASS_RULES[family].spacing96(frame, frame.layouts[i].nodes)
+  const nodes = CLASS_RULES[family].spacing96(frame, frame.layouts[i].nodes, 48)
   if (!nodes.length) return frame
   const mode: LibraryLayout = { name: SPACING_96, nodes }
   const layouts = [...frame.layouts]
   layouts.splice(i + 1, 0, mode)
   return { ...frame, layouts }
+}
+
+/** Materialise the fixed 96mm mode at the selected pitch. CLASS_FRAMES carries the canonical
+ *  48mm identity; anything converting to physical geometry passes through here. */
+export function layoutAtPitch(
+  family: LibraryFamily, frame: LibraryFrame, layout: LibraryLayout, pitchMM: number,
+): LibraryLayout {
+  if (layout.name !== SPACING_96) return layout
+  const per = frame.layouts.find((l) => l.name === SPACING_BASE)
+  if (!per) throw new Error('library: 96mm mode has no perimeter in ' + frame.cols + 'x' + frame.rows)
+  return { name: SPACING_96, nodes: CLASS_RULES[family].spacing96(frame, per.nodes, pitchMM) }
 }
 
 /** How a frame reads to a human, per its class. One call site for every label in the panel. */

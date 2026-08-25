@@ -8,7 +8,7 @@ import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
-  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel, CLASS_RULES,
+  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel, CLASS_RULES, layoutAtPitch,
   canonicalNode,
   type LibrarySelection, type LibraryShapeId, type LibraryFamily,
 } from './library'
@@ -35,10 +35,11 @@ export interface LibraryStageModel {
 
 /** Selected records -> stable-ID arrangement in mm. The ONE conversion. Throws on unknown IDs. */
 export function libraryArrangement(sel: LibrarySelection, pitchMM: number): LibraryArrangement {
-  const { frame, layout } = selectedRecords(sel)
+  const { shape, frame, layout } = selectedRecords(sel)
   const frameCols = sel.view.transpose ? frame.rows : frame.cols
   const frameRows = sel.view.transpose ? frame.cols : frame.rows
-  const t = transformLayout(frame, layout, sel.view)
+  // 96mm is physical: the population is materialised for THIS pitch, never the canonical one.
+  const t = transformLayout(frame, layoutAtPitch(shape.family, frame, layout, pitchMM), sel.view)
   // Engine space is y-up; library rows count downward from the top.
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   return {

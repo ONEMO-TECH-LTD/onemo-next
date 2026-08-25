@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, canonicalNode, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
+import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, layoutAtPitch, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -444,10 +444,13 @@ export default function GridLab() {
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
-              const { layout, draft } = resolveSelection(librarySel, drafts)
-              setEdit(draft
-                ? { name: draft.name, nodes: draft.nodes.map(([x, y]) => [x, y] as [number, number]) }
-                : { name: layout.name + '-custom', nodes: layout.nodes.map(([x, y]) => [x, y] as [number, number]) })
+              const { shape, frame, layout, draft } = resolveSelection(librarySel, drafts)
+              // custom seeds from what is ON SCREEN at this pitch, not the canonical 48 set
+              const source = draft?.nodes ?? layoutAtPitch(shape.family, frame, layout, pitch).nodes
+              setEdit({
+                name: draft ? draft.name : layout.name + '-custom',
+                nodes: source.map(([x, y]) => [x, y] as [number, number]),
+              })
             }}
             saveEdit={() => {
               if (!edit) return

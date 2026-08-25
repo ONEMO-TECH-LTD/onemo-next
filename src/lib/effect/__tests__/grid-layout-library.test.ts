@@ -5,8 +5,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, TRIANGLE_FRAMES, CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
-  LIBRARY_FAMILIES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
-  resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, transformLayout as tl,
+  LIBRARY_FAMILIES, SPACING_MODES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
+  resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, layoutAtPitch,
+  transformLayout as tl,
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
@@ -306,29 +307,51 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
     }
   })
 
-  it('the sample is skip-every-other with the far end always kept (Dan, 08-25 19:55)', () => {
-    const run = (n: number) => [...sample96(n)].sort((a, b) => a - b)
-    expect(run(1)).toEqual([0])
-    expect(run(2)).toEqual([0, 1])
-    expect(run(3)).toEqual([0, 2])
+  it('96mm is a physical distance — the stride is 96/pitch nodes, far end always kept', () => {
+    const run = (n: number, p = 48) => [...sample96(n, p)].sort((a, b) => a - b)
     expect(run(4)).toEqual([0, 2, 3])
     expect(run(5)).toEqual([0, 2, 4])
     expect(run(6)).toEqual([0, 2, 4, 5])
+    expect(run(5, 96)).toEqual([0, 1, 2, 3, 4])   // one node per 96mm: every node
+    expect(run(5, 24)).toEqual([0, 4])            // four nodes per 96mm
+    expect(() => sample96(5, 36)).toThrow('unsupported at pitch')
+  })
+
+  it('the population follows the pitch tier, and the label does not (Dan: 96 is fixed)', () => {
+    const f = CLASS_FRAMES.square.find((x) => x.cols === 5)!
+    const at = (p: number) => layoutAtPitch('square', f, f.layouts.find((l) => l.name === 'perimeter-96')!, p).nodes.length
+    expect([at(24), at(48), at(96)]).toEqual([4, 8, 16])
+    expect(SPACING_MODES.map((m) => m.label)).toEqual(['48 mm', '96 mm'])
+  })
+
+  it('a non-divisible ring pairs instead of leaning — square 4x4 exactly', () => {
+    // Walked clockwise, each side indexes from its own start, so the short closing interval
+    // lands as four balanced adjacent pairs rather than biased to one absolute direction.
+    const f = CLASS_FRAMES.square.find((x) => x.cols === 4)!
+    const got = f.layouts.find((l) => l.name === 'perimeter-96')!.nodes.map(key).sort()
+    expect(got).toEqual(['0,0', '0,1', '0,3', '1,3', '2,0', '3,0', '3,2', '3,3'].sort())
+  })
+
+  it('every square 96 population is closed under a quarter turn', () => {
+    for (const f of CLASS_FRAMES.square.filter((x) => x.cols > 1)) {
+      const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
+      if (!s96) continue
+      const got = new Set(s96.nodes.map(key))
+      for (const [x, y] of s96.nodes)
+        expect(got.has(key([f.rows - 1 - y, x])), `${frameKeyOf(f)} rotate ${key([x, y])}`).toBe(true)
+    }
   })
 
   it('the ruled populations follow from that one rule', () => {
     const n96 = (fam: 'square' | 'rectangle' | 'diamond', c: number, r: number) =>
       CLASS_FRAMES[fam].find((f) => f.cols === c && f.rows === r)!
         .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
-    // square: the computed mode, NOT the four-corner sparse population Dan moved to custom
     expect(n96('square', 3, 3)).toBe(4)
     expect(n96('square', 4, 4)).toBe(8)
     expect(n96('square', 5, 5)).toBe(8)
     expect(n96('rectangle', 1, 4)).toBe(3)
     expect(n96('rectangle', 3, 4)).toBe(6)
     expect(n96('rectangle', 4, 6)).toBe(10)
-    expect(n96('rectangle', 5, 6)).toBe(10)
-    // diamond: r=1 keeps every vertex (the 2-pin artefact is gone), larger rings keep theirs
     expect(n96('diamond', 3, 3)).toBe(4)
     expect(n96('diamond', 7, 7)).toBe(8)
   })
