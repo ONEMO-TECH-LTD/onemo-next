@@ -170,18 +170,6 @@ function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
 }
 
 /**
- * SIGNED CLEARANCE — the signed distance field value at a point: how far it sits from the
- * outline, positive inside, negative outside. This is the one primitive a fill/wrap solve
- * needs: a disc of radius r is held at p exactly when signedClearanceMM(outer, p) >= r, and
- * it is PRESSED when the two are equal. Uses the same bucketed edge index as the seat
- * predicate, so a query is a lookup, not a scan.
- */
-export function signedClearanceMM(outer: ReadonlyArray<Pt>, pt: Pt): number {
-  const d = edgeDistMM(outer, pt)
-  return pointInOuter(pt, outer) ? d : -d
-}
-
-/**
  * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
  * tangency passing by equality (exact integer arithmetic, micron quantum).
  * A float prescreen answers the clear cases; only points within a guard band of the exact
@@ -228,15 +216,6 @@ export function makeCircleSeatPredicate(
     const dx = q(pt[0]) - cqx, dy = q(pt[1]) - cqy
     return dx * dx + dy * dy <= s2
   }
-}
-
-/** Distance from a point to the segment ab. */
-function distToSeg(v: Pt, a: Pt, b: Pt): number {
-  const dx = b[0] - a[0], dy = b[1] - a[1]
-  const len2 = dx * dx + dy * dy
-  let t = len2 > 0 ? ((v[0] - a[0]) * dx + (v[1] - a[1]) * dy) / len2 : 0
-  t = Math.max(0, Math.min(1, t))
-  return Math.hypot(v[0] - a[0] - t * dx, v[1] - a[1] - t * dy)
 }
 
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
