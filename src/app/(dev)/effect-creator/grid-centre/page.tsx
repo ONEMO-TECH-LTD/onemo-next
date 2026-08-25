@@ -100,6 +100,23 @@ export default function GridLab() {
   /** Per-control enables — off sends that control's field not at all, so spec default rules it. */
   const [enPhaseN, setEnPhaseN] = usePersisted('en.phaseStep', 1)
 
+  // On load the bench opens on B1 or the last band you pushed (Dan, 08-25). usePersisted loads
+  // in a post-mount effect, so read storage directly for the one decision that must be right on
+  // first paint.
+  useEffect(() => {
+    try {
+      const em = +(localStorage.getItem('grid-centre.engineMode') ?? '1') || 1
+      const bs = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
+      const b = BANDS.find((x) => x.id === bs) ?? BANDS[0]
+      if (em === 2) {
+        setMode('free')
+        setSizeMin(b.minMM); setSizeMax(b.maxMM)
+        setSizeMM((v) => Math.min(b.maxMM, Math.max(b.minMM, v)))
+      } else setMode(b.id)
+    } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
@@ -411,14 +428,14 @@ export default function GridLab() {
             {engineMode === 1 && <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null) }}>B{b.id}</button>)}
+                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
               </div>
             </div>}
             {engineMode === 2 && <div className="gl-field"><span>Band · slider window</span>
               <div className="gl-seg">
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={sizeMin === b.minMM && sizeMax === b.maxMM}
-                    onClick={() => { setSizeMin(b.minMM); setSizeMax(b.maxMM); setSizeMM(Math.min(Math.max(sizeMM, b.minMM), b.maxMM)) }}>B{b.id}</button>)}
+                    onClick={() => { setSizeMin(b.minMM); setSizeMax(b.maxMM); setSizeMM(Math.min(Math.max(sizeMM, b.minMM), b.maxMM)); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
                 <button aria-pressed={sizeMin === MIN_EFFECT_MM && sizeMax === sizeRange(RELEASED_PADDING_MM).maxMM}
                   onClick={() => { setSizeMin(MIN_EFFECT_MM); setSizeMax(sizeRange(RELEASED_PADDING_MM).maxMM) }}>All</button>
               </div>
@@ -437,7 +454,7 @@ export default function GridLab() {
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
-                  <button key={pt.sizeMM} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
+                  <button key={i} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
                     <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
                   </button>)}
               </div>}
