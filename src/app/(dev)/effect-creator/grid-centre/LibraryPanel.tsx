@@ -55,7 +55,12 @@ export default function LibraryPanel({ sel, setSel, Fold, draft, setDraft, draft
         <div className="gl-steps">
           {LAYOUT_LIBRARY.map((f) => (
             <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === frameKeyOf(frame)}
-              onClick={() => setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name })}>
+              onClick={() => {
+                // The variety stays selected across a size change — same layout name in the new
+                // frame when it exists (Dan: varieties must stay applied on the size change).
+                const keep = sel.layoutId.startsWith('prim:') || f.layouts.some((l) => l.name === sel.layoutId)
+                setSel({ ...sel, frameKey: frameKeyOf(f), layoutId: keep ? sel.layoutId : f.layouts[0].name })
+              }}>
               <b>{f.cols}×{f.rows}</b><span>{orientationOf(f.cols, f.rows)} {kindOf(f.cols, f.rows)}</span>
             </button>
           ))}
