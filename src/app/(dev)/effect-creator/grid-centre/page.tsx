@@ -89,7 +89,7 @@ export default function GridLab() {
   /** Top-level view — the bench, or the layout-library review tab. */
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
-  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'tee', frameKey: '2x3', layoutId: 'tee-L', view: { transpose: false, flipX: false, flipY: false } })
+  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'square', frameKey: '3x3', layoutId: 'ring', view: { transpose: false, flipX: false, flipY: false } })
   /** Sandbox drafts — browser-local authoring; the canonical corpus is never mutated. */
   const [draft, setDraft] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
   const [drafts, setDrafts] = useState<LibraryDraft[]>([])
