@@ -33,10 +33,11 @@ export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'ev
 /** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
  *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
  *  library must not pre-empt it. DRAFT applicability is review data, never engine policy. */
-export type LibraryFamily = 'square'
-export const LIBRARY_FAMILIES: LibraryFamily[] = ['square']
+export type LibraryFamily = 'square' | 'rectangle'
+export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'rectangle']
 export const FAMILY_APPLICABILITY_DRAFT: Record<LibraryFamily, string[]> = {
   square: ['single', 'full', 'perimeter', 'perimeter-96', 'corners'],
+  rectangle: ['full', 'perimeter', 'perimeter-96', 'corners'],
 }
 
 
@@ -66,7 +67,7 @@ export function libraryIntegrity(): string[] {
   return out
 }
 
-export const LAYOUT_LIBRARY: LibraryFrame[] = [
+export const SQUARE_FRAMES: LibraryFrame[] = [
   { cols: 1, rows: 1, layouts: [
     { name: 'single', nodes: [[0, 0]] },
   ] },
@@ -94,6 +95,67 @@ export const LAYOUT_LIBRARY: LibraryFrame[] = [
     { name: 'corners', nodes: [[0, 0], [4, 0], [0, 4], [4, 4]] },
   ] },
 ]
+/** RECTANGLE class — tall canonical frames; wide is the transpose. */
+export const RECTANGLE_FRAMES: LibraryFrame[] = [
+  { cols: 1, rows: 2, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1]] },
+  ] },
+  { cols: 1, rows: 3, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2]] },
+  ] },
+  { cols: 1, rows: 4, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 3]] },
+    { name: 'corners', nodes: [[0, 0], [0, 3]] },
+  ] },
+  { cols: 1, rows: 5, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 4]] },
+    { name: 'corners', nodes: [[0, 0], [0, 4]] },
+  ] },
+  { cols: 2, rows: 3, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [1, 0], [1, 2]] },
+  ] },
+  { cols: 2, rows: 4, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 3], [1, 0], [1, 2], [1, 3]] },
+    { name: 'corners', nodes: [[0, 0], [0, 3], [1, 0], [1, 3]] },
+  ] },
+  { cols: 2, rows: 5, layouts: [
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 4], [1, 0], [1, 2], [1, 4]] },
+    { name: 'corners', nodes: [[0, 0], [0, 4], [1, 0], [1, 4]] },
+  ] },
+  { cols: 3, rows: 4, layouts: [
+    { name: 'full', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3], [2, 0], [2, 1], [2, 2], [2, 3]], note: 'interior — Full grid only' },
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 3], [2, 0], [2, 1], [2, 2], [2, 3]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 3], [2, 0], [2, 2], [2, 3]] },
+    { name: 'corners', nodes: [[0, 0], [0, 3], [2, 0], [2, 3]] },
+  ] },
+  { cols: 3, rows: 5, layouts: [
+    { name: 'full', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4]], note: 'interior — Full grid only' },
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 0], [1, 4], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 4], [2, 0], [2, 2], [2, 4]] },
+    { name: 'corners', nodes: [[0, 0], [0, 4], [2, 0], [2, 4]] },
+  ] },
+  { cols: 4, rows: 5, layouts: [
+    { name: 'full', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [3, 0], [3, 1], [3, 2], [3, 3], [3, 4]], note: 'interior — Full grid only' },
+    { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 0], [1, 4], [2, 0], [2, 4], [3, 0], [3, 1], [3, 2], [3, 3], [3, 4]] },
+    { name: 'perimeter-96', nodes: [[0, 0], [0, 2], [0, 4], [2, 0], [2, 4], [3, 0], [3, 2], [3, 4]] },
+    { name: 'corners', nodes: [[0, 0], [0, 4], [3, 0], [3, 4]] },
+  ] },
+]
+
+/** The frames a class carries. */
+export const CLASS_FRAMES: Record<LibraryFamily, LibraryFrame[]> = {
+  square: SQUARE_FRAMES,
+  rectangle: RECTANGLE_FRAMES,
+}
+/** Back-compat alias — the square corpus. */
+export const LAYOUT_LIBRARY = SQUARE_FRAMES
+
 
 
 
@@ -101,7 +163,7 @@ export const LAYOUT_LIBRARY: LibraryFrame[] = [
 /** THE SHAPE LIBRARY — the ruled classification shapes, literal canonical outlines in the unit
  *  box (y down). aspect 'square' keeps a square span; 'frame' stretches to the frame's span.
  *  Pure data — the bridge materialises, never generates. */
-export type LibraryShapeId = 'square'
+export type LibraryShapeId = 'square' | 'rectangle'
 export interface LibraryShape {
   id: LibraryShapeId
   family: LibraryFamily
@@ -110,6 +172,7 @@ export interface LibraryShape {
 }
 export const LIBRARY_SHAPES: LibraryShape[] = [
   { id: 'square', family: 'square', aspect: 'square', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 1.0000], [0.0000, 1.0000]] },
+  { id: 'rectangle', family: 'rectangle', aspect: 'frame', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 1.0000], [0.0000, 1.0000]] },
 ]
 
 
@@ -134,7 +197,7 @@ export function selectedRecords(sel: LibrarySelection): {
   // retarget to unrelated data — an unknown ID is an error, never a 1x1 fallback.
   const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
   if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
-  const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === sel.frameKey)
+  const frame = CLASS_FRAMES[shape.family].find((f) => frameKeyOf(f) === sel.frameKey)
   if (!frame) throw new Error('library: unknown frameKey ' + sel.frameKey)
   const layout = frame.layouts.find((l) => l.name === sel.layoutId)
   if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)

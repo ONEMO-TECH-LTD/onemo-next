@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { LAYOUT_LIBRARY, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -106,7 +106,9 @@ export default function GridLab() {
     if (tab !== 'library') return null
     const isDraft = librarySel.layoutId.startsWith('draft:')
     const base = isDraft ? { ...librarySel, layoutId: '' } : librarySel
-    const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]
+    const fam = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
+      const frames = CLASS_FRAMES[fam]
+      const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
     const resolved = { ...base, layoutId: isDraft ? frame.layouts[0].name : librarySel.layoutId }
     if (edit) return draftStageModel(resolved, edit.nodes, pitch, pad, frame.cols, frame.rows, '')
     if (isDraft) {
@@ -325,6 +327,25 @@ export default function GridLab() {
   return (
     <div className="gl">
       <style>{CSS}</style>
+      {tab === 'library' && (
+        <div className="gl-libbar">
+          <div className="gl-seg gl-libbar-mode">
+            <button aria-pressed={false} onClick={() => setTab('bench')}>Bench</button>
+            <button aria-pressed onClick={() => setTab('library')}>Library</button>
+          </div>
+          <div className="gl-seg gl-libbar-tabs">
+            {LIBRARY_FAMILIES.map((fam) => {
+              const cur = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
+              return <button key={fam} aria-pressed={cur === fam} onClick={() => {
+                const first = LIBRARY_SHAPES.find((x) => x.family === fam)!
+                const f0 = CLASS_FRAMES[fam][0]
+                setEdit(null)
+                setLibrarySel({ ...librarySel, shapeId: first.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name })
+              }}>{fam}</button>
+            })}
+          </div>
+        </div>
+      )}
       {tab === 'library' ? null : (
         <header className="gl-head">
           <h1>Centre Lab <span className="gl-tag">v3.5.6-lead · centre rules</span></h1>
@@ -390,16 +411,13 @@ export default function GridLab() {
         </section>
 
         <aside className="gl-controls">
-          {tab === 'library' ? <><div className="gl-card gl-libtabs">
-            <div className="gl-seg">
-              <button aria-pressed={false} onClick={() => setTab('bench')}>Bench</button>
-              <button aria-pressed onClick={() => setTab('library')}>Library</button>
-            </div>
-          </div><LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
+          {tab === 'library' ? <><LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
-              const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]
+              const fam = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
+      const frames = CLASS_FRAMES[fam]
+      const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
               const isDraft = librarySel.layoutId.startsWith('draft:')
               const d = isDraft ? drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId) : undefined
               const l = isDraft ? undefined : frame.layouts.find((x) => x.name === librarySel.layoutId)
@@ -407,7 +425,7 @@ export default function GridLab() {
             }}
             saveEdit={() => {
               if (!edit) return
-              const { shape, frame } = selectedRecords({ ...librarySel, layoutId: (LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]).layouts[0].name })
+              const { shape, frame } = selectedRecords({ ...librarySel, layoutId: (CLASS_FRAMES[(LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family].find((f) => frameKeyOf(f) === librarySel.frameKey) ?? CLASS_FRAMES.square[0]).layouts[0].name })
               const rec: LibraryDraft = { id: draftId(shape.family, frameKeyOf(frame), edit.name), className: shape.family, frameKey: frameKeyOf(frame), name: edit.name, nodes: edit.nodes }
               writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
               setEdit(null)
@@ -415,7 +433,9 @@ export default function GridLab() {
             }}
             deleteEdit={() => {
               const nm = edit ? edit.name : librarySel.layoutId.replace(/^draft:/, '')
-              const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? LAYOUT_LIBRARY[0]
+              const fam = (LIBRARY_SHAPES.find((x) => x.id === librarySel.shapeId) ?? LIBRARY_SHAPES[0]).family
+      const frames = CLASS_FRAMES[fam]
+      const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
               writeDrafts(drafts.filter((x) => !(x.frameKey === librarySel.frameKey && x.name === nm)))
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
@@ -1092,7 +1112,7 @@ const CSS = `
 .gl-libedit button:disabled{opacity:.4;cursor:default}
 .gl-libedit button:hover:not(:disabled){color:var(--ink)}
 /* LIBRARY TAB ONLY — full-bleed canvas with the panel floating over it (scoped: .gl-libtab). */
-.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - 24px);
+.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - 70px);
   width:100vw;margin-left:calc(50% - 50vw)}
 .gl-libtab .gl-stage{height:100%;padding:0;border:0;background:none;box-shadow:none}
 .gl-libtab .gl-vp{max-width:none;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;background:var(--panel)}
@@ -1101,5 +1121,9 @@ const CSS = `
 .gl-libtab .gl-controls{position:absolute;top:14px;right:14px;width:300px;max-height:calc(100% - 28px);
   overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
 .gl-libtab .gl-controls>*{backdrop-filter:blur(8px);background:#ffffffe8}
-.gl-libtabs{padding:6px}.gl-libtabs .gl-seg{background:none;border:0;padding:0}
+.gl-libbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:8px 14px;
+  width:100vw;margin-left:calc(50% - 50vw);background:#ffffffe6;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.gl-libbar-mode{flex:none}
+.gl-libbar-tabs{flex:1}
+.gl-libbar .gl-seg button{padding:7px 14px}
 `

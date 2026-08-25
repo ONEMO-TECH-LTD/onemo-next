@@ -5,7 +5,7 @@
 // and edit state only; no engine imports — the bridge is where library records meet engine types.
 
 import type { ReactElement, ReactNode } from 'react'
-import { LAYOUT_LIBRARY, LIBRARY_SHAPES, frameKeyOf, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_SHAPES, frameKeyOf, selectedRecords, type LibrarySelection, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
@@ -28,6 +28,7 @@ export default function LibraryPanel({
   startEdit: () => void
 }) {
   const { shape, frame } = selectedRecords({ ...sel, layoutId: sel.layoutId.startsWith('draft:') ? frame0(sel) : sel.layoutId })
+  const frames = CLASS_FRAMES[shape.family]
   const key = frameKeyOf(frame)
   const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family)
   const boxW = 24 + (frame.cols - 1) * pitch, boxH = 24 + (frame.rows - 1) * pitch
@@ -47,7 +48,7 @@ export default function LibraryPanel({
       </Fold>
       <Fold title="Frame">
         <div className="gl-lib">
-          {LAYOUT_LIBRARY.map((f) => (
+          {frames.map((f) => (
             <button key={frameKeyOf(f)} aria-pressed={frameKeyOf(f) === key}
               onClick={() => {
                 const keep = f.layouts.some((l) => l.name === sel.layoutId)
@@ -99,6 +100,8 @@ export default function LibraryPanel({
 
 /** A draft selection still needs a real corpus layout to resolve the frame — take the first. */
 function frame0(sel: LibrarySelection): string {
-  const f = LAYOUT_LIBRARY.find((x) => frameKeyOf(x) === sel.frameKey) ?? LAYOUT_LIBRARY[0]
+  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId) ?? LIBRARY_SHAPES[0]
+  const fs = CLASS_FRAMES[shape.family]
+  const f = fs.find((x) => frameKeyOf(x) === sel.frameKey) ?? fs[0]
   return f.layouts[0].name
 }
