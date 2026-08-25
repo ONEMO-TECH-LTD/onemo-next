@@ -590,3 +590,141 @@ function areaOfRing(pts: ReadonlyArray<Pt>): number {
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a2 += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
   return a2 / 2
 }
+
+/** A flap-driven answer: the arrangement the exposed edges demanded, and what remains exposed. */
+export interface FlapWrap {
+  at: WrapAt
+  /** Material no magnet holds, as a share of the shape at its wrapped size. */
+  unheldPct: number
+  patches: UnheldPatch[]
+  /** The patches still touching the outline — the exposed edges the layout failed to pin. */
+  edgePatches: UnheldPatch[]
+}
+
+/** Does this unheld patch touch the shape's outline (an exposed EDGE, not an interior gap)?
+ *  A patch boundary that runs along the outline shares it — any ring point at ~zero distance. */
+function touchesOutline(patch: UnheldPatch, outer: ReadonlyArray<Pt>): boolean {
+  for (const ring of patch.rings) {
+    const step = Math.max(1, Math.floor(ring.length / 48))     // sample; rings are dense
+    for (let i = 0; i < ring.length; i += step)
+      if (nearestDist(outer, ring[i][0], ring[i][1]) < 0.75) return true
+  }
+  return false
+}
+
+/**
+ * THE FLAP LOOP — Dan's rule verbatim (08-25): "use the flap id to identify edges unprotected and
+ * place magnets there simple as that and scale or shrink shape for that."
+ *
+ * One loop, no frames, no scoring:
+ *   1. wrap the current magnets (exact size, centred);
+ *   2. flap-id the result, keeping only patches that TOUCH THE OUTLINE — unheld material between
+ *      the extremes is fine (L2), an unprotected edge is the failure;
+ *   3. the next magnet goes to the lattice seat nearest the worst exposed edge — TOP FIRST,
+ *      because gravity peels the top flap (L1);
+ *   4. re-wrap: the size grows or shrinks to whatever the new arrangement demands (R4).
+ * Repeat until the asked-for count is placed. Count is exact (L4): every magnet is placed, the
+ * flap only decides WHERE.
+ */
+export function wrapFlap(
+  sized: (mm: number) => Contour, cfg: WrapConfig, count: number, minMM: number, maxMM: number,
+): FlapWrap | null {
+  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const hold = pitch / Math.SQRT2
+  const want = Math.max(1, Math.round(count))
+  const memo = new Map<number, Pt>()
+
+  // Gravity seeds the first magnet: the top of the shape, not its middle (L1 — a single magnet's
+  // job is to keep the top from falling). Seat parity along the way comes from the lattice.
+  let group: Pt[] = [[0, 0]]
+  let at = wrapGroup(sized, cfg, group, minMM, maxMM, memo)
+  if (!at) return null
+
+  const key = (p: Pt) => `${Math.round(p[0])},${Math.round(p[1])}`
+  while (group.length < want) {
+    const outer = sized(at.sizeMM).outer.pts
+    const patches = unheldOf(outer, at.points, hold)
+    const exposed = patches.filter((p) => touchesOutline(p, outer))
+    // TOP FIRST among exposed edges; largest breaks the tie. No exposed edge → largest patch;
+    // nothing unheld at all → the seat furthest from the group (spread, never stack).
+    const ranked = (exposed.length ? exposed : patches).sort((a, b) => {
+      const ty = Math.max(...a.rings[0].map((q) => q[1])) - Math.max(...b.rings[0].map((q) => q[1]))
+      return Math.abs(ty) > pitch / 2 ? -ty : b.areaMM2 - a.areaMM2
+    })
+    const used = new Set(group.map(key))
+    let placed = false
+    for (const target of ranked.length ? ranked.map((p) => p.centreMM) : [at.anchorMM]) {
+      // Candidate seats around the target, nearest first, in the group's own lattice frame.
+      const lx = (target[0] - at.originMM[0]) / pitch, ly = (target[1] - at.originMM[1]) / pitch
+      const cands: Pt[] = []
+      for (let ix = Math.floor(lx) - 1; ix <= Math.ceil(lx) + 1; ix++)
+        for (let iy = Math.floor(ly) - 1; iy <= Math.ceil(ly) + 1; iy++)
+          cands.push([ix * pitch, iy * pitch])
+      cands.sort((a, b) =>
+        Math.hypot(a[0] - lx * pitch, a[1] - ly * pitch) - Math.hypot(b[0] - lx * pitch, b[1] - ly * pitch))
+      for (const seat of cands) {
+        if (used.has(key(seat))) continue
+        const trial = wrapGroup(sized, cfg, [...group, seat], minMM, maxMM, memo)
+        if (!trial) continue
+        group = [...group, seat]
+        at = trial
+        placed = true
+        break
+      }
+      if (placed) break
+    }
+    if (!placed) return null                          // no lawful seat anywhere for the next magnet
+  }
+
+  // REFINE AT THE FINAL SIZE. The greedy pass places each magnet against the flap of the SMALLER
+  // shape that existed before it — the duck at 2 magnets is 77mm and fully held, so the third had
+  // no signal, and only after the growth does the head show as an exposed edge. So: at the landed
+  // size, while an edge is exposed, move the magnet that matters least onto the seat nearest the
+  // worst exposure — top first — and keep the move only when it lowers the exposure.
+  const topOf = (ps: UnheldPatch[]) => ps.length ? Math.max(...ps.map((q) => Math.max(...q.rings[0].map((r) => r[1])))) : -Infinity
+  const judge = (a: WrapAt) => {
+    const o = sized(a.sizeMM).outer.pts
+    const eps = unheldOf(o, a.points, hold).filter((q) => touchesOutline(q, o))
+    return { eps, top: topOf(eps), area: eps.reduce((s2, q) => s2 + q.areaMM2, 0) }
+  }
+  let cur = judge(at)
+  for (let round = 0; round < want * 2 && cur.eps.length; round++) {
+    const target = [...cur.eps].sort((a, b) => {
+      const ty = Math.max(...a.rings[0].map((r) => r[1])) - Math.max(...b.rings[0].map((r) => r[1]))
+      return Math.abs(ty) > pitch / 2 ? -ty : b.areaMM2 - a.areaMM2
+    })[0].centreMM
+    const lx = (target[0] - at.originMM[0]) / pitch, ly = (target[1] - at.originMM[1]) / pitch
+    const cands: Pt[] = []
+    for (let ix = Math.floor(lx) - 1; ix <= Math.ceil(lx) + 1; ix++)
+      for (let iy = Math.floor(ly) - 1; iy <= Math.ceil(ly) + 1; iy++)
+        cands.push([ix * pitch, iy * pitch])
+    cands.sort((a, b) => Math.hypot(a[0] - lx * pitch, a[1] - ly * pitch) - Math.hypot(b[0] - lx * pitch, b[1] - ly * pitch))
+    const used = new Set(group.map(key))
+    let improved = false
+    for (const seat of cands) {
+      if (used.has(key(seat))) continue
+      // Move each magnet in turn onto this seat; the first move that lowers the exposure wins.
+      for (let m = 0; m < group.length && !improved; m++) {
+        const moved = group.map((g, i) => (i === m ? seat : g))
+        const trial = wrapGroup(sized, cfg, moved, minMM, maxMM, memo)
+        if (!trial) continue
+        const j = judge(trial)
+        const better = j.top < cur.top - 1 || (Math.abs(j.top - cur.top) <= 1 && j.area < cur.area - 1)
+        if (better) { group = moved; at = trial; cur = j; improved = true }
+      }
+      if (improved) break
+    }
+    if (!improved) break
+  }
+
+  const outer = sized(at.sizeMM).outer.pts
+  const patches = unheldOf(outer, at.points, hold)
+  const edgePatches = patches.filter((p) => touchesOutline(p, outer))
+  const shapeA = Math.abs(areaOfRing(outer))
+  return {
+    at,
+    unheldPct: shapeA > 0 ? (patches.reduce((s, p) => s + p.areaMM2, 0) / shapeA) * 100 : 0,
+    patches,
+    edgePatches,
+  }
+}
