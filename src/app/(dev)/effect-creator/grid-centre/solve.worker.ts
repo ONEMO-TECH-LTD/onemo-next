@@ -151,13 +151,26 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const contour = sized(eff)
       ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments } })
     } else if (snapWrap) {
-      // FREE + SNAP — the reversal on the continuous axis. The slider names a size; the material
-      // reveals the layout at that size (centre-rules seating, the existing engine); one wrapGroup
-      // solve presses the shape onto exactly those magnets. Between reveal thresholds every slider
-      // position collapses to the same pressed state — the shape snaps from wrap to wrap.
-      const reveal = computeGrid(sized(sizeMM), { ...cfg, positioning: 1, segmentsDetail: 'light' })
-      const pts = reveal.anchors.map((a) => a.p)
-      if (!pts.length) { ctx.postMessage({ id, model: null }); return }
+      // FREE + SNAP — free logic UNTOUCHED, wrap ADDED (Dan, 08-25: "keep the free mode logic,
+      // only wire the wrap"). Three steps, each a path that already exists:
+      //   1 · the ORIGINAL free solve at the slider's size — same call, same cache;
+      //   2 · the seats it revealed go WHOLE to wrapGroup — the transferred solver names the
+      //       pressed size and the panned registration;
+      //   3 · the ORIGINAL free logic again, through its own forced-registration branch, at the
+      //       pressed size — so what is drawn is free mode's own picture of the wrapped state.
+      const fk = cfgSig + '|' + sizeMM
+      let free = freeCache.get(fk)
+      if (!free) {
+        const contour = sized(sizeMM)
+        free = { contour, grid: computeGrid(contour, cfg) }
+        freeCache.set(fk, free)
+        if (freeCache.size > FREE_CAP) freeCache.delete(freeCache.keys().next().value!)
+      }
+      const pts = free.grid.anchors.map((a) => a.p)
+      if (!pts.length) {
+        ctx.postMessage({ id, model: { contour: free.contour, grid: free.grid, effSize: sizeMM, ladder: [], idx: 0, segments: free.grid.segments } })
+        return
+      }
       const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
       let mx = Infinity, my = Infinity
       for (const q of pts) { if (q[0] < mx) mx = q[0]; if (q[1] < my) my = q[1] }
@@ -171,15 +184,13 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       let memo = snapAnchors.get(cfgSig)
       if (!memo) { memo = new Map(); snapAnchors.set(cfgSig, memo); if (snapAnchors.size > 4) snapAnchors.delete(snapAnchors.keys().next().value!) }
       const at = wrapGroup(sized, wcfg, pts.map(([x, y]) => [x - gx, y - gy] as [number, number]), MIN_EFFECT_MM, sizeMM, memo)
-      if (!at) { snapCache.set(sk, null); ctx.postMessage({ id, model: null }); return }
-      const drawn = wrapGrid(sized, { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM }, at)
-      const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-      const r = spotRadiusOf(pad)
-      const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
-      const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
-      const model = {
-        contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
-        effSize: at.sizeMM, ladder: [], idx: 0, segments,
+      let model: unknown
+      if (!at) {
+        model = { contour: free.contour, grid: free.grid, effSize: sizeMM, ladder: [], idx: 0, segments: free.grid.segments }
+      } else {
+        const contour = sized(at.sizeMM)
+        const grid = computeGrid(contour, { ...cfg, forcePhaseMM: [at.originMM[0], at.originMM[1]] })
+        model = { contour, grid, effSize: at.sizeMM, ladder: [], idx: 0, segments: grid.segments }
       }
       snapCache.set(sk, model)
       if (snapCache.size > FREE_CAP) snapCache.delete(snapCache.keys().next().value!)
