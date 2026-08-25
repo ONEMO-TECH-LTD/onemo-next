@@ -222,6 +222,14 @@ export default function GridLab() {
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[] }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
+  // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
+  // fast solves that follow every slider step never blink it.
+  const [showSolving, setShowSolving] = useState(false)
+  useEffect(() => {
+    if (!solving) { setShowSolving(false); return }
+    const t = setTimeout(() => setShowSolving(true), 250)
+    return () => clearTimeout(t)
+  }, [solving])
   const workerRef = useRef<Worker | null>(null)
   const seqRef = useRef(0)
   /** Newest-only dispatch: one solve in flight, at most one (the latest) queued — a burst of
@@ -295,7 +303,7 @@ export default function GridLab() {
             <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
           </div>
           <div className="gl-vp">
-            {solving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
+            {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
               segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
               onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
