@@ -199,3 +199,66 @@ export const LAYOUT_LIBRARY: LibraryFrame[] = [
     { name: 'X', nodes: [[0, 0], [0, 4], [1, 1], [1, 3], [2, 2], [3, 1], [3, 3], [4, 0], [4, 4]], note: 'interior — Full grid only' },
   ] },
 ]
+
+
+/** THE SHAPE LIBRARY — the ruled classification shapes, literal canonical outlines in the unit
+ *  box (y down). aspect 'square' keeps a square span; 'frame' stretches to the frame's span.
+ *  Pure data — the bridge materialises, never generates. */
+export type LibraryShapeId =
+  | 'square' | 'rectangle' | 'rounded-square' | 'rounded-rectangle' | 'circle'
+  | 'triangle' | 'diamond' | 'tee' | 'ell' | 'waisted'
+export interface LibraryShape {
+  id: LibraryShapeId
+  family: ShapeFamily
+  aspect: 'square' | 'frame'
+  outline: ReadonlyArray<readonly [number, number]>
+}
+export const LIBRARY_SHAPES: LibraryShape[] = [
+  { id: 'square', family: 'square', aspect: 'square', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 1.0000], [0.0000, 1.0000]] },
+  { id: 'rectangle', family: 'square', aspect: 'frame', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 1.0000], [0.0000, 1.0000]] },
+  { id: 'rounded-square', family: 'round', aspect: 'square', outline: [[0.0000, 0.3200], [0.0157, 0.2211], [0.0611, 0.1319], [0.1319, 0.0611], [0.2211, 0.0157], [0.3200, 0.0000], [0.6800, 0.0000], [0.7789, 0.0157], [0.8681, 0.0611], [0.9389, 0.1319], [0.9843, 0.2211], [1.0000, 0.3200], [1.0000, 0.6800], [0.9843, 0.7789], [0.9389, 0.8681], [0.8681, 0.9389], [0.7789, 0.9843], [0.6800, 1.0000], [0.3200, 1.0000], [0.2211, 0.9843], [0.1319, 0.9389], [0.0611, 0.8681], [0.0157, 0.7789], [0.0000, 0.6800]] },
+  { id: 'rounded-rectangle', family: 'round', aspect: 'frame', outline: [[0.0000, 0.3200], [0.0157, 0.2211], [0.0611, 0.1319], [0.1319, 0.0611], [0.2211, 0.0157], [0.3200, 0.0000], [0.6800, 0.0000], [0.7789, 0.0157], [0.8681, 0.0611], [0.9389, 0.1319], [0.9843, 0.2211], [1.0000, 0.3200], [1.0000, 0.6800], [0.9843, 0.7789], [0.9389, 0.8681], [0.8681, 0.9389], [0.7789, 0.9843], [0.6800, 1.0000], [0.3200, 1.0000], [0.2211, 0.9843], [0.1319, 0.9389], [0.0611, 0.8681], [0.0157, 0.7789], [0.0000, 0.6800]] },
+  { id: 'circle', family: 'round', aspect: 'square', outline: [[1.0000, 0.5000], [0.9938, 0.5782], [0.9755, 0.6545], [0.9455, 0.7270], [0.9045, 0.7939], [0.8536, 0.8536], [0.7939, 0.9045], [0.7270, 0.9455], [0.6545, 0.9755], [0.5782, 0.9938], [0.5000, 1.0000], [0.4218, 0.9938], [0.3455, 0.9755], [0.2730, 0.9455], [0.2061, 0.9045], [0.1464, 0.8536], [0.0955, 0.7939], [0.0545, 0.7270], [0.0245, 0.6545], [0.0062, 0.5782], [0.0000, 0.5000], [0.0062, 0.4218], [0.0245, 0.3455], [0.0545, 0.2730], [0.0955, 0.2061], [0.1464, 0.1464], [0.2061, 0.0955], [0.2730, 0.0545], [0.3455, 0.0245], [0.4218, 0.0062], [0.5000, 0.0000], [0.5782, 0.0062], [0.6545, 0.0245], [0.7270, 0.0545], [0.7939, 0.0955], [0.8536, 0.1464], [0.9045, 0.2061], [0.9455, 0.2730], [0.9755, 0.3455], [0.9938, 0.4218]] },
+  { id: 'triangle', family: 'triangle', aspect: 'frame', outline: [[0.0000, 1.0000], [1.0000, 1.0000], [0.5000, 0.0000]] },
+  { id: 'diamond', family: 'triangle', aspect: 'square', outline: [[0.5000, 0.0000], [1.0000, 0.5000], [0.5000, 1.0000], [0.0000, 0.5000]] },
+  { id: 'tee', family: 'triangle', aspect: 'frame', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [1.0000, 0.4000], [0.7000, 0.4000], [0.7000, 1.0000], [0.3000, 1.0000], [0.3000, 0.4000], [0.0000, 0.4000]] },
+  { id: 'ell', family: 'triangle', aspect: 'frame', outline: [[0.0000, 0.0000], [0.4000, 0.0000], [0.4000, 0.5500], [1.0000, 0.5500], [1.0000, 1.0000], [0.0000, 1.0000]] },
+  { id: 'waisted', family: 'triangle', aspect: 'frame', outline: [[0.0000, 0.0000], [1.0000, 0.0000], [0.6200, 0.5000], [1.0000, 1.0000], [0.0000, 1.0000], [0.3800, 0.5000]] },
+]
+
+/** THE UNIVERSAL PRIMITIVES (ruled: "the pair and single magnet must be tried no matter the
+ *  class") — tagged templates available for review in EVERY band/frame; the engine's judge
+ *  decides where they hold, the library never omits them. Lattice units. */
+export const UNIVERSAL_PRIMITIVES: LibraryLayout[] = [
+  { name: 'single', nodes: [[0, 0]] },
+  { name: 'pair-h', nodes: [[0, 0], [1, 0]] },
+  { name: 'pair-v', nodes: [[0, 0], [0, 1]] },
+  { name: 'pair-diag', nodes: [[0, 0], [1, 1]] },
+  { name: 'pair-anti', nodes: [[0, 1], [1, 0]] },
+]
+
+/** Stable-ID selection — indices are forbidden identity (pruning the draft must never silently
+ *  retarget a saved selection). Owned by the pure module. */
+export interface LibrarySelection {
+  shapeId: LibraryShapeId
+  frameKey: string          // 'colsxrows', e.g. '2x3'
+  layoutId: string          // layout name, or 'prim:<name>' for a universal primitive
+  view: LibraryTransform
+}
+export function frameKeyOf(f: LibraryFrame): string { return f.cols + 'x' + f.rows }
+export function selectedRecords(sel: LibrarySelection): {
+  shape: LibraryShape
+  frame: LibraryFrame
+  layout: LibraryLayout
+  isPrimitive: boolean
+} {
+  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId) ?? LIBRARY_SHAPES[0]
+  const frame = LAYOUT_LIBRARY.find((f) => frameKeyOf(f) === sel.frameKey) ?? LAYOUT_LIBRARY[0]
+  if (sel.layoutId.startsWith('prim:')) {
+    const nm = sel.layoutId.slice(5)
+    const prim = UNIVERSAL_PRIMITIVES.find((l) => l.name === nm) ?? UNIVERSAL_PRIMITIVES[0]
+    return { shape, frame, layout: prim, isPrimitive: true }
+  }
+  const layout = frame.layouts.find((l) => l.name === sel.layoutId) ?? frame.layouts[0]
+  return { shape, frame, layout, isPrimitive: false }
+}

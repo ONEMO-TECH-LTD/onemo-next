@@ -88,7 +88,7 @@ export default function GridLab() {
   /** Top-level view — the bench, or the layout-library review tab. */
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
-  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ frameIndex: 4, layoutIndex: 0, family: 'triangle', view: { transpose: false, flipX: false, flipY: false } })
+  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'tee', frameKey: '2x3', layoutId: 'tee-L', view: { transpose: false, flipX: false, flipY: false } })
   const libraryModel = useMemo(() => tab === 'library' ? libraryStageModel(librarySel, pitch, pad) : null, [tab, librarySel, pitch, pad])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
@@ -321,22 +321,28 @@ export default function GridLab() {
           </div>
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
-            {libraryModel ? <Stage contour={libraryModel.contour} grid={libraryModel.grid} lattice={showLattice} box={false}
-              segments={[]} segFill={false} onPan={() => {}} onZoom={() => {}} onReset={() => {}} />
-            : model ? <Stage contour={model.contour} grid={model.grid} lattice={showLattice} box={showBox}
-              segments={showSegs ? model.segments : []} segFill={segFillN !== 0}
-              onPan={(dx, dy) => setManual((m) => { const bx = m ? m.x : model.grid.phaseMM[0], by = m ? m.y : model.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } })}
-              onZoom={(f) => {
-                // Pinch = manual scaling WITHIN the band's range.
-                const b = BANDS.find((x) => x.id === mode)!
-                setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
-              }}
-              onReset={() => setManual(null)} />
-              : src === 'magic'
-                ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
-                  : src === 'cut'
-                  ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
-                  : <Empty text="shape unavailable" />}
+            {(() => {
+              const src2 = libraryModel ?? model
+              if (!src2) return null
+              const stageProps = libraryModel
+                ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: false,
+                    segments: [], segFill: false, onPan: () => {}, onZoom: () => {}, onReset: () => {} }
+                : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
+                    segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
+                    onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
+                    onZoom: (f: number) => {
+                      // Pinch = manual scaling WITHIN the band's range.
+                      const b = BANDS.find((x) => x.id === mode)!
+                      setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
+                    },
+                    onReset: () => setManual(null) }
+              return <Stage {...stageProps} />
+            })()}
+            {!libraryModel && !model && (src === 'magic'
+              ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
+              : src === 'cut'
+                ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
+                : <Empty text="shape unavailable" />)}
           </div>
         </section>
 
