@@ -352,7 +352,12 @@ export default function GridLab() {
             <button aria-pressed onClick={() => setTab('bench')}>Bench</button>
             <button aria-pressed={false} onClick={() => setTab('library')}>Library</button>
           </div>
-          <span className="gl-eye" style={{ marginLeft: 'auto' }}>v3.5.6-lead · centre rules</span>
+          <div className="gl-seg gl-libbar-tabs">
+            <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
+            <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
+            <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
+            <button aria-pressed={src === 'cut'} onClick={() => setSrc('cut')}>Cutouts</button>
+          </div>
         </div>
       )}
 
@@ -440,20 +445,13 @@ export default function GridLab() {
               setEdit(null)
               setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
             }} /></> : <>
-          <Fold title="Shape source">
-            <div className="gl-seg gl-seg3">
-              <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
-              <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
-              <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
-              <button aria-pressed={src === 'cut'} onClick={() => setSrc('cut')}>Cutouts</button>
-            </div>
-
+          <Fold title="Shape">
             {src === 'preset' && <>
-              <label className="gl-field"><span>Preset shape</span>
-                <select value={preset} onChange={e => setPreset(e.target.value as VectorShapeKind)}>
-                  {PRESETS.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-              </label>
+              <div className="gl-lib">
+                {PRESETS.map((k) => (
+                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
+                ))}
+              </div>
               {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
               {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
             </>}
@@ -467,7 +465,14 @@ export default function GridLab() {
             </>}
 
             {src === 'cut' && <>
-              <label className="gl-field"><span>Cutout library · no AI, traced directly</span>
+              <div className="gl-lib">
+                {libCut.map((f) => (
+                  <button key={f} aria-pressed={cutSel === f} onClick={() => { setCutSel(f); loadCut(f) }}>
+                    <b>{f.replace(/\.\w+$/, '')}</b>
+                  </button>
+                ))}
+              </div>
+              <label className="gl-field" style={{ display: 'none' }}><span>Cutout library</span>
                 <select value={cutSel} onChange={(e) => { setCutSel(e.target.value); if (e.target.value) loadCut(e.target.value) }}>
                   <option value="">— pick a cutout —</option>
                   {libCut.map((f) => <option key={f} value={f}>{f.replace(/\.\w+$/, '')}</option>)}
