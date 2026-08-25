@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
+import { CLASS_FRAMES, LIBRARY_FAMILIES, LIBRARY_SHAPES, pickLayout, selectedRecords, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/grid-magnet-library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -113,12 +113,15 @@ export default function GridLab() {
       const frames = CLASS_FRAMES[fam]
       const frame = frames.find((f) => frameKeyOf(f) === librarySel.frameKey) ?? frames[0]
     const resolved = { ...base, layoutId: isDraft ? frame.layouts[0].name : librarySel.layoutId }
-    if (edit) return draftStageModel(resolved, edit.nodes, pitch, pad, frame.cols, frame.rows, '')
+    // A stale or cross-class selection must never take the page down: the strict resolver
+    // stays strict for the pipeline; the view falls back to the frame's first layout.
+    const safe = { ...resolved, layoutId: pickLayout(frame, resolved.layoutId) }
+    if (edit) return draftStageModel(safe, edit.nodes, pitch, pad, frame.cols, frame.rows, '')
     if (isDraft) {
       const d = drafts.find((x) => x.frameKey === librarySel.frameKey && 'draft:' + x.name === librarySel.layoutId)
-      if (d) return draftStageModel(resolved, d.nodes, pitch, pad, frame.cols, frame.rows, '')
+      if (d) return draftStageModel(safe, d.nodes, pitch, pad, frame.cols, frame.rows, '')
     }
-    return libraryStageModel(resolved, pitch, pad)
+    return libraryStageModel(safe, pitch, pad)
   }, [tab, librarySel, pitch, pad, edit, drafts])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
@@ -343,7 +346,7 @@ export default function GridLab() {
                 const first = LIBRARY_SHAPES.find((x) => x.family === fam)!
                 const f0 = CLASS_FRAMES[fam][0]
                 setEdit(null)
-                setLibrarySel({ ...librarySel, shapeId: first.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts.some((l) => l.name === 'perimeter') ? 'perimeter' : f0.layouts[0].name })
+                setLibrarySel({ ...librarySel, shapeId: first.id, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') })
               }}>{fam}</button>
             })}
           </div>

@@ -287,3 +287,10 @@ export function draftIntegrity(d: LibraryDraft, frame: LibraryFrame): string[] {
   }
   return out
 }
+
+/** The layout a frame should land on: the preferred name when it carries it, else its first.
+ *  Every class/type/frame switch goes through this — a selection can never name a layout the
+ *  frame does not have (that threw the strict resolver and took the page down, 08-25). */
+export function pickLayout(frame: LibraryFrame, preferred: string): string {
+  return frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
+}
