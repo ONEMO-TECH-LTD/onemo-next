@@ -168,6 +168,23 @@ const parseFailureCodes = (tree: ts.SourceFile): number[] =>
   [...(tree as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics]
     .map((diagnostic) => diagnostic.code)
 
+const assertDataOnly = (value: unknown, path = 'entry'): void => {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(path + ': non-finite number')
+    return
+  }
+  if (typeof value !== 'object') throw new Error(path + ': non-data ' + typeof value)
+  const proto = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== Array.prototype) throw new Error(path + ': non-plain object')
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key === 'symbol') throw new Error(path + ': symbol key')
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!
+    if (descriptor.get || descriptor.set) throw new Error(path + '.' + key + ': accessor')
+    if ('value' in descriptor) assertDataOnly(descriptor.value, path + '.' + key)
+  }
+}
+
 const corpusDeclarationViolations = (path: string, code = source(path)): string[] => {
   const tree = parse(path, code)
   const out: string[] = []
@@ -198,6 +215,25 @@ const emptyLayoutSentinels = (path: string, code = source(path)): number[] => {
   }
   visit(tree)
   return out
+}
+
+const zone8Violations = (path: string, code = source(path)): string[] => {
+  const violations: string[] = []
+  for (const edge of importEdges(path, code)) {
+    if (!edge.to) continue
+    const libraryEdge = edge.to === LIBRARY || edge.to.startsWith(LIBRARY + '/')
+    if (path === PANEL || path === PAGE) {
+      if (libraryEdge && edge.specifier !== '@/lib/effect/library') violations.push(edge.specifier)
+    } else if (path === join(ROOT, 'grid-magnet-library-bridge.ts')) {
+      const allowed = edge.specifier === './library'
+        || edge.specifier === './types'
+        || edge.specifier === './grid-magnet'
+        || edge.specifier === './grid-magnet-compute'
+        || edge.specifier === './grid-magnet-spec'
+      if (!allowed) violations.push(edge.specifier)
+    }
+  }
+  return violations
 }
 
 describe('Shape-Layout Library Law — activation schedule', () => {
@@ -263,6 +299,13 @@ describe('Shape-Layout Library Law — activation schedule', () => {
 
   it('STEP 1: the approved law is landed verbatim', () => {
     expect(createHash('sha256').update(source(LAW)).digest('hex')).toBe(LAW_SHA256)
+  })
+
+  it('STEP 4 gate self-proof rejects accessors and non-data values', () => {
+    expect(() => assertDataOnly({ get label() { return 'x' } })).toThrow('accessor')
+    expect(() => assertDataOnly({ value: new Date(0) })).toThrow('non-plain object')
+    expect(() => assertDataOnly({ value: Number.POSITIVE_INFINITY })).toThrow('non-finite number')
+    expect(() => assertDataOnly({ [Symbol('x')]: 1 })).toThrow('symbol key')
   })
 
   it('STEP 2: registration invariants derive families from registered classes', () => {
@@ -391,6 +434,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
+      assertDataOnly(entry)
       expect(JSON.parse(JSON.stringify(entry))).toEqual(entry)
       expect(Number.isFinite(entry.widthMM) && Number.isFinite(entry.heightMM)).toBe(true)
     }
@@ -398,15 +442,20 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(new Set(ids).size).toBe(ids.length)
     expect([...catalogue(24).map((entry) => entry.id)].sort()).toEqual([...ids].sort())
     expect([...catalogue(96).map((entry) => entry.id)].sort()).toEqual([...ids].sort())
-    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v1.json')))
-    expect(manifest).toEqual(entries.map((entry) => ({ id: entry.id, classId: entry.classId, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) })))
+    type CatalogueIdentity = { id: string; classId: string; typeId: string; corners: 'sharp' | 'bevel' | 'round'; frameCols: number; frameRows: number; nodesMM: readonly (readonly [number, number])[] }
+    const identity: CatalogueIdentity[] = entries.map((entry) => ({ id: entry.id, classId: entry.classId, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) }))
+    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v1.json'))) as CatalogueIdentity[]
+    const byId = (a: CatalogueIdentity, b: CatalogueIdentity) => a.id.localeCompare(b.id)
+    expect([...manifest].sort(byId)).toEqual([...identity].sort(byId))
   })
-  it('STEP 4: classifier matcher round-trips every catalogue entry', () => {
-    for (const item of classifiedLibraryCatalogue(48)) {
-      expect(Number.isFinite(item.shapeClass.cx) && Number.isFinite(item.shapeClass.cy)).toBe(true)
-      expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), 48).some((entry) => entry.id === item.entry.id)).toBe(true)
+  it('STEP 4: classifier matcher round-trips every catalogue entry at every pitch', () => {
+    for (const pitchMM of [24, 48, 96]) for (const item of classifiedLibraryCatalogue(pitchMM)) {
+      const shape = item.shapeClass
+      const numericFields = [shape.cx, shape.cy, shape.band, shape.widthMM, shape.heightMM, shape.fill, shape.frame.cols, shape.frame.rows, shape.frame.capacity]
+      expect(numericFields.every(Number.isFinite), item.entry.id).toBe(true)
+      expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), pitchMM).some((entry) => entry.id === item.entry.id), item.entry.id).toBe(true)
     }
-  })
+  }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     const barrel = source(join(LIBRARY, 'index.ts'))
     for (const symbol of ['CatalogueEntry', 'LibrarySurface', 'catalogue', 'librarySurface', 'LIBRARY_FAMILIES'])
@@ -420,5 +469,13 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const page = source(PAGE)
     expect(page).toContain('librarySurface(')
     expect(page).toContain('libraryStageModel(')
+    expect(zone8Violations(PANEL)).toEqual([])
+    expect(zone8Violations(PAGE)).toEqual([])
+    expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'))).toEqual([])
+  })
+  it('STEP 5 gate self-proof rejects forbidden panel, page, and bridge edges', () => {
+    expect(zone8Violations(PANEL, source(PANEL) + `\nimport { resolveSelection } from '@/lib/effect/library/selection'`)).toEqual(['@/lib/effect/library/selection'])
+    expect(zone8Violations(PAGE, source(PAGE) + `\nimport { materializeSelection } from '@/lib/effect/library/materialize'`)).toEqual(['@/lib/effect/library/materialize'])
+    expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'), source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport { resolveSelection } from './library/selection'`)).toEqual(['./library/selection'])
   })
 })
