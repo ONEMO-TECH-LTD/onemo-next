@@ -1,13 +1,11 @@
 // library/triangle-geometry.ts — the triangle's pure geometry. Integer lattice arithmetic only:
 // identity and classification are EXACT, floating point is display metadata. No React, no engine.
 
-export type LatticeNode = readonly [number, number]
+import type { LatticeNode, TriangleLayout } from './corpus-triangle'
+
+export type { LatticeNode, TriangleLayout } from './corpus-triangle'
 export type TriangleSideClass = 'equilateral' | 'isosceles' | 'scalene'
 export type TriangleAngleClass = 'acute' | 'right' | 'obtuse'
-export interface TriangleLayout {
-  readonly id: string
-  readonly vertices: readonly [LatticeNode, LatticeNode, LatticeNode]
-}
 
 export interface TriangleGeometry {
   sideClass: TriangleSideClass
@@ -142,24 +140,4 @@ export function symmetryClosure(
     }
   }
   return dedupe(out)
-}
-
-/** Convex hull (monotone chain) of millimetre points — the outline's supporting polygon. */
-export function convexHull(pts: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
-  const p = [...pts].map(([x, y]) => [x, y] as [number, number])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  if (p.length < 3) return p
-  const half = (src: Array<[number, number]>) => {
-    const h: Array<[number, number]> = []
-    for (const q of src) {
-      while (h.length >= 2) {
-        const [ax, ay] = h[h.length - 2], [bx, by] = h[h.length - 1]
-        if ((bx - ax) * (q[1] - ay) - (by - ay) * (q[0] - ax) <= 0) h.pop(); else break
-      }
-      h.push(q)
-    }
-    h.pop()
-    return h
-  }
-  return [...half(p), ...half([...p].reverse())]
 }

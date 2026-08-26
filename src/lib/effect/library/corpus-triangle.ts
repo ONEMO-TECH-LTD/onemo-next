@@ -5,9 +5,13 @@
 // 79 layouts. The test file derives the universe independently and asserts exact set equality,
 // so a deleted or invented record fails.
 
-import type { TriangleLayout } from './triangle-geometry'
+export type LatticeNode = readonly [number, number]
+export interface TriangleLayout {
+  readonly id: string
+  readonly vertices: readonly [LatticeNode, LatticeNode, LatticeNode]
+}
 
-export const TRIANGLE_LAYOUTS: readonly TriangleLayout[] = [
+export const TRIANGLE_LAYOUTS = [
   { id: 'tri:0,0;0,1;1,0', vertices: [[0, 0], [0, 1], [1, 0]] },
   { id: 'tri:0,0;0,1;1,2', vertices: [[0, 0], [0, 1], [1, 2]] },
   { id: 'tri:0,0;0,1;1,3', vertices: [[0, 0], [0, 1], [1, 3]] },
@@ -87,4 +91,4 @@ export const TRIANGLE_LAYOUTS: readonly TriangleLayout[] = [
   { id: 'tri:0,0;2,4;4,2', vertices: [[0, 0], [2, 4], [4, 2]] },
   { id: 'tri:0,0;2,4;4,3', vertices: [[0, 0], [2, 4], [4, 3]] },
   { id: 'tri:0,0;3,4;4,3', vertices: [[0, 0], [3, 4], [4, 3]] },
-]
+] as const satisfies readonly TriangleLayout[]

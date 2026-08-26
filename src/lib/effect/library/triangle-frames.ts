@@ -4,7 +4,7 @@
 
 import { sample96, SPACING_96, SPACING_BASE } from './rules'
 import { transformLayout } from './transforms'
-import type { LibraryTransform } from './types'
+import type { FrameExtent, LibraryTransform } from './types'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import {
   boundsOf, fullNodes, perimeterNodes, perimeterRuns, symmetryClosure, triangleGeometry,
@@ -201,7 +201,7 @@ const TYPE_OF = new Map<string, TriangleProductType>()
 
 function computeUprightView(t: TriangleLayout): LibraryTransform {
   const b = boundsOf([...t.vertices])
-  const frame: LibraryFrame = { cols: b.cols, rows: b.rows, layouts: [] }
+  const frame: FrameExtent = { cols: b.cols, rows: b.rows }
   const layout: LibraryLayout = { name: 'corners', nodes: [...t.vertices] }
   let best = VIEWS[0], bestScore = -1
   for (const view of VIEWS) {

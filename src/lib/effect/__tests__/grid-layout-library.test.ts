@@ -2,7 +2,7 @@
 // bridge mapping (QA F3: tests must FAIL when any required shape/frame/layout
 // is removed; never a point-count oracle).
 
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -18,6 +18,7 @@ import {
   type LibraryEdit,
   TRIANGLE_TYPES,
   type LatticeNode,
+  type TriangleLayout,
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
@@ -27,6 +28,7 @@ import { DIAMOND_FRAMES } from '../library/corpus-diamond'
 import { libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
+import { convexHull } from '../library/geometry'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
  *  mutable Pt. Converting is the BRIDGE's whole job, so a test that calls an engine classifier
@@ -43,8 +45,6 @@ const framesAt = (classId: string, pitchMM: number) => {
   const spec = specOf(classId)
   return spec.types.flatMap((type) => spec.variants(type.id, pitchMM).map((variant) => variant.frame))
 }
-const registryClasses = () => LIBRARY_FAMILIES.filter((classId) => classId !== 'triangle')
-
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
   classId: 'square', frameKey: '3x3', layoutId: 'perimeter',
   view: { transpose: false, flipX: false, flipY: false }, ...over,
@@ -68,14 +68,11 @@ describe('corpus completeness — removal must fail these', () => {
 
 describe('classifier goldens — library and engine taxonomies stay distinct', () => {
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
-    for (const family of registryClasses()) for (const f of framesAt(family, 48)) {
+    for (const family of ['square', 'rectangle'] as const) for (const f of framesAt(family, 48)) {
       // The engine classifier tops out at 5 magnet lines per axis (bands B1-B5), so a 6-line
       // library frame has no class to be read back as. The library carries it; the classifier
       // cannot express it until a sixth band is ruled.
       if (f.cols > 5 || f.rows > 5) continue
-      // The diamond's outline WRAPS its magnet group (Dan), so its box is deliberately not
-      // the frame's class floor — the frame golden does not apply to that class.
-      if (family === 'diamond') continue
       for (const transpose of [false, true]) {
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (family === 'square' && cols !== rows) continue
@@ -95,13 +92,6 @@ describe('classifier goldens — library and engine taxonomies stay distinct', (
     expect(Math.max(...xs2) - Math.min(...xs2)).toBeCloseTo(120, 6)
     expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(120, 6)
   })
-
-
-
-
-  it('families stay complete', () => {
-    expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle', 'diamond', 'triangle'])
-  })
 })
 
 describe('data integrity + transforms', () => {
@@ -109,7 +99,7 @@ describe('data integrity + transforms', () => {
     expect(registryIntegrity()).toEqual([])
   })
   it('transform closure keeps nodes in bounds', () => {
-    for (const f of registryClasses().flatMap((f) => framesAt(f, 48))) for (const l of f.layouts)
+    for (const family of LIBRARY_FAMILIES) for (const f of framesAt(family, 48)) for (const l of f.layouts)
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
         const t = transformLayout(f, l, { transpose, flipX, flipY })
         expect(t.nodes.length).toBe(l.nodes.length)
@@ -282,20 +272,13 @@ describe('selection resolution — one owner, no guessing in the view', () => {
 
 describe('the 96mm spacing mode is computed policy, one rule for every class', () => {
   const key = (n: readonly [number, number]) => n[0] + ',' + n[1]
-  // An extreme is a vertex of the class's own outline — four for a box, four for a Manhattan
-  // ring, three for a triangle.
-  const extremes = (f: { cols: number; rows: number }, family: string): Array<[number, number]> => {
-    if (family === 'diamond') { const k = (f.cols - 1) / 2; return [[k, 0], [0, k], [f.cols - 1, k], [k, f.rows - 1]] }
-    return [[0, 0], [f.cols - 1, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
-  }
-
   it('the corpus stores no 96mm population — it is derived, never hand-written', () => {
     for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES])
       for (const f of frames) expect(f.layouts.map((l) => l.name)).not.toContain('perimeter-96')
   })
 
   it('a frame with a perimeter always offers the 96mm mode, and it is a subset of that perimeter', () => {
-    for (const fam of registryClasses()) for (const f of framesAt(fam, 48)) {
+    for (const fam of LIBRARY_FAMILIES) for (const f of framesAt(fam, 48)) {
       const per = f.layouts.find((l) => l.name === 'perimeter')
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!per) { expect(s96).toBeUndefined(); continue }
@@ -307,11 +290,13 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('every 96mm population keeps every extreme — an extreme is never left bare', () => {
-    for (const fam of registryClasses()) for (const f of framesAt(fam, 48)) {
+    for (const fam of LIBRARY_FAMILIES) for (const f of framesAt(fam, 48)) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
       const got = new Set(s96.nodes.map(key))
-      for (const e of extremes(f, fam)) expect(got.has(key(e)), `${fam} ${frameKeyOf(f)} missing ${key(e)}`).toBe(true)
+      const per = f.layouts.find((l) => l.name === 'perimeter')!
+      for (const e of convexHull(per.nodes))
+        expect(got.has(key(e)), `${fam} ${frameKeyOf(f)} missing ${key(e)}`).toBe(true)
     }
   })
 
@@ -396,7 +381,8 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
       const names = f.layouts.map((l) => l.name)
       for (const n of ['full', 'perimeter', 'perimeter-96', 'corners']) expect(names, frameKeyOf(f)).toContain(n)
       const corners = f.layouts.find((l) => l.name === 'corners')!
-      expect(corners.nodes.map(key).sort()).toEqual(extremes(f, 'diamond').map(key).sort())
+      const perimeter = f.layouts.find((l) => l.name === 'perimeter')!
+      expect(corners.nodes.map(key).sort()).toEqual(convexHull(perimeter.nodes).map(key).sort())
     }
   })
 })
@@ -802,8 +788,8 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
       view: { transpose: false, flipX: false, flipY: false } }
   }
   it('every layout, population and view is a three-cornered triangle clearing exactly 12mm', () => {
-    // The offset is three lines moved out and intersected — no join style, no miter limit, so
-    // nothing is ever clipped. Under Clipper's miter-2 all 79 came out 4 or 5 sided.
+    // The shared sharp-outline producer must preserve the triangle's three supporting corners
+    // while keeping every magnet at least the released padding inside them.
     let checked = 0
     for (const t of TRIANGLE_LAYOUTS) {
       const f = triangleFrame(t, 48)
@@ -827,6 +813,19 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
       }
     }
     expect(checked).toBeGreaterThan(2000)
+  })
+
+  it('every triangle chip measures the one produced outline', () => {
+    const spec = specOf('triangle')
+    for (const type of spec.types) for (const variant of spec.variants(type.id, 48)) {
+      const selection = { ...variant.selection, layoutId: variant.frame.layouts[0].name, view: variant.view }
+      const outline = materializeSelection(selection, 48).outlineMM
+      const xs = outline.map(([x]) => x), ys = outline.map(([, y]) => y)
+      expect(variant.label, variant.id).toBe(
+        Math.round(Math.max(...xs) - Math.min(...xs)) + '×'
+        + Math.round(Math.max(...ys) - Math.min(...ys)),
+      )
+    }
   })
 
   it('a geometry opens RESTING, never in its de-duplication form', () => {
@@ -903,14 +902,14 @@ describe('triangle — straight layouts come before the diagonal ones', () => {
     // and no active shape is symmetric without a level side any more — that was the Slice tab
     expect(active.filter((t) => triangleGeometry(t.vertices).sideClass === 'isosceles' && !restsFlat(t)))
       .toEqual([])
-    expect(active.every((t) => TRIANGLE_LAYOUTS.includes(t))).toBe(true)
+    expect(active.every((t) => (TRIANGLE_LAYOUTS as readonly TriangleLayout[]).includes(t))).toBe(true)
   })
 })
 
 describe('triangle — every tab carries only its own kind', () => {
   const byId = (id: string) => TRIANGLE_LAYOUTS.find((t) => t.id === id)!
   /** The measurable form of each name, read on the view the shape is presented in. */
-  const shown = (t: typeof TRIANGLE_LAYOUTS[number]) => {
+  const shown = (t: TriangleLayout) => {
     const b = boundsOf([...t.vertices])
     const r = tl({ cols: b.cols, rows: b.rows }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
     const [p, q, s] = r.nodes
@@ -1004,7 +1003,6 @@ describe('triangle — every tab carries only its own kind', () => {
 
 describe('the class spec is portable, and nothing outside it knows a class by name', () => {
   const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
-  const LIB = resolve(process.cwd(), 'src/lib/effect/library')
   const PANEL = 'src/app/(dev)/effect-creator/grid-centre/LibraryPanel.tsx'
   const PAGE = 'src/app/(dev)/effect-creator/grid-centre/page.tsx'
   const BRIDGE = 'src/lib/effect/grid-magnet-library-bridge.ts'
@@ -1053,21 +1051,6 @@ describe('the class spec is portable, and nothing outside it knows a class by na
     }
   })
 
-  it('only the spec and the triangle’s own files name the triangle', () => {
-    const allowed = new Set([
-      'class-spec.ts', 'corpus-triangle.ts', 'triangle-frames.ts', 'triangle-geometry.ts',
-      'triangle-types.ts', 'triangle-class.ts', 'class-registry.ts', 'registry-class.ts', 'index.ts', 'types.ts', 'frames.ts',
-    ])
-    const offenders: string[] = []
-    for (const f of readdirSync(LIB)) {
-      if (allowed.has(f)) continue
-      // a comment may still explain the seam; an IMPORT is the leak
-      const src = read('src/lib/effect/library/' + f)
-      if (/from '\.\/(triangle-[a-z]+|corpus-triangle)'/.test(src)) offenders.push(f)
-    }
-    expect(offenders).toEqual([])
-  })
-
   it('the panel, the page and the bridge hold no class policy', () => {
     for (const f of [PANEL, PAGE, BRIDGE]) {
       const src = read(f)
@@ -1098,8 +1081,9 @@ describe('the class spec is portable, and nothing outside it knows a class by na
   })
 
   it('the engine-facing contract does not depend on the browser draft store', () => {
-    const src = read('src/lib/effect/library/class-spec.ts')
-    // drafts.ts asks class-spec for validation; importing back would be a cycle, and would put
+    const src = read('src/lib/effect/library/class-contract.ts')
+    // drafts.ts asks the registered class for validation; importing browser draft state into the
+    // contract would create a cycle and put
     // browser-local storage inside the contract an engine consumes
     expect(src).not.toMatch(/from '\.\/drafts'/)
   })

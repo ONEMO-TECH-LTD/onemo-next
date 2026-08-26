@@ -1,7 +1,7 @@
 // library/options.ts — WHAT THE PANEL MAY OFFER. The view maps these to controls and nothing
 // else: every option already carries the selection it produces and the words it reads, so
 // class, frame, geometry, layout and view policy all stay here (Dan, 08-26: "no logic in UI
-// shell and poage"). Resolution lives in selection.ts; the class answers live in class-spec.ts.
+// shell and poage"). Resolution lives in selection.ts; classes answer through class-registry.ts.
 
 import { specOf } from './class-registry'
 import type { LibraryClass } from './class-contract'
