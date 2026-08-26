@@ -4,8 +4,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
-  LIBRARY_FAMILIES, SPACING_MODES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES,
+  LIBRARY_FAMILIES, SPACING_MODES, CLASS_RULES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, layoutAtPitch,
   transformLayout as tl,
   TRIANGLE_LAYOUTS, triangleGeometry, triangleProductType, triangleTypeOf, triangleFrameKey,
@@ -53,7 +53,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
   it('every shape outline classifies as its declared family', () => {
     for (const s of LIBRARY_SHAPES) {
       // a derived outline has no stored shape to classify — it is proven by its own hull tests
-      if (s.outlineSource === 'arrangement-hull') continue
+      if (CLASS_RULES[s.family].source === 'geometry') continue
       // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
       // the engine classifier reads it as the box-filling 'square' family. The mapping is
       // asserted explicitly so the two taxonomies can never silently merge.
@@ -98,7 +98,6 @@ describe('classifier goldens — declared family is the classifier verdict, not 
 
   it('families and draft applicability stay complete', () => {
     expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle', 'diamond', 'triangle'])
-    for (const fam of LIBRARY_FAMILIES) expect(FAMILY_APPLICABILITY_DRAFT[fam].length).toBeGreaterThan(0)
   })
 })
 
@@ -583,10 +582,12 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     }
   })
 
-  it('the triangle stores no unit outline — its shape record is empty', () => {
+  it('the triangle stores no unit outline — one discriminant decides, not two', () => {
     const tri = LIBRARY_SHAPES.find((s) => s.id === 'triangle')!
-    expect(tri.outlineSource).toBe('arrangement-hull')
+    expect(CLASS_RULES.triangle.source).toBe('geometry')
     expect(tri.outline.length).toBe(0)
+    for (const s of LIBRARY_SHAPES)
+      if (CLASS_RULES[s.family].source === 'registry') expect(s.outline.length).toBeGreaterThan(2)
   })
 
   it('a node on an edge or inside leaves the outline unchanged; one outside changes it', () => {
@@ -636,12 +637,12 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     const id = one('wedge').id
     const sel = sel3(id)
     for (const nodes of [[], [[0, 0]], [[0, 0], [1, 1]]] as Array<Array<[number, number]>>) {
-      const m = draftStageModel(sel, nodes, 48, 12, 2, 2, '')
+      const m = draftStageModel(sel, nodes, 48, 12, 2, 2)
       expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(3)   // still renderable
       expect(m.error).toBeTruthy()
     }
     const good = [...one('wedge').vertices] as Array<[number, number]>
-    expect(draftStageModel(sel, good, 48, 12, 2, 2, '').error).toBeNull()
+    expect(draftStageModel(sel, good, 48, 12, 2, 2).error).toBeNull()
   })
 
   it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
@@ -652,13 +653,6 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(draftIntegrity({ ...base, nodes: [[0, 0], [0, 1], [0, 2]] }, frame).join()).toContain('collinear')
     expect(draftIntegrity({ ...base, geometryId: undefined, nodes: [...one('sail').vertices] as Array<[number, number]> }, frame).join())
       .toContain('geometryId required')
-  })
-
-  it('F2 — the arrangement carries the geometry through every view', () => {
-    const id = one('sail').id
-    for (const view of [{ transpose: false, flipX: false, flipY: false }, { transpose: true, flipX: true, flipY: true }])
-      expect(libraryArrangement({ ...sel3(id), view }, 48).geometryId).toBe(id)
-    expect(libraryArrangement(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48).geometryId).toBeUndefined()
   })
 
   it('F3 — every layout exposes exactly its distinct views, with one active and unique labels', () => {

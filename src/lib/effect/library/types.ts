@@ -21,9 +21,6 @@ export interface LibraryShape {
   id: LibraryShapeId
   family: LibraryFamily
   aspect: 'square' | 'frame'
-  /** Where the preview outline comes from: a stored unit shape scaled into the class box, or
-   *  the arrangement's own hull outset by the padding. A derived outline stores nothing. */
-  outlineSource: 'unit-shape' | 'arrangement-hull'
   outline: ReadonlyArray<readonly [number, number]>
 }
 

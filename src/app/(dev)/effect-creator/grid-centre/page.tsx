@@ -119,7 +119,7 @@ export default function GridLab() {
     const { frame, safeSel, draft } = resolveSelection(librarySel, drafts, pitch)
     const nodes = edit ? edit.nodes : draft?.nodes
     return nodes
-      ? draftStageModel(safeSel, nodes, pitch, pad, frame.cols, frame.rows, '')
+      ? draftStageModel(safeSel, nodes, pitch, pad, frame.cols, frame.rows)
       : libraryStageModel(safeSel, pitch, pad)
   }, [tab, librarySel, pitch, pad, edit, drafts])
   /** The size card reads the ACTUAL outline, so a derived shape reports what it really is. */
@@ -380,7 +380,10 @@ export default function GridLab() {
               {perf.cutMs != null ? <> · cut <Sec ms={perf.cutMs} /></> : null}
               {' · '}solve <Sec ms={perf.solveMs} />
             </span>
-            <span className="gl-eye">{libraryModel ? '' : model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
+            <span className="gl-eye">
+              {tab === 'library' ? 'LIBRARY DRAFT · CANDIDATE REVIEW'
+                : model ? `1mm = ${scale.toFixed(2)} px` : '—'}
+            </span>
           </div>
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}

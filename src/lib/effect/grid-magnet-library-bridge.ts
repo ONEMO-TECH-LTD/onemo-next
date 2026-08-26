@@ -9,7 +9,7 @@ import { spotRadiusOf } from './grid-magnet-compute'
 import { insetRingMM } from './offset'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
-  selectedRecords, transformLayout, kindOf, orientationOf, frameKeyOf, frameLabel, CLASS_RULES, layoutAtPitch,
+  selectedRecords, transformLayout, frameKeyOf, CLASS_RULES, layoutAtPitch,
   canonicalNode, convexHull,
   type LibrarySelection, type LibraryShapeId, type LibraryFamily,
 } from './library'
@@ -17,8 +17,6 @@ import {
 export type { LibrarySelection } from './library'
 
 export interface LibraryArrangement {
-  /** WHICH geometry, for a class whose shape is its layout. Absent for fixed-outline classes. */
-  geometryId?: string
   /** The canonical frame the selection named. */
   sourceFrameKey: string
   /** The ACTUAL frame identity after the view transform — what the pipeline must believe. */
@@ -33,7 +31,6 @@ export interface LibraryArrangement {
 export interface LibraryStageModel {
   contour: Contour
   grid: GridResult
-  title: string
   /** Why a population being drawn is not a saveable shape yet — null when it is. */
   error?: string | null
 }
@@ -48,7 +45,6 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
   // Engine space is y-up; library rows count downward from the top.
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   return {
-    geometryId: sel.geometryId,
     sourceFrameKey: frameKeyOf(frame), frameKey: frameCols + 'x' + frameRows,
     frameCols, frameRows,
     layoutId: layout.name,
@@ -68,12 +64,11 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
   const a = libraryArrangement(sel, pitchMM)
   // A DERIVED outline is the magnets' own hull pushed out by the padding — no stored shape, no
   // box, no re-centring. Its position is the answer, which is what makes it hug (Dan, 08-26).
-  if (shape.outlineSource === 'arrangement-hull')
+  const rules = CLASS_RULES[shape.family]
+  if (rules.source === 'geometry')
     return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible: true, outlineMM: hullOutline(a.nodesMM, padMM) }
   // The frame's physical span is CLASS POLICY — the class rules own it (the square/rectangle
   // class floor, the diamond's wrap-the-ring rule). The bridge asks; it does not re-derive.
-  const rules = CLASS_RULES[shape.family]
-  if (rules.source !== 'registry') throw new Error('library: ' + shape.family + ' has no box rule')
   const box0 = rules.boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
   const w0 = box0.w, h0 = box0.h
   const shapeCompatible = shape.aspect === 'frame' || a.frameCols === a.frameRows
@@ -88,11 +83,11 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
  *  canvas has to stay clickable. The corpus outline stands in until the drawn set is a triangle
  *  again, and the reason travels with it so the panel can refuse the save (QA F1). */
 export function draftOutline(
-  shape: { outlineSource: 'unit-shape' | 'arrangement-hull' },
+  family: LibraryFamily,
   nodesMM: ReadonlyArray<Pt>, sel: LibrarySelection, pitchMM: number, padMM: number,
 ): { outlineMM: Pt[]; error: string | null } {
   const fallback = () => libraryPreview(sel, pitchMM, padMM).outlineMM
-  if (shape.outlineSource !== 'arrangement-hull') return { outlineMM: fallback(), error: null }
+  if (CLASS_RULES[family].source !== 'geometry') return { outlineMM: fallback(), error: null }
   try { return { outlineMM: hullOutline(nodesMM, padMM), error: null } }
   catch (e) { return { outlineMM: fallback(), error: (e as Error).message } }
 }
@@ -114,7 +109,7 @@ export function hullOutline(nodesMM: ReadonlyArray<Pt>, padMM: number): Pt[] {
  *  Same conversion as the corpus path: y-down -> engine y-up, frame span from class floors. */
 export function draftStageModel(
   sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number, padMM: number,
-  frameCols: number, frameRows: number, title: string,
+  frameCols: number, frameRows: number,
 ): LibraryStageModel {
   const { shape } = selectedRecords(sel, pitchMM)
   // A draft is canonical data like every corpus layout, so it goes through the SAME transform
@@ -126,7 +121,7 @@ export function draftStageModel(
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   // A derived outline follows the DRAWN magnets, so adding a node outside the hull changes the
   // shape and adding one inside or on an edge does not.
-  const { outlineMM, error } = draftOutline(shape, nodesMM, sel, pitchMM, padMM)
+  const { outlineMM, error } = draftOutline(shape.family, nodesMM, sel, pitchMM, padMM)
   const contour: Contour = { outer: { pts: [...outlineMM] }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
@@ -143,7 +138,7 @@ export function draftStageModel(
     centresMM: [],
     centreMainMM: [(t.cols - 1) * pitchMM / 2, (t.rows - 1) * pitchMM / 2],
   }
-  return { contour, grid, title, error }
+  return { contour, grid, error }
 }
 
 export { canonicalNode }
@@ -177,9 +172,5 @@ export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM:
     centresMM: [],
     centreMainMM: [(a.frameCols - 1) * pitchMM / 2, (a.frameRows - 1) * pitchMM / 2],
   }
-  // the readout is the ACTUAL outline, never a box approximation
-  const xs = pv.outlineMM.map((q) => q[0]), ys = pv.outlineMM.map((q) => q[1])
-  const w = Math.round(Math.max(...xs) - Math.min(...xs)), h = Math.round(Math.max(...ys) - Math.min(...ys))
-  const title = `${pv.shapeId} · ${a.layoutId} · ${frameLabel(pv.declaredFamily, a.frameCols, a.frameRows)} ${orientationOf(a.frameCols, a.frameRows)} ${kindOf(a.frameCols, a.frameRows)} · ${pv.declaredFamily} · ${a.nodesMM.length}⌾ · ${w}×${h} mm${pv.shapeCompatible ? '' : ' · shape/frame mismatch'} · LIBRARY DRAFT`
-  return { contour, grid, title }
+  return { contour, grid }
 }
