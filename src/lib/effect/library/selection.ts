@@ -8,7 +8,7 @@ import { CLASS_RULES, type ClassRules, type RegistryRules } from './rules'
 import { triangleById, triangleFrame, triangleFrameKey, trianglesOf, triangleFrameKeys, triangleTypeOf, uprightView } from './triangle-frames'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import { boundsOf, type TriangleLayout, type TriangleProductType } from './triangle-geometry'
-import { transformLayout } from './transforms'
+import { transformLayout, viewName } from './transforms'
 import { LIBRARY_SHAPES } from './shapes'
 import { frameKeyOf } from './transforms'
 import type { LibraryDraft } from './drafts'
@@ -155,13 +155,6 @@ const ALL_VIEWS: readonly LibraryTransform[] = [
 const sameView = (a: LibraryTransform, b: LibraryTransform) =>
   a.transpose === b.transpose && a.flipX === b.flipX && a.flipY === b.flipY
 
-/** How each of the eight views reads to a human. A label must identify the TRANSFORM: naming
- *  them by the frame they produce gave four identical '3×3' buttons (QA F2). */
-const VIEW_LABEL = [
-  '0°', 'mirror diagonal ↘', '180°', 'mirror diagonal ↗',
-  'mirror vertical', '90°', 'mirror horizontal', '270°',
-] as const
-
 const transformedKey = (frame: LibraryFrame, layout: LibraryLayout, view: LibraryTransform): string => {
   const t = transformLayout(frame, layout, view)
   return t.cols + 'x' + t.rows + '|' + t.nodes.map(([x, y]) => x + ',' + y).sort().join(' ')
@@ -173,21 +166,23 @@ const transformedKey = (frame: LibraryFrame, layout: LibraryLayout, view: Librar
  *  button unpressed (QA F2). */
 function orientationOptions(
   sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, rules: ClassRules,
+  base: LibraryTransform,
 ): PanelOption[] {
   const selectedKey = transformedKey(frame, layout, sel.view)
   const seen = new Set<string>()
   const out: PanelOption[] = []
-  ALL_VIEWS.forEach((view, index) => {
+  // the presented view leads the list and IS 0 degrees; the rest are turns from it
+  for (const view of [base, ...ALL_VIEWS]) {
     const key = transformedKey(frame, layout, view)
-    if (seen.has(key)) return
+    if (seen.has(key)) continue
     seen.add(key)
     const named = rules.source === 'registry'
       ? rules.orientations.find((o) => sameView(o.view, view)) : undefined
     out.push({
-      id: 'view' + index, label: named?.id ?? VIEW_LABEL[index],
+      id: 'view' + out.length, label: named?.id ?? viewName(base, view),
       active: key === selectedKey, next: { ...sel, view: { ...view } },
     })
-  })
+  }
   return out
 }
 
@@ -219,7 +214,11 @@ export function panelOptions(
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
-  const orientations = orientationOptions(sel, frame, visible, rules)
+  // a class that materialises its own frames presents its geometry upright, and that is 0°
+  const base: LibraryTransform = rules.source === 'geometry'
+    ? uprightView(triangleById(geometryOf(sel)))
+    : { transpose: false, flipX: false, flipY: false }
+  const orientations = orientationOptions(sel, frame, visible, rules, base)
   if (rules.source === 'registry') {
     const frames = CLASS_FRAMES[shape.family]
     const sub = subOf(rules, frame)
