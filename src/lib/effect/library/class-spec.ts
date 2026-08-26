@@ -13,6 +13,7 @@
 // reference; the file's whole job is to name the seam so the branches can be deleted.
 
 import { CLASS_FRAMES } from './frames'
+import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { REGISTRY_RULES, SPACING_96, SPACING_BASE } from './rules'
 import { LIBRARY_SHAPES } from './shapes'
 import { frameKeyOf, transformLayout } from './transforms'
@@ -106,10 +107,6 @@ export interface ClassControls {
  *  imports and what the admin surface imports are visibly different things. */
 export type LibraryClass = ClassSpec & ClassControls
 
-/** The magnet padding the chip's size is quoted at — the same 12mm the outline is drawn with.
- *  Stated here rather than imported so the pure library keeps no engine dependency. */
-const RELEASED_PAD_MM = 12
-
 const NO_VIEW: LibraryTransform = { transpose: false, flipX: false, flipY: false }
 const pickLayoutName = (frame: LibraryFrame, preferred: string): string =>
   frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
@@ -200,7 +197,9 @@ function triangleSpec(): LibraryClass {
     return Math.round(w) + '×' + Math.round(h)
   }
   const asVariant = (t: (typeof TRIANGLE_LAYOUTS)[number], pitchMM: number, i: number): ClassVariant => {
-    const size = sizeOf(t, pitchMM, RELEASED_PAD_MM)
+    // the padding is a property of the MAGNET — built in, guaranteed, one value for every
+    // shape (Dan, 08-26) — so it is imported, never restated
+    const size = sizeOf(t, pitchMM, RELEASED_PADDING_MM)
     return {
       id: t.id, label: size, frame: triangleFrame(t, pitchMM), view: uprightView(t),
       accessibleLabel: TYPE_LABEL[triangleTypeOf(t)] + ' ' + (i + 1) + ' · ' + size + 'mm'

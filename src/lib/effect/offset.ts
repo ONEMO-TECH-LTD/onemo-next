@@ -1,6 +1,6 @@
 // offset.ts — manufacturing OFFSET via Clipper2 (DEC-v5-02 · Creator v5 L5).
 //
-// The −8mm magnetic-backing inset + cut bleed: integer-robust polygon offset with ROUND joins. Pure
+// The magnetic inset + cut bleed: integer-robust polygon offset with ROUND joins. Pure
 // (mm in → mm out). Clipper2-ts is pure TS (no WASM). This is the OP; its live consumer — the
 // attachment/backing flow — is Phase 2 (the attachment contracts are dormant per R6). The cut path
 // never depends on float bézier booleans (DEC-v5-02): Clipper64 works in scaled integers.
@@ -20,7 +20,8 @@ export type OffsetJoin = 'round' | 'sharp' | 'bevel'
 /**
  * Inset (deltaMM < 0) or outset (deltaMM > 0) a closed mm ring. Returns the largest resulting ring — a
  * simple polygon inset yields one ring; an over-inset (delta beyond the shape's inradius) collapses to
- * nothing → null. The −8mm magnetic inset is `insetRingMM(outer, -8)` (round joins, manufacturing); the
+ * nothing → null. The magnetic inset is RELEASED_PADDING_MM — built into the magnet, so every shape
+ * carries it — passed as the delta (round joins, manufacturing); the
  * editor Offset tool passes the user's `joinStyle` — 'round' (soft macro outline), 'sharp' (Miter, keep
  * corners) or 'bevel' (chamfer).
  */
