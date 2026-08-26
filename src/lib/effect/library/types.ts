@@ -9,7 +9,7 @@ export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: b
 
 /** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
  *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
- *  library must not pre-empt it. DRAFT applicability is review data, never engine policy. */
+ *  library must not pre-empt it. */
 export type LibraryFamily = 'square' | 'rectangle' | 'diamond' | 'triangle'
 export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'rectangle', 'diamond', 'triangle']
 

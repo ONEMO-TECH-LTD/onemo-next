@@ -96,7 +96,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
 
 
 
-  it('families and draft applicability stay complete', () => {
+  it('families stay complete', () => {
     expect(LIBRARY_FAMILIES).toEqual(['square', 'rectangle', 'diamond', 'triangle'])
   })
 })
