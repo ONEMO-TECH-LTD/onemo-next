@@ -889,6 +889,7 @@ describe('triangle — every tab carries only its own kind', () => {
     const g = triangleGeometry(t.vertices)
     return {
       sym: g.sideClass === 'isosceles', right: g.angleClass === 'right',
+      scalene: g.sideClass === 'scalene',
       level: E.some(([a, c]) => a[1] === c[1]),
       upright: E.some(([a, c]) => a[0] === c[0]),
       aspect: Math.max(1, r.rows - 1) / Math.max(1, r.cols - 1),
@@ -904,11 +905,13 @@ describe('triangle — every tab carries only its own kind', () => {
       for (const t of trianglesOfType(type)) {
         const m = shown(t)
         const why: string[] = []
-        // a Wedge is a SQUARED CORNER — a right angle presented on a level and an upright side.
-        // A right angle presented any other way is incidental and the shape reads by silhouette.
-        const squared = m.right && m.level && m.upright
+        // a Wedge is the BALANCED SQUARED CORNER — a right angle with EQUAL LEGS, presented on
+        // a level and an upright side. A right angle presented any other way, or with unequal
+        // legs, is incidental and the shape is named by its silhouette like any other.
+        const squared = m.right && m.sym && m.level && m.upright
         if (type === 'wedge' && !squared) why.push('is not a squared corner')
         if (type !== 'wedge' && squared) why.push('is a squared corner')
+        if (type === 'wedge' && !m.sym) why.push('does not have equal legs')
         if (SYMMETRIC.includes(type) && !m.sym) why.push('is not symmetric')
         if (LEANING.includes(type) && m.sym) why.push('is symmetric')
         // the peak family stands on a base; a Slice is the symmetric one that cannot
@@ -938,10 +941,15 @@ describe('triangle — every tab carries only its own kind', () => {
     // 08-26 09:0x Dan — "Mountain is missing 2 x 3". Right angle at the apex, resting on its
     // hypotenuse: a wide symmetric shape, not a squared corner.
     expect(triangleTypeOf(byId('tri:0,0;0,2;1,1'))).toBe('mountain')
-    // 08-26 08:16 Dan — the 2x2 IS a Wedge: the same right angle, presented as a squared corner
-    expect(triangleTypeOf(byId('tri:0,0;0,1;1,0'))).toBe('wedge')
-    // both of Dan's rulings come out of one derived rule, so no override table is needed
     expect(triangleTypeOf(byId('tri:0,0;0,4;2,2'))).toBe('mountain')
+    // 08-26 08:16 Dan — the 2x2 IS a Wedge: equal legs, squared corner
+    expect(triangleTypeOf(byId('tri:0,0;0,1;1,0'))).toBe('wedge')
+    // 08-26 08:11 Dan — "2x3 is not wedge". The OTHER 2x3 is right-SCALENE: it stands on level
+    // and upright sides like the 2x2 but its legs differ, so it is not the balanced corner.
+    expect(triangleTypeOf(byId('tri:0,0;0,2;1,0'))).toBe('pennant')
+    // and therefore no 2x3 remains under Wedge at all, which is what he actually rejected
+    for (const t of trianglesOfType('wedge')) expect(triangleFrameKey(t), t.id).not.toBe('2x3')
+    // all three of Dan's rulings fall out of one derived rule; no override table is needed
   })
 
   it('the tabs hold exactly this population — nothing missing, nothing extra', () => {
@@ -949,7 +957,7 @@ describe('triangle — every tab carries only its own kind', () => {
     for (const t of TRIANGLE_TYPES) got[t] = trianglesOfType(t).length
     expect(got).toEqual({
       pyramid: 2, arrowhead: 1, mountain: 4, needle: 1, slice: 9,
-      wedge: 9, ramp: 7, pennant: 16, sail: 6, fin: 21,
+      wedge: 4, ramp: 8, pennant: 20, sail: 6, fin: 21,
     })
     expect(Object.values(got).reduce((a, b) => a + b, 0)).toBe(76)
   })
