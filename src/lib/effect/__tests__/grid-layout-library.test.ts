@@ -677,12 +677,12 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     const id = one('wedge').id
     const sel = sel3(id)
     for (const nodes of [[], [[0, 0]], [[0, 0], [1, 1]]] as Array<Array<[number, number]>>) {
-      const m = draftStageModel(sel, nodes, 48, 12, 2, 2)
+      const m = draftStageModel(sel, nodes, 48, 12)
       expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(3)   // still renderable
       expect(m.error).toBeTruthy()
     }
     const good = [...one('wedge').vertices] as Array<[number, number]>
-    expect(draftStageModel(sel, good, 48, 12, 2, 2).error).toBeNull()
+    expect(draftStageModel(sel, good, 48, 12).error).toBeNull()
   })
 
   it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
@@ -1096,11 +1096,48 @@ describe('authoring transitions — the five the page used to spell out itself',
 
   it('a new layout starts empty, and the canvas still has somewhere to look', () => {
     expect(startAdd()).toEqual({ name: '', nodes: [] })
-    const m = materializeDraft(sel({ frameKey: '3x3' }), [], 48, 12, 3, 3)
+    const m = materializeDraft(sel({ frameKey: '3x3' }), [], 48, 12)
     // nothing drawn: the seed is the selected layout's own first magnet, not the mm origin
     expect(m.nodesMM).toEqual([])
     expect(m.seedMM).not.toBeNull()
     expect(m.seedMM).toEqual(materializeSelection(sel({ frameKey: '3x3' }), 48, 12).nodesMM[0])
+  })
+
+  it('the producer consumes the selection saveEdit hands back — its own output', () => {
+    // saveEdit returns a selection naming draft:<name>, which is not a corpus layout. The
+    // materialiser must normalise it itself; resolving it strictly made the library refuse its
+    // own output, and the page was hiding that by pre-normalising and passing frame dimensions.
+    const base = sel({ frameKey: '3x3' })
+    const saved = saveEdit(base, [], { name: 'probe', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] }, 48)
+    expect(saved.ok).toBe(true)
+    if (!saved.ok) return
+    const m = materializeDraft(saved.sel, saved.drafts[0].nodes, 48, 12)
+    expect(m.nodesMM).toEqual([[0, 96], [96, 96], [0, 0], [96, 0]])
+    // the frame is the one the SELECTION resolves to, never a caller's claim about it
+    expect(m.frameKey).toBe('3x3')
+    expect(m.frameCols).toBe(3)
+    expect(m.frameRows).toBe(3)
+    expect(m.error).toBeNull()
+
+    // and the same for a triangle, where the outline is derived from the drawn magnets
+    const t = triangleById('tri:0,0;0,2;2,0')
+    const tsel: LibrarySelection = { shapeId: 'triangle', geometryId: t.id,
+      frameKey: frameKeyOf(triangleFrame(t, 48)), layoutId: 'corners', view: uprightView(t) }
+    const tsaved = saveEdit(tsel, [], { name: 'probe', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
+    expect(tsaved.ok).toBe(true)
+    if (!tsaved.ok) return
+    const tm = materializeDraft(tsaved.sel, tsaved.drafts[0].nodes, 48, 12)
+    expect(tm.error).toBeNull()
+    expect(tm.outlineMM).toHaveLength(3)
+    // the magnets it wraps are the DRAWN ones, and every one clears the padding exactly
+    for (const n of tm.nodesMM) {
+      const d = Math.min(...tm.outlineMM.map((a, i) => {
+        const b = tm.outlineMM[(i + 1) % 3]
+        const vx = b[0] - a[0], vy = b[1] - a[1], L = Math.hypot(vx, vy)
+        return Math.abs((n[0] - a[0]) * vy - (n[1] - a[1]) * vx) / L
+      }))
+      expect(d).toBeCloseTo(12, 6)
+    }
   })
 
   it('a custom seeds from what is ON SCREEN at this pitch, not the canonical 48mm set', () => {

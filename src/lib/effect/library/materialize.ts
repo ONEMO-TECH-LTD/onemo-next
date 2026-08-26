@@ -71,14 +71,19 @@ export function materializeSelection(
  *  again, and the reason travels with it so the panel can refuse the save (QA F1). */
 export function materializeDraft(
   sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>,
-  pitchMM: number, padMM: number, frameCols: number, frameRows: number,
+  pitchMM: number, padMM: number,
 ): MaterializedLibrary {
-  const { shape } = resolveSelection(sel, [], pitchMM)
+  // The AUTHORITATIVE frame is the one this selection resolves to, not dimensions a caller
+  // hands in: a caller could pass dimensions the selection contradicts and make the frame key,
+  // the placement and the centre all lie. And the selection saveEdit returns names the draft
+  // itself, so the corpus fallback must be taken on the NORMALISED selection — resolving the
+  // caller's own draft id strictly is how the producer refused its own output.
+  const { shape, frame, safeSel } = resolveSelection(sel, [], pitchMM)
   const spec = specOf(shape.family)
   // A draft is canonical data like every corpus layout, so it goes through the SAME transform
   // and the same one flip — never straight to mm (QA F2).
-  const p = place({ cols: frameCols, rows: frameRows, layouts: [] }, { name: 'draft', nodes }, sel.view, pitchMM)
-  const corpus = materializeSelection(sel, pitchMM, padMM)
+  const p = place(frame, { name: 'draft', nodes }, safeSel.view, pitchMM)
+  const corpus = materializeSelection(safeSel, pitchMM, padMM)
   let outlineMM: readonly PointMM[] = corpus.outlineMM
   let error: string | null = null
   try { outlineMM = spec.outline(p.nodesMM, p.cols, p.rows, pitchMM, padMM) }

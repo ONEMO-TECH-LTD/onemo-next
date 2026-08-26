@@ -54,9 +54,8 @@ export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM:
 /** AUTHORING (Dan, 08-25 — sandbox drafts): a draft's own nodes drawn on the selected frame. */
 export function draftStageModel(
   sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number, padMM: number,
-  frameCols: number, frameRows: number,
 ): LibraryStageModel {
-  return toStage(materializeDraft(sel, nodes, pitchMM, padMM, frameCols, frameRows), pitchMM, padMM)
+  return toStage(materializeDraft(sel, nodes, pitchMM, padMM), pitchMM, padMM)
 }
 
 /** Selection -> the engine-space record the pipeline consumes. */
