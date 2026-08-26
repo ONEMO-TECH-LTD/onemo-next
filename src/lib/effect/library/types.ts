@@ -1,8 +1,10 @@
 // library/types.ts — the layout library's own vocabulary. No engine imports, no React.
 
-export interface LibraryLayout { name: string; nodes: ReadonlyArray<readonly [number, number]>; note?: string }
+export interface FrameExtent { readonly cols: number; readonly rows: number }
 
-export interface LibraryFrame { cols: number; rows: number; layouts: LibraryLayout[] }
+export interface LibraryLayout { readonly name: string; readonly nodes: ReadonlyArray<readonly [number, number]>; readonly note?: string }
+
+export interface LibraryFrame extends FrameExtent { readonly layouts: readonly LibraryLayout[] }
 
 /** A display transform over a canonical (tall) layout. Pure; closed over the frame. */
 export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: boolean }
@@ -14,7 +16,6 @@ export type PointMM = readonly [number, number]
  *  library must not pre-empt it. */
 /** A class whose frames are a literal table. The triangle's frames come from the geometry the
  *  selection names, so it is not one of these and carries no frame registry. */
-export type RegistryFamily = 'square' | 'rectangle' | 'diamond'
 export type LibraryFamily = string
 
 /** Stable-ID selection — indices are forbidden identity (pruning the draft must never silently
@@ -28,6 +29,3 @@ export interface LibrarySelection {
   geometryId?: string
   view: LibraryTransform
 }
-
-/** The class floor's first rung: a one-line axis is 24mm. */
-export const MIN_LIB_MM = 24

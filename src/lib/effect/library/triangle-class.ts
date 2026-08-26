@@ -1,9 +1,9 @@
-import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import type { ClassVariant, DraftShape, LibraryClass } from './class-contract'
 import { boundsAndDuplicateErrors } from './registry-class'
 import { frameKeyOf, transformLayout } from './transforms'
 import { TRIANGLE_TYPES, type TriangleProductType } from './triangle-types'
 import { boundsOf, type TriangleLayout } from './triangle-geometry'
+import { outlineFromLayout } from './outline'
 import { assertTrianglePopulation, restsFlat, triangleById, triangleFrame, trianglesOfType, triangleTypeOf, uprightView } from './triangle-frames'
 import type { LibraryFrame, LibrarySelection, PointMM } from './types'
 
@@ -13,10 +13,11 @@ const label: Record<string, string> = {
 
 const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
   const bounds = boundsOf([...triangle.vertices])
-  const view = transformLayout({ cols: bounds.cols, rows: bounds.rows, layouts: [] }, { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle))
-  const nodes = view.nodes.map(([x, y]) => [x * pitchMM, (view.rows - 1 - y) * pitchMM] as PointMM)
-  const xs = nodes.map((node) => node[0]), ys = nodes.map((node) => node[1])
-  return Math.round(Math.max(...xs) - Math.min(...xs) + RELEASED_PADDING_MM * 2) + '×' + Math.round(Math.max(...ys) - Math.min(...ys) + RELEASED_PADDING_MM * 2)
+  const view = transformLayout({ cols: bounds.cols, rows: bounds.rows }, { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle))
+  const nodesMM = view.nodes.map(([x, y]) => [x * pitchMM, (view.rows - 1 - y) * pitchMM] as PointMM)
+  const outlineMM = outlineFromLayout(nodesMM, { corners: 'sharp' })
+  const xs = outlineMM.map(([x]) => x), ys = outlineMM.map(([, y]) => y)
+  return Math.round(Math.max(...xs) - Math.min(...xs)) + '×' + Math.round(Math.max(...ys) - Math.min(...ys))
 }
 
 const asVariant = (triangle: TriangleLayout, pitchMM: number, index: number): ClassVariant => {

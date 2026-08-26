@@ -9,10 +9,9 @@ import { Clipper, JoinType, EndType } from '@countertype/clipper2-ts'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
 import type { Pt } from './types'
 
-// mm → integer nanometres. Clipper64 is integer-robust; this keeps the 12mm physical clearance
-// on the safe side of the sub-micron outline calculations used by the library producer.
+// mm → integer microns. Clipper64 is integer-robust; 1000 = micron precision, far below the 0.05 mm
 // manufacturing tolerance.
-const SCALE = 1_000_000
+const SCALE = 1000
 export const MANUFACTURING_OFFSET_ARC_TOLERANCE_MM = MANUFACTURING_TOLERANCE_MM / 2
 
 /** Offset corner join — the editor Offset tool's user choice (KAI-9128). */
@@ -52,5 +51,6 @@ export function offsetPathMM(
  */
 export function insetRingMM(ringMM: ReadonlyArray<Pt>, deltaMM: number, joinStyle: OffsetJoin = 'round'): Pt[] | null {
   if (ringMM.length < 3) return null
-  return offset(ringMM, deltaMM, joinStyle, 'polygon', 2)
+  const result = offset(ringMM, deltaMM, joinStyle, 'polygon', 2)
+  return result && result.length >= 3 ? result : null
 }

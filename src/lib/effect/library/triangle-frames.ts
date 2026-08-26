@@ -75,7 +75,7 @@ const computeTriangleTypeOf = (t: TriangleLayout): TriangleProductType => {
  *  draws and therefore the only view naming may read. */
 function presentedCorners(t: TriangleLayout): { cols: number; rows: number; nodes: LatticeNode[] } {
   const b = boundsOf([...t.vertices])
-  return transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
+  return transformLayout({ cols: b.cols, rows: b.rows },
     { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
 }
 

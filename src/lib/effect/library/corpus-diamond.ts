@@ -13,7 +13,7 @@ import type { LibraryFrame } from './types'
  *  perimeter    — the ring alone (|dx|+|dy| = r).
  *  perimeter-96 — the ring sampled every other node (computed in rules.ts, not stored here).
  *  corners      — the four vertices. */
-export const DIAMOND_FRAMES: LibraryFrame[] = [
+export const DIAMOND_FRAMES = [
   { cols: 1, rows: 1, layouts: [
     { name: 'single', nodes: [[0, 0]] },
   ] },
@@ -46,4 +46,4 @@ export const DIAMOND_FRAMES: LibraryFrame[] = [
     { name: 'perimeter', nodes: [[0, 3], [1, 2], [1, 4], [2, 1], [2, 5], [3, 0], [3, 6], [4, 1], [4, 5], [5, 2], [5, 4], [6, 3]] },
     { name: 'corners', nodes: [[0, 3], [3, 0], [3, 6], [6, 3]] },
   ] },
-]
+] as const satisfies readonly LibraryFrame[]

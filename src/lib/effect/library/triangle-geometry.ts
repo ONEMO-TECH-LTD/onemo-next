@@ -5,8 +5,8 @@ export type LatticeNode = readonly [number, number]
 export type TriangleSideClass = 'equilateral' | 'isosceles' | 'scalene'
 export type TriangleAngleClass = 'acute' | 'right' | 'obtuse'
 export interface TriangleLayout {
-  id: string
-  vertices: readonly [LatticeNode, LatticeNode, LatticeNode]
+  readonly id: string
+  readonly vertices: readonly [LatticeNode, LatticeNode, LatticeNode]
 }
 
 export interface TriangleGeometry {

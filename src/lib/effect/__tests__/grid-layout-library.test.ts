@@ -26,6 +26,7 @@ import { RECTANGLE_FRAMES } from '../library/corpus-rectangle'
 import { DIAMOND_FRAMES } from '../library/corpus-diamond'
 import { libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
+import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
  *  mutable Pt. Converting is the BRIDGE's whole job, so a test that calls an engine classifier
@@ -223,7 +224,7 @@ describe('diamond wrapping', () => {
       const pv = libraryPreview({ classId: 'diamond', frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose: false, flipX: false, flipY: false } }, 48)
       const xs = pv.outlineMM.map((q) => q[0])
       const span = Math.max(...xs) - Math.min(...xs)
-      expect(span).toBeCloseTo(2 * (k * 48 + 12 * Math.SQRT2), 5)
+      expect(Math.abs(span - 2 * (k * 48 + 12 * Math.SQRT2))).toBeLessThanOrEqual(MANUFACTURING_TOLERANCE_MM)
     }
   })
 })
@@ -819,7 +820,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
               const dx = q2[0] - q1[0], dy = q2[1] - q1[1]
               best = Math.min(best, Math.abs((m[0] - q1[0]) * dy - (m[1] - q1[1]) * dx) / Math.hypot(dx, dy))
             }
-            expect(best, `${t.id} ${layoutId}`).toBeGreaterThanOrEqual(12 - 1e-6)
+            expect(best, `${t.id} ${layoutId}`).toBeGreaterThanOrEqual(12 - MANUFACTURING_TOLERANCE_MM)
             checked++
           }
         }
@@ -835,7 +836,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
     let floor = 0, wall = 0, none = 0
     for (const t of TRIANGLE_LAYOUTS) {
       const b = boundsOf([...t.vertices])
-      const r = tl({ cols: b.cols, rows: b.rows, layouts: [] }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
+      const r = tl({ cols: b.cols, rows: b.rows }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
       const [p, q, s2] = r.nodes
       const E = [[p, q, s2], [q, s2, p], [s2, p, q]] as Array<[LatticeNode, LatticeNode, LatticeNode]>
       const onFloor = E.some(([a, c]) => a[1] === c[1] && a[1] === r.rows - 1)
@@ -911,7 +912,7 @@ describe('triangle — every tab carries only its own kind', () => {
   /** The measurable form of each name, read on the view the shape is presented in. */
   const shown = (t: typeof TRIANGLE_LAYOUTS[number]) => {
     const b = boundsOf([...t.vertices])
-    const r = tl({ cols: b.cols, rows: b.rows, layouts: [] }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
+    const r = tl({ cols: b.cols, rows: b.rows }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
     const [p, q, s] = r.nodes
     const E = [[p, q], [q, s], [s, p]] as Array<[LatticeNode, LatticeNode]>
     const g = triangleGeometry(t.vertices)

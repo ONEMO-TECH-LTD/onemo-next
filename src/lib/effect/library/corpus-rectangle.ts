@@ -3,7 +3,7 @@
 import type { LibraryFrame } from './types'
 
 /** RECTANGLE class — tall canonical frames; wide is the transpose. */
-export const RECTANGLE_FRAMES: LibraryFrame[] = [
+export const RECTANGLE_FRAMES = [
   { cols: 1, rows: 2, layouts: [
     { name: 'perimeter', nodes: [[0, 0], [0, 1]] },
   ] },
@@ -54,4 +54,4 @@ export const RECTANGLE_FRAMES: LibraryFrame[] = [
     { name: 'perimeter', nodes: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 0], [1, 5], [2, 0], [2, 5], [3, 0], [3, 5], [4, 0], [4, 1], [4, 2], [4, 3], [4, 4], [4, 5]] },
     { name: 'corners', nodes: [[0, 0], [0, 5], [4, 0], [4, 5]] },
   ] },
-]
+] as const satisfies readonly LibraryFrame[]

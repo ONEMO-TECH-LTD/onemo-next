@@ -22,9 +22,9 @@ import type { TriangleGeometry } from './triangle-geometry'
 export type TriangleProductType =
   | 'wedge' | 'needle' | 'arrowhead' | 'pyramid' | 'mountain' | 'flag'
 
-export const TRIANGLE_TYPES: TriangleProductType[] = [
+export const TRIANGLE_TYPES = [
   'pyramid', 'arrowhead', 'mountain', 'needle', 'wedge', 'flag',
-]
+] as const satisfies readonly TriangleProductType[]
 
 /** How a shape sits, measured on the view it is presented in. */
 export interface TriangleShown {

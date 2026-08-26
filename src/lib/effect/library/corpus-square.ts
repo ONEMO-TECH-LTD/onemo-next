@@ -2,7 +2,7 @@
 
 import type { LibraryFrame } from './types'
 
-export const SQUARE_FRAMES: LibraryFrame[] = [
+export const SQUARE_FRAMES = [
   { cols: 1, rows: 1, layouts: [
     { name: 'single', nodes: [[0, 0]] },
   ] },
@@ -25,4 +25,4 @@ export const SQUARE_FRAMES: LibraryFrame[] = [
     { name: 'perimeter', nodes: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [0, 1], [4, 1], [0, 2], [4, 2], [0, 3], [4, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4]] },
     { name: 'corners', nodes: [[0, 0], [4, 0], [0, 4], [4, 4]] },
   ] },
-]
+] as const satisfies readonly LibraryFrame[]
