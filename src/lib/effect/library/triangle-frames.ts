@@ -32,6 +32,18 @@ const RETIRED = new Set<string>([
   // whose 12mm point jutted 52-85mm past its own magnet.
   'tri:0,0;3,4;4,3', 'tri:0,0;1,2;3,3', 'tri:0,0;2,3;3,2', 'tri:0,0;1,3;4,4', 'tri:0,0;1,2;2,1',
   'tri:0,0;2,4;4,2', 'tri:0,0;2,4;3,1', 'tri:0,0;1,3;3,1', 'tri:0,0;1,4;4,1',
+  // 08-26 — "remove ramp penant sail and fin delete the deslop", keeping seven named shapes.
+  // Everything else that leaned is out: four tabs' worth of proportion-band leftovers, most of
+  // them splinters whose 12mm point jutted 52-432mm past its own magnet.
+  'tri:0,0;0,2;2,3', 'tri:0,0;0,1;2,3', 'tri:0,0;0,3;3,4', 'tri:0,0;0,2;3,4', 'tri:0,0;0,1;3,4',
+  'tri:0,0;0,1;1,2', 'tri:0,0;0,2;1,3', 'tri:0,0;0,1;1,3', 'tri:0,0;0,4;1,1', 'tri:0,0;0,3;1,4',
+  'tri:0,0;0,2;1,4', 'tri:0,0;0,1;1,4', 'tri:0,0;0,3;2,4', 'tri:0,0;0,2;2,4', 'tri:0,0;0,1;2,4',
+  'tri:0,0;1,4;2,1', 'tri:0,0;1,4;2,2', 'tri:0,0;1,4;2,3', 'tri:0,0;1,1;2,4', 'tri:0,0;1,0;2,3',
+  'tri:0,0;1,0;2,4', 'tri:0,0;1,4;3,4', 'tri:0,0;1,0;3,4', 'tri:0,0;1,4;3,3', 'tri:0,0;0,1;2,2',
+  'tri:0,0;0,2;3,3', 'tri:0,0;0,1;3,3', 'tri:0,0;0,3;4,4', 'tri:0,0;0,2;4,4', 'tri:0,0;0,1;4,4',
+  'tri:0,0;1,1;2,3', 'tri:0,0;1,3;3,2', 'tri:0,0;1,4;3,1', 'tri:0,0;1,4;3,2', 'tri:0,0;2,4;3,2',
+  'tri:0,0;1,3;3,4', 'tri:0,0;2,4;3,3', 'tri:0,0;1,2;3,4', 'tri:0,0;1,1;3,4', 'tri:0,0;1,4;4,2',
+  'tri:0,0;1,4;4,3', 'tri:0,0;2,4;4,3', 'tri:0,0;1,2;4,4',
 ])
 
 export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)

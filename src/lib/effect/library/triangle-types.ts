@@ -13,17 +13,17 @@ import type { TriangleGeometry } from './triangle-geometry'
  *    Arrowhead — symmetric on a level base, taller than wide
  *    Pyramid   — symmetric on a level base, exactly as wide as it is tall
  *    Mountain  — symmetric on a level base, wider than tall
- *    Pennant   — leaning, long and low
- *    Ramp      — leaning on a level base, wider than tall
- *    Sail      — leaning and taller than wide
- *    Fin       — leaning, anything else */
+ *    Flag      — leaning: no two sides equal, so it points off to one side
+ *
+ *  Ramp, Pennant, Sail and Fin were four names for that one family, split by proportion. A
+ *  proportion is a number, not a thing anyone recognises, so the same shape read as a Ramp at
+ *  one size and a Fin at another, and each tab collected whatever splinters fell in its band.
+ *  Dan, 08-26: "remove ramp penant sail and fin ... these must go in one tab flag". */
 export type TriangleProductType =
-  | 'wedge' | 'needle' | 'arrowhead' | 'pyramid' | 'mountain'
-  | 'pennant' | 'ramp' | 'sail' | 'fin'
+  | 'wedge' | 'needle' | 'arrowhead' | 'pyramid' | 'mountain' | 'flag'
 
 export const TRIANGLE_TYPES: TriangleProductType[] = [
-  'pyramid', 'arrowhead', 'mountain', 'needle',
-  'wedge', 'ramp', 'pennant', 'sail', 'fin',
+  'pyramid', 'arrowhead', 'mountain', 'needle', 'wedge', 'flag',
 ]
 
 /** How a shape sits, measured on the view it is presented in. */
@@ -46,23 +46,22 @@ export interface TriangleShown {
  *  the 159x79 corner sitting under Pennant, "how is the first pennant?". Both are squared
  *  corners and both belong here. His earlier "2x3 is not wedge" was read off a CHIP LABEL — he
  *  had a 3x4 selected and never saw either shape — and that label is now the size in mm. */
-/*  The proportion boundaries are RELATIONAL, not tuned numbers: wider / exactly square / taller /
+/*  The symmetric proportions are RELATIONAL, not tuned numbers: wider / exactly square / taller /
  *  twice as tall. Earlier cut-offs of 0.8 and 1.25 were mine and arbitrary; the lattice only ever
- *  presents symmetric aspects of 0.25, 0.5, 0.75, 1, 1.5 and 2, so the words decide by themselves. */
+ *  presents symmetric aspects of 0.25, 0.5, 0.75, 1, 1.5 and 2, so the words decide by themselves.
+ *  Nothing splits the leaning family by proportion any more — that was the invention. */
 export function triangleProductType(
   g: TriangleGeometry, shown: TriangleShown,
 ): TriangleProductType {
   if (g.angleClass === 'right' && shown.level && shown.upright) return 'wedge'
-  const w = Math.max(1, shown.cols - 1), h = Math.max(1, shown.rows - 1), a = h / w
   if (g.sideClass === 'isosceles') {
+    const w = Math.max(1, shown.cols - 1), h = Math.max(1, shown.rows - 1), a = h / w
     // 08-26 Dan, on the tilted symmetric shapes: "remove slice it is same as basic triangles
     // just turned". Every one of them is retired from the product, so this branch is not
     // reachable from the active catalogue; a symmetric shape that cannot stand flat reads as a
     // leaning shape, and the per-member sweep fires loudly if one is ever made active again.
-    if (!shown.level) return 'fin'
+    if (!shown.level) return 'flag'
     return a >= 2 ? 'needle' : a > 1 ? 'arrowhead' : a === 1 ? 'pyramid' : 'mountain'
   }
-  if (a <= 0.5) return 'pennant'
-  if (a > 1) return 'sail'
-  return shown.level && a < 1 ? 'ramp' : 'fin'
+  return 'flag'
 }

@@ -436,11 +436,11 @@ describe('triangle — the three-point layout universe', () => {
     // PRODUCT — three on 08-26 08:11, then the nine tilted symmetric ones. The universe
     // underneath never changes, so every retirement stays reversible and the review survives.
     expect(TRIANGLE_LAYOUTS.length).toBe(79)
-    expect(TRIANGLE_LAYOUTS.filter(isActive).length).toBe(67)
+    expect(TRIANGLE_LAYOUTS.filter(isActive).length).toBe(24)
     // every active layout lands in exactly one named type, and no type is a dumping ground
     const byType = TRIANGLE_TYPES.map((t) => trianglesOfType(t))
-    expect(byType.reduce((n, l) => n + l.length, 0)).toBe(67)
-    expect(new Set(byType.flat().map((t) => t.id)).size).toBe(67)
+    expect(byType.reduce((n, l) => n + l.length, 0)).toBe(24)
+    expect(new Set(byType.flat().map((t) => t.id)).size).toBe(24)
     for (const l of byType) expect(l.length).toBeGreaterThan(0)
   })
 
@@ -464,8 +464,7 @@ describe('triangle — the three-point layout universe', () => {
     const labels = panelOptions({ shapeId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
       layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
       .types.map((o) => o.label)
-    expect(labels).toEqual(
-      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Ramp', 'Pennant', 'Sail', 'Fin'])
+    expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
     for (const l of labels) expect(l.includes(' '), l).toBe(false)
     expect(labels.join(' ')).not.toContain('Peak')
   })
@@ -613,7 +612,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   })
 
   it('the outline is derived AFTER the view transform and still clears', () => {
-    const base = triSel(one('fin'))
+    const base = triSel(one('flag'))
     for (const view of [{ transpose: true, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: true }]) {
       const sel = { ...base, view }
       const a = libraryArrangement(sel, 48)
@@ -692,12 +691,12 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   })
 
   it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
-    const id = one('fin').id
+    const id = one('flag').id
     const frame = frameOf(id)
     const base = { id: 'x', className: 'triangle', frameKey: frameKeyOf(frame), geometryId: id, name: 'n' }
-    expect(draftIntegrity({ ...base, nodes: [...one('fin').vertices] as Array<[number, number]> }, frame)).toEqual([])
+    expect(draftIntegrity({ ...base, nodes: [...one('flag').vertices] as Array<[number, number]> }, frame)).toEqual([])
     expect(draftIntegrity({ ...base, nodes: [[0, 0], [0, 1], [0, 2]] }, frame).join()).toContain('collinear')
-    expect(draftIntegrity({ ...base, geometryId: undefined, nodes: [...one('fin').vertices] as Array<[number, number]> }, frame).join())
+    expect(draftIntegrity({ ...base, geometryId: undefined, nodes: [...one('flag').vertices] as Array<[number, number]> }, frame).join())
       .toContain('geometryId required')
   })
 
@@ -742,8 +741,9 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(panelOptions(selD, [draft], 48).orientations.length).toBe(distinct.size)
   })
 
-  it('F3 — an asymmetric Sail really does offer all eight', () => {
-    expect(panelOptions(sel3(one('fin').id), [], 48).orientations.length).toBe(8)
+  it('F3 — an asymmetric shape really does offer all eight turns', () => {
+    // a scalene triangle has no symmetry of its own, so all eight lattice views are distinct
+    expect(panelOptions(sel3(one('flag').id), [], 48).orientations.length).toBe(8)
   })
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
@@ -753,7 +753,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   })
 
   it('F5 — the family transition is the module’s, and lands on a resolvable selection', () => {
-    let cur = sel3(one('fin').id, 'perimeter')
+    let cur = sel3(one('flag').id, 'perimeter')
     for (const fam of LIBRARY_FAMILIES) {
       cur = selectionForFamily(cur, fam, 48)
       expect(() => selectedRecords(cur), fam).not.toThrow()
@@ -771,7 +771,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(labels[0]).toContain('Pyramid 1')
     expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'pyramid').length)
     expect(opts.types.map((o) => o.label)).toEqual(
-      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Ramp', 'Pennant', 'Sail', 'Fin'])
+      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
   })
 })
 
@@ -858,7 +858,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
 
   it('the upright view is the one a selection hands back', () => {
     // selecting a class or a geometry hands back that view
-    const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'fin')!
+    const t0 = trianglesOfType('flag')[0]
     const opt = panelOptions(sel3(t0.id), [], 48).frames.find((o) => o.id === t0.id)!
     expect(opt.next.view).toEqual(uprightView(t0))
   })
@@ -879,7 +879,7 @@ describe('triangle — straight layouts come before the diagonal ones', () => {
     expect(TRIANGLE_LAYOUTS.filter(restsFlat).length).toBe(50)
     expect(TRIANGLE_LAYOUTS.filter((t) => !restsFlat(t)).length).toBe(29)
     const active = ([...TRIANGLE_TYPES] as const).flatMap((t) => trianglesOfType(t))
-    expect(active.length).toBe(67)
+    expect(active.length).toBe(24)
     // and no active shape is symmetric without a level side any more — that was the Slice tab
     expect(active.filter((t) => triangleGeometry(t.vertices).sideClass === 'isosceles' && !restsFlat(t)))
       .toEqual([])
@@ -909,7 +909,7 @@ describe('triangle — every tab carries only its own kind', () => {
     // Every name is a PROMISE about the shape as it is presented. This asserts each promise on
     // every member, so a shape can never sit under a name that does not describe it.
     const SYMMETRIC = ['pyramid', 'arrowhead', 'mountain', 'needle']
-    const LEANING = ['ramp', 'pennant', 'sail', 'fin']
+    const LEANING = ['flag']
     for (const type of TRIANGLE_TYPES) {
       for (const t of trianglesOfType(type)) {
         const m = shown(t)
@@ -924,17 +924,13 @@ describe('triangle — every tab carries only its own kind', () => {
         if (LEANING.includes(type) && m.sym) why.push('is symmetric')
         // every symmetric name stands on a base: Dan retired the tilted symmetric shapes
         if (SYMMETRIC.includes(type) && !m.level) why.push('has no level base')
-        // a Ramp is LOW AND WIDE on a flat base — a level side alone let tall spikes in
-        if (type === 'ramp' && !m.level) why.push('has no level base')
-        if (type === 'ramp' && m.aspect >= 1) why.push('is not wider than tall (' + m.aspect.toFixed(2) + ')')
-        // and the proportion each remaining name promises
+        // the proportion each SYMMETRIC name promises. Nothing splits the leaning family by
+        // proportion any more: Ramp/Pennant/Sail/Fin were four names for one thing, cut by a
+        // number, which is why the same shape read as one at one size and another at another.
         if (type === 'needle') expect(m.aspect, t.id).toBeGreaterThanOrEqual(2)
         if (type === 'arrowhead') { expect(m.aspect, t.id).toBeGreaterThan(1); expect(m.aspect, t.id).toBeLessThan(2) }
         if (type === 'pyramid') expect(m.aspect, t.id).toBe(1)
         if (type === 'mountain') expect(m.aspect, t.id).toBeLessThan(1)
-        if (type === 'pennant') expect(m.aspect, t.id).toBeLessThanOrEqual(0.5)
-        if (type === 'sail') expect(m.aspect, t.id).toBeGreaterThan(1)
-        if (type === 'fin') { expect(m.aspect, t.id).toBeGreaterThan(0.5); expect(m.aspect, t.id).toBeLessThanOrEqual(1) }
         expect(why, `${type} <- ${t.id} ${why.join(', ')}`).toEqual([])
       }
     }
@@ -942,9 +938,9 @@ describe('triangle — every tab carries only its own kind', () => {
 
   it('the named aliens stay out of the tabs that once held them', () => {
     // Frozen counterexamples, each one a shape that WAS under a name that did not fit it.
-    // A tall spike on a one-node base is not a Ramp — a Ramp is low and wide.
-    expect(triangleTypeOf(byId('tri:0,0;1,0;2,4'))).toBe('sail')   // presents 3x5, aspect 2.00
-    expect(triangleTypeOf(byId('tri:0,0;1,0;2,3'))).toBe('sail')   // presents 3x4, aspect 1.50
+    // The tall spikes that were once filed as Ramps are out of the product altogether.
+    expect(isActive(byId('tri:0,0;1,0;2,4'))).toBe(false)   // presented 3x5, point jutted 110mm
+    expect(isActive(byId('tri:0,0;1,0;2,3'))).toBe(false)   // presented 3x4, point jutted  90mm
     // 08-26 09:0x Dan — "Mountain is missing 2 x 3". Right angle at the apex, resting on its
     // hypotenuse: a wide symmetric shape, not a squared corner.
     expect(triangleTypeOf(byId('tri:0,0;0,2;1,1'))).toBe('mountain')
@@ -956,6 +952,11 @@ describe('triangle — every tab carries only its own kind', () => {
     expect(triangleTypeOf(byId('tri:0,0;0,2;1,0'))).toBe('wedge')
     // 08-26 Dan: "ramp has wedge option" — this one had fallen through into Ramp
     expect(triangleTypeOf(byId('tri:0,0;0,4;3,0'))).toBe('wedge')
+    // and the seven he kept when the four leaning tabs went, named by their size on screen
+    expect(trianglesOfType('flag').map((t) => t.id).sort()).toEqual([
+      'tri:0,0;0,3;1,1', 'tri:0,0;0,3;2,1', 'tri:0,0;0,3;3,1', 'tri:0,0;0,4;2,1',
+      'tri:0,0;0,4;3,1', 'tri:0,0;0,4;4,1', 'tri:0,0;1,4;3,0',
+    ].sort())
     // every Wedge is a squared corner and every squared corner is a Wedge — no third home
     for (const t of TRIANGLE_LAYOUTS.filter(isActive)) {
       const m = shown(t)
@@ -968,10 +969,9 @@ describe('triangle — every tab carries only its own kind', () => {
     const got: Record<string, number> = {}
     for (const t of TRIANGLE_TYPES) got[t] = trianglesOfType(t).length
     expect(got).toEqual({
-      pyramid: 2, arrowhead: 1, mountain: 4, needle: 1,
-      wedge: 9, ramp: 7, pennant: 16, sail: 6, fin: 21,
+      pyramid: 2, arrowhead: 1, mountain: 4, needle: 1, wedge: 9, flag: 7,
     })
-    expect(Object.values(got).reduce((a, b) => a + b, 0)).toBe(67)
+    expect(Object.values(got).reduce((a, b) => a + b, 0)).toBe(24)
   })
 
   it('every active layout appears in exactly one tab, and every tab has members', () => {

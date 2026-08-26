@@ -293,7 +293,7 @@ export function hullOutlineMM(nodesMM: readonly PointMM[], padMM: number): Point
 const TYPE_LABEL: Record<string, string> = {
   box: 'box', rhomb: 'rhomb', frame: 'frame', banner: 'banner', slim: 'slim',
   pyramid: 'Pyramid', arrowhead: 'Arrowhead', mountain: 'Mountain', needle: 'Needle',
-  wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', sail: 'Sail', fin: 'Fin',
+  wedge: 'Wedge', flag: 'Flag',
 }
 
 export const CLASS_SPECS: Record<LibraryFamily, LibraryClass> = {
