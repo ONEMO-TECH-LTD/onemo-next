@@ -11,7 +11,7 @@ import {
   TRIANGLE_LAYOUTS, triangleGeometry, triangleProductType, triangleTypeOf, triangleFrameKey,
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
-  draftIntegrity, panelOptions, selectionForFamily, uprightView,
+  draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat,
   type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
@@ -825,5 +825,24 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
     const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'sail')!
     const opt = panelOptions(sel3(t0.id), [], 48).frames.find((o) => o.id === t0.id)!
     expect(opt.next.view).toEqual(uprightView(t0))
+  })
+})
+
+describe('triangle — straight layouts come before the diagonal ones', () => {
+  it('every type lists the ones that rest on a flat side first', () => {
+    for (const type of ['peak', 'wedge', 'sail'] as const) {
+      const list = trianglesOfType(type)
+      const firstDiagonal = list.findIndex((t) => !restsFlat(t))
+      if (firstDiagonal < 0) continue
+      // nothing straight may appear after the first diagonal one
+      for (const t of list.slice(firstDiagonal)) expect(restsFlat(t), t.id).toBe(false)
+    }
+  })
+
+  it('50 of the 79 rest on a flat side; 29 can only lean', () => {
+    const all = (['peak', 'wedge', 'sail'] as const).flatMap((t) => trianglesOfType(t))
+    expect(all.length).toBe(79)
+    expect(all.filter(restsFlat).length).toBe(50)
+    expect(all.filter((t) => !restsFlat(t)).length).toBe(29)
   })
 })

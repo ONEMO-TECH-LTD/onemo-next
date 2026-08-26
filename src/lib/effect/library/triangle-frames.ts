@@ -7,8 +7,8 @@ import { transformLayout } from './transforms'
 import type { LibraryTransform } from './types'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import {
-  boundsOf, canonicalTriangleId, fullNodes, perimeterNodes, perimeterRuns, symmetryClosure,
-  triangleGeometry, triangleProductType, verticesOfId,
+  boundsOf, fullNodes, perimeterNodes, perimeterRuns, symmetryClosure,
+  triangleGeometry, triangleProductType,
   type LatticeNode, type TriangleLayout, type TriangleProductType,
 } from './triangle-geometry'
 import type { LibraryFrame, LibraryLayout } from './types'
@@ -60,22 +60,29 @@ export function triangleFrame(t: TriangleLayout, pitchMM: number): LibraryFrame 
   return { cols: b.cols, rows: b.rows, layouts }
 }
 
-/** The frames a product type offers, in the ruled order: area, then columns/rows, then
- *  blunt-to-sharp, then the stable ID. */
+/** Does this triangle have a side it can actually rest on, once turned upright? 29 of the 79
+ *  do not: all three of their sides run diagonally, and the lattice never rotates, so they can
+ *  only ever lean. Dan wants the straight ones first and the diagonal ones apart from them. */
+export function restsFlat(t: TriangleLayout): boolean {
+  const b = boundsOf([...t.vertices])
+  const r = transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
+    { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
+  const [p, q, s] = r.nodes
+  const edges: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
+  return edges.some(([a, c]) => a[1] === c[1] || a[0] === c[0])
+}
+
+/** The layouts a product type offers: every straight one first, then the diagonal ones, and
+ *  within each run by area, columns/rows, blunt-to-sharp, then the stable ID. */
 export function trianglesOfType(type: TriangleProductType): TriangleLayout[] {
   return TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === type).sort((a, b) => {
+    if (restsFlat(a) !== restsFlat(b)) return restsFlat(a) ? -1 : 1
     const ba = boundsOf([...a.vertices]), bb = boundsOf([...b.vertices])
     return (ba.cols * ba.rows) - (bb.cols * bb.rows) || ba.cols - bb.cols || ba.rows - bb.rows
       || triangleGeometry(b.vertices).minAngleDeg - triangleGeometry(a.vertices).minAngleDeg
       || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   })
 }
-
-export const triangleFrameKeys = (type: TriangleProductType): string[] =>
-  [...new Set(trianglesOfType(type).map(triangleFrameKey))]
-
-export const trianglesOf = (type: TriangleProductType, frameKey: string): TriangleLayout[] =>
-  trianglesOfType(type).filter((t) => triangleFrameKey(t) === frameKey)
 
 /** A hand-authored population still has to be a triangle: exactly three hull corners. */
 export function assertTrianglePopulation(nodes: readonly LatticeNode[]): void {
@@ -104,7 +111,6 @@ function hullOfNodes(pts: readonly LatticeNode[]): LatticeNode[] {
   return [...half(p), ...half([...p].reverse())]
 }
 
-export { canonicalTriangleId, verticesOfId }
 
 /** THE UPRIGHT VIEW — how a triangle should first appear: sitting on its longest side with the
  *  third point above it. The stored form is canonical for DE-DUPLICATION (the alphabetically

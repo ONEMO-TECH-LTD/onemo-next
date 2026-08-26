@@ -56,8 +56,6 @@ export function triangleProductType(g: TriangleGeometry): TriangleProductType {
       : 'sail'
 }
 
-export const TRIANGLE_TYPES: TriangleProductType[] = ['peak', 'wedge', 'sail']
-
 /** The eight square-lattice symmetries. The lattice never rotates — these map a node set onto
  *  itself for identity and for orientation, they do not turn the grid. */
 export const D4: Array<(n: LatticeNode) => LatticeNode> = [
@@ -92,10 +90,6 @@ export function canonicalTriangleId(vertices: readonly LatticeNode[]): string {
   if (best === null) throw new Error('triangle: no canonical form')
   return 'tri:' + best
 }
-
-export const verticesOfId = (id: string): [LatticeNode, LatticeNode, LatticeNode] =>
-  id.slice(4).split(';').map((p) => p.split(',').map(Number) as unknown as LatticeNode) as
-    [LatticeNode, LatticeNode, LatticeNode]
 
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))
 

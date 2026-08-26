@@ -171,8 +171,3 @@ export function layoutAtPitch(
   if (!per) throw new Error('library: 96mm mode has no perimeter in ' + frame.cols + 'x' + frame.rows)
   return { name: SPACING_96, nodes: rules.spacing96(frame, per.nodes, pitchMM) }
 }
-
-/** How a frame reads to a human, per its class. One call site for every label in the panel. */
-export function frameLabel(family: LibraryFamily, cols: number, rows: number): string {
-  return CLASS_RULES[family].label(cols, rows)
-}
