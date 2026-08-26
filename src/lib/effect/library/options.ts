@@ -3,7 +3,7 @@
 // class, frame, geometry, layout and view policy all stay here (Dan, 08-26: "no logic in UI
 // shell and poage"). Resolution lives in selection.ts; the class answers live in class-spec.ts.
 
-import { specOf, type ClassSpec } from './class-spec'
+import { specOf, type LibraryClass } from './class-spec'
 import { SPACING_MODES, isSpacingMode } from './rules'
 import { LIBRARY_SHAPES } from './shapes'
 import { transformLayout, viewName } from './transforms'
@@ -61,7 +61,7 @@ const transformedKey = (frame: LibraryFrame, layout: LibraryLayout, view: Librar
  *  can hold a transform whose representative was kept under a different one, which left every
  *  button unpressed (QA F2). */
 function orientationOptions(
-  sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, spec: ClassSpec,
+  sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, spec: LibraryClass,
   base: LibraryTransform,
 ): PanelOption[] {
   const selectedKey = transformedKey(frame, layout, sel.view)

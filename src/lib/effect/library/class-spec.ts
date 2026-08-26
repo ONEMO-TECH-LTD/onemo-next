@@ -23,7 +23,6 @@ import {
   assertTrianglePopulation, restsFlat, triangleById, triangleFrame, trianglesOfType,
   triangleTypeOf, uprightView,
 } from './triangle-frames'
-import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, RegistryFamily,
 } from './types'
@@ -47,29 +46,30 @@ export interface ClassVariant {
 
 export interface ClassType { id: string; label: string }
 
-/** The part of a hand-authored layout a class rules on. */
-export type DraftShape = Pick<LibraryDraft, 'nodes' | 'geometryId'>
+/** The part of a hand-authored layout a class rules on. Stated STRUCTURALLY, not imported from
+ *  the draft store: the engine-facing contract below must not depend on browser-local storage,
+ *  and drafts.ts already asks this file for validation, so importing back would be a cycle. */
+export interface DraftShape {
+  nodes: ReadonlyArray<readonly [number, number]>
+  geometryId?: string
+}
+/** What identifies where a stored layout belongs. Structural for the same reason. */
+export interface DraftIdentity {
+  className: string
+  frameKey: string
+  geometryId?: string
+}
 
+/** WHAT A CLASS IS — the geometry an engine consumes. Nothing here knows about a panel, a
+ *  selection history or a browser store, so a consumer that only needs shapes takes only this. */
 export interface ClassSpec {
   family: LibraryFamily
   /** The product types offered, in order. One entry means a single fixed type. */
   types: ClassType[]
-  /** Which type a selection sits in. */
-  typeOf: (sel: LibrarySelection, pitchMM: number) => string
   /** The offers of one type. */
   variants: (typeId: string, pitchMM: number) => ClassVariant[]
-  /** Which offer a selection names. */
-  variantIdOf: (sel: LibrarySelection) => string
   /** The frame a selection names — throws on an unknown id, never a silent retarget. */
   frameOf: (sel: LibrarySelection, pitchMM: number) => LibraryFrame
-  /** The selection this class opens on. */
-  open: (current: LibrarySelection, pitchMM: number) => LibrarySelection
-  /** The selection an offer produces, carrying the layout across where the offer has it. */
-  select: (current: LibrarySelection, v: ClassVariant) => LibrarySelection
-  /** The views this class NAMES. Empty means it names none and the turns are derived. */
-  orientations: Array<{ id: string; view: LibraryTransform }>
-  /** The presented view that IS 0 degrees. */
-  baseView: (sel: LibrarySelection, pitchMM: number) => LibraryTransform
   /** Materialise a layout at a pitch — the 96mm mode is physical, not an index rule. */
   layoutAt: (frame: LibraryFrame, layout: LibraryLayout, pitchMM: number) => LibraryLayout
   /** The outline in mm around a materialised population. */
@@ -78,11 +78,33 @@ export interface ClassSpec {
   ) => PointMM[]
   /** Why a hand-authored layout cannot be saved — empty list means sound. */
   validateDraft: (d: DraftShape, frame: LibraryFrame) => string[]
-  /** Does a stored draft belong to this selection's frame? */
-  draftMatches: (d: LibraryDraft, sel: LibrarySelection, frameKey: string) => boolean
-  /** The identity a new draft is stored under. */
-  draftIdParts: (sel: LibrarySelection, frameKey: string) => { className: string; frameKey: string; geometryId?: string }
 }
+
+/** HOW THE ADMIN MOVES THROUGH A CLASS — navigation and storage identity. Only the authoring
+ *  surface needs these, so they are a separate contract over the same object rather than
+ *  freight on the engine-facing one. */
+export interface ClassControls {
+  /** Which type a selection sits in. */
+  typeOf: (sel: LibrarySelection, pitchMM: number) => string
+  /** Which offer a selection names. */
+  variantIdOf: (sel: LibrarySelection) => string
+  /** The selection this class opens on. */
+  open: (current: LibrarySelection, pitchMM: number) => LibrarySelection
+  /** The selection an offer produces, carrying the layout across where the offer has it. */
+  select: (current: LibrarySelection, v: ClassVariant) => LibrarySelection
+  /** The views this class NAMES. Empty means it names none and the turns are derived. */
+  orientations: Array<{ id: string; view: LibraryTransform }>
+  /** The presented view that IS 0 degrees. */
+  baseView: (sel: LibrarySelection, pitchMM: number) => LibraryTransform
+  /** Does a stored layout belong to this selection's frame? */
+  draftMatches: (d: DraftIdentity, sel: LibrarySelection, frameKey: string) => boolean
+  /** The identity a new hand-authored layout is stored under. */
+  draftIdParts: (sel: LibrarySelection, frameKey: string) => DraftIdentity
+}
+
+/** One object answers both. The registry is single; the contracts are two, so what an engine
+ *  imports and what the admin surface imports are visibly different things. */
+export type LibraryClass = ClassSpec & ClassControls
 
 const NO_VIEW: LibraryTransform = { transpose: false, flipX: false, flipY: false }
 const pickLayoutName = (frame: LibraryFrame, preferred: string): string =>
@@ -103,7 +125,7 @@ function boundsAndDuplicates(d: DraftShape, frame: LibraryFrame): string[] {
 
 /** A REGISTRY CLASS — its frames are a literal table and its outline is a stored unit shape
  *  scaled to the frame's own box. Square, rectangle and diamond. */
-function registrySpec(family: RegistryFamily): ClassSpec {
+function registrySpec(family: RegistryFamily): LibraryClass {
   const rules = REGISTRY_RULES[family]
   const shape = LIBRARY_SHAPES.find((x) => x.family === family)!
   const frames = () => CLASS_FRAMES[family]
@@ -152,7 +174,7 @@ function registrySpec(family: RegistryFamily): ClassSpec {
 
 /** THE TRIANGLE — its frame, its populations and its outline all come from the geometry the
  *  selection names, so it carries no frame table and no stored unit shape. */
-function triangleSpec(): ClassSpec {
+function triangleSpec(): LibraryClass {
   const shape = LIBRARY_SHAPES.find((x) => x.family === 'triangle')!
   const geoOf = (sel: LibrarySelection) => {
     if (!sel.geometryId) throw new Error('library: triangle selection carries no geometryId')
@@ -256,7 +278,7 @@ const TYPE_LABEL: Record<string, string> = {
   slice: 'Slice', wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', sail: 'Sail', fin: 'Fin',
 }
 
-export const CLASS_SPECS: Record<LibraryFamily, ClassSpec> = {
+export const CLASS_SPECS: Record<LibraryFamily, LibraryClass> = {
   square: registrySpec('square'),
   rectangle: registrySpec('rectangle'),
   diamond: registrySpec('diamond'),
@@ -264,4 +286,4 @@ export const CLASS_SPECS: Record<LibraryFamily, ClassSpec> = {
 }
 
 /** The one call every other module makes. Nobody outside this file tests what a class is. */
-export const specOf = (family: LibraryFamily): ClassSpec => CLASS_SPECS[family]
+export const specOf = (family: LibraryFamily): LibraryClass => CLASS_SPECS[family]

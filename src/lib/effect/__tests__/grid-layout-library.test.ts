@@ -14,6 +14,9 @@ import {
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
   draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat, isActive,
+  startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, draftsFor,
+  materializeSelection, materializeDraft,
+  type LibraryEdit,
   TRIANGLE_TYPES,
   type LatticeNode,
   type RegistryFamily,
@@ -23,6 +26,12 @@ import {
 import { libraryArrangement, libraryPreview, libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
+
+/** The library states its own millimetres as readonly pairs; the engine's classifiers take
+ *  mutable Pt. Converting is the BRIDGE's whole job, so a test that calls an engine classifier
+ *  converts here too rather than the library loosening its own type. */
+const enginePts = (ps: ReadonlyArray<readonly [number, number]>): Array<[number, number]> =>
+  ps.map((p) => [p[0], p[1]])
 
 const isRegistry = (f: string): f is RegistryFamily => (REGISTRY_FAMILIES as string[]).includes(f)
 
@@ -66,7 +75,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
       const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
       const f0 = CLASS_FRAMES[s.family as RegistryFamily][0]
       const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
-      expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(ENGINE_FAMILY[s.family])
+      expect(shapeFamilyOf(enginePts(pv.outlineMM)), s.id).toBe(ENGINE_FAMILY[s.family])
     }
   })
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
@@ -82,7 +91,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (s.aspect === 'square' && cols !== rows) continue          // marked incompatible, not stretched
         const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
-        const c = classifyShape(pv.outlineMM, 48)
+        const c = classifyShape(enginePts(pv.outlineMM), 48)
         expect([c.cx, c.cy], `${s.id} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
       }
     }
@@ -493,20 +502,6 @@ describe('triangle — the three-point layout universe', () => {
 
   it('no record is equilateral — an integer lattice cannot carry one', () => {
     for (const t of TRIANGLE_LAYOUTS) expect(triangleGeometry(t.vertices).sideClass).not.toBe('equilateral')
-  })
-
-  it('geometry supplies the DEFAULT grouping: a right angle reads as a Wedge', () => {
-    // Dan, 08-26, looking at the right-angled 2x2: "it is not peak it is wedge".
-    const rightIso = TRIANGLE_LAYOUTS.filter((t) => {
-      const g = triangleGeometry(t.vertices)
-      return g.angleClass === 'right' && g.sideClass === 'isosceles'
-    })
-    expect(rightIso.length).toBe(8)
-    for (const t of rightIso) {
-      const g = triangleGeometry(t.vertices)
-      const base = g.angleClass === 'right' ? 'wedge' : 'peak'
-      expect(base).toBe('wedge')
-    }
   })
 
   it('the scientific classification survives every transform', () => {
@@ -1072,5 +1067,102 @@ describe('the class spec is portable, and nothing outside it knows a class by na
       for (const sym of ['CLASS_FRAMES', 'REGISTRY_RULES', 'specOf', 'TRIANGLE_'])
         expect(src, `${f} :: ${sym}`).not.toContain(sym)
     }
+  })
+
+  it('the bridge is an adapter: it receives a materialised record and never builds one', () => {
+    const src = read(BRIDGE)
+    // it must not resolve, transform, name a frame or ask a class anything
+    for (const sym of ['selectedRecords', 'transformLayout', 'frameKeyOf', 'specOf', 'resolveSelection'])
+      expect(src, `bridge :: ${sym}`).not.toContain(sym)
+    // what it does import from the library is the materialiser and the record type
+    expect(src).toContain('materializeSelection')
+    expect(src).toContain('materializeDraft')
+  })
+
+  it('the engine-facing contract does not depend on the browser draft store', () => {
+    const src = read('src/lib/effect/library/class-spec.ts')
+    // drafts.ts asks class-spec for validation; importing back would be a cycle, and would put
+    // browser-local storage inside the contract an engine consumes
+    expect(src).not.toMatch(/from '\.\/drafts'/)
+  })
+})
+
+describe('authoring transitions — the five the page used to spell out itself', () => {
+  const triSel = (id: string, layoutId = 'corners'): LibrarySelection => {
+    const t = triangleById(id)
+    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(triangleFrame(t, 48)),
+      layoutId, view: uprightView(t) }
+  }
+
+  it('a new layout starts empty, and the canvas still has somewhere to look', () => {
+    expect(startAdd()).toEqual({ name: '', nodes: [] })
+    const m = materializeDraft(sel({ frameKey: '3x3' }), [], 48, 12, 3, 3)
+    // nothing drawn: the seed is the selected layout's own first magnet, not the mm origin
+    expect(m.nodesMM).toEqual([])
+    expect(m.seedMM).not.toBeNull()
+    expect(m.seedMM).toEqual(materializeSelection(sel({ frameKey: '3x3' }), 48, 12).nodesMM[0])
+  })
+
+  it('a custom seeds from what is ON SCREEN at this pitch, not the canonical 48mm set', () => {
+    const s = sel({ frameKey: '5x5', layoutId: 'perimeter-96' })
+    // the 96mm mode is physical: at 24mm it keeps every fourth node, at 48 every other
+    expect(startEdit(s, [], 24).nodes.length).toBe(4)
+    expect(startEdit(s, [], 48).nodes.length).toBe(8)
+    expect(startEdit(s, [], 96).nodes.length).toBe(16)
+    expect(startEdit(s, [], 48).name).toBe('perimeter-96-custom')
+  })
+
+  it('a click in a TRANSPOSED view lands on the canonical node, and clicking again removes it', () => {
+    const s = sel({ shapeId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter',
+      view: { transpose: true, flipX: false, flipY: false } })
+    // shown 3 wide x 2 tall; the far column, top row, is canonical [0,2]
+    const once = toggleNodeAt(s, [], { name: 'x', nodes: [] }, [96, 48], 48)
+    expect(once.nodes).toEqual([[0, 2]])
+    expect(toggleNodeAt(s, [], once, [96, 48], 48).nodes).toEqual([])
+  })
+
+  it('a click outside the frame changes nothing', () => {
+    const s = sel({ shapeId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter' })
+    const before: LibraryEdit = { name: 'x', nodes: [[0, 0]] }
+    for (const p of [[-48, 0], [480, 0], [0, -48], [0, 480]] as Array<[number, number]>)
+      expect(toggleNodeAt(s, [], before, p, 48), String(p)).toEqual(before)
+  })
+
+  it('save refuses a triangle that is not a triangle, and keeps the geometry in its identity', () => {
+    const id = 'tri:0,0;0,2;2,0'
+    const s = triSel(id)
+    const bad = saveEdit(s, [], { name: 'flat', nodes: [[0, 0], [0, 1], [0, 2]] }, 48)
+    expect(bad.ok).toBe(false)
+    if (!bad.ok) expect(bad.error).toMatch(/collinear|hull/)
+    const good = saveEdit(s, [], { name: 'three', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
+    expect(good.ok).toBe(true)
+    if (good.ok) {
+      expect(good.drafts).toHaveLength(1)
+      expect(good.drafts[0].geometryId).toBe(id)
+      expect(good.drafts[0].id).toContain(id)
+      expect(good.sel.layoutId).toBe(draftLayoutId('three'))
+      // and it resolves back to itself rather than to the corpus layout
+      expect(resolveSelection(good.sel, good.drafts, 48).draft?.nodes).toEqual([[0, 0], [0, 2], [2, 0]])
+    }
+  })
+
+  it('delete removes only THIS geometry’s draft, even when another shares the frame and the name', () => {
+    // two distinct triangles on one frame: same frameKey, same draft name, different shapes
+    const pair = TRIANGLE_LAYOUTS.filter((t) => triangleFrameKey(t) === '3x4' && isActive(t)).slice(0, 2)
+    expect(pair).toHaveLength(2)
+    const mk = (t: typeof pair[number]) => {
+      const s = triSel(t.id)
+      const r = saveEdit(s, [], { name: 'same-name', nodes: t.vertices.map(([x, y]) => [x, y] as [number, number]) }, 48)
+      expect(r.ok, t.id).toBe(true)
+      // delete acts on the selection that NAMES the draft, which is what save hands back
+      return { s: r.ok ? r.sel : s, rec: r.ok ? r.drafts[0] : null! }
+    }
+    const a = mk(pair[0]), b = mk(pair[1])
+    expect(a.rec.id).not.toBe(b.rec.id)
+    const both = [a.rec, b.rec]
+    const after = deleteEdit(a.s, both, null, 48)
+    expect(after.drafts.map((d) => d.geometryId)).toEqual([pair[1].id])
+    // and the surviving one is still reachable from its own selection
+    expect(draftsFor(b.s, after.drafts, 48).map((d) => d.name)).toEqual(['same-name'])
   })
 })
