@@ -65,20 +65,42 @@ function orientationOptions(
   base: LibraryTransform,
 ): PanelOption[] {
   const selectedKey = transformedKey(frame, layout, sel.view)
-  const seen = new Set<string>()
-  const out: PanelOption[] = []
-  // the presented view leads the list and IS 0 degrees; the rest are turns from it
+  // Several transforms can draw the SAME picture — a shape symmetric about its vertical axis
+  // is flipped top-to-bottom by both "mirror horizontal" and a 180 degree turn. Collect every
+  // view per picture, then name the picture by the SIMPLEST transform that reaches it: a
+  // rotation if one does, and a mirror only when no rotation will (Dan, 08-26: "why orientation
+  // has 3 buttons with degrees and 1 mirror horizontal text button when logical to just say
+  // 180?"). Keeping whichever view came first named the matrix, not the result.
+  const groups = new Map<string, LibraryTransform[]>()
   for (const view of [base, ...ALL_VIEWS]) {
     const key = transformedKey(frame, layout, view)
-    if (seen.has(key)) continue
-    seen.add(key)
-    const named = spec.orientations.find((o) => sameView(o.view, view))
-    out.push({
-      id: 'view' + out.length, label: named?.id ?? viewName(base, view),
-      active: key === selectedKey, next: { ...sel, view: { ...view } },
-    })
+    const g = groups.get(key)
+    if (g) g.push(view); else groups.set(key, [view])
   }
-  return out
+  const picked = [...groups].map(([key, views]) => {
+    // a class that names its own views wins; then plain turns, in order; then mirrors
+    const best = views.reduce((a, b) => (rankOf(a, base, spec) <= rankOf(b, base, spec) ? a : b))
+    return { key, view: best, rank: rankOf(best, base, spec) }
+  })
+  // and they READ in that order too, so the row is always 0, 90, 180, 270, then any mirrors
+  picked.sort((a, b) => a.rank - b.rank)
+  return picked.map(({ key, view }, i) => {
+    const named = spec.orientations.find((o) => sameView(o.view, view))
+    return {
+      id: 'view' + i, label: named?.id ?? viewName(base, view),
+      active: key === selectedKey, next: { ...sel, view: { ...view } },
+    }
+  })
+}
+
+/** How plainly a transform describes a picture: a class's own name first, then the four turns
+ *  in order, then the mirrors. Lower is plainer. */
+const TURN_ORDER = ['0°', '90°', '180°', '270°']
+const MIRROR_ORDER = ['mirror horizontal', 'mirror vertical', 'mirror diagonal ↘', 'mirror diagonal ↗']
+function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryClass): number {
+  if (spec.orientations.some((o) => sameView(o.view, view))) return -1
+  const i = TURN_ORDER.indexOf(viewName(base, view))
+  return i >= 0 ? i : 10 + MIRROR_ORDER.indexOf(viewName(base, view))
 }
 
 /** The selection a class tab lands on. The page passes a family; the class decides the rest. */

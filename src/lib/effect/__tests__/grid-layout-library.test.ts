@@ -743,7 +743,27 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
 
   it('F3 — an asymmetric shape really does offer all eight turns', () => {
     // a scalene triangle has no symmetry of its own, so all eight lattice views are distinct
-    expect(panelOptions(sel3(one('flag').id), [], 48).orientations.length).toBe(8)
+    expect(panelOptions(sel3(one('flag').id), [], 48).orientations.map((o) => o.label)).toEqual(
+      ['0°', '90°', '180°', '270°', 'mirror horizontal', 'mirror vertical',
+        'mirror diagonal ↘', 'mirror diagonal ↗'])
+  })
+
+  it('a turn is named by the plainest transform that reaches it, and the row reads in order', () => {
+    // Several transforms draw the same picture: a shape symmetric about its vertical axis is
+    // flipped top-to-bottom by BOTH "mirror horizontal" and a 180 degree turn. Dan, 08-26:
+    // "why orientation has 3 buttons with degrees and 1 mirror horizontal text button when
+    // logical to just say 180?" — every symmetric class now reads as four plain turns.
+    for (const type of TRIANGLE_TYPES) {
+      const labels = panelOptions(sel3(one(type).id), [], 48).orientations.map((o) => o.label)
+      const turns = ['0°', '90°', '180°', '270°']
+      expect(labels.slice(0, Math.min(4, labels.length)), type).toEqual(turns.slice(0, labels.length))
+      // a mirror name appears only where no turn reaches that picture — never as a fifth way
+      // of saying a turn already on the row
+      expect(new Set(labels).size, type).toBe(labels.length)
+    }
+    // and a class with its own vocabulary keeps it
+    const rect = selectionForFamily(sel(), 'rectangle', 48)
+    expect(panelOptions(rect, [], 48).orientations.map((o) => o.label)).toEqual(['portrait', 'landscape'])
   })
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
