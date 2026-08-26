@@ -59,10 +59,9 @@ const ZONE_FILES: Record<Exclude<Zone, 1>, readonly string[]> = {
 }
 
 const libraryFiles = () => files(LIBRARY).filter((path) => path.endsWith('.ts'))
-const step2Files = () => libraryFiles().filter((path) => {
-  const zone = zonesOf(path)[0]
-  return zone !== undefined && zone <= 5
-})
+const zonedFiles = () => libraryFiles()
+const coreFiles = () => zonedFiles().filter((path) => zonesOf(path)[0] <= 5)
+const nonUiFiles = () => zonedFiles().filter((path) => zonesOf(path)[0] <= 6)
 
 const zonesOf = (path: string): Zone[] => {
   const name = basename(path)
@@ -123,7 +122,7 @@ const ALLOWED_ZONES: Record<Zone, readonly Zone[]> = {
 
 const importViolations = (overrides: Record<string, string> = {}): ImportViolation[] => {
   const out: ImportViolation[] = []
-  for (const path of step2Files()) {
+  for (const path of zonedFiles()) {
     const fromZone = zonesOf(path)[0]
     if (fromZone === undefined) continue
     const key = 'library/' + basename(path)
@@ -234,7 +233,7 @@ const callsNamed = (path: string, name: string, code = source(path)): number => 
 }
 
 const barrelExports = (code = source(join(LIBRARY, 'index.ts'))) => {
-  const types: string[] = [], values: string[] = [], wildcards: string[] = []
+  const types: string[] = [], values: string[] = [], wildcards: string[] = [], aliases: string[] = []
   for (const statement of parse(join(LIBRARY, 'index.ts'), code).statements) {
     if (!ts.isExportDeclaration(statement)) continue
     if (!statement.exportClause || !ts.isNamedExports(statement.exportClause)) {
@@ -243,10 +242,12 @@ const barrelExports = (code = source(join(LIBRARY, 'index.ts'))) => {
     }
     for (const element of statement.exportClause.elements) {
       const names = statement.isTypeOnly || element.isTypeOnly ? types : values
-      names.push((element.propertyName ?? element.name).text)
+      if (element.propertyName && element.propertyName.text !== element.name.text)
+        aliases.push(`${element.propertyName.text} as ${element.name.text}`)
+      names.push(element.name.text)
     }
   }
-  return { types: types.sort(), values: values.sort(), wildcards }
+  return { types: types.sort(), values: values.sort(), wildcards, aliases }
 }
 
 const bridgeViolations = (code = source(join(ROOT, 'grid-magnet-library-bridge.ts'))): string[] => {
@@ -373,11 +374,11 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 2: every governed source belongs to exactly one active zone', () => {
     for (const path of libraryFiles()) expect(zonesOf(path), path).toHaveLength(1)
   })
-  it('STEP 2: the AST import matrix enforces zones 0-5', () => {
+  it('STEP 2: the AST import matrix enforces zones 0-7', () => {
     expect(importViolations()).toEqual([])
   })
-  it('STEP 2: zones 0-5 contain no React, Next, or JSX', () => {
-    for (const path of step2Files()) {
+  it('STEP 2: zones 0-6 contain no React, Next, or JSX', () => {
+    for (const path of nonUiFiles()) {
       const tree = parse(path)
       expect(parseFailureCodes(tree), path).toEqual([])
       expect(jsxOffenders(tree), path).toEqual([])
@@ -387,6 +388,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(importViolations({
       'library/selection.ts': `import { squareClass } from './square-class'; void squareClass`,
     })).toContainEqual(expect.objectContaining({ fromZone: 5, toZone: 3 }))
+    expect(importViolations({
+      'library/surface.ts': source(join(LIBRARY, 'surface.ts')) + `\nimport './triangle-class'`,
+    })).toContainEqual(expect.objectContaining({ fromZone: 6, toZone: 3 }))
     expect(jsxOffenders(parse('probe.tsx', `export const Probe = () => <div />`))).toHaveLength(1)
     expect(parseFailureCodes(parse('probe.ts', `export const Probe = <div />`))).not.toEqual([])
     expect(corpusDeclarationViolations('corpus-probe.ts',
@@ -408,14 +412,14 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(offenders).toEqual([])
   })
   it('STEP 2: corpus exports are literal readonly values and no empty frame sentinel remains', () => {
-    for (const path of step2Files().filter((file) => /^corpus-/.test(basename(file))))
+    for (const path of coreFiles().filter((file) => /^corpus-/.test(basename(file))))
       expect(corpusDeclarationViolations(path), path).toEqual([])
-    for (const path of step2Files()) expect(emptyLayoutSentinels(path), path).toEqual([])
+    for (const path of coreFiles()) expect(emptyLayoutSentinels(path), path).toEqual([])
   })
   it('STEP 2: physical constants are owned by grid-magnet-spec', () => {
     const offenders: string[] = []
     const physical = /(PAD|PADDING|PITCH|DIAMETER|DIA).*MM/
-    for (const path of step2Files()) {
+    for (const path of coreFiles()) {
       const tree = parse(path)
       const visit = (node: ts.Node) => {
         if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && physical.test(node.name.text))
@@ -451,7 +455,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 3: one outline and hull implementation own production', () => {
     const declarations: Record<string, string[]> = { outlineFromLayout: [], convexHull: [] }
     const offsetCallers: string[] = []
-    for (const path of step2Files()) {
+    for (const path of coreFiles()) {
       const tree = parse(path)
       const visit = (node: ts.Node) => {
         if (ts.isFunctionDeclaration(node) && node.name && node.name.text in declarations)
@@ -513,6 +517,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       types: ['CatalogueEntry', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
       values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'catalogue', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
+      aliases: [],
     })
     const bridge = source(join(ROOT, 'grid-magnet-library-bridge.ts'))
     for (const symbol of ['materializeSelection', 'materializeDraft', 'resolveSelection', 'panelOptions', 'specOf'])
@@ -534,6 +539,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(zone8Violations(PAGE, source(PAGE) + `\nimport { materializeSelection } from '@/lib/effect/library/materialize'`)).toEqual(['@/lib/effect/library/materialize'])
     expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'), source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport { resolveSelection } from './library/selection'`)).toEqual(['./library/selection'])
     expect(barrelExports(source(join(LIBRARY, 'index.ts')) + `\nexport * from './triangle-class'`).wildcards).toHaveLength(1)
+    expect(barrelExports(source(join(LIBRARY, 'index.ts')).replace(
+      'catalogue }', 'catalogue as hacked }',
+    ))).toMatchObject({ values: expect.arrayContaining(['hacked']), aliases: ['catalogue as hacked'] })
     expect(bridgeViolations(source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport './types'`)).toEqual(['./types'])
     expect(callsNamed(PAGE, 'librarySurface', source(PAGE) + `\nlibrarySurface()`)).toBe(2)
   })
