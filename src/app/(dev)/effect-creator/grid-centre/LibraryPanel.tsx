@@ -1,21 +1,18 @@
 'use client'
 
-// LibraryPanel — the layout-library AUTHORING panel (admin). Pure view: it asks CLASS_RULES
-// what a class offers and renders it. No class logic lives here — no "is this a diamond",
-// no box maths, no sub-type tests. Selection state in, chips out.
+// LibraryPanel — the layout-library AUTHORING panel (admin). A PURE VIEW: it renders the
+// options the library hands it and holds no class logic — no "is this a diamond", no box maths,
+// no sub-type test, no layout filtering, no draft matching. Options in, chips out.
+// Dan, 08-26: "no logic in UI shell and poage".
 
 import type { ReactElement, ReactNode } from 'react'
-import {
- SPACING_MODES, SPACING_BASE, isSpacingMode,
-  frameKeyOf, resolveSelection, panelOptions, draftLayoutId,
-  type LibrarySelection, type LibraryDraft,
-} from '@/lib/effect/library'
+import { panelOptions, type LibraryEdit, type LibraryDraft, type LibrarySelection, type PanelOption } from '@/lib/effect/library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
   sel, setSel, Fold, pitch, boxMM, showBox, setShowBox, editError,
-  edit, setEdit, drafts, saveEdit, deleteEdit, startAdd, startEdit,
+  edit, setEdit, drafts, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
 }: {
   sel: LibrarySelection
   setSel: (next: LibrarySelection) => void
@@ -24,23 +21,21 @@ export default function LibraryPanel({
   boxMM: { w: number; h: number }
   showBox: boolean
   setShowBox: (v: boolean) => void
-  edit: { name: string; nodes: Array<[number, number]> } | null
-  setEdit: (d: { name: string; nodes: Array<[number, number]> } | null) => void
+  edit: LibraryEdit | null
+  setEdit: (d: LibraryEdit | null) => void
   editError: string | null
   drafts: LibraryDraft[]
+  /** The selection names a saved layout of the admin's own. */
+  isDraft: boolean
   saveEdit: () => void
   deleteEdit: () => void
   startAdd: () => void
   startEdit: () => void
 }) {
-  const { shape, frame, draft } = resolveSelection(sel, drafts, pitch)
   const opts = panelOptions(sel, drafts, pitch)
-  const key = frameKeyOf(frame)
-  const mine = drafts.filter((d) => d.frameKey === key && d.className === shape.family
-    && (d.geometryId ?? '') === (sel.geometryId ?? ''))
-  const isDraft = !!draft
-  const has = (n: string) => frame.layouts.some((l) => l.name === n)
-  const go = (o: { next: typeof sel }) => { setEdit(null); setSel(o.next) }
+  // the only state the view adds is whether the editor is open; everything else is an option
+  const go = (o: PanelOption) => { setEdit(null); setSel(o.next) }
+  const pressed = (o: PanelOption) => !edit && o.active
   return (
     <>
       <div className="gl-card gl-libsize">
@@ -75,23 +70,17 @@ export default function LibraryPanel({
 
       <Fold title="Layouts">
         <div className="gl-lib">
-          {frame.layouts.filter((l) => !isSpacingMode(l.name) || l.name === SPACING_BASE).map((l) => (
-            <button key={l.name} aria-pressed={!edit && (sel.layoutId === l.name || (l.name === SPACING_BASE && isSpacingMode(sel.layoutId)))}
-              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: l.name }) }}><b>{l.name}</b></button>
-          ))}
-          {mine.map((d) => (
-            <button key={d.id} aria-pressed={!edit && sel.layoutId === draftLayoutId(d.name)}
-              onClick={() => { setEdit(null); setSel({ ...sel, layoutId: draftLayoutId(d.name) }) }}>
-              <b>{d.name}</b><span>custom</span>
+          {opts.layouts.map((o) => (
+            <button key={o.id} aria-pressed={pressed(o)} onClick={() => go(o)}>
+              <b>{o.label}</b>{o.custom && <span>custom</span>}
             </button>
           ))}
           <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
         </div>
-        <div className="gl-field" style={{ marginTop: 9, opacity: (edit || isSpacingMode(sel.layoutId)) ? 1 : 0.45 }}><span>Spacing</span>
+        <div className="gl-field" style={{ marginTop: 9, opacity: (edit || opts.spacing.some((o) => o.active)) ? 1 : 0.45 }}><span>Spacing</span>
           <div className="gl-seg">
-            {SPACING_MODES.map((m) => (
-              <button key={m.layoutId} aria-pressed={!edit && sel.layoutId === m.layoutId} disabled={!has(m.layoutId)}
-                onClick={() => { setEdit(null); setSel({ ...sel, layoutId: m.layoutId }) }}>{m.label}</button>
+            {opts.spacing.map((o) => (
+              <button key={o.id} aria-pressed={pressed(o)} disabled={o.disabled} onClick={() => go(o)}>{o.label}</button>
             ))}
             <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
           </div>

@@ -2,11 +2,13 @@
 // bridge mapping (QA F3: tests must FAIL when any required shape/frame/layout/primitive
 // is removed; never a point-count oracle).
 
+import { readFileSync, readdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES,
-  LIBRARY_FAMILIES, SPACING_MODES, CLASS_RULES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
-  resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, layoutAtPitch,
+  LIBRARY_FAMILIES, REGISTRY_FAMILIES, SPACING_MODES, specOf, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
+  resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode,
   transformLayout as tl,
   TRIANGLE_LAYOUTS, triangleGeometry, triangleTypeOf, triangleFrameKey,
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
@@ -14,12 +16,15 @@ import {
   draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat, isActive,
   TRIANGLE_TYPES,
   type LatticeNode,
+  type RegistryFamily,
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
 import { libraryArrangement, libraryPreview, libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
+
+const isRegistry = (f: string): f is RegistryFamily => (REGISTRY_FAMILIES as string[]).includes(f)
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
 const SHAPE_IDS = ['square', 'rectangle', 'diamond', 'triangle']
@@ -54,18 +59,18 @@ describe('classifier goldens — declared family is the classifier verdict, not 
   it('every shape outline classifies as its declared family', () => {
     for (const s of LIBRARY_SHAPES) {
       // a derived outline has no stored shape to classify — it is proven by its own hull tests
-      if (CLASS_RULES[s.family].source === 'geometry') continue
+      if (!isRegistry(s.family)) continue
       // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
       // the engine classifier reads it as the box-filling 'square' family. The mapping is
       // asserted explicitly so the two taxonomies can never silently merge.
       const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
-      const f0 = CLASS_FRAMES[s.family][0]
+      const f0 = CLASS_FRAMES[s.family as RegistryFamily][0]
       const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
       expect(shapeFamilyOf(pv.outlineMM), s.id).toBe(ENGINE_FAMILY[s.family])
     }
   })
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
-    for (const s of LIBRARY_SHAPES) for (const f of CLASS_FRAMES[s.family]) {
+    for (const s of LIBRARY_SHAPES) for (const f of (isRegistry(s.family) ? CLASS_FRAMES[s.family as RegistryFamily] : [])) {
       // The engine classifier tops out at 5 magnet lines per axis (bands B1-B5), so a 6-line
       // library frame has no class to be read back as. The library carries it; the classifier
       // cannot express it until a sixth band is ruled.
@@ -77,7 +82,6 @@ describe('classifier goldens — declared family is the classifier verdict, not 
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (s.aspect === 'square' && cols !== rows) continue          // marked incompatible, not stretched
         const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
-        expect(pv.shapeCompatible).toBe(true)
         const c = classifyShape(pv.outlineMM, 48)
         expect([c.cx, c.cy], `${s.id} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
       }
@@ -123,7 +127,7 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
   it('arrangement carries stable IDs and mm nodes', () => {
     const a = libraryArrangement(sel(), 48)
     expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'perimeter', frameCols: 3, frameRows: 3 })
-    expect(libraryPreview(sel(), 48)).toMatchObject({ shapeId: 'square', declaredFamily: 'square', shapeCompatible: true })
+    expect(libraryPreview(sel(), 48)).toMatchObject({ shapeId: 'square', declaredFamily: 'square' })
     expect(a.nodesMM.length).toBe(8)
   })
   it('unknown IDs fail loudly — no silent 1x1 retarget (QA F3)', () => {
@@ -293,7 +297,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('a frame with a perimeter always offers the 96mm mode, and it is a subset of that perimeter', () => {
-    for (const fam of LIBRARY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
+    for (const fam of REGISTRY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
       const per = f.layouts.find((l) => l.name === 'perimeter')
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!per) { expect(s96).toBeUndefined(); continue }
@@ -305,7 +309,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('every 96mm population keeps every extreme — an extreme is never left bare', () => {
-    for (const fam of LIBRARY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
+    for (const fam of REGISTRY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
       const got = new Set(s96.nodes.map(key))
@@ -325,7 +329,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
 
   it('the population follows the pitch tier, and the label does not (Dan: 96 is fixed)', () => {
     const f = CLASS_FRAMES.square.find((x) => x.cols === 5)!
-    const at = (p: number) => layoutAtPitch('square', f, f.layouts.find((l) => l.name === 'perimeter-96')!, p).nodes.length
+    const at = (p: number) => specOf('square').layoutAt(f, f.layouts.find((l) => l.name === 'perimeter-96')!, p).nodes.length
     expect([at(24), at(48), at(96)]).toEqual([4, 8, 16])
     expect(SPACING_MODES.map((m) => m.label)).toEqual(['48 mm', '96 mm'])
   })
@@ -622,12 +626,13 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     }
   })
 
-  it('the triangle stores no unit outline — one discriminant decides, not two', () => {
+  it('the triangle stores no unit outline, and carries no frame registry either', () => {
     const tri = LIBRARY_SHAPES.find((s) => s.id === 'triangle')!
-    expect(CLASS_RULES.triangle.source).toBe('geometry')
     expect(tri.outline.length).toBe(0)
+    // no empty-list sentinel to mistake for a real registry: the key is simply absent
+    expect(Object.keys(CLASS_FRAMES)).toEqual([...REGISTRY_FAMILIES])
     for (const s of LIBRARY_SHAPES)
-      if (CLASS_RULES[s.family].source === 'registry') expect(s.outline.length).toBeGreaterThan(2)
+      if (isRegistry(s.family)) expect(s.outline.length).toBeGreaterThan(2)
   })
 
   it('a node on an edge or inside leaves the outline unchanged; one outside changes it', () => {
@@ -967,5 +972,105 @@ describe('triangle — every tab carries only its own kind', () => {
     expect(new Set(seen).size).toBe(seen.length)
     expect(seen.length).toBe(TRIANGLE_LAYOUTS.filter(isActive).length)
     for (const t of TRIANGLE_TYPES) expect(trianglesOfType(t).length, t).toBeGreaterThan(0)
+  })
+})
+
+describe('the class spec is portable, and nothing outside it knows a class by name', () => {
+  const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
+  const LIB = resolve(process.cwd(), 'src/lib/effect/library')
+  const PANEL = 'src/app/(dev)/effect-creator/grid-centre/LibraryPanel.tsx'
+  const PAGE = 'src/app/(dev)/effect-creator/grid-centre/page.tsx'
+  const BRIDGE = 'src/lib/effect/grid-magnet-library-bridge.ts'
+
+  it('every class answers every member of one contract', () => {
+    for (const fam of LIBRARY_FAMILIES) {
+      const spec = specOf(fam)
+      expect(spec.family, fam).toBe(fam)
+      expect(spec.types.length, fam).toBeGreaterThan(0)
+      for (const t of spec.types) {
+        expect(t.label.trim(), `${fam} ${t.id}`).not.toBe('')
+        const vs = spec.variants(t.id, 48)
+        expect(vs.length, `${fam} ${t.id}`).toBeGreaterThan(0)
+        // every offer is complete: a stable id, a readable label, a real frame and its 0 degrees
+        for (const v of vs) {
+          expect(v.id, `${fam} ${t.id}`).toBeTruthy()
+          expect(v.frame.layouts.length, `${fam} ${v.id}`).toBeGreaterThan(0)
+          expect(typeof v.view.transpose, `${fam} ${v.id}`).toBe('boolean')
+        }
+      }
+      // and the class round-trips: open it, and every answer it gives about that selection
+      // agrees with every other — the type it reports contains the offer it landed on, and the
+      // frame it resolves is the one the selection names
+      const opened = spec.open(sel(), 48)
+      const type = spec.typeOf(opened, 48)
+      expect(spec.types.map((t) => t.id), fam).toContain(type)
+      expect(spec.variants(type, 48).map((v) => v.id), fam).toContain(spec.variantIdOf(opened))
+      expect(frameKeyOf(spec.frameOf(opened, 48)), fam).toBe(opened.frameKey)
+      // and selecting any offer of any type is likewise self-consistent
+      for (const t of spec.types) for (const v of spec.variants(t.id, 48)) {
+        const next = spec.select(opened, v)
+        expect(spec.variantIdOf(next), `${fam} ${v.id}`).toBe(v.id)
+        expect(spec.typeOf(next, 48), `${fam} ${v.id}`).toBe(t.id)
+        expect(frameKeyOf(spec.frameOf(next, 48)), `${fam} ${v.id}`).toBe(next.frameKey)
+        expect(() => selectedRecords(next, 48), `${fam} ${v.id}`).not.toThrow()
+      }
+    }
+  })
+
+  it('every class states its own outline, and none of them is the bridge’s to choose', () => {
+    for (const fam of LIBRARY_FAMILIES) {
+      const spec = specOf(fam)
+      const opened = spec.open(sel(), 48)
+      const a = libraryArrangement(opened, 48)
+      const out = spec.outline(a.nodesMM, a.frameCols, a.frameRows, 48, 12)
+      expect(out.length, fam).toBeGreaterThanOrEqual(3)
+    }
+    // the triangle's is derived from the magnets and the others are not: moving a magnet moves
+    // the triangle's outline, and leaves a registry class's box exactly where it was
+    const tri = specOf('triangle')
+    const t0 = tri.open(sel(), 48)
+    const a0 = libraryArrangement(t0, 48)
+    const moved = [...a0.nodesMM.slice(0, -1), [a0.nodesMM[a0.nodesMM.length - 1][0] + 48, a0.nodesMM[a0.nodesMM.length - 1][1]] as const]
+    expect(tri.outline(moved, a0.frameCols, a0.frameRows, 48, 12))
+      .not.toEqual(tri.outline(a0.nodesMM, a0.frameCols, a0.frameRows, 48, 12))
+    const sq = specOf('square')
+    const s0 = sq.open(sel(), 48)
+    const b0 = libraryArrangement(s0, 48)
+    expect(sq.outline([], b0.frameCols, b0.frameRows, 48, 12))
+      .toEqual(sq.outline(b0.nodesMM, b0.frameCols, b0.frameRows, 48, 12))
+  })
+
+  it('only the spec and the triangle’s own files name the triangle', () => {
+    const allowed = new Set([
+      'class-spec.ts', 'corpus-triangle.ts', 'triangle-frames.ts', 'triangle-geometry.ts',
+      'triangle-types.ts', 'index.ts', 'types.ts', 'frames.ts',
+    ])
+    const offenders: string[] = []
+    for (const f of readdirSync(LIB)) {
+      if (allowed.has(f)) continue
+      // a comment may still explain the seam; an IMPORT is the leak
+      const src = read('src/lib/effect/library/' + f)
+      if (/from '\.\/(triangle-[a-z]+|corpus-triangle)'/.test(src)) offenders.push(f)
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('the panel, the page and the bridge hold no class policy', () => {
+    for (const f of [PANEL, PAGE, BRIDGE]) {
+      const src = read(f)
+      // no class name used as a decision
+      expect(src, f).not.toMatch(/===\s*'(triangle|square|rectangle|diamond)'/)
+      expect(src, f).not.toMatch(/family\s*===/)
+      // no re-derived draft identity, spacing test or outline maths
+      expect(src, f).not.toContain('isSpacingMode')
+      expect(src, f).not.toContain('draftId(')
+      expect(src, f).not.toContain('convexHull')
+    }
+    // and the two UI files import no class table at all
+    for (const f of [PANEL, PAGE]) {
+      const src = read(f)
+      for (const sym of ['CLASS_FRAMES', 'REGISTRY_RULES', 'specOf', 'TRIANGLE_'])
+        expect(src, `${f} :: ${sym}`).not.toContain(sym)
+    }
   })
 })

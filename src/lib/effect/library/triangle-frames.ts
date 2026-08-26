@@ -35,6 +35,14 @@ export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)
  *  is derived and there is nothing to hand-curate. An override list here would only re-introduce
  *  the stale entries that put right triangles in the Pyramid tab. */
 export const triangleTypeOf = (t: TriangleLayout): TriangleProductType => {
+  const hit = TYPE_OF.get(t.id)
+  if (hit) return hit
+  const v = computeTriangleTypeOf(t)
+  TYPE_OF.set(t.id, v)
+  return v
+}
+
+const computeTriangleTypeOf = (t: TriangleLayout): TriangleProductType => {
   const r = presentedCorners(t)
   const [p, q, s] = r.nodes
   const E: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
@@ -102,6 +110,14 @@ export function restsFlat(t: TriangleLayout): boolean {
 /** The layouts a product type offers: every straight one first, then the diagonal ones, and
  *  within each run by area, columns/rows, blunt-to-sharp, then the stable ID. */
 export function trianglesOfType(type: TriangleProductType): TriangleLayout[] {
+  const hit = BY_TYPE.get(type)
+  if (hit) return hit
+  const out = computeTrianglesOfType(type)
+  BY_TYPE.set(type, out)
+  return out
+}
+
+function computeTrianglesOfType(type: TriangleProductType): TriangleLayout[] {
   return TRIANGLE_LAYOUTS.filter((t) => isActive(t) && triangleTypeOf(t) === type).sort((a, b) => {
     if (restsFlat(a) !== restsFlat(b)) return restsFlat(a) ? -1 : 1
     const ba = boundsOf([...a.vertices]), bb = boundsOf([...b.vertices])
@@ -151,6 +167,21 @@ const VIEWS: LibraryTransform[] = [
 ]
 
 export function uprightView(t: TriangleLayout): LibraryTransform {
+  const hit = UPRIGHT.get(t.id)
+  if (hit) return hit
+  const v = computeUprightView(t)
+  UPRIGHT.set(t.id, v)
+  return v
+}
+
+/** Memo over the CORPUS, which is immutable literal data: the same 79 ids give the same eight
+ *  views for the life of the process. Without it the panel recomputes ten types x 79 layouts
+ *  x eight views on every render, which is seconds, not milliseconds. */
+const UPRIGHT = new Map<string, LibraryTransform>()
+const BY_TYPE = new Map<string, TriangleLayout[]>()
+const TYPE_OF = new Map<string, TriangleProductType>()
+
+function computeUprightView(t: TriangleLayout): LibraryTransform {
   const b = boundsOf([...t.vertices])
   const frame: LibraryFrame = { cols: b.cols, rows: b.rows, layouts: [] }
   const layout: LibraryLayout = { name: 'corners', nodes: [...t.vertices] }

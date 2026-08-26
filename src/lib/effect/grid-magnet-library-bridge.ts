@@ -1,15 +1,16 @@
 // grid-magnet-library-bridge.ts — THE ONE NARROW BRIDGE from the pure layout-library module to
-// engine types. One conversion (`libraryArrangement` — stable IDs, truthful frame identity,
-// mm nodes ready for wrapGroup) and the Stage preview composed from it. No solver policy, no
-// UI imports; frame spans come from the classifier's own class floors, never a margin formula.
+// engine types. CONVERSION ONLY: it materialises what a selection names, flips y into engine
+// space, and wraps the result in the engine's own record types. It chooses nothing — which
+// outline a class draws, how a layout materialises at a pitch and what makes a hand-authored
+// population sound are all the class spec's answers (Dan, 08-26: the library carries the class
+// spec). No solver policy, no UI imports, no class branch of its own.
 
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
-  selectedRecords, transformLayout, frameKeyOf, CLASS_RULES, layoutAtPitch,
-  canonicalNode, convexHull,
+  selectedRecords, transformLayout, frameKeyOf, specOf,
   type LibrarySelection, type LibraryShapeId, type LibraryFamily,
 } from './library'
 
@@ -40,7 +41,7 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
   const frameCols = sel.view.transpose ? frame.rows : frame.cols
   const frameRows = sel.view.transpose ? frame.cols : frame.rows
   // 96mm is physical: the population is materialised for THIS pitch, never the canonical one.
-  const t = transformLayout(frame, layoutAtPitch(shape.family, frame, layout, pitchMM), sel.view)
+  const t = transformLayout(frame, specOf(shape.family).layoutAt(frame, layout, pitchMM), sel.view)
   // Engine space is y-up; library rows count downward from the top.
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   return {
@@ -56,26 +57,17 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
 export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: number = RELEASED_PADDING_MM): {
   shapeId: LibraryShapeId
   declaredFamily: LibraryFamily
-  shapeCompatible: boolean
   outlineMM: Pt[]
 } {
   const { shape } = selectedRecords(sel, pitchMM)
   const a = libraryArrangement(sel, pitchMM)
-  // A DERIVED outline is the magnets' own hull pushed out by the padding — no stored shape, no
-  // box, no re-centring. Its position is the answer, which is what makes it hug (Dan, 08-26).
-  const rules = CLASS_RULES[shape.family]
-  if (rules.source === 'geometry')
-    return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible: true, outlineMM: hullOutline(a.nodesMM, padMM) }
-  // The frame's physical span is CLASS POLICY — the class rules own it (the square/rectangle
-  // class floor, the diamond's wrap-the-ring rule). The bridge asks; it does not re-derive.
-  const box0 = rules.boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
-  const w0 = box0.w, h0 = box0.h
-  const shapeCompatible = shape.aspect === 'frame' || a.frameCols === a.frameRows
-  const w = shapeCompatible ? w0 : Math.max(w0, h0)
-  const h = shapeCompatible ? h0 : Math.max(w0, h0)
-  const cx = (a.frameCols - 1) * pitchMM / 2, cy = (a.frameRows - 1) * pitchMM / 2
-  const outlineMM: Pt[] = shape.outline.map(([ux, uy]) => [cx - w / 2 + ux * w, cy + h / 2 - uy * h])
-  return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible, outlineMM }
+  // The outline is CLASS POLICY and the class states it: the square/rectangle class floor, the
+  // diamond's wrap-the-ring rule, the triangle's magnets-own-hull-pushed-out. The bridge asks
+  // and converts; it does not choose between them and does not re-derive any of them.
+  const outlineMM = specOf(shape.family)
+    .outline(a.nodesMM, a.frameCols, a.frameRows, pitchMM, padMM)
+    .map((q) => [q[0], q[1]] as Pt)
+  return { shapeId: shape.id, declaredFamily: shape.family, outlineMM }
 }
 
 /** A population being DRAWN is allowed to be nothing yet, one node, two, or briefly wrong: the
@@ -84,42 +76,14 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
 export function draftOutline(
   family: LibraryFamily,
   nodesMM: ReadonlyArray<Pt>, sel: LibrarySelection, pitchMM: number, padMM: number,
+  frameCols: number, frameRows: number,
 ): { outlineMM: Pt[]; error: string | null } {
-  const fallback = () => libraryPreview(sel, pitchMM, padMM).outlineMM
-  if (CLASS_RULES[family].source !== 'geometry') return { outlineMM: fallback(), error: null }
-  try { return { outlineMM: hullOutline(nodesMM, padMM), error: null } }
-  catch (e) { return { outlineMM: fallback(), error: (e as Error).message } }
-}
-
-/** THE DERIVED OUTLINE: connect the three magnet centres, move each edge out by the padding,
- *  and intersect the three lines. A triangle's corner is a triangle corner — this is the exact
- *  offset, so there is no join style, no miter limit and nothing to clip. The result's position
- *  is authoritative; it is never re-centred on the group's box. */
-export function hullOutline(nodesMM: ReadonlyArray<Pt>, padMM: number): Pt[] {
-  const hull = convexHull(nodesMM)
-  if (hull.length < 3) throw new Error('triangle: collinear population')
-  if (hull.length !== 3) throw new Error('triangle: hull has ' + hull.length + ' vertices')
-  // Each edge moves AWAY from the middle. Taking the normal relative to the centroid needs no
-  // winding convention, so it cannot silently invert in one coordinate system or the other.
-  const cx = (hull[0][0] + hull[1][0] + hull[2][0]) / 3
-  const cy = (hull[0][1] + hull[1][1] + hull[2][1]) / 3
-  const edges = hull.map((a, i) => {
-    const b = hull[(i + 1) % 3]
-    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy)
-    if (L === 0) throw new Error('triangle: collinear population')
-    const d: Pt = [dx / L, dy / L]
-    let n: Pt = [-d[1], d[0]]
-    if ((cx - a[0]) * n[0] + (cy - a[1]) * n[1] > 0) n = [-n[0], -n[1]]
-    return { p: [a[0] + n[0] * padMM, a[1] + n[1] * padMM] as Pt, d }
-  })
-  const meet = (e1: typeof edges[0], e2: typeof edges[0]): Pt => {
-    const den = e1.d[0] * e2.d[1] - e1.d[1] * e2.d[0]
-    if (Math.abs(den) < 1e-12) throw new Error('triangle: collinear population')
-    const t = ((e2.p[0] - e1.p[0]) * e2.d[1] - (e2.p[1] - e1.p[1]) * e2.d[0]) / den
-    return [e1.p[0] + e1.d[0] * t, e1.p[1] + e1.d[1] * t]
+  try {
+    const out = specOf(family).outline(nodesMM, frameCols, frameRows, pitchMM, padMM)
+    return { outlineMM: out.map((q) => [q[0], q[1]] as Pt), error: null }
+  } catch (e) {
+    return { outlineMM: libraryPreview(sel, pitchMM, padMM).outlineMM, error: (e as Error).message }
   }
-  // corner i is where the edge arriving at it meets the edge leaving it
-  return [meet(edges[2], edges[0]), meet(edges[0], edges[1]), meet(edges[1], edges[2])]
 }
 
 /** The Stage preview — composes the arrangement. The lattice field stays the canvas's own. */
@@ -139,7 +103,7 @@ export function draftStageModel(
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   // A derived outline follows the DRAWN magnets, so adding a node outside the hull changes the
   // shape and adding one inside or on an edge does not.
-  const { outlineMM, error } = draftOutline(shape.family, nodesMM, sel, pitchMM, padMM)
+  const { outlineMM, error } = draftOutline(shape.family, nodesMM, sel, pitchMM, padMM, t.cols, t.rows)
   const contour: Contour = { outer: { pts: [...outlineMM] }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
@@ -157,21 +121,6 @@ export function draftStageModel(
     centreMainMM: [(t.cols - 1) * pitchMM / 2, (t.rows - 1) * pitchMM / 2],
   }
   return { contour, grid, error }
-}
-
-export { canonicalNode }
-
-/** mm point -> lattice node index in the selected frame (y-down canon), or null off-frame.
- *  The canvas draws the infinite lattice, so a click can land anywhere: without this bound an
- *  authored layout could hold nodes outside its own frame and be saved (QA F1). */
-export function nodeAtMM(
-  pMM: readonly [number, number], pitchMM: number, frameCols: number, frameRows: number,
-): [number, number] | null {
-  const ix = Math.round(pMM[0] / pitchMM)
-  const iyUp = Math.round(pMM[1] / pitchMM)
-  const iy = frameRows - 1 - iyUp
-  if (ix < 0 || ix >= frameCols || iy < 0 || iy >= frameRows) return null
-  return [ix, iy]
 }
 
 export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM: number): LibraryStageModel {

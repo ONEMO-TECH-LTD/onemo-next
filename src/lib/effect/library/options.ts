@@ -1,17 +1,14 @@
 // library/options.ts — WHAT THE PANEL MAY OFFER. The view maps these to controls and nothing
-// else: every option already carries the selection it produces, so class, frame, geometry and
-// view policy stay here. Resolution lives in selection.ts; this is the layer above it.
+// else: every option already carries the selection it produces and the words it reads, so
+// class, frame, geometry, layout and view policy all stay here (Dan, 08-26: "no logic in UI
+// shell and poage"). Resolution lives in selection.ts; the class answers live in class-spec.ts.
 
-import { CLASS_FRAMES } from './frames'
-import { CLASS_RULES, type ClassRules, type RegistryRules } from './rules'
+import { specOf, type ClassSpec } from './class-spec'
+import { SPACING_MODES, isSpacingMode } from './rules'
 import { LIBRARY_SHAPES } from './shapes'
-import { frameKeyOf, transformLayout, viewName } from './transforms'
-import { firstGeometryOf, geometryOf, pickLayout, resolveSelection } from './selection'
-import { restsFlat, triangleById, triangleFrame, trianglesOfType, triangleTypeOf, uprightView } from './triangle-frames'
-import { boundsOf, type TriangleLayout } from './triangle-geometry'
-import type { TriangleProductType } from './triangle-types'
+import { transformLayout, viewName } from './transforms'
+import { draftLayoutId, pickLayout, resolveSelection, draftsFor } from './selection'
 import type { LibraryDraft } from './drafts'
-import { draftLayoutId } from './selection'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
 } from './types'
@@ -27,20 +24,22 @@ export interface PanelOption {
   next: LibrarySelection
   /** Distinguishes two options that would otherwise read alike. */
   accessibleLabel?: string
+  /** A control the class offers but this frame cannot serve. */
+  disabled?: boolean
+  /** A hand-authored layout rather than a corpus one. */
+  custom?: boolean
 }
 export interface PanelOptions {
   types: PanelOption[]
-  /** The frames a class offers. For a class whose shape IS its layout, each frame is one
-   *  geometry and carries its nodes so the chip can draw it — one block, not two. */
+  /** The offers a class makes. For a class whose shape IS its layout each offer is one
+   *  geometry, so there is one block and not two. */
   frames: PanelOption[]
   orientations: PanelOption[]
+  /** The populations this frame carries, plus the admin's own saved ones. */
+  layouts: PanelOption[]
+  /** The two physical spacings, with the ones this frame cannot serve marked. */
+  spacing: PanelOption[]
 }
-
-const TYPE_LABEL: Record<string, string> = {
-  pyramid: 'Pyramid', arrowhead: 'Arrowhead', mountain: 'Mountain', needle: 'Needle',
-  slice: 'Slice', wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', sail: 'Sail', fin: 'Fin',
-}
-const label = (id: string) => TYPE_LABEL[id] ?? id
 
 /** The eight lattice views, as the library's own transform. */
 const ALL_VIEWS: readonly LibraryTransform[] = [
@@ -62,7 +61,7 @@ const transformedKey = (frame: LibraryFrame, layout: LibraryLayout, view: Librar
  *  can hold a transform whose representative was kept under a different one, which left every
  *  button unpressed (QA F2). */
 function orientationOptions(
-  sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, rules: ClassRules,
+  sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, spec: ClassSpec,
   base: LibraryTransform,
 ): PanelOption[] {
   const selectedKey = transformedKey(frame, layout, sel.view)
@@ -73,8 +72,7 @@ function orientationOptions(
     const key = transformedKey(frame, layout, view)
     if (seen.has(key)) continue
     seen.add(key)
-    const named = rules.source === 'registry'
-      ? rules.orientations.find((o) => sameView(o.view, view)) : undefined
+    const named = spec.orientations.find((o) => sameView(o.view, view))
     out.push({
       id: 'view' + out.length, label: named?.id ?? viewName(base, view),
       active: key === selectedKey, next: { ...sel, view: { ...view } },
@@ -83,87 +81,55 @@ function orientationOptions(
   return out
 }
 
-/** The selection a class tab lands on: its first shape, its first geometry where the class has
- *  one, that geometry's frame, and a layout the frame actually carries. The page passes IDs. */
+/** The selection a class tab lands on. The page passes a family; the class decides the rest. */
 export function selectionForFamily(
   current: LibrarySelection, family: LibraryFamily, pitchMM = 48,
 ): LibrarySelection {
-  const shape = LIBRARY_SHAPES.find((x) => x.family === family)
-  if (!shape) throw new Error('library: no shape for family ' + family)
-  const rules = CLASS_RULES[family]
-  if (rules.source === 'registry') {
-    const f0 = CLASS_FRAMES[family][0]
-    return { ...current, shapeId: shape.id, geometryId: undefined, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') }
-  }
-  const geo = firstGeometryOf(rules.subs[0] as TriangleProductType)
-  const f0 = triangleFrame(geo, pitchMM)
-  return {
-    ...current, shapeId: shape.id, geometryId: geo.id, frameKey: frameKeyOf(f0),
-    layoutId: pickLayout(f0, 'perimeter'), view: uprightView(geo),
-  }
+  if (!LIBRARY_SHAPES.some((x) => x.family === family)) throw new Error('library: no shape for family ' + family)
+  return specOf(family).open(current, pitchMM)
 }
 
 export function panelOptions(
   sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM = 48,
 ): PanelOptions {
   const { shape, frame, layout, draft } = resolveSelection(sel, drafts, pitchMM)
-  const rules = CLASS_RULES[shape.family]
+  const spec = specOf(shape.family)
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
-  // a class that materialises its own frames presents its geometry upright, and that is 0°
-  const base: LibraryTransform = rules.source === 'geometry'
-    ? uprightView(triangleById(geometryOf(sel)))
-    : { transpose: false, flipX: false, flipY: false }
-  const orientations = orientationOptions(sel, frame, visible, rules, base)
-  if (rules.source === 'registry') {
-    const frames = CLASS_FRAMES[shape.family]
-    const sub = subOf(rules, frame)
-    const jump = (f: LibraryFrame): LibrarySelection =>
-      ({ ...sel, frameKey: frameKeyOf(f), layoutId: pickLayout(f, sel.layoutId) })
-    return {
-      types: rules.subs.map((id) => {
-        const f0 = frames.find((f) => subOf(rules, f) === id) ?? frame
-        return { id, label: label(id), active: sub === id, next: jump(f0) }
-      }),
-      frames: frames.filter((f) => subOf(rules, f) === sub).map((f) => ({
-        // the class labels its own frames — the diamond reads by magnets per side, not by the
-        // lattice patch it occupies
-        id: frameKeyOf(f), label: rules.label(f.cols, f.rows),
-        active: frameKeyOf(f) === frameKeyOf(frame), next: jump(f),
-      })),
-      // a class with no named views of its own offers none
-      orientations: rules.orientations.length ? orientations : [],
-    }
-  }
-  const geo = triangleById(geometryOf(sel))
-  const type = triangleTypeOf(geo)
-  const toSel = (t: TriangleLayout): LibrarySelection => {
-    const f = triangleFrame(t, pitchMM)
-    // a new geometry opens standing on its longest side, not in its de-duplication form
-    return {
-      ...sel, geometryId: t.id, frameKey: frameKeyOf(f),
-      layoutId: pickLayout(f, sel.layoutId), view: uprightView(t),
-    }
-  }
+  const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
+  const type = spec.typeOf(sel, pitchMM)
+  const variantId = spec.variantIdOf(sel)
+  const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
+  const has = (name: string) => frame.layouts.some((l) => l.name === name)
+
   return {
-    types: rules.subs.map((id) => {
-      const first = firstGeometryOf(id as TriangleProductType)
-      return { id, label: label(id), active: id === type, next: toSel(first) }
+    types: spec.types.map((t) => {
+      const first = spec.variants(t.id, pitchMM)[0]
+      return { id: t.id, label: t.label, active: t.id === type, next: spec.select(sel, first) }
     }),
-    // one chip per geometry: for this class the frame IS the shape, so a second picker would
-    // be two controls for one choice
-    frames: trianglesOfType(type).map((t, i) => {
-      const b = boundsOf([...t.vertices])
-      return {
-        id: t.id, label: rules.label(b.cols, b.rows), active: t.id === geo.id,
-        accessibleLabel: label(type) + ' ' + (i + 1) + ' · ' + rules.label(b.cols, b.rows)
-          + (restsFlat(t) ? '' : ' · diagonal'),
-        next: toSel(t),
-      }
-    }),
-    orientations,
+    frames: spec.variants(type, pitchMM).map((v) => ({
+      id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
+      active: v.id === variantId, next: spec.select(sel, v),
+    })),
+    // a class with no named views of its own, and no turn that changes the picture, offers none
+    orientations: spec.orientations.length || orientations.length > 1 ? orientations : [],
+    // the 96mm mode is reached from the Spacing row, so it is not also a layout chip
+    layouts: [
+      ...frame.layouts.filter((l) => !isSpacingMode(l.name) || l.name === SPACING_MODES[0].layoutId).map((l) => ({
+        id: l.name, label: l.name,
+        active: sel.layoutId === l.name || (l.name === SPACING_MODES[0].layoutId && isSpacingMode(sel.layoutId)),
+        next: layoutSel(l.name),
+      })),
+      ...draftsFor(sel, drafts, pitchMM).map((d) => ({
+        id: d.id, label: d.name, custom: true,
+        active: sel.layoutId === draftLayoutId(d.name), next: layoutSel(draftLayoutId(d.name)),
+      })),
+    ],
+    spacing: SPACING_MODES.map((m) => ({
+      id: m.layoutId, label: m.label, disabled: !has(m.layoutId),
+      active: sel.layoutId === m.layoutId,
+      next: layoutSel(has(m.layoutId) ? m.layoutId : pickLayout(frame, m.layoutId)),
+    })),
   }
 }
-
-const subOf = (rules: RegistryRules, f: LibraryFrame) => rules.subOf(f.cols, f.rows)

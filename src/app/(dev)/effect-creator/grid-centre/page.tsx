@@ -8,8 +8,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
-import { libraryStageModel, draftStageModel, nodeAtMM, canonicalNode, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { LIBRARY_FAMILIES, selectionForFamily, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, layoutAtPitch, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
+import { libraryStageModel, draftStageModel, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
+import {
+  LIBRARY_FAMILIES, selectionForFamily, resolveSelection, DRAFT_STORE_KEY,
+  startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
+  deleteEdit as libDeleteEdit, toggleNodeAt,
+  type LibraryDraft, type LibraryEdit,
+} from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -99,7 +104,7 @@ export default function GridLab() {
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
   const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter', view: { transpose: false, flipX: false, flipY: false } })
   /** Authoring — browser-local; the canonical corpus is never mutated. */
-  const [edit, setEdit] = useState<{ name: string; nodes: Array<[number, number]> } | null>(null)
+  const [edit, setEdit] = useState<LibraryEdit | null>(null)
   /** Library canvas view — pan in mm, camera zoom. Same camera contract as the bench:
    *  100% sits the subject at half the board, and both boards share one range. */
   const [libView, setLibView] = useState<{ panMM: Pt; zoom: number }>({ panMM: [0, 0], zoom: 1 })
@@ -397,21 +402,9 @@ export default function GridLab() {
                     onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: camClamp(v.zoom * f) })),
                     onReset: () => setLibView({ panMM: [0, 0], zoom: 1 }),
-                    onPickNode: edit ? (pMM: Pt) => {
-                      const { frame } = resolveSelection(librarySel, drafts, pitch)
-                      const cols = librarySel.view.transpose ? frame.rows : frame.cols
-                      const rows = librarySel.view.transpose ? frame.cols : frame.rows
-                      const view = nodeAtMM(pMM, pitch, cols, rows)
-                      if (!view) return
-                      // The click lands in view space; drafts are canonical (QA F2).
-                      const n = canonicalNode(frame, librarySel.view, view)
-                      setEdit((d) => {
-                        if (!d) return d
-                        const k = n[0] + ',' + n[1]
-                        const has = d.nodes.some(([x, y]) => x + ',' + y === k)
-                        return { ...d, nodes: has ? d.nodes.filter(([x, y]) => x + ',' + y !== k) : [...d.nodes, n] }
-                      })
-                    } : undefined }
+                    onPickNode: edit
+                      ? (pMM: Pt) => setEdit((d) => (d ? toggleNodeAt(librarySel, drafts, d, pMM, pitch) : d))
+                      : undefined }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
@@ -451,39 +444,22 @@ export default function GridLab() {
           <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} boxMM={libraryBox}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
             editError={libraryModel?.error ?? null}
-            startAdd={() => setEdit({ name: '', nodes: [] })}
-            startEdit={() => {
-              const { shape, frame, layout, draft } = resolveSelection(librarySel, drafts, pitch)
-              // custom seeds from what is ON SCREEN at this pitch, not the canonical 48 set
-              const source = draft?.nodes ?? layoutAtPitch(shape.family, frame, layout, pitch).nodes
-              setEdit({
-                name: draft ? draft.name : layout.name + '-custom',
-                nodes: source.map(([x, y]) => [x, y] as [number, number]),
-              })
-            }}
+            isDraft={!!resolveSelection(librarySel, drafts, pitch).draft}
+            startAdd={() => setEdit(libStartAdd())}
+            startEdit={() => setEdit(libStartEdit(librarySel, drafts, pitch))}
             saveEdit={() => {
               if (!edit) return
-              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts, pitch)
-              const rec: LibraryDraft = {
-                id: draftId(shape.family, safeSel.frameKey, edit.name, librarySel.geometryId),
-                className: shape.family, frameKey: safeSel.frameKey, geometryId: librarySel.geometryId,
-                name: edit.name, nodes: edit.nodes,
-              }
-              // The corpus checks its own soundness; an authored layout gets the same gate
-              // before it is persisted (QA F1) — never write a draft that breaks its frame.
-              const bad = draftIntegrity(rec, frame)
-              if (bad.length) { setMagStatus('error:' + bad[0]); return }
-              writeDrafts([...drafts.filter((x) => x.id !== rec.id), rec])
+              const r = libSaveEdit(librarySel, drafts, edit, pitch)
+              if (!r.ok) { setMagStatus('error:' + r.error); return }
+              writeDrafts(r.drafts)
               setEdit(null)
-              setLibrarySel({ ...librarySel, layoutId: draftLayoutId(edit.name) })
+              setLibrarySel(r.sel)
             }}
             deleteEdit={() => {
-              const nm = edit ? edit.name : draftNameOf(librarySel.layoutId)
-              const { shape, frame, safeSel } = resolveSelection(librarySel, drafts, pitch)
-              writeDrafts(drafts.filter((x) => !(x.className === shape.family && x.frameKey === safeSel.frameKey
-                && (x.geometryId ?? '') === (librarySel.geometryId ?? '') && x.name === nm)))
+              const r = libDeleteEdit(librarySel, drafts, edit, pitch)
+              writeDrafts(r.drafts)
               setEdit(null)
-              setLibrarySel({ ...librarySel, layoutId: frame.layouts[0].name })
+              setLibrarySel(r.sel)
             }} /></> : <>
           <Fold title="Grid settings">
             <div className="gl-field"><span>Band · the offer list</span>

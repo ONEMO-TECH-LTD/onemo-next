@@ -1,7 +1,7 @@
 // library/drafts.ts — hand-authored layouts: browser-local, never mutating the corpus.
 
-import { assertTrianglePopulation } from './triangle-frames'
-import type { LibraryFrame } from './types'
+import { specOf } from './class-spec'
+import type { LibraryFamily, LibraryFrame } from './types'
 
 /** CUSTOM LAYOUTS (Dan, 08-25): hand-authored by clicking lattice nodes — a trimmed or sparse
  *  population that no computed mode produces. The 48/96 spacing MODE is computed; anything a
@@ -24,23 +24,13 @@ export function draftId(className: string, frameKey: string, name: string, geome
   return 'draft:' + className + ':' + frameKey + (geometryId ? ':' + geometryId : '') + ':' + name
 }
 
-/** Reasons a draft is not saveable — empty list = sound. Pure. */
+/** Reasons a draft is not saveable — empty list = sound. Pure. What makes a POPULATION sound is
+ *  the class's own rule (bounds everywhere; the triangle also owes three hull corners), so it is
+ *  asked, never tested here. */
 export function draftIntegrity(d: LibraryDraft, frame: LibraryFrame): string[] {
   const out: string[] = []
   if (!d.name.trim()) out.push('name required')
   if (!d.nodes.length) out.push('at least one magnet required')
-  const seen = new Set<string>()
-  for (const [x, y] of d.nodes) {
-    if (x < 0 || x >= frame.cols || y < 0 || y >= frame.rows) out.push('node out of frame: ' + x + ',' + y)
-    const k = x + ',' + y
-    if (seen.has(k)) out.push('duplicate node ' + k)
-    seen.add(k)
-  }
-  // A class whose outline is its magnets' hull has a shape rule as well as bounds: SAVE is the
-  // fail-loud boundary, so it is checked here and not while the population is being built.
-  if (d.className === 'triangle') {
-    if (!d.geometryId) out.push('triangle: geometryId required')
-    try { assertTrianglePopulation(d.nodes) } catch (e) { out.push((e as Error).message) }
-  }
+  out.push(...specOf(d.className as LibraryFamily).validateDraft(d, frame))
   return out
 }

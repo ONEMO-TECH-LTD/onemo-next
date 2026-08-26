@@ -10,8 +10,12 @@ export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: b
 /** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
  *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
  *  library must not pre-empt it. */
-export type LibraryFamily = 'square' | 'rectangle' | 'diamond' | 'triangle'
-export const LIBRARY_FAMILIES: LibraryFamily[] = ['square', 'rectangle', 'diamond', 'triangle']
+/** A class whose frames are a literal table. The triangle's frames come from the geometry the
+ *  selection names, so it is not one of these and carries no frame registry. */
+export type RegistryFamily = 'square' | 'rectangle' | 'diamond'
+export type LibraryFamily = RegistryFamily | 'triangle'
+export const REGISTRY_FAMILIES: RegistryFamily[] = ['square', 'rectangle', 'diamond']
+export const LIBRARY_FAMILIES: LibraryFamily[] = [...REGISTRY_FAMILIES, 'triangle']
 
 /** THE SHAPE LIBRARY — the ruled classification shapes, literal canonical outlines in the unit
  *  box (y down). aspect 'square' keeps a square span; 'frame' stretches to the frame's span.
