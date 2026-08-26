@@ -52,7 +52,11 @@ export function triangleFrame(t: TriangleLayout, pitchMM: number): LibraryFrame 
     { name: SPACING_BASE, nodes: per },
     { name: SPACING_96, nodes: trianglePerimeter96(t, pitchMM) },
   ]
-  if (full.length > per.length) layouts.push({ name: 'full', nodes: full, note: 'interior — Full grid only' })
+  // the menu is the same on every class (Dan): full is always offered, and only carries the
+  // Full-grid note when it actually adds an interior magnet
+  layouts.push(full.length > per.length
+    ? { name: 'full', nodes: full, note: 'interior — Full grid only' }
+    : { name: 'full', nodes: full })
   return { cols: b.cols, rows: b.rows, layouts }
 }
 

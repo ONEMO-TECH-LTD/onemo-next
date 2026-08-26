@@ -45,13 +45,14 @@ export function triangleGeometry(vertices: TriangleLayout['vertices']): Triangle
   return { sideClass, angleClass, side2, minAngleDeg: minimumAngle(side2) }
 }
 
-/** THE PRODUCT TYPES. TWO EQUAL SIDES WINS OUTRIGHT: a right-angled isosceles triangle is a
- *  Peak, not a Wedge — Dan, 08-26, on seeing the 2x3 filed as a Wedge: "2x3 is not wedge it is
- *  peak". A Wedge is therefore a right angle WITHOUT the symmetry; everything else is a Sail.
- *  (This reverses the spec's right-first precedence, on his direct ruling.) */
+/** THE PRODUCT TYPES. A RIGHT ANGLE WINS OUTRIGHT: a right-angled triangle is a Wedge even
+ *  when two of its sides are equal — Dan, 08-26, looking at the right-angled 2x2: "it is not
+ *  peak it is wedge". A Peak is symmetric WITHOUT the right angle; everything else is a Sail.
+ *  (His earlier "2x3 is not wedge it is peak" was said while the orientation bug displayed
+ *  layouts lying at arbitrary angles; on a correctly rested shape the rule is the right angle.) */
 export function triangleProductType(g: TriangleGeometry): TriangleProductType {
-  return g.sideClass === 'isosceles' ? 'peak'
-    : g.angleClass === 'right' ? 'wedge'
+  return g.angleClass === 'right' ? 'wedge'
+    : g.sideClass === 'isosceles' ? 'peak'
       : 'sail'
 }
 

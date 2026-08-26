@@ -417,15 +417,15 @@ describe('triangle — the three-point layout universe', () => {
     expect([...universe].sort()).toEqual([...ids].sort())
   })
 
-  it('the product totals are Peak 22 / Wedge 9 / Sail 48', () => {
+  it('the product totals are Peak 14 / Wedge 17 / Sail 48', () => {
     const n = (t: string) => TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === t).length
-    expect([n('peak'), n('wedge'), n('sail')]).toEqual([22, 9, 48])
+    expect([n('peak'), n('wedge'), n('sail')]).toEqual([14, 17, 48])
   })
 
   it('the frame distribution is exactly the ruled table', () => {
     const table: Record<string, [number, number, number]> = {
-      '2x2': [1, 0, 0], '2x3': [1, 1, 1], '2x4': [0, 1, 3], '2x5': [1, 1, 4], '3x3': [3, 0, 1],
-      '3x4': [2, 2, 5], '3x5': [2, 1, 9], '4x4': [4, 0, 4], '4x5': [2, 2, 14], '5x5': [6, 1, 7],
+      '2x2': [0, 1, 0], '2x3': [0, 2, 1], '2x4': [0, 1, 3], '2x5': [1, 1, 4], '3x3': [2, 1, 1],
+      '3x4': [1, 3, 5], '3x5': [1, 2, 9], '4x4': [3, 1, 4], '4x5': [1, 3, 14], '5x5': [5, 2, 7],
     }
     const got: Record<string, [number, number, number]> = {}
     for (const t of TRIANGLE_LAYOUTS) {
@@ -459,19 +459,19 @@ describe('triangle — the three-point layout universe', () => {
     for (const t of TRIANGLE_LAYOUTS) expect(triangleGeometry(t.vertices).sideClass).not.toBe('equilateral')
   })
 
-  it('two equal sides win outright: a right isosceles is a Peak, never a Wedge', () => {
-    // Dan, 08-26, on seeing the 2x3 filed as a Wedge: "2x3 is not wedge it is peak".
+  it('a right angle wins outright: a right isosceles is a Wedge, never a Peak', () => {
+    // Dan, 08-26, looking at the right-angled 2x2: "it is not peak it is wedge".
     const rightIso = TRIANGLE_LAYOUTS.filter((t) => {
       const g = triangleGeometry(t.vertices)
       return g.angleClass === 'right' && g.sideClass === 'isosceles'
     })
     expect(rightIso.length).toBe(8)
-    for (const t of rightIso) expect(triangleTypeOf(t)).toBe('peak')
-    // and a Wedge is a right angle WITHOUT the symmetry
-    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'wedge')) {
+    for (const t of rightIso) expect(triangleTypeOf(t)).toBe('wedge')
+    // and a Peak is symmetric WITHOUT the right angle
+    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'peak')) {
       const g = triangleGeometry(t.vertices)
-      expect(g.angleClass).toBe('right')
-      expect(g.sideClass).toBe('scalene')
+      expect(g.sideClass).toBe('isosceles')
+      expect(g.angleClass).not.toBe('right')
     }
   })
 
