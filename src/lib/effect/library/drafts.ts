@@ -1,6 +1,6 @@
 // library/drafts.ts — hand-authored layouts: browser-local, never mutating the corpus.
 
-import { specOf } from './class-spec'
+import { specOf } from './class-registry'
 import type { LibraryFamily, LibraryFrame } from './types'
 
 /** CUSTOM LAYOUTS (Dan, 08-25): hand-authored by clicking lattice nodes — a trimmed or sparse

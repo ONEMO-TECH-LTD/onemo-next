@@ -102,7 +102,7 @@ export default function GridLab() {
   /** Top-level view — the bench, or the layout-library review tab. */
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
-  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter', view: { transpose: false, flipX: false, flipY: false } })
+  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ classId: 'square', frameKey: '3x3', layoutId: 'perimeter', view: { transpose: false, flipX: false, flipY: false } })
   /** Authoring — browser-local; the canonical corpus is never mutated. */
   const [edit, setEdit] = useState<LibraryEdit | null>(null)
   /** Library canvas view — pan in mm, camera zoom. Same camera contract as the bench:
@@ -353,7 +353,7 @@ export default function GridLab() {
           </div>
           <div className="gl-seg gl-libbar-tabs">
             {LIBRARY_FAMILIES.map((fam) => {
-              const cur = resolveSelection(librarySel, drafts, pitch).shape.family
+              const cur = resolveSelection(librarySel, drafts, pitch).classId
               return <button key={fam} aria-pressed={cur === fam} onClick={() => {
                 setEdit(null)
                 setLibrarySel((current) => selectionForFamily(current, fam, pitch))

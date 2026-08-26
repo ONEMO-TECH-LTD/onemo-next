@@ -7,31 +7,20 @@ export interface LibraryFrame { cols: number; rows: number; layouts: LibraryLayo
 /** A display transform over a canonical (tall) layout. Pure; closed over the frame. */
 export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: boolean }
 
+export type PointMM = readonly [number, number]
+
 /** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
  *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
  *  library must not pre-empt it. */
 /** A class whose frames are a literal table. The triangle's frames come from the geometry the
  *  selection names, so it is not one of these and carries no frame registry. */
 export type RegistryFamily = 'square' | 'rectangle' | 'diamond'
-export type LibraryFamily = RegistryFamily | 'triangle'
-export const REGISTRY_FAMILIES: RegistryFamily[] = ['square', 'rectangle', 'diamond']
-export const LIBRARY_FAMILIES: LibraryFamily[] = [...REGISTRY_FAMILIES, 'triangle']
-
-/** THE SHAPE LIBRARY — the ruled classification shapes, literal canonical outlines in the unit
- *  box (y down). aspect 'square' keeps a square span; 'frame' stretches to the frame's span.
- *  Pure data — the bridge materialises, never generates. */
-export type LibraryShapeId = 'square' | 'rectangle' | 'diamond' | 'triangle'
-export interface LibraryShape {
-  id: LibraryShapeId
-  family: LibraryFamily
-  aspect: 'square' | 'frame'
-  outline: ReadonlyArray<readonly [number, number]>
-}
+export type LibraryFamily = string
 
 /** Stable-ID selection — indices are forbidden identity (pruning the draft must never silently
  *  retarget a saved selection). Owned by the pure module. */
 export interface LibrarySelection {
-  shapeId: LibraryShapeId
+  classId: LibraryFamily
   frameKey: string          // 'colsxrows', e.g. '2x3'
   layoutId: string          // stable layout identity
   /** WHICH triangle. Geometry and population are different axes: the geometry names the shape

@@ -1,12 +1,12 @@
 // Layout-library module + bridge — corpus completeness, classifier goldens, integrity,
-// bridge mapping (QA F3: tests must FAIL when any required shape/frame/layout/primitive
+// bridge mapping (QA F3: tests must FAIL when any required shape/frame/layout
 // is removed; never a point-count oracle).
 
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, registryFramesAt, LIBRARY_SHAPES,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, registryFramesAt,
   LIBRARY_FAMILIES, REGISTRY_FAMILIES, RAW_CLASS_FRAMES, SPACING_MODES, specOf, registryIntegrity, transformLayout, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode,
   transformLayout as tl,
@@ -19,13 +19,11 @@ import {
   type LibraryEdit,
   TRIANGLE_TYPES,
   type LatticeNode,
-  type RegistryFamily,
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
 import { libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
-import { shapeFamilyOf } from '../grid-magnet-class'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
  *  mutable Pt. Converting is the BRIDGE's whole job, so a test that calls an engine classifier
@@ -38,13 +36,10 @@ const libraryArrangement = (selection: LibrarySelection, pitchMM: number) =>
 const libraryPreview = (selection: LibrarySelection, pitchMM: number, padMM = 12) =>
   materializeSelection(selection, pitchMM, padMM)
 
-const isRegistry = (f: string): f is RegistryFamily => (REGISTRY_FAMILIES as string[]).includes(f)
-
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
-const SHAPE_IDS = ['square', 'rectangle', 'diamond', 'triangle']
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
-  shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter',
+  classId: 'square', frameKey: '3x3', layoutId: 'perimeter',
   view: { transpose: false, flipX: false, flipY: false }, ...over,
 })
 
@@ -57,10 +52,6 @@ describe('corpus completeness — removal must fail these', () => {
     expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(12)
     expect(registryFramesAt('square', 48).reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
   })
-  it('the complete ruled shape-ID set', () => {
-    expect(LIBRARY_SHAPES.map((x) => x.id).sort()).toEqual([...SHAPE_IDS].sort())
-  })
-
   it('square class: every frame is even, 1x1..5x5, square kind', () => {
     const seen = new Set<string>()
     for (const f of SQUARE_FRAMES) { expect(f.cols).toBe(f.rows); seen.add(f.cols + 'x' + f.rows) }
@@ -68,44 +59,31 @@ describe('corpus completeness — removal must fail these', () => {
   })
 })
 
-describe('classifier goldens — declared family is the classifier verdict, not a point count', () => {
-  it('every shape outline classifies as its declared family', () => {
-    for (const s of LIBRARY_SHAPES) {
-      // a derived outline has no stored shape to classify — it is proven by its own hull tests
-      if (!isRegistry(s.family)) continue
-      // The LIBRARY class is not the ENGINE family (Meta M1): a rectangle fills its box, so
-      // the engine classifier reads it as the box-filling 'square' family. The mapping is
-      // asserted explicitly so the two taxonomies can never silently merge.
-      const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
-      const f0 = registryFramesAt(s.family as RegistryFamily, 48)[0]
-      const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
-      expect(shapeFamilyOf(enginePts(pv.outlineMM)), s.id).toBe(ENGINE_FAMILY[s.family])
-    }
-  })
+describe('classifier goldens — library and engine taxonomies stay distinct', () => {
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
-    for (const s of LIBRARY_SHAPES) for (const f of (isRegistry(s.family) ? registryFramesAt(s.family as RegistryFamily, 48) : [])) {
+    for (const family of REGISTRY_FAMILIES) for (const f of registryFramesAt(family, 48)) {
       // The engine classifier tops out at 5 magnet lines per axis (bands B1-B5), so a 6-line
       // library frame has no class to be read back as. The library carries it; the classifier
       // cannot express it until a sixth band is ruled.
       if (f.cols > 5 || f.rows > 5) continue
       // The diamond's outline WRAPS its magnet group (Dan), so its box is deliberately not
       // the frame's class floor — the frame golden does not apply to that class.
-      if (s.family === 'diamond') continue
+      if (family === 'diamond') continue
       for (const transpose of [false, true]) {
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
-        if (s.aspect === 'square' && cols !== rows) continue          // marked incompatible, not stretched
-        const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
+        if (family === 'square' && cols !== rows) continue
+        const pv = libraryPreview(sel({ classId: family, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
         const c = classifyShape(enginePts(pv.outlineMM), 48)
-        expect([c.cx, c.cy], `${s.id} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
+        expect([c.cx, c.cy], `${family} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
       }
     }
   })
   it('QA F1 counterexamples: 1x1 spans 24mm and 3x3 spans 120x120mm — never one class larger', () => {
-    const a1 = libraryPreview(sel({ shapeId: 'square', frameKey: '1x1', layoutId: 'single' }), 48)
+    const a1 = libraryPreview(sel({ classId: 'square', frameKey: '1x1', layoutId: 'single' }), 48)
     const xs = a1.outlineMM.map((q) => q[0]), ys = a1.outlineMM.map((q) => q[1])
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(24, 6)
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(24, 6)
-    const a2 = libraryPreview(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48)
+    const a2 = libraryPreview(sel({ classId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48)
     const xs2 = a2.outlineMM.map((q) => q[0]), ys2 = a2.outlineMM.map((q) => q[1])
     expect(Math.max(...xs2) - Math.min(...xs2)).toBeCloseTo(120, 6)
     expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(120, 6)
@@ -140,7 +118,7 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
   it('arrangement carries stable IDs and mm nodes', () => {
     const a = libraryArrangement(sel(), 48)
     expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'perimeter', frameCols: 3, frameRows: 3 })
-    expect(libraryPreview(sel(), 48)).toMatchObject({ shapeId: 'square', declaredFamily: 'square' })
+    expect(libraryPreview(sel(), 48)).toMatchObject({ classId: 'square' })
     expect(a.nodesMM.length).toBe(8)
   })
   it('unknown IDs fail loudly — no silent 1x1 retarget (QA F3)', () => {
@@ -236,7 +214,7 @@ describe('diamond wrapping', () => {
   it('the outline wraps the ring: half-diagonal = k*pitch + padding on the diagonal', () => {
     for (const f of registryFramesAt('diamond', 48)) {
       const k = (f.cols - 1) / 2
-      const pv = libraryPreview({ shapeId: 'diamond', frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose: false, flipX: false, flipY: false } }, 48)
+      const pv = libraryPreview({ classId: 'diamond', frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose: false, flipX: false, flipY: false } }, 48)
       const xs = pv.outlineMM.map((q) => q[0])
       const span = Math.max(...xs) - Math.min(...xs)
       expect(span).toBeCloseTo(2 * (k * 48 + 12 * Math.SQRT2), 6)
@@ -253,43 +231,43 @@ describe('selection resolution — one owner, no guessing in the view', () => {
   it('a stale cross-class layout lands on a real one instead of throwing', () => {
     // Clicking diamond while 'perimeter' was selected on square used to throw and white-screen
     // the tab: the diamond's 1x1 carries only 'single'.
-    const r = resolveSelection(sel({ shapeId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }))
+    const r = resolveSelection(sel({ classId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }), [], 48)
     expect(r.frame.layouts.some((l) => l.name === r.safeSel.layoutId)).toBe(true)
-    expect(() => selectedRecords(r.safeSel)).not.toThrow()
+    expect(() => selectedRecords(r.safeSel, 48)).not.toThrow()
   })
 
   it('unknown shape or frame is a caller bug — both resolvers refuse it (QA F4)', () => {
-    // Guessing here produced a 'safeSel' that still carried the bad shapeId and threw when the
+    // Guessing here produced a 'safeSel' that still carried the bad classId and threw when the
     // pipeline resolved it. Only the LAYOUT is carried across frames, by design.
-    expect(() => resolveSelection(sel({ shapeId: 'nope' as never }))).toThrow('unknown shapeId')
-    expect(() => resolveSelection(sel({ frameKey: '9x9' }))).toThrow('unknown frameKey')
+    expect(() => resolveSelection(sel({ classId: 'nope' as never }), [], 48)).toThrow('unknown classId')
+    expect(() => resolveSelection(sel({ frameKey: '9x9' }), [], 48)).toThrow('unknown frameKey')
   })
 
   it('the strict resolver still refuses the same input — the two are not merged', () => {
-    expect(() => selectedRecords(sel({ shapeId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }))).toThrow('unknown layoutId')
-    expect(() => selectedRecords(sel({ frameKey: '9x9' }))).toThrow('unknown frameKey')
+    expect(() => selectedRecords(sel({ classId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }), 48)).toThrow('unknown layoutId')
+    expect(() => selectedRecords(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
   })
 
   it('a draft resolves only for its own class AND frame AND name', () => {
     const ds = [draft()]
-    const hit = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds)
+    const hit = resolveSelection(sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds, 48)
     expect(hit.draft?.id).toBe('draft:square:3x3:mine')
     // same frame key, different class — must NOT answer for the diamond
-    const cross = resolveSelection(sel({ shapeId: 'diamond', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds)
+    const cross = resolveSelection(sel({ classId: 'diamond', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds, 48)
     expect(cross.draft).toBeNull()
     // same class, different frame
-    const other = resolveSelection(sel({ shapeId: 'square', frameKey: '4x4', layoutId: draftLayoutId('mine') }), ds)
+    const other = resolveSelection(sel({ classId: 'square', frameKey: '4x4', layoutId: draftLayoutId('mine') }), ds, 48)
     expect(other.draft).toBeNull()
   })
 
   it('a draft selection still hands the bridge a real corpus layout', () => {
-    const r = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), [draft()])
+    const r = resolveSelection(sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), [draft()], 48)
     expect(r.safeSel.layoutId).toBe(r.frame.layouts[0].name)
-    expect(() => selectedRecords(r.safeSel)).not.toThrow()
+    expect(() => selectedRecords(r.safeSel, 48)).not.toThrow()
   })
 
   it('a draft that no longer exists resolves to the corpus, not to nothing', () => {
-    const r = resolveSelection(sel({ shapeId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [])
+    const r = resolveSelection(sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [], 48)
     expect(r.draft).toBeNull()
     expect(r.layout.name).toBe(r.frame.layouts[0].name)
   })
@@ -492,7 +470,7 @@ describe('triangle — the three-point layout universe', () => {
   it('the retired vocabulary never reaches the UI, and no name is two words', () => {
     const first = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
     const ff = triangleFrame(first, 48)
-    const labels = panelOptions({ shapeId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
+    const labels = panelOptions({ classId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
       layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
       .types.map((o) => o.label)
     expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
@@ -609,7 +587,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   const PAD = 12
   const triSel = (id: string, layoutId = 'corners'): LibrarySelection => {
     const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
-    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
+    return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
       view: { transpose: false, flipX: false, flipY: false } }
   }
   const one = (type: string) => TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === type)!.id
@@ -658,12 +636,8 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   })
 
   it('the triangle stores no unit outline, and carries no frame registry either', () => {
-    const tri = LIBRARY_SHAPES.find((s) => s.id === 'triangle')!
-    expect(tri.outline.length).toBe(0)
     expect(Object.keys(RAW_CLASS_FRAMES).sort()).toEqual([...REGISTRY_FAMILIES].sort())
     expect(Object.prototype.hasOwnProperty.call(RAW_CLASS_FRAMES, 'triangle')).toBe(false)
-    for (const s of LIBRARY_SHAPES)
-      if (isRegistry(s.family)) expect(s.outline.length).toBeGreaterThan(2)
   })
 
   it('moving one corner changes the derived triangle outline', () => {
@@ -682,7 +656,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
 
   it('a triangle selection without a geometry fails loud', () => {
     expect(() => libraryArrangement(
-      { shapeId: 'triangle', frameKey: '3x3', layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, 48,
+      { classId: 'triangle', frameKey: '3x3', layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, 48,
     )).toThrow('carries no geometryId')
     expect(() => triangleById('tri:nope')).toThrow('unknown triangle geometry')
   })
@@ -696,7 +670,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
 describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   const sel3 = (id: string, layoutId = 'corners'): LibrarySelection => {
     const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
-    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
+    return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
       view: { transpose: false, flipX: false, flipY: false } }
   }
   const one = (type: string) => TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === type)!
@@ -792,16 +766,16 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
     const bad = { ...sel3(one('pyramid').id), frameKey: '9x9' }
-    expect(() => selectedRecords(bad)).toThrow('does not match geometry')
-    expect(() => resolveSelection(bad)).toThrow('does not match geometry')
+    expect(() => selectedRecords(bad, 48)).toThrow('does not match geometry')
+    expect(() => resolveSelection(bad, [], 48)).toThrow('does not match geometry')
   })
 
   it('F5 — the family transition is the module’s, and lands on a resolvable selection', () => {
     let cur = sel3(one('flag').id, 'perimeter')
     for (const fam of LIBRARY_FAMILIES) {
       cur = selectionForFamily(cur, fam, 48)
-      expect(() => selectedRecords(cur), fam).not.toThrow()
-      expect(resolveSelection(cur).shape.family).toBe(fam)
+      expect(() => selectedRecords(cur, 48), fam).not.toThrow()
+      expect(resolveSelection(cur, [], 48).classId).toBe(fam)
     }
   })
 
@@ -822,7 +796,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
 describe('triangle — a corner is a corner, and it opens the right way up', () => {
   const sel3 = (id: string, layoutId = 'corners'): LibrarySelection => {
     const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
-    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
+    return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
       view: { transpose: false, flipX: false, flipY: false } }
   }
   it('every layout, population and view is a three-cornered triangle clearing exactly 12mm', () => {
@@ -834,7 +808,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
       for (const layoutId of f.layouts.map((l) => l.name)) {
         for (const view of [{ transpose: false, flipX: false, flipY: false },
           { transpose: true, flipX: true, flipY: false }]) {
-          const sel: LibrarySelection = { shapeId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f), layoutId, view }
+          const sel: LibrarySelection = { classId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f), layoutId, view }
           const o = libraryPreview(sel, 48, 12).outlineMM
           expect(o.length, `${t.id} ${layoutId}`).toBe(3)
           for (const m of libraryArrangement(sel, 48).nodesMM) {
@@ -890,7 +864,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
     // pressed — this fails on any build that labels relative to the canonical form.
     for (const t of TRIANGLE_LAYOUTS.slice(0, 12)) {
       const f = triangleFrame(t, 48)
-      const sel: LibrarySelection = { shapeId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f),
+      const sel: LibrarySelection = { classId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f),
         layoutId: 'corners', view: uprightView(t) }
       const opts = panelOptions(sel, [], 48).orientations
       expect(opts[0].label, t.id).toBe('0°')
@@ -1094,7 +1068,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
   it('only the spec and the triangle’s own files name the triangle', () => {
     const allowed = new Set([
       'class-spec.ts', 'corpus-triangle.ts', 'triangle-frames.ts', 'triangle-geometry.ts',
-      'triangle-types.ts', 'index.ts', 'types.ts', 'frames.ts',
+      'triangle-types.ts', 'triangle-class.ts', 'class-registry.ts', 'registry-class.ts', 'index.ts', 'types.ts', 'frames.ts',
     ])
     const offenders: string[] = []
     for (const f of readdirSync(LIB)) {
@@ -1146,7 +1120,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
 describe('authoring transitions — the five the page used to spell out itself', () => {
   const triSel = (id: string, layoutId = 'corners'): LibrarySelection => {
     const t = triangleById(id)
-    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(triangleFrame(t, 48)),
+    return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(triangleFrame(t, 48)),
       layoutId, view: uprightView(t) }
   }
 
@@ -1177,7 +1151,7 @@ describe('authoring transitions — the five the page used to spell out itself',
 
     // and the same for a triangle, where the outline is derived from the drawn magnets
     const t = triangleById('tri:0,0;0,2;2,0')
-    const tsel: LibrarySelection = { shapeId: 'triangle', geometryId: t.id,
+    const tsel: LibrarySelection = { classId: 'triangle', geometryId: t.id,
       frameKey: frameKeyOf(triangleFrame(t, 48)), layoutId: 'corners', view: uprightView(t) }
     const tsaved = saveEdit(tsel, [], { name: 'probe', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
     expect(tsaved.ok).toBe(true)
@@ -1206,7 +1180,7 @@ describe('authoring transitions — the five the page used to spell out itself',
   })
 
   it('a click in a TRANSPOSED view lands on the canonical node, and clicking again removes it', () => {
-    const s = sel({ shapeId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter',
+    const s = sel({ classId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter',
       view: { transpose: true, flipX: false, flipY: false } })
     // shown 3 wide x 2 tall; the far column, top row, is canonical [0,2]
     const once = toggleNodeAt(s, [], { name: 'x', nodes: [] }, [96, 48], 48)
@@ -1215,7 +1189,7 @@ describe('authoring transitions — the five the page used to spell out itself',
   })
 
   it('a click outside the frame changes nothing', () => {
-    const s = sel({ shapeId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter' })
+    const s = sel({ classId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter' })
     const before: LibraryEdit = { name: 'x', nodes: [[0, 0]] }
     for (const p of [[-48, 0], [480, 0], [0, -48], [0, 480]] as Array<[number, number]>)
       expect(toggleNodeAt(s, [], before, p, 48), String(p)).toEqual(before)

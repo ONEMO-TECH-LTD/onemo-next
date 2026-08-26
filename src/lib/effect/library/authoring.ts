@@ -5,7 +5,7 @@
 //
 // Every function here is pure: state in, state out. The page holds React state and calls these.
 
-import { specOf } from './class-spec'
+import { specOf } from './class-registry'
 import { draftId, draftIntegrity, type LibraryDraft } from './drafts'
 import { draftLayoutId, draftNameOf, resolveSelection } from './selection'
 import { canonicalNode, frameKeyOf } from './transforms'
@@ -39,8 +39,8 @@ export function startEdit(
 export function saveEdit(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], edit: LibraryEdit, pitchMM: number,
 ): { ok: true; drafts: LibraryDraft[]; sel: LibrarySelection } | { ok: false; error: string } {
-  const { shape, frame, safeSel } = resolveSelection(sel, drafts, pitchMM)
-  const parts = specOf(shape.family).draftIdParts(safeSel, safeSel.frameKey)
+  const { classId, frame, safeSel } = resolveSelection(sel, drafts, pitchMM)
+  const parts = specOf(classId).draftIdParts(safeSel, safeSel.frameKey)
   const rec: LibraryDraft = {
     id: draftId(parts.className, parts.frameKey, edit.name, parts.geometryId),
     className: parts.className, frameKey: parts.frameKey, geometryId: parts.geometryId,
@@ -61,8 +61,8 @@ export function deleteEdit(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], edit: LibraryEdit | null, pitchMM: number,
 ): { drafts: LibraryDraft[]; sel: LibrarySelection } {
   const name = edit ? edit.name : draftNameOf(sel.layoutId)
-  const { shape, frame } = resolveSelection(sel, drafts, pitchMM)
-  const spec = specOf(shape.family)
+  const { classId, frame } = resolveSelection(sel, drafts, pitchMM)
+  const spec = specOf(classId)
   const frameKey = frameKeyOf(frame)
   return {
     drafts: drafts.filter((x) => !(spec.draftMatches(x, sel, frameKey) && x.name === name)),

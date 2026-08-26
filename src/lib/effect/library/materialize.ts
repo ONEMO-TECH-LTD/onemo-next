@@ -6,16 +6,15 @@
 // Dan, 08-26: "separation of UI clean shell and logic and spec must be followed as in the
 // fucking bench". This is the producer side of that seam.
 
-import { specOf, type PointMM } from './class-spec'
+import { specOf } from './class-registry'
 import { resolveSelection, selectedRecords } from './selection'
 import { frameKeyOf, transformLayout } from './transforms'
-import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryShapeId, LibraryTransform } from './types'
+import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, PointMM } from './types'
 
 /** WHAT A SELECTION IS, once resolved: stable identity, truthful frame identity after the view
  *  transform, magnet positions and the outline that wraps them. Millimetres, y UP. */
 export interface MaterializedLibrary {
-  shapeId: LibraryShapeId
-  declaredFamily: LibraryFamily
+  classId: string
   /** The canonical frame the selection named. */
   sourceFrameKey: string
   /** The ACTUAL frame identity after the view transform — what the pipeline must believe. */
@@ -49,13 +48,13 @@ function place(
 export function materializeSelection(
   sel: LibrarySelection, pitchMM: number, padMM: number,
 ): MaterializedLibrary {
-  const { shape, frame, layout } = selectedRecords(sel, pitchMM)
-  const spec = specOf(shape.family)
+  const { classId, frame, layout } = selectedRecords(sel, pitchMM)
+  const spec = specOf(classId)
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
   const p = place(frame, layout, sel.view, pitchMM)
   return {
-    shapeId: shape.id, declaredFamily: shape.family,
+    classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId: layout.name,
     nodesMM: p.nodesMM,
@@ -79,8 +78,8 @@ export function materializeDraft(
   // the placement and the centre all lie. And the selection saveEdit returns names the draft
   // itself, so the corpus fallback must be taken on the NORMALISED selection — resolving the
   // caller's own draft id strictly is how the producer refused its own output.
-  const { shape, frame, safeSel } = resolveSelection(sel, [], pitchMM)
-  const spec = specOf(shape.family)
+  const { classId, frame, safeSel } = resolveSelection(sel, [], pitchMM)
+  const spec = specOf(classId)
   // A draft is canonical data like every corpus layout, so it goes through the SAME transform
   // and the same one flip — never straight to mm (QA F2).
   const p = place(frame, { name: 'draft', nodes }, safeSel.view, pitchMM)
@@ -90,7 +89,7 @@ export function materializeDraft(
   try { outlineMM = spec.outline(p.nodesMM, p.cols, p.rows, pitchMM, padMM) }
   catch (e) { error = (e as Error).message }
   return {
-    shapeId: shape.id, declaredFamily: shape.family,
+    classId,
     sourceFrameKey: corpus.sourceFrameKey, frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
     nodesMM: p.nodesMM, outlineMM, error,

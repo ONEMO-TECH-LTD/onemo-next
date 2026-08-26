@@ -1,15 +1,18 @@
 // library/integrity.ts — the corpus checks its own soundness.
 
-import { RAW_CLASS_FRAMES } from './frames'
-import { withSpacingModes } from './rules'
-import { REGISTRY_FAMILIES } from './types'
+import { LIBRARY_FAMILIES, specOf } from './class-registry'
 import { frameKeyOf } from './transforms'
 
 /** Every violation named; an empty list means the corpus is sound. */
 export function registryIntegrity(): string[] {
   const out: string[] = []
-  for (const fam of REGISTRY_FAMILIES) {
-    const frames = RAW_CLASS_FRAMES[fam].map((f) => withSpacingModes(fam, f, 48))
+  for (const classId of LIBRARY_FAMILIES) {
+    const spec = specOf(classId)
+    for (const type of spec.types) {
+      const variants = spec.variants(type.id, 48)
+      if (!variants.length) out.push(classId + ' ' + type.id + ': no variants')
+      for (const variant of variants) {
+        const frames = [variant.frame]
     const seen = new Set<string>()
     for (const f of frames) {
       const fk = frameKeyOf(f)
@@ -29,6 +32,8 @@ export function registryIntegrity(): string[] {
         if (!l.nodes.length) out.push(fk + ' ' + l.name + ': empty layout')
       }
       if (!f.layouts.length) out.push(fk + ': no layouts')
+    }
+      }
     }
   }
   return out

@@ -1,8 +1,8 @@
 // library/index.ts — the layout-library module's public surface.
 
 export * from './types'
-export * from './class-spec'
-export * from './shapes'
+export * from './class-contract'
+export * from './class-registry'
 export * from './frames'
 export * from './transforms'
 export * from './selection'

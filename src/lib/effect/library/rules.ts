@@ -23,7 +23,7 @@ export const isSpacingMode = (name: string): boolean => SPACING_MODES.some((m) =
  *  distance, so the stride is 96/pitch nodes; the far end is always kept, because an unpinned
  *  extreme is the failure the belt exists to prevent. A short closing interval is lawful —
  *  Dan's hand-made sparse populations are the CUSTOM mode, never this one. */
-export function sample96(n: number, pitchMM = 48): Set<number> {
+export function sample96(n: number, pitchMM: number): Set<number> {
   const stride = 96 / pitchMM
   if (!Number.isInteger(stride) || stride < 1) throw new Error('library: 96mm mode unsupported at pitch ' + pitchMM)
   const keep = new Set<number>()

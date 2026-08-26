@@ -3,9 +3,9 @@
 // class, frame, geometry, layout and view policy all stay here (Dan, 08-26: "no logic in UI
 // shell and poage"). Resolution lives in selection.ts; the class answers live in class-spec.ts.
 
-import { specOf, type LibraryClass } from './class-spec'
+import { specOf } from './class-registry'
+import type { LibraryClass } from './registry-class'
 import { SPACING_MODES, isSpacingMode } from './rules'
-import { LIBRARY_SHAPES } from './shapes'
 import { transformLayout, viewName } from './transforms'
 import { draftLayoutId, pickLayout, resolveSelection, draftsFor } from './selection'
 import type { LibraryDraft } from './drafts'
@@ -105,17 +105,17 @@ function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryCla
 
 /** The selection a class tab lands on. The page passes a family; the class decides the rest. */
 export function selectionForFamily(
-  current: LibrarySelection, family: LibraryFamily, pitchMM = 48,
+  current: LibrarySelection, family: LibraryFamily, pitchMM: number,
 ): LibrarySelection {
-  if (!LIBRARY_SHAPES.some((x) => x.family === family)) throw new Error('library: no shape for family ' + family)
+  specOf(family)
   return specOf(family).open(current, pitchMM)
 }
 
 export function panelOptions(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM = 48,
+  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
 ): PanelOptions {
-  const { shape, frame, layout, draft } = resolveSelection(sel, drafts, pitchMM)
-  const spec = specOf(shape.family)
+  const { classId, frame, layout, draft } = resolveSelection(sel, drafts, pitchMM)
+  const spec = specOf(classId)
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout

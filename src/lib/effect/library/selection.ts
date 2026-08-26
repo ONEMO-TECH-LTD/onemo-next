@@ -6,11 +6,11 @@
 // It asks the class spec and tests nothing itself: which frame a selection names, and which
 // stored drafts belong to it, are the spec's answers, not a branch here.
 
-import { specOf } from './class-spec'
-import { LIBRARY_SHAPES } from './shapes'
+import { specOf } from './class-registry'
+import type { ClassVariant } from './class-contract'
 import { frameKeyOf } from './transforms'
 import type { LibraryDraft } from './drafts'
-import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryShape } from './types'
+import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection } from './types'
 
 /** A hand-authored layout is named in a selection as 'draft:<name>'. One place, one spelling. */
 export const DRAFT_PREFIX = 'draft:'
@@ -23,28 +23,28 @@ export function pickLayout(frame: LibraryFrame, preferred: string): string {
   return frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
 }
 
-const shapeOf = (sel: LibrarySelection): LibraryShape => {
-  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
-  if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
-  return shape
-}
+export const selectVariant = (current: LibrarySelection, variant: ClassVariant): LibrarySelection => ({
+  ...current,
+  ...variant.selection,
+  layoutId: pickLayout(variant.frame, current.layoutId),
+  view: { ...variant.view },
+})
 
 /** STRICT — the pipeline's resolver. An unknown ID is an error, never a silent retarget to
  *  unrelated data (QA F3): stable IDs exist precisely so a stale identity cannot lie. */
-export function selectedRecords(sel: LibrarySelection, pitchMM = 48): {
-  shape: LibraryShape
+export function selectedRecords(sel: LibrarySelection, pitchMM: number): {
+  classId: LibraryFamily
   frame: LibraryFrame
   layout: LibraryLayout
 } {
-  const shape = shapeOf(sel)
-  const frame = specOf(shape.family).frameOf(sel, pitchMM)
+  const frame = specOf(sel.classId).frameOf(sel, pitchMM)
   const layout = frame.layouts.find((l) => l.name === sel.layoutId)
   if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
-  return { shape, frame, layout }
+  return { classId: sel.classId, frame, layout }
 }
 
 export interface ResolvedSelection {
-  shape: LibraryShape
+  classId: LibraryFamily
   frame: LibraryFrame
   /** A selection whose layout certainly exists on the frame — what the bridge is handed. */
   safeSel: LibrarySelection
@@ -60,10 +60,9 @@ export interface ResolvedSelection {
  *  an unknown one is a bug in the caller, and guessing produced a 'safe' selection that still
  *  threw when the pipeline resolved it (QA F4). */
 export function resolveSelection(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM = 48,
+  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
 ): ResolvedSelection {
-  const shape = shapeOf(sel)
-  const spec = specOf(shape.family)
+  const spec = specOf(sel.classId)
   const frame = spec.frameOf(sel, pitchMM)
   const frameKey = frameKeyOf(frame)
   const wantsDraft = isDraftLayout(sel.layoutId)
@@ -74,15 +73,14 @@ export function resolveSelection(
     : null
   const layoutId = wantsDraft ? frame.layouts[0].name : pickLayout(frame, sel.layoutId)
   const layout = frame.layouts.find((l) => l.name === layoutId)!
-  return { shape, frame, safeSel: { ...sel, frameKey, layoutId }, layout, draft }
+  return { classId: sel.classId, frame, safeSel: { ...sel, frameKey, layoutId }, layout, draft }
 }
 
 /** Every stored draft the panel should list for this selection. */
 export function draftsFor(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM = 48,
+  sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number,
 ): LibraryDraft[] {
-  const shape = shapeOf(sel)
-  const spec = specOf(shape.family)
+  const spec = specOf(sel.classId)
   const frameKey = frameKeyOf(spec.frameOf(sel, pitchMM))
   return drafts.filter((d) => spec.draftMatches(d, sel, frameKey))
 }
