@@ -1,11 +1,11 @@
 import { DIAMOND_FRAMES } from './corpus-diamond'
-import { withSpacingModes } from './rules'
-import { registryClass } from './registry-factory'
+import { ring96, withSpacingModes } from './rules'
+import { registryClass } from './registry-class'
 
 export const diamondClass = registryClass({
   classId: 'diamond',
   types: [{ id: 'rhomb', label: 'rhomb' }],
-  frames: (pitchMM) => DIAMOND_FRAMES.map((frame) => withSpacingModes('diamond', frame, pitchMM)),
+  frames: (pitchMM) => DIAMOND_FRAMES.map((frame) => withSpacingModes(frame, pitchMM, ring96)),
   typeOfFrame: () => 'rhomb',
   label: (frame) => { const side = (frame.cols - 1) / 2 + 1; return side + '×' + side },
   orientations: [],

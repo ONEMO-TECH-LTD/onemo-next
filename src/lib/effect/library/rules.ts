@@ -1,7 +1,7 @@
 // library/rules.ts — CLASS POLICY: sub-types, orientation, box measurement, labelling.
 // The view renders this policy without deciding which class it receives.
 
-import { MIN_LIB_MM, type LibraryFrame, type LibraryLayout, type LibraryTransform, type RegistryFamily } from './types'
+import type { LibraryFrame, LibraryLayout } from './types'
 
 type Node = readonly [number, number]
 
@@ -35,7 +35,7 @@ export function sample96(n: number, pitchMM: number): Set<number> {
 /** Axis-aligned ring, WALKED CLOCKWISE. Each side indexes from its own start, so the short
  *  closing interval of a non-divisible run lands as rotationally balanced pairs instead of
  *  biased to one absolute direction (Dan, 08-25: the 4x4 must pair, not lean). */
-function box96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
+export function box96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
   const kx = sample96(frame.cols, pitchMM), ky = sample96(frame.rows, pitchMM)
   // A one-line frame is a chain, not a ring: its two long sides are the same nodes walked in
   // opposite directions, and treating them as a ring would keep every node and make the 96
@@ -52,7 +52,7 @@ function box96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number)
 
 /** Manhattan ring: sides run vertex to vertex with r+1 nodes; a node's place along its side
  *  is |dx| from the vertical vertex. */
-function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
+export function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number): Node[] {
   const k = (frame.cols - 1) / 2
   const keep = sample96(k + 1, pitchMM)
   return perimeter.filter(([x, y]) => {
@@ -64,62 +64,6 @@ function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number
   }).map(([x, y]) => [x, y] as Node)
 }
 
-/** The class floor: an n-line axis starts at 24mm and grows one pitch per extra line. */
-const boxByClassFloor = (cols: number, rows: number, pitchMM: number) =>
-  ({ w: MIN_LIB_MM + (cols - 1) * pitchMM, h: MIN_LIB_MM + (rows - 1) * pitchMM })
-
-/** THE REGISTRY CLASS RULES — one description per class whose frames are a literal table.
- *  A class whose frames are MATERIALISED from a geometry has none of these, and does not
- *  appear here at all: there is no sentinel entry to mistake for a real one. */
-export interface RegistryRules {
-  /** Sub-types offered, in order. One entry means a single fixed type. */
-  subs: string[]
-  /** How a frame is labelled to a human. */
-  label: (cols: number, rows: number) => string
-  /** Which sub a frame belongs to. */
-  subOf: (cols: number, rows: number) => string
-  /** The frame's outer box in mm — the class floor, or the wrapping rule the class needs. */
-  boxMM: (cols: number, rows: number, pitchMM: number, padMM: number) => { w: number; h: number }
-  /** The views this class names. Empty means it has no orientation of its own. */
-  orientations: Array<{ id: string; view: LibraryTransform }>
-  /** The 96mm sample of this class's perimeter — the ring geometry differs per class. */
-  spacing96: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
-}
-
-export const REGISTRY_RULES = {
-  square: {
-    subs: ['box'],
-    subOf: () => 'box',
-    boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
-    label: (c, r) => c + '×' + r,
-    orientations: [],
-    spacing96: box96,
-  },
-  rectangle: {
-    subs: ['frame', 'banner', 'slim'],
-    subOf: (c, r) => (Math.min(c, r) <= 1 ? 'slim' : Math.min(c, r) === 2 ? 'banner' : 'frame'),
-    boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
-    label: (c, r) => c + '×' + r,
-    orientations: [
-      { id: 'portrait', view: { transpose: false, flipX: false, flipY: false } },
-      { id: 'landscape', view: { transpose: true, flipX: false, flipY: false } },
-    ],
-    spacing96: box96,
-  },
-  diamond: {
-    subs: ['rhomb'],
-    subOf: () => 'rhomb',
-    // the outline WRAPS the ring: half-diagonal = ring radius + padding on the diagonal
-    boxMM: (c, _r, pitch, pad) => {
-      const span = 2 * (((c - 1) / 2) * pitch + pad * Math.SQRT2)
-      return { w: span, h: span }
-    },
-    label: (c) => { const side = (c - 1) / 2 + 1; return side + '×' + side },
-    orientations: [],
-    spacing96: ring96,
-  },
-} satisfies Record<RegistryFamily, RegistryRules>
-
 /** A frame as the panel and the pipeline see it: the literal semantic layouts, plus the
  *  computed spacing mode inserted next to the perimeter it samples. The corpus stays literal
  *  (Dan: a readable table, no generation) — only the MODE is computed (Dan: "96mm is mode
@@ -128,12 +72,16 @@ export const REGISTRY_RULES = {
  *  96mm is a PHYSICAL distance, so the population depends on the pitch and the pitch must be
  *  known here. Composing once at 48 and repairing later meant the panel counted a different
  *  set of magnets from the one the canvas drew, at every pitch except 48. */
+export type SpacingSampler = (
+  frame: LibraryFrame, perimeter: ReadonlyArray<readonly [number, number]>, pitchMM: number,
+) => ReadonlyArray<readonly [number, number]>
+
 export function withSpacingModes(
-  family: RegistryFamily, frame: LibraryFrame, pitchMM: number,
+  frame: LibraryFrame, pitchMM: number, spacing96: SpacingSampler,
 ): LibraryFrame {
   const i = frame.layouts.findIndex((l) => l.name === SPACING_BASE)
   if (i < 0) return frame
-  const nodes = REGISTRY_RULES[family].spacing96(frame, frame.layouts[i].nodes, pitchMM)
+  const nodes = spacing96(frame, frame.layouts[i].nodes, pitchMM)
   if (!nodes.length) return frame
   const mode: LibraryLayout = { name: SPACING_96, nodes }
   const layouts = [...frame.layouts]

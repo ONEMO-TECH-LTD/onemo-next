@@ -125,8 +125,8 @@ export default function GridLab() {
     const nodes = edit ? edit.nodes : draft?.nodes
     return nodes
       // the producer resolves its own frame, and it accepts the selection that NAMES the draft
-      ? draftStageModel(librarySel, nodes, pitch, pad)
-      : libraryStageModel(safeSel, pitch, pad)
+      ? draftStageModel(librarySel, nodes, pitch)
+      : libraryStageModel(safeSel, pitch)
   }, [tab, librarySel, pitch, pad, edit, drafts])
   /** The size card reads the ACTUAL outline, so a derived shape reports what it really is. */
   const libraryBox = useMemo(() => {

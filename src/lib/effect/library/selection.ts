@@ -37,7 +37,7 @@ export function selectedRecords(sel: LibrarySelection, pitchMM: number): {
   frame: LibraryFrame
   layout: LibraryLayout
 } {
-  const frame = specOf(sel.classId).frameOf(sel, pitchMM)
+  const frame = specOf(sel.classId).variantOf(sel, pitchMM).frame
   const layout = frame.layouts.find((l) => l.name === sel.layoutId)
   if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
   return { classId: sel.classId, frame, layout }
@@ -63,7 +63,7 @@ export function resolveSelection(
   sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
 ): ResolvedSelection {
   const spec = specOf(sel.classId)
-  const frame = spec.frameOf(sel, pitchMM)
+  const frame = spec.variantOf(sel, pitchMM).frame
   const frameKey = frameKeyOf(frame)
   const wantsDraft = isDraftLayout(sel.layoutId)
   // whether a stored draft belongs to this selection is the class's own rule: the triangle
@@ -81,6 +81,6 @@ export function draftsFor(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number,
 ): LibraryDraft[] {
   const spec = specOf(sel.classId)
-  const frameKey = frameKeyOf(spec.frameOf(sel, pitchMM))
+  const frameKey = frameKeyOf(spec.variantOf(sel, pitchMM).frame)
   return drafts.filter((d) => spec.draftMatches(d, sel, frameKey))
 }

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it, test } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
+import { outlineFromLayout } from '../library/outline'
 
 const ROOT = resolve(process.cwd(), 'src/lib/effect')
 const LIBRARY = join(ROOT, 'library')
@@ -151,8 +152,26 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       expect(() => spec.variantOf({ ...selection, frameKey: 'nope' }, 48)).toThrow()
     }
   })
-  test.todo('STEP 3: constant ownership and no padMM')
-  test.todo('STEP 3: one outline producer and topology/size/clearance')
+  it('STEP 3: outline topology keeps point, line, convex, and concave recipes distinct', () => {
+    const round = outlineFromLayout([[0, 0]], { corners: 'round' })
+    const square = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 0 })
+    const diamond = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 45 })
+    const pill = outlineFromLayout([[0, 0], [48, 0]], { corners: 'round' })
+    const convex = outlineFromLayout([[0, 0], [48, 0], [0, 48]], { corners: 'sharp' })
+    const h = [[0, 0], [96, 0], [96, 96], [64, 96], [64, 32], [32, 32], [32, 96], [0, 96]] as const
+    const concave = outlineFromLayout(h, { corners: 'sharp' }, h)
+    expect(round.length).toBeGreaterThan(3)
+    expect(square).not.toEqual(diamond)
+    expect(pill.length).toBeGreaterThan(2)
+    expect(convex).toHaveLength(3)
+    expect(concave.length).toBeGreaterThan(4)
+  })
+  it('STEP 3: library and bridge contain no runtime padding parameter', () => {
+    const governed = [...files(LIBRARY), join(ROOT, 'grid-magnet-library-bridge.ts')]
+      .filter((path) => path !== LAW)
+    for (const path of governed)
+      expect(source(path), path).not.toMatch(/\bpadMM\b/)
+  })
   test.todo('STEP 4: LAW 0 exact catalogue contract, identity, and matcher')
   test.todo('STEP 5: surface, barrel, shell, bridge, CSS, and caller equality')
 })

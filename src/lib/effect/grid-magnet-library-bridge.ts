@@ -8,7 +8,7 @@
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
-import { MAGNET_DIA_SMALL_MM } from './grid-magnet-spec'
+import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   materializeSelection, materializeDraft,
   type MaterializedLibrary, type LibrarySelection,
@@ -27,7 +27,7 @@ const pts = (ps: MaterializedLibrary['nodesMM']): Pt[] => ps.map((p) => [p[0], p
 
 /** The engine's picture of a materialised library record. The lattice field is seeded only when
  *  nothing is drawn, so an empty canvas still has somewhere to click. */
-function toStage(m: MaterializedLibrary, pitchMM: number, padMM: number): LibraryStageModel {
+function toStage(m: MaterializedLibrary, pitchMM: number): LibraryStageModel {
   const nodesMM = pts(m.nodesMM)
   const contour: Contour = { outer: { pts: pts(m.outlineMM) } , holes: [] }
   const grid: GridResult = {
@@ -36,7 +36,7 @@ function toStage(m: MaterializedLibrary, pitchMM: number, padMM: number): Librar
     lattice: m.seedMM ? [[m.seedMM[0], m.seedMM[1]] as Pt] : [],
     phaseMM: [0, 0],
     panMM: [0, 0],
-    spotRadiusMM: spotRadiusOf(padMM),
+    spotRadiusMM: spotRadiusOf(RELEASED_PADDING_MM),
     contactsMM: [],
     segments: [],
     centresMM: [],
@@ -45,17 +45,17 @@ function toStage(m: MaterializedLibrary, pitchMM: number, padMM: number): Librar
   return { contour, grid, error: m.error }
 }
 
-export function libraryStageModel(sel: LibrarySelection, pitchMM: number, padMM: number): LibraryStageModel {
-  const m = materializeSelection(sel, pitchMM, padMM)
+export function libraryStageModel(sel: LibrarySelection, pitchMM: number): LibraryStageModel {
+  const m = materializeSelection(sel, pitchMM)
   // a corpus selection always has magnets, so the lattice seed is not used here
-  return toStage({ ...m, seedMM: null }, pitchMM, padMM)
+  return toStage({ ...m, seedMM: null }, pitchMM)
 }
 
 /** AUTHORING (Dan, 08-25 — sandbox drafts): a draft's own nodes drawn on the selected frame. */
 export function draftStageModel(
-  sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number, padMM: number,
+  sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number,
 ): LibraryStageModel {
-  return toStage(materializeDraft(sel, nodes, pitchMM, padMM), pitchMM, padMM)
+  return toStage(materializeDraft(sel, nodes, pitchMM), pitchMM)
 }
 
 /** Selection -> the engine-space record the pipeline consumes. */

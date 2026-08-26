@@ -1,11 +1,11 @@
 import { SQUARE_FRAMES } from './corpus-square'
-import { withSpacingModes } from './rules'
-import { registryClass } from './registry-factory'
+import { box96, withSpacingModes } from './rules'
+import { registryClass } from './registry-class'
 
 export const squareClass = registryClass({
   classId: 'square',
   types: [{ id: 'box', label: 'box' }],
-  frames: (pitchMM) => SQUARE_FRAMES.map((frame) => withSpacingModes('square', frame, pitchMM)),
+  frames: (pitchMM) => SQUARE_FRAMES.map((frame) => withSpacingModes(frame, pitchMM, box96)),
   typeOfFrame: () => 'box',
   label: (frame) => frame.cols + '×' + frame.rows,
   orientations: [],

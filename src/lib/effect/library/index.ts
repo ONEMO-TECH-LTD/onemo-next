@@ -3,7 +3,6 @@
 export * from './types'
 export * from './class-contract'
 export * from './class-registry'
-export * from './frames'
 export * from './transforms'
 export * from './selection'
 export * from './options'

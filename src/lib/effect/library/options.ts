@@ -4,10 +4,10 @@
 // shell and poage"). Resolution lives in selection.ts; the class answers live in class-spec.ts.
 
 import { specOf } from './class-registry'
-import type { LibraryClass } from './registry-class'
+import type { LibraryClass } from './class-contract'
 import { SPACING_MODES, isSpacingMode } from './rules'
 import { transformLayout, viewName } from './transforms'
-import { draftLayoutId, pickLayout, resolveSelection, draftsFor } from './selection'
+import { draftLayoutId, pickLayout, resolveSelection, draftsFor, selectVariant } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -121,18 +121,18 @@ export function panelOptions(
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
   const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
   const type = spec.typeOf(sel, pitchMM)
-  const variantId = spec.variantIdOf(sel)
+  const variantId = spec.variantOf(sel, pitchMM).id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
   const has = (name: string) => frame.layouts.some((l) => l.name === name)
 
   return {
     types: spec.types.map((t) => {
       const first = spec.variants(t.id, pitchMM)[0]
-      return { id: t.id, label: t.label, active: t.id === type, next: spec.select(sel, first) }
+      return { id: t.id, label: t.label, active: t.id === type, next: selectVariant(sel, first) }
     }),
     frames: spec.variants(type, pitchMM).map((v) => ({
       id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
-      active: v.id === variantId, next: spec.select(sel, v),
+      active: v.id === variantId, next: selectVariant(sel, v),
     })),
     // a class with no named views of its own, and no turn that changes the picture, offers none
     orientations: spec.orientations.length || orientations.length > 1 ? orientations : [],

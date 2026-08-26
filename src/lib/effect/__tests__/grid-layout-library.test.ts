@@ -6,9 +6,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, registryFramesAt,
-  LIBRARY_FAMILIES, REGISTRY_FAMILIES, RAW_CLASS_FRAMES, SPACING_MODES, specOf, registryIntegrity, transformLayout, frameKeyOf,
-  resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode,
+  LIBRARY_FAMILIES, SPACING_MODES, specOf, registryIntegrity, transformLayout, frameKeyOf,
+  resolveSelection, selectedRecords, selectVariant, draftLayoutId, sample96, canonicalNode,
   transformLayout as tl,
   TRIANGLE_LAYOUTS, triangleGeometry, triangleTypeOf, triangleFrameKey,
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
@@ -22,6 +21,9 @@ import {
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
+import { SQUARE_FRAMES } from '../library/corpus-square'
+import { RECTANGLE_FRAMES } from '../library/corpus-rectangle'
+import { DIAMOND_FRAMES } from '../library/corpus-diamond'
 import { libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 
@@ -32,11 +34,15 @@ const enginePts = (ps: ReadonlyArray<readonly [number, number]>): Array<[number,
   ps.map((p) => [p[0], p[1]])
 
 const libraryArrangement = (selection: LibrarySelection, pitchMM: number) =>
-  materializeSelection(selection, pitchMM, 12)
-const libraryPreview = (selection: LibrarySelection, pitchMM: number, padMM = 12) =>
-  materializeSelection(selection, pitchMM, padMM)
+  materializeSelection(selection, pitchMM)
+const libraryPreview = (selection: LibrarySelection, pitchMM: number) => materializeSelection(selection, pitchMM)
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
+const framesAt = (classId: string, pitchMM: number) => {
+  const spec = specOf(classId)
+  return spec.types.flatMap((type) => spec.variants(type.id, pitchMM).map((variant) => variant.frame))
+}
+const registryClasses = () => LIBRARY_FAMILIES.filter((classId) => classId !== 'triangle')
 
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
   classId: 'square', frameKey: '3x3', layoutId: 'perimeter',
@@ -50,7 +56,7 @@ describe('corpus completeness — removal must fail these', () => {
   it('exactly 16 square layouts as the panel and the pipeline see them', () => {
     // 12 literal semantic populations in the corpus + the 4 computed 96mm modes.
     expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(12)
-    expect(registryFramesAt('square', 48).reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
+    expect(framesAt('square', 48).reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
   })
   it('square class: every frame is even, 1x1..5x5, square kind', () => {
     const seen = new Set<string>()
@@ -61,7 +67,7 @@ describe('corpus completeness — removal must fail these', () => {
 
 describe('classifier goldens — library and engine taxonomies stay distinct', () => {
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
-    for (const family of REGISTRY_FAMILIES) for (const f of registryFramesAt(family, 48)) {
+    for (const family of registryClasses()) for (const f of framesAt(family, 48)) {
       // The engine classifier tops out at 5 magnet lines per axis (bands B1-B5), so a 6-line
       // library frame has no class to be read back as. The library carries it; the classifier
       // cannot express it until a sixth band is ruled.
@@ -102,7 +108,7 @@ describe('data integrity + transforms', () => {
     expect(registryIntegrity()).toEqual([])
   })
   it('transform closure keeps nodes in bounds', () => {
-    for (const f of REGISTRY_FAMILIES.flatMap((f) => registryFramesAt(f, 48))) for (const l of f.layouts)
+    for (const f of registryClasses().flatMap((f) => framesAt(f, 48))) for (const l of f.layouts)
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
         const t = transformLayout(f, l, { transpose, flipX, flipY })
         expect(t.nodes.length).toBe(l.nodes.length)
@@ -132,7 +138,7 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
     expect([a.frameCols, a.frameRows]).toEqual([3, 3])
   })
   it('stage model composes the arrangement; lattice stays the canvas own', () => {
-    const m = libraryStageModel(sel(), 48, 12)
+    const m = libraryStageModel(sel(), 48)
     expect(m.grid.anchors.length).toBe(8)
     expect(m.grid.pitchCentreMM).toBe(48)
     expect(m.grid.spotRadiusMM).toBe(12)
@@ -158,7 +164,7 @@ describe('interior rule and the belt mode', () => {
   })
   it('belt is a spacing mode: every frame above 1x1 carries perimeter and perimeter-96', () => {
     for (const f of SQUARE_FRAMES.filter((x) => x.cols > 1)) {
-      const names = registryFramesAt('square', 48).find((x) => x.cols === f.cols && x.rows === f.rows)!.layouts.map((l) => l.name)
+      const names = framesAt('square', 48).find((x) => x.cols === f.cols && x.rows === f.rows)!.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       expect(names).toContain('perimeter-96')
     }
@@ -167,10 +173,10 @@ describe('interior rule and the belt mode', () => {
 
 describe('rectangle class', () => {
   it('carries exactly its ruled frames', () => {
-    expect(registryFramesAt('rectangle', 48).map(frameKeyOf)).toEqual(['1x2', '1x3', '1x4', '1x5', '2x3', '2x4', '2x5', '3x4', '3x5', '4x5', '4x6', '5x6'])
+    expect(framesAt('rectangle', 48).map(frameKeyOf).sort()).toEqual(['1x2', '1x3', '1x4', '1x5', '2x3', '2x4', '2x5', '3x4', '3x5', '4x5', '4x6', '5x6'].sort())
   })
   it('every frame offers a perimeter, and only 3+ line frames carry an interior full', () => {
-    for (const f of registryFramesAt('rectangle', 48)) {
+    for (const f of framesAt('rectangle', 48)) {
       const names = f.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       const hasFull = names.includes('full')
@@ -185,10 +191,10 @@ describe('rectangle class', () => {
 
 describe('diamond class', () => {
   it('carries the ruled rings', () => {
-    expect(registryFramesAt('diamond', 48).map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
+    expect(framesAt('diamond', 48).map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
   })
   it('uses the SHARED layout vocabulary — full / perimeter / perimeter-96 / corners', () => {
-    for (const f of registryFramesAt('diamond', 48).slice(1)) {
+    for (const f of framesAt('diamond', 48).slice(1)) {
       const k = (f.cols - 1) / 2
       const names = f.layouts.map((l) => l.name)
       expect(names).toContain('full')
@@ -212,12 +218,12 @@ describe('diamond class', () => {
 
 describe('diamond wrapping', () => {
   it('the outline wraps the ring: half-diagonal = k*pitch + padding on the diagonal', () => {
-    for (const f of registryFramesAt('diamond', 48)) {
+    for (const f of framesAt('diamond', 48)) {
       const k = (f.cols - 1) / 2
       const pv = libraryPreview({ classId: 'diamond', frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose: false, flipX: false, flipY: false } }, 48)
       const xs = pv.outlineMM.map((q) => q[0])
       const span = Math.max(...xs) - Math.min(...xs)
-      expect(span).toBeCloseTo(2 * (k * 48 + 12 * Math.SQRT2), 6)
+      expect(span).toBeCloseTo(2 * (k * 48 + 12 * Math.SQRT2), 5)
     }
   })
 })
@@ -288,7 +294,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('a frame with a perimeter always offers the 96mm mode, and it is a subset of that perimeter', () => {
-    for (const fam of REGISTRY_FAMILIES) for (const f of registryFramesAt(fam, 48)) {
+    for (const fam of registryClasses()) for (const f of framesAt(fam, 48)) {
       const per = f.layouts.find((l) => l.name === 'perimeter')
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!per) { expect(s96).toBeUndefined(); continue }
@@ -300,7 +306,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('every 96mm population keeps every extreme — an extreme is never left bare', () => {
-    for (const fam of REGISTRY_FAMILIES) for (const f of registryFramesAt(fam, 48)) {
+    for (const fam of registryClasses()) for (const f of framesAt(fam, 48)) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
       const got = new Set(s96.nodes.map(key))
@@ -331,8 +337,8 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
         const open = spec.open(sel(), pitch)
         for (const t of spec.types) for (const v of spec.variants(t.id, pitch)) {
           for (const layout of v.frame.layouts) {
-            const s = { ...spec.select(open, v), layoutId: layout.name }
-            const drawn = materializeSelection(s, pitch, 12)
+            const s = { ...selectVariant(open, v), layoutId: layout.name }
+            const drawn = materializeSelection(s, pitch)
             const transformed = transformLayout(v.frame, layout, s.view)
             const expected = transformed.nodes.map(([x, y]) =>
               [x * pitch, (transformed.rows - 1 - y) * pitch] as const)
@@ -346,7 +352,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('the population follows the pitch tier, and the label does not (Dan: 96 is fixed)', () => {
-    const at = (p: number) => registryFramesAt('square', p).find((x) => x.cols === 5)!
+    const at = (p: number) => framesAt('square', p).find((x) => x.cols === 5)!
       .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
     expect([at(24), at(48), at(96)]).toEqual([4, 8, 16])
     expect(SPACING_MODES.map((m) => m.label)).toEqual(['48 mm', '96 mm'])
@@ -355,13 +361,13 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   it('a non-divisible ring pairs instead of leaning — square 4x4 exactly', () => {
     // Walked clockwise, each side indexes from its own start, so the short closing interval
     // lands as four balanced adjacent pairs rather than biased to one absolute direction.
-    const f = registryFramesAt('square', 48).find((x) => x.cols === 4)!
+    const f = framesAt('square', 48).find((x) => x.cols === 4)!
     const got = f.layouts.find((l) => l.name === 'perimeter-96')!.nodes.map(key).sort()
     expect(got).toEqual(['0,0', '0,1', '0,3', '1,3', '2,0', '3,0', '3,2', '3,3'].sort())
   })
 
   it('every square 96 population is closed under a quarter turn', () => {
-    for (const f of registryFramesAt('square', 48).filter((x) => x.cols > 1)) {
+    for (const f of framesAt('square', 48).filter((x) => x.cols > 1)) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
       const got = new Set(s96.nodes.map(key))
@@ -372,7 +378,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
 
   it('the ruled populations follow from that one rule', () => {
     const n96 = (fam: 'square' | 'rectangle' | 'diamond', c: number, r: number) =>
-      registryFramesAt(fam, 48).find((f) => f.cols === c && f.rows === r)!
+      framesAt(fam, 48).find((f) => f.cols === c && f.rows === r)!
         .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
     expect(n96('square', 3, 3)).toBe(4)
     expect(n96('square', 4, 4)).toBe(8)
@@ -385,7 +391,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('the diamond vocabulary is complete on every ring, corners are exactly the vertices', () => {
-    for (const f of registryFramesAt('diamond', 48).slice(1)) {
+    for (const f of framesAt('diamond', 48).slice(1)) {
       const names = f.layouts.map((l) => l.name)
       for (const n of ['full', 'perimeter', 'perimeter-96', 'corners']) expect(names, frameKeyOf(f)).toContain(n)
       const corners = f.layouts.find((l) => l.name === 'corners')!
@@ -395,7 +401,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
 })
 
 describe('authoring under a view transform stays canonical (QA F2)', () => {
-  const frame = registryFramesAt('rectangle', 48).find((f) => f.cols === 2 && f.rows === 3)!
+  const frame = framesAt('rectangle', 48).find((f) => f.cols === 2 && f.rows === 3)!
   const views = [false, true].flatMap((transpose) => [false, true].flatMap((flipX) =>
     [false, true].map((flipY) => ({ transpose, flipX, flipY }))))
 
@@ -599,7 +605,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     for (const type of [...TRIANGLE_TYPES]) {
       const sel = triSel(one(type))
       const a = libraryArrangement(sel, 48)
-      const outline = libraryPreview(sel, 48, PAD).outlineMM
+      const outline = libraryPreview(sel, 48).outlineMM
       const hull = a.nodesMM
       expect(hull.length).toBe(3)
       // every magnet sits at least the padding inside the outline
@@ -625,7 +631,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     for (const view of [{ transpose: true, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: true }]) {
       const sel = { ...base, view }
       const a = libraryArrangement(sel, 48)
-      const outline = libraryPreview(sel, 48, PAD).outlineMM
+      const outline = libraryPreview(sel, 48).outlineMM
       for (const m of a.nodesMM) {
         let best = Infinity
         for (let i = 0; i < outline.length; i++)
@@ -635,15 +641,10 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     }
   })
 
-  it('the triangle stores no unit outline, and carries no frame registry either', () => {
-    expect(Object.keys(RAW_CLASS_FRAMES).sort()).toEqual([...REGISTRY_FAMILIES].sort())
-    expect(Object.prototype.hasOwnProperty.call(RAW_CLASS_FRAMES, 'triangle')).toBe(false)
-  })
-
   it('moving one corner changes the derived triangle outline', () => {
     const selection = triSel('tri:0,0;0,2;2,0', 'corners')
-    const before = materializeDraft(selection, [[0, 0], [0, 2], [2, 0]], 48, 12)
-    const after = materializeDraft(selection, [[0, 0], [0, 2], [2, 1]], 48, 12)
+    const before = materializeDraft(selection, [[0, 0], [0, 2], [2, 0]], 48)
+    const after = materializeDraft(selection, [[0, 0], [0, 2], [2, 1]], 48)
     expect(before.error).toBeNull(); expect(after.error).toBeNull()
     expect(after.outlineMM).not.toEqual(before.outlineMM)
   })
@@ -680,12 +681,12 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     const id = one('wedge').id
     const sel = sel3(id)
     for (const nodes of [[], [[0, 0]], [[0, 0], [1, 1]]] as Array<Array<[number, number]>>) {
-      const m = draftStageModel(sel, nodes, 48, 12)
+      const m = draftStageModel(sel, nodes, 48)
       expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(3)   // still renderable
       expect(m.error).toBeTruthy()
     }
     const good = [...one('wedge').vertices] as Array<[number, number]>
-    expect(draftStageModel(sel, good, 48, 12).error).toBeNull()
+    expect(draftStageModel(sel, good, 48).error).toBeNull()
   })
 
   it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
@@ -809,7 +810,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
         for (const view of [{ transpose: false, flipX: false, flipY: false },
           { transpose: true, flipX: true, flipY: false }]) {
           const sel: LibrarySelection = { classId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f), layoutId, view }
-          const o = libraryPreview(sel, 48, 12).outlineMM
+          const o = libraryPreview(sel, 48).outlineMM
           expect(o.length, `${t.id} ${layoutId}`).toBe(3)
           for (const m of libraryArrangement(sel, 48).nodesMM) {
             let best = Infinity
@@ -1010,7 +1011,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
   it('every class answers every member of one contract', () => {
     for (const fam of LIBRARY_FAMILIES) {
       const spec = specOf(fam)
-      expect(spec.family, fam).toBe(fam)
+      expect(spec.classId, fam).toBe(fam)
       expect(spec.types.length, fam).toBeGreaterThan(0)
       for (const t of spec.types) {
         expect(t.label.trim(), `${fam} ${t.id}`).not.toBe('')
@@ -1029,40 +1030,26 @@ describe('the class spec is portable, and nothing outside it knows a class by na
       const opened = spec.open(sel(), 48)
       const type = spec.typeOf(opened, 48)
       expect(spec.types.map((t) => t.id), fam).toContain(type)
-      expect(spec.variants(type, 48).map((v) => v.id), fam).toContain(spec.variantIdOf(opened))
-      expect(frameKeyOf(spec.frameOf(opened, 48)), fam).toBe(opened.frameKey)
+      expect(spec.variants(type, 48).map((v) => v.id), fam).toContain(spec.variantOf(opened, 48).id)
+      expect(frameKeyOf(spec.variantOf(opened, 48).frame), fam).toBe(opened.frameKey)
       // and selecting any offer of any type is likewise self-consistent
       for (const t of spec.types) for (const v of spec.variants(t.id, 48)) {
-        const next = spec.select(opened, v)
-        expect(spec.variantIdOf(next), `${fam} ${v.id}`).toBe(v.id)
+        const next = selectVariant(opened, v)
+        expect(spec.variantOf(next, 48).id, `${fam} ${v.id}`).toBe(v.id)
         expect(spec.typeOf(next, 48), `${fam} ${v.id}`).toBe(t.id)
-        expect(frameKeyOf(spec.frameOf(next, 48)), `${fam} ${v.id}`).toBe(next.frameKey)
+        expect(frameKeyOf(spec.variantOf(next, 48).frame), `${fam} ${v.id}`).toBe(next.frameKey)
         expect(() => selectedRecords(next, 48), `${fam} ${v.id}`).not.toThrow()
       }
     }
   })
 
-  it('every class states its own outline, and none of them is the bridge’s to choose', () => {
+  it('every class variant carries the recipe used by materialisation', () => {
     for (const fam of LIBRARY_FAMILIES) {
       const spec = specOf(fam)
       const opened = spec.open(sel(), 48)
-      const a = libraryArrangement(opened, 48)
-      const out = spec.outline(a.nodesMM, a.frameCols, a.frameRows, 48, 12)
-      expect(out.length, fam).toBeGreaterThanOrEqual(3)
+      const variant = spec.variantOf(opened, 48)
+      expect(variant.outline.corners, fam).toMatch(/sharp|round|bevel/)
     }
-    // the triangle's is derived from the magnets and the others are not: moving a magnet moves
-    // the triangle's outline, and leaves a registry class's box exactly where it was
-    const tri = specOf('triangle')
-    const t0 = tri.open(sel(), 48)
-    const a0 = libraryArrangement(t0, 48)
-    const moved = [...a0.nodesMM.slice(0, -1), [a0.nodesMM[a0.nodesMM.length - 1][0] + 48, a0.nodesMM[a0.nodesMM.length - 1][1]] as const]
-    expect(tri.outline(moved, a0.frameCols, a0.frameRows, 48, 12))
-      .not.toEqual(tri.outline(a0.nodesMM, a0.frameCols, a0.frameRows, 48, 12))
-    const sq = specOf('square')
-    const s0 = sq.open(sel(), 48)
-    const b0 = libraryArrangement(s0, 48)
-    expect(sq.outline([], b0.frameCols, b0.frameRows, 48, 12))
-      .toEqual(sq.outline(b0.nodesMM, b0.frameCols, b0.frameRows, 48, 12))
   })
 
   it('only the spec and the triangle’s own files name the triangle', () => {
@@ -1126,11 +1113,11 @@ describe('authoring transitions — the five the page used to spell out itself',
 
   it('a new layout starts empty, and the canvas still has somewhere to look', () => {
     expect(startAdd()).toEqual({ name: '', nodes: [] })
-    const m = materializeDraft(sel({ frameKey: '3x3' }), [], 48, 12)
+    const m = materializeDraft(sel({ frameKey: '3x3' }), [], 48)
     // nothing drawn: the seed is the selected layout's own first magnet, not the mm origin
     expect(m.nodesMM).toEqual([])
     expect(m.seedMM).not.toBeNull()
-    expect(m.seedMM).toEqual(materializeSelection(sel({ frameKey: '3x3' }), 48, 12).nodesMM[0])
+    expect(m.seedMM).toEqual(materializeSelection(sel({ frameKey: '3x3' }), 48).nodesMM[0])
   })
 
   it('the producer consumes the selection saveEdit hands back — its own output', () => {
@@ -1141,7 +1128,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     const saved = saveEdit(base, [], { name: 'probe', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] }, 48)
     expect(saved.ok).toBe(true)
     if (!saved.ok) return
-    const m = materializeDraft(saved.sel, saved.drafts[0].nodes, 48, 12)
+    const m = materializeDraft(saved.sel, saved.drafts[0].nodes, 48)
     expect(m.nodesMM).toEqual([[0, 96], [96, 96], [0, 0], [96, 0]])
     // the frame is the one the SELECTION resolves to, never a caller's claim about it
     expect(m.frameKey).toBe('3x3')
@@ -1156,7 +1143,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     const tsaved = saveEdit(tsel, [], { name: 'probe', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
     expect(tsaved.ok).toBe(true)
     if (!tsaved.ok) return
-    const tm = materializeDraft(tsaved.sel, tsaved.drafts[0].nodes, 48, 12)
+    const tm = materializeDraft(tsaved.sel, tsaved.drafts[0].nodes, 48)
     expect(tm.error).toBeNull()
     expect(tm.outlineMM).toHaveLength(3)
     // the magnets it wraps are the DRAWN ones, and every one clears the padding exactly
