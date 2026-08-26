@@ -661,7 +661,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(libraryArrangement(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48).geometryId).toBeUndefined()
   })
 
-  it('F3 — every layout exposes exactly its distinct views, no more and no fewer', () => {
+  it('F3 — every layout exposes exactly its distinct views, with one active and unique labels', () => {
     for (const t of TRIANGLE_LAYOUTS) {
       const f = triangleFrame(t, 48)
       const corners = f.layouts.find((l) => l.name === 'corners')!
@@ -670,11 +670,36 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
         const r = tl(f, corners, { transpose, flipX, flipY })
         distinct.add(r.cols + 'x' + r.rows + '|' + r.nodes.map((n) => n[0] + ',' + n[1]).sort().join(' '))
       }
-      const opts = panelOptions(sel3(t.id), [], 48).orientations
-      expect(opts.length, t.id).toBe(distinct.size)
-      expect(new Set(opts.map((o) => o.id)).size).toBe(opts.length)
-      for (const o of opts) expect(o.next.geometryId).toBe(t.id)
+      // EVERY valid current transform must have exactly one active representative — marking
+      // active by exact transform equality left 80 states with nothing pressed (QA F2).
+      for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
+        const opts = panelOptions({ ...sel3(t.id), view: { transpose, flipX, flipY } }, [], 48).orientations
+        expect(opts.length, t.id).toBe(distinct.size)
+        expect(opts.filter((o) => o.active), `${t.id} ${transpose}${flipX}${flipY}`).toHaveLength(1)
+        expect(new Set(opts.map((o) => o.label)).size, t.id).toBe(opts.length)
+        for (const o of opts) expect(o.next.geometryId).toBe(t.id)
+      }
     }
+  })
+
+  it('F2 — a saved custom layout is deduped from its own population, not the corpus', () => {
+    // an asymmetric population on a symmetric Peak has all eight views, even though the Peak's
+    // own corners have fewer
+    const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'peak'
+      && panelOptions(sel3(t.id), [], 48).orientations.length < 8)!
+    const f = triangleFrame(peak, 48)
+    const asym: Array<[number, number]> = [[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
+    const draft = {
+      id: draftId('triangle', frameKeyOf(f), 'asym', peak.id), className: 'triangle',
+      frameKey: frameKeyOf(f), geometryId: peak.id, name: 'asym', nodes: asym,
+    }
+    const selD = { ...sel3(peak.id), layoutId: draftLayoutId('asym') }
+    const distinct = new Set<string>()
+    for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
+      const r = tl(f, { name: 'd', nodes: asym }, { transpose, flipX, flipY })
+      distinct.add(r.cols + 'x' + r.rows + '|' + r.nodes.map((n) => n[0] + ',' + n[1]).sort().join(' '))
+    }
+    expect(panelOptions(selD, [draft], 48).orientations.length).toBe(distinct.size)
   })
 
   it('F3 — an asymmetric Sail really does offer all eight', () => {

@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel, draftStageModel, nodeAtMM, canonicalNode, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
-import { CLASS_FRAMES, CLASS_RULES, LIBRARY_FAMILIES, LIBRARY_SHAPES, firstGeometryOf, triangleFrame, pickLayout, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, layoutAtPitch, frameKeyOf, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
+import { LIBRARY_FAMILIES, selectionForFamily, resolveSelection, draftLayoutId, draftNameOf, draftIntegrity, layoutAtPitch, draftId, DRAFT_STORE_KEY, type LibraryDraft } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
@@ -349,16 +349,8 @@ export default function GridLab() {
             {LIBRARY_FAMILIES.map((fam) => {
               const cur = resolveSelection(librarySel, drafts, pitch).shape.family
               return <button key={fam} aria-pressed={cur === fam} onClick={() => {
-                const first = LIBRARY_SHAPES.find((x) => x.family === fam)!
-                // a class whose frames come from a geometry lands on that geometry's frame
-                const geo = CLASS_RULES[fam].framesFromGeometry
-                  ? firstGeometryOf(CLASS_RULES[fam].subs[0] as never) : null
-                const f0 = geo ? triangleFrame(geo, pitch) : CLASS_FRAMES[fam][0]
                 setEdit(null)
-                setLibrarySel({
-                  ...librarySel, shapeId: first.id, geometryId: geo?.id,
-                  frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter'),
-                })
+                setLibrarySel((current) => selectionForFamily(current, fam, pitch))
               }}>{fam}</button>
             })}
           </div>

@@ -1,7 +1,7 @@
 // library/rules.ts — CLASS POLICY: sub-types, orientation, box measurement, labelling.
 // The view asks these; it never tests 'is this a diamond'. Shared with the classifier bridge.
 
-import { MIN_LIB_MM, type LibraryFamily, type LibraryFrame, type LibraryLayout } from './types'
+import { MIN_LIB_MM, type LibraryFamily, type LibraryFrame, type LibraryLayout, type LibraryTransform } from './types'
 
 type Node = readonly [number, number]
 
@@ -71,29 +71,38 @@ const boxByClassFloor = (cols: number, rows: number, pitchMM: number) =>
 /** THE CLASS RULES — one description per class, read by the panel AND available to the
  *  classifier bridge. No class logic lives in the UI (Dan, 08-25): the view asks these, it
  *  never asks 'is this a diamond'. */
-export interface ClassRules {
+/** THE CLASS RULES — one description per class. A class either has a FRAME REGISTRY, in which
+ *  case it must supply every rule that reads a frame, or its frames are MATERIALISED from the
+ *  geometry the selection names, in which case it supplies none of them. The distinction is the
+ *  type, so a geometry class cannot carry a rule that would never be called (QA F3). */
+interface BaseRules {
   /** Sub-types offered, in order. One entry means a single fixed type. */
   subs: string[]
-  /** Which sub a frame belongs to. Absent when the class materialises its own frames. */
-  subOf?: (cols: number, rows: number) => string
-  /** The frame's outer box in mm. Absent for a class whose outline is derived from its
-   *  magnets — there is nothing to approximate, so there is nothing to get wrong. */
-  boxMM?: (cols: number, rows: number, pitchMM: number, padMM: number) => { w: number; h: number }
   /** How a frame is labelled to a human. */
   label: (cols: number, rows: number) => string
-  /** The views this class offers, in order. Empty means the class has no orientation.
-   *  A rectangle turns; the square and the diamond have no orientation. */
-  orientations: Array<{ id: string; view: { transpose: boolean; flipX: boolean; flipY: boolean } }>
-  /** True when the class has no frame registry: its frames are materialised from the geometry
-   *  the selection names, already at the requested pitch. */
-  framesFromGeometry?: boolean
-  /** The 96mm sample of this class's perimeter. Absent when the class materialises its own
-   *  populations at the requested pitch. */
-  spacing96?: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
 }
 
-export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
+export interface RegistryRules extends BaseRules {
+  source: 'registry'
+  /** Which sub a frame belongs to. */
+  subOf: (cols: number, rows: number) => string
+  /** The frame's outer box in mm — the class floor, or the wrapping rule the class needs. */
+  boxMM: (cols: number, rows: number, pitchMM: number, padMM: number) => { w: number; h: number }
+  /** The views this class names. Empty means it has no orientation of its own. */
+  orientations: Array<{ id: string; view: LibraryTransform }>
+  /** The 96mm sample of this class's perimeter — the ring geometry differs per class. */
+  spacing96: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
+}
+
+export interface GeometryRules extends BaseRules {
+  source: 'geometry'
+}
+
+export type ClassRules = RegistryRules | GeometryRules
+
+export const CLASS_RULES = {
   square: {
+    source: 'registry',
     subs: ['box'],
     subOf: () => 'box',
     boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
@@ -102,6 +111,7 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
     spacing96: box96,
   },
   rectangle: {
+    source: 'registry',
     subs: ['frame', 'banner', 'slim'],
     subOf: (c, r) => (Math.min(c, r) <= 1 ? 'slim' : Math.min(c, r) === 2 ? 'banner' : 'frame'),
     boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
@@ -113,6 +123,7 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
     spacing96: box96,
   },
   diamond: {
+    source: 'registry',
     subs: ['rhomb'],
     subOf: () => 'rhomb',
     // the outline WRAPS the ring: half-diagonal = ring radius + padding on the diagonal
@@ -125,15 +136,13 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
     spacing96: ring96,
   },
   triangle: {
-    // The product types, in the ruled order. A triangle's frame, its populations and its
-    // outline all come from the geometry it carries, so the class supplies no box formula, no
-    // frame sub-rule and no sampler — carrying dead ones made them traps (QA F7).
+    // A triangle's frame, its populations and its outline all come from the geometry it
+    // carries, so it supplies no sub-rule, no box formula, no sampler and no named views.
+    source: 'geometry',
     subs: ['peak', 'wedge', 'sail'],
     label: (c, r) => c + '×' + r,
-    orientations: [{ id: 'derived', view: { transpose: false, flipX: false, flipY: false } }],
-    framesFromGeometry: true,
   },
-}
+} satisfies Record<LibraryFamily, ClassRules>
 
 /** A frame as the panel and the pipeline see it: the literal semantic layouts, plus the
  *  computed spacing mode inserted next to the perimeter it samples. The corpus stays literal
@@ -142,9 +151,9 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
 export function withSpacingModes(family: LibraryFamily, frame: LibraryFrame): LibraryFrame {
   const i = frame.layouts.findIndex((l) => l.name === SPACING_BASE)
   if (i < 0) return frame
-  const rule = CLASS_RULES[family].spacing96
-  if (!rule) return frame
-  const nodes = rule(frame, frame.layouts[i].nodes, 48)
+  const rules = CLASS_RULES[family]
+  if (rules.source !== 'registry') return frame
+  const nodes = rules.spacing96(frame, frame.layouts[i].nodes, 48)
   if (!nodes.length) return frame
   const mode: LibraryLayout = { name: SPACING_96, nodes }
   const layouts = [...frame.layouts]
@@ -158,13 +167,12 @@ export function layoutAtPitch(
   family: LibraryFamily, frame: LibraryFrame, layout: LibraryLayout, pitchMM: number,
 ): LibraryLayout {
   if (layout.name !== SPACING_96) return layout
+  const rules = CLASS_RULES[family]
   // a class that materialises its own frames already did this at the requested pitch
-  if (CLASS_RULES[family].framesFromGeometry) return layout
+  if (rules.source !== 'registry') return layout
   const per = frame.layouts.find((l) => l.name === SPACING_BASE)
   if (!per) throw new Error('library: 96mm mode has no perimeter in ' + frame.cols + 'x' + frame.rows)
-  const rule = CLASS_RULES[family].spacing96
-  if (!rule) return layout
-  return { name: SPACING_96, nodes: rule(frame, per.nodes, pitchMM) }
+  return { name: SPACING_96, nodes: rules.spacing96(frame, per.nodes, pitchMM) }
 }
 
 /** How a frame reads to a human, per its class. One call site for every label in the panel. */

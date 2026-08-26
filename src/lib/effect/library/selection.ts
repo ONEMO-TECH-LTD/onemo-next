@@ -4,7 +4,7 @@
 // tab down (diamond had no 'perimeter', 08-25).
 
 import { CLASS_FRAMES } from './frames'
-import { CLASS_RULES, type ClassRules } from './rules'
+import { CLASS_RULES, type ClassRules, type RegistryRules } from './rules'
 import { triangleById, triangleFrame, triangleFrameKey, trianglesOf, triangleFrameKeys, triangleTypeOf } from './triangle-frames'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import { boundsOf, type TriangleLayout, type TriangleProductType } from './triangle-geometry'
@@ -34,7 +34,7 @@ export function selectedRecords(sel: LibrarySelection, pitchMM = 48): {
 } {
   const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
   if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
-  if (CLASS_RULES[shape.family].framesFromGeometry) {
+  if (CLASS_RULES[shape.family].source === 'geometry') {
     const geo = triangleById(geometryOf(sel))
     const frame = triangleFrame(geo, pitchMM)
     assertFrameKey(sel, geo.id, frame)
@@ -90,7 +90,7 @@ export function resolveSelection(
   const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
   if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
   // The triangle's frame IS its geometry: one materialised frame, not a registry lookup.
-  if (CLASS_RULES[shape.family].framesFromGeometry) {
+  if (CLASS_RULES[shape.family].source === 'geometry') {
     const geo = triangleById(geometryOf(sel))
     const frame = triangleFrame(geo, pitchMM)
     assertFrameKey(sel, geo.id, frame)
@@ -155,27 +155,39 @@ const ALL_VIEWS: readonly LibraryTransform[] = [
 const sameView = (a: LibraryTransform, b: LibraryTransform) =>
   a.transpose === b.transpose && a.flipX === b.flipX && a.flipY === b.flipY
 
-/** THE DISTINCT ORIENTATIONS of the selected layout. A symmetric shape has fewer than eight —
- *  a Sail has all eight, and a fixed list of four hid half of them (QA F3). Views producing an
- *  identical node set are one option, never duplicated. */
+/** How each of the eight views reads to a human. A label must identify the TRANSFORM: naming
+ *  them by the frame they produce gave four identical '3×3' buttons (QA F2). */
+const VIEW_LABEL = [
+  '0°', 'mirror diagonal ↘', '180°', 'mirror diagonal ↗',
+  'mirror vertical', '90°', 'mirror horizontal', '270°',
+] as const
+
+const transformedKey = (frame: LibraryFrame, layout: LibraryLayout, view: LibraryTransform): string => {
+  const t = transformLayout(frame, layout, view)
+  return t.cols + 'x' + t.rows + '|' + t.nodes.map(([x, y]) => x + ',' + y).sort().join(' ')
+}
+
+/** THE DISTINCT ORIENTATIONS of the selected population. Views producing an identical node set
+ *  are one option — and the ACTIVE one is chosen by that same equivalence, because a selection
+ *  can hold a transform whose representative was kept under a different one, which left every
+ *  button unpressed (QA F2). */
 function orientationOptions(
   sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, rules: ClassRules,
 ): PanelOption[] {
-  const out: PanelOption[] = []
+  const selectedKey = transformedKey(frame, layout, sel.view)
   const seen = new Set<string>()
-  for (const view of ALL_VIEWS) {
-    const t = transformLayout(frame, layout, view)
-    const k = t.cols + 'x' + t.rows + '|' + t.nodes.map((n) => n[0] + ',' + n[1]).sort().join(' ')
-    if (seen.has(k)) continue
-    seen.add(k)
-    // a class that names its views keeps its own words; anything beyond them reads as the
-    // frame it turns into
-    const named = rules.orientations.find((o) => sameView(o.view, view))
+  const out: PanelOption[] = []
+  ALL_VIEWS.forEach((view, index) => {
+    const key = transformedKey(frame, layout, view)
+    if (seen.has(key)) return
+    seen.add(key)
+    const named = rules.source === 'registry'
+      ? rules.orientations.find((o) => sameView(o.view, view)) : undefined
     out.push({
-      id: 'view' + out.length, label: named ? named.id : t.cols + '×' + t.rows,
-      active: sameView(view, sel.view), next: { ...sel, view: { ...view } },
+      id: 'view' + index, label: named?.id ?? VIEW_LABEL[index],
+      active: key === selectedKey, next: { ...sel, view: { ...view } },
     })
-  }
+  })
   return out
 }
 
@@ -187,7 +199,7 @@ export function selectionForFamily(
   const shape = LIBRARY_SHAPES.find((x) => x.family === family)
   if (!shape) throw new Error('library: no shape for family ' + family)
   const rules = CLASS_RULES[family]
-  if (!rules.framesFromGeometry) {
+  if (rules.source === 'registry') {
     const f0 = CLASS_FRAMES[family][0]
     return { ...current, shapeId: shape.id, geometryId: undefined, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') }
   }
@@ -199,10 +211,13 @@ export function selectionForFamily(
 export function panelOptions(
   sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM = 48,
 ): PanelOptions {
-  const { shape, frame, layout } = resolveSelection(sel, drafts, pitchMM)
+  const { shape, frame, layout, draft } = resolveSelection(sel, drafts, pitchMM)
   const rules = CLASS_RULES[shape.family]
-  const orientations = orientationOptions(sel, frame, layout, rules)
-  if (!rules.framesFromGeometry) {
+  // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
+  // resolver falls back to for a draft (QA F2)
+  const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
+  const orientations = orientationOptions(sel, frame, visible, rules)
+  if (rules.source === 'registry') {
     const frames = CLASS_FRAMES[shape.family]
     const sub = subOf(rules, frame)
     const jump = (f: LibraryFrame): LibrarySelection =>
@@ -219,6 +234,7 @@ export function panelOptions(
         active: frameKeyOf(f) === frameKeyOf(frame), next: jump(f),
       })),
       geometries: [],
+      // a class with no named views of its own offers none
       orientations: rules.orientations.length ? orientations : [],
     }
   }
@@ -250,6 +266,4 @@ export function panelOptions(
   }
 }
 
-/** A class without sub-types answers with its one type. */
-const subOf = (rules: { subs: string[]; subOf?: (c: number, r: number) => string }, f: LibraryFrame) =>
-  rules.subOf ? rules.subOf(f.cols, f.rows) : rules.subs[0]
+const subOf = (rules: RegistryRules, f: LibraryFrame) => rules.subOf(f.cols, f.rows)

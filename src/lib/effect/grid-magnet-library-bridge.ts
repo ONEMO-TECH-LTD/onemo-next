@@ -72,9 +72,9 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
     return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible: true, outlineMM: hullOutline(a.nodesMM, padMM) }
   // The frame's physical span is CLASS POLICY — the class rules own it (the square/rectangle
   // class floor, the diamond's wrap-the-ring rule). The bridge asks; it does not re-derive.
-  const boxRule = CLASS_RULES[shape.family].boxMM
-  if (!boxRule) throw new Error('library: ' + shape.family + ' has no box rule')
-  const box0 = boxRule(a.frameCols, a.frameRows, pitchMM, padMM)
+  const rules = CLASS_RULES[shape.family]
+  if (rules.source !== 'registry') throw new Error('library: ' + shape.family + ' has no box rule')
+  const box0 = rules.boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
   const w0 = box0.w, h0 = box0.h
   const shapeCompatible = shape.aspect === 'frame' || a.frameCols === a.frameRows
   const w = shapeCompatible ? w0 : Math.max(w0, h0)
