@@ -6,7 +6,6 @@
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
-import { insetRingMM } from './offset'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   selectedRecords, transformLayout, frameKeyOf, CLASS_RULES, layoutAtPitch,
@@ -92,16 +91,35 @@ export function draftOutline(
   catch (e) { return { outlineMM: fallback(), error: (e as Error).message } }
 }
 
-/** THE DERIVED OUTLINE: connect the magnet centres, push the edges out by the padding. The
- *  result's position is authoritative — it is never re-centred on the group's box, which is
- *  exactly why the earlier stored-triangle attempt did not hug its magnets. */
+/** THE DERIVED OUTLINE: connect the three magnet centres, move each edge out by the padding,
+ *  and intersect the three lines. A triangle's corner is a triangle corner — this is the exact
+ *  offset, so there is no join style, no miter limit and nothing to clip. The result's position
+ *  is authoritative; it is never re-centred on the group's box. */
 export function hullOutline(nodesMM: ReadonlyArray<Pt>, padMM: number): Pt[] {
   const hull = convexHull(nodesMM)
   if (hull.length < 3) throw new Error('triangle: collinear population')
   if (hull.length !== 3) throw new Error('triangle: hull has ' + hull.length + ' vertices')
-  const out = insetRingMM(hull, padMM, 'sharp')
-  if (!out) throw new Error('triangle: 12mm outline collapsed')
-  return out
+  // Each edge moves AWAY from the middle. Taking the normal relative to the centroid needs no
+  // winding convention, so it cannot silently invert in one coordinate system or the other.
+  const cx = (hull[0][0] + hull[1][0] + hull[2][0]) / 3
+  const cy = (hull[0][1] + hull[1][1] + hull[2][1]) / 3
+  const edges = hull.map((a, i) => {
+    const b = hull[(i + 1) % 3]
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy)
+    if (L === 0) throw new Error('triangle: collinear population')
+    const d: Pt = [dx / L, dy / L]
+    let n: Pt = [-d[1], d[0]]
+    if ((cx - a[0]) * n[0] + (cy - a[1]) * n[1] > 0) n = [-n[0], -n[1]]
+    return { p: [a[0] + n[0] * padMM, a[1] + n[1] * padMM] as Pt, d }
+  })
+  const meet = (e1: typeof edges[0], e2: typeof edges[0]): Pt => {
+    const den = e1.d[0] * e2.d[1] - e1.d[1] * e2.d[0]
+    if (Math.abs(den) < 1e-12) throw new Error('triangle: collinear population')
+    const t = ((e2.p[0] - e1.p[0]) * e2.d[1] - (e2.p[1] - e1.p[1]) * e2.d[0]) / den
+    return [e1.p[0] + e1.d[0] * t, e1.p[1] + e1.d[1] * t]
+  }
+  // corner i is where the edge arriving at it meets the edge leaving it
+  return [meet(edges[2], edges[0]), meet(edges[0], edges[1]), meet(edges[1], edges[2])]
 }
 
 /** The Stage preview — composes the arrangement. The lattice field stays the canvas's own. */

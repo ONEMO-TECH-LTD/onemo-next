@@ -11,7 +11,7 @@ import {
   TRIANGLE_LAYOUTS, triangleGeometry, triangleProductType, triangleTypeOf, triangleFrameKey,
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
-  draftIntegrity, panelOptions, selectionForFamily,
+  draftIntegrity, panelOptions, selectionForFamily, uprightView,
   type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
@@ -723,5 +723,60 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(new Set(labels).size).toBe(labels.length)
     expect(labels[0]).toContain('Peak layout 1')
     expect(opts.types.map((o) => o.label)).toEqual(['Peak', 'Wedge', 'Sail'])
+  })
+})
+
+describe('triangle — a corner is a corner, and it opens the right way up', () => {
+  const sel3 = (id: string, layoutId = 'corners'): LibrarySelection => {
+    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
+      view: { transpose: false, flipX: false, flipY: false } }
+  }
+  it('every layout, population and view is a three-cornered triangle clearing exactly 12mm', () => {
+    // The offset is three lines moved out and intersected — no join style, no miter limit, so
+    // nothing is ever clipped. Under Clipper's miter-2 all 79 came out 4 or 5 sided.
+    let checked = 0
+    for (const t of TRIANGLE_LAYOUTS) {
+      const f = triangleFrame(t, 48)
+      for (const layoutId of f.layouts.map((l) => l.name)) {
+        for (const view of [{ transpose: false, flipX: false, flipY: false },
+          { transpose: true, flipX: true, flipY: false }]) {
+          const sel: LibrarySelection = { shapeId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f), layoutId, view }
+          const o = libraryPreview(sel, 48, 12).outlineMM
+          expect(o.length, `${t.id} ${layoutId}`).toBe(3)
+          for (const m of libraryArrangement(sel, 48).nodesMM) {
+            let best = Infinity
+            for (let i = 0; i < 3; i++) {
+              const q1 = o[i], q2 = o[(i + 1) % 3]
+              const dx = q2[0] - q1[0], dy = q2[1] - q1[1]
+              best = Math.min(best, Math.abs((m[0] - q1[0]) * dy - (m[1] - q1[1]) * dx) / Math.hypot(dx, dy))
+            }
+            expect(best, `${t.id} ${layoutId}`).toBeGreaterThanOrEqual(12 - 1e-6)
+            checked++
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(2000)
+  })
+
+  it('a geometry opens point-up, never in its de-duplication form', () => {
+    // The lattice never rotates, so only eight views exist and a diagonal longest edge cannot
+    // be levelled. What IS reachable for every layout: the apex never hangs below the whole
+    // base. 37 of the 79 point strictly up and 8 sit flat on their longest side; the rest lean,
+    // because their longest edge runs diagonally and no lattice view can level it.
+    for (const t of TRIANGLE_LAYOUTS) {
+      const b = boundsOf([...t.vertices])
+      const r = tl({ cols: b.cols, rows: b.rows, layouts: [] }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
+      const [p, q, s] = r.nodes
+      const len = (x: readonly number[], y: readonly number[]) => (x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2
+      const edges = [[p, q, s], [q, s, p], [s, p, q]] as Array<[LatticeNode, LatticeNode, LatticeNode]>
+      const [a, c, apex] = edges.reduce((m, e) => (len(e[0], e[1]) > len(m[0], m[1]) ? e : m))
+      expect(apex[1] > a[1] && apex[1] > c[1], t.id).toBe(false)
+    }
+    // selecting a class or a geometry hands back that view
+    const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'sail')!
+    const opt = panelOptions(sel3(t0.id), [], 48).geometries.find((o) => o.id === t0.id)!
+    expect(opt.next.view).toEqual(uprightView(t0))
   })
 })

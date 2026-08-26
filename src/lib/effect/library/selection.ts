@@ -5,7 +5,7 @@
 
 import { CLASS_FRAMES } from './frames'
 import { CLASS_RULES, type ClassRules, type RegistryRules } from './rules'
-import { triangleById, triangleFrame, triangleFrameKey, trianglesOf, triangleFrameKeys, triangleTypeOf } from './triangle-frames'
+import { triangleById, triangleFrame, triangleFrameKey, trianglesOf, triangleFrameKeys, triangleTypeOf, uprightView } from './triangle-frames'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import { boundsOf, type TriangleLayout, type TriangleProductType } from './triangle-geometry'
 import { transformLayout } from './transforms'
@@ -205,7 +205,10 @@ export function selectionForFamily(
   }
   const geo = firstGeometryOf(rules.subs[0] as TriangleProductType)
   const f0 = triangleFrame(geo, pitchMM)
-  return { ...current, shapeId: shape.id, geometryId: geo.id, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') }
+  return {
+    ...current, shapeId: shape.id, geometryId: geo.id, frameKey: frameKeyOf(f0),
+    layoutId: pickLayout(f0, 'perimeter'), view: uprightView(geo),
+  }
 }
 
 export function panelOptions(
@@ -243,7 +246,11 @@ export function panelOptions(
   const frameKey = triangleFrameKey(geo)
   const toSel = (t: TriangleLayout): LibrarySelection => {
     const f = triangleFrame(t, pitchMM)
-    return { ...sel, geometryId: t.id, frameKey: frameKeyOf(f), layoutId: pickLayout(f, sel.layoutId) }
+    // a new geometry opens standing on its longest side, not in its de-duplication form
+    return {
+      ...sel, geometryId: t.id, frameKey: frameKeyOf(f),
+      layoutId: pickLayout(f, sel.layoutId), view: uprightView(t),
+    }
   }
   return {
     types: rules.subs.map((id) => {

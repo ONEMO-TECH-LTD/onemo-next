@@ -3,6 +3,8 @@
 // the shared one from rules.ts. Nothing here re-decides either.
 
 import { sample96, SPACING_96, SPACING_BASE } from './rules'
+import { transformLayout } from './transforms'
+import type { LibraryTransform } from './types'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import {
   boundsOf, canonicalTriangleId, fullNodes, perimeterNodes, perimeterRuns, symmetryClosure,
@@ -99,3 +101,43 @@ function hullOfNodes(pts: readonly LatticeNode[]): LatticeNode[] {
 }
 
 export { canonicalTriangleId, verticesOfId }
+
+/** THE UPRIGHT VIEW — how a triangle should first appear: sitting on its longest side with the
+ *  third point above it. The stored form is canonical for DE-DUPLICATION (the alphabetically
+ *  smallest of the eight), which is a sorting rule with no idea which way is up — so a layout
+ *  arrived lying on its side. The identity is untouched; this only picks the view it opens on. */
+const VIEWS: LibraryTransform[] = [
+  { transpose: false, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: false },
+  { transpose: false, flipX: false, flipY: true }, { transpose: false, flipX: true, flipY: true },
+  { transpose: true, flipX: false, flipY: false }, { transpose: true, flipX: true, flipY: false },
+  { transpose: true, flipX: false, flipY: true }, { transpose: true, flipX: true, flipY: true },
+]
+
+export function uprightView(t: TriangleLayout): LibraryTransform {
+  const b = boundsOf([...t.vertices])
+  const frame: LibraryFrame = { cols: b.cols, rows: b.rows, layouts: [] }
+  const layout: LibraryLayout = { name: 'corners', nodes: [...t.vertices] }
+  let best = VIEWS[0], bestScore = -1
+  for (const view of VIEWS) {
+    const r = transformLayout(frame, layout, view)
+    const [p, q, s2] = r.nodes
+    const len = (a: LatticeNode, c: LatticeNode) => (a[0] - c[0]) ** 2 + (a[1] - c[1]) ** 2
+    const edges: Array<[LatticeNode, LatticeNode, LatticeNode]> = [[p, q, s2], [q, s2, p], [s2, p, q]]
+    // The BASE is the side a person would stand it on. For an isosceles triangle that is the
+    // odd side out — the apex is the vertex between the two equal sides, whatever their length.
+    // Only when all three differ is the longest side the base.
+    const odd = edges.find((e) => {
+      const others = edges.filter((x) => x !== e)
+      return len(others[0][0], others[0][1]) === len(others[1][0], others[1][1])
+    })
+    const [a, c, apex] = odd ?? edges.reduce((m, e) => (len(e[0], e[1]) > len(m[0], m[1]) ? e : m))
+    // The lattice never rotates, so only 8 views exist and most longest edges are diagonal:
+    // a level base is reachable for a few, POINT UP is reachable for nearly all. Rank by that.
+    const apexTop = apex[1] < a[1] && apex[1] < c[1]
+    const level = a[1] === c[1]
+    const onBottom = level && a[1] === r.rows - 1
+    const score = (apexTop ? 8 : 0) + (onBottom ? 4 : 0) + (level ? 2 : 0) + (r.cols >= r.rows ? 1 : 0)
+    if (score > bestScore) { bestScore = score; best = view }
+  }
+  return best
+}
