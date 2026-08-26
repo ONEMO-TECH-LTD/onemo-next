@@ -46,8 +46,19 @@ const RETIRED = new Set<string>([
 
 export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)
 
-export const triangleTypeOf = (t: TriangleLayout): TriangleProductType =>
-  TYPE_RULED[t.id] ?? triangleProductType(triangleGeometry(t.vertices))
+export const triangleTypeOf = (t: TriangleLayout): TriangleProductType => {
+  if (TYPE_RULED[t.id]) return TYPE_RULED[t.id]
+  const b = boundsOf([...t.vertices])
+  const r = transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
+    { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
+  const [p, q, s] = r.nodes
+  const E: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
+  return triangleProductType(triangleGeometry(t.vertices), {
+    cols: r.cols, rows: r.rows,
+    level: E.some(([a, c]) => a[1] === c[1]),
+    vertical: E.some(([a, c]) => a[0] === c[0]),
+  })
+}
 
 export const triangleFrameKey = (t: TriangleLayout): string => {
   const b = boundsOf([...t.vertices])

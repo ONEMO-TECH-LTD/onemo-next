@@ -12,6 +12,7 @@ import {
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
   draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat, isActive,
+  TRIANGLE_TYPES,
   type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
@@ -417,13 +418,16 @@ describe('triangle — the three-point layout universe', () => {
     expect([...universe].sort()).toEqual([...ids].sort())
   })
 
-  it('the universe stays 79; the ACTIVE catalogue is Pyramid 16 / Wedge 12 / Fin 48', () => {
+  it('the universe stays 79; every active layout has exactly one named type', () => {
     // Geometry supplies the default grouping; Dan's per-layout rulings override it, and three
     // layouts are retired from the product. Neither changes the universe underneath.
     expect(TRIANGLE_LAYOUTS.length).toBe(79)
     expect(TRIANGLE_LAYOUTS.filter(isActive).length).toBe(76)
-    expect([trianglesOfType('pyramid').length, trianglesOfType('wedge').length, trianglesOfType('fin').length])
-      .toEqual([16, 12, 48])
+    // every active layout lands in exactly one named type, and no type is a dumping ground
+    const byType = TRIANGLE_TYPES.map((t) => trianglesOfType(t))
+    expect(byType.reduce((n, l) => n + l.length, 0)).toBe(76)
+    expect(new Set(byType.flat().map((t) => t.id)).size).toBe(76)
+    for (const l of byType) expect(l.length).toBeGreaterThan(0)
   })
 
   it('the retired three are out of the product and still in the universe', () => {
@@ -431,7 +435,7 @@ describe('triangle — the three-point layout universe', () => {
     for (const id of ['tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2']) {
       const t = TRIANGLE_LAYOUTS.find((x) => x.id === id)!
       expect(isActive(t), id).toBe(false)
-      expect((['pyramid', 'wedge', 'fin'] as const).some((k) => trianglesOfType(k).includes(t))).toBe(false)
+      expect(([...TRIANGLE_TYPES] as const).some((k) => trianglesOfType(k).includes(t))).toBe(false)
     }
   })
 
@@ -447,7 +451,7 @@ describe('triangle — the three-point layout universe', () => {
     const labels = panelOptions({ shapeId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
       layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
       .types.map((o) => o.label)
-    expect(labels).toEqual(['Pyramid', 'Wedge', 'Fin'])
+    expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Slice', 'Wedge', 'Ramp', 'Pennant', 'Fin'])
     for (const l of labels) expect(l.includes(' '), l).toBe(false)
     expect(labels.join(' ')).not.toContain('Peak')
     expect(labels.join(' ')).not.toContain('Sail')
@@ -585,7 +589,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / Math.hypot(b[0] - a[0], b[1] - a[1])
 
   it('one Peak, one Wedge and one Sail each clear their three edges by 12mm', () => {
-    for (const type of ['pyramid', 'wedge', 'fin']) {
+    for (const type of [...TRIANGLE_TYPES]) {
       const sel = triSel(one(type))
       const a = libraryArrangement(sel, 48)
       const outline = libraryPreview(sel, 48, PAD).outlineMM
@@ -766,7 +770,8 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(new Set(labels).size).toBe(labels.length)
     expect(labels[0]).toContain('Pyramid 1')
     expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'pyramid').length)
-    expect(opts.types.map((o) => o.label)).toEqual(['Pyramid', 'Wedge', 'Fin'])
+    expect(opts.types.map((o) => o.label)).toEqual(
+      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Slice', 'Wedge', 'Ramp', 'Pennant', 'Fin'])
   })
 })
 
@@ -861,7 +866,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
 
 describe('triangle — straight layouts come before the diagonal ones', () => {
   it('every type lists the ones that rest on a flat side first', () => {
-    for (const type of ['pyramid', 'wedge', 'fin'] as const) {
+    for (const type of [...TRIANGLE_TYPES] as const) {
       const list = trianglesOfType(type)
       const firstDiagonal = list.findIndex((t) => !restsFlat(t))
       if (firstDiagonal < 0) continue
@@ -873,7 +878,7 @@ describe('triangle — straight layouts come before the diagonal ones', () => {
   it('the universe splits 50 flat / 29 leaning; the active catalogue keeps that split honest', () => {
     expect(TRIANGLE_LAYOUTS.filter(restsFlat).length).toBe(50)
     expect(TRIANGLE_LAYOUTS.filter((t) => !restsFlat(t)).length).toBe(29)
-    const active = (['pyramid', 'wedge', 'fin'] as const).flatMap((t) => trianglesOfType(t))
+    const active = ([...TRIANGLE_TYPES] as const).flatMap((t) => trianglesOfType(t))
     expect(active.length).toBe(76)
     expect(active.every((t) => TRIANGLE_LAYOUTS.includes(t))).toBe(true)
   })

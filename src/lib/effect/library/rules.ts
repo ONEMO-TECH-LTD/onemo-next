@@ -1,6 +1,7 @@
 // library/rules.ts — CLASS POLICY: sub-types, orientation, box measurement, labelling.
 // The view asks these; it never tests 'is this a diamond'. Shared with the classifier bridge.
 
+import { TRIANGLE_TYPES } from './triangle-geometry'
 import { MIN_LIB_MM, type LibraryFamily, type LibraryFrame, type LibraryLayout, type LibraryTransform } from './types'
 
 type Node = readonly [number, number]
@@ -136,7 +137,7 @@ export const CLASS_RULES = {
     // A triangle's frame, its populations and its outline all come from the geometry it
     // carries, so it supplies no sub-rule, no box formula, no sampler and no named views.
     source: 'geometry',
-    subs: ['pyramid', 'wedge', 'fin'],
+    subs: [...TRIANGLE_TYPES],
     label: (c, r) => c + '×' + r,
   },
 } satisfies Record<LibraryFamily, ClassRules>
