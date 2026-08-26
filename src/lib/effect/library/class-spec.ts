@@ -15,7 +15,7 @@
 import { CLASS_FRAMES } from './frames'
 import { REGISTRY_RULES, SPACING_96, SPACING_BASE } from './rules'
 import { LIBRARY_SHAPES } from './shapes'
-import { frameKeyOf } from './transforms'
+import { frameKeyOf, transformLayout } from './transforms'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import { boundsOf, convexHull } from './triangle-geometry'
 import { TRIANGLE_TYPES, type TriangleProductType } from './triangle-types'
@@ -106,6 +106,10 @@ export interface ClassControls {
  *  imports and what the admin surface imports are visibly different things. */
 export type LibraryClass = ClassSpec & ClassControls
 
+/** The magnet padding the chip's size is quoted at — the same 12mm the outline is drawn with.
+ *  Stated here rather than imported so the pure library keeps no engine dependency. */
+const RELEASED_PAD_MM = 12
+
 const NO_VIEW: LibraryTransform = { transpose: false, flipX: false, flipY: false }
 const pickLayoutName = (frame: LibraryFrame, preferred: string): string =>
   frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
@@ -181,11 +185,25 @@ function triangleSpec(): LibraryClass {
     return triangleById(sel.geometryId)
   }
   const firstOf = (typeId: string) => trianglesOfType(typeId as TriangleProductType)[0]
-  const asVariant = (t: (typeof TRIANGLE_LAYOUTS)[number], pitchMM: number, i: number): ClassVariant => {
+  /** The chip reads the SIZE, because that is the fact being chosen between. The lattice box it
+   *  used to print is not that: several different shapes share one box, so Ramp showed eight
+   *  chips reading "3x4 3x4 3x4 4x5 4x5 4x5 4x5 4x5" (Dan: "ramp has same frame names it is
+   *  weird"). Every size in every tab is distinct. */
+  const sizeOf = (t: (typeof TRIANGLE_LAYOUTS)[number], pitchMM: number, padMM: number): string => {
     const b = boundsOf([...t.vertices])
+    const r = transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
+      { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
+    const mm = r.nodes.map(([x, y]) => [x * pitchMM, (r.rows - 1 - y) * pitchMM] as PointMM)
+    const o = hullOutlineMM(mm, padMM)
+    const w = Math.max(...o.map((p) => p[0])) - Math.min(...o.map((p) => p[0]))
+    const h = Math.max(...o.map((p) => p[1])) - Math.min(...o.map((p) => p[1]))
+    return Math.round(w) + '×' + Math.round(h)
+  }
+  const asVariant = (t: (typeof TRIANGLE_LAYOUTS)[number], pitchMM: number, i: number): ClassVariant => {
+    const size = sizeOf(t, pitchMM, RELEASED_PAD_MM)
     return {
-      id: t.id, label: b.cols + '×' + b.rows, frame: triangleFrame(t, pitchMM), view: uprightView(t),
-      accessibleLabel: TYPE_LABEL[triangleTypeOf(t)] + ' ' + (i + 1) + ' · ' + b.cols + '×' + b.rows
+      id: t.id, label: size, frame: triangleFrame(t, pitchMM), view: uprightView(t),
+      accessibleLabel: TYPE_LABEL[triangleTypeOf(t)] + ' ' + (i + 1) + ' · ' + size + 'mm'
         + (restsFlat(t) ? '' : ' · diagonal'),
     }
   }
@@ -275,7 +293,7 @@ export function hullOutlineMM(nodesMM: readonly PointMM[], padMM: number): Point
 const TYPE_LABEL: Record<string, string> = {
   box: 'box', rhomb: 'rhomb', frame: 'frame', banner: 'banner', slim: 'slim',
   pyramid: 'Pyramid', arrowhead: 'Arrowhead', mountain: 'Mountain', needle: 'Needle',
-  slice: 'Slice', wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', sail: 'Sail', fin: 'Fin',
+  wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', sail: 'Sail', fin: 'Fin',
 }
 
 export const CLASS_SPECS: Record<LibraryFamily, LibraryClass> = {

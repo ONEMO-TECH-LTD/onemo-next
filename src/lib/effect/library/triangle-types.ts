@@ -8,22 +8,21 @@ import type { TriangleGeometry } from './triangle-geometry'
  *  retired vocabulary and must not reach the UI; 'wedge' and 'sail' survive as two of the ten.
  *
  *  Each name is his description made measurable on the presented view:
- *    Wedge     — the balanced squared corner: equal legs on a level side and an upright side
+ *    Wedge     — a squared corner: the right angle stood on a level side and an upright side
  *    Needle    — symmetric on a level base, at least twice as tall as it is wide
  *    Arrowhead — symmetric on a level base, taller than wide
  *    Pyramid   — symmetric on a level base, exactly as wide as it is tall
  *    Mountain  — symmetric on a level base, wider than tall
- *    Slice     — symmetric with no level side to stand on
  *    Pennant   — leaning, long and low
  *    Ramp      — leaning on a level base, wider than tall
  *    Sail      — leaning and taller than wide
  *    Fin       — leaning, anything else */
 export type TriangleProductType =
   | 'wedge' | 'needle' | 'arrowhead' | 'pyramid' | 'mountain'
-  | 'slice' | 'pennant' | 'ramp' | 'sail' | 'fin'
+  | 'pennant' | 'ramp' | 'sail' | 'fin'
 
 export const TRIANGLE_TYPES: TriangleProductType[] = [
-  'pyramid', 'arrowhead', 'mountain', 'needle', 'slice',
+  'pyramid', 'arrowhead', 'mountain', 'needle',
   'wedge', 'ramp', 'pennant', 'sail', 'fin',
 ]
 
@@ -37,27 +36,30 @@ export interface TriangleShown {
   upright: boolean
 }
 
-/** WHY A RIGHT ANGLE ALONE DOES NOT MAKE A WEDGE. Dan ruled the 2x2 a Wedge and rejected both
- *  2x3s from that tab, and a right angle alone cannot tell them apart. Two things do:
+/** A WEDGE IS A SQUARED CORNER, equal legs or not. What decides is HOW the right angle is
+ *  presented, not the angle alone: standing on a level side with an upright side beside it, the
+ *  corner is the whole shape. Resting on its hypotenuse, the same triangle's right angle sits up
+ *  at the apex where nobody reads it as a corner — that is a Mountain.
  *
- *  HOW the right angle is presented — the 2x2 stands on a level side with an upright side
- *  beside it, so the squared corner is what you see. The isosceles 2x3 rests on its hypotenuse
- *  and its right angle sits up at the apex, where it reads as a mountain, not a corner.
- *
- *  WHETHER THE LEGS ARE EQUAL — the scalene 2x3 also stands on level and upright sides, but its
- *  legs differ, so it reads as a long low shape with a squared end, not as the balanced corner
- *  Dan accepted. A Wedge is the BALANCED squared corner; every other right angle is incidental
- *  and the shape is named by its silhouette like any other. */
+ *  I narrowed this to equal legs earlier today, which sent the unequal-legged squared corners
+ *  into Ramp and Pennant. Dan, looking at the rendered shapes: "ramp has wedge option" and, of
+ *  the 159x79 corner sitting under Pennant, "how is the first pennant?". Both are squared
+ *  corners and both belong here. His earlier "2x3 is not wedge" was read off a CHIP LABEL — he
+ *  had a 3x4 selected and never saw either shape — and that label is now the size in mm. */
 /*  The proportion boundaries are RELATIONAL, not tuned numbers: wider / exactly square / taller /
  *  twice as tall. Earlier cut-offs of 0.8 and 1.25 were mine and arbitrary; the lattice only ever
  *  presents symmetric aspects of 0.25, 0.5, 0.75, 1, 1.5 and 2, so the words decide by themselves. */
 export function triangleProductType(
   g: TriangleGeometry, shown: TriangleShown,
 ): TriangleProductType {
-  if (g.angleClass === 'right' && g.sideClass === 'isosceles' && shown.level && shown.upright) return 'wedge'
+  if (g.angleClass === 'right' && shown.level && shown.upright) return 'wedge'
   const w = Math.max(1, shown.cols - 1), h = Math.max(1, shown.rows - 1), a = h / w
   if (g.sideClass === 'isosceles') {
-    if (!shown.level) return 'slice'
+    // 08-26 Dan, on the tilted symmetric shapes: "remove slice it is same as basic triangles
+    // just turned". Every one of them is retired from the product, so this branch is not
+    // reachable from the active catalogue; a symmetric shape that cannot stand flat reads as a
+    // leaning shape, and the per-member sweep fires loudly if one is ever made active again.
+    if (!shown.level) return 'fin'
     return a >= 2 ? 'needle' : a > 1 ? 'arrowhead' : a === 1 ? 'pyramid' : 'mountain'
   }
   if (a <= 0.5) return 'pennant'

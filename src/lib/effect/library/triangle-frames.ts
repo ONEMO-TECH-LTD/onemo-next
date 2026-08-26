@@ -21,11 +21,17 @@ export const triangleById = (id: string): TriangleLayout => {
   return t
 }
 
-/** 08-26 08:11 — "remove these layouts", attached to the Wedge / 3x4 screen, whose layout block
- *  held exactly these three. Retired from the product; still in the 79-geometry universe, so the
- *  review evidence survives. */
+/** RETIRED FROM THE PRODUCT, still in the 79-geometry universe — a retirement leaves the
+ *  catalogue, not the corpus, so the review evidence survives and nothing is unrecoverable. */
 const RETIRED = new Set<string>([
+  // 08-26 08:11 — "remove these layouts", attached to the Wedge / 3x4 screen, whose layout
+  // block held exactly these three.
   'tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2',
+  // 08-26 — "remove slice it is same as basic triangles just turned". The nine symmetric
+  // shapes with no level side: fat ones read as a Pyramid lying over, and four were splinters
+  // whose 12mm point jutted 52-85mm past its own magnet.
+  'tri:0,0;3,4;4,3', 'tri:0,0;1,2;3,3', 'tri:0,0;2,3;3,2', 'tri:0,0;1,3;4,4', 'tri:0,0;1,2;2,1',
+  'tri:0,0;2,4;4,2', 'tri:0,0;2,4;3,1', 'tri:0,0;1,3;3,1', 'tri:0,0;1,4;4,1',
 ])
 
 export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)
@@ -204,8 +210,17 @@ function computeUprightView(t: TriangleLayout): LibraryTransform {
     })
     const [a, c, apex] = odd ?? edges.reduce((m, e) => (len(e[0], e[1]) > len(m[0], m[1]) ? e : m))
     const apexAbove = apex[1] <= a[1] && apex[1] <= c[1]
-    const score = (onFloor ? 16 : 0) + (onWall ? 8 : 0) + (apexAbove ? 4 : 0)
-      + (a[1] === c[1] && a[1] === r.rows - 1 ? 2 : 0) + (r.cols >= r.rows ? 1 : 0)
+    // HANDEDNESS. Without this the ranking is blind to left/right, so two shapes of the same
+    // family come up mirrored and the tab reads as random (Dan: "shapes in ramp flipped to
+    // right and left this is wrong ... they all need to be shaped and oriented in the same
+    // way"). Every shape now leads with its high side on the LEFT and falls away to the right,
+    // which is how the ones he approved were already sitting.
+    const maxY = Math.max(...r.nodes.map((n) => n[1]))
+    const tip = r.nodes.find((n) => n[1] !== maxY) ?? r.nodes[0]
+    const leansLeft = tip[0] * 2 <= (r.cols - 1)
+    const score = (onFloor ? 32 : 0) + (onWall ? 16 : 0) + (apexAbove ? 8 : 0)
+      + (a[1] === c[1] && a[1] === r.rows - 1 ? 4 : 0) + (r.cols >= r.rows ? 2 : 0)
+      + (leansLeft ? 1 : 0)
     if (score > bestScore) { bestScore = score; best = view }
   }
   return best
