@@ -455,6 +455,7 @@ export default function GridLab() {
           </div>
           <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} boxMM={libraryBox}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
+            editError={libraryModel?.error ?? null}
             startAdd={() => setEdit({ name: '', nodes: [] })}
             startEdit={() => {
               const { shape, frame, layout, draft } = resolveSelection(librarySel, drafts, pitch)
@@ -1129,6 +1130,8 @@ const CSS = `
 .gl-libdim{margin-left:auto;align-self:center;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
 .gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.gl-liberr{display:block;margin-top:6px;font:600 11px var(--mono);color:#e5484d;font-style:normal}
+.gl-libgeo button span{display:block;font:600 10px var(--mono);color:var(--ink-3);margin-top:2px}
 .gl-camnum{display:inline-flex;align-items:baseline;gap:3px}
 .gl-camnum input{width:86px;font:700 20px var(--mono);color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:8px;padding:5px 8px;text-align:right;

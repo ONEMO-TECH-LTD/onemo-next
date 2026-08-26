@@ -4,18 +4,19 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, CLASS_RULES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES, FAMILY_APPLICABILITY_DRAFT,
   LIBRARY_FAMILIES, SPACING_MODES, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode, layoutAtPitch,
   transformLayout as tl,
   TRIANGLE_LAYOUTS, triangleGeometry, triangleProductType, triangleTypeOf, triangleFrameKey,
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
+  draftIntegrity, panelOptions, selectionForFamily,
   type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
-import { libraryArrangement, libraryPreview, libraryStageModel } from '../grid-magnet-library-bridge'
+import { libraryArrangement, libraryPreview, libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
 
@@ -619,5 +620,89 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   it('draft identity carries the geometry, so two layouts on one frame cannot cross', () => {
     const [a, b] = TRIANGLE_LAYOUTS.filter((t) => triangleFrameKey(t) === '3x4').slice(0, 2)
     expect(draftId('triangle', '3x4', 'mine', a.id)).not.toBe(draftId('triangle', '3x4', 'mine', b.id))
+  })
+})
+
+describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
+  const sel3 = (id: string, layoutId = 'corners'): LibrarySelection => {
+    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+    return { shapeId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
+      view: { transpose: false, flipX: false, flipY: false } }
+  }
+  const one = (type: string) => TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === type)!
+  const frameOf = (id: string) => triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+
+  it('F1 — a population being drawn never throws, and says why it is not saveable', () => {
+    const id = one('wedge').id
+    const sel = sel3(id)
+    for (const nodes of [[], [[0, 0]], [[0, 0], [1, 1]]] as Array<Array<[number, number]>>) {
+      const m = draftStageModel(sel, nodes, 48, 12, 2, 2, '')
+      expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(3)   // still renderable
+      expect(m.error).toBeTruthy()
+    }
+    const good = [...one('wedge').vertices] as Array<[number, number]>
+    expect(draftStageModel(sel, good, 48, 12, 2, 2, '').error).toBeNull()
+  })
+
+  it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
+    const id = one('sail').id
+    const frame = frameOf(id)
+    const base = { id: 'x', className: 'triangle', frameKey: frameKeyOf(frame), geometryId: id, name: 'n' }
+    expect(draftIntegrity({ ...base, nodes: [...one('sail').vertices] as Array<[number, number]> }, frame)).toEqual([])
+    expect(draftIntegrity({ ...base, nodes: [[0, 0], [0, 1], [0, 2]] }, frame).join()).toContain('collinear')
+    expect(draftIntegrity({ ...base, geometryId: undefined, nodes: [...one('sail').vertices] as Array<[number, number]> }, frame).join())
+      .toContain('geometryId required')
+  })
+
+  it('F2 — the arrangement carries the geometry through every view', () => {
+    const id = one('sail').id
+    for (const view of [{ transpose: false, flipX: false, flipY: false }, { transpose: true, flipX: true, flipY: true }])
+      expect(libraryArrangement({ ...sel3(id), view }, 48).geometryId).toBe(id)
+    expect(libraryArrangement(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48).geometryId).toBeUndefined()
+  })
+
+  it('F3 — every layout exposes exactly its distinct views, no more and no fewer', () => {
+    for (const t of TRIANGLE_LAYOUTS) {
+      const f = triangleFrame(t, 48)
+      const corners = f.layouts.find((l) => l.name === 'corners')!
+      const distinct = new Set<string>()
+      for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
+        const r = tl(f, corners, { transpose, flipX, flipY })
+        distinct.add(r.cols + 'x' + r.rows + '|' + r.nodes.map((n) => n[0] + ',' + n[1]).sort().join(' '))
+      }
+      const opts = panelOptions(sel3(t.id), [], 48).orientations
+      expect(opts.length, t.id).toBe(distinct.size)
+      expect(new Set(opts.map((o) => o.id)).size).toBe(opts.length)
+      for (const o of opts) expect(o.next.geometryId).toBe(t.id)
+    }
+  })
+
+  it('F3 — an asymmetric Sail really does offer all eight', () => {
+    expect(panelOptions(sel3(one('sail').id), [], 48).orientations.length).toBe(8)
+  })
+
+  it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
+    const bad = { ...sel3(one('peak').id), frameKey: '9x9' }
+    expect(() => selectedRecords(bad)).toThrow('does not match geometry')
+    expect(() => resolveSelection(bad)).toThrow('does not match geometry')
+  })
+
+  it('F5 — the family transition is the module’s, and lands on a resolvable selection', () => {
+    let cur = sel3(one('sail').id, 'perimeter')
+    for (const fam of LIBRARY_FAMILIES) {
+      cur = selectionForFamily(cur, fam, 48)
+      expect(() => selectedRecords(cur), fam).not.toThrow()
+      expect(resolveSelection(cur).shape.family).toBe(fam)
+    }
+  })
+
+  it('F6 — two layouts on one frame are distinguishable, and types read as products', () => {
+    const peak33 = TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'peak' && triangleFrameKey(t) === '3x3')
+    expect(peak33.length).toBeGreaterThan(1)
+    const opts = panelOptions(sel3(peak33[0].id), [], 48)
+    const labels = opts.geometries.map((o) => o.accessibleLabel)
+    expect(new Set(labels).size).toBe(labels.length)
+    expect(labels[0]).toContain('Peak layout 1')
+    expect(opts.types.map((o) => o.label)).toEqual(['Peak', 'Wedge', 'Sail'])
   })
 })

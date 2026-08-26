@@ -74,10 +74,11 @@ const boxByClassFloor = (cols: number, rows: number, pitchMM: number) =>
 export interface ClassRules {
   /** Sub-types offered, in order. One entry means a single fixed type. */
   subs: string[]
-  /** Which sub a frame belongs to. */
-  subOf: (cols: number, rows: number) => string
-  /** The frame's outer box in mm — the class floor, or the wrapping rule the class needs. */
-  boxMM: (cols: number, rows: number, pitchMM: number, padMM: number) => { w: number; h: number }
+  /** Which sub a frame belongs to. Absent when the class materialises its own frames. */
+  subOf?: (cols: number, rows: number) => string
+  /** The frame's outer box in mm. Absent for a class whose outline is derived from its
+   *  magnets — there is nothing to approximate, so there is nothing to get wrong. */
+  boxMM?: (cols: number, rows: number, pitchMM: number, padMM: number) => { w: number; h: number }
   /** How a frame is labelled to a human. */
   label: (cols: number, rows: number) => string
   /** The views this class offers, in order. Empty means the class has no orientation.
@@ -86,8 +87,9 @@ export interface ClassRules {
   /** True when the class has no frame registry: its frames are materialised from the geometry
    *  the selection names, already at the requested pitch. */
   framesFromGeometry?: boolean
-  /** The 96mm sample of this class's perimeter — the ring geometry differs per class. */
-  spacing96: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
+  /** The 96mm sample of this class's perimeter. Absent when the class materialises its own
+   *  populations at the requested pitch. */
+  spacing96?: (frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number) => Node[]
 }
 
 export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
@@ -123,21 +125,13 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
     spacing96: ring96,
   },
   triangle: {
-    // The product types, in the ruled order. A triangle's frame comes from the geometry it
-    // carries, so the class holds no box formula and no stored outline.
+    // The product types, in the ruled order. A triangle's frame, its populations and its
+    // outline all come from the geometry it carries, so the class supplies no box formula, no
+    // frame sub-rule and no sampler — carrying dead ones made them traps (QA F7).
     subs: ['peak', 'wedge', 'sail'],
-    subOf: () => 'peak',
-    boxMM: (c, r, pitch) => boxByClassFloor(c, r, pitch),
     label: (c, r) => c + '×' + r,
-    orientations: [
-      { id: 'up', view: { transpose: false, flipX: false, flipY: false } },
-      { id: 'right', view: { transpose: true, flipX: false, flipY: false } },
-      { id: 'mirror', view: { transpose: false, flipX: true, flipY: false } },
-      { id: 'down', view: { transpose: false, flipX: false, flipY: true } },
-    ],
+    orientations: [{ id: 'derived', view: { transpose: false, flipX: false, flipY: false } }],
     framesFromGeometry: true,
-    // materialised per geometry in triangle-frames.ts, from THIS shared sampler
-    spacing96: (frame, perimeter) => [...perimeter],
   },
 }
 
@@ -148,7 +142,9 @@ export const CLASS_RULES: Record<LibraryFamily, ClassRules> = {
 export function withSpacingModes(family: LibraryFamily, frame: LibraryFrame): LibraryFrame {
   const i = frame.layouts.findIndex((l) => l.name === SPACING_BASE)
   if (i < 0) return frame
-  const nodes = CLASS_RULES[family].spacing96(frame, frame.layouts[i].nodes, 48)
+  const rule = CLASS_RULES[family].spacing96
+  if (!rule) return frame
+  const nodes = rule(frame, frame.layouts[i].nodes, 48)
   if (!nodes.length) return frame
   const mode: LibraryLayout = { name: SPACING_96, nodes }
   const layouts = [...frame.layouts]
@@ -166,7 +162,9 @@ export function layoutAtPitch(
   if (CLASS_RULES[family].framesFromGeometry) return layout
   const per = frame.layouts.find((l) => l.name === SPACING_BASE)
   if (!per) throw new Error('library: 96mm mode has no perimeter in ' + frame.cols + 'x' + frame.rows)
-  return { name: SPACING_96, nodes: CLASS_RULES[family].spacing96(frame, per.nodes, pitchMM) }
+  const rule = CLASS_RULES[family].spacing96
+  if (!rule) return layout
+  return { name: SPACING_96, nodes: rule(frame, per.nodes, pitchMM) }
 }
 
 /** How a frame reads to a human, per its class. One call site for every label in the panel. */

@@ -1,5 +1,6 @@
 // library/drafts.ts — hand-authored layouts: browser-local, never mutating the corpus.
 
+import { assertTrianglePopulation } from './triangle-frames'
 import type { LibraryFrame } from './types'
 
 /** CUSTOM LAYOUTS (Dan, 08-25): hand-authored by clicking lattice nodes — a trimmed or sparse
@@ -34,6 +35,12 @@ export function draftIntegrity(d: LibraryDraft, frame: LibraryFrame): string[] {
     const k = x + ',' + y
     if (seen.has(k)) out.push('duplicate node ' + k)
     seen.add(k)
+  }
+  // A class whose outline is its magnets' hull has a shape rule as well as bounds: SAVE is the
+  // fail-loud boundary, so it is checked here and not while the population is being built.
+  if (d.className === 'triangle') {
+    if (!d.geometryId) out.push('triangle: geometryId required')
+    try { assertTrianglePopulation(d.nodes) } catch (e) { out.push((e as Error).message) }
   }
   return out
 }

@@ -4,14 +4,15 @@
 // tab down (diamond had no 'perimeter', 08-25).
 
 import { CLASS_FRAMES } from './frames'
-import { CLASS_RULES } from './rules'
+import { CLASS_RULES, type ClassRules } from './rules'
 import { triangleById, triangleFrame, triangleFrameKey, trianglesOf, triangleFrameKeys, triangleTypeOf } from './triangle-frames'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import { boundsOf, type TriangleLayout, type TriangleProductType } from './triangle-geometry'
+import { transformLayout } from './transforms'
 import { LIBRARY_SHAPES } from './shapes'
 import { frameKeyOf } from './transforms'
 import type { LibraryDraft } from './drafts'
-import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryShape } from './types'
+import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryShape, LibraryTransform } from './types'
 
 /** A hand-authored layout is named in a selection as 'draft:<name>'. One place, one spelling. */
 export const DRAFT_PREFIX = 'draft:'
@@ -34,7 +35,9 @@ export function selectedRecords(sel: LibrarySelection, pitchMM = 48): {
   const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
   if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
   if (CLASS_RULES[shape.family].framesFromGeometry) {
-    const frame = triangleFrame(triangleById(geometryOf(sel)), pitchMM)
+    const geo = triangleById(geometryOf(sel))
+    const frame = triangleFrame(geo, pitchMM)
+    assertFrameKey(sel, geo.id, frame)
     const layout = frame.layouts.find((l) => l.name === sel.layoutId)
     if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
     return { shape, frame, layout }
@@ -46,32 +49,19 @@ export function selectedRecords(sel: LibrarySelection, pitchMM = 48): {
   return { shape, frame, layout }
 }
 
-/** The frames a class offers for a selection. For the triangle they are materialised from the
- *  geometry the selection names; every other class reads its registry. One seam, no branch in
- *  the view. */
-export function framesFor(sel: LibrarySelection, pitchMM = 48): LibraryFrame[] {
-  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId) ?? LIBRARY_SHAPES[0]
-  if (shape.family !== 'triangle') return CLASS_FRAMES[shape.family]
-  const type = (sel.layoutId && CLASS_RULES.triangle.subs.includes(subOfSel(sel))
-    ? subOfSel(sel) : triangleTypeOf(triangleById(geometryOf(sel)))) as TriangleProductType
-  return triangleFrameKeys(type).map((k) => triangleFrame(trianglesOf(type, k)[0], pitchMM))
+/** The frame a geometry carries is not a matter of opinion: a selection that names a different
+ *  one is a caller bug, exactly as an unknown frame is for the registry classes. Every
+ *  module-owned transition already produces the truthful key. */
+function assertFrameKey(sel: LibrarySelection, geometryId: string, frame: LibraryFrame): void {
+  const actual = frameKeyOf(frame)
+  if (sel.frameKey !== actual)
+    throw new Error('library: frameKey ' + sel.frameKey + ' does not match geometry ' + geometryId + ' (' + actual + ')')
 }
-
-const subOfSel = (sel: LibrarySelection): string =>
-  triangleTypeOf(triangleById(geometryOf(sel)))
 
 /** The geometry a triangle selection names — fail loud, never a silent first record. */
 export function geometryOf(sel: LibrarySelection): string {
   if (!sel.geometryId) throw new Error('library: triangle selection carries no geometryId')
   return sel.geometryId
-}
-
-/** Every geometry offered for the selection's type and frame, with its product type. */
-export function geometriesFor(sel: LibrarySelection): TriangleLayout[] {
-  const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
-  if (!shape || shape.family !== 'triangle') return []
-  const t = triangleById(geometryOf(sel))
-  return trianglesOf(triangleTypeOf(t), triangleFrameKey(t))
 }
 
 /** The first geometry of a product type — what a type tab lands on. */
@@ -100,9 +90,10 @@ export function resolveSelection(
   const shape = LIBRARY_SHAPES.find((x) => x.id === sel.shapeId)
   if (!shape) throw new Error('library: unknown shapeId ' + sel.shapeId)
   // The triangle's frame IS its geometry: one materialised frame, not a registry lookup.
-  if (shape.family === 'triangle') {
+  if (CLASS_RULES[shape.family].framesFromGeometry) {
     const geo = triangleById(geometryOf(sel))
     const frame = triangleFrame(geo, pitchMM)
+    assertFrameKey(sel, geo.id, frame)
     const frameKey = frameKeyOf(frame)
     const wantsDraft = isDraftLayout(sel.layoutId)
     const draft = wantsDraft
@@ -130,39 +121,105 @@ export function resolveSelection(
 /** THE PANEL'S OPTIONS — every control the library offers for a selection, already normalised.
  *  The view maps these to buttons; it never asks what class it is looking at (Dan, 08-25:
  *  "no fucking logic in the ui either"). Each option carries the selection it produces. */
-export interface PanelOption { id: string; active: boolean; next: LibrarySelection }
+export interface PanelOption {
+  id: string
+  /** What the control reads. Product labels are the module's to decide, not the view's. */
+  label: string
+  active: boolean
+  next: LibrarySelection
+}
 export interface GeometryOption extends PanelOption {
   nodes: ReadonlyArray<readonly [number, number]>
   cols: number
   rows: number
+  /** Distinguishes two layouts sharing a frame, for the eye and for a screen reader. */
+  accessibleLabel: string
 }
 export interface PanelOptions {
   types: PanelOption[]
   frames: PanelOption[]
   geometries: GeometryOption[]
-  frameLabel: string
+  orientations: PanelOption[]
+}
+
+const TYPE_LABEL: Record<string, string> = { peak: 'Peak', wedge: 'Wedge', sail: 'Sail' }
+const label = (id: string) => TYPE_LABEL[id] ?? id
+
+/** The eight lattice views, as the library's own transform. */
+const ALL_VIEWS: readonly LibraryTransform[] = [
+  { transpose: false, flipX: false, flipY: false }, { transpose: true, flipX: false, flipY: false },
+  { transpose: false, flipX: true, flipY: true }, { transpose: true, flipX: true, flipY: true },
+  { transpose: false, flipX: true, flipY: false }, { transpose: true, flipX: true, flipY: false },
+  { transpose: false, flipX: false, flipY: true }, { transpose: true, flipX: false, flipY: true },
+]
+const sameView = (a: LibraryTransform, b: LibraryTransform) =>
+  a.transpose === b.transpose && a.flipX === b.flipX && a.flipY === b.flipY
+
+/** THE DISTINCT ORIENTATIONS of the selected layout. A symmetric shape has fewer than eight —
+ *  a Sail has all eight, and a fixed list of four hid half of them (QA F3). Views producing an
+ *  identical node set are one option, never duplicated. */
+function orientationOptions(
+  sel: LibrarySelection, frame: LibraryFrame, layout: LibraryLayout, rules: ClassRules,
+): PanelOption[] {
+  const out: PanelOption[] = []
+  const seen = new Set<string>()
+  for (const view of ALL_VIEWS) {
+    const t = transformLayout(frame, layout, view)
+    const k = t.cols + 'x' + t.rows + '|' + t.nodes.map((n) => n[0] + ',' + n[1]).sort().join(' ')
+    if (seen.has(k)) continue
+    seen.add(k)
+    // a class that names its views keeps its own words; anything beyond them reads as the
+    // frame it turns into
+    const named = rules.orientations.find((o) => sameView(o.view, view))
+    out.push({
+      id: 'view' + out.length, label: named ? named.id : t.cols + '×' + t.rows,
+      active: sameView(view, sel.view), next: { ...sel, view: { ...view } },
+    })
+  }
+  return out
+}
+
+/** The selection a class tab lands on: its first shape, its first geometry where the class has
+ *  one, that geometry's frame, and a layout the frame actually carries. The page passes IDs. */
+export function selectionForFamily(
+  current: LibrarySelection, family: LibraryFamily, pitchMM = 48,
+): LibrarySelection {
+  const shape = LIBRARY_SHAPES.find((x) => x.family === family)
+  if (!shape) throw new Error('library: no shape for family ' + family)
+  const rules = CLASS_RULES[family]
+  if (!rules.framesFromGeometry) {
+    const f0 = CLASS_FRAMES[family][0]
+    return { ...current, shapeId: shape.id, geometryId: undefined, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') }
+  }
+  const geo = firstGeometryOf(rules.subs[0] as TriangleProductType)
+  const f0 = triangleFrame(geo, pitchMM)
+  return { ...current, shapeId: shape.id, geometryId: geo.id, frameKey: frameKeyOf(f0), layoutId: pickLayout(f0, 'perimeter') }
 }
 
 export function panelOptions(
   sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM = 48,
 ): PanelOptions {
-  const { shape, frame } = resolveSelection(sel, drafts, pitchMM)
+  const { shape, frame, layout } = resolveSelection(sel, drafts, pitchMM)
   const rules = CLASS_RULES[shape.family]
-  if (shape.family !== 'triangle') {
+  const orientations = orientationOptions(sel, frame, layout, rules)
+  if (!rules.framesFromGeometry) {
     const frames = CLASS_FRAMES[shape.family]
-    const sub = rules.subOf(frame.cols, frame.rows)
+    const sub = subOf(rules, frame)
     const jump = (f: LibraryFrame): LibrarySelection =>
       ({ ...sel, frameKey: frameKeyOf(f), layoutId: pickLayout(f, sel.layoutId) })
     return {
       types: rules.subs.map((id) => {
-        const f0 = frames.find((f) => rules.subOf(f.cols, f.rows) === id) ?? frame
-        return { id, active: sub === id, next: jump(f0) }
+        const f0 = frames.find((f) => subOf(rules, f) === id) ?? frame
+        return { id, label: label(id), active: sub === id, next: jump(f0) }
       }),
-      frames: frames.filter((f) => rules.subOf(f.cols, f.rows) === sub).map((f) => ({
-        id: frameKeyOf(f), active: frameKeyOf(f) === frameKeyOf(frame), next: jump(f),
+      frames: frames.filter((f) => subOf(rules, f) === sub).map((f) => ({
+        // the class labels its own frames — the diamond reads by magnets per side, not by the
+        // lattice patch it occupies
+        id: frameKeyOf(f), label: rules.label(f.cols, f.rows),
+        active: frameKeyOf(f) === frameKeyOf(frame), next: jump(f),
       })),
       geometries: [],
-      frameLabel: frameKeyOf(frame),
+      orientations: rules.orientations.length ? orientations : [],
     }
   }
   const geo = triangleById(geometryOf(sel))
@@ -175,15 +232,24 @@ export function panelOptions(
   return {
     types: rules.subs.map((id) => {
       const first = firstGeometryOf(id as TriangleProductType)
-      return { id, active: id === type, next: toSel(first) }
+      return { id, label: label(id), active: id === type, next: toSel(first) }
     }),
-    frames: triangleFrameKeys(type).map((k) => ({
-      id: k, active: k === frameKey, next: toSel(trianglesOf(type, k)[0]),
-    })),
-    geometries: trianglesOf(type, frameKey).map((t) => {
+    frames: triangleFrameKeys(type).map((k) => {
+      const [c, r] = k.split('x').map(Number)
+      return { id: k, label: rules.label(c, r), active: k === frameKey, next: toSel(trianglesOf(type, k)[0]) }
+    }),
+    geometries: trianglesOf(type, frameKey).map((t, i) => {
       const b = boundsOf([...t.vertices])
-      return { id: t.id, active: t.id === geo.id, nodes: t.vertices, cols: b.cols, rows: b.rows, next: toSel(t) }
+      return {
+        id: t.id, label: rules.label(b.cols, b.rows), active: t.id === geo.id,
+        accessibleLabel: label(type) + ' layout ' + (i + 1) + ' · ' + rules.label(b.cols, b.rows),
+        nodes: t.vertices, cols: b.cols, rows: b.rows, next: toSel(t),
+      }
     }),
-    frameLabel: frameKey,
+    orientations,
   }
 }
+
+/** A class without sub-types answers with its one type. */
+const subOf = (rules: { subs: string[]; subOf?: (c: number, r: number) => string }, f: LibraryFrame) =>
+  rules.subOf ? rules.subOf(f.cols, f.rows) : rules.subs[0]

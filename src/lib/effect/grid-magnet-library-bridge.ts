@@ -17,6 +17,8 @@ import {
 export type { LibrarySelection } from './library'
 
 export interface LibraryArrangement {
+  /** WHICH geometry, for a class whose shape is its layout. Absent for fixed-outline classes. */
+  geometryId?: string
   /** The canonical frame the selection named. */
   sourceFrameKey: string
   /** The ACTUAL frame identity after the view transform — what the pipeline must believe. */
@@ -32,6 +34,8 @@ export interface LibraryStageModel {
   contour: Contour
   grid: GridResult
   title: string
+  /** Why a population being drawn is not a saveable shape yet — null when it is. */
+  error?: string | null
 }
 
 /** Selected records -> stable-ID arrangement in mm. The ONE conversion. Throws on unknown IDs. */
@@ -44,6 +48,7 @@ export function libraryArrangement(sel: LibrarySelection, pitchMM: number): Libr
   // Engine space is y-up; library rows count downward from the top.
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   return {
+    geometryId: sel.geometryId,
     sourceFrameKey: frameKeyOf(frame), frameKey: frameCols + 'x' + frameRows,
     frameCols, frameRows,
     layoutId: layout.name,
@@ -67,7 +72,9 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
     return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible: true, outlineMM: hullOutline(a.nodesMM, padMM) }
   // The frame's physical span is CLASS POLICY — the class rules own it (the square/rectangle
   // class floor, the diamond's wrap-the-ring rule). The bridge asks; it does not re-derive.
-  const box0 = CLASS_RULES[shape.family].boxMM(a.frameCols, a.frameRows, pitchMM, padMM)
+  const boxRule = CLASS_RULES[shape.family].boxMM
+  if (!boxRule) throw new Error('library: ' + shape.family + ' has no box rule')
+  const box0 = boxRule(a.frameCols, a.frameRows, pitchMM, padMM)
   const w0 = box0.w, h0 = box0.h
   const shapeCompatible = shape.aspect === 'frame' || a.frameCols === a.frameRows
   const w = shapeCompatible ? w0 : Math.max(w0, h0)
@@ -75,6 +82,19 @@ export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: nu
   const cx = (a.frameCols - 1) * pitchMM / 2, cy = (a.frameRows - 1) * pitchMM / 2
   const outlineMM: Pt[] = shape.outline.map(([ux, uy]) => [cx - w / 2 + ux * w, cy + h / 2 - uy * h])
   return { shapeId: shape.id, declaredFamily: shape.family, shapeCompatible, outlineMM }
+}
+
+/** A population being DRAWN is allowed to be nothing yet, one node, two, or briefly wrong: the
+ *  canvas has to stay clickable. The corpus outline stands in until the drawn set is a triangle
+ *  again, and the reason travels with it so the panel can refuse the save (QA F1). */
+export function draftOutline(
+  shape: { outlineSource: 'unit-shape' | 'arrangement-hull' },
+  nodesMM: ReadonlyArray<Pt>, sel: LibrarySelection, pitchMM: number, padMM: number,
+): { outlineMM: Pt[]; error: string | null } {
+  const fallback = () => libraryPreview(sel, pitchMM, padMM).outlineMM
+  if (shape.outlineSource !== 'arrangement-hull') return { outlineMM: fallback(), error: null }
+  try { return { outlineMM: hullOutline(nodesMM, padMM), error: null } }
+  catch (e) { return { outlineMM: fallback(), error: (e as Error).message } }
 }
 
 /** THE DERIVED OUTLINE: connect the magnet centres, push the edges out by the padding. The
@@ -106,16 +126,15 @@ export function draftStageModel(
   const nodesMM: Pt[] = t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM])
   // A derived outline follows the DRAWN magnets, so adding a node outside the hull changes the
   // shape and adding one inside or on an edge does not.
-  const outlineMM = shape.outlineSource === 'arrangement-hull'
-    ? hullOutline(nodesMM, padMM)
-    : libraryPreview(sel, pitchMM, padMM).outlineMM
+  const { outlineMM, error } = draftOutline(shape, nodesMM, sel, pitchMM, padMM)
   const contour: Contour = { outer: { pts: [...outlineMM] }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
     pitchCentreMM: pitchMM,
-    // An EMPTY draft still needs a clickable field: the canvas seeds its lattice from
-    // anchors[0] ?? lattice[0], so a phase seed keeps the spots on screen with zero magnets.
-    lattice: nodesMM.length ? [] : [[0, 0]],
+    // An EMPTY draft still needs a clickable field, and it has to land where the magnets the
+    // admin just saw were: the canvas seeds from anchors[0] ?? lattice[0], so with nothing
+    // drawn we seed from the selected layout's own first node instead of the mm origin.
+    lattice: nodesMM.length ? [] : [libraryArrangement(sel, pitchMM).nodesMM[0] ?? [0, 0]],
     phaseMM: [0, 0],
     panMM: [0, 0],
     spotRadiusMM: spotRadiusOf(padMM),
@@ -124,7 +143,7 @@ export function draftStageModel(
     centresMM: [],
     centreMainMM: [(t.cols - 1) * pitchMM / 2, (t.rows - 1) * pitchMM / 2],
   }
-  return { contour, grid, title }
+  return { contour, grid, title, error }
 }
 
 export { canonicalNode }
