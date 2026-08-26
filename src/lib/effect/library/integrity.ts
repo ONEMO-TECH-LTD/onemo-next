@@ -6,7 +6,7 @@ import { REGISTRY_FAMILIES } from './types'
 import { frameKeyOf } from './transforms'
 
 /** Every violation named; an empty list means the corpus is sound. */
-export function libraryIntegrity(): string[] {
+export function registryIntegrity(): string[] {
   const out: string[] = []
   for (const fam of REGISTRY_FAMILIES) {
     const frames = RAW_CLASS_FRAMES[fam].map((f) => withSpacingModes(fam, f, 48))

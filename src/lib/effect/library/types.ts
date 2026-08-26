@@ -33,7 +33,7 @@ export interface LibraryShape {
 export interface LibrarySelection {
   shapeId: LibraryShapeId
   frameKey: string          // 'colsxrows', e.g. '2x3'
-  layoutId: string          // layout name, or 'prim:<name>' for a universal primitive
+  layoutId: string          // stable layout identity
   /** WHICH triangle. Geometry and population are different axes: the geometry names the shape
    *  (its three vertices), layoutId names the magnets on it. Mandatory for the triangle. */
   geometryId?: string

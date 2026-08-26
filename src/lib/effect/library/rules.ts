@@ -1,5 +1,5 @@
 // library/rules.ts — CLASS POLICY: sub-types, orientation, box measurement, labelling.
-// The view asks these; it never tests 'is this a diamond'. Shared with the classifier bridge.
+// The view renders this policy without deciding which class it receives.
 
 import { MIN_LIB_MM, type LibraryFrame, type LibraryLayout, type LibraryTransform, type RegistryFamily } from './types'
 

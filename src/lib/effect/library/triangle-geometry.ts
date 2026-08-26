@@ -116,7 +116,7 @@ export function fullNodes(v: TriangleLayout['vertices']): LatticeNode[] {
 }
 
 /** The symmetries that map this triangle onto itself — used to keep a sampled population as
- *  symmetric as the shape it sits on, so a Peak never leans because a run did not divide. */
+ *  symmetric as the shape it sits on, so a balanced type never leans because a run did not divide. */
 export function selfSymmetries(v: TriangleLayout['vertices']): Array<(n: LatticeNode) => LatticeNode> {
   const target = serialize(normalise([...v]))
   const { cols, rows } = boundsOf([...v])

@@ -14,15 +14,6 @@ export function transformLayout(
   return { cols: c, rows: r, nodes: ns }
 }
 
-/** Frame kind, the classifier's taxonomy (square / slim / standard) — pure. */
-export function kindOf(cols: number, rows: number): 'square' | 'slim' | 'standard' {
-  return cols === rows ? 'square' : Math.min(cols, rows) <= 2 ? 'slim' : 'standard'
-}
-
-export function orientationOf(cols: number, rows: number): 'tall' | 'wide' | 'even' {
-  return rows > cols ? 'tall' : cols > rows ? 'wide' : 'even'
-}
-
 export function frameKeyOf(f: LibraryFrame): string { return f.cols + 'x' + f.rows }
 
 /** The inverse of transformLayout for ONE node: a view-space node back to canonical.

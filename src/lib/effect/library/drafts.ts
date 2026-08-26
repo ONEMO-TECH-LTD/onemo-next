@@ -16,7 +16,7 @@ export interface LibraryDraft {
    *  other, so the geometry is part of the identity, not a note. */
   geometryId?: string
   name: string
-  nodes: Array<[number, number]>   // lattice units, y-down, same canon as LAYOUT_LIBRARY
+  nodes: Array<[number, number]>   // lattice units, y-down, same canonical basis as the corpus
 }
 
 export const DRAFT_STORE_KEY = 'grid-centre.library-drafts'

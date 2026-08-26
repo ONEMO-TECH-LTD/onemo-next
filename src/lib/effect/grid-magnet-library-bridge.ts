@@ -8,7 +8,7 @@
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
-import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
+import { MAGNET_DIA_SMALL_MM } from './grid-magnet-spec'
 import {
   materializeSelection, materializeDraft,
   type MaterializedLibrary, type LibrarySelection,
@@ -59,12 +59,3 @@ export function draftStageModel(
 }
 
 /** Selection -> the engine-space record the pipeline consumes. */
-export function libraryArrangement(sel: LibrarySelection, pitchMM: number, padMM = RELEASED_PADDING_MM): MaterializedLibrary {
-  return materializeSelection(sel, pitchMM, padMM)
-}
-
-/** Preview metadata — AUTHORING DISPLAY ONLY, never part of the pipeline arrangement (Meta M1:
- *  the declared library family must not pre-empt Step-1's open recognition-source ruling). */
-export function libraryPreview(sel: LibrarySelection, pitchMM: number, padMM: number = RELEASED_PADDING_MM): MaterializedLibrary {
-  return materializeSelection(sel, pitchMM, padMM)
-}

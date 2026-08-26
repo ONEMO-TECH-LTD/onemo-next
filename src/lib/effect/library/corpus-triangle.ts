@@ -2,8 +2,8 @@
 // runtime: every non-collinear three-node layout inside a 5x5 field, deduplicated under
 // translation and the eight lattice symmetries, in canonical portrait form.
 //
-// 79 layouts — Peak 14, Wedge 17, Sail 48. The test file derives the universe independently and
-// asserts exact set equality, so a deleted or invented record fails.
+// 79 layouts. The test file derives the universe independently and asserts exact set equality,
+// so a deleted or invented record fails.
 
 import type { TriangleLayout } from './triangle-geometry'
 

@@ -4,8 +4,8 @@
 
 import type { TriangleGeometry } from './triangle-geometry'
 
-/** Dan's own naming list (08-26), one word each. Peak / Wedge / Sail as a THREE-name grouping is
- *  retired vocabulary and must not reach the UI; 'wedge' and 'sail' survive as two of the ten.
+/** Dan's own naming list (08-26), one word each. The retired three-name grouping must not reach
+ *  the UI; current product labels are defined below.
  *
  *  Each name is his description made measurable on the presented view:
  *    Wedge     — a squared corner: the right angle stood on a level side and an upright side
@@ -15,7 +15,7 @@ import type { TriangleGeometry } from './triangle-geometry'
  *    Mountain  — symmetric on a level base, wider than tall
  *    Flag      — leaning: no two sides equal, so it points off to one side
  *
- *  Ramp, Pennant, Sail and Fin were four names for that one family, split by proportion. A
+ *  The retired leaning labels were four names for one family, split by proportion. A
  *  proportion is a number, not a thing anyone recognises, so the same shape read as a Ramp at
  *  one size and a Fin at another, and each tab collected whatever splinters fell in its band.
  *  Dan, 08-26: "remove ramp penant sail and fin ... these must go in one tab flag". */

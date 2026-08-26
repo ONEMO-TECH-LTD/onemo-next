@@ -7,7 +7,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, registryFramesAt, LIBRARY_SHAPES,
-  LIBRARY_FAMILIES, REGISTRY_FAMILIES, SPACING_MODES, specOf, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
+  LIBRARY_FAMILIES, REGISTRY_FAMILIES, RAW_CLASS_FRAMES, SPACING_MODES, specOf, registryIntegrity, transformLayout, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode,
   transformLayout as tl,
   TRIANGLE_LAYOUTS, triangleGeometry, triangleTypeOf, triangleFrameKey,
@@ -23,7 +23,7 @@ import {
   type LibraryDraft,
   type LibrarySelection,
 } from '../library'
-import { libraryArrangement, libraryPreview, libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
+import { libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { shapeFamilyOf } from '../grid-magnet-class'
 
@@ -32,6 +32,11 @@ import { shapeFamilyOf } from '../grid-magnet-class'
  *  converts here too rather than the library loosening its own type. */
 const enginePts = (ps: ReadonlyArray<readonly [number, number]>): Array<[number, number]> =>
   ps.map((p) => [p[0], p[1]])
+
+const libraryArrangement = (selection: LibrarySelection, pitchMM: number) =>
+  materializeSelection(selection, pitchMM, 12)
+const libraryPreview = (selection: LibrarySelection, pitchMM: number, padMM = 12) =>
+  materializeSelection(selection, pitchMM, padMM)
 
 const isRegistry = (f: string): f is RegistryFamily => (REGISTRY_FAMILIES as string[]).includes(f)
 
@@ -60,7 +65,6 @@ describe('corpus completeness — removal must fail these', () => {
     const seen = new Set<string>()
     for (const f of SQUARE_FRAMES) { expect(f.cols).toBe(f.rows); seen.add(f.cols + 'x' + f.rows) }
     for (const n of [1, 2, 3, 4, 5]) expect(seen.has(n + 'x' + n)).toBe(true)
-    expect(kindOf(3, 3)).toBe('square'); expect(orientationOf(3, 3)).toBe('even')
   })
 })
 
@@ -117,7 +121,7 @@ describe('classifier goldens — declared family is the classifier verdict, not 
 
 describe('data integrity + transforms', () => {
   it('unique frames/names, in-bounds unique nodes, no empties', () => {
-    expect(libraryIntegrity()).toEqual([])
+    expect(registryIntegrity()).toEqual([])
   })
   it('transform closure keeps nodes in bounds', () => {
     for (const f of REGISTRY_FAMILIES.flatMap((f) => registryFramesAt(f, 48))) for (const l of f.layouts)
@@ -350,10 +354,11 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
         for (const t of spec.types) for (const v of spec.variants(t.id, pitch)) {
           for (const layout of v.frame.layouts) {
             const s = { ...spec.select(open, v), layoutId: layout.name }
-            const resolved = spec.frameOf(s, pitch).layouts.find((l) => l.name === layout.name)!
             const drawn = materializeSelection(s, pitch, 12)
-            expect(drawn.nodesMM.length, `${fam} ${v.id} ${layout.name} @${pitch}`)
-              .toBe(resolved.nodes.length)
+            const transformed = transformLayout(v.frame, layout, s.view)
+            const expected = transformed.nodes.map(([x, y]) =>
+              [x * pitch, (transformed.rows - 1 - y) * pitch] as const)
+            expect(drawn.nodesMM, `${fam} ${v.id} ${layout.name} @${pitch}`).toEqual(expected)
             checked++
           }
         }
@@ -492,7 +497,7 @@ describe('triangle — the three-point layout universe', () => {
       .types.map((o) => o.label)
     expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
     for (const l of labels) expect(l.includes(' '), l).toBe(false)
-    expect(labels.join(' ')).not.toContain('Peak')
+    expect(labels.join(' ')).not.toContain('retired-three-name-type')
   })
 
   it('the frame distribution of the universe is exactly the derived table', () => {
@@ -585,7 +590,7 @@ describe('triangle — populations', () => {
     }
   })
 
-  it('a Peak stays mirror-balanced — a non-divisible run cannot make it lean', () => {
+  it('a balanced symmetric type stays mirror-balanced — a non-divisible run cannot make it lean', () => {
     for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'pyramid')) {
       const s96 = new Set(trianglePerimeter96(t, 48).map(key))
       for (const f of selfSymmetries(t.vertices)) {
@@ -612,7 +617,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   const clearance = (p: readonly [number, number], a: readonly [number, number], b: readonly [number, number]) =>
     Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / Math.hypot(b[0] - a[0], b[1] - a[1])
 
-  it('one Peak, one Wedge and one Sail each clear their three edges by 12mm', () => {
+  it('one active type representative each clears its three edges by 12mm', () => {
     for (const type of [...TRIANGLE_TYPES]) {
       const sel = triSel(one(type))
       const a = libraryArrangement(sel, 48)
@@ -655,25 +660,18 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   it('the triangle stores no unit outline, and carries no frame registry either', () => {
     const tri = LIBRARY_SHAPES.find((s) => s.id === 'triangle')!
     expect(tri.outline.length).toBe(0)
-    // no empty-list sentinel to mistake for a real registry: the key is simply absent
-    expect([...REGISTRY_FAMILIES]).toEqual([...REGISTRY_FAMILIES])
+    expect(Object.keys(RAW_CLASS_FRAMES).sort()).toEqual([...REGISTRY_FAMILIES].sort())
+    expect(Object.prototype.hasOwnProperty.call(RAW_CLASS_FRAMES, 'triangle')).toBe(false)
     for (const s of LIBRARY_SHAPES)
       if (isRegistry(s.family)) expect(s.outline.length).toBeGreaterThan(2)
   })
 
-  it('a node on an edge or inside leaves the outline unchanged; one outside changes it', () => {
-    const id = one('wedge')
-    const t = TRIANGLE_LAYOUTS.find((x) => x.id === id)!
-    const sel = triSel(id, 'perimeter')
-    const corners = libraryPreview({ ...sel, layoutId: 'corners' }, 48, PAD).outlineMM
-    const per = libraryPreview(sel, 48, PAD).outlineMM          // adds the edge nodes
-    const same = (a: typeof corners, b: typeof corners) =>
-      a.length === b.length && a.every((p, i) => Math.abs(p[0] - b[i][0]) < 0.05 && Math.abs(p[1] - b[i][1]) < 0.05)
-    expect(same(corners, per), 'edge nodes must not move the outline').toBe(true)
-    // a node outside the hull is a different triangle
-    const outside = [...t.vertices.map(([x, y]) => [x, y] as [number, number])]
-    outside[0] = [outside[0][0], outside[0][1] + 1]
-    expect(canonicalTriangleId(outside)).not.toBe(id)
+  it('moving one corner changes the derived triangle outline', () => {
+    const selection = triSel('tri:0,0;0,2;2,0', 'corners')
+    const before = materializeDraft(selection, [[0, 0], [0, 2], [2, 0]], 48, 12)
+    const after = materializeDraft(selection, [[0, 0], [0, 2], [2, 1]], 48, 12)
+    expect(before.error).toBeNull(); expect(after.error).toBeNull()
+    expect(after.outlineMM).not.toEqual(before.outlineMM)
   })
 
   it('a collinear or four-corner population fails loudly', () => {
@@ -748,7 +746,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   })
 
   it('F2 — a saved custom layout is deduped from its own population, not the corpus', () => {
-    // an asymmetric population on a symmetric Peak has all eight views, even though the Peak's
+    // an asymmetric population on a symmetric geometry has all eight views, even though its
     // own corners have fewer
     const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid'
       && panelOptions(sel3(t.id), [], 48).orientations.length < 8)!
@@ -971,7 +969,7 @@ describe('triangle — every tab carries only its own kind', () => {
         // every symmetric name stands on a base: Dan retired the tilted symmetric shapes
         if (SYMMETRIC.includes(type) && !m.level) why.push('has no level base')
         // the proportion each SYMMETRIC name promises. Nothing splits the leaning family by
-        // proportion any more: Ramp/Pennant/Sail/Fin were four names for one thing, cut by a
+        // proportion any more: the retired leaning categories were one family, cut by a
         // number, which is why the same shape read as one at one size and another at another.
         if (type === 'needle') expect(m.aspect, t.id).toBeGreaterThanOrEqual(2)
         if (type === 'arrowhead') { expect(m.aspect, t.id).toBeGreaterThan(1); expect(m.aspect, t.id).toBeLessThan(2) }

@@ -85,7 +85,7 @@ export const triangleFrameKey = (t: TriangleLayout): string => {
 }
 
 /** The 96 population: the SHARED sampler run over each directed side, every vertex retained,
- *  then closed under the triangle's own symmetries so a non-divisible run cannot make a Peak
+ *  then closed under the triangle's own symmetries so a non-divisible run cannot make a balanced type
  *  lean to one side. */
 export function trianglePerimeter96(t: TriangleLayout, pitchMM: number): LatticeNode[] {
   const keep: LatticeNode[] = []
@@ -193,7 +193,7 @@ export function uprightView(t: TriangleLayout): LibraryTransform {
 }
 
 /** Memo over the CORPUS, which is immutable literal data: the same 79 ids give the same eight
- *  views for the life of the process. Without it the panel recomputes ten types x 79 layouts
+ *  views for the life of the process. Without it the panel recomputes every type x 79 layouts
  *  x eight views on every render, which is seconds, not milliseconds. */
 const UPRIGHT = new Map<string, LibraryTransform>()
 const BY_TYPE = new Map<string, TriangleLayout[]>()
