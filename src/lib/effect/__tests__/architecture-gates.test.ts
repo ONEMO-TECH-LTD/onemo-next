@@ -5,6 +5,8 @@ import ts from 'typescript'
 import { describe, expect, it, test } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
+import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
+import { catalogueCandidates, classifiedLibraryCatalogue } from '../grid-magnet-library-catalogue'
 
 const ROOT = resolve(process.cwd(), 'src/lib/effect')
 const LIBRARY = join(ROOT, 'library')
@@ -51,7 +53,7 @@ const ZONE_FILES: Record<Exclude<Zone, 1>, readonly string[]> = {
     'triangle-class.ts', 'triangle-frames.ts', 'triangle-geometry.ts', 'triangle-types.ts',
   ],
   4: ['class-registry.ts'],
-  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'drafts.ts', 'integrity.ts'],
+  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'drafts.ts', 'integrity.ts'],
 }
 
 const step2Files = () => files(LIBRARY).filter((path) => /\.tsx?$/.test(path)
@@ -161,6 +163,10 @@ const jsxOffenders = (tree: ts.SourceFile): ts.Node[] => {
   visit(tree)
   return out
 }
+
+const parseFailureCodes = (tree: ts.SourceFile): number[] =>
+  [...(tree as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics]
+    .map((diagnostic) => diagnostic.code)
 
 const corpusDeclarationViolations = (path: string, code = source(path)): string[] => {
   const tree = parse(path, code)
@@ -276,13 +282,18 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(importViolations()).toEqual([])
   })
   it('STEP 2: zones 0-5 contain no React, Next, or JSX', () => {
-    for (const path of step2Files()) expect(jsxOffenders(parse(path)), path).toEqual([])
+    for (const path of step2Files()) {
+      const tree = parse(path)
+      expect(parseFailureCodes(tree), path).toEqual([])
+      expect(jsxOffenders(tree), path).toEqual([])
+    }
   })
   it('STEP 2 gate self-proof rejects forbidden service-to-class, JSX, mutable corpus and sentinels', () => {
     expect(importViolations({
       'library/selection.ts': `import { squareClass } from './square-class'; void squareClass`,
     })).toContainEqual(expect.objectContaining({ fromZone: 5, toZone: 3 }))
     expect(jsxOffenders(parse('probe.tsx', `export const Probe = () => <div />`))).toHaveLength(1)
+    expect(parseFailureCodes(parse('probe.ts', `export const Probe = <div />`))).not.toEqual([])
     expect(corpusDeclarationViolations('corpus-probe.ts',
       `export const FRAMES: readonly unknown[] = []`)).toEqual(['FRAMES'])
     expect(emptyLayoutSentinels('sentinel.ts',
@@ -366,6 +377,35 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     for (const path of governed)
       expect(source(path), path).not.toMatch(/\bpadMM\b/)
   })
-  test.todo('STEP 4: LAW 0 exact catalogue contract, identity, and matcher')
+  it('STEP 4: catalogue V1 has exact readonly data-only records and frozen identity', () => {
+    type Exact = Readonly<{
+      classId: string; typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
+      nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
+      widthMM: number; heightMM: number; frameCols: number; frameRows: number
+    }>
+    type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
+    const exact: Equal<CatalogueEntry, Exact> = true
+    expect(exact).toBe(true)
+    expect(CATALOGUE_FORMAT_VERSION).toBe(1)
+    const entries = catalogue(48)
+    const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows'].sort()
+    for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
+      expect(Object.keys(entry).sort()).toEqual(keys)
+      expect(JSON.parse(JSON.stringify(entry))).toEqual(entry)
+      expect(Number.isFinite(entry.widthMM) && Number.isFinite(entry.heightMM)).toBe(true)
+    }
+    const ids = entries.map((entry) => entry.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect([...catalogue(24).map((entry) => entry.id)].sort()).toEqual([...ids].sort())
+    expect([...catalogue(96).map((entry) => entry.id)].sort()).toEqual([...ids].sort())
+    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v1.json')))
+    expect(manifest).toEqual(entries.map((entry) => ({ id: entry.id, classId: entry.classId, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) })))
+  })
+  it('STEP 4: classifier matcher round-trips every catalogue entry', () => {
+    for (const item of classifiedLibraryCatalogue(48)) {
+      expect(Number.isFinite(item.shapeClass.cx) && Number.isFinite(item.shapeClass.cy)).toBe(true)
+      expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), 48).some((entry) => entry.id === item.entry.id)).toBe(true)
+    }
+  })
   test.todo('STEP 5: surface, barrel, shell, bridge, CSS, and caller equality')
 })
