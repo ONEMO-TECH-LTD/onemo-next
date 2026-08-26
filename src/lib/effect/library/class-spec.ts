@@ -12,9 +12,9 @@
 // It adds no new behaviour. Every member below reuses a function that already existed, by
 // reference; the file's whole job is to name the seam so the branches can be deleted.
 
-import { CLASS_FRAMES } from './frames'
+import { registryFramesAt } from './frames'
 import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
-import { REGISTRY_RULES, SPACING_96, SPACING_BASE } from './rules'
+import { REGISTRY_RULES } from './rules'
 import { LIBRARY_SHAPES } from './shapes'
 import { frameKeyOf, transformLayout } from './transforms'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
@@ -25,7 +25,7 @@ import {
   triangleTypeOf, uprightView,
 } from './triangle-frames'
 import type {
-  LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, RegistryFamily,
+  LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, RegistryFamily,
 } from './types'
 
 /** A point in millimetres. The library states its own geometry; the bridge maps it to the
@@ -71,8 +71,6 @@ export interface ClassSpec {
   variants: (typeId: string, pitchMM: number) => ClassVariant[]
   /** The frame a selection names — throws on an unknown id, never a silent retarget. */
   frameOf: (sel: LibrarySelection, pitchMM: number) => LibraryFrame
-  /** Materialise a layout at a pitch — the 96mm mode is physical, not an index rule. */
-  layoutAt: (frame: LibraryFrame, layout: LibraryLayout, pitchMM: number) => LibraryLayout
   /** The outline in mm around a materialised population. */
   outline: (
     nodesMM: readonly PointMM[], frameCols: number, frameRows: number, pitchMM: number, padMM: number,
@@ -129,35 +127,29 @@ function boundsAndDuplicates(d: DraftShape, frame: LibraryFrame): string[] {
 function registrySpec(family: RegistryFamily): LibraryClass {
   const rules = REGISTRY_RULES[family]
   const shape = LIBRARY_SHAPES.find((x) => x.family === family)!
-  const frames = () => CLASS_FRAMES[family]
+  const frames = (pitchMM: number) => registryFramesAt(family, pitchMM)
   const subOf = (f: LibraryFrame) => rules.subOf(f.cols, f.rows)
   const asVariant = (f: LibraryFrame): ClassVariant =>
     ({ id: frameKeyOf(f), label: rules.label(f.cols, f.rows), frame: f, view: NO_VIEW })
-  const frameOf = (sel: LibrarySelection): LibraryFrame => {
-    const f = frames().find((x) => frameKeyOf(x) === sel.frameKey)
+  const frameOf = (sel: LibrarySelection, pitchMM: number): LibraryFrame => {
+    const f = frames(pitchMM).find((x) => frameKeyOf(x) === sel.frameKey)
     if (!f) throw new Error('library: unknown frameKey ' + sel.frameKey)
     return f
   }
   return {
     family,
     types: rules.subs.map((id) => ({ id, label: id })),
-    typeOf: (sel) => subOf(frameOf(sel)),
-    variants: (typeId) => frames().filter((f) => subOf(f) === typeId).map(asVariant),
+    typeOf: (sel, pitchMM) => subOf(frameOf(sel, pitchMM)),
+    variants: (typeId, pitchMM) => frames(pitchMM).filter((f) => subOf(f) === typeId).map(asVariant),
     variantIdOf: (sel) => sel.frameKey,
     frameOf,
-    open: (current) => {
-      const f0 = frames()[0]
+    open: (current, pitchMM) => {
+      const f0 = frames(pitchMM)[0]
       return { ...current, shapeId: shape.id, geometryId: undefined, frameKey: frameKeyOf(f0), layoutId: pickLayoutName(f0, 'perimeter') }
     },
     select: (current, v) => ({ ...current, frameKey: v.id, layoutId: pickLayoutName(v.frame, current.layoutId) }),
     orientations: rules.orientations,
     baseView: () => NO_VIEW,
-    layoutAt: (frame, layout, pitchMM) => {
-      if (layout.name !== SPACING_96) return layout
-      const per = frame.layouts.find((l) => l.name === SPACING_BASE)
-      if (!per) throw new Error('library: 96mm mode has no perimeter in ' + frame.cols + 'x' + frame.rows)
-      return { name: SPACING_96, nodes: rules.spacing96(frame, per.nodes, pitchMM) }
-    },
     // The frame's physical span is CLASS POLICY: the square/rectangle class floor, the diamond's
     // wrap-the-ring rule. A shape drawn square keeps its square span on an oblong frame.
     outline: (_nodesMM, frameCols, frameRows, pitchMM, padMM) => {
@@ -238,8 +230,6 @@ function triangleSpec(): LibraryClass {
     }),
     orientations: [],
     baseView: (sel) => uprightView(geoOf(sel)),
-    // this class materialises its own frames at the requested pitch, so nothing is left to do
-    layoutAt: (_frame, layout) => layout,
     // THE DERIVED OUTLINE: connect the magnet centres, move each edge out by the padding.
     outline: (nodesMM, _c, _r, _pitchMM, padMM) => hullOutlineMM(nodesMM, padMM),
     validateDraft: (d, frame) => {

@@ -1,12 +1,15 @@
 // library/integrity.ts — the corpus checks its own soundness.
 
-import { CLASS_FRAMES } from './frames'
+import { RAW_CLASS_FRAMES } from './frames'
+import { withSpacingModes } from './rules'
+import { REGISTRY_FAMILIES } from './types'
 import { frameKeyOf } from './transforms'
 
 /** Every violation named; an empty list means the corpus is sound. */
 export function libraryIntegrity(): string[] {
   const out: string[] = []
-  for (const frames of Object.values(CLASS_FRAMES)) {
+  for (const fam of REGISTRY_FAMILIES) {
+    const frames = RAW_CLASS_FRAMES[fam].map((f) => withSpacingModes(fam, f, 48))
     const seen = new Set<string>()
     for (const f of frames) {
       const fk = frameKeyOf(f)

@@ -25,8 +25,9 @@ export const startAdd = (): LibraryEdit => ({ name: '', nodes: [] })
 export function startEdit(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number,
 ): LibraryEdit {
-  const { shape, frame, layout, draft } = resolveSelection(sel, drafts, pitchMM)
-  const source = draft?.nodes ?? specOf(shape.family).layoutAt(frame, layout, pitchMM).nodes
+  const { layout, draft } = resolveSelection(sel, drafts, pitchMM)
+  // the frame already carries the population for THIS pitch, so there is nothing to repair
+  const source = draft?.nodes ?? layout.nodes
   return {
     name: draft ? draft.name : layout.name + '-custom',
     nodes: source.map(([x, y]) => [x, y] as [number, number]),

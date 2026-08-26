@@ -6,7 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, CLASS_FRAMES, LIBRARY_SHAPES,
+  SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES, registryFramesAt, LIBRARY_SHAPES,
   LIBRARY_FAMILIES, REGISTRY_FAMILIES, SPACING_MODES, specOf, libraryIntegrity, transformLayout, kindOf, orientationOf, frameKeyOf,
   resolveSelection, selectedRecords, draftLayoutId, sample96, canonicalNode,
   transformLayout as tl,
@@ -50,7 +50,7 @@ describe('corpus completeness — removal must fail these', () => {
   it('exactly 16 square layouts as the panel and the pipeline see them', () => {
     // 12 literal semantic populations in the corpus + the 4 computed 96mm modes.
     expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(12)
-    expect(CLASS_FRAMES.square.reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
+    expect(registryFramesAt('square', 48).reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
   })
   it('the complete ruled shape-ID set', () => {
     expect(LIBRARY_SHAPES.map((x) => x.id).sort()).toEqual([...SHAPE_IDS].sort())
@@ -73,13 +73,13 @@ describe('classifier goldens — declared family is the classifier verdict, not 
       // the engine classifier reads it as the box-filling 'square' family. The mapping is
       // asserted explicitly so the two taxonomies can never silently merge.
       const ENGINE_FAMILY: Record<string, string> = { square: 'square', rectangle: 'square', diamond: 'triangle' }
-      const f0 = CLASS_FRAMES[s.family as RegistryFamily][0]
+      const f0 = registryFramesAt(s.family as RegistryFamily, 48)[0]
       const pv = libraryPreview(sel({ shapeId: s.id, frameKey: frameKeyOf(f0), layoutId: f0.layouts[0].name }), 48)
       expect(shapeFamilyOf(enginePts(pv.outlineMM)), s.id).toBe(ENGINE_FAMILY[s.family])
     }
   })
   it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
-    for (const s of LIBRARY_SHAPES) for (const f of (isRegistry(s.family) ? CLASS_FRAMES[s.family as RegistryFamily] : [])) {
+    for (const s of LIBRARY_SHAPES) for (const f of (isRegistry(s.family) ? registryFramesAt(s.family as RegistryFamily, 48) : [])) {
       // The engine classifier tops out at 5 magnet lines per axis (bands B1-B5), so a 6-line
       // library frame has no class to be read back as. The library carries it; the classifier
       // cannot express it until a sixth band is ruled.
@@ -120,7 +120,7 @@ describe('data integrity + transforms', () => {
     expect(libraryIntegrity()).toEqual([])
   })
   it('transform closure keeps nodes in bounds', () => {
-    for (const f of Object.values(CLASS_FRAMES).flat()) for (const l of f.layouts)
+    for (const f of REGISTRY_FAMILIES.flatMap((f) => registryFramesAt(f, 48))) for (const l of f.layouts)
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
         const t = transformLayout(f, l, { transpose, flipX, flipY })
         expect(t.nodes.length).toBe(l.nodes.length)
@@ -176,7 +176,7 @@ describe('interior rule and the belt mode', () => {
   })
   it('belt is a spacing mode: every frame above 1x1 carries perimeter and perimeter-96', () => {
     for (const f of SQUARE_FRAMES.filter((x) => x.cols > 1)) {
-      const names = CLASS_FRAMES.square.find((x) => x.cols === f.cols && x.rows === f.rows)!.layouts.map((l) => l.name)
+      const names = registryFramesAt('square', 48).find((x) => x.cols === f.cols && x.rows === f.rows)!.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       expect(names).toContain('perimeter-96')
     }
@@ -185,10 +185,10 @@ describe('interior rule and the belt mode', () => {
 
 describe('rectangle class', () => {
   it('carries exactly its ruled frames', () => {
-    expect(CLASS_FRAMES.rectangle.map(frameKeyOf)).toEqual(['1x2', '1x3', '1x4', '1x5', '2x3', '2x4', '2x5', '3x4', '3x5', '4x5', '4x6', '5x6'])
+    expect(registryFramesAt('rectangle', 48).map(frameKeyOf)).toEqual(['1x2', '1x3', '1x4', '1x5', '2x3', '2x4', '2x5', '3x4', '3x5', '4x5', '4x6', '5x6'])
   })
   it('every frame offers a perimeter, and only 3+ line frames carry an interior full', () => {
-    for (const f of CLASS_FRAMES.rectangle) {
+    for (const f of registryFramesAt('rectangle', 48)) {
       const names = f.layouts.map((l) => l.name)
       expect(names).toContain('perimeter')
       const hasFull = names.includes('full')
@@ -203,10 +203,10 @@ describe('rectangle class', () => {
 
 describe('diamond class', () => {
   it('carries the ruled rings', () => {
-    expect(CLASS_FRAMES.diamond.map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
+    expect(registryFramesAt('diamond', 48).map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
   })
   it('uses the SHARED layout vocabulary — full / perimeter / perimeter-96 / corners', () => {
-    for (const f of CLASS_FRAMES.diamond.slice(1)) {
+    for (const f of registryFramesAt('diamond', 48).slice(1)) {
       const k = (f.cols - 1) / 2
       const names = f.layouts.map((l) => l.name)
       expect(names).toContain('full')
@@ -230,7 +230,7 @@ describe('diamond class', () => {
 
 describe('diamond wrapping', () => {
   it('the outline wraps the ring: half-diagonal = k*pitch + padding on the diagonal', () => {
-    for (const f of CLASS_FRAMES.diamond) {
+    for (const f of registryFramesAt('diamond', 48)) {
       const k = (f.cols - 1) / 2
       const pv = libraryPreview({ shapeId: 'diamond', frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose: false, flipX: false, flipY: false } }, 48)
       const xs = pv.outlineMM.map((q) => q[0])
@@ -306,7 +306,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('a frame with a perimeter always offers the 96mm mode, and it is a subset of that perimeter', () => {
-    for (const fam of REGISTRY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
+    for (const fam of REGISTRY_FAMILIES) for (const f of registryFramesAt(fam, 48)) {
       const per = f.layouts.find((l) => l.name === 'perimeter')
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!per) { expect(s96).toBeUndefined(); continue }
@@ -318,7 +318,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('every 96mm population keeps every extreme — an extreme is never left bare', () => {
-    for (const fam of REGISTRY_FAMILIES) for (const f of CLASS_FRAMES[fam]) {
+    for (const fam of REGISTRY_FAMILIES) for (const f of registryFramesAt(fam, 48)) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
       const got = new Set(s96.nodes.map(key))
@@ -336,9 +336,35 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
     expect(() => sample96(5, 36)).toThrow('unsupported at pitch')
   })
 
+  it('the panel and the canvas see the SAME magnets, at every pitch, for every class', () => {
+    // The 96mm population is a physical distance, so it depends on the pitch. Composing it once
+    // at 48 and repairing it at draw time meant every reader BEFORE the repair — the resolver,
+    // the option layer, the orientation dedupe — counted a different set from the one on
+    // screen: 28 shapes disagreed at 24mm and 96mm. Nothing visibly broke only because those
+    // classes are symmetric.
+    let checked = 0
+    for (const fam of LIBRARY_FAMILIES) {
+      const spec = specOf(fam)
+      for (const pitch of [24, 48, 96]) {
+        const open = spec.open(sel(), pitch)
+        for (const t of spec.types) for (const v of spec.variants(t.id, pitch)) {
+          for (const layout of v.frame.layouts) {
+            const s = { ...spec.select(open, v), layoutId: layout.name }
+            const resolved = spec.frameOf(s, pitch).layouts.find((l) => l.name === layout.name)!
+            const drawn = materializeSelection(s, pitch, 12)
+            expect(drawn.nodesMM.length, `${fam} ${v.id} ${layout.name} @${pitch}`)
+              .toBe(resolved.nodes.length)
+            checked++
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(200)
+  })
+
   it('the population follows the pitch tier, and the label does not (Dan: 96 is fixed)', () => {
-    const f = CLASS_FRAMES.square.find((x) => x.cols === 5)!
-    const at = (p: number) => specOf('square').layoutAt(f, f.layouts.find((l) => l.name === 'perimeter-96')!, p).nodes.length
+    const at = (p: number) => registryFramesAt('square', p).find((x) => x.cols === 5)!
+      .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
     expect([at(24), at(48), at(96)]).toEqual([4, 8, 16])
     expect(SPACING_MODES.map((m) => m.label)).toEqual(['48 mm', '96 mm'])
   })
@@ -346,13 +372,13 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   it('a non-divisible ring pairs instead of leaning — square 4x4 exactly', () => {
     // Walked clockwise, each side indexes from its own start, so the short closing interval
     // lands as four balanced adjacent pairs rather than biased to one absolute direction.
-    const f = CLASS_FRAMES.square.find((x) => x.cols === 4)!
+    const f = registryFramesAt('square', 48).find((x) => x.cols === 4)!
     const got = f.layouts.find((l) => l.name === 'perimeter-96')!.nodes.map(key).sort()
     expect(got).toEqual(['0,0', '0,1', '0,3', '1,3', '2,0', '3,0', '3,2', '3,3'].sort())
   })
 
   it('every square 96 population is closed under a quarter turn', () => {
-    for (const f of CLASS_FRAMES.square.filter((x) => x.cols > 1)) {
+    for (const f of registryFramesAt('square', 48).filter((x) => x.cols > 1)) {
       const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
       if (!s96) continue
       const got = new Set(s96.nodes.map(key))
@@ -363,7 +389,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
 
   it('the ruled populations follow from that one rule', () => {
     const n96 = (fam: 'square' | 'rectangle' | 'diamond', c: number, r: number) =>
-      CLASS_FRAMES[fam].find((f) => f.cols === c && f.rows === r)!
+      registryFramesAt(fam, 48).find((f) => f.cols === c && f.rows === r)!
         .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
     expect(n96('square', 3, 3)).toBe(4)
     expect(n96('square', 4, 4)).toBe(8)
@@ -376,7 +402,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
   })
 
   it('the diamond vocabulary is complete on every ring, corners are exactly the vertices', () => {
-    for (const f of CLASS_FRAMES.diamond.slice(1)) {
+    for (const f of registryFramesAt('diamond', 48).slice(1)) {
       const names = f.layouts.map((l) => l.name)
       for (const n of ['full', 'perimeter', 'perimeter-96', 'corners']) expect(names, frameKeyOf(f)).toContain(n)
       const corners = f.layouts.find((l) => l.name === 'corners')!
@@ -386,7 +412,7 @@ describe('the 96mm spacing mode is computed policy, one rule for every class', (
 })
 
 describe('authoring under a view transform stays canonical (QA F2)', () => {
-  const frame = CLASS_FRAMES.rectangle.find((f) => f.cols === 2 && f.rows === 3)!
+  const frame = registryFramesAt('rectangle', 48).find((f) => f.cols === 2 && f.rows === 3)!
   const views = [false, true].flatMap((transpose) => [false, true].flatMap((flipX) =>
     [false, true].map((flipY) => ({ transpose, flipX, flipY }))))
 
@@ -630,7 +656,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     const tri = LIBRARY_SHAPES.find((s) => s.id === 'triangle')!
     expect(tri.outline.length).toBe(0)
     // no empty-list sentinel to mistake for a real registry: the key is simply absent
-    expect(Object.keys(CLASS_FRAMES)).toEqual([...REGISTRY_FAMILIES])
+    expect([...REGISTRY_FAMILIES]).toEqual([...REGISTRY_FAMILIES])
     for (const s of LIBRARY_SHAPES)
       if (isRegistry(s.family)) expect(s.outline.length).toBeGreaterThan(2)
   })
@@ -1096,7 +1122,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
     // and the two UI files import no class table at all
     for (const f of [PANEL, PAGE]) {
       const src = read(f)
-      for (const sym of ['CLASS_FRAMES', 'REGISTRY_RULES', 'specOf', 'TRIANGLE_'])
+      for (const sym of ['RAW_CLASS_FRAMES', 'registryFramesAt', 'REGISTRY_RULES', 'specOf', 'TRIANGLE_'])
         expect(src, `${f} :: ${sym}`).not.toContain(sym)
     }
   })

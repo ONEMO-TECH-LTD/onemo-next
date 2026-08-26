@@ -123,11 +123,17 @@ export const REGISTRY_RULES = {
 /** A frame as the panel and the pipeline see it: the literal semantic layouts, plus the
  *  computed spacing mode inserted next to the perimeter it samples. The corpus stays literal
  *  (Dan: a readable table, no generation) — only the MODE is computed (Dan: "96mm is mode
- *  correctly calculating ... 96mm is skip every 48mm logic"). */
-export function withSpacingModes(family: RegistryFamily, frame: LibraryFrame): LibraryFrame {
+ *  correctly calculating ... 96mm is skip every 48mm logic").
+ *
+ *  96mm is a PHYSICAL distance, so the population depends on the pitch and the pitch must be
+ *  known here. Composing once at 48 and repairing later meant the panel counted a different
+ *  set of magnets from the one the canvas drew, at every pitch except 48. */
+export function withSpacingModes(
+  family: RegistryFamily, frame: LibraryFrame, pitchMM: number,
+): LibraryFrame {
   const i = frame.layouts.findIndex((l) => l.name === SPACING_BASE)
   if (i < 0) return frame
-  const nodes = REGISTRY_RULES[family].spacing96(frame, frame.layouts[i].nodes, 48)
+  const nodes = REGISTRY_RULES[family].spacing96(frame, frame.layouts[i].nodes, pitchMM)
   if (!nodes.length) return frame
   const mode: LibraryLayout = { name: SPACING_96, nodes }
   const layouts = [...frame.layouts]

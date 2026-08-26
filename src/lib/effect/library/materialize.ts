@@ -51,8 +51,9 @@ export function materializeSelection(
 ): MaterializedLibrary {
   const { shape, frame, layout } = selectedRecords(sel, pitchMM)
   const spec = specOf(shape.family)
-  // 96mm is physical: the population is materialised for THIS pitch, never the canonical one.
-  const p = place(frame, spec.layoutAt(frame, layout, pitchMM), sel.view, pitchMM)
+  // 96mm is physical, and the FRAME already carries the population for this pitch — every
+  // reader sees the same magnets rather than the panel counting one set and the canvas another.
+  const p = place(frame, layout, sel.view, pitchMM)
   return {
     shapeId: shape.id, declaredFamily: shape.family,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
