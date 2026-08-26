@@ -439,22 +439,16 @@ describe('triangle — the three-point layout universe', () => {
     }
   })
 
-  it('every ruled layout is grouped as Dan ruled it, and no name is two words', () => {
-    // 08-26 08:11 "2x3 is not wedge it is peak" — in today's words, a Pyramid
-    for (const id of ['tri:0,0;0,2;1,0', 'tri:0,0;0,2;1,1'])
-      expect(triangleTypeOf(TRIANGLE_LAYOUTS.find((t) => t.id === id)!), id).toBe('pyramid')
-    // 08-26 08:16 "it is not peak it is wedge"
-    expect(triangleTypeOf(TRIANGLE_LAYOUTS.find((t) => t.id === 'tri:0,0;0,1;1,0')!)).toBe('wedge')
-    // Dan, 08-26: no two-word product names, and the retired vocabulary never reaches the UI
+  it('the retired vocabulary never reaches the UI, and no name is two words', () => {
     const first = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
     const ff = triangleFrame(first, 48)
     const labels = panelOptions({ shapeId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
       layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
       .types.map((o) => o.label)
-    expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Slice', 'Wedge', 'Ramp', 'Pennant', 'Fin'])
+    expect(labels).toEqual(
+      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Slice', 'Wedge', 'Ramp', 'Pennant', 'Sail', 'Fin'])
     for (const l of labels) expect(l.includes(' '), l).toBe(false)
     expect(labels.join(' ')).not.toContain('Peak')
-    expect(labels.join(' ')).not.toContain('Sail')
   })
 
   it('the frame distribution of the universe is exactly the derived table', () => {
@@ -771,7 +765,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(labels[0]).toContain('Pyramid 1')
     expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'pyramid').length)
     expect(opts.types.map((o) => o.label)).toEqual(
-      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Slice', 'Wedge', 'Ramp', 'Pennant', 'Fin'])
+      ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Slice', 'Wedge', 'Ramp', 'Pennant', 'Sail', 'Fin'])
   })
 })
 
@@ -881,5 +875,89 @@ describe('triangle — straight layouts come before the diagonal ones', () => {
     const active = ([...TRIANGLE_TYPES] as const).flatMap((t) => trianglesOfType(t))
     expect(active.length).toBe(76)
     expect(active.every((t) => TRIANGLE_LAYOUTS.includes(t))).toBe(true)
+  })
+})
+
+describe('triangle — every tab carries only its own kind', () => {
+  const byId = (id: string) => TRIANGLE_LAYOUTS.find((t) => t.id === id)!
+  /** The measurable form of each name, read on the view the shape is presented in. */
+  const shown = (t: typeof TRIANGLE_LAYOUTS[number]) => {
+    const b = boundsOf([...t.vertices])
+    const r = tl({ cols: b.cols, rows: b.rows, layouts: [] }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
+    const [p, q, s] = r.nodes
+    const E = [[p, q], [q, s], [s, p]] as Array<[LatticeNode, LatticeNode]>
+    const g = triangleGeometry(t.vertices)
+    return {
+      sym: g.sideClass === 'isosceles', right: g.angleClass === 'right',
+      level: E.some(([a, c]) => a[1] === c[1]),
+      upright: E.some(([a, c]) => a[0] === c[0]),
+      aspect: Math.max(1, r.rows - 1) / Math.max(1, r.cols - 1),
+    }
+  }
+
+  it('no tab contains a triangle alien to its name', () => {
+    // Every name is a PROMISE about the shape as it is presented. This asserts each promise on
+    // every member, so a shape can never sit under a name that does not describe it.
+    const SYMMETRIC = ['pyramid', 'arrowhead', 'mountain', 'needle', 'slice']
+    const LEANING = ['ramp', 'pennant', 'sail', 'fin']
+    for (const type of TRIANGLE_TYPES) {
+      for (const t of trianglesOfType(type)) {
+        const m = shown(t)
+        const why: string[] = []
+        // a Wedge is a SQUARED CORNER — a right angle presented on a level and an upright side.
+        // A right angle presented any other way is incidental and the shape reads by silhouette.
+        const squared = m.right && m.level && m.upright
+        if (type === 'wedge' && !squared) why.push('is not a squared corner')
+        if (type !== 'wedge' && squared) why.push('is a squared corner')
+        if (SYMMETRIC.includes(type) && !m.sym) why.push('is not symmetric')
+        if (LEANING.includes(type) && m.sym) why.push('is symmetric')
+        // the peak family stands on a base; a Slice is the symmetric one that cannot
+        if (['pyramid', 'arrowhead', 'mountain', 'needle'].includes(type) && !m.level) why.push('has no level base')
+        if (type === 'slice' && m.level) why.push('has a level base to stand on')
+        // a Ramp is LOW AND WIDE on a flat base — a level side alone let tall spikes in
+        if (type === 'ramp' && !m.level) why.push('has no level base')
+        if (type === 'ramp' && m.aspect >= 1) why.push('is not wider than tall (' + m.aspect.toFixed(2) + ')')
+        // and the proportion each remaining name promises
+        if (type === 'needle') expect(m.aspect, t.id).toBeGreaterThanOrEqual(2)
+        if (type === 'arrowhead') { expect(m.aspect, t.id).toBeGreaterThan(1); expect(m.aspect, t.id).toBeLessThan(2) }
+        if (type === 'pyramid') expect(m.aspect, t.id).toBe(1)
+        if (type === 'mountain') expect(m.aspect, t.id).toBeLessThan(1)
+        if (type === 'pennant') expect(m.aspect, t.id).toBeLessThanOrEqual(0.5)
+        if (type === 'sail') expect(m.aspect, t.id).toBeGreaterThan(1)
+        if (type === 'fin') { expect(m.aspect, t.id).toBeGreaterThan(0.5); expect(m.aspect, t.id).toBeLessThanOrEqual(1) }
+        expect(why, `${type} <- ${t.id} ${why.join(', ')}`).toEqual([])
+      }
+    }
+  })
+
+  it('the named aliens stay out of the tabs that once held them', () => {
+    // Frozen counterexamples, each one a shape that WAS under a name that did not fit it.
+    // A tall spike on a one-node base is not a Ramp — a Ramp is low and wide.
+    expect(triangleTypeOf(byId('tri:0,0;1,0;2,4'))).toBe('sail')   // presents 3x5, aspect 2.00
+    expect(triangleTypeOf(byId('tri:0,0;1,0;2,3'))).toBe('sail')   // presents 3x4, aspect 1.50
+    // 08-26 09:0x Dan — "Mountain is missing 2 x 3". Right angle at the apex, resting on its
+    // hypotenuse: a wide symmetric shape, not a squared corner.
+    expect(triangleTypeOf(byId('tri:0,0;0,2;1,1'))).toBe('mountain')
+    // 08-26 08:16 Dan — the 2x2 IS a Wedge: the same right angle, presented as a squared corner
+    expect(triangleTypeOf(byId('tri:0,0;0,1;1,0'))).toBe('wedge')
+    // both of Dan's rulings come out of one derived rule, so no override table is needed
+    expect(triangleTypeOf(byId('tri:0,0;0,4;2,2'))).toBe('mountain')
+  })
+
+  it('the tabs hold exactly this population — nothing missing, nothing extra', () => {
+    const got: Record<string, number> = {}
+    for (const t of TRIANGLE_TYPES) got[t] = trianglesOfType(t).length
+    expect(got).toEqual({
+      pyramid: 2, arrowhead: 1, mountain: 4, needle: 1, slice: 9,
+      wedge: 9, ramp: 7, pennant: 16, sail: 6, fin: 21,
+    })
+    expect(Object.values(got).reduce((a, b) => a + b, 0)).toBe(76)
+  })
+
+  it('every active layout appears in exactly one tab, and every tab has members', () => {
+    const seen = TRIANGLE_TYPES.flatMap((t) => trianglesOfType(t).map((x) => x.id))
+    expect(new Set(seen).size).toBe(seen.length)
+    expect(seen.length).toBe(TRIANGLE_LAYOUTS.filter(isActive).length)
+    for (const t of TRIANGLE_TYPES) expect(trianglesOfType(t).length, t).toBeGreaterThan(0)
   })
 })

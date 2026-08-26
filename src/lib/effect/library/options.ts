@@ -8,7 +8,8 @@ import { LIBRARY_SHAPES } from './shapes'
 import { frameKeyOf, transformLayout, viewName } from './transforms'
 import { firstGeometryOf, geometryOf, pickLayout, resolveSelection } from './selection'
 import { restsFlat, triangleById, triangleFrame, trianglesOfType, triangleTypeOf, uprightView } from './triangle-frames'
-import { boundsOf, type TriangleLayout, type TriangleProductType } from './triangle-geometry'
+import { boundsOf, type TriangleLayout } from './triangle-geometry'
+import type { TriangleProductType } from './triangle-types'
 import type { LibraryDraft } from './drafts'
 import { draftLayoutId } from './selection'
 import type {
@@ -37,7 +38,7 @@ export interface PanelOptions {
 
 const TYPE_LABEL: Record<string, string> = {
   pyramid: 'Pyramid', arrowhead: 'Arrowhead', mountain: 'Mountain', needle: 'Needle',
-  slice: 'Slice', wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', fin: 'Fin',
+  slice: 'Slice', wedge: 'Wedge', ramp: 'Ramp', pennant: 'Pennant', sail: 'Sail', fin: 'Fin',
 }
 const label = (id: string) => TYPE_LABEL[id] ?? id
 

@@ -7,10 +7,10 @@ import { transformLayout } from './transforms'
 import type { LibraryTransform } from './types'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import {
-  boundsOf, fullNodes, perimeterNodes, perimeterRuns, symmetryClosure,
-  triangleGeometry, triangleProductType,
-  type LatticeNode, type TriangleLayout, type TriangleProductType,
+  boundsOf, fullNodes, perimeterNodes, perimeterRuns, symmetryClosure, triangleGeometry,
+  type LatticeNode, type TriangleLayout,
 } from './triangle-geometry'
+import { triangleProductType, type TriangleProductType } from './triangle-types'
 import type { LibraryFrame, LibraryLayout } from './types'
 
 const key = (n: LatticeNode) => n[0] + ',' + n[1]
@@ -21,43 +21,36 @@ export const triangleById = (id: string): TriangleLayout => {
   return t
 }
 
-/** THE ACTIVE PRODUCT CATALOGUE — Dan's rulings on individual layouts.
- *
- *  No geometric rule reproduces them: he ruled the 2x3 a Peak and the 2x2 a Wedge, and neither
- *  precedence gives both — right-angle-first makes the 2x3 a Wedge, two-equal-sides-first makes
- *  the 2x2 a Peak. Grouping is therefore CURATED, and geometry only supplies the default. Every
- *  entry here cites the moment it was ruled; nothing is added by inference.
- *
- *  The 79-geometry universe underneath is untouched — a retired layout leaves the product, not
- *  the corpus, so the review evidence survives. */
-const TYPE_RULED: Record<string, TriangleProductType> = {
-  // 08-26 08:11 — "2x3 is not wedge it is peak", of the two then grouped under Wedge / 2x3
-  'tri:0,0;0,2;1,0': 'pyramid',
-  'tri:0,0;0,2;1,1': 'pyramid',
-  // 08-26 08:16 — "it is not peak it is wedge", of the right-angled 2x2 on screen
-  'tri:0,0;0,1;1,0': 'wedge',
-}
-
 /** 08-26 08:11 — "remove these layouts", attached to the Wedge / 3x4 screen, whose layout block
- *  held exactly these three. Retired from the product; still in the universe. */
+ *  held exactly these three. Retired from the product; still in the 79-geometry universe, so the
+ *  review evidence survives. */
 const RETIRED = new Set<string>([
   'tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2',
 ])
 
 export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)
 
+/** No per-layout override table. Dan's two rulings — the 2x2 a Wedge, the 2x3 a peak-family
+ *  shape — are BOTH produced by the presented-corner rule in triangle-types.ts, so the grouping
+ *  is derived and there is nothing to hand-curate. An override list here would only re-introduce
+ *  the stale entries that put right triangles in the Pyramid tab. */
 export const triangleTypeOf = (t: TriangleLayout): TriangleProductType => {
-  if (TYPE_RULED[t.id]) return TYPE_RULED[t.id]
-  const b = boundsOf([...t.vertices])
-  const r = transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
-    { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
+  const r = presentedCorners(t)
   const [p, q, s] = r.nodes
   const E: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
   return triangleProductType(triangleGeometry(t.vertices), {
     cols: r.cols, rows: r.rows,
     level: E.some(([a, c]) => a[1] === c[1]),
-    vertical: E.some(([a, c]) => a[0] === c[0]),
+    upright: E.some(([a, c]) => a[0] === c[0]),
   })
+}
+
+/** The three corners as the shape is PRESENTED — its upright view, which is what the panel
+ *  draws and therefore the only view naming may read. */
+function presentedCorners(t: TriangleLayout): { cols: number; rows: number; nodes: LatticeNode[] } {
+  const b = boundsOf([...t.vertices])
+  return transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
+    { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
 }
 
 export const triangleFrameKey = (t: TriangleLayout): string => {
@@ -100,9 +93,7 @@ export function triangleFrame(t: TriangleLayout, pitchMM: number): LibraryFrame 
  *  do not: all three of their sides run diagonally, and the lattice never rotates, so they can
  *  only ever lean. Dan wants the straight ones first and the diagonal ones apart from them. */
 export function restsFlat(t: TriangleLayout): boolean {
-  const b = boundsOf([...t.vertices])
-  const r = transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
-    { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
+  const r = presentedCorners(t)
   const [p, q, s] = r.nodes
   const edges: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
   return edges.some(([a, c]) => a[1] === c[1] || a[0] === c[0])

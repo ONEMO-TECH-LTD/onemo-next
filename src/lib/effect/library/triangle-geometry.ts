@@ -44,43 +44,6 @@ export function triangleGeometry(vertices: TriangleLayout['vertices']): Triangle
   return { sideClass, angleClass, side2, minAngleDeg: minimumAngle(side2) }
 }
 
-/** THE PRODUCT TYPES (Dan, 08-26) — one word each, from his own naming list. Peak / Wedge /
- *  Sail are retired vocabulary and must not reach the UI.
- *
- *  Each name is his description turned into something measurable, read on the view the shape is
- *  PRESENTED in, because how it sits is what a person is looking at:
- *    Wedge     — has a right angle
- *    Needle    — symmetric and very tall for its width
- *    Arrowhead — symmetric on a level base, taller than wide
- *    Pyramid   — symmetric on a level base, as wide as it is tall
- *    Mountain  — symmetric on a level base, wider than tall
- *    Slice     — symmetric with no level side to stand on
- *    Pennant   — leaning and long and low
- *    Ramp      — leaning, on a level base, wider than tall
- *    Fin       — leaning, anything else */
-export type TriangleProductType =
-  | 'wedge' | 'needle' | 'arrowhead' | 'pyramid' | 'mountain' | 'slice' | 'pennant' | 'ramp' | 'fin'
-
-export const TRIANGLE_TYPES: TriangleProductType[] = [
-  'pyramid', 'arrowhead', 'mountain', 'needle', 'slice', 'wedge', 'ramp', 'pennant', 'fin',
-]
-
-/** What the shape reads as, given its geometry and how it sits. */
-export function triangleProductType(
-  g: TriangleGeometry, shown: { cols: number; rows: number; level: boolean; vertical: boolean },
-): TriangleProductType {
-  if (g.angleClass === 'right') return 'wedge'
-  const sym = g.sideClass === 'isosceles'
-  const w = Math.max(1, shown.cols - 1), h = Math.max(1, shown.rows - 1), a = h / w
-  if (sym) {
-    if (a >= 2) return 'needle'
-    if (!shown.level) return 'slice'
-    return a >= 1.25 ? 'arrowhead' : a > 0.8 ? 'pyramid' : 'mountain'
-  }
-  if (a <= 0.5) return 'pennant'
-  return shown.level ? 'ramp' : 'fin'
-}
-
 export const D4: Array<(n: LatticeNode) => LatticeNode> = [
   ([x, y]) => [x, y], ([x, y]) => [-y, x], ([x, y]) => [-x, -y], ([x, y]) => [y, -x],
   ([x, y]) => [-x, y], ([x, y]) => [y, x], ([x, y]) => [x, -y], ([x, y]) => [-y, -x],

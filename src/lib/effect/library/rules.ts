@@ -1,7 +1,7 @@
 // library/rules.ts — CLASS POLICY: sub-types, orientation, box measurement, labelling.
 // The view asks these; it never tests 'is this a diamond'. Shared with the classifier bridge.
 
-import { TRIANGLE_TYPES } from './triangle-geometry'
+import { TRIANGLE_TYPES } from './triangle-types'
 import { MIN_LIB_MM, type LibraryFamily, type LibraryFrame, type LibraryLayout, type LibraryTransform } from './types'
 
 type Node = readonly [number, number]
