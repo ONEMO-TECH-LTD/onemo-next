@@ -123,20 +123,21 @@ export function uprightView(t: TriangleLayout): LibraryTransform {
     const [p, q, s2] = r.nodes
     const len = (a: LatticeNode, c: LatticeNode) => (a[0] - c[0]) ** 2 + (a[1] - c[1]) ** 2
     const edges: Array<[LatticeNode, LatticeNode, LatticeNode]> = [[p, q, s2], [q, s2, p], [s2, p, q]]
-    // The BASE is the side a person would stand it on. For an isosceles triangle that is the
-    // odd side out — the apex is the vertex between the two equal sides, whatever their length.
-    // Only when all three differ is the longest side the base.
+    // A shape RESTS on a flat side. Prefer a level edge along the bottom, then a level edge up
+    // the left; only a triangle with no axis-aligned side at all falls back to standing its
+    // apex above the base. Ranking by apex-above alone hung a wedge from its point.
+    const onFloor = edges.some(([a, c]) => a[1] === c[1] && a[1] === r.rows - 1)
+    const onWall = edges.some(([a, c]) => a[0] === c[0] && a[0] === 0)
+    // the base is the odd side out for an isosceles triangle — the apex is the vertex between
+    // the two equal sides — and the longest side only when all three differ
     const odd = edges.find((e) => {
       const others = edges.filter((x) => x !== e)
       return len(others[0][0], others[0][1]) === len(others[1][0], others[1][1])
     })
     const [a, c, apex] = odd ?? edges.reduce((m, e) => (len(e[0], e[1]) > len(m[0], m[1]) ? e : m))
-    // The lattice never rotates, so only 8 views exist and most longest edges are diagonal:
-    // a level base is reachable for a few, POINT UP is reachable for nearly all. Rank by that.
-    const apexTop = apex[1] < a[1] && apex[1] < c[1]
-    const level = a[1] === c[1]
-    const onBottom = level && a[1] === r.rows - 1
-    const score = (apexTop ? 8 : 0) + (onBottom ? 4 : 0) + (level ? 2 : 0) + (r.cols >= r.rows ? 1 : 0)
+    const apexAbove = apex[1] <= a[1] && apex[1] <= c[1]
+    const score = (onFloor ? 16 : 0) + (onWall ? 8 : 0) + (apexAbove ? 4 : 0)
+      + (a[1] === c[1] && a[1] === r.rows - 1 ? 2 : 0) + (r.cols >= r.rows ? 1 : 0)
     if (score > bestScore) { bestScore = score; best = view }
   }
   return best

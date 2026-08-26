@@ -43,7 +43,7 @@ export function canonicalNode(
 /** A view as a 2x2 lattice matrix, so views can be COMPOSED and COMPARED. transformLayout
  *  applies transpose, then flipX, then flipY. */
 type Mat = readonly [number, number, number, number]   // [a b; c d]
-export function viewMatrix(t: LibraryTransform): Mat {
+function viewMatrix(t: LibraryTransform): Mat {
   let m: Mat = t.transpose ? [0, 1, 1, 0] : [1, 0, 0, 1]
   if (t.flipX) m = [-m[0], -m[1], m[2], m[3]]
   if (t.flipY) m = [m[0], m[1], -m[2], -m[3]]
@@ -71,5 +71,8 @@ const NAMED: Array<{ m: Mat; id: string }> = [
  *  the default read 'mirror diagonal' while the shape sat upright (Dan, 08-26). */
 export function viewName(base: LibraryTransform, view: LibraryTransform): string {
   const rel = mul(viewMatrix(view), inv(viewMatrix(base)))
-  return NAMED.find((n) => n.m.every((v, i) => v === rel[i]))?.id ?? '?'
+  const named = NAMED.find((n) => n.m.every((v, i) => v === rel[i]))
+  // the eight views are a closed group, so a composition of two of them is always one of them
+  if (!named) throw new Error('library: view is not a lattice symmetry')
+  return named.id
 }

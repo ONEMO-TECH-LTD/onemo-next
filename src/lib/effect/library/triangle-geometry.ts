@@ -45,11 +45,13 @@ export function triangleGeometry(vertices: TriangleLayout['vertices']): Triangle
   return { sideClass, angleClass, side2, minAngleDeg: minimumAngle(side2) }
 }
 
-/** THE PRODUCT TYPES (Dan, 08-26). Right angle wins outright — a right isosceles is a Wedge,
- *  never a Peak. Scientific classes stay internal; these three are what the product shows. */
+/** THE PRODUCT TYPES. TWO EQUAL SIDES WINS OUTRIGHT: a right-angled isosceles triangle is a
+ *  Peak, not a Wedge — Dan, 08-26, on seeing the 2x3 filed as a Wedge: "2x3 is not wedge it is
+ *  peak". A Wedge is therefore a right angle WITHOUT the symmetry; everything else is a Sail.
+ *  (This reverses the spec's right-first precedence, on his direct ruling.) */
 export function triangleProductType(g: TriangleGeometry): TriangleProductType {
-  return g.angleClass === 'right' ? 'wedge'
-    : g.sideClass === 'isosceles' ? 'peak'
+  return g.sideClass === 'isosceles' ? 'peak'
+    : g.angleClass === 'right' ? 'wedge'
       : 'sail'
 }
 

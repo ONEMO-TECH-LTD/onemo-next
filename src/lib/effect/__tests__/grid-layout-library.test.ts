@@ -417,15 +417,15 @@ describe('triangle — the three-point layout universe', () => {
     expect([...universe].sort()).toEqual([...ids].sort())
   })
 
-  it('the product totals are Peak 14 / Wedge 17 / Sail 48', () => {
+  it('the product totals are Peak 22 / Wedge 9 / Sail 48', () => {
     const n = (t: string) => TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === t).length
-    expect([n('peak'), n('wedge'), n('sail')]).toEqual([14, 17, 48])
+    expect([n('peak'), n('wedge'), n('sail')]).toEqual([22, 9, 48])
   })
 
   it('the frame distribution is exactly the ruled table', () => {
     const table: Record<string, [number, number, number]> = {
-      '2x2': [0, 1, 0], '2x3': [0, 2, 1], '2x4': [0, 1, 3], '2x5': [1, 1, 4], '3x3': [2, 1, 1],
-      '3x4': [1, 3, 5], '3x5': [1, 2, 9], '4x4': [3, 1, 4], '4x5': [1, 3, 14], '5x5': [5, 2, 7],
+      '2x2': [1, 0, 0], '2x3': [1, 1, 1], '2x4': [0, 1, 3], '2x5': [1, 1, 4], '3x3': [3, 0, 1],
+      '3x4': [2, 2, 5], '3x5': [2, 1, 9], '4x4': [4, 0, 4], '4x5': [2, 2, 14], '5x5': [6, 1, 7],
     }
     const got: Record<string, [number, number, number]> = {}
     for (const t of TRIANGLE_LAYOUTS) {
@@ -459,13 +459,20 @@ describe('triangle — the three-point layout universe', () => {
     for (const t of TRIANGLE_LAYOUTS) expect(triangleGeometry(t.vertices).sideClass).not.toBe('equilateral')
   })
 
-  it('a right angle wins outright: a right isosceles is a Wedge, never a Peak', () => {
+  it('two equal sides win outright: a right isosceles is a Peak, never a Wedge', () => {
+    // Dan, 08-26, on seeing the 2x3 filed as a Wedge: "2x3 is not wedge it is peak".
     const rightIso = TRIANGLE_LAYOUTS.filter((t) => {
       const g = triangleGeometry(t.vertices)
       return g.angleClass === 'right' && g.sideClass === 'isosceles'
     })
-    expect(rightIso.length).toBeGreaterThan(0)
-    for (const t of rightIso) expect(triangleTypeOf(t)).toBe('wedge')
+    expect(rightIso.length).toBe(8)
+    for (const t of rightIso) expect(triangleTypeOf(t)).toBe('peak')
+    // and a Wedge is a right angle WITHOUT the symmetry
+    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'wedge')) {
+      const g = triangleGeometry(t.vertices)
+      expect(g.angleClass).toBe('right')
+      expect(g.sideClass).toBe('scalene')
+    }
   })
 
   it('the product type survives every transform', () => {
@@ -760,20 +767,54 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
     expect(checked).toBeGreaterThan(2000)
   })
 
-  it('a geometry opens point-up, never in its de-duplication form', () => {
-    // The lattice never rotates, so only eight views exist and a diagonal longest edge cannot
-    // be levelled. What IS reachable for every layout: the apex never hangs below the whole
-    // base. 37 of the 79 point strictly up and 8 sit flat on their longest side; the rest lean,
-    // because their longest edge runs diagonally and no lattice view can level it.
+  it('a geometry opens RESTING, never in its de-duplication form', () => {
+    // A shape rests on a flat side. Ranking by apex-above-base alone hung a wedge from its
+    // point (Dan, 08-26); the rule prefers a level edge on the floor, then one up the left
+    // wall, and only falls back to apex-above for a triangle with no axis-aligned side.
+    let floor = 0, wall = 0, none = 0
     for (const t of TRIANGLE_LAYOUTS) {
       const b = boundsOf([...t.vertices])
       const r = tl({ cols: b.cols, rows: b.rows, layouts: [] }, { name: 'c', nodes: [...t.vertices] }, uprightView(t))
-      const [p, q, s] = r.nodes
+      const [p, q, s2] = r.nodes
+      const E = [[p, q, s2], [q, s2, p], [s2, p, q]] as Array<[LatticeNode, LatticeNode, LatticeNode]>
+      const onFloor = E.some(([a, c]) => a[1] === c[1] && a[1] === r.rows - 1)
+      const onWall = E.some(([a, c]) => a[0] === c[0] && a[0] === 0)
+      if (onFloor) floor++
+      if (onWall) wall++
+      if (!onFloor && !onWall) none++
+      // whichever way it lands, the apex never hangs below the whole base
       const len = (x: readonly number[], y: readonly number[]) => (x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2
-      const edges = [[p, q, s], [q, s, p], [s, p, q]] as Array<[LatticeNode, LatticeNode, LatticeNode]>
-      const [a, c, apex] = edges.reduce((m, e) => (len(e[0], e[1]) > len(m[0], m[1]) ? e : m))
+      const odd = E.find((e) => {
+        const o = E.filter((x) => x !== e)
+        return len(o[0][0], o[0][1]) === len(o[1][0], o[1][1])
+      })
+      const [a, c, apex] = odd ?? E.reduce((m, e) => (len(e[0], e[1]) > len(m[0], m[1]) ? e : m))
       expect(apex[1] > a[1] && apex[1] > c[1], t.id).toBe(false)
+      // and any axis-aligned side it does have is never left hanging at the top
+      if (onFloor) expect(E.some(([x, y]) => x[1] === y[1] && x[1] === r.rows - 1)).toBe(true)
     }
+    // 50 rest on the floor and 10 of those also stand a side against the left wall; 29 have no
+    // axis-aligned side at all. The lattice never rotates, so that is the ceiling of eight
+    // views — a triangle whose sides are all diagonal cannot be stood on one.
+    expect([floor, wall, none]).toEqual([50, 10, 29])
+  })
+
+  it('the presented view IS 0 degrees, and every other button names the turn from it', () => {
+    // Naming turns against the STORED form let a layout sit upright with 'mirror diagonal'
+    // pressed — this fails on any build that labels relative to the canonical form.
+    for (const t of TRIANGLE_LAYOUTS.slice(0, 12)) {
+      const f = triangleFrame(t, 48)
+      const sel: LibrarySelection = { shapeId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f),
+        layoutId: 'corners', view: uprightView(t) }
+      const opts = panelOptions(sel, [], 48).orientations
+      expect(opts[0].label, t.id).toBe('0°')
+      expect(opts[0].active, t.id).toBe(true)
+      expect(opts.filter((o) => o.active)).toHaveLength(1)
+      expect(new Set(opts.map((o) => o.label)).size).toBe(opts.length)
+    }
+  })
+
+  it('the upright view is the one a selection hands back', () => {
     // selecting a class or a geometry hands back that view
     const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'sail')!
     const opt = panelOptions(sel3(t0.id), [], 48).geometries.find((o) => o.id === t0.id)!
