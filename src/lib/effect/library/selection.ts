@@ -5,7 +5,7 @@
 
 import { CLASS_FRAMES } from './frames'
 import { CLASS_RULES, type ClassRules, type RegistryRules } from './rules'
-import { triangleById, triangleFrame, triangleFrameKey, trianglesOf, triangleFrameKeys, triangleTypeOf, uprightView } from './triangle-frames'
+import { triangleById, triangleFrame, trianglesOfType, triangleTypeOf, uprightView } from './triangle-frames'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import { boundsOf, type TriangleLayout, type TriangleProductType } from './triangle-geometry'
 import { transformLayout, viewName } from './transforms'
@@ -127,18 +127,18 @@ export interface PanelOption {
   label: string
   active: boolean
   next: LibrarySelection
-}
-export interface GeometryOption extends PanelOption {
-  nodes: ReadonlyArray<readonly [number, number]>
-  cols: number
-  rows: number
-  /** Distinguishes two layouts sharing a frame, for the eye and for a screen reader. */
-  accessibleLabel: string
+  /** Present when the option has a shape of its own to draw. */
+  nodes?: ReadonlyArray<readonly [number, number]>
+  cols?: number
+  rows?: number
+  /** Distinguishes two options that would otherwise read alike. */
+  accessibleLabel?: string
 }
 export interface PanelOptions {
   types: PanelOption[]
+  /** The frames a class offers. For a class whose shape IS its layout, each frame is one
+   *  geometry and carries its nodes so the chip can draw it — one block, not two. */
   frames: PanelOption[]
-  geometries: GeometryOption[]
   orientations: PanelOption[]
 }
 
@@ -235,14 +235,12 @@ export function panelOptions(
         id: frameKeyOf(f), label: rules.label(f.cols, f.rows),
         active: frameKeyOf(f) === frameKeyOf(frame), next: jump(f),
       })),
-      geometries: [],
       // a class with no named views of its own offers none
       orientations: rules.orientations.length ? orientations : [],
     }
   }
   const geo = triangleById(geometryOf(sel))
   const type = triangleTypeOf(geo)
-  const frameKey = triangleFrameKey(geo)
   const toSel = (t: TriangleLayout): LibrarySelection => {
     const f = triangleFrame(t, pitchMM)
     // a new geometry opens standing on its longest side, not in its de-duplication form
@@ -256,15 +254,13 @@ export function panelOptions(
       const first = firstGeometryOf(id as TriangleProductType)
       return { id, label: label(id), active: id === type, next: toSel(first) }
     }),
-    frames: triangleFrameKeys(type).map((k) => {
-      const [c, r] = k.split('x').map(Number)
-      return { id: k, label: rules.label(c, r), active: k === frameKey, next: toSel(trianglesOf(type, k)[0]) }
-    }),
-    geometries: trianglesOf(type, frameKey).map((t, i) => {
+    // one chip per geometry: for this class the frame IS the shape, so a second picker would
+    // be two controls for one choice
+    frames: trianglesOfType(type).map((t, i) => {
       const b = boundsOf([...t.vertices])
       return {
         id: t.id, label: rules.label(b.cols, b.rows), active: t.id === geo.id,
-        accessibleLabel: label(type) + ' layout ' + (i + 1) + ' · ' + rules.label(b.cols, b.rows),
+        accessibleLabel: label(type) + ' ' + (i + 1) + ' · ' + rules.label(b.cols, b.rows),
         nodes: t.vertices, cols: b.cols, rows: b.rows, next: toSel(t),
       }
     }),

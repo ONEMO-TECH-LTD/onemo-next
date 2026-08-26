@@ -67,27 +67,21 @@ export default function LibraryPanel({
       <Fold title="Frame">
         <div className="gl-lib">
           {opts.frames.map((o) => (
-            <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}><b>{o.label}</b></button>
-          ))}
-        </div>
-      </Fold>
-      {opts.geometries.length > 0 && (
-        <Fold title="Layout">
-          <div className="gl-lib gl-libgeo">
-            {opts.geometries.map((o) => (
-              <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}
-                aria-label={o.accessibleLabel} title={o.accessibleLabel}>
-                <svg viewBox={`-0.6 -0.6 ${o.cols + 0.2} ${o.rows + 0.2}`} width="34" height="34">
+            <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}
+              aria-label={o.accessibleLabel} title={o.accessibleLabel}>
+              {o.nodes && (
+                <svg viewBox={`-0.6 -0.6 ${(o.cols ?? 1) + 0.2} ${(o.rows ?? 1) + 0.2}`} width="30" height="30">
                   <polygon points={o.nodes.map(([x, y]) => `${x},${y}`).join(' ')}
                     fill="var(--accent)" fillOpacity="0.18" stroke="var(--accent)" strokeWidth="0.09" />
                   {o.nodes.map(([x, y]) => <circle key={`${x},${y}`} cx={x} cy={y} r="0.26" fill="var(--magnet)" />)}
                 </svg>
-                <span>{o.label}</span>
-              </button>
-            ))}
-          </div>
-        </Fold>
-      )}
+              )}
+              <b>{o.label}</b>
+            </button>
+          ))}
+        </div>
+      </Fold>
+
       <Fold title="Layouts">
         <div className="gl-lib">
           {frame.layouts.filter((l) => !isSpacingMode(l.name) || l.name === SPACING_BASE).map((l) => (

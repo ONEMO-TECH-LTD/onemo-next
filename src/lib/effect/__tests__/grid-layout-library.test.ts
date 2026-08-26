@@ -722,14 +722,20 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     }
   })
 
-  it('F6 — two layouts on one frame are distinguishable, and types read as products', () => {
-    const peak33 = TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'peak' && triangleFrameKey(t) === '3x3')
-    expect(peak33.length).toBeGreaterThan(1)
-    const opts = panelOptions(sel3(peak33[0].id), [], 48)
-    const labels = opts.geometries.map((o) => o.accessibleLabel)
+  it('F6 — every option on one block is distinguishable, and types read as products', () => {
+    // ONE block, not two: for this class the frame IS the shape, so the frame chips carry the
+    // geometry and its miniature. A second picker would be two controls for one choice.
+    const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'peak')!
+    const opts = panelOptions(sel3(peak.id), [], 48)
+    const labels = opts.frames.map((o) => o.accessibleLabel!)
     expect(new Set(labels).size).toBe(labels.length)
-    expect(labels[0]).toContain('Peak layout 1')
+    expect(labels[0]).toContain('Peak 1')
+    expect(opts.frames.every((o) => o.nodes && o.nodes.length === 3)).toBe(true)
+    expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'peak').length)
     expect(opts.types.map((o) => o.label)).toEqual(['Peak', 'Wedge', 'Sail'])
+    // and a registry class keeps plain frame chips with no shape of their own
+    const sq = panelOptions(sel({ shapeId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), [], 48)
+    expect(sq.frames.every((o) => !o.nodes)).toBe(true)
   })
 })
 
@@ -817,7 +823,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
   it('the upright view is the one a selection hands back', () => {
     // selecting a class or a geometry hands back that view
     const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'sail')!
-    const opt = panelOptions(sel3(t0.id), [], 48).geometries.find((o) => o.id === t0.id)!
+    const opt = panelOptions(sel3(t0.id), [], 48).frames.find((o) => o.id === t0.id)!
     expect(opt.next.view).toEqual(uprightView(t0))
   })
 })
