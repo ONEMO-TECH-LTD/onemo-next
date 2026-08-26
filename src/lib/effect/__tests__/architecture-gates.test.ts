@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import ts from 'typescript'
-import { describe, expect, it, test } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
@@ -57,7 +57,7 @@ const ZONE_FILES: Record<Exclude<Zone, 1>, readonly string[]> = {
 }
 
 const step2Files = () => files(LIBRARY).filter((path) => /\.tsx?$/.test(path)
-  && !['index.ts', 'surface.ts'].includes(basename(path)))
+  && !['index.ts', 'public-types.ts', 'public-values.ts', 'surface.ts'].includes(basename(path)))
 
 const zonesOf = (path: string): Zone[] => {
   const name = basename(path)
@@ -407,5 +407,18 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), 48).some((entry) => entry.id === item.entry.id)).toBe(true)
     }
   })
-  test.todo('STEP 5: surface, barrel, shell, bridge, CSS, and caller equality')
+  it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
+    const barrel = source(join(LIBRARY, 'index.ts'))
+    for (const symbol of ['CatalogueEntry', 'LibrarySurface', 'catalogue', 'librarySurface', 'LIBRARY_FAMILIES'])
+      expect(barrel).toContain(symbol)
+    const bridge = source(join(ROOT, 'grid-magnet-library-bridge.ts'))
+    for (const symbol of ['materializeSelection', 'materializeDraft', 'resolveSelection', 'panelOptions', 'specOf'])
+      expect(bridge).not.toContain(symbol)
+    const panel = source(PANEL)
+    expect(panel).not.toContain('panelOptions(')
+    expect(panel).toContain('options: PanelOptions')
+    const page = source(PAGE)
+    expect(page).toContain('librarySurface(')
+    expect(page).toContain('libraryStageModel(')
+  })
 })

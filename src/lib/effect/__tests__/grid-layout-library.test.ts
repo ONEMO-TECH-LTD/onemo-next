@@ -5,27 +5,25 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  LIBRARY_FAMILIES, SPACING_MODES, specOf, registryIntegrity, transformLayout, frameKeyOf,
-  resolveSelection, selectedRecords, selectVariant, draftLayoutId, sample96, canonicalNode,
-  transformLayout as tl,
-  TRIANGLE_LAYOUTS, triangleGeometry, triangleTypeOf, triangleFrameKey,
-  triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
-  fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
-  draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat, isActive,
-  startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, draftsFor,
-  materializeSelection, materializeDraft,
-  type LibraryEdit,
-  TRIANGLE_TYPES,
-  type LatticeNode,
-  type TriangleLayout,
-  type LibraryDraft,
-  type LibrarySelection,
-} from '../library'
+import { LIBRARY_FAMILIES, specOf } from '../library/class-registry'
+import { registryIntegrity } from '../library/integrity'
+import { SPACING_MODES, sample96 } from '../library/rules'
+import { transformLayout, frameKeyOf, canonicalNode, transformLayout as tl } from '../library/transforms'
+import { resolveSelection, selectedRecords, selectVariant, draftLayoutId, draftsFor } from '../library/selection'
+import { TRIANGLE_LAYOUTS } from '../library/corpus-triangle'
+import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, fullNodes, boundsOf, selfSymmetries, D4, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
+import { triangleTypeOf, triangleById, triangleFrame, triangleFrameKey, trianglePerimeter96, uprightView, trianglesOfType, restsFlat, isActive, assertTrianglePopulation } from '../library/triangle-frames'
+import { TRIANGLE_TYPES } from '../library/triangle-types'
+import { draftId, draftIntegrity, type LibraryDraft } from '../library/drafts'
+import { panelOptions, selectionForFamily } from '../library/options'
+import { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, type LibraryEdit } from '../library/authoring'
+import { materializeSelection, materializeDraft } from '../library/materialize'
+import { librarySurface } from '../library/surface'
+import type { LibrarySelection } from '../library/types'
 import { SQUARE_FRAMES } from '../library/corpus-square'
 import { RECTANGLE_FRAMES } from '../library/corpus-rectangle'
 import { DIAMOND_FRAMES } from '../library/corpus-diamond'
-import { libraryStageModel, draftStageModel } from '../grid-magnet-library-bridge'
+import { libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 import { convexHull } from '../library/geometry'
@@ -129,11 +127,11 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
     expect([a.frameCols, a.frameRows]).toEqual([3, 3])
   })
   it('stage model composes the arrangement; lattice stays the canvas own', () => {
-    const m = libraryStageModel(sel(), 48)
+    const m = libraryStageModel(librarySurface(sel(), [], null, 48).materialized, 48)
     expect(m.grid.anchors.length).toBe(8)
     expect(m.grid.pitchCentreMM).toBe(48)
     expect(m.grid.spotRadiusMM).toBe(12)
-    expect(m.grid.lattice).toEqual([])
+    expect(m.grid.lattice).toEqual([[0, 96]])
     expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(4)
   })
   it('node geometry scales with the pitch tier', () => {
@@ -668,12 +666,12 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     const id = one('wedge').id
     const sel = sel3(id)
     for (const nodes of [[], [[0, 0]], [[0, 0], [1, 1]]] as Array<Array<[number, number]>>) {
-      const m = draftStageModel(sel, nodes, 48)
-      expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(3)   // still renderable
+      const m = librarySurface(sel, [], { name: '', nodes }, 48).materialized
+      expect(m.outlineMM.length).toBeGreaterThanOrEqual(3)
       expect(m.error).toBeTruthy()
     }
     const good = [...one('wedge').vertices] as Array<[number, number]>
-    expect(draftStageModel(sel, good, 48).error).toBeNull()
+    expect(librarySurface(sel, [], { name: '', nodes: good }, 48).materialized.error).toBeNull()
   })
 
   it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
@@ -1075,9 +1073,9 @@ describe('the class spec is portable, and nothing outside it knows a class by na
     // it must not resolve, transform, name a frame or ask a class anything
     for (const sym of ['selectedRecords', 'transformLayout', 'frameKeyOf', 'specOf', 'resolveSelection'])
       expect(src, `bridge :: ${sym}`).not.toContain(sym)
-    // what it does import from the library is the materialiser and the record type
-    expect(src).toContain('materializeSelection')
-    expect(src).toContain('materializeDraft')
+    expect(src).toContain('MaterializedLibrary')
+    expect(src).not.toContain('materializeSelection')
+    expect(src).not.toContain('materializeDraft')
   })
 
   it('the engine-facing contract does not depend on the browser draft store', () => {

@@ -6,25 +6,23 @@
 // Dan, 08-26: "no logic in UI shell and poage".
 
 import type { ReactElement, ReactNode } from 'react'
-import { panelOptions, type LibraryEdit, type LibraryDraft, type LibrarySelection, type PanelOption } from '@/lib/effect/library'
+import type { LibraryEdit, LibrarySelection, PanelOption, PanelOptions } from '@/lib/effect/library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
-  sel, setSel, Fold, pitch, boxMM, showBox, setShowBox, editError,
-  edit, setEdit, drafts, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
+  setSel, Fold, options, boxMM, showBox, setShowBox, editError,
+  edit, setEdit, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
 }: {
-  sel: LibrarySelection
   setSel: (next: LibrarySelection) => void
   Fold: FoldComponent
-  pitch: number
+  options: PanelOptions
   boxMM: { w: number; h: number }
   showBox: boolean
   setShowBox: (v: boolean) => void
   edit: LibraryEdit | null
   setEdit: (d: LibraryEdit | null) => void
   editError: string | null
-  drafts: LibraryDraft[]
   /** The selection names a saved layout of the admin's own. */
   isDraft: boolean
   saveEdit: () => void
@@ -32,7 +30,7 @@ export default function LibraryPanel({
   startAdd: () => void
   startEdit: () => void
 }) {
-  const opts = panelOptions(sel, drafts, pitch)
+  const opts = options
   // the only state the view adds is whether the editor is open; everything else is an option
   const go = (o: PanelOption) => { setEdit(null); setSel(o.next) }
   const pressed = (o: PanelOption) => !edit && o.active
@@ -43,7 +41,7 @@ export default function LibraryPanel({
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
       <Fold title="Type">
-        <div className={opts.types.length > 3 ? 'gl-lib' : 'gl-seg'}>
+        <div className="gl-seg">
           {opts.types.map((o) => (
             <button key={o.id} aria-pressed={o.active} disabled={opts.types.length === 1}
               onClick={() => go(o)}><b>{o.label}</b></button>

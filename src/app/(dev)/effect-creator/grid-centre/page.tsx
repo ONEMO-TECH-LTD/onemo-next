@@ -8,12 +8,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
-import { libraryStageModel, draftStageModel, type LibrarySelection } from '@/lib/effect/grid-magnet-library-bridge'
+import { libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
 import {
-  LIBRARY_FAMILIES, selectionForFamily, resolveSelection, DRAFT_STORE_KEY,
+  LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  type LibraryDraft, type LibraryEdit,
+  type LibraryDraft, type LibraryEdit, type LibrarySelection,
 } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
@@ -119,15 +119,12 @@ export default function GridLab() {
     setDrafts(next)
     try { localStorage.setItem(DRAFT_STORE_KEY, JSON.stringify(next)) } catch { }
   }
-  const libraryModel = useMemo(() => {
-    if (tab !== 'library') return null
-    const { safeSel, draft } = resolveSelection(librarySel, drafts, pitch)
-    const nodes = edit ? edit.nodes : draft?.nodes
-    return nodes
-      // the producer resolves its own frame, and it accepts the selection that NAMES the draft
-      ? draftStageModel(librarySel, nodes, pitch)
-      : libraryStageModel(safeSel, pitch)
-  }, [tab, librarySel, pitch, edit, drafts])
+  const libraryState = useMemo(() => tab === 'library'
+    ? librarySurface(librarySel, drafts, edit, pitch) : null,
+  [tab, librarySel, pitch, edit, drafts])
+  const libraryModel = useMemo(() => libraryState
+    ? libraryStageModel(libraryState.materialized, pitch) : null,
+  [libraryState, pitch])
   /** The size card reads the ACTUAL outline, so a derived shape reports what it really is. */
   const libraryBox = useMemo(() => {
     const pts = libraryModel?.contour.outer.pts
@@ -353,7 +350,7 @@ export default function GridLab() {
           </div>
           <div className="gl-seg gl-libbar-tabs">
             {LIBRARY_FAMILIES.map((fam) => {
-              const cur = resolveSelection(librarySel, drafts, pitch).classId
+              const cur = librarySurface(librarySel, drafts, edit, pitch).classId
               return <button key={fam} aria-pressed={cur === fam} onClick={() => {
                 setEdit(null)
                 setLibrarySel((current) => selectionForFamily(current, fam, pitch))
@@ -442,10 +439,10 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          <LibraryPanel sel={librarySel} setSel={setLibrarySel} Fold={Fold} pitch={pitch} boxMM={libraryBox}
-            showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit} drafts={drafts}
+          <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState?.options ?? librarySurface(librarySel, drafts, edit, pitch).options} boxMM={libraryBox}
+            showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
             editError={libraryModel?.error ?? null}
-            isDraft={!!resolveSelection(librarySel, drafts, pitch).draft}
+            isDraft={libraryState?.isDraft ?? false}
             startAdd={() => setEdit(libStartAdd())}
             startEdit={() => setEdit(libStartEdit(librarySel, drafts, pitch))}
             saveEdit={() => {

@@ -1,18 +1,10 @@
-// library/index.ts — the layout-library module's public surface.
-
-export * from './types'
-export * from './class-contract'
-export * from './class-registry'
-export * from './transforms'
-export * from './selection'
-export * from './options'
-export * from './triangle-geometry'
-export * from './triangle-types'
-export * from './corpus-triangle'
-export * from './triangle-frames'
-export * from './rules'
-export * from './drafts'
-export * from './authoring'
-export * from './materialize'
-export * from './integrity'
-export * from './catalogue'
+// Library runtime contract. Tests import implementation modules by direct path.
+export type {
+  CornerMode, LibraryFamily, LibrarySelection, CatalogueEntry, LibrarySurface,
+  PanelOption, PanelOptions, LibraryEdit, LibraryDraft, MaterializedLibrary,
+} from './public-types'
+export {
+  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, CATALOGUE_FORMAT_VERSION, catalogue,
+  librarySurface, selectionForFamily, startAdd, startEdit, saveEdit, deleteEdit,
+  toggleNodeAt, DRAFT_STORE_KEY,
+} from './public-values'

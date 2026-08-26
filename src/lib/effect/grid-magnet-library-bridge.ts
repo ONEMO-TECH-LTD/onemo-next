@@ -10,11 +10,8 @@ import type { GridResult } from './grid-magnet'
 import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
-  materializeSelection, materializeDraft,
-  type MaterializedLibrary, type LibrarySelection,
+  type MaterializedLibrary,
 } from './library'
-
-export type { LibrarySelection } from './library'
 
 export interface LibraryStageModel {
   contour: Contour
@@ -45,17 +42,8 @@ function toStage(m: MaterializedLibrary, pitchMM: number): LibraryStageModel {
   return { contour, grid, error: m.error }
 }
 
-export function libraryStageModel(sel: LibrarySelection, pitchMM: number): LibraryStageModel {
-  const m = materializeSelection(sel, pitchMM)
-  // a corpus selection always has magnets, so the lattice seed is not used here
-  return toStage({ ...m, seedMM: null }, pitchMM)
-}
-
-/** AUTHORING (Dan, 08-25 — sandbox drafts): a draft's own nodes drawn on the selected frame. */
-export function draftStageModel(
-  sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number,
-): LibraryStageModel {
-  return toStage(materializeDraft(sel, nodes, pitchMM), pitchMM)
+export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
+  return toStage(materialized, pitchMM)
 }
 
 /** Selection -> the engine-space record the pipeline consumes. */
