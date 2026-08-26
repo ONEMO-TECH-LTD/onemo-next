@@ -24,10 +24,6 @@ export interface PanelOption {
   label: string
   active: boolean
   next: LibrarySelection
-  /** Present when the option has a shape of its own to draw. */
-  nodes?: ReadonlyArray<readonly [number, number]>
-  cols?: number
-  rows?: number
   /** Distinguishes two options that would otherwise read alike. */
   accessibleLabel?: string
 }
@@ -39,7 +35,7 @@ export interface PanelOptions {
   orientations: PanelOption[]
 }
 
-const TYPE_LABEL: Record<string, string> = { peak: 'Peak', wedge: 'Wedge', sail: 'Sail' }
+const TYPE_LABEL: Record<string, string> = { perfect: 'Perfect', sharp: 'Sharp', slanted: 'Slanted' }
 const label = (id: string) => TYPE_LABEL[id] ?? id
 
 /** The eight lattice views, as the library's own transform. */
@@ -159,7 +155,7 @@ export function panelOptions(
         id: t.id, label: rules.label(b.cols, b.rows), active: t.id === geo.id,
         accessibleLabel: label(type) + ' ' + (i + 1) + ' · ' + rules.label(b.cols, b.rows)
           + (restsFlat(t) ? '' : ' · diagonal'),
-        nodes: t.vertices, cols: b.cols, rows: b.rows, next: toSel(t),
+        next: toSel(t),
       }
     }),
     orientations,

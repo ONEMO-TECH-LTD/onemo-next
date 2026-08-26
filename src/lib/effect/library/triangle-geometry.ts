@@ -4,7 +4,21 @@
 export type LatticeNode = readonly [number, number]
 export type TriangleSideClass = 'equilateral' | 'isosceles' | 'scalene'
 export type TriangleAngleClass = 'acute' | 'right' | 'obtuse'
-export type TriangleProductType = 'peak' | 'wedge' | 'sail'
+/** THE PRODUCT GROUPS (Dan, 08-26). Peak / Wedge / Sail are retired vocabulary — these are
+ *  what the product shows, one word each, from his own list:
+ *    Perfect  — balanced on a flat base  (Pyramid, Arrowhead, Mountain)
+ *    Sharp    — tall and pointed         (Needle, Spike, Slice, Icicle)
+ *    Slanted  — leaning                  (Sail, Fin, Ramp, Wedge, Pennant, Flag)
+ *  One word everywhere, groups included — the longer phrases in his list were the research
+ *  descriptions, not labels. */
+export type TriangleProductType = 'perfect' | 'sharp' | 'slanted'
+
+/** The names each group may carry. A layout gets one when Dan names it; the group is derived. */
+export const GROUP_NAMES: Record<TriangleProductType, string[]> = {
+  perfect: ['Pyramid', 'Arrowhead', 'Mountain'],
+  sharp: ['Needle', 'Spike', 'Slice', 'Icicle'],
+  slanted: ['Sail', 'Fin', 'Ramp', 'Wedge', 'Pennant', 'Flag'],
+}
 
 export interface TriangleLayout {
   id: string
@@ -45,19 +59,18 @@ export function triangleGeometry(vertices: TriangleLayout['vertices']): Triangle
   return { sideClass, angleClass, side2, minAngleDeg: minimumAngle(side2) }
 }
 
-/** THE PRODUCT TYPES. A RIGHT ANGLE WINS OUTRIGHT: a right-angled triangle is a Wedge even
- *  when two of its sides are equal — Dan, 08-26, looking at the right-angled 2x2: "it is not
- *  peak it is wedge". A Peak is symmetric WITHOUT the right angle; everything else is a Sail.
- *  (His earlier "2x3 is not wedge it is peak" was said while the orientation bug displayed
- *  layouts lying at arbitrary angles; on a correctly rested shape the rule is the right angle.) */
-export function triangleProductType(g: TriangleGeometry): TriangleProductType {
-  return g.angleClass === 'right' ? 'wedge'
-    : g.sideClass === 'isosceles' ? 'peak'
-      : 'sail'
+/** The group a triangle READS as, measured on the view it is presented in — not on its
+ *  storage, because how it sits is what a person is looking at. Symmetric and standing on a
+ *  level base is Perfect; symmetric but pointed or with no base to stand on is Sharp; anything
+ *  that leans is Slanted. Dan's per-layout rulings override this in the catalogue. */
+export function triangleProductType(
+  g: TriangleGeometry, shown: { cols: number; rows: number; level: boolean },
+): TriangleProductType {
+  if (g.sideClass !== 'isosceles') return 'slanted'
+  const w = Math.max(1, shown.cols - 1), h = Math.max(1, shown.rows - 1)
+  return shown.level && h / w < 2 ? 'perfect' : 'sharp'
 }
 
-/** The eight square-lattice symmetries. The lattice never rotates — these map a node set onto
- *  itself for identity and for orientation, they do not turn the grid. */
 export const D4: Array<(n: LatticeNode) => LatticeNode> = [
   ([x, y]) => [x, y], ([x, y]) => [-y, x], ([x, y]) => [-x, -y], ([x, y]) => [y, -x],
   ([x, y]) => [-x, y], ([x, y]) => [y, x], ([x, y]) => [x, -y], ([x, y]) => [-y, -x],

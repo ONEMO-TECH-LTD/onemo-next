@@ -68,16 +68,7 @@ export default function LibraryPanel({
         <div className="gl-lib">
           {opts.frames.map((o) => (
             <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}
-              aria-label={o.accessibleLabel} title={o.accessibleLabel}>
-              {o.nodes && (
-                <svg viewBox={`-0.6 -0.6 ${(o.cols ?? 1) + 0.2} ${(o.rows ?? 1) + 0.2}`} width="30" height="30">
-                  <polygon points={o.nodes.map(([x, y]) => `${x},${y}`).join(' ')}
-                    fill="var(--accent)" fillOpacity="0.18" stroke="var(--accent)" strokeWidth="0.09" />
-                  {o.nodes.map(([x, y]) => <circle key={`${x},${y}`} cx={x} cy={y} r="0.26" fill="var(--magnet)" />)}
-                </svg>
-              )}
-              <b>{o.label}</b>
-            </button>
+              aria-label={o.accessibleLabel} title={o.accessibleLabel}><b>{o.label}</b></button>
           ))}
         </div>
       </Fold>

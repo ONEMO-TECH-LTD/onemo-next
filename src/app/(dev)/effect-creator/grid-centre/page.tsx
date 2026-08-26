@@ -1128,7 +1128,6 @@ const CSS = `
 .gl-seg.gl-liborient{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 .gl-seg.gl-liborient button{white-space:normal;min-height:34px;line-height:1.15}
 .gl-liberr{display:block;margin-top:6px;font:600 11px var(--mono);color:#e5484d;font-style:normal}
-.gl-lib button svg{display:block;margin:0 auto 2px}
 .gl-camnum{display:inline-flex;align-items:baseline;gap:3px}
 .gl-camnum input{width:86px;font:700 20px var(--mono);color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:8px;padding:5px 8px;text-align:right;
