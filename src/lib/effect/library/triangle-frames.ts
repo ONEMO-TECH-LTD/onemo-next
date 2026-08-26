@@ -21,8 +21,33 @@ export const triangleById = (id: string): TriangleLayout => {
   return t
 }
 
+/** THE ACTIVE PRODUCT CATALOGUE — Dan's rulings on individual layouts.
+ *
+ *  No geometric rule reproduces them: he ruled the 2x3 a Peak and the 2x2 a Wedge, and neither
+ *  precedence gives both — right-angle-first makes the 2x3 a Wedge, two-equal-sides-first makes
+ *  the 2x2 a Peak. Grouping is therefore CURATED, and geometry only supplies the default. Every
+ *  entry here cites the moment it was ruled; nothing is added by inference.
+ *
+ *  The 79-geometry universe underneath is untouched — a retired layout leaves the product, not
+ *  the corpus, so the review evidence survives. */
+const TYPE_RULED: Record<string, TriangleProductType> = {
+  // 08-26 08:11 — "2x3 is not wedge it is peak", of the two then grouped under Wedge / 2x3
+  'tri:0,0;0,2;1,0': 'peak',
+  'tri:0,0;0,2;1,1': 'peak',
+  // 08-26 08:16 — "it is not peak it is wedge", of the right-angled 2x2 on screen
+  'tri:0,0;0,1;1,0': 'wedge',
+}
+
+/** 08-26 08:11 — "remove these layouts", attached to the Wedge / 3x4 screen, whose layout block
+ *  held exactly these three. Retired from the product; still in the universe. */
+const RETIRED = new Set<string>([
+  'tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2',
+])
+
+export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)
+
 export const triangleTypeOf = (t: TriangleLayout): TriangleProductType =>
-  triangleProductType(triangleGeometry(t.vertices))
+  TYPE_RULED[t.id] ?? triangleProductType(triangleGeometry(t.vertices))
 
 export const triangleFrameKey = (t: TriangleLayout): string => {
   const b = boundsOf([...t.vertices])
@@ -75,7 +100,7 @@ export function restsFlat(t: TriangleLayout): boolean {
 /** The layouts a product type offers: every straight one first, then the diagonal ones, and
  *  within each run by area, columns/rows, blunt-to-sharp, then the stable ID. */
 export function trianglesOfType(type: TriangleProductType): TriangleLayout[] {
-  return TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === type).sort((a, b) => {
+  return TRIANGLE_LAYOUTS.filter((t) => isActive(t) && triangleTypeOf(t) === type).sort((a, b) => {
     if (restsFlat(a) !== restsFlat(b)) return restsFlat(a) ? -1 : 1
     const ba = boundsOf([...a.vertices]), bb = boundsOf([...b.vertices])
     return (ba.cols * ba.rows) - (bb.cols * bb.rows) || ba.cols - bb.cols || ba.rows - bb.rows

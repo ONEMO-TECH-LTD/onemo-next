@@ -11,7 +11,7 @@ import {
   TRIANGLE_LAYOUTS, triangleGeometry, triangleProductType, triangleTypeOf, triangleFrameKey,
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
-  draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat,
+  draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat, isActive,
   type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
@@ -417,12 +417,40 @@ describe('triangle — the three-point layout universe', () => {
     expect([...universe].sort()).toEqual([...ids].sort())
   })
 
-  it('the product totals are Peak 14 / Wedge 17 / Sail 48', () => {
-    const n = (t: string) => TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === t).length
-    expect([n('peak'), n('wedge'), n('sail')]).toEqual([14, 17, 48])
+  it('the universe stays 79; the ACTIVE catalogue is Peak 16 / Wedge 12 / Sail 48', () => {
+    // Geometry supplies the default grouping; Dan's per-layout rulings override it, and three
+    // layouts are retired from the product. Neither changes the universe underneath.
+    expect(TRIANGLE_LAYOUTS.length).toBe(79)
+    expect(TRIANGLE_LAYOUTS.filter(isActive).length).toBe(76)
+    expect([trianglesOfType('peak').length, trianglesOfType('wedge').length, trianglesOfType('sail').length])
+      .toEqual([16, 12, 48])
   })
 
-  it('the frame distribution is exactly the ruled table', () => {
+  it('every ruled layout is grouped as Dan ruled it, and the retired three are out', () => {
+    // 08-26 08:11 "2x3 is not wedge it is peak"
+    for (const id of ['tri:0,0;0,2;1,0', 'tri:0,0;0,2;1,1'])
+      expect(triangleTypeOf(TRIANGLE_LAYOUTS.find((t) => t.id === id)!), id).toBe('peak')
+    // 08-26 08:16 "it is not peak it is wedge"
+    expect(triangleTypeOf(TRIANGLE_LAYOUTS.find((t) => t.id === 'tri:0,0;0,1;1,0')!)).toBe('wedge')
+    // 08-26 08:11 "remove these layouts", of the Wedge / 3x4 screen
+    for (const id of ['tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2']) {
+      const t = TRIANGLE_LAYOUTS.find((x) => x.id === id)!
+      expect(isActive(t), id).toBe(false)
+      expect((['peak', 'wedge', 'sail'] as const).some((k) => trianglesOfType(k).includes(t))).toBe(false)
+    }
+  })
+
+  it('no single geometric precedence reproduces the ruled grouping', () => {
+    // This is why the catalogue is curated: right-angle-first makes the 2x3 a Wedge,
+    // two-equal-sides-first makes the 2x2 a Peak. Both rulings cannot come from one formula.
+    const g = (id: string) => triangleGeometry(TRIANGLE_LAYOUTS.find((t) => t.id === id)!.vertices)
+    const rightFirst = (id: string) => g(id).angleClass === 'right' ? 'wedge' : g(id).sideClass === 'isosceles' ? 'peak' : 'sail'
+    const isoFirst = (id: string) => g(id).sideClass === 'isosceles' ? 'peak' : g(id).angleClass === 'right' ? 'wedge' : 'sail'
+    expect(rightFirst('tri:0,0;0,2;1,0')).toBe('wedge')   // but Dan ruled it Peak
+    expect(isoFirst('tri:0,0;0,1;1,0')).toBe('peak')      // but Dan ruled it Wedge
+  })
+
+  it('the frame distribution of the universe is exactly the derived table', () => {
     const table: Record<string, [number, number, number]> = {
       '2x2': [0, 1, 0], '2x3': [0, 2, 1], '2x4': [0, 1, 3], '2x5': [1, 1, 4], '3x3': [2, 1, 1],
       '3x4': [1, 3, 5], '3x5': [1, 2, 9], '4x4': [3, 1, 4], '4x5': [1, 3, 14], '5x5': [5, 2, 7],
@@ -431,7 +459,10 @@ describe('triangle — the three-point layout universe', () => {
     for (const t of TRIANGLE_LAYOUTS) {
       const k = triangleFrameKey(t)
       got[k] = got[k] ?? [0, 0, 0]
-      got[k][{ peak: 0, wedge: 1, sail: 2 }[triangleTypeOf(t)]]++
+      // the universe's own distribution, from geometry alone — the curated catalogue sits above
+      const geo = triangleGeometry(t.vertices)
+      const base = geo.angleClass === 'right' ? 'wedge' : geo.sideClass === 'isosceles' ? 'peak' : 'sail'
+      got[k][{ peak: 0, wedge: 1, sail: 2 }[base]]++
     }
     expect(got).toEqual(table)
     // three nodes in one line are collinear, so there is no 1xN triangle frame
@@ -459,26 +490,26 @@ describe('triangle — the three-point layout universe', () => {
     for (const t of TRIANGLE_LAYOUTS) expect(triangleGeometry(t.vertices).sideClass).not.toBe('equilateral')
   })
 
-  it('a right angle wins outright: a right isosceles is a Wedge, never a Peak', () => {
+  it('geometry supplies the DEFAULT grouping: a right angle reads as a Wedge', () => {
     // Dan, 08-26, looking at the right-angled 2x2: "it is not peak it is wedge".
     const rightIso = TRIANGLE_LAYOUTS.filter((t) => {
       const g = triangleGeometry(t.vertices)
       return g.angleClass === 'right' && g.sideClass === 'isosceles'
     })
     expect(rightIso.length).toBe(8)
-    for (const t of rightIso) expect(triangleTypeOf(t)).toBe('wedge')
-    // and a Peak is symmetric WITHOUT the right angle
-    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'peak')) {
+    for (const t of rightIso) {
       const g = triangleGeometry(t.vertices)
-      expect(g.sideClass).toBe('isosceles')
-      expect(g.angleClass).not.toBe('right')
+      const base = g.angleClass === 'right' ? 'wedge' : 'peak'
+      expect(base).toBe('wedge')
     }
   })
 
-  it('the product type survives every transform', () => {
+  it('the GEOMETRIC type survives every transform', () => {
+    // the curated catalogue can override a layout's grouping, but the geometry it is derived
+    // from must be transform-invariant or the identity itself would move
     for (const t of TRIANGLE_LAYOUTS) for (const f of D4F)
       expect(triangleProductType(triangleGeometry(t.vertices.map(f) as never)), t.id)
-        .toBe(triangleTypeOf(t))
+        .toBe(triangleProductType(triangleGeometry(t.vertices)))
   })
 })
 
@@ -839,10 +870,11 @@ describe('triangle — straight layouts come before the diagonal ones', () => {
     }
   })
 
-  it('50 of the 79 rest on a flat side; 29 can only lean', () => {
-    const all = (['peak', 'wedge', 'sail'] as const).flatMap((t) => trianglesOfType(t))
-    expect(all.length).toBe(79)
-    expect(all.filter(restsFlat).length).toBe(50)
-    expect(all.filter((t) => !restsFlat(t)).length).toBe(29)
+  it('the universe splits 50 flat / 29 leaning; the active catalogue keeps that split honest', () => {
+    expect(TRIANGLE_LAYOUTS.filter(restsFlat).length).toBe(50)
+    expect(TRIANGLE_LAYOUTS.filter((t) => !restsFlat(t)).length).toBe(29)
+    const active = (['peak', 'wedge', 'sail'] as const).flatMap((t) => trianglesOfType(t))
+    expect(active.length).toBe(76)
+    expect(active.every((t) => TRIANGLE_LAYOUTS.includes(t))).toBe(true)
   })
 })
