@@ -1,5 +1,5 @@
-import { materializeDraft, materializeSelection, type MaterializedLibrary } from './materialize'
-import { panelOptions, type PanelOptions } from './options'
+import { materializeResolved, type MaterializedLibrary } from './materialize'
+import { panelOptionsResolved, type PanelOptions } from './options'
 import { resolveSelection } from './selection'
 import type { LibraryEdit } from './authoring'
 import type { LibraryDraft } from './drafts'
@@ -19,8 +19,8 @@ export function librarySurface(
   const nodes = edit ? edit.nodes : resolved.draft?.nodes
   return {
     classId: resolved.classId,
-    materialized: nodes ? materializeDraft(selection, nodes, pitchMM) : materializeSelection(resolved.safeSel, pitchMM),
-    options: panelOptions(selection, drafts, pitchMM),
+    materialized: materializeResolved(resolved, nodes ?? null, pitchMM),
+    options: panelOptionsResolved(selection, drafts, pitchMM, resolved),
     isDraft: Boolean(resolved.draft),
   }
 }

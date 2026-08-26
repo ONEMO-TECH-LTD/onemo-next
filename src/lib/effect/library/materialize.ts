@@ -8,7 +8,7 @@
 
 import { specOf } from './class-registry'
 import { outlineFromLayout } from './outline'
-import { resolveSelection, selectedRecords } from './selection'
+import { resolveSelection, selectedRecords, type ResolvedSelection } from './selection'
 import { frameKeyOf, transformLayout } from './transforms'
 import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, PointMM } from './types'
 
@@ -46,24 +46,45 @@ function place(
 
 /** A corpus selection, materialised. Throws on an unknown id — stable IDs exist so that a stale
  *  identity cannot silently retarget to unrelated data (QA F3). */
-export function materializeSelection(
-  sel: LibrarySelection, pitchMM: number,
+export function materializeResolved(
+  resolved: ResolvedSelection, nodes: ReadonlyArray<readonly [number, number]> | null, pitchMM: number,
 ): MaterializedLibrary {
-  const { classId, frame, layout } = selectedRecords(sel, pitchMM)
+  const { classId, frame, layout, safeSel } = resolved
   const spec = specOf(classId)
-  const variant = spec.variantOf(sel, pitchMM)
+  const variant = spec.variantOf(safeSel, pitchMM)
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
-  const p = place(frame, layout, sel.view, pitchMM)
-  return {
+  const p = place(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
+  const corpus = nodes ? place(frame, layout, safeSel.view, pitchMM) : p
+  const corpusOutline = outlineFromLayout(corpus.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, corpus.nodesMM))
+  if (!nodes) return {
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId: layout.name,
-    nodesMM: p.nodesMM,
-    outlineMM: outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(sel, p.nodesMM)),
+    nodesMM: p.nodesMM, outlineMM: corpusOutline,
     error: null,
     seedMM: p.nodesMM[0] ?? null,
   }
+  let outlineMM: readonly PointMM[] = corpusOutline
+  const validation = spec.validateDraft({ nodes, geometryId: safeSel.geometryId }, frame)
+  let error: string | null = validation[0] ?? null
+  if (!error) try { outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM)) }
+  catch (e) { error = (e as Error).message }
+  return {
+    classId,
+    sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
+    frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
+    nodesMM: p.nodesMM,
+    outlineMM, error,
+    seedMM: p.nodesMM.length ? null : corpus.nodesMM[0] ?? null,
+  }
+}
+
+export function materializeSelection(
+  sel: LibrarySelection, pitchMM: number,
+): MaterializedLibrary {
+  selectedRecords(sel, pitchMM)
+  return materializeResolved(resolveSelection(sel, [], pitchMM), null, pitchMM)
 }
 
 /** A population being DRAWN is allowed to be nothing yet, one node, two, or briefly not a shape:
@@ -78,23 +99,5 @@ export function materializeDraft(
   // the placement and the centre all lie. And the selection saveEdit returns names the draft
   // itself, so the corpus fallback must be taken on the NORMALISED selection — resolving the
   // caller's own draft id strictly is how the producer refused its own output.
-  const { classId, frame, safeSel } = resolveSelection(sel, [], pitchMM)
-  const spec = specOf(classId)
-  const variant = spec.variantOf(safeSel, pitchMM)
-  // A draft is canonical data like every corpus layout, so it goes through the SAME transform
-  // and the same one flip — never straight to mm (QA F2).
-  const p = place(frame, { name: 'draft', nodes }, safeSel.view, pitchMM)
-  const corpus = materializeSelection(safeSel, pitchMM)
-  let outlineMM: readonly PointMM[] = corpus.outlineMM
-  const validation = spec.validateDraft({ nodes, geometryId: safeSel.geometryId }, frame)
-  let error: string | null = validation[0] ?? null
-  if (!error) try { outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM)) }
-  catch (e) { error = (e as Error).message }
-  return {
-    classId,
-    sourceFrameKey: corpus.sourceFrameKey, frameKey: p.cols + 'x' + p.rows,
-    frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
-    nodesMM: p.nodesMM, outlineMM, error,
-    seedMM: p.nodesMM.length ? null : corpus.seedMM,
-  }
+  return materializeResolved(resolveSelection(sel, [], pitchMM), nodes, pitchMM)
 }

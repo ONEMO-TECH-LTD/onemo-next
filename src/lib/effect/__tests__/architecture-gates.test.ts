@@ -41,7 +41,7 @@ const retiredProbes = [
   'classifier bridge',
 ]
 
-type Zone = 0 | 1 | 2 | 3 | 4 | 5
+type Zone = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 type ImportEdge = { from: string; to: string | null; specifier: string; typeOnly: boolean }
 type ImportViolation = ImportEdge & { fromZone: Zone; toZone?: Zone; reason: string }
 
@@ -54,10 +54,15 @@ const ZONE_FILES: Record<Exclude<Zone, 1>, readonly string[]> = {
   ],
   4: ['class-registry.ts'],
   5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'drafts.ts', 'integrity.ts'],
+  6: ['surface.ts'],
+  7: ['index.ts'],
 }
 
-const step2Files = () => files(LIBRARY).filter((path) => /\.tsx?$/.test(path)
-  && !['index.ts', 'public-types.ts', 'public-values.ts', 'surface.ts'].includes(basename(path)))
+const libraryFiles = () => files(LIBRARY).filter((path) => path.endsWith('.ts'))
+const step2Files = () => libraryFiles().filter((path) => {
+  const zone = zonesOf(path)[0]
+  return zone !== undefined && zone <= 5
+})
 
 const zonesOf = (path: string): Zone[] => {
   const name = basename(path)
@@ -113,6 +118,7 @@ const concretePackage = (path: string): string | null => {
 
 const ALLOWED_ZONES: Record<Zone, readonly Zone[]> = {
   0: [0], 1: [0], 2: [0, 2], 3: [0, 1, 2, 3], 4: [0, 3], 5: [0, 2, 4, 5],
+  6: [0, 5, 6], 7: [0, 4, 5, 6, 7],
 }
 
 const importViolations = (overrides: Record<string, string> = {}): ImportViolation[] => {
@@ -217,20 +223,66 @@ const emptyLayoutSentinels = (path: string, code = source(path)): number[] => {
   return out
 }
 
+const callsNamed = (path: string, name: string, code = source(path)): number => {
+  let count = 0
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) count++
+    ts.forEachChild(node, visit)
+  }
+  visit(parse(path, code))
+  return count
+}
+
+const barrelExports = (code = source(join(LIBRARY, 'index.ts'))) => {
+  const types: string[] = [], values: string[] = [], wildcards: string[] = []
+  for (const statement of parse(join(LIBRARY, 'index.ts'), code).statements) {
+    if (!ts.isExportDeclaration(statement)) continue
+    if (!statement.exportClause || !ts.isNamedExports(statement.exportClause)) {
+      wildcards.push(statement.getText())
+      continue
+    }
+    for (const element of statement.exportClause.elements) {
+      const names = statement.isTypeOnly || element.isTypeOnly ? types : values
+      names.push((element.propertyName ?? element.name).text)
+    }
+  }
+  return { types: types.sort(), values: values.sort(), wildcards }
+}
+
+const bridgeViolations = (code = source(join(ROOT, 'grid-magnet-library-bridge.ts'))): string[] => {
+  const violations: string[] = []
+  for (const statement of parse(join(ROOT, 'grid-magnet-library-bridge.ts'), code).statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue
+    const specifier = statement.moduleSpecifier.text
+    const clause = statement.importClause
+    const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings)
+      ? clause.namedBindings.elements : []
+    const names = named.map((part) => (part.propertyName ?? part.name).text).sort()
+    const typeOnly = Boolean(clause?.isTypeOnly)
+      || Boolean(clause && !clause.name && named.length > 0 && named.every((part) => part.isTypeOnly))
+    const exact = (expected: readonly string[]) => names.length === expected.length
+      && names.every((name, index) => name === expected[index]) && !clause?.name
+    if (specifier === './library') {
+      if (!typeOnly || !exact(['MaterializedLibrary'])) violations.push(specifier)
+    } else if (specifier === './types' || specifier === './grid-magnet') {
+      if (!typeOnly) violations.push(specifier)
+    } else if (specifier === './grid-magnet-spec') {
+      if (typeOnly || !exact(['MAGNET_DIA_SMALL_MM', 'RELEASED_PADDING_MM'])) violations.push(specifier)
+    } else violations.push(specifier)
+  }
+  return violations
+}
+
 const zone8Violations = (path: string, code = source(path)): string[] => {
   const violations: string[] = []
+  if (path === join(ROOT, 'grid-magnet-library-bridge.ts')) return bridgeViolations(code)
   for (const edge of importEdges(path, code)) {
     if (!edge.to) continue
     const libraryEdge = edge.to === LIBRARY || edge.to.startsWith(LIBRARY + '/')
     if (path === PANEL || path === PAGE) {
       if (libraryEdge && edge.specifier !== '@/lib/effect/library') violations.push(edge.specifier)
-    } else if (path === join(ROOT, 'grid-magnet-library-bridge.ts')) {
-      const allowed = edge.specifier === './library'
-        || edge.specifier === './types'
-        || edge.specifier === './grid-magnet'
-        || edge.specifier === './grid-magnet-compute'
-        || edge.specifier === './grid-magnet-spec'
-      if (!allowed) violations.push(edge.specifier)
+      if (path === PAGE && edge.to === join(ROOT, 'grid-magnet-library-bridge.ts')
+        && edge.specifier !== '@/lib/effect/grid-magnet-library-bridge') violations.push(edge.specifier)
     }
   }
   return violations
@@ -319,7 +371,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     }
   })
   it('STEP 2: every governed source belongs to exactly one active zone', () => {
-    for (const path of step2Files()) expect(zonesOf(path), path).toHaveLength(1)
+    for (const path of libraryFiles()) expect(zonesOf(path), path).toHaveLength(1)
   })
   it('STEP 2: the AST import matrix enforces zones 0-5', () => {
     expect(importViolations()).toEqual([])
@@ -457,9 +509,11 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     }
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
-    const barrel = source(join(LIBRARY, 'index.ts'))
-    for (const symbol of ['CatalogueEntry', 'LibrarySurface', 'catalogue', 'librarySurface', 'LIBRARY_FAMILIES'])
-      expect(barrel).toContain(symbol)
+    expect(barrelExports()).toEqual({
+      types: ['CatalogueEntry', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'catalogue', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      wildcards: [],
+    })
     const bridge = source(join(ROOT, 'grid-magnet-library-bridge.ts'))
     for (const symbol of ['materializeSelection', 'materializeDraft', 'resolveSelection', 'panelOptions', 'specOf'])
       expect(bridge).not.toContain(symbol)
@@ -469,6 +523,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const page = source(PAGE)
     expect(page).toContain('librarySurface(')
     expect(page).toContain('libraryStageModel(')
+    expect(callsNamed(PAGE, 'librarySurface')).toBe(1)
+    expect(callsNamed(PAGE, 'libraryStageModel')).toBe(1)
     expect(zone8Violations(PANEL)).toEqual([])
     expect(zone8Violations(PAGE)).toEqual([])
     expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'))).toEqual([])
@@ -477,5 +533,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(zone8Violations(PANEL, source(PANEL) + `\nimport { resolveSelection } from '@/lib/effect/library/selection'`)).toEqual(['@/lib/effect/library/selection'])
     expect(zone8Violations(PAGE, source(PAGE) + `\nimport { materializeSelection } from '@/lib/effect/library/materialize'`)).toEqual(['@/lib/effect/library/materialize'])
     expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'), source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport { resolveSelection } from './library/selection'`)).toEqual(['./library/selection'])
+    expect(barrelExports(source(join(LIBRARY, 'index.ts')) + `\nexport * from './triangle-class'`).wildcards).toHaveLength(1)
+    expect(bridgeViolations(source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport './types'`)).toEqual(['./types'])
+    expect(callsNamed(PAGE, 'librarySurface', source(PAGE) + `\nlibrarySurface()`)).toBe(2)
   })
 })

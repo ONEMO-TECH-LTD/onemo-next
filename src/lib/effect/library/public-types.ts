@@ -1,8 +1,0 @@
-export type { CornerMode } from './class-contract'
-export type { LibraryFamily, LibrarySelection } from './types'
-export type { CatalogueEntry } from './catalogue'
-export type { LibrarySurface } from './surface'
-export type { PanelOption, PanelOptions } from './options'
-export type { LibraryEdit } from './authoring'
-export type { LibraryDraft } from './drafts'
-export type { MaterializedLibrary } from './materialize'

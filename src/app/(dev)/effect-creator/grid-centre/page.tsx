@@ -349,13 +349,12 @@ export default function GridLab() {
             <button aria-pressed onClick={() => setTab('library')}>Library</button>
           </div>
           <div className="gl-seg gl-libbar-tabs">
-            {LIBRARY_FAMILIES.map((fam) => {
-              const cur = librarySurface(librarySel, drafts, edit, pitch).classId
-              return <button key={fam} aria-pressed={cur === fam} onClick={() => {
+            {LIBRARY_FAMILIES.map((fam) => (
+              <button key={fam} aria-pressed={libraryState?.classId === fam} onClick={() => {
                 setEdit(null)
                 setLibrarySel((current) => selectionForFamily(current, fam, pitch))
               }}>{fam}</button>
-            })}
+            ))}
           </div>
         </div>
       )}
@@ -439,7 +438,7 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState?.options ?? librarySurface(librarySel, drafts, edit, pitch).options} boxMM={libraryBox}
+          {libraryState ? <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState.options} boxMM={libraryBox}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
             editError={libraryModel?.error ?? null}
             isDraft={libraryState?.isDraft ?? false}
@@ -458,7 +457,7 @@ export default function GridLab() {
               writeDrafts(r.drafts)
               setEdit(null)
               setLibrarySel(r.sel)
-            }} /></> : <>
+            }} /> : null}</> : <>
           <Fold title="Grid settings">
             <div className="gl-field"><span>Band · the offer list</span>
               <div className="gl-seg">

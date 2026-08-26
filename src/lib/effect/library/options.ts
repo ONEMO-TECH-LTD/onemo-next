@@ -7,7 +7,7 @@ import { specOf } from './class-registry'
 import type { LibraryClass } from './class-contract'
 import { SPACING_MODES, isSpacingMode } from './rules'
 import { transformLayout, viewName } from './transforms'
-import { draftLayoutId, pickLayout, resolveSelection, draftsFor, selectVariant } from './selection'
+import { draftLayoutId, pickLayout, resolveSelection, draftsFor, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -107,14 +107,13 @@ function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryCla
 export function selectionForFamily(
   current: LibrarySelection, family: LibraryFamily, pitchMM: number,
 ): LibrarySelection {
-  specOf(family)
   return specOf(family).open(current, pitchMM)
 }
 
-export function panelOptions(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
+export function panelOptionsResolved(
+  sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
 ): PanelOptions {
-  const { classId, frame, layout, draft } = resolveSelection(sel, drafts, pitchMM)
+  const { classId, frame, layout, draft } = resolved
   const spec = specOf(classId)
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
@@ -154,4 +153,10 @@ export function panelOptions(
       next: layoutSel(has(m.layoutId) ? m.layoutId : pickLayout(frame, m.layoutId)),
     })),
   }
+}
+
+export function panelOptions(
+  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
+): PanelOptions {
+  return panelOptionsResolved(sel, drafts, pitchMM, resolveSelection(sel, drafts, pitchMM))
 }

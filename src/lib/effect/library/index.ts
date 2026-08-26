@@ -1,10 +1,16 @@
-// Library runtime contract. Tests import implementation modules by direct path.
-export type {
-  CornerMode, LibraryFamily, LibrarySelection, CatalogueEntry, LibrarySurface,
-  PanelOption, PanelOptions, LibraryEdit, LibraryDraft, MaterializedLibrary,
-} from './public-types'
-export {
-  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, CATALOGUE_FORMAT_VERSION, catalogue,
-  librarySurface, selectionForFamily, startAdd, startEdit, saveEdit, deleteEdit,
-  toggleNodeAt, DRAFT_STORE_KEY,
-} from './public-values'
+export type { CornerMode } from './class-contract'
+export type { LibraryFamily, LibrarySelection } from './types'
+export type { CatalogueEntry } from './catalogue'
+export type { LibrarySurface } from './surface'
+export type { PanelOption, PanelOptions } from './options'
+export type { LibraryEdit } from './authoring'
+export type { LibraryDraft } from './drafts'
+export type { MaterializedLibrary } from './materialize'
+
+export { DEFAULT_LIBRARY_SELECTION } from './selection'
+export { LIBRARY_FAMILIES } from './class-registry'
+export { CATALOGUE_FORMAT_VERSION, catalogue } from './catalogue'
+export { librarySurface } from './surface'
+export { selectionForFamily } from './options'
+export { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt } from './authoring'
+export { DRAFT_STORE_KEY } from './drafts'

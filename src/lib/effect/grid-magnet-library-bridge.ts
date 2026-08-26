@@ -7,7 +7,6 @@
 
 import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
-import { spotRadiusOf } from './grid-magnet-compute'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   type MaterializedLibrary,
@@ -33,7 +32,7 @@ function toStage(m: MaterializedLibrary, pitchMM: number): LibraryStageModel {
     lattice: m.seedMM ? [[m.seedMM[0], m.seedMM[1]] as Pt] : [],
     phaseMM: [0, 0],
     panMM: [0, 0],
-    spotRadiusMM: spotRadiusOf(RELEASED_PADDING_MM),
+    spotRadiusMM: RELEASED_PADDING_MM,
     contactsMM: [],
     segments: [],
     centresMM: [],

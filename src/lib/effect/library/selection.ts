@@ -14,6 +14,10 @@ import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection } fro
 
 /** A hand-authored layout is named in a selection as 'draft:<name>'. One place, one spelling. */
 export const DRAFT_PREFIX = 'draft:'
+export const DEFAULT_LIBRARY_SELECTION: LibrarySelection = {
+  classId: 'square', frameKey: '3x3', layoutId: 'perimeter',
+  view: { transpose: false, flipX: false, flipY: false },
+}
 export const draftLayoutId = (name: string): string => DRAFT_PREFIX + name
 export const isDraftLayout = (layoutId: string): boolean => layoutId.startsWith(DRAFT_PREFIX)
 export const draftNameOf = (layoutId: string): string => layoutId.slice(DRAFT_PREFIX.length)
