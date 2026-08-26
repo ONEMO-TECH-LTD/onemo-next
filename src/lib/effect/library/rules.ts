@@ -68,9 +68,6 @@ function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM: number
 const boxByClassFloor = (cols: number, rows: number, pitchMM: number) =>
   ({ w: MIN_LIB_MM + (cols - 1) * pitchMM, h: MIN_LIB_MM + (rows - 1) * pitchMM })
 
-/** THE CLASS RULES — one description per class, read by the panel AND available to the
- *  classifier bridge. No class logic lives in the UI (Dan, 08-25): the view asks these, it
- *  never asks 'is this a diamond'. */
 /** THE CLASS RULES — one description per class. A class either has a FRAME REGISTRY, in which
  *  case it must supply every rule that reads a frame, or its frames are MATERIALISED from the
  *  geometry the selection names, in which case it supplies none of them. The distinction is the

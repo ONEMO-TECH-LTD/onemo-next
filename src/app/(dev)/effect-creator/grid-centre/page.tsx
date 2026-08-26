@@ -1122,6 +1122,8 @@ const CSS = `
 .gl-libdim{margin-left:auto;align-self:center;font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
   background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer;transition:.12s}
 .gl-libdim[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.gl-seg.gl-liborient{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.gl-seg.gl-liborient button{white-space:normal;min-height:34px;line-height:1.15}
 .gl-liberr{display:block;margin-top:6px;font:600 11px var(--mono);color:#e5484d;font-style:normal}
 .gl-libgeo button span{display:block;font:600 10px var(--mono);color:var(--ink-3);margin-top:2px}
 .gl-camnum{display:inline-flex;align-items:baseline;gap:3px}
