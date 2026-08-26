@@ -4,22 +4,6 @@
 export type LatticeNode = readonly [number, number]
 export type TriangleSideClass = 'equilateral' | 'isosceles' | 'scalene'
 export type TriangleAngleClass = 'acute' | 'right' | 'obtuse'
-/** THE PRODUCT GROUPS (Dan, 08-26). Peak / Wedge / Sail are retired vocabulary — these are
- *  what the product shows, one word each, from his own list:
- *    Perfect  — balanced on a flat base  (Pyramid, Arrowhead, Mountain)
- *    Sharp    — tall and pointed         (Needle, Spike, Slice, Icicle)
- *    Slanted  — leaning                  (Sail, Fin, Ramp, Wedge, Pennant, Flag)
- *  One word everywhere, groups included — the longer phrases in his list were the research
- *  descriptions, not labels. */
-export type TriangleProductType = 'perfect' | 'sharp' | 'slanted'
-
-/** The names each group may carry. A layout gets one when Dan names it; the group is derived. */
-export const GROUP_NAMES: Record<TriangleProductType, string[]> = {
-  perfect: ['Pyramid', 'Arrowhead', 'Mountain'],
-  sharp: ['Needle', 'Spike', 'Slice', 'Icicle'],
-  slanted: ['Sail', 'Fin', 'Ramp', 'Wedge', 'Pennant', 'Flag'],
-}
-
 export interface TriangleLayout {
   id: string
   vertices: readonly [LatticeNode, LatticeNode, LatticeNode]
@@ -44,6 +28,7 @@ function minimumAngle(side2: readonly [number, number, number]): number {
   return (Math.acos(Math.max(-1, Math.min(1, cosA))) * 180) / Math.PI
 }
 
+/** EXACT integer classification — identity never rests on floating point. */
 export function triangleGeometry(vertices: TriangleLayout['vertices']): TriangleGeometry {
   if (cross(vertices[0], vertices[1], vertices[2]) === 0) throw new Error('triangle: collinear vertices')
   const side2 = [
@@ -59,16 +44,16 @@ export function triangleGeometry(vertices: TriangleLayout['vertices']): Triangle
   return { sideClass, angleClass, side2, minAngleDeg: minimumAngle(side2) }
 }
 
-/** The group a triangle READS as, measured on the view it is presented in — not on its
- *  storage, because how it sits is what a person is looking at. Symmetric and standing on a
- *  level base is Perfect; symmetric but pointed or with no base to stand on is Sharp; anything
- *  that leans is Slanted. Dan's per-layout rulings override this in the catalogue. */
-export function triangleProductType(
-  g: TriangleGeometry, shown: { cols: number; rows: number; level: boolean },
-): TriangleProductType {
-  if (g.sideClass !== 'isosceles') return 'slanted'
-  const w = Math.max(1, shown.cols - 1), h = Math.max(1, shown.rows - 1)
-  return shown.level && h / w < 2 ? 'perfect' : 'sharp'
+/** THE PRODUCT TYPES (Dan, 08-26). One word each, from his own naming list — Peak / Wedge /
+ *  Sail are retired vocabulary and must not reach the UI. The grouping RULE is unchanged: a
+ *  right angle reads as a Wedge, symmetry without one as a Pyramid, everything else a Fin, and
+ *  Dan's per-layout rulings override that in the catalogue. */
+export type TriangleProductType = 'pyramid' | 'wedge' | 'fin'
+
+export function triangleProductType(g: TriangleGeometry): TriangleProductType {
+  return g.angleClass === 'right' ? 'wedge'
+    : g.sideClass === 'isosceles' ? 'pyramid'
+      : 'fin'
 }
 
 export const D4: Array<(n: LatticeNode) => LatticeNode> = [

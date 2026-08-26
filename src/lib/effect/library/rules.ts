@@ -136,7 +136,7 @@ export const CLASS_RULES = {
     // A triangle's frame, its populations and its outline all come from the geometry it
     // carries, so it supplies no sub-rule, no box formula, no sampler and no named views.
     source: 'geometry',
-    subs: ['perfect', 'sharp', 'slanted'],
+    subs: ['pyramid', 'wedge', 'fin'],
     label: (c, r) => c + '×' + r,
   },
 } satisfies Record<LibraryFamily, ClassRules>

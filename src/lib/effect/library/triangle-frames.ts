@@ -31,9 +31,11 @@ export const triangleById = (id: string): TriangleLayout => {
  *  The 79-geometry universe underneath is untouched — a retired layout leaves the product, not
  *  the corpus, so the review evidence survives. */
 const TYPE_RULED: Record<string, TriangleProductType> = {
-  // Dan's 08:11 and 08:16 rulings were given in the retired Peak / Wedge / Sail vocabulary and
-  // do not carry over to the new groups, which describe how a shape reads rather than its
-  // angles. They are re-stated here when he names these layouts in the new words.
+  // 08-26 08:11 — "2x3 is not wedge it is peak", of the two then grouped under Wedge / 2x3
+  'tri:0,0;0,2;1,0': 'pyramid',
+  'tri:0,0;0,2;1,1': 'pyramid',
+  // 08-26 08:16 — "it is not peak it is wedge", of the right-angled 2x2 on screen
+  'tri:0,0;0,1;1,0': 'wedge',
 }
 
 /** 08-26 08:11 — "remove these layouts", attached to the Wedge / 3x4 screen, whose layout block
@@ -44,16 +46,8 @@ const RETIRED = new Set<string>([
 
 export const isActive = (t: TriangleLayout): boolean => !RETIRED.has(t.id)
 
-export const triangleTypeOf = (t: TriangleLayout): TriangleProductType => {
-  if (TYPE_RULED[t.id]) return TYPE_RULED[t.id]
-  const b = boundsOf([...t.vertices])
-  const r = transformLayout({ cols: b.cols, rows: b.rows, layouts: [] },
-    { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
-  const [p, q, s] = r.nodes
-  const level = ([[p, q], [q, s], [s, p]] as Array<[LatticeNode, LatticeNode]>)
-    .some(([a, c]) => a[1] === c[1])
-  return triangleProductType(triangleGeometry(t.vertices), { cols: r.cols, rows: r.rows, level })
-}
+export const triangleTypeOf = (t: TriangleLayout): TriangleProductType =>
+  TYPE_RULED[t.id] ?? triangleProductType(triangleGeometry(t.vertices))
 
 export const triangleFrameKey = (t: TriangleLayout): string => {
   const b = boundsOf([...t.vertices])

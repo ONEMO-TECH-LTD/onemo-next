@@ -35,7 +35,7 @@ export interface PanelOptions {
   orientations: PanelOption[]
 }
 
-const TYPE_LABEL: Record<string, string> = { perfect: 'Perfect', sharp: 'Sharp', slanted: 'Slanted' }
+const TYPE_LABEL: Record<string, string> = { pyramid: 'Pyramid', wedge: 'Wedge', fin: 'Fin' }
 const label = (id: string) => TYPE_LABEL[id] ?? id
 
 /** The eight lattice views, as the library's own transform. */

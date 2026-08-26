@@ -12,7 +12,6 @@ import {
   triangleFrame, trianglePerimeter96, canonicalTriangleId, perimeterRuns, perimeterNodes,
   fullNodes, boundsOf, selfSymmetries, D4, triangleById, assertTrianglePopulation, draftId,
   draftIntegrity, panelOptions, selectionForFamily, uprightView, trianglesOfType, restsFlat, isActive,
-  GROUP_NAMES,
   type LatticeNode,
   type LibraryDraft,
   type LibrarySelection,
@@ -418,13 +417,13 @@ describe('triangle — the three-point layout universe', () => {
     expect([...universe].sort()).toEqual([...ids].sort())
   })
 
-  it('the universe stays 79; the ACTIVE catalogue is Perfect 11 / Sharp 10 / Slanted 55', () => {
+  it('the universe stays 79; the ACTIVE catalogue is Pyramid 16 / Wedge 12 / Fin 48', () => {
     // Geometry supplies the default grouping; Dan's per-layout rulings override it, and three
     // layouts are retired from the product. Neither changes the universe underneath.
     expect(TRIANGLE_LAYOUTS.length).toBe(79)
     expect(TRIANGLE_LAYOUTS.filter(isActive).length).toBe(76)
-    expect([trianglesOfType('perfect').length, trianglesOfType('sharp').length, trianglesOfType('slanted').length])
-      .toEqual([11, 10, 55])
+    expect([trianglesOfType('pyramid').length, trianglesOfType('wedge').length, trianglesOfType('fin').length])
+      .toEqual([16, 12, 48])
   })
 
   it('the retired three are out of the product and still in the universe', () => {
@@ -432,17 +431,26 @@ describe('triangle — the three-point layout universe', () => {
     for (const id of ['tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2']) {
       const t = TRIANGLE_LAYOUTS.find((x) => x.id === id)!
       expect(isActive(t), id).toBe(false)
-      expect((['perfect', 'sharp', 'slanted'] as const).some((k) => trianglesOfType(k).includes(t))).toBe(false)
+      expect((['pyramid', 'wedge', 'fin'] as const).some((k) => trianglesOfType(k).includes(t))).toBe(false)
     }
   })
 
-  it('the group is read from the presented view, and every name is one word', () => {
-    // Dan, 08-26: no two-word product names. Groups and variant names alike.
-    for (const g of ['perfect', 'sharp', 'slanted'] as const)
-      for (const n of GROUP_NAMES[g]) expect(n.includes(' '), n).toBe(false)
-    expect(Object.keys(GROUP_NAMES)).toEqual(['perfect', 'sharp', 'slanted'])
-    // and the retired vocabulary is gone from what a user can see
-    expect(JSON.stringify(GROUP_NAMES).toLowerCase()).not.toContain('peak')
+  it('every ruled layout is grouped as Dan ruled it, and no name is two words', () => {
+    // 08-26 08:11 "2x3 is not wedge it is peak" — in today's words, a Pyramid
+    for (const id of ['tri:0,0;0,2;1,0', 'tri:0,0;0,2;1,1'])
+      expect(triangleTypeOf(TRIANGLE_LAYOUTS.find((t) => t.id === id)!), id).toBe('pyramid')
+    // 08-26 08:16 "it is not peak it is wedge"
+    expect(triangleTypeOf(TRIANGLE_LAYOUTS.find((t) => t.id === 'tri:0,0;0,1;1,0')!)).toBe('wedge')
+    // Dan, 08-26: no two-word product names, and the retired vocabulary never reaches the UI
+    const first = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
+    const ff = triangleFrame(first, 48)
+    const labels = panelOptions({ shapeId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
+      layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
+      .types.map((o) => o.label)
+    expect(labels).toEqual(['Pyramid', 'Wedge', 'Fin'])
+    for (const l of labels) expect(l.includes(' '), l).toBe(false)
+    expect(labels.join(' ')).not.toContain('Peak')
+    expect(labels.join(' ')).not.toContain('Sail')
   })
 
   it('the frame distribution of the universe is exactly the derived table', () => {
@@ -550,7 +558,7 @@ describe('triangle — populations', () => {
   })
 
   it('a Peak stays mirror-balanced — a non-divisible run cannot make it lean', () => {
-    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'perfect')) {
+    for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'pyramid')) {
       const s96 = new Set(trianglePerimeter96(t, 48).map(key))
       for (const f of selfSymmetries(t.vertices)) {
         const img = t.vertices.map(f)
@@ -577,7 +585,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
     Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / Math.hypot(b[0] - a[0], b[1] - a[1])
 
   it('one Peak, one Wedge and one Sail each clear their three edges by 12mm', () => {
-    for (const type of ['perfect', 'sharp', 'slanted']) {
+    for (const type of ['pyramid', 'wedge', 'fin']) {
       const sel = triSel(one(type))
       const a = libraryArrangement(sel, 48)
       const outline = libraryPreview(sel, 48, PAD).outlineMM
@@ -602,7 +610,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   })
 
   it('the outline is derived AFTER the view transform and still clears', () => {
-    const base = triSel(one('slanted'))
+    const base = triSel(one('fin'))
     for (const view of [{ transpose: true, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: true }]) {
       const sel = { ...base, view }
       const a = libraryArrangement(sel, 48)
@@ -625,7 +633,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   })
 
   it('a node on an edge or inside leaves the outline unchanged; one outside changes it', () => {
-    const id = one('sharp')
+    const id = one('wedge')
     const t = TRIANGLE_LAYOUTS.find((x) => x.id === id)!
     const sel = triSel(id, 'perimeter')
     const corners = libraryPreview({ ...sel, layoutId: 'corners' }, 48, PAD).outlineMM
@@ -668,24 +676,24 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   const frameOf = (id: string) => triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
 
   it('F1 — a population being drawn never throws, and says why it is not saveable', () => {
-    const id = one('sharp').id
+    const id = one('wedge').id
     const sel = sel3(id)
     for (const nodes of [[], [[0, 0]], [[0, 0], [1, 1]]] as Array<Array<[number, number]>>) {
       const m = draftStageModel(sel, nodes, 48, 12, 2, 2)
       expect(m.contour.outer.pts.length).toBeGreaterThanOrEqual(3)   // still renderable
       expect(m.error).toBeTruthy()
     }
-    const good = [...one('sharp').vertices] as Array<[number, number]>
+    const good = [...one('wedge').vertices] as Array<[number, number]>
     expect(draftStageModel(sel, good, 48, 12, 2, 2).error).toBeNull()
   })
 
   it('F1 — save refuses a collinear or four-corner triangle draft, and a missing geometry', () => {
-    const id = one('slanted').id
+    const id = one('fin').id
     const frame = frameOf(id)
     const base = { id: 'x', className: 'triangle', frameKey: frameKeyOf(frame), geometryId: id, name: 'n' }
-    expect(draftIntegrity({ ...base, nodes: [...one('slanted').vertices] as Array<[number, number]> }, frame)).toEqual([])
+    expect(draftIntegrity({ ...base, nodes: [...one('fin').vertices] as Array<[number, number]> }, frame)).toEqual([])
     expect(draftIntegrity({ ...base, nodes: [[0, 0], [0, 1], [0, 2]] }, frame).join()).toContain('collinear')
-    expect(draftIntegrity({ ...base, geometryId: undefined, nodes: [...one('slanted').vertices] as Array<[number, number]> }, frame).join())
+    expect(draftIntegrity({ ...base, geometryId: undefined, nodes: [...one('fin').vertices] as Array<[number, number]> }, frame).join())
       .toContain('geometryId required')
   })
 
@@ -713,7 +721,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   it('F2 — a saved custom layout is deduped from its own population, not the corpus', () => {
     // an asymmetric population on a symmetric Peak has all eight views, even though the Peak's
     // own corners have fewer
-    const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'perfect'
+    const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid'
       && panelOptions(sel3(t.id), [], 48).orientations.length < 8)!
     const f = triangleFrame(peak, 48)
     const asym: Array<[number, number]> = [[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
@@ -731,17 +739,17 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   })
 
   it('F3 — an asymmetric Sail really does offer all eight', () => {
-    expect(panelOptions(sel3(one('slanted').id), [], 48).orientations.length).toBe(8)
+    expect(panelOptions(sel3(one('fin').id), [], 48).orientations.length).toBe(8)
   })
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
-    const bad = { ...sel3(one('perfect').id), frameKey: '9x9' }
+    const bad = { ...sel3(one('pyramid').id), frameKey: '9x9' }
     expect(() => selectedRecords(bad)).toThrow('does not match geometry')
     expect(() => resolveSelection(bad)).toThrow('does not match geometry')
   })
 
   it('F5 — the family transition is the module’s, and lands on a resolvable selection', () => {
-    let cur = sel3(one('slanted').id, 'perimeter')
+    let cur = sel3(one('fin').id, 'perimeter')
     for (const fam of LIBRARY_FAMILIES) {
       cur = selectionForFamily(cur, fam, 48)
       expect(() => selectedRecords(cur), fam).not.toThrow()
@@ -752,13 +760,13 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
   it('F6 — every option on one block is distinguishable, and types read as products', () => {
     // ONE block, not two: for this class the frame IS the shape, so the frame chips carry the
     // geometry and its miniature. A second picker would be two controls for one choice.
-    const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'perfect')!
+    const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
     const opts = panelOptions(sel3(peak.id), [], 48)
     const labels = opts.frames.map((o) => o.accessibleLabel!)
     expect(new Set(labels).size).toBe(labels.length)
-    expect(labels[0]).toContain('Perfect 1')
-    expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'perfect').length)
-    expect(opts.types.map((o) => o.label)).toEqual(['Perfect', 'Sharp', 'Slanted'])
+    expect(labels[0]).toContain('Pyramid 1')
+    expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'pyramid').length)
+    expect(opts.types.map((o) => o.label)).toEqual(['Pyramid', 'Wedge', 'Fin'])
   })
 })
 
@@ -845,7 +853,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
 
   it('the upright view is the one a selection hands back', () => {
     // selecting a class or a geometry hands back that view
-    const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'slanted')!
+    const t0 = TRIANGLE_LAYOUTS.find((x) => triangleTypeOf(x) === 'fin')!
     const opt = panelOptions(sel3(t0.id), [], 48).frames.find((o) => o.id === t0.id)!
     expect(opt.next.view).toEqual(uprightView(t0))
   })
@@ -853,7 +861,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
 
 describe('triangle — straight layouts come before the diagonal ones', () => {
   it('every type lists the ones that rest on a flat side first', () => {
-    for (const type of ['perfect', 'sharp', 'slanted'] as const) {
+    for (const type of ['pyramid', 'wedge', 'fin'] as const) {
       const list = trianglesOfType(type)
       const firstDiagonal = list.findIndex((t) => !restsFlat(t))
       if (firstDiagonal < 0) continue
@@ -865,7 +873,7 @@ describe('triangle — straight layouts come before the diagonal ones', () => {
   it('the universe splits 50 flat / 29 leaning; the active catalogue keeps that split honest', () => {
     expect(TRIANGLE_LAYOUTS.filter(restsFlat).length).toBe(50)
     expect(TRIANGLE_LAYOUTS.filter((t) => !restsFlat(t)).length).toBe(29)
-    const active = (['perfect', 'sharp', 'slanted'] as const).flatMap((t) => trianglesOfType(t))
+    const active = (['pyramid', 'wedge', 'fin'] as const).flatMap((t) => trianglesOfType(t))
     expect(active.length).toBe(76)
     expect(active.every((t) => TRIANGLE_LAYOUTS.includes(t))).toBe(true)
   })
