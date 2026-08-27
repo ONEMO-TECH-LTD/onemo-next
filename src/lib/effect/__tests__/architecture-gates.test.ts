@@ -256,6 +256,13 @@ const emptyLayoutSentinels = (path: string, code = source(path)): number[] => {
 const runtimeExportNames = (path: string, code = source(path)): string[] => {
   const names: string[] = []
   for (const statement of parse(path, code).statements) {
+    // `export { a, b }` carries no module specifier and no export modifier — it was invisible
+    if (ts.isExportDeclaration(statement) && !statement.moduleSpecifier && !statement.isTypeOnly
+      && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+      for (const element of statement.exportClause.elements)
+        if (!element.isTypeOnly) names.push(element.name.text)
+      continue
+    }
     if (!ts.canHaveModifiers(statement)
       || !ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue
     if (ts.isFunctionDeclaration(statement) && statement.name) names.push(statement.name.text)
@@ -263,6 +270,51 @@ const runtimeExportNames = (path: string, code = source(path)): string[] => {
       if (ts.isIdentifier(declaration.name)) names.push(declaration.name.text)
   }
   return names.sort()
+}
+
+/** The transition owner's ENTIRE contents, not a list of syntaxes it may not use. Blacklisting
+ *  delegation is unwinnable — renamed helpers, then a local export list, then require() each
+ *  walked past a gate written for the last one (QA, 08-27). A whitelist inverts it: two type-only
+ *  imports and two exported function declarations are all this file may contain, so there is
+ *  nothing for a delegation to be written with. */
+const transitionShapeViolations = (path: string, code = source(path)): string[] => {
+  const tree = parse(path, code)
+  const out: string[] = []
+  const expected = ['pickLayout', 'selectVariant']
+  const declared: string[] = []
+  for (const statement of tree.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const specifier = ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier.text : '?'
+      if (!statement.importClause?.isTypeOnly) out.push('runtime import ' + specifier)
+      else if (!['./class-contract', './types'].includes(specifier)) out.push('import ' + specifier)
+      continue
+    }
+    if (ts.isFunctionDeclaration(statement) && statement.name
+      && ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+      declared.push(statement.name.text)
+      continue
+    }
+    out.push('statement: ' + statement.getText(tree).split('\n')[0].slice(0, 60))
+  }
+  if (declared.sort().join() !== expected.join()) out.push('declares ' + declared.join())
+  // and nothing anywhere in the library may reach a module at runtime by call
+  return out
+}
+
+/** LAW 7 in the other direction: a runtime `require()` or dynamic `import()` reaches around
+ *  every import gate there is. Nothing in the library does either. */
+const runtimeModuleCalls = (path: string, code = source(path)): string[] => {
+  const tree = parse(path, code)
+  const out: string[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)
+      && ((ts.isIdentifier(node.expression) && node.expression.text === 'require')
+        || node.expression.kind === ts.SyntaxKind.ImportKeyword)) out.push(node.getText(tree))
+    if (ts.isImportEqualsDeclaration(node)) out.push(node.getText(tree))
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return out
 }
 
 const callsNamed = (path: string, name: string, code = source(path)): number => {
@@ -713,6 +765,16 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(runtimeExportNames(TRANSITION)).toEqual(['pickLayout', 'selectVariant'])
     expect(runtimeExportNames(join(LIBRARY, 'transforms.ts')))
       .toEqual(['canonicalNode', 'frameKeyOf', 'transformLayout', 'viewName'])
+    expect(transitionShapeViolations(TRANSITION)).toEqual([])
+    for (const path of libraryFiles()) expect(runtimeModuleCalls(path), path).toEqual([])
+    // the three delegations that each walked past the previous gate
+    expect(transitionShapeViolations(TRANSITION,
+      source(TRANSITION).replace("import type { ClassVariant } from './class-contract'",
+        "import { helper } from './transforms'\nimport type { ClassVariant } from './class-contract'")))
+      .toContain('runtime import ./transforms')
+    expect(runtimeModuleCalls('probe.ts', `const t = require('./transforms.ts')`)).toHaveLength(1)
+    expect(runtimeExportNames('probe.ts', `function a() {}\nfunction b() {}\nexport { a, b }`))
+      .toEqual(['a', 'b'])
     // geometry.ts owns both directions (placeMM out, nodeAtMM back); rules.ts converts nothing —
     // it samples a physical stride, which is the pitch as a COUNT, not a coordinate
     expect([...new Set(flips)].sort()).toEqual(['geometry.ts'])

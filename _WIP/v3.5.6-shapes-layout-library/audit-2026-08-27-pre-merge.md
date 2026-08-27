@@ -171,7 +171,9 @@ balanced pairing Dan asked for on 08-26. Whether that row should show is his cal
   - **M6** — `nodeAtMM` drops the y-up inverse → *authoring behaviour (transposed click)*
   - **M7** — `selectVariant` lands on the frame's first layout, dropping the carry → *F6a*
   - **M10** — `pickLayout`/`selectVariant` moved verbatim back into transforms.ts → *LAW 1 owner*
-  - **M10'** — the same policy moved into transforms.ts behind renamed wrappers, the owner delegating to it — QA's counterexample, which the owner-by-name gate did NOT catch → *LAW 1 owner has no runtime dependency*
+  - **M10'** — the same policy behind renamed wrappers, the owner delegating to it — QA's counterexample; the owner-by-name gate did NOT catch it → *selection-transition.ts shape whitelist*
+  - **M10''** — the same again via a local `export { … }` list and `require('./transforms.ts')` — QA's second counterexample; the type-only-edge gate did NOT catch it either → *shape whitelist + library-wide ban on runtime module calls*
+  - **M12** — any statement at all added to selection-transition.ts beyond its two type imports and two functions → *shape whitelist*
   - **M11** — a heading edited in the law, hash untouched → *approved-law SHA*
 - visual gate on 4046 (serving tree confirmed by `lsof`): **35 states** — 0 overflow, 0 overlap,
   0 duplicate printed or spoken names, 0 body sideways-scroll, 0 console errors, Bench returns
