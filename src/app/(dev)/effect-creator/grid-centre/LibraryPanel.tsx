@@ -48,7 +48,7 @@ export default function LibraryPanel({
           ))}
         </div>
       </Fold>
-      {opts.orientations.length > 1 && (
+      {opts.orientations.length > 0 && (
         <Fold title="Orientation">
           <div className="gl-seg gl-liborient">
             {opts.orientations.map((o) => (
