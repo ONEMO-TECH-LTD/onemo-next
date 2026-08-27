@@ -41,6 +41,13 @@ any source. Shipping a contradicting duplicate of the governed law is the exact 
 exists to stop, and it made my own "no unnecessary elements" line false. Deleted; only this
 ledger remains.
 
+**Four gates in a row proved my ownership claim by the wrong evidence.** Owner-by-name was
+satisfied by a renamed wrapper; type-only-edges by a `require()`; the shape whitelist by a
+`globalThis` bag, because no check of a file's SHAPE can see its function BODIES. Each fix was
+written against the last counterexample, so the next was always one syntax away. The owner is
+now pinned by its bytes — the same protection the law file itself carries — which ends the class
+instead of adding a fifth patch. Every counterexample QA produced is frozen in the gate.
+
 **I put selection policy in the geometry file to satisfy an ownership gate.** Collapsing the
 duplicate `pickLayout`/`selectVariant` was right; parking them in `transforms.ts` — which
 declares itself pure geometry — traded a duplication for a wrong owner and passed the count.
@@ -174,6 +181,8 @@ balanced pairing Dan asked for on 08-26. Whether that row should show is his cal
   - **M10'** — the same policy behind renamed wrappers, the owner delegating to it — QA's counterexample; the owner-by-name gate did NOT catch it → *selection-transition.ts shape whitelist*
   - **M10''** — the same again via a local `export { … }` list and `require('./transforms.ts')` — QA's second counterexample; the type-only-edge gate did NOT catch it either → *shape whitelist + library-wide ban on runtime module calls*
   - **M12** — any statement at all added to selection-transition.ts beyond its two type imports and two functions → *shape whitelist*
+  - **M13** — the policy smuggled out through a `globalThis` bag, the owner's shape untouched — QA's third counterexample; no shape check can see a function BODY → *owner pinned by content hash*
+  - **M14** — one character changed inside an owner body → *owner content hash + behaviour*
   - **M11** — a heading edited in the law, hash untouched → *approved-law SHA*
 - visual gate on 4046 (serving tree confirmed by `lsof`): **35 states** — 0 overflow, 0 overlap,
   0 duplicate printed or spoken names, 0 body sideways-scroll, 0 console errors, Bench returns

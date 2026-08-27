@@ -20,6 +20,12 @@ const CATALOGUE_ADAPTER = join(ROOT, 'grid-magnet-library-catalogue.ts')
 const LAW = join(LIBRARY, 'shape-layout-lib-architecture.md')
 const ARCH_GATE = join(TESTS, 'architecture-gates.test.ts')
 const LAW_SHA256 = '8ba6480c7c85bc96f01cc12682c43d6803fcb4714ba9ed824aed016605a539c9'
+/** The transition owner is 25 lines that change ~never, and three gates in a row proved that
+ *  checking its SHAPE leaves its BODIES free: policy was smuggled out through renamed helpers,
+ *  through require(), and finally through globalThis, each time with the shape intact. The law
+ *  file is protected by its bytes for the same reason; so is this. Change the file and change
+ *  this hash in the same commit, deliberately. */
+const TRANSITION_SHA256 = '3820872cc33c2b5996b543f37105444025a37857897f14903f30466da59c17f1'
 
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const path = join(dir, entry.name)
@@ -766,6 +772,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(runtimeExportNames(join(LIBRARY, 'transforms.ts')))
       .toEqual(['canonicalNode', 'frameKeyOf', 'transformLayout', 'viewName'])
     expect(transitionShapeViolations(TRANSITION)).toEqual([])
+    // and its bodies, which no shape check can see
+    expect(createHash('sha256').update(readFileSync(TRANSITION)).digest('hex')).toBe(TRANSITION_SHA256)
     for (const path of libraryFiles()) expect(runtimeModuleCalls(path), path).toEqual([])
     // the three delegations that each walked past the previous gate
     expect(transitionShapeViolations(TRANSITION,
