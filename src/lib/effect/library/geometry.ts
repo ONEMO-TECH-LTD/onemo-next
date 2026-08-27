@@ -1,5 +1,14 @@
 import type { PointMM } from './types'
 
+export function boundsMM(points: readonly PointMM[]): { widthMM: number; heightMM: number } {
+  const xs = points.map(([x]) => x)
+  const ys = points.map(([, y]) => y)
+  return {
+    widthMM: Math.max(...xs) - Math.min(...xs),
+    heightMM: Math.max(...ys) - Math.min(...ys),
+  }
+}
+
 export function convexHull(pts: readonly PointMM[]): PointMM[] {
   const sorted = pts.map(([x, y]) => [x, y] as PointMM).sort((a, b) => a[0] - b[0] || a[1] - b[1])
   if (sorted.length < 3) return sorted

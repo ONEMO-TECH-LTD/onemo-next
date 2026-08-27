@@ -1,8 +1,8 @@
-import { assertTypeId, type ClassControls, type ClassSpec, type ClassType, type ClassVariant, type DraftIdentity, type DraftShape, type LibraryClass, type OutlineRecipe } from './class-contract'
+import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { frameKeyOf } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, PointMM } from './types'
 
-export interface RegistryClassConfig {
+interface RegistryClassConfig {
   classId: LibraryFamily
   types: readonly ClassType[]
   frames(pitchMM: number): readonly LibraryFrame[]
@@ -14,6 +14,11 @@ export interface RegistryClassConfig {
   validateDraft(draft: DraftShape, frame: LibraryFrame): string[]
   draftMatches(draft: DraftIdentity, sel: LibrarySelection, frameKey: string): boolean
   draftIdParts(sel: LibrarySelection, frameKey: string): DraftIdentity
+}
+
+export function assertTypeId(classId: string, types: readonly ClassType[], typeId: string): void {
+  if (!types.some((type) => type.id === typeId))
+    throw new Error(`library: unknown typeId ${typeId} in ${classId}`)
 }
 
 const none: LibraryTransform = { transpose: false, flipX: false, flipY: false }

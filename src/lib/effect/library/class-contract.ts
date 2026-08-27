@@ -20,11 +20,6 @@ export interface ClassVariant {
 
 export interface ClassType { id: string; label: string }
 
-export function assertTypeId(classId: string, types: readonly ClassType[], typeId: string): void {
-  if (!types.some((type) => type.id === typeId))
-    throw new Error(`library: unknown typeId ${typeId} in ${classId}`)
-}
-
 export interface DraftShape { nodes: ReadonlyArray<readonly [number, number]>; geometryId?: string }
 export interface DraftIdentity { className: string; frameKey: string; geometryId?: string }
 

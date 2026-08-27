@@ -2,8 +2,6 @@ import { catalogue, type CatalogueEntry } from './library'
 import { classifyShape, shapeFamilyOf } from './grid-magnet-class'
 import type { Pt } from './types'
 
-export const CATALOGUE_RUNTIME_STATUS = 'catalogue contract landed; runtime consumption pending'
-
 const points = (outline: readonly (readonly [number, number])[]) => outline.map(([x, y]) => [x, y] as Pt)
 
 export function classifiedLibraryCatalogue(pitchMM: number) {

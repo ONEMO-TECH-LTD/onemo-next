@@ -9,9 +9,9 @@ artifact — needs to follow the format."
 
 ## Scope
 This law governs the LIBRARY only: src/lib/effect/library/**, its panel, the library parts of
-the shared page, and the engine bridge. The BENCH is a separate structure with different goals
-and gets its own law when its structure is next touched. What binds them is the CONTRACT below,
-not shared structure.
+the shared page, the engine bridge, and the classifier catalogue adapter. The BENCH is a
+separate structure with different goals and gets its own law when its structure is next touched.
+What binds them is the CONTRACT below, not shared structure.
 
 ## LAW 0 — THE OUTPUT CONTRACT OUTRANKS EVERYTHING
 The catalogue record is the product of the library and the input to the classifier. Its V1
@@ -53,7 +53,7 @@ Five standing gates (activated when the catalogue lands):
 | 5 services | selection/options/authoring/materialize/catalogue/drafts | zones 0, 2, 4, same-zone services; never corpus or concrete classes |
 | 6 surface | surface.ts | zones 0 and 5 |
 | 7 barrel | index.ts | exact public exports from zones 0, 5, 6, plus the readonly LIBRARY_FAMILIES view derived by class-registry.ts |
-| 8 shell/adapter | LibraryPanel.tsx, library parts of page.tsx, bridge | page/panel: barrel only. Bridge: barrel, engine types, and named physical constants from grid-magnet-spec; no library internals, no geometry or selection decision |
+| 8 shell/adapter | LibraryPanel.tsx, library parts of page.tsx, grid-magnet-library-bridge.ts, grid-magnet-library-catalogue.ts | page/panel: barrel only. Bridge: barrel, engine types, and named physical constants from grid-magnet-spec. Catalogue adapter: barrel, classifier functions, and type-only engine point types. No library internals. |
 
 Gate mechanics: every governed file assigned to exactly one zone (unassigned or doubly
 assigned fails); imports read via typescript.createSourceFile — ImportDeclaration,
@@ -79,9 +79,10 @@ are out of scope. Never regex over source lines.
    takes pitchMM explicitly; dimensionless topology takes no fake pitch; nothing
    scale-dependent computes at module load.
 6. NO SENTINELS — absence is typed absence, never an empty placeholder.
-7. SHELLS ARE SHELLS — page/panel import the library barrel only. Bridge imports are limited
-   to the barrel, engine types, and grid-magnet-spec constants. All three remain free of
-   resolver/materialiser/spec queries; React state and rendering only in the shells.
+7. SHELLS AND ADAPTERS STAY AT THE BOUNDARY — page/panel import the library barrel only.
+   Bridge imports are limited to the barrel, engine types, and grid-magnet-spec constants.
+   The catalogue adapter imports the barrel, classifier functions, and type-only engine point
+   types. None may reach into library internals or repeat selection/materialisation policy.
 8. THE BARREL IS THE RUNTIME CONTRACT — exact export whitelist; tests import internals by
    direct path.
 9. ONE FILE, ONE JOB — enforced structurally: the zone matrix plus a ban on React/Next/JSX in

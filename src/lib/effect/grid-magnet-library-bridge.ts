@@ -12,7 +12,7 @@ import {
   type MaterializedLibrary,
 } from './library'
 
-export interface LibraryStageModel {
+interface LibraryStageModel {
   contour: Contour
   grid: GridResult
   /** Why a population being drawn is not a saveable shape yet — null when it is. */

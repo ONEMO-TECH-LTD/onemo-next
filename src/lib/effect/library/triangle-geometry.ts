@@ -2,6 +2,7 @@
 // identity and classification are EXACT, floating point is display metadata. No React, no engine.
 
 import type { LatticeNode, TriangleLayout } from './corpus-triangle'
+import { convexHull } from './geometry'
 
 export type { LatticeNode, TriangleLayout } from './corpus-triangle'
 export type TriangleSideClass = 'equilateral' | 'isosceles' | 'scalene'
@@ -140,4 +141,12 @@ export function symmetryClosure(
     }
   }
   return dedupe(out)
+}
+
+export function assertTrianglePopulation(nodes: readonly LatticeNode[]): void {
+  const unique = [...new Map(nodes.map((node) => [key(node), node])).values()]
+  if (unique.length < 3) throw new Error('triangle: collinear population')
+  const hull = convexHull(unique)
+  if (hull.length < 3) throw new Error('triangle: collinear population')
+  if (hull.length !== 3) throw new Error('triangle: hull has ' + hull.length + ' vertices')
 }

@@ -1,5 +1,5 @@
-// library/rules.ts — CLASS POLICY: sub-types, orientation, box measurement, labelling.
-// The view renders this policy without deciding which class it receives.
+// library/rules.ts — shared physical spacing-mode policy.
+// Owns the fixed spacing vocabulary and pitch-aware 96mm samplers; no UI or class taxonomy.
 
 import type { LibraryFrame, LibraryLayout } from './types'
 
@@ -72,7 +72,7 @@ export function ring96(frame: LibraryFrame, perimeter: readonly Node[], pitchMM:
  *  96mm is a PHYSICAL distance, so the population depends on the pitch and the pitch must be
  *  known here. Composing once at 48 and repairing later meant the panel counted a different
  *  set of magnets from the one the canvas drew, at every pitch except 48. */
-export type SpacingSampler = (
+type SpacingSampler = (
   frame: LibraryFrame, perimeter: ReadonlyArray<readonly [number, number]>, pitchMM: number,
 ) => ReadonlyArray<readonly [number, number]>
 

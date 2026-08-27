@@ -21,11 +21,6 @@ export type CatalogueEntry = Readonly<{
   frameRows: number
 }>
 
-const bounds = (points: readonly PointMM[]) => ({
-  widthMM: Math.max(...points.map(([x]) => x)) - Math.min(...points.map(([x]) => x)),
-  heightMM: Math.max(...points.map(([, y]) => y)) - Math.min(...points.map(([, y]) => y)),
-})
-
 export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
   const entries: CatalogueEntry[] = []
   for (const classId of LIBRARY_FAMILIES) {
@@ -36,14 +31,13 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
       for (const layout of variant.frame.layouts) {
         const selection = { ...selected, layoutId: layout.name }
         const materialized = materializeSelection(selection, pitchMM)
-        const size = bounds(materialized.outlineMM)
         entries.push(Object.freeze({
           classId, typeId: type.id,
           id: [classId, type.id, variant.id, layout.name, selection.view.transpose ? 't' : 'n', selection.view.flipX ? 'x' : 'n', selection.view.flipY ? 'y' : 'n'].map(encodeURIComponent).join('/'),
           label: variant.label + ' · ' + layout.name,
           pitchMM, corners: variant.outline.corners,
           nodesMM: materialized.nodesMM, outlineMM: materialized.outlineMM,
-          widthMM: size.widthMM, heightMM: size.heightMM,
+          widthMM: materialized.widthMM, heightMM: materialized.heightMM,
           frameCols: materialized.frameCols, frameRows: materialized.frameRows,
         }))
       }

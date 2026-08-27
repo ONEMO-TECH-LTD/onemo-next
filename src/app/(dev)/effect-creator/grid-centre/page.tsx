@@ -125,13 +125,6 @@ export default function GridLab() {
   const libraryModel = useMemo(() => libraryState
     ? libraryStageModel(libraryState.materialized, pitch) : null,
   [libraryState, pitch])
-  /** The size card reads the ACTUAL outline, so a derived shape reports what it really is. */
-  const libraryBox = useMemo(() => {
-    const pts = libraryModel?.contour.outer.pts
-    if (!pts || !pts.length) return { w: 0, h: 0 }
-    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1])
-    return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
-  }, [libraryModel])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -438,7 +431,8 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          {libraryState ? <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState.options} boxMM={libraryBox}
+          {libraryState ? <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState.options}
+            boxMM={{ w: libraryState.materialized.widthMM, h: libraryState.materialized.heightMM }}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
             editError={libraryModel?.error ?? null}
             isDraft={libraryState?.isDraft ?? false}

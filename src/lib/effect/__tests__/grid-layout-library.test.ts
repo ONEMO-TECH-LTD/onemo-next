@@ -11,9 +11,9 @@ import { SPACING_MODES, sample96 } from '../library/rules'
 import { transformLayout, frameKeyOf, canonicalNode, transformLayout as tl } from '../library/transforms'
 import { resolveSelection, selectVariant, draftLayoutId } from '../library/selection'
 import { TRIANGLE_LAYOUTS } from '../library/corpus-triangle'
-import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, fullNodes, boundsOf, selfSymmetries, D4, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
-import { triangleTypeOf, triangleById, triangleFrame, trianglePerimeter96, uprightView, trianglesOfType, restsFlat, isActive, assertTrianglePopulation } from '../library/triangle-frames'
-import { TRIANGLE_TYPES } from '../library/triangle-types'
+import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, fullNodes, boundsOf, selfSymmetries, D4, assertTrianglePopulation, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
+import { triangleById, triangleFrame, trianglePerimeter96 } from '../library/triangle-frames'
+import { TRIANGLE_TYPES, triangleTypeOf, uprightView, trianglesOfType, restsFlat, isActive } from '../library/triangle-types'
 import { draftId, draftIntegrity, type LibraryDraft } from '../library/drafts'
 import { panelOptionsResolved, selectionForFamily } from '../library/options'
 import { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, type LibraryEdit } from '../library/authoring'
@@ -170,6 +170,8 @@ describe('one resolved population at every caller', () => {
             expect(entry, id).toBeDefined()
             expect(entry!.nodesMM, id).toStrictEqual(expected.nodesMM)
             expect(entry!.outlineMM, id).toStrictEqual(expected.outlineMM)
+            expect(entry!.widthMM, id).toBe(expected.widthMM)
+            expect(entry!.heightMM, id).toBe(expected.heightMM)
             expect(entry!.frameCols, id).toBe(expected.frameCols)
             expect(entry!.frameRows, id).toBe(expected.frameRows)
             const stage = libraryStageModel(expected, pitchMM)

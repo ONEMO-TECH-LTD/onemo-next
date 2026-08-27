@@ -1,9 +1,8 @@
 # Shape-Layout Library — Technical Specification
 (lands as src/lib/effect/library/shape-layout-lib-spec.md, beside the law)
 
-The LAW (shape-layout-lib-architecture.md) says what must hold and how it is enforced.
-THIS document says how the library works and what it emits. Written at 11af898e against the
-source as read, not as planned.
+The LAW says what must hold and how it is enforced. This document states the present shipped
+design; update it in the same commit whenever that design changes.
 
 ## 1. Purpose
 
@@ -35,7 +34,8 @@ same Stage/canvas shell; Bench does not consume CatalogueEntry. Engine consumpti
   6 surface     surface.ts — librarySurface(): the ONE call the page makes
   7 barrel      index.ts — the exact public export list
   8 shells      LibraryPanel.tsx (options in, chips out) · page.tsx library region (React
-                state only) · grid-magnet-library-bridge.ts (record -> engine Contour/GridResult)
+                state only) · grid-magnet-library-bridge.ts (record -> engine Contour/GridResult) ·
+                grid-magnet-library-catalogue.ts (catalogue -> classifier compatibility)
 
 Imports flow downward only; enforced by the AST gate in architecture-gates.test.ts.
 
@@ -53,7 +53,9 @@ Imports flow downward only; enforced by the AST gate in architecture-gates.test.
 - VIEW: one of 8 lattice symmetries (transpose/flipX/flipY). Presented view IS 0 degrees;
   button names are relative turns, plainest transform wins.
 - SELECTION { classId, frameKey, layoutId, geometryId?, view }: stable IDs only, never
-  indices. Unknown ids throw (law 13).
+  indices. Unknown class/type/variant/frame/geometry/draft identities throw. The sole
+  exception is the documented admin layout-carry: a layout absent on the next frame falls back
+  to that frame's first corpus layout.
 - VARIANT: one offer of a class — its frame, presented view, OutlineRecipe
   { corners: sharp|round|bevel, pointRotationDeg? } and the selection fragment reaching it.
 - DRAFT: a hand-authored population, browser-local (localStorage DRAFT_STORE_KEY), identity
@@ -69,7 +71,7 @@ Imports flow downward only; enforced by the AST gate in architecture-gates.test.
          y-flip to mm: [ix*pitch, (rows-1-iy)*pitch]   mm, y-UP from here on
          outlineFromLayout(nodesMM, recipe, boundaryOf?)
     -> MaterializedLibrary { classId, sourceFrameKey, frameKey, frameCols/Rows, layoutId,
-         nodesMM, outlineMM, error, seedMM }
+         nodesMM, outlineMM, widthMM, heightMM, error, seedMM }
   page: ONE librarySurface() = { classId, materialized, options, isDraft }
         ONE libraryStageModel(materialized) via the bridge -> Stage render
   authoring: pure transitions in authoring.ts; save validates via the class
@@ -131,7 +133,7 @@ classifyShape reads the outline's bounding box into axis classes cx/cy (class n 
 occupancy. KNOWN LIMITS (classifier audit 2026-08-26): the match key is coarse (avg 9.5
 candidates per query, diamonds ~16); a pill classifies family 'square'; half of ShapeClass's
 fields have no consumer. Classifier repair is a separate, unstarted lane.
-STATUS (verbatim constant): "catalogue contract landed; runtime consumption pending" — the
+STATUS: "catalogue contract landed; runtime consumption pending" — the
 solver does NOT consume the catalogue until Dan authorises that wiring.
 
 ## 8. Adding a class (the whole recipe)
@@ -141,6 +143,8 @@ solver does NOT consume the catalogue until Dan authorises that wiring.
    directly (triangle-class.ts is the model). Concave shapes state boundaryOf (ordered ring);
    round shapes state corners:'round' in the recipe.
 2. One line in class-registry.ts CLASS_SPECS.
-Nothing else: LIBRARY_FAMILIES derives, the zone gate recognises class packages by filename
-convention, forbidden class-id comparisons derive from CLASS_SPECS keys, the UI renders it,
-and the catalogue enumerates it. The gates fail anything that reaches wider.
+3. Add class-specific behaviour tests and, after Dan approves the product addition, update
+   catalogue-identity.v1.json with the new stable entries.
+No generic service, UI, bridge, matcher or architecture-gate implementation changes are needed:
+families derive, the zone gate recognises the package convention, the UI renders the generic
+options, and catalogue enumeration is registry-driven.

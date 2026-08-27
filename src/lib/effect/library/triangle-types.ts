@@ -2,7 +2,10 @@
 // looking at. Geometry (triangle-geometry.ts) is pure and stays out of naming; naming reads the
 // PRESENTED view, because how a shape sits is what is being looked at, not how it is stored.
 
-import type { TriangleGeometry } from './triangle-geometry'
+import { TRIANGLE_LAYOUTS } from './corpus-triangle'
+import { transformLayout } from './transforms'
+import type { FrameExtent, LibraryLayout, LibraryTransform } from './types'
+import { boundsOf, triangleGeometry, type LatticeNode, type TriangleGeometry, type TriangleLayout } from './triangle-geometry'
 
 /** Dan's own naming list (08-26), one word each. The retired three-name grouping must not reach
  *  the UI; current product labels are defined below.
@@ -26,8 +29,27 @@ export const TRIANGLE_TYPES = [
   'pyramid', 'arrowhead', 'mountain', 'needle', 'wedge', 'flag',
 ] as const satisfies readonly TriangleProductType[]
 
+/** RETIRED FROM THE PRODUCT, still in the 79-geometry universe — a retirement leaves the
+ *  catalogue, not the corpus, so the review evidence survives and nothing is unrecoverable. */
+const RETIRED = new Set<string>([
+  'tri:0,0;0,3;2,0', 'tri:0,0;1,3;2,1', 'tri:0,0;1,3;2,2',
+  'tri:0,0;3,4;4,3', 'tri:0,0;1,2;3,3', 'tri:0,0;2,3;3,2', 'tri:0,0;1,3;4,4', 'tri:0,0;1,2;2,1',
+  'tri:0,0;2,4;4,2', 'tri:0,0;2,4;3,1', 'tri:0,0;1,3;3,1', 'tri:0,0;1,4;4,1',
+  'tri:0,0;0,2;2,3', 'tri:0,0;0,1;2,3', 'tri:0,0;0,3;3,4', 'tri:0,0;0,2;3,4', 'tri:0,0;0,1;3,4',
+  'tri:0,0;0,1;1,2', 'tri:0,0;0,2;1,3', 'tri:0,0;0,1;1,3', 'tri:0,0;0,4;1,1', 'tri:0,0;0,3;1,4',
+  'tri:0,0;0,2;1,4', 'tri:0,0;0,1;1,4', 'tri:0,0;0,3;2,4', 'tri:0,0;0,2;2,4', 'tri:0,0;0,1;2,4',
+  'tri:0,0;1,4;2,1', 'tri:0,0;1,4;2,2', 'tri:0,0;1,4;2,3', 'tri:0,0;1,1;2,4', 'tri:0,0;1,0;2,3',
+  'tri:0,0;1,0;2,4', 'tri:0,0;1,4;3,4', 'tri:0,0;1,0;3,4', 'tri:0,0;1,4;3,3', 'tri:0,0;0,1;2,2',
+  'tri:0,0;0,2;3,3', 'tri:0,0;0,1;3,3', 'tri:0,0;0,3;4,4', 'tri:0,0;0,2;4,4', 'tri:0,0;0,1;4,4',
+  'tri:0,0;1,1;2,3', 'tri:0,0;1,3;3,2', 'tri:0,0;1,4;3,1', 'tri:0,0;1,4;3,2', 'tri:0,0;2,4;3,2',
+  'tri:0,0;1,3;3,4', 'tri:0,0;2,4;3,3', 'tri:0,0;1,2;3,4', 'tri:0,0;1,1;3,4', 'tri:0,0;1,4;4,2',
+  'tri:0,0;1,4;4,3', 'tri:0,0;2,4;4,3', 'tri:0,0;1,2;4,4',
+])
+
+export const isActive = (triangle: TriangleLayout): boolean => !RETIRED.has(triangle.id)
+
 /** How a shape sits, measured on the view it is presented in. */
-export interface TriangleShown {
+interface TriangleShown {
   cols: number
   rows: number
   /** has a horizontal side */
@@ -65,3 +87,90 @@ export function triangleProductType(
   }
   return 'flag'
 }
+
+const presentedCorners = (triangle: TriangleLayout): { cols: number; rows: number; nodes: LatticeNode[] } => {
+  const bounds = boundsOf([...triangle.vertices])
+  return transformLayout({ cols: bounds.cols, rows: bounds.rows },
+    { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle))
+}
+
+export const triangleTypeOf = (triangle: TriangleLayout): TriangleProductType => {
+  const hit = TYPE_OF.get(triangle.id)
+  if (hit) return hit
+  const shown = presentedCorners(triangle)
+  const [p, q, s] = shown.nodes
+  const edges: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
+  const type = triangleProductType(triangleGeometry(triangle.vertices), {
+    cols: shown.cols, rows: shown.rows,
+    level: edges.some(([a, c]) => a[1] === c[1]),
+    upright: edges.some(([a, c]) => a[0] === c[0]),
+  })
+  TYPE_OF.set(triangle.id, type)
+  return type
+}
+
+export function restsFlat(triangle: TriangleLayout): boolean {
+  const shown = presentedCorners(triangle)
+  const [p, q, s] = shown.nodes
+  const edges: Array<[LatticeNode, LatticeNode]> = [[p, q], [q, s], [s, p]]
+  return edges.some(([a, c]) => a[1] === c[1] || a[0] === c[0])
+}
+
+export function trianglesOfType(type: TriangleProductType): TriangleLayout[] {
+  const hit = BY_TYPE.get(type)
+  if (hit) return hit
+  const triangles = TRIANGLE_LAYOUTS.filter((triangle) => isActive(triangle) && triangleTypeOf(triangle) === type)
+    .sort((a, b) => {
+      if (restsFlat(a) !== restsFlat(b)) return restsFlat(a) ? -1 : 1
+      const ba = boundsOf([...a.vertices]), bb = boundsOf([...b.vertices])
+      return (ba.cols * ba.rows) - (bb.cols * bb.rows) || ba.cols - bb.cols || ba.rows - bb.rows
+        || triangleGeometry(b.vertices).minAngleDeg - triangleGeometry(a.vertices).minAngleDeg
+        || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    })
+  BY_TYPE.set(type, triangles)
+  return triangles
+}
+
+const VIEWS: LibraryTransform[] = [
+  { transpose: false, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: false },
+  { transpose: false, flipX: false, flipY: true }, { transpose: false, flipX: true, flipY: true },
+  { transpose: true, flipX: false, flipY: false }, { transpose: true, flipX: true, flipY: false },
+  { transpose: true, flipX: false, flipY: true }, { transpose: true, flipX: true, flipY: true },
+]
+
+export function uprightView(triangle: TriangleLayout): LibraryTransform {
+  const hit = UPRIGHT.get(triangle.id)
+  if (hit) return hit
+  const bounds = boundsOf([...triangle.vertices])
+  const frame: FrameExtent = { cols: bounds.cols, rows: bounds.rows }
+  const layout: LibraryLayout = { name: 'corners', nodes: [...triangle.vertices] }
+  let best = VIEWS[0], bestScore = -1
+  for (const view of VIEWS) {
+    const shown = transformLayout(frame, layout, view)
+    const [p, q, s] = shown.nodes
+    const length = (a: LatticeNode, c: LatticeNode) => (a[0] - c[0]) ** 2 + (a[1] - c[1]) ** 2
+    const edges: Array<[LatticeNode, LatticeNode, LatticeNode]> = [[p, q, s], [q, s, p], [s, p, q]]
+    const onFloor = edges.some(([a, c]) => a[1] === c[1] && a[1] === shown.rows - 1)
+    const onWall = edges.some(([a, c]) => a[0] === c[0] && a[0] === 0)
+    const odd = edges.find((edge) => {
+      const others = edges.filter((other) => other !== edge)
+      return length(others[0][0], others[0][1]) === length(others[1][0], others[1][1])
+    })
+    const [a, c, apex] = odd ?? edges.reduce((bestEdge, edge) =>
+      length(edge[0], edge[1]) > length(bestEdge[0], bestEdge[1]) ? edge : bestEdge)
+    const apexAbove = apex[1] <= a[1] && apex[1] <= c[1]
+    const maxY = Math.max(...shown.nodes.map((node) => node[1]))
+    const tip = shown.nodes.find((node) => node[1] !== maxY) ?? shown.nodes[0]
+    const leansLeft = tip[0] * 2 <= shown.cols - 1
+    const score = (onFloor ? 32 : 0) + (onWall ? 16 : 0) + (apexAbove ? 8 : 0)
+      + (a[1] === c[1] && a[1] === shown.rows - 1 ? 4 : 0) + (shown.cols >= shown.rows ? 2 : 0)
+      + (leansLeft ? 1 : 0)
+    if (score > bestScore) { bestScore = score; best = view }
+  }
+  UPRIGHT.set(triangle.id, best)
+  return best
+}
+
+const UPRIGHT = new Map<string, LibraryTransform>()
+const BY_TYPE = new Map<string, TriangleLayout[]>()
+const TYPE_OF = new Map<string, TriangleProductType>()

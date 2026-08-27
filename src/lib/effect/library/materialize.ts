@@ -7,6 +7,7 @@
 // fucking bench". This is the producer side of that seam.
 
 import { outlineFromLayout } from './outline'
+import { boundsMM } from './geometry'
 import { resolveSelection, type ResolvedSelection } from './selection'
 import { frameKeyOf, transformLayout } from './transforms'
 import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, PointMM } from './types'
@@ -24,6 +25,8 @@ export interface MaterializedLibrary {
   layoutId: string
   nodesMM: readonly PointMM[]
   outlineMM: readonly PointMM[]
+  widthMM: number
+  heightMM: number
   /** Why the population being drawn is not a shape yet — null when it is. */
   error: string | null
   /** Where to look when nothing is drawn yet: the selected layout's own first magnet, so an
@@ -52,37 +55,42 @@ export function materializeResolved(
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
   const p = place(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
-  if (!nodes) return {
-    classId,
-    sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
-    frameCols: p.cols, frameRows: p.rows, layoutId: layout.name,
-    nodesMM: p.nodesMM,
-    outlineMM: outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM)),
-    error: null,
-    seedMM: p.nodesMM[0] ?? null,
+  if (!nodes) {
+    const outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM))
+    const { widthMM, heightMM } = boundsMM(outlineMM)
+    return {
+      classId,
+      sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
+      frameCols: p.cols, frameRows: p.rows, layoutId: layout.name,
+      nodesMM: p.nodesMM, outlineMM, widthMM, heightMM,
+      error: null,
+      seedMM: p.nodesMM[0] ?? null,
+    }
   }
   const validation = spec.validateDraft({ nodes, geometryId: safeSel.geometryId }, frame)
   let error: string | null = validation[0] ?? null
   if (!error) try {
     const outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM))
+    const { widthMM, heightMM } = boundsMM(outlineMM)
     return {
       classId,
       sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
       frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
       nodesMM: p.nodesMM,
-      outlineMM, error: null,
+      outlineMM, widthMM, heightMM, error: null,
       seedMM: null,
     }
   }
   catch (e) { error = (e as Error).message }
   const corpus = place(frame, layout, safeSel.view, pitchMM)
   const outlineMM = outlineFromLayout(corpus.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, corpus.nodesMM))
+  const { widthMM, heightMM } = boundsMM(outlineMM)
   return {
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
     nodesMM: p.nodesMM,
-    outlineMM, error,
+    outlineMM, widthMM, heightMM, error,
     seedMM: p.nodesMM.length ? null : corpus.nodesMM[0] ?? null,
   }
 }

@@ -15,7 +15,7 @@ const PANEL = resolve(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/L
 const PAGE = resolve(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
 const LAW = join(LIBRARY, 'shape-layout-lib-architecture.md')
 const ARCH_GATE = join(TESTS, 'architecture-gates.test.ts')
-const LAW_SHA256 = '9a9c8d0b9f9d58d4b078b9bff10d5f86b3ef9e225c84da737cf55e89c0e214ee'
+const LAW_SHA256 = 'a80440427207866350cad2deff1b2ad71555cd3b661d38b99f35ec6b45cf2316'
 
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const path = join(dir, entry.name)
@@ -63,6 +63,13 @@ const concretePackage = (path: string): string | null => {
   const hit = /^([a-z0-9-]+)-(?:class|frames|geometry|types)\.ts$/.exec(basename(path))
   return hit?.[1] === 'registry' ? null : hit?.[1] ?? null
 }
+
+const unregisteredClassPackages = (paths: readonly string[] = libraryFiles()): string[] =>
+  paths.flatMap((path) => {
+    const classId = concretePackage(path)
+    return classId && !Object.prototype.hasOwnProperty.call(CLASS_SPECS, classId)
+      ? [basename(path)] : []
+  })
 
 const zonesOf = (path: string): Zone[] => {
   const name = basename(path)
@@ -192,6 +199,18 @@ const assertDataOnly = (value: unknown, path = 'entry'): void => {
   }
 }
 
+const contractRuntimeDeclarations = (path: string, code = source(path)): string[] => {
+  const out: string[] = []
+  for (const statement of parse(path, code).statements) {
+    if (ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement)
+      || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement))
+      out.push(statement.getText())
+    if (ts.isImportDeclaration(statement) && !statement.importClause?.isTypeOnly)
+      out.push(statement.getText())
+  }
+  return out
+}
+
 const corpusDeclarationViolations = (path: string, code = source(path)): string[] => {
   const tree = parse(path, code)
   const out: string[] = []
@@ -284,17 +303,19 @@ const catalogueAdapterViolations = (code = source(join(ROOT, 'grid-magnet-librar
     const clause = statement.importClause
     const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings)
       ? clause.namedBindings.elements : []
-    const names = named.map((part) => (part.propertyName ?? part.name).text).sort()
-    const typeOnly = Boolean(clause?.isTypeOnly)
-      || Boolean(clause && !clause.name && named.length > 0 && named.every((part) => part.isTypeOnly))
-    const exact = (expected: readonly string[]) => names.length === expected.length
-      && names.every((name, index) => name === expected[index]) && !clause?.name
+    const parts = new Map(named.map((part) => [
+      (part.propertyName ?? part.name).text,
+      Boolean(clause?.isTypeOnly || part.isTypeOnly),
+    ]))
+    const exact = (expected: Readonly<Record<string, boolean>>) => !clause?.name
+      && parts.size === Object.keys(expected).length
+      && Object.entries(expected).every(([name, typeOnly]) => parts.get(name) === typeOnly)
     if (specifier === './library') {
-      if (typeOnly || !exact(['CatalogueEntry', 'catalogue'])) violations.push(specifier)
+      if (!exact({ catalogue: false, CatalogueEntry: true })) violations.push(specifier)
     } else if (specifier === './grid-magnet-class') {
-      if (typeOnly || !exact(['classifyShape', 'shapeFamilyOf'])) violations.push(specifier)
+      if (!exact({ classifyShape: false, shapeFamilyOf: false })) violations.push(specifier)
     } else if (specifier === './types') {
-      if (!typeOnly || !exact(['Pt'])) violations.push(specifier)
+      if (!exact({ Pt: true })) violations.push(specifier)
     } else violations.push(specifier)
   }
   return violations
@@ -400,6 +421,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 2: every governed source belongs to exactly one active zone', () => {
     for (const path of libraryFiles()) expect(zonesOf(path), path).toHaveLength(1)
   })
+  it('STEP 2: every concrete class package is registered', () => {
+    expect(unregisteredClassPackages()).toEqual([])
+  })
   it('STEP 2: the AST import matrix enforces zones 0-7', () => {
     expect(importViolations()).toEqual([])
   })
@@ -410,6 +434,10 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       expect(jsxOffenders(tree), path).toEqual([])
     }
   })
+  it('STEP 2: contracts contain declarations only', () => {
+    for (const path of ['types.ts', 'class-contract.ts'])
+      expect(contractRuntimeDeclarations(join(LIBRARY, path)), path).toEqual([])
+  })
   it('STEP 2 gate self-proof rejects forbidden service-to-class, JSX, mutable corpus and sentinels', () => {
     const classId = Object.keys(CLASS_SPECS)[0]
     expect(importViolations({
@@ -418,11 +446,15 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(importViolations({
       'library/circle-class.ts': `import { ${classId}Class } from './${classId}-class'; void ${classId}Class`,
     })).toContainEqual(expect.objectContaining({ fromZone: 3, toZone: 3, reason: 'concrete class package edge is forbidden' }))
+    expect(unregisteredClassPackages([
+      ...libraryFiles(), join(LIBRARY, 'circle-class.ts'),
+    ])).toContain('circle-class.ts')
     expect(importViolations({
       'library/surface.ts': source(join(LIBRARY, 'surface.ts')) + `\nimport './triangle-class'`,
     })).toContainEqual(expect.objectContaining({ fromZone: 6, toZone: 3 }))
     expect(jsxOffenders(parse('probe.tsx', `export const Probe = () => <div />`))).toHaveLength(1)
     expect(parseFailureCodes(parse('probe.ts', `export const Probe = <div />`))).not.toEqual([])
+    expect(contractRuntimeDeclarations('contract-probe.ts', `export function probe() {}`)).toHaveLength(1)
     expect(corpusDeclarationViolations('corpus-probe.ts',
       `export const FRAMES: readonly unknown[] = []`)).toEqual(['FRAMES'])
     expect(emptyLayoutSentinels('sentinel.ts',
@@ -577,6 +609,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(catalogueAdapterViolations(source(join(ROOT, 'grid-magnet-library-catalogue.ts')).replace(
       "from './library'", "from './library/catalogue'",
     ))).toEqual(['./library/catalogue'])
+    expect(catalogueAdapterViolations(
+      source(join(ROOT, 'grid-magnet-library-catalogue.ts')).replace('type CatalogueEntry', 'CatalogueEntry'),
+    )).toEqual(['./library'])
     expect(callsNamed(PAGE, 'librarySurface', source(PAGE) + `\nlibrarySurface()`)).toBe(2)
   })
 })
