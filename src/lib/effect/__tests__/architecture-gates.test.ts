@@ -7,6 +7,8 @@ import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry
 import { outlineFromLayout } from '../library/outline'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
 import { catalogueCandidates, classifiedLibraryCatalogue } from '../grid-magnet-library-catalogue'
+import { selectVariant } from '../library/selection'
+import { materializeSelection } from '../library/materialize'
 
 const ROOT = resolve(process.cwd(), 'src/lib/effect')
 const LIBRARY = join(ROOT, 'library')
@@ -371,7 +373,7 @@ const pageSizeViolations = (code = source(PAGE)): string[] => {
   const visit = (node: ts.Node) => {
     if (ts.isPropertyAccessExpression(node) && node.name.text === 'outer'
       && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'contour'
-      && node.expression.expression.getText(tree).replace('?', '') === 'libraryModel')
+      && node.expression.expression.getText(tree).replace(/[?!]/g, '') === 'libraryModel')
       violations.push(node.getText(tree))
     if (ts.isPropertyAccessExpression(node) && node.name.text === 'outlineMM'
       && node.expression.getText(tree).includes('materialized')) violations.push(node.getText(tree))
@@ -511,7 +513,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     }
   })
   it('STEP 2: contracts contain declarations only', () => {
-    for (const path of ['types.ts', 'class-contract.ts'])
+    for (const path of ZONE_FILES[0])
       expect(contractRuntimeDeclarations(join(LIBRARY, path)), path).toEqual([])
   })
   it('STEP 2 gate self-proof rejects forbidden service-to-class, JSX, mutable corpus and sentinels', () => {
@@ -573,6 +575,14 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       const pts = libraryModel?.contour.outer.pts
       return pts.map((point) => point[0])
     })()`)).not.toEqual([])
+    // a non-null assertion is ordinary TypeScript and read the same size out of the contour
+    expect(pageSizeViolations(source(PAGE).replace(
+      'boxMM={{ w: libraryState.materialized.widthMM',
+      'boxMM={{ w: Math.max(...libraryModel!.contour.outer.pts.map((p) => p[0]))',
+    ))).not.toEqual([])
+    // and zone 0's rule reaches a THIRD contract file, not just the two it was written against
+    expect(contractRuntimeDeclarations(join(LIBRARY, 'qa-contract.ts'),
+      `export function leakedRuntime(): number { return 1 }`)).toHaveLength(1)
   })
   it('STEP 2: library identity fails loudly through the registry', () => {
     expect(() => specOf('nope')).toThrow('unknown classId')
@@ -648,6 +658,22 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const byId = (a: CatalogueIdentity, b: CatalogueIdentity) => a.id.localeCompare(b.id)
     expect([...manifest].sort(byId)).toEqual([...identity].sort(byId))
   })
+  it('STEP 4: every record at every pitch equals an independent build through the class contract', () => {
+    for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
+      const [classId, typeId, variantId, layoutId, t, x, y] = entry.id.split('/').map(decodeURIComponent)
+      const spec = specOf(classId)
+      const opened = spec.open({ classId, frameKey: '', layoutId: '', view: { transpose: false, flipX: false, flipY: false } }, pitchMM)
+      const variant = spec.variants(typeId, pitchMM).find((item) => item.id === variantId)!
+      const expected = materializeSelection({
+        ...selectVariant(opened, variant), layoutId,
+        view: { transpose: t === 't', flipX: x === 'x', flipY: y === 'y' },
+      }, pitchMM)
+      expect(entry.nodesMM, entry.id + ' nodes @' + pitchMM).toEqual(expected.nodesMM)
+      expect(entry.outlineMM, entry.id + ' outline @' + pitchMM).toEqual(expected.outlineMM)
+      expect([entry.widthMM, entry.heightMM, entry.frameCols, entry.frameRows], entry.id + ' size @' + pitchMM)
+        .toEqual([expected.widthMM, expected.heightMM, expected.frameCols, expected.frameRows])
+    }
+  }, 30_000)
   it('STEP 4: classifier matcher round-trips every catalogue entry at every pitch', () => {
     for (const pitchMM of [24, 48, 96]) for (const item of classifiedLibraryCatalogue(pitchMM)) {
       const shape = item.shapeClass
@@ -674,6 +700,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(page).toContain('libraryStageModel(')
     expect(callsNamed(PAGE, 'librarySurface')).toBe(1)
     expect(callsNamed(PAGE, 'libraryStageModel')).toBe(1)
+    const SURFACE = join(LIBRARY, 'surface.ts')
+    for (const name of ['resolveSelection', 'materializeResolved', 'panelOptionsResolved'])
+      expect(callsNamed(SURFACE, name), name).toBe(1)
     expect(zone8Violations(PANEL)).toEqual([])
     expect(zone8Violations(PAGE)).toEqual([])
     expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'))).toEqual([])
@@ -695,5 +724,10 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       source(join(ROOT, 'grid-magnet-library-catalogue.ts')).replace('type CatalogueEntry', 'CatalogueEntry'),
     )).toEqual(['./library'])
     expect(callsNamed(PAGE, 'librarySurface', source(PAGE) + `\nlibrarySurface()`)).toBe(2)
+    expect(callsNamed(join(LIBRARY, 'surface.ts'), 'resolveSelection',
+      source(join(LIBRARY, 'surface.ts')).replace(
+        'const resolved = resolveSelection(selection, drafts, pitchMM)',
+        'const resolved = resolveSelection(selection, drafts, pitchMM)\n  void resolveSelection(selection, drafts, pitchMM)',
+      ))).toBe(2)
   })
 })

@@ -53,8 +53,8 @@ const NAMED: Array<{ m: Mat; id: string }> = [
   { m: [0, 1, -1, 0], id: '270°' },
   { m: [-1, 0, 0, 1], id: 'mirror vertical' },
   { m: [1, 0, 0, -1], id: 'mirror horizontal' },
-  { m: [0, 1, 1, 0], id: 'mirror diagonal ↘' },
-  { m: [0, -1, -1, 0], id: 'mirror diagonal ↗' },
+  { m: [0, 1, 1, 0], id: 'mirror down-diagonal' },
+  { m: [0, -1, -1, 0], id: 'mirror up-diagonal' },
 ]
 
 /** What a view reads as RELATIVE TO the one on screen: the presented view is 0°, and every

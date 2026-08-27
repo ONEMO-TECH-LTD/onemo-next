@@ -96,7 +96,7 @@ function orientationOptions(
 /** How plainly a transform describes a picture: a class's own name first, then the four turns
  *  in order, then the mirrors. Lower is plainer. */
 const TURN_ORDER = ['0°', '90°', '180°', '270°']
-const MIRROR_ORDER = ['mirror horizontal', 'mirror vertical', 'mirror diagonal ↘', 'mirror diagonal ↗']
+const MIRROR_ORDER = ['mirror horizontal', 'mirror vertical', 'mirror down-diagonal', 'mirror up-diagonal']
 function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryClass): number {
   if (spec.orientations.some((o) => sameView(o.view, view))) return -1
   const i = TURN_ORDER.indexOf(viewName(base, view))

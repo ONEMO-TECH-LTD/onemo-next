@@ -15,7 +15,7 @@ import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, f
 import { triangleById, triangleFrame, trianglePerimeter96 } from '../library/triangle-frames'
 import { TRIANGLE_TYPES, triangleTypeOf, uprightView, trianglesOfType, restsFlat, isActive } from '../library/triangle-types'
 import { draftId, draftIntegrity, type LibraryDraft } from '../library/drafts'
-import { panelOptionsResolved, selectionForFamily } from '../library/options'
+import { panelOptionsResolved, selectionForFamily, type PanelOption } from '../library/options'
 import { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, type LibraryEdit } from '../library/authoring'
 import { materializeSelection, materializeResolved } from '../library/materialize'
 import { librarySurface } from '../library/surface'
@@ -847,7 +847,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     // a scalene triangle has no symmetry of its own, so all eight lattice views are distinct
     expect(panelOptionsFor(sel3(one('flag').id), [], 48).orientations.map((o) => o.label)).toEqual(
       ['0°', '90°', '180°', '270°', 'mirror horizontal', 'mirror vertical',
-        'mirror diagonal ↘', 'mirror diagonal ↗'])
+        'mirror down-diagonal', 'mirror up-diagonal'])
   })
 
   it('a turn is named by the plainest transform that reaches it, and the row reads in order', () => {
@@ -894,6 +894,25 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     expect(opts.frames.length).toBe(TRIANGLE_LAYOUTS.filter((t) => triangleTypeOf(t) === 'pyramid').length)
     expect(opts.types.map((o) => o.label)).toEqual(
       ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
+  })
+
+  it('F7 — no block, on any class, offers two chips that READ the same', () => {
+    // F6 proved it for one block of one triangle type, which is why two orientation chips could
+    // both read "mirror diagonal" and reach Dan's screen (08-27). Distinguishability is a law of
+    // every block on every class, so it is checked over the whole registry, not one sample.
+    let cur: LibrarySelection = sel3(one('flag').id, 'perimeter')
+    for (const fam of LIBRARY_FAMILIES) {
+      cur = selectionForFamily(cur, fam, 48)
+      const spec = specOf(fam)
+      for (const type of spec.types) for (const variant of spec.variants(type.id, 48)) {
+        const opts = panelOptionsFor(selectVariant(cur, variant), [], 48)
+        for (const [block, options] of Object.entries(opts) as Array<[string, PanelOption[]]>) {
+          const reads = options.map((o) => o.label)
+          expect(new Set(reads).size, fam + '/' + type.id + '/' + variant.id + '/' + block
+            + ' reads: ' + reads.join(' | ')).toBe(reads.length)
+        }
+      }
+    }
   })
 })
 
