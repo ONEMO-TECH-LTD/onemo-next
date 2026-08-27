@@ -42,7 +42,8 @@ const panelOptionsFor = (selection: LibrarySelection, drafts: readonly LibraryDr
   panelOptionsResolved(selection, drafts, pitchMM, resolveSelection(selection, drafts, pitchMM))
 const materializeDraftResolved = (
   selection: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number,
-) => materializeResolved(resolveSelection(selection, [], pitchMM), nodes, pitchMM)
+  drafts: readonly LibraryDraft[] = [],
+) => materializeResolved(resolveSelection(selection, drafts, pitchMM), nodes, pitchMM)
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
 const framesAt = (classId: string, pitchMM: number) => {
@@ -134,6 +135,33 @@ describe('data integrity + transforms', () => {
         expect(errors).toContain('square box @' + pitchMM + ': no variants')
     } finally {
       spy.mockRestore()
+    }
+  })
+  it('registry drafts fail bounds and duplicate checks before save at every pitch', () => {
+    for (const classId of ['square', 'rectangle', 'diamond'] as const) {
+      const spec = specOf(classId)
+      for (const pitchMM of [24, 48, 96]) {
+        const selection = spec.open(sel(), pitchMM)
+        const frame = spec.variantOf(selection, pitchMM).frame
+        const records = [
+          {
+            edit: { name: 'outside', nodes: [[frame.cols, 0]] as Array<[number, number]> },
+            error: 'node out of frame: ' + frame.cols + ',0',
+          },
+          {
+            edit: { name: 'duplicate', nodes: [[0, 0], [0, 0]] as Array<[number, number]> },
+            error: 'duplicate node 0,0',
+          },
+        ]
+        for (const { edit, error } of records) {
+          const draft: LibraryDraft = {
+            id: 'draft:' + classId + ':' + selection.frameKey + ':' + edit.name,
+            className: classId, frameKey: selection.frameKey, name: edit.name, nodes: edit.nodes,
+          }
+          expect(draftIntegrity(draft, frame), classId + ' @' + pitchMM).toContain(error)
+          expect(saveEdit(selection, [], edit, pitchMM)).toEqual({ ok: false, error })
+        }
+      }
     }
   })
   it('transform closure keeps nodes in bounds', () => {
@@ -332,16 +360,16 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     expect(() => materializeSelection(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
   })
 
-  it('a draft resolves only for its own class AND frame AND name', () => {
+  it('a draft identity resolves only for its own class AND frame AND name', () => {
     const ds = [draft()]
     const hit = resolveSelection(sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds, 48)
     expect(hit.draft?.id).toBe('draft:square:3x3:mine')
-    // same frame key, different class — must NOT answer for the diamond
-    const cross = resolveSelection(sel({ classId: 'diamond', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds, 48)
-    expect(cross.draft).toBeNull()
-    // same class, different frame
-    const other = resolveSelection(sel({ classId: 'square', frameKey: '4x4', layoutId: draftLayoutId('mine') }), ds, 48)
-    expect(other.draft).toBeNull()
+    expect(() => resolveSelection(
+      sel({ classId: 'diamond', frameKey: '3x3', layoutId: draftLayoutId('mine') }), ds, 48,
+    )).toThrow('unknown draft mine in 3x3')
+    expect(() => resolveSelection(
+      sel({ classId: 'square', frameKey: '4x4', layoutId: draftLayoutId('mine') }), ds, 48,
+    )).toThrow('unknown draft mine in 4x4')
   })
 
   it('a draft selection still hands the bridge a real corpus layout', () => {
@@ -350,10 +378,10 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     expect(() => materializeSelection(r.safeSel, 48)).not.toThrow()
   })
 
-  it('a draft that no longer exists resolves to the corpus, not to nothing', () => {
-    const r = resolveSelection(sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [], 48)
-    expect(r.draft).toBeNull()
-    expect(r.layout.name).toBe(r.frame.layouts[0].name)
+  it('a draft identity that no longer exists fails loudly', () => {
+    expect(() => resolveSelection(
+      sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [], 48,
+    )).toThrow('library: unknown draft deleted in 3x3')
   })
 })
 
@@ -1201,7 +1229,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     const saved = saveEdit(base, [], { name: 'probe', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] }, 48)
     expect(saved.ok).toBe(true)
     if (!saved.ok) return
-    const m = materializeDraftResolved(saved.sel, saved.drafts[0].nodes, 48)
+    const m = materializeDraftResolved(saved.sel, saved.drafts[0].nodes, 48, saved.drafts)
     expect(m.nodesMM).toEqual([[0, 96], [96, 96], [0, 0], [96, 0]])
     // the frame is the one the SELECTION resolves to, never a caller's claim about it
     expect(m.frameKey).toBe('3x3')
@@ -1216,7 +1244,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     const tsaved = saveEdit(tsel, [], { name: 'probe', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
     expect(tsaved.ok).toBe(true)
     if (!tsaved.ok) return
-    const tm = materializeDraftResolved(tsaved.sel, tsaved.drafts[0].nodes, 48)
+    const tm = materializeDraftResolved(tsaved.sel, tsaved.drafts[0].nodes, 48, tsaved.drafts)
     expect(tm.error).toBeNull()
     expect(tm.outlineMM).toHaveLength(3)
     // the magnets it wraps are the DRAWN ones, and every one clears the padding exactly

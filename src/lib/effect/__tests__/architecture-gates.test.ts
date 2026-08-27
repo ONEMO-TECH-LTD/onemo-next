@@ -13,9 +13,11 @@ const LIBRARY = join(ROOT, 'library')
 const TESTS = join(ROOT, '__tests__')
 const PANEL = resolve(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/LibraryPanel.tsx')
 const PAGE = resolve(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
+const BRIDGE = join(ROOT, 'grid-magnet-library-bridge.ts')
+const CATALOGUE_ADAPTER = join(ROOT, 'grid-magnet-library-catalogue.ts')
 const LAW = join(LIBRARY, 'shape-layout-lib-architecture.md')
 const ARCH_GATE = join(TESTS, 'architecture-gates.test.ts')
-const LAW_SHA256 = 'a80440427207866350cad2deff1b2ad71555cd3b661d38b99f35ec6b45cf2316'
+const LAW_SHA256 = 'f3b448eb681364fb0275f5fcafc7ea832110c07fcd1f859be396a916718a0306'
 
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const path = join(dir, entry.name)
@@ -55,6 +57,8 @@ const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
 }
 
 const libraryFiles = () => files(LIBRARY).filter((path) => path.endsWith('.ts'))
+const domainRuntimeFiles = () => [...libraryFiles(), BRIDGE, CATALOGUE_ADAPTER]
+const governedRuntimeFiles = () => [...domainRuntimeFiles(), PANEL, PAGE]
 const zonedFiles = () => libraryFiles()
 const coreFiles = () => zonedFiles().filter((path) => zonesOf(path)[0] <= 5)
 const nonUiFiles = () => zonedFiles().filter((path) => zonesOf(path)[0] <= 6)
@@ -271,9 +275,9 @@ const barrelExports = (code = source(join(LIBRARY, 'index.ts'))) => {
   return { types: types.sort(), values: values.sort(), wildcards, aliases }
 }
 
-const bridgeViolations = (code = source(join(ROOT, 'grid-magnet-library-bridge.ts'))): string[] => {
+const bridgeViolations = (code = source(BRIDGE)): string[] => {
   const violations: string[] = []
-  for (const statement of parse(join(ROOT, 'grid-magnet-library-bridge.ts'), code).statements) {
+  for (const statement of parse(BRIDGE, code).statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue
     const specifier = statement.moduleSpecifier.text
     const clause = statement.importClause
@@ -295,9 +299,9 @@ const bridgeViolations = (code = source(join(ROOT, 'grid-magnet-library-bridge.t
   return violations
 }
 
-const catalogueAdapterViolations = (code = source(join(ROOT, 'grid-magnet-library-catalogue.ts'))): string[] => {
+const catalogueAdapterViolations = (code = source(CATALOGUE_ADAPTER)): string[] => {
   const violations: string[] = []
-  for (const statement of parse(join(ROOT, 'grid-magnet-library-catalogue.ts'), code).statements) {
+  for (const statement of parse(CATALOGUE_ADAPTER, code).statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue
     const specifier = statement.moduleSpecifier.text
     const clause = statement.importClause
@@ -323,25 +327,97 @@ const catalogueAdapterViolations = (code = source(join(ROOT, 'grid-magnet-librar
 
 const zone8Violations = (path: string, code = source(path)): string[] => {
   const violations: string[] = []
-  if (path === join(ROOT, 'grid-magnet-library-bridge.ts')) return bridgeViolations(code)
-  if (path === join(ROOT, 'grid-magnet-library-catalogue.ts')) return catalogueAdapterViolations(code)
+  if (path === BRIDGE) return bridgeViolations(code)
+  if (path === CATALOGUE_ADAPTER) return catalogueAdapterViolations(code)
   for (const edge of importEdges(path, code)) {
     if (!edge.to) continue
     const libraryEdge = edge.to === LIBRARY || edge.to.startsWith(LIBRARY + '/')
     if (path === PANEL || path === PAGE) {
       if (libraryEdge && edge.specifier !== '@/lib/effect/library') violations.push(edge.specifier)
-      if (path === PAGE && edge.to === join(ROOT, 'grid-magnet-library-bridge.ts')
+      if (path === PAGE && edge.to === BRIDGE
         && edge.specifier !== '@/lib/effect/grid-magnet-library-bridge') violations.push(edge.specifier)
     }
   }
   return violations
 }
 
+const classComparisonViolations = (path: string, code = source(path)): string[] => {
+  const tree = parse(path, code)
+  const violations: string[] = []
+  const registered = (node: ts.Expression): boolean => ts.isStringLiteralLike(node)
+    && Object.prototype.hasOwnProperty.call(CLASS_SPECS, node.text)
+  const equality = new Set([
+    ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken,
+    ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken,
+  ])
+  const visit = (node: ts.Node) => {
+    if (ts.isBinaryExpression(node) && equality.has(node.operatorToken.kind)
+      && (registered(node.left) || registered(node.right))) violations.push(node.getText(tree))
+    if (ts.isCaseClause(node) && registered(node.expression)) violations.push(node.getText(tree))
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === 'includes' && ts.isArrayLiteralExpression(node.expression.expression)
+      && node.expression.expression.elements.some((element) => ts.isStringLiteralLike(element)
+        && Object.prototype.hasOwnProperty.call(CLASS_SPECS, element.text)))
+      violations.push(node.getText(tree))
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return violations
+}
+
+const pageSizeViolations = (code = source(PAGE)): string[] => {
+  const tree = parse(PAGE, code)
+  const violations: string[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isPropertyAccessExpression(node) && node.name.text === 'outer'
+      && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'contour'
+      && node.expression.expression.getText(tree).replace('?', '') === 'libraryModel')
+      violations.push(node.getText(tree))
+    if (ts.isPropertyAccessExpression(node) && node.name.text === 'outlineMM'
+      && node.expression.getText(tree).includes('materialized')) violations.push(node.getText(tree))
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return violations
+}
+
+const pitchDefaultViolations = (
+  paths: readonly string[] = domainRuntimeFiles(), overrides: ReadonlyMap<string, string> = new Map(),
+): string[] => {
+  const offenders: string[] = []
+  for (const path of paths) {
+    const tree = parse(path, overrides.get(path) ?? source(path))
+    const visit = (node: ts.Node) => {
+      if (ts.isParameter(node) && ts.isIdentifier(node.name) && /pitchMM/i.test(node.name.text)
+        && node.initializer) offenders.push(path)
+      ts.forEachChild(node, visit)
+    }
+    visit(tree)
+  }
+  return offenders
+}
+
+const physicalConstantViolations = (
+  paths: readonly string[] = domainRuntimeFiles(), overrides: ReadonlyMap<string, string> = new Map(),
+): string[] => {
+  const offenders: string[] = []
+  const physical = /(PAD|PADDING|PITCH|DIAMETER|DIA).*MM/
+  for (const path of paths) {
+    const tree = parse(path, overrides.get(path) ?? source(path))
+    const visit = (node: ts.Node) => {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && physical.test(node.name.text))
+        offenders.push(path + ':' + node.name.text)
+      ts.forEachChild(node, visit)
+    }
+    visit(tree)
+  }
+  return offenders
+}
+
 describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 1: retired runtime/test vocabulary is absent', () => {
     const governed = [
-      ...files(LIBRARY),
-      join(ROOT, 'grid-magnet-library-bridge.ts'),
+      ...domainRuntimeFiles(),
       PANEL,
       PAGE,
       ...files(TESTS).filter((path) => /\.test\.tsx?$/.test(path)),
@@ -461,17 +537,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       `const frame = { cols: 1, rows: 1, layouts: [] }`)).toEqual([1])
   })
   it('STEP 2: no runtime pitch default exists in library services', () => {
-    const offenders: string[] = []
-    for (const path of files(LIBRARY).filter((file) => file.endsWith('.ts'))) {
-      const tree = parse(path)
-      const visit = (node: ts.Node) => {
-        if (ts.isParameter(node) && ts.isIdentifier(node.name) && /pitchMM/i.test(node.name.text)
-          && node.initializer) offenders.push(path)
-        ts.forEachChild(node, visit)
-      }
-      visit(tree)
-    }
-    expect(offenders).toEqual([])
+    expect(pitchDefaultViolations()).toEqual([])
   })
   it('STEP 2: corpus exports are literal readonly values and no empty frame sentinel remains', () => {
     for (const path of coreFiles().filter((file) => /^corpus-/.test(basename(file))))
@@ -479,18 +545,34 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     for (const path of coreFiles()) expect(emptyLayoutSentinels(path), path).toEqual([])
   })
   it('STEP 2: physical constants are owned by grid-magnet-spec', () => {
-    const offenders: string[] = []
-    const physical = /(PAD|PADDING|PITCH|DIAMETER|DIA).*MM/
-    for (const path of coreFiles()) {
-      const tree = parse(path)
-      const visit = (node: ts.Node) => {
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && physical.test(node.name.text))
-          offenders.push(path + ':' + node.name.text)
-        ts.forEachChild(node, visit)
-      }
-      visit(tree)
-    }
-    expect(offenders).toEqual([])
+    expect(physicalConstantViolations()).toEqual([])
+  })
+  it('STEP 2: physical and class policy cover every non-UI runtime file', () => {
+    for (const path of governedRuntimeFiles()) if (zonesOf(path)[0] !== 3)
+      expect(classComparisonViolations(path), path).toEqual([])
+  })
+  it('STEP 3: page consumes producer-owned size only', () => {
+    expect(pageSizeViolations()).toEqual([])
+  })
+  it('STEP 2/3 gate self-proof rejects physical defaults, class branches, and size recomputation', () => {
+    const physicalOverrides = new Map<string, string>([[
+      join(LIBRARY, 'surface.ts'), source(join(LIBRARY, 'surface.ts')) + '\nconst FAKE_PITCH_MM = 48',
+    ]])
+    expect(physicalConstantViolations(undefined, physicalOverrides))
+      .toEqual([join(LIBRARY, 'surface.ts') + ':FAKE_PITCH_MM'])
+    const pitchOverrides = new Map<string, string>([[
+      BRIDGE, source(BRIDGE).replace('pitchMM: number)', 'pitchMM: number = 48)'),
+    ]])
+    expect(pitchDefaultViolations(undefined, pitchOverrides)).toEqual([BRIDGE])
+    const classBranch = source(join(LIBRARY, 'surface.ts')).replace(
+      'const resolved = resolveSelection(selection, drafts, pitchMM)',
+      "const resolved = resolveSelection(selection, drafts, pitchMM)\n  if (resolved.classId === 'triangle') void 0",
+    )
+    expect(classComparisonViolations(join(LIBRARY, 'surface.ts'), classBranch)).not.toEqual([])
+    expect(pageSizeViolations(source(PAGE) + `\nconst libraryBox = (() => {
+      const pts = libraryModel?.contour.outer.pts
+      return pts.map((point) => point[0])
+    })()`)).not.toEqual([])
   })
   it('STEP 2: library identity fails loudly through the registry', () => {
     expect(() => specOf('nope')).toThrow('unknown classId')

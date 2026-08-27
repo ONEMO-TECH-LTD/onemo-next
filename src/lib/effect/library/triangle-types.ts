@@ -72,7 +72,7 @@ interface TriangleShown {
  *  twice as tall. Earlier cut-offs of 0.8 and 1.25 were mine and arbitrary; the lattice only ever
  *  presents symmetric aspects of 0.25, 0.5, 0.75, 1, 1.5 and 2, so the words decide by themselves.
  *  Nothing splits the leaning family by proportion any more — that was the invention. */
-export function triangleProductType(
+function triangleProductType(
   g: TriangleGeometry, shown: TriangleShown,
 ): TriangleProductType {
   if (g.angleClass === 'right' && shown.level && shown.upright) return 'wedge'

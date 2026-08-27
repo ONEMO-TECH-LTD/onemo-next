@@ -47,7 +47,7 @@ Five standing gates (activated when the catalogue lands):
 |---|---|---|
 | 0 contracts | types.ts, class-contract.ts | type-only imports from zone 0 and approved external type modules; no runtime imports |
 | 1 corpus | literal corpus-*.ts | zone 0, type-only |
-| 2 geometry | geometry.ts, transforms.ts, outline.ts | zone 0; grid-magnet-spec constants; offset.ts |
+| 2 geometry | geometry.ts, transforms.ts, outline.ts, rules.ts | zone 0; grid-magnet-spec constants; offset.ts |
 | 3 classes | one self-contained class package per class + shared constructor | zones 0-2; NEVER another concrete class package |
 | 4 registry | class-registry.ts only | zones 0 and 3, registration only |
 | 5 services | selection/options/authoring/materialize/catalogue/drafts | zones 0, 2, 4, same-zone services; never corpus or concrete classes |

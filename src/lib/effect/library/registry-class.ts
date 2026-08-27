@@ -61,7 +61,10 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
       return variant(frame, config.typeOfFrame(frame))
     },
     boundaryOf: config.boundaryOf,
-    validateDraft: config.validateDraft,
+    validateDraft: (draft, frame) => [
+      ...boundsAndDuplicateErrors(draft, frame),
+      ...config.validateDraft(draft, frame),
+    ],
   }
   const controls: ClassControls = {
     open: (current, pitchMM) => {

@@ -79,7 +79,7 @@ export function canonicalTriangleId(vertices: readonly LatticeNode[]): string {
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))
 
 /** Every exact lattice node on the closed segment a..b, endpoints included, in order. */
-export function edgeRun(a: LatticeNode, b: LatticeNode): LatticeNode[] {
+function edgeRun(a: LatticeNode, b: LatticeNode): LatticeNode[] {
   const dx = b[0] - a[0], dy = b[1] - a[1]
   const g = gcd(Math.abs(dx), Math.abs(dy)) || 1
   const step: LatticeNode = [dx / g, dy / g]

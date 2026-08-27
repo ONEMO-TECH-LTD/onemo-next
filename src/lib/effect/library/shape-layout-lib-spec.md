@@ -19,7 +19,7 @@ same Stage/canvas shell; Bench does not consume CatalogueEntry. Engine consumpti
                 ClassSpec, ClassControls, LibraryClass, DraftShape/Identity)
   1 corpus      corpus-square/rectangle/diamond/triangle.ts — literal readonly data
   2 geometry    transforms.ts (transformLayout, canonicalNode, viewName) · geometry.ts
-                (convexHull, rotateAround) · outline.ts (THE producer) · rules.ts
+                (convexHull, rotateAround, boundsMM) · outline.ts (THE producer) · rules.ts
                 (spacing samplers box96/ring96/sample96, withSpacingModes)
   3 classes     registry-class.ts (shared constructor) · square/rectangle/diamond-class.ts ·
                 triangle-class.ts + triangle-types.ts + triangle-frames.ts +
@@ -44,7 +44,7 @@ Imports flow downward only; enforced by the AST gate in architecture-gates.test.
 - FRAME: a cols x rows lattice patch carrying named LAYOUTS (populations of disk nodes,
   y-DOWN integer lattice coordinates). Registry classes list frames literally in their corpus;
   the triangle materialises one frame per geometry (its three vertices + derived populations:
-  corners / perimeter / full).
+  corners / perimeter / perimeter-96 / full).
 - PITCH: physical lattice spacing in mm (24/48/96 supported). Frames are only meaningful AT a
   pitch: the 96mm spacing mode is a physical distance, sampled per pitch by the class's
   sampler (box96 for rings, ring96 for the diamond, sample96 runs). PITCH is explicit for every

@@ -67,6 +67,8 @@ export function resolveSelection(
   const draft = wantsDraft
     ? drafts.find((d) => spec.draftMatches(d, sel, frameKey) && d.name === draftNameOf(sel.layoutId)) ?? null
     : null
+  if (wantsDraft && !draft)
+    throw new Error(`library: unknown draft ${draftNameOf(sel.layoutId)} in ${frameKey}`)
   const layoutId = wantsDraft ? frame.layouts[0].name : pickLayout(frame, sel.layoutId)
   const layout = frame.layouts.find((l) => l.name === layoutId)!
   return { classId: sel.classId, spec, variant, typeId, frame, safeSel: { ...sel, frameKey, layoutId }, layout, draft }
