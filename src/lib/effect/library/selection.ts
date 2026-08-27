@@ -7,7 +7,7 @@
 // stored drafts belong to it, are the spec's answers, not a branch here.
 
 import { specOf } from './class-registry'
-import type { ClassVariant } from './class-contract'
+import type { ClassVariant, LibraryClass } from './class-contract'
 import { frameKeyOf } from './transforms'
 import type { LibraryDraft } from './drafts'
 import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection } from './types'
@@ -34,21 +34,11 @@ export const selectVariant = (current: LibrarySelection, variant: ClassVariant):
   view: { ...variant.view },
 })
 
-/** STRICT — the pipeline's resolver. An unknown ID is an error, never a silent retarget to
- *  unrelated data (QA F3): stable IDs exist precisely so a stale identity cannot lie. */
-export function selectedRecords(sel: LibrarySelection, pitchMM: number): {
-  classId: LibraryFamily
-  frame: LibraryFrame
-  layout: LibraryLayout
-} {
-  const frame = specOf(sel.classId).variantOf(sel, pitchMM).frame
-  const layout = frame.layouts.find((l) => l.name === sel.layoutId)
-  if (!layout) throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
-  return { classId: sel.classId, frame, layout }
-}
-
 export interface ResolvedSelection {
   classId: LibraryFamily
+  spec: LibraryClass
+  variant: ClassVariant
+  typeId: string
   frame: LibraryFrame
   /** A selection whose layout certainly exists on the frame — what the bridge is handed. */
   safeSel: LibrarySelection
@@ -67,7 +57,9 @@ export function resolveSelection(
   sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
 ): ResolvedSelection {
   const spec = specOf(sel.classId)
-  const frame = spec.variantOf(sel, pitchMM).frame
+  const variant = spec.variantOf(sel, pitchMM)
+  const frame = variant.frame
+  const typeId = variant.typeId
   const frameKey = frameKeyOf(frame)
   const wantsDraft = isDraftLayout(sel.layoutId)
   // whether a stored draft belongs to this selection is the class's own rule: the triangle
@@ -77,14 +69,5 @@ export function resolveSelection(
     : null
   const layoutId = wantsDraft ? frame.layouts[0].name : pickLayout(frame, sel.layoutId)
   const layout = frame.layouts.find((l) => l.name === layoutId)!
-  return { classId: sel.classId, frame, safeSel: { ...sel, frameKey, layoutId }, layout, draft }
-}
-
-/** Every stored draft the panel should list for this selection. */
-export function draftsFor(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number,
-): LibraryDraft[] {
-  const spec = specOf(sel.classId)
-  const frameKey = frameKeyOf(spec.variantOf(sel, pitchMM).frame)
-  return drafts.filter((d) => spec.draftMatches(d, sel, frameKey))
+  return { classId: sel.classId, spec, variant, typeId, frame, safeSel: { ...sel, frameKey, layoutId }, layout, draft }
 }

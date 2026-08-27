@@ -45,13 +45,9 @@ type Zone = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 type ImportEdge = { from: string; to: string | null; specifier: string; typeOnly: boolean }
 type ImportViolation = ImportEdge & { fromZone: Zone; toZone?: Zone; reason: string }
 
-const ZONE_FILES: Record<Exclude<Zone, 1>, readonly string[]> = {
+const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
   0: ['types.ts', 'class-contract.ts'],
   2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts'],
-  3: [
-    'registry-class.ts', 'square-class.ts', 'rectangle-class.ts', 'diamond-class.ts',
-    'triangle-class.ts', 'triangle-frames.ts', 'triangle-geometry.ts', 'triangle-types.ts',
-  ],
   4: ['class-registry.ts'],
   5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'drafts.ts', 'integrity.ts'],
   6: ['surface.ts'],
@@ -63,10 +59,16 @@ const zonedFiles = () => libraryFiles()
 const coreFiles = () => zonedFiles().filter((path) => zonesOf(path)[0] <= 5)
 const nonUiFiles = () => zonedFiles().filter((path) => zonesOf(path)[0] <= 6)
 
+const concretePackage = (path: string): string | null => {
+  const hit = /^([a-z0-9-]+)-(?:class|frames|geometry|types)\.ts$/.exec(basename(path))
+  return hit?.[1] === 'registry' ? null : hit?.[1] ?? null
+}
+
 const zonesOf = (path: string): Zone[] => {
   const name = basename(path)
   const matches: Zone[] = []
   if (/^corpus-.*\.ts$/.test(name)) matches.push(1)
+  if (name === 'registry-class.ts' || concretePackage(path)) matches.push(3)
   for (const [zone, names] of Object.entries(ZONE_FILES))
     if (names.includes(name)) matches.push(Number(zone) as Zone)
   return matches
@@ -110,11 +112,6 @@ const importEdges = (path: string, code = source(path)): ImportEdge[] => {
   return out
 }
 
-const concretePackage = (path: string): string | null => {
-  const hit = /^(square|rectangle|diamond|triangle)-(?:class|frames|geometry|types)\.ts$/.exec(basename(path))
-  return hit?.[1] ?? null
-}
-
 const ALLOWED_ZONES: Record<Zone, readonly Zone[]> = {
   0: [0], 1: [0], 2: [0, 2], 3: [0, 1, 2, 3], 4: [0, 3], 5: [0, 2, 4, 5],
   6: [0, 5, 6], 7: [0, 4, 5, 6, 7],
@@ -122,7 +119,12 @@ const ALLOWED_ZONES: Record<Zone, readonly Zone[]> = {
 
 const importViolations = (overrides: Record<string, string> = {}): ImportViolation[] => {
   const out: ImportViolation[] = []
-  for (const path of zonedFiles()) {
+  const paths = [...new Set([
+    ...zonedFiles(),
+    ...Object.keys(overrides).filter((key) => key.startsWith('library/'))
+      .map((key) => join(LIBRARY, key.slice('library/'.length))),
+  ])]
+  for (const path of paths) {
     const fromZone = zonesOf(path)[0]
     if (fromZone === undefined) continue
     const key = 'library/' + basename(path)
@@ -274,9 +276,34 @@ const bridgeViolations = (code = source(join(ROOT, 'grid-magnet-library-bridge.t
   return violations
 }
 
+const catalogueAdapterViolations = (code = source(join(ROOT, 'grid-magnet-library-catalogue.ts'))): string[] => {
+  const violations: string[] = []
+  for (const statement of parse(join(ROOT, 'grid-magnet-library-catalogue.ts'), code).statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue
+    const specifier = statement.moduleSpecifier.text
+    const clause = statement.importClause
+    const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings)
+      ? clause.namedBindings.elements : []
+    const names = named.map((part) => (part.propertyName ?? part.name).text).sort()
+    const typeOnly = Boolean(clause?.isTypeOnly)
+      || Boolean(clause && !clause.name && named.length > 0 && named.every((part) => part.isTypeOnly))
+    const exact = (expected: readonly string[]) => names.length === expected.length
+      && names.every((name, index) => name === expected[index]) && !clause?.name
+    if (specifier === './library') {
+      if (typeOnly || !exact(['CatalogueEntry', 'catalogue'])) violations.push(specifier)
+    } else if (specifier === './grid-magnet-class') {
+      if (typeOnly || !exact(['classifyShape', 'shapeFamilyOf'])) violations.push(specifier)
+    } else if (specifier === './types') {
+      if (!typeOnly || !exact(['Pt'])) violations.push(specifier)
+    } else violations.push(specifier)
+  }
+  return violations
+}
+
 const zone8Violations = (path: string, code = source(path)): string[] => {
   const violations: string[] = []
   if (path === join(ROOT, 'grid-magnet-library-bridge.ts')) return bridgeViolations(code)
+  if (path === join(ROOT, 'grid-magnet-library-catalogue.ts')) return catalogueAdapterViolations(code)
   for (const edge of importEdges(path, code)) {
     if (!edge.to) continue
     const libraryEdge = edge.to === LIBRARY || edge.to.startsWith(LIBRARY + '/')
@@ -362,7 +389,6 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   })
 
   it('STEP 2: registration invariants derive families from registered classes', () => {
-    expect(LIBRARY_FAMILIES).toEqual(Object.keys(CLASS_SPECS))
     for (const [classId, spec] of Object.entries(CLASS_SPECS)) {
       expect(specOf(classId), classId).toBe(spec)
       expect(spec.classId).toBe(classId)
@@ -385,9 +411,13 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     }
   })
   it('STEP 2 gate self-proof rejects forbidden service-to-class, JSX, mutable corpus and sentinels', () => {
+    const classId = Object.keys(CLASS_SPECS)[0]
     expect(importViolations({
-      'library/selection.ts': `import { squareClass } from './square-class'; void squareClass`,
+      'library/selection.ts': `import { ${classId}Class } from './${classId}-class'; void ${classId}Class`,
     })).toContainEqual(expect.objectContaining({ fromZone: 5, toZone: 3 }))
+    expect(importViolations({
+      'library/circle-class.ts': `import { ${classId}Class } from './${classId}-class'; void ${classId}Class`,
+    })).toContainEqual(expect.objectContaining({ fromZone: 3, toZone: 3, reason: 'concrete class package edge is forbidden' }))
     expect(importViolations({
       'library/surface.ts': source(join(LIBRARY, 'surface.ts')) + `\nimport './triangle-class'`,
     })).toContainEqual(expect.objectContaining({ fromZone: 6, toZone: 3 }))
@@ -533,6 +563,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(zone8Violations(PANEL)).toEqual([])
     expect(zone8Violations(PAGE)).toEqual([])
     expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'))).toEqual([])
+    expect(zone8Violations(join(ROOT, 'grid-magnet-library-catalogue.ts'))).toEqual([])
   })
   it('STEP 5 gate self-proof rejects forbidden panel, page, and bridge edges', () => {
     expect(zone8Violations(PANEL, source(PANEL) + `\nimport { resolveSelection } from '@/lib/effect/library/selection'`)).toEqual(['@/lib/effect/library/selection'])
@@ -543,6 +574,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       'catalogue }', 'catalogue as hacked }',
     ))).toMatchObject({ values: expect.arrayContaining(['hacked']), aliases: ['catalogue as hacked'] })
     expect(bridgeViolations(source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport './types'`)).toEqual(['./types'])
+    expect(catalogueAdapterViolations(source(join(ROOT, 'grid-magnet-library-catalogue.ts')).replace(
+      "from './library'", "from './library/catalogue'",
+    ))).toEqual(['./library/catalogue'])
     expect(callsNamed(PAGE, 'librarySurface', source(PAGE) + `\nlibrarySurface()`)).toBe(2)
   })
 })

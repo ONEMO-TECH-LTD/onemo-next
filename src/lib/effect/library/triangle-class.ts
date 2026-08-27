@@ -1,4 +1,4 @@
-import type { ClassVariant, DraftShape, LibraryClass } from './class-contract'
+import { assertTypeId, type ClassType, type ClassVariant, type DraftShape, type LibraryClass } from './class-contract'
 import { boundsAndDuplicateErrors } from './registry-class'
 import { frameKeyOf, transformLayout } from './transforms'
 import { TRIANGLE_TYPES, type TriangleProductType } from './triangle-types'
@@ -10,6 +10,7 @@ import type { LibraryFrame, LibrarySelection, PointMM } from './types'
 const label: Record<string, string> = {
   pyramid: 'Pyramid', arrowhead: 'Arrowhead', mountain: 'Mountain', needle: 'Needle', wedge: 'Wedge', flag: 'Flag',
 }
+const types: readonly ClassType[] = TRIANGLE_TYPES.map((id) => ({ id, label: label[id] }))
 
 const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
   const bounds = boundsOf([...triangle.vertices])
@@ -23,6 +24,7 @@ const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
 const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, frame = triangleFrame(triangle, pitchMM)): ClassVariant => {
   const size = sizeOf(triangle, pitchMM)
   return {
+    typeId: triangleTypeOf(triangle),
     id: triangle.id,
     label: size,
     ...(index === undefined ? {} : { accessibleLabel: label[triangleTypeOf(triangle)] + ' ' + (index + 1) + ' · ' + size + 'mm' + (restsFlat(triangle) ? '' : ' · diagonal') }),
@@ -54,8 +56,11 @@ const openVariant = (current: LibrarySelection, variant: ClassVariant): LibraryS
 
 export const triangleClass: LibraryClass = {
   classId: 'triangle',
-  types: TRIANGLE_TYPES.map((id) => ({ id, label: label[id] })),
-  variants: (typeId, pitchMM) => trianglesOfType(typeId as TriangleProductType).map((triangle, index) => asVariant(triangle, pitchMM, index)),
+  types,
+  variants: (typeId, pitchMM) => {
+    assertTypeId('triangle', types, typeId)
+    return trianglesOfType(typeId as TriangleProductType).map((triangle, index) => asVariant(triangle, pitchMM, index))
+  },
   variantOf: (sel, pitchMM) => {
     const triangle = triangleBySelection(sel)
     const frame = triangleFrame(triangle, pitchMM)
@@ -64,7 +69,6 @@ export const triangleClass: LibraryClass = {
     return asVariant(triangle, pitchMM, undefined, frame)
   },
   validateDraft: triangleDraftErrors,
-  typeOf: (sel) => triangleTypeOf(triangleBySelection(sel)),
   open: (current, pitchMM) => openVariant(current, asVariant(trianglesOfType(TRIANGLE_TYPES[0])[0], pitchMM, 0)),
   orientations: [],
   baseView: (sel) => uprightView(triangleBySelection(sel)),

@@ -6,7 +6,6 @@
 // Dan, 08-26: "separation of UI clean shell and logic and spec must be followed as in the
 // fucking bench". This is the producer side of that seam.
 
-import { specOf } from './class-registry'
 import { outlineFromLayout } from './outline'
 import { resolveSelection, type ResolvedSelection } from './selection'
 import { frameKeyOf, transformLayout } from './transforms'
@@ -49,9 +48,7 @@ function place(
 export function materializeResolved(
   resolved: ResolvedSelection, nodes: ReadonlyArray<readonly [number, number]> | null, pitchMM: number,
 ): MaterializedLibrary {
-  const { classId, frame, layout, safeSel } = resolved
-  const spec = specOf(classId)
-  const variant = spec.variantOf(safeSel, pitchMM)
+  const { classId, spec, variant, frame, layout, safeSel } = resolved
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
   const p = place(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)

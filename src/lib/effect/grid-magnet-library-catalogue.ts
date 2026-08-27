@@ -1,4 +1,4 @@
-import { catalogue, type CatalogueEntry } from './library/catalogue'
+import { catalogue, type CatalogueEntry } from './library'
 import { classifyShape, shapeFamilyOf } from './grid-magnet-class'
 import type { Pt } from './types'
 

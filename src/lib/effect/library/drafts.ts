@@ -9,7 +9,7 @@ import type { LibraryFamily, LibraryFrame } from './types'
  *  Browser-local until exported — the canonical corpus above is never mutated at runtime.
  *  A draft is the same literal shape as a library layout, plus where it belongs. */
 export interface LibraryDraft {
-  id: string                 // 'draft:<class>:<frame>:<name>'
+  id: string                 // 'draft:<class>:<frame>[:<geometryId>]:<name>'
   className: string          // the class folder, e.g. 'square'
   frameKey: string
   /** WHICH triangle this was drawn on. Two geometries in one frame must not answer for each

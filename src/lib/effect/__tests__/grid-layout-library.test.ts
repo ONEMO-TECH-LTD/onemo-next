@@ -4,12 +4,12 @@
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { registryIntegrity } from '../library/integrity'
 import { SPACING_MODES, sample96 } from '../library/rules'
 import { transformLayout, frameKeyOf, canonicalNode, transformLayout as tl } from '../library/transforms'
-import { resolveSelection, selectedRecords, selectVariant, draftLayoutId, draftsFor } from '../library/selection'
+import { resolveSelection, selectVariant, draftLayoutId } from '../library/selection'
 import { TRIANGLE_LAYOUTS } from '../library/corpus-triangle'
 import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, fullNodes, boundsOf, selfSymmetries, D4, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
 import { triangleTypeOf, triangleById, triangleFrame, trianglePerimeter96, uprightView, trianglesOfType, restsFlat, isActive, assertTrianglePopulation } from '../library/triangle-frames'
@@ -19,7 +19,8 @@ import { panelOptionsResolved, selectionForFamily } from '../library/options'
 import { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, type LibraryEdit } from '../library/authoring'
 import { materializeSelection, materializeResolved } from '../library/materialize'
 import { librarySurface } from '../library/surface'
-import type { LibrarySelection } from '../library/types'
+import { catalogue } from '../library/catalogue'
+import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { SQUARE_FRAMES } from '../library/corpus-square'
 import { RECTANGLE_FRAMES } from '../library/corpus-rectangle'
 import { DIAMOND_FRAMES } from '../library/corpus-diamond'
@@ -54,7 +55,7 @@ const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
 })
 
 describe('corpus completeness — removal must fail these', () => {
-  it('exactly the 15 canonical frame keys', () => {
+  it('exactly the five canonical square frame keys', () => {
     expect(SQUARE_FRAMES.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
   })
   it('exactly 16 square layouts as the panel and the pipeline see them', () => {
@@ -101,6 +102,40 @@ describe('data integrity + transforms', () => {
   it('unique frames/names, in-bounds unique nodes, no empties', () => {
     expect(registryIntegrity()).toEqual([])
   })
+  it('integrity rejects every corrupted variant class at every pitch', () => {
+    const spec = specOf('square')
+    const original = spec.variants
+    const frame: LibraryFrame = {
+      cols: 1, rows: 1, layouts: [
+        { name: 'duplicate', nodes: [[0, 0], [0, 0], [1, 0]] as const },
+        { name: 'duplicate', nodes: [] },
+      ],
+    }
+    const variant = { ...original('box', 48)[0], id: 'duplicate', frame }
+    const spy = vi.spyOn(spec, 'variants').mockImplementation(() => [variant, variant])
+    try {
+      expect(registryIntegrity()).toEqual(expect.arrayContaining([
+        expect.stringContaining('duplicate variant id'),
+        expect.stringContaining('duplicate layout name'),
+        expect.stringContaining('duplicate node'),
+        expect.stringContaining('node out of bounds'),
+        expect.stringContaining('empty layout'),
+      ]))
+    } finally {
+      spy.mockRestore()
+    }
+  })
+  it('integrity rejects a type with no variants at every pitch', () => {
+    const spec = specOf('square')
+    const spy = vi.spyOn(spec, 'variants').mockImplementation(() => [])
+    try {
+      const errors = registryIntegrity()
+      for (const pitchMM of [24, 48, 96])
+        expect(errors).toContain('square box @' + pitchMM + ': no variants')
+    } finally {
+      spy.mockRestore()
+    }
+  })
   it('transform closure keeps nodes in bounds', () => {
     for (const family of LIBRARY_FAMILIES) for (const f of framesAt(family, 48)) for (const l of f.layouts)
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
@@ -111,6 +146,53 @@ describe('data integrity + transforms', () => {
           expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThan(t.rows)
         }
       }
+  })
+})
+
+describe('one resolved population at every caller', () => {
+  it('surface, catalogue, and bridge preserve each class variant at every pitch', () => {
+    for (const classId of LIBRARY_FAMILIES) {
+      const spec = specOf(classId)
+      for (const pitchMM of [24, 48, 96]) {
+        const opened = spec.open(sel(), pitchMM)
+        const entries = catalogue(pitchMM)
+        for (const type of spec.types) for (const variant of spec.variants(type.id, pitchMM)) {
+          const selected = selectVariant(opened, variant)
+          for (const layout of variant.frame.layouts) {
+            const selection = { ...selected, layoutId: layout.name }
+            const expected = materializeSelection(selection, pitchMM)
+            const surface = librarySurface(selection, [], null, pitchMM).materialized
+            const id = [classId, type.id, variant.id, layout.name,
+              selection.view.transpose ? 't' : 'n', selection.view.flipX ? 'x' : 'n', selection.view.flipY ? 'y' : 'n',
+            ].map(encodeURIComponent).join('/')
+            const entry = entries.find((item) => item.id === id)
+            expect(surface, id).toStrictEqual(expected)
+            expect(entry, id).toBeDefined()
+            expect(entry!.nodesMM, id).toStrictEqual(expected.nodesMM)
+            expect(entry!.outlineMM, id).toStrictEqual(expected.outlineMM)
+            expect(entry!.frameCols, id).toBe(expected.frameCols)
+            expect(entry!.frameRows, id).toBe(expected.frameRows)
+            const stage = libraryStageModel(expected, pitchMM)
+            expect(stage.contour.outer.pts, id).toStrictEqual(expected.outlineMM)
+            expect(stage.grid.anchors.map((anchor) => anchor.p), id).toStrictEqual(expected.nodesMM)
+          }
+        }
+      }
+    }
+  })
+  it('librarySurface resolves its active variant exactly once', () => {
+    const spec = specOf('square')
+    const spy = vi.spyOn(spec, 'variantOf')
+    try {
+      librarySurface(sel(), [], null, 48)
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+  it('every class rejects an unknown type at every pitch', () => {
+    for (const classId of LIBRARY_FAMILIES) for (const pitchMM of [24, 48, 96])
+      expect(() => specOf(classId).variants('nope', pitchMM)).toThrow('unknown typeId nope in ' + classId)
   })
 })
 
@@ -233,7 +315,7 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     // the tab: the diamond's 1x1 carries only 'single'.
     const r = resolveSelection(sel({ classId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }), [], 48)
     expect(r.frame.layouts.some((l) => l.name === r.safeSel.layoutId)).toBe(true)
-    expect(() => selectedRecords(r.safeSel, 48)).not.toThrow()
+    expect(() => materializeSelection(r.safeSel, 48)).not.toThrow()
   })
 
   it('unknown shape or frame is a caller bug — both resolvers refuse it (QA F4)', () => {
@@ -243,9 +325,9 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     expect(() => resolveSelection(sel({ frameKey: '9x9' }), [], 48)).toThrow('unknown frameKey')
   })
 
-  it('the strict resolver still refuses the same input — the two are not merged', () => {
-    expect(() => selectedRecords(sel({ classId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }), 48)).toThrow('unknown layoutId')
-    expect(() => selectedRecords(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
+  it('the strict materializer still refuses the same input — the two are not merged', () => {
+    expect(() => materializeSelection(sel({ classId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }), 48)).toThrow('unknown layoutId')
+    expect(() => materializeSelection(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
   })
 
   it('a draft resolves only for its own class AND frame AND name', () => {
@@ -263,7 +345,7 @@ describe('selection resolution — one owner, no guessing in the view', () => {
   it('a draft selection still hands the bridge a real corpus layout', () => {
     const r = resolveSelection(sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('mine') }), [draft()], 48)
     expect(r.safeSel.layoutId).toBe(r.frame.layouts[0].name)
-    expect(() => selectedRecords(r.safeSel, 48)).not.toThrow()
+    expect(() => materializeSelection(r.safeSel, 48)).not.toThrow()
   })
 
   it('a draft that no longer exists resolves to the corpus, not to nothing', () => {
@@ -758,7 +840,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
     const bad = { ...sel3(one('pyramid').id), frameKey: '9x9' }
-    expect(() => selectedRecords(bad, 48)).toThrow('does not match geometry')
+    expect(() => materializeSelection(bad, 48)).toThrow('does not match geometry')
     expect(() => resolveSelection(bad, [], 48)).toThrow('does not match geometry')
   })
 
@@ -766,7 +848,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     let cur = sel3(one('flag').id, 'perimeter')
     for (const fam of LIBRARY_FAMILIES) {
       cur = selectionForFamily(cur, fam, 48)
-      expect(() => selectedRecords(cur, 48), fam).not.toThrow()
+      expect(() => materializeSelection(cur, 48), fam).not.toThrow()
       expect(resolveSelection(cur, [], 48).classId).toBe(fam)
     }
   })
@@ -1031,7 +1113,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
       // agrees with every other — the type it reports contains the offer it landed on, and the
       // frame it resolves is the one the selection names
       const opened = spec.open(sel(), 48)
-      const type = spec.typeOf(opened, 48)
+      const type = spec.variantOf(opened, 48).typeId
       expect(spec.types.map((t) => t.id), fam).toContain(type)
       expect(spec.variants(type, 48).map((v) => v.id), fam).toContain(spec.variantOf(opened, 48).id)
       expect(frameKeyOf(spec.variantOf(opened, 48).frame), fam).toBe(opened.frameKey)
@@ -1039,9 +1121,9 @@ describe('the class spec is portable, and nothing outside it knows a class by na
       for (const t of spec.types) for (const v of spec.variants(t.id, 48)) {
         const next = selectVariant(opened, v)
         expect(spec.variantOf(next, 48).id, `${fam} ${v.id}`).toBe(v.id)
-        expect(spec.typeOf(next, 48), `${fam} ${v.id}`).toBe(t.id)
+        expect(spec.variantOf(next, 48).typeId, `${fam} ${v.id}`).toBe(t.id)
         expect(frameKeyOf(spec.variantOf(next, 48).frame), `${fam} ${v.id}`).toBe(next.frameKey)
-        expect(() => selectedRecords(next, 48), `${fam} ${v.id}`).not.toThrow()
+        expect(() => materializeSelection(next, 48), `${fam} ${v.id}`).not.toThrow()
       }
     }
   })
@@ -1077,7 +1159,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
   it('the bridge is an adapter: it receives a materialised record and never builds one', () => {
     const src = read(BRIDGE)
     // it must not resolve, transform, name a frame or ask a class anything
-    for (const sym of ['selectedRecords', 'transformLayout', 'frameKeyOf', 'specOf', 'resolveSelection'])
+    for (const sym of ['transformLayout', 'frameKeyOf', 'specOf', 'resolveSelection'])
       expect(src, `bridge :: ${sym}`).not.toContain(sym)
     expect(src).toContain('MaterializedLibrary')
     expect(src).not.toContain('materializeSelection')
@@ -1206,6 +1288,6 @@ describe('authoring transitions — the five the page used to spell out itself',
     const after = deleteEdit(a.s, both, null, 48)
     expect(after.drafts.map((d) => d.geometryId)).toEqual([pair[1].id])
     // and the surviving one is still reachable from its own selection
-    expect(draftsFor(b.s, after.drafts, 48).map((d) => d.name)).toEqual(['same-name'])
+    expect(resolveSelection(b.s, after.drafts, 48).draft?.name).toBe('same-name')
   })
 })

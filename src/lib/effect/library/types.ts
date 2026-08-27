@@ -11,8 +11,7 @@ export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: b
 
 export type PointMM = readonly [number, number]
 
-/** A class whose frames are a literal table. The triangle's frames come from the geometry the
- *  selection names, so it is not one of these and carries no frame registry. */
+/** Stable registered class identity; validity is owned by the fail-loud registry. */
 export type LibraryFamily = string
 
 /** Stable-ID selection — indices are forbidden identity (pruning the draft must never silently

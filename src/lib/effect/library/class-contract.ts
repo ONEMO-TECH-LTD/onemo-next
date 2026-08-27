@@ -8,6 +8,7 @@ export interface OutlineRecipe {
 }
 
 export interface ClassVariant {
+  typeId: string
   id: string
   label: string
   accessibleLabel?: string
@@ -18,6 +19,11 @@ export interface ClassVariant {
 }
 
 export interface ClassType { id: string; label: string }
+
+export function assertTypeId(classId: string, types: readonly ClassType[], typeId: string): void {
+  if (!types.some((type) => type.id === typeId))
+    throw new Error(`library: unknown typeId ${typeId} in ${classId}`)
+}
 
 export interface DraftShape { nodes: ReadonlyArray<readonly [number, number]>; geometryId?: string }
 export interface DraftIdentity { className: string; frameKey: string; geometryId?: string }
@@ -32,7 +38,6 @@ export interface ClassSpec {
 }
 
 export interface ClassControls {
-  typeOf(sel: LibrarySelection, pitchMM: number): string
   open(current: LibrarySelection, pitchMM: number): LibrarySelection
   orientations: readonly { id: string; view: LibraryTransform }[]
   baseView(sel: LibrarySelection, pitchMM: number): LibraryTransform

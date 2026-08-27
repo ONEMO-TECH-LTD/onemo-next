@@ -6,8 +6,8 @@
 import { specOf } from './class-registry'
 import type { LibraryClass } from './class-contract'
 import { SPACING_MODES, isSpacingMode } from './rules'
-import { transformLayout, viewName } from './transforms'
-import { draftLayoutId, pickLayout, draftsFor, selectVariant, type ResolvedSelection } from './selection'
+import { frameKeyOf, transformLayout, viewName } from './transforms'
+import { draftLayoutId, pickLayout, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -113,14 +113,12 @@ export function selectionForFamily(
 export function panelOptionsResolved(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
 ): PanelOptions {
-  const { classId, frame, layout, draft } = resolved
-  const spec = specOf(classId)
+  const { spec, variant, typeId: type, frame, layout, draft } = resolved
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
   const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
-  const type = spec.typeOf(sel, pitchMM)
-  const variantId = spec.variantOf(sel, pitchMM).id
+  const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
   const has = (name: string) => frame.layouts.some((l) => l.name === name)
 
@@ -142,7 +140,7 @@ export function panelOptionsResolved(
         active: sel.layoutId === l.name || (l.name === SPACING_MODES[0].layoutId && isSpacingMode(sel.layoutId)),
         next: layoutSel(l.name),
       })),
-      ...draftsFor(sel, drafts, pitchMM).map((d) => ({
+      ...drafts.filter((d) => spec.draftMatches(d, sel, frameKeyOf(frame))).map((d) => ({
         id: d.id, label: d.name, custom: true,
         active: sel.layoutId === draftLayoutId(d.name), next: layoutSel(draftLayoutId(d.name)),
       })),

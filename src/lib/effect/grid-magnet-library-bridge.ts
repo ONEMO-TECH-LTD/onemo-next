@@ -23,24 +23,20 @@ const pts = (ps: MaterializedLibrary['nodesMM']): Pt[] => ps.map((p) => [p[0], p
 
 /** The engine's picture of a materialised library record. The lattice field is seeded only when
  *  nothing is drawn, so an empty canvas still has somewhere to click. */
-function toStage(m: MaterializedLibrary, pitchMM: number): LibraryStageModel {
-  const nodesMM = pts(m.nodesMM)
-  const contour: Contour = { outer: { pts: pts(m.outlineMM) } , holes: [] }
+export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
+  const nodesMM = pts(materialized.nodesMM)
+  const contour: Contour = { outer: { pts: pts(materialized.outlineMM) } , holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
     pitchCentreMM: pitchMM,
-    lattice: m.seedMM ? [[m.seedMM[0], m.seedMM[1]] as Pt] : [],
+    lattice: materialized.seedMM ? [[materialized.seedMM[0], materialized.seedMM[1]] as Pt] : [],
     phaseMM: [0, 0],
     panMM: [0, 0],
     spotRadiusMM: RELEASED_PADDING_MM,
     contactsMM: [],
     segments: [],
     centresMM: [],
-    centreMainMM: [(m.frameCols - 1) * pitchMM / 2, (m.frameRows - 1) * pitchMM / 2],
+    centreMainMM: [(materialized.frameCols - 1) * pitchMM / 2, (materialized.frameRows - 1) * pitchMM / 2],
   }
-  return { contour, grid, error: m.error }
-}
-
-export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
-  return toStage(materialized, pitchMM)
+  return { contour, grid, error: materialized.error }
 }

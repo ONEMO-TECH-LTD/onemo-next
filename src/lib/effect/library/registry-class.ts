@@ -1,4 +1,4 @@
-import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
+import { assertTypeId, type ClassControls, type ClassSpec, type ClassType, type ClassVariant, type DraftIdentity, type DraftShape, type LibraryClass, type OutlineRecipe } from './class-contract'
 import { frameKeyOf } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, PointMM } from './types'
 
@@ -33,8 +33,8 @@ export function boundsAndDuplicateErrors(draft: DraftShape, frame: LibraryFrame)
 }
 
 export function registryClass(config: RegistryClassConfig): LibraryClass {
-  const variant = (frame: LibraryFrame): ClassVariant => ({
-    id: frameKeyOf(frame), label: config.label(frame), frame, view: none,
+  const variant = (frame: LibraryFrame, typeId: string): ClassVariant => ({
+    typeId, id: frameKeyOf(frame), label: config.label(frame), frame, view: none,
     outline: config.outline,
     selection: { classId: config.classId, frameKey: frameKeyOf(frame) },
   })
@@ -46,13 +46,19 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
   const spec: ClassSpec = {
     classId: config.classId,
     types: config.types,
-    variants: (typeId, pitchMM) => config.frames(pitchMM).filter((frame) => config.typeOfFrame(frame) === typeId).map(variant),
-    variantOf: (sel, pitchMM) => variant(variantFrame(sel, pitchMM)),
+    variants: (typeId, pitchMM) => {
+      assertTypeId(config.classId, config.types, typeId)
+      return config.frames(pitchMM).filter((frame) => config.typeOfFrame(frame) === typeId)
+        .map((frame) => variant(frame, typeId))
+    },
+    variantOf: (sel, pitchMM) => {
+      const frame = variantFrame(sel, pitchMM)
+      return variant(frame, config.typeOfFrame(frame))
+    },
     boundaryOf: config.boundaryOf,
     validateDraft: config.validateDraft,
   }
   const controls: ClassControls = {
-    typeOf: (sel, pitchMM) => config.typeOfFrame(variantFrame(sel, pitchMM)),
     open: (current, pitchMM) => {
       const frame = config.frames(pitchMM)[0]
       return { ...current, classId: config.classId, geometryId: undefined, frameKey: frameKeyOf(frame), layoutId: pickLayout(frame, 'perimeter'), view: none }
