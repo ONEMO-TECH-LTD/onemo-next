@@ -43,7 +43,7 @@ export default function LibraryPanel({
       <Fold title="Type">
         <div className="gl-lib">
           {opts.types.map((o) => (
-            <button key={o.id} aria-pressed={o.active} disabled={opts.types.length === 1}
+            <button key={o.id} aria-pressed={o.active} disabled={o.disabled}
               onClick={() => go(o)}><b>{o.label}</b></button>
           ))}
         </div>

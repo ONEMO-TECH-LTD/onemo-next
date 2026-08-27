@@ -123,9 +123,14 @@ export function panelOptionsResolved(
   const has = (name: string) => frame.layouts.some((l) => l.name === name)
 
   return {
+    // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
+    // the library's answer; the view counted the options itself and decided (law 14).
     types: spec.types.map((t) => {
       const first = spec.variants(t.id, pitchMM)[0]
-      return { id: t.id, label: t.label, active: t.id === type, next: selectVariant(sel, first) }
+      return {
+        id: t.id, label: t.label, active: t.id === type,
+        disabled: spec.types.length === 1, next: selectVariant(sel, first),
+      }
     }),
     frames: spec.variants(type, pitchMM).map((v) => ({
       id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,

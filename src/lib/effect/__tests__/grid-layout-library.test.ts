@@ -896,6 +896,17 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
   })
 
+  it('F6b — a class with one type offers no choice, and the library says so', () => {
+    // moving this out of the panel is only real if the ANSWER is tested: the shell now renders
+    // whatever `disabled` it is handed, so nothing else would notice the library dropping it.
+    for (const fam of LIBRARY_FAMILIES) {
+      const spec = specOf(fam)
+      const opts = panelOptionsFor(selectionForFamily(sel3(one('flag').id), fam, 48), [], 48)
+      for (const option of opts.types)
+        expect(Boolean(option.disabled), fam + '/' + option.id).toBe(spec.types.length === 1)
+    }
+  })
+
   it('F7 — no block, on any class, offers two chips that READ the same', () => {
     // F6 proved it for one block of one triangle type, which is why two orientation chips could
     // both read "mirror diagonal" and reach Dan's screen (08-27). Distinguishability is a law of

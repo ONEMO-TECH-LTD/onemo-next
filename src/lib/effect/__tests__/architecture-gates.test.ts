@@ -383,6 +383,22 @@ const pageSizeViolations = (code = source(PAGE)): string[] => {
   return violations
 }
 
+/** LAW 14 — a shell may ask whether it was given anything; it may never count the options and
+ *  decide. Comparing `.length` to anything but zero is the count-driven layout that put nine
+ *  names in one unwrapping row and a different Type block on the triangle (Dan, 08-26/08-27). */
+const countDrivenLayout = (path: string, code = source(path)): string[] => {
+  const tree = parse(path, code)
+  const out: string[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isBinaryExpression(node)
+      && ts.isPropertyAccessExpression(node.left) && node.left.name.text === 'length'
+      && ts.isNumericLiteral(node.right) && node.right.text !== '0') out.push(node.getText(tree))
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return out
+}
+
 const pitchDefaultViolations = (
   paths: readonly string[] = domainRuntimeFiles(), overrides: ReadonlyMap<string, string> = new Map(),
 ): string[] => {
@@ -555,6 +571,14 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   })
   it('STEP 3: page consumes producer-owned size only', () => {
     expect(pageSizeViolations()).toEqual([])
+  })
+  it('STEP 5: no shell counts its options to choose what to render', () => {
+    // the panel is the only shell that receives PanelOptions; the page passes the record
+    // through untouched, and its own `.length` tests are bench contour geometry
+    expect(countDrivenLayout(PANEL)).toEqual([])
+    expect(source(PAGE)).not.toMatch(/\boptions\.(types|frames|orientations|layouts|spacing)\b/)
+    expect(countDrivenLayout('probe.tsx', `const x = opts.types.length === 1`)).toHaveLength(1)
+    expect(countDrivenLayout('probe.tsx', `const x = opts.types.length > 0`)).toEqual([])
   })
   it('STEP 2/3 gate self-proof rejects physical defaults, class branches, and size recomputation', () => {
     const physicalOverrides = new Map<string, string>([[
