@@ -143,7 +143,7 @@ balanced pairing Dan asked for on 08-26. Whether that row should show is his cal
 
 ## 8 · State
 
-**Audited head: caac69709571911e7529727d5bd15d2361fd278a** — every number below re-run at that exact commit, by me.
+**Audited head: f66bdb0bed0a23d388809ab0ce7d74e38807caa5** — the code commit this ledger records. Every number below was re-run at that exact commit, by me, after it landed; this commit adds only the SHA, so the ledger names a head that exists rather than one it cannot know.
 
 - effect suite: 40 files, **563 / 563**
 - architecture gates: **28**, zero deferred
