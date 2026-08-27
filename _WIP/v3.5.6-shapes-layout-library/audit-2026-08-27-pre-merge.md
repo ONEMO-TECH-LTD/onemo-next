@@ -148,13 +148,31 @@ balanced pairing Dan asked for on 08-26. Whether that row should show is his cal
 - effect suite: 40 files, **563 / 563**
 - architecture gates: **28**, zero deferred
 - `tsc --noEmit`: clean
-- scoped ESLint at **`--max-warnings 0`**: exit 0 (not "zero errors")
+- ESLint at **`--max-warnings 0`**, exit 0, over the exact library scope: `library/**`, the
+  bridge, the catalogue adapter, `LibraryPanel.tsx`, and this library's two gate files.
+  `crop-corner-default.test.ts` carries three warnings; it is outside this scope, predates
+  the branch (`28e5a063`) and is untouched by it — named here rather than hidden by a
+  narrower command.
 - catalogue: **163 records × 24/48/96**, identical id set, matcher round-trip 163/163
 - shapes: **45** — square 5 · rectangle 12 · diamond 4 · triangle 24
-- **eleven mutations run by my own hand, all dead**: the four QA closing-ledger holes, both
-  operand orders of the option count, a duplicate spoken chip name, a second placeMM, a second
-  pickLayout, the layout-carry dropped, the lone-type answer dropped, selection policy moved
-  back into geometry, and the law edited without its hash
+- **mutations run by my own hand — every one dead. The total is the length of this list, not a number kept beside it:**
+
+  - **C1** — a registered zone-0 contract file gains `export function leakedRuntime()` → *STEP 2 declarations-only*
+  - **C2** — `nodesMM: pitchMM === 48 ? materialized.nodesMM : []` → *STEP 4 caller equality at every pitch*
+  - **C3** — a second `resolveSelection(...)` in surface.ts → *STEP 5 call counts*
+  - **C4** — panel width from `Math.max(...libraryModel!.contour.outer.pts...)` → *STEP 3 producer-owned size*
+  - **Q1** — `1 !== opts.orientations.length` — the comparison reversed → *STEP 5 no shell counts its options*
+  - **Q2** — a chip's accessible name collapsed to its type label → *F7 distinguishability*
+  - **M1** — the panel counts its own types to grey a lone chip → *STEP 5 no shell counts its options*
+  - **M2** — `disabled: false` — the library drops the lone-type answer → *F6b*
+  - **M3** — a second `placeMM` declared in materialize.ts → *LAW 1 one implementation*
+  - **M4** — a second `pickLayout` declared in selection.ts → *LAW 1 one implementation*
+  - **M5** — `bounds.cols * pitchMM` — the mm conversion back in the triangle package → *LAW 1 one implementation*
+  - **M6** — `nodeAtMM` drops the y-up inverse → *authoring behaviour (transposed click)*
+  - **M7** — `selectVariant` lands on the frame's first layout, dropping the carry → *F6a*
+  - **M10** — `pickLayout`/`selectVariant` moved verbatim back into transforms.ts → *LAW 1 owner*
+  - **M10'** — the same policy moved into transforms.ts behind renamed wrappers, the owner delegating to it — QA's counterexample, which the owner-by-name gate did NOT catch → *LAW 1 owner has no runtime dependency*
+  - **M11** — a heading edited in the law, hash untouched → *approved-law SHA*
 - visual gate on 4046 (serving tree confirmed by `lsof`): **35 states** — 0 overflow, 0 overlap,
   0 duplicate printed or spoken names, 0 body sideways-scroll, 0 console errors, Bench returns
   to exactly one viewport

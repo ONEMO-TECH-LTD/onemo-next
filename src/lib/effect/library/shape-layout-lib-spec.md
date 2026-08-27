@@ -29,7 +29,8 @@ same Stage/canvas shell; Bench does not consume CatalogueEntry. Engine consumpti
                 triangle-geometry.ts (the triangle package's own lattice math)
   4 registry    class-registry.ts — CLASS_SPECS (sole registration source), derived
                 LIBRARY_FAMILIES, fail-loud specOf()
-  5 services    selection.ts (resolveSelection, selectVariant, draft naming) ·
+  5 services    selection.ts (resolveSelection, draft naming; re-exports the zone-2
+                selection transitions) ·
                 materialize.ts (materializeResolved -> MaterializedLibrary) ·
                 options.ts (panelOptionsResolved -> PanelOptions) · authoring.ts
                 (startAdd/startEdit/saveEdit/deleteEdit/toggleNodeAt) · drafts.ts ·

@@ -249,6 +249,22 @@ const emptyLayoutSentinels = (path: string, code = source(path)): number[] => {
   return out
 }
 
+/** What a module actually exports at runtime — the names, not the file they were declared in.
+ *  Owner-by-name is satisfiable by a pass-through: the policy moves elsewhere and a wrapper
+ *  keeps the expected name (QA, 08-27). The real invariant is that the owner has nothing to
+ *  delegate TO. */
+const runtimeExportNames = (path: string, code = source(path)): string[] => {
+  const names: string[] = []
+  for (const statement of parse(path, code).statements) {
+    if (!ts.canHaveModifiers(statement)
+      || !ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue
+    if (ts.isFunctionDeclaration(statement) && statement.name) names.push(statement.name.text)
+    if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations)
+      if (ts.isIdentifier(declaration.name)) names.push(declaration.name.text)
+  }
+  return names.sort()
+}
+
 const callsNamed = (path: string, name: string, code = source(path)): number => {
   let count = 0
   const visit = (node: ts.Node) => {
@@ -689,6 +705,14 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(source(join(LIBRARY, 'transforms.ts'))).not.toMatch(/\bLibrarySelection\b|\bClassVariant\b/)
     expect(owners.pickLayout).toEqual(['selection-transition.ts'])
     expect(owners.selectVariant).toEqual(['selection-transition.ts'])
+    // and the owner must have nothing to delegate to: every edge type-only, exactly two of them
+    const TRANSITION = join(LIBRARY, 'selection-transition.ts')
+    expect(importEdges(TRANSITION).every((edge) => edge.typeOnly)).toBe(true)
+    expect(importEdges(TRANSITION).map((edge) => edge.specifier).sort())
+      .toEqual(['./class-contract', './types'])
+    expect(runtimeExportNames(TRANSITION)).toEqual(['pickLayout', 'selectVariant'])
+    expect(runtimeExportNames(join(LIBRARY, 'transforms.ts')))
+      .toEqual(['canonicalNode', 'frameKeyOf', 'transformLayout', 'viewName'])
     // geometry.ts owns both directions (placeMM out, nodeAtMM back); rules.ts converts nothing —
     // it samples a physical stride, which is the pitch as a COUNT, not a coordinate
     expect([...new Set(flips)].sort()).toEqual(['geometry.ts'])
