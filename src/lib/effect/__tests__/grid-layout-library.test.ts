@@ -936,9 +936,13 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       for (const type of spec.types) for (const variant of spec.variants(type.id, 48)) {
         const opts = panelOptionsFor(selectVariant(cur, variant), [], 48)
         for (const [block, options] of Object.entries(opts) as Array<[string, PanelOption[]]>) {
-          const reads = options.map((o) => o.label)
-          expect(new Set(reads).size, fam + '/' + type.id + '/' + variant.id + '/' + block
-            + ' reads: ' + reads.join(' | ')).toBe(reads.length)
+          // both the printed chip and the name a screen reader says — F6 checked the spoken one
+          // for a single triangle type only, so duplicate Wedge names went unnoticed
+          for (const read of ['label', 'accessibleLabel'] as const) {
+            const reads = options.map((o) => o[read]).filter((x): x is string => x !== undefined)
+            expect(new Set(reads).size, fam + '/' + type.id + '/' + variant.id + '/' + block
+              + ' ' + read + ': ' + reads.join(' | ')).toBe(reads.length)
+          }
         }
       }
     }

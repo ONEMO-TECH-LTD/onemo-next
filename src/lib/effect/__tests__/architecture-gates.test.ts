@@ -389,10 +389,13 @@ const pageSizeViolations = (code = source(PAGE)): string[] => {
 const countDrivenLayout = (path: string, code = source(path)): string[] => {
   const tree = parse(path, code)
   const out: string[] = []
+  const isCount = (n: ts.Node) => ts.isPropertyAccessExpression(n) && n.name.text === 'length'
+  const isThreshold = (n: ts.Node) => ts.isNumericLiteral(n) && n.text !== '0'
   const visit = (node: ts.Node) => {
+    // either operand order — `opts.x.length === 1` and `1 === opts.x.length` are one rule
     if (ts.isBinaryExpression(node)
-      && ts.isPropertyAccessExpression(node.left) && node.left.name.text === 'length'
-      && ts.isNumericLiteral(node.right) && node.right.text !== '0') out.push(node.getText(tree))
+      && ((isCount(node.left) && isThreshold(node.right))
+        || (isThreshold(node.left) && isCount(node.right)))) out.push(node.getText(tree))
     ts.forEachChild(node, visit)
   }
   visit(tree)
@@ -578,7 +581,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(countDrivenLayout(PANEL)).toEqual([])
     expect(source(PAGE)).not.toMatch(/\boptions\.(types|frames|orientations|layouts|spacing)\b/)
     expect(countDrivenLayout('probe.tsx', `const x = opts.types.length === 1`)).toHaveLength(1)
+    expect(countDrivenLayout('probe.tsx', `const x = 1 !== opts.types.length`)).toHaveLength(1)
     expect(countDrivenLayout('probe.tsx', `const x = opts.types.length > 0`)).toEqual([])
+    expect(countDrivenLayout('probe.tsx', `const x = 0 < opts.types.length`)).toEqual([])
   })
   it('STEP 2/3 gate self-proof rejects physical defaults, class branches, and size recomputation', () => {
     const physicalOverrides = new Map<string, string>([[
