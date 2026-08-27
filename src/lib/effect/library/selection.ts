@@ -8,7 +8,8 @@
 
 import { specOf } from './class-registry'
 import type { ClassVariant, LibraryClass } from './class-contract'
-import { frameKeyOf, pickLayout, selectVariant } from './transforms'
+import { pickLayout } from './selection-transition'
+import { frameKeyOf } from './transforms'
 import type { LibraryDraft } from './drafts'
 import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection } from './types'
 
@@ -22,7 +23,7 @@ export const draftLayoutId = (name: string): string => DRAFT_PREFIX + name
 const isDraftLayout = (layoutId: string): boolean => layoutId.startsWith(DRAFT_PREFIX)
 export const draftNameOf = (layoutId: string): string => layoutId.slice(DRAFT_PREFIX.length)
 
-export { pickLayout, selectVariant } from './transforms'
+export { pickLayout, selectVariant } from './selection-transition'
 
 export interface ResolvedSelection {
   classId: LibraryFamily

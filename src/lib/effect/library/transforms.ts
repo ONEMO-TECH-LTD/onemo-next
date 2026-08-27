@@ -1,22 +1,6 @@
 // library/transforms.ts — pure integer geometry over a frame. Resolution lives in selection.ts.
 
-import type { ClassVariant } from './class-contract'
-import type { FrameExtent, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform } from './types'
-
-/** The layout a frame should land on: the preferred name when it carries it, else its first.
- *  Zone 3 may not reach zone 5, so both were writing this out; it is frame vocabulary and
- *  belongs beside frameKeyOf. */
-export function pickLayout(frame: LibraryFrame, preferred: string): string {
-  return frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
-}
-
-/** The selection a variant reaches, carrying the layout across when the new frame has it. */
-export const selectVariant = (current: LibrarySelection, variant: ClassVariant): LibrarySelection => ({
-  ...current,
-  ...variant.selection,
-  layoutId: pickLayout(variant.frame, current.layoutId),
-  view: { ...variant.view },
-})
+import type { FrameExtent, LibraryLayout, LibraryTransform } from './types'
 
 /** Apply a transform. Pure integer geometry — no engine, no React. */
 export function transformLayout(

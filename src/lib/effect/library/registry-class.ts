@@ -1,5 +1,6 @@
 import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
-import { frameKeyOf, pickLayout } from './transforms'
+import { pickLayout } from './selection-transition'
+import { frameKeyOf } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, PointMM } from './types'
 
 interface RegistryClassConfig {

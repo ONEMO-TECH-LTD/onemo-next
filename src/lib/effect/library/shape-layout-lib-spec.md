@@ -18,9 +18,12 @@ same Stage/canvas shell; Bench does not consume CatalogueEntry. Engine consumpti
                 PointMM, LibraryFamily) · class-contract.ts (OutlineRecipe, ClassVariant,
                 ClassSpec, ClassControls, LibraryClass, DraftShape/Identity)
   1 corpus      corpus-square/rectangle/diamond/triangle.ts — literal readonly data
-  2 geometry    transforms.ts (transformLayout, canonicalNode, viewName) · geometry.ts
-                (convexHull, rotateAround, boundsMM) · outline.ts (THE producer) · rules.ts
-                (spacing samplers box96/ring96/sample96, withSpacingModes)
+  2 pure mechanics
+                transforms.ts (transformLayout, canonicalNode, viewName) · geometry.ts
+                (convexHull, rotateAround, boundsMM, placeMM lattice->mm, nodeAtMM back) ·
+                outline.ts (THE producer) · rules.ts (spacing samplers box96/ring96/sample96,
+                withSpacingModes) · selection-transition.ts (pickLayout, selectVariant — the
+                one layout-carry, needed by both zone 3 and zone 5)
   3 classes     registry-class.ts (shared constructor) · square/rectangle/diamond-class.ts ·
                 triangle-class.ts + triangle-types.ts + triangle-frames.ts +
                 triangle-geometry.ts (the triangle package's own lattice math)

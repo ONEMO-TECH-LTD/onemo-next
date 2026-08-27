@@ -47,7 +47,7 @@ Five standing gates (activated when the catalogue lands):
 |---|---|---|
 | 0 contracts | types.ts, class-contract.ts | type-only imports from zone 0 and approved external type modules; no runtime imports |
 | 1 corpus | literal corpus-*.ts | zone 0, type-only |
-| 2 geometry | geometry.ts, transforms.ts, outline.ts, rules.ts | zone 0; grid-magnet-spec constants; offset.ts |
+| 2 pure mechanics | geometry.ts, transforms.ts, outline.ts, rules.ts, selection-transition.ts | zone 0; grid-magnet-spec constants; offset.ts |
 | 3 classes | one self-contained class package per class + shared constructor | zones 0-2; NEVER another concrete class package |
 | 4 registry | class-registry.ts only | zones 0 and 3, registration only |
 | 5 services | selection/options/authoring/materialize/catalogue/drafts | zones 0, 2, 4, same-zone services; never corpus or concrete classes |
@@ -65,7 +65,10 @@ are out of scope. Never regex over source lines.
 ## The laws
 
 1. ONE PRODUCER PER FACT — outline: outlineFromLayout only; population: the class's
-   pitch-aware frames only; size: measured from producer output, never recomputed.
+   pitch-aware frames only; size: measured from producer output, never recomputed;
+   lattice-to-mm placement: placeMM/nodeAtMM only; layout-carry and variant selection:
+   selection-transition.ts only. A fact needed by two zones moves to the zone both may
+   import — it is never copied, and never parked in a module whose job it is not.
 2. CONSTANT OWNERSHIP — identifiers matching /(PAD|PADDING|PITCH|DIAMETER|DIA).*MM/ are
    declared only in grid-magnet-spec.ts. No runtime padMM parameter or field anywhere in
    library/surface/bridge. No runtime numeric default for pitchMM.

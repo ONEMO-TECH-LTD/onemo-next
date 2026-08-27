@@ -19,7 +19,7 @@ const BRIDGE = join(ROOT, 'grid-magnet-library-bridge.ts')
 const CATALOGUE_ADAPTER = join(ROOT, 'grid-magnet-library-catalogue.ts')
 const LAW = join(LIBRARY, 'shape-layout-lib-architecture.md')
 const ARCH_GATE = join(TESTS, 'architecture-gates.test.ts')
-const LAW_SHA256 = 'f3b448eb681364fb0275f5fcafc7ea832110c07fcd1f859be396a916718a0306'
+const LAW_SHA256 = '8ba6480c7c85bc96f01cc12682c43d6803fcb4714ba9ed824aed016605a539c9'
 
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const path = join(dir, entry.name)
@@ -51,7 +51,7 @@ type ImportViolation = ImportEdge & { fromZone: Zone; toZone?: Zone; reason: str
 
 const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
   0: ['types.ts', 'class-contract.ts'],
-  2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts'],
+  2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts', 'selection-transition.ts'],
   4: ['class-registry.ts'],
   5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'drafts.ts', 'integrity.ts'],
   6: ['surface.ts'],
@@ -682,8 +682,13 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       visit(tree)
     }
     expect(owners.placeMM).toEqual(['geometry.ts'])
-    expect(owners.pickLayout).toEqual(['transforms.ts'])
-    expect(owners.selectVariant).toEqual(['transforms.ts'])
+    // transforms.ts is geometry; selection vocabulary reaching it is how the last collapse
+    // put state policy in the wrong module to satisfy an owner count (QA, 08-27)
+    expect(importEdges(join(LIBRARY, 'transforms.ts')).flatMap((edge) => edge.specifier))
+      .toEqual(['./types'])
+    expect(source(join(LIBRARY, 'transforms.ts'))).not.toMatch(/\bLibrarySelection\b|\bClassVariant\b/)
+    expect(owners.pickLayout).toEqual(['selection-transition.ts'])
+    expect(owners.selectVariant).toEqual(['selection-transition.ts'])
     // geometry.ts owns both directions (placeMM out, nodeAtMM back); rules.ts converts nothing —
     // it samples a physical stride, which is the pitch as a COUNT, not a coordinate
     expect([...new Set(flips)].sort()).toEqual(['geometry.ts'])

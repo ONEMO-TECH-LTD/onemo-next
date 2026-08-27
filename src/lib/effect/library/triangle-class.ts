@@ -1,12 +1,13 @@
 import type { ClassType, ClassVariant, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { assertTypeId, boundsAndDuplicateErrors } from './registry-class'
-import { frameKeyOf, selectVariant } from './transforms'
+import { selectVariant } from './selection-transition'
+import { frameKeyOf } from './transforms'
 import { TRIANGLE_TYPES, restsFlat, triangleTypeOf, trianglesOfType, uprightView, type TriangleProductType } from './triangle-types'
 import { assertTrianglePopulation, boundsOf, type TriangleLayout } from './triangle-geometry'
 import { outlineFromLayout } from './outline'
 import { boundsMM, placeMM } from './geometry'
 import { triangleById, triangleFrame } from './triangle-frames'
-import type { LibraryFrame, LibrarySelection, PointMM } from './types'
+import type { LibraryFrame, LibrarySelection } from './types'
 
 const label: Record<string, string> = {
   pyramid: 'Pyramid', arrowhead: 'Arrowhead', mountain: 'Mountain', needle: 'Needle', wedge: 'Wedge', flag: 'Flag',
