@@ -12,12 +12,12 @@ import { transformLayout, frameKeyOf, canonicalNode, transformLayout as tl } fro
 import { resolveSelection, selectedRecords, selectVariant, draftLayoutId, draftsFor } from '../library/selection'
 import { TRIANGLE_LAYOUTS } from '../library/corpus-triangle'
 import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, fullNodes, boundsOf, selfSymmetries, D4, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
-import { triangleTypeOf, triangleById, triangleFrame, triangleFrameKey, trianglePerimeter96, uprightView, trianglesOfType, restsFlat, isActive, assertTrianglePopulation } from '../library/triangle-frames'
+import { triangleTypeOf, triangleById, triangleFrame, trianglePerimeter96, uprightView, trianglesOfType, restsFlat, isActive, assertTrianglePopulation } from '../library/triangle-frames'
 import { TRIANGLE_TYPES } from '../library/triangle-types'
 import { draftId, draftIntegrity, type LibraryDraft } from '../library/drafts'
-import { panelOptions, selectionForFamily } from '../library/options'
+import { panelOptionsResolved, selectionForFamily } from '../library/options'
 import { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, type LibraryEdit } from '../library/authoring'
-import { materializeSelection, materializeDraft } from '../library/materialize'
+import { materializeSelection, materializeResolved } from '../library/materialize'
 import { librarySurface } from '../library/surface'
 import type { LibrarySelection } from '../library/types'
 import { SQUARE_FRAMES } from '../library/corpus-square'
@@ -37,6 +37,11 @@ const enginePts = (ps: ReadonlyArray<readonly [number, number]>): Array<[number,
 const libraryArrangement = (selection: LibrarySelection, pitchMM: number) =>
   materializeSelection(selection, pitchMM)
 const libraryPreview = (selection: LibrarySelection, pitchMM: number) => materializeSelection(selection, pitchMM)
+const panelOptionsFor = (selection: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number) =>
+  panelOptionsResolved(selection, drafts, pitchMM, resolveSelection(selection, drafts, pitchMM))
+const materializeDraftResolved = (
+  selection: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>, pitchMM: number,
+) => materializeResolved(resolveSelection(selection, [], pitchMM), nodes, pitchMM)
 
 const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
 const framesAt = (classId: string, pitchMM: number) => {
@@ -461,7 +466,7 @@ describe('triangle — the three-point layout universe', () => {
   it('the retired vocabulary never reaches the UI, and no name is two words', () => {
     const first = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
     const ff = triangleFrame(first, 48)
-    const labels = panelOptions({ classId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
+    const labels = panelOptionsFor({ classId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
       layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
       .types.map((o) => o.label)
     expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
@@ -476,7 +481,8 @@ describe('triangle — the three-point layout universe', () => {
     }
     const got: Record<string, [number, number, number]> = {}
     for (const t of TRIANGLE_LAYOUTS) {
-      const k = triangleFrameKey(t)
+      const b = boundsOf([...t.vertices])
+      const k = b.cols + 'x' + b.rows
       got[k] = got[k] ?? [0, 0, 0]
       // the universe's own distribution, by SCIENTIFIC class — those stay internal and fixed,
       // while the product grouping above them is Dan's to name and change
@@ -628,8 +634,8 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
 
   it('moving one corner changes the derived triangle outline', () => {
     const selection = triSel('tri:0,0;0,2;2,0', 'corners')
-    const before = materializeDraft(selection, [[0, 0], [0, 2], [2, 0]], 48)
-    const after = materializeDraft(selection, [[0, 0], [0, 2], [2, 1]], 48)
+    const before = materializeDraftResolved(selection, [[0, 0], [0, 2], [2, 0]], 48)
+    const after = materializeDraftResolved(selection, [[0, 0], [0, 2], [2, 1]], 48)
     expect(before.error).toBeNull(); expect(after.error).toBeNull()
     expect(after.outlineMM).not.toEqual(before.outlineMM)
   })
@@ -648,7 +654,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   })
 
   it('draft identity carries the geometry, so two layouts on one frame cannot cross', () => {
-    const [a, b] = TRIANGLE_LAYOUTS.filter((t) => triangleFrameKey(t) === '3x4').slice(0, 2)
+    const [a, b] = TRIANGLE_LAYOUTS.filter((t) => frameKeyOf(triangleFrame(t, 48)) === '3x4').slice(0, 2)
     expect(draftId('triangle', '3x4', 'mine', a.id)).not.toBe(draftId('triangle', '3x4', 'mine', b.id))
   })
 })
@@ -696,7 +702,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       // EVERY valid current transform must have exactly one active representative — marking
       // active by exact transform equality left 80 states with nothing pressed (QA F2).
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
-        const opts = panelOptions({ ...sel3(t.id), view: { transpose, flipX, flipY } }, [], 48).orientations
+        const opts = panelOptionsFor({ ...sel3(t.id), view: { transpose, flipX, flipY } }, [], 48).orientations
         expect(opts.length, t.id).toBe(distinct.size)
         expect(opts.filter((o) => o.active), `${t.id} ${transpose}${flipX}${flipY}`).toHaveLength(1)
         expect(new Set(opts.map((o) => o.label)).size, t.id).toBe(opts.length)
@@ -709,7 +715,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     // an asymmetric population on a symmetric geometry has all eight views, even though its
     // own corners have fewer
     const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid'
-      && panelOptions(sel3(t.id), [], 48).orientations.length < 8)!
+      && panelOptionsFor(sel3(t.id), [], 48).orientations.length < 8)!
     const f = triangleFrame(peak, 48)
     const asym: Array<[number, number]> = [[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
     const draft = {
@@ -722,12 +728,12 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       const r = tl(f, { name: 'd', nodes: asym }, { transpose, flipX, flipY })
       distinct.add(r.cols + 'x' + r.rows + '|' + r.nodes.map((n) => n[0] + ',' + n[1]).sort().join(' '))
     }
-    expect(panelOptions(selD, [draft], 48).orientations.length).toBe(distinct.size)
+    expect(panelOptionsFor(selD, [draft], 48).orientations.length).toBe(distinct.size)
   })
 
   it('F3 — an asymmetric shape really does offer all eight turns', () => {
     // a scalene triangle has no symmetry of its own, so all eight lattice views are distinct
-    expect(panelOptions(sel3(one('flag').id), [], 48).orientations.map((o) => o.label)).toEqual(
+    expect(panelOptionsFor(sel3(one('flag').id), [], 48).orientations.map((o) => o.label)).toEqual(
       ['0°', '90°', '180°', '270°', 'mirror horizontal', 'mirror vertical',
         'mirror diagonal ↘', 'mirror diagonal ↗'])
   })
@@ -738,7 +744,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     // "why orientation has 3 buttons with degrees and 1 mirror horizontal text button when
     // logical to just say 180?" — every symmetric class now reads as four plain turns.
     for (const type of TRIANGLE_TYPES) {
-      const labels = panelOptions(sel3(one(type).id), [], 48).orientations.map((o) => o.label)
+      const labels = panelOptionsFor(sel3(one(type).id), [], 48).orientations.map((o) => o.label)
       const turns = ['0°', '90°', '180°', '270°']
       expect(labels.slice(0, Math.min(4, labels.length)), type).toEqual(turns.slice(0, labels.length))
       // a mirror name appears only where no turn reaches that picture — never as a fifth way
@@ -747,7 +753,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     }
     // and a class with its own vocabulary keeps it
     const rect = selectionForFamily(sel(), 'rectangle', 48)
-    expect(panelOptions(rect, [], 48).orientations.map((o) => o.label)).toEqual(['portrait', 'landscape'])
+    expect(panelOptionsFor(rect, [], 48).orientations.map((o) => o.label)).toEqual(['portrait', 'landscape'])
   })
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {
@@ -769,7 +775,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     // ONE block, not two: for this class the frame IS the shape, so the frame chips carry the
     // geometry and its miniature. A second picker would be two controls for one choice.
     const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
-    const opts = panelOptions(sel3(peak.id), [], 48)
+    const opts = panelOptionsFor(sel3(peak.id), [], 48)
     const labels = opts.frames.map((o) => o.accessibleLabel!)
     expect(new Set(labels).size).toBe(labels.length)
     expect(labels[0]).toContain('Pyramid 1')
@@ -865,7 +871,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
       const f = triangleFrame(t, 48)
       const sel: LibrarySelection = { classId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f),
         layoutId: 'corners', view: uprightView(t) }
-      const opts = panelOptions(sel, [], 48).orientations
+      const opts = panelOptionsFor(sel, [], 48).orientations
       expect(opts[0].label, t.id).toBe('0°')
       expect(opts[0].active, t.id).toBe(true)
       expect(opts.filter((o) => o.active)).toHaveLength(1)
@@ -876,7 +882,7 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
   it('the upright view is the one a selection hands back', () => {
     // selecting a class or a geometry hands back that view
     const t0 = trianglesOfType('flag')[0]
-    const opt = panelOptions(sel3(t0.id), [], 48).frames.find((o) => o.id === t0.id)!
+    const opt = panelOptionsFor(sel3(t0.id), [], 48).frames.find((o) => o.id === t0.id)!
     expect(opt.next.view).toEqual(uprightView(t0))
   })
 })
@@ -1096,7 +1102,7 @@ describe('authoring transitions — the five the page used to spell out itself',
 
   it('a new layout starts empty, and the canvas still has somewhere to look', () => {
     expect(startAdd()).toEqual({ name: '', nodes: [] })
-    const m = materializeDraft(sel({ frameKey: '3x3' }), [], 48)
+    const m = materializeDraftResolved(sel({ frameKey: '3x3' }), [], 48)
     // nothing drawn: the seed is the selected layout's own first magnet, not the mm origin
     expect(m.nodesMM).toEqual([])
     expect(m.seedMM).not.toBeNull()
@@ -1111,7 +1117,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     const saved = saveEdit(base, [], { name: 'probe', nodes: [[0, 0], [2, 0], [0, 2], [2, 2]] }, 48)
     expect(saved.ok).toBe(true)
     if (!saved.ok) return
-    const m = materializeDraft(saved.sel, saved.drafts[0].nodes, 48)
+    const m = materializeDraftResolved(saved.sel, saved.drafts[0].nodes, 48)
     expect(m.nodesMM).toEqual([[0, 96], [96, 96], [0, 0], [96, 0]])
     // the frame is the one the SELECTION resolves to, never a caller's claim about it
     expect(m.frameKey).toBe('3x3')
@@ -1126,7 +1132,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     const tsaved = saveEdit(tsel, [], { name: 'probe', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
     expect(tsaved.ok).toBe(true)
     if (!tsaved.ok) return
-    const tm = materializeDraft(tsaved.sel, tsaved.drafts[0].nodes, 48)
+    const tm = materializeDraftResolved(tsaved.sel, tsaved.drafts[0].nodes, 48)
     expect(tm.error).toBeNull()
     expect(tm.outlineMM).toHaveLength(3)
     // the magnets it wraps are the DRAWN ones, and every one clears the padding exactly
@@ -1185,7 +1191,7 @@ describe('authoring transitions — the five the page used to spell out itself',
 
   it('delete removes only THIS geometry’s draft, even when another shares the frame and the name', () => {
     // two distinct triangles on one frame: same frameKey, same draft name, different shapes
-    const pair = TRIANGLE_LAYOUTS.filter((t) => triangleFrameKey(t) === '3x4' && isActive(t)).slice(0, 2)
+    const pair = TRIANGLE_LAYOUTS.filter((t) => frameKeyOf(triangleFrame(t, 48)) === '3x4' && isActive(t)).slice(0, 2)
     expect(pair).toHaveLength(2)
     const mk = (t: typeof pair[number]) => {
       const s = triSel(t.id)

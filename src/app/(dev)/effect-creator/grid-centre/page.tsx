@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
 import {
-  LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
+  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
   type LibraryDraft, type LibraryEdit, type LibrarySelection,
@@ -102,7 +102,7 @@ export default function GridLab() {
   /** Top-level view — the bench, or the layout-library review tab. */
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
-  const [librarySel, setLibrarySel] = useState<LibrarySelection>({ classId: 'square', frameKey: '3x3', layoutId: 'perimeter', view: { transpose: false, flipX: false, flipY: false } })
+  const [librarySel, setLibrarySel] = useState<LibrarySelection>(DEFAULT_LIBRARY_SELECTION)
   /** Authoring — browser-local; the canonical corpus is never mutated. */
   const [edit, setEdit] = useState<LibraryEdit | null>(null)
   /** Library canvas view — pan in mm, camera zoom. Same camera contract as the bench:

@@ -11,9 +11,6 @@ export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: b
 
 export type PointMM = readonly [number, number]
 
-/** THE LIBRARY'S OWN REVIEW TAXONOMY (Meta M1): a local declaration, deliberately NOT the
- *  engine classifier's type — runtime family recognition is Step-1's open ruling and the
- *  library must not pre-empt it. */
 /** A class whose frames are a literal table. The triangle's frames come from the geometry the
  *  selection names, so it is not one of these and carries no frame registry. */
 export type LibraryFamily = string

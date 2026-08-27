@@ -44,5 +44,3 @@ function toStage(m: MaterializedLibrary, pitchMM: number): LibraryStageModel {
 export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
   return toStage(materialized, pitchMM)
 }
-
-/** Selection -> the engine-space record the pipeline consumes. */

@@ -20,12 +20,12 @@ const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
   return Math.round(Math.max(...xs) - Math.min(...xs)) + '×' + Math.round(Math.max(...ys) - Math.min(...ys))
 }
 
-const asVariant = (triangle: TriangleLayout, pitchMM: number, index: number): ClassVariant => {
-  const frame = triangleFrame(triangle, pitchMM)
+const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, frame = triangleFrame(triangle, pitchMM)): ClassVariant => {
+  const size = sizeOf(triangle, pitchMM)
   return {
     id: triangle.id,
-    label: sizeOf(triangle, pitchMM),
-    accessibleLabel: label[triangleTypeOf(triangle)] + ' ' + (index + 1) + ' · ' + sizeOf(triangle, pitchMM) + 'mm' + (restsFlat(triangle) ? '' : ' · diagonal'),
+    label: size,
+    ...(index === undefined ? {} : { accessibleLabel: label[triangleTypeOf(triangle)] + ' ' + (index + 1) + ' · ' + size + 'mm' + (restsFlat(triangle) ? '' : ' · diagonal') }),
     frame,
     view: uprightView(triangle),
     outline: { corners: 'sharp' },
@@ -58,9 +58,10 @@ export const triangleClass: LibraryClass = {
   variants: (typeId, pitchMM) => trianglesOfType(typeId as TriangleProductType).map((triangle, index) => asVariant(triangle, pitchMM, index)),
   variantOf: (sel, pitchMM) => {
     const triangle = triangleBySelection(sel)
-    const variant = asVariant(triangle, pitchMM, 0)
-    if (variant.selection.frameKey !== sel.frameKey) throw new Error('library: frameKey ' + sel.frameKey + ' does not match geometry ' + triangle.id + ' (' + variant.selection.frameKey + ')')
-    return variant
+    const frame = triangleFrame(triangle, pitchMM)
+    const frameKey = frameKeyOf(frame)
+    if (frameKey !== sel.frameKey) throw new Error('library: frameKey ' + sel.frameKey + ' does not match geometry ' + triangle.id + ' (' + frameKey + ')')
+    return asVariant(triangle, pitchMM, undefined, frame)
   },
   validateDraft: triangleDraftErrors,
   typeOf: (sel) => triangleTypeOf(triangleBySelection(sel)),

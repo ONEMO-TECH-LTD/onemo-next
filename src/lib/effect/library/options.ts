@@ -7,7 +7,7 @@ import { specOf } from './class-registry'
 import type { LibraryClass } from './class-contract'
 import { SPACING_MODES, isSpacingMode } from './rules'
 import { transformLayout, viewName } from './transforms'
-import { draftLayoutId, pickLayout, resolveSelection, draftsFor, selectVariant, type ResolvedSelection } from './selection'
+import { draftLayoutId, pickLayout, draftsFor, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -153,10 +153,4 @@ export function panelOptionsResolved(
       next: layoutSel(has(m.layoutId) ? m.layoutId : pickLayout(frame, m.layoutId)),
     })),
   }
-}
-
-export function panelOptions(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[] = [], pitchMM: number,
-): PanelOptions {
-  return panelOptionsResolved(sel, drafts, pitchMM, resolveSelection(sel, drafts, pitchMM))
 }

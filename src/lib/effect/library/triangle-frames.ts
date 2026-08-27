@@ -4,6 +4,7 @@
 
 import { sample96, SPACING_96, SPACING_BASE } from './rules'
 import { transformLayout } from './transforms'
+import { convexHull } from './geometry'
 import type { FrameExtent, LibraryTransform } from './types'
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
 import {
@@ -79,11 +80,6 @@ function presentedCorners(t: TriangleLayout): { cols: number; rows: number; node
     { name: 'corners', nodes: [...t.vertices] }, uprightView(t))
 }
 
-export const triangleFrameKey = (t: TriangleLayout): string => {
-  const b = boundsOf([...t.vertices])
-  return b.cols + 'x' + b.rows
-}
-
 /** The 96 population: the SHARED sampler run over each directed side, every vertex retained,
  *  then closed under the triangle's own symmetries so a non-divisible run cannot make a balanced type
  *  lean to one side. */
@@ -149,29 +145,10 @@ function computeTrianglesOfType(type: TriangleProductType): TriangleLayout[] {
 export function assertTrianglePopulation(nodes: readonly LatticeNode[]): void {
   const uniq = [...new Map(nodes.map((n) => [key(n), n])).values()]
   if (uniq.length < 3) throw new Error('triangle: collinear population')
-  const hull = hullOfNodes(uniq)
+  const hull = convexHull(uniq)
   if (hull.length < 3) throw new Error('triangle: collinear population')
   if (hull.length !== 3) throw new Error('triangle: hull has ' + hull.length + ' vertices')
 }
-
-function hullOfNodes(pts: readonly LatticeNode[]): LatticeNode[] {
-  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  if (p.length < 3) return p
-  const half = (src: LatticeNode[]) => {
-    const h: LatticeNode[] = []
-    for (const q of src) {
-      while (h.length >= 2) {
-        const a = h[h.length - 2], b = h[h.length - 1]
-        if ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]) <= 0) h.pop(); else break
-      }
-      h.push(q)
-    }
-    h.pop()
-    return h
-  }
-  return [...half(p), ...half([...p].reverse())]
-}
-
 
 /** THE UPRIGHT VIEW — how a triangle should first appear: sitting on its longest side with the
  *  third point above it. The stored form is canonical for DE-DUPLICATION (the alphabetically

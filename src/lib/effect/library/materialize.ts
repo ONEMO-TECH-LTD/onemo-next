@@ -8,7 +8,7 @@
 
 import { specOf } from './class-registry'
 import { outlineFromLayout } from './outline'
-import { resolveSelection, selectedRecords, type ResolvedSelection } from './selection'
+import { resolveSelection, type ResolvedSelection } from './selection'
 import { frameKeyOf, transformLayout } from './transforms'
 import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, PointMM } from './types'
 
@@ -55,21 +55,31 @@ export function materializeResolved(
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
   const p = place(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
-  const corpus = nodes ? place(frame, layout, safeSel.view, pitchMM) : p
-  const corpusOutline = outlineFromLayout(corpus.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, corpus.nodesMM))
   if (!nodes) return {
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId: layout.name,
-    nodesMM: p.nodesMM, outlineMM: corpusOutline,
+    nodesMM: p.nodesMM,
+    outlineMM: outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM)),
     error: null,
     seedMM: p.nodesMM[0] ?? null,
   }
-  let outlineMM: readonly PointMM[] = corpusOutline
   const validation = spec.validateDraft({ nodes, geometryId: safeSel.geometryId }, frame)
   let error: string | null = validation[0] ?? null
-  if (!error) try { outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM)) }
+  if (!error) try {
+    const outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM))
+    return {
+      classId,
+      sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
+      frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
+      nodesMM: p.nodesMM,
+      outlineMM, error: null,
+      seedMM: null,
+    }
+  }
   catch (e) { error = (e as Error).message }
+  const corpus = place(frame, layout, safeSel.view, pitchMM)
+  const outlineMM = outlineFromLayout(corpus.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, corpus.nodesMM))
   return {
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
@@ -83,21 +93,8 @@ export function materializeResolved(
 export function materializeSelection(
   sel: LibrarySelection, pitchMM: number,
 ): MaterializedLibrary {
-  selectedRecords(sel, pitchMM)
-  return materializeResolved(resolveSelection(sel, [], pitchMM), null, pitchMM)
-}
-
-/** A population being DRAWN is allowed to be nothing yet, one node, two, or briefly not a shape:
- *  the canvas has to stay clickable. The corpus outline stands in until the drawn set is sound
- *  again, and the reason travels with it so the panel can refuse the save (QA F1). */
-export function materializeDraft(
-  sel: LibrarySelection, nodes: ReadonlyArray<readonly [number, number]>,
-  pitchMM: number,
-): MaterializedLibrary {
-  // The AUTHORITATIVE frame is the one this selection resolves to, not dimensions a caller
-  // hands in: a caller could pass dimensions the selection contradicts and make the frame key,
-  // the placement and the centre all lie. And the selection saveEdit returns names the draft
-  // itself, so the corpus fallback must be taken on the NORMALISED selection — resolving the
-  // caller's own draft id strictly is how the producer refused its own output.
-  return materializeResolved(resolveSelection(sel, [], pitchMM), nodes, pitchMM)
+  const resolved = resolveSelection(sel, [], pitchMM)
+  if (resolved.safeSel.layoutId !== sel.layoutId)
+    throw new Error('library: unknown layoutId ' + sel.layoutId + ' in ' + sel.frameKey)
+  return materializeResolved(resolved, null, pitchMM)
 }

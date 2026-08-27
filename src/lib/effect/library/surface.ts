@@ -3,10 +3,10 @@ import { panelOptionsResolved, type PanelOptions } from './options'
 import { resolveSelection } from './selection'
 import type { LibraryEdit } from './authoring'
 import type { LibraryDraft } from './drafts'
-import type { LibrarySelection } from './types'
+import type { LibraryFamily, LibrarySelection } from './types'
 
 export interface LibrarySurface {
-  classId: string
+  classId: LibraryFamily
   materialized: MaterializedLibrary
   options: PanelOptions
   isDraft: boolean

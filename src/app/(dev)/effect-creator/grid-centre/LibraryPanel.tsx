@@ -41,7 +41,7 @@ export default function LibraryPanel({
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
       <Fold title="Type">
-        <div className="gl-seg">
+        <div className="gl-lib">
           {opts.types.map((o) => (
             <button key={o.id} aria-pressed={o.active} disabled={opts.types.length === 1}
               onClick={() => go(o)}><b>{o.label}</b></button>
