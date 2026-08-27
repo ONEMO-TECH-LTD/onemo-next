@@ -1,5 +1,5 @@
 import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
-import { frameKeyOf } from './transforms'
+import { frameKeyOf, pickLayout } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, PointMM } from './types'
 
 interface RegistryClassConfig {
@@ -22,9 +22,6 @@ export function assertTypeId(classId: string, types: readonly ClassType[], typeI
 }
 
 const none: LibraryTransform = { transpose: false, flipX: false, flipY: false }
-const pickLayout = (frame: LibraryFrame, preferred: string) =>
-  frame.layouts.some((layout) => layout.name === preferred) ? preferred : frame.layouts[0].name
-
 export function boundsAndDuplicateErrors(draft: DraftShape, frame: LibraryFrame): string[] {
   const errors: string[] = []
   const seen = new Set<string>()

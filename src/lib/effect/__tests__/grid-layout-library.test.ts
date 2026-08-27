@@ -896,6 +896,24 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       ['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
   })
 
+  it('F6a — a variant carries the layout across when the new frame has it, and only then', () => {
+    // the documented admin layout-carry is the ONE tolerated fallback in the whole library, and
+    // nothing asserted it: dropping it and always landing on the frame's first layout left every
+    // test green. Both halves are checked — it carries when it can, it falls back when it cannot.
+    for (const fam of LIBRARY_FAMILIES) {
+      const spec = specOf(fam)
+      const base = selectionForFamily(sel3(one('flag').id), fam, 48)
+      for (const type of spec.types) for (const variant of spec.variants(type.id, 48)) {
+        const names = variant.frame.layouts.map((l) => l.name)
+        const carried = names[names.length - 1]
+        expect(selectVariant({ ...base, layoutId: carried }, variant).layoutId,
+          fam + '/' + variant.id + ' carries ' + carried).toBe(carried)
+        expect(selectVariant({ ...base, layoutId: 'no-such-layout' }, variant).layoutId,
+          fam + '/' + variant.id + ' falls back').toBe(names[0])
+      }
+    }
+  })
+
   it('F6b — a class with one type offers no choice, and the library says so', () => {
     // moving this out of the panel is only real if the ANSWER is tested: the shell now renders
     // whatever `disabled` it is handed, so nothing else would notice the library dropping it.

@@ -1,4 +1,25 @@
-import type { PointMM } from './types'
+import { transformLayout } from './transforms'
+import type { FrameExtent, LibraryLayout, LibraryTransform, PointMM } from './types'
+
+/** THE PLACEMENT: a layout, under a view, at a pitch, in millimetres. Library canon counts rows
+ *  downward from the top; millimetres count upward, so the flip happens here and nowhere else.
+ *  It was written twice — once for the canvas, once for the chip label — and the two disagreeing
+ *  is exactly what put a 120x120 chip on a 135x135 shape (08-26). */
+export function placeMM(
+  frame: FrameExtent, layout: LibraryLayout, view: LibraryTransform, pitchMM: number,
+): { cols: number; rows: number; nodesMM: PointMM[] } {
+  const t = transformLayout(frame, layout, view)
+  return {
+    cols: t.cols, rows: t.rows,
+    nodesMM: t.nodes.map(([ix, iy]) => [ix * pitchMM, (t.rows - 1 - iy) * pitchMM] as PointMM),
+  }
+}
+
+/** placeMM inverted for ONE point: where a millimetre click lands on the view's lattice. The
+ *  flip is the same one, so it lives beside it rather than being written out at the click site. */
+export const nodeAtMM = (
+  pMM: readonly [number, number], rows: number, pitchMM: number,
+): [number, number] => [Math.round(pMM[0] / pitchMM), rows - 1 - Math.round(pMM[1] / pitchMM)]
 
 export function boundsMM(points: readonly PointMM[]): { widthMM: number; heightMM: number } {
   const xs = points.map(([x]) => x)

@@ -7,10 +7,10 @@
 // fucking bench". This is the producer side of that seam.
 
 import { outlineFromLayout } from './outline'
-import { boundsMM } from './geometry'
+import { boundsMM, placeMM } from './geometry'
 import { resolveSelection, type ResolvedSelection } from './selection'
-import { frameKeyOf, transformLayout } from './transforms'
-import type { LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform, PointMM } from './types'
+import { frameKeyOf } from './transforms'
+import type { LibrarySelection, PointMM } from './types'
 
 /** WHAT A SELECTION IS, once resolved: stable identity, truthful frame identity after the view
  *  transform, magnet positions and the outline that wraps them. Millimetres, y UP. */
@@ -34,18 +34,6 @@ export interface MaterializedLibrary {
   seedMM: PointMM | null
 }
 
-/** Library canon counts rows downward from the top; millimetres count upward. One flip, here. */
-const toMM = (
-  nodes: ReadonlyArray<readonly [number, number]>, rows: number, pitchMM: number,
-): PointMM[] => nodes.map(([ix, iy]) => [ix * pitchMM, (rows - 1 - iy) * pitchMM] as PointMM)
-
-function place(
-  frame: LibraryFrame, layout: LibraryLayout, view: LibraryTransform, pitchMM: number,
-): { cols: number; rows: number; nodesMM: PointMM[] } {
-  const t = transformLayout(frame, layout, view)
-  return { cols: t.cols, rows: t.rows, nodesMM: toMM(t.nodes, t.rows, pitchMM) }
-}
-
 /** A corpus selection, materialised. Throws on an unknown id — stable IDs exist so that a stale
  *  identity cannot silently retarget to unrelated data (QA F3). */
 export function materializeResolved(
@@ -54,45 +42,29 @@ export function materializeResolved(
   const { classId, spec, variant, frame, layout, safeSel } = resolved
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
-  const p = place(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
-  if (!nodes) {
-    const outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM))
-    const { widthMM, heightMM } = boundsMM(outlineMM)
-    return {
-      classId,
-      sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
-      frameCols: p.cols, frameRows: p.rows, layoutId: layout.name,
-      nodesMM: p.nodesMM, outlineMM, widthMM, heightMM,
-      error: null,
-      seedMM: p.nodesMM[0] ?? null,
-    }
-  }
-  const validation = spec.validateDraft({ nodes, geometryId: safeSel.geometryId }, frame)
-  let error: string | null = validation[0] ?? null
-  if (!error) try {
-    const outlineMM = outlineFromLayout(p.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, p.nodesMM))
-    const { widthMM, heightMM } = boundsMM(outlineMM)
-    return {
-      classId,
-      sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
-      frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
-      nodesMM: p.nodesMM,
-      outlineMM, widthMM, heightMM, error: null,
-      seedMM: null,
-    }
-  }
-  catch (e) { error = (e as Error).message }
-  const corpus = place(frame, layout, safeSel.view, pitchMM)
-  const outlineMM = outlineFromLayout(corpus.nodesMM, variant.outline, spec.boundaryOf?.(safeSel, corpus.nodesMM))
-  const { widthMM, heightMM } = boundsMM(outlineMM)
-  return {
+  const p = placeMM(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
+  const outlineOf = (ns: readonly PointMM[]) =>
+    outlineFromLayout(ns, variant.outline, spec.boundaryOf?.(safeSel, ns))
+  /** The one record. Only the outline it wraps, its layout name, why it is not a shape yet and
+   *  where to look when nothing is drawn ever differ between the three cases. */
+  const record = (
+    outlineMM: readonly PointMM[], layoutId: string, error: string | null, seedMM: PointMM | null,
+  ): MaterializedLibrary => ({
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
-    frameCols: p.cols, frameRows: p.rows, layoutId: 'draft',
-    nodesMM: p.nodesMM,
-    outlineMM, widthMM, heightMM, error,
-    seedMM: p.nodesMM.length ? null : corpus.nodesMM[0] ?? null,
-  }
+    frameCols: p.cols, frameRows: p.rows, layoutId,
+    nodesMM: p.nodesMM, outlineMM, ...boundsMM(outlineMM), error, seedMM,
+  })
+
+  if (!nodes) return record(outlineOf(p.nodesMM), layout.name, null, p.nodesMM[0] ?? null)
+
+  let error: string | null = spec.validateDraft({ nodes, geometryId: safeSel.geometryId }, frame)[0] ?? null
+  if (!error) try { return record(outlineOf(p.nodesMM), 'draft', null, null) }
+  catch (e) { error = (e as Error).message }
+  // not a shape yet: the magnets being drawn are still shown, wrapped by the corpus outline
+  const corpus = placeMM(frame, layout, safeSel.view, pitchMM)
+  return record(outlineOf(corpus.nodesMM), 'draft', error,
+    p.nodesMM.length ? null : corpus.nodesMM[0] ?? null)
 }
 
 export function materializeSelection(

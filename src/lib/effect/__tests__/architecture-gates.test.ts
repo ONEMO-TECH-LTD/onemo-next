@@ -648,6 +648,41 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(declarations.convexHull).toEqual(['geometry.ts'])
     expect(offsetCallers).toEqual(['outline.ts'])
   })
+  it('LAW 1: placement, layout-carry and variant selection each have one implementation', () => {
+    // each of these was written out twice — the lattice-to-mm flip once for the canvas and once
+    // for the chip label, pickLayout in zone 3 and again in zone 5, selectVariant in zone 5 and
+    // by hand in the triangle package. Two copies of one fact is how the chip came to say
+    // 120x120 over a 135x135 shape.
+    const owners: Record<string, string[]> = { placeMM: [], pickLayout: [], selectVariant: [] }
+    const flips: string[] = []
+    for (const path of libraryFiles()) {
+      const tree = parse(path)
+      const visit = (node: ts.Node) => {
+        const name = ts.isFunctionDeclaration(node) ? node.name?.text
+          : ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+            && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+            ? node.name.text : undefined
+        if (name && name in owners) owners[name].push(basename(path))
+        // the lattice<->mm conversion itself: anything scaled BY the pitch. rules.ts counts a
+        // ring side from its own start, which reads similar and is a different fact — this
+        // catches the conversion, not the arithmetic shape.
+        if (ts.isBinaryExpression(node)
+          && (node.operatorToken.kind === ts.SyntaxKind.AsteriskToken
+            || node.operatorToken.kind === ts.SyntaxKind.SlashToken)
+          && [node.left, node.right].some((side) => ts.isIdentifier(side) && side.text === 'pitchMM')
+          // `96 / pitchMM` is a physical distance in NODES — a count, not a coordinate
+          && !ts.isNumericLiteral(node.left)) flips.push(basename(path))
+        ts.forEachChild(node, visit)
+      }
+      visit(tree)
+    }
+    expect(owners.placeMM).toEqual(['geometry.ts'])
+    expect(owners.pickLayout).toEqual(['transforms.ts'])
+    expect(owners.selectVariant).toEqual(['transforms.ts'])
+    // geometry.ts owns both directions (placeMM out, nodeAtMM back); rules.ts converts nothing —
+    // it samples a physical stride, which is the pitch as a COUNT, not a coordinate
+    expect([...new Set(flips)].sort()).toEqual(['geometry.ts'])
+  })
   it('STEP 3: library and bridge contain no runtime padding parameter', () => {
     const governed = [...files(LIBRARY), join(ROOT, 'grid-magnet-library-bridge.ts')]
       .filter((path) => path !== LAW)

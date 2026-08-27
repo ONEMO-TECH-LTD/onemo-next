@@ -8,6 +8,7 @@
 import { specOf } from './class-registry'
 import { draftId, draftIntegrity, type LibraryDraft } from './drafts'
 import { draftLayoutId, draftNameOf, resolveSelection } from './selection'
+import { nodeAtMM } from './geometry'
 import { canonicalNode, frameKeyOf } from './transforms'
 import type { LibrarySelection } from './types'
 
@@ -80,8 +81,7 @@ export function toggleNodeAt(
   const { frame } = resolveSelection(sel, drafts, pitchMM)
   const cols = sel.view.transpose ? frame.rows : frame.cols
   const rows = sel.view.transpose ? frame.cols : frame.rows
-  const ix = Math.round(pMM[0] / pitchMM)
-  const iy = rows - 1 - Math.round(pMM[1] / pitchMM)
+  const [ix, iy] = nodeAtMM(pMM, rows, pitchMM)
   if (ix < 0 || ix >= cols || iy < 0 || iy >= rows) return edit
   const n = canonicalNode(frame, sel.view, [ix, iy])
   const k = n[0] + ',' + n[1]

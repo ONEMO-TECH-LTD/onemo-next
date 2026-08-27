@@ -1,10 +1,10 @@
-import type { ClassType, ClassVariant, DraftShape, LibraryClass } from './class-contract'
+import type { ClassType, ClassVariant, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { assertTypeId, boundsAndDuplicateErrors } from './registry-class'
-import { frameKeyOf, transformLayout } from './transforms'
+import { frameKeyOf, selectVariant } from './transforms'
 import { TRIANGLE_TYPES, restsFlat, triangleTypeOf, trianglesOfType, uprightView, type TriangleProductType } from './triangle-types'
 import { assertTrianglePopulation, boundsOf, type TriangleLayout } from './triangle-geometry'
 import { outlineFromLayout } from './outline'
-import { boundsMM } from './geometry'
+import { boundsMM, placeMM } from './geometry'
 import { triangleById, triangleFrame } from './triangle-frames'
 import type { LibraryFrame, LibrarySelection, PointMM } from './types'
 
@@ -13,12 +13,15 @@ const label: Record<string, string> = {
 }
 const types: readonly ClassType[] = TRIANGLE_TYPES.map((id) => ({ id, label: label[id] }))
 
+/** ONE recipe for the class, so the chip and the canvas cannot be measured differently. */
+const OUTLINE: OutlineRecipe = { corners: 'sharp' }
+
+/** The chip reads the size the producer would draw — same placement, same recipe, same bounds. */
 const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
   const bounds = boundsOf([...triangle.vertices])
-  const view = transformLayout({ cols: bounds.cols, rows: bounds.rows }, { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle))
-  const nodesMM = view.nodes.map(([x, y]) => [x * pitchMM, (view.rows - 1 - y) * pitchMM] as PointMM)
-  const outlineMM = outlineFromLayout(nodesMM, { corners: 'sharp' })
-  const { widthMM, heightMM } = boundsMM(outlineMM)
+  const placed = placeMM({ cols: bounds.cols, rows: bounds.rows },
+    { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle), pitchMM)
+  const { widthMM, heightMM } = boundsMM(outlineFromLayout(placed.nodesMM, OUTLINE))
   return Math.round(widthMM) + '×' + Math.round(heightMM)
 }
 
@@ -31,7 +34,7 @@ const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, fr
     ...(index === undefined ? {} : { accessibleLabel: label[triangleTypeOf(triangle)] + ' ' + (index + 1) + ' · ' + size + 'mm' + (restsFlat(triangle) ? '' : ' · diagonal') }),
     frame,
     view: uprightView(triangle),
-    outline: { corners: 'sharp' },
+    outline: OUTLINE,
     selection: { classId: 'triangle', geometryId: triangle.id, frameKey: frameKeyOf(frame) },
   }
 }
@@ -48,13 +51,6 @@ const triangleDraftErrors = (draft: DraftShape, frame: LibraryFrame): string[] =
   return errors
 }
 
-const openVariant = (current: LibrarySelection, variant: ClassVariant): LibrarySelection => ({
-  ...current,
-  ...variant.selection,
-  layoutId: variant.frame.layouts.some((layout) => layout.name === current.layoutId) ? current.layoutId : variant.frame.layouts[0].name,
-  view: { ...variant.view },
-})
-
 export const triangleClass: LibraryClass = {
   classId: 'triangle',
   types,
@@ -70,7 +66,7 @@ export const triangleClass: LibraryClass = {
     return asVariant(triangle, pitchMM, undefined, frame)
   },
   validateDraft: triangleDraftErrors,
-  open: (current, pitchMM) => openVariant(current, asVariant(trianglesOfType(TRIANGLE_TYPES[0])[0], pitchMM, 0)),
+  open: (current, pitchMM) => selectVariant(current, asVariant(trianglesOfType(TRIANGLE_TYPES[0])[0], pitchMM, 0)),
   orientations: [],
   baseView: (sel) => uprightView(triangleBySelection(sel)),
   draftMatches: (draft, sel, frameKey) => draft.className === 'triangle' && draft.frameKey === frameKey && draft.geometryId === sel.geometryId,

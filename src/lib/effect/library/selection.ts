@@ -8,7 +8,7 @@
 
 import { specOf } from './class-registry'
 import type { ClassVariant, LibraryClass } from './class-contract'
-import { frameKeyOf } from './transforms'
+import { frameKeyOf, pickLayout, selectVariant } from './transforms'
 import type { LibraryDraft } from './drafts'
 import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection } from './types'
 
@@ -22,17 +22,7 @@ export const draftLayoutId = (name: string): string => DRAFT_PREFIX + name
 const isDraftLayout = (layoutId: string): boolean => layoutId.startsWith(DRAFT_PREFIX)
 export const draftNameOf = (layoutId: string): string => layoutId.slice(DRAFT_PREFIX.length)
 
-/** The layout a frame should land on: the preferred name when it carries it, else its first. */
-export function pickLayout(frame: LibraryFrame, preferred: string): string {
-  return frame.layouts.some((l) => l.name === preferred) ? preferred : frame.layouts[0].name
-}
-
-export const selectVariant = (current: LibrarySelection, variant: ClassVariant): LibrarySelection => ({
-  ...current,
-  ...variant.selection,
-  layoutId: pickLayout(variant.frame, current.layoutId),
-  view: { ...variant.view },
-})
+export { pickLayout, selectVariant } from './transforms'
 
 export interface ResolvedSelection {
   classId: LibraryFamily
