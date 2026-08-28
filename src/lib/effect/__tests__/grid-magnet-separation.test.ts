@@ -42,6 +42,17 @@ const walkAst = (src: string, visit: (n: ts.Node) => void) => {
 const importsOf = (text: string): string[] =>
   [...text.matchAll(/from ['"]([^'"]+)['"]/g)].map((m) => m[1])
 
+/** IMPORT declarations only — a `export … from './units/x'` re-export shim is NOT an import, and
+ *  conflating the two is what let the migration seam look like a dependency. Re-exports are
+ *  governed separately in zone 2b, where they belong. */
+const importDeclsOf = (text: string): string[] => {
+  const out: string[] = []
+  walkAst(text, (n) => {
+    if (ts.isImportDeclaration(n)) out.push(n.moduleSpecifier.getText().slice(1, -1))
+  })
+  return out
+}
+
 /** Released surface values, read out of the spec's own declarations — never hand-listed. */
 const RELEASED_VALUES = (() => {
   const src = readFileSync(join(LIB, 'grid-magnet-spec.ts'), 'utf8')
@@ -99,7 +110,7 @@ describe('2 — traffic is one-way', () => {
   it('every module file imports only from its allow-list', () => {
     for (const { file, text } of readModule()) {
       const allowed = ALLOWED[file]!
-      const bad = importsOf(text).filter((i) => !allowed.some((rx) => rx.test(i)))
+      const bad = importDeclsOf(text).filter((i) => !allowed.some((rx) => rx.test(i)))
       expect(bad, `${file} imports outside its allow-list: ${bad.join(', ')}`).toEqual([])
     }
   })
