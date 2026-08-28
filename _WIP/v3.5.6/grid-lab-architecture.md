@@ -13,6 +13,21 @@ Target structure and the staged plan to reach it. Not yet true of the code.
 **Goal.** The engine exports headless into the studio backend to define sizes and manufacturing
 layouts. One callable pipeline, no browser, no cross-dependencies, UI a shell.
 
+**Two phases, and only the second one is "finished".** Completion is not defined by this document — it
+is defined by `v3.5.6-current-brief.md` §12, Dan's acceptance contract, and by the five steps in
+`v3.5.6-pipeline-brief.md` §2. Measured against those, the structural work below is **foundation, not
+completion**:
+
+- **Phase A — S1–S5. The engine becomes callable.** Clean units, one pipeline, headless, UI a shell.
+  Behaviour at the end of Phase A is what it is today plus the classifier. **This phase does not make
+  the engine correct**, and nothing in it may be reported as the build being done.
+- **Phase B — S6–S9. The engine becomes correct.** Judge, layout populations, centring table, Spec/admin
+  authority, then the acceptance run. This is where §12 is satisfied.
+
+Phase A first is a sequencing judgement, not a scope reduction: every Phase B rule lands *inside* a unit
+Phase A creates, and bolting the rules onto today's structure is what produced the interaction bugs of
+08-25 in the first place.
+
 ---
 
 ## 1 · Laws
@@ -153,9 +168,10 @@ already asserts 163 records × 3 pitches *equal* — an existing gate, not new m
 gate suite beyond the one import matrix. The engine's own tests are the classifier audit Dan ordered
 and the catalogue oracle that already exists.
 
-**Execution gates.** S1–S3 need no open product answer. OQ1–OQ2 gate S4. OQ3, OQ5 and OQ6 gate
-product activation in S5. OQ4 is not a decision yet — it is resolved by reading the actual studio
-caller before anything freezes or exports its wire contract.
+**Execution gates.** S1–S3 need no open product answer. OQ1 gates S4. OQ5 gates S6's band judgement.
+OQ2 gates S7's centring table. OQ7 and OQ8 gate S9, because §12 makes Fit modes and scoring
+configurations acceptance conditions. OQ3 and OQ6 gate product activation. OQ4 is not a decision — it is
+resolved by reading the actual studio caller before anything freezes or exports a wire contract.
 
 **S1 · Delete only what is provably dead.**
 Delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer trace, and
@@ -210,9 +226,9 @@ direct engine imports.
 *Done when:* the pipeline runs from a Node test with no worker, the oracle calls it instead of
 rebuilding the composition, and the mutation proof runs against the **real** page and worker.
 
-**S4 · Complete the product logic.** Catalogue-backed classifier (below), the y-flip repair, the
-96mm arc as judge evidence, the decision trace and the standing audit. *(The generic layout fallback
-lands in S2, not here.)*
+**S4 · The classifier, complete.** Catalogue-backed classifier (method below), the y-flip repair, the
+decision trace and the standing audit. *(The generic layout fallback lands in S2; the 96mm arc and the
+rest of the judge are S6 — naming them here was this plan's own overclaim.)*
 Two named defects close here or the stage is not done: **4 of 38 rectangle records report `cx = cy`**
 — a rectangle carrying a square's axis pair, exactly the silent misclassification the audit exists to
 catch — and the **`round` family reaches nothing** (a pill classifies as `square`), which the enum's
@@ -221,6 +237,62 @@ deletion resolves by making the catalogue's own classes the answer.
 **S5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
 the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
 24/48/96, real cutouts, every centre mode, every band, manual, then verify the live surface.
+*Done when:* Phase A is structurally complete. **This is not the acceptance run** — it proves the
+re-layout changed nothing, not that the engine answers correctly. §12 is closed at S9.
+
+---
+
+## PHASE B — the engine becomes correct
+
+Every stage below is a requirement already written in Dan's briefs, mapped to the unit that owns it.
+None is new scope.
+
+**S6 · Judge, complete.** Today's judge ranks by **unheld area** — `unheldPct`, `areaMM2` in the band
+ladder — which is on the brief's dead list by name: it ranked Dan's correct 143mm duck *below* the wrong
+125mm one. The brief's STEP 5 is six ordered elements and only one of them is anywhere in the plan:
+
+1. the **96mm perimeter law** as an **arc** along the outline, never an area, with the 1–2 magnet
+   exception judged by centring/balance;
+2. **gravity first** — the upper mass pinned before anything below; a pair across the width, not one
+   magnet mid-mass;
+3. **segment-edge priority** — no segment or edge left unprotected;
+4. **coverage dominance** — at the same size, the layout holding more wins;
+5. **best class match** — native catalogue layout > repaired > discovery;
+6. **landing** — fewest magnets that satisfy everything, then least shift, every other lawful result
+   still offered.
+
+Plus two hard constraints: **the count is exact, never silently dropped** in the solver (the frame and
+size move to deliver N; the interior is never filled to make up the number), and **perimeter is the
+manufacturing default**, whose subtractive count-drop is correct behaviour.
+*Done when:* unheld-area ranking is deleted, the duck returns Dan's own answers (below), and every
+lawful result is still offered rather than filtered.
+
+**S7 · Layout and centring, complete.**
+*Layout:* populations are `full · perimeter · corners`, with perimeter carrying its spacing mode
+`48 · 96 · custom`. Today the code has a `perimeterOnly` boolean and no `corners` population or spacing
+mode at all. The Clipper subtraction stays the **repair** — the class is the guard.
+*Centring:* the class → centring-mode table wired (**OQ2**), and the four centring rules enforced as
+one procedure — group centre on the shape centroid, wrap from there, shift only the minimum a lawful
+tighter wrap demands, prefer the tight solution closest to the centroid. The derived-centre proposal
+(one mass → its own centre; several → the governed top mass) lands here if Dan rules it.
+
+**S8 · Spec and admin are the only configuration authority** (`v3.5.6-current-brief.md` §8). Every
+result-affecting value lives in Spec, is exposed by an admin control, and is traced Spec → control →
+live consumer. Any hidden constant found gets the smallest control and the same wiring. The spec is 80
+lines today and the bench renders 14 controls; that ratio has never been audited, and §12 clause 4 makes
+the trace an acceptance condition.
+
+**S9 · Acceptance — §12, the closing gate.** The build is complete only when all seven hold: automatic
+search finds every layout Dan can produce manually with the same controls · every distinct lawful result
+across bands is shown · flat/equal and every exposed scoring configuration behave as ruled with no hidden
+filtering · every result-affecting value is traceable from Spec to a control to a consumer · manual,
+free, automatic and band give the same candidate the same verdict · real cutouts, holes, every centre
+mode, every Fit mode, every band and manual registration are exercised · the live tab runs with no hidden
+recomputation or runtime errors.
+
+**And the picture, not the analysis** — Dan's duck, his own acceptance evidence: **3 magnets → the third
+in the head at ~143mm**, not the neck at 125 · **4 → a pair per mass at ~147mm** · **6 → three stacked
+pairs at ~192mm**, waist row skipped.
 
 ### The classifier method
 
@@ -274,6 +346,20 @@ then, and only a genuine product choice found by that read comes back to you.
 allowed.
 
 **OQ6 · Control wording** — degrees everywhere, or portrait/landscape stays on the rectangle.
+
+**OQ7 · Are the Fit modes live?** `v3.5.6-current-brief.md` §5 names `group | single | double | most |
+all` as the admin-selected Fit mode, and §12 clause 6 makes exercising **all Fit modes** an acceptance
+condition. Measured: **none of them exists in the code** — zero matches in the engine. The Clipper exact
+wrap solves the tightest size a fixed group fits, so contact is a *result*, not a selection, and the flap
+those modes were judged with is deleted (*"the disk IS the allowance"*). Either the exact wrap supersedes
+them and §12 clause 6 drops the phrase, or they are real product inputs that must be built. I will not
+decide which — one route deletes a written acceptance condition, the other adds a control surface.
+
+**OQ8 · What is scoring mode in the new engine?** §7 requires **both** flat/equal (all laws equal, every
+lawful result visible) **and** every exposed scoring configuration to behave as ruled — and §12 clause 3
+makes that an acceptance condition. Voting and its weights are deleted at S1 as the superseded
+mechanism. So either scoring is the judge's ordering in S6 made admin-selectable, or scoring mode is dead
+and §7/§12 lose that clause. Also Dan's, for the same reason.
 
 **Settled, removed from this list:** current-size erosion (already universal) · the 96mm arc (a law
 in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
