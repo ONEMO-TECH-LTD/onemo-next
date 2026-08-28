@@ -6,7 +6,9 @@ code that already exists plus the destination each piece is owed.
 
 **Why it exists.** The blueprint names destinations at file level ("compute splits four ways").
 That stops the wrong *file* being edited; it does not stop a body landing in the wrong *unit* or
-being quietly retyped. 52 symbols needed an owner and the blueprint named about a dozen.
+being quietly retyped. **96 symbols** needed an owner — 52 of them top-level functions and
+consts, the rest types and file-private helpers that still have to land somewhere — and the
+blueprint named about a dozen.
 
 **Move classes.**
 `VERBATIM` — the body is byte-identical after the move; only its import lines may change.
