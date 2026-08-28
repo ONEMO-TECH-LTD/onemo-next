@@ -33,7 +33,7 @@ export function governMass<M extends { areaMM2: number; centreMM: Pt; peakClearM
 /**
  * The centres a mode aims at — the switchable test system. Every returned point both anchors
  * the slide walk and (for single-target modes) is the balance target. Mode 2 returns every
- * mass centre; its balance target is then the governing mass via centeringRef.
+ * mass centre; the caller selects among them with governMass.
  */
 export function centeringAnchors(
   mode: CentreMode,
