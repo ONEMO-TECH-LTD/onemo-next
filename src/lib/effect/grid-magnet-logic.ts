@@ -1,6 +1,6 @@
 // grid-magnet-logic.ts — LOGIC: policies. Reads what compute measured; weighs with spec's values.
 
-import type { CentreMode, Governor, Pt, SafeSegment } from './types'
+import type { Pt } from './types'
 
 // Moved to units/centring.ts and types.ts (S2). Re-exported so no consumer changes in the move.
 export { governMass, centeringAnchors, centeringRef, anchorBakeOf, anchorFromBake, type AnchorBake } from './units/centring'
