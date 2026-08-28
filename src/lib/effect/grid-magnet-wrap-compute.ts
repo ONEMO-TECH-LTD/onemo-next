@@ -10,7 +10,7 @@
  * is what its previous header falsely claimed while it imported the door and four units.
  */
 
-import type { BandRung, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
+import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
@@ -22,6 +22,7 @@ import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_MM } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
+import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -31,7 +32,7 @@ import { inBand, orderOffers } from './units/judge'
 // The wrap solver now lives in units/wrap.ts (S2 step 5); its result shaping stays here with the
 // ladder until adapters land in S3. Re-exported so no consumer changes in the move.
 export { wrapGroup }
-export type { BandRung, WrapAt, WrapConfig } from './types'
+export type { BandRung, BandSolve, WrapAt, WrapConfig } from './types'
 
 /** The wrapped answer as the canvas draws it. Display only — nothing is decided here. */
 export function wrapGrid(
@@ -83,7 +84,7 @@ export function wrapGrid(
 export function wrapBandLadder(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
   anchorAtMM?: (mm: number) => Pt,
-): BandRung[] {
+): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
   // Sequencer's job: derive the governed centre ONCE and hand it to wrap, which never computes
@@ -107,10 +108,11 @@ export function wrapBandLadder(
   }
   const seen = new Set<string>()
   const rungs: BandRung[] = []
-  const SCAN_MM = 1
-  for (let mm = loMM; mm <= hiMM + 1e-9; mm += SCAN_MM) {
+  const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
+  for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
     if (!pts.length) continue
+    witnesses.push({ revealMM: mm, points: pts })
     // Layout identity: the seated pattern in lattice units, origin-free.
     let mx = Infinity, my = Infinity
     for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
@@ -126,5 +128,5 @@ export function wrapBandLadder(
     if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
     rungs.push({ at, revealMM: mm })
   }
-  return orderOffers(rungs)
+  return { offers: orderOffers(rungs), bestSeated: bestSeatedCandidate(witnesses) }
 }

@@ -16,6 +16,7 @@ import { computeGrid } from '../grid-magnet'
 import { scaleContour } from '../grid-magnet-compute'
 import { makeContourSeatPredicate } from '../foundation/geometry'
 import { wrapGroup } from '../units/wrap'
+import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
 import { makeSizer } from '../grid-magnet-bridge'
@@ -399,16 +400,60 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     for (const f of ['grid-magnet.ts', 'grid-magnet-compute.ts']) {
       const text = readFileSync(join(LIB, f), 'utf8')
       for (const dead of ['bandWalk', 'fitSizeInBand', 'snapRange', 'maxPressMM']) {
-        expect(text, `${f} still holds ${dead} — the rigid gate the brief rejects`).not.toMatch(new RegExp(`\\b${dead}\\b`))
+        expect(text, `${f} still holds ${dead}`).not.toMatch(new RegExp(`\\b${dead}\\b`))
       }
     }
   })
 
-  it('the worker answers an empty band with no-lawful-offer plus a witness', () => {
-    const w = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts'), 'utf8')
-    expect(w, 'the empty band must post offers: [] with a no-lawful-offer diagnostic').toMatch(/offers: \[\]/)
-    expect(w).toMatch(/reason: 'no-lawful-offer'/)
-    expect(w, 'the witness must not be produced by the deleted walk').not.toMatch(/\bbandFit\b|\bfitSizeInBand\b/)
+  const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+
+  it('CALLS the solver: every returned offer is inside the band it was asked for', () => {
+    // The previous version scanned source text. QA mutated the real post to `offers:
+    // [bestSeatedMM]`, added a decoy `void { offers: [] }`, and every test stayed green. This one
+    // calls the solver on a band that DOES produce offers, so deleting the membership rule fails it.
+    // A SQUARE cannot prove this: its bisection bounds already keep every wrap inside the band, so
+    // deleting the rule changes nothing. A star reveals small layouts that wrap far below the band
+    // floor — 115, 128, 149, 150mm all leak into 168-216 the moment the rule goes.
+    const star = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
+        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    for (const [shape, lo, hi] of [[sq, 24, 72], [star, 120, 168], [star, 168, 216]] as const) {
+      const solve = wrapBandLadder(shape, { paddingMM: 12, pitchMM: 48 }, lo, hi, 24)
+      expect(solve.offers.length, `band ${lo}-${hi} must produce offers`).toBeGreaterThan(0)
+      for (const o of solve.offers) {
+        expect(o.at.sizeMM, `offer ${o.at.sizeMM}mm escaped band ${lo}-${hi}`).toBeGreaterThanOrEqual(lo - 0.005)
+        expect(o.at.sizeMM, `offer ${o.at.sizeMM}mm escaped band ${lo}-${hi}`).toBeLessThanOrEqual(hi + 0.005)
+      }
+    }
+  })
+
+  it('band membership actually filters — the star leaks without it', () => {
+    const star = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
+        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    const solve = wrapBandLadder(star, { paddingMM: 12, pitchMM: 48 }, 168, 216, 24)
+    expect(solve.offers.length, 'this band must hold offers, or the test proves nothing').toBe(2)
+    expect(solve.offers.every((o) => o.at.sizeMM >= 168), 'a sub-band layout was offered').toBe(true)
+  })
+
+  it('the witness comes from layout and is never an offer', () => {
+    const solve = wrapBandLadder(sq, { paddingMM: 12, pitchMM: 48 }, 24, 72, 24)
+    expect(solve.bestSeated, 'layout must supply a witness').not.toBeNull()
+    expect(Object.keys(solve)).toEqual(['offers', 'bestSeated'])
+    // The witness is a REVEAL size, not a wrapped offer: it carries no contact size at all.
+    expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
   })
 
   it('the shell never labels the witness a fit', () => {

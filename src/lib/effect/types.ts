@@ -114,6 +114,14 @@ export interface WrapAt {
 /** One rung the band offers: a revealed layout at its exact contact size. */
 export interface BandRung { at: WrapAt; revealMM: number }
 
+/** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
+ *  calibration witness layout selected from the SAME generated population. The witness is never an
+ *  offer and is never lawful. */
+export interface BandSolve {
+  offers: BandRung[]
+  bestSeated: { revealMM: number; points: Pt[] } | null
+}
+
 // The engine's request/response vocabulary.
 export interface GridConfig {
   pitchMM?: number

@@ -2,7 +2,7 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
-import { wrapBandLadder, wrapGrid, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
@@ -35,7 +35,7 @@ const ctx = self as unknown as Worker
 // free-slider moves, manual band scaling, re-walks and the idle prefetcher; a new shape
 // clears everything.
 let shapeSig = ''
-const rungCache = new Map<string, BandRung[]>()
+const rungCache = new Map<string, BandSolve>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
 // and scaled linearly per size. Positions are shape features; only qualification is size-
 // dependent (evaluated inside anchorFromBake). Core mode (1) is size-dependent by definition
@@ -81,19 +81,6 @@ function anchorFnFor(
   return (mm: number) => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
 }
 
-/** The calibration witness: the size in the band that seats the most magnets. It is NOT a fit and
- *  is never offered — it exists so an empty band shows something rather than nothing. */
-function bandBestSeatedMM(
-  sized: (mm: number) => Contour, cfg: GridConfig, band: { minMM: number; maxMM: number },
-): number {
-  let bestMM = band.minMM, bestN = -1
-  for (let mm = band.minMM; mm <= band.maxMM; mm += 4) {
-    const n = computeGrid(sized(mm), { ...cfg, segmentsDetail: 'light' }).anchors.length
-    if (n > bestN) { bestN = n; bestMM = mm }
-  }
-  return bestMM
-}
-
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
@@ -128,12 +115,13 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // contact size. Composition only: the wrap engine is transferred untouched.
       const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
       const key = JSON.stringify([cfgSig, band.id])
-      let rungs = rungCache.get(key)
-      if (!rungs) {
-        rungs = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, anchorFnFor(sized, cfg, cfgSig, sig))
-        rungCache.set(key, rungs)
+      let solve = rungCache.get(key)
+      if (!solve) {
+        solve = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, anchorFnFor(sized, cfg, cfgSig, sig))
+        rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
+      const rungs = solve.offers
       if (rungs.length) {
         // RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the
         // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
@@ -161,10 +149,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         } })
         return
       }
-      // NO LAWFUL OFFER. The band revealed nothing that wraps inside it. The best-seated size is a
-      // CALIBRATION WITNESS only — it is returned so the canvas is not blank, and it must never be
-      // presented as a fit. The old rigid walk that showed it AS the band result is deleted.
-      const bestSeatedMM = bandBestSeatedMM(sized, cfg, band)
+      // NO LAWFUL OFFER. Judge allowed nothing in this band. The witness comes from LAYOUT's own
+      // generated population — the worker measures nothing and ranks nothing — and it is evidence,
+      // never an offer.
+      const bestSeatedMM = solve.bestSeated?.revealMM ?? band.minMM
       const contour = sized(bestSeatedMM)
       const grid = computeGrid(contour, cfg)
       ctx.postMessage({ id, model: {
