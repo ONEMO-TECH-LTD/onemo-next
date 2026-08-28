@@ -104,7 +104,6 @@ export function wrapGroup(
   const anchorAt = (mm: number): Pt => cfg.anchorAtMM(mm)
   const heldAt = (mm: number): Pt | null => {
     const c = sized(mm)
-    const outer = c.outer.pts
     const anchor = anchorAt(mm)
     const centred: Pt = [anchor[0] - mid[0], anchor[1] - mid[1]]
     let ok = true
@@ -129,7 +128,6 @@ export function wrapGroup(
   }
   const origin = heldAt(hi) ?? heldAt(hi)
   if (!origin) return null
-  const outer = sized(hi).outer.pts
   const anchor = anchorAt(hi)
   const pts = g.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)
   const finalMid: Pt = [origin[0] + mid[0], origin[1] + mid[1]]
