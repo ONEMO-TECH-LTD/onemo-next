@@ -17,17 +17,6 @@ export type { BBox } from './types'
 
 export function dist(a: Pt, b: Pt): number { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
-/** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
- *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
- *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
- *  Enforced through the dominance tiers, not preferred. */
-export function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
-  if (!seated.length) return 0
-  let sum = 0
-  for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)
-  return sum / seated.length
-}
-
 /** THE RIGID GATE (Dan, 2026-08-20): the worst disc's gap past its margined edge. A layout
  *  qualifies only when EVERY disc touches within the allowance — 0 = touch, 1 = 1mm space.
  *  Normal mode enforces this; Auto mode adapts the allowance instead. */
@@ -60,25 +49,6 @@ export function contactPointsMM(
     out.push(best)
   }
   return out
-}
-
-/** Split seated nodes into perimeter belt and fully-surrounded interior. */
-export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
-  const R = step * 1.45
-  const belt: Pt[] = [], interior: Pt[] = []
-  for (let i = 0; i < seated.length; i++) {
-    const p = seated[i]
-    let l = false, r = false, u = false, d = false
-    for (let j = 0; j < seated.length; j++) {
-      if (j === i) continue
-      const dx = seated[j][0] - p[0], dy = seated[j][1] - p[1]
-      if (Math.hypot(dx, dy) > R) continue
-      if (dx > 1) r = true; else if (dx < -1) l = true
-      if (dy > 1) u = true; else if (dy < -1) d = true
-    }
-    if (l && r && u && d) interior.push(p); else belt.push(p)
-  }
-  return { belt, interior }
 }
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */

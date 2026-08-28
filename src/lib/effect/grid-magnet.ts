@@ -1,43 +1,26 @@
 // grid-magnet.ts — the engine bridge: computeGrid and the band snap, wiring spec + compute + logic.
 // One import door for consumers; the modules stay behind it.
 
-import type { Contour, Pt } from './types'
+import type { Contour, GridConfig, GridResult, Pt } from './types'
+export type { GridConfig, GridResult } from './types'
+import { registerLayout } from './units/layout'
+import { safeSegments } from './units/segment'
+import { centeringAnchors, governMass } from './units/centring'
+import { bbox, centroidOf, latticeAt, spotRadiusOf } from './foundation/geometry'
 import {
-  BANDS,
   CENTRE_MODE,
-  DEFAULT_PITCH_MM,
   GOVERNOR,
   MASS_DEPTH_MM,
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
-  POSITIONING,
   SNAP_STEP_MM,
 } from './grid-magnet-spec'
-import {
-  bbox,
-  centroidOf,
-  fieldSpanMM,
-  contactPointsMM,
-  maxPressMM,
-  pressExcessMM,
-  latticeAt,
-  makeCircleSeatPredicate,
-  makeSeatPredicate,
-  safeSegments,
-  spotRadiusOf,
-  type SafeSegment,
-} from './grid-magnet-compute'
-import {
-  applyCoverage,
-  assignSizes,
-  bandOf,
-  centeringAnchors,
-  governMass,
-  type Anchor,
-  type CentreMode,
-  type Governor,
-  type MagnetPlan,
-} from './grid-magnet-logic'
+import { contactPointsMM, maxPressMM } from './grid-magnet-compute'
+import { fieldSpanMM } from './foundation/geometry'
+import { bandOf } from './foundation/geometry'
+import { applyCoverage } from './units/layout'
+import { assignSizes } from './grid-magnet-logic'
+import type { CentreMode, Governor } from './types'
 
 export * from './grid-magnet-spec'
 export {
@@ -51,132 +34,28 @@ export {
 } from './grid-magnet-compute'
 export { bandOf, type Anchor, type MagnetDia, type MagnetPlan } from './grid-magnet-logic'
 
-export interface GridConfig {
-  pitchMM?: number
-  paddingMM?: number
-  /** How finely the lattice slides under the shape when searching registrations. */
-  phaseStepMM?: number
-  /** Manual calibration: force this registration (mm phase) instead of searching. */
-  forcePhaseMM?: Pt
-  /** Clearance a region must survive to count as a mass for centring. */
-  massDepthMM?: number
-  /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
-  centreMode?: number
-  /** Positioning law — 0 voting · 1 centre rules (parity-locked, no voting). */
-  positioning?: number
-  /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */
-  governor?: number
-  /** Baked governed centre for this size (anchor bake) — skips per-size anchor derivation.
-   *  Positions are shape features and scale linearly; re-measuring per size is mesh noise. */
-  centreOverrideMM?: Pt
-  /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
-  segmentsDetail?: 'full' | 'light'
-  /** Voting dominance order — which force rules, admin-picked; spec default when absent. */
-  votingOrder?: number
-  /** Per-size solve reuse for band walks — owned by the caller (the worker). */
-  solveCache?: Map<number, GridResult>
-  plan?: MagnetPlan
-  perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
-  /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
-  circle?: boolean
-}
-
-export interface GridResult {
-  anchors: Anchor[]
-  pitchCentreMM: number
-  /** Every lattice position at the chosen phase, seated or not. */
-  lattice: Pt[]
-  /** The phase the search chose, mm. */
-  phaseMM: Pt
-  /** Registration offset from the canonical phase, mm per axis — the pan class. */
-  panMM: Pt
-  /** The spot radius the erosion used — the padding, centre-measured. */
-  spotRadiusMM: number
-  /** Outline points where a disc touches (within one snap step of its margined edge). */
-  contactsMM: Pt[]
-  /** The legal area's islands with depth masses — what centring anchored on. */
-  segments: SafeSegment[]
-  /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
-  centresMM: Pt[]
-  /** THE centre that governed the winning layout — the main point of the centring system. */
-  centreMainMM: Pt
-}
-
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 
-const mod = (v: number, m: number) => ((v % m) + m) % m
 
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
-  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-  const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-  // Coverage reach from a magnet centre: the spot IS the allowance (flap deleted as a dupe).
-  const reach = spotRadiusOf(pad)
-  const plan = cfg.plan ?? 'all6'
-  const perimeterOnly = cfg.perimeterOnly ?? true
-  const outer = contourMM.outer.pts
-  const bb = bbox(outer)
-  const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
+  // Placement is layout's; this door only shapes the result the bench and the ladder read.
+  // Until the pipeline module exists (S3) this door sequences the units: segment measures, centring
+  // names the target, layout places. No unit reaches sideways for any of it.
+  const pad0 = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const r0 = spotRadiusOf(pad0)
+  const outer0 = contourMM.outer.pts
+  const bb0 = bbox(outer0)
+  const segments0 = safeSegments(outer0, r0, Math.max(r0, cfg.massDepthMM ?? MASS_DEPTH_MM), cfg.segmentsDetail ?? 'full')
+  const mode0 = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
+  const gov0 = (cfg.governor ?? GOVERNOR) as Governor
+  const centres0 = cfg.centreOverrideMM ? [cfg.centreOverrideMM] : centeringAnchors(mode0, segments0, [(bb0.minX + bb0.maxX) / 2, (bb0.minY + bb0.maxY) / 2], centroidOf(outer0))
+  const masses0 = segments0.flatMap((x) => (x.masses.length ? x.masses : [x]))
+  const midY0 = (bb0.minY + bb0.maxY) / 2
+  const ruleTarget0: Pt = cfg.centreOverrideMM ?? (mode0 === 2 ? (governMass(masses0, gov0, midY0)?.centreMM ?? centres0[0]) : centres0[0])
 
-  const fits = cfg.circle
-    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
-    : makeSeatPredicate(outer, spotRadiusOf(pad))
-
-  const massDepth = Math.max(spotRadiusOf(pad), cfg.massDepthMM ?? MASS_DEPTH_MM)
-  const segments = safeSegments(outer, spotRadiusOf(pad), massDepth, cfg.segmentsDetail ?? 'full')
-
-  // THE shape's centres — chosen by the centre-mode switch (logic's table). Every returned
-  // point anchors the slide walk; single-target modes also fix the balance target.
-  const mode = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
-  const positioning = cfg.positioning ?? POSITIONING
-  const governor = (cfg.governor ?? GOVERNOR) as Governor
-  const centres = cfg.centreOverrideMM ? [cfg.centreOverrideMM] : centeringAnchors(mode, segments, [cx, cy], centroidOf(outer))
-  // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
-  const allMasses = segments.flatMap((s) => (s.masses.length ? s.masses : [s]))
-  const midY = (bb.minY + bb.maxY) / 2
-  const ruleTarget: Pt = cfg.centreOverrideMM ?? (mode === 2 ? (governMass(allMasses, governor, midY)?.centreMM ?? centres[0]) : centres[0])
-
-  let bestSeated: Pt[] = []
-  let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
-  let mainCentre: Pt = centres[0]
-  if (fits && cfg.forcePhaseMM) {
-    // Manual calibration: seat exactly at the given registration, no search.
-    bestOx = mod(cfg.forcePhaseMM[0], pitch)
-    bestOy = mod(cfg.forcePhaseMM[1], pitch)
-    bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
-    bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
-    bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
-  } else if (fits && positioning === 1) {
-    // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
-    // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
-    // even count puts the GAP on it — so a 108x91 (class 2x2) shape is judged as a 2x2 frame
-    // whose centre IS the governed centre. Magnets still govern first: a parity seating more
-    // wins; at EQUAL seats the canonical frame parity always beats the rest, and coverage
-    // only sorts the non-canonical remainder. Centring is exact by construction.
-    const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
-    const half = pitch / 2
-    const clsOf = (side: number) => bandOf(side)?.id ?? BANDS[BANDS.length - 1].id
-    const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
-    const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
-    const otherX = canX === bxc ? bxc + half : bxc
-    const otherY = canY === byc ? byc + half : byc
-    // canon = how many axes carry their class-derived parity (2 = the full canonical frame).
-    const cands: Array<[number, number, number]> = [
-      [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
-    ]
-    let best: { seats: number; canon: number; excess: number } | null = null
-    for (const [px, py, canon] of cands) {
-      const ox = mod(px, pitch), oy = mod(py, pitch)
-      const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
-      if (!seat.length) continue
-      const excess = pressExcessMM(outer, seat, reach)
-      const wins = !best
-        || seat.length > best.seats
-        || (seat.length === best.seats && canon > best.canon)
-        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
-      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
-    }
-    mainCentre = ruleTarget
-  }
+  const { bb, pitch, reach, plan, perimeterOnly, outer, segments, centres, ruleTarget,
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, positioning } =
+    registerLayout(contourMM, cfg, { segments: segments0, centres: centres0, ruleTarget: ruleTarget0 })
 
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
 
@@ -192,7 +71,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     lattice,
     phaseMM: [bestOx, bestOy],
     panMM: [bestKx, bestKy],
-    spotRadiusMM: spotRadiusOf(pad),
+    spotRadiusMM: reach,
     segments,
     centresMM: positioning === 1 ? [ruleTarget] : centres,
     centreMainMM: mainCentre,

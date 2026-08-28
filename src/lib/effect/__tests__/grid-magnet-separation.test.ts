@@ -102,8 +102,12 @@ describe('2 — traffic is one-way', () => {
   const ALLOWED: Record<string, RegExp[]> = {
     'grid-magnet-spec.ts': [],
     'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/foundation\/[a-z-]+$/],
-    'grid-magnet-logic.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/units\/[a-z-]+$/],  // import allowed ONLY as the shim's own re-export; see the unit zone below
-    'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/],
+    'grid-magnet-logic.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/foundation\/[a-z-]+$/],
+    // grid-magnet.ts is the TEMPORARY PIPELINE seat until pipeline/ lands (S3): it sequences
+    // segment -> centring -> layout and shapes the result. Sequencing units is what a pipeline
+    // does, so this is the one file that may import them — and the unit zone still forbids any
+    // unit from importing back.
+    'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
   }
 
@@ -168,6 +172,7 @@ describe('2b — the units are self-sufficient', () => {
 
   it('a legacy file may only REACH a unit through a re-export, never an import', () => {
     for (const { file, text } of readModule()) {
+      if (file === 'grid-magnet.ts') continue   // the temporary pipeline seat — see its allow-list
       const bad: string[] = []
       walkAst(text, (n) => {
         if (!ts.isImportDeclaration(n)) return

@@ -10,7 +10,7 @@
 
 import type { BBox, Pt } from '../types'
 import { prepare, holds } from '@/lib/grid-engine/compute/geometry'
-import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from '../grid-magnet-spec'
+import { BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, type Band } from '../grid-magnet-spec'
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -233,4 +233,10 @@ export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
     return [mx / pts.length, my / pts.length]
   }
   return [sx / (3 * a2), sy / (3 * a2)]
+}
+
+/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
+export function bandOf(sizeMM: number): Band | null {
+  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
+  return null
 }
