@@ -90,7 +90,11 @@ describe('1 — the module is portable', () => {
 describe('2 — traffic is one-way', () => {
   const ALLOWED: Record<string, RegExp[]> = {
     'grid-magnet-spec.ts': [],
-    'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/],
+    // `./units/*` is the MIGRATION SEAM and nothing else: as each unit is extracted, this file
+    // becomes a re-export shim so no consumer changes in the same commit as the move. Traffic is
+    // still one-way (a retiring module reaching DOWN to a unit, never a unit reaching up), and both
+    // the shim and this entry die at cutover when the last consumer is repointed.
+    'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-logic.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/],
     'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/],
     'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
