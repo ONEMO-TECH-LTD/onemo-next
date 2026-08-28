@@ -8,7 +8,7 @@ artifact kept for traceability. If a file here disagrees with a live document, t
 | File | What it governs |
 |---|---|
 | `v3.5.6-pipeline-brief.md` | **The pipeline** — what it is, each step, what the classifier delivers |
-| `v3.5.6-pipeline.md` | Step 1 only — the unit sheet (Dan scoped it: *"document step 1 only"*, 08-25 17:04) |
+| `grid-lab-architecture.md` | The code structure and the staged refactor; owns the open questions and the classifier method |
 | `v3.5.6-current-brief.md` | The engine's product authority — the three laws, neutrality, safe area, Spec/module ownership, acceptance |
 
 > One caveat on `v3.5.6-current-brief.md`, recorded rather than edited: its §5 Fit contact policy
