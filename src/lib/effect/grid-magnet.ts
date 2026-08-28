@@ -10,10 +10,8 @@ import {
   MASS_DEPTH_MM,
   MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
-  PHASE_STEP_MM,
   POSITIONING,
   SNAP_STEP_MM,
-  VOTING_ORDER,
 } from './grid-magnet-spec'
 import {
   bbox,
@@ -25,7 +23,6 @@ import {
   latticeAt,
   makeCircleSeatPredicate,
   makeSeatPredicate,
-  pointInMass,
   safeSegments,
   spotRadiusOf,
   type SafeSegment,
@@ -35,10 +32,7 @@ import {
   assignSizes,
   bandOf,
   centeringAnchors,
-  centeringRef,
   governMass,
-  registrationScore,
-  type VotingOrder,
   type Anchor,
   type CentreMode,
   type Governor,
@@ -109,8 +103,6 @@ export interface GridResult {
 }
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
-/** Phase-dedupe key quantum — micron identity for slide phases, not a law value. */
-const QUANTUM_KEY_MM = 0.001
 
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
@@ -119,7 +111,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   // Coverage reach from a magnet centre: the spot IS the allowance (flap deleted as a dupe).
   const reach = spotRadiusOf(pad)
-  const phaseStep = Math.max(1, cfg.phaseStepMM ?? PHASE_STEP_MM)
   const plan = cfg.plan ?? 'all6'
   const perimeterOnly = cfg.perimeterOnly ?? true
   const outer = contourMM.outer.pts
@@ -185,68 +176,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
       if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
     }
     mainCentre = ruleTarget
-  } else if (fits) {
-    // Phases: ONE full ladder swept from the first centre, plus each further mass centre's
-    // EXACT slide (k=0) — the only slide of a second base the ladder doesn't already cover.
-    // Every mass-centred registration is sampled at ANY step size without multiplying the walk.
-    const phases = (bases: number[]): { p: number; k: number }[] => {
-      const out: { p: number; k: number }[] = []
-      const seen = new Set<number>()
-      const push = (p: number, k: number) => {
-        const id = Math.round(p / QUANTUM_KEY_MM)
-        if (!seen.has(id)) { seen.add(id); out.push({ p, k }) }
-      }
-      for (let k = 0; k < pitch; k += phaseStep) push(mod(bases[0] + k, pitch), k)
-      for (let i = 1; i < bases.length; i++) push(mod(bases[i], pitch), 0)
-      return out
-    }
-    // TWO-PASS SWEEP — same winner, a fraction of the work. Seat count sits on the top
-    // dominance tier for every voting order that begins with magnets, so a slide below the
-    // maximum count can never win: pass 1 counts seats per slide (cheap); pass 2 runs the
-    // full scoring ONLY over the max-count slides, in the same iteration order, so winner
-    // and tie-breaks are identical to the single-pass sweep. Orders that put another force
-    // on top take the exact single-pass road instead.
-    const pyList = phases(centres.map((a) => a[1] - bb.minY))
-    const pxList = phases(centres.map((a) => a[0] - bb.minX))
-    // Legality memo — every grid point is judged once; pass 2 re-reads, never re-measures.
-    const memo = new Map<number, boolean>()
-    const fitsM = (p: Pt): boolean => {
-      // Micron identity — exact for any phase source, fractional mass centres included.
-      const k = Math.round((p[0] - bb.minX) / QUANTUM_KEY_MM) * 2097152 + Math.round((p[1] - bb.minY) / QUANTUM_KEY_MM)
-      const hit = memo.get(k)
-      if (hit !== undefined) return hit
-      const v = fits(p)
-      memo.set(k, v)
-      return v
-    }
-    let maxCount = 0
-    const counts = new Int32Array(pyList.length * pxList.length)
-    for (let yi = 0; yi < pyList.length; yi++) for (let xi = 0; xi < pxList.length; xi++) {
-      let n = 0
-      for (const p of latticeAt(bb, pitch, pxList[xi].p, pyList[yi].p)) if (fitsM(p)) n++
-      counts[yi * pxList.length + xi] = n
-      if (n > maxCount) maxCount = n
-    }
-    let bestScore = -Infinity
-    for (let yi = 0; yi < pyList.length; yi++) {
-      const py = pyList[yi]
-      for (let xi = 0; xi < pxList.length; xi++) {
-        if (counts[yi * pxList.length + xi] !== maxCount) continue
-        const px = pxList[xi]
-        const seat = latticeAt(bb, pitch, px.p, py.p).filter(fitsM)
-        if (!seat.length) continue
-        const excess = pressExcessMM(outer, seat, reach)
-        // Balance target: mode 2 → the smallest mass that holds a seat governs (logic's rule),
-        // containment against the mass's real outline; other modes → the mode's single centre.
-        const ref = mode === 2 ? centeringRef(segments, seat, pointInMass, governor, midY) : null
-        const inRef = ref ? seat.filter((p) => pointInMass(p, ref)) : seat
-        const [tx, ty] = ref ? ref.centreMM : centres[0]
-        let sx = 0, sy = 0; for (const p of inRef) { sx += p[0]; sy += p[1] }
-        const balance = Math.hypot(sx / inRef.length - tx, sy / inRef.length - ty)
-        const score = registrationScore(seat.length, excess, balance, cfg.votingOrder as VotingOrder | undefined)
-        if (score > bestScore) { bestScore = score; bestSeated = seat; bestOx = px.p; bestOy = py.p; bestKx = px.k; bestKy = py.k; mainCentre = [tx, ty] }
-      }
-    }
   }
 
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)

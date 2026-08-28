@@ -3,18 +3,14 @@
 import type { Pt } from './types'
 
 // Moved to units/centring.ts and types.ts (S2). Re-exported so no consumer changes in the move.
-export { governMass, centeringAnchors, centeringRef, anchorBakeOf, anchorFromBake } from './units/centring'
+export { governMass, centeringAnchors, anchorBakeOf, anchorFromBake } from './units/centring'
 export type { AnchorBake } from './types'
 export type { CentreMode, Governor } from './types'
 import {
-  BALANCE_WEIGHT,
   BANDS,
-  FLAP_WEIGHT,
   MAGNET_DIA_LARGE_MM,
   MAGNET_DIA_SMALL_MM,
   MIN_ANCHORS,
-  SEAT_WEIGHT,
-  VOTING_ORDER,
 } from './grid-magnet-spec'
 import { bbox, splitPerimeter } from './grid-magnet-compute'
 import type { Band } from './grid-magnet-spec'
@@ -29,21 +25,6 @@ export type MagnetPlan = 'all6' | 'all8' | 'corners8'
 export type MagnetDia = typeof MAGNET_DIA_SMALL_MM | typeof MAGNET_DIA_LARGE_MM
 
 export interface Anchor { p: Pt; dia: MagnetDia }
-
-/** Magnet count always governs — it is the band's step axis (Dan). The order only decides
- *  which force places the layout among equal counts: press-the-discs first, or centre first. */
-export type VotingOrder = 0 | 1
-const ORDERS: ReadonlyArray<readonly [number, number]> = [
-  [FLAP_WEIGHT, BALANCE_WEIGHT], // magnets > wrap (press) > centring — default
-  [BALANCE_WEIGHT, FLAP_WEIGHT], // magnets > centring > wrap (press)
-]
-export function registrationScore(
-  seats: number, pressMM: number, balanceMM: number, order?: VotingOrder,
-): number {
-  const [pw, bw] = ORDERS[order ?? (VOTING_ORDER as VotingOrder)] ?? ORDERS[0]
-  return seats * SEAT_WEIGHT - pressMM * pw - balanceMM * bw
-}
-
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */
 export function applyCoverage(

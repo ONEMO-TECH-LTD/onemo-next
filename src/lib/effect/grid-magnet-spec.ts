@@ -53,12 +53,6 @@ export const PHASE_STEP_FLOOR_MM = 1
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
-/** Voting dominance tiers — strict: the top force always beats the next, never blends.
- *  VOTING_ORDER picks which force sits on which tier (0 = magnets > wrap > centring). */
-export const SEAT_WEIGHT = 100000
-export const FLAP_WEIGHT = 100
-export const BALANCE_WEIGHT = 1
-export const VOTING_ORDER = 0
 
 /** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
  *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
@@ -68,7 +62,7 @@ export const MASS_DEPTH_CEIL_MM = 24
 
 /** Positioning law — 0 voting (count/centring/coverage compete across swept slides) ·
  *  1 centre rules (grid locked to the centre by parity; seats pick among 4 parity slides). */
-export const POSITIONING = 0
+export const POSITIONING = 1
 
 /** Governor — which mass rules in Masses mode: 0 smallest · 1 deepest · 2 top (gravity) ·
  *  3 top-small (upper-half smallest, else topmost). */

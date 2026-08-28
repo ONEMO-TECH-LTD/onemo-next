@@ -68,25 +68,6 @@ export function centeringAnchors(
 }
 
 /**
- * The centring target — Dan's rule: THE SMALLEST MASS THAT HOLDS A MAGNET GOVERNS; the grid
- * centres on its deepest point. The roomy masses adapt; an unused sliver can never hijack.
- * Null when no seated magnet lands in any mass — the caller falls back to the box centre.
- */
-export function centeringRef(
-  segments: ReadonlyArray<SafeSegment>, seated: ReadonlyArray<Pt>,
-  inMass: (p: Pt, mass: { bbox: SafeSegment['bbox']; rings: Pt[][] }) => boolean,
-  governor: Governor,
-  midY?: number,
-): { centreMM: Pt; bbox: SafeSegment['bbox']; rings: Pt[][] } | null {
-  const holding: Array<{ areaMM2: number; centreMM: Pt; peakClearMM: number; bbox: SafeSegment['bbox']; rings: Pt[][] }> = []
-  for (const seg of segments) {
-    const masses = seg.masses.length ? seg.masses : [seg]
-    for (const m of masses) if (seated.some((p) => inMass(p, m))) holding.push(m)
-  }
-  return governMass(holding, governor, midY)
-}
-
-/**
  * ANCHOR BAKE (Dan, 2026-08-25: "measure the centre once and stick to it — unless size truly
  * moves the inner area's centre"). A centre is a property of the SHAPE: mass deep-points, the
  * box centre, the centroid and the global deep point are fixed relative features and scale

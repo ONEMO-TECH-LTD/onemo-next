@@ -1,12 +1,11 @@
 // grid-magnet-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
-import type { BBox, Contour, Pt } from './types'
+import type { Contour, Pt } from './types'
 import { edgeDistMM } from './foundation/geometry'
 
 // Moved to foundation/geometry.ts (S2 step 1). Re-exported so no consumer changes in the move.
 export { bbox, spotRadiusOf, fieldSpanMM, latticeAt, latticeOver, makeSeatPredicate,
   makeCircleSeatPredicate, centroidOf } from './foundation/geometry'
-import { pointInPolygon } from './attachment'
 
 // Moved to units/segment.ts (S2). Re-exported so every existing consumer is untouched by the move;
 // callers are repointed at the unit in a later commit, not this one.
@@ -61,13 +60,6 @@ export function contactPointsMM(
     out.push(best)
   }
   return out
-}
-
-/** Is a point inside a mass's real outline? Box prescreen, then the traced ring. */
-export function pointInMass(p: Pt, mass: { bbox: BBox; rings: Pt[][] }): boolean {
-  if (p[0] < mass.bbox.minX || p[0] > mass.bbox.maxX || p[1] < mass.bbox.minY || p[1] > mass.bbox.maxY) return false
-  if (!mass.rings.length) return true
-  return mass.rings.some((ring) => pointInPolygon(p, ring as Pt[]))
 }
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
