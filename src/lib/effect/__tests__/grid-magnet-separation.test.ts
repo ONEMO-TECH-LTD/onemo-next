@@ -90,7 +90,7 @@ describe('1 — the module is portable', () => {
 describe('2 — traffic is one-way', () => {
   const ALLOWED: Record<string, RegExp[]> = {
     'grid-magnet-spec.ts': [],
-    'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/],
+    'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-logic.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/units\/[a-z-]+$/],  // import allowed ONLY as the shim's own re-export; see the unit zone below
     'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/],
     'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
@@ -164,6 +164,29 @@ describe('2b — the units are self-sufficient', () => {
         if (/^\.\/units\//.test(spec)) bad.push(spec)
       })
       expect(bad, `${file} IMPORTS a unit (only \`export … from './units/x'\` is the shim): ${bad.join(' · ')}`).toEqual([])
+    }
+  })
+})
+
+describe('2c — the foundation holds primitives only', () => {
+  const FOUNDATION = join(LIB, 'foundation')
+  const foundationFiles = (): string[] =>
+    existsSync(FOUNDATION) ? readdirSync(FOUNDATION).filter((f) => f.endsWith('.ts')) : []
+  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/]
+
+  it('imports nothing but shared types, spec and the repo-wide geometry kernel', () => {
+    for (const f of foundationFiles()) {
+      const bad = importsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
+        .filter((i) => !FOUNDATION_ALLOWED.some((rx) => rx.test(i)))
+      expect(bad, `foundation/${f} reaches outside its allow-list: ${bad.join(' · ')}`).toEqual([])
+    }
+  })
+
+  it('never reaches a unit or a retiring aggregate', () => {
+    for (const f of foundationFiles()) {
+      const bad = importsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
+        .filter((i) => /\/units\/|grid-magnet-(compute|logic|class|bridge)$/.test(i))
+      expect(bad, `foundation/${f} depends on something above it: ${bad.join(' · ')}`).toEqual([])
     }
   })
 })
