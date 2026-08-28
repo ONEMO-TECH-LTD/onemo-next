@@ -20,7 +20,7 @@ completion**:
 
 - **AUTHORISED BUILD — S1–S4 only.** Delete provably dead code, move proven bodies to their owners,
   expose one headless pipeline and the shell seam, complete the classifier. This makes the selected
-  internals callable. **It does not complete the engine**, and nothing in it may be reported as done.
+  internals callable. **It does not complete the engine**, and completing S1–S4 may not be reported as engine completion.
 - **DEFERRED — S5–S9, not authorised and not planned in this build.** The cutover deletion, then the
   judge, layout populations, centring table, Spec/admin authority and the acceptance run. These titles
   exist only to show what S1–S4 must not make harder. No S5–S9 code, decomposition, acceptance claim
@@ -188,9 +188,14 @@ real bench. The generic buckets and the old door are **not** deleted here.
 `units/{segment,classifier,centring,layout,wrap,judge}/`, `pipeline/`, `adapters/`. No other folder,
 facade, registry, harness, audit module or gate file.
 
-**May edit or move bodies from** — the nine `grid-magnet*` modules, `types.ts` for shared vocabulary
-only, the three `grid-centre` shell files (solely to consume the adapter, render the trace and keep the
-worker to transport), and the two existing test files in place. Moves obey L6: proven bodies are
+**May edit or move bodies from** — these files and no others:
+`src/lib/effect/grid-magnet-spec.ts` · `grid-magnet-compute.ts` · `grid-magnet-logic.ts` ·
+`grid-magnet.ts` · `grid-magnet-wrap-compute.ts` · `grid-magnet-class.ts` · `grid-magnet-bridge.ts` ·
+`grid-magnet-library-catalogue.ts` · `grid-magnet-library-bridge.ts` · `types.ts` (shared vocabulary
+only) · `src/app/(dev)/effect-creator/grid-centre/page.tsx` · `LibraryPanel.tsx` · `solve.worker.ts`
+(solely to consume the adapter, render the trace and keep the worker to transport) ·
+`src/lib/effect/__tests__/grid-magnet-separation.test.ts` ·
+`src/lib/effect/__tests__/catalogue-solver-oracle.test.ts`. Moves obey L6: proven bodies are
 byte-identical apart from import plumbing. Behaviour changes are limited to hole preservation, the
 common fallback path, the y-flip and classifier corrections, and the shell-to-adapter seam.
 
@@ -286,96 +291,25 @@ Two named defects close here or the stage is not done: **4 of 38 rectangle recor
 catch — and the **`round` family reaches nothing** (a pill classifies as `square`), which the enum's
 deletion resolves by making the catalogue's own classes the answer.
 
-**S5 · Cut over and delete — DEFERRED, not authorised in this build.** Once every production caller has moved: delete `grid-magnet.ts`,
-the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
-24/48/96, real cutouts, every centre mode, every band, manual, then verify the live surface.
-Held back deliberately: the old door stays alive until the new path is proven on the bench, so nothing
-is removed before its replacement has run. **This was never the acceptance run** — §12 closes at S9.
+**S5 · Cutover — DEFERRED.** Retire the old door and the generic buckets once the replacement is
+authorised and proven on the bench.
 
 ---
 
-## DEFERRED — what completion still requires (not authorised, not planned here)
+## DEFERRED — the later stages, titles and ownership only
 
-Every stage below is a requirement already written in Dan's briefs, mapped to the unit that owns it.
-None is new scope.
+Listed so S1–S4 cannot make them harder. **Not authorised, not planned, not decomposed here** — the
+requirements themselves live in `v3.5.6-pipeline-brief.md` §2 and `v3.5.6-current-brief.md` §12, which
+are their one home.
 
-**S6 · Judge, complete.** Today's judge ranks by **unheld area** — `unheldPct`, `areaMM2` in the band
-ladder — which is on the brief's dead list by name: it ranked Dan's correct 143mm duck *below* the wrong
-125mm one. The brief's STEP 5 is six ordered elements and only one of them is anywhere in the plan:
+**S6 · Judge completion — DEFERRED.** Owns the ruled judge and the manufacturing laws.
 
-1. the **96mm perimeter law** as an **arc** along the outline, never an area, with the 1–2 magnet
-   exception judged by centring/balance;
-2. **gravity first** — the upper mass pinned before anything below; a pair across the width, not one
-   magnet mid-mass;
-3. **segment-edge priority** — no segment or edge left unprotected;
-4. **coverage dominance** — at the same size, the layout holding more wins;
-5. **best class match** — native catalogue layout > repaired > discovery;
-6. **landing** — fewest magnets that satisfy everything, then least shift, every other lawful result
-   still offered.
+**S7 · Layout and centring completion — DEFERRED.** Owns populations, spacing, and the class-to-centring
+policy.
 
-Plus two hard constraints: **the count is exact, never silently dropped** in the solver (the frame and
-size move to deliver N; the interior is never filled to make up the number), and **perimeter is the
-manufacturing default**, whose subtractive count-drop is correct behaviour.
-*Done when:* unheld-area ranking is deleted, the duck returns Dan's own answers (below), and every
-lawful result is still offered rather than filtered.
+**S8 · Spec/admin authority — DEFERRED.** Owns the Spec → control → consumer trace.
 
-**S7 · Layout and centring, complete.**
-*Layout:* populations are `full · perimeter · corners`, with perimeter carrying its spacing mode
-`48 · 96 · custom`. Today the code has a `perimeterOnly` boolean and no `corners` population or spacing
-mode at all. The Clipper subtraction stays the **repair** — the class is the guard.
-*Centring:* the class → centring-mode table wired (**OQ2**), and the four centring rules enforced as
-one procedure — group centre on the shape centroid, wrap from there, shift only the minimum a lawful
-tighter wrap demands, prefer the tight solution closest to the centroid. The derived-centre proposal
-(one mass → its own centre; several → the governed top mass) lands here if Dan rules it.
-
-**S8 · Spec and admin are the only configuration authority** (`v3.5.6-current-brief.md` §8). Every
-result-affecting value lives in Spec, is exposed by an admin control, and is traced Spec → control →
-live consumer. Any hidden constant found gets the smallest control and the same wiring. The spec is 80
-lines today and the bench renders 14 controls; that ratio has never been audited, and §12 clause 4 makes
-the trace an acceptance condition.
-
-**S9 · Acceptance — §12, the closing gate.** The build is complete only when all seven hold: automatic
-search finds every layout Dan can produce manually with the same controls · every distinct lawful result
-across bands is shown · flat/equal and every exposed scoring configuration behave as ruled with no hidden
-filtering · every result-affecting value is traceable from Spec to a control to a consumer · manual,
-free, automatic and band give the same candidate the same verdict · real cutouts, holes, every centre
-mode, every Fit mode, every band and manual registration are exercised · the live tab runs with no hidden
-recomputation or runtime errors.
-
-**And the picture, not the analysis** — Dan's duck, his own acceptance evidence: **3 magnets → the third
-in the head at ~143mm**, not the neck at 125 · **4 → a pair per mass at ~147mm** · **6 → three stacked
-pairs at ~192mm**, waist row skipped.
-
-### The classifier method
-
-Exact ruled facts filter — the axis pair both sides carry. Then remove only candidates **dominated
-on every continuous fact** (fill *and* aspect): a Pareto frontier, not a priority order. One
-surviving class → decided; several → **ambiguous, every tied class named in the trace**.
-
-```ts
-fillError   = |candidate.fill - query.fill|
-aspectError = |candidate.widthMM / candidate.heightMM - query.widthMM / query.heightMM|
-```
-
-*Why not "fill, then aspect":* a lexicographic order is a ranking policy I would be inventing, and it
-was never ruled.
-
-**Measured over all 163 records, my own probe, matching QA's independently:**
-
-| pitch | decided | ambiguous | missed |
-|---|---|---|---|
-| 24 mm | 139 | 24 | 0 |
-| **48 mm** | **163** | **0** | **0** |
-| 96 mm | 151 | 12 | 0 |
-
-Every ambiguity is diamond↔triangle; no square/rectangle confusion, no misses at any pitch. These
-numbers prove self-classification on the corpus only; they do not predict accuracy on an arbitrary
-cutout.
-
-**The standing audit, per entry, at 24/48/96:** its own id stays a candidate · its own class stays
-in the result · no wrong decided class · no miss · ambiguity explicit and complete.
-*123-of-163 is a baseline, not the acceptance contract.*
-
+**S9 · Product acceptance — DEFERRED.** Owns the acceptance contract and Dan's live evidence.
 ---
 
 ## 5 · Open — Dan's calls
@@ -398,21 +332,6 @@ then, and only a genuine product choice found by that read comes back to you.
 allowed.
 
 **OQ6 · Control wording** — degrees everywhere, or portrait/landscape stays on the rectangle.
-
-**OQ7 · Are the Fit modes live?** *(Deferred — gates the acceptance stage, never this build.)* `v3.5.6-current-brief.md` §5 names `group | single | double | most |
-all` as the admin-selected Fit mode, and §12 clause 6 makes exercising **all Fit modes** an acceptance
-condition. Measured: **none of them exists in the code** — zero matches in the engine. The Clipper exact
-wrap solves the tightest size a fixed group fits, so contact is a *result*, not a selection, and the flap
-those modes were judged with is deleted (*"the disk IS the allowance"*). Either the exact wrap supersedes
-them and §12 clause 6 drops the phrase, or they are real product inputs that must be built. I will not
-decide which — one route deletes a written acceptance condition, the other adds a control surface.
-
-**OQ8 · What is scoring mode in the new engine?** *(Deferred — gates the acceptance stage, never this
-build.)* §7 requires **both** flat/equal (all laws equal, every
-lawful result visible) **and** every exposed scoring configuration to behave as ruled — and §12 clause 3
-makes that an acceptance condition. Voting and its weights are deleted at S1 as the superseded
-mechanism. So either scoring is the judge's ordering in S6 made admin-selectable, or scoring mode is dead
-and §7/§12 lose that clause. Also Dan's, for the same reason.
 
 **Settled, removed from this list:** current-size erosion (already universal) · the 96mm arc (a law
 in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
