@@ -107,8 +107,10 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 **Consumers checked:**
 
 - `bandSnapPoints` — **zero consumers.** Dead export.
-- `fitSizeInBand` / `bandWalk` / `maxPressMM` — **LIVE.** `grid-centre/solve.worker.ts` calls them
-  through `bandFit` for the empty-band fallback and the non-positioning path. Not deletable yet.
+- `fitSizeInBand` / `bandWalk` / `maxPressMM` — live at exactly **two** touchpoints, both relics:
+  the empty-band fallback, and the idle prefetcher warming caches for a path that never runs. The
+  page hardcodes `positioning: 1` with no control to change it, so the worker's non-positioning
+  branch is **unreachable**. Once the fallback is rebuilt (stage 2) the whole chain has no caller.
 - voting scorer + weights, `centeringRef`, `pointInMass` — reachable only via `positioning !== 1`.
 - `wrap()`, `wrapFlap`, `unheldOf` — only the two benches being deleted.
 - **Survive:** `pressExcessMM` (centre-rules tie-break), `makeCircleSeatPredicate` (circle preset),
@@ -126,15 +128,29 @@ Freeze current live results first: four classes, every band, manual phase and si
 fallback. Then delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer
 trace, and delete only symbols whose last production caller went with them — the voting scorer and
 its weights, `centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
-**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM`** until the pipeline replaces their live behaviour.
-No behaviour change inside a structural deletion.
+**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — not because they earn a
+place, but because a structural deletion must not change behaviour. They are replaced and deleted in
+stage 2.
 *Done when:* the frozen results reproduce exactly.
 
-**Stage 2 · Move bodies to owners.** Foundation, segment, centring, layout, wrap, judge — existing
-bodies moved, not rewritten. `applyCoverage` → layout (it changes the population). `assignSizes` →
-adapters (it shapes output). The wrap module drops its six rebuilt primitives and its false header.
-Land the derived-zone import matrix in the same commit.
-*Done when:* the frozen results still reproduce, and a unit→unit import fails the suite.
+**Stage 2 · Move bodies to owners, and rebuild the fallback as a verdict.** Foundation, segment,
+centring, layout, wrap, judge — existing bodies moved, not rewritten. `applyCoverage` → layout (it
+changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
+rebuilt primitives and its false header. Land the derived-zone import matrix in the same commit.
+
+**The empty band is a judge verdict, not an escape hatch.** Today an empty band falls back into the
+old walk and shows the size that seats the most magnets, loose — the rigid gate and band-only wrap
+Dan outlawed, kept alive to avoid a blank screen. Replaced by the pipeline answering with the same
+solver it always uses: when a band yields no offer, widen the reveal to the full size range and
+report **"no offer in this band — the nearest lawful offer is N⌾ at X mm, which belongs to band Y."**
+Same law, same wrap, no old machinery, and a more useful answer than a loose shape. Cost is honest:
+the wide scan is ~8× the reveal solves of one band, so it runs **only** when the band comes back
+empty — which is exactly when it is needed.
+
+With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
+no caller and are deleted in this stage.
+*Done when:* the frozen results still reproduce, the empty band reports its nearest offer, and a
+unit→unit import fails the suite.
 
 **Stage 3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
 `manual | band | automatic` — changes *candidate enumeration only*; segment, class, centre, layout,
@@ -185,7 +201,9 @@ in the result · no wrong decided class · no miss · ambiguity explicit and com
 in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
 (authorised: *"finish properly wiring and completing the classifier the pipeline and run it"*) ·
 the y-flip (a technical defect I fix before whole-catalogue activation, not a sequencing question
-for Dan) · the empty-band fallback (preserved until a product ruling changes it).
+for Dan) · the empty-band fallback (**rebuilt** as a judge verdict on the new solver, not inherited
+from the walk — Dan, this session: a fallback is either a declared verified alternative or it is
+built on the new architecture).
 
 ---
 
