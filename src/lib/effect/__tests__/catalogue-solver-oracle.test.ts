@@ -17,9 +17,25 @@ import { describe, expect, it } from 'vitest'
 import { catalogue, type CatalogueEntry } from '../library/catalogue'
 import { computeGrid } from '../grid-magnet'
 import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
+import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 import type { Pt } from '../types'
 
-const key = (p: readonly number[]) => Math.round(p[0]) + ',' + Math.round(p[1])
+/** Agreement is judged at the MANUFACTURING tolerance, not the nearest millimetre. Rounding to
+ *  whole mm let a solver anchor sit 0.4mm off and still read as a match — the same class of
+ *  error as hand-rounding a diamond corner from 16.971 to 17, which is exactly what this oracle
+ *  exists to catch. */
+const agrees = (a: readonly number[], b: readonly number[]) =>
+  Math.abs(a[0] - b[0]) <= MANUFACTURING_TOLERANCE_MM && Math.abs(a[1] - b[1]) <= MANUFACTURING_TOLERANCE_MM
+const missingFrom = (
+  seated: readonly Pt[], certified: readonly (readonly [number, number])[],
+): string[] => certified
+  .filter((want) => !seated.some((got) => agrees(got, want)))
+  .map(([x, y]) => x.toFixed(3) + ',' + y.toFixed(3))
+
+/** One case is one record AT one pitch. Keying the open set by bare id made a record that fails
+ *  at 24 only indistinguishable from one failing at all three, so closing two pitches changed
+ *  nothing. */
+const caseId = (id: string, pitchMM: number) => id + '@' + pitchMM
 
 /** The lattice is laid over the outline's bounding box, so the registration that reproduces a
  *  certified layout is that layout's own offset from the box corner — exactly, never rounded:
@@ -32,7 +48,7 @@ const seatedAt = (entry: CatalogueEntry, pitchMM: number, paddingMM = RELEASED_P
     pitchMM, paddingMM, perimeterOnly: false,
     forcePhaseMM: [phase(entry.nodesMM[0][0] - minX), phase(entry.nodesMM[0][1] - minY)] as Pt,
   })
-  return new Set(grid.anchors.map((a) => key(a.p)))
+  return grid.anchors.map((a) => a.p)
 }
 
 /** The records this oracle does not yet reproduce, pinned by EXACT ID in a checked-in fixture.
@@ -46,17 +62,16 @@ const seatedAt = (entry: CatalogueEntry, pitchMM: number, paddingMM = RELEASED_P
  *  transformed view. Open engine finding, not a library defect. */
 const OPEN: readonly string[] = JSON.parse(
   readFileSync(join(__dirname, 'fixtures/solver-oracle-open.v1.json'), 'utf8')) as string[]
-const isOpen = (entry: CatalogueEntry) => OPEN.includes(entry.id)
+const isOpen = (entry: CatalogueEntry, pitchMM: number) => OPEN.includes(caseId(entry.id, pitchMM))
 
 describe('the certified catalogue is the oracle the generator answers to', () => {
   it('the engine accepts every certified disk, at every supported pitch', () => {
     const rejected: string[] = []
     let checked = 0
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
-      if (isOpen(entry)) continue
+      if (isOpen(entry, pitchMM)) continue
       checked++
-      const seated = seatedAt(entry, pitchMM)
-      const missing = [...new Set(entry.nodesMM.map(key))].filter((k) => !seated.has(k))
+      const missing = missingFrom(seatedAt(entry, pitchMM), entry.nodesMM)
       if (missing.length) rejected.push(`@${pitchMM} ${decodeURIComponent(entry.id)} missing ${missing.join(' ')}`)
     }
     expect(checked).toBeGreaterThan(200)
@@ -65,22 +80,26 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
 
   it('the open set is exactly what still disagrees — no more, and no fewer', () => {
     const failing: string[] = []
-    for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
-      const seated = seatedAt(entry, pitchMM)
-      if (![...new Set(entry.nodesMM.map(key))].every((k) => seated.has(k))) failing.push(entry.id)
-    }
-    expect([...new Set(failing)].sort()).toEqual([...OPEN].sort())
-    // every open id is a real record, and every one is a transformed view — the shape of the gap
-    for (const id of OPEN) {
-      expect(catalogue(48).some((e) => e.id === id), id).toBe(true)
-      expect(id.endsWith('/n/n/n'), id).toBe(false)
+    for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM))
+      if (missingFrom(seatedAt(entry, pitchMM), entry.nodesMM).length)
+        failing.push(caseId(entry.id, pitchMM))
+    expect(failing.sort()).toEqual([...OPEN].sort())
+    // every open case is a real record at a supported pitch, and every one is a y-flipped view
+    for (const open of OPEN) {
+      const at = open.lastIndexOf('@')
+      const id = open.slice(0, at), pitchMM = Number(open.slice(at + 1))
+      expect([24, 48, 96]).toContain(pitchMM)
+      expect(catalogue(pitchMM).some((e) => e.id === id), open).toBe(true)
+      expect(id.endsWith('y'), open).toBe(true)
     }
   }, 120_000)
 
   it('the oracle can fail: a certified disk moved off the lattice is rejected', () => {
     const entry = catalogue(48).find((e) => e.id === 'square/box/3x3/full/n/n/n')!
     const moved = { ...entry, nodesMM: [[entry.nodesMM[0][0] + 7, entry.nodesMM[0][1]], ...entry.nodesMM.slice(1)] } as CatalogueEntry
-    const seated = seatedAt(moved, 48)
-    expect([...new Set(moved.nodesMM.map(key))].every((k) => seated.has(k))).toBe(false)
+    expect(missingFrom(seatedAt(moved, 48), moved.nodesMM)).not.toEqual([])
+    // and a sub-millimetre drift is caught too — whole-mm rounding hid 0.4mm
+    const drifted = { ...entry, nodesMM: [[entry.nodesMM[0][0] + 0.4, entry.nodesMM[0][1]], ...entry.nodesMM.slice(1)] } as CatalogueEntry
+    expect(missingFrom(seatedAt(entry, 48), drifted.nodesMM)).not.toEqual([])
   })
 })
