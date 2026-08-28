@@ -68,3 +68,9 @@ excludes `_WIP` entirely.
 So this looks like ~148 MB of tracked dead weight, half of it an accidental duplicate. Removing tracked
 binaries is a deletion of committed data, so it waits on Dan's word rather than being swept in with a
 documentation tidy.
+
+- **`v3.5.6/v3.5.6-pipeline.md`** — the step-1 unit sheet (08-25). Superseded by
+  `v3.5.6-pipeline-brief.md` (the pipeline) and `grid-lab-architecture.md` (the code structure).
+  Archived because it actively contradicts them: it names the family enum `square · round · triangle`
+  and marks both `shapeFamilyOf` and the classifier panel **done** — the hardcoded families with their
+  invented `fill < 0.68` are being deleted, and the decision trace is not built.

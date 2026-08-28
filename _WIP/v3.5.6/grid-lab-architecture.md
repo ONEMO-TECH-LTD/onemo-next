@@ -5,9 +5,7 @@
 `grid-core.ts`, the `grid-lab` route) — a separate public door. Naming both "Grid Lab" is how the
 studio integrates the wrong one.
 
-Target structure and the staged plan to reach it. Not yet true of the code. Written after a full
-read of the engine, then revised against an independent architecture review (findings F1–F10, all
-reproduced at source before acceptance).
+Target structure and the staged plan to reach it. Not yet true of the code.
 
 **The product pipeline it serves** — what each step delivers and what the classifier owes — is
 `v3.5.6-pipeline-brief.md`. This document is the code structure only.
