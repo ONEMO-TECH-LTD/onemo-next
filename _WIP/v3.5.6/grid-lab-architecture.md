@@ -188,14 +188,26 @@ real bench. The generic buckets and the old door are **not** deleted here.
 `units/{segment,classifier,centring,layout,wrap,judge}/`, `pipeline/`, `adapters/`. No other folder,
 facade, registry, harness, audit module or gate file.
 
-**May edit or move bodies from** — these files and no others:
-`src/lib/effect/grid-magnet-spec.ts` · `grid-magnet-compute.ts` · `grid-magnet-logic.ts` ·
-`grid-magnet.ts` · `grid-magnet-wrap-compute.ts` · `grid-magnet-class.ts` · `grid-magnet-bridge.ts` ·
-`grid-magnet-library-catalogue.ts` · `grid-magnet-library-bridge.ts` · `types.ts` (shared vocabulary
-only) · `src/app/(dev)/effect-creator/grid-centre/page.tsx` · `LibraryPanel.tsx` · `solve.worker.ts`
-(solely to consume the adapter, render the trace and keep the worker to transport) ·
-`src/lib/effect/__tests__/grid-magnet-separation.test.ts` ·
-`src/lib/effect/__tests__/catalogue-solver-oracle.test.ts`. Moves obey L6: proven bodies are
+**May edit or move bodies from** — these fifteen files and no others:
+
+- `src/lib/effect/grid-magnet-spec.ts`
+- `src/lib/effect/grid-magnet-compute.ts`
+- `src/lib/effect/grid-magnet-logic.ts`
+- `src/lib/effect/grid-magnet.ts`
+- `src/lib/effect/grid-magnet-wrap-compute.ts`
+- `src/lib/effect/grid-magnet-class.ts`
+- `src/lib/effect/grid-magnet-bridge.ts`
+- `src/lib/effect/grid-magnet-library-catalogue.ts`
+- `src/lib/effect/grid-magnet-library-bridge.ts`
+- `src/lib/effect/types.ts` — shared vocabulary only
+- `src/app/(dev)/effect-creator/grid-centre/page.tsx`
+- `src/app/(dev)/effect-creator/grid-centre/LibraryPanel.tsx`
+- `src/app/(dev)/effect-creator/grid-centre/solve.worker.ts`
+- `src/lib/effect/__tests__/grid-magnet-separation.test.ts`
+- `src/lib/effect/__tests__/catalogue-solver-oracle.test.ts`
+
+The three shell files may change **only** to consume the adapter, render the trace, and keep the worker
+to transport and cache. Moves obey L6: proven bodies are
 byte-identical apart from import plumbing. Behaviour changes are limited to hole preservation, the
 common fallback path, the y-flip and classifier corrections, and the shell-to-adapter seam.
 
@@ -291,6 +303,33 @@ Two named defects close here or the stage is not done: **4 of 38 rectangle recor
 catch — and the **`round` family reaches nothing** (a pill classifies as `square`), which the enum's
 deletion resolves by making the catalogue's own classes the answer.
 
+### The classifier method
+
+Exact ruled facts filter — the axis pair both sides carry. Then remove only candidates **dominated on
+every continuous fact** (fill *and* aspect): a Pareto frontier, not a priority order. One surviving
+class → decided; several → **ambiguous, every tied class named in the trace**.
+
+```ts
+fillError   = |candidate.fill - query.fill|
+aspectError = |candidate.widthMM / candidate.heightMM - query.widthMM / query.heightMM|
+```
+
+A lexicographic "fill, then aspect" order is forbidden: it invents a ranking policy that was never ruled.
+
+**Measured over all 163 records, two independent probes agreeing:**
+
+| pitch | decided | ambiguous | missed |
+|---|---:|---:|---:|
+| 24 mm | 139 | 24 | 0 |
+| **48 mm** | **163** | **0** | **0** |
+| 96 mm | 151 | 12 | 0 |
+
+Every ambiguity is diamond↔triangle; no square/rectangle confusion, no misses at any pitch. These
+numbers prove self-classification on the corpus only; they predict nothing about an arbitrary cutout.
+
+**The standing audit, per entry, at 24/48/96:** its own id stays a candidate · its own class stays in
+the result · no wrong decided class · no miss · ambiguity explicit and complete.
+
 **S5 · Cutover — DEFERRED.** Retire the old door and the generic buckets once the replacement is
 authorised and proven on the bench.
 
@@ -312,35 +351,14 @@ policy.
 **S9 · Product acceptance — DEFERRED.** Owns the acceptance contract and Dan's live evidence.
 ---
 
-## 5 · Open — Dan's calls
+## 5 · Open gate for this build
 
-Quote the ID to rule on one.
+**OQ1 · Class source split.** Family from the silhouette while frame and kind come from the legal-area
+segments — or everything from the segments? (Erosion at the current size is already universal
+eligibility; only this split is open.) It gates S4 and nothing else: the build may not invent the answer.
 
-**OQ1 · Class source split.** Family from the silhouette while frame and kind come from the
-legal-area segments — or everything from the segments? (Erosion at the current size is already
-universal eligibility; only this split is open.)
-
-**OQ2 · Class → centring-mode table.** Unfilled by design — the one mapping I will not guess.
-
-**OQ3 · Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
-
-**OQ4 · ~~The studio wire format~~ — reassigned, not a decision yet.** Nobody has read the studio
-caller. It is a bounded read task in the plan; `LayoutOffer` stays an internal typed record until
-then, and only a genuine product choice found by that read comes back to you.
-
-**OQ5 · Band boundaries** — whether B6 exists (a 264mm axis), and when interior magnets are ever
-allowed.
-
-**OQ6 · Control wording** — degrees everywhere, or portrait/landscape stays on the rectangle.
-
-**Settled, removed from this list:** current-size erosion (already universal) · the 96mm arc (a law
-in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
-(authorised: *"finish properly wiring and completing the classifier the pipeline and run it"*) ·
-the y-flip (a technical defect I fix before whole-catalogue activation (S4), not a sequencing question
-for Dan) · engine hole handling (a defect, not a Dan gate: the engine obeys supplied `Contour.holes`
-in this refactor and adapters may not erase them; raster hole *extraction* stays parked upstream) ·
-the empty-band fallback (layout generates candidates, judge alone decides legality — not inherited
-from the walk).
+Every other product decision lives in `v3.5.6-pipeline-brief.md` §7 and is re-derived when its deferred
+stage is authorised.
 
 ---
 
