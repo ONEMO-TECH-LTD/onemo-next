@@ -114,7 +114,7 @@ layout through the SAME materialisation path and returns readonly, Object.frozen
     corners:  'sharp'|'round'|'bevel'
     nodesMM:  readonly [x,y][]   disk CENTRES, mm, y-UP, origin = frame node (0, rows-1)
     outlineMM: readonly [x,y][]  closed ring, mm, y-UP, same space as nodesMM; offset 12mm
-                                 from the hull/boundary — boundary disks attain the 12mm
+                                 from the hull — hull disks attain the 12mm
                                  minimum exactly, interior disks sit farther in
     widthMM:  number     outline bounds (max-min x)
     heightMM: number     outline bounds (max-min y)

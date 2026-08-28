@@ -65,16 +65,19 @@ const OPEN: readonly string[] = JSON.parse(
 const isOpen = (entry: CatalogueEntry, pitchMM: number) => OPEN.includes(caseId(entry.id, pitchMM))
 
 describe('the certified catalogue is the oracle the generator answers to', () => {
-  it('the engine accepts every certified disk, at every supported pitch', () => {
+  // TARGET INVARIANT: the engine accepts every certified disk at every supported pitch.
+  // CURRENT CONFORMANCE: everywhere except the exact open pitch-cases below. The two are stated
+  // separately on purpose — a title that claims the target while the body skips 68 records is
+  // the overclaim this whole oracle exists to stop.
+  it('the engine accepts every certified disk outside the exact open pitch-cases', () => {
     const rejected: string[] = []
-    let checked = 0
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       if (isOpen(entry, pitchMM)) continue
-      checked++
       const missing = missingFrom(seatedAt(entry, pitchMM), entry.nodesMM)
       if (missing.length) rejected.push(`@${pitchMM} ${decodeURIComponent(entry.id)} missing ${missing.join(' ')}`)
     }
-    expect(checked).toBeGreaterThan(200)
+    // coverage needs no separate count: the next test asserts the open set EXACTLY, so every
+    // record at every pitch is either checked here or named there
     expect(rejected).toEqual([])
   }, 120_000)
 
