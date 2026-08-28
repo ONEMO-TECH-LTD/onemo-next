@@ -23,6 +23,10 @@ unaffected AST subtree must compare equal; only the named change is permitted. N
 rewrite class.
 `SPLIT` — the body divides between owners; destinations cite AST statement spans that together
 cover the original exactly once, minus spans marked DELETE.
+`NEW (S2-AUTHORISED)` — no baseline declaration exists. Permitted **only** where an
+already-authorised S2 delta cannot be expressed by moving an existing body. The matrix pins the
+exact declaration, the verifier compares it exactly, and the landed import graph must contain the
+named consumers.
 `DELETE` — no owner, with the reason and any replacement prerequisite.
 
 **Foundation rule (L1).** A primitive enters `foundation/` only with **two or more consuming UNIT
@@ -40,7 +44,7 @@ Where the audit found one, the symbol moves into that unit instead.
 | `bbox` | `foundation` | VERBATIM | segment · classifier · layout |
 | **`pointInContour`** | `foundation` | **NEW (S2-AUTHORISED)** | `pointInOuter(outer) && !holes.some(pointInOuter)`. Three landed unit consumers — segment, layout, wrap — all of which would otherwise rediscover "inside material" for themselves. Centralising it is the L1 seam this matrix exists to protect |
 | **`edgeDistToContourMM`** | `foundation` | **NEW (S2-AUTHORISED)** | `min(edgeDistMM(outer), …edgeDistMM(each hole))`. Same three consumers; the second of the two facts every hole-aware path needs |
-| **`contourCentroidOf`** | `foundation` | **NEW (S2-AUTHORISED)** | outer signed area minus hole signed areas. `centroidOf(outer)` cannot produce the material centroid of an asymmetric holed contour, and the Weight centre reads it |
+| **`contourCentroidOf`** | `units/centring` | **NEW (S2-AUTHORISED)** | outer signed area minus hole signed areas — `centroidOf(outer)` cannot give the material centroid of an asymmetric holed contour. **One consumer, Weight centring, so it lives in that unit** — a geometry helper does not earn foundation by being geometry. Same rule that moved the lattice helpers out |
 | `dist` | **DELETE** | — | **zero production importers.** My earlier count matched the substring inside `paper/dist/` and `.../dist/index.js` paths — path fragments, not consumers |
 | `spotRadiusOf` | `foundation` | VERBATIM | segment · layout · wrap |
 | `fieldSpanMM` | `adapters` | VERBATIM | once `snapRange` dies its only consumer is the bridge — an adapter, not a unit |
@@ -132,8 +136,15 @@ Where the audit found one, the symbol moves into that unit instead.
 
 Generated from the AST at `3caa09b8`, not hand-typed. Indices are positions in the declaration's
 statement list; the leading text is the stable identifier that survives unrelated line movement.
-**Every statement of every SPLIT declaration appears here exactly once**, DELETE and plumbing rows
-included, so ownership is decided here and not by whoever writes the verifier.
+**Every statement of every SPLIT declaration appears here exactly once with exactly one owner**,
+DELETE and plumbing rows included, so ownership is decided here and not by whoever writes the
+verifier. Nested blocks are expanded until that is true; **the verifier fails the matrix itself if
+any row names more than one owner or leaves a nested block unexpanded.**
+
+**Owner rules used throughout.** `pipeline` calls units and passes their outputs — nothing else.
+`adapters` own request and default resolution, transport, caches and view-model packaging.
+`segment` owns measurement bodies including `bbox` and the segment-box producer. `centring`,
+`layout`, `classifier` and `judge` own only their rule bodies.
 
 ### `computeGrid` — 27 statements
 
@@ -144,7 +155,7 @@ included, so ownership is decided here and not by whoever writes the verifier.
 | 7–8 | `const bb = bbox(outer)` · `const cx =` | `units/layout` | VERBATIM |
 | 9 | `const fits = cfg.circle` | `units/layout` | AMEND (hole-aware eligibility) |
 | 10 | `const massDepth =` | `adapters` | VERBATIM |
-| 11 | `const segments = safeSegments(` | `units/segment` | VERBATIM (call site) |
+| 11 | `const segments = safeSegments(` | `pipeline` | VERBATIM (**the call is sequencing; the measurement body is segment's**) |
 | 12–14 | `const mode` · `const positioning` · `const governor` | `adapters` | VERBATIM |
 | 15–18 | `const centres =` … `const ruleTarget:` | `units/centring` | VERBATIM |
 | 19–21 | `let bestSeated` · `let bestOx` · `let mainCentre` | `units/layout` | VERBATIM |
@@ -160,7 +171,10 @@ included, so ownership is decided here and not by whoever writes the verifier.
 
 | # | starts with | owner | class |
 |---|---|---|---|
-| 0–3 | `const pitch` · `const scanCfg` · `const wcfg` · `const anchorMemo` | `pipeline` | VERBATIM |
+| 0 | `const pitch = cfg.pitchMM ??` | `adapters` | VERBATIM (config resolution) |
+| 1 | `const scanCfg: GridConfig = { …positioning: 1, segmentsDetail: 'light' }` | `units/layout` | VERBATIM (**layout input construction — positioning and detail are policy, not sequence**) |
+| 2 | `const wcfg: WrapConfig = {` | `units/wrap` | VERBATIM (wrap input construction) |
+| 3 | `const anchorMemo = new Map<number, Pt>()` | `adapters` | VERBATIM (**a cache — never pipeline**) |
 | 4 | `const seen = new Set<string>()` | `units/layout` | VERBATIM (identity dedupe) |
 | 5 | `const rungs: BandRung[] = []` | `pipeline` | VERBATIM |
 | 6 | `const SCAN_MM = 1` | **DELETE** | — the scan step comes from the typed request/Spec path; a hardcoded constant may not enter the pipeline |
@@ -178,7 +192,16 @@ included, so ownership is decided here and not by whoever writes the verifier.
 | # | starts with | owner | class |
 |---|---|---|---|
 | 0–1 | `const key =` · `let hit = bakeCache.get(key)` | `adapters` | VERBATIM (cache lookup) |
-| 2 | `if (!hit) {` — inner: `refMM`/`outer`/`bb`/`r` → `pipeline`; `const segs = safeSegments(` → `units/segment`; `const bake = anchorBakeOf(` → `units/centring`; the segment-box union loop → `units/segment`; `shapeFamilyOf(outer)` → `units/classifier`; `bakeCache.set` + eviction → `adapters` | SPLIT | VERBATIM |
+| 2 | `if (!hit) {` — expanded below | SPLIT | — |
+| 2.0 | `const refMM = sizeRange(` | `adapters` | VERBATIM (padding/size resolution) |
+| 2.1 | `const outer = sized(refMM).outer.pts` | `adapters` | VERBATIM |
+| 2.2 | `const bb = bbox(outer)` | `units/segment` | VERBATIM (**a measurement — the pipeline may not perform it**) |
+| 2.3 | `const r = spotRadiusOf(` | `adapters` | VERBATIM |
+| 2.4 | `const segs = safeSegments(` | `pipeline` | VERBATIM (a call into segment) |
+| 2.5 | `const bake = anchorBakeOf(` | `pipeline` | VERBATIM (a call into centring) |
+| 2.6–2.7 | `let sx0 = Infinity …` · the segment-box union loop | `units/segment` | VERBATIM (the segment-box producer) |
+| 2.8 | `hit = { bake, segW, segH, family: shapeFamilyOf(outer) }` | SPLIT | `shapeFamilyOf(` call → `pipeline` (into classifier); the record assembly → `adapters` |
+| 2.9–2.10 | `bakeCache.set(` · eviction | `adapters` | VERBATIM |
 | 3 | `return hit` | `adapters` | VERBATIM |
 
 ### `anchorFnFor` — 8 statements
@@ -200,7 +223,15 @@ included, so ownership is decided here and not by whoever writes the verifier.
 | 2·try 0 | `const sized = makeSizer(` | `adapters` | VERBATIM |
 | 2·try 1–4 | `const pts` · `let h = 0` · the hash loop · `const sig =` | `adapters` | VERBATIM |
 | 2·try 5–6 | `if (sig !== shapeSig)` · `const cfgSig =` | `adapters` | AMEND (drops the deleted `walkCaches`/`walkFits` clears) |
-| 2·try 7 | `if (manualBand && sizeMM > 0) { … }` — the three branches | SPLIT | manual and band branches → `pipeline`; the rule-4 landing loop → `units/judge`; `recog` facts → `units/classifier`; `postMessage` and view-model assembly → `adapters`; the trailing `bandFit` branch → **DELETE** |
+| 2·try 7 | `if (manualBand && sizeMM > 0) {` — three branches, expanded below | SPLIT | — |
+| …b0.0–0.2 | `const aFn = anchorFnFor(` · `const contour = sized(` · `const grid = computeGrid(` | `pipeline` | VERBATIM (calls only) |
+| …b0.3 | `ctx.postMessage({ … })` | `adapters` | VERBATIM |
+| …b1.0 | `const band = BANDS.find(` | `adapters` | VERBATIM (request resolution) |
+| …b1.1–1.2 | `const key = JSON.stringify(` · `let rungs = rungCache.get(` | `adapters` | VERBATIM (cache) |
+| …b1.3 | `if (!rungs) { … }` — `wrapBandLadder(` call → `pipeline`; `rungCache.set` + eviction → `adapters` | SPLIT | VERBATIM |
+| …b1.4 | `if (rungs.length) {` — the rule-4 landing loop → `units/judge`; `wrapGrid(` and `assignSizes(` → `adapters`; `safeSegments(` → `pipeline`; `classFrameNodes(` + `recog` facts → `units/classifier`; ladder mapping and `postMessage` → `adapters` | SPLIT | VERBATIM |
+| …b1.5–1.7 | the `bandFit` fallback and its post | **DELETE** | — with `bandFit` |
+| …else 0–5 | the whole trailing `bandFit` branch | **DELETE** | — with `bandFit` |
 | 2·try 8 | `schedulePrefetch(` | **DELETE** | — |
 | 2·catch | `ctx.postMessage({ id, model: null, error: …})` | `adapters` | VERBATIM |
 
@@ -218,18 +249,21 @@ The verifier implements exactly this and nothing more:
 3. **SPLIT.** Baseline statement spans are disjoint, cover the original body exactly once minus
    named DELETE spans, and each span occurs exactly once in a named destination. Wrapper and
    import plumbing is enumerated separately and may not contain rules.
-4. **AMEND.** Every unaffected AST subtree compares equal; only the delta named in the row is
+4. **NEW.** The row's pinned declaration compares exactly, and the landed import graph contains
+   every consumer the row names — no more and no fewer.
+5. **AMEND.** Every unaffected AST subtree compares equal; only the delta named in the row is
    permitted.
-5. **DELETE.** A re-export-aware zero-production-consumer trace at the moment of deletion, plus
+6. **DELETE.** A re-export-aware zero-production-consumer trace at the moment of deletion, plus
    the row's named prerequisite where one exists.
-6. **Foundation.** Count direct consuming unit packages from the landed import graph — never
+7. **Foundation.** Count direct consuming unit packages from the landed import graph — never
    files, adapters, re-exports or intentions.
 
 ## 9 · What this matrix does not do
 
 It assigns owners. It does not authorise the deferred stages, does not settle OQ1, and adds no
-behaviour. The only behaviour changes permitted in S2 are the ones already authorised, and every
-`AMEND` row names its own: holes scale with the outer ring · eligibility rejects a centre inside
-an inflated hole · the legal-area measurement retains hole boundaries · wrap's valid-origin
-construction subtracts inflated holes · the required anchor query replaces wrap's internal
-centring call.
+behaviour of its own.
+
+**Every permitted S2 behaviour change is owned solely by its `AMEND` or `NEW` row and its
+fragment-manifest entry. This section adds no second list** — the previous version repeated five
+deltas here and had already fallen behind the rows, which would have left a verifier with two
+authorities that disagree.
