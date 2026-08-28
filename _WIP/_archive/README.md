@@ -11,10 +11,6 @@ artifact kept for traceability. If a file here disagrees with a live document, t
 | `grid-lab-architecture.md` | The code structure and the staged refactor; owns the open questions and the classifier method |
 | `v3.5.6-current-brief.md` | The engine's product authority — the three laws, neutrality, safe area, Spec/module ownership, acceptance |
 
-> One caveat on `v3.5.6-current-brief.md`, recorded rather than edited: its §5 Fit contact policy
-> (`group | single | double | most | all`) and the six scoring orders belonged to the v3.5.5 engine that
-> was rolled back on 08-24. Sections 1, 4, 7, 8, 9 and 12 are live.
-
 ---
 
 ## What is in here, and why
