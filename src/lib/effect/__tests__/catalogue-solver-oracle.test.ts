@@ -25,7 +25,7 @@ import type { Pt } from '../types'
  *  error as hand-rounding a diamond corner from 16.971 to 17, which is exactly what this oracle
  *  exists to catch. */
 const agrees = (a: readonly number[], b: readonly number[]) =>
-  Math.abs(a[0] - b[0]) <= MANUFACTURING_TOLERANCE_MM && Math.abs(a[1] - b[1]) <= MANUFACTURING_TOLERANCE_MM
+  Math.hypot(a[0] - b[0], a[1] - b[1]) <= MANUFACTURING_TOLERANCE_MM
 const missingFrom = (
   seated: readonly Pt[], certified: readonly (readonly [number, number])[],
 ): string[] => certified
@@ -104,5 +104,10 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
     // and a sub-millimetre drift is caught too — whole-mm rounding hid 0.4mm
     const drifted = { ...entry, nodesMM: [[entry.nodesMM[0][0] + 0.4, entry.nodesMM[0][1]], ...entry.nodesMM.slice(1)] } as CatalogueEntry
     expect(missingFrom(seatedAt(entry, 48), drifted.nodesMM)).not.toEqual([])
+    // tolerance is a DISTANCE, not a per-axis budget: 0.049 on each axis is 0.0693mm away,
+    // outside tolerance, and a per-axis comparator let it pass. grid-core.ts:499 is the
+    // repo's precedent — it measures the same way.
+    const diagonal = { ...entry, nodesMM: [[entry.nodesMM[0][0] + 0.049, entry.nodesMM[0][1] + 0.049], ...entry.nodesMM.slice(1)] } as CatalogueEntry
+    expect(missingFrom(seatedAt(entry, 48), diagonal.nodesMM)).not.toEqual([])
   })
 })
