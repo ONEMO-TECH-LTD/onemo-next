@@ -21,6 +21,11 @@ layouts. One callable pipeline, no browser, no cross-dependencies, UI a shell.
 3. **The pipeline holds sequence, never rules.** No threshold, no measurement, no ranking in it.
 4. **One home per fact.** Physical constants in spec; each derived fact has one producer.
 5. **The shell renders.** Page and panel reach the engine only through adapters.
+6. **Proven bodies move; they are never retyped.** The tree is built new, the geometry is carried
+   across unchanged, and each move is proven by an empty diff. Every regression this project has
+   paid for came from re-writing something that already worked — the y-flip written three times,
+   the size maths three times, four gates that checked a spelling. The one clean transfer went
+   cleanly because `wrapGroup` moved byte-identical.
 
 **Kernel rule:** a primitive enters the foundation only with **two or more unit consumers**. One
 consumer means it moves into that unit. Otherwise "foundation" becomes the next "compute".
@@ -120,6 +125,22 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 
 **Already clean:** no React/Next/DOM in `lib/effect` or the library; nothing in `lib/` imports
 `app/`; the library's 30 files are under their own law with 28 gates.
+
+**What survives, and what goes** — this is why the work is a re-layout, not a rewrite:
+
+| moved unchanged (law 6) | lines | deleted | lines |
+|---|---|---|---|
+| seat predicate + edge index | 165 | the two old routes | 2183 |
+| `safeSegments` | 248 | `wrap`/`wrapFlap`/`unheldOf` chain | 375 |
+| centring: anchors, governors, bake | 138 | band walk + `fitSizeInBand` + `bandSnapPoints` | 76 |
+| centre-rules parity registration | 30 | `computeGrid` voting branch | 62 |
+| Clipper wrap solve | 157 | voting scorer, weights, `centeringRef` | ~55 |
+| spec · shape normalisation | 192 | | |
+| `library/` — untouched, own law | 1976 | | |
+
+Twelve destinations from four files: `grid-magnet-compute` splits four ways, `grid-magnet-logic`
+three, the door two, the wrap module three. **The behaviour lock that makes this safe:** the
+catalogue oracle asserts 163 records × 3 pitches *equal*, and stage 1 freezes the live bench.
 
 ---
 
