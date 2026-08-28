@@ -6,6 +6,7 @@ import { wrapBandLadder, wrapGrid, type BandRung, type WrapConfig } from '@/lib/
 import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
+import { defaultLanding } from '@/lib/effect/units/judge'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
@@ -176,15 +177,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the
         // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
         // half a pitch of it, the best-centred is the default landing. All offers stay visible.
-        const half = (cfg.pitchMM ?? DEFAULT_PITCH_MM) / 2
-        const c0 = rungs[0]
-        let ruleIdx = 0
-        for (let i = 1; i < rungs.length; i++) {
-          const r = rungs[i]
-          if (r.at.count !== c0.at.count || r.at.sizeMM > c0.at.sizeMM + half) continue
-          const b = rungs[ruleIdx]
-          if (r.at.centreOffMM < b.at.centreOffMM - 0.01) ruleIdx = i
-        }
+        const ruleIdx = defaultLanding(rungs, cfg.pitchMM ?? DEFAULT_PITCH_MM)
         const idx = Math.min(stepSel ?? ruleIdx, rungs.length - 1)
         const at = rungs[idx].at
         const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }

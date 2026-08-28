@@ -111,6 +111,9 @@ export interface WrapAt {
   gapsMM: number[]
 }
 
+/** One rung the band offers: a revealed layout at its exact contact size. */
+export interface BandRung { at: WrapAt; revealMM: number }
+
 // The engine's request/response vocabulary.
 export interface GridConfig {
   pitchMM?: number

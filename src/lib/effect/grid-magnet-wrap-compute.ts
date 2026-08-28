@@ -17,7 +17,7 @@
 // safe-area islands, no voting, no coverage, no flap. Inputs are the outline, the pitch and the
 // radius. Nothing here reads a policy.
 
-import type { Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
+import type { BandRung, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
 import { bbox, centroidOf, spotRadiusOf } from './foundation/geometry'
@@ -26,6 +26,7 @@ import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_MM } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
+import { inBand, orderOffers } from './units/judge'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -35,7 +36,7 @@ import { wrapGroup } from './units/wrap'
 // The wrap solver now lives in units/wrap.ts (S2 step 5); its result shaping stays here with the
 // ladder until adapters land in S3. Re-exported so no consumer changes in the move.
 export { wrapGroup }
-export type { WrapAt, WrapConfig } from './types'
+export type { BandRung, WrapAt, WrapConfig } from './types'
 
 /** The wrapped answer as the canvas draws it. Display only — nothing is decided here. */
 export function wrapGrid(
@@ -68,9 +69,6 @@ export function wrapGrid(
     },
   }
 }
-
-/** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number }
 
 /**
  * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
@@ -130,9 +128,8 @@ export function wrapBandLadder(
     const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
     const at = wrapGroup(sized, wcfg, group, minMM, hiMM)
     if (!at) continue
-    if (at.sizeMM < loMM - 0.005 || at.sizeMM > hiMM + 0.005) continue   // another band owns it
+    if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
     rungs.push({ at, revealMM: mm })
   }
-  rungs.sort((a, b) => a.at.sizeMM - b.at.sizeMM)
-  return rungs
+  return orderOffers(rungs)
 }
