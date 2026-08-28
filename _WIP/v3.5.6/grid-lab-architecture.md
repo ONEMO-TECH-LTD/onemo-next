@@ -18,15 +18,18 @@ is defined by `v3.5.6-current-brief.md` §12, Dan's acceptance contract, and by 
 `v3.5.6-pipeline-brief.md` §2. Measured against those, the structural work below is **foundation, not
 completion**:
 
-- **Phase A — S1–S5. The engine becomes callable.** Clean units, one pipeline, headless, UI a shell.
-  Behaviour at the end of Phase A is what it is today plus the classifier. **This phase does not make
-  the engine correct**, and nothing in it may be reported as the build being done.
-- **Phase B — S6–S9. The engine becomes correct.** Judge, layout populations, centring table, Spec/admin
-  authority, then the acceptance run. This is where §12 is satisfied.
+- **AUTHORISED BUILD — S1–S4 only.** Delete provably dead code, move proven bodies to their owners,
+  expose one headless pipeline and the shell seam, complete the classifier. This makes the selected
+  internals callable. **It does not complete the engine**, and nothing in it may be reported as done.
+- **DEFERRED — S5–S9, not authorised and not planned in this build.** The cutover deletion, then the
+  judge, layout populations, centring table, Spec/admin authority and the acceptance run. These titles
+  exist only to show what S1–S4 must not make harder. No S5–S9 code, decomposition, acceptance claim
+  or cutover is part of this build.
 
-Phase A first is a sequencing judgement, not a scope reduction: every Phase B rule lands *inside* a unit
-Phase A creates, and bolting the rules onto today's structure is what produced the interaction bugs of
-08-25 in the first place.
+Doing S1–S4 first is a sequencing judgement, not a scope reduction: every deferred rule lands *inside* a
+unit S1–S4 creates, and bolting rules onto today's structure is what produced the interaction bugs of
+08-25. The old door and the generic buckets stay alive until the deferred cutover, so the new path is
+proven on the bench before anything it replaced is removed.
 
 ---
 
@@ -168,10 +171,38 @@ already asserts 163 records × 3 pitches *equal* — an existing gate, not new m
 gate suite beyond the one import matrix. The engine's own tests are the classifier audit Dan ordered
 and the catalogue oracle that already exists.
 
-**Execution gates.** S1–S3 need no open product answer. OQ1 gates S4. OQ5 gates S6's band judgement.
-OQ2 gates S7's centring table. OQ7 and OQ8 gate S9, because §12 makes Fit modes and scoring
-configurations acceptance conditions. OQ3 and OQ6 gate product activation. OQ4 is not a decision — it is
-resolved by reading the actual studio caller before anything freezes or exports a wire contract.
+**Execution gates for the authorised build.** S1–S3 need no open product answer. **OQ1 gates S4** — the
+class source is Dan's, and the build may not invent the silhouette-versus-segments split. Nothing else
+gates this build. Every other open question belongs to a deferred stage and is listed there; none may be
+used to justify work inside S1–S4.
+
+### Build scope lock
+
+Fixed by the peer gate before any code. Anything outside it is drift and stops the build.
+
+**May delete** — the `grid-magnet/` and `grid-wrap/` route files; the deletion-list symbols and only the
+imports they orphan; the old fallback and prefetch chain, and only once the S2 path replaces it on the
+real bench. The generic buckets and the old door are **not** deleted here.
+
+**May create** — `foundation/` (only for a primitive with two or more landed unit consumers),
+`units/{segment,classifier,centring,layout,wrap,judge}/`, `pipeline/`, `adapters/`. No other folder,
+facade, registry, harness, audit module or gate file.
+
+**May edit or move bodies from** — the nine `grid-magnet*` modules, `types.ts` for shared vocabulary
+only, the three `grid-centre` shell files (solely to consume the adapter, render the trace and keep the
+worker to transport), and the two existing test files in place. Moves obey L6: proven bodies are
+byte-identical apart from import plumbing. Behaviour changes are limited to hole preservation, the
+common fallback path, the y-flip and classifier corrections, and the shell-to-adapter seam.
+
+**Must not touch** — `library/**`, `geometry-truth.ts`, `offset.ts`, the Session 59 engine, and every
+deferred product decision: the class→centring mapping, the 96mm judge, full layout populations,
+scoring and Fit modes, band boundaries, the activation set, control wording, the studio wire format. No
+new control, threshold, ranking or golden.
+
+**A deviation is:** a changed production file outside the allowlist · a new file outside the four target
+folders · any edit under `library/` · any new test, doc or gate artifact · a rewritten proven body · a
+new threshold, ranking or control · any cutover or deferred-stage behaviour · any fallback that bypasses
+the common wrap and judge.
 
 **S1 · Delete only what is provably dead.**
 Delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer trace, and
@@ -180,14 +211,15 @@ delete only symbols whose last production caller went with them — the voting s
 **Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — a structural deletion must
 not change what the bench does. Replaced and deleted in S2.
 
-**Keep the unheld measurement — `unheldOf`, `ringsOf`, `touchesOutline` (~45 lines) — permanently.**
-Their only callers are `wrapFlap` and the `grid-wrap` route, so the consumer trace would delete them,
-and Phase B needs all three: `unheldOf` is the exact coverage measure that judge element 4 (coverage
-dominance) ranks on, and `touchesOutline` is what separates an **exposed edge** from an interior gap —
-the predicate elements 1 and 3 (the 96mm *arc* and segment-edge priority) are both defined in terms of.
-What the brief kills is unheld **area as the judge**, which is the ranking, not the measurement. They
-move to `foundation` in S2; only `wrapFlap` — count-first, aimed at patch centroids, wrong axis under
-the reversal — is deleted.
+**The `unheldOf` / `ringsOf` / `touchesOutline` chain is deleted with the rest.** I proposed keeping it
+as a future coverage primitive and was wrong on the facts. Measured: a 100×100 square with one interior
+radius-10 magnet returns **10000 mm² unheld — identical to no magnet at all**; the correct figure is
+9685.84. `Clipper.difference` returns the held disc as a negative ring and `ringsOf` drops every
+negative path, so an interior magnet contributes nothing. It only measures at all when a disc crosses
+the boundary. `touchesOutline` is not an arc measure either — it samples every `length/48` points
+against a hardcoded 0.75mm threshold. Keeping it would preserve a defect, not a capability, and with
+one prospective consumer it fails the kernel rule anyway. The ruled measurements — hole-aware coverage
+subtraction and a real ordered-outline arc — get written in the judge when the judge is authorised.
 *Done when:* the bench still solves on all four classes and every band, the existing suite and the
 catalogue oracle stay green.
 
@@ -210,9 +242,10 @@ Foundation, segment, centring, layout, wrap, judge — existing bodies moved, no
 contour-aware: outer eroded, every supplied hole inflated and subtracted by the same radius, and
 `Contour.holes` preserved through scaling and sizing. `applyCoverage` → layout (it
 changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
-rebuilt primitives and its false header. The derived-zone import matrix lands in the same commit and
-**`grid-magnet-separation.test.ts` is deleted with it** — it is a replacement for a gate proven blind,
-not a second gate.
+rebuilt primitives and its false header. **Replace the hand-listed contents of
+`grid-magnet-separation.test.ts` with the one derived-zone import matrix, in place.** No second gate
+file is created; the only other test touched in S1–S4 is `catalogue-solver-oracle.test.ts`, rewired to
+the real pipeline and extended with the classifier audit.
 
 **The empty band is answered by the units, not by an escape hatch.** Today it falls back into the
 old walk and shows the size that seats the most magnets, loose — the rigid gate and band-only wrap
@@ -253,15 +286,15 @@ Two named defects close here or the stage is not done: **4 of 38 rectangle recor
 catch — and the **`round` family reaches nothing** (a pill classifies as `square`), which the enum's
 deletion resolves by making the catalogue's own classes the answer.
 
-**S5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
+**S5 · Cut over and delete — DEFERRED, not authorised in this build.** Once every production caller has moved: delete `grid-magnet.ts`,
 the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
 24/48/96, real cutouts, every centre mode, every band, manual, then verify the live surface.
-*Done when:* Phase A is structurally complete. **This is not the acceptance run** — it proves the
-re-layout changed nothing, not that the engine answers correctly. §12 is closed at S9.
+Held back deliberately: the old door stays alive until the new path is proven on the bench, so nothing
+is removed before its replacement has run. **This was never the acceptance run** — §12 closes at S9.
 
 ---
 
-## PHASE B — the engine becomes correct
+## DEFERRED — what completion still requires (not authorised, not planned here)
 
 Every stage below is a requirement already written in Dan's briefs, mapped to the unit that owns it.
 None is new scope.
@@ -366,7 +399,7 @@ allowed.
 
 **OQ6 · Control wording** — degrees everywhere, or portrait/landscape stays on the rectangle.
 
-**OQ7 · Are the Fit modes live?** `v3.5.6-current-brief.md` §5 names `group | single | double | most |
+**OQ7 · Are the Fit modes live?** *(Deferred — gates the acceptance stage, never this build.)* `v3.5.6-current-brief.md` §5 names `group | single | double | most |
 all` as the admin-selected Fit mode, and §12 clause 6 makes exercising **all Fit modes** an acceptance
 condition. Measured: **none of them exists in the code** — zero matches in the engine. The Clipper exact
 wrap solves the tightest size a fixed group fits, so contact is a *result*, not a selection, and the flap
@@ -374,7 +407,8 @@ those modes were judged with is deleted (*"the disk IS the allowance"*). Either 
 them and §12 clause 6 drops the phrase, or they are real product inputs that must be built. I will not
 decide which — one route deletes a written acceptance condition, the other adds a control surface.
 
-**OQ8 · What is scoring mode in the new engine?** §7 requires **both** flat/equal (all laws equal, every
+**OQ8 · What is scoring mode in the new engine?** *(Deferred — gates the acceptance stage, never this
+build.)* §7 requires **both** flat/equal (all laws equal, every
 lawful result visible) **and** every exposed scoring configuration to behave as ruled — and §12 clause 3
 makes that an acceptance condition. Voting and its weights are deleted at S1 as the superseded
 mechanism. So either scoring is the judge's ordering in S6 made admin-selectable, or scoring mode is dead
