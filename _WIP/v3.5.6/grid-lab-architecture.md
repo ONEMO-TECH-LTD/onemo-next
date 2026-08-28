@@ -163,14 +163,21 @@ contour-aware: outer eroded, every supplied hole inflated and subtracted by the 
 changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
 rebuilt primitives and its false header. Land the derived-zone import matrix in the same commit.
 
-**The empty band is a judge verdict, not an escape hatch.** Today an empty band falls back into the
+**The empty band is answered by the units, not by an escape hatch.** Today it falls back into the
 old walk and shows the size that seats the most magnets, loose — the rigid gate and band-only wrap
-Dan outlawed, kept alive to avoid a blank screen. Replaced by the pipeline answering with the same
-solver it always uses: when a band yields no offer, widen the reveal to the full size range and
-report **"no offer in this band — the nearest lawful offer is N⌾ at X mm, which belongs to band Y."**
-Same law, same wrap, no old machinery, and a more useful answer than a loose shape. Cost is honest:
-the wide scan is ~8× the reveal solves of one band, so it runs **only** when the band comes back
-empty — which is exactly when it is needed.
+the brief lists as "do not preserve", kept alive to avoid a blank screen. The capability is
+preserved explicitly and the old path deleted:
+
+- **`units/layout` owns fallback candidate generation.** When catalogue candidates yield no lawful
+  offer it generates generically. It is not a new unit and not a second law.
+- **Every candidate then passes the same `wrap` and the same `judge`.** No separate path, no
+  separate rules.
+- **If none passes:** `offers: []` plus `diagnostic: { reason: 'no-lawful-offer', bestSeated? }`.
+  The UI may show that calibration witness; it may never present it as a lawful offer.
+- **Where the nearest lawful offer lives** is not a special rule — it is the `automatic` search
+  envelope, asked by the adapter, returning offers with their own band.
+
+The pipeline decides none of this: it sequences layout → wrap → judge and passes the result on.
 
 With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
 no caller and are deleted in this stage.
