@@ -17,13 +17,10 @@ import {
   CENTRE_MODE,
   GOVERNOR,
   MASS_DEPTH_MM,
-  MIN_EFFECT_MM,
   PADDING_FLOOR_MM,
   SNAP_STEP_MM,
 } from './grid-magnet-spec'
-import { contactPointsMM, maxPressMM } from './grid-magnet-compute'
-import { fieldSpanMM } from './units/layout'
-import { bandOf } from './units/layout'
+import { contactPointsMM } from './grid-magnet-compute'
 import { applyCoverage } from './units/layout'
 import { assignSizes } from './grid-magnet-logic'
 import type { CentreMode, Governor } from './types'
@@ -84,67 +81,6 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   }
 }
 
-/** One holding rung in a band: the size and its seat count. */
+/** One holding rung in a band — retained only as the page's ladder view-model type until the
+ *  adapter seam lands in S3. The walk that produced it is deleted. */
 export interface BandSnapPoint { sizeMM: number; count: number }
-
-/** The walk range: the band as a RANGE; above the last band, up to the derived field span. */
-function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
-  const band = bandOf(fromMM)
-  if (band) return [band.minMM, band.maxMM]
-  return [fromMM, fieldSpanMM(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))]
-}
-
-/** One pass over the band: the per-count contact sizes AND the best-seated rung (fallback). */
-function bandWalk(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { points: BandSnapPoint[]; bestSeatedMM: number } {
-  const [lo, hi] = snapRange(cfg, fromMM)
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
-  const solve = (mm: number): GridResult => {
-    let g = cfg.solveCache?.get(mm)
-    if (!g) { g = computeGrid(sized(mm), walkCfg); cfg.solveCache?.set(mm, g) }
-    return g
-  }
-  // Counts already seating just below the band reached contact earlier — loose here, not rungs.
-  const below = lo - stepMM >= MIN_EFFECT_MM ? solve(lo - stepMM).anchors.length : 0
-  const points: BandSnapPoint[] = []
-  const seen = new Set<number>()
-  for (let c = 1; c <= below; c++) seen.add(c)
-  const reach = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-  let bestSeatedMM = lo, bestSeats = -1
-  for (let mm = lo; mm <= hi; mm += stepMM) {
-    const grid = solve(mm)
-    const count = grid.anchors.length
-    if (count > bestSeats) { bestSeats = count; bestSeatedMM = mm }
-    // THE RIGID GATE (Dan): every disc must touch within the allowance — 0 = touch,
-    // 1 = 1mm space — measured with one size-step of slack (the walk's own resolution).
-    // A count whose layout leaves a disc floating past that is NOT an option here;
-    // Auto mode adapts the allowance instead.
-    const contour = sized(mm)
-    const rigid = count >= 1
-      && maxPressMM(contour.outer.pts, grid.anchors.map((a) => a.p), reach) <= stepMM
-    if (rigid && !seen.has(count)) {
-      seen.add(count)
-      points.push({ sizeMM: mm, count })
-    }
-  }
-  return { points, bestSeatedMM }
-}
-
-/**
- * Band snap under the contact law. `ladder` = one rung per magnet count at its contact size;
- * the landing pick is the smallest size at the band's maximum count. When no count reaches
- * contact inside the band, the best-seated size shows as an explicit fallback, never a fit.
- */
-export function fitSizeInBand(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): { sizeMM: number; grid: GridResult; ladder: BandSnapPoint[]; pickIdx: number } {
-  const { points, bestSeatedMM } = bandWalk(sized, cfg, fromMM, stepMM)
-  const dispCfg: GridConfig = cfg
-  if (points.length) {
-    const maxCount = Math.max(...points.map((p) => p.count))
-    const pickIdx = points.findIndex((p) => p.count === maxCount)
-    return { sizeMM: points[pickIdx].sizeMM, grid: computeGrid(sized(points[pickIdx].sizeMM), dispCfg), ladder: points, pickIdx }
-  }
-  return { sizeMM: bestSeatedMM, grid: computeGrid(sized(bestSeatedMM), dispCfg), ladder: [], pickIdx: 0 }
-}

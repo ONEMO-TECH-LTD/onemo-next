@@ -18,15 +18,6 @@ export { safeSegments } from './units/segment'
 export type { BBox } from './types'
 
 
-/** THE RIGID GATE (Dan, 2026-08-20): the worst disc's gap past its margined edge. A layout
- *  qualifies only when EVERY disc touches within the allowance — 0 = touch, 1 = 1mm space.
- *  Normal mode enforces this; Auto mode adapts the allowance instead. */
-export function maxPressMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
-  let m = 0
-  for (const s of seated) { const g = edgeDistMM(outer, s) - reach; if (g > m) m = g }
-  return m
-}
-
 /** Where discs actually touch: for each seated disc within `slackMM` of its margined edge,
  *  the nearest point on the outline — drawn so tangency is visible, never guessed. */
 export function contactPointsMM(

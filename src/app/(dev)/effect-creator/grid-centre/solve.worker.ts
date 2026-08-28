@@ -1,7 +1,7 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, computeGrid, fitSizeInBand, MIN_EFFECT_MM, type GridConfig, type GridResult } from '@/lib/effect/grid-magnet'
+import { BANDS, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
@@ -34,8 +34,6 @@ const ctx = self as unknown as Worker
 // free-slider moves, manual band scaling, re-walks and the idle prefetcher; a new shape
 // clears everything.
 let shapeSig = ''
-const walkCaches = new Map<string, Map<number, GridResult>>()
-const walkFits = new Map<string, { fit: ReturnType<typeof fitSizeInBand> }>()
 const rungCache = new Map<string, BandRung[]>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
 // and scaled linearly per size. Positions are shape features; only qualification is size-
@@ -82,66 +80,23 @@ function anchorFnFor(
   return (mm: number) => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
 }
 
-const WALK_CAP = 10
+/** The calibration witness: the size in the band that seats the most magnets. It is NOT a fit and
+ *  is never offered — it exists so an empty band shows something rather than nothing. */
+function bandBestSeatedMM(
+  sized: (mm: number) => Contour, cfg: GridConfig, band: { minMM: number; maxMM: number },
+): number {
+  let bestMM = band.minMM, bestN = -1
+  for (let mm = band.minMM; mm <= band.maxMM; mm += 4) {
+    const n = computeGrid(sized(mm), { ...cfg, segmentsDetail: 'light' }).anchors.length
+    if (n > bestN) { bestN = n; bestMM = mm }
+  }
+  return bestMM
+}
+
 const FITS_CAP = 12
 
-function sizeCacheOf(sig: string): Map<number, GridResult> {
-  let m = walkCaches.get(sig)
-  if (!m) {
-    m = new Map()
-    walkCaches.set(sig, m)
-    if (walkCaches.size > WALK_CAP) walkCaches.delete(walkCaches.keys().next().value!)
-  }
-  return m
-}
-
-/** The one band-solve routine — the click path and the prefetcher share it byte for byte. */
-function bandFit(
-  sized: (mm: number) => Contour, cfg: GridConfig, cfgSig: string,
-  bandId: number, snapStep: number,
-): { fit: ReturnType<typeof fitSizeInBand> } {
-  const key = JSON.stringify([cfgSig, bandId, snapStep])
-  const hit = walkFits.get(key)
-  if (hit) return hit
-  const band = BANDS.find((b) => b.id === bandId) ?? BANDS[0]
-  const out = { fit: fitSizeInBand(sized, { ...cfg, solveCache: sizeCacheOf(cfgSig) }, band.minMM, snapStep) }
-  walkFits.set(key, out)
-  if (walkFits.size > FITS_CAP) walkFits.delete(walkFits.keys().next().value!)
-  return out
-}
-
-// Idle prefetch — between interactions the worker warms every band for the current shape and
-// dials, one size per macrotask so a real request always interrupts within one solve.
-let gen = 0
-function schedulePrefetch(
-  myGen: number, sized: (mm: number) => Contour, cfg: GridConfig, cfgSig: string,
-  snapStep: number,
-): void {
-  const walkCfg: GridConfig = { ...cfg, segmentsDetail: 'light' }
-  const cache = sizeCacheOf(cfgSig)
-  const sizes: number[] = []
-  for (const b of BANDS) for (let mm = b.minMM; mm <= b.maxMM; mm += Math.max(1, snapStep)) if (!cache.has(mm)) sizes.push(mm)
-  let i = 0
-  const bandsLeft = BANDS.map((b) => b.id)
-  const step = () => {
-    if (myGen !== gen) return
-    if (i < sizes.length) {
-      const mm = sizes[i++]
-      if (!cache.has(mm)) cache.set(mm, computeGrid(sized(mm), walkCfg))
-      setTimeout(step, 0)
-      return
-    }
-    const bandId = bandsLeft.shift()
-    if (bandId === undefined) return
-    bandFit(sized, cfg, cfgSig, bandId, snapStep)
-    setTimeout(step, 0)
-  }
-  setTimeout(step, 0)
-}
-
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, snapStep, stepSel } = e.data
-  gen++
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     const pts = base.outer.pts
@@ -152,7 +107,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
     }
     const sig = JSON.stringify([offsetMM, pts.length, h])
-    if (sig !== shapeSig) { shapeSig = sig; walkCaches.clear(); walkFits.clear(); rungCache.clear(); }
+    if (sig !== shapeSig) { shapeSig = sig; rungCache.clear(); }
     const cfgSig = JSON.stringify(cfg)
     if (manualBand && sizeMM > 0) {
       // MANUAL CALIBRATION (QA F5): the requested size and phase are honoured directly —
@@ -200,19 +155,20 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         } })
         return
       }
-      // The band's range revealed no layout that wraps inside it — honest walk fallback.
-      const { fit } = bandFit(sized, cfg, cfgSig, mode, snapStep)
-      const contour = sized(fit.sizeMM)
-      ctx.postMessage({ id, model: { contour, grid: fit.grid, effSize: fit.sizeMM, ladder: [], idx: 0, segments: fit.grid.segments } })
+      // NO LAWFUL OFFER. The band revealed nothing that wraps inside it. The best-seated size is a
+      // CALIBRATION WITNESS only — it is returned so the canvas is not blank, and it must never be
+      // presented as a fit. The old rigid walk that showed it AS the band result is deleted.
+      const bestSeatedMM = bandBestSeatedMM(sized, cfg, band)
+      const contour = sized(bestSeatedMM)
+      const grid = computeGrid(contour, cfg)
+      ctx.postMessage({ id, model: {
+        contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
+        offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
+      } })
     } else {
-      const { fit } = bandFit(sized, cfg, cfgSig, mode, snapStep)
-      const idx = fit.ladder.length ? Math.min(stepSel ?? fit.pickIdx, fit.ladder.length - 1) : 0
-      const eff = fit.ladder.length ? fit.ladder[idx].sizeMM : fit.sizeMM
-      const grid = eff === fit.sizeMM ? fit.grid : computeGrid(sized(eff), cfg)
-      const contour = sized(eff)
-      ctx.postMessage({ id, model: { contour, grid, effSize: eff, ladder: fit.ladder, idx, segments: grid.segments } })
+      // Non-positioning is unreachable: the page hardcodes positioning 1 and voting is deleted.
+      ctx.postMessage({ id, model: null, error: 'positioning must be 1 — voting was removed in S2' })
     }
-    schedulePrefetch(gen, sized, cfg, cfgSig, snapStep)
   } catch (err) {
     ctx.postMessage({ id, model: null, error: String((err as Error)?.message ?? err) })
   }

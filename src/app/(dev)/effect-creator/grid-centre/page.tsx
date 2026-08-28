@@ -468,7 +468,7 @@ export default function GridLab() {
                     : model
                     ? model.ladder.length
                       ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.length} holding layouts in band`
-                      : 'nothing fully fits in this band — best seated shown'
+                      : 'no lawful offer in this band — calibration witness only, not a fit'
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">

@@ -370,3 +370,27 @@ describe('6 — a supplied hole is material boundary, not decoration', () => {
     expect(off, 'wrap placed the magnet inside the hole').toBeGreaterThanOrEqual((at!.sizeMM * 60) / 192 - 12)
   })
 })
+
+describe('7 — an empty band returns no lawful offer, never a fit', () => {
+  it('the old rigid walk is gone from every production path', () => {
+    for (const f of ['grid-magnet.ts', 'grid-magnet-compute.ts']) {
+      const text = readFileSync(join(LIB, f), 'utf8')
+      for (const dead of ['bandWalk', 'fitSizeInBand', 'snapRange', 'maxPressMM']) {
+        expect(text, `${f} still holds ${dead} — the rigid gate the brief rejects`).not.toMatch(new RegExp(`\\b${dead}\\b`))
+      }
+    }
+  })
+
+  it('the worker answers an empty band with no-lawful-offer plus a witness', () => {
+    const w = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts'), 'utf8')
+    expect(w, 'the empty band must post offers: [] with a no-lawful-offer diagnostic').toMatch(/offers: \[\]/)
+    expect(w).toMatch(/reason: 'no-lawful-offer'/)
+    expect(w, 'the witness must not be produced by the deleted walk').not.toMatch(/\bbandFit\b|\bfitSizeInBand\b/)
+  })
+
+  it('the shell never labels the witness a fit', () => {
+    const page = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx'), 'utf8')
+    expect(page).not.toMatch(/nothing fully fits in this band/)
+    expect(page).toMatch(/no lawful offer in this band/)
+  })
+})
