@@ -16,7 +16,7 @@ import { computeGrid } from '../grid-magnet'
 import type { Contour, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
-const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-magnet/page.tsx')
+const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
 
 const MODULE_FILES = [
   'grid-magnet-spec.ts',
@@ -63,14 +63,15 @@ const RELEASED_VALUES = (() => {
   return values
 })()
 
-/** Skips generator-knob data (the GENS table) and JSX min/max attrs — those are pinned below. */
+/** Skips generator-knob data (GENS), the camera zoom clamp (CAM_MAX — a view multiplier that
+ *  collides with the 12mm padding, not a restated law) and JSX min/max attrs — pinned below. */
 const findBareLawValue = (text: string) => {
   const hits: string[] = []
   walkAst(text, (n) => {
     if (!ts.isNumericLiteral(n) || !RELEASED_VALUES.has(Number(n.text))) return
     for (let a: ts.Node | undefined = n.parent; a; a = a.parent) {
       if (ts.isJsxAttribute(a) && /^(min|max)$/.test(a.name.getText())) return
-      if (ts.isVariableDeclaration(a) && a.name.getText() === 'GENS') return
+      if (ts.isVariableDeclaration(a) && /^(GENS|CAM_MAX)$/.test(a.name.getText())) return
     }
     hits.push(`${n.text} in \`${n.parent.getText().slice(0, 50)}\``)
   })
@@ -105,7 +106,7 @@ describe('2 — traffic is one-way', () => {
 
   it('the page reaches the module only through the engine door, the spec and the ui-bridge', () => {
     const reaches = importsOf(pageText()).filter((i) => /grid-magnet/.test(i))
-    const bad = reaches.filter((i) => !/grid-magnet(-spec|-bridge)?$/.test(i))
+    const bad = reaches.filter((i) => !/grid-magnet(-spec|-bridge|-library-bridge)?$/.test(i))
     expect(bad, `page reaches into the module's internals: ${bad.join(', ')}`).toEqual([])
   })
 

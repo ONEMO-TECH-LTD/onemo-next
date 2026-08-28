@@ -280,19 +280,6 @@ function snapRange(cfg: GridConfig, fromMM: number): [number, number] {
   return [fromMM, fieldSpanMM(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))]
 }
 
-/**
- * THE CONTACT LAW (Dan, 2026-08-19): "the scale must be scaling up and down until edges touch
- * the disc — this is zero flap." Every disc wears the allowance as an invisible margin, and a
- * band option is a magnet COUNT at its CONTACT size — the smallest size where that count still
- * seats against the margined discs. No wrap test: the seat geometry IS the law. A count whose
- * contact lies below the band belongs to the band below, not here worn loose.
- */
-export function bandSnapPoints(
-  sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,
-): BandSnapPoint[] {
-  return bandWalk(sized, cfg, fromMM, stepMM).points
-}
-
 /** One pass over the band: the per-count contact sizes AND the best-seated rung (fallback). */
 function bandWalk(
   sized: (mm: number) => Contour, cfg: GridConfig, fromMM: number, stepMM: number,

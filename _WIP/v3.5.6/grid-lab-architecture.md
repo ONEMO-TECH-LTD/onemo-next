@@ -223,8 +223,19 @@ the common wrap and judge.
 
 **S1 · Delete only what is provably dead.**
 Delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer trace, and
-delete only symbols whose last production caller went with them — the voting scorer and its weights,
-`centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
+delete only symbols whose last production caller went with them.
+
+**What the trace actually found (S1 executed).** Deleted: `wrap`, `wrapFlap`, `unheldOf`, `ringsOf`,
+`touchesOutline`, `areaOfRing`, the `UnheldPatch`/`FlapWrap` types, `bandSnapPoints` — every one with
+zero remaining production consumers; the wrap module's only importer is now the live worker, taking
+`wrapBandLadder` and `wrapGrid`.
+
+**Deferred to S2, against the original list: the voting branch, its scorer, weights, `centeringRef` and
+`pointInMass`.** They have NOT lost their last caller. `POSITIONING` defaults to `0`, so
+`computeGrid(contour, {})` still enters the voting branch, and the separation test exercises exactly
+that path. Deleting it in S1 would change behaviour, which S1 forbids. Measured on squares 24/72/120/168
+the two paths agree exactly — but four squares is not the space, so the deletion belongs with S2, where
+`units/layout` owns registration and the default is settled deliberately rather than as a side effect.
 **Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — a structural deletion must
 not change what the bench does. Replaced and deleted in S2.
 
