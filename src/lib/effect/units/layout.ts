@@ -12,7 +12,7 @@ import {
   bandOf, bbox, edgeDistMM, latticeAt, makeCircleSeatPredicate, makeSeatPredicate, spotRadiusOf,
 } from '../foundation/geometry'
 import {
-  BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_FLOOR_MM, POSITIONING,
+  BANDS, DEFAULT_PITCH_MM, PADDING_FLOOR_MM, POSITIONING,
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
