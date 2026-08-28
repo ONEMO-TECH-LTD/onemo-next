@@ -1,181 +1,200 @@
-# GRID LAB — ENGINE ARCHITECTURE AND REFACTOR PLAN
+# MAGNETIC GRID ENGINE — ARCHITECTURE AND REFACTOR PLAN
 
-Target structure and the staged plan to reach it. Not yet true of the code.
-Written after a full read of the engine: spec, types, compute, logic, the door, the bridges, the
-wrap module, the classifier, the library (30 files), the worker and the page.
+**Scope.** The v3.5.6 cluster: `src/lib/effect/grid-magnet*`, `src/lib/effect/library/`, and the
+`grid-centre` bench. **Out of scope, retained:** the Session 59 engine (`src/lib/effect/grid.ts`,
+`grid-core.ts`, the `grid-lab` route) — a separate public door. Naming both "Grid Lab" is how the
+studio integrates the wrong one.
+
+Target structure and the staged plan to reach it. Not yet true of the code. Written after a full
+read of the engine, then revised against an independent architecture review (findings F1–F10, all
+reproduced at source before acceptance).
 
 **Goal.** The engine exports headless into the studio backend to define sizes and manufacturing
-layouts. So: one callable pipeline, no browser, no cross-dependencies, UI a shell.
+layouts. One callable pipeline, no browser, no cross-dependencies, UI a shell.
 
 ---
 
 ## 1 · Laws
 
-1. **Shared foundation is used, never rebuilt.** Spec, types and kernel are components. A unit that
-   re-implements a primitive is a defect. *Gate: duplicate-producer scan.*
-2. **A unit never imports another unit.** If wrap needs the centre, the pipeline hands it over.
-   *Gate: AST import matrix over `units/**` — the first gate to build.*
+1. **Shared foundation is used, never rebuilt.** A unit that re-implements a primitive is a defect.
+2. **A unit never imports another unit.** The pipeline passes outputs between them.
 3. **The pipeline holds sequence, never rules.** No threshold, no measurement, no ranking in it.
-   *Gate: not yet — after the module exists.*
 4. **One home per fact.** Physical constants in spec; each derived fact has one producer.
-   *Gate: exists (literal scan, library law).*
 5. **The shell renders.** Page and panel reach the engine only through adapters.
-   *Gate: exists for the library; extend to the engine.*
 
-**Kernel rule:** a primitive belongs in the kernel only when **two or more units** use it. One
-consumer means it moves into that unit. Without this, "kernel" becomes the next "compute".
+**Kernel rule:** a primitive enters the foundation only with **two or more unit consumers**. One
+consumer means it moves into that unit. Otherwise "foundation" becomes the next "compute".
 
 ---
 
 ## 2 · Target tree
 
-Files stay where they are unless marked. New folders only where new units are born.
+Files stay put unless marked. New folders only where new units are born.
 
 ```
 src/lib/effect/
-  grid-magnet-spec.ts        KEEP   values only (80 lines, already clean)
-  types.ts                   KEEP   vocabulary
-  kernel/                    NEW    primitives with ≥2 unit consumers
-    geometry.ts              ← bbox, area, centroid, point-in-polygon, nearest-edge
-    lattice.ts               ← latticeAt/latticeOver, seat predicate
-    erosion.ts               ← the 12mm legal-area primitive
-    offset.ts                KEEP in place (Clipper wrapper)
-  units/                     NEW    self-sufficient; NEVER import each other
-    segment/                 ← safeSegments (islands, masses, segment box)
-    classifier/              ← grid-magnet-class.ts + the catalogue matcher, completed
-    centring/                ← anchor bake, six modes, governors
-    wrap/                    ← the Clipper solve only
-    judge/                   ← band membership, landing, the 96mm law when it lands
-  library/                   KEEP IN PLACE — its own law + 28 gates; registered as a unit
-  pipeline/                  NEW    the five steps in order; no rules
-  adapters/                  NEW    ui-bridge, library-bridge, worker dispatch, catalogue adapter
+  grid-magnet-spec.ts      KEEP   values only
+  types.ts                 KEEP   vocabulary
+  geometry-truth.ts        KEEP   repo-wide, not engine-owned
+  offset.ts                KEEP   repo-wide Clipper wrapper
+  foundation/              NEW    primitives with ≥2 unit consumers
+                                  bbox · area · centroid · point-in-contour · nearest-edge
+                                  lattice · seat predicate · erosion
+  units/                   NEW    self-sufficient; NEVER import each other
+    segment/               ← safeSegments: legal contour, islands, masses, segment box
+    classifier/            ← grid-magnet-class.ts + the catalogue matcher, completed
+    centring/              ← anchor bake, six modes, governors
+    layout/                ← registration, population (full/perimeter/custom), generic fallback
+    wrap/                  ← fixed nodes → minimum lawful contact size + minimum shift
+    judge/                 ← evidence, legality, ordered offers, default landing
+  library/                 KEEP IN PLACE — its own law + 28 gates
+  pipeline/                NEW    one serialisable call; sequences the units
+  adapters/                NEW    ui-bridge · library-bridge · worker transport · catalogue adapter
 
-  DELETED
-    grid-magnet.ts           the voting-era door (349) — computeGrid's centre-rules branch moves
-                             to units/wrap; the voting branch and the band walk die
-    grid-magnet-logic.ts     split: centring → units/centring, coverage/plan → units/judge
+  RETIRED AT CUTOVER (stage 5, not before)
+    grid-magnet.ts         the door: centre-rules body → units/layout, voting branch deleted
+    grid-magnet-compute.ts split: primitives → foundation, safeSegments → units/segment
+    grid-magnet-logic.ts   split: centring → units/centring, applyCoverage → units/layout,
+                           assignSizes → adapters (it shapes output, it does not judge)
 
 src/app/(dev)/effect-creator/
-  grid-centre/               THE BENCH — shell
-    page.tsx                 KEEP (1147) render + state; only sanctioned imports — verified clean
-    LibraryPanel.tsx         KEEP
-    solve.worker.ts          SHRINK 226 → ~40: dispatch only
-  grid-magnet/               DELETE — voting reference
-  grid-wrap/                 DELETE — superseded count-first bench
+  grid-centre/             THE BENCH — shell
+    page.tsx               KEEP; loses its direct engine imports at stage 3
+    LibraryPanel.tsx       KEEP
+    solve.worker.ts        SHRINK 226 → transport/cache only
+  grid-magnet/  grid-wrap/ DELETE — voting reference, superseded count-first bench
 ```
+
+**Unit boundaries that matter:** `wrap` receives a fixed magnet set and solves only its contact
+size — it never registers or populates a layout. `layout` never wraps, never ranks, never infers a
+class. `judge` never mutates a population.
 
 ---
 
 ## 3 · What the read found
 
-**The pipeline is assembled in the worker.** `bakeOf` (step 1), `anchorFnFor` (step 2),
-`wrapBandLadder` (steps 3–4), the rule-4 landing (step 5) — all in `solve.worker.ts`. No module in
-`lib/` composes them. The catalogue-vs-solver oracle had to rebuild the composition by hand.
+**The pipeline is assembled in the worker.** `bakeOf`, `anchorFnFor`, `wrapBandLadder`, the rule-4
+landing — all in `solve.worker.ts`. No module in `lib/` composes them; the catalogue-vs-solver
+oracle had to rebuild the composition by hand.
 
-**Step 3 does not exist.** The layout comes from `computeGrid`'s centre-rules reveal, not from the
-library. `catalogueCandidates` has no caller.
+**Layout generation has no owner.** `computeGrid` registers the lattice and populates it; the wrap
+module solves a fixed set. Today both live behind one door.
 
-**The wrap module's header is false.** It says *"deliberately disconnected… no centring modes, no
-governing mass, no safe-area islands, no voting, no coverage"* — it imports `computeGrid`,
-`safeSegments`, `centeringAnchors`, `governMass`, `applyCoverage`.
+**The wrap module's header is false.** It claims to be disconnected from centring, masses, coverage
+and the door; it imports `computeGrid`, `safeSegments`, `centeringAnchors`, `governMass`,
+`applyCoverage`.
 
-**Foundation rebuilt inside the wrap module** (law 1 violations, measured):
+**Foundation rebuilt inside the wrap module:**
 
 | in `grid-magnet-wrap-compute.ts` | already exists in |
 |---|---|
-| `box()` | `bbox()` — compute |
-| `inside()` | `pointInOuter` — compute (private) |
-| `nearestDist()` | `edgeDistMM` — compute (private, **indexed**; the copy is a brute scan) |
-| `areaOfRing()` | shoelace in `centroidOf` / `areaOf` |
-| `heldAt`, `anchorAt`, `midOf` | written twice — in `wrap` and in `wrapGroup` |
-| `mod()` | defined again inside `wrapGrid` |
+| `box()` | `bbox()` |
+| `inside()` | `pointInOuter` (private) |
+| `nearestDist()` | `edgeDistMM` (private, **indexed**; the copy is a brute scan) |
+| `areaOfRing()` | shoelace in `centroidOf` |
+| `heldAt`, `anchorAt`, `midOf` | written twice — `wrap` and `wrapGroup` |
+| `mod()` | again inside `wrapGrid` |
 
-**Dead or dying, with consumers checked:**
+**Holes are structurally discarded.** `scaleContour`, `normBaseContour`, `normMaskContour`,
+`normGeneratedRing` all return `holes: []`, and the seat predicate takes only the outer ring. The
+brief requires every supplied boundary to stay material; the ledger parked it as blocked upstream
+(the tracer emits one ring). Named here as a real gap — see unknown 4.
 
-- `bandSnapPoints` — **zero consumers today.** Dead export.
-- `registrationScore` + `ORDERS` + `SEAT_WEIGHT`/`FLAP_WEIGHT`/`BALANCE_WEIGHT`/`VOTING_ORDER`,
-  `centeringRef`, `pointInMass` — reachable only when `positioning !== 1`, i.e. the voting route.
-- `maxPressMM` — only the band walk's rigid gate. Dies with the walk.
+**The separation gate cannot see the live bench.** Proven by my own mutation: a raw
+`grid-magnet-compute` import injected into `grid-centre/page.tsx` leaves it **12/12 green**, because
+the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
+
+**Consumers checked:**
+
+- `bandSnapPoints` — **zero consumers.** Dead export.
+- `fitSizeInBand` / `bandWalk` / `maxPressMM` — **LIVE.** `grid-centre/solve.worker.ts` calls them
+  through `bandFit` for the empty-band fallback and the non-positioning path. Not deletable yet.
+- voting scorer + weights, `centeringRef`, `pointInMass` — reachable only via `positioning !== 1`.
 - `wrap()`, `wrapFlap`, `unheldOf` — only the two benches being deleted.
-- **Survives, do not cut:** `pressExcessMM` (the centre-rules parity tie-break is live),
-  `makeCircleSeatPredicate` (the circle preset), `splitPerimeter` (feeds `applyCoverage`).
+- **Survive:** `pressExcessMM` (centre-rules tie-break), `makeCircleSeatPredicate` (circle preset),
+  `splitPerimeter` (feeds `applyCoverage`).
 
-**Already clean, leave alone:** no React/Next/DOM anywhere in `lib/effect` or the library; nothing
-in `lib/` imports `app/`; the page's maths is all view maths and its engine imports are the
-sanctioned ones only — the door for constants and types, spec, the two bridges, the library barrel;
-the library's 30 files are under their own law with 28 gates.
+**Already clean:** no React/Next/DOM in `lib/effect` or the library; nothing in `lib/` imports
+`app/`; the library's 30 files are under their own law with 28 gates.
 
 ---
 
 ## 4 · Plan
 
-Deletion first — it shrinks everything after it.
+**Stage 1 · Characterise, then delete only what is provably dead.**
+Freeze current live results first: four classes, every band, manual phase and size, the empty-band
+fallback. Then delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer
+trace, and delete only symbols whose last production caller went with them — the voting scorer and
+its weights, `centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
+**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM`** until the pipeline replaces their live behaviour.
+No behaviour change inside a structural deletion.
+*Done when:* the frozen results reproduce exactly.
 
-**Stage 1 · Delete.** The two benches (`grid-magnet/`, `grid-wrap/` routes), then what loses its
-last consumer: `wrap()`, `wrapFlap`, `unheldOf`, the voting scorer and its weights, `centeringRef`,
-the band walk (`bandWalk`, `fitSizeInBand`, `bandSnapPoints`, `maxPressMM`).
-*Done when:* the bench solves identically on all four classes and every band, tests green.
+**Stage 2 · Move bodies to owners.** Foundation, segment, centring, layout, wrap, judge — existing
+bodies moved, not rewritten. `applyCoverage` → layout (it changes the population). `assignSizes` →
+adapters (it shapes output). The wrap module drops its six rebuilt primitives and its false header.
+Land the derived-zone import matrix in the same commit.
+*Done when:* the frozen results still reproduce, and a unit→unit import fails the suite.
 
-> **Consequence to decide before this lands.** The band walk is also the bench's **fallback**: when
-> a band reveals no layout that wraps inside it, the worker falls back to `fitSizeInBand` and shows
-> *"nothing fully fits in this band — best seated shown"*. Delete the walk and that path goes with
-> it — the band would honestly offer nothing instead. Keep the fallback, or drop it? (unknown 8)
+**Stage 3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
+`manual | band | automatic` — changes *candidate enumeration only*; segment, class, centre, layout,
+wrap and judge are the same calls in every mode. The worker becomes transport and cache. The shell
+gets an adapter surface (`createGridRequest`, `gridViewModel`, `libraryViewModel`) and loses its
+direct engine imports.
+*Done when:* the pipeline runs from a Node test with no worker, the oracle calls it instead of
+rebuilding the composition, and the mutation proof runs against the **real** page and worker.
 
-**Stage 2 · Stop rebuilding the foundation.** The wrap module uses compute's primitives instead of
-its own copies; `heldAt`/`anchorAt`/`midOf` written once. Correct the false header.
-*Done when:* the six duplicates above are gone and the wrap answers are unchanged, size for size.
+**Stage 4 · Complete the product logic.** Catalogue-backed classifier (below), the generic layout
+fallback for shapes the catalogue does not enumerate, the y-flip repair, the 96mm arc as judge
+evidence, the decision trace and the standing audit.
 
-**Stage 3 · Split what's left of wrap.** `units/wrap` (the Clipper solve), `units/judge` (band
-membership + landing), `adapters/` (`wrapGrid`).
-*Done when:* each file has one job and the bench is byte-identical on screen.
+**Stage 5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
+the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
+24/48/96, real cutouts, every centre mode, every band, manual, then verify the live surface.
 
-**Stage 4 · The pipeline module.** `bakeOf`, `anchorFnFor`, the ladder call and the landing move out
-of the worker into `pipeline/`. The worker becomes dispatch.
-*Done when:* the pipeline is callable from a Node test with no worker, and the oracle uses it
-instead of hand-rebuilding the composition.
+### The classifier method
 
-**Stage 5 · Complete the classifier.** Delete the hardcoded family (`fill < 0.68`, the `0.08` corner
-inset, `minor <= 2`); the matching catalogue entry's class is the answer. Exact facts (the axis
-pair) filter; continuous facts (fill, then aspect) order — so no threshold is invented. Ties are
-reported as ambiguous, never resolved silently. Add the decision trace and the standing audit
-(every record classifies to its own class).
-*Done when:* measured over all 163 records at 24/48/96 and the real cutouts, reported as
-decided / ambiguous / missed. Baseline to beat: **123 of 163 decided, 0 missed.**
+Exact ruled facts filter — the axis pair both sides carry. Then remove only candidates **dominated
+on every continuous fact** (fill *and* aspect): a Pareto frontier, not a priority order. One
+surviving class → decided; several → **ambiguous, every tied class named in the trace**.
 
-**Stage 6 · Law and gates.** Land the law with **one** gate — unit-never-imports-unit. The rest as
-their structure appears.
-*Done when:* a probe file importing one unit from another fails the suite.
+*Why not "fill, then aspect":* a lexicographic order is a ranking policy I would be inventing, and
+it was never ruled. Honest cost: a frontier leaves more candidates standing than an invented
+priority would, so expect more ambiguity — which the audit is there to show rather than hide.
+
+**The standing audit, per entry, at 24/48/96:** its own id stays a candidate · its own class stays
+in the result · no wrong decided class · no miss · ambiguity explicit and complete.
+*123-of-163 is a baseline, not the acceptance contract.*
 
 ---
 
-## 5 · Open unknowns
+## 5 · Open — Dan's calls
 
-Each is separately answerable; none blocks stage 1.
+1. **Class source split.** Family from the silhouette while frame/kind come from the legal-area
+   segments — or everything from the segments? (Erosion at the current size is already universal
+   eligibility; only this split is open.)
+2. **Class → centring-mode table.** Unfilled by design.
+3. **Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
+4. **Holes.** The brief requires them as material boundaries; the ledger parked them as blocked at
+   the tracer. In scope now, or still parked?
+5. **The studio wire format.** `LayoutOffer` stays an internal typed record until the studio caller
+   is read — id/source, class result, nodesMM, size, centre deviation, coverage evidence, verdict.
+6. Band boundaries / whether B6 exists / when interior magnets are ever allowed / control wording.
 
-1. **Legal area at size.** The 12mm rim is physical and does not scale, so the legal area genuinely
-   differs at each size while the outline's identity is scale-free. Confirm the split.
-2. **Classifier source.** Class read from the segments, with the catalogue supplying the answer —
-   or family from the silhouette and frame/kind from the segments?
-3. **The output contract.** What the studio backend needs from a layout (magnets, size, class,
-   evidence?) is unknown, so the pipeline returns a typed result and freezing it waits.
-4. **The 96mm perimeter law.** Ruled, never built. It belongs in `units/judge` — but whether it
-   filters offers or only orders them is unsettled.
-5. **Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
-6. **Solver → catalogue wiring.** Stage 5 makes the classifier answer from the catalogue; the
-   solver taking its candidates from it is a separate authorisation.
-7. **The y-flip defect** — 68 records / 204 pitch-cases where the engine registers a flipped view
-   wrongly. Fix before or after stage 6?
-8. **The empty-band fallback.** Keep "best seated shown" when a band reveals nothing, or let the
-   band offer nothing? Deleting the walk removes it either way — this decides whether it is
-   rebuilt small inside `units/judge`.
+**Settled, removed from this list:** current-size erosion (already universal) · the 96mm arc (a law
+in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
+(authorised: *"finish properly wiring and completing the classifier the pipeline and run it"*) ·
+the y-flip (a technical defect I fix before whole-catalogue activation, not a sequencing question
+for Dan) · the empty-band fallback (preserved until a product ruling changes it).
 
 ---
 
 ## 6 · Not doing, and why
 
-- **Moving spec/types into folders** — churn with no gain; they are already single-purpose.
-- **Moving `geometry-truth.ts`** — shared with the whole app, not engine-owned.
+- **Relocating `geometry-truth.ts` / `offset.ts`** — repo-wide, not engine-owned.
 - **Relocating `library/`** — 28 gates reference its paths; the move buys nothing.
-- **A full gate suite up front** — gates for structure that does not exist yet are theatre. One
-  now, the rest when their structure lands.
-- **Freezing the output contract now** — see unknown 3.
+- **Freezing the studio wire format** — see open 5.
+- **Pinning active function bodies by hash** — the library's owner-file pin was the end of a
+  specific attack; it is not a general structural tool.
+- **A full gate suite up front** — the derived-zone matrix lands in stage 2; the rest follow their
+  structure.
