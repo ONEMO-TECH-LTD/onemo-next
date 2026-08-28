@@ -1,7 +1,7 @@
 // grid-magnet-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
-import type { BBox, Contour, Pt, SafeMass, SafeSegment } from './types'
-import { bbox, edgeDistMM, pointInOuter } from './foundation/geometry'
+import type { BBox, Contour, Pt } from './types'
+import { edgeDistMM } from './foundation/geometry'
 
 // Moved to foundation/geometry.ts (S2 step 1). Re-exported so no consumer changes in the move.
 export { bbox, spotRadiusOf, fieldSpanMM, latticeAt, latticeOver, makeSeatPredicate,
