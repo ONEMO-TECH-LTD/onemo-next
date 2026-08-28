@@ -173,8 +173,8 @@ and the catalogue oracle that already exists.
 
 **Execution gates for the authorised build.** S1–S3 need no open product answer. **OQ1 gates S4** — the
 class source is Dan's, and the build may not invent the silhouette-versus-segments split. Nothing else
-gates this build. Every other open question belongs to a deferred stage and is listed there; none may be
-used to justify work inside S1–S4.
+gates this build. Deferred questions are recorded in `v3.5.6-pipeline-brief.md` §7, and none may be used
+to justify work inside S1–S4.
 
 ### Build scope lock
 
@@ -366,7 +366,8 @@ stage is authorised.
 
 - **Relocating `geometry-truth.ts` / `offset.ts`** — repo-wide, not engine-owned.
 - **Relocating `library/`** — 28 gates reference its paths; the move buys nothing.
-- **Freezing the studio wire format** before reading its real caller — see OQ4.
+- **Freezing the studio wire format** before reading its real caller — deferred; recorded in
+  `v3.5.6-pipeline-brief.md` §7.
 - **Pinning active function bodies by hash** — the library's owner-file pin was the end of a
   specific attack; it is not a general structural tool.
 - **A full gate suite up front** — the derived-zone matrix lands in S2; the rest follow their
