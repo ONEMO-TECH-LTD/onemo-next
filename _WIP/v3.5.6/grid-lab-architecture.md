@@ -179,12 +179,31 @@ delete only symbols whose last production caller went with them — the voting s
 `centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
 **Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — a structural deletion must
 not change what the bench does. Replaced and deleted in S2.
+
+**Keep the unheld measurement — `unheldOf`, `ringsOf`, `touchesOutline` (~45 lines) — permanently.**
+Their only callers are `wrapFlap` and the `grid-wrap` route, so the consumer trace would delete them,
+and Phase B needs all three: `unheldOf` is the exact coverage measure that judge element 4 (coverage
+dominance) ranks on, and `touchesOutline` is what separates an **exposed edge** from an interior gap —
+the predicate elements 1 and 3 (the 96mm *arc* and segment-edge priority) are both defined in terms of.
+What the brief kills is unheld **area as the judge**, which is the ranking, not the measurement. They
+move to `foundation` in S2; only `wrapFlap` — count-first, aimed at patch centroids, wrong axis under
+the reversal — is deleted.
 *Done when:* the bench still solves on all four classes and every band, the existing suite and the
 catalogue oracle stay green.
 
 > **No behaviour freeze.** The old engine never produced correct answers — the voting tab
 > approximated. Freezing its output as a golden would make the defect the reference. Correctness is
 > judged against the catalogue oracle, which already exists, and against the live surface.
+
+**Checked against Phase B before authorising S1 — two risks raised, both clear:**
+*Deleting voting does not delete the mechanism that gets the duck right.* The ledger credits voting with
+Dan's 147mm duck because "it seats every legal node at a size and the count falls out". That mechanism is
+`latticeAt(bb, pitch, ox, oy).filter(fits)` — **shared by all three branches**, not owned by voting. S1
+deletes the *scorer and its weights*; the seat-filter and the centre-rules parity registration are kept
+and move to `units/layout`.
+*The pipeline call cannot reintroduce the count axis.* Its envelope is `manual{sizeMM} | band{bandId} |
+automatic{sizeRangeMM}` — no count is an input anywhere, so the reversal (*"the number must come from
+size range"*) is structural, not a convention that can drift.
 
 **S2 · Move bodies to owners; fallback generation under layout, verdict under judge.**
 Foundation, segment, centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
