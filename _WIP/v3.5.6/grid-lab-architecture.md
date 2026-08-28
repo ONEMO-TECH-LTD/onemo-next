@@ -9,6 +9,9 @@ Target structure and the staged plan to reach it. Not yet true of the code. Writ
 read of the engine, then revised against an independent architecture review (findings F1–F10, all
 reproduced at source before acceptance).
 
+**The product pipeline it serves** — what each step delivers and what the classifier owes — is
+`v3.5.6-pipeline-brief.md`. This document is the code structure only.
+
 **Goal.** The engine exports headless into the studio backend to define sizes and manufacturing
 layouts. One callable pipeline, no browser, no cross-dependencies, UI a shell.
 
@@ -16,16 +19,15 @@ layouts. One callable pipeline, no browser, no cross-dependencies, UI a shell.
 
 ## 1 · Laws
 
-1. **Shared foundation is used, never rebuilt.** A unit that re-implements a primitive is a defect.
-2. **A unit never imports another unit.** The pipeline passes outputs between them.
-3. **The pipeline holds sequence, never rules.** No threshold, no measurement, no ranking in it.
-4. **One home per fact.** Physical constants in spec; each derived fact has one producer.
-5. **The shell renders.** Page and panel reach the engine only through adapters.
-6. **Proven bodies move; they are never retyped.** The tree is built new, the geometry is carried
-   across unchanged, and each move is proven by an empty diff. Every regression this project has
-   paid for came from re-writing something that already worked — the y-flip written three times,
-   the size maths three times, four gates that checked a spelling. The one clean transfer went
-   cleanly because `wrapGroup` moved byte-identical.
+**L1 · Shared foundation is used, never rebuilt.** A unit that re-implements a primitive is a defect.
+**L2 · A unit never imports another unit.** The pipeline passes outputs between them.
+**L3 · The pipeline holds sequence, never rules.** No threshold, no measurement, no ranking in it.
+**L4 · One home per fact.** Physical constants in spec; each derived fact has one producer.
+**L5 · The shell renders.** Page and panel reach the engine only through adapters.
+**L6 · Proven bodies move; they are never retyped.** The tree is built new, the geometry carried
+across unchanged, each move proven by an empty diff. Every regression this project has paid for came
+from rewriting something that already worked; the one clean transfer succeeded because `wrapGroup`
+moved byte-identical.
 
 **Kernel rule:** a primitive enters the foundation only with **two or more unit consumers**. One
 consumer means it moves into that unit. Otherwise "foundation" becomes the next "compute".
@@ -117,7 +119,7 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 - `fitSizeInBand` / `bandWalk` / `maxPressMM` — live at exactly **two** touchpoints, both relics:
   the empty-band fallback, and the idle prefetcher warming caches for a path that never runs. The
   page hardcodes `positioning: 1` with no control to change it, so the worker's non-positioning
-  branch is **unreachable**. Once the fallback is rebuilt (stage 2) the whole chain has no caller.
+  branch is **unreachable**. Once the fallback is rebuilt (S2) the whole chain has no caller.
 - voting scorer + weights, `centeringRef`, `pointInMass` — reachable only via `positioning !== 1`.
 - `wrap()`, `wrapFlap`, `unheldOf` — only the two benches being deleted.
 - **Survive:** `pressExcessMM` (centre-rules tie-break), `makeCircleSeatPredicate` (circle preset),
@@ -128,7 +130,7 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 
 **What survives, and what goes** — this is why the work is a re-layout, not a rewrite:
 
-| moved unchanged (law 6) | lines | deleted | lines |
+| moved unchanged (L6) | lines | deleted | lines |
 |---|---|---|---|
 | seat predicate + edge index | 165 | the two old routes | 2183 |
 | `safeSegments` | 248 | `wrap`/`wrapFlap`/`unheldOf` chain | 375 |
@@ -140,23 +142,31 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 
 Twelve destinations from four files: `grid-magnet-compute` splits four ways, `grid-magnet-logic`
 three, the door two, the wrap module three. **The behaviour lock that makes this safe:** the
-catalogue oracle asserts 163 records × 3 pitches *equal*, and stage 1 freezes the live bench.
+catalogue oracle asserts 163 records × 3 pitches *equal*, and S1 freezes the live bench.
 
 ---
 
 ## 4 · Plan
 
-**S1 · Characterise, then delete only what is provably dead.**
-Freeze current live results first: four classes, every band, manual phase and size, the empty-band
-fallback, and a directly-supplied donut contour. Then delete the `grid-magnet/` and `grid-wrap/`
-routes, re-run a re-export-aware consumer trace, and delete only symbols whose last production caller went with them — the voting scorer and
-its weights, `centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
-**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — not because they earn a
-place, but because a structural deletion must not change behaviour. They are replaced and deleted in S2.
-*Done when:* the frozen results reproduce exactly.
+**Execution gates.** S1–S3 need no open product answer. OQ1–OQ2 gate S4. OQ3, OQ5 and OQ6 gate
+product activation in S5. OQ4 is not a decision yet — it is resolved by reading the actual studio
+caller before anything freezes or exports its wire contract.
 
-**S2 · Move bodies to owners, and rebuild the fallback as a verdict.** Foundation, segment,
-centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
+**S1 · Characterise, then delete only what is provably dead.**
+Freeze current live results first: four classes, every band, manual phase and size, and the
+empty-band fallback. Add a directly-supplied donut as a **failing** characterisation — current code
+erases its hole, so the target assertion stays red until S2. Freezing it green would bless the
+defect. Then delete the `grid-magnet/` and `grid-wrap/`
+routes, re-run a re-export-aware consumer trace, and delete only symbols whose last production
+caller went with them — the voting scorer and its weights, `centeringRef`, the
+`wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
+**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — not because they earn a
+place, but because a structural deletion must not change behaviour. Replaced and deleted in S2.
+*Done when:* the non-hole frozen results reproduce exactly, and the donut counterexample proves the
+current hole loss.
+
+**S2 · Move bodies to owners; fallback generation under layout, verdict under judge.**
+Foundation, segment, centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
 contour-aware: outer eroded, every supplied hole inflated and subtracted by the same radius, and
 `Contour.holes` preserved through scaling and sizing. `applyCoverage` → layout (it
 changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
@@ -164,8 +174,8 @@ rebuilt primitives and its false header. Land the derived-zone import matrix in 
 
 **The empty band is answered by the units, not by an escape hatch.** Today it falls back into the
 old walk and shows the size that seats the most magnets, loose — the rigid gate and band-only wrap
-the brief lists as "do not preserve", kept alive to avoid a blank screen. The capability is
-preserved explicitly and the old path deleted:
+the brief lists as "do not preserve", kept alive to avoid a blank screen. Capability preserved
+explicitly, old path deleted:
 
 - **`units/layout` owns fallback candidate generation.** When catalogue candidates yield no lawful
   offer it generates generically. It is not a new unit and not a second law.
@@ -180,8 +190,10 @@ The pipeline decides none of this: it sequences layout → wrap → judge and pa
 
 With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
 no caller and are deleted in S2.
-*Done when:* the frozen results still reproduce, the empty band reports its nearest offer, and a
-unit→unit import fails the suite.
+*Done when:* the non-hole frozen results still reproduce · the donut target now passes · an
+`automatic` envelope reports the nearest lawful offer where one exists, otherwise `offers` is empty
+and the `no-lawful-offer` diagnostic carries only a calibration witness · a unit→unit import fails
+the suite.
 
 **S3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
 `manual | band | automatic` — changes *candidate enumeration only*; segment, class, centre, layout,
@@ -191,9 +203,9 @@ direct engine imports.
 *Done when:* the pipeline runs from a Node test with no worker, the oracle calls it instead of
 rebuilding the composition, and the mutation proof runs against the **real** page and worker.
 
-**S4 · Complete the product logic.** Catalogue-backed classifier (below), the generic layout
-fallback for shapes the catalogue does not enumerate, the y-flip repair, the 96mm arc as judge
-evidence, the decision trace and the standing audit.
+**S4 · Complete the product logic.** Catalogue-backed classifier (below), the y-flip repair, the
+96mm arc as judge evidence, the decision trace and the standing audit. *(The generic layout fallback
+lands in S2, not here.)*
 
 **S5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
 the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
@@ -221,10 +233,9 @@ was never ruled.
 | **48 mm** | **163** | **0** | **0** |
 | 96 mm | 151 | 12 | 0 |
 
-Every ambiguity is diamond↔triangle; no square/rectangle confusion, no misses at any pitch. I had
-predicted a frontier would leave *more* candidates standing than an invented priority — that was
-speculation and it is false. These numbers prove self-classification on the corpus only; they do not
-predict accuracy on an arbitrary cutout.
+Every ambiguity is diamond↔triangle; no square/rectangle confusion, no misses at any pitch. These
+numbers prove self-classification on the corpus only; they do not predict accuracy on an arbitrary
+cutout.
 
 **The standing audit, per entry, at 24/48/96:** its own id stays a candidate · its own class stays
 in the result · no wrong decided class · no miss · ambiguity explicit and complete.
@@ -244,8 +255,10 @@ universal eligibility; only this split is open.)
 
 **OQ3 · Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
 
-**OQ4 · The studio wire format.** `LayoutOffer` stays an internal typed record until the studio caller
-is read — id/source, class result, nodesMM, size, centre deviation, coverage evidence, verdict.
+**OQ4 · ~~The studio wire format~~ — reassigned, not a decision yet.** Nobody has read the studio
+caller. It is a bounded read task in the plan; `LayoutOffer` stays an internal typed record until
+then, and only a genuine product choice found by that read comes back to you.
+
 **OQ5 · Band boundaries** — whether B6 exists (a 264mm axis), and when interior magnets are ever
 allowed.
 
@@ -256,9 +269,9 @@ in judge, eligibility and repair evidence, not an optional ranker) · solver-to-
 (authorised: *"finish properly wiring and completing the classifier the pipeline and run it"*) ·
 the y-flip (a technical defect I fix before whole-catalogue activation (S4), not a sequencing question
 for Dan) · engine hole handling (a defect, not a Dan gate: the engine obeys supplied `Contour.holes`
-in this refactor and adapters may not erase them; raster hole *extraction* stays parked upstream) · the empty-band fallback (**rebuilt** as a judge verdict on the new solver, not inherited
-from the walk — Dan, this session: a fallback is either a declared verified alternative or it is
-built on the new architecture).
+in this refactor and adapters may not erase them; raster hole *extraction* stays parked upstream) ·
+the empty-band fallback (layout generates candidates, judge alone decides legality — not inherited
+from the walk).
 
 ---
 
@@ -266,7 +279,7 @@ built on the new architecture).
 
 - **Relocating `geometry-truth.ts` / `offset.ts`** — repo-wide, not engine-owned.
 - **Relocating `library/`** — 28 gates reference its paths; the move buys nothing.
-- **Freezing the studio wire format** — see open 5.
+- **Freezing the studio wire format** before reading its real caller — see OQ4.
 - **Pinning active function bodies by hash** — the library's owner-file pin was the end of a
   specific attack; it is not a general structural tool.
 - **A full gate suite up front** — the derived-zone matrix lands in S2; the rest follow their
