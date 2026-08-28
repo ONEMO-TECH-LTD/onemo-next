@@ -16,7 +16,7 @@ import {
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
-export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
+function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45
   const belt: Pt[] = [], interior: Pt[] = []
   for (let i = 0; i < seated.length; i++) {
@@ -37,7 +37,7 @@ export function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt:
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
 /** What layout decided — placement only; the caller turns it into the engine's result. */
-export interface LayoutPlacement {
+interface LayoutPlacement {
   bb: ReturnType<typeof bbox>; pitch: number; reach: number
   plan: NonNullable<GridConfig['plan']>; perimeterOnly: boolean
   outer: ReadonlyArray<Pt>; fits: ((p: Pt) => boolean) | null
@@ -50,7 +50,7 @@ export interface LayoutPlacement {
  *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
  *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
  *  Enforced through the dominance tiers, not preferred. */
-export function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
   if (!seated.length) return 0
   let sum = 0
   for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)

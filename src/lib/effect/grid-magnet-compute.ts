@@ -15,7 +15,6 @@ export { safeSegments } from './units/segment'
 
 export type { BBox } from './types'
 
-export function dist(a: Pt, b: Pt): number { return Math.hypot(a[0] - b[0], a[1] - b[1]) }
 
 /** THE RIGID GATE (Dan, 2026-08-20): the worst disc's gap past its margined edge. A layout
  *  qualifies only when EVERY disc touches within the allowance — 0 = touch, 1 = 1mm space.

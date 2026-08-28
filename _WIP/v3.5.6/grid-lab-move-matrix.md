@@ -35,6 +35,45 @@ Where the audit found one, the symbol moves into that unit instead.
 
 ---
 
+## 0a · Audit against this matrix — executed state
+
+Run after steps 1–6 landed. Every claim below is measured, not recalled.
+
+**Nothing the working parts did was lost.** Two full-surface comparisons against the pre-S2
+baseline tag, on a separate checkout of that tag rather than a stash:
+
+| surface | cases | result |
+|---|---|---|
+| The Centre Lab's centring — 6 modes × 4 governors × 3 shapes × 4 sizes, comparing seated points, the governing centre and every candidate centre | **288** | **identical** |
+| The wrap module — 3 shapes × 4 bands × 3 modes × 2 governors, comparing count, exact size, centre deviation, every magnet position, every per-magnet gap and the reveal size | **72** | **identical** |
+
+**On `centeringRef`, deleted with voting.** Its rule — *the smallest mass **that holds a magnet**
+governs* — was reachable **only** through the voting branch (`grid-magnet.ts:241`, inside
+`else if (fits)`). The Centre Lab runs centre-rules, where the target comes from `governMass` over
+all masses. So the Centre Lab never used it and lost nothing. **But the rule itself now exists
+nowhere**: filtering masses by which hold a seat is not the same as filtering by clearance, and it
+is Dan's stated wording. Recoverable from history; belongs to the deferred judge/centring
+completion, not to this refactor. Recorded rather than quietly dropped.
+
+**Unit self-sufficiency:** no unit imports another, none reaches a retiring aggregate, foundation
+depends on nothing above it. The two hits an automated sweep raised were false: segment sorts its
+own measurements by area, and layout's match was the word "ranks" inside a comment saying it never
+ranks.
+
+**Three matrix rows found unexecuted, now closed:** `dist` was still present with zero importers
+(the row said DELETE); `splitPerimeter`, `pressExcessMM` and `LayoutPlacement` were exported from
+layout with no consumer outside it and are now private.
+
+**Correctly still standing, each gated on a replacement that does not exist yet:** `bandWalk` /
+`fitSizeInBand` / `maxPressMM` (they die when layout's generic fallback lands) · `shapeFamilyOf`
+(dies when the catalogue answers) · `wrapGrid`, `contactPointsMM`, `scaleContour`, `assignSizes`
+(they move when adapters land) · `wrapBandLadder` (moves when the pipeline lands).
+
+**Remaining old files are shims plus that list:** compute 562→56, logic 208→32, class 144→51,
+wrap-compute 685→135, door 349→144.
+
+---
+
 ## 0 · Landing sequence
 
 The map said where every declaration goes and never said in what order it could move. That gap is
