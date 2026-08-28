@@ -177,7 +177,9 @@ Foundation, segment, centring, layout, wrap, judge — existing bodies moved, no
 contour-aware: outer eroded, every supplied hole inflated and subtracted by the same radius, and
 `Contour.holes` preserved through scaling and sizing. `applyCoverage` → layout (it
 changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
-rebuilt primitives and its false header. Land the derived-zone import matrix in the same commit.
+rebuilt primitives and its false header. The derived-zone import matrix lands in the same commit and
+**`grid-magnet-separation.test.ts` is deleted with it** — it is a replacement for a gate proven blind,
+not a second gate.
 
 **The empty band is answered by the units, not by an escape hatch.** Today it falls back into the
 old walk and shows the size that seats the most magnets, loose — the rigid gate and band-only wrap
@@ -213,6 +215,10 @@ rebuilding the composition, and the mutation proof runs against the **real** pag
 **S4 · Complete the product logic.** Catalogue-backed classifier (below), the y-flip repair, the
 96mm arc as judge evidence, the decision trace and the standing audit. *(The generic layout fallback
 lands in S2, not here.)*
+Two named defects close here or the stage is not done: **4 of 38 rectangle records report `cx = cy`**
+— a rectangle carrying a square's axis pair, exactly the silent misclassification the audit exists to
+catch — and the **`round` family reaches nothing** (a pill classifies as `square`), which the enum's
+deletion resolves by making the catalogue's own classes the answer.
 
 **S5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
 the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
