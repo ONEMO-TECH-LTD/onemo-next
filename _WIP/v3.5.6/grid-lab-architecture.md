@@ -125,8 +125,11 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 - **Survive:** `pressExcessMM` (centre-rules tie-break), `makeCircleSeatPredicate` (circle preset),
   `splitPerimeter` (feeds `applyCoverage`).
 
-**Already clean:** no React/Next/DOM in `lib/effect` or the library; nothing in `lib/` imports
-`app/`; the library's 30 files are under their own law with 28 gates.
+**Already clean, measured on the cluster:** no React, Next or DOM in `grid-magnet*.ts` or `library/`;
+no `lib/` → `app/` import outside test files. The library's 29 modules are under their own law with 28
+gates. *(The wider `lib/effect/` folder is not DOM-free — `composite.ts`, `mask.ts`, `segment-ml.ts`
+and `prepare-effect.ts` call `document.createElement`. They are the older effect pipeline, out of this
+scope, and they are why the headless claim is made about the cluster and not the folder.)*
 
 **What survives, and what goes** — this is why the work is a re-layout, not a rewrite:
 
@@ -138,7 +141,7 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 | centre-rules parity registration | 30 | `computeGrid` voting branch | 62 |
 | Clipper wrap solve | 157 | voting scorer, weights, `centeringRef` | ~55 |
 | spec · shape normalisation | 192 | | |
-| `library/` — untouched, own law | 1976 | | |
+| `library/` — untouched, own law | 1693 | | |
 
 Twelve destinations from four files: `grid-magnet-compute` splits four ways, `grid-magnet-logic`
 three, the door two, the wrap module three. **What makes the moves checkable:** the catalogue oracle
