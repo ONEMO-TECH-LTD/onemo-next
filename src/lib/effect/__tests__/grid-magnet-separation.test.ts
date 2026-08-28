@@ -16,6 +16,9 @@ import { computeGrid } from '../grid-magnet'
 import { scaleContour } from '../grid-magnet-compute'
 import { makeContourSeatPredicate } from '../foundation/geometry'
 import { wrapGroup } from '../units/wrap'
+import { contourCentroidOf } from '../units/centring'
+import { safeSegments } from '../units/segment'
+import { makeSizer } from '../grid-magnet-bridge'
 import type { Contour, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
@@ -361,6 +364,26 @@ describe('6 — a supplied hole is material boundary, not decoration', () => {
     const inHole = g.anchors.filter((a) => Math.hypot(a.p[0] - 96, a.p[1] - 96) < 60 - 12)
     expect(inHole.map((a) => a.p), 'magnets seated inside the hole').toEqual([])
     expect(g.anchors.length).toBeGreaterThan(0)
+  })
+
+  it('an OFF-CENTRE hole moves the material centroid and clears the legal area', () => {
+    // A centred hole hides both defects: the centroid does not move and no segment centre lands in
+    // it. That is why the first four tests passed while segmentation and the weight centre were
+    // still hole-blind.
+    const off: Contour = { outer: { pts: [[0, 0], [192, 0], [192, 192], [0, 192]] as Pt[] }, holes: [{ pts: ring(72, 96, 48) }] }
+    expect(contourCentroidOf(off)[0], 'the hole sits left, so the material centre must move right').toBeGreaterThan(100)
+    const inHole = safeSegments(off, 12, 16, 'full')
+      .filter((sg) => Math.hypot(sg.centreMM[0] - 72, sg.centreMM[1] - 96) < 48 - 12)
+    expect(inHole.map((sg) => sg.centreMM), 'a legal-area centre inside a hole').toEqual([])
+  })
+
+  it('an outline offset carries the holes with it', () => {
+    expect(makeSizer(donut(192), 5)(192).holes.length).toBe(1)
+  })
+
+  it('two contours sharing an outline but differing in holes are not the same shape', () => {
+    const worker = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts'), 'utf8')
+    expect(worker, 'the cache signature must feed every hole ring, not just the outer').toMatch(/for \(const hole of base\.holes\) feed\(hole\.pts\)/)
   })
 
   it('wrap never places the group inside a supplied hole', () => {

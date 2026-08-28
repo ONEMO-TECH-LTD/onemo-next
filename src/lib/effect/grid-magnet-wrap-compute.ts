@@ -14,7 +14,7 @@ import type { BandRung, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig 
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
-import { centroidOf } from './units/centring'
+import { contourCentroidOf } from './units/centring'
 import { spotRadiusOf } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
@@ -92,10 +92,10 @@ export function wrapBandLadder(
   const anchorFn: (mm: number) => Pt = anchorAtMM ?? ((mm: number) => {
     const outer = sized(mm).outer.pts
     const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-    const segs = safeSegments(outer, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
+    const segs = safeSegments(sized(mm), r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
     const bb = bbox(outer)
     const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
-    const cands = centeringAnchors((cfg.centreMode ?? CENTRE_MODE) as CentreMode, segs, boxC, centroidOf(outer))
+    const cands = centeringAnchors((cfg.centreMode ?? CENTRE_MODE) as CentreMode, segs, boxC, contourCentroidOf(sized(mm)))
     if (((cfg.centreMode ?? CENTRE_MODE) as number) !== 2) return cands[0] ?? boxC
     const masses = segs.flatMap((x) => (x.masses.length ? x.masses : [x]))
     return governMass(masses, (cfg.governor ?? GOVERNOR) as Governor, (bb.minY + bb.maxY) / 2)?.centreMM ?? cands[0] ?? boxC

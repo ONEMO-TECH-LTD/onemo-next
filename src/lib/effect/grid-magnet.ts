@@ -11,7 +11,7 @@ import { registerLayout } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { bbox } from './foundation/geometry'
-import { centroidOf } from './units/centring'
+import { contourCentroidOf } from './units/centring'
 import { latticeAt, spotRadiusOf } from './units/layout'
 import {
   CENTRE_MODE,
@@ -48,10 +48,10 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const r0 = spotRadiusOf(pad0)
   const outer0 = contourMM.outer.pts
   const bb0 = bbox(outer0)
-  const segments0 = safeSegments(outer0, r0, Math.max(r0, cfg.massDepthMM ?? MASS_DEPTH_MM), cfg.segmentsDetail ?? 'full')
+  const segments0 = safeSegments(contourMM, r0, Math.max(r0, cfg.massDepthMM ?? MASS_DEPTH_MM), cfg.segmentsDetail ?? 'full')
   const mode0 = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
   const gov0 = (cfg.governor ?? GOVERNOR) as Governor
-  const centres0 = cfg.centreOverrideMM ? [cfg.centreOverrideMM] : centeringAnchors(mode0, segments0, [(bb0.minX + bb0.maxX) / 2, (bb0.minY + bb0.maxY) / 2], centroidOf(outer0))
+  const centres0 = cfg.centreOverrideMM ? [cfg.centreOverrideMM] : centeringAnchors(mode0, segments0, [(bb0.minX + bb0.maxX) / 2, (bb0.minY + bb0.maxY) / 2], contourCentroidOf(contourMM))
   const masses0 = segments0.flatMap((x) => (x.masses.length ? x.masses : [x]))
   const midY0 = (bb0.minY + bb0.maxY) / 2
   const ruleTarget0: Pt = cfg.centreOverrideMM ?? (mode0 === 2 ? (governMass(masses0, gov0, midY0)?.centreMM ?? centres0[0]) : centres0[0])

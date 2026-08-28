@@ -3,8 +3,8 @@
 // Moved from grid-magnet-compute.ts byte-identical (S2 step 2). It stands on foundation, not on
 // the file it left — the first attempt imported back into compute and made a cycle.
 
-import type { BBox, Pt, SafeMass, SafeSegment } from '../types'
-import { bbox, edgeDistMM, pointInOuter } from '../foundation/geometry'
+import type { BBox, Contour, Pt, SafeMass, SafeSegment } from '../types'
+import { bbox, edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
 const KEY_QUANTUM_MM = 0.01
@@ -28,19 +28,26 @@ const MS_CASES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
  * A MEASUREMENT for display and scoring — magnet legality stays the exact per-point test.
  */
 export function safeSegments(
-  outer: ReadonlyArray<Pt>, spotRadiusMM: number, massDepthMM: number,
+  contour: Contour, spotRadiusMM: number, massDepthMM: number,
   detail: 'full' | 'light' = 'full',
 ): SafeSegment[] {
-  if (outer.length < 3) return []
+  if (contour.outer.pts.length < 3) return []
   // Dense traced outlines are decimated for this measurement — display grain, not legality.
   const MAXV = 800
-  const k = Math.max(1, Math.ceil(outer.length / MAXV))
-  const ring: Pt[] = []
-  for (let i = 0; i < outer.length; i += k) ring.push(outer[i])
+  const decimate = (pts: ReadonlyArray<Pt>): Pt[] => {
+    const k = Math.max(1, Math.ceil(pts.length / MAXV))
+    const out: Pt[] = []
+    for (let i = 0; i < pts.length; i += k) out.push(pts[i])
+    return out
+  }
+  const ring = decimate(contour.outer.pts)
+  // A supplied hole is a MATERIAL BOUNDARY: the legal area must stop at its edge exactly as it
+  // stops at the outline. Measuring the outer ring alone put legal-area centres inside holes.
+  const measured: Contour = { outer: { pts: ring }, holes: contour.holes.map((h) => ({ pts: decimate(h.pts) })) }
   const r = spotRadiusMM
   const signed = (p: Pt): number => {
-    const d = edgeDistMM(ring, p)
-    return pointInOuter(p, ring) ? d - r : -(d + r)
+    const d = edgeDistToContourMM(measured, p)
+    return pointInContour(p, measured) ? d - r : -(d + r)
   }
   const step = 2 // mesh grain, mm
   const bb = bbox(ring)

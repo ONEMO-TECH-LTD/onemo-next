@@ -3,7 +3,8 @@
 
 import { BANDS, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, type BandRung, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
-import { bbox, centroidOf, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
+import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
+import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 import { defaultLanding } from '@/lib/effect/units/judge'
@@ -53,8 +54,8 @@ function bakeOf(
     const outer = sized(refMM).outer.pts
     const bb = bbox(outer)
     const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-    const segs = safeSegments(outer, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
-    const bake = anchorBakeOf(segs, [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2], centroidOf(outer), refMM, (bb.minY + bb.maxY) / 2)
+    const segs = safeSegments(sized(refMM), r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
+    const bake = anchorBakeOf(segs, [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2], contourCentroidOf(sized(refMM)), refMM, (bb.minY + bb.maxY) / 2)
     let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity
     for (const sg of segs) { sx0 = Math.min(sx0, sg.bbox.minX); sy0 = Math.min(sy0, sg.bbox.minY); sx1 = Math.max(sx1, sg.bbox.maxX); sy1 = Math.max(sy1, sg.bbox.maxY) }
     hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
@@ -99,14 +100,19 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
   const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
-    const pts = base.outer.pts
-    // Full-content hash — sampling (length + two points) collided across shapes (F2, Meta QA).
+    // Full-content hash over EVERY ring — outer and each hole, with ring boundaries. Hashing the
+    // outer ring alone let two contours with the same outline and different holes share a bake.
     let h = 0
-    for (let i = 0; i < pts.length; i++) {
-      h = (Math.imul(h, 31) + Math.round(pts[i][0] * 1000)) | 0
-      h = (Math.imul(h, 31) + Math.round(pts[i][1] * 1000)) | 0
+    const feed = (pts: ReadonlyArray<import('@/lib/effect/types').Pt>) => {
+      h = (Math.imul(h, 31) + pts.length) | 0
+      for (const [x, y] of pts) {
+        h = (Math.imul(h, 31) + Math.round(x * 1000)) | 0
+        h = (Math.imul(h, 31) + Math.round(y * 1000)) | 0
+      }
     }
-    const sig = JSON.stringify([offsetMM, pts.length, h])
+    feed(base.outer.pts)
+    for (const hole of base.holes) feed(hole.pts)
+    const sig = JSON.stringify([offsetMM, base.outer.pts.length, base.holes.length, h])
     if (sig !== shapeSig) { shapeSig = sig; rungCache.clear(); }
     const cfgSig = JSON.stringify(cfg)
     if (manualBand && sizeMM > 0) {
@@ -139,7 +145,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const drawn = wrapGrid(sized, wcfg, at)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)
-        const segments = safeSegments(drawn.contour.outer.pts, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
+        const segments = safeSegments(drawn.contour, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
         const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM }))
         const bk = bakeOf(sized, cfg, sig)

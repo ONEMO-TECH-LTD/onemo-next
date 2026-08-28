@@ -4,7 +4,7 @@
 // are new. CentreMode/Governor and the SafeSegment vocabulary moved to types.ts in the same commit,
 // so this unit imports no other unit.
 
-import type { AnchorBake, CentreMode, Governor, Pt, SafeSegment } from '../types'
+import type { AnchorBake, CentreMode, Contour, Governor, Pt, SafeSegment } from '../types'
 
 // Moved out of foundation (F3): zero unit consumers there; the weight centre is centring's.
 /** Area centroid of a polygon (shoelace) — the material's weight centre. */
@@ -22,6 +22,32 @@ export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
     return [mx / pts.length, my / pts.length]
   }
   return [sx / (3 * a2), sy / (3 * a2)]
+}
+
+/** Ring area, orientation-independent. */
+function ringAreaMM2(pts: ReadonlyArray<Pt>): number {
+  let area2 = 0
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) area2 += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
+  return Math.abs(area2) / 2
+}
+
+/** The MATERIAL centroid: the outline's centroid with every hole's mass subtracted. centroidOf on
+ *  the outer ring alone reports the box centre for an asymmetric holed shape, which is not where
+ *  the material actually is — that is what the Weight centre reads. */
+export function contourCentroidOf(contour: Contour): Pt {
+  const outerArea = ringAreaMM2(contour.outer.pts)
+  const outerCentre = centroidOf(contour.outer.pts)
+  let area = outerArea
+  let sx = outerCentre[0] * outerArea
+  let sy = outerCentre[1] * outerArea
+  for (const hole of contour.holes) {
+    const holeArea = ringAreaMM2(hole.pts)
+    const holeCentre = centroidOf(hole.pts)
+    area -= holeArea
+    sx -= holeCentre[0] * holeArea
+    sy -= holeCentre[1] * holeArea
+  }
+  return area > 1e-9 ? [sx / area, sy / area] : outerCentre
 }
 
 /** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity) ·

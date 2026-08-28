@@ -32,7 +32,9 @@ export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | nul
   const L = Math.max(bb.w, bb.h, 1)
   const c = contourFromShape(vs, { mmPerPx: FLATTEN_REF_MM / L, maskHeightPx })
   if (!c) return null
-  return { outer: { pts: c.outer.pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt) }, holes: [] }
+  const norm = (pts: ReadonlyArray<Pt>): Pt[] => pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt)
+  // Every ring normalises. Dropping holes here deleted them before the engine ever saw them.
+  return { outer: { pts: norm(c.outer.pts) }, holes: c.holes.map((h) => ({ pts: norm(h.pts) })) }
 }
 
 /** Sizer for one base contour: real-mm contour at any longest side, outline offset applied. */
@@ -41,7 +43,10 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
     const c = scaleContour(base, mm)
     if (!offsetMM) return c
     const o = insetRingMM(c.outer.pts, offsetMM, 'round')
-    return o && o.length >= 3 ? { outer: { pts: o }, holes: [] } : c
+    // A positive offset grows the outline and SHRINKS every hole by the same amount — a hole is a
+    // boundary, so an inset moves it inward from the material's point of view.
+    const holes = c.holes.map((h) => insetRingMM(h.pts, -mm, 'round')).filter((h): h is Pt[] => !!h && h.length >= 3)
+    return o && o.length >= 3 ? { outer: { pts: o }, holes: holes.map((pts) => ({ pts })) } : c
   }
 }
 
