@@ -35,6 +35,38 @@ Where the audit found one, the symbol moves into that unit instead.
 
 ---
 
+## 0 · Landing sequence
+
+The map said where every declaration goes and never said in what order it could move. That gap is
+what broke the first attempt: `foundation` may only hold a primitive with two or more unit
+consumers, but no unit can exist before `foundation` does. Executing the map without an order, I
+extracted a unit that then reached back into the file it had just left — a cycle, and the exact
+contamination this refactor exists to remove.
+
+**The rule is measured at the END of S2, not per commit.** It describes the landed architecture.
+Applying it to every intermediate state is what makes it circular and unexecutable.
+
+**Order, each step one commit, each proved before the next starts:**
+
+| # | lands | why here |
+|---|---|---|
+| 1 | **`foundation`** | bbox · the indexed edge kernel · centroid · spot radius · band lookup · lattice · seat predicates. Nothing else moves. Old files re-export, so no caller changes. Every unit below stands on this, so it cannot come second |
+| 2 | **`segment`** | the legal-area measurement — imports foundation, never a legacy file |
+| 3 | **`classifier`** | the axis pair and class frame. `shapeFamilyOf` stays behind: two live callers to repoint first |
+| 4 | **`layout`** | registration, population, the generic fallback. **The voting branch and the band walk die here**, so this is the one step with a behaviour change, and it carries its own before/after proof |
+| 5 | **`wrap`** | the Clipper solve. The anchor becomes a parameter the caller supplies, so wrap stops reaching into centring |
+| 6 | **`judge`** | band membership and the default landing — the rules currently buried in the ladder and the worker |
+
+`centring` (step 0) is already landed. `pipeline` and `adapters` follow in S3; they receive their
+first bodies from the worker and the ladder, and that is the commit that makes the engine callable.
+
+**Every step proves the same four things before the next begins:** moved bodies byte-identical ·
+the suite at its standing baseline · engine output identical before and after · the bench solving
+on the live surface. Step 4 is the exception on the third: its behaviour change is the point, so it
+states what changed and why instead of claiming equality.
+
+---
+
 ## 1 · `grid-magnet-compute.ts` (28 declarations)
 
 | symbol | → owner | class | why |
