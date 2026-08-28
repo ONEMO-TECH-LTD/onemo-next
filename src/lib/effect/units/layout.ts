@@ -6,13 +6,14 @@
 //
 // The voting sweep is gone (step 4a): centre-rules parity is the only registration path.
 
-import type { Contour, GridConfig, Pt, SafeSegment } from '../types'
+import type { BBox, Contour, GridConfig, Pt, SafeSegment } from '../types'
+import type { Band } from '../grid-magnet-spec'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
-  bandOf, bbox, edgeDistMM, edgeDistToContourMM, latticeAt, makeCircleSeatPredicate, makeSeatPredicate, pointInOuter, spotRadiusOf,
+  bbox, edgeDistMM, edgeDistToContourMM, makeCircleSeatPredicate, makeSeatPredicate, pointInContour,
 } from '../foundation/geometry'
 import {
-  BANDS, DEFAULT_PITCH_MM, PADDING_FLOOR_MM, POSITIONING,
+  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, POSITIONING,
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
@@ -33,6 +34,49 @@ function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; 
   }
   return { belt, interior }
 }
+
+// Moved out of foundation (F3): each had ONE unit consumer — this one. A primitive earns a
+// foundation seat with two or more, and a helper does not earn it by being geometry.
+/** Spot radius = the padding, measured from the magnet centre. */
+export function spotRadiusOf(padMM: number): number {
+  return padMM
+}
+
+/** Full field span: the fixed 9×9 board on the base 48 grid, plus one spot either side — 408 at
+ *  12 padding. Pitch never changes the board: 96 skips points on it, 24 adds points within it. */
+export function fieldSpanMM(padMM: number): number {
+  return (FIELD_POSITIONS_PER_AXIS - 1) * DEFAULT_PITCH_MM + 2 * spotRadiusOf(padMM)
+}
+
+/** Axis positions at `step` with a phase offset, spanning [min, max]. */
+function axisFrom(min: number, max: number, step: number, phase: number): number[] {
+  if (step <= 0 || max <= min) return [(min + max) / 2]
+  const res: number[] = []
+  let x = min + (((phase % step) + step) % step)
+  while (x - step >= min - 1e-6) x -= step
+  for (; x <= max + 1e-6; x += step) if (x >= min - 1e-6) res.push(x)
+  return res
+}
+
+/** Lattice across a region at phase (ox, oy). */
+export function latticeAt(bb: BBox, pitch: number, ox: number, oy: number): Pt[] {
+  const out: Pt[] = []
+  for (const x of axisFrom(bb.minX, bb.maxX, pitch, ox))
+    for (const y of axisFrom(bb.minY, bb.maxY, pitch, oy)) out.push([x, y])
+  return out
+}
+
+/** The same lattice generator over an arbitrary region. */
+export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
+  return latticeAt(region, pitch, phase[0], phase[1])
+}
+
+/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
+export function bandOf(sizeMM: number): Band | null {
+  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
+  return null
+}
+
 
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
@@ -75,11 +119,12 @@ export function registerLayout(
 
   // Eligibility is over the whole CONTOUR: a centre must clear the outline AND every supplied
   // hole. The outer-ring predicate cannot see a hole, which is how a magnet landed inside one.
-  const holeFree = (p: Pt) => contourMM.holes.every((h) => !pointInOuter(p, h.pts) && edgeDistMM(h.pts, p) >= spotRadiusOf(pad))
+  const clear = (p: Pt) => pointInContour(p, contourMM)
+    && contourMM.holes.every((h) => edgeDistMM(h.pts, p) >= spotRadiusOf(pad))
   const outerFits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
     : makeSeatPredicate(outer, spotRadiusOf(pad))
-  const fits = outerFits && (contourMM.holes.length ? (p: Pt) => outerFits(p) && holeFree(p) : outerFits)
+  const fits = outerFits && (contourMM.holes.length ? (p: Pt) => outerFits(p) && clear(p) : outerFits)
 
   const { segments, centres, ruleTarget } = given
 

@@ -10,46 +10,11 @@
 
 import type { BBox, Contour, Pt } from '../types'
 import { prepare, holds } from '@/lib/grid-engine/compute/geometry'
-import { BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, type Band } from '../grid-magnet-spec'
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   return { minX, minY, maxX, maxY }
-}
-
-/** Spot radius = the padding, measured from the magnet centre. */
-export function spotRadiusOf(padMM: number): number {
-  return padMM
-}
-
-/** Full field span: the fixed 9×9 board on the base 48 grid, plus one spot either side — 408 at
- *  12 padding. Pitch never changes the board: 96 skips points on it, 24 adds points within it. */
-export function fieldSpanMM(padMM: number): number {
-  return (FIELD_POSITIONS_PER_AXIS - 1) * DEFAULT_PITCH_MM + 2 * spotRadiusOf(padMM)
-}
-
-/** Axis positions at `step` with a phase offset, spanning [min, max]. */
-function axisFrom(min: number, max: number, step: number, phase: number): number[] {
-  if (step <= 0 || max <= min) return [(min + max) / 2]
-  const res: number[] = []
-  let x = min + (((phase % step) + step) % step)
-  while (x - step >= min - 1e-6) x -= step
-  for (; x <= max + 1e-6; x += step) if (x >= min - 1e-6) res.push(x)
-  return res
-}
-
-/** Lattice across a region at phase (ox, oy). */
-export function latticeAt(bb: BBox, pitch: number, ox: number, oy: number): Pt[] {
-  const out: Pt[] = []
-  for (const x of axisFrom(bb.minX, bb.maxX, pitch, ox))
-    for (const y of axisFrom(bb.minY, bb.maxY, pitch, oy)) out.push([x, y])
-  return out
-}
-
-/** The same lattice generator over an arbitrary region. */
-export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
-  return latticeAt(region, pitch, phase[0], phase[1])
 }
 
 /**
@@ -169,6 +134,10 @@ export function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
   return inside
 }
 
+// These stay in foundation deliberately: they are built ENTIRELY from the edge kernel above, and
+// relocating them would mean exporting edgeIdxOf — trading a clean internal for a leak. The
+// two-consumer rule is about primitives that units share, not about splitting a primitive from
+// the index it is made of.
 /**
  * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
  * tangency passing by equality (exact integer arithmetic, micron quantum).
@@ -218,27 +187,16 @@ export function makeCircleSeatPredicate(
   }
 }
 
-/** Area centroid of a polygon (shoelace) — the material's weight centre. */
-export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
-  let a2 = 0, sx = 0, sy = 0
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const cross = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
-    a2 += cross
-    sx += (pts[j][0] + pts[i][0]) * cross
-    sy += (pts[j][1] + pts[i][1]) * cross
-  }
-  if (Math.abs(a2) < 1e-9) {
-    let mx = 0, my = 0
-    for (const p of pts) { mx += p[0]; my += p[1] }
-    return [mx / pts.length, my / pts.length]
-  }
-  return [sx / (3 * a2), sy / (3 * a2)]
-}
-
-/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
-export function bandOf(sizeMM: number): Band | null {
-  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
-  return null
+/** Seat predicate over a whole CONTOUR: a centre must clear the outline and every hole by the spot
+ *  radius. The outer-ring predicate above cannot see a hole at all. */
+export function makeContourSeatPredicate(
+  contour: Contour, spotRadiusMM: number,
+): ((pt: Pt) => boolean) | null {
+  const outerFits = makeSeatPredicate(contour.outer.pts, spotRadiusMM)
+  if (!outerFits) return null
+  if (!contour.holes.length) return outerFits
+  return (pt: Pt) => outerFits(pt)
+    && !contour.holes.some((h) => pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM)
 }
 
 /** Inside MATERIAL: inside the outer ring AND outside every supplied hole. The two facts every
@@ -257,16 +215,4 @@ export function edgeDistToContourMM(contour: Contour, pt: Pt): number {
     distanceMM = Math.min(distanceMM, edgeDistMM(hole.pts, pt))
   }
   return distanceMM
-}
-
-/** Seat predicate over a whole CONTOUR: a centre must clear the outline and every hole by the spot
- *  radius. The outer-ring predicate above cannot see a hole at all. */
-export function makeContourSeatPredicate(
-  contour: Contour, spotRadiusMM: number,
-): ((pt: Pt) => boolean) | null {
-  const outerFits = makeSeatPredicate(contour.outer.pts, spotRadiusMM)
-  if (!outerFits) return null
-  if (!contour.holes.length) return outerFits
-  return (pt: Pt) => outerFits(pt)
-    && !contour.holes.some((h) => pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM)
 }

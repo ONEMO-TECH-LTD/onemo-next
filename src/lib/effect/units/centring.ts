@@ -6,6 +6,24 @@
 
 import type { AnchorBake, CentreMode, Governor, Pt, SafeSegment } from '../types'
 
+// Moved out of foundation (F3): zero unit consumers there; the weight centre is centring's.
+/** Area centroid of a polygon (shoelace) — the material's weight centre. */
+export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
+  let a2 = 0, sx = 0, sy = 0
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const cross = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
+    a2 += cross
+    sx += (pts[j][0] + pts[i][0]) * cross
+    sy += (pts[j][1] + pts[i][1]) * cross
+  }
+  if (Math.abs(a2) < 1e-9) {
+    let mx = 0, my = 0
+    for (const p of pts) { mx += p[0]; my += p[1] }
+    return [mx / pts.length, my / pts.length]
+  }
+  return [sx / (3 * a2), sy / (3 * a2)]
+}
+
 /** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity) ·
  *  3 top-small — RULED 2026-08-19: among masses in the shape's upper half the smallest governs;
  *  if nothing lives in the upper half, the topmost governs. The small mass needs the precision,

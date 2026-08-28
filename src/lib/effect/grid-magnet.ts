@@ -6,7 +6,9 @@ export type { GridConfig, GridResult } from './types'
 import { registerLayout } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
-import { bbox, centroidOf, latticeAt, spotRadiusOf } from './foundation/geometry'
+import { bbox } from './foundation/geometry'
+import { centroidOf } from './units/centring'
+import { latticeAt, spotRadiusOf } from './units/layout'
 import {
   CENTRE_MODE,
   GOVERNOR,
@@ -16,8 +18,8 @@ import {
   SNAP_STEP_MM,
 } from './grid-magnet-spec'
 import { contactPointsMM, maxPressMM } from './grid-magnet-compute'
-import { fieldSpanMM } from './foundation/geometry'
-import { bandOf } from './foundation/geometry'
+import { fieldSpanMM } from './units/layout'
+import { bandOf } from './units/layout'
 import { applyCoverage } from './units/layout'
 import { assignSizes } from './grid-magnet-logic'
 import type { CentreMode, Governor } from './types'

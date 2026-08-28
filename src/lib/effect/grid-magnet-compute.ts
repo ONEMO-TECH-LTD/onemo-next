@@ -4,8 +4,10 @@ import type { Contour, Pt } from './types'
 import { edgeDistMM } from './foundation/geometry'
 
 // Moved to foundation/geometry.ts (S2 step 1). Re-exported so no consumer changes in the move.
-export { bbox, spotRadiusOf, fieldSpanMM, latticeAt, latticeOver, makeSeatPredicate,
-  makeCircleSeatPredicate, centroidOf } from './foundation/geometry'
+export { bbox } from './foundation/geometry'
+export { makeSeatPredicate, makeCircleSeatPredicate } from './foundation/geometry'
+export { spotRadiusOf, fieldSpanMM, latticeAt, latticeOver } from './units/layout'
+export { centroidOf } from './units/centring'
 
 // Moved to units/segment.ts (S2). Re-exported so every existing consumer is untouched by the move;
 // callers are repointed at the unit in a later commit, not this one.
