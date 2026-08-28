@@ -56,7 +56,7 @@ src/lib/effect/
   pipeline/                NEW    one serialisable call; sequences the units
   adapters/                NEW    ui-bridge · library-bridge · worker transport · catalogue adapter
 
-  RETIRED AT CUTOVER (stage 5, not before)
+  RETIRED AT CUTOVER (S5, not before)
     grid-magnet.ts         the door: centre-rules body → units/layout, voting branch deleted
     grid-magnet-compute.ts split: primitives → foundation, safeSegments → units/segment
     grid-magnet-logic.ts   split: centring → units/centring, applyCoverage → units/layout,
@@ -64,7 +64,7 @@ src/lib/effect/
 
 src/app/(dev)/effect-creator/
   grid-centre/             THE BENCH — shell
-    page.tsx               KEEP; loses its direct engine imports at stage 3
+    page.tsx               KEEP; loses its direct engine imports at S3
     LibraryPanel.tsx       KEEP
     solve.worker.ts        SHRINK 226 → transport/cache only
   grid-magnet/  grid-wrap/ DELETE — voting reference, superseded count-first bench
@@ -146,17 +146,16 @@ catalogue oracle asserts 163 records × 3 pitches *equal*, and stage 1 freezes t
 
 ## 4 · Plan
 
-**Stage 1 · Characterise, then delete only what is provably dead.**
+**S1 · Characterise, then delete only what is provably dead.**
 Freeze current live results first: four classes, every band, manual phase and size, the empty-band
 fallback, and a directly-supplied donut contour. Then delete the `grid-magnet/` and `grid-wrap/`
 routes, re-run a re-export-aware consumer trace, and delete only symbols whose last production caller went with them — the voting scorer and
 its weights, `centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
 **Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — not because they earn a
-place, but because a structural deletion must not change behaviour. They are replaced and deleted in
-stage 2.
+place, but because a structural deletion must not change behaviour. They are replaced and deleted in S2.
 *Done when:* the frozen results reproduce exactly.
 
-**Stage 2 · Move bodies to owners, and rebuild the fallback as a verdict.** Foundation, segment,
+**S2 · Move bodies to owners, and rebuild the fallback as a verdict.** Foundation, segment,
 centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
 contour-aware: outer eroded, every supplied hole inflated and subtracted by the same radius, and
 `Contour.holes` preserved through scaling and sizing. `applyCoverage` → layout (it
@@ -180,11 +179,11 @@ preserved explicitly and the old path deleted:
 The pipeline decides none of this: it sequences layout → wrap → judge and passes the result on.
 
 With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
-no caller and are deleted in this stage.
+no caller and are deleted in S2.
 *Done when:* the frozen results still reproduce, the empty band reports its nearest offer, and a
 unit→unit import fails the suite.
 
-**Stage 3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
+**S3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
 `manual | band | automatic` — changes *candidate enumeration only*; segment, class, centre, layout,
 wrap and judge are the same calls in every mode. The worker becomes transport and cache. The shell
 gets an adapter surface (`createGridRequest`, `gridViewModel`, `libraryViewModel`) and loses its
@@ -192,11 +191,11 @@ direct engine imports.
 *Done when:* the pipeline runs from a Node test with no worker, the oracle calls it instead of
 rebuilding the composition, and the mutation proof runs against the **real** page and worker.
 
-**Stage 4 · Complete the product logic.** Catalogue-backed classifier (below), the generic layout
+**S4 · Complete the product logic.** Catalogue-backed classifier (below), the generic layout
 fallback for shapes the catalogue does not enumerate, the y-flip repair, the 96mm arc as judge
 evidence, the decision trace and the standing audit.
 
-**Stage 5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
+**S5 · Cut over and delete.** Once every production caller has moved: delete `grid-magnet.ts`,
 the generic compute/logic buckets and the obsolete bridge exports. Run the whole catalogue at
 24/48/96, real cutouts, every centre mode, every band, manual, then verify the live surface.
 
@@ -235,19 +234,27 @@ in the result · no wrong decided class · no miss · ambiguity explicit and com
 
 ## 5 · Open — Dan's calls
 
-1. **Class source split.** Family from the silhouette while frame/kind come from the legal-area
-   segments — or everything from the segments? (Erosion at the current size is already universal
-   eligibility; only this split is open.)
-2. **Class → centring-mode table.** Unfilled by design.
-3. **Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
-4. **The studio wire format.** `LayoutOffer` stays an internal typed record until the studio caller
-   is read — id/source, class result, nodesMM, size, centre deviation, coverage evidence, verdict.
-6. Band boundaries / whether B6 exists / when interior magnets are ever allowed / control wording.
+Quote the ID to rule on one.
+
+**OQ1 · Class source split.** Family from the silhouette while frame and kind come from the
+legal-area segments — or everything from the segments? (Erosion at the current size is already
+universal eligibility; only this split is open.)
+
+**OQ2 · Class → centring-mode table.** Unfilled by design — the one mapping I will not guess.
+
+**OQ3 · Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
+
+**OQ4 · The studio wire format.** `LayoutOffer` stays an internal typed record until the studio caller
+is read — id/source, class result, nodesMM, size, centre deviation, coverage evidence, verdict.
+**OQ5 · Band boundaries** — whether B6 exists (a 264mm axis), and when interior magnets are ever
+allowed.
+
+**OQ6 · Control wording** — degrees everywhere, or portrait/landscape stays on the rectangle.
 
 **Settled, removed from this list:** current-size erosion (already universal) · the 96mm arc (a law
 in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
 (authorised: *"finish properly wiring and completing the classifier the pipeline and run it"*) ·
-the y-flip (a technical defect I fix before whole-catalogue activation, not a sequencing question
+the y-flip (a technical defect I fix before whole-catalogue activation (S4), not a sequencing question
 for Dan) · engine hole handling (a defect, not a Dan gate: the engine obeys supplied `Contour.holes`
 in this refactor and adapters may not erase them; raster hole *extraction* stays parked upstream) · the empty-band fallback (**rebuilt** as a judge verdict on the new solver, not inherited
 from the walk — Dan, this session: a fallback is either a declared verified alternative or it is
@@ -262,5 +269,5 @@ built on the new architecture).
 - **Freezing the studio wire format** — see open 5.
 - **Pinning active function bodies by hash** — the library's owner-file pin was the end of a
   specific attack; it is not a general structural tool.
-- **A full gate suite up front** — the derived-zone matrix lands in stage 2; the rest follow their
+- **A full gate suite up front** — the derived-zone matrix lands in S2; the rest follow their
   structure.
