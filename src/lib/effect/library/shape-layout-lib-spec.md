@@ -73,7 +73,7 @@ Imports flow downward only; enforced by the AST gate in architecture-gates.test.
     -> materializeResolved:
          transformLayout(frame, layout, view)          integer, view space
          y-flip to mm: [ix*pitch, (rows-1-iy)*pitch]   mm, y-UP from here on
-         outlineFromLayout(nodesMM, recipe, boundaryOf?)
+         outlineFromLayout(nodesMM, recipe)
     -> MaterializedLibrary { classId, sourceFrameKey, frameKey, frameCols/Rows, layoutId,
          nodesMM, outlineMM, widthMM, heightMM, error, seedMM }
   page: ONE librarySurface() = { classId, materialized, options, isDraft }
@@ -83,8 +83,10 @@ Imports flow downward only; enforced by the AST gate in architecture-gates.test.
 
 ## 5. THE OUTLINE RULE (one producer)
 
-outlineFromLayout(nodesMM, recipe, boundaryMM?):
-  path   = boundaryMM (ordered, for concave shapes like the future H) else convexHull(nodesMM)
+outlineFromLayout(nodesMM, recipe):
+  path   = convexHull(nodesMM) — always. A notched population (T, L, H, plus) reads as the
+           hull its extreme disks span: those are canonical classes with disks removed, not
+           shapes of their own (Dan, 2026-08-28).
   1 pt   -> Clipper open-path cap: round => circle (r = 12mm), square => 24mm square;
             pointRotationDeg rotates the square cap about the disk (square class 0deg,
             diamond class 45deg -> 33.94mm corner-up) — Dan's ruling: same disks under a
@@ -144,8 +146,7 @@ solver does NOT consume the catalogue until Dan authorises that wiring.
 
 1. One class package: its corpus (literal readonly data) + one file exporting a LibraryClass —
    registry classes via registryClass(config); a geometry class implements the contract
-   directly (triangle-class.ts is the model). Concave shapes state boundaryOf (ordered ring);
-   round shapes state corners:'round' in the recipe.
+   directly (triangle-class.ts is the model). Round shapes state corners:'round' in the recipe.
 2. One line in class-registry.ts CLASS_SPECS.
 3. Add class-specific behaviour tests and, after Dan approves the product addition, update
    catalogue-identity.v1.json with the new stable entries.

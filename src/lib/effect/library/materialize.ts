@@ -43,8 +43,7 @@ export function materializeResolved(
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
   const p = placeMM(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
-  const outlineOf = (ns: readonly PointMM[]) =>
-    outlineFromLayout(ns, variant.outline, spec.boundaryOf?.(safeSel, ns))
+  const outlineOf = (ns: readonly PointMM[]) => outlineFromLayout(ns, variant.outline)
   /** The one record. Only the outline it wraps, its layout name, why it is not a shape yet and
    *  where to look when nothing is drawn ever differ between the three cases. */
   const record = (

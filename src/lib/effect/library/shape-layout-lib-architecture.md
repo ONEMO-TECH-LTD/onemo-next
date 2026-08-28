@@ -112,10 +112,16 @@ are out of scope. Never regex over source lines.
 - Entry identity = disk layout + outline IN ORIENTATION. Never dedupe across classes by disks
   alone: the 1x1 square (edge-up, 24x24) and 1x1 diamond (corner-up, 24*sqrt2 = 33.94mm) are
   distinct products. Mechanism: OutlineRecipe.pointRotationDeg (0 / 45) applied by the one
-  producer around the disk; boundaryOf means ordered concave topology (H, double-T) and
-  nothing else.
+  producer around the disk.
 - The magnet's 12mm padding is built in and universal: one constant, no per-entry or per-call
   padding.
+- (2026-08-28) THE OUTLINE IS ALWAYS THE DISKS' OWN HULL. A T, an L, an H or a plus is a
+  canonical class with disks taken out, not a shape of its own — "the specifics like T and L is
+  just same basic canon classes with some disks taken out". So there is no stated-boundary
+  path and no concave outline: a notched population reads as the hull its extreme disks span.
+  Unknown shapes are answered by the solver placing magnets into the customer's real outline,
+  never by enumerating more entries; the catalogue's job is to be the CERTIFIED SET that
+  generation is checked against.
 
 Every machine-checkable rule above has a named gate in architecture-gates.test.ts. Residual
 semantic claims are marked QA responsibility and are not presented as machine-proven. Change a

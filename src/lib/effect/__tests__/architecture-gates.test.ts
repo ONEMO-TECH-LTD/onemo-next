@@ -19,7 +19,7 @@ const BRIDGE = join(ROOT, 'grid-magnet-library-bridge.ts')
 const CATALOGUE_ADAPTER = join(ROOT, 'grid-magnet-library-catalogue.ts')
 const LAW = join(LIBRARY, 'shape-layout-lib-architecture.md')
 const ARCH_GATE = join(TESTS, 'architecture-gates.test.ts')
-const LAW_SHA256 = '8ba6480c7c85bc96f01cc12682c43d6803fcb4714ba9ed824aed016605a539c9'
+const LAW_SHA256 = 'ead93d033a2b639926fc642f506bfa2bac24b95ddda9b88e0729dfd97b76a9f6'
 /** The transition owner is 25 lines that change ~never, and three gates in a row proved that
  *  checking its SHAPE leaves its BODIES free: policy was smuggled out through renamed helpers,
  *  through require(), and finally through globalThis, each time with the shape intact. The law
@@ -695,19 +695,26 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       expect(() => spec.variantOf({ ...selection, frameKey: 'nope' }, 48)).toThrow()
     }
   })
-  it('STEP 3: outline topology keeps point, line, convex, and concave recipes distinct', () => {
+  it('STEP 3: outline topology keeps point, line and area recipes distinct', () => {
+    // The outline is the disks' own hull, offset. Dan, 08-28: a T or an L is a canonical class
+    // with disks taken out, not a shape of its own — so there is no stated-boundary path and
+    // nothing concave to draw.
     const round = outlineFromLayout([[0, 0]], { corners: 'round' })
     const square = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 0 })
     const diamond = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 45 })
     const pill = outlineFromLayout([[0, 0], [48, 0]], { corners: 'round' })
     const convex = outlineFromLayout([[0, 0], [48, 0], [0, 48]], { corners: 'sharp' })
-    const h = [[0, 0], [96, 0], [96, 96], [64, 96], [64, 32], [32, 32], [32, 96], [0, 96]] as const
-    const concave = outlineFromLayout(h, { corners: 'sharp' }, h)
     expect(round.length).toBeGreaterThan(3)
     expect(square).not.toEqual(diamond)
     expect(pill.length).toBeGreaterThan(2)
     expect(convex).toHaveLength(3)
-    expect(concave.length).toBeGreaterThan(4)
+    // A notched population reads as its HULL. An L's extreme disks span a right triangle, so an
+    // L is a triangle-class piece with disks taken out — which is why the library already carries
+    // it as Wedge 159x79 (●·· / ●●●). An H keeps its corners, so an H stays square.
+    const l = [[0, 0], [0, 48], [0, 96], [48, 96], [96, 96]] as const
+    expect(outlineFromLayout(l, { corners: 'sharp' })).toHaveLength(3)
+    const h = [[0, 0], [0, 48], [0, 96], [48, 48], [96, 0], [96, 48], [96, 96]] as const
+    expect(outlineFromLayout(h, { corners: 'sharp' })).toHaveLength(4)
   })
   it('STEP 3: one outline and hull implementation own production', () => {
     const declarations: Record<string, string[]> = { outlineFromLayout: [], convexHull: [] }

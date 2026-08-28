@@ -1,7 +1,7 @@
 import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { pickLayout } from './selection-transition'
 import { frameKeyOf } from './transforms'
-import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, PointMM } from './types'
+import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
 
 interface RegistryClassConfig {
   classId: LibraryFamily
@@ -11,7 +11,6 @@ interface RegistryClassConfig {
   label(frame: LibraryFrame): string
   orientations: readonly { id: string; view: LibraryTransform }[]
   outline: OutlineRecipe
-  boundaryOf?(sel: LibrarySelection, nodesMM: readonly PointMM[]): readonly PointMM[] | undefined
   validateDraft(draft: DraftShape, frame: LibraryFrame): string[]
   draftMatches(draft: DraftIdentity, sel: LibrarySelection, frameKey: string): boolean
   draftIdParts(sel: LibrarySelection, frameKey: string): DraftIdentity
@@ -58,7 +57,6 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
       const frame = variantFrame(sel, pitchMM)
       return variant(frame, config.typeOfFrame(frame))
     },
-    boundaryOf: config.boundaryOf,
     validateDraft: (draft, frame) => [
       ...boundsAndDuplicateErrors(draft, frame),
       ...config.validateDraft(draft, frame),

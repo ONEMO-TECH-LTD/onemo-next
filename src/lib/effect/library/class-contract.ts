@@ -1,4 +1,4 @@
-import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform, PointMM } from './types'
+import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
 
 export type CornerMode = 'sharp' | 'bevel' | 'round'
 
@@ -28,7 +28,6 @@ export interface ClassSpec {
   types: readonly ClassType[]
   variants(typeId: string, pitchMM: number): readonly ClassVariant[]
   variantOf(sel: LibrarySelection, pitchMM: number): ClassVariant
-  boundaryOf?(sel: LibrarySelection, nodesMM: readonly PointMM[]): readonly PointMM[] | undefined
   validateDraft(draft: DraftShape, frame: LibraryFrame): string[]
 }
 
