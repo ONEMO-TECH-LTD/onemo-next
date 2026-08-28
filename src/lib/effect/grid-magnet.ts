@@ -1,5 +1,9 @@
-// grid-magnet.ts — the engine bridge: computeGrid and the band snap, wiring spec + compute + logic.
-// One import door for consumers; the modules stay behind it.
+// grid-magnet.ts — TEMPORARY S2 SEQUENCER SEAT and the public door.
+//
+// computeGrid no longer computes: it sequences segment -> centring -> layout and shapes the result.
+// The band walk below is the OLD rigid fallback and is deleted the moment layout's generic
+// candidate path replaces it. S3 moves the sequencing into pipeline/ and the shaping into
+// adapters/, after which this file is deleted.
 
 import type { Contour, GridConfig, GridResult, Pt } from './types'
 export type { GridConfig, GridResult } from './types'

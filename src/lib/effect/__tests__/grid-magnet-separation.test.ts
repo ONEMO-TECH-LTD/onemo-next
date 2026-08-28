@@ -21,13 +21,11 @@ import type { Contour, Pt } from '../types'
 const LIB = join(process.cwd(), 'src/lib/effect')
 const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
 
-const MODULE_FILES = [
-  'grid-magnet-spec.ts',
-  'grid-magnet-compute.ts',
-  'grid-magnet-logic.ts',
-  'grid-magnet.ts',
-  'grid-magnet-bridge.ts',
-] as const
+// DERIVED, never hand-listed: the previous five-name list omitted wrap-compute, class and the
+// worker — and wrap-compute imports four units and sequences them, invisibly.
+const MODULE_FILES = readdirSync(LIB)
+  .filter((f) => /^grid-magnet.*\.ts$/.test(f) && !f.endsWith('.d.ts'))
+  .sort()
 
 const readModule = () =>
   MODULE_FILES.map((f) => ({ file: f, text: readFileSync(join(LIB, f), 'utf8') }))
@@ -44,6 +42,25 @@ const walkAst = (src: string, visit: (n: ts.Node) => void) => {
 
 const importsOf = (text: string): string[] =>
   [...text.matchAll(/from ['"]([^'"]+)['"]/g)].map((m) => m[1])
+
+/** EVERY module reference an AST can carry — plain and side-effect imports, re-exports with a
+ *  specifier, dynamic import() and require(). The regex scanner missed side-effect imports and
+ *  dynamic forms, which is how four separate mutations stayed green. */
+const moduleRefsOf = (text: string): string[] => {
+  const out: string[] = []
+  walkAst(text, (n) => {
+    if (ts.isImportDeclaration(n) || (ts.isExportDeclaration(n) && n.moduleSpecifier)) {
+      const m = (n as { moduleSpecifier?: ts.Expression }).moduleSpecifier
+      if (m) out.push(m.getText().slice(1, -1))
+    }
+    if (ts.isCallExpression(n)) {
+      const fn = n.expression.getText()
+      if ((fn === 'require' || n.expression.kind === ts.SyntaxKind.ImportKeyword) && n.arguments[0]
+          && ts.isStringLiteral(n.arguments[0])) out.push(n.arguments[0].text)
+    }
+  })
+  return out
+}
 
 /** IMPORT declarations only — a `export … from './units/x'` re-export shim is NOT an import, and
  *  conflating the two is what let the migration seam look like a dependency. Re-exports are
@@ -111,13 +128,22 @@ describe('2 — traffic is one-way', () => {
     // does, so this is the one file that may import them — and the unit zone still forbids any
     // unit from importing back.
     'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
+    // The two SEQUENCER SEATS may import units (sequencing them is what a pipeline does); both
+    // hand over to pipeline/ at S3. Every other retiring file re-exports only.
+    'grid-magnet-wrap-compute.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/offset$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^@countertype\/clipper2-ts$/],
+    'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
+    'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
+    'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
     'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
   }
 
   it('every module file imports only from its allow-list', () => {
     for (const { file, text } of readModule()) {
-      const allowed = ALLOWED[file]!
-      const bad = importDeclsOf(text).filter((i) => !allowed.some((rx) => rx.test(i)))
+      const allowed = ALLOWED[file]
+      // A derived file with no allow-list is UNGOVERNED — fail loudly rather than skip it. That is
+      // how wrap-compute sequenced four units invisibly under the old hand-listed set.
+      expect(allowed, `${file} is in the cluster but has no allow-list entry — govern it`).toBeDefined()
+      const bad = importDeclsOf(text).filter((i) => !allowed!.some((rx) => rx.test(i)))
       expect(bad, `${file} imports outside its allow-list: ${bad.join(', ')}`).toEqual([])
     }
   })
@@ -155,7 +181,7 @@ const UNIT_ALLOWED = [
 describe('2b — the units are self-sufficient', () => {
   it('every unit file imports only shared vocabulary, spec or foundation', () => {
     for (const f of unitFiles()) {
-      const bad = importsOf(readFileSync(join(UNITS_DIR, f), 'utf8'))
+      const bad = moduleRefsOf(readFileSync(join(UNITS_DIR, f), 'utf8'))
         .filter((i) => !UNIT_ALLOWED.some((rx) => rx.test(i)))
       expect(bad, `units/${f} reaches outside its allow-list: ${bad.join(' · ')}`).toEqual([])
     }
@@ -163,7 +189,7 @@ describe('2b — the units are self-sufficient', () => {
 
   it('no unit imports another unit', () => {
     for (const f of unitFiles()) {
-      const bad = importsOf(readFileSync(join(UNITS_DIR, f), 'utf8')).filter((i) => /^\.\/[a-z-]+$/.test(i))
+      const bad = moduleRefsOf(readFileSync(join(UNITS_DIR, f), 'utf8')).filter((i) => /^\.\/[a-z-]+$/.test(i))
       expect(bad, `units/${f} imports another unit: ${bad.join(' · ')}`).toEqual([])
     }
   })
@@ -171,15 +197,32 @@ describe('2b — the units are self-sufficient', () => {
   it('no unit reaches back into a retiring aggregate or the app', () => {
     for (const f of unitFiles()) {
       const text = readFileSync(join(UNITS_DIR, f), 'utf8')
-      const bad = importsOf(text).filter((i) => /grid-magnet-(compute|logic|class|bridge)$|^@\/app\//.test(i))
+      const bad = moduleRefsOf(text).filter((i) => /grid-magnet-(compute|logic|class|bridge)$|^@\/app\//.test(i))
       expect(bad, `units/${f} reaches up to ${bad.join(' · ')}`).toEqual([])
       expect(text, `units/${f} depends on a framework`).not.toMatch(/from ['"]react['"]|from ['"]next|\.css['"]/)
     }
   })
 
+  it('only the two named sequencer seats hold unit edges, and exactly the pinned ones', () => {
+    const TEMPORARY_UNIT_EDGES: Record<string, readonly string[]> = {
+      'grid-magnet.ts': ['./units/centring', './units/layout', './units/segment'],
+      'grid-magnet-wrap-compute.ts': ['./units/centring', './units/judge', './units/layout', './units/segment', './units/wrap'],
+      'grid-magnet-class.ts': ['./units/classifier'],
+      'grid-magnet-compute.ts': ['./units/centring', './units/layout', './units/segment'],
+      'grid-magnet-logic.ts': ['./units/centring', './units/layout'],
+    }
+    for (const { file, text } of readModule()) {
+      const edges = [...new Set(moduleRefsOf(text).filter((i) => /^\.\/units\//.test(i)))].sort()
+      const pinned = [...(TEMPORARY_UNIT_EDGES[file] ?? [])].sort()
+      expect(edges, `${file}: unit edges must equal the pinned set exactly`).toEqual(pinned)
+    }
+  })
+
   it('a legacy file may only REACH a unit through a re-export, never an import', () => {
     for (const { file, text } of readModule()) {
-      if (file === 'grid-magnet.ts') continue   // the temporary pipeline seat — see its allow-list
+      // The two SEQUENCER SEATS may import units, because sequencing them is what a pipeline does.
+      // Every other retiring file may only re-export. Both seats hand over at S3.
+      if (file === 'grid-magnet.ts' || file === 'grid-magnet-wrap-compute.ts') continue
       const bad: string[] = []
       walkAst(text, (n) => {
         if (!ts.isImportDeclaration(n)) return
@@ -199,15 +242,28 @@ describe('2c — the foundation holds primitives only', () => {
 
   it('imports nothing but shared types, spec and the repo-wide geometry kernel', () => {
     for (const f of foundationFiles()) {
-      const bad = importsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
+      const bad = moduleRefsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
         .filter((i) => !FOUNDATION_ALLOWED.some((rx) => rx.test(i)))
       expect(bad, `foundation/${f} reaches outside its allow-list: ${bad.join(' · ')}`).toEqual([])
     }
   })
 
+  it('holds no policy — no ranking, no ordering, no preference', () => {
+    for (const f of foundationFiles()) {
+      const text = readFileSync(join(FOUNDATION, f), 'utf8')
+      const hits: string[] = []
+      walkAst(text, (n) => {
+        if (ts.isCallExpression(n) && /\.sort$/.test(n.expression.getText())) hits.push('sort()')
+        if (ts.isFunctionDeclaration(n) && n.name && /^(rank|score|prefer|best|choose|pick|order)/i.test(n.name.text))
+          hits.push(n.name.text)
+      })
+      expect(hits, `foundation/${f} contains policy: ${hits.join(' · ')}`).toEqual([])
+    }
+  })
+
   it('never reaches a unit or a retiring aggregate', () => {
     for (const f of foundationFiles()) {
-      const bad = importsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
+      const bad = moduleRefsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
         .filter((i) => /\/units\/|grid-magnet-(compute|logic|class|bridge)$/.test(i))
       expect(bad, `foundation/${f} depends on something above it: ${bad.join(' · ')}`).toEqual([])
     }

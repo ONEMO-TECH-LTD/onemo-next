@@ -1,21 +1,14 @@
-// grid-magnet-wrap-compute.ts — COMPUTE: wrap. Self-contained, exact.
-//
-// ONE job: add N magnets, shrink the shape onto them.
-//
-// Method (Clipper2, the recommended geometry route — no physics loop, no iteration artifacts):
-//
-//   1. Deflate the outline by the disc radius. The remaining region is exactly where a magnet
-//      CENTRE is allowed to sit.
-//   2. The magnets are a rigid group with local offsets L1..Ln, so the grid origin O is valid iff
-//      every O+Li lies in that region — i.e. iff O lies in the INTERSECTION of the region
-//      translated by each -Li.
-//   3. Non-empty intersection ⟺ the group fits at this size. Empty ⟺ it does not.
-//   4. Binary-search the size for the smallest one that still fits. That is the tightest wrap,
-//      computed rather than converged on, so it cannot stop early or jitter.
-//
-// Deliberately disconnected from the rest of the engine: no centring modes, no governing mass, no
-// safe-area islands, no voting, no coverage, no flap. Inputs are the outline, the pitch and the
-// radius. Nothing here reads a policy.
+/**
+ * Temporary S2 pipeline sequencer.
+ *
+ * Calls the extracted units in the legacy order so public behaviour stays stable during the move:
+ * segment measures, centring names the anchor, layout reveals candidates, wrap solves each to its
+ * contact size, judge rules on band membership and order. It holds no rule of its own.
+ *
+ * S3 replaces this file with the one headless pipeline. Until then it is a governed sequencer seat,
+ * pinned to an exact set of unit edges by the separation gate — not a self-contained module, which
+ * is what its previous header falsely claimed while it imported the door and four units.
+ */
 
 import type { BandRung, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'

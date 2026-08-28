@@ -1,6 +1,6 @@
 // foundation/geometry.ts — FOUNDATION: the primitives every unit stands on.
 //
-// Moved from grid-magnet-compute.ts byte-identical (S2 step 1, move class VERBATIM); only the
+// Primitives with two or more real unit consumers, and nothing else. Moved byte-identical; only the
 // imports below are new. Foundation lands FIRST because a unit cannot import something that does
 // not exist yet — extracting a unit before its primitives is what produced the compute<->segment
 // cycle on the first attempt. The two-or-more-unit-consumers rule is measured at the END of S2,

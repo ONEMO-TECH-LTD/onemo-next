@@ -12,7 +12,7 @@ import type { Pt } from './types'
 // Moved to units/classifier.ts and types.ts (S2 step 3). Re-exported so no consumer changes.
 export { axisClassOf, classifyShape, classFloorMM, frameNodes, classFrameNodes } from './units/classifier'
 export type { AxisClass, FrameKind, ShapeClass } from './types'
-import { bbox } from './grid-magnet-compute'
+import { bbox } from './foundation/geometry'
 
 /** The three primitive families (Dan, 08-24 23:26): SQUARE and its rectangles fill the frame;
  *  ROUND are their rounded versions — square counts, corner padding; TRIANGLE (triangle,
