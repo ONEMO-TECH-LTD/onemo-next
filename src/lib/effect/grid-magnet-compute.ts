@@ -52,5 +52,7 @@ export function contactPointsMM(
 
 /** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */
 export function scaleContour(base: Contour, longestMM: number): Contour {
-  return { outer: { pts: base.outer.pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt) }, holes: [] }
+  const scale = (pts: ReadonlyArray<Pt>): Pt[] => pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt)
+  // Every supplied ring scales. Returning holes: [] here silently deleted a donut's hole.
+  return { outer: { pts: scale(base.outer.pts) }, holes: base.holes.map((h) => ({ pts: scale(h.pts) })) }
 }

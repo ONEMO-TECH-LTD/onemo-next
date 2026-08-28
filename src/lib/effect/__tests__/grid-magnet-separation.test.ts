@@ -13,6 +13,9 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { computeGrid } from '../grid-magnet'
+import { scaleContour } from '../grid-magnet-compute'
+import { makeContourSeatPredicate } from '../foundation/geometry'
+import { wrapGroup } from '../units/wrap'
 import type { Contour, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
@@ -276,5 +279,38 @@ describe('5 — the solve is one pure function', () => {
     expect(computeGrid(square(24), { paddingMM: 12 }).anchors.length).toBe(1)
     expect(computeGrid(square(72), { paddingMM: 12 }).anchors.length).toBe(4)
     expect(computeGrid(square(120), { paddingMM: 12 }).anchors.length).toBe(8)
+  })
+})
+
+describe('6 — a supplied hole is material boundary, not decoration', () => {
+  const ring = (cx: number, cy: number, r: number, n = 64): Pt[] =>
+    Array.from({ length: n }, (_, i) => {
+      const t = (i / n) * Math.PI * 2
+      return [cx + r * Math.cos(t), cy + r * Math.sin(t)] as Pt
+    })
+  const donut = (s: number): Contour =>
+    ({ outer: { pts: [[0, 0], [s, 0], [s, s], [0, s]] as Pt[] }, holes: [{ pts: ring(s / 2, s / 2, (s * 60) / 192) }] })
+
+  it('scaling carries every ring — a scaled donut still has its hole', () => {
+    expect(scaleContour(donut(192), 0.5).holes.length).toBe(1)
+  })
+
+  it('the contour seat predicate refuses the hole centre', () => {
+    const fits = makeContourSeatPredicate(donut(192), 12)!
+    expect(fits([96, 96]), 'a magnet centre inside a supplied hole must be illegal').toBe(false)
+  })
+
+  it('no seated magnet lands inside a supplied hole', () => {
+    const g = computeGrid(donut(192), { paddingMM: 12, pitchMM: 48 })
+    const inHole = g.anchors.filter((a) => Math.hypot(a.p[0] - 96, a.p[1] - 96) < 60 - 12)
+    expect(inHole.map((a) => a.p), 'magnets seated inside the hole').toEqual([])
+    expect(g.anchors.length).toBeGreaterThan(0)
+  })
+
+  it('wrap never places the group inside a supplied hole', () => {
+    const at = wrapGroup((mm) => donut(mm), { paddingMM: 12, anchorAtMM: (mm) => [mm / 2, mm / 2] as Pt }, [[0, 0]], 96, 192)
+    expect(at).not.toBeNull()
+    const off = Math.hypot(at!.points[0][0] - at!.sizeMM / 2, at!.points[0][1] - at!.sizeMM / 2)
+    expect(off, 'wrap placed the magnet inside the hole').toBeGreaterThanOrEqual((at!.sizeMM * 60) / 192 - 12)
   })
 })

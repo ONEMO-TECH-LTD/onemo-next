@@ -8,7 +8,7 @@
 //
 // Nothing here holds policy: no threshold, no ranking, no choice. Measurement only.
 
-import type { BBox, Pt } from '../types'
+import type { BBox, Contour, Pt } from '../types'
 import { prepare, holds } from '@/lib/grid-engine/compute/geometry'
 import { BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, type Band } from '../grid-magnet-spec'
 
@@ -239,4 +239,34 @@ export function centroidOf(pts: ReadonlyArray<Pt>): Pt {
 export function bandOf(sizeMM: number): Band | null {
   for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
   return null
+}
+
+/** Inside MATERIAL: inside the outer ring AND outside every supplied hole. The two facts every
+ *  hole-aware path needs, held once — segment, layout and wrap all consume them, so they belong
+ *  here rather than being rediscovered three times. */
+export function pointInContour(pt: Pt, contour: Contour): boolean {
+  return pointInOuter(pt, contour.outer.pts)
+    && !contour.holes.some((hole) => pointInOuter(pt, hole.pts))
+}
+
+/** Distance to the nearest MATERIAL boundary — the outer ring or any hole edge, whichever is
+ *  closer. A hole edge is as real a boundary as the outline. */
+export function edgeDistToContourMM(contour: Contour, pt: Pt): number {
+  let distanceMM = edgeDistMM(contour.outer.pts, pt)
+  for (const hole of contour.holes) {
+    distanceMM = Math.min(distanceMM, edgeDistMM(hole.pts, pt))
+  }
+  return distanceMM
+}
+
+/** Seat predicate over a whole CONTOUR: a centre must clear the outline and every hole by the spot
+ *  radius. The outer-ring predicate above cannot see a hole at all. */
+export function makeContourSeatPredicate(
+  contour: Contour, spotRadiusMM: number,
+): ((pt: Pt) => boolean) | null {
+  const outerFits = makeSeatPredicate(contour.outer.pts, spotRadiusMM)
+  if (!outerFits) return null
+  if (!contour.holes.length) return outerFits
+  return (pt: Pt) => outerFits(pt)
+    && !contour.holes.some((h) => pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM)
 }

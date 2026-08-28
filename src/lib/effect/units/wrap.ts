@@ -9,19 +9,33 @@
 
 import { Clipper, FillRule, JoinType, EndType, PointInPolygonResult, type Paths64 } from '@countertype/clipper2-ts'
 import type { Contour, Pt, WrapAt, WrapConfig } from '../types'
-import { edgeDistMM, pointInOuter } from '../foundation/geometry'
+import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from '../offset'
 import { PADDING_FLOOR_MM } from '../grid-magnet-spec'
 
 /** Micron scale — private to wrap. */
 const S = 1000
 
-function seatRegion(outer: ReadonlyArray<Pt>, radiusMM: number): Paths64 | null {
+function seatRegion(contour: Contour, radiusMM: number): Paths64 | null {
+  const outer = contour.outer.pts
   const flat: number[] = []
   for (const [x, y] of outer) flat.push(Math.round(x * S), Math.round(y * S))
   const tol = MANUFACTURING_OFFSET_ARC_TOLERANCE_MM
   const region = Clipper.inflatePaths([Clipper.makePath(flat)], -(radiusMM + tol) * S, JoinType.Round, EndType.Polygon, 2, tol * S)
-  return region && region.length ? region : null
+  if (!region || !region.length) return null
+  if (!contour.holes.length) return region
+  // Every supplied hole is a boundary: inflate it by the same radius and subtract it, so no magnet
+  // centre can sit in a hole or within a spot radius of its edge.
+  const blocked: Paths64 = []
+  for (const hole of contour.holes) {
+    const hf: number[] = []
+    for (const [x, y] of hole.pts) hf.push(Math.round(x * S), Math.round(y * S))
+    const grown = Clipper.inflatePaths([Clipper.makePath(hf)], (radiusMM + tol) * S, JoinType.Round, EndType.Polygon, 2, tol * S)
+    if (grown && grown.length) blocked.push(...grown)
+  }
+  if (!blocked.length) return region
+  const left = Clipper.difference(region, blocked, FillRule.NonZero)
+  return left && left.length ? left : null
 }
 
 /** Every grid origin at which the whole rigid group is seated — empty when it cannot fit. */
@@ -89,16 +103,17 @@ export function wrapGroup(
 
   const anchorAt = (mm: number): Pt => cfg.anchorAtMM(mm)
   const heldAt = (mm: number): Pt | null => {
-    const outer = sized(mm).outer.pts
+    const c = sized(mm)
+    const outer = c.outer.pts
     const anchor = anchorAt(mm)
     const centred: Pt = [anchor[0] - mid[0], anchor[1] - mid[1]]
     let ok = true
     for (const [lx, ly] of g) {
       const px = centred[0] + lx, py = centred[1] + ly
-      if (!pointInOuter([px, py], outer) || edgeDistMM(outer, [px, py]) < radius) { ok = false; break }
+      if (!pointInContour([px, py], c) || edgeDistToContourMM(c, [px, py]) < radius) { ok = false; break }
     }
     if (ok) return centred
-    const region = seatRegion(outer, radius)
+    const region = seatRegion(c, radius)
     if (!region) return null
     const valid = validOrigins(region, g)
     if (!valid) return null
@@ -125,7 +140,7 @@ export function wrapGroup(
     points: pts,
     originMM: origin,
     anchorMM: anchor,
-    gapsMM: pts.map((q) => Math.max(0, edgeDistMM(outer, q) - radius)),
+    gapsMM: pts.map((q) => Math.max(0, edgeDistToContourMM(sized(hi), q) - radius)),
   }
 }
 

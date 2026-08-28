@@ -9,7 +9,7 @@
 import type { Contour, GridConfig, Pt, SafeSegment } from '../types'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
-  bandOf, bbox, edgeDistMM, latticeAt, makeCircleSeatPredicate, makeSeatPredicate, spotRadiusOf,
+  bandOf, bbox, edgeDistMM, edgeDistToContourMM, latticeAt, makeCircleSeatPredicate, makeSeatPredicate, pointInOuter, spotRadiusOf,
 } from '../foundation/geometry'
 import {
   BANDS, DEFAULT_PITCH_MM, PADDING_FLOOR_MM, POSITIONING,
@@ -50,10 +50,10 @@ interface LayoutPlacement {
  *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
  *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
  *  Enforced through the dominance tiers, not preferred. */
-function pressExcessMM(outer: ReadonlyArray<Pt>, seated: ReadonlyArray<Pt>, reach: number): number {
+function pressExcessMM(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): number {
   if (!seated.length) return 0
   let sum = 0
-  for (const s of seated) sum += Math.max(0, edgeDistMM(outer, s) - reach)
+  for (const s of seated) sum += Math.max(0, edgeDistToContourMM(contour, s) - reach)
   return sum / seated.length
 }
 
@@ -73,9 +73,13 @@ export function registerLayout(
   const bb = bbox(outer)
   const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
 
-  const fits = cfg.circle
+  // Eligibility is over the whole CONTOUR: a centre must clear the outline AND every supplied
+  // hole. The outer-ring predicate cannot see a hole, which is how a magnet landed inside one.
+  const holeFree = (p: Pt) => contourMM.holes.every((h) => !pointInOuter(p, h.pts) && edgeDistMM(h.pts, p) >= spotRadiusOf(pad))
+  const outerFits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
     : makeSeatPredicate(outer, spotRadiusOf(pad))
+  const fits = outerFits && (contourMM.holes.length ? (p: Pt) => outerFits(p) && holeFree(p) : outerFits)
 
   const { segments, centres, ruleTarget } = given
 
@@ -117,7 +121,7 @@ export function registerLayout(
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
-      const excess = pressExcessMM(outer, seat, reach)
+      const excess = pressExcessMM(contourMM, seat, reach)
       const wins = !best
         || seat.length > best.seats
         || (seat.length === best.seats && canon > best.canon)
