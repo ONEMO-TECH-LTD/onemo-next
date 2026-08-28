@@ -6,6 +6,40 @@ import type { VShape } from '@/lib/vector-core'
 
 export type Pt = [number, number] // [x, y]
 
+// Grid engine shared vocabulary — moved here (S2) so units never import one another for a type.
+export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
+
+/** A mass inside an island — the region surviving the depth probe, with its outline. */
+export interface SafeMass {
+  areaMM2: number
+  /** The deepest point of the mass — always inside the material. */
+  centreMM: Pt
+  /** The mass's peak clearance, mm. */
+  peakClearMM: number
+  bbox: BBox
+  rings: Pt[][]
+}
+
+/** One connected island of the legal magnet-centre area, measured on a mesh. */
+export interface SafeSegment {
+  areaMM2: number
+  /** The island's deepest point — max clearance, never a concave void. */
+  centreMM: Pt
+  /** The island's area-average point — can sit in a concave void; a test-mode reference. */
+  meanMM: Pt
+  /** The island's peak clearance, mm — how deep its most buried point sits. */
+  peakClearMM: number
+  bbox: BBox
+  /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
+  rings: Pt[][]
+  /** Sub-masses at the depth probe: limbs and slivers die shallow, true masses survive. */
+  masses: SafeMass[]
+}
+
+export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
+export type Governor = 0 | 1 | 2 | 3
+
+
 export interface Ring {
   pts: Pt[] // closed ring, no duplicated last point
 }

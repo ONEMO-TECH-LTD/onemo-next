@@ -1,15 +1,16 @@
 // grid-magnet-compute.ts — COMPUTE: geometry and arithmetic. Values come from spec or the caller.
 
-import type { Contour, Pt } from './types'
+import type { BBox, Contour, Pt } from './types'
 import { pointInPolygon } from './attachment'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import { DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS } from './grid-magnet-spec'
 
 // Moved to units/segment.ts (S2). Re-exported so every existing consumer is untouched by the move;
 // callers are repointed at the unit in a later commit, not this one.
-export { safeSegments, type SafeMass, type SafeSegment } from './units/segment'
+export { safeSegments } from './units/segment'
+export type { SafeMass, SafeSegment } from './types'
 
-export type BBox = { minX: number; minY: number; maxX: number; maxY: number }
+export type { BBox } from './types'
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity

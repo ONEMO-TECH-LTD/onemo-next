@@ -5,38 +5,11 @@
 // they are the shared edge kernel and move to foundation when layout lands as their second unit
 // consumer — a primitive with one consumer may not sit in foundation.
 
-import type { Pt } from '../types'
-import { bbox, edgeDistMM, pointInOuter, type BBox } from '../grid-magnet-compute'
+import type { BBox, Pt, SafeMass, SafeSegment } from '../types'
+import { bbox, edgeDistMM, pointInOuter } from '../grid-magnet-compute'
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
 const KEY_QUANTUM_MM = 0.01
-
-/** A mass inside an island — the region surviving the depth probe, with its outline. */
-export interface SafeMass {
-  areaMM2: number
-  /** The deepest point of the mass — always inside the material. */
-  centreMM: Pt
-  /** The mass's peak clearance, mm. */
-  peakClearMM: number
-  bbox: BBox
-  rings: Pt[][]
-}
-
-/** One connected island of the legal magnet-centre area, measured on a mesh. */
-export interface SafeSegment {
-  areaMM2: number
-  /** The island's deepest point — max clearance, never a concave void. */
-  centreMM: Pt
-  /** The island's area-average point — can sit in a concave void; a test-mode reference. */
-  meanMM: Pt
-  /** The island's peak clearance, mm — how deep its most buried point sits. */
-  peakClearMM: number
-  bbox: BBox
-  /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
-  rings: Pt[][]
-  /** Sub-masses at the depth probe: limbs and slivers die shallow, true masses survive. */
-  masses: SafeMass[]
-}
 
 /** Marching-squares topology: per corner-sign mask (array position), the cell-edge pairs a
  *  contour crosses. Edges 0=top 1=right 2=bottom 3=left. */
