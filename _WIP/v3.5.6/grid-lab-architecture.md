@@ -141,29 +141,33 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 | `library/` — untouched, own law | 1976 | | |
 
 Twelve destinations from four files: `grid-magnet-compute` splits four ways, `grid-magnet-logic`
-three, the door two, the wrap module three. **The behaviour lock that makes this safe:** the
-catalogue oracle asserts 163 records × 3 pitches *equal*, and S1 freezes the live bench.
+three, the door two, the wrap module three. **What makes the moves checkable:** the catalogue oracle
+already asserts 163 records × 3 pitches *equal* — an existing gate, not new machinery.
 
 ---
 
 ## 4 · Plan
 
+**Only grid-lab internals that will be used.** No characterisation harness, no audit module, no
+gate suite beyond the one import matrix. The engine's own tests are the classifier audit Dan ordered
+and the catalogue oracle that already exists.
+
 **Execution gates.** S1–S3 need no open product answer. OQ1–OQ2 gate S4. OQ3, OQ5 and OQ6 gate
 product activation in S5. OQ4 is not a decision yet — it is resolved by reading the actual studio
 caller before anything freezes or exports its wire contract.
 
-**S1 · Characterise, then delete only what is provably dead.**
-Freeze current live results first: four classes, every band, manual phase and size, and the
-empty-band fallback. Add a directly-supplied donut as a **failing** characterisation — current code
-erases its hole, so the target assertion stays red until S2. Freezing it green would bless the
-defect. Then delete the `grid-magnet/` and `grid-wrap/`
-routes, re-run a re-export-aware consumer trace, and delete only symbols whose last production
-caller went with them — the voting scorer and its weights, `centeringRef`, the
-`wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
-**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — not because they earn a
-place, but because a structural deletion must not change behaviour. Replaced and deleted in S2.
-*Done when:* the non-hole frozen results reproduce exactly, and the donut counterexample proves the
-current hole loss.
+**S1 · Delete only what is provably dead.**
+Delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer trace, and
+delete only symbols whose last production caller went with them — the voting scorer and its weights,
+`centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
+**Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — a structural deletion must
+not change what the bench does. Replaced and deleted in S2.
+*Done when:* the bench still solves on all four classes and every band, the existing suite and the
+catalogue oracle stay green.
+
+> **No behaviour freeze.** The old engine never produced correct answers — the voting tab
+> approximated. Freezing its output as a golden would make the defect the reference. Correctness is
+> judged against the catalogue oracle, which already exists, and against the live surface.
 
 **S2 · Move bodies to owners; fallback generation under layout, verdict under judge.**
 Foundation, segment, centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
@@ -190,10 +194,10 @@ The pipeline decides none of this: it sequences layout → wrap → judge and pa
 
 With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
 no caller and are deleted in S2.
-*Done when:* the non-hole frozen results still reproduce · the donut target now passes · an
-`automatic` envelope reports the nearest lawful offer where one exists, otherwise `offers` is empty
-and the `no-lawful-offer` diagnostic carries only a calibration witness · a unit→unit import fails
-the suite.
+*Done when:* the bench still solves and the oracle stays green · a supplied donut keeps its hole
+through the pipeline · an `automatic` envelope reports the nearest lawful offer where one exists,
+otherwise `offers` is empty and the `no-lawful-offer` diagnostic carries only a calibration witness ·
+a unit→unit import fails the suite.
 
 **S3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
 `manual | band | automatic` — changes *candidate enumeration only*; segment, class, centre, layout,
@@ -284,3 +288,6 @@ from the walk).
   specific attack; it is not a general structural tool.
 - **A full gate suite up front** — the derived-zone matrix lands in S2; the rest follow their
   structure.
+- **Characterisation goldens of the current engine** — it never produced correct answers, so its
+  output is not a reference. Freezing it would bless the defect (Dan, this session).
+- **Any test or audit module that is not the product** — only grid-lab internals that will be used.
