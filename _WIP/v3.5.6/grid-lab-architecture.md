@@ -96,9 +96,11 @@ and the door; it imports `computeGrid`, `safeSegments`, `centeringAnchors`, `gov
 | `mod()` | again inside `wrapGrid` |
 
 **Holes are structurally discarded.** `scaleContour`, `normBaseContour`, `normMaskContour`,
-`normGeneratedRing` all return `holes: []`, and the seat predicate takes only the outer ring. The
-brief requires every supplied boundary to stay material; the ledger parked it as blocked upstream
-(the tracer emits one ring). Named here as a real gap — see unknown 4.
+`normGeneratedRing` all return `holes: []`, and the seat predicate takes only the outer ring — while
+`Contour.holes` exists in the type and the brief requires every supplied boundary to stay material.
+Two different problems, and only one was parked: **the engine erasing holes a caller supplies is a
+defect, in scope now**; teaching the raster tracer to discover multiple rings stays parked upstream.
+A headless caller constructs a `Contour` directly, so the engine work needs no tracer.
 
 **The separation gate cannot see the live bench.** Proven by my own mutation: a raw
 `grid-magnet-compute` import injected into `grid-centre/page.tsx` leaves it **12/12 green**, because
@@ -125,8 +127,8 @@ the test reads the obsolete `grid-magnet/page.tsx` and five hand-listed files.
 
 **Stage 1 · Characterise, then delete only what is provably dead.**
 Freeze current live results first: four classes, every band, manual phase and size, the empty-band
-fallback. Then delete the `grid-magnet/` and `grid-wrap/` routes, re-run a re-export-aware consumer
-trace, and delete only symbols whose last production caller went with them — the voting scorer and
+fallback, and a directly-supplied donut contour. Then delete the `grid-magnet/` and `grid-wrap/`
+routes, re-run a re-export-aware consumer trace, and delete only symbols whose last production caller went with them — the voting scorer and
 its weights, `centeringRef`, the `wrap`/`wrapFlap`/`unheldOf` chain, `bandSnapPoints`.
 **Keep `fitSizeInBand`, `bandWalk`, `maxPressMM` for this commit only** — not because they earn a
 place, but because a structural deletion must not change behaviour. They are replaced and deleted in
@@ -134,7 +136,9 @@ stage 2.
 *Done when:* the frozen results reproduce exactly.
 
 **Stage 2 · Move bodies to owners, and rebuild the fallback as a verdict.** Foundation, segment,
-centring, layout, wrap, judge — existing bodies moved, not rewritten. `applyCoverage` → layout (it
+centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
+contour-aware: outer eroded, every supplied hole inflated and subtracted by the same radius, and
+`Contour.holes` preserved through scaling and sizing. `applyCoverage` → layout (it
 changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
 rebuilt primitives and its false header. Land the derived-zone import matrix in the same commit.
 
@@ -174,9 +178,26 @@ Exact ruled facts filter — the axis pair both sides carry. Then remove only ca
 on every continuous fact** (fill *and* aspect): a Pareto frontier, not a priority order. One
 surviving class → decided; several → **ambiguous, every tied class named in the trace**.
 
-*Why not "fill, then aspect":* a lexicographic order is a ranking policy I would be inventing, and
-it was never ruled. Honest cost: a frontier leaves more candidates standing than an invented
-priority would, so expect more ambiguity — which the audit is there to show rather than hide.
+```ts
+fillError   = |candidate.fill - query.fill|
+aspectError = |candidate.widthMM / candidate.heightMM - query.widthMM / query.heightMM|
+```
+
+*Why not "fill, then aspect":* a lexicographic order is a ranking policy I would be inventing, and it
+was never ruled.
+
+**Measured over all 163 records, my own probe, matching QA's independently:**
+
+| pitch | decided | ambiguous | missed |
+|---|---|---|---|
+| 24 mm | 139 | 24 | 0 |
+| **48 mm** | **163** | **0** | **0** |
+| 96 mm | 151 | 12 | 0 |
+
+Every ambiguity is diamond↔triangle; no square/rectangle confusion, no misses at any pitch. I had
+predicted a frontier would leave *more* candidates standing than an invented priority — that was
+speculation and it is false. These numbers prove self-classification on the corpus only; they do not
+predict accuracy on an arbitrary cutout.
 
 **The standing audit, per entry, at 24/48/96:** its own id stays a candidate · its own class stays
 in the result · no wrong decided class · no miss · ambiguity explicit and complete.
@@ -191,9 +212,7 @@ in the result · no wrong decided class · no miss · ambiguity explicit and com
    eligibility; only this split is open.)
 2. **Class → centring-mode table.** Unfilled by design.
 3. **Which catalogue entries ship** as product. 45 shapes / 163 records are a review corpus.
-4. **Holes.** The brief requires them as material boundaries; the ledger parked them as blocked at
-   the tracer. In scope now, or still parked?
-5. **The studio wire format.** `LayoutOffer` stays an internal typed record until the studio caller
+4. **The studio wire format.** `LayoutOffer` stays an internal typed record until the studio caller
    is read — id/source, class result, nodesMM, size, centre deviation, coverage evidence, verdict.
 6. Band boundaries / whether B6 exists / when interior magnets are ever allowed / control wording.
 
@@ -201,7 +220,8 @@ in the result · no wrong decided class · no miss · ambiguity explicit and com
 in judge, eligibility and repair evidence, not an optional ranker) · solver-to-catalogue wiring
 (authorised: *"finish properly wiring and completing the classifier the pipeline and run it"*) ·
 the y-flip (a technical defect I fix before whole-catalogue activation, not a sequencing question
-for Dan) · the empty-band fallback (**rebuilt** as a judge verdict on the new solver, not inherited
+for Dan) · engine hole handling (a defect, not a Dan gate: the engine obeys supplied `Contour.holes`
+in this refactor and adapters may not erase them; raster hole *extraction* stays parked upstream) · the empty-band fallback (**rebuilt** as a judge verdict on the new solver, not inherited
 from the walk — Dan, this session: a fallback is either a declared verified alternative or it is
 built on the new architecture).
 
