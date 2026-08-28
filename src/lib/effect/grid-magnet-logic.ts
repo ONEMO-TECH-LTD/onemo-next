@@ -3,7 +3,8 @@
 import type { Pt } from './types'
 
 // Moved to units/centring.ts and types.ts (S2). Re-exported so no consumer changes in the move.
-export { governMass, centeringAnchors, centeringRef, anchorBakeOf, anchorFromBake, type AnchorBake } from './units/centring'
+export { governMass, centeringAnchors, centeringRef, anchorBakeOf, anchorFromBake } from './units/centring'
+export type { AnchorBake } from './types'
 export type { CentreMode, Governor } from './types'
 import {
   BALANCE_WEIGHT,

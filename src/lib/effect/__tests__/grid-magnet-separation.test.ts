@@ -8,7 +8,7 @@
 //   4. no surface restates a released value as a bare literal
 //   5. the solve is deterministic — same inputs, same layout, whatever mode asked
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
@@ -90,12 +90,8 @@ describe('1 — the module is portable', () => {
 describe('2 — traffic is one-way', () => {
   const ALLOWED: Record<string, RegExp[]> = {
     'grid-magnet-spec.ts': [],
-    // `./units/*` is the MIGRATION SEAM and nothing else: as each unit is extracted, this file
-    // becomes a re-export shim so no consumer changes in the same commit as the move. Traffic is
-    // still one-way (a retiring module reaching DOWN to a unit, never a unit reaching up), and both
-    // the shim and this entry die at cutover when the last consumer is repointed.
-    'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/units\/[a-z-]+$/],
-    'grid-magnet-logic.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/units\/[a-z-]+$/],
+    'grid-magnet-compute.ts': [/^\.\/types$/, /^\.\/attachment$/, /^\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/],
+    'grid-magnet-logic.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/units\/[a-z-]+$/],  // import allowed ONLY as the shim's own re-export; see the unit zone below
     'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/],
     'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
   }
@@ -117,6 +113,57 @@ describe('2 — traffic is one-way', () => {
   it('the module never imports from the app', () => {
     for (const { file, text } of readModule()) {
       expect(text, `${file} must not import from the app`).not.toMatch(/from ['"]@\/app\//)
+    }
+  })
+})
+
+/**
+ * THE UNIT ZONE — derived from the filesystem, never hand-listed. The previous version read five
+ * legacy files by name, so a new unit was invisible to it: a direct unit->unit import passed 12/12,
+ * and so did policy pulled back into compute. Both mutations are reproduced below.
+ */
+const UNITS_DIR = join(LIB, 'units')
+const unitFiles = (): string[] =>
+  existsSync(UNITS_DIR) ? readdirSync(UNITS_DIR).filter((f) => f.endsWith('.ts')) : []
+
+/** A unit may reach shared vocabulary, spec and foundation. Never another unit, never a legacy
+ *  aggregate, never the app, never a framework. */
+const UNIT_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^\.\.\/foundation\/[a-z-]+$/]
+
+describe('2b — the units are self-sufficient', () => {
+  it('every unit file imports only shared vocabulary, spec or foundation', () => {
+    for (const f of unitFiles()) {
+      const bad = importsOf(readFileSync(join(UNITS_DIR, f), 'utf8'))
+        .filter((i) => !UNIT_ALLOWED.some((rx) => rx.test(i)))
+      expect(bad, `units/${f} reaches outside its allow-list: ${bad.join(' · ')}`).toEqual([])
+    }
+  })
+
+  it('no unit imports another unit', () => {
+    for (const f of unitFiles()) {
+      const bad = importsOf(readFileSync(join(UNITS_DIR, f), 'utf8')).filter((i) => /^\.\/[a-z-]+$/.test(i))
+      expect(bad, `units/${f} imports another unit: ${bad.join(' · ')}`).toEqual([])
+    }
+  })
+
+  it('no unit reaches back into a retiring aggregate or the app', () => {
+    for (const f of unitFiles()) {
+      const text = readFileSync(join(UNITS_DIR, f), 'utf8')
+      const bad = importsOf(text).filter((i) => /grid-magnet-(compute|logic|class|bridge)$|^@\/app\//.test(i))
+      expect(bad, `units/${f} reaches up to ${bad.join(' · ')}`).toEqual([])
+      expect(text, `units/${f} depends on a framework`).not.toMatch(/from ['"]react['"]|from ['"]next|\.css['"]/)
+    }
+  })
+
+  it('a legacy file may only REACH a unit through a re-export, never an import', () => {
+    for (const { file, text } of readModule()) {
+      const bad: string[] = []
+      walkAst(text, (n) => {
+        if (!ts.isImportDeclaration(n)) return
+        const spec = n.moduleSpecifier.getText().slice(1, -1)
+        if (/^\.\/units\//.test(spec)) bad.push(spec)
+      })
+      expect(bad, `${file} IMPORTS a unit (only \`export … from './units/x'\` is the shim): ${bad.join(' · ')}`).toEqual([])
     }
   })
 })

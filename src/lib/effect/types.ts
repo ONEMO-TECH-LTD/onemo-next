@@ -36,6 +36,16 @@ export interface SafeSegment {
   masses: SafeMass[]
 }
 
+export interface AnchorBake {
+  refMM: number
+  boxC: Pt
+  weightC: Pt
+  /** Deepest island's deep point at reference — the global Deep anchor. */
+  deepC: Pt
+  refMidY: number
+  masses: Array<{ centreMM: Pt; areaMM2: number; peakClearMM: number }>
+}
+
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
 export type Governor = 0 | 1 | 2 | 3
 

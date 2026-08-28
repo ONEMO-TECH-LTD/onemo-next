@@ -4,7 +4,7 @@
 // are new. CentreMode/Governor and the SafeSegment vocabulary moved to types.ts in the same commit,
 // so this unit imports no other unit.
 
-import type { CentreMode, Governor, Pt, SafeSegment } from '../types'
+import type { AnchorBake, CentreMode, Governor, Pt, SafeSegment } from '../types'
 
 /** Which mass rules — the switchable governor: 0 smallest area · 1 deepest · 2 top (gravity) ·
  *  3 top-small — RULED 2026-08-19: among masses in the shape's upper half the smallest governs;
@@ -97,16 +97,6 @@ export function centeringRef(
  * excluded: its definition (area-weighted mean of the legal area) truly moves with size, so
  * it stays measured live.
  */
-export interface AnchorBake {
-  refMM: number
-  boxC: Pt
-  weightC: Pt
-  /** Deepest island's deep point at reference — the global Deep anchor. */
-  deepC: Pt
-  refMidY: number
-  masses: Array<{ centreMM: Pt; areaMM2: number; peakClearMM: number }>
-}
-
 export function anchorBakeOf(
   segments: ReadonlyArray<SafeSegment>, boxC: Pt, weightC: Pt, refMM: number, refMidY: number,
 ): AnchorBake {
@@ -142,4 +132,3 @@ export function anchorFromBake(
   }
   return governMass(pool, governor, bake.refMidY * sc)?.centreMM ?? at(bake.boxC)
 }
-
