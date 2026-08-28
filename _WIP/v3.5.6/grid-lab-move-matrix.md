@@ -143,7 +143,9 @@ any row names more than one owner or leaves a nested block unexpanded.**
 
 **Owner rules used throughout.** `pipeline` calls units and passes their outputs — nothing else.
 `adapters` own request and default resolution, transport, caches and view-model packaging.
-`segment` owns measurement bodies including `bbox` and the segment-box producer. `centring`,
+**`bbox` resolved explicitly:** `foundation` owns the primitive, the unit that needs the
+measurement owns the call, and `pipeline` only receives and passes the result. `segment` owns the
+legal-area measurement body and the segment-box producer. `centring`,
 `layout`, `classifier` and `judge` own only their rule bodies.
 
 ### `computeGrid` — 27 statements
@@ -195,7 +197,7 @@ any row names more than one owner or leaves a nested block unexpanded.**
 | 2 | `if (!hit) {` — expanded below | SPLIT | — |
 | 2.0 | `const refMM = sizeRange(` | `adapters` | VERBATIM (padding/size resolution) |
 | 2.1 | `const outer = sized(refMM).outer.pts` | `adapters` | VERBATIM |
-| 2.2 | `const bb = bbox(outer)` | `units/segment` | VERBATIM (**a measurement — the pipeline may not perform it**) |
+| 2.2 | `const bb = bbox(outer)` | `units/segment` | VERBATIM (segment needs it for the segment box; the primitive stays in foundation) |
 | 2.3 | `const r = spotRadiusOf(` | `adapters` | VERBATIM |
 | 2.4 | `const segs = safeSegments(` | `pipeline` | VERBATIM (a call into segment) |
 | 2.5 | `const bake = anchorBakeOf(` | `pipeline` | VERBATIM (a call into centring) |
