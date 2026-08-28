@@ -187,7 +187,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         }
         const idx = Math.min(stepSel ?? ruleIdx, rungs.length - 1)
         const at = rungs[idx].at
-        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined }
+        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }
         const drawn = wrapGrid(sized, wcfg, at)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)

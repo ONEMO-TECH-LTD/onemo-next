@@ -76,6 +76,41 @@ export type MagnetDia = 6 | 8
 
 export interface Anchor { p: Pt; dia: MagnetDia }
 
+export interface WrapConfig {
+  pitchMM?: number
+  paddingMM?: number
+  magnetDiaMM?: number
+  /** Centre mode + governor — the existing centring system decides where the group sits. */
+  centreMode?: number
+  governor?: number
+  massDepthMM?: number
+  /** Baked anchor query (anchor bake): the governed centre at any size, positions measured once
+   *  on the shape and scaled — replaces per-size mesh re-measurement. In-worker only. */
+  /** REQUIRED: the governed centre at any size. Wrap never derives a centre — that is centring's,
+   *  and a unit may not call another unit. The sequencer supplies it. */
+  anchorAtMM: (mm: number) => Pt
+  /** Perimeter belt — drop fully-surrounded interior seats, keeping the rim. Reused from the
+   *  voting bench. Applied to the ARRANGEMENT before the wrap is solved, so the shape still
+   *  wraps tight around exactly the magnets that remain. */
+  perimeterOnly?: boolean
+  // NO flap dial. In this engine it would be `radius = padding + flap` — one number behind two
+  // controls — and it would also shrink the legal seating area, which is exactly the job T1 says
+  // an allowance must never do. The padding IS the reach here.
+}
+
+export interface WrapAt {
+  count: number
+  sizeMM: number
+  /** How far the group's middle ended up from the governed anchor. */
+  centreOffMM: number
+  points: Pt[]
+  originMM: Pt
+  /** The governed centre the Centre mode named — what the canvas should mark as the centre.
+   *  NOT the lattice origin: that sits on a magnet and is meaningless as a centre. */
+  anchorMM: Pt
+  gapsMM: number[]
+}
+
 // The engine's request/response vocabulary.
 export interface GridConfig {
   pitchMM?: number

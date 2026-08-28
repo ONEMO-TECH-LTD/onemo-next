@@ -1,0 +1,145 @@
+// units/wrap.ts — WRAP: a fixed magnet set in, the tightest lawful size out.
+//
+// Moved from grid-magnet-wrap-compute.ts (S2 step 5). It receives a group and an ANCHOR QUERY and
+// solves only contact size — it no longer reaches into centring for the governed centre, because a
+// unit may not call another unit. The caller supplies the anchor at every size wrap bisects.
+//
+// Its three rebuilt primitives are gone: box, inside and nearestDist were duplicates of bbox,
+// pointInOuter and edgeDistMM, and nearestDist was a brute scan where the original is indexed.
+
+import { Clipper, FillRule, JoinType, EndType, PointInPolygonResult, type Paths64 } from '@countertype/clipper2-ts'
+import type { Contour, Pt, WrapAt, WrapConfig } from '../types'
+import { edgeDistMM, pointInOuter } from '../foundation/geometry'
+import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from '../offset'
+import { PADDING_FLOOR_MM } from '../grid-magnet-spec'
+
+/** Micron scale — private to wrap. */
+const S = 1000
+
+function seatRegion(outer: ReadonlyArray<Pt>, radiusMM: number): Paths64 | null {
+  const flat: number[] = []
+  for (const [x, y] of outer) flat.push(Math.round(x * S), Math.round(y * S))
+  const tol = MANUFACTURING_OFFSET_ARC_TOLERANCE_MM
+  const region = Clipper.inflatePaths([Clipper.makePath(flat)], -(radiusMM + tol) * S, JoinType.Round, EndType.Polygon, 2, tol * S)
+  return region && region.length ? region : null
+}
+
+/** Every grid origin at which the whole rigid group is seated — empty when it cannot fit. */
+function validOrigins(region: Paths64, group: ReadonlyArray<Pt>): Paths64 | null {
+  let acc: Paths64 | null = null
+  for (const [lx, ly] of group) {
+    const shifted = Clipper.translatePaths(region, Math.round(-lx * S), Math.round(-ly * S))
+    acc = acc === null ? shifted : Clipper.intersect(acc, shifted, FillRule.NonZero)
+    if (!acc || acc.length === 0) return null
+  }
+  return acc && acc.length ? acc : null
+}
+
+/**
+ * The governed anchor — the existing centring system's answer for this shape.
+ *
+ * Wrap does not decide where the shape's centre is; the Centre mode and governor do, exactly as
+ * they do everywhere else. This is only consulted AFTER the size is settled, so it never affects
+ * whether a layout fits or how tight it wraps — it only chooses which of the valid grid origins
+ * to take when there is freedom to choose.
+ */
+function pickOrigin(valid: Paths64, towards: Pt): Pt {
+  const tx = Math.round(towards[0] * S), ty = Math.round(towards[1] * S)
+  for (const path of valid) {
+    if (Clipper.pointInPolygon({ x: tx, y: ty }, path) !== PointInPolygonResult.IsOutside) {
+      return towards                                   // already lawful — sit exactly on it
+    }
+  }
+  let best: Pt = towards, bd = Infinity
+  for (const path of valid) {
+    for (let i = 0; i < path.length; i++) {
+      const a = path[i], b = path[(i + 1) % path.length]
+      const ax = Number(a.x) / S, ay = Number(a.y) / S
+      const bx = Number(b.x) / S, by = Number(b.y) / S
+      const dx = bx - ax, dy = by - ay
+      const len2 = dx * dx + dy * dy
+      let t = len2 > 0 ? ((towards[0] - ax) * dx + (towards[1] - ay) * dy) / len2 : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const qx = ax + t * dx, qy = ay + t * dy
+      const d = (qx - towards[0]) ** 2 + (qy - towards[1]) ** 2
+      if (d < bd) { bd = d; best = [qx, qy] }
+    }
+  }
+  return best
+}
+
+/**
+ * Solve ONE explicit arrangement: the tightest centred wrap for exactly these magnets.
+ *
+ * This is the core the count-driven `wrap` already ran internally for each of its candidate
+ * blocks; it is exposed because the arrangement is the thing that should be chosen — by coverage,
+ * by mass, by hand — and only then wrapped. Local offsets in, tight size and placement out.
+ *
+ * The group starts CENTRED (its middle on the governed anchor) and shifts only as far as a
+ * lawful tighter wrap demands.
+ */
+export function wrapGroup(
+  sized: (mm: number) => Contour, cfg: WrapConfig, group: ReadonlyArray<Pt>, minMM: number, maxMM: number,
+  ): WrapAt | null {
+  if (!group.length) return null
+  const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const g = group.map((p) => [p[0], p[1]] as Pt)
+  const xs = g.map((p) => p[0]), ys = g.map((p) => p[1])
+  const mid: Pt = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+
+  const anchorAt = (mm: number): Pt => cfg.anchorAtMM(mm)
+  const heldAt = (mm: number): Pt | null => {
+    const outer = sized(mm).outer.pts
+    const anchor = anchorAt(mm)
+    const centred: Pt = [anchor[0] - mid[0], anchor[1] - mid[1]]
+    let ok = true
+    for (const [lx, ly] of g) {
+      const px = centred[0] + lx, py = centred[1] + ly
+      if (!pointInOuter([px, py], outer) || edgeDistMM(outer, [px, py]) < radius) { ok = false; break }
+    }
+    if (ok) return centred
+    const region = seatRegion(outer, radius)
+    if (!region) return null
+    const valid = validOrigins(region, g)
+    if (!valid) return null
+    return pickOrigin(valid, centred)
+  }
+
+  if (!heldAt(maxMM)) return null
+  let lo = minMM, hi = maxMM
+  if (heldAt(lo)) hi = lo
+  else while (hi - lo > 0.01) {
+    const m = (lo + hi) / 2
+    if (heldAt(m)) hi = m; else lo = m
+  }
+  const origin = heldAt(hi) ?? heldAt(hi)
+  if (!origin) return null
+  const outer = sized(hi).outer.pts
+  const anchor = anchorAt(hi)
+  const pts = g.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)
+  const finalMid: Pt = [origin[0] + mid[0], origin[1] + mid[1]]
+  return {
+    count: pts.length,
+    sizeMM: Math.round(hi * 100) / 100,
+    centreOffMM: Math.round(Math.hypot(finalMid[0] - anchor[0], finalMid[1] - anchor[1]) * 10) / 10,
+    points: pts,
+    originMM: origin,
+    anchorMM: anchor,
+    gapsMM: pts.map((q) => Math.max(0, edgeDistMM(outer, q) - radius)),
+  }
+}
+
+/**
+ * Add `count` magnets and wrap the shape around them.
+ *
+ * CENTRE FIRST, exactly as Centre-rules does it: the lattice is not searched, it is PINNED — the
+ * magnet group's own middle is placed on the governed centre (a single magnet's centre on it, a
+ * pair's midpoint on it, a 2x2's middle cell on it). Deviation from the centre is therefore zero
+ * by construction, not by preference.
+ *
+ * WRAP SECOND: with the group pinned, the only free variable is size. The shape is shrunk to the
+ * smallest size at which every magnet is still held — so it is centred AND wrapped, and the size
+ * is the one that achieves both. Nothing slides off the centre to buy a tighter wrap, and nothing
+ * grows past its wrap to buy centring.
+ */
+/** The wrapped answer as the canvas draws it. Display only — nothing is decided here. */

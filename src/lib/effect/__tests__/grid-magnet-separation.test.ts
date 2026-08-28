@@ -143,7 +143,11 @@ const unitFiles = (): string[] =>
 
 /** A unit may reach shared vocabulary, spec and foundation. Never another unit, never a legacy
  *  aggregate, never the app, never a framework. */
-const UNIT_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^\.\.\/foundation\/[a-z-]+$/]
+const UNIT_ALLOWED = [
+  /^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^\.\.\/foundation\/[a-z-]+$/,
+  /^\.\.\/offset$/, /^\.\.\/geometry-truth$/,          // repo-wide primitives, not engine-owned
+  /^@countertype\/clipper2-ts$/,                        // the geometry library itself
+]
 
 describe('2b — the units are self-sufficient', () => {
   it('every unit file imports only shared vocabulary, spec or foundation', () => {
