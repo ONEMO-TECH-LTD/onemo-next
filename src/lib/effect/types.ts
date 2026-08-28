@@ -46,6 +46,31 @@ export interface AnchorBake {
   masses: Array<{ centreMM: Pt; areaMM2: number; peakClearMM: number }>
 }
 
+// Classifier vocabulary — shared so no unit imports another for a type.
+/** How many magnet lines an axis of this length can carry, 1..5. */
+export type AxisClass = 1 | 2 | 3 | 4 | 5
+
+/** Slim = the minor axis carries one or two lines, so the frame is a chain or a ladder.
+ *  Standard = three or four lines on the minor axis — a real two-dimensional field. */
+export type FrameKind = 'square' | 'slim' | 'standard'
+
+export interface ShapeClass {
+  /** Node lines the box can carry on each axis. */
+  cx: AxisClass
+  cy: AxisClass
+  /** The product band — the dominant axis class (Compute System §4). */
+  band: AxisClass
+  kind: FrameKind
+  /** Which axis is dominant; 'none' when square. */
+  dominant: 'x' | 'y' | 'none'
+  widthMM: number
+  heightMM: number
+  /** Material area over bounding-box area — how much of its box the shape actually fills. */
+  fill: number
+  /** The candidate node frame this pair implies: cx by cy lines, spanning 2n-1 cells per axis. */
+  frame: { cols: AxisClass; rows: AxisClass; capacity: number }
+}
+
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5
 export type Governor = 0 | 1 | 2 | 3
 
