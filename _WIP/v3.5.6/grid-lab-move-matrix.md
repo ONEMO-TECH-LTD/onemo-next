@@ -125,12 +125,18 @@ symbol with one unit consumer lives inside that unit however widely it is import
 
 ## 7 · Totals
 
-| | count |
+Counted from the table itself, expanding grouped rows — **70 rows, 96 symbols**:
+
+| class | symbols |
 |---|---|
-| VERBATIM | 44 |
-| SIGNATURE | 1 |
+| VERBATIM | 71 |
+| DELETE | 20 |
 | SPLIT | 4 |
-| DELETE | 16 |
+| SIGNATURE | 1 |
+
+**Three quarters of the engine moves untouched.** That is the measurement behind calling this a
+re-layout rather than a rewrite, and the number a reviewer should hold me to: if VERBATIM falls
+during S2, bodies are being retyped.
 
 Four destinations carry no symbol at all until S3: `pipeline` receives its first bodies from
 `wrapBandLadder` and the worker, which is the point at which the engine becomes callable.
