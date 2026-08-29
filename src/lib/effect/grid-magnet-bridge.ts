@@ -154,6 +154,18 @@ export function ledgerOf(result: PipelineResult): LedgerRow[] {
   }))
 }
 
+/** Every lattice position across the shape at this size, on the governed registration. */
+function latticeOverContour(contour: Contour, pitchMM: number, anchor: Pt): Pt[] {
+  const xs = contour.outer.pts.map((p) => p[0]), ys = contour.outer.pts.map((p) => p[1])
+  const region = {
+    minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys),
+  }
+  return latticeOver(region, pitchMM, [
+    ((anchor[0] - region.minX) % pitchMM + pitchMM) % pitchMM,
+    ((anchor[1] - region.minY) % pitchMM + pitchMM) % pitchMM,
+  ])
+}
+
 /** THE BENCH MODEL — the pipeline's result as the canvas draws it. Assembly only: it chooses
  *  nothing. With no selection it returns the classified shape and an empty magnet set, so the
  *  bench shows what the pipeline found without promoting one answer, which is what the raw MVP
@@ -178,7 +190,10 @@ export function benchModel(
     grid: {
       anchors: assignSizes(points.map(([x, y]) => [x, y] as Pt), plan),
       pitchCentreMM: result.pitchMM,
-      lattice: [],
+      // THE LATTICE IS THE SHAPE'S, NOT THE SELECTION'S. It is every position this grid offers on
+      // this shape at this size, and it must be visible before anything is picked — returning an
+      // empty list left the board blank on a shape that was loaded and classified.
+      lattice: latticeOverContour(contour, result.pitchMM, anchor),
       phaseMM: [0, 0],
       panMM: [0, 0],
       spotRadiusMM: result.spotRadiusMM,

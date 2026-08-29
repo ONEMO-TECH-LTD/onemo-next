@@ -136,54 +136,47 @@ function legalSpanMM(points: readonly Pt[]): number {
  * four and keep only the highest-count one, deleting three lawful registrations before wrap ever
  * saw them, which is the max-count prefilter the brief forbids by name.
  */
-/** The LEGAL span a shape shows at one size — the region a magnet CENTRE may occupy, which is what
- *  a band is defined on (Dan, 2026-08-29: "the range in which the shape is must be measured by
- *  inner legal area"). Deliberately NOT the mass union: that is a deeper probe (16mm against the
- *  magnet's own 12mm), so calibrating a band against it would target a ceiling the shape can never
- *  reach — every shape failed to reach its own band, including a plain square. Band and frame are
- *  two different measurements of the same shape and each keeps its own. */
-function legalSpanAtMM(
-  sized: (mm: number) => Contour, sizeMM: number, radiusMM: number, depthMM: number,
-): number | null {
-  const segments = safeSegments(sized(sizeMM), radiusMM, depthMM, 'light')
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const segment of segments) {
-    if (segment.bbox.minX < minX) minX = segment.bbox.minX
-    if (segment.bbox.minY < minY) minY = segment.bbox.minY
-    if (segment.bbox.maxX > maxX) maxX = segment.bbox.maxX
-    if (segment.bbox.maxY > maxY) maxY = segment.bbox.maxY
-  }
-  return minX === Infinity ? null : Math.max(maxX - minX, maxY - minY)
+/** The frame a shape carries at one size — the same measurement the classifier reads. */
+function frameAtMM(
+  sized: (mm: number) => Contour, sizeMM: number, radiusMM: number, depthMM: number, pitchMM: number,
+): { cols: number; rows: number } | null {
+  return frameOfMasses(safeSegments(sized(sizeMM), radiusMM, depthMM, 'light'), pitchMM)
 }
 
 /**
- * THE SIZE AT WHICH THIS SHAPE FILLS THE BAND — solved, not assumed.
+ * THE SIZE AT WHICH THIS SHAPE CARRIES THE BAND'S POSITIONS — solved, not assumed.
  *
- * The band is a range of LEGAL span, and sizes are OUTLINE sizes. Converting one to the other by
- * taking the rim off both sides is exact only for an axis-aligned outline: measured at B4's top
- * size of 215mm, a square shows 182mm of live span (B4, right) while a star shows 120mm (B3,
- * three bands adrift), so the star was classified far below the band it was asked for and could
- * never be offered a B4 layout (QA F1b).
+ * THE BAND IS THE FRAME. "A band says how many magnet positions the shape can carry across its
+ * dominant axis: B1 holds one, B2 two, B3 three" (spec, from Dan's ruling). So the target is a
+ * POSITION COUNT, and it is solved against the very measurement the classifier then reads — the
+ * live-mass frame. Two earlier targets each mixed two rulers and each was wrong:
  *
- * Live span grows monotonically with size — the shape scales while the 12mm rim does not — so the
- * size that reaches the band's ceiling is found by bisection on the same measurement the classifier
- * then uses. This is a bounded measurement solve on ONE quantity, not the deleted candidate sweep:
- * nothing is seated, wrapped or compared here.
+ *   - the band's OUTLINE ceiling: outline-minus-rim is the legal span only for an axis-aligned
+ *     shape, so a star classified three bands adrift;
+ *   - the band's LEGAL ceiling: the mesh quantises in ~2mm steps, so it overshot 191 to 192 —
+ *     four pitches, FIVE positions — and asking for B4 returned a 5x5 frame whose every layout
+ *     belongs to B5, with 72 attempts where one band can only mean one frame. Worse, legal span
+ *     and live mass are different probes, so the frame read one position lower again on a star.
  *
- * Null when the shape cannot reach the band at any size the board allows — an honest answer, not a
- * silent classification at the wrong size.
+ * One quantity, one probe, no conversion. The frame grows monotonically with size, so the smallest
+ * size carrying the band's count is a bisection. Null when the shape never carries that many
+ * positions at any size the board allows — an honest answer, not a silent wrong one.
  */
 function calibrateSizeForBand(
-  sized: (mm: number) => Contour, targetSpanMM: number, radiusMM: number, depthMM: number,
-  ceilingMM: number,
+  sized: (mm: number) => Contour, positions: number, radiusMM: number, depthMM: number,
+  pitchMM: number, ceilingMM: number,
 ): number | null {
+  const dominantAt = (mm: number): number => {
+    const f = frameAtMM(sized, mm, radiusMM, depthMM, pitchMM)
+    return f ? Math.max(f.cols, f.rows) : 0
+  }
+  if (dominantAt(ceilingMM) < positions) return null
   let lo = MIN_EFFECT_MM, hi = ceilingMM
-  if ((legalSpanAtMM(sized, hi, radiusMM, depthMM) ?? 0) < targetSpanMM) return null
   for (let i = 0; i < 40 && hi - lo > 0.05; i++) {
     const mid = (lo + hi) / 2
-    if ((legalSpanAtMM(sized, mid, radiusMM, depthMM) ?? 0) < targetSpanMM) lo = mid; else hi = mid
+    if (dominantAt(mid) < positions) lo = mid; else hi = mid
   }
-  return hi
+  return dominantAt(hi) === positions ? hi : null
 }
 
 export function runPipeline(request: PipelineRequest): PipelineResult {
@@ -209,11 +202,11 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
   // the two cannot disagree.
   const depthMM = Math.max(radiusMM, request.massDepthMM ?? MASS_DEPTH_MM)
   const calibratedMM = band
-    ? calibrateSizeForBand(sized, band.maxMM, radiusMM, depthMM, ceilingMM)
+    ? calibrateSizeForBand(sized, band.id, radiusMM, depthMM, pitchMM, ceilingMM)
     : envelope.kind === 'manual' ? envelope.sizeMM : null
   if (calibratedMM === null)
     return { frame: null, classifiedAtMM: span.maxMM, pitchMM, anchorMM: null, segments: [], attempts: [],
-      reason: 'shape cannot reach band ' + (band ? band.id : '?') + ' at any size the board allows',
+      reason: 'this shape never carries ' + (band ? band.id : '?') + ' magnet positions across at any size the board allows',
       baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
   const classifiedAtMM = calibratedMM
   const contour = sized(classifiedAtMM)

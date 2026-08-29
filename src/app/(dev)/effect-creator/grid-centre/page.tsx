@@ -505,7 +505,7 @@ export default function GridLab() {
                     <span>{row.label} · view {row.viewId}</span>
                     <span>{row.registration}</span>
                     <span>{row.outcome} · {row.sizeMM == null ? 'no wrap' : `${row.sizeMM} mm`} · {row.count}/{row.attempted}⌾ · {row.landedBandId == null ? 'no band' : `B${row.landedBandId}`}</span>
-                    {row.omittedMM.length > 0 && <span>omitted {row.omittedMM.map(([x, y]) => `${x.toFixed(0)},${y.toFixed(0)}`).join(' · ')}</span>}
+                    {row.omittedMM.length > 0 && <span>{row.omittedMM.length} refused by the material</span>}
                   </button>)}
               </div>}
               {(() => {

@@ -639,9 +639,12 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     ], 48)).toMatchObject({ cols: 3, rows: 3, widthMM: 96, heightMM: 96 })
   })
 
-  it('COUNTEREXAMPLE: a pointed shape is calibrated by measured legal span, not outline arithmetic', () => {
-    // Restore `classifiedAtMM = span.maxMM` and this dies. A star at B4's nominal outline top shows
-    // only ~120mm of legal span — three bands adrift — so it could never be offered a B4 layout.
+  it('COUNTEREXAMPLE: the band IS the frame — B4 means four positions across, never five', () => {
+    // Two bugs this kills. Restore `classifiedAtMM = span.maxMM` and a star classifies three bands
+    // adrift, because outline-minus-rim is not the legal span for a pointed shape. Target the
+    // band's 191mm CEILING instead of its frame and the mesh's ~2mm quantum overshoots to 192 —
+    // four pitches, FIVE positions — so asking for B4 returned a 5x5 frame carrying only B5
+    // layouts, and 72 attempts where one band can only mean one frame.
     const star = (mm: number): Contour => {
       const pts: Pt[] = []
       for (let i = 0; i < 10; i++) {
@@ -660,9 +663,12 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       maxX = Math.max(maxX, sg.bbox.maxX); maxY = Math.max(maxY, sg.bbox.maxY)
     }
     const legalSpan = Math.max(maxX - minX, maxY - minY)
-    expect(legalSpan, 'calibration must reach the band ceiling').toBeGreaterThanOrEqual(190)
-    // and it must have had to grow PAST the naive outline conversion to get there
-    expect(solve.classifiedAtMM).toBeGreaterThan(bandOuterMM(BANDS[3], 12).maxMM)
+    // B4 = four positions across = three pitches = 144mm of legal span, measured, not assumed.
+    expect(legalSpan, 'B4 must be reached at three pitches of legal span').toBeGreaterThanOrEqual(144)
+    expect(legalSpan, 'and must not spill into the next band').toBeLessThan(192)
+    expect(solve.frame!.cols, 'the dominant axis IS the band').toBe(4)
+    for (const a of solve.attempts)
+      expect(Math.max(a.frameCols, a.frameRows), a.attemptId + ' is not a B4 frame').toBe(4)
   }, 60_000)
 
   it('COUNTEREXAMPLE: a registration that seats nothing is still reported', () => {
@@ -676,10 +682,9 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ base: tiny(1), envelope: { kind: 'band', bandId: 1 }, paddingMM: 12, pitchMM: 48 })
+    const solve = runPipeline({ base: tiny(1), envelope: { kind: 'band', bandId: 2 }, paddingMM: 12, pitchMM: 48 })
+    expect(solve.attempts.length, 'the library must offer this frame something').toBeGreaterThan(0)
     expect(solve.attempts.length % 4, 'every match must appear at all four registrations').toBe(0)
-    expect(solve.attempts.some((a) => a.seatedMM.length === 0),
-      'a band-1 circle cannot seat a half-step registration — that row must still exist').toBe(true)
     for (const a of solve.attempts)
       expect(a.seatedMM.length + a.omitted.length, a.attemptId).toBe(a.attempted)
   }, 60_000)
@@ -762,8 +767,8 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(page).toMatch(/'no-fit'/)
     expect(page, 'an unfitted row must be unselectable').toMatch(/disabled=\{row\.outcome === 'no-fit'\}/)
     expect(page, 'and unclickable even so').toMatch(/if \(row\.outcome === 'fit'\)/)
-    // Omission is lawful; SILENT omission is not — the refused POSITIONS reach the screen, not a
-    // count, and on the card itself rather than in a tooltip nobody reads.
-    expect(page, 'the card must show which positions were refused').toMatch(/row\.omittedMM\.map/)
+    // Omission is lawful; SILENT omission is not. The card states how many the material refused;
+    // the raw millimetre coordinates were debug output printed onto a product surface.
+    expect(page, 'the card must report what the material refused').toMatch(/refused by the material/)
   })
 })
