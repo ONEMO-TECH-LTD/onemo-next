@@ -19,21 +19,9 @@
 // was mine on 2026-08-25 and it read "no generation AT SOLVE TIME", which is a different claim —
 // what was rejected then was a solve-time generator filtering patterns per family.
 
-import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM } from '../grid-magnet-spec'
 import type { LibraryFrame } from './types'
 
 type Pt = readonly [number, number]
-
-/** How many positions of a given lattice the board holds, per axis. The board is fixed in
- *  millimetres, so this is the one place the two are converted: 17x21 at 24mm, 9x11 at 48, 5x6 at
- *  96. Spec states the millimetres and does no arithmetic. */
-export function boardPositions(pitchMM: number): { cols: number; rows: number } {
-  if (!Number.isFinite(pitchMM) || pitchMM <= 0) throw new Error('library: bad pitch ' + pitchMM)
-  return {
-    cols: Math.floor(BOARD_WIDTH_MM / pitchMM) + 1,
-    rows: Math.floor(BOARD_HEIGHT_MM / pitchMM) + 1,
-  }
-}
 
 /** THE CANON — every node of the frame. */
 export function fullNodes(cols: number, rows: number): Pt[] {

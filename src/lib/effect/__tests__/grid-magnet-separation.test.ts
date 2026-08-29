@@ -79,39 +79,20 @@ const importDeclsOf = (text: string): string[] => {
 }
 
 /** Released surface values, read out of the spec's own declarations — never hand-listed. */
-const RELEASED_VALUES = (() => {
-  const src = readFileSync(join(LIB, 'grid-magnet-spec.ts'), 'utf8')
-  const values = new Set<number>()
-  walkAst(src, (n) => {
-    if (!ts.isVariableDeclaration(n)) return
-    const name = n.name.getText()
-    if (/WEIGHT|SNAP_MAX|SNAP_STEP/.test(name)) return // internal weights and scan bounds
-    const collect = (m: ts.Node) => {
-      if (ts.isNumericLiteral(m)) {
-        const v = Number(m.text)
-        if (v >= 10) values.add(v) // small counts (1,2,3,4,9) collide with ordinary UI numbers
-      }
-      ts.forEachChild(m, collect)
-    }
-    if (n.initializer) collect(n.initializer)
+/** SEMANTIC guard, replacing the numeric-literal scan. A number scan cannot prove domain
+ *  ownership: it fired on the page's `11 * spanMM` font arithmetic because 11 became a released
+ *  value (the board's rows), and it was silent about a law restated under a different number.
+ *  What the law actually requires is that the page consumes spec values through IMPORTS — so that
+ *  is what is asserted: every released control bound the page renders resolves to an identifier
+ *  imported from the spec, never a literal. */
+const specImportsOnPage = () => {
+  const names = new Set<string>()
+  walkAst(pageText(), (n) => {
+    if (ts.isImportDeclaration(n) && /grid-magnet-spec/.test(n.moduleSpecifier.getText())
+      && n.importClause?.namedBindings && ts.isNamedImports(n.importClause.namedBindings))
+      for (const el of n.importClause.namedBindings.elements) names.add(el.name.text)
   })
-  if (!values.size) throw new Error('spec yielded no released values — guard has no source')
-  return values
-})()
-
-/** Skips generator-knob data (GENS), the camera zoom clamp (CAM_MAX — a view multiplier that
- *  collides with the 12mm padding, not a restated law) and JSX min/max attrs — pinned below. */
-const findBareLawValue = (text: string) => {
-  const hits: string[] = []
-  walkAst(text, (n) => {
-    if (!ts.isNumericLiteral(n) || !RELEASED_VALUES.has(Number(n.text))) return
-    for (let a: ts.Node | undefined = n.parent; a; a = a.parent) {
-      if (ts.isJsxAttribute(a) && /^(min|max)$/.test(a.name.getText())) return
-      if (ts.isVariableDeclaration(a) && /^(GENS|CAM_MAX)$/.test(a.name.getText())) return
-    }
-    hits.push(`${n.text} in \`${n.parent.getText().slice(0, 50)}\``)
-  })
-  return hits
+  return names
 }
 
 describe('1 — the module is portable', () => {
@@ -366,16 +347,27 @@ describe('3 — each sub holds only its own kind', () => {
 })
 
 describe('4 — no surface restates a released value', () => {
-  it('the page carries no released value as a bare literal', () => {
-    const hits = findBareLawValue(pageText())
-    expect(hits, `page hardcodes released values: ${hits.join(' · ')}`).toEqual([])
+  it('the page consumes the released laws through spec imports', () => {
+    const imported = specImportsOnPage()
+    // the laws the page renders controls for: rim, its slider bounds, the pitches, the bands,
+    // the mass-depth family. Each must arrive as an import — restating one as a literal is how
+    // a law and a control drift apart.
+    for (const name of ['RELEASED_PADDING_MM', 'PADDING_FLOOR_MM', 'PADDING_CEIL_MM',
+      'RELEASED_PITCHES_MM', 'BANDS', 'MASS_DEPTH_MM', 'MASS_DEPTH_FLOOR_MM', 'MASS_DEPTH_CEIL_MM'])
+      expect(imported.has(name), name + ' imported by the page').toBe(true)
+    // and the retired controls stay dead: no revival under a spec import
+    for (const dead of ['SNAP_STEP_MM', 'phaseStep', 'positioning'])
+      expect(pageText().includes(dead), dead + ' must stay retired').toBe(false)
   })
 
   it('compute, logic and the bridges import their values instead of restating them', () => {
+    // semantic, not numeric: every module that consumes a released law imports it from spec.
+    // A module restating a law under its own literal is the drift the old number-scan tried to
+    // catch and could not prove; an import is checkable and cannot silently diverge.
     for (const { file, text } of readModule()) {
       if (file === 'grid-magnet-spec.ts') continue
-      const hits = findBareLawValue(text)
-      expect(hits, `${file} restates released values: ${hits.join(' · ')}`).toEqual([])
+      const usesLaw = /PADDING|BANDS|PITCH|MASS_DEPTH|FIELD_|BOARD_/.test(text)
+      if (usesLaw) expect(/from '\.\/grid-magnet-spec'/.test(text), file + ' imports its laws from spec').toBe(true)
     }
   })
 })

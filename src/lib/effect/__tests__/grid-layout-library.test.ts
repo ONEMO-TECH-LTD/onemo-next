@@ -20,13 +20,13 @@ import { materializeSelection, materializeResolved } from '../library/materializ
 import { librarySurface } from '../library/surface'
 import { catalogue } from '../library/catalogue'
 
-import { boardPositions, CANON_LAYOUT } from '../library/canon'
+import { CANON_LAYOUT } from '../library/canon'
+import { boardPositions } from '../library/geometry'
 import { bandOfFrame } from '../library/rules'
 import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
-import { convexHull } from '../library/geometry'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
  *  mutable Pt. Converting is the BRIDGE's whole job, so a test that calls an engine classifier

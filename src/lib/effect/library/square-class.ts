@@ -1,4 +1,5 @@
-import { boardPositions, frameOf } from './canon'
+import { frameOf } from './canon'
+import { boardPositions } from './geometry'
 import { registryClass } from './registry-class'
 import type { LibraryFrame } from './types'
 

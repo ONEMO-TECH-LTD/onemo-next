@@ -1,5 +1,24 @@
 import { transformLayout } from './transforms'
+import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM } from '../grid-magnet-spec'
 import type { FrameExtent, LibraryLayout, LibraryTransform, PointMM } from './types'
+
+/** THE BOARD IN POSITIONS, per lattice — the inverse of the flip below: millimetres to a position
+ *  count. The board is fixed at 384x480mm of legal area; a coarser pitch reaches it with fewer
+ *  positions (17x21 at 24mm, 9x11 at 48, 5x6 at 96). Lives here because geometry.ts is the one
+ *  owner of every lattice<->mm conversion, in both directions. */
+export function boardPositions(pitchMM: number): { cols: number; rows: number } {
+  if (!Number.isFinite(pitchMM) || pitchMM <= 0) throw new Error('library: bad pitch ' + pitchMM)
+  return {
+    cols: Math.floor(BOARD_WIDTH_MM / pitchMM) + 1,
+    rows: Math.floor(BOARD_HEIGHT_MM / pitchMM) + 1,
+  }
+}
+
+/** THE LEGAL SPAN of a frame's canon population at a pitch, in millimetres — n positions span n-1
+ *  gaps. The conversion half of bandOfFrame: rules.ts owns which band that span falls in. */
+export function frameLegalSpanMM(frame: FrameExtent, pitchMM: number): number {
+  return (Math.max(frame.cols, frame.rows) - 1) * pitchMM
+}
 
 /** THE PLACEMENT: a layout, under a view, at a pitch, in millimetres. Library canon counts rows
  *  downward from the top; millimetres count upward, so the flip happens here and nowhere else.

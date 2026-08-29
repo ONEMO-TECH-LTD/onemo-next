@@ -57,7 +57,7 @@ type ImportViolation = ImportEdge & { fromZone: Zone; toZone?: Zone; reason: str
 
 const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
   0: ['types.ts', 'class-contract.ts'],
-  2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts', 'selection-transition.ts'],
+  2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts', 'selection-transition.ts', 'canon.ts'],
   4: ['class-registry.ts'],
   5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'band-ranges.ts', 'drafts.ts', 'integrity.ts'],
   6: ['surface.ts'],
@@ -811,7 +811,6 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
     expect(CATALOGUE_FORMAT_VERSION).toBe(3)
-    const entries = catalogue(48)
     const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
@@ -819,15 +818,26 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       expect(JSON.parse(JSON.stringify(entry))).toEqual(entry)
       expect(Number.isFinite(entry.widthMM) && Number.isFinite(entry.heightMM)).toBe(true)
     }
-    const ids = entries.map((entry) => entry.id)
-    expect(new Set(ids).size).toBe(ids.length)
-    expect([...catalogue(24).map((entry) => entry.id)].sort()).toEqual([...ids].sort())
-    expect([...catalogue(96).map((entry) => entry.id)].sort()).toEqual([...ids].sort())
+    // The pitches legitimately hold DIFFERENT sets: frames are pitch-aware because the board is
+    // fixed in millimetres (17x21 at 24, 9x11 at 48, 5x6 at 96). Identity is therefore keyed by
+    // id@pitch; an identical-id-set assertion across pitches is false by construction. A record
+    // that exists at several pitches must keep one stable id.
+    for (const pitchMM of [24, 48, 96]) {
+      const ids = catalogue(pitchMM).map((entry) => entry.id)
+      expect(new Set(ids).size, 'unique ids @' + pitchMM).toBe(ids.length)
+    }
     type CatalogueIdentity = { id: string; classId: string; typeId: string; corners: 'sharp' | 'bevel' | 'round'; frameCols: number; frameRows: number; nodesMM: readonly (readonly [number, number])[] }
-    const identity: CatalogueIdentity[] = entries.map((entry) => ({ id: entry.id, classId: entry.classId, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) }))
-    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v1.json'))) as CatalogueIdentity[]
+    const identityAt = (pitchMM: number): CatalogueIdentity[] => catalogue(pitchMM).map((entry) => ({ id: entry.id, classId: entry.classId, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) }))
+    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v3.json'))) as Record<string, CatalogueIdentity[]>
     const byId = (a: CatalogueIdentity, b: CatalogueIdentity) => a.id.localeCompare(b.id)
-    expect([...manifest].sort(byId)).toEqual([...identity].sort(byId))
+    for (const pitchMM of [24, 48, 96])
+      expect([...manifest[String(pitchMM)]].sort(byId), 'manifest @' + pitchMM).toEqual([...identityAt(pitchMM)].sort(byId))
+    // a record present at several pitches keeps one identity: same class/type/frame under its id
+    const at48 = new Map(identityAt(48).map((e) => [e.id, e]))
+    for (const e of identityAt(96)) {
+      const twin = at48.get(e.id)
+      if (twin) expect([twin.classId, twin.typeId, twin.frameCols, twin.frameRows], e.id).toEqual([e.classId, e.typeId, e.frameCols, e.frameRows])
+    }
   })
   it('STEP 4: every record at every pitch equals an independent build through the class contract', () => {
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {

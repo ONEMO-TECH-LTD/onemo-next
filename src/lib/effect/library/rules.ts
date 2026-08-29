@@ -5,6 +5,7 @@
 // (Dan, 2026-08-29). What remains here is measurement, which is the same question whoever asks it.
 
 import { BANDS } from '../grid-magnet-spec'
+import { frameLegalSpanMM } from './geometry'
 import type { LibraryFrame } from './types'
 
 type Pt = readonly [number, number]
@@ -42,7 +43,6 @@ export function legalExtentMM(nodes: readonly Pt[]): number {
 }
 
 export function bandOfFrame(frame: LibraryFrame, pitchMM: number): number | null {
-  const canon = frame.layouts[0]
-  if (!canon) return null
-  return bandIdOfMM(legalExtentMM(canon.nodes.map(([x, y]) => [x * pitchMM, y * pitchMM] as Pt)))
+  if (!frame.layouts[0]) return null
+  return bandIdOfMM(frameLegalSpanMM(frame, pitchMM))
 }

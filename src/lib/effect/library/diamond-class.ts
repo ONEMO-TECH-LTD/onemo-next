@@ -1,4 +1,5 @@
-import { boardPositions, diamondMask, frameOf } from './canon'
+import { diamondMask, frameOf } from './canon'
+import { boardPositions } from './geometry'
 import { registryClass } from './registry-class'
 import type { LibraryFrame } from './types'
 
