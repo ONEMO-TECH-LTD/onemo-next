@@ -123,7 +123,10 @@ export default function GridLab() {
     ? libraryStageModel(libraryState.materialized, pitch) : null,
   [libraryState, pitch])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
-  const [stepSel, setStepSel] = useState<number | null>(null)
+  /** Which attempt the viewer picked, by its stable id — never by position. An index into the
+   *  ledger drew a different answer as soon as a row above it failed, and a null index used to
+   *  mean "the first one that fitted", which is a ranking the raw MVP must not have. */
+  const [stepSel, setStepSel] = useState<string | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
   const [bandScale, setBandScale] = useState<number | null>(null)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
@@ -267,6 +270,7 @@ export default function GridLab() {
     sizeMM: number | null; count: number; offMM: number | null
     label: string; classId: string; transposed: boolean
     omitted: number; attempted: number; landedBandId: number | null; registration: string
+    viewId: string; attemptId: string
   }
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: LedgerRow[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { cols: number; rows: number; segWmm: number; segHmm: number }; diagnostic?: { reason: string } }
   const [model, setModel] = useState<Model | null>(null)
@@ -321,7 +325,7 @@ export default function GridLab() {
       mode,
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
-      stepSel,
+      selectedAttemptId: stepSel,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
@@ -469,7 +473,7 @@ export default function GridLab() {
                     ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
                     ? model.ladder.some((r) => r.sizeMM != null)
-                      ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.filter((r) => r.sizeMM != null).length} of ${model.ladder.length} attempts fitted · ${new Set(model.ladder.map((r) => r.label + (r.transposed ? '/t' : ''))).size} layouts × 4 grid positions`
+                      ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}${model.ladder.filter((r) => r.sizeMM != null).length} of ${model.ladder.length} attempts fitted · ${new Set(model.ladder.map((r) => r.label + '/' + r.viewId)).size} layouts × 4 grid positions${stepSel ? ` · showing ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''}` : ' · pick a row to draw one'}`
                       : model.ladder.length
                         ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library offered ${new Set(model.ladder.map((r) => r.label)).size} layouts and the material refused every one`
                         : `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library holds no layout for this grid`
@@ -480,10 +484,10 @@ export default function GridLab() {
                     Unsorted and unranked by design: Dan scoped ordering after the raw MVP, so what
                     you see is what the pipeline found, not what something decided you should see. */}
                 {model.ladder.map((row, i) =>
-                  <button key={i} aria-pressed={bandScale === null && i === model.idx}
+                  <button key={row.attemptId} aria-pressed={bandScale === null && stepSel === row.attemptId}
                     disabled={row.sizeMM == null}
-                    title={`${row.label}${row.transposed ? ' · turned' : ''} · ${row.registration} · ${row.count} of ${row.attempted} seated${row.omitted ? ` · ${row.omitted} refused by the material` : ''}`}
-                    onClick={() => { if (row.sizeMM != null) { setStepSel(i); setBandScale(null) } }}>
+                    title={`${row.label} · view ${row.viewId} · ${row.registration} · ${row.count} of ${row.attempted} seated${row.omitted ? ` · ${row.omitted} refused by the material` : ''}`}
+                    onClick={() => { if (row.sizeMM != null) { setStepSel(row.attemptId); setBandScale(null) } }}>
                     <b>{row.sizeMM == null ? 'no fit' : `${row.sizeMM} mm`}</b>
                     <span>{row.count}⌾{row.omitted ? ` −${row.omitted}` : ''}{row.landedBandId != null && row.landedBandId !== mode ? ` · B${row.landedBandId}` : ''}</span>
                   </button>)}

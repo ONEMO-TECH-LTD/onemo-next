@@ -14,7 +14,7 @@ import {
   bbox, edgeDistMM, pointInOuter,
 } from '../foundation/geometry'
 import {
-  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, SNAP_STEP_MM,
+  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM,
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
@@ -75,7 +75,12 @@ export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
 /** Which band a LEGAL extent falls in. Bands are measured on the legal area, never the outline box:
  *  a pointed or diagonal outline is far bigger than the region inside it that can hold a magnet. */
 export function bandOf(legalMM: number): Band | null {
-  for (const b of BANDS) if (legalMM >= b.minMM && legalMM <= b.maxMM) return b
+  // The table states whole-millimetre ends (0-47, 48-95, ...) so that no size lives in two bands,
+  // but a real span is fractional: a 47.5mm legal extent fell BETWEEN B1 and B2 and came back with
+  // no band at all, which is how a lawfully wrapped layout ended up unlabelled (QA F3c). The
+  // interval is half-open on the upper end, so the bands tile the line with no holes and no
+  // overlap — 47.5 is B1, 48.0 is B2.
+  for (const b of BANDS) if (legalMM >= b.minMM && legalMM < b.maxMM + 1) return b
   return null
 }
 
@@ -156,6 +161,20 @@ export function makeContourSeatPredicate(
 }
 
 const mod = (v: number, m: number) => ((v % m) + m) % m
+
+/** THE FOUR GOVERNED REGISTRATIONS, as offsets from the governed centre. Centre rules pins the
+ *  grid by parity instead of sweeping it: each axis either carries a NODE on the centre or a GAP
+ *  on it, which is these four. Layout owns them because layout owns the lattice — the pipeline
+ *  sequences, it does not define geometry. */
+export function registrationOffsets(pitchMM: number): Array<[number, number]> {
+  const half = pitchMM / 2
+  return [[0, 0], [half, 0], [0, half], [half, half]]
+}
+
+/** A view's stable short id: transpose/flipX/flipY as three letters. */
+export function viewIdOf(view: { transpose: boolean; flipX: boolean; flipY: boolean }): string {
+  return (view.transpose ? 't' : 'n') + (view.flipX ? 'x' : 'n') + (view.flipY ? 'y' : 'n')
+}
 
 /** What layout decided — placement only; the caller turns it into the engine's result. */
 interface LayoutPlacement {

@@ -3,7 +3,7 @@
 // PRESENTED view, because how a shape sits is what is being looked at, not how it is stored.
 
 import { TRIANGLE_LAYOUTS } from './corpus-triangle'
-import { transformLayout } from './transforms'
+import { D4_VIEWS, transformLayout } from './transforms'
 import type { FrameExtent, LibraryLayout, LibraryTransform } from './types'
 import { boundsOf, triangleGeometry, type LatticeNode, type TriangleGeometry, type TriangleLayout } from './triangle-geometry'
 
@@ -131,12 +131,7 @@ export function trianglesOfType(type: TriangleProductType): TriangleLayout[] {
   return triangles
 }
 
-const VIEWS: LibraryTransform[] = [
-  { transpose: false, flipX: false, flipY: false }, { transpose: false, flipX: true, flipY: false },
-  { transpose: false, flipX: false, flipY: true }, { transpose: false, flipX: true, flipY: true },
-  { transpose: true, flipX: false, flipY: false }, { transpose: true, flipX: true, flipY: false },
-  { transpose: true, flipX: false, flipY: true }, { transpose: true, flipX: true, flipY: true },
-]
+const VIEWS = D4_VIEWS
 
 export function uprightView(triangle: TriangleLayout): LibraryTransform {
   const hit = UPRIGHT.get(triangle.id)

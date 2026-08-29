@@ -5,7 +5,7 @@
 // cut. They measured the wrong box and encoded the old five-band product range in a type; the
 // pipeline reads the frame off the usable material instead, which is all that remains here.
 
-import type { BBox, Pt, SafeSegment } from '../types'
+import type { BBox, SafeSegment } from '../types'
 
 /** THE FRAME — the grid the shape's USABLE MATERIAL carries. Dan's step 1: "determine segmented
  *  legal area ... we can define what aspect ratio of the bbox is of the legal shape area and it
@@ -23,8 +23,11 @@ import type { BBox, Pt, SafeSegment } from '../types'
  *  material one position at a time, and wrap remains the only authority on what fits. */
 export function massUnionBoxMM(segments: readonly SafeSegment[]): BBox | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  // LIVE MASSES ONLY. The fallback that used the segment itself when it held no mass re-admitted
+  // exactly what this function exists to exclude: a dead arm IS a legal segment with no mass in it,
+  // so a 96x96 body beside a 240x30 dead island read 6x3 instead of 3x3 (QA F1, 2026-08-29).
   for (const segment of segments)
-    for (const mass of (segment.masses.length ? segment.masses : [segment])) {
+    for (const mass of segment.masses) {
       if (mass.bbox.minX < minX) minX = mass.bbox.minX
       if (mass.bbox.minY < minY) minY = mass.bbox.minY
       if (mass.bbox.maxX > maxX) maxX = mass.bbox.maxX

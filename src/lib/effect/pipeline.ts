@@ -19,18 +19,19 @@ import type { Contour, Pt, SafeSegment, WrapAt, WrapConfig } from './types'
 import type { CentreMode, Governor } from './types'
 import {
   BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_FLOOR_MM,
-  RELEASED_PADDING_MM,
+  RELEASED_PADDING_MM, SIZE_CEIL_MARGIN_MM,
 } from './grid-magnet-spec'
 import { bbox } from './foundation/geometry'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, contourCentroidOf, governMass } from './units/centring'
 import { frameOfMasses } from './units/classifier'
 import {
-  bandOf, bandOuterMM, legalOfOuterMM, makeCircleSeatPredicate, makeContourSeatPredicate,
-  spotRadiusOf,
+  bandOf, bandOuterMM, fieldSpanMM, legalOfOuterMM, makeCircleSeatPredicate,
+  makeContourSeatPredicate, registrationOffsets, spotRadiusOf,
 } from './units/layout'
 import { wrapGroup } from './units/wrap'
 import { layoutsForFrame } from './grid-magnet-library-catalogue'
+import { viewIdOf } from './units/layout'
 
 export interface PipelineRequest {
   /** The shape at any size — the one thing the caller owns. */
@@ -64,8 +65,12 @@ export interface Attempt {
   readonly classId: string
   readonly frameCols: number
   readonly frameRows: number
-  /** The library record was used turned — a landscape shape wearing a canonical-tall layout. */
-  readonly transposed: boolean
+  /** WHICH of the eight ways round this layout is turned — 'n/n/n' is upright. A mirror is a
+   *  different magnet set, so the view is part of what was tried, not decoration. */
+  readonly viewId: string
+  /** Stable identity: entry + view + registration. The shell selects BY THIS, never by position —
+   *  an index into a filtered list draws a different attempt the moment a row above it fails. */
+  readonly attemptId: string
   /** Which of the governed registrations this attempt seated at, as an offset from the anchor. */
   readonly registrationMM: Pt
   readonly attempted: number
@@ -89,6 +94,9 @@ export interface PipelineResult {
   readonly segments: readonly SafeSegment[]
   /** Every layout × registration the pipeline tried. Unordered and unfiltered by construction. */
   readonly attempts: readonly Attempt[]
+  /** Set when the pipeline could not classify at all, and why. An empty list with no reason would
+   *  be indistinguishable from a library that holds nothing. */
+  readonly reason?: string
 }
 
 /** Local offsets about a group's own middle — the form wrapGroup takes. */
@@ -112,9 +120,54 @@ function legalSpanMM(points: readonly Pt[]): number {
  * four and keep only the highest-count one, deleting three lawful registrations before wrap ever
  * saw them, which is the max-count prefilter the brief forbids by name.
  */
-function registrations(pitchMM: number): Pt[] {
-  const half = pitchMM / 2
-  return [[0, 0], [half, 0], [0, half], [half, half]]
+/** The LEGAL span a shape shows at one size — the region a magnet CENTRE may occupy, which is what
+ *  a band is defined on (Dan, 2026-08-29: "the range in which the shape is must be measured by
+ *  inner legal area"). Deliberately NOT the mass union: that is a deeper probe (16mm against the
+ *  magnet's own 12mm), so calibrating a band against it would target a ceiling the shape can never
+ *  reach — every shape failed to reach its own band, including a plain square. Band and frame are
+ *  two different measurements of the same shape and each keeps its own. */
+function legalSpanAtMM(
+  sized: (mm: number) => Contour, sizeMM: number, radiusMM: number, depthMM: number,
+): number | null {
+  const segments = safeSegments(sized(sizeMM), radiusMM, depthMM, 'light')
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const segment of segments) {
+    if (segment.bbox.minX < minX) minX = segment.bbox.minX
+    if (segment.bbox.minY < minY) minY = segment.bbox.minY
+    if (segment.bbox.maxX > maxX) maxX = segment.bbox.maxX
+    if (segment.bbox.maxY > maxY) maxY = segment.bbox.maxY
+  }
+  return minX === Infinity ? null : Math.max(maxX - minX, maxY - minY)
+}
+
+/**
+ * THE SIZE AT WHICH THIS SHAPE FILLS THE BAND — solved, not assumed.
+ *
+ * The band is a range of LEGAL span, and sizes are OUTLINE sizes. Converting one to the other by
+ * taking the rim off both sides is exact only for an axis-aligned outline: measured at B4's top
+ * size of 215mm, a square shows 182mm of live span (B4, right) while a star shows 120mm (B3,
+ * three bands adrift), so the star was classified far below the band it was asked for and could
+ * never be offered a B4 layout (QA F1b).
+ *
+ * Live span grows monotonically with size — the shape scales while the 12mm rim does not — so the
+ * size that reaches the band's ceiling is found by bisection on the same measurement the classifier
+ * then uses. This is a bounded measurement solve on ONE quantity, not the deleted candidate sweep:
+ * nothing is seated, wrapped or compared here.
+ *
+ * Null when the shape cannot reach the band at any size the board allows — an honest answer, not a
+ * silent classification at the wrong size.
+ */
+function calibrateSizeForBand(
+  sized: (mm: number) => Contour, targetSpanMM: number, radiusMM: number, depthMM: number,
+  ceilingMM: number,
+): number | null {
+  let lo = MIN_EFFECT_MM, hi = ceilingMM
+  if ((legalSpanAtMM(sized, hi, radiusMM, depthMM) ?? 0) < targetSpanMM) return null
+  for (let i = 0; i < 40 && hi - lo > 0.05; i++) {
+    const mid = (lo + hi) / 2
+    if ((legalSpanAtMM(sized, mid, radiusMM, depthMM) ?? 0) < targetSpanMM) lo = mid; else hi = mid
+  }
+  return hi
 }
 
 export function runPipeline(request: PipelineRequest): PipelineResult {
@@ -123,17 +176,25 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
   // admin slider's floor (Dan, 2026-08-29: "point it to the last locked number").
   const padMM = Math.max(PADDING_FLOOR_MM, request.paddingMM ?? RELEASED_PADDING_MM)
   const radiusMM = spotRadiusOf(padMM)
-  const band = BANDS.find((b) => b.id === request.bandId) ?? BANDS[0]
+  // FAIL LOUD. An unknown band silently became B1, so asking for band 999 and band 1 returned
+  // byte-identical answers — a wrong question answered confidently is worse than an error.
+  const band = BANDS.find((b) => b.id === request.bandId)
+  if (!band) throw new Error('pipeline: unknown band ' + request.bandId)
   // The band is a LEGAL range; sizes are OUTLINE sizes, so it converts through this shape's own
   // rim. A diamond and a square in one band do not share an outline range.
   const span = bandOuterMM(band, padMM)
 
-  // STEP 1 + 2 — measure at the top of the band's range: the largest this shape may be while still
-  // in the band, so the most positions its material can carry here. A smaller size inside the same
-  // band can only ever read the same frame or a smaller one.
-  const classifiedAtMM = span.maxMM
-  const contour = request.sized(classifiedAtMM)
+  // STEP 1 + 2 — measure where the shape actually FILLS the band, not where its outline happens to
+  // be. The size is solved against the same live-span measurement the frame is then read from, so
+  // the two cannot disagree.
   const depthMM = Math.max(radiusMM, request.massDepthMM ?? MASS_DEPTH_MM)
+  const calibratedMM = calibrateSizeForBand(request.sized, band.maxMM, radiusMM, depthMM,
+    fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM)
+  if (calibratedMM === null)
+    return { frame: null, classifiedAtMM: span.maxMM, pitchMM, anchorMM: null, segments: [], attempts: [],
+      reason: 'shape cannot reach band ' + band.id + ' at any size the board allows' }
+  const classifiedAtMM = calibratedMM
+  const contour = request.sized(classifiedAtMM)
   const segments = safeSegments(contour, radiusMM, depthMM, 'full')
   const frame = frameOfMasses(segments, pitchMM)
 
@@ -158,7 +219,8 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
     : makeContourSeatPredicate(contour, radiusMM)
 
   if (!frame || !fits)
-    return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts: [] }
+    return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts: [],
+      reason: !frame ? 'no live mass to classify' : 'the outline admits no seat at all' }
 
   const wcfg: WrapConfig = {
     pitchMM, paddingMM: padMM, centreMode: request.centreMode, governor: request.governor,
@@ -170,7 +232,7 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
   const attempts: Attempt[] = []
   for (const match of matches) {
     const { group } = localise(match.nodesMM as Pt[])
-    for (const [dx, dy] of registrations(pitchMM)) {
+    for (const [dx, dy] of registrationOffsets(pitchMM)) {
       const origin: Pt = [anchorMM[0] + dx, anchorMM[1] + dy]
       const placed = group.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)
       // Per position, one physical question, asked of the real material. This IS the omission
@@ -181,20 +243,23 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
         if (fits(point)) seatedMM.push(point)
         else omitted.push({ pointMM: point, reason: 'outside-safe-area' })
       }
-      if (!seatedMM.length) continue
 
       // STEP 4 — the survivors go to wrap WHOLE and unchanged. Wrap is the only authority on fit,
       // and it either seats the entire group or answers null; nothing here removes a magnet to
-      // make a failure succeed.
-      const { group: survivors } = localise(seatedMM)
-      const wrap = wrapGroup(request.sized, wcfg, survivors, MIN_EFFECT_MM, span.maxMM)
+      // make a failure succeed. A registration that seated NOTHING is still reported: it is a
+      // real thing the pipeline tried, and dropping it made the bench claim four grid positions
+      // while rendering two (QA F3a).
+      const wrap = seatedMM.length
+        ? wrapGroup(request.sized, wcfg, localise(seatedMM).group, MIN_EFFECT_MM, span.maxMM)
+        : null
       attempts.push({
         entryId: match.entry.id,
         label: match.entry.label,
         classId: match.entry.classId,
         frameCols: frame.cols,
         frameRows: frame.rows,
-        transposed: match.transposed,
+        viewId: viewIdOf(match.match.view),
+        attemptId: match.entry.id + '|' + viewIdOf(match.match.view) + '|' + dx + ',' + dy,
         registrationMM: [dx, dy],
         attempted: placed.length,
         seatedMM,

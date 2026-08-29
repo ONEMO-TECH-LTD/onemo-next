@@ -20,7 +20,9 @@ interface SolveRequest {
   /** Manual scale/pan: solve directly at sizeMM with cfg (carries forcePhaseMM). */
   manualBand?: boolean
   sizeMM: number
-  stepSel: number | null
+  /** The attempt the viewer picked, by stable id. Null means nothing is picked and nothing is
+   *  drawn — the engine never chooses one for them. */
+  selectedAttemptId: string | null
 }
 
 const ctx = self as unknown as Worker
@@ -80,7 +82,7 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, selectedAttemptId } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
@@ -120,7 +122,8 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         offMM: a.wrap ? a.wrap.centreOffMM : null,
         label: a.label,
         classId: a.classId,
-        transposed: a.transposed,
+        viewId: a.viewId,
+        attemptId: a.attemptId,
         omitted: a.omitted.length,
         attempted: a.attempted,
         landedBandId: a.landedBandId,
@@ -136,12 +139,16 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const recog = frame
         ? { cols: frame.cols, rows: frame.rows, segWmm: frame.widthMM, segHmm: frame.heightMM }
         : undefined
-      const drawable = solve.attempts.map((a, i) => ({ a, i })).filter(({ a }) => a.wrap)
-      if (drawable.length) {
-        // Which row is DRAWN is the viewer's choice, not the engine's: with none picked the first
-        // in generation order is shown. There is no default landing and no ranking — Dan scoped
-        // ordering out of the MVP so the raw behaviour can be seen before anything sorts it.
-        const chosen = drawable[Math.min(stepSel ?? 0, drawable.length - 1)]
+      // SELECTION IS THE VIEWER'S, ALWAYS. Nothing is promoted: with no pick, no attempt is drawn
+      // at all and the shape shows on its own. Defaulting to the first fitted attempt WAS a
+      // ranking — the one thing the raw MVP must not do — and it indexed a filtered array while
+      // the page indexed the full ledger, so a failed row above the pick silently drew a
+      // different answer (QA F5). Selection is by stable id now, never by position.
+      const chosenIndex = selectedAttemptId == null ? -1
+        : solve.attempts.findIndex((a) => a.attemptId === selectedAttemptId)
+      const chosen = chosenIndex >= 0 && solve.attempts[chosenIndex].wrap
+        ? { a: solve.attempts[chosenIndex], i: chosenIndex } : null
+      if (chosen) {
         const at = chosen.a.wrap!
         const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }
         const drawn = wrapGrid(sized, wcfg, at)
@@ -155,14 +162,16 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         } })
         return
       }
-      // NOTHING WRAPPED. Either the library holds no layout for this frame, or every layout it
-      // holds was refused by the material. Both are answers, and the ledger above says which.
+      // NOTHING CHOSEN, or nothing wrapped. The shape draws on its own with the ledger beside it:
+      // either the viewer has picked nothing yet, the library holds no layout for this frame, or
+      // every layout it holds was refused by the material. The ledger says which.
       const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
       const contour = sized(span.minMM)
       const grid = computeGrid(contour, anchorAt ? { ...cfg, centreOverrideMM: anchorAt(span.minMM) } : cfg)
       ctx.postMessage({ id, model: {
         contour, grid, effSize: span.minMM, ladder, idx: 0, segments: grid.segments, recog,
-        diagnostic: { reason: solve.attempts.length ? 'no-layout-fitted' : 'no-layout-for-frame' },
+        diagnostic: { reason: !solve.attempts.length ? 'no-layout-for-frame'
+          : solve.attempts.some((a) => a.wrap) ? 'nothing-selected' : 'no-layout-fitted' },
       } })
     }
   } catch (err) {

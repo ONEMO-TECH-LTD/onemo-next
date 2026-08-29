@@ -5,7 +5,7 @@
 
 import { specOf } from './class-registry'
 import type { LibraryClass } from './class-contract'
-import { frameKeyOf, transformLayout, viewName } from './transforms'
+import { D4_VIEWS, frameKeyOf, sameView, transformLayout, viewName } from './transforms'
 import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
@@ -39,15 +39,8 @@ export interface PanelOptions {
   layouts: PanelOption[]
 }
 
-/** The eight lattice views, as the library's own transform. */
-const ALL_VIEWS: readonly LibraryTransform[] = [
-  { transpose: false, flipX: false, flipY: false }, { transpose: true, flipX: false, flipY: false },
-  { transpose: false, flipX: true, flipY: true }, { transpose: true, flipX: true, flipY: true },
-  { transpose: false, flipX: true, flipY: false }, { transpose: true, flipX: true, flipY: false },
-  { transpose: false, flipX: false, flipY: true }, { transpose: true, flipX: false, flipY: true },
-]
-const sameView = (a: LibraryTransform, b: LibraryTransform) =>
-  a.transpose === b.transpose && a.flipX === b.flipX && a.flipY === b.flipY
+/** The eight lattice views and their comparison come from transforms.ts — the one owner. */
+const ALL_VIEWS = D4_VIEWS
 
 const transformedKey = (frame: LibraryFrame, layout: LibraryLayout, view: LibraryTransform): string => {
   const t = transformLayout(frame, layout, view)

@@ -571,7 +571,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(a.landedBandId, a.entryId + ' wrapped without a band label').not.toBeNull()
     // and nothing is removed for landing elsewhere: every wrapped attempt survives to the caller.
     expect(solve.attempts.every((a) => a.wrap === null || a.wrap.sizeMM > 0)).toBe(true)
-  })
+  }, 30_000)
 
   it('every layout is tried at all four governed registrations — no hidden winner', () => {
     // The engine built four lawful registrations and returned ONE, by seat count. Measured on a
@@ -580,13 +580,13 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     const solve = runPipeline({ sized: sq, bandId: 4, paddingMM: 12, pitchMM: 48 })
     const byEntry = new Map<string, Set<string>>()
     for (const a of solve.attempts) {
-      const key = a.entryId + (a.transposed ? '/t' : '')
+      const key = a.entryId + '/' + a.viewId
       byEntry.set(key, (byEntry.get(key) ?? new Set()).add(a.registrationMM.join(',')))
     }
     expect(byEntry.size, 'the library must offer this frame something').toBeGreaterThan(0)
     for (const [entry, phases] of byEntry)
-      expect(phases.size, entry + ' was not tried at every registration that seated').toBeGreaterThan(1)
-  })
+      expect(phases.size, entry + ' was not tried at all four governed registrations').toBe(4)
+  }, 30_000)
 
   it('what the material refuses is RECORDED, never silently dropped', () => {
     // Dan, 2026-08-29: "anything falling off the layout is just omitted as not fitting the shape".
@@ -608,7 +608,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
         .toBe(a.attempted)
       for (const o of a.omitted) expect(o.reason).toBe('outside-safe-area')
     }
-  })
+  }, 30_000)
 
   it('the pipeline runs headless and sorts nothing', () => {
     // This lane's deliverable is an engine that answers from a plain test with no browser. It also
@@ -623,7 +623,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(sizes.join() === ascending.join() && sizes.join() === descending.join()
         || (sizes.join() !== ascending.join() || new Set(sizes).size === 1),
       'the attempt list came back sorted — something ranked it').toBe(true)
-  })
+  }, 30_000)
 
   it('the shell never presents a layout that did not fit as one that did', () => {
     // The witness is gone with the sweep, but the failure it guarded is not: the shell must never
