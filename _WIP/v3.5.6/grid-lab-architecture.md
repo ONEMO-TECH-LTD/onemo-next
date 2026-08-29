@@ -1,11 +1,15 @@
-# MAGNETIC GRID ENGINE — ARCHITECTURE AND REFACTOR PLAN
+# MAGNETIC GRID ENGINE — ARCHITECTURE RECORD
+
+> **Not an execution plan.** This records the structure the S1/S2 extraction reached and why. Its staged
+> plan is superseded: the execution contract and task list is `v3.5.6-delivery-plan.md`, and where this
+> record describes future work differently, the delivery plan controls.
 
 **Scope.** The v3.5.6 cluster: `src/lib/effect/grid-magnet*`, `src/lib/effect/library/`, and the
 `grid-centre` bench. **Out of scope, retained:** the Session 59 engine (`src/lib/effect/grid.ts`,
 `grid-core.ts`, the `grid-lab` route) — a separate public door. Naming both "Grid Lab" is how the
 a later integrator picks up the wrong one.
 
-Target structure and the staged plan to reach it. Not yet true of the code.
+Structural record of the extracted engine. Some target statements below are historical.
 
 **The product pipeline it serves** — what each step delivers and what the classifier owes — is
 `v3.5.6-pipeline-brief.md`. This document is the code structure only.
