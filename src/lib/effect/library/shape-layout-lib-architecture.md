@@ -30,7 +30,7 @@ nodesMM by one owner (rules.ts) so no consumer re-derives them, and bandId is ne
 frame the board cannot hold at that lattice is not published at all.
 
 Five standing gates (activated when the catalogue lands):
-1. EXACT TYPE — compile-time equality of CatalogueEntry against the V1 shape via an Equal<>
+1. EXACT TYPE — compile-time equality of CatalogueEntry against the V3 shape via an Equal<>
    type assertion in the gate file (catches added/removed/optionalised/widened fields), plus a
    readonly-keys assertion.
 2. EXACT KEYS — every produced record at 24/48/96 has exactly the fifteen keys.

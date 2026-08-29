@@ -57,7 +57,7 @@ export const MIN_ANCHORS = 2
  *  boundary — the region a magnet CENTRE may occupy. Banding on it means a band says how many
  *  magnet positions the shape can carry across its dominant axis: B1 holds one, B2 two, B3 three.
  *  Band and class then agree by construction rather than by coincidence — measured across the whole
- *  library, a record's legal band equals its frame's larger axis in all 163 cases.
+ *  library, a record's legal band equals its frame's larger axis for every published catalogue record.
  *
  *  Banding on the OUTER box was the bug: a pointed or diagonal outline is far bigger than the area
  *  inside it that can hold anything. Sixteen triangle records sat one band too high for exactly
