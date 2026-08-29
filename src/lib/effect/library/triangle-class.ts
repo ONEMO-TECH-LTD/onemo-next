@@ -56,6 +56,7 @@ const triangleDraftErrors = (draft: DraftShape, frame: LibraryFrame): string[] =
 
 export const triangleClass: LibraryClass = {
   classId: 'triangle',
+  catalogueRole: 'preset',
   types,
   variants: (typeId, pitchMM) => {
     assertTypeId('triangle', types, typeId)

@@ -1,10 +1,11 @@
-import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
+import type { CatalogueRole, ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { bandOfFrame } from './rules'
 import { frameKeyOf } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
 
 interface RegistryClassConfig {
   classId: LibraryFamily
+  catalogueRole: CatalogueRole
   types: readonly ClassType[]
   frames(pitchMM: number): readonly LibraryFrame[]
   typeOfFrame(frame: LibraryFrame): string
@@ -52,6 +53,7 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
   }
   const spec: ClassSpec = {
     classId: config.classId,
+    catalogueRole: config.catalogueRole,
     types: config.types,
     variants: (typeId, pitchMM) => {
       assertTypeId(config.classId, config.types, typeId)

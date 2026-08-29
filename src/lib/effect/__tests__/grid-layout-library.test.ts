@@ -26,6 +26,7 @@ import { bandOfFrame } from '../library/rules'
 import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
+import { canonCatalogue } from '../library/catalogue'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
@@ -76,6 +77,50 @@ describe('corpus completeness — removal must fail these', () => {
   })
   it('every square frame is square', () => {
     for (const pitch of [24, 48, 96]) for (const f of framesAt('square', pitch)) expect(f.cols).toBe(f.rows)
+  })
+})
+
+describe('canon and presets — what the engine may offer by itself', () => {
+  it('square and rectangle are canon; diamond and triangle are presets', () => {
+    // Dan, 2026-08-29: "the canon is square and rectangle the rest are layouts for us to have for
+    // potential presets." Flip any of these four and the roster the engine matches from changes,
+    // which is what put twelve triangle presets into a squircle's automatic answer.
+    for (const pitchMM of [24, 48, 96]) {
+      const roleOf = new Map<string, string>()
+      for (const entry of catalogue(pitchMM)) roleOf.set(entry.classId, entry.catalogueRole)
+      expect(roleOf.get('square'), 'square @' + pitchMM).toBe('canon')
+      expect(roleOf.get('rectangle'), 'rectangle @' + pitchMM).toBe('canon')
+      expect(roleOf.get('diamond'), 'diamond @' + pitchMM).toBe('preset')
+      expect(roleOf.get('triangle'), 'triangle @' + pitchMM).toBe('preset')
+    }
+  })
+
+  it('the canon roster excludes every preset, and the full inventory still holds them', () => {
+    for (const pitchMM of [24, 48, 96]) {
+      const canon = canonCatalogue(pitchMM)
+      expect(canon.length, 'canon is not empty @' + pitchMM).toBeGreaterThan(0)
+      expect(canon.every((e) => e.catalogueRole === 'canon'), 'a preset leaked into the canon roster').toBe(true)
+      expect(canon.some((e) => e.classId === 'diamond' || e.classId === 'triangle'),
+        'diamond or triangle reached the automatic roster').toBe(false)
+      // and nothing is LOST — presets remain in the inventory, for when they are chosen
+      const all = catalogue(pitchMM)
+      expect(all.some((e) => e.classId === 'triangle'), 'triangle vanished from the inventory').toBe(true)
+      expect(all.some((e) => e.classId === 'diamond'), 'diamond vanished from the inventory').toBe(true)
+      expect(all.length, 'the inventory is larger than the canon roster').toBeGreaterThan(canon.length)
+    }
+  })
+
+  it('ONE canon population per frame — the answer to a classified frame is not a pile', () => {
+    // A frame has exactly one canon layout. Thirteen was the symptom of the missing role.
+    for (const pitchMM of [24, 48, 96]) {
+      const byFrame = new Map<string, string[]>()
+      for (const entry of canonCatalogue(pitchMM)) {
+        const key = entry.frameCols + 'x' + entry.frameRows
+        byFrame.set(key, [...(byFrame.get(key) ?? []), entry.id])
+      }
+      for (const [frame, ids] of byFrame)
+        expect(ids.length, frame + ' @' + pitchMM + ' has ' + ids.length + ' canon layouts: ' + ids.join(', ')).toBe(1)
+    }
   })
 })
 

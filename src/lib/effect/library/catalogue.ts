@@ -1,17 +1,26 @@
 import { LIBRARY_FAMILIES, specOf } from './class-registry'
 import { selectVariant } from './selection'
 import { materializeSelection } from './materialize'
-import type { CornerMode } from './class-contract'
+import type { CatalogueRole, CornerMode } from './class-contract'
 import type { LibraryFamily, PointMM } from './types'
 import { bandIdOfMM, legalBoxMM } from './rules'
 export { bandIdOfMM } from './rules'
 
-/** v3: one canon population per frame, pitch-aware frames, and a band that is never null.
- *  No new fields — the semantics and the identity set changed, which is what the version says. */
-export const CATALOGUE_FORMAT_VERSION = 3
+/** v4: every record states whether the engine may match it AUTOMATICALLY (canon) or only when it
+ *  is explicitly asked for (preset). Square and rectangle are canon — the frame is the class, so a
+ *  classified shape maps onto exactly one of them. Diamond and triangle are presets: node subsets
+ *  on the same rectangular frames, kept for when someone chooses them (Dan, 2026-08-29: "the canon
+ *  is square and rectangle the rest are layouts for us to have for potential presets").
+ *
+ *  It is a FIELD because a name cannot carry eligibility: with only classId to go on, a matcher
+ *  keyed on the frame returned one square and twelve triangle presets for a 4x4, and the engine
+ *  wrapped all thirteen. Automatic eligibility is matcher data, not a UI label. */
+export const CATALOGUE_FORMAT_VERSION = 4
 
 export type CatalogueEntry = Readonly<{
   classId: LibraryFamily
+  /** Whether the engine may offer this record without being asked. */
+  catalogueRole: CatalogueRole
   typeId: string
   id: string
   label: string
@@ -47,7 +56,7 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
         if (bandId === null)
           throw new Error('library: ' + materialized.frameKey + ' at ' + pitchMM + 'mm has no released band')
         entries.push(Object.freeze({
-          classId, typeId: type.id,
+          classId, catalogueRole: spec.catalogueRole, typeId: type.id,
           id: [classId, type.id, variant.id, layout.name, selection.view.transpose ? 't' : 'n', selection.view.flipX ? 'x' : 'n', selection.view.flipY ? 'y' : 'n'].map(encodeURIComponent).join('/'),
           label: variant.label + ' · ' + layout.name,
           pitchMM, corners: variant.outline.corners,
@@ -61,4 +70,15 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
     }
   }
   return Object.freeze(entries)
+}
+
+/** The layouts the engine may offer BY ITSELF for this frame: canon only. This is the automatic
+ *  roster, and it is the one the pipeline's layout step reads.
+ *
+ *  Kept separate from `catalogue()` rather than replacing it: the full inventory is still what the
+ *  admin browses, what a preset is chosen from, and what next-best may reach for. The two questions
+ *  are "what exists" and "what may be matched without being asked", and only the second one belongs
+ *  in an automatic answer. */
+export function canonCatalogue(pitchMM: number): readonly CatalogueEntry[] {
+  return catalogue(pitchMM).filter((entry) => entry.catalogueRole === 'canon')
 }

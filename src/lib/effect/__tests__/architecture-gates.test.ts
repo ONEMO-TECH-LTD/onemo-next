@@ -800,9 +800,10 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     for (const path of governed)
       expect(source(path), path).not.toMatch(/\bpadMM\b/)
   })
-  it('STEP 4: catalogue V3 has exact readonly data-only records and frozen identity', () => {
+  it('STEP 4: catalogue V4 has exact readonly data-only records and frozen identity', () => {
     type Exact = Readonly<{
-      classId: string; typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
+      classId: string; catalogueRole: 'canon' | 'preset'
+      typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
       nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
       bandId: number; legalWidthMM: number; legalHeightMM: number
@@ -810,8 +811,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
-    expect(CATALOGUE_FORMAT_VERSION).toBe(3)
-    const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
+    expect(CATALOGUE_FORMAT_VERSION).toBe(4)
+    const keys = ['classId', 'catalogueRole', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
       assertDataOnly(entry)
@@ -826,9 +827,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       const ids = catalogue(pitchMM).map((entry) => entry.id)
       expect(new Set(ids).size, 'unique ids @' + pitchMM).toBe(ids.length)
     }
-    type CatalogueIdentity = { id: string; classId: string; typeId: string; corners: 'sharp' | 'bevel' | 'round'; frameCols: number; frameRows: number; nodesMM: readonly (readonly [number, number])[] }
-    const identityAt = (pitchMM: number): CatalogueIdentity[] => catalogue(pitchMM).map((entry) => ({ id: entry.id, classId: entry.classId, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) }))
-    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v3.json'))) as Record<string, CatalogueIdentity[]>
+    type CatalogueIdentity = { id: string; classId: string; catalogueRole: string; typeId: string; corners: 'sharp' | 'bevel' | 'round'; frameCols: number; frameRows: number; nodesMM: readonly (readonly [number, number])[] }
+    const identityAt = (pitchMM: number): CatalogueIdentity[] => catalogue(pitchMM).map((entry) => ({ id: entry.id, classId: entry.classId, catalogueRole: entry.catalogueRole, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) }))
+    const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v4.json'))) as Record<string, CatalogueIdentity[]>
     const byId = (a: CatalogueIdentity, b: CatalogueIdentity) => a.id.localeCompare(b.id)
     for (const pitchMM of [24, 48, 96])
       expect([...manifest[String(pitchMM)]].sort(byId), 'manifest @' + pitchMM).toEqual([...identityAt(pitchMM)].sort(byId))

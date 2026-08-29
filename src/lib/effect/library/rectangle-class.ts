@@ -16,6 +16,7 @@ function rectangleFrames(pitchMM: number): readonly LibraryFrame[] {
 
 export const rectangleClass = registryClass({
   classId: 'rectangle',
+  catalogueRole: 'canon',
   types: [{ id: 'frame', label: 'frame' }, { id: 'banner', label: 'banner' }, { id: 'slim', label: 'slim' }],
   frames: (pitchMM) => rectangleFrames(pitchMM),
   typeOfFrame: (frame) => typeOf(frame.cols, frame.rows),
