@@ -260,7 +260,15 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number } }
+  /** One row of the pipeline's ledger: a layout the library offered, tried at one registration.
+   *  A row with no size never fitted — it stays visible, because a layout the material refused is
+   *  an answer too and hiding it would be the filter the MVP exists to do without. */
+  type LedgerRow = {
+    sizeMM: number | null; count: number; offMM: number | null
+    label: string; classId: string; transposed: boolean
+    omitted: number; attempted: number; landedBandId: number | null
+  }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: LedgerRow[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { cols: number; rows: number; segWmm: number; segHmm: number }; diagnostic?: { reason: string } }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -460,15 +468,24 @@ export default function GridLab() {
                   : bandScale !== null
                     ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
-                    ? model.ladder.length
-                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.length} holding layouts in band`
-                      : 'no lawful offer in this band — calibration witness only, not a fit'
+                    ? model.ladder.some((r) => r.sizeMM != null)
+                      ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.filter((r) => r.sizeMM != null).length} of ${model.ladder.length} tried layouts fitted`
+                      : model.ladder.length
+                        ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library offered ${model.ladder.length} layouts and the material refused every one`
+                        : `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library holds no layout for this grid`
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
-                {model.ladder.map((pt, i) =>
-                  <button key={i} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
-                    <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
+                {/* THE LEDGER — every layout the pipeline tried, in the order it tried them.
+                    Unsorted and unranked by design: Dan scoped ordering after the raw MVP, so what
+                    you see is what the pipeline found, not what something decided you should see. */}
+                {model.ladder.map((row, i) =>
+                  <button key={i} aria-pressed={bandScale === null && i === model.idx}
+                    disabled={row.sizeMM == null}
+                    title={`${row.label}${row.transposed ? ' · turned' : ''} · ${row.count} of ${row.attempted} seated${row.omitted ? ` · ${row.omitted} refused by the material` : ''}`}
+                    onClick={() => { if (row.sizeMM != null) { setStepSel(i); setBandScale(null) } }}>
+                    <b>{row.sizeMM == null ? 'no fit' : `${row.sizeMM} mm`}</b>
+                    <span>{row.count}⌾{row.omitted ? ` −${row.omitted}` : ''}{row.landedBandId != null && row.landedBandId !== mode ? ` · B${row.landedBandId}` : ''}</span>
                   </button>)}
               </div>}
               {(() => {

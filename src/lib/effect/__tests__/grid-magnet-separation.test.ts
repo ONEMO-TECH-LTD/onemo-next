@@ -625,9 +625,16 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       'the attempt list came back sorted — something ranked it').toBe(true)
   })
 
-  it('the shell never labels the witness a fit', () => {
+  it('the shell never presents a layout that did not fit as one that did', () => {
+    // The witness is gone with the sweep, but the failure it guarded is not: the shell must never
+    // let a row that never fitted read as a fit. A row with no size is labelled "no fit" AND is
+    // unselectable, so the canvas cannot draw one — the two are enforced together.
     const page = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx'), 'utf8')
     expect(page).not.toMatch(/nothing fully fits in this band/)
-    expect(page).toMatch(/no lawful offer in this band/)
+    expect(page).toMatch(/no fit/)
+    expect(page, 'an unfitted row must be unselectable').toMatch(/disabled=\{row\.sizeMM == null\}/)
+    expect(page, 'and unclickable even so').toMatch(/if \(row\.sizeMM != null\)/)
+    // Omission is lawful; SILENT omission is not — what the material refused reaches the screen.
+    expect(page, 'the shell must show what the material refused').toMatch(/row\.omitted/)
   })
 })
