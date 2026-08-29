@@ -22,8 +22,9 @@ completion**:
 - **AUTHORISED BUILD — S1–S4 only.** Delete provably dead code, move proven bodies to their owners,
   expose one headless pipeline and the shell seam, complete the classifier. This makes the selected
   internals callable. **It does not complete the engine**, and completing S1–S4 may not be reported as engine completion.
-- **DEFERRED — S5–S9, not authorised and not planned in this build.** The cutover deletion, then the
-  judge, layout populations, centring table, Spec/admin authority and the acceptance run. These titles
+- **DEFERRED — S5–S10, not authorised and not planned in this build.** The cutover deletion, then
+  the judge, layout populations, centring table, Spec/admin authority, the acceptance run, and
+  **last of all the API bundle** — which waits until the engine is correct, not merely callable. These titles
   exist only to show what S1–S4 must not make harder. No S5–S9 code, decomposition, acceptance claim
   or cutover is part of this build.
 
@@ -361,6 +362,15 @@ policy.
 **S8 · Spec/admin authority — DEFERRED.** Owns the Spec → control → consumer trace.
 
 **S9 · Product acceptance — DEFERRED.** Owns the acceptance contract and Dan's live evidence.
+
+**S10 · The API bundle — DEFERRED, and LAST.** One clean callable surface an app can consume.
+**It comes after the engine is finished, never alongside it** (Dan, 2026-08-29: *"API is the last
+phase. We need to finish the engine first"*). Wrapping an engine that does not yet answer correctly
+would freeze the wrong answers into a contract, and every caller would then hold us to them.
+
+Its shape is the engine's own, defined on its own terms — there is no external caller in this
+lane's scope to design against. What it owes: a single entry point taking a shape and settings and
+returning the lawful layouts with their evidence, serialisable, no browser, no DOM, no React.
 ---
 
 ## 5 · Open gate for this build
